@@ -130,10 +130,22 @@ Perhaps this system could also be used to label operations as being allowed to o
 Modules
 -------
 
-Let's use the word *module* to refer to a small computation graph i.e. a set of inputs, a series of operators, and a set of outputs. A large number of tools will operate on these modules. For example, a gradient operator can take a module as input and output an adjoint module that calculates the gradient, or it can output a single module which performs both the forward and backward prop.
+Let's use the word *module* to refer to a small computation graph i.e. a set of inputs, a series of operators, and a set of outputs. A large number of tools will operate on these modules. For example, a gradient operator can take a module as input and output an adjoint module that calculates the gradient, or it can output a single module which performs both the forward and backward prop. The optimizer will take a module and output an optimized module that performs the equivalent computation, etc.
+
+Compiled and interpreted mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In compiled mode, we could imagine the entire computation graph being represented using a single module. We can optimize this module, then calculate the gradient, and then once more optimize the module, resulting in a single module which calculates both forward and backward prop as efficiently as possible.
 
 During interpreter mode, we can imagine each operation (or a small set of operations) to produce a single module. This module is differentiated, producing an adjoint module which calculates the gradient. This adjoint module is added to the tape, in the same way that AD is implemented using operatore overloading. During the forward prop we are sure to save all the inputs to the adjoint module in memory, so that we can simply walk through the tape in reverse in order to calculate the gradients.
 
 With this approach one can support both compiled and interpreted mode while using the same set of tools.
+
+Device interface
+----------------
+
+The final result of the pipeline is a module that has been optimized and differentiated, but is still device independent. The precise process by which we transform a module into executable code is not clearly defined yet.
+
+In a general compilation pipeline the intermediate representation is often lowered into a device-specific representation before being converted into executable code. In deep learning it is common for computation graphs to be executed on a mix of devices e.g. partially on the GPU and partially on the CPU. Hence, a device-specific representation is problematic. Theano's approach is to keep the same representation, assume the operators are executed on CPU by default, and replace operators with GPU equivalents where possible, inserting memory transfers where needed. Frameworks such as Torch allow the user more fine-grained control, allowing them to specify for each operator whether it should be run on the GPU or CPU. A good solution for Myia would perhaps be to use the hints system to express preferences for devices, which allows the user control while not sacrificing the independece of the IR.
+
+Other considerations are e.g. memory allocators, device transfers, maintaing a state (e.g. for streams, cuBLAS handles, etc.).These should be abstracted in a way similar to e.g. Torch and Collenchyma.
