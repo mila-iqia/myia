@@ -96,7 +96,7 @@ Intermediate representation
 
 The intermediate representation should have the same requirements as any other medium-level intermediate representation i.e. *accurate* in the sense that it must fully describe the mathematical operations, and *independent* of the source language that generated it (Python, Lua, etc.) as well as the target language (CUDA, OpenCL, CPU, FPGA, etc.).
 
-The computation graphs in Theano and TensorFlow have several of these properties already. In the compiler literature, this can be seen as an IR using Click's `sea of nodes<`_ representation (as used in the `FIRM compiler`_). With that perspective, it should be easy to see how we can introduce control flow in the IR (i.e. with region and phi nodes).
+The computation graphs in Theano and TensorFlow have several of these properties already. In the compiler literature, this can be seen as an IR using Click's `sea of nodes`_ representation (as used in the `FIRM compiler`_). With that perspective, it should be easy to see how we can introduce control flow in the IR (i.e. with region and phi nodes).
 
 Given that the IR can be used to construct and execute graphs at runtime, it should be represented and processed in an efficient way (e.g. using C, a custom binary format, or an in-memory serialization format such as Flatbuffers_). Tools should be provided for serialization and to convert graphs to a human-readable text based representation.
 
