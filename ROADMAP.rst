@@ -1,219 +1,139 @@
-Roadmap
-=======
+====
+Myia
+====
 
-A short outline of what I belive are some fundamental design choices for
-the next Theano. These are based on discussions I had at
-FAIR (Jeff Johnson, Soumith Chintala) when they were
-working on a TensorFlow equivalent and PyTorch, with Alex Wiltschko at Twitter
-(including some discussions with Zachary DeVito from Stanford), with the
-Theano developers, Olexa Bilaniuk, James Bergstra, and several others.
+Myia (pronouned *my-ah*) is the daughter of Theano, and the project name for a set of ideas that we are exploring for a potential successor of Theano.
 
-A view important guiding principles and features:
+Deep learning frameworks
+========================
 
--  **Modularity**; Alex Wiltschko originally championed this, and I
-   think it is extremely important. Instead of the monolithic systems we
-   have seen so far we need a series of separate projects with clearly
-   defined interfaces. This involves developing a language-independent
-   graph representation.
--  **Runtime *and* compile time**; so far systems can be defined as
-   either compile-time (Theano, TensorFlow, MXNet) or runtime (Chainer,
-   Torch, torch-autograd). The former can more easily apply
-   optimizations, the latter are easier to debug and more easily allows
-   for complicated control flow. Why not do both (like Lisp)?
--  **Checkpointing**; a well-known technique that has never made it into
-   machine learning (except for some non-general bits and pieces). But
-   it could be extremely powerful. Imagine never running out of memory
-   again! This is a feature more than a design principle, but it could
-   be a major selling point.
+Deep learning frameworks encompass a wide variety of features and objectives.
 
-The different components:
+* Multi-dimensional array primitives
+* High-level mathematical functions
+* Efficient GPU and CPU kernels
+* Symbolic and/or automatic differentiation
+* Computation graph optimization for performance and numerical stability
+* Device (backend) agnostic interface
+* Neural-network training tools
+* Multi-GPU and multi-node computation
 
-1. API
-------
+We have witnessed an explosion in the number of deep learning frameworks: Caffe, Chainer, CNTK, Theano, Torch, MXNet, and TensorFlow are perhaps the most common ones in the deep learning community, but there are many more out there: Deeplearning4j, Leaf, Brainstorm, DSSTNE, Neon, Veles, Paddle, etc.
 
-The API is language-specific. It transforms the users input into some
-intermediate representation.
+These frameworks differ in their emphasis on production or research, the backends they support, the languages they employ, the balance they strike between user-friendliness and flexibility, etc. In the progress, they duplicate large amounts of work. Many frameworks re-implement array data types, kernels, memory allocators, adjoint operators, etc.
 
-.. code:: python
+Vision
+======
 
-    from numpy.random import rand
-    from myia import grad, sum, tanh
-    
-    def f(x):
-        return sum(tanh(x))
-    
-    df = grad(f)
-    grad, loss = df(rand(3, 3))
+The features of a deep learning framework effectively comprise a compiler pipeline. From this perspective, the arrays are data types; the API is a language; the computation graph is the intermediate representation; the performance and stability optimizations are the compiler backend; the conversion to CUDA kernels is the code generator; etc.
 
-2. Intermediate representation
-------------------------------
+Theano has traditionally taken this view, and refers to itself as a framework that combines aspects from a computer algebra system (CAS) and an optimizing compiler. TensorFlow holds a similar view, whereas frameworks such as Torch tend to eschew these abstractions in favor of a more minimalist approach.
 
-A language-agnostic representation of computation graphs.
+Toolchain
+---------
 
-::
+In keeping with the compiler analogy, our vision for Myia is a *domain-specific compiler toolchain*, similar in spirit to LLVM (which defines itself as a "collection of modular and reusable compiler and toolchain technologies"). It would take the form of a set of tools, specifications, and clearly defined APIs targeted at array programming on a variety of backends (CPU and GPU).
 
-    1 new x1(ndim=2,dtype=float64)  # Define a new tensor variable with 2 dimensions and a data type
-    2 tanh x2 x1  # Apply the hyperbolic tangent operator to x1 and store the result in x2
-    3 sum x3 x2  # Sum the elements of x2 and store them in x3
-    4 return x3  # Return the value of x3
+Applying this Unix philosophy of modular software development to deep learning frameworks has many benefits. Having an intermediate representation for array programming will allow for retargetability, where a variety of different frontends and backends can benefit from the same set of e.g. gradient operators and numerical optimizations, and each framework will be able to benefit from new features implemented as part of the toolchain.
 
-A fair amount of thought and consideration should be put into which
-information this graph should contain, and what it should not contain.
-This decides what the API, IR, and compiler/interpreter are responsible
-for. For example:
-
-1. Should the IR be in `static single assignment
-   form <https://en.wikipedia.org/wiki/Static_single_assignment_form>`__?
-2. What kind of type system should this IR have? I believe `intersection
-   typing <https://en.wikipedia.org/wiki/Type_system#Intersection_types>`__
-   is a natural choice e.g. ``ndim=2`` for a general matrix, but
-   ``ndim=2,shape=(3,3),symmetric=true`` for a symmetric 3x3 matrix.
-   Note that we would be using
-   `*generic* <https://en.wikipedia.org/wiki/Generic_programming>`__
-   intersection types.
-3. Should we introduce "hints" e.g. unstructured annotations that can
-   help the interpreter/compiler with knowing how to execute certain
-   commands? Useful hints could be "do this operation in-place" or
-   "choose this particular convolution implementation". These hints can
-   be freely ignored.
-4. What operators should we support? For example, should ``lstm`` be an
-   operator (since an LSTM kernel exists in cuDNN)?
-5. Should the IR define the data type of each variable (below), or just
-   input variables (above), or should we do type inference entirely at
-   runtime (i.e. data types should be hints)?
-
-   ::
-
-       1 new x1(ndim=2,dtype=float64)
-       2 tanh x2(ndim=2,dtype=float64) x1
-       3 sum x3(ndim=0,dtype=float64) x2
-       4 return x3
-
-6. Should the return types of operators be part of the IR? For example,
-   is the fact that ``type(tanh(x)) == type(x)`` (assuming ``x`` is
-   floating point) part of the IR specification or a property of the
-   operator itself that the compiler/interpreter applies.
-7. What control flow statements should be part of the IR and how should
-   they be represented? We can look at TensorFlow here, and `Click's
-   'sea of nodes'
-   representation <http://grothoff.org/christian/teaching/2007/3353/papers/click95simple.pdf>`__.
-8. How do we deal with platform specific operations? Should the IR be
-   entirely platform agnostic? This  forces the interpreter and compiler
-   to decide when to transfer to the GPU or not, which is a bad idea
-   (and the cause of a lot of slowdowns with Theano). Instead, the user
-   should be able to control this (as in Torch). Should they then take
-   the form of operators, or types, or both?
-
-   ::
-
-       # Using operators
-       1 new x1(ndim=2,dtype=float64)
-       2 togpu x2(ndim=2,dtype=float64) x1
-       3 sum x3(ndim=0,dtype=float64) x2  # Compiler needs to figure out what's on the GPU and not
-       # Using types
-       1 new x1(ndim=2,dtype=float64)
-       2 cast x2(ndim=2,dtype=float64,device=gpu1)
-       3 sum x3(ndim=2,dtype=float64,device=gpu1) x2  # Compiler just looks at the type
-
-Important guidelines when making these decisions should be: The
-computation graph needs to contain all the information required to
-perform the correct computation, but it should make minimal assumptions
-otherwise to allow the compiler to optimize. I'm inclined to say that
-the IR should be mathematical more than programmatical (except for the
-hints); it shouldn't care about *how* the computation is executed or how
-memory is managed, only about describing the execution in mathematical
-terms. It shouldn't make any assumptions about the platform it is
-running on (could be FPGA, CPU, GPU, a cluster).
-
-3a. Runtime engine (automatic differentation)
----------------------------------------------
-
-I would argue the system should have a runtime engine based on automatic
-differentiation implemented with operator overloading (cf.
-torch-autograd, PyTorch, Chainer). This allows for control flows within
-the host language and easy debugging within the host language as well.
-
-.. code:: python
-
-    from myia import run
-    from numpy.random import rand
-    
-    def f(x):
-        if sum(x) > 0.1:
-            return x
-        else:
-            return x + 1
-        
-    run(f)(rand(3, 3))
-
-The ``run`` API would work by producing a single line of the IR (section
-2) at a time and sending it to the AD/runtime execution engine. So when
-``run(f)`` gets called, the line
-``1 new x1(ndim=2,dtype=float64,shape=(3,3)`` is sent to the engine and
-executed1. The ``sum(x)`` results in the instruction ``2 sum x2 x1``
-which returns a 0-dimensional scalar with a value. The comparison
-operator of this object is overloaded of course so that ``sum(x) > 0.1``
-can evaluate normally.
-
-In short, the runtime/AD engine simply receives one instruction at a
-time and executes them immediately (possibly asynchronosly). Most
-importantly, if the engine is informed that a variable is
-differentiable, the engine is also in charge of keeping track of the
-operators applied and their inputs, so that it can perform reverse
-gradient computation.
-
-1. Perhaps returning a pointer to which the actual NumPy data can be
-   copied, or perhaps there should be a ``new from`` operator that
-   accepts a memory pointer.
-
-3b. Compiler
-------------
-
-3b.1 Gradient
-~~~~~~~~~~~~~
-
-Given an IR and a series of variables to differentiate, this module
-spits out a new IR that includes the gradient computation of the
-differentiable variables. Note that this is closely related to the IR
-specification itself, since the gradient of each operator and its
-properties should probably be part of the IR specification.
-
-3b.2 Optimizers
-~~~~~~~~~~~~~~~
-
-An optimizer simply takes an IR and spits out a new, optimized IR that
-performs the same computation. It can perform all the typical
-optimizations. It can optionally consider the hints as well. Since the
-IR is a sea-of-nodes style graph representation (with control flow being
-represented with nodes), optimizations such as dead-code elimination are
-trivial.
-
-3b.3 Compiler
-~~~~~~~~~~~~~
-
-Given an entire optimized computation graph, this module is expected to
-somehow execute it. There can be many different compilers: MPI-enabled
-multi-node schedulers, FPGA-enabled compilers, etc. The only interface
-restriction is that they must accept the IR and a set of inputs, and are
-expected to produce the correct outputs.
-
-The compiler's prerogative is to match the operations described in the
-IR to the correct kernels at its disposal. It relies on the type system
-here (using kernels for the correct data type, but also the correct
-shape e.g. to select convolution kernels, to use the fact that matrices
-are symmetric, or even to choose kernels based on auto-tuning, etc.).
-
-The compiler is in charge of memory management as well (potentially
-using e.g. CNMeM, CUB, or Torch's memory allocator).
-
-4. Kernels
+Components
 ----------
 
-The actual implementation of the operators should be a set of kernels
-that can easily be re-used by the different compilers and interpreters.
-For a large part, these kernels are already present in cuBLAS and cuDNN,
-or they can be re-used from e.g. Torch (TH, THNN, THC, THCUNN). These
-kernels should be BLAS-style, making zero assumptions about memory
-management, execution environment, etc. They should simply take pointers
-to the input and output, possibly some flags, and perform the required
-computation.
+Components of Myia could include:
+
+* Intermediate representation
+
+  * Language-independent representation of computation graphs (with support for control flow e.g. branching and loops)
+  * Array type system
+  * Specification of mathematical operators and interface to add more
+  * Hint system for device-specific instructions
+* Automatic differentiation
+
+  * Specification of adjoint operators
+  * A gradient operator for computation graphs
+* Optimization
+
+  * Compiler optimizations such as common subexpression elimination, graph simplification (i.e. symbolic simplification), constant propagation, etc.
+  * Numerical optimizations for speed/stability
+* Backend
+
+  * Backend-specific primitives
+  * Abstractions for memory management
+  * Implementation of array types
+  * Dynamic kernel compilation
+* Front-end
+
+  * Python API
+  
+Many different components have been implemented as part of different frameworks e.g. most frameworks have array data types, a variety of kernels, Theano and TensorFlow have in-memory computation graph representations, cuDNN and cuBLAS provide primitives, etc. Ideally these components can be separated out, refactored and re-used as part of the Myia toolchain.
+
+Features
+--------
+
+Myia's conception also stems from the desire to implement new features which are currently offered by few of the mainstream frameworks. The hope is that a new architecture will enable these features to be implemented more easily. Two examples are *checkpointing* and a *hybrid interpreter/compiled execution of code*.
+
+Checkpointing
+~~~~~~~~~~~~~
+
+Checkpointing is an old technique in automatic differentiation. It involves the dropping of intermediate values during the forward propagation which are recalculated during the backward propagation, trading in performance for memory. It would allow experimenting with models which would otherwise not fit on a single GPU. Having a frontend/backend agnostic implementation would allow a variety of frameworks to benefit from this advanced functionality.
+
+Hybrid interpreter/compiled execution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Frameworks like Theano and TensorFlow construct a computation graph which is compiled to a single callable function. This approach allows for the optimization of the graph and is more efficient (no operator overloading, no interfacing with the host language). On the other hand it forces the computation graph to include control flow primitives (such as Theano's `scan` function), makes debugging more complicated (since it can no longer be done in the host language), and slows down the development cycle because of the need to compile code.
+
+Frameworks like torch-autograd and Chainer operate entirely in the host language (Lua and Python respectively) and use operator overloading with a tape to implement automatic differentiation. The advantage of this approach is that the control flow can be entirely determined in the host language, and debugging is very easy (e.g. one can simply use `pdb` and inspect the values returned by each operator), but it comes at the cost of performance and memory when naively implemented.
+
+Just as LLVM's IR can be compiled statically or run using just-in-time (JIT) compilation, Myia's IR too should be able to be compiled statically (similarly to Theano) or just-in-time (similar to Chainer), or both (similar to the way Lisp programs can be partially compiled and interpreted). This would allow a user to switch seamlessly between quick development and optimized production code.
+
+Implementation
+==============
+
+The implementation details of the entire toolchain are very much up in the air, but initial discussions lead to some ideas.
+
+Intermediate representation
+---------------------------
+
+The intermediate representation should have the same requirements as any other medium-level intermediate representation i.e. *accurate* in the sense that it must fully describe the mathematical operations, and *independent* of the source language that generated it (Python, Lua, etc.) as well as the target language (CUDA, OpenCL, CPU, FPGA, etc.).
+
+The computation graphs in Theano and TensorFlow have several of these properties already. In the compiler literature, this can be seen as an IR using Click's *`sea of nodes`_* representation (as used in the `FIRM compiler`_). With that perspective, it should be easy to see how we can introduce control flow in the IR (i.e. with region and phi nodes).
+
+Given that the IR can be used to construct and execute graphs at runtime, it should be represented and processed in an efficient way (e.g. using C, a custom binary format, or an in-memory serialization format such as Flatbuffers_). Tools should be provided for serialization and to convert graphs to a human-readable text based representation.
+
+DMLC's `NNVM project`_ introduces a C++ based intermediate representation, but without support for control flow (i.e. it assumes the graph is acyclical).
+
+.. _sea of nodes: http://grothoff.org/christian/teaching/2007/3353/papers/click95simple.pdf
+.. _FIRM compiler: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.716.5826&rep=rep1&type=pdf
+.. _NNVM project: https://github.com/dmlc/nnvm
+.. _Flatbuffers: https://github.com/google/flatbuffers
+
+Type system
+-----------
+
+A type system reduces the chances of bugs appearing and allows for more optimization. At the very least a type system expressing floating-point precision is required for dispatching. However, a type system for multi-dimensional arrays could be made much more expressive using `dependent types`_, `intersection types`_ and subtypes_. For example, one could define:::
+
+  ssymv: array(dim=2, dtype=float32, symmetric=true, shape=(n, n)) x array(dim=1, dtype=float32, shape=(n,)) -> array(dim=1, dtype=float32, shape=(n,))
+  
+Such a system would allow for dispatching based on e.g. symmetry, perform shape inference, detect type errors based on e.g. data type, and perform optimizations using e.g. the fact that a matrix with one column is equivalent to a vector in some cases.
+
+.. _dependent types: https://en.wikipedia.org/wiki/Dependent_type
+.. _intersection types: https://en.wikipedia.org/wiki/Type_system#Intersection_types
+.. _subtypes: https://en.wikipedia.org/wiki/Subtyping
+
+Hints
+-----
+
+The intermediate representation should allow for platform-specific annotations (hints). This would allow a user to e.g. suggest the use of a specific convolution kernel, trading off performance for memory.
+
+Perhaps this system could also be used to label operations as being allowed to operate in-place when executing in interpreter mode (in compiled mode the system can determine this by itself).
+
+Modules
+-------
+
+Let's use the word *module* to refer to a small computation graph i.e. a set of inputs, a series of operators, and a set of outputs. A large number of tools will operate on these modules. For example, a gradient operator can take a module as input and output an adjoint module that calculates the gradient, or it can output a single module which performs both the forward and backward prop.
+
+In compiled mode, we could imagine the entire computation graph being represented using a single module. We can optimize this module, then calculate the gradient, and then once more optimize the module, resulting in a single module which calculates both forward and backward prop as efficiently as possible.
+
+During interpreter mode, we can imagine each operation (or a small set of operations) to produce a single module. This module is differentiated, producing an adjoint module which calculates the gradient. This adjoint module is added to the tape, in the same way that AD is implemented using operatore overloading. During the forward prop we are sure to save all the inputs to the adjoint module in memory, so that we can simply walk through the tape in reverse in order to calculate the gradients.
+
+With this approach one can support both compiled and interpreted mode while using the same set of tools.
