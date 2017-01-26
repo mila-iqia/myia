@@ -98,7 +98,7 @@ The intermediate representation should have the same requirements as any other m
 
 The computation graphs in Theano and TensorFlow have several of these properties already, although their support for control flow is awkward. In the compiler literature their approach is most similar to Click's `sea of nodes`_ representation (as used in the `FIRM compiler`_ and the JavaScript V8 TurboFan engine). Following those implementations it should be easy to see how we can properly introduce control flow in the IR (i.e. with region and phi nodes). Automatic differentiation can be applied directly on this intermediate representation i.e. the gradient of a Phi node is a conditional and vice versa.
 
-Other ideas include generalizing several tensor operations (inner and outer products, traces, etc.) to Einstein summation nodes, as was done in `Diderot's compiler`__.
+Other ideas include generalizing several tensor operations (inner and outer products, traces, etc.) to Einstein summation nodes, as was done in `Diderot's compiler`_.
 
 Given that the IR can be used to construct and execute graphs at runtime, it should be represented and processed in an efficient way (e.g. using C/C++, a custom binary format, or an in-memory serialization format such as Flatbuffers_). Tools should be provided for serialization and to convert graphs to a human-readable text based representation.
 
