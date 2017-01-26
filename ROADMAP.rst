@@ -65,7 +65,7 @@ Components of Myia could include:
 
   * Python API
   
-Many different components have been implemented as part of different frameworks e.g. most frameworks have array data types, a variety of kernels, Theano and TensorFlow have in-memory computation graph representations, cuDNN and cuBLAS provide primitives, etc. Ideally these components can be separated out, refactored and re-used as part of the Myia toolchain.
+Many different components have been implemented as part of different frameworks e.g. most frameworks have array data types, a variety of kernels, Theano and TensorFlow have computation graph representations, cuDNN and cuBLAS provide primitives, etc. Ideally these components can be separated out, refactored and re-used as part of the Myia toolchain.
 
 Features
 --------
@@ -96,9 +96,11 @@ Intermediate representation
 
 The intermediate representation should have the same requirements as any other medium-level intermediate representation i.e. *accurate* in the sense that it must fully describe the mathematical operations, and *independent* of the source language that generated it (Python, Lua, etc.) as well as the target language (CUDA, OpenCL, CPU, FPGA, etc.).
 
-The computation graphs in Theano and TensorFlow have several of these properties already. In the compiler literature, this can be seen as an IR using Click's `sea of nodes`_ representation (as used in the `FIRM compiler`_). With that perspective, it should be easy to see how we can introduce control flow in the IR (i.e. with region and phi nodes).
+The computation graphs in Theano and TensorFlow have several of these properties already, although their support for control flow is awkward. In the compiler literature their approach is most similar to Click's `sea of nodes`_ representation (as used in the `FIRM compiler`_ and the JavaScript V8 TurboFan engine). Following those implementations it should be easy to see how we can properly introduce control flow in the IR (i.e. with region and phi nodes). Automatic differentiation can be applied directly on this intermediate representation i.e. the gradient of a Phi node is a conditional and vice versa.
 
-Given that the IR can be used to construct and execute graphs at runtime, it should be represented and processed in an efficient way (e.g. using C, a custom binary format, or an in-memory serialization format such as Flatbuffers_). Tools should be provided for serialization and to convert graphs to a human-readable text based representation.
+Other ideas include generalizing several tensor operations (inner and outer products, traces, etc.) to Einstein summation nodes, as was done in `Diderot's compiler`__.
+
+Given that the IR can be used to construct and execute graphs at runtime, it should be represented and processed in an efficient way (e.g. using C/C++, a custom binary format, or an in-memory serialization format such as Flatbuffers_). Tools should be provided for serialization and to convert graphs to a human-readable text based representation.
 
 DMLC's `NNVM project`_ introduces a C++ based intermediate representation, but without support for control flow (i.e. it assumes the graph is acyclical).
 
@@ -106,6 +108,7 @@ DMLC's `NNVM project`_ introduces a C++ based intermediate representation, but w
 .. _FIRM compiler: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.716.5826&rep=rep1&type=pdf
 .. _NNVM project: https://github.com/dmlc/nnvm
 .. _Flatbuffers: https://github.com/google/flatbuffers
+.. _Diderot's compiler: https://cpc2016.infor.uva.es/wp-content/uploads/2016/06/CPC2016_paper_21-compressed.pdf
 
 Type system
 -----------
@@ -120,12 +123,12 @@ Such a system would allow for dispatching based on e.g. symmetry, perform shape 
 .. _intersection types: https://en.wikipedia.org/wiki/Type_system#Intersection_types
 .. _subtypes: https://en.wikipedia.org/wiki/Subtyping
 
-Hints
------
+Built-ins
+---------
 
-The intermediate representation should allow for platform-specific annotations (hints). This would allow a user to e.g. suggest the use of a specific convolution kernel, trading off performance for memory.
+The intermediate representation should allow for platform-specific built-ins. This would allow a user to e.g. use a specific convolution kernel, trading off performance for memory. Alternatively this system could take the form of annotating nodes. The backend can then use these annotations during the code generation phase.
 
-Perhaps this system could also be used to label operations as being allowed to operate in-place when executing in interpreter mode (in compiled mode the system can determine this by itself).
+Perhaps this system could also be used to label operations as being allowed to operate in-place when executing in interpreter mode (in compiled mode the compiler can determine this by itself).
 
 Modules
 -------
@@ -146,6 +149,8 @@ Device interface
 
 The final result of the pipeline is a module that has been optimized and differentiated, but is still device independent. The precise process by which we transform a module into executable code is not clearly defined yet.
 
-In a general compilation pipeline the intermediate representation is often lowered into a device-specific representation before being converted into executable code. In deep learning it is common for computation graphs to be executed on a mix of devices e.g. partially on the GPU and partially on the CPU. Hence, a device-specific representation is problematic. Theano's approach is to keep the same representation, assume the operators are executed on CPU by default, and replace operators with GPU equivalents where possible, inserting memory transfers where needed. Frameworks such as Torch allow the user more fine-grained control, allowing them to specify for each operator whether it should be run on the GPU or CPU. A good solution for Myia would perhaps be to use the hints system to express preferences for devices, which allows the user control while not sacrificing the independece of the IR.
+In a general compilation pipeline the intermediate representation is often lowered into a device-specific representation before being converted into executable code. In deep learning it is common for computation graphs to be executed on a mix of devices e.g. partially on the GPU and partially on the CPU. Hence, a device-specific representation is problematic. Theano's approach is to keep the same representation, assume the operators are executed on CPU by default, and replace operators with GPU equivalents where possible, inserting memory transfers where needed. Frameworks such as Torch allow the user more fine-grained control, allowing them to specify for each operator whether it should be run on the GPU or CPU. A good solution for Myia would perhaps be to use a hints system to express preferences for devices, which allows the user control while not sacrificing the independece of the IR.
+
+Significant work might be needed to ensure that e.g. loops (which are expressed using conditionals and jumps only) use memory efficiently. This engineering effort is the price of simplifying the control flow in the IR to conditionals and phi nodes only.
 
 Other considerations are e.g. memory allocators, device transfers, maintaing a state (e.g. for streams, cuBLAS handles, etc.).These should be abstracted in a way similar to e.g. Torch and Collenchyma.
