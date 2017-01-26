@@ -36,7 +36,9 @@ In keeping with the compiler analogy, our vision for Myia is a *domain-specific 
 
 Applying this Unix philosophy of modular software development to deep learning frameworks has many benefits. Having an intermediate representation for array programming will allow for retargetability, where a variety of different frontends and backends can benefit from the same set of e.g. gradient operators and numerical optimizations, and each framework will be able to benefit from new features implemented as part of the toolchain.
 
-The second target of Myia is to fully embrace the fact that deep learning frameworks such as Theano/TensorFlow are effectively trying to be domain-specific languages (DSLs) in all but name. However, several common practices in language and compiler design such as a coherent type system, control flow, SSA representation, different IR levels, etc. were never fully exploited.
+The second target of Myia is to fully embrace the fact that deep learning frameworks such as Theano/TensorFlow are effectively trying to be domain-specific languages (DSLs) in all but name. However, several common practices in language and compiler design such as a coherent type system, control flow, SSA representation, different IR levels, etc. were never exploited. Applying the knowledge that exists in language and compiler design to our DL frameworks could be beneficial.
+
+The end-result is hopefully a DL framework that is more general and flexible than the existing offerings, while encouraging an ecosystem where more code can be shared.
 
 Components
 ----------
