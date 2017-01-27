@@ -25,7 +25,7 @@ These frameworks differ in their emphasis on production or research, the backend
 Vision
 ======
 
-The features of a deep learning framework effectively comprise a compiler pipeline. From this perspective we can take Theano as an example: the arrays are a type system; the Python interface is a language; the computation graph is the intermediate representation; the performance and stability optimizations are the optimizations; replacing nodes with GPU-specific nodes is lowering the IR; the final conversion to CUDA kernels is code generation; etc.
+The features of a deep learning framework effectively comprise a compiler pipeline. From this perspective we can take Theano as an example: the arrays are a type system; the Python interface is a language; the computation graph is the intermediate representation; the performance and stability optimizations are the optimizating compiler; replacing nodes with GPU-specific nodes is lowering the IR; the final conversion to CUDA kernels is code generation; etc.
 
 Theano has traditionally taken this view, and refers to itself as a framework that combines aspects from a computer algebra system (CAS) and an optimizing compiler. TensorFlow holds a similar view, whereas frameworks such as Torch tend to eschew these abstractions in favor of a more minimalist approach.
 
@@ -36,7 +36,7 @@ In keeping with the compiler analogy, our vision for Myia is a *domain-specific 
 
 Applying this Unix philosophy of modular software development to deep learning frameworks has many benefits. Having an intermediate representation for array programming will allow for retargetability, where a variety of different frontends and backends can benefit from the same set of e.g. gradient operators and numerical optimizations, and each framework will be able to benefit from new features implemented as part of the toolchain.
 
-The second target of Myia is to fully embrace the fact that deep learning frameworks such as Theano/TensorFlow are effectively trying to be domain-specific languages (DSLs) in all but name. However, several common practices in language and compiler design such as a coherent type system, control flow, SSA representation, different IR levels, etc. were never exploited. Applying the knowledge that exists in language and compiler design to our DL frameworks could be beneficial.
+The second target of Myia is to fully embrace the fact that deep learning frameworks such as Theano/TensorFlow are effectively trying to be domain-specific languages (DSLs) in all but name. However, several common practices in language and compiler design such as a coherent type system, control flow, SSA representation, different IR levels, etc. were never fully exploited. Advances could be made by applying the lessons learnt in language and compiler design to DL frameworks.
 
 The end-result is hopefully a DL framework that is more general and flexible than the existing offerings, while encouraging an ecosystem where more code can be shared.
 
