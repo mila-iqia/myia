@@ -1,5 +1,7 @@
 # Myia
 
+Myia is a research/prototyping project to develop a new toolchain for array programming with GPU support and automatic differentiation.
+
 Feature                        | Myia | Theano | TensorFlow | PyTorch | NumPy | CUDA | Torch
 ------------------------------ | ---- | ------ | ---------- | ------- | ----- | ---- | -----
 Array type                     | ✓    | ✓      | ✓          | ✓       | ✓     | ✗    | ✓
