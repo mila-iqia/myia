@@ -10,7 +10,7 @@ Control flow statements        | ✓    | ✗      | ✗          | ✓       | 
 Optimizing compiler            | ✓    | ✓      | ✓          | ✗       | ✗     | ✓    | ✗
 Optimizing numerical stability | ✓    | ✓      | ✗          | ✗       | ✗     | ✗    | ✗
 
-* **Array type**: For user-friendliness and type safety we want built-in array types. Theano and TensorFlow both support gradual typing (shapes can be optionally given) with type inference, although more formal and extensive type systems which include shape types, symmetric matrices, etc. could be included.
+* **Array type**: For user-friendliness and type safety we want built-in array types. Theano and TensorFlow both support gradual typing (shapes can be optionally given) with type inference, although more formal and extensive type systems which include shape types, symmetric matrices, etc. would be better.
 * **GPU support**: For performance reasons we want to be able to use parallel architectures e.g. GPUs through CUDA
 * **Reverse-mode AD**: Deep learning research relies heavily on calculating gradients for functions with large input spaces
 * **Python integration**: Python is the go-to programming language for scientists, with a huge number of libraries that can be used for visualization, data preprocessing, etc.
