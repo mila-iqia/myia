@@ -2,15 +2,16 @@
 
 Myia is a research/prototyping project to develop a new toolchain for array programming with GPU support and automatic differentiation.
 
-Feature                        | Myia | Theano | TensorFlow | PyTorch | NumPy | CUDA | Torch
------------------------------- | ---- | ------ | ---------- | ------- | ----- | ---- | -----
-Array type                     | ✓    | ✓      | ✓          | ✓       | ✓     | ✗    | ✓
-GPU support                    | ✓    | ✓      | ✓          | ✓       | ✗     | ✓    | ✓
-Reverse-mode AD                | ✓    | ✓      | ✓          | ✓       | ✗     | ✗    | ✓
-Python integration             | ✓    | ✓      | ✓          | ✓       | ✓     | ✗    | ✗
-Control flow statements        | ✓    | ✗      | ✗          | ✓       | ✓     | ✓    | ✗
-Optimizing compiler            | ✓    | ✓      | ✓          | ✗       | ✗     | ✓    | ✗
-Optimizing numerical stability | ✓    | ✓      | ✗          | ✗       | ✗     | ✗    | ✗
+Feature                        | Myia | Theano | TensorFlow | PyTorch | Autograd | CUDA | Torch
+------------------------------ | ---- | ------ | ---------- | ------- | -------- | ---- | -----
+Array type                     | ✓    | ✓      | ✓          | ✓       | ✓        | ✗    | ✓
+GPU support                    | ✓    | ✓      | ✓          | ✓       | ✗        | ✓    | ✓
+Reverse-mode AD                | ✓    | ✓      | ✓          | ✓       | ✓        | ✗    | ✓
+Python integration             | ✓    | ✓      | ✓          | ✓       | ✓        | ✗    | ✗
+Control flow statements        | ✓    | ✗      | ✗          | ✓       | ✓        | ✓    | ✗
+Optimizing compiler            | ✓    | ✓      | ✓          | ✗       | ✗        | ✓    | ✗
+Optimizing numerical stability | ✓    | ✓      | ✗          | ✗       | ✗        | ✗    | ✗
+Runtime debugging              | ✓    | ✗      | ✗          | ✓       | ✓        | ✗    | ✗
 
 * **Array type**: For user-friendliness and type safety we want built-in array types. Theano and TensorFlow both support gradual typing (shapes can be optionally given) with type inference, although more formal and extensive type systems which include shape types, symmetric matrices, etc. would be better.
 * **GPU support**: For performance reasons we want to be able to use parallel architectures e.g. GPUs through CUDA
@@ -19,3 +20,4 @@ Optimizing numerical stability | ✓    | ✓      | ✗          | ✗       | 
 * **Control flow statements**: Although libraries like Theano and TensorFlow have support for control flow, it is in the form of function calls instead of statements. Moreover, some support (e.g. `continue` and `break` statements) is missing, and the internal representation of control flow (such as loops) limits and complicates the optimizing compiler.
 * **Optimizing compiler**: For high-performance and portability a pipeline involving code generation for potentially multiple backends is preferred over an interpreted language
 * **Optimizing numerical stability**: Since the program formulation is intended to be more mathematical than numerical, we want our compiler to optimize for numerical stability
+* **Runtime debugging**: Certain numerical errors are easiest to debug when the user can easily print or log intermediate values, or drop into a debugger when certain conditions arise. Theano and TensorFlow provide custom debugging tools for this, but they are generally not as convenient as dropping into `pdb` in PyTorch or NumPy. Since Myia is envisioned as a subset of Python, it could support a Python-based mode that operators like PyTorch or Autograd.
