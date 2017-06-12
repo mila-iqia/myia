@@ -1,5 +1,7 @@
 # Myia
 
+[![Build Status](https://travis-ci.com/mila-udem/myia.svg?token=p8b613NdVqVa9KeL48d5&branch=master)](https://travis-ci.com/mila-udem/myia)
+
 Myia is a research/prototyping project to develop a new toolchain for array programming with GPU support and automatic differentiation.
 
 Feature                        | Myia | Theano | TensorFlow | PyTorch | Autograd | CUDA | Torch
