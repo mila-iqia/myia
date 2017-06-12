@@ -3,9 +3,9 @@ python:
   - "3.5"
   - "3.6"
 
-# command to install dependencies
+# Command to install dependencies
 install:
   pip install pep8
 
-# command to run tests
-script: ./tests.py
+# Command to run tests
+script: ./run_tests.sh
