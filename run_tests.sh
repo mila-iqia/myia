@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Abort on first error
 set -e
 
