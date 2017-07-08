@@ -1,7 +1,7 @@
 
 from myia.ast import \
     Location, Symbol, Literal, \
-    LetRec, If, Lambda, Apply, Begin
+    LetRec, If, Lambda, Apply, Begin, Tuple
 from myia.symbols import get_operator, builtins
 import ast
 import inspect
@@ -142,7 +142,7 @@ class Parser(LocVisitor):
     def visit_arguments(self, args):
         return [self.visit(arg) for arg in args.args]
 
-    def visit_body(self, stmts, wrapup=None):
+    def visit_body(self, stmts, return_wrapper=False):
         results = []
         for stmt in stmts:
             ret = self.returns
@@ -155,51 +155,88 @@ class Parser(LocVisitor):
             else:
                 results.append(r)
         groups = group(results, lambda x: isinstance(x, _Assign))
-        def helper(groups):
+        def helper(groups, result=None):
             (isass, grp), *rest = groups
             if isass:
                 bindings = tuple((a.varname, a.value) for a in grp)
                 if len(rest) == 0:
-                    if wrapup is None:
+                    if result is None:
                         raise MyiaSyntaxError(grp[-1].location, "Missing return statement.")
                     else:
-                        return LetRec(bindings, wrapup(self))
-                return LetRec(bindings, helper(rest))
+                        return LetRec(bindings, result)
+                return LetRec(bindings, helper(rest, result))
             elif len(rest) == 0:
                 if len(grp) == 1:
                     return grp[0]
                 else:
                     return Begin(grp)
             else:
-                return Begin(grp + [helper(rest)])
+                return Begin(grp + [helper(rest, result)])
 
-        return helper(groups)
+        if return_wrapper:
+            return lambda v: helper(groups, v)
+        else:
+            return helper(groups)
 
     def visit_Return(self, node, loc):
         self.returns = True
         return self.visit(node.value).at(loc)
 
+    def new_variable(self, base_name):
+        sym = Symbol(self.gensym(base_name))
+        self.env.set({base_name: Redirect(sym.label)})
+        # The following statement can override the previous, if sym.label == base_name
+        # That is fine and intended.
+        self.env.set({sym.label: sym})
+        return sym
+
+    def make_assign(self, base_name, value, location=None):
+        sym = self.new_variable(base_name)
+        self.local_assignments.add(base_name)
+        return _Assign(sym, value, location)
+
     def visit_If(self, node, loc):
         p1 = Parser(self)
-        body = p1.visit_body(node.body, wrapup=lambda _: None)
+        body = p1.visit_body(node.body, True)
         p2 = Parser(self)
-        orelse = p2.visit_body(node.orelse, wrapup=lambda _: None)
-        print(p1.local_assignments)
-        print(p2.local_assignments)
-        None
+        orelse = p2.visit_body(node.orelse, True)
+        if p1.returns != p2.returns:
+            raise MyiaSyntaxError(loc, "Either none or all branches of an if statement must return a value.")
+        if p1.local_assignments != p2.local_assignments:
+            raise MyiaSyntaxError(loc, "All branches of an if statement must assign to the same set of variables.\nTrue branch sets: {}\nElse branch sets: {}".format(" ".join(sorted(p1.local_assignments)), " ".join(sorted(p2.local_assignments))))
+
+        if p1.returns:
+            return If(self.visit(node.test),
+                      body(None),
+                      orelse(None),
+                      location=loc)
+        else:
+            ass = list(p1.local_assignments)
+            if len(ass) == 1:
+                a, = ass
+                val = If(self.visit(node.test),
+                         body(p1.env[a]),
+                         orelse(p2.env[a]),
+                         location=loc)
+                return self.make_assign(a, val, None)
+            else:
+                val = If(self.visit(node.test),
+                         body(Tuple(p1.env[v] for v in ass)),
+                         orelse(Tuple(p2.env[v] for v in ass)),
+                         location=loc)
+                tmp = Symbol(self.gensym('#tmp'))
+                stmts = [_Assign(tmp, val, None)]
+                for i, a in enumerate(ass):
+                    stmt = self.make_assign(a, Apply(builtins.index, tmp, Literal(i)))
+                    stmts.append(stmt)
+                return Begin(stmts)
 
     def visit_Assign(self, node, loc):
         targ, = node.targets
         if isinstance(targ, ast.Tuple):
             raise MyiaSyntaxError(loc, "Deconstructing assignment is not supported.")
         val = self.visit(node.value)
-        sym = Symbol(self.gensym(targ.id))
-        self.env.set({targ.id: Redirect(sym.label)})
-        # The following statement can override the previous, if sym.label == targ.id
-        # That is fine and intended.
-        self.env.set({sym.label: sym})
-        self.local_assignments.add(targ.id)
-        return _Assign(sym, val, location=loc)
+        return self.make_assign(targ.id, val, loc)
 
     def visit_FunctionDef(self, node, loc, allow_decorator=False):
         if node.args.vararg:
@@ -213,7 +250,7 @@ class Parser(LocVisitor):
         if not allow_decorator and len(node.decorator_list) > 0:
             raise MyiaSyntaxError(loc, "Functions should not have decorators.")
         subp = Parser(self)
-        args = [self.gensym(arg.arg) for arg in node.args.args]
+        args = [Symbol(self.gensym(arg.arg)) for arg in node.args.args]
         subp.env.set({arg.arg: s for arg, s in zip(node.args.args, args)})
         result = subp.visit_body(node.body)
         if subp.free_variables:
@@ -224,7 +261,6 @@ class Parser(LocVisitor):
         return Lambda(node.name,
                       args,
                       result,
-                      # list(map(self.visit, node.body))[-1],
                       location=loc)
 
     def visit_Lambda(self, node, loc):

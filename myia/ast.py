@@ -105,3 +105,13 @@ class Begin(MyiaASTNode):
 
     def __str__(self):
         return "(begin {})".format(" ".join(map(str, self.stmts)))
+
+
+class Tuple(MyiaASTNode):
+    def __init__(self, values, location=None):
+        self.values = list(values)
+        self.location = location
+
+    def __str__(self):
+        return "{{{}}}".format(" ".join(map(str, self.values)))
+
