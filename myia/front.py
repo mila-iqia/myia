@@ -3,6 +3,7 @@ from myia.ast import \
     Location, Symbol, Literal, \
     LetRec, If, Lambda, Apply, Begin, Tuple
 from myia.symbols import get_operator, builtins
+from uuid import uuid4 as uuid
 import ast
 import inspect
 import textwrap
@@ -30,31 +31,49 @@ class Redirect:
         self.key = key
 
 
+class GenSym:
+    def __init__(self, namespace):
+        self.varcounts = {}
+        self.namespace = namespace
+
+    def name(self, name):
+        if name in self.varcounts:
+            self.varcounts[name] += 1
+            return '{}#{}'.format(name, self.varcounts[name])
+        else:
+            self.varcounts[name] = 0
+            return name
+
+    def sym(self, name, namespace=None):
+        return Symbol(self.name(name), namespace=namespace or self.namespace)
+
+
 class Env:
-    def __init__(self, parent = None):
+    def __init__(self, parent=None, namespace=None):
         self.parent = parent
+        self.gen = parent.gen if parent else GenSym(namespace or str(uuid()))
         self.bindings = {}
 
-    def fork(self):
-        return Env(self)
-
-    def get(self, name, redirect=True):
+    def get_free(self, name, redirect=True):
         if name in self.bindings:
+            free = False
             result = self.bindings[name]
         elif self.parent is None:
-            raise Exception("Undeclared variable: {}".format(name))
+            raise NameError("Undeclared variable: {}".format(name))
         else:
+            free = True
             result = self.parent[name]
         if redirect and isinstance(result, Redirect):
-            return self[result.key]
+            return self.get_free(result.key, True)
         else:
-            return result
+            return (free, result)
 
-    def set(self, bindings):
+    def update(self, bindings):
         self.bindings.update(bindings)
 
     def __getitem__(self, name):
-        return self.get(name)
+        _, x = self.get_free(name)
+        return x
 
     def __setitem__(self, name, value):
         self.bindings[name] = value
@@ -115,29 +134,28 @@ def group(arr, classify):
 
 class Parser(LocVisitor):
 
-    def __init__(self, parent):
-        self.free_variables = []
+    def __init__(self, parent, global_env=None):
+        self.free_variables = {}
         self.local_assignments = set()
         self.returns = False
         
         if isinstance(parent, Locator):
             self.parent = None
             self.env = Env()
-            self.varcount = {}
+            self.globals_accessed = set()
+            self.global_env = global_env
+            self.return_error = None
             super().__init__(parent)
         else:
             self.parent = parent
-            self.env = parent.env.fork()
-            self.varcount = parent.varcount
+            self.env = Env(parent.env)
+            self.globals_accessed = parent.globals_accessed
+            self.global_env = parent.global_env
+            self.return_error = parent.return_error
             super().__init__(parent.locator)
 
     def gensym(self, name):
-        if name in self.varcount:
-            self.varcount[name] += 1
-            return '{}#{}'.format(name, self.varcount[name])
-        else:
-            self.varcount[name] = 0
-            return name
+        return self.env.gen.sym(name)
 
     def visit_arguments(self, args):
         return [self.visit(arg) for arg in args.args]
@@ -179,21 +197,55 @@ class Parser(LocVisitor):
             return helper(groups)
 
     def visit_Return(self, node, loc):
+        if self.return_error:
+            raise MyiaSyntaxError(loc, self.return_error)
         self.returns = True
         return self.visit(node.value).at(loc)
 
     def new_variable(self, base_name):
-        sym = Symbol(self.gensym(base_name))
-        self.env.set({base_name: Redirect(sym.label)})
+        sym = self.gensym(base_name)
+        self.env.update({base_name: Redirect(sym.label)})
         # The following statement can override the previous, if sym.label == base_name
         # That is fine and intended.
-        self.env.set({sym.label: sym})
+        self.env.update({sym.label: sym})
         return sym
 
     def make_assign(self, base_name, value, location=None):
         sym = self.new_variable(base_name)
         self.local_assignments.add(base_name)
         return _Assign(sym, value, location)
+
+    def visit_While(self, node, loc):
+        fsym = self.global_env.gen.sym('#while')
+
+        p = Parser(self)
+        p.return_error = "While loops cannot contain return statements."
+        body = p.visit_body(node.body, True)
+        in_vars = list(set(p.free_variables.keys()) | set(p.local_assignments))
+        out_vars = list(p.local_assignments)
+
+        # We now redo the parsing in order to avoid having free variables
+        p = Parser(self)
+        in_syms = [p.gensym(v) for v in in_vars]
+        p.env.update({v: s for v, s in zip(in_vars, in_syms)})
+        test = p.visit(node.test)
+        initial_values = [p.env[v] for v in out_vars]
+        body = p.visit_body(node.body, True)
+        new_body = If(test,
+                      body(Apply(fsym, *[p.env[v] for v in in_vars])),
+                      Tuple(initial_values))
+
+        self.global_env[fsym.label] = Lambda(fsym.label, in_syms, new_body, location=loc)
+        self.globals_accessed.add(fsym.label)
+
+        tmp = self.gensym('#tmp')
+        val = Apply(fsym, Tuple(self.env[v] for v in in_vars))
+        stmts = [_Assign(tmp, val, None)]
+        for i, v in enumerate(out_vars):
+            stmt = self.make_assign(v, Apply(builtins.index, tmp, Literal(i)))
+            stmts.append(stmt)
+        return Begin(stmts)
+
 
     def visit_If(self, node, loc):
         p1 = Parser(self)
@@ -206,6 +258,7 @@ class Parser(LocVisitor):
             raise MyiaSyntaxError(loc, "All branches of an if statement must assign to the same set of variables.\nTrue branch sets: {}\nElse branch sets: {}".format(" ".join(sorted(p1.local_assignments)), " ".join(sorted(p2.local_assignments))))
 
         if p1.returns:
+            self.returns = True
             return If(self.visit(node.test),
                       body(None),
                       orelse(None),
@@ -224,7 +277,7 @@ class Parser(LocVisitor):
                          body(Tuple(p1.env[v] for v in ass)),
                          orelse(Tuple(p2.env[v] for v in ass)),
                          location=loc)
-                tmp = Symbol(self.gensym('#tmp'))
+                tmp = self.gensym('#tmp')
                 stmts = [_Assign(tmp, val, None)]
                 for i, a in enumerate(ass):
                     stmt = self.make_assign(a, Apply(builtins.index, tmp, Literal(i)))
@@ -250,18 +303,21 @@ class Parser(LocVisitor):
         if not allow_decorator and len(node.decorator_list) > 0:
             raise MyiaSyntaxError(loc, "Functions should not have decorators.")
         subp = Parser(self)
-        args = [Symbol(self.gensym(arg.arg)) for arg in node.args.args]
-        subp.env.set({arg.arg: s for arg, s in zip(node.args.args, args)})
+        args = [self.gensym(arg.arg) for arg in node.args.args]
+        subp.env.update({arg.arg: s for arg, s in zip(node.args.args, args)})
         result = subp.visit_body(node.body)
         if subp.free_variables:
             v, _ = items(subp.free_variables)[0]
             raise MyiaSyntaxError(v.location, "Functions cannot have free variables.")
         if not subp.returns:
             raise MyiaSyntaxError(loc, "Function does not return a value.")
-        return Lambda(node.name,
-                      args,
-                      result,
-                      location=loc)
+        fn = Lambda(node.name,
+                    args,
+                    result,
+                    location=loc)
+        self.global_env[node.name] = fn
+        return Symbol(node.name, namespace='global')
+        # return fn
 
     def visit_Lambda(self, node, loc):
         return Lambda("lambda",
@@ -269,14 +325,19 @@ class Parser(LocVisitor):
                       self.visit(node.body),
                       location=loc)
 
-    def visit_Expr(self, node, loc):
+    def visit_Expr(self, node, loc, allow_decorator='this is a dummy_parameter'):
         return self.visit(node.value)
 
     def visit_Name(self, node, loc):
         try:
-            return self.env[node.id]
-        except Exception as e:
-            raise MyiaSyntaxError(loc, e.args[0])
+            free, v = self.env.get_free(node.id)
+            if free:
+                self.free_variables[node.id] = v
+            return v
+        except NameError as e:
+            # raise MyiaSyntaxError(loc, e.args[0])
+            self.globals_accessed.add(node.id)
+            return Symbol(node.id, namespace='global')
 
     def visit_Num(self, node, loc):
         return Literal(node.n)
@@ -355,7 +416,11 @@ def parse_function(fn):
 
 def parse_source(url, line, src):
     tree = ast.parse(src).body[0]
-    return Parser(Locator(url, line)).visit(tree, allow_decorator=True)
+    p = Parser(Locator(url, line), Env(namespace='global'))
+    r = p.visit(tree, allow_decorator=True)
+    # print(p.global_env.bindings)
+    # print(p.globals_accessed)
+    return r
 
 
 def myia(fn):
