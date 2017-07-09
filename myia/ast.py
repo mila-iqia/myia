@@ -33,15 +33,19 @@ class MyiaASTNode:
         rval.location = location
         return rval
 
+    def __repr__(self):
+        return str(self)
+
 
 class Symbol(MyiaASTNode):
-    def __init__(self, label, *, location=None):
+    def __init__(self, label, *, namespace=None, location=None):
         assert isinstance(label, str)
         self.label = label
+        self.namespace = namespace
         self.location = location
 
     def __str__(self):
-        return self.label
+        return self.label # + ':' + (self.namespace or '???')
 
 
 class Literal(MyiaASTNode):

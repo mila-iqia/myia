@@ -6,29 +6,32 @@ class Props:
     def __init__(self, d):
         self.__dict__ = d
 
+def _bsym(name):
+    return Symbol(name, namespace='builtin')
+
 builtins_dict = dict(
-    add = Symbol('add'),
-    subtract = Symbol('subtract'),
-    multiply = Symbol('multiply'),
-    divide = Symbol('divide'),
-    power = Symbol('power'),
-    dot = Symbol('dot'),
-    bitwise_or = Symbol('bitwise_or'),
-    bitwise_and = Symbol('bitwise_and'),
-    bitwise_xor = Symbol('bitwise_xor'),
-    unary_add = Symbol('unary_add'),
-    unary_subtract = Symbol('unary_subtract'),
-    bitwise_not = Symbol('bitwise_not'),
-    negate = Symbol('negate'),
-    less = Symbol('less'),
-    greater = Symbol('greater'),
-    less_equal = Symbol('less_equal'),
-    greater_equal = Symbol('greater_equal'),
-    equal = Symbol('equal'),
-    range = Symbol('range'),
-    index = Symbol('index'),
-    map = Symbol('map'),
-    filter = Symbol('filter')
+    add = _bsym('add'),
+    subtract = _bsym('subtract'),
+    multiply = _bsym('multiply'),
+    divide = _bsym('divide'),
+    power = _bsym('power'),
+    dot = _bsym('dot'),
+    bitwise_or = _bsym('bitwise_or'),
+    bitwise_and = _bsym('bitwise_and'),
+    bitwise_xor = _bsym('bitwise_xor'),
+    unary_add = _bsym('unary_add'),
+    unary_subtract = _bsym('unary_subtract'),
+    bitwise_not = _bsym('bitwise_not'),
+    negate = _bsym('negate'),
+    less = _bsym('less'),
+    greater = _bsym('greater'),
+    less_equal = _bsym('less_equal'),
+    greater_equal = _bsym('greater_equal'),
+    equal = _bsym('equal'),
+    range = _bsym('range'),
+    index = _bsym('index'),
+    map = _bsym('map'),
+    filter = _bsym('filter')
 )
 
 builtins = Props(builtins_dict)
