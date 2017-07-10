@@ -119,3 +119,11 @@ class Tuple(MyiaASTNode):
     def __str__(self):
         return "{{{}}}".format(" ".join(map(str, self.values)))
 
+class Closure(MyiaASTNode):
+    def __init__(self, fn, args, location=None):
+        self.fn = fn
+        self.args = list(args)
+        self.location = location
+
+    def __str__(self):
+        return '(closure {} {})'.format(self.fn, " ".join(map(str, self.args)))

@@ -1,13 +1,14 @@
 
 from myia.ast import \
     Location, Symbol, Literal, \
-    LetRec, If, Lambda, Apply, Begin, Tuple
+    LetRec, If, Lambda, Apply, Begin, Tuple, Closure
 from myia.symbols import get_operator, builtins
 from uuid import uuid4 as uuid
 import ast
 import inspect
 import textwrap
 import sys
+
 
 
 class MyiaSyntaxError(Exception):
@@ -134,10 +135,11 @@ def group(arr, classify):
 
 class Parser(LocVisitor):
 
-    def __init__(self, parent, global_env=None):
+    def __init__(self, parent, global_env=None, dry=None, pull_free_variables=False):
         self.free_variables = {}
         self.local_assignments = set()
         self.returns = False
+        self.pull_free_variables = pull_free_variables
         
         if isinstance(parent, Locator):
             self.parent = None
@@ -145,6 +147,7 @@ class Parser(LocVisitor):
             self.globals_accessed = set()
             self.global_env = global_env
             self.return_error = None
+            self.dry = dry
             super().__init__(parent)
         else:
             self.parent = parent
@@ -152,6 +155,7 @@ class Parser(LocVisitor):
             self.globals_accessed = parent.globals_accessed
             self.global_env = parent.global_env
             self.return_error = parent.return_error
+            self.dry = parent.dry if dry is None else dry
             super().__init__(parent.locator)
 
     def gensym(self, name):
@@ -218,28 +222,25 @@ class Parser(LocVisitor):
     def visit_While(self, node, loc):
         fsym = self.global_env.gen.sym('#while')
 
-        p = Parser(self)
+        p = Parser(self, pull_free_variables=True)
         p.return_error = "While loops cannot contain return statements."
-        body = p.visit_body(node.body, True)
-        in_vars = list(set(p.free_variables.keys()) | set(p.local_assignments))
-        out_vars = list(p.local_assignments)
-
-        # We now redo the parsing in order to avoid having free variables
-        p = Parser(self)
-        in_syms = [p.gensym(v) for v in in_vars]
-        p.env.update({v: s for v, s in zip(in_vars, in_syms)})
         test = p.visit(node.test)
-        initial_values = [p.env[v] for v in out_vars]
         body = p.visit_body(node.body, True)
+        in_vars = list(set(p.free_variables.keys()))
+        out_vars = list(p.local_assignments)
+        in_syms = [p.free_variables[v] for v in in_vars]
+
+        initial_values = [p.env[v] for v in out_vars]
         new_body = If(test,
                       body(Apply(fsym, *[p.env[v] for v in in_vars])),
                       Tuple(initial_values))
 
-        self.global_env[fsym.label] = Lambda(fsym.label, in_syms, new_body, location=loc)
+        if not self.dry:
+            self.global_env[fsym.label] = Lambda(fsym.label, in_syms, new_body, location=loc)
         self.globals_accessed.add(fsym.label)
 
         tmp = self.gensym('#tmp')
-        val = Apply(fsym, Tuple(self.env[v] for v in in_vars))
+        val = Apply(fsym, *[self.env[v] for v in in_vars])
         stmts = [_Assign(tmp, val, None)]
         for i, v in enumerate(out_vars):
             stmt = self.make_assign(v, Apply(builtins.index, tmp, Literal(i)))
@@ -315,15 +316,22 @@ class Parser(LocVisitor):
                     args,
                     result,
                     location=loc)
-        self.global_env[node.name] = fn
+        if not self.dry:
+            self.global_env[node.name] = fn
         return Symbol(node.name, namespace='global')
         # return fn
 
+    def reg_lambda(self, args, body, label="#lambda"):
+        ref = self.global_env.gen.sym(label)
+        l = Lambda(ref.label, args, body)
+        if not self.dry:
+            self.global_env[ref.label] = l
+        return ref
+
     def visit_Lambda(self, node, loc):
-        return Lambda("lambda",
-                      self.visit_arguments(node.args),
-                      self.visit(node.body),
-                      location=loc)
+        return self.make_closure([a.arg for a in node.args.args],
+                                 node.body).at(loc)
+
 
     def visit_Expr(self, node, loc, allow_decorator='this is a dummy_parameter'):
         return self.visit(node.value)
@@ -332,6 +340,8 @@ class Parser(LocVisitor):
         try:
             free, v = self.env.get_free(node.id)
             if free:
+                if self.pull_free_variables:
+                    v = self.new_variable(node.id)
                 self.free_variables[node.id] = v
             return v
         except NameError as e:
@@ -384,26 +394,44 @@ class Parser(LocVisitor):
                      *[self.visit(arg) for arg in node.args],
                      location=loc)
         
+    def make_closure(self, inputs, expr, label="#lambda"):
+        p = Parser(self, pull_free_variables=True)
+        sinputs = [p.new_variable(i) for i in inputs]
+        p.env.update({k: v for k, v in zip(inputs, sinputs)})
+        if callable(expr):
+            body = expr(p)
+        else:
+            body = p.visit(expr)
+        fargnames = list(p.free_variables.keys())
+        fargs = [p.free_variables[k] for k in fargnames]
+        lbda = self.reg_lambda(fargs + sinputs, body, label=label).at(body)
+        if len(fargs) > 0:
+            return Closure(lbda, [self.env[k] for k in fargnames])
+        else:
+            return lbda
 
     def visit_ListComp(self, node, loc):
         if len(node.generators) > 1:
             raise MyiaSyntaxError(loc,
                 "List comprehensions can only iterate over a single target")
+
         gen = node.generators[0]
         if len(gen.ifs) > 0:
             test1, *others = reversed(gen.ifs)
-            cond = self.visit(test1)
-            for test in others:
-                cond = If(self.visit(test), cond, Literal(False))
+            def mkcond(p):
+                cond = p.visit(test1)
+                for test in others:
+                    cond = If(p.visit(test), cond, Literal(False))
+                return cond
             arg = Apply(builtins.filter,
-                        Lambda("filtercmp", [self.visit(gen.target)], cond),
+                        self.make_closure([gen.target.id], mkcond, label="#filtercmp"),
                         self.visit(gen.iter))
         else:
             arg = self.visit(gen.iter)
-        return Apply(builtins.map,
-                     Lambda("listcmp", [self.visit(gen.target)], self.visit(node.elt)),
-                     arg,
-                     location=loc)
+
+        lbda = self.make_closure([gen.target.id], node.elt, label="#listcmp")
+
+        return Apply(builtins.map, lbda, arg, location=loc)
 
     def visit_arg(self, node, loc):
         return Symbol(node.arg, location=loc)
@@ -420,8 +448,21 @@ def parse_source(url, line, src):
     r = p.visit(tree, allow_decorator=True)
     # print(p.global_env.bindings)
     # print(p.globals_accessed)
-    return r
+    return p.global_env.bindings
 
+
+def make_error_function(data):
+    def _f(*args, **kwargs):
+        raise Exception("Function {} is for internal use only.".format(data["name"]))
+    _f.data = data
+    return _f
 
 def myia(fn):
-    return parse_function(fn)
+    data = parse_function(fn)
+    glob = fn.__globals__
+    bindings = {k: make_error_function({"name": k, "ast": v, "globals": glob})
+                for k, v in data.items()}
+    glob.update(bindings)
+    fn.data = bindings[fn.__name__].data
+    fn.associates = bindings
+    return fn
