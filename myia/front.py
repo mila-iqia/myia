@@ -134,11 +134,14 @@ def group(arr, classify):
 
 class Parser(LocVisitor):
 
-    def __init__(self, parent, global_env=None, dry=None, pull_free_variables=False):
+    def __init__(self, parent, global_env=None, dry=None,
+                 pull_free_variables=False,
+                 top_level=False):
         self.free_variables = {}
         self.local_assignments = set()
         self.returns = False
         self.pull_free_variables = pull_free_variables
+        self.top_level = top_level
         
         if isinstance(parent, Locator):
             self.parent = None
@@ -288,6 +291,8 @@ class Parser(LocVisitor):
         targ, = node.targets
         if isinstance(targ, ast.Tuple):
             raise MyiaSyntaxError(loc, "Deconstructing assignment is not supported.")
+        if isinstance(targ, ast.Subscript):
+            raise MyiaSyntaxError(loc, "Assigning to subscripts or slices is not supported.")
         val = self.visit(node.value)
         return self.make_assign(targ.id, val, loc)
 
@@ -302,26 +307,15 @@ class Parser(LocVisitor):
             raise MyiaSyntaxError(loc, "Default arguments are not allowed.")
         if not allow_decorator and len(node.decorator_list) > 0:
             raise MyiaSyntaxError(loc, "Functions should not have decorators.")
-        subp = Parser(self)
-        args = [self.gensym(arg.arg) for arg in node.args.args]
-        subp.env.update({arg.arg: s for arg, s in zip(node.args.args, args)})
-        result = subp.visit_body(node.body)
-        if subp.free_variables:
-            v, _ = items(subp.free_variables)[0]
-            raise MyiaSyntaxError(v.location, "Functions cannot have free variables.")
-        if not subp.returns:
-            raise MyiaSyntaxError(loc, "Function does not return a value.")
-        fn = Lambda(node.name,
-                    args,
-                    result,
-                    location=loc)
-        if not self.dry:
-            self.global_env[node.name] = fn
-        return Symbol(node.name, namespace='global')
-        # return fn
 
-    def reg_lambda(self, args, body, label="#lambda"):
-        ref = self.global_env.gen.sym(label)
+        lbl = node.name if self.top_level else '#:' + node.name
+        binding = (node.name, self.global_env.gen.sym(lbl))
+        return self.make_closure([arg.arg for arg in node.args.args],
+                                 node.body,
+                                 binding=binding).at(loc)
+
+    def reg_lambda(self, args, body, label="#lambda", binding=None):
+        ref = binding[1] if binding else self.global_env.gen.sym(label)
         l = Lambda(ref.label, args, body)
         if not self.dry:
             self.global_env[ref.label] = l
@@ -341,6 +335,7 @@ class Parser(LocVisitor):
             if free:
                 if self.pull_free_variables:
                     v = self.new_variable(node.id)
+                v = v.at(loc)
                 self.free_variables[node.id] = v
             return v
         except NameError as e:
@@ -392,18 +387,22 @@ class Parser(LocVisitor):
         return Apply(self.visit(node.func),
                      *[self.visit(arg) for arg in node.args],
                      location=loc)
-        
-    def make_closure(self, inputs, expr, label="#lambda"):
+
+    def make_closure(self, inputs, expr, label="#lambda", binding=None):
         p = Parser(self, pull_free_variables=True)
+        binding = binding if binding else (label, self.global_env.gen.sym(label))
         sinputs = [p.new_variable(i) for i in inputs]
+        p.env[binding[0]] = binding[1]
         p.env.update({k: v for k, v in zip(inputs, sinputs)})
         if callable(expr):
             body = expr(p)
+        elif isinstance(expr, list):
+            body = p.visit_body(expr)
         else:
             body = p.visit(expr)
         fargnames = list(p.free_variables.keys())
         fargs = [p.free_variables[k] for k in fargnames]
-        lbda = self.reg_lambda(fargs + sinputs, body, label=label).at(body)
+        lbda = self.reg_lambda(fargs + sinputs, body, binding=binding).at(body)
         if len(fargs) > 0:
             return Closure(lbda, [self.env[k] for k in fargnames])
         else:
@@ -432,6 +431,18 @@ class Parser(LocVisitor):
 
         return Apply(builtins.map, lbda, arg, location=loc)
 
+    def visit_AugAssign(self, node, loc):
+        targ = node.target
+        if isinstance(targ, ast.Tuple):
+            raise MyiaSyntaxError(loc, "Deconstructing assignment is not supported.")
+        if isinstance(targ, ast.Subscript):
+            raise MyiaSyntaxError(loc, "Assigning to subscripts or slices is not supported.")
+        aug = self.visit(node.value)
+        op = get_operator(node.op)
+        prev = self.env[targ.id]
+        val = Apply(op, prev, aug, location=loc)
+        return self.make_assign(targ.id, val, loc)
+
     def visit_arg(self, node, loc):
         return Symbol(node.arg, location=loc)
 
@@ -447,7 +458,7 @@ def _get_global_env(url):
 
 def parse_source(url, line, src):
     tree = ast.parse(src).body[0]
-    p = Parser(Locator(url, line), _get_global_env(url))
+    p = Parser(Locator(url, line), _get_global_env(url), top_level=True)
     r = p.visit(tree, allow_decorator=True)
     # print(p.global_env.bindings)
     # print(p.globals_accessed)
