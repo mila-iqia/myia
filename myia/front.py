@@ -10,7 +10,6 @@ import textwrap
 import sys
 
 
-
 class MyiaSyntaxError(Exception):
     def __init__(self, location, message):
         self.location = location
@@ -441,10 +440,14 @@ def parse_function(fn):
     _, line = inspect.getsourcelines(fn)
     return parse_source(inspect.getfile(fn), line, textwrap.dedent(inspect.getsource(fn)))
 
+_global_envs = {}
+
+def _get_global_env(url):
+    return _global_envs.setdefault(url, Env(namespace='global'))
 
 def parse_source(url, line, src):
     tree = ast.parse(src).body[0]
-    p = Parser(Locator(url, line), Env(namespace='global'))
+    p = Parser(Locator(url, line), _get_global_env(url))
     r = p.visit(tree, allow_decorator=True)
     # print(p.global_env.bindings)
     # print(p.globals_accessed)
