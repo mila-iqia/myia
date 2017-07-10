@@ -85,7 +85,10 @@ class Locator:
         self.line_offset = line_offset
 
     def __call__(self, node):
-        return Location(self.url, node.lineno + self.line_offset - 1, node.col_offset)
+        try:
+            return Location(self.url, node.lineno + self.line_offset - 1, node.col_offset)
+        except AttributeError:
+            return None
 
 
 class LocVisitor:
@@ -287,14 +290,39 @@ class Parser(LocVisitor):
                     stmts.append(stmt)
                 return Begin(stmts)
 
+    def visit_Slice(self, node, loc):
+        return Apply(Symbol('slice'),
+                     self.visit(node.lower) if node.lower else Literal(0),
+                     self.visit(node.upper) if node.upper else Literal(None),
+                     self.visit(node.step) if node.step else Literal(1))
+
+    def visit_ExtSlice(self, node, loc):
+        return Tuple(self.visit(v) for v in node.dims).at(loc)
+
+    def visit_Index(self, node, loc):
+        return self.visit(node.value)
+
+    def visit_Tuple(self, node, loc):
+        return Tuple(self.visit(v) for v in node.elts).at(loc)
+
     def visit_Assign(self, node, loc):
         targ, = node.targets
         if isinstance(targ, ast.Tuple):
             raise MyiaSyntaxError(loc, "Deconstructing assignment is not supported.")
         if isinstance(targ, ast.Subscript):
-            raise MyiaSyntaxError(loc, "Assigning to subscripts or slices is not supported.")
-        val = self.visit(node.value)
-        return self.make_assign(targ.id, val, loc)
+            if not isinstance(targ.value, ast.Name):
+                raise MyiaSyntaxError(loc, "You can only set a slice on a variable.")
+            print(dir(targ.slice))
+
+            val = self.visit(node.value)
+            slice = Apply(Symbol('setslice'),
+                          self.visit(targ.value),
+                          self.visit(targ.slice), val)
+            return self.make_assign(targ.value.id, slice, loc)
+            
+        else:
+            val = self.visit(node.value)
+            return self.make_assign(targ.id, val, loc)
 
     def visit_FunctionDef(self, node, loc, allow_decorator=False):
         if node.args.vararg:
@@ -433,10 +461,8 @@ class Parser(LocVisitor):
 
     def visit_AugAssign(self, node, loc):
         targ = node.target
-        if isinstance(targ, ast.Tuple):
-            raise MyiaSyntaxError(loc, "Deconstructing assignment is not supported.")
         if isinstance(targ, ast.Subscript):
-            raise MyiaSyntaxError(loc, "Assigning to subscripts or slices is not supported.")
+            raise MyiaSyntaxError(loc, "Augmented assignment to subscripts or slices is not supported.")
         aug = self.visit(node.value)
         op = get_operator(node.op)
         prev = self.env[targ.id]
