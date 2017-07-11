@@ -1,5 +1,6 @@
 
 from myia.ast import \
+    MyiaASTNode, \
     Location, Symbol, Literal, \
     LetRec, If, Lambda, Apply, Begin, Tuple, Closure
 from myia.symbols import get_operator, builtins
@@ -20,7 +21,8 @@ _prevhook = sys.excepthook
 def exception_handler(exception_type, exception, traceback):
     if (exception_type == MyiaSyntaxError):
         print("{}: {}".format(exception_type.__name__, exception.message), file=sys.stderr)
-        print(exception.location.traceback(), file=sys.stderr)
+        if exception.location:
+            print(exception.location.traceback(), file=sys.stderr)
     else:
         _prevhook(exception_type, exception, traceback)
 sys.excepthook = exception_handler
@@ -106,7 +108,10 @@ class LocVisitor:
         except AttributeError:
             raise MyiaSyntaxError(loc,
                                   "Unrecognized Python AST node type: {}".format(cls))
-        return method(node, loc, **kwargs)
+        rval = method(node, loc, **kwargs)
+        if isinstance(rval, MyiaASTNode):
+            rval = rval.at(loc)
+        return rval
 
 
 class _Assign:
@@ -205,13 +210,27 @@ class Parser(LocVisitor):
         else:
             return helper(groups)
 
+    def visit_Module(self, node, loc, allow_decorator=False):
+        return [self.visit(stmt, allow_decorator=allow_decorator)
+                for stmt in node.body]
+
     def visit_Return(self, node, loc):
         if self.return_error:
             raise MyiaSyntaxError(loc, self.return_error)
         self.returns = True
         return self.visit(node.value).at(loc)
 
-    def new_variable(self, base_name):
+    def base_name(self, input):
+        if isinstance(input, str):
+            base_name = input
+        elif isinstance(input, ast.arg):
+            base_name = input.arg
+        elif isinstance(input, ast.Name):
+            base_name = input.id
+        return base_name
+
+    def new_variable(self, input):
+        base_name = self.base_name(input)
         sym = self.gensym(base_name)
         self.env.update({base_name: Redirect(sym.label)})
         # The following statement can override the previous, if sym.label == base_name
@@ -315,7 +334,7 @@ class Parser(LocVisitor):
             print(dir(targ.slice))
 
             val = self.visit(node.value)
-            slice = Apply(Symbol('setslice'),
+            slice = Apply(builtins.setslice,
                           self.visit(targ.value),
                           self.visit(targ.slice), val)
             return self.make_assign(targ.value.id, slice, loc)
@@ -469,6 +488,11 @@ class Parser(LocVisitor):
         val = Apply(op, prev, aug, location=loc)
         return self.make_assign(targ.id, val, loc)
 
+    def visit_Attribute(self, node, loc):
+        return Apply(builtins.getattr.at(loc),
+                     self.visit(node.value),
+                     Literal(node.attr).at(loc)).at(loc)
+
     def visit_arg(self, node, loc):
         return Symbol(node.arg, location=loc)
 
@@ -483,11 +507,13 @@ def _get_global_env(url):
     return _global_envs.setdefault(url, Env(namespace='global'))
 
 def parse_source(url, line, src):
-    tree = ast.parse(src).body[0]
+    tree = ast.parse(src)
     p = Parser(Locator(url, line), _get_global_env(url), top_level=True)
     r = p.visit(tree, allow_decorator=True)
     # print(p.global_env.bindings)
     # print(p.globals_accessed)
+    for k, v in p.global_env.bindings.items():
+        _validate(v)
     return p.global_env.bindings
 
 
@@ -506,3 +532,10 @@ def myia(fn):
     fn.data = bindings[fn.__name__].data
     fn.associates = bindings
     return fn
+
+
+def _validate(node):
+    if not node.location:
+        print('Missing location: {}'.format(node))
+    for child in node.children():
+        _validate(child)

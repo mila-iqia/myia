@@ -33,6 +33,9 @@ class MyiaASTNode:
         rval.location = location
         return rval
 
+    def children(self):
+        return []
+
     def __repr__(self):
         return str(self)
 
@@ -74,6 +77,12 @@ class LetRec(MyiaASTNode):
         self.location = location
         self.body = body
 
+    def children(self):
+        rval = []
+        for a, b in self.bindings:
+            rval += [a, b]
+        return rval + [self.body]
+
     def __str__(self):
         return '(letrec ({}) {})'.format(
             " ".join('({} {})'.format(k, v) for k, v in self.bindings),
@@ -96,6 +105,9 @@ class Lambda(MyiaASTNode):
         self.body = body
         self.location = location
 
+    def children(self):
+        return self.args + [self.body]
+
     def __str__(self):
         return '(lambda ({}) {})'.format(
             " ".join([str(arg) for arg in self.args]), str(self.body))
@@ -114,6 +126,9 @@ class If(MyiaASTNode):
         self.f = f
         self.location = location
 
+    def children(self):
+        return [self.cond, self.t, self.f]
+
     def __str__(self):
         return '(if {} {} {})'.format(self.cond, self.t, self.f)
 
@@ -127,8 +142,11 @@ class If(MyiaASTNode):
 class Apply(MyiaASTNode):
     def __init__(self, fn, *args, location=None):
         self.fn = fn
-        self.args = args
+        self.args = tuple(args)
         self.location = location
+
+    def children(self):
+        return (self.fn,) + self.args
 
     def __str__(self):
         return "({} {})".format(str(self.fn), " ".join(str(a) for a in self.args))
@@ -144,6 +162,9 @@ class Begin(MyiaASTNode):
         self.stmts = stmts
         self.location = location
 
+    def children(self):
+        return self.stmts
+
     def __str__(self):
         return "(begin {})".format(" ".join(map(str, self.stmts)))
 
@@ -157,6 +178,9 @@ class Tuple(MyiaASTNode):
         self.values = list(values)
         self.location = location
 
+    def children(self):
+        return self.values
+
     def __str__(self):
         return "{{{}}}".format(" ".join(map(str, self.values)))
 
@@ -168,6 +192,9 @@ class Closure(MyiaASTNode):
         self.fn = fn
         self.args = list(args)
         self.location = location
+
+    def children(self):
+        return [self.fn] + self.args
 
     def __str__(self):
         return '(closure {} {})'.format(self.fn, " ".join(map(str, self.args)))

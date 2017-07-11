@@ -31,7 +31,9 @@ builtins_dict = dict(
     range = _bsym('range'),
     index = _bsym('index'),
     map = _bsym('map'),
-    filter = _bsym('filter')
+    filter = _bsym('filter'),
+    getattr = _bsym('getattr'),
+    setslice = _bsym('setslice')
 )
 
 builtins = Props(builtins_dict)
