@@ -47,6 +47,14 @@ class Symbol(MyiaASTNode):
     def __str__(self):
         return self.label # + ':' + (self.namespace or '???')
 
+    def __descr__(self, _):
+        *first, last = self.label.split("#")
+        if len(first) == 0 or first == [""]:
+            return ({"Symbol"}, self.label, ({"Namespace"}, self.namespace or "???"))
+        else:
+            return ({"Symbol"}, "#".join(first), ({"SymbolIndex"}, last),
+                    ({"Namespace"}, self.namespace or "???"))
+
 
 class Literal(MyiaASTNode):
     def __init__(self, value, *, location=None):
@@ -55,6 +63,9 @@ class Literal(MyiaASTNode):
 
     def __str__(self):
         return repr(self.value)
+
+    def __descr__(self, recurse):
+        return ({"Literal"}, recurse(self.value))
 
 
 class LetRec(MyiaASTNode):
@@ -68,6 +79,15 @@ class LetRec(MyiaASTNode):
             " ".join('({} {})'.format(k, v) for k, v in self.bindings),
             self.body)
 
+    def __descr__(self, recurse):
+        return ({"LetRec"},
+                ({"Keyword"}, "letrec"),
+                ({"LetRecBindings"},
+                 *[[{"LetRecBinding"}, recurse(k), recurse(v)] for k, v in self.bindings]),
+                ({"Keyword"}, "in"),
+                ({"LetRecBody"}, recurse(self.body)))
+
+
 
 class Lambda(MyiaASTNode):
     def __init__(self, label, args, body, *, location=None):
@@ -80,6 +100,12 @@ class Lambda(MyiaASTNode):
         return '(lambda ({}) {})'.format(
             " ".join([str(arg) for arg in self.args]), str(self.body))
 
+    def __descr__(self, recurse):
+        return ({"Lambda"},
+                ({"Keyword"}, "λ"),
+                ({"LambdaArguments"}, *[recurse(a) for a in self.args]),
+                recurse(self.body))
+
 
 class If(MyiaASTNode):
     def __init__(self, cond, t, f, *, location=None):
@@ -91,6 +117,12 @@ class If(MyiaASTNode):
     def __str__(self):
         return '(if {} {} {})'.format(self.cond, self.t, self.f)
 
+    def __descr__(self, recurse):
+        return ({"If"},
+                ({"IfCond"}, recurse(self.cond)),
+                ({"IfTrue"}, recurse(self.t)),
+                ({"IfFalse"}, recurse(self.f)))
+
 
 class Apply(MyiaASTNode):
     def __init__(self, fn, *args, location=None):
@@ -101,6 +133,11 @@ class Apply(MyiaASTNode):
     def __str__(self):
         return "({} {})".format(str(self.fn), " ".join(str(a) for a in self.args))
 
+    def __descr__(self, recurse):
+        return ({"Apply"},
+                recurse(self.fn),
+                *[recurse(a) for a in self.args])
+
 
 class Begin(MyiaASTNode):
     def __init__(self, stmts, location=None):
@@ -110,6 +147,10 @@ class Begin(MyiaASTNode):
     def __str__(self):
         return "(begin {})".format(" ".join(map(str, self.stmts)))
 
+    def __descr__(self, recurse):
+        return ({"Begin"},
+                ({"Keyword"}, "begin"),
+                [recurse(a) for a in self.stmts])
 
 class Tuple(MyiaASTNode):
     def __init__(self, values, location=None):
@@ -119,6 +160,9 @@ class Tuple(MyiaASTNode):
     def __str__(self):
         return "{{{}}}".format(" ".join(map(str, self.values)))
 
+    def __descr__(self, recurse):
+        return ({"Tuple"}, *[recurse(a) for a in self.values])
+
 class Closure(MyiaASTNode):
     def __init__(self, fn, args, location=None):
         self.fn = fn
@@ -127,3 +171,8 @@ class Closure(MyiaASTNode):
 
     def __str__(self):
         return '(closure {} {})'.format(self.fn, " ".join(map(str, self.args)))
+
+    def __descr__(self, recurse):
+        return ({"Closure"},
+                recurse(self.fn),
+                *[recurse(a) for a in self.args])
