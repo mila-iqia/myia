@@ -180,16 +180,17 @@ class Parser(LocVisitor):
             base_name = input.id
         return base_name
 
-    def reg_lambda(self, args, body, label="#lambda", binding=None):
+    def reg_lambda(self, args, body, loc=None, label="#lambda", binding=None):
         ref = binding[1] if binding else self.global_env.gen.sym(label)
-        l = Lambda(ref.label, args, body)
+        l = Lambda(ref.label, args, body).at(loc)
         if not self.dry:
             self.global_env[ref.label] = l
         return ref
 
     def new_variable(self, input):
         base_name = self.base_name(input)
-        sym = self.gensym(base_name)
+        loc = self.make_location(input)
+        sym = self.gensym(base_name).at(loc)
         self.env.update({base_name: Redirect(sym.label)})
         # The following statement can override the previous, if sym.label == base_name
         # That is fine and intended.
@@ -201,7 +202,7 @@ class Parser(LocVisitor):
         self.local_assignments.add(base_name)
         return _Assign(sym, value, location)
 
-    def make_closure(self, inputs, expr, label="#lambda", binding=None):
+    def make_closure(self, inputs, expr, loc=None, label="#lambda", binding=None):
         p = Parser(self, pull_free_variables=True)
         binding = binding if binding else (label, self.global_env.gen.sym(label))
         sinputs = [p.new_variable(i) for i in inputs]
@@ -215,9 +216,9 @@ class Parser(LocVisitor):
             body = p.visit(expr)
         fargnames = list(p.free_variables.keys())
         fargs = [p.free_variables[k] for k in fargnames]
-        lbda = self.reg_lambda(fargs + sinputs, body, binding=binding).at(body)
+        lbda = self.reg_lambda(fargs + sinputs, body, loc=loc, binding=binding).at(loc)
         if len(fargs) > 0:
-            return Closure(lbda, [self.env[k] for k in fargnames])
+            return Closure(lbda, [self.env[k] for k in fargnames]).at(loc)
         else:
             return lbda
 
@@ -292,13 +293,13 @@ class Parser(LocVisitor):
         if isinstance(targ, ast.Subscript):
             raise MyiaSyntaxError(loc, "Augmented assignment to subscripts or slices is not supported.")
         aug = self.visit(node.value)
-        op = get_operator(node.op)
+        op = get_operator(node.op).at(loc)
         prev = self.env[targ.id]
         val = Apply(op, prev, aug, location=loc)
         return self.make_assign(targ.id, val, loc)
 
     def visit_BinOp(self, node, loc):
-        op = get_operator(node.op)
+        op = get_operator(node.op).at(loc)
         return Apply(op, self.visit(node.left), self.visit(node.right), location=loc)
 
     def visit_BoolOp(self, node, loc):
@@ -348,9 +349,11 @@ class Parser(LocVisitor):
 
         lbl = node.name if self.top_level else '#:' + node.name
         binding = (node.name, self.global_env.gen.sym(lbl))
-        return self.make_closure([arg.arg for arg in node.args.args],
+
+        return self.make_closure([arg for arg in node.args.args],
                                  node.body,
-                                 binding=binding).at(loc)
+                                 loc=loc,
+                                 binding=binding)
 
     def visit_If(self, node, loc):
         p1 = Parser(self)
@@ -385,7 +388,11 @@ class Parser(LocVisitor):
                 tmp = self.gensym('#tmp')
                 stmts = [_Assign(tmp, val, None)]
                 for i, a in enumerate(ass):
-                    stmt = self.make_assign(a, Apply(builtins.index, tmp, Literal(i)))
+                    idx = Apply(builtins.index,
+                                tmp,
+                                Literal(i).at(a.location),
+                                cannot_fail=True)
+                    stmt = self.make_assign(a, idx)
                     stmts.append(stmt)
                 return Begin(stmts)
 
@@ -399,8 +406,8 @@ class Parser(LocVisitor):
         return self.visit(node.value)
 
     def visit_Lambda(self, node, loc):
-        return self.make_closure([a.arg for a in node.args.args],
-                                 node.body).at(loc)
+        return self.make_closure([a for a in node.args.args],
+                                 node.body, loc=loc).at(loc)
 
     def visit_ListComp(self, node, loc):
         if len(node.generators) > 1:
@@ -416,12 +423,13 @@ class Parser(LocVisitor):
                     cond = If(p.visit(test), cond, Literal(False))
                 return cond
             arg = Apply(builtins.filter,
-                        self.make_closure([gen.target.id], mkcond, label="#filtercmp"),
+                        self.make_closure([gen.target], mkcond,
+                                          loc=loc, label="#filtercmp"),
                         self.visit(gen.iter))
         else:
             arg = self.visit(gen.iter)
 
-        lbda = self.make_closure([gen.target.id], node.elt, label="#listcmp")
+        lbda = self.make_closure([gen.target], node.elt, loc=loc, label="#listcmp")
 
         return Apply(builtins.map, lbda, arg, location=loc)
 
@@ -482,14 +490,14 @@ class Parser(LocVisitor):
 
         initial_values = [p.env[v] for v in out_vars]
         new_body = If(test,
-                      body(Apply(fsym, *[p.env[v] for v in in_vars])),
+                      body(Apply(fsym, *[p.env[v] for v in in_vars])).at(loc),
                       Tuple(initial_values))
 
         if not self.dry:
             self.global_env[fsym.label] = Lambda(fsym.label, in_syms, new_body, location=loc)
         self.globals_accessed.add(fsym.label)
 
-        tmp = self.gensym('#tmp')
+        tmp = self.gensym('#tmp').at(loc)
         val = Apply(fsym, *[self.env[v] for v in in_vars])
         stmts = [_Assign(tmp, val, None)]
         for i, v in enumerate(out_vars):
@@ -513,8 +521,10 @@ def parse_source(url, line, src):
     r = p.visit(tree, allow_decorator=True)
     # print(p.global_env.bindings)
     # print(p.globals_accessed)
-    for k, v in p.global_env.bindings.items():
-        _validate(v)
+
+    # for k, v in p.global_env.bindings.items():
+    #     _validate(v)
+
     return p.global_env.bindings
 
 
