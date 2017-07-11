@@ -23,3 +23,23 @@ Runtime debugging              | ✓    | ✗      | ✗          | ✓       | 
 * **Optimizing compiler**: For high-performance and portability a pipeline involving code generation for potentially multiple backends is preferred over an interpreted language
 * **Optimizing numerical stability**: Since the program formulation is intended to be more mathematical than numerical, we want our compiler to optimize for numerical stability
 * **Runtime debugging**: Certain numerical errors are easiest to debug when the user can easily print or log intermediate values, or drop into a debugger when certain conditions arise. Theano and TensorFlow provide custom debugging tools for this, but they are generally not as convenient as dropping into `pdb` in PyTorch or Autograd. Since Myia is envisioned as a subset of Python, it could support a Python-based mode similar to these frameworks.
+
+## Command line
+
+At this stage of development, the following commands are available:
+
+```bash
+$ python -m myia -h
+Myia
+
+Usage:
+  myia parse [FILE] [-e <expr>]
+  myia (-h | --help)
+  myia --version
+
+Options:
+  -h --help     Show this screen.
+  -e <expr>     Provide an expression to evaluate.
+  --version     Show version.
+```
+
