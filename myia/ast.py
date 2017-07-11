@@ -3,6 +3,10 @@
 from uuid import uuid1
 from copy import copy
 import textwrap
+import traceback
+
+
+__save_trace__ = False # __debug__
 
 
 class Location:
@@ -28,6 +32,15 @@ class Location:
 
 
 class MyiaASTNode:
+    def __init__(self, location=None):
+        self.location = location
+        if __save_trace__:
+            # TODO: make sure that we're always removing the right
+            # number of entries
+            self.trace = traceback.extract_stack()[:-2]
+        else:
+            self.trace = None
+
     def at(self, location):
         rval = copy(self)
         rval.location = location
@@ -41,11 +54,11 @@ class MyiaASTNode:
 
 
 class Symbol(MyiaASTNode):
-    def __init__(self, label, *, namespace=None, location=None):
+    def __init__(self, label, *, namespace=None, **kw):
+        super().__init__(**kw)
         assert isinstance(label, str)
         self.label = label
         self.namespace = namespace
-        self.location = location
 
     def __str__(self):
         return self.label # + ':' + (self.namespace or '???')
@@ -60,9 +73,9 @@ class Symbol(MyiaASTNode):
 
 
 class Literal(MyiaASTNode):
-    def __init__(self, value, *, location=None):
+    def __init__(self, value, **kw):
         self.value = value
-        self.location = location
+        super().__init__(**kw)
 
     def __str__(self):
         return repr(self.value)
@@ -72,9 +85,9 @@ class Literal(MyiaASTNode):
 
 
 class LetRec(MyiaASTNode):
-    def __init__(self, bindings, body, *, location=None):
+    def __init__(self, bindings, body, **kw):
+        super().__init__(**kw)
         self.bindings = bindings
-        self.location = location
         self.body = body
 
     def children(self):
@@ -99,11 +112,11 @@ class LetRec(MyiaASTNode):
 
 
 class Lambda(MyiaASTNode):
-    def __init__(self, label, args, body, *, location=None):
+    def __init__(self, label, args, body, **kw):
+        super().__init__(**kw)
         self.label = label
         self.args = args
         self.body = body
-        self.location = location
 
     def children(self):
         return self.args + [self.body]
@@ -120,11 +133,11 @@ class Lambda(MyiaASTNode):
 
 
 class If(MyiaASTNode):
-    def __init__(self, cond, t, f, *, location=None):
+    def __init__(self, cond, t, f, **kw):
+        super().__init__(**kw)
         self.cond = cond
         self.t = t
         self.f = f
-        self.location = location
 
     def children(self):
         return [self.cond, self.t, self.f]
@@ -140,10 +153,14 @@ class If(MyiaASTNode):
 
 
 class Apply(MyiaASTNode):
-    def __init__(self, fn, *args, location=None):
+    def __init__(self, fn, *args, cannot_fail=False, **kw):
+        super().__init__(**kw)
         self.fn = fn
         self.args = tuple(args)
-        self.location = location
+        # Boilerplate calls added by the parser should be annotated cannot_fail
+        # if they are not supposed to fail, so that when they inevitably do, blame
+        # can be assigned properly.
+        self.cannot_fail = cannot_fail
 
     def children(self):
         return (self.fn,) + self.args
@@ -158,9 +175,9 @@ class Apply(MyiaASTNode):
 
 
 class Begin(MyiaASTNode):
-    def __init__(self, stmts, location=None):
+    def __init__(self, stmts, **kw):
+        super().__init__(**kw)
         self.stmts = stmts
-        self.location = location
 
     def children(self):
         return self.stmts
@@ -174,9 +191,9 @@ class Begin(MyiaASTNode):
                 [recurse(a) for a in self.stmts])
 
 class Tuple(MyiaASTNode):
-    def __init__(self, values, location=None):
+    def __init__(self, values, **kw):
+        super().__init__(**kw)
         self.values = list(values)
-        self.location = location
 
     def children(self):
         return self.values
@@ -188,10 +205,10 @@ class Tuple(MyiaASTNode):
         return ({"Tuple"}, *[recurse(a) for a in self.values])
 
 class Closure(MyiaASTNode):
-    def __init__(self, fn, args, location=None):
+    def __init__(self, fn, args, **kw):
+        super().__init__(**kw)
         self.fn = fn
         self.args = list(args)
-        self.location = location
 
     def children(self):
         return [self.fn] + self.args
