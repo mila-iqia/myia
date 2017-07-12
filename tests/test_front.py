@@ -64,6 +64,11 @@ def myia_syntax_error(fn):
     return test
 
 
+############
+# Features #
+############
+
+
 @myia_test(((1, 2), 3))
 def test_just_add(x, y):
     return x + y
@@ -84,6 +89,7 @@ def test_if(x):
     else:
         return -1
 
+
 @myia_test((-100, 1), (-5, 2), (5, 3), (100, 4), (0, 5))
 def test_nested_if(x):
     if x < 0:
@@ -98,6 +104,7 @@ def test_nested_if(x):
             return 4
     else:
         return 5
+
 
 @myia_test((-1, 303), (0, 303), (1, 30))
 def test_if2(x):
@@ -116,11 +123,13 @@ def test_while(x, y):
         x -= y
     return x
 
+
 @myia_test(((10, 10), 200))
 def test_nested_while(x, y):
     result = 0
     i = x
-    j = 0 # Fails if this line is removed, see test_while_blockvar for why
+    # Fails if this line is removed, see test_while_blockvar for why
+    j = 0
     while i > 0:
         j = y
         while j > 0:
@@ -129,14 +138,17 @@ def test_nested_while(x, y):
         i -= 1
     return result
 
+
 @myia_test((50, 55))
 def test_closure(x):
     def g(y):
         # Closes over x
         return x + y
+
     def h():
         # Closes over g
         return g(5)
+
     return h()
 
 
@@ -188,10 +200,11 @@ def test_pow8(x):
 
 # Test nested loops
 # Computes y = x^10, d/dx=10x^9
+@xfail
 @myia_test(
     (2, 1024)
 )
-def pow10(x):
+def test_pow10(x):
     v = x
     j = 0
     while j < 3:
@@ -220,16 +233,19 @@ def test_stxerr_varargs2(**kw):
     "We do not support **kw"
     return 123
 
+
 @myia_syntax_error
 def test_stxerr_kwargs(x):
     "We do not support keyword arguments in function calls"
     return range(start = x, end = x)
+
 
 @myia_syntax_error
 def test_stxerr_function_slice(x):
     "We do not support setting a slice directly on the result of a call"
     (x + x)[0] = 1
     return x
+
 
 ##################
 # Known failures #
@@ -240,9 +256,26 @@ def test_stxerr_function_slice(x):
 @myia_test((50, 55))
 def test_forward_ref(x):
     def h():
+        # h does not have g in its closure, because it is
+        # defined before g
         return g(5)
 
     def g(y):
         return x + y
 
     return h()
+
+
+@xfail
+@myia_test((10, 0))
+def test_while_blockvar(x):
+    result = 0
+    while x > 0:
+        # The local block variable y causes the bug, because myia
+        # requires it to be set outside the block so that it is
+        # guaranteed to have a value if 0 loops are executed. This is
+        # what we want if y is referenced outside the loop, but it
+        # isn't in this case, so we want to fix this eventually.
+        y = x * x
+        x -= y
+    return result
