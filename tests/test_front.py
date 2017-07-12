@@ -1,4 +1,3 @@
-
 from myia.front import parse_function, MyiaSyntaxError
 from myia.interpret import evaluate
 import pytest
@@ -8,6 +7,7 @@ mark = pytest.mark
 xfail = pytest.mark.xfail
 
 _functions = {}
+
 
 def myia_test(*tests):
     """
@@ -24,8 +24,10 @@ def myia_test(*tests):
              as the argument(s) to the function. `output` must be
              the value the function should return for these inputs.
     """
+
     def decorate(fn):
         fname = fn.__name__
+
         def test(inputs, output):
             if fname not in _functions:
                 data = parse_function(fn)
@@ -38,21 +40,28 @@ def myia_test(*tests):
             assert python_result == output
             assert myia_result == output
         return pytest.mark.parametrize('inputs,output', list(tests))(test)
+
     return decorate
+
 
 def myia_syntax_error(fn):
     """
-    Decorate a test function that is expected to be a syntax error in myia.
+    Decorate a test function that is expected to produce a
+    syntax error in myia.
     """
     fname = fn.__name__
+
     def test():
         with pytest.raises(MyiaSyntaxError):
             parse_function(fn)
+
     return test
+
 
 @myia_test(((1, 2), 3))
 def test_just_add(x, y):
     return x + y
+
 
 @myia_test((13, -33))
 def test_shadow_variable(x):
@@ -61,12 +70,14 @@ def test_shadow_variable(x):
     x = -x
     return x
 
+
 @myia_test((-10, -1), (0, -1), (10, 1))
 def test_if(x):
     if x > 0:
         return 1
     else:
         return -1
+
 
 @myia_test((-1, 303), (0, 303), (1, 30))
 def test_if2(x):
@@ -77,6 +88,7 @@ def test_if2(x):
         a = 101
         b = 202
     return a + b
+
 
 @myia_test(((100, 10), 0), ((50, 7), -6))
 def test_while(x, y):
@@ -89,25 +101,29 @@ def test_while(x, y):
 # Errors #
 ##########
 
+
 @myia_syntax_error
 def test_stxerr_varargs1(x, y, *args):
     return 123
+
 
 @myia_syntax_error
 def test_stxerr_varargs2(**kw):
     return 123
 
 
-
 ##################
 # Known failures #
 ##################
+
 
 @xfail
 @myia_test((50, 55))
 def test_forward_ref(x):
     def h():
         return g(5)
+
     def g(y):
         return x + y
+
     return h()
