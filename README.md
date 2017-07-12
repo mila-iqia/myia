@@ -45,3 +45,12 @@ Options:
   --version     Show version.
 ```
 
+## Tests
+
+Run tests with:
+
+```bash
+$ pytest
+```
+
+Make sure that pytest is installed (`pip install pytest`) and myia is in your PYTHONPATH.
