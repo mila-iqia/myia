@@ -28,17 +28,23 @@ def myia_test(*tests):
     def decorate(fn):
         fname = fn.__name__
 
-        def test(inputs, output):
+        def test(inputs, output, gradOut=None):
             if fname not in _functions:
                 data = parse_function(fn)
                 _functions.update(data)
             node = _functions[fname]
+
             if not isinstance(inputs, tuple):
                 inputs = inputs,
+
             python_result = fn(*inputs)
             myia_result = evaluate(node, _functions)(*inputs)
+
             assert python_result == output
             assert myia_result == output
+            # TODO:
+            #assert grad_result == gradOut
+
         return pytest.mark.parametrize('inputs,output', list(tests))(test)
 
     return decorate
@@ -95,6 +101,70 @@ def test_while(x, y):
     while x > 0:
         x -= y
     return x
+
+
+# ReLU test with multiple return statements
+# If x > 0, then derivative is 1, else it's 0
+@myia_test(
+    (5, 5),
+    (0, 0),
+    (-1, 0)
+)
+def test_relu(x):
+    if x > 0:
+        return x
+    else:
+        return 0
+#testGrad(relu, [5], [5], [1])
+#testGrad(relu, [0], [0], [0])
+#testGrad(relu, [-1], [0], [0])
+
+
+# If x > y, then dx/dy = 1, else 0
+@myia_test(
+    ((7, 3), 7),
+    ((1, 3), 3)
+)
+def test_max(x, y):
+    if x > y:
+        return x
+    else:
+        return y
+#testGrad(max, [7, 3], [7], [1, 0])
+#testGrad(max, [1, 3], [3], [0, 1])
+
+
+# Computes x^8, d/dx = 8x^7
+@myia_test(
+    (2, 256),
+    (1, 1)
+)
+def test_pow8(x):
+    i = 0
+    while i < 3:
+        x = x * x
+        i = i + 1
+    return x
+#testGrad(pow8, [2], [256], [1024])
+#testGrad(pow8, [1], [1], [8])
+
+
+# Test nested loops
+# Computes y = x^10, d/dx=10x^9
+@myia_test(
+    (2, 1024)
+)
+def pow10(x):
+    v = x
+    j = 0
+    while j < 3:
+        i = 0
+        while i < 3:
+            v = v * x
+            i = i + 1
+        j = j + 1
+    return v
+#testGrad(pow10, [2], [1024], [5120])
 
 
 ##########
