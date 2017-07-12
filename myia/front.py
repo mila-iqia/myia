@@ -477,6 +477,10 @@ class Parser(LocVisitor):
                      self.visit(node.slice.value),
                      location=loc)
 
+    def visit_UnaryOp(self, node, loc):
+        op = get_operator(node.op).at(loc)
+        return Apply(op, self.visit(node.operand), location=loc)
+
     def visit_While(self, node, loc):
         fsym = self.global_env.gen.sym('#while')
 
@@ -508,7 +512,10 @@ class Parser(LocVisitor):
 
 def parse_function(fn):
     _, line = inspect.getsourcelines(fn)
-    return parse_source(inspect.getfile(fn), line, textwrap.dedent(inspect.getsource(fn)))
+    _, bindings = parse_source(inspect.getfile(fn),
+                               line,
+                               textwrap.dedent(inspect.getsource(fn)))
+    return bindings
 
 _global_envs = {}
 
@@ -525,7 +532,7 @@ def parse_source(url, line, src):
     # for k, v in p.global_env.bindings.items():
     #     _validate(v)
 
-    return p.global_env.bindings
+    return r, p.global_env.bindings
 
 
 def make_error_function(data):

@@ -29,6 +29,14 @@ if __name__ == '__main__':
             raise ValueError('Cannot provide a FILE and an expression at the same time.')
         text = expr if expr else open(file).read()
         url = '<command-line>' if expr else file
-        print(parse_source(url, 1, text))
+        r, bindings = parse_source(url, 1, text)
+        if bindings:
+            for k, v in bindings.items():
+                print('{}:\n  {}'.format(k, v))
+        else:
+            if not isinstance(r, list):
+                r = [r]
+            for entry in r:
+                print(entry)
     else:
         shame()
