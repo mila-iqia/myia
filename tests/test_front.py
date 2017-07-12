@@ -84,6 +84,20 @@ def test_if(x):
     else:
         return -1
 
+@myia_test((-100, 1), (-5, 2), (5, 3), (100, 4), (0, 5))
+def test_nested_if(x):
+    if x < 0:
+        if x < -10:
+            return 1
+        else:
+            return 2
+    elif x > 0:
+        if x < 10:
+            return 3
+        else:
+            return 4
+    else:
+        return 5
 
 @myia_test((-1, 303), (0, 303), (1, 30))
 def test_if2(x):
@@ -101,6 +115,29 @@ def test_while(x, y):
     while x > 0:
         x -= y
     return x
+
+@myia_test(((10, 10), 200))
+def test_nested_while(x, y):
+    result = 0
+    i = x
+    j = 0 # Fails if this line is removed, see test_while_blockvar for why
+    while i > 0:
+        j = y
+        while j > 0:
+            result += 2
+            j -= 1
+        i -= 1
+    return result
+
+@myia_test((50, 55))
+def test_closure(x):
+    def g(y):
+        # Closes over x
+        return x + y
+    def h():
+        # Closes over g
+        return g(5)
+    return h()
 
 
 # ReLU test with multiple return statements
@@ -174,13 +211,25 @@ def pow10(x):
 
 @myia_syntax_error
 def test_stxerr_varargs1(x, y, *args):
+    "We do not support *args"
     return 123
 
 
 @myia_syntax_error
 def test_stxerr_varargs2(**kw):
+    "We do not support **kw"
     return 123
 
+@myia_syntax_error
+def test_stxerr_kwargs(x):
+    "We do not support keyword arguments in function calls"
+    return range(start = x, end = x)
+
+@myia_syntax_error
+def test_stxerr_function_slice(x):
+    "We do not support setting a slice directly on the result of a call"
+    (x + x)[0] = 1
+    return x
 
 ##################
 # Known failures #
