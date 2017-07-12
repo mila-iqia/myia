@@ -1,5 +1,29 @@
 # Myia
 
+## Usage
+
+### Command line
+
+At this stage of development, the `parse` and `eval` commands are available. To get help:
+
+```bash
+$ python -m myia -h
+$ python -m myia parse -h
+$ python -m myia eval -h
+```
+
+### Tests
+
+Run tests with:
+
+```bash
+$ ./run_tests.sh
+```
+
+Make sure that pytest is installed (`pip install pytest`).
+
+## About Myia
+
 [![Build Status](https://travis-ci.com/mila-udem/myia.svg?token=p8b613NdVqVa9KeL48d5&branch=master)](https://travis-ci.com/mila-udem/myia)
 
 Myia is a research/prototyping project to develop a new toolchain for array programming with GPU support and automatic differentiation.
@@ -23,23 +47,3 @@ Runtime debugging              | ✓    | ✗      | ✗          | ✓       | 
 * **Optimizing compiler**: For high-performance and portability a pipeline involving code generation for potentially multiple backends is preferred over an interpreted language
 * **Optimizing numerical stability**: Since the program formulation is intended to be more mathematical than numerical, we want our compiler to optimize for numerical stability
 * **Runtime debugging**: Certain numerical errors are easiest to debug when the user can easily print or log intermediate values, or drop into a debugger when certain conditions arise. Theano and TensorFlow provide custom debugging tools for this, but they are generally not as convenient as dropping into `pdb` in PyTorch or Autograd. Since Myia is envisioned as a subset of Python, it could support a Python-based mode similar to these frameworks.
-
-## Command line
-
-At this stage of development, the `parse` and `eval` commands are available. To get help:
-
-```bash
-$ python -m myia -h
-$ python -m myia parse -h
-$ python -m myia eval -h
-```
-
-## Tests
-
-Run tests with:
-
-```bash
-$ pytest
-```
-
-Make sure that pytest is installed (`pip install pytest`) and myia is in your `PYTHONPATH`.

@@ -7,7 +7,10 @@ from .interpret import evaluate
 parser = argparse.ArgumentParser(prog='myia')
 subparsers = parser.add_subparsers(dest='command')
 
-p_parse = subparsers.add_parser('parse', help='Parse an expression and print its representation')
+p_parse = subparsers.add_parser(
+    'parse',
+    help='Parse an expression and print its representation'
+)
 p_parse.add_argument('FILE', nargs='?', help='The file to parse.')
 p_parse.add_argument('--expr', '-e', metavar='EXPR',
                      dest='expr', help='The expression to parse.')
