@@ -63,6 +63,14 @@ class Symbol(MyiaASTNode):
     def __str__(self):
         return self.label # + ':' + (self.namespace or '???')
 
+    def __eq__(self, s):
+        return isinstance(s, Symbol) \
+            and self.label == s.label \
+            and self.namespace == s.namespace
+
+    def __hash__(self):
+        return hash((self.label, self.namespace))
+
     def __descr__(self, _):
         *first, last = self.label.split("#")
         if len(first) == 0 or first == [""]:

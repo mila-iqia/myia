@@ -34,12 +34,14 @@ Myia
 
 Usage:
   myia parse [FILE] [-e <expr>]
+  myia eval [FILE] [-e <expr>] [--args <args>]
   myia (-h | --help)
   myia --version
 
 Options:
   -h --help     Show this screen.
   -e <expr>     Provide an expression to evaluate.
+  --args <args> Provide arguments to the function to evaluate.
   --version     Show version.
 ```
 

@@ -350,10 +350,12 @@ class Parser(LocVisitor):
         lbl = node.name if self.top_level else '#:' + node.name
         binding = (node.name, self.global_env.gen.sym(lbl))
 
-        return self.make_closure([arg for arg in node.args.args],
+        sym = self.new_variable(node.name)
+        clos = self.make_closure([arg for arg in node.args.args],
                                  node.body,
                                  loc=loc,
                                  binding=binding)
+        return _Assign(sym, clos, loc)
 
     def visit_If(self, node, loc):
         p1 = Parser(self)
@@ -390,7 +392,7 @@ class Parser(LocVisitor):
                 for i, a in enumerate(ass):
                     idx = Apply(builtins.index,
                                 tmp,
-                                Literal(i).at(a.location),
+                                Literal(i),
                                 cannot_fail=True)
                     stmt = self.make_assign(a, idx)
                     stmts.append(stmt)
@@ -484,15 +486,23 @@ class Parser(LocVisitor):
     def visit_While(self, node, loc):
         fsym = self.global_env.gen.sym('#while')
 
-        p = Parser(self, pull_free_variables=True)
-        p.return_error = "While loops cannot contain return statements."
+        # We visit the body once to get the free variables
+        testp = Parser(self, global_env=Env())
+        testp.return_error = "While loops cannot contain return statements."
+        testp.visit(node.test)
+        testp.visit_body(node.body, True)
+        in_vars = list(set(testp.free_variables.keys())|testp.local_assignments)
+        out_vars = list(testp.local_assignments)
+
+        # We visit once more, this time adding the free vars as parameters
+        p = Parser(self)
+        in_syms = [p.new_variable(v) for v in in_vars]
+        # Have to execute this before the body in order to get the right
+        # symbols, otherwise they will be shadowed
+        initial_values = [p.env[v] for v in out_vars]
         test = p.visit(node.test)
         body = p.visit_body(node.body, True)
-        in_vars = list(set(p.free_variables.keys()))
-        out_vars = list(p.local_assignments)
-        in_syms = [p.free_variables[v] for v in in_vars]
 
-        initial_values = [p.env[v] for v in out_vars]
         new_body = If(test,
                       body(Apply(fsym, *[p.env[v] for v in in_vars])).at(loc),
                       Tuple(initial_values))
@@ -508,6 +518,34 @@ class Parser(LocVisitor):
             stmt = self.make_assign(v, Apply(builtins.index, tmp, Literal(i)))
             stmts.append(stmt)
         return Begin(stmts)
+
+    # def visit_While(self, node, loc):
+    #     fsym = self.global_env.gen.sym('#while')
+
+    #     p = Parser(self, pull_free_variables=True)
+    #     p.return_error = "While loops cannot contain return statements."
+    #     test = p.visit(node.test)
+    #     body = p.visit_body(node.body, True)
+    #     in_vars = list(set(p.free_variables.keys())|p.local_assignments)
+    #     out_vars = list(p.local_assignments)
+    #     in_syms = [p.free_variables[v] for v in in_vars]
+
+    #     initial_values = [self.env[v] for v in out_vars]
+    #     new_body = If(test,
+    #                   body(Apply(fsym, *[p.env[v] for v in in_vars])).at(loc),
+    #                   Tuple(initial_values))
+
+    #     if not self.dry:
+    #         self.global_env[fsym.label] = Lambda(fsym.label, in_syms, new_body, location=loc)
+    #     self.globals_accessed.add(fsym.label)
+
+    #     tmp = self.gensym('#tmp').at(loc)
+    #     val = Apply(fsym, *[self.env[v] for v in in_vars])
+    #     stmts = [_Assign(tmp, val, None)]
+    #     for i, v in enumerate(out_vars):
+    #         stmt = self.make_assign(v, Apply(builtins.index, tmp, Literal(i)))
+    #         stmts.append(stmt)
+    #     return Begin(stmts)
 
 
 def parse_function(fn):
@@ -526,6 +564,12 @@ def parse_source(url, line, src):
     tree = ast.parse(src)
     p = Parser(Locator(url, line), _get_global_env(url), top_level=True)
     r = p.visit(tree, allow_decorator=True)
+
+    if isinstance(r, list):
+        r, = r
+    if isinstance(r, _Assign):
+        r = r.value
+
     # print(p.global_env.bindings)
     # print(p.globals_accessed)
 
