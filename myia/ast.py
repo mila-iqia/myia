@@ -1,12 +1,11 @@
-
-
 from uuid import uuid1
 from copy import copy
 import textwrap
 import traceback
 
 
-__save_trace__ = False # __debug__
+# __debug__
+__save_trace__ = False
 
 
 class Location:
@@ -23,7 +22,9 @@ class Location:
             with open(self.url) as file:
                 raw_code = file.readlines()[self.line - 1].rstrip("\n")
                 raw_caret = ' ' * self.column + '^'
-                code, caret = textwrap.dedent(raw_code + '\n' + raw_caret).split("\n")
+                code, caret = textwrap.dedent(
+                    raw_code + '\n' + raw_caret
+                ).split("\n")
             return '  File "{}", line {}, column {}\n    {}\n    {}'.format(
                 self.url, self.line, self.column, code, caret)
         except FileNotFoundError as e:
@@ -61,7 +62,7 @@ class Symbol(MyiaASTNode):
         self.namespace = namespace
 
     def __str__(self):
-        return self.label # + ':' + (self.namespace or '???')
+        return self.label
 
     def __eq__(self, s):
         return isinstance(s, Symbol) \
@@ -74,7 +75,11 @@ class Symbol(MyiaASTNode):
     def __descr__(self, _):
         *first, last = self.label.split("#")
         if len(first) == 0 or first == [""]:
-            return ({"Symbol"}, self.label, ({"Namespace"}, self.namespace or "???"))
+            return (
+                {"Symbol"},
+                self.label,
+                ({"Namespace"}, self.namespace or "???")
+            )
         else:
             return ({"Symbol"}, "#".join(first), ({"SymbolIndex"}, last),
                     ({"Namespace"}, self.namespace or "???"))
@@ -110,13 +115,16 @@ class LetRec(MyiaASTNode):
             self.body)
 
     def __descr__(self, recurse):
+        letRecBindings = [
+            [{"LetRecBinding"}, recurse(k), recurse(v)]
+            for
+            k, v in self.bindings
+        ]
         return ({"LetRec"},
                 ({"Keyword"}, "letrec"),
-                ({"LetRecBindings"},
-                 *[[{"LetRecBinding"}, recurse(k), recurse(v)] for k, v in self.bindings]),
+                ({"LetRecBindings"}, *letRecBindings),
                 ({"Keyword"}, "in"),
                 ({"LetRecBody"}, recurse(self.body)))
-
 
 
 class Lambda(MyiaASTNode):
@@ -165,16 +173,18 @@ class Apply(MyiaASTNode):
         super().__init__(**kw)
         self.fn = fn
         self.args = tuple(args)
-        # Boilerplate calls added by the parser should be annotated cannot_fail
-        # if they are not supposed to fail, so that when they inevitably do, blame
-        # can be assigned properly.
+        # Boilerplate calls added by the parser should be
+        # annotated cannot_fail if they are not supposed to fail,
+        # so that when they inevitably do, blame can be assigned properly.
         self.cannot_fail = cannot_fail
 
     def children(self):
         return (self.fn,) + self.args
 
     def __str__(self):
-        return "({} {})".format(str(self.fn), " ".join(str(a) for a in self.args))
+        return "({} {})".format(
+            str(self.fn), " ".join(str(a) for a in self.args)
+        )
 
     def __descr__(self, recurse):
         return ({"Apply"},
@@ -198,6 +208,7 @@ class Begin(MyiaASTNode):
                 ({"Keyword"}, "begin"),
                 [recurse(a) for a in self.stmts])
 
+
 class Tuple(MyiaASTNode):
     def __init__(self, values, **kw):
         super().__init__(**kw)
@@ -211,6 +222,7 @@ class Tuple(MyiaASTNode):
 
     def __descr__(self, recurse):
         return ({"Tuple"}, *[recurse(a) for a in self.values])
+
 
 class Closure(MyiaASTNode):
     def __init__(self, fn, args, **kw):

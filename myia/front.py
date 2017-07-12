@@ -1,4 +1,3 @@
-
 from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Literal, \
@@ -18,13 +17,20 @@ class MyiaSyntaxError(Exception):
 
 
 _prevhook = sys.excepthook
+
+
 def exception_handler(exception_type, exception, traceback):
     if (exception_type == MyiaSyntaxError):
-        print("{}: {}".format(exception_type.__name__, exception.message), file=sys.stderr)
+        print(
+            "{}: {}".format(exception_type.__name__, exception.message),
+            file=sys.stderr
+        )
         if exception.location:
             print(exception.location.traceback(), file=sys.stderr)
     else:
         _prevhook(exception_type, exception, traceback)
+
+
 sys.excepthook = exception_handler
 
 
@@ -88,7 +94,11 @@ class Locator:
 
     def __call__(self, node):
         try:
-            return Location(self.url, node.lineno + self.line_offset - 1, node.col_offset)
+            return Location(
+                self.url,
+                node.lineno + self.line_offset - 1,
+                node.col_offset
+            )
         except AttributeError:
             return None
 
@@ -106,8 +116,10 @@ class LocVisitor:
         try:
             method = getattr(self, 'visit_' + cls)
         except AttributeError:
-            raise MyiaSyntaxError(loc,
-                                  "Unrecognized Python AST node type: {}".format(cls))
+            raise MyiaSyntaxError(
+                loc,
+                "Unrecognized Python AST node type: {}".format(cls)
+            )
         rval = method(node, loc, **kwargs)
         if isinstance(rval, MyiaASTNode):
             rval = rval.at(loc)
@@ -121,7 +133,10 @@ class _Assign:
         self.location = location
 
 
+# FIXME: please comment this, or consider using plain Python None
 _c = object()
+
+
 def group(arr, classify):
     current_c = _c
     results = []
@@ -150,7 +165,7 @@ class Parser(LocVisitor):
         self.returns = False
         self.pull_free_variables = pull_free_variables
         self.top_level = top_level
-        
+
         if isinstance(parent, Locator):
             self.parent = None
             self.env = Env()
@@ -192,7 +207,8 @@ class Parser(LocVisitor):
         loc = self.make_location(input)
         sym = self.gensym(base_name).at(loc)
         self.env.update({base_name: Redirect(sym.label)})
-        # The following statement can override the previous, if sym.label == base_name
+        # The following statement can override the previous,
+        # if sym.label == base_name
         # That is fine and intended.
         self.env.update({sym.label: sym})
         return sym
@@ -202,9 +218,17 @@ class Parser(LocVisitor):
         self.local_assignments.add(base_name)
         return _Assign(sym, value, location)
 
-    def make_closure(self, inputs, expr, loc=None, label="#lambda", binding=None):
+    def make_closure(
+        self,
+        inputs,
+        expr,
+        loc=None,
+        label="#lambda",
+        binding=None
+    ):
         p = Parser(self, pull_free_variables=True)
-        binding = binding if binding else (label, self.global_env.gen.sym(label))
+        if binding is None:
+            binding = (label, self.global_env.gen.sym(label))
         sinputs = [p.new_variable(i) for i in inputs]
         p.env[binding[0]] = binding[1]
         p.env.update({k: v for k, v in zip(inputs, sinputs)})
@@ -216,7 +240,11 @@ class Parser(LocVisitor):
             body = p.visit(expr)
         fargnames = list(p.free_variables.keys())
         fargs = [p.free_variables[k] for k in fargnames]
-        lbda = self.reg_lambda(fargs + sinputs, body, loc=loc, binding=binding).at(loc)
+        lbda = self.reg_lambda(
+            fargs + sinputs,
+            body,
+            loc=loc,
+            binding=binding).at(loc)
         if len(fargs) > 0:
             return Closure(lbda, [self.env[k] for k in fargnames]).at(loc)
         else:
@@ -228,20 +256,26 @@ class Parser(LocVisitor):
             ret = self.returns
             r = self.visit(stmt)
             if ret:
-                raise MyiaSyntaxError(r.location,
-                                      "There should be no statements after return.")
+                raise MyiaSyntaxError(
+                    r.location,
+                    "There should be no statements after return."
+                )
             if isinstance(r, Begin):
                 results += r.stmts
             else:
                 results.append(r)
         groups = group(results, lambda x: isinstance(x, _Assign))
+
         def helper(groups, result=None):
             (isass, grp), *rest = groups
             if isass:
                 bindings = tuple((a.varname, a.value) for a in grp)
                 if len(rest) == 0:
                     if result is None:
-                        raise MyiaSyntaxError(grp[-1].location, "Missing return statement.")
+                        raise MyiaSyntaxError(
+                            grp[-1].location,
+                            "Missing return statement."
+                        )
                     else:
                         return LetRec(bindings, result)
                 return LetRec(bindings, helper(rest, result))
@@ -267,10 +301,16 @@ class Parser(LocVisitor):
     def visit_Assign(self, node, loc):
         targ, = node.targets
         if isinstance(targ, ast.Tuple):
-            raise MyiaSyntaxError(loc, "Deconstructing assignment is not supported.")
+            raise MyiaSyntaxError(
+                loc,
+                "Deconstructing assignment is not supported."
+            )
         if isinstance(targ, ast.Subscript):
             if not isinstance(targ.value, ast.Name):
-                raise MyiaSyntaxError(loc, "You can only set a slice on a variable.")
+                raise MyiaSyntaxError(
+                    loc,
+                    "You can only set a slice on a variable."
+                )
             print(dir(targ.slice))
 
             val = self.visit(node.value)
@@ -278,7 +318,7 @@ class Parser(LocVisitor):
                           self.visit(targ.value),
                           self.visit(targ.slice), val)
             return self.make_assign(targ.value.id, slice, loc)
-            
+
         else:
             val = self.visit(node.value)
             return self.make_assign(targ.id, val, loc)
@@ -291,7 +331,11 @@ class Parser(LocVisitor):
     def visit_AugAssign(self, node, loc):
         targ = node.target
         if isinstance(targ, ast.Subscript):
-            raise MyiaSyntaxError(loc, "Augmented assignment to subscripts or slices is not supported.")
+            raise MyiaSyntaxError(
+                loc,
+                "Augmented assignment to subscripts or "
+                "slices is not supported."
+            )
         aug = self.visit(node.value)
         op = get_operator(node.op).at(loc)
         prev = self.env[targ.id]
@@ -300,7 +344,10 @@ class Parser(LocVisitor):
 
     def visit_BinOp(self, node, loc):
         op = get_operator(node.op).at(loc)
-        return Apply(op, self.visit(node.left), self.visit(node.right), location=loc)
+        return Apply(
+            op,
+            self.visit(node.left),
+            self.visit(node.right), location=loc)
 
     def visit_BoolOp(self, node, loc):
         left, right = node.values
@@ -314,20 +361,27 @@ class Parser(LocVisitor):
     def visit_Call(self, node, loc):
         if (len(node.keywords) > 0):
             raise MyiaSyntaxError(loc, "Keyword arguments are not allowed.")
-        return Apply(self.visit(node.func),
-                     *[self.visit(arg) for arg in node.args],
-                     location=loc)
-
+        return Apply(
+            self.visit(node.func),
+            *[self.visit(arg) for arg in node.args],
+            location=loc
+        )
 
     def visit_Compare(self, node, loc):
         ops = [get_operator(op) for op in node.ops]
         if len(ops) == 1:
-            return Apply(ops[0], self.visit(node.left), self.visit(node.comparators[0]))
+            return Apply(
+                ops[0],
+                self.visit(node.left),
+                self.visit(node.comparators[0])
+            )
         else:
-            raise MyiaSyntaxError(loc,
-                                  "Comparisons must have a maximum of two operands")
+            raise MyiaSyntaxError(
+                loc,
+                "Comparisons must have a maximum of two operands"
+            )
 
-    def visit_Expr(self, node, loc, allow_decorator='this is a dummy_parameter'):
+    def visit_Expr(self, node, loc, allow_decorator='dummy_parameter'):
         return self.visit(node.value)
 
     def visit_ExtSlice(self, node, loc):
@@ -341,7 +395,10 @@ class Parser(LocVisitor):
         if node.args.kwarg:
             raise MyiaSyntaxError(loc, "Varargs are not allowed.")
         if node.args.kwonlyargs:
-            raise MyiaSyntaxError(loc, "Keyword-only arguments are not allowed.")
+            raise MyiaSyntaxError(
+                loc,
+                "Keyword-only arguments are not allowed."
+            )
         if node.args.defaults or node.args.kw_defaults:
             raise MyiaSyntaxError(loc, "Default arguments are not allowed.")
         if not allow_decorator and len(node.decorator_list) > 0:
@@ -363,10 +420,21 @@ class Parser(LocVisitor):
         p2 = Parser(self)
         orelse = p2.visit_body(node.orelse, True)
         if p1.returns != p2.returns:
-            raise MyiaSyntaxError(loc, "Either none or all branches of an if statement must return a value.")
+            raise MyiaSyntaxError(
+                loc,
+                "Either none or all branches of an if statement must return "
+                "a value."
+            )
         if p1.local_assignments != p2.local_assignments:
-            raise MyiaSyntaxError(loc, "All branches of an if statement must assign to the same set of variables.\nTrue branch sets: {}\nElse branch sets: {}".format(" ".join(sorted(p1.local_assignments)), " ".join(sorted(p2.local_assignments))))
-
+            raise MyiaSyntaxError(
+                loc,
+                "All branches of an if statement must assign to the same set "
+                " of variables.\nTrue branch sets: {}\nElse branch sets: {}"
+                .format(
+                    " ".join(sorted(p1.local_assignments)),
+                    " ".join(sorted(p2.local_assignments))
+                )
+            )
         if p1.returns:
             self.returns = True
             return If(self.visit(node.test),
@@ -413,17 +481,21 @@ class Parser(LocVisitor):
 
     def visit_ListComp(self, node, loc):
         if len(node.generators) > 1:
-            raise MyiaSyntaxError(loc,
-                "List comprehensions can only iterate over a single target")
+            raise MyiaSyntaxError(
+                loc,
+                "List comprehensions can only iterate over a single target"
+            )
 
         gen = node.generators[0]
         if len(gen.ifs) > 0:
             test1, *others = reversed(gen.ifs)
+
             def mkcond(p):
                 cond = p.visit(test1)
                 for test in others:
                     cond = If(p.visit(test), cond, Literal(False))
                 return cond
+
             arg = Apply(builtins.filter,
                         self.make_closure([gen.target], mkcond,
                                           loc=loc, label="#filtercmp"),
@@ -431,7 +503,12 @@ class Parser(LocVisitor):
         else:
             arg = self.visit(gen.iter)
 
-        lbda = self.make_closure([gen.target], node.elt, loc=loc, label="#listcmp")
+        lbda = self.make_closure(
+            [gen.target],
+            node.elt,
+            loc=loc,
+            label="#listcmp"
+        )
 
         return Apply(builtins.map, lbda, arg, location=loc)
 
@@ -491,7 +568,9 @@ class Parser(LocVisitor):
         testp.return_error = "While loops cannot contain return statements."
         testp.visit(node.test)
         testp.visit_body(node.body, True)
-        in_vars = list(set(testp.free_variables.keys())|testp.local_assignments)
+        in_vars = list(
+            set(testp.free_variables.keys()) | testp.local_assignments
+        )
         out_vars = list(testp.local_assignments)
 
         # We visit once more, this time adding the free vars as parameters
@@ -508,7 +587,12 @@ class Parser(LocVisitor):
                       Tuple(initial_values))
 
         if not self.dry:
-            self.global_env[fsym.label] = Lambda(fsym.label, in_syms, new_body, location=loc)
+            self.global_env[fsym.label] = Lambda(
+                fsym.label,
+                in_syms,
+                new_body,
+                location=loc
+            )
         self.globals_accessed.add(fsym.label)
 
         tmp = self.gensym('#tmp').at(loc)
@@ -532,18 +616,21 @@ class Parser(LocVisitor):
 
     #     initial_values = [self.env[v] for v in out_vars]
     #     new_body = If(test,
-    #                   body(Apply(fsym, *[p.env[v] for v in in_vars])).at(loc),
+    #                   body(Apply(
+    #                       fsym, *[p.env[v] for v in in_vars])).at(loc),
     #                   Tuple(initial_values))
 
     #     if not self.dry:
-    #         self.global_env[fsym.label] = Lambda(fsym.label, in_syms, new_body, location=loc)
+    #         self.global_env[fsym.label] = Lambda(
+    #           fsym.label, in_syms, new_body, location=loc)
     #     self.globals_accessed.add(fsym.label)
 
     #     tmp = self.gensym('#tmp').at(loc)
     #     val = Apply(fsym, *[self.env[v] for v in in_vars])
     #     stmts = [_Assign(tmp, val, None)]
     #     for i, v in enumerate(out_vars):
-    #         stmt = self.make_assign(v, Apply(builtins.index, tmp, Literal(i)))
+    #         stmt = self.make_assign(
+    #            v, Apply(builtins.index, tmp, Literal(i)))
     #         stmts.append(stmt)
     #     return Begin(stmts)
 
@@ -557,8 +644,10 @@ def parse_function(fn):
 
 _global_envs = {}
 
+
 def _get_global_env(url):
     return _global_envs.setdefault(url, Env(namespace='global'))
+
 
 def parse_source(url, line, src):
     tree = ast.parse(src)
@@ -581,9 +670,12 @@ def parse_source(url, line, src):
 
 def make_error_function(data):
     def _f(*args, **kwargs):
-        raise Exception("Function {} is for internal use only.".format(data["name"]))
+        raise Exception(
+            "Function {} is for internal use only.".format(data["name"])
+        )
     _f.data = data
     return _f
+
 
 def myia(fn):
     data = parse_function(fn)

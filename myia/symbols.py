@@ -6,6 +6,7 @@ class Props:
     def __init__(self, d):
         self.__dict__ = d
 
+
 def _bsym(name):
     return Symbol(name, namespace='builtin')
 
@@ -110,10 +111,9 @@ def _update_function_map():
 
 # END]]]
 
+
 def get_operator(node):
     try:
         return operator_map[node.__class__.__name__]
     except KeyError:
         raise NotImplementedError("Unknown operator: {}".format(node))
-
-

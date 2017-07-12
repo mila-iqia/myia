@@ -14,26 +14,37 @@ p_parse.add_argument('--expr', '-e', metavar='EXPR',
 
 p_eval = subparsers.add_parser('eval', help='eval help')
 p_eval.add_argument('FILE', nargs='?', help='The file to evaluate.')
-p_eval.add_argument('--expr', '-e', metavar='EXPR',
-                     dest='expr', help='The expression to evaluate.')
+p_eval.add_argument(
+    '--expr',
+    '-e',
+    metavar='EXPR',
+    dest='expr',
+    help='The expression to evaluate.'
+)
 p_eval.add_argument('--args', metavar='ARGS',
                     dest='args',
                     help='Arguments to provide to the function.')
 
+
 def shame():
-    raise NotImplementedError('You provided a command to myia that is not yet implemented. This is clearly the fault of myia developers. They are terrible. You should tell them.')
+    raise NotImplementedError(
+        'You provided a command to myia that is not yet implemented.'
+    )
 
 
 def getcode(arguments):
     expr, file = arguments.expr, arguments.FILE
     if expr and file:
-        raise ValueError('Cannot provide a FILE and an expression at the same time.')
+        raise ValueError(
+            'Cannot provide a FILE and an expression at the same time.'
+        )
     if not expr and not file:
         print('Must provide FILE or use -e option.', file=sys.stderr)
         sys.exit(1)
     code = expr if expr else open(file).read()
     url = '<command-line>' if expr else file
     return url, code
+
 
 def command_parse(arguments):
     url, code = getcode(arguments)
@@ -46,6 +57,7 @@ def command_parse(arguments):
             r = [r]
         for entry in r:
             print(entry)
+
 
 def command_eval(arguments):
     url, code = getcode(arguments)

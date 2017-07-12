@@ -1,4 +1,3 @@
-
 from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Literal, \
@@ -7,6 +6,7 @@ from myia.ast import \
 from .symbols import builtins
 
 _global_env = {}
+
 
 def impl(sym):
     def decorator(fn):
@@ -19,33 +19,41 @@ def impl(sym):
 def add(x, y):
     return x + y
 
+
 @impl(builtins.subtract)
 def subtract(x, y):
     return x - y
+
 
 @impl(builtins.multiply)
 def multiply(x, y):
     return x * y
 
+
 @impl(builtins.divide)
 def divide(x, y):
     return x / y
+
 
 @impl(builtins.unary_subtract)
 def unary_subtract(x):
     return -x
 
+
 @impl(builtins.less)
 def less(x, y):
     return x < y
+
 
 @impl(builtins.greater)
 def greater(x, y):
     return x > y
 
+
 @impl(builtins.index)
 def greater(t, i):
     return t[i]
+
 
 @impl(builtins.map)
 def _map(f, xs):
@@ -62,7 +70,9 @@ class Evaluator:
         try:
             method = getattr(self, 'eval_' + cls)
         except AttributeError:
-            raise Exception("Unrecognized node type for evaluation: {}".format(cls))
+            raise Exception(
+                "Unrecognized node type for evaluation: {}".format(cls)
+            )
         rval = method(node)
         return rval
 
@@ -80,8 +90,10 @@ class Evaluator:
     def eval_Closure(self, node):
         fn = self.eval(node.fn)
         args = list(map(self.eval, node.args))
+
         def partial(*args2):
             return fn(*args, *args2)
+
         return partial
 
     def eval_If(self, node):
@@ -92,7 +104,10 @@ class Evaluator:
 
     def eval_Lambda(self, node):
         def func(*args):
-            ev = Evaluator({s: arg for s, arg in zip(node.args, args)}, self.global_env)
+            ev = Evaluator(
+                {s: arg for s, arg in zip(node.args, args)},
+                self.global_env
+            )
             return ev.eval(node.body)
         return func
 
@@ -121,4 +136,3 @@ def evaluate(node, bindings):
     for k, v in bindings.items():
         env[Symbol(k, namespace='global')] = Evaluator({}, env).eval(v)
     return Evaluator({}, env).eval(node)
-
