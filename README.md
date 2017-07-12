@@ -26,23 +26,12 @@ Runtime debugging              | ✓    | ✗      | ✗          | ✓       | 
 
 ## Command line
 
-At this stage of development, the following commands are available:
+At this stage of development, the `parse` and `eval` commands are available. To get help:
 
 ```bash
 $ python -m myia -h
-Myia
-
-Usage:
-  myia parse [FILE] [-e <expr>]
-  myia eval [FILE] [-e <expr>] [--args <args>]
-  myia (-h | --help)
-  myia --version
-
-Options:
-  -h --help     Show this screen.
-  -e <expr>     Provide an expression to evaluate.
-  --args <args> Provide arguments to the function to evaluate.
-  --version     Show version.
+$ python -m myia parse -h
+$ python -m myia eval -h
 ```
 
 ## Tests
@@ -53,4 +42,4 @@ Run tests with:
 $ pytest
 ```
 
-Make sure that pytest is installed (`pip install pytest`) and myia is in your PYTHONPATH.
+Make sure that pytest is installed (`pip install pytest`) and myia is in your `PYTHONPATH`.
