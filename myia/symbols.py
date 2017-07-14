@@ -2,8 +2,10 @@
 from .ast import Symbol, Literal
 from .util import Props
 
+
 def _bsym(name):
     return Symbol(name, namespace='builtin')
+
 
 builtins_dict = dict(
     add = _bsym('add'),
@@ -32,7 +34,9 @@ builtins_dict = dict(
     setslice = _bsym('setslice')
 )
 
+
 builtins = Props(builtins_dict)
+
 
 operator_map = dict(
     Add = builtins.add,
