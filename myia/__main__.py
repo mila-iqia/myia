@@ -49,6 +49,10 @@ def getcode(arguments):
     return url, code
 
 
+def command_None(arguments):
+    parser.print_help()
+
+
 def command_parse(arguments):
     url, code = getcode(arguments)
     r, bindings = parse_source(url, 1, code)
@@ -73,6 +77,7 @@ def command_eval(arguments):
         print(result(*args))
     else:
         print(result)
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
