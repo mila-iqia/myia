@@ -2,6 +2,7 @@ from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Literal, \
     LetRec, If, Lambda, Apply, Begin, Tuple, Closure
+from myia.util import group_contiguous
 from myia.symbols import get_operator, builtins
 from uuid import uuid4 as uuid
 import ast
@@ -133,28 +134,6 @@ class _Assign:
         self.location = location
 
 
-# FIXME: please comment this, or consider using plain Python None
-_c = object()
-
-
-def group(arr, classify):
-    current_c = _c
-    results = []
-    current = []
-    for a in arr:
-        c = classify(a)
-        if current_c == c:
-            current.append(a)
-        else:
-            if current_c is not _c:
-                results.append((current_c, current))
-            current_c = c
-            current = [a]
-    if current_c is not _c:
-        results.append((current_c, current))
-    return results
-
-
 class Parser(LocVisitor):
 
     def __init__(self, parent, global_env=None, dry=None,
@@ -264,7 +243,7 @@ class Parser(LocVisitor):
                 results += r.stmts
             else:
                 results.append(r)
-        groups = group(results, lambda x: isinstance(x, _Assign))
+        groups = group_contiguous(results, lambda x: isinstance(x, _Assign))
 
         def helper(groups, result=None):
             (isass, grp), *rest = groups

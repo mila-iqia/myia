@@ -1,11 +1,6 @@
 
 from .ast import Symbol, Literal
-
-
-class Props:
-    def __init__(self, d):
-        self.__dict__ = d
-
+from .util import Props
 
 def _bsym(name):
     return Symbol(name, namespace='builtin')
