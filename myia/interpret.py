@@ -1,7 +1,7 @@
 from myia.ast import \
     MyiaASTNode, \
-    Location, Symbol, Literal, \
-    LetRec, If, Lambda, Apply, Begin, Tuple, Closure
+    Location, Symbol, Value, \
+    Let, If, Lambda, Apply, Begin, Tuple, Closure
 
 from .symbols import builtins
 
@@ -111,13 +111,10 @@ class Evaluator:
             return ev.eval(node.body)
         return func
 
-    def eval_LetRec(self, node):
+    def eval_Let(self, node):
         for k, v in node.bindings:
             self.env[k] = self.eval(v)
         return self.eval(node.body)
-
-    def eval_Literal(self, node):
-        return node.value
 
     def eval_Symbol(self, node):
         try:
@@ -127,6 +124,9 @@ class Evaluator:
 
     def eval_Tuple(self, node):
         return tuple(self.eval(x) for x in node.values)
+
+    def eval_Value(self, node):
+        return node.value
 
 
 def evaluate(node, bindings):

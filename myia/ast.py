@@ -27,7 +27,7 @@ class Location:
                 ).split("\n")
             return '  File "{}", line {}, column {}\n    {}\n    {}'.format(
                 self.url, self.line, self.column, code, caret)
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             return '  File "{}", line {}, column {}'.format(
                 self.url, self.line, self.column)
 
@@ -85,7 +85,7 @@ class Symbol(MyiaASTNode):
                     ({"Namespace"}, self.namespace or "???"))
 
 
-class Literal(MyiaASTNode):
+class Value(MyiaASTNode):
     def __init__(self, value, **kw):
         self.value = value
         super().__init__(**kw)
@@ -94,10 +94,10 @@ class Literal(MyiaASTNode):
         return repr(self.value)
 
     def __descr__(self, recurse):
-        return ({"Literal"}, recurse(self.value))
+        return ({"Value"}, recurse(self.value))
 
 
-class LetRec(MyiaASTNode):
+class Let(MyiaASTNode):
     def __init__(self, bindings, body, **kw):
         super().__init__(**kw)
         self.bindings = bindings
@@ -110,21 +110,21 @@ class LetRec(MyiaASTNode):
         return rval + [self.body]
 
     def __str__(self):
-        return '(letrec ({}) {})'.format(
+        return '(let ({}) {})'.format(
             " ".join('({} {})'.format(k, v) for k, v in self.bindings),
             self.body)
 
     def __descr__(self, recurse):
-        letRecBindings = [
-            [{"LetRecBinding"}, recurse(k), recurse(v)]
+        letBindings = [
+            [{"LetBinding"}, recurse(k), recurse(v)]
             for
             k, v in self.bindings
         ]
-        return ({"LetRec"},
-                ({"Keyword"}, "letrec"),
-                ({"LetRecBindings"}, *letRecBindings),
+        return ({"Let"},
+                ({"Keyword"}, "let"),
+                ({"LetBindings"}, *letBindings),
                 ({"Keyword"}, "in"),
-                ({"LetRecBody"}, recurse(self.body)))
+                ({"LetBody"}, recurse(self.body)))
 
 
 class Lambda(MyiaASTNode):

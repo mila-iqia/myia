@@ -1,5 +1,5 @@
 
-from .ast import Symbol, Literal
+from .ast import Symbol, Value
 from .util import Props
 
 
@@ -90,7 +90,7 @@ def _add_numpy_map():
         _.multiply: builtins.multiply,
         _.subtract: builtins.subtract
     }
-    numpy_map[_] = Literal(_)
+    numpy_map[_] = Value(_)
 
     global function_map
     function_map = {**function_map, **numpy_map}

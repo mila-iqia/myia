@@ -1,7 +1,7 @@
 from myia.ast import \
     MyiaASTNode, \
-    Location, Symbol, Literal, \
-    LetRec, If, Lambda, Apply, Begin, Tuple, Closure
+    Location, Symbol, Value, \
+    Let, If, Lambda, Apply, Begin, Tuple, Closure
 from myia.util import group_contiguous
 from myia.symbols import get_operator, builtins
 from uuid import uuid4 as uuid
@@ -21,7 +21,7 @@ _prevhook = sys.excepthook
 
 
 def exception_handler(exception_type, exception, traceback):
-    if (exception_type == MyiaSyntaxError):
+    if exception_type == MyiaSyntaxError:
         print(
             "{}: {}".format(exception_type.__name__, exception.message),
             file=sys.stderr
@@ -256,8 +256,8 @@ class Parser(LocVisitor):
                             "Missing return statement."
                         )
                     else:
-                        return LetRec(bindings, result)
-                return LetRec(bindings, helper(rest, result))
+                        return Let(bindings, result)
+                return Let(bindings, helper(rest, result))
             elif len(rest) == 0:
                 if len(grp) == 1:
                     return grp[0]
@@ -305,7 +305,7 @@ class Parser(LocVisitor):
     def visit_Attribute(self, node, loc):
         return Apply(builtins.getattr.at(loc),
                      self.visit(node.value),
-                     Literal(node.attr).at(loc)).at(loc)
+                     Value(node.attr).at(loc)).at(loc)
 
     def visit_AugAssign(self, node, loc):
         targ = node.target
@@ -331,9 +331,9 @@ class Parser(LocVisitor):
     def visit_BoolOp(self, node, loc):
         left, right = node.values
         if isinstance(node.op, ast.And):
-            return If(self.visit(left), self.visit(right), Literal(False))
+            return If(self.visit(left), self.visit(right), Value(False))
         elif isinstance(node.op, ast.Or):
-            return If(self.visit(left), Literal(True), self.visit(right))
+            return If(self.visit(left), Value(True), self.visit(right))
         else:
             raise MyiaSyntaxError(loc, "Unknown operator: {}".format(node.op))
 
@@ -439,7 +439,7 @@ class Parser(LocVisitor):
                 for i, a in enumerate(ass):
                     idx = Apply(builtins.index,
                                 tmp,
-                                Literal(i),
+                                Value(i),
                                 cannot_fail=True)
                     stmt = self.make_assign(a, idx)
                     stmts.append(stmt)
@@ -472,7 +472,7 @@ class Parser(LocVisitor):
             def mkcond(p):
                 cond = p.visit(test1)
                 for test in others:
-                    cond = If(p.visit(test), cond, Literal(False))
+                    cond = If(p.visit(test), cond, Value(False))
                 return cond
 
             arg = Apply(builtins.filter,
@@ -510,7 +510,7 @@ class Parser(LocVisitor):
             return Symbol(node.id, namespace='global')
 
     def visit_Num(self, node, loc):
-        return Literal(node.n)
+        return Value(node.n)
 
     def visit_Return(self, node, loc):
         if self.return_error:
@@ -520,12 +520,12 @@ class Parser(LocVisitor):
 
     def visit_Slice(self, node, loc):
         return Apply(Symbol('slice'),
-                     self.visit(node.lower) if node.lower else Literal(0),
-                     self.visit(node.upper) if node.upper else Literal(None),
-                     self.visit(node.step) if node.step else Literal(1))
+                     self.visit(node.lower) if node.lower else Value(0),
+                     self.visit(node.upper) if node.upper else Value(None),
+                     self.visit(node.step) if node.step else Value(1))
 
     def visit_Str(self, node, loc):
-        return Literal(node.s)
+        return Value(node.s)
 
     def visit_Tuple(self, node, loc):
         return Tuple(self.visit(v) for v in node.elts).at(loc)
@@ -578,7 +578,7 @@ class Parser(LocVisitor):
         val = Apply(fsym, *[self.env[v] for v in in_vars])
         stmts = [_Assign(tmp, val, None)]
         for i, v in enumerate(out_vars):
-            stmt = self.make_assign(v, Apply(builtins.index, tmp, Literal(i)))
+            stmt = self.make_assign(v, Apply(builtins.index, tmp, Value(i)))
             stmts.append(stmt)
         return Begin(stmts)
 
@@ -609,7 +609,7 @@ class Parser(LocVisitor):
     #     stmts = [_Assign(tmp, val, None)]
     #     for i, v in enumerate(out_vars):
     #         stmt = self.make_assign(
-    #            v, Apply(builtins.index, tmp, Literal(i)))
+    #            v, Apply(builtins.index, tmp, Value(i)))
     #         stmts.append(stmt)
     #     return Begin(stmts)
 
