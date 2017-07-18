@@ -240,3 +240,20 @@ class Closure(MyiaASTNode):
         return ({"Closure"},
                 recurse(self.fn),
                 *[recurse(a) for a in self.args])
+
+class Transformer:
+    def transform(self, node, **kwargs):
+        cls = node.__class__.__name__
+        try:
+            method = getattr(self, 'transform_' + cls)
+        except AttributeError:
+            raise Exception(
+                "Unrecognized node type in {}: {}".format(
+                    self.__class__.__name__, cls)
+            )
+        rval = method(node, **kwargs)
+        if not rval.location:
+            rval.location = node.location
+        return rval
+
+

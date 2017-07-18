@@ -1,37 +1,26 @@
 import re
-from myia.ast import Apply, Let, Lambda, If, Tuple
+from myia.ast import Apply, Let, Lambda, If, Tuple, Transformer
 from myia.front import GenSym
 from uuid import uuid4 as uuid
 
 
 def a_normal(node):
     """
-    Convert the expression represented by this node in
+    transform the expression represented by this node in
     A-normal form (ANF). ANF forbids expression nesting,
     so e.g. (f (g x)) would become (let ((tmp (g x))) (f tmp))
 
     :param node: The expression to process
     :return: The expression in A-normal form
     """
-    node = ANormalConverter(GenSym(uuid())).convert(node)
-    node = CollapseLet().convert(node)
+    node = ANormalTransformer(GenSym(uuid())).transform(node)
+    node = CollapseLet().transform(node)
     return node
 
 
-class ANormalConverter:
+class ANormalTransformer(Transformer):
     def __init__(self, gen):
         self.gen = gen
-
-    def convert(self, node, stash=False):
-        cls = node.__class__.__name__
-        try:
-            method = getattr(self, 'convert_' + cls)
-        except AttributeError:
-            raise Exception(
-                "Unrecognized node type for a-normal conversion: {}".format(cls)
-            )
-        rval = method(node, stash)
-        return rval
 
     def stash(self, stash, result, default_name):
         if stash is not False:
@@ -41,7 +30,7 @@ class ANormalConverter:
             return sym
         return result
 
-    def convert_arguments(self, args, constructor,
+    def transform_arguments(self, args, constructor,
                           stash, base_name=None, tags=None):
 
         bindings = []
@@ -49,7 +38,7 @@ class ANormalConverter:
 
         if base_name is None:
             fn, *args = args
-            fn = self.convert(fn, stash=(None, bindings))
+            fn = self.transform(fn, stash=(None, bindings))
             new_args.append(fn)
             if "/" in fn.label:
                 base_name = ""
@@ -61,9 +50,9 @@ class ANormalConverter:
 
         for arg, tag in zip(args, tags):
             if tag is False:
-                new_arg = self.convert(arg)
+                new_arg = self.transform(arg)
             else:
-                new_arg = self.convert(arg, stash=(base_name + '/' + tag, bindings))
+                new_arg = self.transform(arg, stash=(base_name + '/' + tag, bindings))
             new_args.append(new_arg)
 
         app = constructor(*new_args)
@@ -74,76 +63,65 @@ class ANormalConverter:
         return self.stash(stash, result, base_name + '/out')
 
 
-    def convert_Apply(self, node, stash=False):
-        return self.convert_arguments((node.fn,) + node.args, Apply, stash)
+    def transform_Apply(self, node, stash=False):
+        return self.transform_arguments((node.fn,) + node.args, Apply, stash)
 
-    def convert_Symbol(self, node, stash=False):
+    def transform_Symbol(self, node, stash=False):
         return node
 
-    def convert_Value(self, node, stash=False):
+    def transform_Value(self, node, stash=False):
         return node
 
-    def convert_Lambda(self, node, stash=False):
-        result = Lambda('#lambda', node.args, self.convert(node.body))
+    def transform_Lambda(self, node, stash=False):
+        result = Lambda('#lambda', node.args, self.transform(node.body))
         return self.stash(stash, result, 'lambda')
 
-    def convert_If(self, node, stash=False):
-        return self.convert_arguments((node.cond, node.t, node.f),
+    def transform_If(self, node, stash=False):
+        return self.transform_arguments((node.cond, node.t, node.f),
                                       If, stash, 'if', ('cond', False, False))
 
-    def convert_Let(self, node, stash=False):
-        result = Let([(s, self.convert(b)) for s, b in node.bindings],
-                     self.convert(node.body))
+    def transform_Let(self, node, stash=False):
+        result = Let([(s, self.transform(b)) for s, b in node.bindings],
+                     self.transform(node.body))
         return self.stash(stash, result, 'if')
 
-    def convert_Tuple(self, node, stash=False):
+    def transform_Tuple(self, node, stash=False):
         def _Tuple(*args): return Tuple(args)
-        return self.convert_arguments(node.values, _Tuple, stash, 'tup')
+        return self.transform_arguments(node.values, _Tuple, stash, 'tup')
 
 
-class CollapseLet:
+class CollapseLet(Transformer):
     def __init__(self):
         pass
 
-    def convert(self, node):
-        cls = node.__class__.__name__
-        try:
-            method = getattr(self, 'convert_' + cls)
-        except AttributeError:
-            raise Exception(
-                "Unrecognized node type for let collapse: {}".format(cls)
-            )
-        rval = method(node)
-        return rval
-
-    def convert_Let(self, node):
+    def transform_Let(self, node):
         new_bindings = []
         for s, b in node.bindings:
-            b = self.convert(b)
+            b = self.transform(b)
             if isinstance(b, Let):
                 new_bindings += b.bindings
                 b = b.body
             new_bindings.append((s, b))
-        body = self.convert(node.body)
+        body = self.transform(node.body)
         if isinstance(body, Let):
             return Let(new_bindings + body.bindings, body.body)
         return Let(new_bindings, body)
 
-    def convert_Symbol(self, node):
+    def transform_Symbol(self, node):
         return node
 
-    def convert_Value(self, node):
+    def transform_Value(self, node):
         return node
 
-    def convert_Lambda(self, node):
-        return Lambda('#lambda', node.args, self.convert(node.body))
+    def transform_Lambda(self, node):
+        return Lambda('#lambda', node.args, self.transform(node.body))
 
-    def convert_Apply(self, node):
-        return Apply(self.convert(node.fn), *[self.convert(a) for a in node.args])
+    def transform_Apply(self, node):
+        return Apply(self.transform(node.fn), *[self.transform(a) for a in node.args])
 
-    def convert_Tuple(self, node):
-        return Tuple(self.convert(a) for a in node.values)
+    def transform_Tuple(self, node):
+        return Tuple(self.transform(a) for a in node.values)
 
-    def convert_If(self, node):
-        return If(self.convert(node.cond), self.convert(node.t), self.convert(node.f))
+    def transform_If(self, node):
+        return If(self.transform(node.cond), self.transform(node.t), self.transform(node.f))
 
