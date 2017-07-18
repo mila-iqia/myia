@@ -1,6 +1,8 @@
 
 import argparse
 import sys
+
+from myia.compile import a_normal
 from .front import parse_source
 from .interpret import evaluate
 
@@ -14,6 +16,7 @@ p_parse = subparsers.add_parser(
 p_parse.add_argument('FILE', nargs='?', help='The file to parse.')
 p_parse.add_argument('--expr', '-e', metavar='EXPR',
                      dest='expr', help='The expression to parse.')
+p_parse.add_argument('-a', action='store_true', help='Convert to a-normal form.')
 
 p_eval = subparsers.add_parser('eval', help='Evaluate an expression')
 p_eval.add_argument('FILE', nargs='?', help='The file to evaluate.')
@@ -54,16 +57,17 @@ def command_None(arguments):
 
 
 def command_parse(arguments):
+    wrap = a_normal if arguments.a else (lambda x: x)
     url, code = getcode(arguments)
     r, bindings = parse_source(url, 1, code)
     if bindings:
         for k, v in bindings.items():
-            print('{}:\n  {}'.format(k, v))
+            print('{}:\n  {}'.format(k, wrap(v)))
     else:
         if not isinstance(r, list):
             r = [r]
         for entry in r:
-            print(entry)
+            print(wrap(entry))
 
 
 def command_eval(arguments):
