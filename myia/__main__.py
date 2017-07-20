@@ -1,10 +1,22 @@
 
 import argparse
 import sys
-
-from myia.compile import a_normal
+from .compile import a_normal
 from .front import parse_source
 from .interpret import evaluate
+
+
+def H(node):
+    try:
+        from hrepr import hrepr
+    except ImportError:
+        print('The --format html option requires the \'hrepr\' package',
+              'to be installed.\nTo install the package, use the command:',
+              '\n\n$ pip3 install hrepr',
+              file=sys.stderr)
+        sys.exit(1)
+    return hrepr(node)
+
 
 parser = argparse.ArgumentParser(prog='myia')
 subparsers = parser.add_subparsers(dest='command')
@@ -16,7 +28,10 @@ p_parse = subparsers.add_parser(
 p_parse.add_argument('FILE', nargs='?', help='The file to parse.')
 p_parse.add_argument('--expr', '-e', metavar='EXPR',
                      dest='expr', help='The expression to parse.')
-p_parse.add_argument('-a', action='store_true', help='Convert to a-normal form.')
+p_parse.add_argument('-a', action='store_true',
+                     help='Convert to a-normal form.')
+p_parse.add_argument('--format', '-f', default='ascii',
+                     help='Format to print out (ascii (default) or html)')
 
 p_eval = subparsers.add_parser('eval', help='Evaluate an expression')
 p_eval.add_argument('FILE', nargs='?', help='The file to evaluate.')
@@ -60,14 +75,23 @@ def command_parse(arguments):
     wrap = a_normal if arguments.a else (lambda x: x)
     url, code = getcode(arguments)
     r, bindings = parse_source(url, 1, code)
+
+    ishtml = arguments.format == 'html'
+
     if bindings:
-        for k, v in bindings.items():
-            print('{}:\n  {}'.format(k, wrap(v)))
+        if ishtml:
+            print(H({k: wrap(v) for k, v in bindings.items()}).as_page())
+        else:
+            for k, v in bindings.items():
+                print(f'{k}:\n  {wrap(v)}')
     else:
         if not isinstance(r, list):
             r = [r]
         for entry in r:
-            print(wrap(entry))
+            if ishtml:
+                print(H(wrap(entry)).as_page())
+            else:
+                print(wrap(entry))
 
 
 def command_eval(arguments):

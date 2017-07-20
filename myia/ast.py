@@ -2,9 +2,11 @@ from uuid import uuid1
 from copy import copy
 import textwrap
 import traceback
+import os.path
 
 
-# __debug__
+_css_path = f'{os.path.dirname(__file__)}/ast.css'
+_css = None
 __save_trace__ = False
 
 
@@ -32,9 +34,25 @@ class Location:
                 self.url, self.line, self.column)
 
 
+def _get_location(x):
+    if isinstance(x, MyiaASTNode):
+        return x.location
+    elif isinstance(x, Location) or x is None:
+        return x
+    else:
+        raise TypeError(f'{x} is not a location')
+
+
 class MyiaASTNode:
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        global _css
+        if _css is None:
+            _css = open(_css_path).read()
+        return H.style(_css)
+
     def __init__(self, location=None):
-        self.location = location
+        self.location = _get_location(location)
         if __save_trace__:
             # TODO: make sure that we're always removing the right
             # number of entries
@@ -44,7 +62,7 @@ class MyiaASTNode:
 
     def at(self, location):
         rval = copy(self)
-        rval.location = location
+        rval.location = _get_location(location)
         return rval
 
     def children(self):
@@ -72,17 +90,18 @@ class Symbol(MyiaASTNode):
     def __hash__(self):
         return hash((self.label, self.namespace))
 
-    def __descr__(self, _):
+    def __hrepr__(self, H, hrepr):
         *first, last = self.label.split("#")
+        ns = f'myia-ns-{self.namespace or "-none"}'
         if len(first) == 0 or first == [""]:
-            return (
-                {"Symbol"},
+            return H.div['Symbol', ns](
                 self.label,
-                ({"Namespace"}, self.namespace or "???")
             )
         else:
-            return ({"Symbol"}, "#".join(first), ({"SymbolIndex"}, last),
-                    ({"Namespace"}, self.namespace or "???"))
+            return H.div['Symbol', ns](
+                '#'.join(first),
+                H.span['SymbolIndex'](last),
+            )
 
 
 class Value(MyiaASTNode):
@@ -93,8 +112,8 @@ class Value(MyiaASTNode):
     def __str__(self):
         return repr(self.value)
 
-    def __descr__(self, recurse):
-        return ({"Value"}, recurse(self.value))
+    def __hrepr__(self, H, hrepr):
+        return H.div['Value'](hrepr(self.value))
 
 
 class Let(MyiaASTNode):
@@ -114,17 +133,17 @@ class Let(MyiaASTNode):
             " ".join('({} {})'.format(k, v) for k, v in self.bindings),
             self.body)
 
-    def __descr__(self, recurse):
-        letBindings = [
-            [{"LetBinding"}, recurse(k), recurse(v)]
-            for
-            k, v in self.bindings
+    def __hrepr__(self, H, hrepr):
+        let_bindings = [
+            H.div['LetBinding'](hrepr(k), hrepr(v))
+            for k, v in self.bindings
         ]
-        return ({"Let"},
-                ({"Keyword"}, "let"),
-                ({"LetBindings"}, *letBindings),
-                ({"Keyword"}, "in"),
-                ({"LetBody"}, recurse(self.body)))
+        return H.div['Let'](
+            H.div['Keyword']('let'),
+            H.div['LetBindings'](*let_bindings),
+            H.div['Keyword']('in'),
+            H.div['LetBody'](hrepr(self.body))
+        )
 
 
 class Lambda(MyiaASTNode):
@@ -141,11 +160,12 @@ class Lambda(MyiaASTNode):
         return '(lambda ({}) {})'.format(
             " ".join([str(arg) for arg in self.args]), str(self.body))
 
-    def __descr__(self, recurse):
-        return ({"Lambda"},
-                ({"Keyword"}, "λ"),
-                ({"LambdaArguments"}, *[recurse(a) for a in self.args]),
-                recurse(self.body))
+    def __hrepr__(self, H, hrepr):
+        return H.div['Lambda'](
+            H.div['Keyword']('λ'),
+            H.div['LambdaArguments'](*[hrepr(a) for a in self.args]),
+            hrepr(self.body)
+        )
 
 
 class If(MyiaASTNode):
@@ -161,11 +181,12 @@ class If(MyiaASTNode):
     def __str__(self):
         return '(if {} {} {})'.format(self.cond, self.t, self.f)
 
-    def __descr__(self, recurse):
-        return ({"If"},
-                ({"IfCond"}, recurse(self.cond)),
-                ({"IfTrue"}, recurse(self.t)),
-                ({"IfFalse"}, recurse(self.f)))
+    def __hrepr__(self, H, hrepr):
+        return H.div['If'](
+            H.div['IfCond'](hrepr(self.cond)),
+            H.div['IfThen'](hrepr(self.t)),
+            H.div['IfElse'](hrepr(self.f))
+        )
 
 
 class Apply(MyiaASTNode):
@@ -186,10 +207,8 @@ class Apply(MyiaASTNode):
             str(self.fn), " ".join(str(a) for a in self.args)
         )
 
-    def __descr__(self, recurse):
-        return ({"Apply"},
-                recurse(self.fn),
-                *[recurse(a) for a in self.args])
+    def __hrepr__(self, H, hrepr):
+        return H.div['Apply'](hrepr(self.fn), *[hrepr(a) for a in self.args])
 
 
 class Begin(MyiaASTNode):
@@ -203,10 +222,11 @@ class Begin(MyiaASTNode):
     def __str__(self):
         return "(begin {})".format(" ".join(map(str, self.stmts)))
 
-    def __descr__(self, recurse):
-        return ({"Begin"},
-                ({"Keyword"}, "begin"),
-                [recurse(a) for a in self.stmts])
+    def __hrepr__(self, H, hrepr):
+        return H.div['Begin'](
+            H.div['Keyword']('begin'),
+            [hrepr(a) for a in self.stmts]
+        )
 
 
 class Tuple(MyiaASTNode):
@@ -220,8 +240,8 @@ class Tuple(MyiaASTNode):
     def __str__(self):
         return "{{{}}}".format(" ".join(map(str, self.values)))
 
-    def __descr__(self, recurse):
-        return ({"Tuple"}, *[recurse(a) for a in self.values])
+    def __hrepr__(self, H, hrepr):
+        return H.div['Tuple'](*[hrepr(a) for a in self.values])
 
 
 class Closure(MyiaASTNode):
@@ -236,10 +256,10 @@ class Closure(MyiaASTNode):
     def __str__(self):
         return '(closure {} {})'.format(self.fn, " ".join(map(str, self.args)))
 
-    def __descr__(self, recurse):
-        return ({"Closure"},
-                recurse(self.fn),
-                *[recurse(a) for a in self.args])
+    def __hrepr__(self, H, hrepr):
+        return H.div['Closure'](hrepr(self.fn),
+                                *[hrepr(a) for a in self.args], '...')
+
 
 class Transformer:
     def transform(self, node, **kwargs):
@@ -255,5 +275,3 @@ class Transformer:
         if not rval.location:
             rval.location = node.location
         return rval
-
-

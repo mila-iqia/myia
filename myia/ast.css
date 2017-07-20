@@ -1,0 +1,161 @@
+/*
+ * Style for Myia's AST when it is pretty-printed using
+ * hrepr. This style will be automatically inserted when
+ * outputting to an html file or to a Jupyter notebook.
+ */
+
+.myia-ns-builtin {
+	background: lightgreen;
+}
+
+.myia-ns-global {
+	background: orange;
+}
+
+.Lambda {
+	font-family: monospace;
+}
+
+.Namespace {
+	display: none;
+}
+
+.Symbol, .Value {
+	display: inline-block;
+	padding: 2px;
+}
+
+.SymbolIndex {
+	font-size: 75%;
+	position: relative;
+	top: 0.5em;
+}
+
+.Keyword {
+	display: inline-block;
+	font-weight: bold;
+	padding: 2px;
+}
+
+.Apply {
+	display: inline-block;
+	border: 1px solid black;
+	margin: 2px;
+	padding: 2px;
+}
+
+.Apply > :nth-child(1) {
+	font-weight: bold;
+	color: #008;
+	margin-right: 5px;
+}
+
+.Begin, .Lambda, .Let {
+	display: inline-block;
+	border-left: 1px solid black;
+	padding-left: 2px;
+	margin-left: 2px;
+}
+
+.Lambda > :nth-child(3),
+.Begin > :nth-child(2),
+.Let > :nth-child(2),
+.Let > :nth-child(4) {
+	display: block;
+	border-left: 3px solid black;
+	padding-left: 5px;
+	margin-left: 5px;
+}
+
+.Begin > :nth-child(2) > * {
+	display: block;
+}
+
+.Tuple {
+	display: inline-block;
+	border: 2px dotted green;
+	margin: 2px;
+	padding: 2px;
+}
+
+.Tuple > * {
+	margin-left: 5px;
+	margin-right: 5px;
+}
+
+.LambdaArguments {
+	display: inline-block;
+}
+
+.LambdaArguments > * {
+	padding: 5px;
+	color: #f80;
+	font-weight: bold;
+}
+
+.IfCond:before, .IfThen:before, .IfElse:before {
+	font-weight: bold;
+	padding-right: 5px;	
+}
+
+.IfCond:before {
+	content: '?';
+	color: #808;
+}
+
+.IfThen:before {
+	content: '✓';
+	color: #080;
+}
+
+.IfElse:before {
+	content: '✖';
+	color: #f00;
+}
+
+.If {
+	display: inline-block;
+}
+
+.If > * {
+	display: block;
+}
+
+.If > * > * {
+	vertical-align: middle;
+}
+
+.Let > * {
+	display: block;
+}
+
+.LetBindings {
+	display: table;
+}
+
+.LetBinding {
+	display: table-row;
+}
+
+.LetBinding > * {
+	display: table-cell;
+}
+
+.LetBinding > :nth-child(1) {
+	padding-right: 15px;
+	color: #f80;
+	font-weight: bold;
+}
+
+.Closure {
+	border: 1px dotted black;
+	margin: 2px;
+	padding: 2px;
+}
+
+.Closure > :nth-child(1) {
+	color: #008;
+	margin-right: 5px;
+}
+
+
