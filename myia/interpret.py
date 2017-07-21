@@ -5,12 +5,12 @@ from myia.ast import \
 
 from .symbols import builtins
 
-_global_env = {}
+global_env = {}
 
 
 def impl(sym):
     def decorator(fn):
-        _global_env[sym] = fn
+        global_env[sym] = fn
         return fn
     return decorator
 
@@ -132,7 +132,7 @@ class Evaluator:
 def evaluate(node, bindings):
     if isinstance(node, list):
         node, = node
-    env = {**_global_env}
+    env = {**global_env}
     for k, v in bindings.items():
         env[Symbol(k, namespace='global')] = Evaluator({}, env).eval(v)
     return Evaluator({}, env).eval(node)

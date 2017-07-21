@@ -3,35 +3,35 @@ from .ast import Symbol, Value
 from .util import Props
 
 
-def _bsym(name):
+def bsym(name):
     return Symbol(name, namespace='builtin')
 
 
 builtins_dict = dict(
-    add = _bsym('add'),
-    subtract = _bsym('subtract'),
-    multiply = _bsym('multiply'),
-    divide = _bsym('divide'),
-    power = _bsym('power'),
-    dot = _bsym('dot'),
-    bitwise_or = _bsym('bitwise_or'),
-    bitwise_and = _bsym('bitwise_and'),
-    bitwise_xor = _bsym('bitwise_xor'),
-    unary_add = _bsym('unary_add'),
-    unary_subtract = _bsym('unary_subtract'),
-    bitwise_not = _bsym('bitwise_not'),
-    negate = _bsym('negate'),
-    less = _bsym('less'),
-    greater = _bsym('greater'),
-    less_equal = _bsym('less_equal'),
-    greater_equal = _bsym('greater_equal'),
-    equal = _bsym('equal'),
-    range = _bsym('range'),
-    index = _bsym('index'),
-    map = _bsym('map'),
-    filter = _bsym('filter'),
-    getattr = _bsym('getattr'),
-    setslice = _bsym('setslice')
+    add = bsym('add'),
+    subtract = bsym('subtract'),
+    multiply = bsym('multiply'),
+    divide = bsym('divide'),
+    power = bsym('power'),
+    dot = bsym('dot'),
+    bitwise_or = bsym('bitwise_or'),
+    bitwise_and = bsym('bitwise_and'),
+    bitwise_xor = bsym('bitwise_xor'),
+    unary_add = bsym('unary_add'),
+    unary_subtract = bsym('unary_subtract'),
+    bitwise_not = bsym('bitwise_not'),
+    negate = bsym('negate'),
+    less = bsym('less'),
+    greater = bsym('greater'),
+    less_equal = bsym('less_equal'),
+    greater_equal = bsym('greater_equal'),
+    equal = bsym('equal'),
+    range = bsym('range'),
+    index = bsym('index'),
+    map = bsym('map'),
+    filter = bsym('filter'),
+    getattr = bsym('getattr'),
+    setslice = bsym('setslice')
 )
 
 
