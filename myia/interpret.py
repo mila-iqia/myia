@@ -8,6 +8,48 @@ from .symbols import builtins
 global_env = {}
 
 
+###################
+# Special objects #
+###################
+
+
+class FunctionImpl:
+    def __init__(self, ast, bindings):
+        assert isinstance(ast, Lambda)
+        self.ast = ast
+        self.bindings = bindings
+        self.primal = None
+        self.grad = None
+        node = ast
+
+        def func(*args):
+            ev = Evaluator(
+                {s: arg for s, arg in zip(node.args, args)},
+                self.bindings
+            )
+            return ev.eval(node.body)
+
+        self._func = func
+
+    def __call__(self, *args):
+        return self._func(*args)
+
+
+class ClosureImpl:
+    def __init__(self, fn, args):
+        assert isinstance(fn, FunctionImpl)
+        self.fn = fn
+        self.args = args
+
+    def __call__(self, *args):
+        return self.fn(*self.args, *args)
+
+
+############################################
+# Implementations of arithmetic primitives #
+############################################
+
+
 def impl(sym):
     def decorator(fn):
         global_env[sym] = fn
@@ -90,11 +132,7 @@ class Evaluator:
     def eval_Closure(self, node):
         fn = self.eval(node.fn)
         args = list(map(self.eval, node.args))
-
-        def partial(*args2):
-            return fn(*args, *args2)
-
-        return partial
+        return ClosureImpl(fn, args)
 
     def eval_If(self, node):
         if self.eval(node.cond):
@@ -103,13 +141,7 @@ class Evaluator:
             return self.eval(node.f)
 
     def eval_Lambda(self, node):
-        def func(*args):
-            ev = Evaluator(
-                {s: arg for s, arg in zip(node.args, args)},
-                self.global_env
-            )
-            return ev.eval(node.body)
-        return func
+        return FunctionImpl(node, self.global_env)
 
     def eval_Let(self, node):
         for k, v in node.bindings:
