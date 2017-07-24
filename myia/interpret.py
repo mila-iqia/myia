@@ -166,5 +166,6 @@ def evaluate(node, bindings):
         node, = node
     env = {**global_env}
     for k, v in bindings.items():
-        env[Symbol(k, namespace='global')] = Evaluator({}, env).eval(v)
+        # env[Symbol(k, namespace='global')] = Evaluator({}, env).eval(v)
+        env[k] = Evaluator({}, env).eval(v)
     return Evaluator({}, env).eval(node)

@@ -1,4 +1,4 @@
-from uuid import uuid1
+from uuid import uuid4 as uuid
 from copy import copy
 import textwrap
 import traceback
@@ -73,35 +73,78 @@ class MyiaASTNode:
 
 
 class Symbol(MyiaASTNode):
-    def __init__(self, label, *, namespace=None, **kw):
+    """
+    Represent a variable name in Myia's frontend AST.
+
+    Symbols should not be created directly. They should be created
+    through a GenSym factory: GenSym enforces a unique namespace and
+    keeps track of versions to guarantee that no Symbols accidentally
+    collide.
+
+    Attributes:
+        label (str or Symbol): the name of the variable. If
+            relation is None, this must be a string, otherwise
+            this must be a symbol.
+        namespace (str): the namespace in which the variable
+            lives. This is usually 'global', 'builtin', or a
+            uuid created on a per-Lambda expression basis.
+        version (int): differentiates variables with the same
+            name and namespace. This can happen when there are
+            multiple writes to the same variable in Python.
+        relation (str): how this variable relates to some other
+            variable in the 'label' attribute. For example,
+            automatic differentiation will accumulate the gradient
+            for variable x in a Symbol with label x and relation
+            'sensitivity'.
+
+    The HTML pretty-printer will show the version as a subscript
+    (except for version 1), and the relation as a prefix on
+    the representation of the parent Symbol.
+    """
+    def __init__(self, label, *,
+                 namespace=None,
+                 version=1,
+                 relation=None,
+                 **kw):
         super().__init__(**kw)
-        assert isinstance(label, str)
+        if relation is None:
+            assert isinstance(label, str)
+        else:
+            assert isinstance(label, Symbol)
         self.label = label
         self.namespace = namespace
+        self.version = version
+        self.relation = relation
 
     def __str__(self):
-        return self.label
+        v = f'#{self.version}' if self.version > 1 else ''
+        r = f'/{self.relation}' if self.relation else ''
+        return f'{self.label}{v}{r}'
 
     def __eq__(self, s):
         return isinstance(s, Symbol) \
             and self.label == s.label \
-            and self.namespace == s.namespace
+            and self.namespace == s.namespace \
+            and self.version == s.version \
+            and self.relation == s.relation
 
     def __hash__(self):
-        return hash((self.label, self.namespace))
+        return hash((self.label, self.namespace,
+                     self.version, self.relation))
 
     def __hrepr__(self, H, hrepr):
-        *first, last = self.label.split("#")
         ns = f'myia-ns-{self.namespace or "-none"}'
-        if len(first) == 0 or first == [""]:
-            return H.div['Symbol', ns](
-                self.label,
-            )
+        rval = H.div['Symbol', ns]
+        if self.relation:
+            rval = rval(H.span['SymbolRelation'])
+        if isinstance(self.label, str):
+            rval = rval(self.label)
         else:
-            return H.div['Symbol', ns](
-                '#'.join(first),
-                H.span['SymbolIndex'](last),
-            )
+            rval = rval(hrepr(self.label))
+        if self.version <= 1:
+            return rval
+        else:
+            return rval(H.span['SymbolIndex'](self.version))
 
 
 class Value(MyiaASTNode):
@@ -259,6 +302,38 @@ class Closure(MyiaASTNode):
     def __hrepr__(self, H, hrepr):
         return H.div['Closure'](hrepr(self.fn),
                                 *[hrepr(a) for a in self.args], '...')
+
+
+class GenSym:
+    def __init__(self, namespace=None):
+        self.varcounts = {}
+        self.namespace = namespace or uuid()
+
+    def inc_version(self, ref):
+        if ref in self.varcounts:
+            self.varcounts[ref] += 1
+            return self.varcounts[ref]
+        else:
+            self.varcounts[ref] = 1
+            return 1
+
+    def sym(self, name, reference_name=None):
+        return Symbol(
+            name,
+            namespace=self.namespace,
+            version=self.inc_version(reference_name or name),
+            relation=None
+        )
+
+    def rel(self, orig, relation):
+        ref = f'{str(orig)}/{relation}'
+        version = self.inc_version(ref)
+        return Symbol(
+            orig,
+            namespace=self.namespace,
+            version=version,
+            relation=relation
+        )
 
 
 class Transformer:

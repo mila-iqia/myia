@@ -1,7 +1,9 @@
 from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
-    Let, If, Lambda, Apply, Begin, Tuple, Closure
+    Let, If, Lambda, Apply, \
+    Begin, Tuple, Closure, \
+    GenSym
 from myia.util import group_contiguous
 from myia.symbols import get_operator, builtins
 from uuid import uuid4 as uuid
@@ -38,23 +40,6 @@ sys.excepthook = exception_handler
 class Redirect:
     def __init__(self, key):
         self.key = key
-
-
-class GenSym:
-    def __init__(self, namespace):
-        self.varcounts = {}
-        self.namespace = namespace
-
-    def name(self, name):
-        if name in self.varcounts:
-            self.varcounts[name] += 1
-            return '{}#{}'.format(name, self.varcounts[name])
-        else:
-            self.varcounts[name] = 0
-            return name
-
-    def sym(self, name, namespace=None):
-        return Symbol(self.name(name), namespace=namespace or self.namespace)
 
 
 class Env:
@@ -178,7 +163,7 @@ class Parser(LocVisitor):
         ref = binding[1] if binding else self.global_env.gen.sym(label)
         l = Lambda(ref.label, args, body).at(loc)
         if not self.dry:
-            self.global_env[ref.label] = l
+            self.global_env[ref] = l
         return ref
 
     def new_variable(self, input):
@@ -290,7 +275,6 @@ class Parser(LocVisitor):
                     loc,
                     "You can only set a slice on a variable."
                 )
-            print(dir(targ.slice))
 
             val = self.visit(node.value)
             slice = Apply(builtins.setslice,
@@ -566,7 +550,7 @@ class Parser(LocVisitor):
                       Tuple(initial_values))
 
         if not self.dry:
-            self.global_env[fsym.label] = Lambda(
+            self.global_env[fsym] = Lambda(
                 fsym.label,
                 in_syms,
                 new_body,
@@ -581,37 +565,6 @@ class Parser(LocVisitor):
             stmt = self.make_assign(v, Apply(builtins.index, tmp, Value(i)))
             stmts.append(stmt)
         return Begin(stmts)
-
-    # def visit_While(self, node, loc):
-    #     fsym = self.global_env.gen.sym('#while')
-
-    #     p = Parser(self, pull_free_variables=True)
-    #     p.return_error = "While loops cannot contain return statements."
-    #     test = p.visit(node.test)
-    #     body = p.visit_body(node.body, True)
-    #     in_vars = list(set(p.free_variables.keys())|p.local_assignments)
-    #     out_vars = list(p.local_assignments)
-    #     in_syms = [p.free_variables[v] for v in in_vars]
-
-    #     initial_values = [self.env[v] for v in out_vars]
-    #     new_body = If(test,
-    #                   body(Apply(
-    #                       fsym, *[p.env[v] for v in in_vars])).at(loc),
-    #                   Tuple(initial_values))
-
-    #     if not self.dry:
-    #         self.global_env[fsym.label] = Lambda(
-    #           fsym.label, in_syms, new_body, location=loc)
-    #     self.globals_accessed.add(fsym.label)
-
-    #     tmp = self.gensym('#tmp').at(loc)
-    #     val = Apply(fsym, *[self.env[v] for v in in_vars])
-    #     stmts = [_Assign(tmp, val, None)]
-    #     for i, v in enumerate(out_vars):
-    #         stmt = self.make_assign(
-    #            v, Apply(builtins.index, tmp, Value(i)))
-    #         stmts.append(stmt)
-    #     return Begin(stmts)
 
 
 def parse_function(fn):
@@ -662,7 +615,8 @@ def myia(fn):
     bindings = {k: make_error_function({"name": k, "ast": v, "globals": glob})
                 for k, v in data.items()}
     glob.update(bindings)
-    fn.data = bindings[fn.__name__].data
+    fsym = Symbol(fn.__name__, namespace='global')
+    fn.data = bindings[fsym].data
     fn.associates = bindings
     return fn
 

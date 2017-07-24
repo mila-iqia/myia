@@ -1,5 +1,6 @@
 from myia.front import parse_function, MyiaSyntaxError
 from myia.interpret import evaluate
+from myia.ast import Symbol
 import pytest
 import inspect
 
@@ -27,12 +28,13 @@ def myia_test(*tests):
 
     def decorate(fn):
         fname = fn.__name__
+        fsym = Symbol(fname, namespace='global')
 
         def test(inputs, output, gradOut=None):
-            if fname not in _functions:
+            if fsym not in _functions:
                 data = parse_function(fn)
                 _functions.update(data)
-            node = _functions[fname]
+            node = _functions[fsym]
 
             if not isinstance(inputs, tuple):
                 inputs = inputs,
