@@ -118,8 +118,8 @@ class Symbol(MyiaASTNode):
 
     def __str__(self):
         v = f'#{self.version}' if self.version > 1 else ''
-        r = f'/{self.relation}' if self.relation else ''
-        return f'{self.label}{v}{r}'
+        r = f'{self.relation}:' if self.relation else ''
+        return f'{r}{self.label}{v}'
 
     def __eq__(self, s):
         return isinstance(s, Symbol) \
