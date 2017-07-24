@@ -1,10 +1,8 @@
 import re
 from myia.ast import Apply, Let, Lambda, If, Tuple, Transformer
 from myia.front import GenSym
-from uuid import uuid4 as uuid
 
 
-# TODO: use the original function's gensym
 # TODO: Lambda should never be a sub-expression, it should be pulled
 #       out to the top-level, and wrapped with Closure if needed.
 
@@ -21,13 +19,13 @@ def a_normal(node):
     :param node: The expression to process
     :return: The expression in A-normal form
     """
-    node = ANormalTransformer(GenSym(uuid())).transform(node)
+    node = ANormalTransformer().transform(node)
     node = CollapseLet().transform(node)
     return node
 
 
 class ANormalTransformer(Transformer):
-    def __init__(self, gen):
+    def __init__(self, gen=None):
         self.gen = gen
 
     def stash(self, stash, result, default_name):
@@ -89,7 +87,10 @@ class ANormalTransformer(Transformer):
         return node
 
     def transform_Lambda(self, node, stash=False):
-        result = Lambda('#lambda', node.args, self.transform(node.body))
+        tr = ANormalTransformer(node.gen)
+        result = Lambda(node.args,
+                        tr.transform(node.body),
+                        node.gen)
         return self.stash(stash, result, 'lambda')
 
     def transform_If(self, node, stash=False):
@@ -135,7 +136,9 @@ class CollapseLet(Transformer):
         return node
 
     def transform_Lambda(self, node):
-        return Lambda('#lambda', node.args, self.transform(node.body))
+        return Lambda(node.args,
+                      self.transform(node.body),
+                      node.gen)
 
     def transform_Apply(self, node):
         return Apply(self.transform(node.fn),

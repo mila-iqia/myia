@@ -161,9 +161,10 @@ class Parser(LocVisitor):
             base_name = input.id
         return base_name
 
-    def reg_lambda(self, args, body, loc=None, label="#lambda", binding=None):
+    def reg_lambda(self, args, body, gen, loc=None,
+                   label="#lambda", binding=None):
         ref = binding[1] if binding else self.global_env.gen.sym(label)
-        l = Lambda(ref.label, args, body).at(loc)
+        l = Lambda(args, body, gen).at(loc)
         if not self.dry:
             self.global_env[ref] = l
         return ref
@@ -209,6 +210,7 @@ class Parser(LocVisitor):
         lbda = self.reg_lambda(
             fargs + sinputs,
             body,
+            self.env.gen,
             loc=loc,
             binding=binding).at(loc)
         if len(fargs) > 0:
@@ -553,9 +555,9 @@ class Parser(LocVisitor):
 
         if not self.dry:
             self.global_env[fsym] = Lambda(
-                fsym.label,
                 in_syms,
                 new_body,
+                p.env.gen,
                 location=loc
             )
         self.globals_accessed.add(fsym.label)

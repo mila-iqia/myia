@@ -190,11 +190,11 @@ class Let(MyiaASTNode):
 
 
 class Lambda(MyiaASTNode):
-    def __init__(self, label, args, body, **kw):
+    def __init__(self, args, body, gen, **kw):
         super().__init__(**kw)
-        self.label = label
         self.args = args
         self.body = body
+        self.gen = gen
 
     def children(self):
         return self.args + [self.body]
