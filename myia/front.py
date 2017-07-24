@@ -43,9 +43,10 @@ class Redirect:
 
 
 class Env:
-    def __init__(self, parent=None, namespace=None):
+    def __init__(self, parent=None, namespace=None, gen=None):
         self.parent = parent
-        self.gen = parent.gen if parent else GenSym(namespace or str(uuid()))
+        self.gen = gen or \
+            parent.gen if parent else GenSym(namespace or str(uuid()))
         self.bindings = {}
 
     def get_free(self, name, redirect=True):
@@ -122,6 +123,7 @@ class _Assign:
 class Parser(LocVisitor):
 
     def __init__(self, parent, global_env=None, dry=None,
+                 gen=None,
                  pull_free_variables=False,
                  top_level=False):
         self.free_variables = {}
@@ -132,7 +134,7 @@ class Parser(LocVisitor):
 
         if isinstance(parent, Locator):
             self.parent = None
-            self.env = Env()
+            self.env = Env(gen=gen)
             self.globals_accessed = set()
             self.global_env = global_env
             self.return_error = None
@@ -140,7 +142,7 @@ class Parser(LocVisitor):
             super().__init__(parent)
         else:
             self.parent = parent
-            self.env = Env(parent.env)
+            self.env = Env(parent.env, gen=gen)
             self.globals_accessed = parent.globals_accessed
             self.global_env = parent.global_env
             self.return_error = parent.return_error
@@ -190,7 +192,7 @@ class Parser(LocVisitor):
         label="#lambda",
         binding=None
     ):
-        p = Parser(self, pull_free_variables=True)
+        p = Parser(self, pull_free_variables=True, gen=GenSym())
         if binding is None:
             binding = (label, self.global_env.gen.sym(label))
         sinputs = [p.new_variable(i) for i in inputs]
@@ -527,7 +529,7 @@ class Parser(LocVisitor):
         fsym = self.global_env.gen.sym('#while')
 
         # We visit the body once to get the free variables
-        testp = Parser(self, global_env=Env())
+        testp = Parser(self, global_env=Env(), dry=True)
         testp.return_error = "While loops cannot contain return statements."
         testp.visit(node.test)
         testp.visit_body(node.body, True)
@@ -537,7 +539,7 @@ class Parser(LocVisitor):
         out_vars = list(testp.local_assignments)
 
         # We visit once more, this time adding the free vars as parameters
-        p = Parser(self)
+        p = Parser(self, gen=GenSym())
         in_syms = [p.new_variable(v) for v in in_vars]
         # Have to execute this before the body in order to get the right
         # symbols, otherwise they will be shadowed
