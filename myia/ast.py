@@ -1,3 +1,5 @@
+from typing import List, Tuple as TTup, Iterable, Dict, Union
+
 from uuid import uuid4 as uuid
 from copy import copy
 import textwrap
@@ -10,16 +12,19 @@ _css = None
 __save_trace__ = False
 
 
+Locatable = Union['MyiaASTNode', 'Location', None]
+
+
 class Location:
-    def __init__(self, url, line, column):
+    def __init__(self, url: str, line: int, column: int) -> None:
         self.url = url
         self.line = line
         self.column = column
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '{}@{}:{}'.format(self.url, self.line, self.column)
 
-    def traceback(self):
+    def traceback(self) -> str:
         try:
             with open(self.url) as file:
                 raw_code = file.readlines()[self.line - 1].rstrip("\n")
@@ -34,7 +39,7 @@ class Location:
                 self.url, self.line, self.column)
 
 
-def _get_location(x):
+def _get_location(x: Locatable) -> Location:
     if isinstance(x, MyiaASTNode):
         return x.location
     elif isinstance(x, Location) or x is None:
@@ -51,7 +56,7 @@ class MyiaASTNode:
             _css = open(_css_path).read()
         return H.style(_css)
 
-    def __init__(self, location=None):
+    def __init__(self, location: Locatable = None) -> None:
         self.location = _get_location(location)
         if __save_trace__:
             # TODO: make sure that we're always removing the right
@@ -60,15 +65,15 @@ class MyiaASTNode:
         else:
             self.trace = None
 
-    def at(self, location):
+    def at(self, location) -> 'MyiaASTNode':
         rval = copy(self)
         rval.location = _get_location(location)
         return rval
 
-    def children(self):
+    def children(self) -> List['MyiaASTNode']:
         return []
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self)
 
 
@@ -101,11 +106,13 @@ class Symbol(MyiaASTNode):
     (except for version 1), and the relation as a prefix on
     the representation of the parent Symbol.
     """
-    def __init__(self, label, *,
-                 namespace=None,
-                 version=1,
-                 relation=None,
-                 **kw):
+    def __init__(self,
+                 label: Union[str, 'Symbol'],
+                 *,
+                 namespace: str = None,
+                 version: int = 1,
+                 relation: str = None,
+                 **kw) -> None:
         super().__init__(**kw)
         if relation is None:
             assert isinstance(label, str)
@@ -116,19 +123,20 @@ class Symbol(MyiaASTNode):
         self.version = version
         self.relation = relation
 
-    def __str__(self):
+    def __str__(self) -> str:
         v = f'#{self.version}' if self.version > 1 else ''
         r = f'{self.relation}:' if self.relation else ''
         return f'{r}{self.label}{v}'
 
-    def __eq__(self, s):
+    def __eq__(self, obj) -> bool:
+        s: Symbol = obj
         return isinstance(s, Symbol) \
             and self.label == s.label \
             and self.namespace == s.namespace \
             and self.version == s.version \
             and self.relation == s.relation
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.label, self.namespace,
                      self.version, self.relation))
 
@@ -152,7 +160,7 @@ class Value(MyiaASTNode):
         self.value = value
         super().__init__(**kw)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return repr(self.value)
 
     def __hrepr__(self, H, hrepr):
@@ -160,18 +168,21 @@ class Value(MyiaASTNode):
 
 
 class Let(MyiaASTNode):
-    def __init__(self, bindings, body, **kw):
+    def __init__(self,
+                 bindings: List[TTup[Symbol, MyiaASTNode]],
+                 body: MyiaASTNode,
+                 **kw) -> None:
         super().__init__(**kw)
         self.bindings = bindings
         self.body = body
 
-    def children(self):
-        rval = []
+    def children(self) -> List[MyiaASTNode]:
+        rval: List[MyiaASTNode] = []
         for a, b in self.bindings:
             rval += [a, b]
         return rval + [self.body]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '(let ({}) {})'.format(
             " ".join('({} {})'.format(k, v) for k, v in self.bindings),
             self.body)
@@ -190,16 +201,20 @@ class Let(MyiaASTNode):
 
 
 class Lambda(MyiaASTNode):
-    def __init__(self, args, body, gen, **kw):
+    def __init__(self,
+                 args: List[MyiaASTNode],
+                 body: MyiaASTNode,
+                 gen: 'GenSym',
+                 **kw) -> None:
         super().__init__(**kw)
         self.args = args
         self.body = body
         self.gen = gen
 
-    def children(self):
+    def children(self) -> List[MyiaASTNode]:
         return self.args + [self.body]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '(lambda ({}) {})'.format(
             " ".join([str(arg) for arg in self.args]), str(self.body))
 
@@ -212,16 +227,20 @@ class Lambda(MyiaASTNode):
 
 
 class If(MyiaASTNode):
-    def __init__(self, cond, t, f, **kw):
+    def __init__(self,
+                 cond: MyiaASTNode,
+                 t: MyiaASTNode,
+                 f: MyiaASTNode,
+                 **kw) -> None:
         super().__init__(**kw)
         self.cond = cond
         self.t = t
         self.f = f
 
-    def children(self):
+    def children(self) -> List[MyiaASTNode]:
         return [self.cond, self.t, self.f]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '(if {} {} {})'.format(self.cond, self.t, self.f)
 
     def __hrepr__(self, H, hrepr):
@@ -233,17 +252,21 @@ class If(MyiaASTNode):
 
 
 class Apply(MyiaASTNode):
-    def __init__(self, fn, *args, cannot_fail=False, **kw):
+    def __init__(self,
+                 fn: MyiaASTNode,
+                 *args: MyiaASTNode,
+                 cannot_fail: bool = False,
+                 **kw) -> None:
         super().__init__(**kw)
         self.fn = fn
-        self.args = tuple(args)
+        self.args = list(args)
         # Boilerplate calls added by the parser should be
         # annotated cannot_fail if they are not supposed to fail,
         # so that when they inevitably do, blame can be assigned properly.
         self.cannot_fail = cannot_fail
 
-    def children(self):
-        return (self.fn,) + self.args
+    def children(self) -> List[MyiaASTNode]:
+        return [self.fn] + self.args
 
     def __str__(self):
         return "({} {})".format(
@@ -255,14 +278,14 @@ class Apply(MyiaASTNode):
 
 
 class Begin(MyiaASTNode):
-    def __init__(self, stmts, **kw):
+    def __init__(self, stmts: List[MyiaASTNode], **kw) -> None:
         super().__init__(**kw)
         self.stmts = stmts
 
-    def children(self):
+    def children(self) -> List[MyiaASTNode]:
         return self.stmts
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "(begin {})".format(" ".join(map(str, self.stmts)))
 
     def __hrepr__(self, H, hrepr):
@@ -273,14 +296,14 @@ class Begin(MyiaASTNode):
 
 
 class Tuple(MyiaASTNode):
-    def __init__(self, values, **kw):
+    def __init__(self, values: Iterable[MyiaASTNode], **kw) -> None:
         super().__init__(**kw)
         self.values = list(values)
 
-    def children(self):
+    def children(self) -> List[MyiaASTNode]:
         return self.values
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "{{{}}}".format(" ".join(map(str, self.values)))
 
     def __hrepr__(self, H, hrepr):
@@ -288,15 +311,18 @@ class Tuple(MyiaASTNode):
 
 
 class Closure(MyiaASTNode):
-    def __init__(self, fn, args, **kw):
+    def __init__(self,
+                 fn: MyiaASTNode,
+                 args: Iterable[MyiaASTNode],
+                 **kw) -> None:
         super().__init__(**kw)
         self.fn = fn
         self.args = list(args)
 
-    def children(self):
+    def children(self) -> List[MyiaASTNode]:
         return [self.fn] + self.args
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '(closure {} {})'.format(self.fn, " ".join(map(str, self.args)))
 
     def __hrepr__(self, H, hrepr):
@@ -314,11 +340,11 @@ class GenSym:
     a unique namespace with the uuid4 method.
     """
 
-    def __init__(self, namespace=None):
-        self.varcounts = {}
-        self.namespace = namespace or uuid()
+    def __init__(self, namespace: str = None) -> None:
+        self.varcounts: Dict[str, int] = {}
+        self.namespace: str = namespace or str(uuid())
 
-    def inc_version(self, ref):
+    def inc_version(self, ref: str) -> int:
         """
         Increment the current version number for the variable
         name given as ref.
@@ -330,7 +356,7 @@ class GenSym:
             self.varcounts[ref] = 1
             return 1
 
-    def sym(self, name):
+    def sym(self, name: str) -> Symbol:
         """
         Create a unique Symbol with the given name. If one or more
         Symbols with the same name exists, the new Symbol will have
@@ -343,7 +369,7 @@ class GenSym:
             relation=None
         )
 
-    def rel(self, orig, relation):
+    def rel(self, orig: Symbol, relation: str) -> Symbol:
         """
         Create a new Symbol that relates to the orig Symbol with
         the given relation. The new Symbol is guaranteed not to

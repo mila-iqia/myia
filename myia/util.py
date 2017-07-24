@@ -6,6 +6,9 @@ class Props:
     def __init__(self, d):
         self.__dict__ = d
 
+    def __getattr__(self, attr):
+        return self.__dict__[attr]
+
 
 def group_contiguous(arr, classify):
     """
