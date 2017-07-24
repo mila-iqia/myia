@@ -305,11 +305,24 @@ class Closure(MyiaASTNode):
 
 
 class GenSym:
+    """
+    Symbol generator. The generator creates unique Symbols in the
+    given namespace, assuming that it is the only generator (to ever
+    exist) for that namespace.
+
+    If it is given None as its initial namespace, GenSym generates
+    a unique namespace with the uuid4 method.
+    """
+
     def __init__(self, namespace=None):
         self.varcounts = {}
         self.namespace = namespace or uuid()
 
     def inc_version(self, ref):
+        """
+        Increment the current version number for the variable
+        name given as ref.
+        """
         if ref in self.varcounts:
             self.varcounts[ref] += 1
             return self.varcounts[ref]
@@ -317,15 +330,30 @@ class GenSym:
             self.varcounts[ref] = 1
             return 1
 
-    def sym(self, name, reference_name=None):
+    def sym(self, name):
+        """
+        Create a unique Symbol with the given name. If one or more
+        Symbols with the same name exists, the new Symbol will have
+        a higher version number than any of them.
+        """
         return Symbol(
             name,
             namespace=self.namespace,
-            version=self.inc_version(reference_name or name),
+            version=self.inc_version(name),
             relation=None
         )
 
     def rel(self, orig, relation):
+        """
+        Create a new Symbol that relates to the orig Symbol with
+        the given relation. The new Symbol is guaranteed not to
+        already exist.
+        """
+        # Note: str(a) == str(b) if a == b, but it is possible (I think?)
+        #  that str(a) == str(b) if a != b. This is okay, it just means that
+        #  some symbols may have a higher version than strictly
+        #  necessary (note that we could use the same count for all
+        #  variables, and everything would still work)
         ref = f'{str(orig)}/{relation}'
         version = self.inc_version(ref)
         return Symbol(
