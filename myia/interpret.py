@@ -2,8 +2,8 @@ from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
     Let, If, Lambda, Apply, Begin, Tuple, Closure
-
 from .symbols import builtins
+import inspect
 
 global_env = {}
 
@@ -13,9 +13,22 @@ global_env = {}
 ###################
 
 
+class PrimitiveImpl:
+    def __init__(self, fn):
+        self.argnames = inspect.getargs(fn.__code__).args
+        self.nargs = len(self.argnames)
+        self.fn = fn
+        self.primal = None
+        self.grad = None
+
+    def __call__(self, *args):
+        return self.fn(*args)
+
+
 class FunctionImpl:
     def __init__(self, ast, bindings):
         assert isinstance(ast, Lambda)
+        self.nargs = len(ast.args)
         self.ast = ast
         self.bindings = bindings
         self.primal = None
@@ -37,7 +50,8 @@ class FunctionImpl:
 
 class ClosureImpl:
     def __init__(self, fn, args):
-        assert isinstance(fn, FunctionImpl)
+        assert isinstance(fn, (PrimitiveImpl, FunctionImpl))
+        self.nargs = fn.nargs - len(args)
         self.fn = fn
         self.args = args
 
@@ -52,8 +66,9 @@ class ClosureImpl:
 
 def impl(sym):
     def decorator(fn):
-        global_env[sym] = fn
-        return fn
+        prim = PrimitiveImpl(fn)
+        global_env[sym] = prim
+        return prim
     return decorator
 
 
