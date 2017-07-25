@@ -1,7 +1,7 @@
 
 
-from .ast import Transformer, Symbol
-from .interpret import global_env, impl
+from .ast import Transformer, Symbol, Lambda, Apply, Tuple
+from .interpret import global_env, impl, PrimitiveImpl, ClosureImpl
 from .symbols import builtins, bsym
 
 
@@ -16,17 +16,28 @@ builtins.Jinv = bsym('Jinv')
 ######################################
 
 
-_grad_map = {}
-
-
 def rgrad(sym):
     # Copy symbol to grad namespace
     rsym = Symbol(sym.label, namespace='grad:builtin')
 
     def decorator(fn):
-        _grad_map[sym] = rsym
-        global_env[rsym] = fn
-        return fn
+        prim = global_env[sym]
+        assert isinstance(prim, PrimitiveImpl)
+
+        # Wrap the primitive and a closure-converted backpropagator
+        # in a combined method that follows the protocol
+        G = GenSym(namespace=uuid())
+        args = [G.sym(a) for a in prim.argnames]
+        forward = Apply(sym, *args)
+        backward = ClosureImpl(rsym, args)
+        ast = Lambda(args, Tuple(forward, backward))
+        impl = FunctionImpl(ast, global_env)
+        prim.grad = impl
+        impl.primal = prim
+
+        global_env[rsym] = PrimitiveImpl(fn)
+        return impl
+
     return decorator
 
 
@@ -96,23 +107,23 @@ def Jinv(x):
 
 
 @rgrad(builtins.zero)
-def gzero(d, x):
-    ...
+def gzero(x, d):
+    return (zero(x),)
 
 
 @rgrad(builtins.merge)
-def gmerge(d, x, y):
-    ...
+def gmerge(x, y, d):
+    return (d, d)
 
 
 @rgrad(builtins.J)
-def gJ(d, x):
-    ...
+def gJ(x, d):
+    return (Jinv(d),)
 
 
 @rgrad(builtins.Jinv)
-def gJinv(d, x):
-    ...
+def gJinv(x, d):
+    return (J(d),)
 
 
 ######################################
@@ -121,22 +132,22 @@ def gJinv(d, x):
 
 
 @rgrad(builtins.add)
-def gadd(dz, _, _):
+def gadd(x, y, dz):
     return (dz, dz)
 
 
 @rgrad(builtins.subtract)
-def gsubtract(dz, _, _):
+def gsubtract(x, y, dz):
     return (dz, -dz)
 
 
 @rgrad(builtins.multiply)
-def gmultiply(dz, x, y):
+def gmultiply(x, y, dz):
     return (dz * y, dz * x)
 
 
 @rgrad(builtins.divide)
-def gdivide(dz, x, y):
+def gdivide(x, y, dz):
     return (dz / y, -dz * x / (y * y))
 
 
@@ -153,6 +164,7 @@ class Grad(Transformer):
     #     i.e. the quantity we are ultimately interested in
 
     def __init__(self):
+        self.tagged_map = {}
         self.sensitivity_map = {}
         self.backpropagator_map = {}
 
@@ -162,15 +174,15 @@ class Grad(Transformer):
 
         if isinstance(value, Symbol):
             # x = y ==> x_up = y_up
-            return [(self.transform(var), self.transform(value))]
+            return [(self.tagged_var(var), self.tagged_var(value))]
 
         elif isinstance(value, Apply):
             # x = f(y) ==> (x_up, x_bprop) = f_up(y_up)
             tmp = self.gensym('tmp')
             return [(tmp,
-                     Apply(self.transform(value.fn),
-                           *[self.transform(a) for a in value.args])),
-                    (self.transform(var),
+                     Apply(self.tagged_var(value.fn),
+                           *[self.tagged_var(a) for a in value.args])),
+                    (self.tagged_var(var),
                      Apply(builtins.index, tmp, Value(0))),
                     (self.backpropagator_var(var),
                      Apply(builtins.index, tmp, Value(0)))]
@@ -181,9 +193,9 @@ class Grad(Transformer):
             # through Closure, and lambda has no freevars, so we do:
             # x = Closure(f, w, z) ==> x_up = Closure(f_up, w_up, z_up) (???)
 
-            args = [self.transform(a) for a in value.args]
-            return [(self.transform(var),
-                     Closure(self.transform(value.fn), args))]
+            args = [self.tagged_var(a) for a in value.args]
+            return [(self.tagged_var(var),
+                     Closure(self.tagged_var(value.fn), args))]
 
         else:
             raise Exception(f'phi is not defined on node type: {value}')
@@ -220,7 +232,7 @@ class Grad(Transformer):
             new_sens = list(map(self.new_sensitivity_var, vars))
             tmp = self.gensym('tmp')
             group = Tuple(sens)
-            app = Apply(builtins.gadd, group, value)
+            app = Apply(builtins.merge, group, value)
             rval = [(tmp, app)]
             for i, new_sen in enumerate(new_sens):
                 rval.append((new_sen, Apply(builtins.index, tmp, Value(i))))
@@ -228,11 +240,17 @@ class Grad(Transformer):
         else:
             sen = self.sensitivity_var(var)
             new_sen = self.new_sensitivity_var(var)
-            app = Apply(builtins.gadd, sen, value)
+            app = Apply(builtins.merge, sen, value)
             return [(new_sen, app)]
+
+    def tagged_var(v):
+        # Maps v to the v_up variable i.e. the tagged variable for v
+        assert isinstance(v, Symbol)
+        return self.tagged_map.setdefault(v, self.gensym(v.label))
 
     def sensitivity_var(v):
         # Maps v to the v_sen variable i.e. the gradient of v
+        assert isinstance(v, Symbol)
         return self.sensitivity_map[v]
 
     def new_sensitivity_var(v):
@@ -240,6 +258,7 @@ class Grad(Transformer):
         # the single-assignment property: instead of v_sen = v_sen + x,
         # we do v_sen2 = v_sen + x. self.sensitivity_var maps to the latest
         # return value for this function.
+        assert isinstance(v, Symbol)
         new_v = self.gensym(v.label)
         self.sensitivity_map[v] = new_v
         return new_v
@@ -260,26 +279,31 @@ class Grad(Transformer):
     # def transform_If(self, node):
     #     return node
 
-    # def transform_Lambda(self, node):
-    #     return node
-
-    def transform_Let(self, node):
+    def transform_Lambda(self, node):
+        the_arguments = node.args
+        let = node.body
+        assert isinstance(let, Let)  # TODO: could be symbol too
         forward = []
         backward = []
-        for s, v in node.bindings:
+        for s, v in let.bindings:
             forward += self.phi(s, v)
             backward += self.rho(s, v)
 
         zeros = [self.zero_init(s) for s in the_arguments] \
-            + [self.zero_init(s) for s, _ in node.bindings]
+            + [self.zero_init(s) for s, _ in let.bindings]
 
-        out_sen = self.sensitivity_var(node.body)
+        out_sen = self.sensitivity_var(let.body)
 
         backp_args = Tuple(...)
         backp_ret = Tuple(self.sensitivity_var(arg) for arg in self.backp_args)
         backp = Lambda([*backp_args, out_sen], Let(backward, backp_ret))
 
-        return Let(forward, Tuple(self.transform(node.body), backp))
+        new_args = map(self.transform, the_arguments)
+        new_body = Let(forward, Tuple(self.transform(let.body), backp))
+        return Lambda(new_args, new_body)
+
+    # def transform_Let(self, node):
+    #     return node
 
     # def transform_Symbol(self, node):
     #     return node
