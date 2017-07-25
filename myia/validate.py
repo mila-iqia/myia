@@ -32,4 +32,3 @@ def unbound(node, avail=None):
     else:
         for child in node.children():
             unbound(child, avail)
-

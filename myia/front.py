@@ -672,4 +672,3 @@ def myia(fn):
     fn.data = bindings[fsym].data
     fn.associates = bindings
     return fn
-

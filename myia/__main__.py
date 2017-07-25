@@ -130,11 +130,14 @@ def command_grad(arguments):
     lbda = bindings[r]
     if not isinstance(lbda, Lambda):
         print('grad can only operate on a function.', file=sys.stderr)
-    G = Grad(a_normal(lbda))
+    G = Grad(r, a_normal(lbda))
     g = G.transform()
     from .validate import unbound
-    unbound(g)
-    display(g, arguments.format)
+    # unbound(g)
+    # display(g, arguments.format)
+    bindings = G.global_env.bindings
+    _bindings = {k: unbound(v) for k, v in bindings.items()}
+    display(bindings, arguments.format)
 
 
 if __name__ == '__main__':

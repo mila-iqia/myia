@@ -1,11 +1,12 @@
-from typing import Dict
+from typing import Dict, List
 
 from .ast import \
-    Transformer, GenSym, \
+    Transformer, GenSym, MyiaASTNode, \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure
 from .interpret import \
     global_env, impl, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
+from .front import Env
 from .symbols import builtins, bsym
 from copy import copy
 
@@ -168,10 +169,15 @@ class Grad:
     # x_sen is the sensitivity of the gradient to changes in x,
     #     i.e. the quantity we are ultimately interested in
 
-    def __init__(self, primal: Lambda) -> None:
+    def __init__(self,
+                 name: Symbol,
+                 primal: Lambda,
+                 global_env: Env = None) -> None:
+        self.name = name
         assert(isinstance(primal, Lambda))
         self.primal = primal
         self.gensym = primal.gen
+        self.global_env = global_env or Env(namespace='global')
         self.tagged_map: Dict[Symbol, Symbol] = {}
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
         self.backpropagator_map: Dict[Symbol, Symbol] = {}
@@ -326,11 +332,20 @@ class Grad:
         backp_fn = Lambda([*backp_args, out_sen],
                           Let(self.zeroes + backward, backp_ret),
                           self.gensym)
-        backp = Closure(backp_fn, backp_args)
+        backp_sym = self.global_env.gen(self.name, '♢*')
+        self.global_env[backp_sym] = backp_fn
 
-        new_args = map(self.tagged_var, args)
-        new_body = Let(forward, Tuple([self.tagged_var(let.body), backp]))
-        return Lambda(new_args, new_body, self.gensym)
+        backp_cl = Closure(backp_sym, backp_args)
+        backp_clsym = self.gensym(self.name, '♢')
+        forward.append((backp_clsym, backp_cl))
+        new_body = Let(forward,
+                       Tuple([self.tagged_var(let.body), backp_clsym]))
+
+        new_args = list(map(self.tagged_var, args))
+        ret_fn = Lambda(new_args, new_body, self.gensym)
+        ret_sym = self.global_env.gen(self.name, '↑')
+        self.global_env[ret_sym] = ret_fn
+        return ret_sym
 
     # def transform_Value(self, node):
     #     return node
