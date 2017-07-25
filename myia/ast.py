@@ -149,7 +149,7 @@ class Symbol(MyiaASTNode):
         ns = f'myia-ns-{self.namespace or "-none"}'
         rval = H.div['Symbol', ns]
         if self.relation:
-            rval = rval(H.span['SymbolRelation'])
+            rval = rval(H.span['SymbolRelation'](self.relation))
         if isinstance(self.label, str):
             rval = rval(self.label)
         else:
@@ -388,12 +388,19 @@ class GenSym:
         #  variables, and everything would still work)
         ref = f'{str(orig)}/{relation}'
         version = self.inc_version(ref)
+        # print(f'{ref} {version}<br/>')
         return Symbol(
             orig,
             namespace=self.namespace,
             version=version,
             relation=relation
         )
+
+    def __call__(self, s: Union[str, Symbol], rel: str = None) -> Symbol:
+        if isinstance(s, str):
+            return self.sym(s)
+        else:
+            return self.rel(s, rel)
 
 
 class _Assign(MyiaASTNode):

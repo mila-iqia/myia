@@ -46,11 +46,34 @@ p_eval.add_argument('--args', metavar='ARGS',
                     dest='args',
                     help='Arguments to provide to the function.')
 
+p_grad = subparsers.add_parser(
+    'grad',
+    help='Display the gradient of the expression.'
+)
+p_grad.add_argument(
+    'FILE',
+    help='The file with the function to take the gradient of'
+)
+p_grad.add_argument('--expr', '-e', metavar='EXPR',
+                    dest='expr',
+                    help='The expression to take the gradient of.')
+p_grad.add_argument('--format', '-f', default='ascii',
+                    help='Format to print out (ascii (default) or html)')
 
 def shame():
     raise NotImplementedError(
         'You provided a command to myia that is not yet implemented.'
     )
+
+
+def display(data, format):
+    if format == 'html':
+        print(H(data).as_page())
+    elif isinstance(data, dict):
+        for k, v in data.items():
+            print(f'{k}:\n  {v}')
+    else:
+        print(data)
 
 
 def getcode(arguments):
@@ -75,23 +98,14 @@ def command_parse(arguments):
     wrap = a_normal if arguments.a else (lambda x: x)
     url, code = getcode(arguments)
     r, bindings = parse_source(url, 1, code)
-
-    ishtml = arguments.format == 'html'
-
     if bindings:
-        if ishtml:
-            print(H({k: wrap(v) for k, v in bindings.items()}).as_page())
-        else:
-            for k, v in bindings.items():
-                print(f'{k}:\n  {wrap(v)}')
+        display({k: wrap(v) for k, v in bindings.items()},
+                arguments.format)
     else:
         if not isinstance(r, list):
             r = [r]
         for entry in r:
-            if ishtml:
-                print(H(wrap(entry)).as_page())
-            else:
-                print(wrap(entry))
+            display(wrap(entry), arguments.format)
 
 
 def command_eval(arguments):
@@ -105,6 +119,19 @@ def command_eval(arguments):
         print(result(*args))
     else:
         print(result)
+
+
+def command_grad(arguments):
+    from .ast import Lambda
+    from .grad import Grad
+    url, code = getcode(arguments)
+    r, bindings = parse_source(url, 1, code)
+    lbda = bindings[r]
+    if not isinstance(lbda, Lambda):
+        print('grad can only operate on a function.', file=sys.stderr)
+    G = Grad(a_normal(lbda))
+    g = G.transform()
+    display(g, arguments.format)
 
 
 if __name__ == '__main__':

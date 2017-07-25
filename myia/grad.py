@@ -1,7 +1,11 @@
+from typing import Dict
 
-
-from .ast import Transformer, Symbol, Lambda, Apply, Tuple
-from .interpret import global_env, impl, PrimitiveImpl, ClosureImpl
+from .ast import \
+    Transformer, GenSym, \
+    Symbol, Value, Lambda, Let, Apply, Tuple, Closure
+from .interpret import \
+    global_env, impl, \
+    PrimitiveImpl, FunctionImpl, ClosureImpl
 from .symbols import builtins, bsym
 
 
@@ -26,11 +30,11 @@ def rgrad(sym):
 
         # Wrap the primitive and a closure-converted backpropagator
         # in a combined method that follows the protocol
-        G = GenSym(namespace=uuid())
+        G = GenSym()
         args = [G.sym(a) for a in prim.argnames]
         forward = Apply(sym, *args)
-        backward = ClosureImpl(rsym, args)
-        ast = Lambda(args, Tuple(forward, backward))
+        backward = Closure(rsym, args)
+        ast = Lambda(args, Tuple([forward, backward]), G)
         impl = FunctionImpl(ast, global_env)
         prim.grad = impl
         impl.primal = prim
@@ -57,7 +61,7 @@ def zero(x):
     elif isinstance(x, ClosureImpl):
         return tuple(zero(a) for a in x.args)
     else:
-        raise TypeError('Cannot create a zero conformant with {x}')
+        raise TypeError(f'Cannot create a zero conformant with {x}')
 
 
 @impl(builtins.merge)
@@ -69,7 +73,7 @@ def merge(x, y):
         assert len(x) == len(y)
         return tuple(merge(a, b) for a, b in zip(x, y))
     else:
-        raise TypeError('Cannot merge values of type {type(x)}')
+        raise TypeError(f'Cannot merge values of type {type(x)}')
 
 
 @impl(builtins.J)
@@ -84,7 +88,7 @@ def J(x):
         # ??
         return ClosureImpl(J(x.fn), J(x.args))
     else:
-        raise TypeError('Invalid argument for J: {x}')
+        raise TypeError(f'Invalid argument for J: {x}')
 
 
 @impl(builtins.Jinv)
@@ -98,7 +102,7 @@ def Jinv(x):
     elif isinstance(x, ClosureImpl):
         return ClosureImpl(Jinv(x.fn), Jinv(x.args))
     else:
-        raise TypeError('Invalid argument for Jinv: {x}')
+        raise TypeError(f'Invalid argument for Jinv: {x}')
 
 
 ###########################################
@@ -154,7 +158,7 @@ def gdivide(x, y, dz):
 # Following the methodology in the following paper:
 #   http://www.bcl.hamilton.ie/~barak/papers/toplas-reverse.pdf
 
-class Grad(Transformer):
+class Grad:
     # Notation:
     # x_up is the reverse (backprop-ready) version of x
     # x_bprop is a function that takes the sensitivity of x and
@@ -163,12 +167,15 @@ class Grad(Transformer):
     # x_sen is the sensitivity of the gradient to changes in x,
     #     i.e. the quantity we are ultimately interested in
 
-    def __init__(self):
-        self.tagged_map = {}
-        self.sensitivity_map = {}
-        self.backpropagator_map = {}
+    def __init__(self, primal: Lambda) -> None:
+        assert(isinstance(primal, Lambda))
+        self.primal = primal
+        self.gensym = primal.gen
+        self.tagged_map: Dict[Symbol, Symbol] = {}
+        self.sensitivity_map: Dict[Symbol, Symbol] = {}
+        self.backpropagator_map: Dict[Symbol, Symbol] = {}
 
-    def phi(var, value):
+    def phi(self, var, value):
         # phi (p. 26) transformation on let bindings, transforms
         # the forward phase.
 
@@ -200,7 +207,7 @@ class Grad(Transformer):
         else:
             raise Exception(f'phi is not defined on node type: {value}')
 
-    def rho(var, value):
+    def rho(self, var, value):
         # rho (p. 26) transformation on let bindings, represents the
         # corresponding operations to do in the backward phase
 
@@ -222,11 +229,11 @@ class Grad(Transformer):
         else:
             raise Exception(f'rho is not defined on node type: {value}')
 
-    def zero_init(var):
+    def zero_init(self, var):
         return (self.new_sensitivity_var(var),
-                Apply(builtins.zero, self.transform(var)))
+                Apply(builtins.zero, self.tagged_var(var)))
 
-    def accum(vars, value):
+    def accum(self, vars, value):
         if isinstance(vars, list):
             sens = list(map(self.sensitivity_var, vars))
             new_sens = list(map(self.new_sensitivity_var, vars))
@@ -243,29 +250,63 @@ class Grad(Transformer):
             app = Apply(builtins.merge, sen, value)
             return [(new_sen, app)]
 
-    def tagged_var(v):
+    def tagged_var(self, v):
         # Maps v to the v_up variable i.e. the tagged variable for v
         assert isinstance(v, Symbol)
-        return self.tagged_map.setdefault(v, self.gensym(v.label))
+        return self.tagged_map.setdefault(v, self.gensym(v, '↑'))
 
-    def sensitivity_var(v):
+    def sensitivity_var(self, v):
         # Maps v to the v_sen variable i.e. the gradient of v
         assert isinstance(v, Symbol)
-        return self.sensitivity_map[v]
+        try:
+            return self.sensitivity_map[v]
+        except KeyError:
+            return self.new_sensitivity_var(v)
 
-    def new_sensitivity_var(v):
+    def new_sensitivity_var(self, v):
         # Create a new sensitivity variable for v. This is used to preserve
         # the single-assignment property: instead of v_sen = v_sen + x,
         # we do v_sen2 = v_sen + x. self.sensitivity_var maps to the latest
         # return value for this function.
         assert isinstance(v, Symbol)
-        new_v = self.gensym(v.label)
+        new_v = self.gensym(v, '∇')
         self.sensitivity_map[v] = new_v
         return new_v
 
-    def backpropagator_var(v):
+    def backpropagator_var(self, v):
         # Maps v to the v_bprop variable i.e. the backpropagator for v
-        return self.backpropagator_map.setdefault(v, self.gensym(v.label))
+        return self.backpropagator_map.setdefault(v, self.gensym(v, '♢'))
+
+    def transform(self):
+        args = self.primal.args
+        let = self.primal.body
+        assert isinstance(let, Let)  # TODO: could be symbol too
+
+        # Create this sensitivity variable first (it's an argument).
+        out_sen = self.sensitivity_var(let.body)
+
+        forward = []
+        backward = []
+        for s, v in let.bindings:
+            forward += self.phi(s, v)
+
+        zeros = [self.zero_init(s) for s in args] \
+            + [self.zero_init(s) for s, _ in let.bindings]
+
+        for s, v in reversed(let.bindings):
+            backward += self.rho(s, v)
+
+        backp_ret = Tuple(self.sensitivity_var(arg) for arg in args)
+        backp_args = \
+            [self.tagged_var(s) for s, _ in let.bindings] \
+            + [self.tagged_var(arg) for arg in args]
+        backp = Lambda([*backp_args, out_sen],
+                       Let(zeros + backward, backp_ret),
+                       self.gensym)
+
+        new_args = map(self.tagged_var, args)
+        new_body = Let(forward, Tuple([self.tagged_var(let.body), backp]))
+        return Lambda(new_args, new_body, self.gensym)
 
     # def transform_Value(self, node):
     #     return node
@@ -279,28 +320,8 @@ class Grad(Transformer):
     # def transform_If(self, node):
     #     return node
 
-    def transform_Lambda(self, node):
-        the_arguments = node.args
-        let = node.body
-        assert isinstance(let, Let)  # TODO: could be symbol too
-        forward = []
-        backward = []
-        for s, v in let.bindings:
-            forward += self.phi(s, v)
-            backward += self.rho(s, v)
-
-        zeros = [self.zero_init(s) for s in the_arguments] \
-            + [self.zero_init(s) for s, _ in let.bindings]
-
-        out_sen = self.sensitivity_var(let.body)
-
-        backp_args = Tuple(...)
-        backp_ret = Tuple(self.sensitivity_var(arg) for arg in self.backp_args)
-        backp = Lambda([*backp_args, out_sen], Let(backward, backp_ret))
-
-        new_args = map(self.transform, the_arguments)
-        new_body = Let(forward, Tuple(self.transform(let.body), backp))
-        return Lambda(new_args, new_body)
+    # def transform_Lambda(self, node):
+    #     return node
 
     # def transform_Let(self, node):
     #     return node
