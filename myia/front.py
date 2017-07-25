@@ -1,8 +1,12 @@
+from typing import \
+    Dict, Set, List, Tuple as TupleT, \
+    cast, Union, Callable, Optional
+
 from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
     Let, If, Lambda, Apply, \
-    Begin, Tuple, Closure, \
+    Begin, Tuple, Closure, _Assign, \
     GenSym
 from myia.util import group_contiguous
 from myia.symbols import get_operator, builtins
@@ -14,7 +18,7 @@ import sys
 
 
 class MyiaSyntaxError(Exception):
-    def __init__(self, location, message):
+    def __init__(self, location: Location, message: str) -> None:
         self.location = location
         self.message = message
 
@@ -38,18 +42,23 @@ sys.excepthook = exception_handler
 
 
 class Redirect:
-    def __init__(self, key):
+    def __init__(self, key: str) -> None:
         self.key = key
 
 
 class Env:
-    def __init__(self, parent=None, namespace=None, gen=None):
+    def __init__(self,
+                 parent: 'Env' = None,
+                 namespace: str = None,
+                 gen: GenSym = None) -> None:
         self.parent = parent
-        self.gen = gen or \
+        self.gen: GenSym = gen or \
             parent.gen if parent else GenSym(namespace or str(uuid()))
-        self.bindings = {}
+        self.bindings: Dict[Union[str, Symbol],
+                            Union[MyiaASTNode, Redirect]] = {}
 
-    def get_free(self, name, redirect=True):
+    def get_free(self,
+                 name: str) -> TupleT[bool, MyiaASTNode]:
         if name in self.bindings:
             free = False
             result = self.bindings[name]
@@ -58,28 +67,32 @@ class Env:
         else:
             free = True
             result = self.parent[name]
-        if redirect and isinstance(result, Redirect):
-            return self.get_free(result.key, True)
+        # if redirect and isinstance(result, Redirect):
+        #     return self.get_free(result.key, True)
+        # else:
+        #     return (free, result)
+        if isinstance(result, Redirect):
+            return self.get_free(result.key)
         else:
             return (free, result)
 
-    def update(self, bindings):
+    def update(self, bindings) -> None:
         self.bindings.update(bindings)
 
-    def __getitem__(self, name):
+    def __getitem__(self, name) -> MyiaASTNode:
         _, x = self.get_free(name)
         return x
 
-    def __setitem__(self, name, value):
+    def __setitem__(self, name, value) -> None:
         self.bindings[name] = value
 
 
 class Locator:
-    def __init__(self, url, line_offset):
+    def __init__(self, url: str, line_offset: int) -> None:
         self.url = url
         self.line_offset = line_offset
 
-    def __call__(self, node):
+    def __call__(self, node: Union[ast.expr, ast.stmt]) -> Location:
         try:
             return Location(
                 self.url,
@@ -91,13 +104,13 @@ class Locator:
 
 
 class LocVisitor:
-    def __init__(self, locator):
+    def __init__(self, locator: Locator) -> None:
         self.locator = locator
 
-    def make_location(self, node):
+    def make_location(self, node) -> Location:
         return self.locator(node)
 
-    def visit(self, node, **kwargs):
+    def visit(self, node: ast.AST, **kwargs) -> MyiaASTNode:
         loc = self.make_location(node)
         cls = node.__class__.__name__
         try:
@@ -113,21 +126,20 @@ class LocVisitor:
         return rval
 
 
-class _Assign:
-    def __init__(self, varname, value, location):
-        self.varname = varname
-        self.value = value
-        self.location = location
+InputNode = Union[str, ast.arg, ast.Name]
 
 
 class Parser(LocVisitor):
 
-    def __init__(self, parent, global_env=None, dry=None,
-                 gen=None,
-                 pull_free_variables=False,
-                 top_level=False):
-        self.free_variables = {}
-        self.local_assignments = set()
+    def __init__(self,
+                 parent: Union[Locator, 'Parser'],
+                 global_env: Env = None,
+                 dry: bool = None,
+                 gen: GenSym = None,
+                 pull_free_variables: bool = False,
+                 top_level: bool = False) -> None:
+        self.free_variables: Dict[str, Symbol] = {}
+        self.local_assignments: Set[str] = set()
         self.returns = False
         self.pull_free_variables = pull_free_variables
         self.top_level = top_level
@@ -135,9 +147,9 @@ class Parser(LocVisitor):
         if isinstance(parent, Locator):
             self.parent = None
             self.env = Env(gen=gen)
-            self.globals_accessed = set()
+            self.globals_accessed: Set[str] = set()
             self.global_env = global_env
-            self.return_error = None
+            self.return_error: str = None
             self.dry = dry
             super().__init__(parent)
         else:
@@ -145,14 +157,14 @@ class Parser(LocVisitor):
             self.env = Env(parent.env, gen=gen)
             self.globals_accessed = parent.globals_accessed
             self.global_env = parent.global_env
-            self.return_error = parent.return_error
+            self.return_error: str = parent.return_error
             self.dry = parent.dry if dry is None else dry
             super().__init__(parent.locator)
 
-    def gensym(self, name):
+    def gensym(self, name: str) -> Symbol:
         return self.env.gen.sym(name)
 
-    def base_name(self, input):
+    def base_name(self, input: InputNode) -> str:
         if isinstance(input, str):
             base_name = input
         elif isinstance(input, ast.arg):
@@ -161,38 +173,48 @@ class Parser(LocVisitor):
             base_name = input.id
         return base_name
 
-    def reg_lambda(self, args, body, gen, loc=None,
-                   label="#lambda", binding=None):
+    def reg_lambda(self,
+                   args: List[Symbol],
+                   body: MyiaASTNode,
+                   gen: GenSym,
+                   loc: Location = None,
+                   label: str = "#lambda",
+                   binding: TupleT[str, Symbol] = None) -> Symbol:
         ref = binding[1] if binding else self.global_env.gen.sym(label)
         l = Lambda(args, body, gen).at(loc)
         if not self.dry:
             self.global_env[ref] = l
         return ref
 
-    def new_variable(self, input):
+    def new_variable(self, input: InputNode) -> Symbol:
         base_name = self.base_name(input)
         loc = self.make_location(input)
         sym = self.gensym(base_name).at(loc)
-        self.env.update({base_name: Redirect(sym.label)})
+        label = sym.label
+        if isinstance(label, Symbol):
+            raise TypeError('Label should be a string.')
+        self.env.update({base_name: Redirect(label)})
         # The following statement can override the previous,
         # if sym.label == base_name
         # That is fine and intended.
-        self.env.update({sym.label: sym})
+        self.env.update({label: sym})
         return sym
 
-    def make_assign(self, base_name, value, location=None):
+    def make_assign(self,
+                    base_name: str,
+                    value: MyiaASTNode,
+                    location: Location = None) -> _Assign:
         sym = self.new_variable(base_name)
         self.local_assignments.add(base_name)
         return _Assign(sym, value, location)
 
-    def make_closure(
-        self,
-        inputs,
-        expr,
-        loc=None,
-        label="#lambda",
-        binding=None
-    ):
+    def make_closure(self,
+                     inputs: List[InputNode],
+                     expr: Union[Callable, ast.AST, List[ast.stmt]],
+                     loc: Location = None,
+                     label: str = "#lambda",
+                     binding: TupleT[str, Symbol] = None) \
+            -> Union[Closure, Symbol]:
         p = Parser(self, pull_free_variables=True, gen=GenSym())
         if binding is None:
             binding = (label, self.global_env.gen.sym(label))
@@ -218,8 +240,10 @@ class Parser(LocVisitor):
         else:
             return lbda
 
-    def visit_body(self, stmts, return_wrapper=False):
-        results = []
+    def body_wrapper(self,
+                     stmts: List[ast.stmt]) \
+            -> Callable[[Optional[MyiaASTNode]], MyiaASTNode]:
+        results: List[MyiaASTNode] = []
         for stmt in stmts:
             ret = self.returns
             r = self.visit(stmt)
@@ -255,10 +279,10 @@ class Parser(LocVisitor):
             else:
                 return Begin(grp + [helper(rest, result)])
 
-        if return_wrapper:
-            return lambda v: helper(groups, v)
-        else:
-            return helper(groups)
+        return lambda v: helper(groups, v)
+
+    def visit_body(self, stmts: List[ast.stmt]) -> MyiaASTNode:
+        return self.body_wrapper(stmts)(None)
 
     # def visit_arg(self, node, loc):
     #     return Symbol(node.arg, location=loc)
@@ -266,7 +290,7 @@ class Parser(LocVisitor):
     # def visit_arguments(self, args):
     #     return [self.visit(arg) for arg in args.args]
 
-    def visit_Assign(self, node, loc):
+    def visit_Assign(self, node: ast.Assign, loc: Location) -> _Assign:
         targ, = node.targets
         if isinstance(targ, ast.Tuple):
             raise MyiaSyntaxError(
@@ -286,18 +310,21 @@ class Parser(LocVisitor):
                           self.visit(targ.slice), val)
             return self.make_assign(targ.value.id, slice, loc)
 
-        else:
+        elif isinstance(targ, ast.Name):
             val = self.visit(node.value)
             return self.make_assign(targ.id, val, loc)
 
-    def visit_Attribute(self, node, loc):
+        else:
+            raise MyiaSyntaxError(loc, f'Unsupported targ for Assign: {targ}')
+
+    def visit_Attribute(self, node: ast.Attribute, loc: Location) -> Apply:
         return Apply(builtins.getattr.at(loc),
                      self.visit(node.value),
                      Value(node.attr).at(loc)).at(loc)
 
-    def visit_AugAssign(self, node, loc):
+    def visit_AugAssign(self, node: ast.AugAssign, loc: Location) -> _Assign:
         targ = node.target
-        if isinstance(targ, ast.Subscript):
+        if not isinstance(targ, ast.Name):
             raise MyiaSyntaxError(
                 loc,
                 "Augmented assignment to subscripts or "
@@ -309,14 +336,14 @@ class Parser(LocVisitor):
         val = Apply(op, prev, aug, location=loc)
         return self.make_assign(targ.id, val, loc)
 
-    def visit_BinOp(self, node, loc):
+    def visit_BinOp(self, node: ast.BinOp, loc: Location) -> Apply:
         op = get_operator(node.op).at(loc)
         return Apply(
             op,
             self.visit(node.left),
             self.visit(node.right), location=loc)
 
-    def visit_BoolOp(self, node, loc):
+    def visit_BoolOp(self, node: ast.BoolOp, loc: Location) -> If:
         left, right = node.values
         if isinstance(node.op, ast.And):
             return If(self.visit(left), self.visit(right), Value(False))
@@ -325,7 +352,7 @@ class Parser(LocVisitor):
         else:
             raise MyiaSyntaxError(loc, "Unknown operator: {}".format(node.op))
 
-    def visit_Call(self, node, loc):
+    def visit_Call(self, node: ast.Call, loc: Location) -> Apply:
         if (len(node.keywords) > 0):
             raise MyiaSyntaxError(loc, "Keyword arguments are not allowed.")
         return Apply(
@@ -334,7 +361,7 @@ class Parser(LocVisitor):
             location=loc
         )
 
-    def visit_Compare(self, node, loc):
+    def visit_Compare(self, node: ast.Compare, loc: Location) -> Apply:
         ops = [get_operator(op) for op in node.ops]
         if len(ops) == 1:
             return Apply(
@@ -348,15 +375,21 @@ class Parser(LocVisitor):
                 "Comparisons must have a maximum of two operands"
             )
 
-    def visit_Expr(self, node, loc, allow_decorator='dummy_parameter'):
+    def visit_Expr(self,
+                   node: ast.Expr,
+                   loc: Location,
+                   allow_decorator='dummy_parameter') -> MyiaASTNode:
         return self.visit(node.value)
 
-    def visit_ExtSlice(self, node, loc):
+    def visit_ExtSlice(self, node: ast.ExtSlice, loc: Location) -> Tuple:
         return Tuple(self.visit(v) for v in node.dims).at(loc)
 
     # def visit_For(self, node, loc): # TODO
 
-    def visit_FunctionDef(self, node, loc, allow_decorator=False):
+    def visit_FunctionDef(self,
+                          node: ast.FunctionDef,
+                          loc: Location,
+                          allow_decorator=False) -> _Assign:
         if node.args.vararg:
             raise MyiaSyntaxError(loc, "Varargs are not allowed.")
         if node.args.kwarg:
@@ -381,11 +414,12 @@ class Parser(LocVisitor):
                                  binding=binding)
         return _Assign(sym, clos, loc)
 
-    def visit_If(self, node, loc):
+    def visit_If(self, node: ast.If, loc: Location) \
+            -> Union[MyiaASTNode, _Assign]:
         p1 = Parser(self)
-        body = p1.visit_body(node.body, True)
+        body = p1.body_wrapper(node.body)
         p2 = Parser(self)
-        orelse = p2.visit_body(node.orelse, True)
+        orelse = p2.body_wrapper(node.orelse)
         if p1.returns != p2.returns:
             raise MyiaSyntaxError(
                 loc,
@@ -431,22 +465,24 @@ class Parser(LocVisitor):
                                 cannot_fail=True)
                     stmt = self.make_assign(a, idx)
                     stmts.append(stmt)
-                return Begin(stmts)
+                return Begin(cast(List[MyiaASTNode], stmts))
 
-    def visit_IfExp(self, node, loc):
+    def visit_IfExp(self, node: ast.IfExp, loc: Location) -> If:
         return If(self.visit(node.test),
                   self.visit(node.body),
                   self.visit(node.orelse),
                   location=loc)
 
-    def visit_Index(self, node, loc):
+    def visit_Index(self, node: ast.Index, loc: Location) -> MyiaASTNode:
         return self.visit(node.value)
 
-    def visit_Lambda(self, node, loc):
+    def visit_Lambda(self, node: ast.Lambda, loc: Location) \
+            -> Union[Closure, Symbol]:
         return self.make_closure([a for a in node.args.args],
                                  node.body, loc=loc).at(loc)
 
-    def visit_ListComp(self, node, loc):
+    def visit_ListComp(self, node: ast.ListComp, loc: Location) \
+            -> MyiaASTNode:
         if len(node.generators) > 1:
             raise MyiaSyntaxError(
                 loc,
@@ -454,6 +490,14 @@ class Parser(LocVisitor):
             )
 
         gen = node.generators[0]
+        if not isinstance(gen.target, ast.Name):
+            t = gen.target
+            raise MyiaSyntaxError(
+                loc,
+                f'List comprehension target must be a Name, not {t}'
+            )
+
+        arg: MyiaASTNode = None
         if len(gen.ifs) > 0:
             test1, *others = reversed(gen.ifs)
 
@@ -483,9 +527,10 @@ class Parser(LocVisitor):
         return [self.visit(stmt, allow_decorator=allow_decorator)
                 for stmt in node.body]
 
-    def visit_Name(self, node, loc):
+    def visit_Name(self, node: ast.Name, loc: Location) -> Symbol:
         try:
             free, v = self.env.get_free(node.id)
+            assert isinstance(v, Symbol)
             if free:
                 if self.pull_free_variables:
                     v = self.new_variable(node.id)
@@ -497,44 +542,46 @@ class Parser(LocVisitor):
             self.globals_accessed.add(node.id)
             return Symbol(node.id, namespace='global')
 
-    def visit_Num(self, node, loc):
+    def visit_Num(self, node: ast.Num, loc: Location) -> Value:
         return Value(node.n)
 
-    def visit_Return(self, node, loc):
+    def visit_Return(self, node: ast.Return, loc: Location) -> MyiaASTNode:
         if self.return_error:
             raise MyiaSyntaxError(loc, self.return_error)
         self.returns = True
         return self.visit(node.value).at(loc)
 
-    def visit_Slice(self, node, loc):
+    def visit_Slice(self, node: ast.Slice, loc: Location) -> Apply:
         return Apply(Symbol('slice'),
                      self.visit(node.lower) if node.lower else Value(0),
                      self.visit(node.upper) if node.upper else Value(None),
                      self.visit(node.step) if node.step else Value(1))
 
-    def visit_Str(self, node, loc):
+    def visit_Str(self, node: ast.Str, loc: Location) -> Value:
         return Value(node.s)
 
-    def visit_Tuple(self, node, loc):
+    def visit_Tuple(self, node: ast.Tuple, loc: Location) -> Tuple:
         return Tuple(self.visit(v) for v in node.elts).at(loc)
 
-    def visit_Subscript(self, node, loc):
-        return Apply(builtins.index, self.visit(node.value),
-                     self.visit(node.slice.value),
+    def visit_Subscript(self, node: ast.Subscript, loc: Location) -> Apply:
+        # TODO: test this
+        return Apply(builtins.index,
+                     self.visit(node.value),
+                     self.visit(node.slice),
                      location=loc)
 
-    def visit_UnaryOp(self, node, loc):
+    def visit_UnaryOp(self, node: ast.UnaryOp, loc: Location) -> Apply:
         op = get_operator(node.op).at(loc)
         return Apply(op, self.visit(node.operand), location=loc)
 
-    def visit_While(self, node, loc):
+    def visit_While(self, node: ast.While, loc: Location) -> Begin:
         fsym = self.global_env.gen.sym('#while')
 
         # We visit the body once to get the free variables
         testp = Parser(self, global_env=Env(), dry=True)
         testp.return_error = "While loops cannot contain return statements."
         testp.visit(node.test)
-        testp.visit_body(node.body, True)
+        testp.body_wrapper(node.body)
         in_vars = list(
             set(testp.free_variables.keys()) | testp.local_assignments
         )
@@ -547,7 +594,7 @@ class Parser(LocVisitor):
         # symbols, otherwise they will be shadowed
         initial_values = [p.env[v] for v in out_vars]
         test = p.visit(node.test)
-        body = p.visit_body(node.body, True)
+        body = p.body_wrapper(node.body)
 
         new_body = If(test,
                       body(Apply(fsym, *[p.env[v] for v in in_vars])).at(loc),
@@ -560,11 +607,12 @@ class Parser(LocVisitor):
                 p.env.gen,
                 location=loc
             )
+        assert isinstance(fsym.label, str)
         self.globals_accessed.add(fsym.label)
 
         tmp = self.gensym('#tmp').at(loc)
         val = Apply(fsym, *[self.env[v] for v in in_vars])
-        stmts = [_Assign(tmp, val, None)]
+        stmts: List[MyiaASTNode] = [_Assign(tmp, val, None)]
         for i, v in enumerate(out_vars):
             stmt = self.make_assign(v, Apply(builtins.index, tmp, Value(i)))
             stmts.append(stmt)
@@ -578,7 +626,8 @@ def parse_function(fn):
                                textwrap.dedent(inspect.getsource(fn)))
     return bindings
 
-_global_envs = {}
+
+_global_envs: Dict[str, Env] = {}
 
 
 def _get_global_env(url):

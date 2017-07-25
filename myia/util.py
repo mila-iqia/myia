@@ -9,6 +9,12 @@ class Props:
     def __getattr__(self, attr):
         return self.__dict__[attr]
 
+    def __setattr__(self, attr, value):
+        if attr.startswith('_'):
+            super().__setattr__(attr, value)
+        else:
+            self.__dict__[attr] = value
+
 
 def group_contiguous(arr, classify):
     """

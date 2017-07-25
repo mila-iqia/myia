@@ -1,4 +1,6 @@
-from typing import List, Tuple as TTup, Iterable, Dict, Union
+from typing import \
+    List, Tuple as TupleT, Iterable, Dict, Union, \
+    cast, TypeVar
 
 from uuid import uuid4 as uuid
 from copy import copy
@@ -48,6 +50,9 @@ def _get_location(x: Locatable) -> Location:
         raise TypeError(f'{x} is not a location')
 
 
+T = TypeVar('T', bound='MyiaASTNode')
+
+
 class MyiaASTNode:
     @classmethod
     def __hrepr_resources__(cls, H):
@@ -65,7 +70,7 @@ class MyiaASTNode:
         else:
             self.trace = None
 
-    def at(self, location) -> 'MyiaASTNode':
+    def at(self: T, location: Locatable) -> T:
         rval = copy(self)
         rval.location = _get_location(location)
         return rval
@@ -169,7 +174,7 @@ class Value(MyiaASTNode):
 
 class Let(MyiaASTNode):
     def __init__(self,
-                 bindings: List[TTup[Symbol, MyiaASTNode]],
+                 bindings: List[TupleT[Symbol, MyiaASTNode]],
                  body: MyiaASTNode,
                  **kw) -> None:
         super().__init__(**kw)
@@ -202,7 +207,7 @@ class Let(MyiaASTNode):
 
 class Lambda(MyiaASTNode):
     def __init__(self,
-                 args: List[MyiaASTNode],
+                 args: List[Symbol],
                  body: MyiaASTNode,
                  gen: 'GenSym',
                  **kw) -> None:
@@ -212,7 +217,8 @@ class Lambda(MyiaASTNode):
         self.gen = gen
 
     def children(self) -> List[MyiaASTNode]:
-        return self.args + [self.body]
+        args = cast(List[MyiaASTNode], self.args)
+        return args + [self.body]
 
     def __str__(self) -> str:
         return '(lambda ({}) {})'.format(
@@ -388,6 +394,16 @@ class GenSym:
             version=version,
             relation=relation
         )
+
+
+class _Assign(MyiaASTNode):
+    def __init__(self,
+                 varname: Symbol,
+                 value: MyiaASTNode,
+                 location: Location) -> None:
+        self.varname = varname
+        self.value = value
+        self.location = location
 
 
 class Transformer:

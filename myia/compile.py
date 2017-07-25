@@ -78,7 +78,7 @@ class ANormalTransformer(Transformer):
         return self.stash(stash, result, base_name + '/out')
 
     def transform_Apply(self, node, stash=False):
-        return self.transform_arguments((node.fn,) + node.args, Apply, stash)
+        return self.transform_arguments([node.fn] + node.args, Apply, stash)
 
     def transform_Symbol(self, node, stash=False):
         return node

@@ -108,7 +108,7 @@ def greater(x, y):
 
 
 @impl(builtins.index)
-def greater(t, i):
+def index(t, i):
     return t[i]
 
 

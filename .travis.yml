@@ -4,7 +4,7 @@ python:
 
 # Command to install dependencies
 install:
-  pip install pep8
+  pip install mypy pep8
 
 # Command to run tests
 script: ./run_tests.sh
