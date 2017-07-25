@@ -7,6 +7,7 @@ from .interpret import \
     global_env, impl, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
 from .symbols import builtins, bsym
+from copy import copy
 
 
 builtins.zero = bsym('zero')
@@ -174,6 +175,7 @@ class Grad:
         self.tagged_map: Dict[Symbol, Symbol] = {}
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
         self.backpropagator_map: Dict[Symbol, Symbol] = {}
+        self.zeroes: List[MyiaASTNode] = []
 
     def phi(self, var, value):
         # phi (p. 26) transformation on let bindings, transforms
@@ -192,7 +194,7 @@ class Grad:
                     (self.tagged_var(var),
                      Apply(builtins.index, tmp, Value(0))),
                     (self.backpropagator_var(var),
-                     Apply(builtins.index, tmp, Value(0)))]
+                     Apply(builtins.index, tmp, Value(1)))]
 
         elif isinstance(value, Closure):
             # x = lambda y: ... ==> x_up = (lambda y: ...)_up
@@ -203,6 +205,11 @@ class Grad:
             args = [self.tagged_var(a) for a in value.args]
             return [(self.tagged_var(var),
                      Closure(self.tagged_var(value.fn), args))]
+
+        elif isinstance(value, Tuple):
+            return [(self.tagged_var(var),
+                     Tuple(self.tagged_var(a) for a in value.values)),
+                    (self.backpropagator_var(var), Value(None))]
 
         else:
             raise Exception(f'phi is not defined on node type: {value}')
@@ -224,14 +231,21 @@ class Grad:
 
         elif isinstance(value, Closure):
             # x = Closure(f, w, z) ==> (w_sen, z_sen) += x_sen
-            return self.accum(value.args, var)
+            return self.accum(value.args, self.tagged_var(var))
+
+        elif isinstance(value, Tuple):
+            return self.accum(value.values, self.tagged_var(var))
 
         else:
             raise Exception(f'rho is not defined on node type: {value}')
 
     def zero_init(self, var):
-        return (self.new_sensitivity_var(var),
-                Apply(builtins.zero, self.tagged_var(var)))
+        new_var = self.new_sensitivity_var(var)
+        init = (new_var,
+                Apply(builtins.zero,
+                      Apply(builtins.Jinv, self.tagged_var(var))))
+        self.zeroes.append(init)
+        return new_var
 
     def accum(self, vars, value):
         if isinstance(vars, list):
@@ -253,15 +267,20 @@ class Grad:
     def tagged_var(self, v):
         # Maps v to the v_up variable i.e. the tagged variable for v
         assert isinstance(v, Symbol)
-        return self.tagged_map.setdefault(v, self.gensym(v, '↑'))
+        if v.namespace in {'global', 'builtin'}:
+            return Apply(builtins.J, v)
+        else:
+            return copy(self.tagged_map.setdefault(v, self.gensym(v, '↑')))
 
     def sensitivity_var(self, v):
         # Maps v to the v_sen variable i.e. the gradient of v
         assert isinstance(v, Symbol)
         try:
-            return self.sensitivity_map[v]
+            return copy(self.sensitivity_map[v])
         except KeyError:
-            return self.new_sensitivity_var(v)
+            # self.zeroes.append(self.zero_init(v))
+            # return self.new_sensitivity_var(v)
+            return self.zero_init(v)
 
     def new_sensitivity_var(self, v):
         # Create a new sensitivity variable for v. This is used to preserve
@@ -275,7 +294,7 @@ class Grad:
 
     def backpropagator_var(self, v):
         # Maps v to the v_bprop variable i.e. the backpropagator for v
-        return self.backpropagator_map.setdefault(v, self.gensym(v, '♢'))
+        return copy(self.backpropagator_map.setdefault(v, self.gensym(v, '♢')))
 
     def transform(self):
         args = self.primal.args
@@ -290,19 +309,24 @@ class Grad:
         for s, v in let.bindings:
             forward += self.phi(s, v)
 
-        zeros = [self.zero_init(s) for s in args] \
-            + [self.zero_init(s) for s, _ in let.bindings]
+        # zeros = [self.zero_init(s) for s in args] \
+        #     + [self.zero_init(s) for s, _ in let.bindings]
 
         for s, v in reversed(let.bindings):
             backward += self.rho(s, v)
 
-        backp_ret = Tuple(self.sensitivity_var(arg) for arg in args)
-        backp_args = \
-            [self.tagged_var(s) for s, _ in let.bindings] \
-            + [self.tagged_var(arg) for arg in args]
-        backp = Lambda([*backp_args, out_sen],
-                       Let(zeros + backward, backp_ret),
-                       self.gensym)
+        backp_bargs = [self.backpropagator_var(s) for s, _ in let.bindings]
+        backp_cargs = [self.tagged_var(s) for s, _ in let.bindings]
+        backp_rargs = [self.tagged_var(arg) for arg in args]
+        backp_args = backp_bargs + backp_cargs + backp_rargs
+        backp_ret = Tuple([
+            Tuple([self.sensitivity_var(arg.label) for arg in backp_cargs]),
+            *[self.sensitivity_var(arg) for arg in args]
+        ])
+        backp_fn = Lambda([*backp_args, out_sen],
+                          Let(self.zeroes + backward, backp_ret),
+                          self.gensym)
+        backp = Closure(backp_fn, backp_args)
 
         new_args = map(self.tagged_var, args)
         new_body = Let(forward, Tuple([self.tagged_var(let.body), backp]))
