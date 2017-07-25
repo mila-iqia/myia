@@ -60,6 +60,7 @@ p_grad.add_argument('--expr', '-e', metavar='EXPR',
 p_grad.add_argument('--format', '-f', default='ascii',
                     help='Format to print out (ascii (default) or html)')
 
+
 def shame():
     raise NotImplementedError(
         'You provided a command to myia that is not yet implemented.'
@@ -131,6 +132,8 @@ def command_grad(arguments):
         print('grad can only operate on a function.', file=sys.stderr)
     G = Grad(a_normal(lbda))
     g = G.transform()
+    from .validate import unbound
+    unbound(g)
     display(g, arguments.format)
 
 

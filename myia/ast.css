@@ -158,4 +158,7 @@
 	margin-right: 5px;
 }
 
-
+.unbound, .unbound * {
+	background-color: red;
+	color: white;
+}

@@ -673,14 +673,3 @@ def myia(fn):
     fn.associates = bindings
     return fn
 
-
-def _validate(node):
-    if not node.location:
-        print('Missing source location: {}'.format(node))
-        if node.trace:
-            t = node.trace[-1]
-            print('  Definition at:')
-            print('    ' + t.filename + ' line ' + str(t.lineno))
-            print('    ' + t.line)
-    for child in node.children():
-        _validate(child)

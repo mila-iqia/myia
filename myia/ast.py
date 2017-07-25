@@ -1,5 +1,5 @@
 from typing import \
-    List, Tuple as TupleT, Iterable, Dict, Union, \
+    List, Tuple as TupleT, Iterable, Dict, Set, Union, \
     cast, TypeVar
 
 from uuid import uuid4 as uuid
@@ -69,6 +69,7 @@ class MyiaASTNode:
             self.trace = traceback.extract_stack()[:-2]
         else:
             self.trace = None
+        self.annotations: Set[str] = set()
 
     def at(self: T, location: Locatable) -> T:
         rval = copy(self)
@@ -154,10 +155,11 @@ class Symbol(MyiaASTNode):
             rval = rval(self.label)
         else:
             rval = rval(hrepr(self.label))
-        if self.version <= 1:
-            return rval
-        else:
-            return rval(H.span['SymbolIndex'](self.version))
+        if self.version > 1:
+            rval = rval(H.span['SymbolIndex'](self.version))
+        if self.annotations:
+            rval = rval.__getitem__(tuple(self.annotations))
+        return rval
 
 
 class Value(MyiaASTNode):
