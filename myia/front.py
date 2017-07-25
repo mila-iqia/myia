@@ -147,7 +147,7 @@ class Parser(LocVisitor):
         if isinstance(parent, Locator):
             self.parent = None
             self.env = Env(gen=gen)
-            self.globals_accessed: Set[str] = set()
+            # self.globals_accessed: Set[str] = set()
             self.global_env = global_env
             self.return_error: str = None
             self.dry = dry
@@ -155,11 +155,13 @@ class Parser(LocVisitor):
         else:
             self.parent = parent
             self.env = Env(parent.env, gen=gen)
-            self.globals_accessed = parent.globals_accessed
+            # self.globals_accessed = parent.globals_accessed
             self.global_env = parent.global_env
             self.return_error: str = parent.return_error
             self.dry = parent.dry if dry is None else dry
             super().__init__(parent.locator)
+
+        self.dest = self.gensym('#lambda')
 
     def gensym(self, name: str) -> Symbol:
         return self.env.gen.sym(name)
@@ -219,6 +221,7 @@ class Parser(LocVisitor):
         if binding is None:
             binding = (label, self.global_env.gen.sym(label))
         sinputs = [p.new_variable(i) for i in inputs]
+        p.dest = binding[1]
         p.env[binding[0]] = binding[1]
         p.env.update({k: v for k, v in zip(inputs, sinputs)})
         if callable(expr):
@@ -539,7 +542,7 @@ class Parser(LocVisitor):
             return v
         except NameError as e:
             # raise MyiaSyntaxError(loc, e.args[0])
-            self.globals_accessed.add(node.id)
+            # self.globals_accessed.add(node.id)
             return Symbol(node.id, namespace='global')
 
     def visit_Num(self, node: ast.Num, loc: Location) -> Value:
@@ -575,7 +578,9 @@ class Parser(LocVisitor):
         return Apply(op, self.visit(node.operand), location=loc)
 
     def visit_While(self, node: ast.While, loc: Location) -> Begin:
-        fsym = self.global_env.gen.sym('#while')
+        # fsym = self.global_env.gen.sym('#while')
+        assert self.dest
+        fsym = self.global_env.gen(self.dest, '↻')
 
         # We visit the body once to get the free variables
         testp = Parser(self, global_env=Env(), dry=True)
@@ -589,6 +594,7 @@ class Parser(LocVisitor):
 
         # We visit once more, this time adding the free vars as parameters
         p = Parser(self, gen=GenSym())
+        p.dest = fsym
         in_syms = [p.new_variable(v) for v in in_vars]
         # Have to execute this before the body in order to get the right
         # symbols, otherwise they will be shadowed
@@ -607,8 +613,8 @@ class Parser(LocVisitor):
                 p.env.gen,
                 location=loc
             )
-        assert isinstance(fsym.label, str)
-        self.globals_accessed.add(fsym.label)
+        # assert isinstance(fsym.label, str)
+        # self.globals_accessed.add(fsym.label)
 
         tmp = self.gensym('#tmp').at(loc)
         val = Apply(fsym, *[self.env[v] for v in in_vars])
