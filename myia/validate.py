@@ -57,7 +57,7 @@ def grad_test(data):
     gbindings = G.global_env.bindings
 
     func = evaluate(r, bindings)
-    gfunc = evaluate(g, gbindings)
+    gfunc = evaluate(g, {**gbindings, **bindings})
 
     eps = 1e-10
 

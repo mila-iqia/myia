@@ -4,17 +4,19 @@ from .ast import \
     Transformer, GenSym, MyiaASTNode, \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure
 from .interpret import \
-    global_env, impl, \
+    global_env, impl, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
 from .front import Env
 from .symbols import builtins, bsym
 from copy import copy
+from .compile import a_normal
 
 
 builtins.zero = bsym('zero')
 builtins.merge = bsym('merge')
 builtins.J = bsym('J')
 builtins.Jinv = bsym('Jinv')
+builtins.shift_grad = bsym('shift_grad')
 
 
 ######################################
@@ -50,6 +52,27 @@ def rgrad(sym):
 ################################################
 # Implementation of primitives needed for Grad #
 ################################################
+
+
+@impl(builtins.shift_grad)
+def shift_grad(closure, n):
+    """Given a transformed closure, transforms its bprop
+    so that it groups the first n arguments together (these
+    arguments are assumed to be the variables closed over)."""
+    # TODO: this functionality should be implemented elsewhere,
+    # as it is it will play awkwardly with grad(grad), I think.
+
+    # assert isinstance(closure, ClosureImpl)
+    def f(*args):
+        result, bprop = closure(*args)
+
+        def bprop2(*args):
+            results = bprop(*args)
+            return (results[0] + results[1:1 + n], *results[1 + n:])
+        return (result, PrimitiveImpl(bprop2))
+    prim = PrimitiveImpl(f)
+    prim.primal = closure.primal
+    return prim
 
 
 @impl(builtins.zero)
@@ -88,10 +111,23 @@ def J(x):
     elif isinstance(x, PrimitiveImpl):
         return x.grad
     elif isinstance(x, FunctionImpl):
-        return make_grad(x)
+        G = Grad(
+            name = x.ast.ref,
+            primal = a_normal(x.ast)
+        )
+        g = G.transform()
+        bindings = {**x.bindings, **G.global_env.bindings}
+        gfn = evaluate(g, bindings)
+        gfn.primal = x
+        x.grad = gfn
+        return gfn
+        # return make_grad(x)
     elif isinstance(x, ClosureImpl):
         # ??
-        return ClosureImpl(J(x.fn), J(x.args))
+        c = ClosureImpl(shift_grad(J(x.fn), len(x.args)),
+                        J(tuple(x.args)))
+        c.primal = x
+        return c
     else:
         raise TypeError(f'Invalid argument for J: {x}')
 
@@ -103,9 +139,12 @@ def Jinv(x):
     elif isinstance(x, tuple):
         return tuple(Jinv(a) for a in x)
     elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
+        assert x.primal is not None
         return x.primal
     elif isinstance(x, ClosureImpl):
-        return ClosureImpl(Jinv(x.fn), Jinv(x.args))
+        c = ClosureImpl(Jinv(x.fn), Jinv(tuple(x.args)))
+        c.grad = x
+        return c
     else:
         raise TypeError(f'Invalid argument for Jinv: {x}')
 
@@ -218,8 +257,10 @@ class Grad:
             # x = Closure(f, w, z) ==> x_up = Closure(f_up, w_up, z_up) (???)
 
             args = [self.tagged_var(a) for a in value.args]
-            return [(self.tagged_var(var),
-                     Closure(self.tagged_var(value.fn), args))]
+            clos = Closure(value.fn, args)
+            expr = Apply(builtins.J, clos)
+            return [(self.tagged_var(var), expr),
+                    (self.backpropagator_var(var), Value(None))]
 
         elif isinstance(value, Tuple):
             return [(self.tagged_var(var),
@@ -250,10 +291,10 @@ class Grad:
 
         elif isinstance(value, Closure):
             # x = Closure(f, w, z) ==> (w_sen, z_sen) += x_sen
-            return self.accum(value.args, self.tagged_var(var))
+            return self.accum(value.args, self.sensitivity_var(var))
 
         elif isinstance(value, Tuple):
-            return self.accum(value.values, self.tagged_var(var))
+            return self.accum(value.values, self.sensitivity_var(var))
 
         else:
             raise Exception(f'rho is not defined on node type: {value}')
@@ -270,7 +311,8 @@ class Grad:
         if isinstance(vars, list):
             vvars = [(i, v) for i, v in enumerate(vars)
                      if not isinstance(v, Value)]
-            sens = [self.sensitivity_var(v) or Apply(builtins.zero, v)
+            sens = [self.sensitivity_var(v) or
+                    Apply(builtins.zero, Apply(builtins.Jinv, v))
                     for v in vars]
             new_sens = [self.new_sensitivity_var(v) for _, v in vvars]
             tmp = self.gensym('tmp')
@@ -325,6 +367,10 @@ class Grad:
     def transform(self):
         args = self.primal.args
         let = self.primal.body
+
+        if isinstance(let, Symbol):
+            tmp = self.gensym('tmp')
+            let = Let([(tmp, let)], tmp)
         assert isinstance(let, Let)  # TODO: could be symbol too
 
         # Create this sensitivity variable first (it's an argument).
@@ -335,9 +381,6 @@ class Grad:
         for s, v in let.bindings:
             forward += self.phi(s, v)
 
-        # zeros = [self.zero_init(s) for s in args] \
-        #     + [self.zero_init(s) for s, _ in let.bindings]
-
         for s, v in reversed(let.bindings):
             backward += self.rho(s, v)
 
@@ -346,7 +389,8 @@ class Grad:
         backp_rargs = [self.tagged_var(arg) for arg in args]
         backp_args = backp_bargs + backp_cargs + backp_rargs
         backp_ret = Tuple([
-            Tuple([self.sensitivity_var(arg.label) for arg in backp_cargs]),
+            # Tuple([self.sensitivity_var(arg.label) for arg in backp_cargs]),
+            Tuple([]),
             *[self.sensitivity_var(arg) for arg in args]
         ])
         backp_fn = Lambda([*map(copy, backp_args), out_sen],

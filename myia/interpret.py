@@ -149,7 +149,9 @@ class Evaluator:
     def eval_Closure(self, node):
         fn = self.eval(node.fn)
         args = list(map(self.eval, node.args))
-        return ClosureImpl(fn, args)
+        clos = ClosureImpl(fn, args)
+        clos.primal = fn.primal
+        return clos
 
     def eval_If(self, node):
         if self.eval(node.cond):
@@ -184,5 +186,8 @@ def evaluate(node, bindings):
     env = {**global_env}
     for k, v in bindings.items():
         # env[Symbol(k, namespace='global')] = Evaluator({}, env).eval(v)
-        env[k] = Evaluator({}, env).eval(v)
+        if isinstance(v, MyiaASTNode):
+            env[k] = Evaluator({}, env).eval(v)
+        else:
+            env[k] = v
     return Evaluator({}, env).eval(node)

@@ -184,6 +184,7 @@ class Parser(LocVisitor):
                    binding: TupleT[str, Symbol] = None) -> Symbol:
         ref = binding[1] if binding else self.global_env.gen.sym(label)
         l = Lambda(args, body, gen).at(loc)
+        l.ref = ref
         if not self.dry:
             self.global_env[ref] = l
         return ref

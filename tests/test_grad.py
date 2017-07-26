@@ -111,3 +111,27 @@ def test_dup_args_in_call(x):
     """The naive gradient update rule fails when a function's arguments
     contain the same variable more than once."""
     return x * x
+
+
+@grad_test((4, 5))
+def test_simple_closure(a, b):
+    """Test some trivial closures."""
+    def f():
+        return a + 1
+
+    def g():
+        return b + 2
+    return f() * g()
+
+
+@grad_test((4,))
+def test_closure(a):
+    """This is the closure test in the paper."""
+    def x1(b):
+
+        def x4(c):
+            return b
+        return x4
+    x2 = x1(a)
+    x3 = x2(1)
+    return x3
