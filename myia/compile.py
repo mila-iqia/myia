@@ -1,5 +1,6 @@
 import re
-from myia.ast import Apply, Let, Lambda, If, Tuple, Transformer
+from myia.ast import \
+    Apply, Symbol, Value, Let, Lambda, If, Tuple, Transformer
 from myia.front import GenSym
 
 
@@ -110,6 +111,16 @@ class ANormalTransformer(Transformer):
 
     def transform_Closure(self, node, stash=False):
         return node
+
+    def transform_Begin(self, node, stash=False):
+        stmts = [stmt for stmt in node.stmts[:-1]
+                 if not isinstance(stmt, (Symbol, Value))] + node.stmts[-1:]
+        if len(stmts) == 1:
+            return self.transform(stmts[0], stash=stash)
+        else:
+            syms = [self.gen('_') for stmt in stmts]
+            bindings = list(zip(syms, stmts))
+            return self.transform_Let(Let(bindings, syms[-1]), stash)
 
 
 class CollapseLet(Transformer):
