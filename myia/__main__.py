@@ -4,6 +4,7 @@ import sys
 from .compile import a_normal
 from .front import parse_source
 from .interpret import evaluate
+from .validate import grad_test, unbound
 
 
 def H(node):
@@ -59,6 +60,9 @@ p_grad.add_argument('--expr', '-e', metavar='EXPR',
                     help='The expression to take the gradient of.')
 p_grad.add_argument('--format', '-f', default='ascii',
                     help='Format to print out (ascii (default) or html)')
+p_grad.add_argument('--args', metavar='ARGS',
+                    dest='args',
+                    help='Arguments to provide to the function.')
 
 
 def shame():
@@ -91,6 +95,16 @@ def getcode(arguments):
     return url, code
 
 
+def getargs(arguments):
+    if arguments.args:
+        args = eval(arguments.args)
+        if not isinstance(args, tuple):
+            args = args,
+        return args
+    else:
+        return None
+
+
 def command_None(arguments):
     parser.print_help()
 
@@ -113,31 +127,25 @@ def command_eval(arguments):
     url, code = getcode(arguments)
     r, bindings = parse_source(url, 1, code)
     result = evaluate(r, bindings)
-    if arguments.args:
-        args = eval(arguments.args)
-        if not isinstance(args, tuple):
-            args = args,
+    args = getargs(arguments)
+    if args:
         print(result(*args))
     else:
         print(result)
 
 
 def command_grad(arguments):
-    from .ast import Lambda
-    from .grad import Grad
     url, code = getcode(arguments)
-    r, bindings = parse_source(url, 1, code)
-    lbda = bindings[r]
-    if not isinstance(lbda, Lambda):
-        print('grad can only operate on a function.', file=sys.stderr)
-    G = Grad(r, a_normal(lbda))
-    g = G.transform()
-    from .validate import unbound
-    # unbound(g)
-    # display(g, arguments.format)
-    bindings = G.global_env.bindings
-    _bindings = {k: unbound(v) for k, v in bindings.items()}
-    display(bindings, arguments.format)
+    results = grad_test(url, 1, code)
+    args = getargs(arguments)
+    if args:
+        t = results['test']
+        display(t(args), arguments.format)
+    else:
+        bindings = results['grad_bindings']
+        for k, v in bindings.items():
+            unbound(v)
+        display(bindings, arguments.format)
 
 
 if __name__ == '__main__':

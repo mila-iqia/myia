@@ -28,6 +28,7 @@ class PrimitiveImpl:
 class FunctionImpl:
     def __init__(self, ast, bindings):
         assert isinstance(ast, Lambda)
+        self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
         self.ast = ast
         self.bindings = bindings
@@ -51,6 +52,7 @@ class FunctionImpl:
 class ClosureImpl:
     def __init__(self, fn, args):
         assert isinstance(fn, (PrimitiveImpl, FunctionImpl))
+        self.argnames = [a for a in fn.argnames[len(args):]]
         self.nargs = fn.nargs - len(args)
         self.fn = fn
         self.args = args
