@@ -69,7 +69,7 @@ def grad_test(url, line_offset, code):
             r2 = pyfn(*argsl)
             d = (r2 - r1) / (2 * eps)
             g = grads[i]
-            gg = max(grads[i], 1e-10)
+            gg = 1e-10 if g == 0 else g
             derivatives[arg] = dict(
                 difference = d,
                 computed = g,

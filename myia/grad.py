@@ -58,7 +58,7 @@ def zero(x):
         return 0
     elif isinstance(x, tuple):
         return tuple(gzero(a) for a in x)
-    elif isinstance(x, FunctionImpl):
+    elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
         return ()
     elif isinstance(x, ClosureImpl):
         return tuple(zero(a) for a in x.args)
@@ -68,9 +68,10 @@ def zero(x):
 
 @impl(builtins.merge)
 def merge(x, y):
-    assert type(x) is type(y)
-    if isinstance(x, (int, float)):
+    if isinstance(x, (int, float)) and isinstance(y, (int, float)):
         return x + y
+    elif type(x) is not type(y):
+        raise TypeError(f'Cannot merge {x} and {y} (not same type).')
     elif isinstance(x, tuple):
         assert len(x) == len(y)
         return tuple(merge(a, b) for a, b in zip(x, y))
@@ -84,6 +85,8 @@ def J(x):
         return x
     elif isinstance(x, tuple):
         return tuple(J(a) for a in x)
+    elif isinstance(x, PrimitiveImpl):
+        return x.grad
     elif isinstance(x, FunctionImpl):
         return make_grad(x)
     elif isinstance(x, ClosureImpl):
@@ -99,7 +102,7 @@ def Jinv(x):
         return x
     elif isinstance(x, tuple):
         return tuple(Jinv(a) for a in x)
-    elif isinstance(x, FunctionImpl):
+    elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
         return x.primal
     elif isinstance(x, ClosureImpl):
         return ClosureImpl(Jinv(x.fn), Jinv(x.args))
@@ -114,22 +117,22 @@ def Jinv(x):
 
 @rgrad(builtins.zero)
 def gzero(x, d):
-    return (zero(x),)
+    return ((), zero(x))
 
 
 @rgrad(builtins.merge)
 def gmerge(x, y, d):
-    return (d, d)
+    return ((), d, d)
 
 
 @rgrad(builtins.J)
 def gJ(x, d):
-    return (Jinv(d),)
+    return ((), Jinv(d),)
 
 
 @rgrad(builtins.Jinv)
 def gJinv(x, d):
-    return (J(d),)
+    return ((), J(d))
 
 
 ######################################
@@ -139,22 +142,22 @@ def gJinv(x, d):
 
 @rgrad(builtins.add)
 def gadd(x, y, dz):
-    return (dz, dz)
+    return ((), dz, dz)
 
 
 @rgrad(builtins.subtract)
 def gsubtract(x, y, dz):
-    return (dz, -dz)
+    return ((), dz, -dz)
 
 
 @rgrad(builtins.multiply)
 def gmultiply(x, y, dz):
-    return (dz * y, dz * x)
+    return ((), dz * y, dz * x)
 
 
 @rgrad(builtins.divide)
 def gdivide(x, y, dz):
-    return (dz / y, -dz * x / (y * y))
+    return ((), dz / y, -dz * x / (y * y))
 
 
 # Following the methodology in the following paper:
@@ -189,7 +192,8 @@ class Grad:
 
         if isinstance(value, Symbol):
             # x = y ==> x_up = y_up
-            return [(self.tagged_var(var), self.tagged_var(value))]
+            return [(self.tagged_var(var), self.tagged_var(value)),
+                    (self.backpropagator_var(var), Value(None))]
 
         elif isinstance(value, Apply):
             # x = f(y) ==> (x_up, x_bprop) = f_up(y_up)
@@ -226,7 +230,7 @@ class Grad:
 
         if isinstance(value, Symbol):
             # x = y ==> y_sen += x_sen
-            return self.accum([value], self.sensitivity_var(var))
+            return self.accum([value], Tuple([self.sensitivity_var(var)]))
 
         elif isinstance(value, Apply):
             # x = f(y) ==> (f_sen, y_sen) += x_bprop(x_sen)
@@ -308,7 +312,7 @@ class Grad:
         assert isinstance(let, Let)  # TODO: could be symbol too
 
         # Create this sensitivity variable first (it's an argument).
-        out_sen = self.sensitivity_var(let.body)
+        out_sen = self.new_sensitivity_var(let.body)
 
         forward = []
         backward = []
@@ -329,7 +333,7 @@ class Grad:
             Tuple([self.sensitivity_var(arg.label) for arg in backp_cargs]),
             *[self.sensitivity_var(arg) for arg in args]
         ])
-        backp_fn = Lambda([*backp_args, out_sen],
+        backp_fn = Lambda([*map(copy, backp_args), out_sen],
                           Let(self.zeroes + backward, backp_ret),
                           self.gensym)
         backp_sym = self.global_env.gen(self.name, '♢*')
