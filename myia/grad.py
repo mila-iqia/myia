@@ -195,6 +195,11 @@ class Grad:
             return [(self.tagged_var(var), self.tagged_var(value)),
                     (self.backpropagator_var(var), Value(None))]
 
+        elif isinstance(value, Value):
+            # x = 5 ==> x_up = 5
+            return [(self.tagged_var(var), value),
+                    (self.backpropagator_var(var), Value(None))]
+
         elif isinstance(value, Apply):
             # x = f(y) ==> (x_up, x_bprop) = f_up(y_up)
             tmp = self.gensym('tmp')
@@ -232,6 +237,10 @@ class Grad:
             # x = y ==> y_sen += x_sen
             return self.accum([value], Tuple([self.sensitivity_var(var)]))
 
+        elif isinstance(value, Value):
+            # x = 5 ==> <nothing>
+            return []
+
         elif isinstance(value, Apply):
             # x = f(y) ==> (f_sen, y_sen) += x_bprop(x_sen)
             args = [value.fn, *value.args]
@@ -259,13 +268,16 @@ class Grad:
 
     def accum(self, vars, value):
         if isinstance(vars, list):
-            sens = list(map(self.sensitivity_var, vars))
-            new_sens = list(map(self.new_sensitivity_var, vars))
+            vvars = [(i, v) for i, v in enumerate(vars)
+                     if not isinstance(v, Value)]
+            sens = [self.sensitivity_var(v) or Apply(builtins.zero, v)
+                    for v in vars]
+            new_sens = [self.new_sensitivity_var(v) for _, v in vvars]
             tmp = self.gensym('tmp')
             group = Tuple(sens)
             app = Apply(builtins.merge, group, value)
             rval = [(tmp, app)]
-            for i, new_sen in enumerate(new_sens):
+            for new_sen, (i, _) in zip(new_sens, vvars):
                 rval.append((new_sen, Apply(builtins.index, tmp, Value(i))))
             return rval
         else:
@@ -276,7 +288,9 @@ class Grad:
 
     def tagged_var(self, v):
         # Maps v to the v_up variable i.e. the tagged variable for v
-        assert isinstance(v, Symbol)
+        assert isinstance(v, (Symbol, Value))
+        if isinstance(v, Value):
+            return v
         if v.namespace in {'global', 'builtin'}:
             return Apply(builtins.J, v)
         else:
@@ -284,6 +298,8 @@ class Grad:
 
     def sensitivity_var(self, v):
         # Maps v to the v_sen variable i.e. the gradient of v
+        if isinstance(v, Value):
+            return None
         assert isinstance(v, Symbol)
         try:
             return copy(self.sensitivity_map[v])
