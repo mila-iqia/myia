@@ -214,7 +214,7 @@ class Lambda(MyiaASTNode):
                  gen: 'GenSym',
                  **kw) -> None:
         super().__init__(**kw)
-        self.ref: Symbol
+        self.ref: Symbol = None
         self.args = args
         self.body = body
         self.gen = gen

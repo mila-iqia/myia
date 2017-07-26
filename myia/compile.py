@@ -47,12 +47,15 @@ class ANormalTransformer(Transformer):
             fn, *args = args
             fn = self.transform(fn, stash=(None, bindings))
             new_args.append(fn)
-            if "/" in fn.label:
+            base_label = fn
+            while isinstance(base_label, Symbol):
+                base_label = base_label.label
+            if "/" in base_label:
                 base_name = ""
-            elif fn.label.startswith('#'):
-                base_name = fn.label
+            elif base_label.startswith('#'):
+                base_name = base_label
             else:
-                base_name = re.split("[^A-Za-z_]", fn.label)[0]
+                base_name = re.split("[^A-Za-z_]", base_label)[0]
 
         if tags is None:
             tags = ['in' + str(i + 1) for i, _ in enumerate(args)]
@@ -92,6 +95,7 @@ class ANormalTransformer(Transformer):
         result = Lambda(node.args,
                         tr.transform(node.body),
                         node.gen)
+        result.ref = node.ref
         return self.stash(stash, result, 'lambda')
 
     def transform_If(self, node, stash=False):
@@ -147,9 +151,11 @@ class CollapseLet(Transformer):
         return node
 
     def transform_Lambda(self, node):
-        return Lambda(node.args,
-                      self.transform(node.body),
-                      node.gen)
+        result = Lambda(node.args,
+                        self.transform(node.body),
+                        node.gen)
+        result.ref = node.ref
+        return result
 
     def transform_Apply(self, node):
         return Apply(self.transform(node.fn),

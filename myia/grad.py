@@ -112,7 +112,7 @@ def J(x):
         return x.grad
     elif isinstance(x, FunctionImpl):
         G = Grad(
-            name = x.ast.ref,
+            name = x.ast.ref or x.ast.gen('???'),
             primal = a_normal(x.ast)
         )
         g = G.transform()
