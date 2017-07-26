@@ -119,6 +119,32 @@ def _map(f, xs):
     return list(map(f, xs))
 
 
+@impl(builtins.switch)
+def switch(cond, t, f):
+    if cond:
+        return t
+    else:
+        return f
+
+
+@impl(builtins.lazy_if)
+def lazy_if(cond, t, f):
+    if cond:
+        return t()
+    else:
+        return f()
+
+
+@impl(builtins.half_lazy_if)
+def half_lazy_if(cond, t, f):
+    # First branch is lazy, second is eager
+    # Use case: when a branch is a constant
+    if cond:
+        return t()
+    else:
+        return f
+
+
 class Evaluator:
     def __init__(self, env, global_env):
         self.global_env = global_env

@@ -32,7 +32,10 @@ builtins_dict: Dict[str, Symbol] = dict(
     map = bsym('map'),
     filter = bsym('filter'),
     getattr = bsym('getattr'),
-    setslice = bsym('setslice')
+    setslice = bsym('setslice'),
+    switch = bsym('switch'),
+    lazy_if = bsym('lazy_if'),
+    half_lazy_if = bsym('half_lazy_if')
 )
 
 
