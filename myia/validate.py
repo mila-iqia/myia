@@ -1,6 +1,6 @@
 from .ast import Symbol, Lambda, Let
 from .compile import a_normal
-from .front import parse_source
+from .front import parse_source, parse_function0
 from .grad import Grad
 from .interpret import evaluate
 
@@ -38,11 +38,17 @@ def unbound(node, avail=None):
             unbound(child, avail)
 
 
-def grad_test(url, line_offset, code):
-    _globals = {}
-    exec(code, _globals)
-    r, bindings = parse_source(url, line_offset, code)
-    pyfn = _globals[r.label]
+def grad_test(data):
+    if isinstance(data, tuple):
+        url, line_offset, code = data
+        _globals = {}
+        exec(code, _globals)
+        r, bindings = parse_source(url, line_offset, code)
+        pyfn = _globals[r.label]
+    else:
+        pyfn = data
+        r, bindings = parse_function0(pyfn)
+
     lbda = bindings[r]
     if not isinstance(lbda, Lambda):
         print('grad can only operate on a function.', file=sys.stderr)

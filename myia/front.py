@@ -626,11 +626,14 @@ class Parser(LocVisitor):
 
 
 def parse_function(fn):
+    return parse_function0(fn)[1]
+
+
+def parse_function0(fn):
     _, line = inspect.getsourcelines(fn)
-    _, bindings = parse_source(inspect.getfile(fn),
-                               line,
-                               textwrap.dedent(inspect.getsource(fn)))
-    return bindings
+    return parse_source(inspect.getfile(fn),
+                        line,
+                        textwrap.dedent(inspect.getsource(fn)))
 
 
 _global_envs: Dict[str, Env] = {}

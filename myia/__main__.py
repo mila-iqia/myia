@@ -136,7 +136,7 @@ def command_eval(arguments):
 
 def command_grad(arguments):
     url, code = getcode(arguments)
-    results = grad_test(url, 1, code)
+    results = grad_test((url, 1, code))
     args = getargs(arguments)
     if args:
         t = results['test']
