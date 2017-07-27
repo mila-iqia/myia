@@ -6,10 +6,11 @@ from .ast import \
 from .interpret import \
     global_env, impl, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
-from .front import Env
+from .front import Env, parse_function0
 from .symbols import builtins, bsym
 from copy import copy
 from .compile import a_normal
+from .util import Props
 
 
 builtins.zero = bsym('zero')
@@ -24,11 +25,42 @@ builtins.shift_grad = bsym('shift_grad')
 ######################################
 
 
+# def rgrad(sym):
+#     # Copy symbol to grad namespace
+#     rsym = Symbol(sym, namespace='builtin', relation='♢*')
+#     #Symbol(sym.label, namespace='grad:builtin')
+
+#     def decorator(fn):
+#         prim = global_env[sym]
+#         assert isinstance(prim, PrimitiveImpl)
+
+#         # Wrap the primitive and a closure-converted backpropagator
+#         # in a combined method that follows the protocol
+#         G = GenSym()
+#         args = [G.sym(a) for a in prim.argnames]
+#         forward = Apply(sym, *[Apply(builtins.Jinv, a)
+#                                for a in args])
+#         backward = Closure(rsym, args)
+#         ast = Lambda(args, Tuple([forward, backward]), G)
+#         impl = FunctionImpl(ast, global_env)
+#         prim.grad = impl
+#         impl.primal = prim
+
+#         global_env[rsym] = PrimitiveImpl(fn)
+#         return impl
+
+#     return decorator
+
+
 def rgrad(sym):
     # Copy symbol to grad namespace
-    rsym = Symbol(sym.label, namespace='grad:builtin')
+    rsym = Symbol(sym, namespace='builtin', relation='♢*')
+    #Symbol(sym.label, namespace='grad:builtin')
 
-    def decorator(fn):
+    def decorator(orig_fn):
+        r, bindings = parse_function0(orig_fn)
+        fn = evaluate(r, bindings)
+
         prim = global_env[sym]
         assert isinstance(prim, PrimitiveImpl)
 
@@ -44,7 +76,7 @@ def rgrad(sym):
         prim.grad = impl
         impl.primal = prim
 
-        global_env[rsym] = PrimitiveImpl(fn)
+        global_env[rsym] = fn #PrimitiveImpl(fn)
         return impl
 
     return decorator
@@ -154,10 +186,11 @@ def Jinv(x):
 # Gradients of primitives needed for Grad #
 ###########################################
 
+myia_builtins = Props(globals())
 
 @rgrad(builtins.zero)
 def gzero(x, d):
-    return ((), zero(x))
+    return ((), myia_builtins.zero(x))
 
 
 @rgrad(builtins.merge)
@@ -167,12 +200,12 @@ def gmerge(x, y, d):
 
 @rgrad(builtins.J)
 def gJ(x, d):
-    return ((), Jinv(d),)
+    return ((), myia_builtins.Jinv(d),)
 
 
 @rgrad(builtins.Jinv)
 def gJinv(x, d):
-    return ((), J(d))
+    return ((), myia_builtins.J(d))
 
 
 ######################################
@@ -223,27 +256,55 @@ def gless(x, y, dz):
 @rgrad(builtins.lazy_if)
 def glazy_if(c, t, f, dz):
     if c:
-        return ((), False, t()[1](dz)[0], zero(Jinv(f)))
+        return ((),
+                False,
+                t()[1](dz)[0],
+                myia_builtins.zero(myia_builtins.Jinv(f)))
     else:
-        return ((), False, zero(Jinv(t)), f()[1](dz)[0])
+        return ((),
+                False,
+                myia_builtins.zero(myia_builtins.Jinv(t)),
+                f()[1](dz)[0])
 
 
 @rgrad(builtins.half_lazy_if)
 def ghalf_lazy_if(c, t, f, dz):
     if c:
-        return ((), False, t()[1](dz)[0], zero(Jinv(f)))
+        return ((),
+                False,
+                t()[1](dz)[0],
+                myia_builtins.zero(myia_builtins.Jinv(f)))
     else:
-        return ((), False, zero(Jinv(t)), dz)
+        return ((),
+                False,
+                myia_builtins.zero(myia_builtins.Jinv(t)),
+                dz)
+
+
+@rgrad(builtins.switch)
+def gswitch(c, t, f, dz):
+    if c:
+        return ((),
+                False,
+                dz,
+                myia_builtins.zero(myia_builtins.Jinv(f)))
+    else:
+        return ((),
+                False,
+                myia_builtins.zero(myia_builtins.Jinv(t)),
+                dz)
 
 
 #################################
 # Gradients of other primitives #
 #################################
 
-
 @rgrad(builtins.index)
 def gindex(tup, idx, dz):
-    return ((), tuple(dz if idx == i else 0 for i in range(len(tup))), 0)
+    def f(pair):
+        return myia_builtins.switch(pair[0] == idx, dz, 0)
+    rval = myia_builtins.map(f, myia_builtins.enumerate(tup))
+    return ((), rval, 0)
 
 
 # Following the methodology in the following paper:

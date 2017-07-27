@@ -151,7 +151,7 @@ def test_if(a, b):
         return b
 
 
-@grad_test((4, 5, 2), (11, 3, 1))
+@grad_test((4, 5, 2), (7, 3, 1))
 def test_while(x, y, z):
     rval = 0
     # Cannot compare to 0 or finite diff is unstable
