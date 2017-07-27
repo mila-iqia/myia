@@ -98,3 +98,6 @@ ENV/
 
 # emacs backup files
 *~
+
+# mypy cache
+.mypy_cache
