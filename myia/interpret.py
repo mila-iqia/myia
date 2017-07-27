@@ -5,7 +5,17 @@ from myia.ast import \
 from .symbols import builtins
 import inspect
 
-global_env = {}
+
+class BuiltinCollection:
+    pass
+
+
+myia_builtins = Symbol('myia_builtins', namespace='global')
+
+
+global_env = {
+    myia_builtins: BuiltinCollection()
+}
 
 
 ###################
@@ -89,6 +99,9 @@ def impl(sym):
     def decorator(fn):
         prim = PrimitiveImpl(fn)
         global_env[sym] = prim
+        setattr(global_env[myia_builtins],
+                fn.__name__.lstrip('_'),
+                prim)
         return prim
     return decorator
 
@@ -118,6 +131,11 @@ def unary_subtract(x):
     return -x
 
 
+@impl(builtins.equal)
+def equal(x, y):
+    return x == y
+
+
 @impl(builtins.less)
 def less(x, y):
     return x < y
@@ -128,14 +146,29 @@ def greater(x, y):
     return x > y
 
 
+@impl(builtins.len)
+def _len(t):
+    return len(t)
+
+
 @impl(builtins.index)
 def index(t, i):
     return t[i]
 
 
+@impl(builtins.getattr)
+def index(obj, attr):
+    return getattr(obj, attr)
+
+
 @impl(builtins.map)
 def _map(f, xs):
-    return list(map(f, xs))
+    return tuple(map(f, xs))
+
+
+@impl(builtins.enumerate)
+def _enumerate(xs):
+    return tuple(enumerate(xs))
 
 
 @impl(builtins.switch)

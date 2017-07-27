@@ -9,6 +9,7 @@ def bsym(name):
 
 
 builtins_dict: Dict[str, Symbol] = dict(
+    myia_builtins = Symbol('myia_builtins', namespace='global'),
     add = bsym('add'),
     subtract = bsym('subtract'),
     multiply = bsym('multiply'),
@@ -27,8 +28,10 @@ builtins_dict: Dict[str, Symbol] = dict(
     less_equal = bsym('less_equal'),
     greater_equal = bsym('greater_equal'),
     equal = bsym('equal'),
+    len = bsym('len'),
     range = bsym('range'),
     index = bsym('index'),
+    enumerate = bsym('enumerate'),
     map = bsym('map'),
     filter = bsym('filter'),
     getattr = bsym('getattr'),
