@@ -8,8 +8,14 @@ def bsym(name):
     return Symbol(name, namespace='builtin')
 
 
+def gsym(name):
+    return Symbol(name, namespace='global')
+
+
 builtins_dict: Dict[str, Symbol] = dict(
-    myia_builtins = Symbol('myia_builtins', namespace='global'),
+    # Builtins that correspond to operator applications,
+    # or are inserted by the compiler. They are not accessible
+    # in the user's global namespace
     add = bsym('add'),
     subtract = bsym('subtract'),
     multiply = bsym('multiply'),
@@ -28,17 +34,20 @@ builtins_dict: Dict[str, Symbol] = dict(
     less_equal = bsym('less_equal'),
     greater_equal = bsym('greater_equal'),
     equal = bsym('equal'),
-    len = bsym('len'),
-    range = bsym('range'),
     index = bsym('index'),
-    enumerate = bsym('enumerate'),
-    map = bsym('map'),
-    filter = bsym('filter'),
     getattr = bsym('getattr'),
     setslice = bsym('setslice'),
-    switch = bsym('switch'),
     lazy_if = bsym('lazy_if'),
-    half_lazy_if = bsym('half_lazy_if')
+    half_lazy_if = bsym('half_lazy_if'),
+
+    # Myia's global variables
+    myia_builtins = gsym('myia_builtins'),
+    len = gsym('len'),
+    range = gsym('range'),
+    enumerate = gsym('enumerate'),
+    map = gsym('map'),
+    filter = gsym('filter'),
+    switch = gsym('switch'),
 )
 
 

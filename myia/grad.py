@@ -304,8 +304,8 @@ def gswitch(c, t, f, dz):
 @rgrad(builtins.index)
 def gindex(tup, idx, dz):
     def f(pair):
-        return myia_builtins.switch(pair[0] == idx, dz, 0)
-    rval = myia_builtins.map(f, myia_builtins.enumerate(tup))
+        return switch(pair[0] == idx, dz, 0)
+    rval = map(f, enumerate(tup))
     return ((), rval, 0)
 
 
