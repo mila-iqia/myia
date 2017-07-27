@@ -48,6 +48,8 @@ builtins_dict: Dict[str, Symbol] = dict(
     map = gsym('map'),
     filter = gsym('filter'),
     switch = gsym('switch'),
+    first = gsym('first'),
+    second = gsym('second'),
 )
 
 

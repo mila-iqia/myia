@@ -301,12 +301,38 @@ def gswitch(c, t, f, dz):
 # Gradients of other primitives #
 #################################
 
+
 @rgrad(builtins.index)
 def gindex(tup, idx, dz):
     def f(pair):
         return switch(pair[0] == idx, dz, 0)
     rval = map(f, enumerate(tup))
     return ((), rval, 0)
+
+
+@rgrad(builtins.len)
+def glen(xs, dz):
+    return ((), myia_builtins.zero(myia_builtins.Jinv(xs)))
+
+
+@rgrad(builtins.range)
+def grange(n, dz):
+    return ((), 0)
+
+
+@rgrad(builtins.map)
+def gmap(f, xs, dz):
+    # I... think that's right?
+    # TODO: test it
+    d = map(f(xs)[1], dz)
+    df = reduce(myia_builtins.merge, map(first, d))
+    dxs = map(second, d)
+    return ((), df, dxs)
+
+
+@rgrad(builtins.enumerate)
+def genumerate(xs, dz):
+    return ((), map(second, dz))
 
 
 # Following the methodology in the following paper:

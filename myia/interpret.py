@@ -151,9 +151,24 @@ def _len(t):
     return len(t)
 
 
+@impl(builtins.range)
+def _range(t):
+    return tuple(range(t))
+
+
 @impl(builtins.index)
 def index(t, i):
     return t[i]
+
+
+@impl(builtins.first)
+def first(t):
+    return t[0]
+
+
+@impl(builtins.second)
+def second(t):
+    return t[1]
 
 
 @impl(builtins.getattr)
