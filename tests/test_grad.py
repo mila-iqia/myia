@@ -11,16 +11,17 @@ def grad_test(*tests):
     tests:
 
     1.  When applied on the given arguments, all of the following
-        functions must return the same value:
+        function calls must return the same value:
         a. The original, pure Python function.
         b. The myia-compiled function.
         c. The grad-transformed myia function.
 
     2.  The gradient on each input, given an output gradient of
-        one, must be within a small relative error of the
-        finite-difference estimation of the function, using
-        the pure Python implementation:
-        * diff = f(x + eps, ...)
+        one, must be within a small error of the symmetric
+        finite-difference estimation:
+        * diff_dx = f(..., x + eps, ...) - f(..., x - eps, ...) / 2eps
+        * computed_dx = J(f)(..., x, ...)[1](1)
+        * error_dx = abs(diff_dx - computed_dx) > eps_2
 
     TODO: allow specifying the gradient values explicitly.
     """
@@ -36,6 +37,7 @@ def grad_test(*tests):
             if exc:
                 raise exc
             results = testfn(test_data)
+            print(results)
             if not results['match']:
                 for row in ['python', 'myia', 'myiag']:
                     print(f'{row}:\t{results[row]}')
@@ -110,6 +112,7 @@ def test_constant(x):
 def test_dup_args_in_call(x):
     """The naive gradient update rule fails when a function's arguments
     contain the same variable more than once."""
+    # TODO: VERY VERY IMPORTANT TO FIX
     return x * x
 
 
@@ -135,3 +138,24 @@ def test_closure(a):
     x2 = x1(a)
     x3 = x2(1)
     return x3
+
+
+# TODO: test when a == b (finite diff will return ~0.5, but not our method)
+@grad_test((4, 5), (68, -4))
+def test_if(a, b):
+    # This is max, but what this is really testing is the most basic
+    # if statement, so I prefer to name the test 'test_if'
+    if a > b:
+        return a
+    else:
+        return b
+
+
+@grad_test((4, 5, 2), (11, 3, 1))
+def test_while(x, y, z):
+    rval = 0
+    # Cannot compare to 0 or finite diff is unstable
+    while x > -0.1:
+        rval += y
+        x -= z
+    return rval
