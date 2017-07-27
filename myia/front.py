@@ -348,6 +348,7 @@ class Parser(LocVisitor):
             self.visit(node.right), location=loc)
 
     def visit_BoolOp(self, node: ast.BoolOp, loc: Location) -> If:
+        raise MyiaSyntaxError(loc, 'Boolean expressions are not supported.')
         left, right = node.values
         if isinstance(node.op, ast.And):
             return If(self.visit(left), self.visit(right), Value(False))
@@ -504,6 +505,7 @@ class Parser(LocVisitor):
                 return Begin(cast(List[MyiaASTNode], stmts))
 
     def visit_IfExp(self, node: ast.IfExp, loc: Location) -> If:
+        raise MyiaSyntaxError(loc, 'If expressions are not supported.')
         return If(self.visit(node.test),
                   self.visit(node.body),
                   self.visit(node.orelse),
@@ -519,6 +521,9 @@ class Parser(LocVisitor):
 
     def visit_ListComp(self, node: ast.ListComp, loc: Location) \
             -> MyiaASTNode:
+
+        raise MyiaSyntaxError(loc, 'List comprehensions not supported.')
+
         if len(node.generators) > 1:
             raise MyiaSyntaxError(
                 loc,
@@ -580,6 +585,11 @@ class Parser(LocVisitor):
 
     def visit_Name(self, node: ast.Name, loc: Location) -> Symbol:
         return self.visit_variable(node.id, loc)
+
+    def visit_NameConstant(self,
+                           node: ast.NameConstant,
+                           loc: Location) -> Value:
+        return Value(node.value)
 
     def visit_Num(self, node: ast.Num, loc: Location) -> Value:
         return Value(node.n)
