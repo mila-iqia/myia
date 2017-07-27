@@ -420,10 +420,15 @@ class Parser(LocVisitor):
 
     def visit_If(self, node: ast.If, loc: Location) \
             -> Union[MyiaASTNode, _Assign]:
-        p1 = Parser(self)
+
+        p1 = Parser(self, pull_free_variables=True, gen=GenSym())
+        p1.dest = self.global_env.gen(self.dest, '✓')
         body = p1.body_wrapper(node.body)
-        p2 = Parser(self)
+
+        p2 = Parser(self, pull_free_variables=True, gen=GenSym())
+        p2.dest = self.global_env.gen(self.dest, '✗')
         orelse = p2.body_wrapper(node.orelse)
+
         if p1.returns != p2.returns:
             raise MyiaSyntaxError(
                 loc,
@@ -440,28 +445,55 @@ class Parser(LocVisitor):
                     " ".join(sorted(p2.local_assignments))
                 )
             )
+
+        for k in p1.free_variables:
+            self.visit_variable(k)
+        for k in p2.free_variables:
+            self.visit_variable(k)
+
+        then_args = [p1.env[v] for v in p1.free_variables]
+        then_vars = [self.env[v] for v in p1.free_variables]
+
+        else_args = [p2.env[v] for v in p2.free_variables]
+        else_vars = [self.env[v] for v in p2.free_variables]
+
+        def mkapply(then_body, else_body):
+            then_fn = self.reg_lambda(
+                then_args, then_body, self.env.gen, None, "#if",
+                (None, p1.dest)
+            )
+            then_branch = Closure(then_fn, then_vars)
+
+            else_fn = self.reg_lambda(
+                else_args, else_body, self.env.gen, None, "#if",
+                (None, p2.dest)
+            )
+            else_branch = Closure(else_fn, else_vars)
+            return Apply(builtins.lazy_if,
+                         self.visit(node.test),
+                         then_branch,
+                         else_branch,
+                         location=loc)
+
         if p1.returns:
             self.returns = True
-            return If(self.visit(node.test),
-                      body(None),
-                      orelse(None),
-                      location=loc)
+            return mkapply(body(None), orelse(None))
+
         else:
             ass = list(p1.local_assignments)
+
             if len(ass) == 1:
                 a, = ass
-                val = If(self.visit(node.test),
-                         body(p1.env[a]),
-                         orelse(p2.env[a]),
-                         location=loc)
-                return self.make_assign(a, val, None)
+                app = mkapply(body(p1.env[a]), orelse(p2.env[a]))
+                return self.make_assign(a, app, None)
+
             else:
-                val = If(self.visit(node.test),
-                         body(Tuple(p1.env[v] for v in ass)),
-                         orelse(Tuple(p2.env[v] for v in ass)),
-                         location=loc)
+                app = mkapply(
+                    body(Tuple(p1.env[v] for v in ass)),
+                    orelse(Tuple(p2.env[v] for v in ass))
+                )
                 tmp = self.gensym('#tmp')
-                stmts = [_Assign(tmp, val, None)]
+                stmts = [_Assign(tmp, app, None)]
                 for i, a in enumerate(ass):
                     idx = Apply(builtins.index,
                                 tmp,
@@ -531,20 +563,23 @@ class Parser(LocVisitor):
         return [self.visit(stmt, allow_decorator=allow_decorator)
                 for stmt in node.body]
 
-    def visit_Name(self, node: ast.Name, loc: Location) -> Symbol:
+    def visit_variable(self, name: str, loc: Location = None) -> Symbol:
         try:
-            free, v = self.env.get_free(node.id)
+            free, v = self.env.get_free(name)
             assert isinstance(v, Symbol)
             if free:
                 if self.pull_free_variables:
-                    v = self.new_variable(node.id)
+                    v = self.new_variable(name)
                 v = v.at(loc)
-                self.free_variables[node.id] = v
+                self.free_variables[name] = v
             return v
         except NameError as e:
             # raise MyiaSyntaxError(loc, e.args[0])
-            # self.globals_accessed.add(node.id)
-            return Symbol(node.id, namespace='global')
+            # self.globals_accessed.add(name)
+            return Symbol(name, namespace='global')
+
+    def visit_Name(self, node: ast.Name, loc: Location) -> Symbol:
+        return self.visit_variable(node.id, loc)
 
     def visit_Num(self, node: ast.Num, loc: Location) -> Value:
         return Value(node.n)
@@ -578,24 +613,36 @@ class Parser(LocVisitor):
         op = get_operator(node.op).at(loc)
         return Apply(op, self.visit(node.operand), location=loc)
 
+    def explore_vars(self, *exprs, return_error=None):
+        testp = Parser(self, global_env=Env(), dry=True)
+        testp.return_error = return_error
+
+        for expr in exprs:
+            if isinstance(expr, list):
+                testp.body_wrapper(expr)
+            else:
+                testp.visit(expr)
+
+        return {
+            'in': list(
+                set(testp.free_variables.keys()) | testp.local_assignments
+            ),
+            'out': list(testp.local_assignments)
+        }
+
     def visit_While(self, node: ast.While, loc: Location) -> Begin:
-        # fsym = self.global_env.gen.sym('#while')
         assert self.dest
-        fsym = self.global_env.gen(self.dest, '↻')
+        wsym = self.global_env.gen(self.dest, '↻')
+        wbsym = self.global_env.gen(self.dest, '⥁')
 
         # We visit the body once to get the free variables
-        testp = Parser(self, global_env=Env(), dry=True)
-        testp.return_error = "While loops cannot contain return statements."
-        testp.visit(node.test)
-        testp.body_wrapper(node.body)
-        in_vars = list(
-            set(testp.free_variables.keys()) | testp.local_assignments
-        )
-        out_vars = list(testp.local_assignments)
+        while_vars = self.explore_vars(node.test, node.body)
+        in_vars = while_vars['in']
+        out_vars = while_vars['out']
 
         # We visit once more, this time adding the free vars as parameters
         p = Parser(self, gen=GenSym())
-        p.dest = fsym
+        p.dest = wsym
         in_syms = [p.new_variable(v) for v in in_vars]
         # Have to execute this before the body in order to get the right
         # symbols, otherwise they will be shadowed
@@ -603,22 +650,31 @@ class Parser(LocVisitor):
         test = p.visit(node.test)
         body = p.body_wrapper(node.body)
 
-        new_body = If(test,
-                      body(Apply(fsym, *[p.env[v] for v in in_vars])).at(loc),
-                      Tuple(initial_values))
+        if_args = in_syms
+        if_body = body(Apply(wsym, *[p.env[v] for v in in_vars])).at(loc)
+        if_fn = self.reg_lambda(
+            if_args, if_body, self.env.gen, None, "#while_if",
+            (None, wbsym)
+        )
+        new_body = Apply(
+            builtins.half_lazy_if,
+            test,
+            Closure(if_fn, in_syms),
+            Tuple(initial_values)
+        )
 
         if not self.dry:
-            self.global_env[fsym] = Lambda(
+            self.global_env[wsym] = Lambda(
                 in_syms,
                 new_body,
                 p.env.gen,
                 location=loc
             )
-        # assert isinstance(fsym.label, str)
-        # self.globals_accessed.add(fsym.label)
+        # assert isinstance(wsym.label, str)
+        # self.globals_accessed.add(wsym.label)
 
         tmp = self.gensym('#tmp').at(loc)
-        val = Apply(fsym, *[self.env[v] for v in in_vars])
+        val = Apply(wsym, *[self.env[v] for v in in_vars])
         stmts: List[MyiaASTNode] = [_Assign(tmp, val, None)]
         for i, v in enumerate(out_vars):
             stmt = self.make_assign(v, Apply(builtins.index, tmp, Value(i)))
@@ -646,6 +702,7 @@ def _get_global_env(url):
 
 def parse_source(url, line, src):
     tree = ast.parse(src)
+    # FreeVariablesTagger().visit(tree)
     p = Parser(Locator(url, line), _get_global_env(url), top_level=True)
     r = p.visit(tree, allow_decorator=True)
 
