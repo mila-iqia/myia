@@ -336,6 +336,7 @@ class Parser(LocVisitor):
             )
         aug = self.visit(node.value)
         op = get_operator(node.op).at(loc)
+        self.visit_variable(targ.id)
         prev = self.env[targ.id]
         val = Apply(op, prev, aug, location=loc)
         return self.make_assign(targ.id, val, loc)
@@ -452,10 +453,10 @@ class Parser(LocVisitor):
         for k in p2.free_variables:
             self.visit_variable(k)
 
-        then_args = [p1.env[v] for v in p1.free_variables]
+        then_args = [sym for v, sym in p1.free_variables.items()]
         then_vars = [self.env[v] for v in p1.free_variables]
 
-        else_args = [p2.env[v] for v in p2.free_variables]
+        else_args = [sym for v, sym in p2.free_variables.items()]
         else_vars = [self.env[v] for v in p2.free_variables]
 
         def mkapply(then_body, else_body):
