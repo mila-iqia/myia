@@ -202,12 +202,13 @@ def test_pow8(x):
 
 # Test nested loops
 # Computes y = x^10, d/dx=10x^9
-@xfail
 @myia_test(
-    (2, 1024)
+    (2, 1024),
+    (3, 59049)
 )
 def test_pow10(x):
     v = x
+    i = 0
     j = 0
     while j < 3:
         i = 0

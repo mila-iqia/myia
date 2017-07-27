@@ -71,6 +71,7 @@ def grad_test(data):
     gfunc = evaluate(g, {**gbindings, **bindings})
 
     eps = 1e-10
+    rel_error = 1e-03
 
     def test(args):
         python = pyfn(*args)
@@ -86,10 +87,11 @@ def grad_test(data):
             r2 = pyfn(*argsl)
             d = (r2 - r1) / (2 * eps)
             g = grads[i]
+            threshold = max(abs(rel_error * d), abs(rel_error * g))
             derivatives[arg] = dict(
                 difference = d,
                 computed = g,
-                match = abs(d - g) < 1e-04
+                match = abs(d - g) <= threshold
             )
 
         return dict(

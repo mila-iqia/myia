@@ -159,3 +159,17 @@ def test_while(x, y, z):
         rval += y
         x -= z
     return rval
+
+
+@grad_test((2,), (3,))
+def test_pow10(x):
+    v = x
+    i = 0
+    j = 0
+    while j < 3:
+        i = 0
+        while i < 3:
+            v = v * x
+            i = i + 1
+        j = j + 1
+    return v

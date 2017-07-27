@@ -640,6 +640,9 @@ class Parser(LocVisitor):
         in_vars = while_vars['in']
         out_vars = while_vars['out']
 
+        for v in in_vars:
+            self.visit_variable(v)
+
         # We visit once more, this time adding the free vars as parameters
         p = Parser(self, gen=GenSym())
         p.dest = wsym
