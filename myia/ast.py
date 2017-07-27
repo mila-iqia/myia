@@ -415,6 +415,9 @@ class _Assign(MyiaASTNode):
         self.value = value
         self.location = location
 
+    def __str__(self):
+        return f'(_assign {self.varname} {self.value})'
+
 
 class Transformer:
     def transform(self, node, **kwargs):

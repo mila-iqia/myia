@@ -1,6 +1,6 @@
 import re
 from myia.ast import \
-    Apply, Symbol, Value, Let, Lambda, If, Tuple, Transformer
+    Apply, Symbol, Value, Let, Lambda, If, Closure, Tuple, Transformer
 from myia.front import GenSym
 
 
@@ -114,7 +114,10 @@ class ANormalTransformer(Transformer):
         return self.transform_arguments(node.values, _Tuple, stash, 'tup')
 
     def transform_Closure(self, node, stash=False):
-        return node
+        def rebuild(f, *args):
+            return Closure(f, args)
+        return self.transform_arguments([node.fn, *node.args],
+                                        rebuild, stash, 'closure')
 
     def transform_Begin(self, node, stash=False):
         stmts = [stmt for stmt in node.stmts[:-1]

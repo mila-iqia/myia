@@ -52,9 +52,20 @@ def grad_test(data):
     lbda = bindings[r]
     if not isinstance(lbda, Lambda):
         print('grad can only operate on a function.', file=sys.stderr)
-    G = Grad(r, a_normal(lbda))
-    g = G.transform()
-    gbindings = G.global_env.bindings
+
+    transformed = {}
+    gbindings = {}
+    for k, v in bindings.items():
+        G = Grad(k, a_normal(v))
+        g = G.transform()
+        transformed[k] = g
+        gbindings.update(G.global_env.bindings)
+
+    g = transformed[r]
+
+    # G = Grad(r, a_normal(lbda))
+    # g = G.transform()
+    # gbindings = G.global_env.bindings
 
     func = evaluate(r, bindings)
     gfunc = evaluate(g, {**gbindings, **bindings})
@@ -75,11 +86,10 @@ def grad_test(data):
             r2 = pyfn(*argsl)
             d = (r2 - r1) / (2 * eps)
             g = grads[i]
-            gg = 1e-10 if g == 0 else g
             derivatives[arg] = dict(
                 difference = d,
                 computed = g,
-                match = abs(d / gg - 1) < 1e-04
+                match = abs(d - g) < 1e-04
             )
 
         return dict(

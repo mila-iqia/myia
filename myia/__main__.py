@@ -110,7 +110,12 @@ def command_None(arguments):
 
 
 def command_parse(arguments):
-    wrap = a_normal if arguments.a else (lambda x: x)
+    def wrap(x):
+        unbound(x)
+        if arguments.a:
+            return a_normal(x)
+        else:
+            return x
     url, code = getcode(arguments)
     r, bindings = parse_source(url, 1, code)
     if bindings:

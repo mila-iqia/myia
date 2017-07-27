@@ -24,6 +24,12 @@ class PrimitiveImpl:
     def __call__(self, *args):
         return self.fn(*args)
 
+    def __str__(self):
+        return f'Prim({self.fn})'
+
+    def __repr__(self):
+        return str(self)
+
 
 class FunctionImpl:
     def __init__(self, ast, bindings):
@@ -37,6 +43,7 @@ class FunctionImpl:
         node = ast
 
         def func(*args):
+            assert(len(args) == len(node.args))
             ev = Evaluator(
                 {s: arg for s, arg in zip(node.args, args)},
                 self.bindings
@@ -47,6 +54,12 @@ class FunctionImpl:
 
     def __call__(self, *args):
         return self._func(*args)
+
+    def __str__(self):
+        return f'Func({self.ast.ref or self.ast})'
+
+    def __repr__(self):
+        return str(self)
 
 
 class ClosureImpl:
@@ -59,6 +72,12 @@ class ClosureImpl:
 
     def __call__(self, *args):
         return self.fn(*self.args, *args)
+
+    def __str__(self):
+        return f'Clos({self.fn}, {self.args})'
+
+    def __repr__(self):
+        return str(self)
 
 
 ############################################
