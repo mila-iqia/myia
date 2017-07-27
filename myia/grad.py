@@ -36,7 +36,8 @@ def rgrad(sym):
         # in a combined method that follows the protocol
         G = GenSym()
         args = [G.sym(a) for a in prim.argnames]
-        forward = Apply(sym, *args)
+        forward = Apply(sym, *[Apply(builtins.Jinv, a)
+                               for a in args])
         backward = Closure(rsym, args)
         ast = Lambda(args, Tuple([forward, backward]), G)
         impl = FunctionImpl(ast, global_env)
@@ -80,7 +81,7 @@ def zero(x):
     if isinstance(x, (int, float)):
         return 0
     elif isinstance(x, tuple):
-        return tuple(gzero(a) for a in x)
+        return tuple(zero(a) for a in x)
     elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
         return ()
     elif isinstance(x, ClosureImpl):
@@ -197,6 +198,52 @@ def gmultiply(x, y, dz):
 @rgrad(builtins.divide)
 def gdivide(x, y, dz):
     return ((), dz / y, -dz * x / (y * y))
+
+
+@rgrad(builtins.unary_subtract)
+def gunary_subtract(x, dz):
+    return ((), -dz)
+
+
+###################################################
+# Gradients of boolean and conditional primitives #
+###################################################
+
+
+@rgrad(builtins.greater)
+def ggreater(x, y, dz):
+    return ((), False, False)
+
+
+@rgrad(builtins.less)
+def gless(x, y, dz):
+    return ((), False, False)
+
+
+@rgrad(builtins.lazy_if)
+def glazy_if(c, t, f, dz):
+    if c:
+        return ((), False, t()[1](dz)[0], zero(Jinv(f)))
+    else:
+        return ((), False, zero(Jinv(t)), f()[1](dz)[0])
+
+
+@rgrad(builtins.half_lazy_if)
+def ghalf_lazy_if(c, t, f, dz):
+    if c:
+        return ((), False, t()[1](dz)[0], zero(Jinv(f)))
+    else:
+        return ((), False, zero(Jinv(t)), dz)
+
+
+#################################
+# Gradients of other primitives #
+#################################
+
+
+@rgrad(builtins.index)
+def gindex(tup, idx, dz):
+    return ((), tuple(dz if idx == i else 0 for i in range(len(tup))), 0)
 
 
 # Following the methodology in the following paper:
