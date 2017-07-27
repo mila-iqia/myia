@@ -157,7 +157,7 @@ def index(t, i):
 
 
 @impl(builtins.getattr)
-def index(obj, attr):
+def _getattr(obj, attr):
     return getattr(obj, attr)
 
 

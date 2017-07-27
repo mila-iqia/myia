@@ -76,7 +76,7 @@ def rgrad(sym):
         prim.grad = impl
         impl.primal = prim
 
-        global_env[rsym] = fn #PrimitiveImpl(fn)
+        global_env[rsym] = fn
         return impl
 
     return decorator
@@ -186,7 +186,9 @@ def Jinv(x):
 # Gradients of primitives needed for Grad #
 ###########################################
 
+
 myia_builtins = Props(globals())
+
 
 @rgrad(builtins.zero)
 def gzero(x, d):
