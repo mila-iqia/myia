@@ -4,19 +4,21 @@ from .ast import \
     Transformer, GenSym, MyiaASTNode, \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure
 from .interpret import \
-    global_env, impl, evaluate, \
+    global_env, impl, myia_impl, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
 from .front import Env, parse_function0
-from .symbols import builtins, bsym
+from .symbols import builtins, bsym, gsym
 from copy import copy
 from .compile import a_normal
 from .util import Props
 
 
-builtins.zero = bsym('zero')
-builtins.merge = bsym('merge')
-builtins.J = bsym('J')
-builtins.Jinv = bsym('Jinv')
+builtins.fill = gsym('fill')
+builtins.zero = gsym('zero')
+builtins.one = gsym('one')
+builtins.merge = gsym('merge')
+builtins.J = gsym('J')
+builtins.Jinv = gsym('Jinv')
 builtins.shift_grad = bsym('shift_grad')
 
 
@@ -108,18 +110,28 @@ def shift_grad(closure, n):
     return prim
 
 
-@impl(builtins.zero)
-def zero(x):
+@impl(builtins.fill)
+def fill(x, value):
     if isinstance(x, (int, float)):
-        return 0
+        return value
     elif isinstance(x, tuple):
-        return tuple(zero(a) for a in x)
+        return tuple(fill(a, value) for a in x)
     elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
         return ()
     elif isinstance(x, ClosureImpl):
-        return tuple(zero(a) for a in x.args)
+        return tuple(fill(a, value) for a in x.args)
     else:
-        raise TypeError(f'Cannot create a zero conformant with {x}')
+        raise TypeError(f'Cannot create a {value} conformant with {x}')
+
+
+@impl(builtins.zero)
+def zero(x):
+    return fill(x, 0)
+
+
+@impl(builtins.one)
+def one(x):
+    return fill(x, 1)
 
 
 @impl(builtins.merge)
@@ -192,7 +204,7 @@ myia_builtins = Props(globals())
 
 @rgrad(builtins.zero)
 def gzero(x, d):
-    return ((), myia_builtins.zero(x))
+    return ((), zero(x))
 
 
 @rgrad(builtins.merge)
@@ -202,12 +214,12 @@ def gmerge(x, y, d):
 
 @rgrad(builtins.J)
 def gJ(x, d):
-    return ((), myia_builtins.Jinv(d),)
+    return ((), Jinv(d),)
 
 
 @rgrad(builtins.Jinv)
 def gJinv(x, d):
-    return ((), myia_builtins.J(d))
+    return ((), J(d))
 
 
 ######################################
