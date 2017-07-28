@@ -90,9 +90,9 @@ class ClosureImpl:
         return str(self)
 
 
-############################################
-# Implementations of arithmetic primitives #
-############################################
+##########################
+# Implementation helpers #
+##########################
 
 
 def impl(sym):
@@ -104,6 +104,23 @@ def impl(sym):
                 prim)
         return prim
     return decorator
+
+
+def myia_impl(sym):
+    def decorator(orig_fn):
+        r, bindings = parse_function0(orig_fn)
+        fn = evaluate(r, bindings)
+        global_env[sym] = fn
+        setattr(global_env[myia_builtins],
+                fn.__name__.lstrip('_'),
+                fn)
+        return fn
+    return decorator
+
+
+##############################################
+# Implementations of myia's global functions #
+##############################################
 
 
 @impl(builtins.add)
@@ -210,6 +227,11 @@ def half_lazy_if(cond, t, f):
         return t()
     else:
         return f
+
+
+##################################
+# Class to Evaluate MyiaASTNodes #
+##################################
 
 
 class Evaluator:
