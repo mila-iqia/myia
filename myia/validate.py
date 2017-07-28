@@ -1,8 +1,8 @@
 from .ast import Symbol, Lambda, Let
 from .compile import a_normal
 from .front import parse_source, parse_function0
-from .grad import Grad
-from .interpret import evaluate
+from .grad import Grad, one
+from .interpret import evaluate, global_env
 
 
 def missing_source(node):
@@ -38,7 +38,14 @@ def unbound(node, avail=None):
             unbound(child, avail)
 
 
-def grad_test(data):
+def guard(fn, args):
+    try:
+        return fn(*args)
+    except Exception as exc:
+        return exc
+
+
+def get_functions(data):
     if isinstance(data, tuple):
         url, line_offset, code = data
         _globals = {}
@@ -53,6 +60,34 @@ def grad_test(data):
     if not isinstance(lbda, Lambda):
         print('grad can only operate on a function.', file=sys.stderr)
 
+    func = evaluate(r, bindings)
+
+    pyfn.__globals__.update({str(k): v for k, v in global_env.items()})
+
+    return pyfn, lbda, func, r, bindings
+
+
+eps = 1e-10
+rel_error = 1e-03
+
+
+def finite_diff(fn, args, eps=eps):
+    rval = []
+    for i in range(len(args)):
+        argsl = list(args)
+        argsl[i] -= eps
+        r1 = fn(*argsl)
+        argsl[i] += 2 * eps
+        r2 = fn(*argsl)
+        d = (r2 - r1) / (2 * eps)
+        rval.append(d)
+    return rval
+
+
+def grad_test(data):
+
+    pyfn, lbda, func, r, bindings = get_functions(data)
+
     transformed = {}
     gbindings = {}
     for k, v in bindings.items():
@@ -63,37 +98,23 @@ def grad_test(data):
 
     g = transformed[r]
 
-    # G = Grad(r, a_normal(lbda))
-    # g = G.transform()
-    # gbindings = G.global_env.bindings
-
-    func = evaluate(r, bindings)
     gfunc = evaluate(g, {**gbindings, **bindings})
 
-    eps = 1e-10
-    rel_error = 1e-03
-
     def test(args):
-        python = pyfn(*args)
-        myia = func(*args)
+        python = guard(pyfn, args)
+        assert isinstance(python, (int, float))
+        myia = guard(func, args)
         myiag, bprop = gfunc(*args)
-        grads = bprop(1)[1:]
+        grads = bprop(one(myiag))[1:]
+        diffs = finite_diff(pyfn, args)
         derivatives = {}
-        for i, arg in enumerate(func.argnames):
-            argsl = list(args)
-            argsl[i] -= eps
-            r1 = pyfn(*argsl)
-            argsl[i] += 2 * eps
-            r2 = pyfn(*argsl)
-            d = (r2 - r1) / (2 * eps)
-            g = grads[i]
+        for arg, g, d in zip(func.argnames, grads, diffs):
             threshold = max(abs(rel_error * d), abs(rel_error * g))
             derivatives[arg] = dict(
                 difference = d,
                 computed = g,
                 match = abs(d - g) <= threshold
             )
-
         return dict(
             python = python,
             myia = myia,
