@@ -211,9 +211,9 @@ def switch(cond, t, f):
         return f
 
 
-@impl(builtins.value_wrap)
-def value_wrap(x):
-    return PrimitiveImpl(lambda: x)
+@impl(builtins.identity)
+def identity(x):
+    return x
 
 
 @impl(builtins.lazy_if)

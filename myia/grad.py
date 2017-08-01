@@ -11,6 +11,10 @@ from .symbols import builtins, bsym, gsym
 from copy import copy
 from .compile import a_normal
 from .util import Props
+from .buche import buche as _buche
+
+
+buche = _buche['log']
 
 
 builtins.fill = gsym('fill')
@@ -40,11 +44,12 @@ def prim_rgrad(sym):
         # in a combined method that follows the protocol
         G = GenSym()
         args = [G.sym(a) for a in prim.argnames]
-        forward = Apply(sym, *[Apply(builtins.Jinv, a)
-                               for a in args])
+        forward = Apply(builtins.J,
+                        Apply(sym, *[Apply(builtins.Jinv, a)
+                                     for a in args]))
         backward = Closure(rsym, args)
         ast = Lambda(args, Tuple([forward, backward]), G)
-        impl = FunctionImpl(ast, global_env)
+        impl = FunctionImpl(ast, (global_env,))
         prim.grad = impl
         impl.primal = prim
 
@@ -70,8 +75,9 @@ def rgrad(sym):
         # in a combined method that follows the protocol
         G = GenSym()
         args = [G.sym(a) for a in prim.argnames]
-        forward = Apply(sym, *[Apply(builtins.Jinv, a)
-                               for a in args])
+        forward = Apply(builtins.J,
+                        Apply(sym, *[Apply(builtins.Jinv, a)
+                                     for a in args]))
         backward = Closure(rsym, args)
         ast = Lambda(args, Tuple([forward, backward]), G)
         impl = FunctionImpl(ast, (global_env,))
@@ -154,6 +160,7 @@ def J(x):
     elif isinstance(x, tuple):
         return tuple(J(a) for a in x)
     elif isinstance(x, PrimitiveImpl):
+        assert x.grad is not None
         return x.grad
     elif isinstance(x, FunctionImpl):
         G = Grad(
@@ -172,7 +179,6 @@ def J(x):
         gfn.primal = x
         x.grad = gfn
         return gfn
-        # return make_grad(x)
     elif isinstance(x, ClosureImpl):
         # ??
         c = ClosureImpl(shift_grad(J(x.fn), len(x.args)),
@@ -313,6 +319,11 @@ def gswitch(c, t, f, dz):
                 False,
                 myia_builtins.zero(myia_builtins.Jinv(t)),
                 dz)
+
+
+@rgrad(builtins.identity)
+def gidentity(v, dz):
+    return ((), dz)
 
 
 #################################

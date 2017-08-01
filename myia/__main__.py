@@ -172,7 +172,12 @@ def command_grad(arguments):
     bindings = {**results['func_bindings'], **results['grad_bindings']}
     if args:
         t = results['test']
-        display(t(args), arguments.format)
+        try:
+            rval = t(args)
+            display(rval, arguments.format)
+        except Exception as exc:
+            rval = None
+            traceback.print_exc()
         display(bindings, arguments.format, 'bindings')
     else:
         for k, v in bindings.items():

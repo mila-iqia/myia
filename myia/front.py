@@ -685,7 +685,7 @@ class Parser(LocVisitor):
             builtins.switch,
             test,
             Closure(if_fn, in_syms),
-            Apply(builtins.value_wrap, Tuple(initial_values))
+            Closure(builtins.identity, (Tuple(initial_values),))
         ))
 
         if not self.dry:
