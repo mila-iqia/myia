@@ -162,3 +162,12 @@
 	background-color: red;
 	color: white;
 }
+
+.error {
+	background: #fdd;
+}
+
+.error.error0 {
+	background: #faa;
+}
+

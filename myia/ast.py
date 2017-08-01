@@ -82,6 +82,12 @@ class MyiaASTNode:
     def __repr__(self) -> str:
         return str(self)
 
+    def __hrepr__(self, H, hrepr):
+        rval = H.div[self.__class__.__name__]
+        if self.annotations:
+            rval = rval.__getitem__(tuple(self.annotations))
+        return rval
+
 
 class Symbol(MyiaASTNode):
     """
@@ -131,7 +137,8 @@ class Symbol(MyiaASTNode):
 
     def __str__(self) -> str:
         v = f'#{self.version}' if self.version > 1 else ''
-        r = f'{self.relation}:' if self.relation else ''
+        # r = f'{self.relation}:' if self.relation else ''
+        r = f'{self.relation}' if self.relation else ''
         return f'{r}{self.label}{v}'
 
     def __eq__(self, obj) -> bool:
@@ -148,7 +155,7 @@ class Symbol(MyiaASTNode):
 
     def __hrepr__(self, H, hrepr):
         ns = f'myia-ns-{self.namespace or "-none"}'
-        rval = H.div['Symbol', ns]
+        rval = super().__hrepr__(H, hrepr)[ns]
         if self.relation:
             rval = rval(H.span['SymbolRelation'](self.relation))
         if isinstance(self.label, str):
@@ -157,8 +164,6 @@ class Symbol(MyiaASTNode):
             rval = rval(hrepr(self.label))
         if self.version > 1:
             rval = rval(H.span['SymbolIndex'](self.version))
-        if self.annotations:
-            rval = rval.__getitem__(tuple(self.annotations))
         return rval
 
 
@@ -171,7 +176,7 @@ class Value(MyiaASTNode):
         return repr(self.value)
 
     def __hrepr__(self, H, hrepr):
-        return H.div['Value'](hrepr(self.value))
+        return super().__hrepr__(H, hrepr)(hrepr(self.value))
 
 
 class Let(MyiaASTNode):
@@ -199,7 +204,7 @@ class Let(MyiaASTNode):
             H.div['LetBinding'](hrepr(k), hrepr(v))
             for k, v in self.bindings
         ]
-        return H.div['Let'](
+        return super().__hrepr__(H, hrepr)(
             H.div['Keyword']('let'),
             H.div['LetBindings'](*let_bindings),
             H.div['Keyword']('in'),
@@ -228,7 +233,7 @@ class Lambda(MyiaASTNode):
             " ".join([str(arg) for arg in self.args]), str(self.body))
 
     def __hrepr__(self, H, hrepr):
-        return H.div['Lambda'](
+        return super().__hrepr__(H, hrepr)(
             H.div['Keyword']('λ'),
             H.div['LambdaArguments'](*[hrepr(a) for a in self.args]),
             hrepr(self.body)
@@ -253,7 +258,7 @@ class If(MyiaASTNode):
         return '(if {} {} {})'.format(self.cond, self.t, self.f)
 
     def __hrepr__(self, H, hrepr):
-        return H.div['If'](
+        return super().__hrepr__(H, hrepr)(
             H.div['IfCond'](hrepr(self.cond)),
             H.div['IfThen'](hrepr(self.t)),
             H.div['IfElse'](hrepr(self.f))
@@ -283,7 +288,10 @@ class Apply(MyiaASTNode):
         )
 
     def __hrepr__(self, H, hrepr):
-        return H.div['Apply'](hrepr(self.fn), *[hrepr(a) for a in self.args])
+        return super().__hrepr__(H, hrepr)(
+            hrepr(self.fn),
+            *[hrepr(a) for a in self.args]
+        )
 
 
 class Begin(MyiaASTNode):
@@ -298,7 +306,7 @@ class Begin(MyiaASTNode):
         return "(begin {})".format(" ".join(map(str, self.stmts)))
 
     def __hrepr__(self, H, hrepr):
-        return H.div['Begin'](
+        return super().__hrepr__(H, hrepr)(
             H.div['Keyword']('begin'),
             [hrepr(a) for a in self.stmts]
         )
@@ -316,7 +324,9 @@ class Tuple(MyiaASTNode):
         return "{{{}}}".format(" ".join(map(str, self.values)))
 
     def __hrepr__(self, H, hrepr):
-        return H.div['Tuple'](*[hrepr(a) for a in self.values])
+        return super().__hrepr__(H, hrepr)(
+            *[hrepr(a) for a in self.values]
+        )
 
 
 class Closure(MyiaASTNode):
@@ -335,8 +345,11 @@ class Closure(MyiaASTNode):
         return '(closure {} {})'.format(self.fn, " ".join(map(str, self.args)))
 
     def __hrepr__(self, H, hrepr):
-        return H.div['Closure'](hrepr(self.fn),
-                                *[hrepr(a) for a in self.args], '...')
+        return super().__hrepr__(H, hrepr)(
+            hrepr(self.fn),
+            *[hrepr(a) for a in self.args],
+            '...'
+        )
 
 
 class GenSym:
