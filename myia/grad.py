@@ -5,7 +5,7 @@ from .ast import \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure
 from .interpret import \
     global_env, impl, myia_impl, evaluate, \
-    PrimitiveImpl, FunctionImpl, ClosureImpl
+    PrimitiveImpl, FunctionImpl2 as FunctionImpl, ClosureImpl2 as ClosureImpl
 from .front import Env, parse_function0
 from .symbols import builtins, bsym, gsym
 from copy import copy
@@ -27,31 +27,31 @@ builtins.shift_grad = bsym('shift_grad')
 ######################################
 
 
-# def rgrad(sym):
-#     # Copy symbol to grad namespace
-#     rsym = Symbol(sym, namespace='builtin', relation='♢*')
-#     #Symbol(sym.label, namespace='grad:builtin')
+def prim_rgrad(sym):
+    # Copy symbol to grad namespace
+    rsym = Symbol(sym, namespace='builtin', relation='♢*')
+    #Symbol(sym.label, namespace='grad:builtin')
 
-#     def decorator(fn):
-#         prim = global_env[sym]
-#         assert isinstance(prim, PrimitiveImpl)
+    def decorator(fn):
+        prim = global_env[sym]
+        assert isinstance(prim, PrimitiveImpl)
 
-#         # Wrap the primitive and a closure-converted backpropagator
-#         # in a combined method that follows the protocol
-#         G = GenSym()
-#         args = [G.sym(a) for a in prim.argnames]
-#         forward = Apply(sym, *[Apply(builtins.Jinv, a)
-#                                for a in args])
-#         backward = Closure(rsym, args)
-#         ast = Lambda(args, Tuple([forward, backward]), G)
-#         impl = FunctionImpl(ast, global_env)
-#         prim.grad = impl
-#         impl.primal = prim
+        # Wrap the primitive and a closure-converted backpropagator
+        # in a combined method that follows the protocol
+        G = GenSym()
+        args = [G.sym(a) for a in prim.argnames]
+        forward = Apply(sym, *[Apply(builtins.Jinv, a)
+                               for a in args])
+        backward = Closure(rsym, args)
+        ast = Lambda(args, Tuple([forward, backward]), G)
+        impl = FunctionImpl(ast, global_env)
+        prim.grad = impl
+        impl.primal = prim
 
-#         global_env[rsym] = PrimitiveImpl(fn)
-#         return impl
+        global_env[rsym] = PrimitiveImpl(fn)
+        return impl
 
-#     return decorator
+    return decorator
 
 
 def rgrad(sym):
@@ -74,7 +74,7 @@ def rgrad(sym):
                                for a in args])
         backward = Closure(rsym, args)
         ast = Lambda(args, Tuple([forward, backward]), G)
-        impl = FunctionImpl(ast, global_env)
+        impl = FunctionImpl(ast, (global_env,))
         prim.grad = impl
         impl.primal = prim
 
@@ -161,7 +161,13 @@ def J(x):
             primal = a_normal(x.ast)
         )
         g = G.transform()
-        bindings = {**x.bindings, **G.global_env.bindings}
+        # bindings = {**x.bindings, **G.global_env.bindings}
+
+        bindings = {}
+        bindings.update(G.global_env.bindings)
+        for env in reversed(x.envs):
+            bindings.update(env)
+
         gfn = evaluate(g, bindings)
         gfn.primal = x
         x.grad = gfn
