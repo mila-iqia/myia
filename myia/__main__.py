@@ -1,10 +1,12 @@
 
 import argparse
 import sys
+import traceback
 from .compile import a_normal
 from .front import parse_source
 from .interpret import evaluate
 from .validate import grad_test, unbound
+from .buche import buche
 
 
 def H(node):
@@ -31,8 +33,8 @@ p_parse.add_argument('--expr', '-e', metavar='EXPR',
                      dest='expr', help='The expression to parse.')
 p_parse.add_argument('-a', action='store_true',
                      help='Convert to a-normal form.')
-p_parse.add_argument('--format', '-f', default='ascii',
-                     help='Format to print out (ascii (default) or html)')
+p_parse.add_argument('--format', '-f', default='text',
+                     help='Format to print out (text (default) or html)')
 
 p_eval = subparsers.add_parser('eval', help='Evaluate an expression')
 p_eval.add_argument('FILE', nargs='?', help='The file to evaluate.')
@@ -46,6 +48,8 @@ p_eval.add_argument(
 p_eval.add_argument('--args', metavar='ARGS',
                     dest='args',
                     help='Arguments to provide to the function.')
+p_eval.add_argument('--format', '-f', default='text',
+                    help='Format to print out (text (default) or html)')
 
 p_grad = subparsers.add_parser(
     'grad',
@@ -58,8 +62,8 @@ p_grad.add_argument(
 p_grad.add_argument('--expr', '-e', metavar='EXPR',
                     dest='expr',
                     help='The expression to take the gradient of.')
-p_grad.add_argument('--format', '-f', default='ascii',
-                    help='Format to print out (ascii (default) or html)')
+p_grad.add_argument('--format', '-f', default='text',
+                    help='Format to print out (text (default) or html)')
 p_grad.add_argument('--args', metavar='ARGS',
                     dest='args',
                     help='Arguments to provide to the function.')
@@ -71,9 +75,25 @@ def shame():
     )
 
 
-def display(data, format):
+setup_done = False
+
+
+def display(data, format, mode='normal'):
+    global setup_done
     if format == 'html':
         print(H(data).as_page())
+    elif format == 'buche':
+        if not setup_done:
+            buche.raw(command='open', path='/', type='tabs', anchor='top')
+            buche.open('funcs', 'tabs', anchor='left')
+            setup_done = True
+        if mode == 'normal':
+            buche(data)
+        elif isinstance(data, dict):
+            for k, v in data.items():
+                buche['funcs'][str(k)](v)
+        else:
+            buche(data)
     elif isinstance(data, dict):
         for k, v in data.items():
             print(f'{k}:\n  {v}')
@@ -134,23 +154,30 @@ def command_eval(arguments):
     result = evaluate(r, bindings)
     args = getargs(arguments)
     if args:
-        print(result(*args))
+        try:
+            value = result(*args)
+            display(result(*args), arguments.format)
+        except Exception as exc:
+            traceback.print_exc()
+            display({k: v for k, v in bindings.items()},
+                    arguments.format)
     else:
-        print(result)
+        display(result, arguments.format)
 
 
 def command_grad(arguments):
     url, code = getcode(arguments)
     results = grad_test((url, 1, code))
     args = getargs(arguments)
+    bindings = {**results['func_bindings'], **results['grad_bindings']}
     if args:
         t = results['test']
         display(t(args), arguments.format)
+        display(bindings, arguments.format, 'bindings')
     else:
-        bindings = results['grad_bindings']
         for k, v in bindings.items():
             unbound(v)
-        display(bindings, arguments.format)
+        display(bindings, arguments.format, 'bindings')
 
 
 if __name__ == '__main__':
