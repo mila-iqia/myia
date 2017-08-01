@@ -137,12 +137,15 @@ class Parser(LocVisitor):
                  dry: bool = None,
                  gen: GenSym = None,
                  pull_free_variables: bool = False,
-                 top_level: bool = False) -> None:
+                 top_level: bool = False,
+                 macros: Dict[str, Callable[..., MyiaASTNode]] = {}) \
+            -> None:
         self.free_variables: Dict[str, Symbol] = {}
         self.local_assignments: Set[str] = set()
         self.returns = False
         self.pull_free_variables = pull_free_variables
         self.top_level = top_level
+        self.macros = macros
 
         if isinstance(parent, Locator):
             self.parent = None
@@ -162,6 +165,10 @@ class Parser(LocVisitor):
             super().__init__(parent.locator)
 
         self.dest = self.gensym('#lambda')
+
+    def sub_parser(self, **kw):
+        kw.setdefault('macros', self.macros)
+        return Parser(self, **kw)
 
     def gensym(self, name: str) -> Symbol:
         return self.env.gen.sym(name)
@@ -218,7 +225,7 @@ class Parser(LocVisitor):
                      label: str = "#lambda",
                      binding: TupleT[str, Symbol] = None) \
             -> Union[Closure, Symbol]:
-        p = Parser(self, pull_free_variables=True, gen=GenSym())
+        p = self.sub_parser(pull_free_variables=True, gen=GenSym())
         if binding is None:
             binding = (label, self.global_env.gen.sym(label))
         sinputs = [p.new_variable(i) for i in inputs]
@@ -358,12 +365,16 @@ class Parser(LocVisitor):
         else:
             raise MyiaSyntaxError(loc, "Unknown operator: {}".format(node.op))
 
-    def visit_Call(self, node: ast.Call, loc: Location) -> Apply:
+    def visit_Call(self, node: ast.Call, loc: Location) -> MyiaASTNode:
         if (len(node.keywords) > 0):
             raise MyiaSyntaxError(loc, "Keyword arguments are not allowed.")
+        args = [self.visit(arg) for arg in node.args]
+        if isinstance(node.func, ast.Name) and node.func.id in self.macros:
+            return self.macros[node.func.id](*args)
         return Apply(
             self.visit(node.func),
-            *[self.visit(arg) for arg in node.args],
+            *args,
+            # *[self.visit(arg) for arg in node.args],
             location=loc
         )
 
@@ -423,11 +434,11 @@ class Parser(LocVisitor):
     def visit_If(self, node: ast.If, loc: Location) \
             -> Union[MyiaASTNode, _Assign]:
 
-        p1 = Parser(self, pull_free_variables=True, gen=GenSym())
+        p1 = self.sub_parser(pull_free_variables=True, gen=GenSym())
         p1.dest = self.global_env.gen(self.dest, '✓')
         body = p1.body_wrapper(node.body)
 
-        p2 = Parser(self, pull_free_variables=True, gen=GenSym())
+        p2 = self.sub_parser(pull_free_variables=True, gen=GenSym())
         p2.dest = self.global_env.gen(self.dest, '✗')
         orelse = p2.body_wrapper(node.orelse)
 
@@ -630,7 +641,7 @@ class Parser(LocVisitor):
         return Apply(op, self.visit(node.operand), location=loc)
 
     def explore_vars(self, *exprs, return_error=None):
-        testp = Parser(self, global_env=Env(), dry=True)
+        testp = self.sub_parser(global_env=Env(), dry=True)
         testp.return_error = return_error
 
         for expr in exprs:
@@ -660,7 +671,7 @@ class Parser(LocVisitor):
             self.visit_variable(v)
 
         # We visit once more, this time adding the free vars as parameters
-        p = Parser(self, gen=GenSym())
+        p = self.sub_parser(gen=GenSym())
         p.dest = wsym
         in_syms = [p.new_variable(v) for v in in_vars]
         # Have to execute this before the body in order to get the right
@@ -707,15 +718,16 @@ class Parser(LocVisitor):
         return Begin(stmts)
 
 
-def parse_function(fn):
-    return parse_function0(fn)[1]
+def parse_function(fn, **kw):
+    return parse_function0(fn, **kw)[1]
 
 
-def parse_function0(fn):
+def parse_function0(fn, **kw):
     _, line = inspect.getsourcelines(fn)
     return parse_source(inspect.getfile(fn),
                         line,
-                        textwrap.dedent(inspect.getsource(fn)))
+                        textwrap.dedent(inspect.getsource(fn)),
+                        **kw)
 
 
 _global_envs: Dict[str, Env] = {}
@@ -725,10 +737,10 @@ def _get_global_env(url):
     return _global_envs.setdefault(url, Env(namespace='global'))
 
 
-def parse_source(url, line, src):
+def parse_source(url, line, src, **kw):
     tree = ast.parse(src)
     # FreeVariablesTagger().visit(tree)
-    p = Parser(Locator(url, line), _get_global_env(url), top_level=True)
+    p = Parser(Locator(url, line), _get_global_env(url), top_level=True, **kw)
     r = p.visit(tree, allow_decorator=True)
 
     if isinstance(r, list):
