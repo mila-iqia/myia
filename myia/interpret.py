@@ -211,6 +211,11 @@ def switch(cond, t, f):
         return f
 
 
+@impl(builtins.value_wrap)
+def value_wrap(x):
+    return PrimitiveImpl(lambda: x)
+
+
 @impl(builtins.lazy_if)
 def lazy_if(cond, t, f):
     if cond:

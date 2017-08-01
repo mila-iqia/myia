@@ -39,6 +39,7 @@ builtins_dict: Dict[str, Symbol] = dict(
     setslice = bsym('setslice'),
     lazy_if = bsym('lazy_if'),
     half_lazy_if = bsym('half_lazy_if'),
+    value_wrap = bsym('value_wrap'),
 
     # Myia's global variables
     myia_builtins = gsym('myia_builtins'),
