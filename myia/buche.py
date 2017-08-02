@@ -58,6 +58,7 @@ class Buche:
     def __init__(self, master, channel):
         self.master = master
         self.channel = channel
+        self.to_open = {}
 
     def raw(self, path=None, **params):
         if path is None:
@@ -67,14 +68,21 @@ class Buche:
         self.master.raw(path=self.channel, **params)
 
     def open(self, name, type, **params):
-        subchannel = self.join_path(name)
-        self.master.raw(command='open', path=subchannel, type=type, **params)
+        self.to_open[name] = (type, params)
 
     def join_path(self, p):
         return f'{self.channel.rstrip("/")}/{p.rstrip("/")}'
 
     def __getitem__(self, item):
         subchannel = self.join_path(item)
+        info = self.to_open.get(item, None)
+        if info:
+            del self.to_open[item]
+            type, params = info
+            self.master.raw(command='open',
+                            path=subchannel,
+                            type=type,
+                            **params)
         return Buche(self.master, subchannel)
 
     def __call__(self, obj, **params):
