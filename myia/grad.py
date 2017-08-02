@@ -5,8 +5,8 @@ from .ast import \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure
 from .interpret import \
     global_env, impl, myia_impl, evaluate, \
-    PrimitiveImpl, FunctionImpl2 as FunctionImpl, ClosureImpl2 as ClosureImpl
-from .front import Env, parse_function0
+    PrimitiveImpl, FunctionImpl, ClosureImpl
+from .front import Env, parse_function0, get_global_env
 from .symbols import builtins, bsym, gsym
 from copy import copy
 from .compile import a_normal
@@ -15,6 +15,7 @@ from .buche import buche as _buche
 
 
 buche = _buche['log']
+# fbuche = _buche['funcs2']
 
 
 builtins.fill = gsym('fill')
@@ -22,8 +23,10 @@ builtins.zero = gsym('zero')
 builtins.one = gsym('one')
 builtins.merge = gsym('merge')
 builtins.J = gsym('J')
+builtins.JX = gsym('JX')
 builtins.Jinv = gsym('Jinv')
-builtins.shift_grad = bsym('shift_grad')
+# builtins.shift_grad = bsym('shift_grad')
+# builtins.skim = bsym('skim')
 
 
 ######################################
@@ -31,14 +34,21 @@ builtins.shift_grad = bsym('shift_grad')
 ######################################
 
 
+def macro_grad_for(nclos_args):
+    def macro_grad(*args):
+        return Tuple([Tuple(args[:nclos_args]), *args[nclos_args:]])
+    return macro_grad
+
+
 def prim_rgrad(sym):
     # Copy symbol to grad namespace
     rsym = Symbol(sym, namespace='builtin', relation='♢*')
     #Symbol(sym.label, namespace='grad:builtin')
 
+    prim = global_env[sym]
+    assert isinstance(prim, PrimitiveImpl)
+
     def decorator(fn):
-        prim = global_env[sym]
-        assert isinstance(prim, PrimitiveImpl)
 
         # Wrap the primitive and a closure-converted backpropagator
         # in a combined method that follows the protocol
@@ -60,31 +70,47 @@ def prim_rgrad(sym):
 
 
 def rgrad(sym):
-    # Copy symbol to grad namespace
-    rsym = Symbol(sym, namespace='builtin', relation='♢*')
     #Symbol(sym.label, namespace='grad:builtin')
 
     def decorator(orig_fn):
-        r, bindings = parse_function0(orig_fn)
-        fn = evaluate(r, bindings)
-
         prim = global_env[sym]
         assert isinstance(prim, PrimitiveImpl)
 
+        _cache = {}
+
         # Wrap the primitive and a closure-converted backpropagator
         # in a combined method that follows the protocol
-        G = GenSym()
-        args = [G.sym(a) for a in prim.argnames]
-        forward = Apply(builtins.J,
-                        Apply(sym, *[Apply(builtins.Jinv, a)
-                                     for a in args]))
-        backward = Closure(rsym, args)
-        ast = Lambda(args, Tuple([forward, backward]), G)
-        impl = FunctionImpl(ast, (global_env,))
-        prim.grad = impl
-        impl.primal = prim
+        def mkgrad(nargs_closure):
+            cached = _cache.get(nargs_closure, None)
+            if cached:
+                return cached
 
-        global_env[rsym] = fn
+            # Copy symbol to grad namespace
+            rsym = Symbol(sym,
+                          version=nargs_closure,
+                          namespace='builtin',
+                          relation='♢*')
+
+            r, bindings = parse_function0(
+                orig_fn,
+                macros={'GRAD': macro_grad_for(nargs_closure)}
+            )
+            fn = evaluate(r, bindings)
+            G = GenSym()
+            args = [G.sym(a) for a in prim.argnames]
+            forward = Apply(builtins.J,
+                            Apply(sym, *[Apply(builtins.Jinv, a)
+                                         for a in args]))
+            backward = Closure(rsym, args)
+            ast = Lambda(args, Tuple([forward, backward]), G)
+            impl = FunctionImpl(ast, (global_env,))
+            impl.primal = prim
+            global_env[rsym] = fn
+            _cache[nargs_closure] = impl
+            return impl
+
+        prim.grad = mkgrad
+
         return impl
 
     return decorator
@@ -95,25 +121,33 @@ def rgrad(sym):
 ################################################
 
 
-@impl(builtins.shift_grad)
-def shift_grad(closure, n):
-    """Given a transformed closure, transforms its bprop
-    so that it groups the first n arguments together (these
-    arguments are assumed to be the variables closed over)."""
-    # TODO: this functionality should be implemented elsewhere,
-    # as it is it will play awkwardly with grad(grad), I think.
+# @impl(builtins.shift_grad)
+# def shift_grad(closure, n):
+#     """Given a transformed closure, transforms its bprop
+#     so that it groups the first n arguments together (these
+#     arguments are assumed to be the variables closed over)."""
+#     # TODO: this functionality should be implemented elsewhere,
+#     # as it is it will play awkwardly with grad(grad), I think.
 
-    # assert isinstance(closure, ClosureImpl)
-    def f(*args):
-        result, bprop = closure(*args)
+#     # assert isinstance(closure, ClosureImpl)
+#     def f(*args):
+#         result, bprop = closure(*args)
 
-        def bprop2(*args):
-            results = bprop(*args)
-            return (results[0] + results[1:1 + n], *results[1 + n:])
-        return (result, PrimitiveImpl(bprop2))
-    prim = PrimitiveImpl(f)
-    prim.primal = closure.primal
-    return prim
+#         def bprop2(*args):
+#             results = bprop(*args)
+#             return (results[0] + results[1:1 + n], *results[1 + n:])
+#         return (result, PrimitiveImpl(bprop2, name=f'bprop{str(closure)}'))
+#     prim = PrimitiveImpl(f, name=f'shift{str(closure)}')
+#     prim.primal = closure.primal
+#     return prim
+
+
+# @impl(builtins.skim)
+# def skim(tup, n):
+#     if n >= 0:
+#         return (tup[0] + tup[1:n + 1], *tup[n + 1:])
+#     else:
+#         return (tup[0][:-n], *tup[0][-n:], *tup[1:])
 
 
 @impl(builtins.fill)
@@ -153,19 +187,19 @@ def merge(x, y):
         raise TypeError(f'Cannot merge values of type {type(x)}')
 
 
-@impl(builtins.J)
-def J(x):
-    if isinstance(x, (int, float)):
-        return x
-    elif isinstance(x, tuple):
-        return tuple(J(a) for a in x)
-    elif isinstance(x, PrimitiveImpl):
-        assert x.grad is not None
-        return x.grad
-    elif isinstance(x, FunctionImpl):
+def JGrad(x):
+    _cache = {}
+
+    def make_grad(nargs_closure):
+        gfn = _cache.get(nargs_closure, None)
+        if gfn:
+            return gfn
+
         G = Grad(
             name = x.ast.ref or x.ast.gen('???'),
-            primal = a_normal(x.ast)
+            primal = a_normal(x.ast),
+            nargs_closure = nargs_closure,
+            global_env = get_global_env()
         )
         g = G.transform()
         # bindings = {**x.bindings, **G.global_env.bindings}
@@ -177,14 +211,40 @@ def J(x):
 
         gfn = evaluate(g, bindings)
         gfn.primal = x
-        x.grad = gfn
+        # x.grad = gfn
+        _cache[nargs_closure] = gfn
         return gfn
+    return make_grad
+
+
+@impl(builtins.JX)
+def JX(x, nargs_closure):
+    if isinstance(x, PrimitiveImpl):
+        assert x.grad is not None
+        return x.grad(nargs_closure)
+    elif isinstance(x, FunctionImpl):
+        if not x.grad:
+            x.grad = JGrad(x)
+        return x.grad(nargs_closure)
+    else:
+        raise TypeError(f'JX applied on wrong type: {x}')
+
+
+@impl(builtins.J)
+def J(x):
+    if isinstance(x, (int, float)):
+        return x
+    elif isinstance(x, tuple):
+        return tuple(J(a) for a in x)
+    elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
+        return JX(x, 0)
     elif isinstance(x, ClosureImpl):
-        # ??
-        c = ClosureImpl(shift_grad(J(x.fn), len(x.args)),
+        c = ClosureImpl(JX(x.fn, len(x.args)),
                         J(tuple(x.args)))
         c.primal = x
         return c
+    elif x is None:
+        return None
     else:
         raise TypeError(f'Invalid argument for J: {x}')
 
@@ -200,8 +260,9 @@ def Jinv(x):
         return x.primal
     elif isinstance(x, ClosureImpl):
         c = ClosureImpl(Jinv(x.fn), Jinv(tuple(x.args)))
-        c.grad = x
         return c
+    elif x is None:
+        return x
     else:
         raise TypeError(f'Invalid argument for Jinv: {x}')
 
@@ -216,22 +277,27 @@ myia_builtins = Props(globals())
 
 @rgrad(builtins.zero)
 def gzero(x, d):
-    return ((), zero(x))
+    return GRAD(zero(x))
 
 
 @rgrad(builtins.merge)
 def gmerge(x, y, d):
-    return ((), d, d)
+    return GRAD(d, d)
+
+
+@rgrad(builtins.JX)
+def gJX(x, n, d):
+    return GRAD(Jinv(d), 0)
 
 
 @rgrad(builtins.J)
 def gJ(x, d):
-    return ((), Jinv(d),)
+    return GRAD(Jinv(d))
 
 
 @rgrad(builtins.Jinv)
 def gJinv(x, d):
-    return ((), J(d))
+    return GRAD(J(d))
 
 
 ######################################
@@ -241,27 +307,27 @@ def gJinv(x, d):
 
 @rgrad(builtins.add)
 def gadd(x, y, dz):
-    return ((), dz, dz)
+    return GRAD(dz, dz)
 
 
 @rgrad(builtins.subtract)
 def gsubtract(x, y, dz):
-    return ((), dz, -dz)
+    return GRAD(dz, -dz)
 
 
 @rgrad(builtins.multiply)
 def gmultiply(x, y, dz):
-    return ((), dz * y, dz * x)
+    return GRAD(dz * y, dz * x)
 
 
 @rgrad(builtins.divide)
 def gdivide(x, y, dz):
-    return ((), dz / y, -dz * x / (y * y))
+    return GRAD(dz / y, -dz * x / (y * y))
 
 
 @rgrad(builtins.unary_subtract)
 def gunary_subtract(x, dz):
-    return ((), -dz)
+    return GRAD(-dz)
 
 
 ###################################################
@@ -271,59 +337,66 @@ def gunary_subtract(x, dz):
 
 @rgrad(builtins.greater)
 def ggreater(x, y, dz):
-    return ((), False, False)
+    return GRAD(False, False)
 
 
 @rgrad(builtins.less)
 def gless(x, y, dz):
-    return ((), False, False)
+    return GRAD(False, False)
 
 
 @rgrad(builtins.lazy_if)
 def glazy_if(c, t, f, dz):
     if c:
-        return ((),
-                False,
-                t()[1](dz)[0],
-                myia_builtins.zero(myia_builtins.Jinv(f)))
+        return GRAD(
+            False,
+            t()[1](dz)[0],
+            myia_builtins.zero(myia_builtins.Jinv(f))
+        )
     else:
-        return ((),
-                False,
-                myia_builtins.zero(myia_builtins.Jinv(t)),
-                f()[1](dz)[0])
+        return GRAD(
+            False,
+            myia_builtins.zero(myia_builtins.Jinv(t)),
+            f()[1](dz)[0]
+        )
 
 
 @rgrad(builtins.half_lazy_if)
 def ghalf_lazy_if(c, t, f, dz):
     if c:
-        return ((),
-                False,
-                t()[1](dz)[0],
-                myia_builtins.zero(myia_builtins.Jinv(f)))
+        return GRAD(
+            (),
+            False,
+            t()[1](dz)[0],
+            myia_builtins.zero(myia_builtins.Jinv(f))
+        )
     else:
-        return ((),
-                False,
-                myia_builtins.zero(myia_builtins.Jinv(t)),
-                dz)
+        return GRAD(
+            False,
+            myia_builtins.zero(myia_builtins.Jinv(t)),
+            dz
+        )
 
 
 @rgrad(builtins.switch)
 def gswitch(c, t, f, dz):
     if c:
-        return ((),
-                False,
-                dz,
-                myia_builtins.zero(myia_builtins.Jinv(f)))
+        return GRAD(
+            False,
+            dz,
+            myia_builtins.zero(myia_builtins.Jinv(f))
+        )
     else:
-        return ((),
-                False,
-                myia_builtins.zero(myia_builtins.Jinv(t)),
-                dz)
+        return GRAD(
+            False,
+            myia_builtins.zero(myia_builtins.Jinv(t)),
+            dz
+        )
 
 
 @rgrad(builtins.identity)
 def gidentity(v, dz):
-    return ((), dz)
+    return GRAD(dz)
 
 
 #################################
@@ -336,17 +409,17 @@ def gindex(tup, idx, dz):
     def f(pair):
         return switch(pair[0] == idx, dz, 0)
     rval = map(f, enumerate(tup))
-    return ((), rval, 0)
+    return GRAD(rval, 0)
 
 
 @rgrad(builtins.len)
 def glen(xs, dz):
-    return ((), myia_builtins.zero(myia_builtins.Jinv(xs)))
+    return GRAD(myia_builtins.zero(myia_builtins.Jinv(xs)))
 
 
 @rgrad(builtins.range)
 def grange(n, dz):
-    return ((), 0)
+    return GRAD(0)
 
 
 @rgrad(builtins.map)
@@ -356,12 +429,12 @@ def gmap(f, xs, dz):
     d = map(f(xs)[1], dz)
     df = reduce(myia_builtins.merge, map(first, d))
     dxs = map(second, d)
-    return ((), df, dxs)
+    return GRAD(df, dxs)
 
 
 @rgrad(builtins.enumerate)
 def genumerate(xs, dz):
-    return ((), map(second, dz))
+    return GRAD(map(second, dz))
 
 
 # Following the methodology in the following paper:
@@ -379,7 +452,8 @@ class Grad:
     def __init__(self,
                  name: Symbol,
                  primal: Lambda,
-                 global_env: Env = None) -> None:
+                 global_env: Env,
+                 nargs_closure = 0) -> None:
         self.name = name
         assert(isinstance(primal, Lambda))
         self.primal = primal
@@ -389,6 +463,7 @@ class Grad:
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
         self.backpropagator_map: Dict[Symbol, Symbol] = {}
         self.zeroes: List[MyiaASTNode] = []
+        self.nargs_closure = nargs_closure
 
     def phi(self, var, value):
         # phi (p. 26) transformation on let bindings, transforms
@@ -424,6 +499,8 @@ class Grad:
             args = [self.tagged_var(a) for a in value.args]
             clos = Closure(value.fn, args)
             expr = Apply(builtins.J, clos)
+            fn = Apply(builtins.JX, value.fn, Value(len(args)))
+            expr = Closure(fn, args)
             return [(self.tagged_var(var), expr),
                     (self.backpropagator_var(var), Value(None))]
 
@@ -553,15 +630,18 @@ class Grad:
         backp_cargs = [self.tagged_var(s) for s, _ in let.bindings]
         backp_rargs = [self.tagged_var(arg) for arg in args]
         backp_args = backp_bargs + backp_cargs + backp_rargs
+        backp_all_ret = [self.sensitivity_var(arg) for arg in args]
         backp_ret = Tuple([
             # Tuple([self.sensitivity_var(arg.label) for arg in backp_cargs]),
-            Tuple([]),
-            *[self.sensitivity_var(arg) for arg in args]
+            Tuple(backp_all_ret[:self.nargs_closure]),
+            *backp_all_ret[self.nargs_closure:]
         ])
         backp_fn = Lambda([*map(copy, backp_args), out_sen],
                           Let(self.zeroes + backward, backp_ret),
                           self.gensym)
         backp_sym = self.global_env.gen(self.name, '♢*')
+        backp_fn.ref = backp_sym
+        # fbuche[str(backp_sym)](backp_fn)
         self.global_env[backp_sym] = backp_fn
 
         backp_cl = Closure(backp_sym, backp_args)
@@ -573,29 +653,7 @@ class Grad:
         new_args = list(map(self.tagged_var, args))
         ret_fn = Lambda(new_args, new_body, self.gensym)
         ret_sym = self.global_env.gen(self.name, '↑')
+        ret_fn.ref = ret_sym
+        # fbuche[str(ret_sym)](ret_fn)
         self.global_env[ret_sym] = ret_fn
         return ret_sym
-
-    # def transform_Value(self, node):
-    #     return node
-
-    # def transform_Apply(self, node):
-    #     return node
-
-    # def transform_Closure(self, node):
-    #     return node
-
-    # def transform_If(self, node):
-    #     return node
-
-    # def transform_Lambda(self, node):
-    #     return node
-
-    # def transform_Let(self, node):
-    #     return node
-
-    # def transform_Symbol(self, node):
-    #     return node
-
-    # def transform_Tuple(self, node):
-    #     return node
