@@ -1,6 +1,20 @@
 
+import os
 import json
 from hrepr import StdHRepr
+
+
+_css_path = f'{os.path.dirname(__file__)}/myia.css'
+_css = None
+
+
+class HReprBase:
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        global _css
+        if _css is None:
+            _css = open(_css_path).read()
+        return H.style(_css)
 
 
 class HRepr(StdHRepr):

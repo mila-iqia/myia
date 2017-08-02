@@ -2,6 +2,7 @@ from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
     Let, If, Lambda, Apply, Begin, Tuple, Closure
+from .buche import HReprBase
 from .symbols import builtins
 import inspect
 
@@ -23,7 +24,7 @@ global_env = {
 ###################
 
 
-class PrimitiveImpl:
+class PrimitiveImpl(HReprBase):
     def __init__(self, fn, name=None):
         self.argnames = inspect.getargs(fn.__code__).args
         self.nargs = len(self.argnames)
@@ -44,11 +45,11 @@ class PrimitiveImpl:
     def __hrepr__(self, H, hrepr):
         return H.div['PrimitiveImpl'](
             H.div['class_title']('Primitive'),
-            H.div['class_contents'](hrepr(self.fn))
+            H.div['class_contents'](self.name or hrepr(self.fn))
         )
 
 
-class FunctionImpl:
+class FunctionImpl(HReprBase):
     def __init__(self, ast, envs):
         assert isinstance(ast, Lambda)
         self.argnames = [a.label for a in ast.args]
@@ -81,12 +82,11 @@ class FunctionImpl:
     def __hrepr__(self, H, hrepr):
         return H.div['FunctionImpl'](
             H.div['class_title']('Function'),
-            # H.div['class_contents'](hrepr(self.ast.ref or self.ast))
-            H.div['class_contents'](hrepr(self.ast))
+            H.div['class_contents'](hrepr(self.ast.ref or self.ast))
         )
 
 
-class ClosureImpl:
+class ClosureImpl(HReprBase):
     def __init__(self, fn, args):
         assert isinstance(fn, (PrimitiveImpl, FunctionImpl))
         self.argnames = [a for a in fn.argnames[len(args):]]

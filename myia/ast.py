@@ -6,11 +6,9 @@ from uuid import uuid4 as uuid
 from copy import copy
 import textwrap
 import traceback
-import os.path
+from .buche import HReprBase
 
 
-_css_path = f'{os.path.dirname(__file__)}/ast.css'
-_css = None
 __save_trace__ = False
 
 
@@ -53,14 +51,7 @@ def _get_location(x: Locatable) -> Location:
 T = TypeVar('T', bound='MyiaASTNode')
 
 
-class MyiaASTNode:
-    @classmethod
-    def __hrepr_resources__(cls, H):
-        global _css
-        if _css is None:
-            _css = open(_css_path).read()
-        return H.style(_css)
-
+class MyiaASTNode(HReprBase):
     def __init__(self, location: Locatable = None) -> None:
         self.location = _get_location(location)
         if __save_trace__:
