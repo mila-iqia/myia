@@ -159,7 +159,7 @@
 }
 
 
-.ClosureImpl, .FunctionImpl, .PrimitiveImpl {
+.ClosureImpl, .FunctionImpl, .PrimitiveImpl, .VMFrame {
 	display: inline-flex;
 	flex-direction: column;
 	border: 1px solid blue;
@@ -179,7 +179,6 @@
 .class_contents > * {
 	display: block;
 }
-
 
 .unbound, .unbound * {
 	background-color: red;

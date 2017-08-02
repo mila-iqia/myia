@@ -4,6 +4,7 @@ from myia.ast import \
     Let, If, Lambda, Apply, Begin, Tuple, Closure
 from .buche import HReprBase
 from .symbols import builtins
+from .event import EventDispatcher
 import inspect
 
 
@@ -56,7 +57,7 @@ class FunctionImpl(HReprBase):
         self.nargs = len(ast.args)
         self.args = ast.args
         self.ast = ast
-        self.instructions = VMCode(ast.body).instructions
+        self.code = VMCode(ast.body)
         self.envs = envs
         self.primal = None
         self.grad = None
@@ -64,7 +65,7 @@ class FunctionImpl(HReprBase):
 
         def func(*args):
             assert(len(args) == len(node.args))
-            return vm(self.instructions,
+            return vm(self.code,
                       {s: arg for s, arg in zip(node.args, args)},
                       *self.envs)
 
@@ -111,55 +112,6 @@ class ClosureImpl(HReprBase):
                 hrepr(self.args)
             )
         )
-
-
-# class FunctionImpl:
-#     def __init__(self, ast, bindings):
-#         assert isinstance(ast, Lambda)
-#         self.argnames = [a.label for a in ast.args]
-#         self.nargs = len(ast.args)
-#         self.ast = ast
-#         self.bindings = bindings
-#         self.primal = None
-#         self.grad = None
-#         node = ast
-
-#         def func(*args):
-#             assert(len(args) == len(node.args))
-#             ev = Evaluator(
-#                 {s: arg for s, arg in zip(node.args, args)},
-#                 self.bindings
-#             )
-#             return ev.eval(node.body)
-
-#         self._func = func
-
-#     def __call__(self, *args):
-#         return self._func(*args)
-
-#     def __str__(self):
-#         return f'Func({self.ast.ref or self.ast})'
-
-#     def __repr__(self):
-#         return str(self)
-
-
-# class ClosureImpl:
-#     def __init__(self, fn, args):
-#         assert isinstance(fn, (PrimitiveImpl, FunctionImpl))
-#         self.argnames = [a for a in fn.argnames[len(args):]]
-#         self.nargs = fn.nargs - len(args)
-#         self.fn = fn
-#         self.args = args
-
-#     def __call__(self, *args):
-#         return self.fn(*self.args, *args)
-
-#     def __str__(self):
-#         return f'Clos({self.fn}, {self.args})'
-
-#     def __repr__(self):
-#         return str(self)
 
 
 ##########################
@@ -315,9 +267,11 @@ def vm(instructions, *binding_groups):
     return VM(instructions, *binding_groups).result
 
 
-class VMFrame:
-    def __init__(self, instructions, envs):
-        self.instructions = instructions
+class VMFrame(HReprBase):
+    def __init__(self, vm, code, envs):
+        self.vm = vm
+        self.code = code
+        self.instructions = code.instructions
         self.pc = 0
         self.envs = ({},) + envs
         self.stack = [None]
@@ -347,14 +301,18 @@ class VMFrame:
         else:
             cmd, node, *args = instr
             self.focus = node
-            method = getattr(self, 'instruction_' + cmd)
+            mname = 'instruction_' + cmd
+            if self.vm.do_emit_events:
+                self.vm.emit(mname, self, node, *args)
+                self.vm.emit_instruction(self, cmd, node, *args)
+            method = getattr(self, mname)
             return method(node, *args)
 
     def instruction_reduce(self, node, nargs):
         fn, *args = self.take(nargs + 1)
         if isinstance(fn, FunctionImpl):
             bind = {k: v for k, v in zip(fn.args, args)}
-            return VMFrame(fn.instructions, (bind,) + fn.envs)
+            return VMFrame(self.vm, fn.code, (bind,) + fn.envs)
         elif isinstance(fn, ClosureImpl):
             self.stack.append(fn.fn)
             self.stack += fn.args
@@ -378,14 +336,14 @@ class VMFrame:
         value = self.stack.pop()
         self.envs[0][dest] = value
 
-    def instruction_fetch(self, node):
+    def instruction_fetch(self, node, sym):
         for env in self.envs:
             try:
-                self.stack.append(env[node])
+                self.stack.append(env[sym])
                 return None
             except KeyError as err:
                 pass
-        raise KeyError(f'Could not resolve {node}')
+        raise KeyError(f'Could not resolve {sym}')
 
     def instruction_push(self, node, value):
         self.stack.append(value)
@@ -393,12 +351,22 @@ class VMFrame:
     def instruction_lambda(self, node):
         self.stack.append(FunctionImpl(node, self.envs))
 
+    def __hrepr__(self, H, hrepr):
+        ref = getattr(self.code.node, 'ref', self.code.node)
+        return H.div['VMFrame'](
+            H.div['class_title']('VMFrame'),
+            H.div['class_contents'](hrepr(ref))
+        )
 
-class VM:
-    def __init__(self, instructions, *envs):
-        # self.env = env
-        self.frame = VMFrame(instructions, envs)
+
+class VM(EventDispatcher):
+    def __init__(self, code, *envs, emit_events=True):
+        super().__init__(self, emit_events)
+        self.do_emit_events = emit_events
+        self.frame = VMFrame(self, code, envs)
         self.frames = []
+        if self.do_emit_events:
+            self.emit_frame(self.frame)
         self.result = self.eval()
 
     def eval(self):
@@ -408,6 +376,8 @@ class VM:
                 if new_frame is not None:
                     self.frames.append(self.frame)
                     self.frame = new_frame
+                    if self.do_emit_events:
+                        self.emit_frame(self.frame)
             except StopIteration:
                 rval = self.frame.top()
                 if not self.frames:
@@ -416,6 +386,8 @@ class VM:
                     self.frame = self.frames.pop()
                     self.frame.stack.append(rval)
             except Exception as exc:
+                if self.do_emit_events:
+                    self.emit_error(exc)
                 self.error_unwind(exc)
                 raise exc from None
 
@@ -427,7 +399,7 @@ class VM:
                 node.annotations = node.annotations | ann
 
 
-class VMCode:
+class VMCode(HReprBase):
     def __init__(self, node):
         self.node = node
         self.instructions = []
@@ -475,7 +447,7 @@ class VMCode:
         self.process(node.body)
 
     def process_Symbol(self, node):
-        self.instr('fetch', node)
+        self.instr('fetch', node, node)
 
     def process_Tuple(self, node):
         for x in node.values:
@@ -484,6 +456,27 @@ class VMCode:
 
     def process_Value(self, node):
         self.instr('push', node, node.value)
+
+    def __hrepr__(self, H, hrepr):
+        rows = []
+        for cmd, _, *args in self.instructions:
+            row = H.tr()
+            for x in (cmd, *args):
+                row = row(H.td(hrepr(x)))
+            rows.append(row)
+        return H.table['VMCodeInstructions'](*rows)
+
+
+def evaluate(node, bindings):
+    if isinstance(node, list):
+        node, = node
+    env = {**global_env}
+    for k, v in bindings.items():
+        if isinstance(v, MyiaASTNode):
+            env[k] = vm(VMCode(v), env)
+        else:
+            env[k] = v
+    return vm(VMCode(node), env)
 
 
 # class Evaluator:
@@ -551,18 +544,6 @@ class VMCode:
 
 #     def eval_Value(self, node):
 #         return node.value
-
-
-def evaluate(node, bindings):
-    if isinstance(node, list):
-        node, = node
-    env = {**global_env}
-    for k, v in bindings.items():
-        if isinstance(v, MyiaASTNode):
-            env[k] = vm(VMCode(v).instructions, env)
-        else:
-            env[k] = v
-    return vm(VMCode(node).instructions, env)
 
 
 # def old_evaluate(node, bindings):
