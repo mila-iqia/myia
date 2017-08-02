@@ -208,12 +208,14 @@ class Lambda(MyiaASTNode):
                  args: List[Symbol],
                  body: MyiaASTNode,
                  gen: 'GenSym',
+                 global_env: object = None,
                  **kw) -> None:
         super().__init__(**kw)
         self.ref: Symbol = None
         self.args = args
         self.body = body
         self.gen = gen
+        self.global_env = global_env
 
     def children(self) -> List[MyiaASTNode]:
         args = cast(List[MyiaASTNode], self.args)

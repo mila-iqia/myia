@@ -96,6 +96,7 @@ class ANormalTransformer(Transformer):
                         tr.transform(node.body),
                         node.gen)
         result.ref = node.ref
+        result.global_env = node.global_env
         return self.stash(stash, result, 'lambda')
 
     def transform_If(self, node, stash=False):
@@ -158,6 +159,7 @@ class CollapseLet(Transformer):
                         self.transform(node.body),
                         node.gen)
         result.ref = node.ref
+        result.global_env = node.global_env
         return result
 
     def transform_Apply(self, node):

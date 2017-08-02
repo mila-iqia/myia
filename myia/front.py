@@ -46,9 +46,9 @@ class Redirect:
         self.key = key
 
 
-class Env:
+class ParseEnv:
     def __init__(self,
-                 parent: 'Env' = None,
+                 parent: 'ParseEnv' = None,
                  namespace: str = None,
                  gen: GenSym = None) -> None:
         self.parent = parent
@@ -67,10 +67,6 @@ class Env:
         else:
             free = True
             result = self.parent[name]
-        # if redirect and isinstance(result, Redirect):
-        #     return self.get_free(result.key, True)
-        # else:
-        #     return (free, result)
         if isinstance(result, Redirect):
             return self.get_free(result.key)
         else:
@@ -133,7 +129,7 @@ class Parser(LocVisitor):
 
     def __init__(self,
                  parent: Union[Locator, 'Parser'],
-                 global_env: Env = None,
+                 global_env: ParseEnv = None,
                  dry: bool = None,
                  gen: GenSym = None,
                  pull_free_variables: bool = False,
@@ -149,7 +145,7 @@ class Parser(LocVisitor):
 
         if isinstance(parent, Locator):
             self.parent = None
-            self.env = Env(gen=gen)
+            self.env = ParseEnv(gen=gen)
             # self.globals_accessed: Set[str] = set()
             self.global_env = global_env
             self.return_error: str = None
@@ -158,7 +154,7 @@ class Parser(LocVisitor):
             super().__init__(parent)
         else:
             self.parent = parent
-            self.env = Env(parent.env, gen=gen)
+            self.env = ParseEnv(parent.env, gen=gen)
             # self.globals_accessed = parent.globals_accessed
             self.global_env = parent.global_env
             self.return_error: str = parent.return_error
@@ -193,6 +189,7 @@ class Parser(LocVisitor):
         ref = binding[1] if binding else self.global_env.gen.sym(label)
         l = Lambda(args, body, gen).at(loc)
         l.ref = ref
+        l.global_env = self.global_env
         if not self.dry:
             self.global_env[ref] = l
         return ref
@@ -642,7 +639,7 @@ class Parser(LocVisitor):
         return Apply(op, self.visit(node.operand), location=loc)
 
     def explore_vars(self, *exprs, return_error=None):
-        testp = self.sub_parser(global_env=Env(), dry=True)
+        testp = self.sub_parser(global_env=ParseEnv(), dry=True)
         testp.return_error = return_error
 
         for expr in exprs:
@@ -701,12 +698,15 @@ class Parser(LocVisitor):
         ))
 
         if not self.dry:
-            self.global_env[wsym] = Lambda(
+            l = Lambda(
                 in_syms,
                 new_body,
                 p.env.gen,
                 location=loc
             )
+            l.ref = wsym
+            l.global_env = self.global_env
+            self.global_env[wsym] = l
         # assert isinstance(wsym.label, str)
         # self.globals_accessed.add(wsym.label)
 
@@ -731,11 +731,12 @@ def parse_function0(fn, **kw):
                         **kw)
 
 
-_global_envs: Dict[str, Env] = {}
+_global_envs: Dict[str, ParseEnv] = {}
 
 
 def get_global_env(url=None):
-    return _global_envs.setdefault(url, Env(namespace='global'))
+    namespace = f'global'  # :{url}'
+    return _global_envs.setdefault(url, ParseEnv(namespace=namespace))
 
 
 def parse_source(url, line, src, **kw):

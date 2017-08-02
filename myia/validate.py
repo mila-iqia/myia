@@ -155,7 +155,7 @@ def grad_test(data):
     transformed = {}
     gbindings = {}
 
-    G = Grad(r, a_normal(lbda), get_global_env())
+    G = Grad(r, a_normal(lbda))
     g = G.transform()
     transformed[r] = g
     gbindings.update(G.global_env.bindings)

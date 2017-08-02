@@ -6,7 +6,7 @@ from .ast import \
 from .interpret import \
     global_env, impl, myia_impl, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
-from .front import Env, parse_function0, get_global_env
+from .front import ParseEnv, parse_function0, get_global_env
 from .symbols import builtins, bsym, gsym
 from copy import copy
 from .compile import a_normal
@@ -40,33 +40,33 @@ def macro_grad_for(nclos_args):
     return macro_grad
 
 
-def prim_rgrad(sym):
-    # Copy symbol to grad namespace
-    rsym = Symbol(sym, namespace='builtin', relation='♢*')
-    #Symbol(sym.label, namespace='grad:builtin')
+# def prim_rgrad(sym):
+#     # Copy symbol to grad namespace
+#     rsym = Symbol(sym, namespace='builtin', relation='♢*')
+#     #Symbol(sym.label, namespace='grad:builtin')
 
-    prim = global_env[sym]
-    assert isinstance(prim, PrimitiveImpl)
+#     prim = global_env[sym]
+#     assert isinstance(prim, PrimitiveImpl)
 
-    def decorator(fn):
+#     def decorator(fn):
 
-        # Wrap the primitive and a closure-converted backpropagator
-        # in a combined method that follows the protocol
-        G = GenSym()
-        args = [G.sym(a) for a in prim.argnames]
-        forward = Apply(builtins.J,
-                        Apply(sym, *[Apply(builtins.Jinv, a)
-                                     for a in args]))
-        backward = Closure(rsym, args)
-        ast = Lambda(args, Tuple([forward, backward]), G)
-        impl = FunctionImpl(ast, (global_env,))
-        prim.grad = impl
-        impl.primal = prim
+#         # Wrap the primitive and a closure-converted backpropagator
+#         # in a combined method that follows the protocol
+#         G = GenSym()
+#         args = [G.sym(a) for a in prim.argnames]
+#         forward = Apply(builtins.J,
+#                         Apply(sym, *[Apply(builtins.Jinv, a)
+#                                      for a in args]))
+#         backward = Closure(rsym, args)
+#         ast = Lambda(args, Tuple([forward, backward]), G)
+#         impl = FunctionImpl(ast, (global_env,))
+#         prim.grad = impl
+#         impl.primal = prim
 
-        global_env[rsym] = PrimitiveImpl(fn)
-        return impl
+#         global_env[rsym] = PrimitiveImpl(fn)
+#         return impl
 
-    return decorator
+#     return decorator
 
 
 def rgrad(sym):
@@ -103,6 +103,7 @@ def rgrad(sym):
                                          for a in args]))
             backward = Closure(rsym, args)
             ast = Lambda(args, Tuple([forward, backward]), G)
+            ast.global_env = get_global_env()
             impl = FunctionImpl(ast, (global_env,))
             impl.primal = prim
             global_env[rsym] = fn
@@ -199,7 +200,7 @@ def JGrad(x):
             name = x.ast.ref or x.ast.gen('???'),
             primal = a_normal(x.ast),
             nargs_closure = nargs_closure,
-            global_env = get_global_env()
+            # global_env = get_global_env()
         )
         g = G.transform()
         # bindings = {**x.bindings, **G.global_env.bindings}
@@ -452,13 +453,15 @@ class Grad:
     def __init__(self,
                  name: Symbol,
                  primal: Lambda,
-                 global_env: Env,
+                 # global_env: ParseEnv,
                  nargs_closure = 0) -> None:
         self.name = name
         assert(isinstance(primal, Lambda))
         self.primal = primal
         self.gensym = primal.gen
-        self.global_env = global_env or Env(namespace='global')
+        # self.global_env = global_env or ParseEnv(namespace='global')
+        assert primal.global_env
+        self.global_env = primal.global_env
         self.tagged_map: Dict[Symbol, Symbol] = {}
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
         self.backpropagator_map: Dict[Symbol, Symbol] = {}
@@ -640,6 +643,7 @@ class Grad:
                           Let(self.zeroes + backward, backp_ret),
                           self.gensym)
         backp_sym = self.global_env.gen(self.name, '♢*')
+        backp_fn.global_env = self.global_env
         backp_fn.ref = backp_sym
         # fbuche[str(backp_sym)](backp_fn)
         self.global_env[backp_sym] = backp_fn
@@ -653,6 +657,7 @@ class Grad:
         new_args = list(map(self.tagged_var, args))
         ret_fn = Lambda(new_args, new_body, self.gensym)
         ret_sym = self.global_env.gen(self.name, '↑')
+        ret_fn.global_env = self.global_env
         ret_fn.ref = ret_sym
         # fbuche[str(ret_sym)](ret_fn)
         self.global_env[ret_sym] = ret_fn
