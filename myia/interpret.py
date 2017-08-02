@@ -24,10 +24,11 @@ global_env = {
 
 
 class PrimitiveImpl:
-    def __init__(self, fn):
+    def __init__(self, fn, name=None):
         self.argnames = inspect.getargs(fn.__code__).args
         self.nargs = len(self.argnames)
         self.fn = fn
+        self.name = name or fn.__name__
         self.primal = None
         self.grad = None
 
@@ -35,30 +36,36 @@ class PrimitiveImpl:
         return self.fn(*args)
 
     def __str__(self):
-        return f'Prim({self.fn})'
+        return f'Prim({self.name or self.fn})'
 
     def __repr__(self):
         return str(self)
 
+    def __hrepr__(self, H, hrepr):
+        return H.div['PrimitiveImpl'](
+            H.div['class_title']('Primitive'),
+            H.div['class_contents'](hrepr(self.fn))
+        )
+
 
 class FunctionImpl:
-    def __init__(self, ast, bindings):
+    def __init__(self, ast, envs):
         assert isinstance(ast, Lambda)
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
+        self.args = ast.args
         self.ast = ast
-        self.bindings = bindings
+        self.instructions = VMCode(ast.body).instructions
+        self.envs = envs
         self.primal = None
         self.grad = None
         node = ast
 
         def func(*args):
             assert(len(args) == len(node.args))
-            ev = Evaluator(
-                {s: arg for s, arg in zip(node.args, args)},
-                self.bindings
-            )
-            return ev.eval(node.body)
+            return vm(self.instructions,
+                      {s: arg for s, arg in zip(node.args, args)},
+                      *self.envs)
 
         self._func = func
 
@@ -70,6 +77,13 @@ class FunctionImpl:
 
     def __repr__(self):
         return str(self)
+
+    def __hrepr__(self, H, hrepr):
+        return H.div['FunctionImpl'](
+            H.div['class_title']('Function'),
+            # H.div['class_contents'](hrepr(self.ast.ref or self.ast))
+            H.div['class_contents'](hrepr(self.ast))
+        )
 
 
 class ClosureImpl:
@@ -88,6 +102,64 @@ class ClosureImpl:
 
     def __repr__(self):
         return str(self)
+
+    def __hrepr__(self, H, hrepr):
+        return H.div['ClosureImpl'](
+            H.div['class_title']('Closure'),
+            H.div['class_contents'](
+                hrepr(self.fn),
+                hrepr(self.args)
+            )
+        )
+
+
+# class FunctionImpl:
+#     def __init__(self, ast, bindings):
+#         assert isinstance(ast, Lambda)
+#         self.argnames = [a.label for a in ast.args]
+#         self.nargs = len(ast.args)
+#         self.ast = ast
+#         self.bindings = bindings
+#         self.primal = None
+#         self.grad = None
+#         node = ast
+
+#         def func(*args):
+#             assert(len(args) == len(node.args))
+#             ev = Evaluator(
+#                 {s: arg for s, arg in zip(node.args, args)},
+#                 self.bindings
+#             )
+#             return ev.eval(node.body)
+
+#         self._func = func
+
+#     def __call__(self, *args):
+#         return self._func(*args)
+
+#     def __str__(self):
+#         return f'Func({self.ast.ref or self.ast})'
+
+#     def __repr__(self):
+#         return str(self)
+
+
+# class ClosureImpl:
+#     def __init__(self, fn, args):
+#         assert isinstance(fn, (PrimitiveImpl, FunctionImpl))
+#         self.argnames = [a for a in fn.argnames[len(args):]]
+#         self.nargs = fn.nargs - len(args)
+#         self.fn = fn
+#         self.args = args
+
+#     def __call__(self, *args):
+#         return self.fn(*self.args, *args)
+
+#     def __str__(self):
+#         return f'Clos({self.fn}, {self.args})'
+
+#     def __repr__(self):
+#         return str(self)
 
 
 ##########################
@@ -239,55 +311,6 @@ def half_lazy_if(cond, t, f):
 ##################################
 
 
-class FunctionImpl2:
-    def __init__(self, ast, envs):
-        assert isinstance(ast, Lambda)
-        self.argnames = [a.label for a in ast.args]
-        self.nargs = len(ast.args)
-        self.args = ast.args
-        self.ast = ast
-        self.instructions = VMCode(ast.body).instructions
-        self.envs = envs
-        self.primal = None
-        self.grad = None
-        node = ast
-
-        def func(*args):
-            assert(len(args) == len(node.args))
-            return vm(self.instructions,
-                      {s: arg for s, arg in zip(node.args, args)},
-                      *self.envs)
-
-        self._func = func
-
-    def __call__(self, *args):
-        return self._func(*args)
-
-    def __str__(self):
-        return f'Func({self.ast.ref or self.ast})'
-
-    def __repr__(self):
-        return str(self)
-
-
-class ClosureImpl2:
-    def __init__(self, fn, args):
-        assert isinstance(fn, (PrimitiveImpl, FunctionImpl2))
-        self.argnames = [a for a in fn.argnames[len(args):]]
-        self.nargs = fn.nargs - len(args)
-        self.fn = fn
-        self.args = args
-
-    def __call__(self, *args):
-        return self.fn(*self.args, *args)
-
-    def __str__(self):
-        return f'Clos({self.fn}, {self.args})'
-
-    def __repr__(self):
-        return str(self)
-
-
 def vm(instructions, *binding_groups):
     return VM(instructions, *binding_groups).result
 
@@ -329,10 +352,10 @@ class VMFrame:
 
     def instruction_reduce(self, node, nargs):
         fn, *args = self.take(nargs + 1)
-        if isinstance(fn, FunctionImpl2):
+        if isinstance(fn, FunctionImpl):
             bind = {k: v for k, v in zip(fn.args, args)}
             return VMFrame(fn.instructions, (bind,) + fn.envs)
-        elif isinstance(fn, ClosureImpl2):
+        elif isinstance(fn, ClosureImpl):
             self.stack.append(fn.fn)
             self.stack += fn.args
             self.stack += args
@@ -347,7 +370,7 @@ class VMFrame:
     def instruction_closure(self, node):
         args = self.stack.pop()
         fn = self.stack.pop()
-        clos = ClosureImpl2(fn, args)
+        clos = ClosureImpl(fn, args)
         clos.primal = fn.primal
         self.stack.append(clos)
 
@@ -368,7 +391,7 @@ class VMFrame:
         self.stack.append(value)
 
     def instruction_lambda(self, node):
-        self.stack.append(FunctionImpl2(node, self.envs))
+        self.stack.append(FunctionImpl(node, self.envs))
 
 
 class VM:
@@ -463,71 +486,71 @@ class VMCode:
         self.instr('push', node, node.value)
 
 
-class Evaluator:
-    def __init__(self, env, global_env):
-        self.global_env = global_env
-        self.env = env
+# class Evaluator:
+#     def __init__(self, env, global_env):
+#         self.global_env = global_env
+#         self.env = env
 
-    def eval(self, node):
-        cls = node.__class__.__name__
-        try:
-            method = getattr(self, 'eval_' + cls)
-        except AttributeError:
-            raise Exception(
-                "Unrecognized node type for evaluation: {}".format(cls)
-            )
-        try:
-            rval = method(node)
-        except Exception as exc:
-            level = getattr(exc, 'level', 0)
-            exc.level = level + 1
-            node.annotations = node.annotations | {'error', f'error{level}'}
-            raise exc from None
-        return rval
+#     def eval(self, node):
+#         cls = node.__class__.__name__
+#         try:
+#             method = getattr(self, 'eval_' + cls)
+#         except AttributeError:
+#             raise Exception(
+#                 "Unrecognized node type for evaluation: {}".format(cls)
+#             )
+#         try:
+#             rval = method(node)
+#         except Exception as exc:
+#             level = getattr(exc, 'level', 0)
+#             exc.level = level + 1
+#             node.annotations = node.annotations | {'error', f'error{level}'}
+#             raise exc from None
+#         return rval
 
-    def eval_Apply(self, node):
-        fn = self.eval(node.fn)
-        args = map(self.eval, node.args)
-        return fn(*args)
+#     def eval_Apply(self, node):
+#         fn = self.eval(node.fn)
+#         args = map(self.eval, node.args)
+#         return fn(*args)
 
-    def eval_Begin(self, node):
-        rval = None
-        for stmt in node.stmts:
-            rval = self.eval(stmt)
-        return rval
+#     def eval_Begin(self, node):
+#         rval = None
+#         for stmt in node.stmts:
+#             rval = self.eval(stmt)
+#         return rval
 
-    def eval_Closure(self, node):
-        fn = self.eval(node.fn)
-        args = list(map(self.eval, node.args))
-        clos = ClosureImpl(fn, args)
-        clos.primal = fn.primal
-        return clos
+#     def eval_Closure(self, node):
+#         fn = self.eval(node.fn)
+#         args = list(map(self.eval, node.args))
+#         clos = ClosureImpl(fn, args)
+#         clos.primal = fn.primal
+#         return clos
 
-    def eval_If(self, node):
-        if self.eval(node.cond):
-            return self.eval(node.t)
-        else:
-            return self.eval(node.f)
+#     def eval_If(self, node):
+#         if self.eval(node.cond):
+#             return self.eval(node.t)
+#         else:
+#             return self.eval(node.f)
 
-    def eval_Lambda(self, node):
-        return FunctionImpl(node, self.global_env)
+#     def eval_Lambda(self, node):
+#         return FunctionImpl(node, self.global_env)
 
-    def eval_Let(self, node):
-        for k, v in node.bindings:
-            self.env[k] = self.eval(v)
-        return self.eval(node.body)
+#     def eval_Let(self, node):
+#         for k, v in node.bindings:
+#             self.env[k] = self.eval(v)
+#         return self.eval(node.body)
 
-    def eval_Symbol(self, node):
-        try:
-            return self.env[node]
-        except KeyError:
-            return self.global_env[node]
+#     def eval_Symbol(self, node):
+#         try:
+#             return self.env[node]
+#         except KeyError:
+#             return self.global_env[node]
 
-    def eval_Tuple(self, node):
-        return tuple(self.eval(x) for x in node.values)
+#     def eval_Tuple(self, node):
+#         return tuple(self.eval(x) for x in node.values)
 
-    def eval_Value(self, node):
-        return node.value
+#     def eval_Value(self, node):
+#         return node.value
 
 
 def evaluate(node, bindings):
@@ -542,14 +565,14 @@ def evaluate(node, bindings):
     return vm(VMCode(node).instructions, env)
 
 
-def old_evaluate(node, bindings):
-    if isinstance(node, list):
-        node, = node
-    env = {**global_env}
-    for k, v in bindings.items():
-        # env[Symbol(k, namespace='global')] = Evaluator({}, env).eval(v)
-        if isinstance(v, MyiaASTNode):
-            env[k] = Evaluator({}, env).eval(v)
-        else:
-            env[k] = v
-    return Evaluator({}, env).eval(node)
+# def old_evaluate(node, bindings):
+#     if isinstance(node, list):
+#         node, = node
+#     env = {**global_env}
+#     for k, v in bindings.items():
+#         # env[Symbol(k, namespace='global')] = Evaluator({}, env).eval(v)
+#         if isinstance(v, MyiaASTNode):
+#             env[k] = Evaluator({}, env).eval(v)
+#         else:
+#             env[k] = v
+#     return Evaluator({}, env).eval(node)

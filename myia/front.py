@@ -138,7 +138,7 @@ class Parser(LocVisitor):
                  gen: GenSym = None,
                  pull_free_variables: bool = False,
                  top_level: bool = False,
-                 macros: Dict[str, Callable[..., MyiaASTNode]] = {}) \
+                 macros: Dict[str, Callable[..., MyiaASTNode]] = None) \
             -> None:
         self.free_variables: Dict[str, Symbol] = {}
         self.local_assignments: Set[str] = set()
@@ -154,6 +154,7 @@ class Parser(LocVisitor):
             self.global_env = global_env
             self.return_error: str = None
             self.dry = dry
+            self.macros = macros or {}
             super().__init__(parent)
         else:
             self.parent = parent
@@ -162,12 +163,12 @@ class Parser(LocVisitor):
             self.global_env = parent.global_env
             self.return_error: str = parent.return_error
             self.dry = parent.dry if dry is None else dry
+            self.macros = macros or parent.macros
             super().__init__(parent.locator)
 
         self.dest = self.gensym('#lambda')
 
     def sub_parser(self, **kw):
-        kw.setdefault('macros', self.macros)
         return Parser(self, **kw)
 
     def gensym(self, name: str) -> Symbol:
@@ -733,14 +734,14 @@ def parse_function0(fn, **kw):
 _global_envs: Dict[str, Env] = {}
 
 
-def _get_global_env(url):
+def get_global_env(url=None):
     return _global_envs.setdefault(url, Env(namespace='global'))
 
 
 def parse_source(url, line, src, **kw):
     tree = ast.parse(src)
     # FreeVariablesTagger().visit(tree)
-    p = Parser(Locator(url, line), _get_global_env(url), top_level=True, **kw)
+    p = Parser(Locator(url, line), get_global_env(url), top_level=True, **kw)
     r = p.visit(tree, allow_decorator=True)
 
     if isinstance(r, list):

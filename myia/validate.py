@@ -1,6 +1,6 @@
 from .ast import Symbol, Lambda, Let
 from .compile import a_normal
-from .front import parse_source, parse_function0
+from .front import parse_source, parse_function0, get_global_env
 from .grad import Grad, one
 from .interpret import evaluate, global_env
 
@@ -154,13 +154,11 @@ def grad_test(data):
 
     transformed = {}
     gbindings = {}
-    for k, v in bindings.items():
-        G = Grad(k, a_normal(v))
-        g = G.transform()
-        transformed[k] = g
-        gbindings.update(G.global_env.bindings)
 
-    g = transformed[r]
+    G = Grad(r, a_normal(lbda), get_global_env())
+    g = G.transform()
+    transformed[r] = g
+    gbindings.update(G.global_env.bindings)
 
     gfunc = evaluate(g, {**gbindings, **bindings})
 

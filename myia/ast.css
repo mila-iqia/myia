@@ -158,6 +158,29 @@
 	margin-right: 5px;
 }
 
+
+.ClosureImpl, .FunctionImpl, .PrimitiveImpl {
+	display: inline-flex;
+	flex-direction: column;
+	border: 1px solid blue;
+}
+
+.class_title {
+	color: white;
+	font-weight: bold;
+	background: blue;
+	padding: 3px;
+}
+
+.class_contents {
+	padding: 5px;
+}
+
+.class_contents > * {
+	display: block;
+}
+
+
 .unbound, .unbound * {
 	background-color: red;
 	color: white;
