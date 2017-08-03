@@ -12,10 +12,10 @@ class BuiltinCollection:
     pass
 
 
-myia_builtins = Symbol('myia_builtins', namespace='global')
+myia_builtins = builtins.myia_builtins
 
 
-global_env = {
+root_globals = {
     myia_builtins: BuiltinCollection()
 }
 
@@ -122,8 +122,8 @@ class ClosureImpl(HReprBase):
 def impl(sym):
     def decorator(fn):
         prim = PrimitiveImpl(fn)
-        global_env[sym] = prim
-        setattr(global_env[myia_builtins],
+        root_globals[sym] = prim
+        setattr(root_globals[myia_builtins],
                 fn.__name__.lstrip('_'),
                 prim)
         return prim
@@ -134,8 +134,8 @@ def myia_impl(sym):
     def decorator(orig_fn):
         r, bindings = parse_function0(orig_fn)
         fn = evaluate(r, bindings)
-        global_env[sym] = fn
-        setattr(global_env[myia_builtins],
+        root_globals[sym] = fn
+        setattr(root_globals[myia_builtins],
                 fn.__name__.lstrip('_'),
                 fn)
         return fn
@@ -366,7 +366,7 @@ class VM(EventDispatcher):
         self.frame = VMFrame(self, code, envs)
         self.frames = []
         if self.do_emit_events:
-            self.emit_frame(self.frame)
+            self.emit_new_frame(self.frame)
         self.result = self.eval()
 
     def eval(self):
@@ -377,7 +377,7 @@ class VM(EventDispatcher):
                     self.frames.append(self.frame)
                     self.frame = new_frame
                     if self.do_emit_events:
-                        self.emit_frame(self.frame)
+                        self.emit_new_frame(self.frame)
             except StopIteration:
                 rval = self.frame.top()
                 if not self.frames:
@@ -470,90 +470,10 @@ class VMCode(HReprBase):
 def evaluate(node, bindings):
     if isinstance(node, list):
         node, = node
-    env = {**global_env}
+    env = {**root_globals}
     for k, v in bindings.items():
         if isinstance(v, MyiaASTNode):
             env[k] = vm(VMCode(v), env)
         else:
             env[k] = v
     return vm(VMCode(node), env)
-
-
-# class Evaluator:
-#     def __init__(self, env, global_env):
-#         self.global_env = global_env
-#         self.env = env
-
-#     def eval(self, node):
-#         cls = node.__class__.__name__
-#         try:
-#             method = getattr(self, 'eval_' + cls)
-#         except AttributeError:
-#             raise Exception(
-#                 "Unrecognized node type for evaluation: {}".format(cls)
-#             )
-#         try:
-#             rval = method(node)
-#         except Exception as exc:
-#             level = getattr(exc, 'level', 0)
-#             exc.level = level + 1
-#             node.annotations = node.annotations | {'error', f'error{level}'}
-#             raise exc from None
-#         return rval
-
-#     def eval_Apply(self, node):
-#         fn = self.eval(node.fn)
-#         args = map(self.eval, node.args)
-#         return fn(*args)
-
-#     def eval_Begin(self, node):
-#         rval = None
-#         for stmt in node.stmts:
-#             rval = self.eval(stmt)
-#         return rval
-
-#     def eval_Closure(self, node):
-#         fn = self.eval(node.fn)
-#         args = list(map(self.eval, node.args))
-#         clos = ClosureImpl(fn, args)
-#         clos.primal = fn.primal
-#         return clos
-
-#     def eval_If(self, node):
-#         if self.eval(node.cond):
-#             return self.eval(node.t)
-#         else:
-#             return self.eval(node.f)
-
-#     def eval_Lambda(self, node):
-#         return FunctionImpl(node, self.global_env)
-
-#     def eval_Let(self, node):
-#         for k, v in node.bindings:
-#             self.env[k] = self.eval(v)
-#         return self.eval(node.body)
-
-#     def eval_Symbol(self, node):
-#         try:
-#             return self.env[node]
-#         except KeyError:
-#             return self.global_env[node]
-
-#     def eval_Tuple(self, node):
-#         return tuple(self.eval(x) for x in node.values)
-
-#     def eval_Value(self, node):
-#         return node.value
-
-
-# def old_evaluate(node, bindings):
-#     if isinstance(node, list):
-#         node, = node
-#     env = {**global_env}
-#     for k, v in bindings.items():
-#         # env[Symbol(k, namespace='global')] = Evaluator({}, env).eval(v)
-#         if isinstance(v, MyiaASTNode):
-#             env[k] = Evaluator({}, env).eval(v)
-#         else:
-#             env[k] = v
-#     return Evaluator({}, env).eval(node)

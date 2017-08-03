@@ -4,9 +4,10 @@ from .ast import \
     Transformer, GenSym, MyiaASTNode, \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure
 from .interpret import \
-    global_env, impl, myia_impl, evaluate, \
+    root_globals, impl, myia_impl, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
-from .front import ParseEnv, parse_function0, get_global_env
+from .front import \
+    ParseEnv, parse_function0, get_global_parse_env
 from .symbols import builtins, bsym, gsym
 from copy import copy
 from .compile import a_normal
@@ -45,7 +46,7 @@ def macro_grad_for(nclos_args):
 #     rsym = Symbol(sym, namespace='builtin', relation='♢*')
 #     #Symbol(sym.label, namespace='grad:builtin')
 
-#     prim = global_env[sym]
+#     prim = root_globals[sym]
 #     assert isinstance(prim, PrimitiveImpl)
 
 #     def decorator(fn):
@@ -59,11 +60,11 @@ def macro_grad_for(nclos_args):
 #                                      for a in args]))
 #         backward = Closure(rsym, args)
 #         ast = Lambda(args, Tuple([forward, backward]), G)
-#         impl = FunctionImpl(ast, (global_env,))
+#         impl = FunctionImpl(ast, (root_globals,))
 #         prim.grad = impl
 #         impl.primal = prim
 
-#         global_env[rsym] = PrimitiveImpl(fn)
+#         root_globals[rsym] = PrimitiveImpl(fn)
 #         return impl
 
 #     return decorator
@@ -73,7 +74,7 @@ def rgrad(sym):
     #Symbol(sym.label, namespace='grad:builtin')
 
     def decorator(orig_fn):
-        prim = global_env[sym]
+        prim = root_globals[sym]
         assert isinstance(prim, PrimitiveImpl)
 
         _cache = {}
@@ -87,7 +88,7 @@ def rgrad(sym):
 
             # Copy symbol to grad namespace
             rsym = Symbol(sym,
-                          version=nargs_closure,
+                          version=nargs_closure + 1,
                           namespace='builtin',
                           relation='♢*')
 
@@ -103,10 +104,10 @@ def rgrad(sym):
                                          for a in args]))
             backward = Closure(rsym, args)
             ast = Lambda(args, Tuple([forward, backward]), G)
-            ast.global_env = get_global_env()
-            impl = FunctionImpl(ast, (global_env,))
+            ast.global_env = get_global_parse_env('__root__')
+            impl = FunctionImpl(ast, (root_globals,))
             impl.primal = prim
-            global_env[rsym] = fn
+            root_globals[rsym] = fn
             _cache[nargs_closure] = impl
             return impl
 

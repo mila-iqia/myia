@@ -1,8 +1,8 @@
 from .ast import Symbol, Lambda, Let
 from .compile import a_normal
-from .front import parse_source, parse_function0, get_global_env
+from .front import parse_source, parse_function0
 from .grad import Grad, one
-from .interpret import evaluate, global_env
+from .interpret import evaluate, root_globals
 
 
 def missing_source(node):
@@ -62,7 +62,7 @@ def get_functions(data):
 
     func = evaluate(r, bindings)
 
-    pyfn.__globals__.update({str(k): v for k, v in global_env.items()})
+    pyfn.__globals__.update({str(k): v for k, v in root_globals.items()})
 
     return pyfn, lbda, func, r, bindings
 

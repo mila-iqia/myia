@@ -734,7 +734,7 @@ def parse_function0(fn, **kw):
 _global_envs: Dict[str, ParseEnv] = {}
 
 
-def get_global_env(url=None):
+def get_global_parse_env(url):
     namespace = f'global'  # :{url}'
     return _global_envs.setdefault(url, ParseEnv(namespace=namespace))
 
@@ -742,7 +742,10 @@ def get_global_env(url=None):
 def parse_source(url, line, src, **kw):
     tree = ast.parse(src)
     # FreeVariablesTagger().visit(tree)
-    p = Parser(Locator(url, line), get_global_env(url), top_level=True, **kw)
+    p = Parser(Locator(url, line),
+               get_global_parse_env(url),
+               top_level=True,
+               **kw)
     r = p.visit(tree, allow_decorator=True)
 
     if isinstance(r, list):
