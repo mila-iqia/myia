@@ -3,6 +3,7 @@ class Event(list):
     def __init__(self, name, dispatcher=None):
         self.name = name
         self.dispatcher = dispatcher
+        self.owner = dispatcher.owner if dispatcher else None
 
     def register(self, handler):
         # Returns the handler so it can be used as a decorator
@@ -29,8 +30,9 @@ class EventDispatcher:
     def __init__(self, owner=None, discover=True):
         self._events = {'NEW': Event('NEW', self),
                         'ALL': Event('ALL', self)}
+        self.owner = owner
         if discover:
-            discovery(owner or self, self)
+            discovery_event(owner or self, self)
 
     def on(self, event_name, *handlers):
         self[event_name].extend(handlers)
@@ -52,11 +54,24 @@ class EventDispatcher:
             return self[event_name[3:]].register
         elif event_name.startswith('emit_'):
             return self[event_name[5:]]
-        else:
-            return super().__getattr__(event_name)
 
 
 # Newly constructed EventDispatchers emit this event so that
 # we can hook to them more easily.
 # Event signature: (discovery_event, dispatcher_owner, dispatcher)
-discovery = Event('discovery')
+discovery_event = Event('discovery')
+
+
+def on_discovery(type, event_name=None):
+    def decorate(fn):
+        nonlocal event_name
+        if event_name is None and fn.__name__.startswith('on_'):
+            event_name = fn.__name__[3:]
+        assert event_name is not None
+
+        def seek(_, owner, dispatcher):
+            if isinstance(owner, type):
+                dispatcher.on(event_name, fn)
+        discovery_event.register(seek)
+        return fn
+    return decorate

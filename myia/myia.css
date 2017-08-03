@@ -185,6 +185,9 @@
 	color: white;
 }
 
+.missing_source {
+}
+
 .error {
 	background: #fdd;
 }

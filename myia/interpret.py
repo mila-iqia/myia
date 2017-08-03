@@ -388,15 +388,7 @@ class VM(EventDispatcher):
             except Exception as exc:
                 if self.do_emit_events:
                     self.emit_error(exc)
-                self.error_unwind(exc)
                 raise exc from None
-
-    def error_unwind(self, exc):
-        for i, frame in enumerate([self.frame] + self.frames):
-            node = frame.focus
-            if node:
-                ann = {'error', f'error{i}'}
-                node.annotations = node.annotations | ann
 
 
 class VMCode(HReprBase):

@@ -67,8 +67,27 @@ class Buche:
             path = self.join_path(path)
         self.master.raw(path=self.channel, **params)
 
-    def open(self, name, type, **params):
-        self.to_open[name] = (type, params)
+    def pre(self, message):
+        self.raw(command = 'log', format = 'pre', contents = message)
+
+    def text(self, message):
+        self.raw(command = 'log', format = 'text', contents = message)
+
+    def html(self, message):
+        self.raw(command = 'log', format = 'html', contents = message)
+
+    def markdown(self, message):
+        self.raw(command = 'log', format = 'markdown', contents = message)
+
+    def open(self, name, type, force=False, **params):
+        if force:
+            subchannel = self.join_path(name)
+            self.master.raw(command='open',
+                            path=subchannel,
+                            type=type,
+                            **params)
+        else:
+            self.to_open[name] = (type, params)
 
     def join_path(self, p):
         return f'{self.channel.rstrip("/")}/{p.rstrip("/")}'
@@ -79,10 +98,7 @@ class Buche:
         if info:
             del self.to_open[item]
             type, params = info
-            self.master.raw(command='open',
-                            path=subchannel,
-                            type=type,
-                            **params)
+            self.open(item, type, force=True, **params)
         return Buche(self.master, subchannel)
 
     def __call__(self, obj, **params):

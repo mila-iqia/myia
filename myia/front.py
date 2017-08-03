@@ -2,6 +2,7 @@ from typing import \
     Dict, Set, List, Tuple as TupleT, \
     cast, Union, Callable, Optional
 
+from .event import EventDispatcher
 from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
@@ -50,10 +51,18 @@ class ParseEnv:
     def __init__(self,
                  parent: 'ParseEnv' = None,
                  namespace: str = None,
-                 gen: GenSym = None) -> None:
+                 gen: GenSym = None,
+                 url: str = None) -> None:
+        if namespace is None:
+            namespace = str(uuid())
+        if namespace.startswith('global'):
+            self.events = EventDispatcher(self)
+        else:
+            self.events = None
+        self.url = url
         self.parent = parent
         self.gen: GenSym = gen or \
-            parent.gen if parent else GenSym(namespace or str(uuid()))
+            (parent.gen if parent else GenSym(namespace))
         self.bindings: Dict[Union[str, Symbol],
                             Union[MyiaASTNode, Redirect]] = {}
 
@@ -73,7 +82,9 @@ class ParseEnv:
             return (free, result)
 
     def update(self, bindings) -> None:
-        self.bindings.update(bindings)
+        # self.bindings.update(bindings)
+        for k, v in bindings.items():
+            self[k] = v
 
     def __getitem__(self, name) -> MyiaASTNode:
         _, x = self.get_free(name)
@@ -81,6 +92,8 @@ class ParseEnv:
 
     def __setitem__(self, name, value) -> None:
         self.bindings[name] = value
+        if self.events:
+            self.events.emit_declare(name, value)
 
 
 class Locator:
@@ -736,7 +749,8 @@ _global_envs: Dict[str, ParseEnv] = {}
 
 def get_global_parse_env(url):
     namespace = f'global'  # :{url}'
-    return _global_envs.setdefault(url, ParseEnv(namespace=namespace))
+    env = ParseEnv(namespace=namespace, url=url)
+    return _global_envs.setdefault(url, env)
 
 
 def parse_source(url, line, src, **kw):

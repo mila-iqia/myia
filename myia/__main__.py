@@ -2,11 +2,76 @@
 import argparse
 import sys
 import traceback
+from . import ast
 from .compile import a_normal
 from .front import parse_source
 from .interpret import evaluate
-from .validate import grad_test, unbound
+from .validate import grad_test, unbound, missing_source
 from .buche import buche
+
+from .event import on_discovery
+from .interpret import VM
+from .ast import Symbol
+from .front import ParseEnv
+
+
+def setup_buche(arguments):
+    buche.raw(command='open', path='/', type='tabs', anchor='top')
+    buche.open('_', 'log', force=True)
+    buche.open('decls', 'tabs', force=True, anchor='left')
+    buche.open('stores', 'tabs', force=True, anchor='left')
+    buche.open('problems', 'tabs', force=True, anchor='left')
+
+    def add_class(node, kls):
+        buche.raw(command = 'reprocess',
+                  selector = f'.pyid-{id(node)}',
+                  body = f'this.classList.add("{kls}")')
+
+    if arguments.stores:
+        @on_discovery(VM)
+        def on_instruction_store(_, frame, node, var):
+            buche['stores'][str(var)](frame.top())
+
+    if arguments.check:
+        checks = set(arguments.check.split(','))
+
+        @on_discovery(ParseEnv)
+        def on_declare(e, name, value):
+            pbuche = buche['problems']
+            url = e.owner.url.split('/')[-1]
+            if 'unbound' in checks:
+                for node in unbound(value):
+                    node.annotations = node.annotations | {'unbound'}
+                    pbuche['unbound'](node)
+            if 'source' in checks:
+                for node in missing_source(value):
+                    node.annotations = node.annotations | {'missing_source'}
+                    msbuche = pbuche['missing_source']
+                    msbuche(node)
+                    if node.trace:
+                        t = node.trace[-1]
+                        msbuche.pre('  Definition at:')
+                        msbuche.pre(f'    {t.filename} line {t.lineno}')
+                        msbuche.pre(f'    {t.line}')
+
+    if arguments.decls:
+        @on_discovery(ParseEnv)
+        def on_declare(e, name, value):
+            buche['decls'][str(name)](value)
+
+        @on_discovery(VM)
+        def on_error(e, exc):
+            vm = e.owner
+            focus = vm.frame.focus
+            add_class(focus, 'error0')
+            buche.html('<h2>An error occurred</h2>')
+            buche.html('<h3>Node</h3>')
+            buche(focus)
+            buche.html('<h3>Traceback</h3>')
+            for i, frame in enumerate([vm.frame] + vm.frames):
+                node = frame.focus
+                if node:
+                    add_class(node, 'error')
 
 
 def H(node):
@@ -68,6 +133,29 @@ p_grad.add_argument('--args', metavar='ARGS',
                     dest='args',
                     help='Arguments to provide to the function.')
 
+p_inspect = subparsers.add_parser('inspect',
+                                  help='Inspect/evaluate an expression')
+p_inspect.add_argument('FILE', nargs='?', help='The file to evaluate.')
+p_inspect.add_argument(
+    '--expr',
+    '-e',
+    metavar='EXPR',
+    dest='expr',
+    help='The expression to evaluate.'
+)
+p_inspect.add_argument('--args', metavar='ARGS', default='()',
+                       dest='args',
+                       help='Arguments to provide to the function.')
+p_inspect.add_argument('--stores', action='store_true',
+                       help='Log the values taken by each variable.')
+p_inspect.add_argument('--decls', action='store_true',
+                       dest='decls',
+                       help='Log the AST for all functions.')
+p_inspect.add_argument('--all', action='store_true',
+                       help='Log everything that can be logged.')
+p_inspect.add_argument('--check', metavar='PROBLEMS', dest='check',
+                       help='One or more of: unbound,source.')
+
 
 def shame():
     raise NotImplementedError(
@@ -75,18 +163,11 @@ def shame():
     )
 
 
-setup_done = False
-
-
 def display(data, format, mode='normal'):
     global setup_done
     if format == 'html':
         print(H(data).as_page())
     elif format == 'buche':
-        if not setup_done:
-            buche.raw(command='open', path='/', type='tabs', anchor='top')
-            buche.open('funcs', 'tabs', anchor='left')
-            setup_done = True
         if mode == 'normal':
             buche(data)
         elif isinstance(data, dict):
@@ -131,7 +212,6 @@ def command_None(arguments):
 
 def command_parse(arguments):
     def wrap(x):
-        unbound(x)
         if arguments.a:
             return a_normal(x)
         else:
@@ -154,13 +234,8 @@ def command_eval(arguments):
     result = evaluate(r, bindings)
     args = getargs(arguments)
     if args:
-        try:
-            value = result(*args)
-            display(result(*args), arguments.format)
-        except Exception as exc:
-            traceback.print_exc()
-            display({k: v for k, v in bindings.items()},
-                    arguments.format)
+        value = result(*args)
+        display(value, arguments.format)
     else:
         display(result, arguments.format)
 
@@ -183,6 +258,28 @@ def command_grad(arguments):
         for k, v in bindings.items():
             unbound(v)
         display(bindings, arguments.format, 'bindings')
+
+
+def command_inspect(arguments):
+    ast.__save_trace__ = True
+    if arguments.all:
+        arguments.decls = True
+        arguments.stores = True
+    url, code = getcode(arguments)
+    args = getargs(arguments)
+    setup_buche(arguments)
+    r, bindings = parse_source(url, 1, code)
+    fn = evaluate(r, bindings)
+    if args:
+        try:
+            value = fn(*args)
+        except Exception as exc:
+            print(traceback.format_exc())
+            sys.exit(1)
+        buche['_'].html('<h2>Result</h2>')
+        buche['_'](value)
+    else:
+        buche['_']('Done')
 
 
 if __name__ == '__main__':
