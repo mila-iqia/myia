@@ -7,7 +7,7 @@ from .compile import a_normal
 from .front import parse_source
 from .interpret import evaluate
 from .validate import \
-    grad_test, unbound, missing_source, \
+    unbound, missing_source, \
     analysis
 from .buche import buche
 
@@ -119,22 +119,22 @@ p_eval.add_argument('--args', metavar='ARGS',
 p_eval.add_argument('--format', '-f', default='text',
                     help='Format to print out (text (default) or html)')
 
-p_grad = subparsers.add_parser(
-    'grad',
-    help='Display the gradient of the expression.'
-)
-p_grad.add_argument(
-    'FILE',
-    help='The file with the function to take the gradient of'
-)
-p_grad.add_argument('--expr', '-e', metavar='EXPR',
-                    dest='expr',
-                    help='The expression to take the gradient of.')
-p_grad.add_argument('--format', '-f', default='text',
-                    help='Format to print out (text (default) or html)')
-p_grad.add_argument('--args', metavar='ARGS',
-                    dest='args',
-                    help='Arguments to provide to the function.')
+# p_grad = subparsers.add_parser(
+#     'grad',
+#     help='Display the gradient of the expression.'
+# )
+# p_grad.add_argument(
+#     'FILE',
+#     help='The file with the function to take the gradient of'
+# )
+# p_grad.add_argument('--expr', '-e', metavar='EXPR',
+#                     dest='expr',
+#                     help='The expression to take the gradient of.')
+# p_grad.add_argument('--format', '-f', default='text',
+#                     help='Format to print out (text (default) or html)')
+# p_grad.add_argument('--args', metavar='ARGS',
+#                     dest='args',
+#                     help='Arguments to provide to the function.')
 
 p_inspect = subparsers.add_parser('inspect',
                                   help='Inspect/evaluate an expression')
@@ -246,24 +246,24 @@ def command_eval(arguments):
         display(result, arguments.format)
 
 
-def command_grad(arguments):
-    url, code = getcode(arguments)
-    results = grad_test((url, 1, code))
-    args = getargs(arguments)
-    bindings = {**results['func_bindings'], **results['grad_bindings']}
-    if args:
-        t = results['test']
-        try:
-            rval = t(args)
-            display(rval, arguments.format)
-        except Exception as exc:
-            rval = None
-            traceback.print_exc()
-        display(bindings, arguments.format, 'bindings')
-    else:
-        for k, v in bindings.items():
-            unbound(v)
-        display(bindings, arguments.format, 'bindings')
+# def command_grad(arguments):
+#     url, code = getcode(arguments)
+#     results = grad_test((url, 1, code))
+#     args = getargs(arguments)
+#     bindings = {**results['func_bindings'], **results['grad_bindings']}
+#     if args:
+#         t = results['test']
+#         try:
+#             rval = t(args)
+#             display(rval, arguments.format)
+#         except Exception as exc:
+#             rval = None
+#             traceback.print_exc()
+#         display(bindings, arguments.format, 'bindings')
+#     else:
+#         for k, v in bindings.items():
+#             unbound(v)
+#         display(bindings, arguments.format, 'bindings')
 
 
 def command_inspect(arguments):

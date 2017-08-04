@@ -1,4 +1,4 @@
-from myia.validate import grad_test as grad_test_helper
+from myia.validate import analysis
 from pytest import mark, fail
 
 
@@ -28,8 +28,7 @@ def grad_test(*tests):
     def decorate(fn):
         try:
             exc = None
-            compilation_data = grad_test_helper(fn)
-            testfn = compilation_data['test']
+            testfn = analysis('grad', fn)
         except Exception as e:
             exc = e
 
@@ -40,7 +39,7 @@ def grad_test(*tests):
             print(results)
             if not results['match']:
                 for row in ['python', 'myia', 'myiag']:
-                    print(f'{row}:\t{results[row]}')
+                    print(f'{row}:\t{results[row+"_result"]}')
                 fail('Mismatch is output values (see stdout)')
             for arg, d in results["derivatives"].items():
                 if not d['match']:

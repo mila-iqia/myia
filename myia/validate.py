@@ -32,37 +32,6 @@ def unbound(node, avail=None):
             yield from unbound(child, avail)
 
 
-def guard(fn, args):
-    try:
-        return fn(*args)
-    except Exception as exc:
-        return exc
-
-
-def get_functions(data):
-    if isinstance(data, tuple):
-        url, line_offset, code = data
-        _globals = {}
-        exec(code, _globals)
-        r, genv = parse_source(url, line_offset, code)
-        pyfn = _globals[r.label]
-    else:
-        pyfn = data
-        r, genv = parse_function(pyfn)
-
-    bindings = genv.bindings
-    lbda = bindings[r]
-    if not isinstance(lbda, Lambda):
-        print('grad can only operate on a function.', file=sys.stderr)
-
-    # func = evaluate(r, bindings)
-    func = evaluate(lbda)
-
-    pyfn.__globals__.update({str(k): v for k, v in root_globals.items()})
-
-    return pyfn, lbda, func, r, bindings
-
-
 eps = 1e-10
 rel_error = 1e-03
 
@@ -144,47 +113,7 @@ class GradTester:
         return results
 
 
-def grad_test(data):
-
-    pyfn, lbda, func, r, bindings = get_functions(data)
-
-    transformed = {}
-    gbindings = {}
-
-    G = Grad(r, a_normal(lbda))
-    g = G.transform()
-    transformed[r] = g
-    gbindings.update(G.global_env.bindings)
-
-    # gfunc = evaluate(g, {**gbindings, **bindings})
-    gfunc = evaluate(gbindings[g])
-
-    def test(args):
-        python = guard(pyfn, args)
-        myia = guard(func, args)
-        myiag, bprop = gfunc(*args)
-        gt = GradTester(pyfn, bprop, args, myiag, func.argnames, None)
-        return dict(
-            python = python,
-            myia = myia,
-            myiag = myiag,
-            match = python == myia == myiag,
-            derivatives = gt.compare()
-        )
-
-    return dict(
-        func = func,
-        func_py = pyfn,
-        func_sym = r,
-        func_bindings = bindings,
-        grad = gfunc,
-        grad_sym = g,
-        grad_bindings = gbindings,
-        test = test
-    )
-
-
-def get_functions2(data):
+def get_functions(data):
     if isinstance(data, tuple):
         url, line_offset, code = data
         _globals = {}
@@ -196,20 +125,12 @@ def get_functions2(data):
         sym, genv = parse_function(pyfn)
 
     bindings = genv.bindings
-
-    # lbda = bindings[r]
-    # if not isinstance(lbda, Lambda):
-    #     print('grad can only operate on a function.', file=sys.stderr)
-
-    # func = evaluate(sym, bindings)
-
     pyfn.__globals__.update({str(k): v for k, v in root_globals.items()})
-
     return pyfn, sym, bindings
 
 
 def analysis(mode, spec, args=None):
-    pyfn, sym, bindings = get_functions2(spec)
+    pyfn, sym, bindings = get_functions(spec)
     method = globals()[f'analysis_{mode}']
     test = method(pyfn, sym, bindings)
     if args:
