@@ -63,7 +63,10 @@ class GradTester:
             self.wrap = lambda x: x
             self.unwrap = lambda x: x
         else:
-            self.outnames = (outname,)
+            if outnames is None:
+                self.outnames = (outname,)
+            else:
+                self.outnames = outnames
             self.out = (out,)
             self.wrap = lambda x: (x,)
             self.unwrap = lambda x: x[0]
@@ -236,7 +239,15 @@ def analysis_grad2(pyfn, sym, bindings):
     g2 = G.transform()
     gfunc2 = evaluate(bindings[g2])
 
+    def gradients(*args):
+        return gfunc(*args)[1](1)[1]
+
     def test(args):
-        return gfunc2(*args)[1](1)
+        # return gfunc2(*args)[1](1)
+
+        myiag2, bprop = gfunc2(*args)
+        gt = GradTester(gradients, bprop, args, myiag2,
+                        func.argnames, ('(df/dx)',))
+        return gt.compare()
 
     return test

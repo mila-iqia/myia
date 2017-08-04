@@ -52,6 +52,30 @@ def grad_test(*tests):
     return decorate
 
 
+def grad2_test(*tests):
+    def decorate(fn):
+        try:
+            exc = None
+            testfn = analysis('grad2', fn)
+        except Exception as e:
+            exc = e
+
+        def test(test_data):
+            if exc:
+                raise exc
+            results = testfn(test_data)
+            print(results)
+            for arg, d in results.items():
+                if not d['match']:
+                    print(f'Argument {arg}:')
+                    print(f'\tFinite differences: {d["difference"]}')
+                    print(f'\tGradient output:    {d["computed"]}')
+                    fail(f'Mismatch in gradients for {arg} (see stdout)')
+
+        return mark.parametrize('test_data', list(tests))(test)
+    return decorate
+
+
 @grad_test((3, 4))
 def test_add(x, y):
     """Test the gradient of addition alone."""
@@ -172,3 +196,21 @@ def test_pow10(x):
             i = i + 1
         j = j + 1
     return v
+
+
+@grad2_test((12,))
+def test_g2_simple(x):
+    y = x
+    return (x * y) * (x * y)
+
+
+@grad2_test((3,))
+def test_g2_loop(x):
+    # Unfortunately, for the time being, this test is slow as balls,
+    # because grad2 is slow as balls.
+    rval = 2
+    y = 3
+    while y > -0.1:
+        rval *= x
+        y -= 1
+    return rval
