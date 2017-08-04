@@ -732,7 +732,7 @@ class Parser(LocVisitor):
         return Begin(stmts)
 
 
-def parse_function0(fn, **kw):
+def parse_function(fn, **kw):
     _, line = inspect.getsourcelines(fn)
     return parse_source(inspect.getfile(fn),
                         line,
@@ -773,7 +773,7 @@ def make_error_function(data):
 
 
 def myia(fn):
-    _, genv = parse_function0(fn)
+    _, genv = parse_function(fn)
     gbindings = genv.bindings
     glob = fn.__globals__
     bindings = {k: make_error_function({"name": k, "ast": v, "globals": glob})

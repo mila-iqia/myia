@@ -5,7 +5,7 @@ import traceback
 from . import ast
 from .compile import a_normal
 from .front import parse_source
-from .interpret import evaluate2
+from .interpret import evaluate
 from .validate import \
     grad_test, unbound, missing_source, \
     analysis
@@ -237,7 +237,7 @@ def command_parse(arguments):
 def command_eval(arguments):
     url, code = getcode(arguments)
     r, genv = parse_source(url, 1, code)
-    result = evaluate2(r, genv)
+    result = evaluate(r, genv)
     args = getargs(arguments)
     if args:
         value = result(*args)

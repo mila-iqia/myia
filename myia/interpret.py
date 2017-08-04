@@ -4,6 +4,7 @@ from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
     Let, If, Lambda, Apply, Begin, Tuple, Closure
+from .front import parse_function
 from .buche import HReprBase
 from .symbols import builtins
 from .event import EventDispatcher
@@ -139,8 +140,8 @@ def impl(sym):
 
 def myia_impl(sym):
     def decorator(orig_fn):
-        r, genv = parse_function0(orig_fn)
-        fn = evaluate2(r, genv)
+        r, genv = parse_function(orig_fn)
+        fn = evaluate(r, genv)
         root_globals[sym] = fn
         setattr(root_globals[myia_builtins],
                 fn.__name__.lstrip('_'),
@@ -355,7 +356,7 @@ class VMFrame(HReprBase):
                 if isinstance(v, Lambda):
                     cv = compile_cache.get(v, None)
                     if cv is None:
-                        cv = evaluate2(v)
+                        cv = evaluate(v)
                         compile_cache[v] = cv
                     v = cv
                 self.stack.append(v)
@@ -481,7 +482,7 @@ class VMCode(HReprBase):
         return H.table['VMCodeInstructions'](*rows)
 
 
-def evaluate2(node, parse_env=None):
+def evaluate(node, parse_env=None):
     if isinstance(node, Lambda):
         parse_env = node.global_env
     assert parse_env is not None

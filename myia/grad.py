@@ -4,10 +4,10 @@ from .ast import \
     Transformer, GenSym, MyiaASTNode, \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure
 from .interpret import \
-    root_globals, impl, myia_impl, evaluate2, \
+    root_globals, impl, myia_impl, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
 from .front import \
-    ParseEnv, parse_function0, get_global_parse_env
+    ParseEnv, parse_function, get_global_parse_env
 from .symbols import builtins, bsym, gsym
 from copy import copy
 from .compile import a_normal
@@ -87,11 +87,11 @@ def rgrad(sym):
                           namespace='builtin',
                           relation='♢*')
 
-            r, genv = parse_function0(
+            r, genv = parse_function(
                 orig_fn,
                 macros={'GRAD': macro_grad_for(nargs_closure)}
             )
-            fn = evaluate2(r, genv)
+            fn = evaluate(r, genv)
             G = GenSym()
             args = [G.sym(a) for a in prim.argnames]
             forward = Apply(builtins.J,
@@ -185,7 +185,7 @@ def JGrad(x):
         for env in reversed(x.envs):
             bindings.update(env)
 
-        gfn = evaluate2(bindings[g])
+        gfn = evaluate(bindings[g])
         gfn.primal = x
         _cache[nargs_closure] = gfn
         return gfn
@@ -236,7 +236,7 @@ def Jinv(x):
     elif isinstance(x, FunctionImpl):
         assert x.primal_sym is not None
         if isinstance(x.primal_sym, Symbol):
-            primal = evaluate2(x.primal_sym, x.ast.global_env)
+            primal = evaluate(x.primal_sym, x.ast.global_env)
         else:
             primal = x.primal_sym
         if not isinstance(primal, (FunctionImpl, PrimitiveImpl)):
@@ -504,11 +504,11 @@ class Grad:
 
             args = [self.tagged_var(a) for a in value.args]
 
-            fn = evaluate2(value.fn, self.global_env)
+            fn = evaluate(value.fn, self.global_env)
             if isinstance(fn, PrimitiveImpl):
                 # fn = Apply(builtins.JX, value.fn, Value(len(args)))
                 # expr = Closure(fn, args)
-                fn = evaluate2(value.fn, get_global_parse_env('__root__'))
+                fn = evaluate(value.fn, get_global_parse_env('__root__'))
                 gfn = JX(fn, len(value.args))
                 expr = Closure(gfn.ast.ref, args)
             else:

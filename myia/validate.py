@@ -1,8 +1,8 @@
 from .ast import Symbol, Lambda, Let
 from .compile import a_normal
-from .front import parse_source, parse_function0
+from .front import parse_source, parse_function
 from .grad import Grad, one
-from .interpret import evaluate2, root_globals
+from .interpret import evaluate, root_globals
 
 
 def missing_source(node):
@@ -48,7 +48,7 @@ def get_functions(data):
         pyfn = _globals[r.label]
     else:
         pyfn = data
-        r, genv = parse_function0(pyfn)
+        r, genv = parse_function(pyfn)
 
     bindings = genv.bindings
     lbda = bindings[r]
@@ -56,7 +56,7 @@ def get_functions(data):
         print('grad can only operate on a function.', file=sys.stderr)
 
     # func = evaluate(r, bindings)
-    func = evaluate2(lbda)
+    func = evaluate(lbda)
 
     pyfn.__globals__.update({str(k): v for k, v in root_globals.items()})
 
@@ -157,7 +157,7 @@ def grad_test(data):
     gbindings.update(G.global_env.bindings)
 
     # gfunc = evaluate(g, {**gbindings, **bindings})
-    gfunc = evaluate2(gbindings[g])
+    gfunc = evaluate(gbindings[g])
 
     def test(args):
         python = guard(pyfn, args)
@@ -193,7 +193,7 @@ def get_functions2(data):
         pyfn = _globals[sym.label]
     else:
         pyfn = data
-        sym, genv = parse_function0(pyfn)
+        sym, genv = parse_function(pyfn)
 
     bindings = genv.bindings
 
@@ -232,7 +232,7 @@ def compare_calls(funcs, args):
 
 
 def analysis_eval(pyfn, sym, bindings):
-    func = evaluate2(bindings[sym])
+    func = evaluate(bindings[sym])
 
     def test(args):
         return compare_calls(dict(python = pyfn, myia = func), args)
@@ -241,14 +241,14 @@ def analysis_eval(pyfn, sym, bindings):
 
 
 def analysis_grad(pyfn, sym, bindings):
-    func = evaluate2(bindings[sym])
+    func = evaluate(bindings[sym])
 
     lbda = bindings[sym]
     G = Grad(sym, a_normal(lbda))
     g = G.transform()
     assert G.global_env.bindings is bindings
 
-    gfunc = evaluate2(bindings[g])
+    gfunc = evaluate(bindings[g])
 
     def test(args):
         myiag, bprop = gfunc(*args)
@@ -299,13 +299,13 @@ def grad2_transform(rsym, bindings):
 
 def analysis_grad2(pyfn, sym, bindings):
     lbda = bindings[sym]
-    func = evaluate2(lbda)
+    func = evaluate(lbda)
 
     G = Grad(sym, a_normal(lbda))
     g = G.transform()
     assert G.global_env.bindings is bindings
 
-    gfunc = evaluate2(bindings[g])
+    gfunc = evaluate(bindings[g])
 
     # from .buche import buche
     # buche(g)
@@ -313,7 +313,7 @@ def analysis_grad2(pyfn, sym, bindings):
     g2_sym = grad2_transform(g, bindings)
     G = Grad(g2_sym, a_normal(bindings[g2_sym]))
     g2 = G.transform()
-    gfunc2 = evaluate2(bindings[g2])
+    gfunc2 = evaluate(bindings[g2])
 
     def test(args):
         return gfunc2(*args)[1](1)
