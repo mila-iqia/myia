@@ -47,6 +47,7 @@ builtins_dict: Dict[str, Symbol] = dict(
     range = gsym('range'),
     enumerate = gsym('enumerate'),
     map = gsym('map'),
+    reduce = gsym('reduce'),
     filter = gsym('filter'),
     switch = gsym('switch'),
     first = gsym('first'),

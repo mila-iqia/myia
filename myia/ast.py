@@ -216,6 +216,7 @@ class Lambda(MyiaASTNode):
         self.body = body
         self.gen = gen
         self.global_env = global_env
+        self.primal: Symbol = None
 
     def children(self) -> List[MyiaASTNode]:
         args = cast(List[MyiaASTNode], self.args)

@@ -2,7 +2,7 @@ from .ast import Symbol, Lambda, Let
 from .compile import a_normal
 from .front import parse_source, parse_function0
 from .grad import Grad, one
-from .interpret import evaluate, root_globals
+from .interpret import evaluate2, root_globals
 
 
 def missing_source(node):
@@ -44,17 +44,19 @@ def get_functions(data):
         url, line_offset, code = data
         _globals = {}
         exec(code, _globals)
-        r, bindings = parse_source(url, line_offset, code)
+        r, genv = parse_source(url, line_offset, code)
         pyfn = _globals[r.label]
     else:
         pyfn = data
-        r, bindings = parse_function0(pyfn)
+        r, genv = parse_function0(pyfn)
 
+    bindings = genv.bindings
     lbda = bindings[r]
     if not isinstance(lbda, Lambda):
         print('grad can only operate on a function.', file=sys.stderr)
 
-    func = evaluate(r, bindings)
+    # func = evaluate(r, bindings)
+    func = evaluate2(lbda)
 
     pyfn.__globals__.update({str(k): v for k, v in root_globals.items()})
 
@@ -154,7 +156,8 @@ def grad_test(data):
     transformed[r] = g
     gbindings.update(G.global_env.bindings)
 
-    gfunc = evaluate(g, {**gbindings, **bindings})
+    # gfunc = evaluate(g, {**gbindings, **bindings})
+    gfunc = evaluate2(gbindings[g])
 
     def test(args):
         python = guard(pyfn, args)
@@ -179,3 +182,140 @@ def grad_test(data):
         grad_bindings = gbindings,
         test = test
     )
+
+
+def get_functions2(data):
+    if isinstance(data, tuple):
+        url, line_offset, code = data
+        _globals = {}
+        exec(code, _globals)
+        sym, genv = parse_source(url, line_offset, code)
+        pyfn = _globals[sym.label]
+    else:
+        pyfn = data
+        sym, genv = parse_function0(pyfn)
+
+    bindings = genv.bindings
+
+    # lbda = bindings[r]
+    # if not isinstance(lbda, Lambda):
+    #     print('grad can only operate on a function.', file=sys.stderr)
+
+    # func = evaluate(sym, bindings)
+
+    pyfn.__globals__.update({str(k): v for k, v in root_globals.items()})
+
+    return pyfn, sym, bindings
+
+
+def analysis(mode, spec, args=None):
+    pyfn, sym, bindings = get_functions2(spec)
+    method = globals()[f'analysis_{mode}']
+    test = method(pyfn, sym, bindings)
+    if args:
+        return test(args)
+    else:
+        return test
+
+
+def compare_calls(funcs, args):
+    rval = {}
+    for k, fn in funcs.items():
+        try:
+            r = fn(*args)
+        except Exception as exc:
+            r = exc
+        rval[f'{k}_result'] = r
+    vals = list(rval.values())
+    rval['match'] = all(x == y for x, y in zip(vals[:-1], vals[1:]))
+    return rval
+
+
+def analysis_eval(pyfn, sym, bindings):
+    func = evaluate2(bindings[sym])
+
+    def test(args):
+        return compare_calls(dict(python = pyfn, myia = func), args)
+
+    return test
+
+
+def analysis_grad(pyfn, sym, bindings):
+    func = evaluate2(bindings[sym])
+
+    lbda = bindings[sym]
+    G = Grad(sym, a_normal(lbda))
+    g = G.transform()
+    assert G.global_env.bindings is bindings
+
+    gfunc = evaluate2(bindings[g])
+
+    def test(args):
+        myiag, bprop = gfunc(*args)
+        comparison = compare_calls(dict(
+            python = pyfn,
+            myia = func,
+            myiag = lambda *args: myiag
+        ), args)
+        gt = GradTester(pyfn, bprop, args, myiag, func.argnames, None)
+        comparison.update(dict(
+            derivatives = gt.compare()
+        ))
+        return comparison
+
+    return test
+
+
+def grad2_transform(rsym, bindings):
+    rlbda = bindings[rsym]
+    genv = rlbda.global_env
+    gen = rlbda.gen
+    rrsym = genv.gen('GG')
+
+    from .ast import Lambda, Apply, Value, Let
+    from .symbols import builtins
+
+    sym_arg = gen('ARG')
+    sym_values = (gen("values"), Apply(rsym, sym_arg))
+    sym_bprop = (gen("bprop"), Apply(builtins.index, sym_values[0], Value(1)))
+    sym_grads = (gen("grads"), Apply(sym_bprop[0], Value(1)))
+    sym_grad = (gen("grad"), Apply(builtins.index, sym_grads[0], Value(1)))
+    ret = Let((sym_values, sym_bprop, sym_grads, sym_grad), sym_grad[0])
+    glbda = Lambda([sym_arg], ret, gen)
+    genv[rrsym] = glbda
+    glbda.ref = rrsym
+    glbda.global_env = rlbda.global_env
+
+    return rrsym
+
+    # return Lambda(
+    #     ARGS,
+    #     Let((gen('X'), Apply()))
+    #     Apply(builtins.index, Apply())
+    # )
+    # glbda.global_env[]
+    # return glbda
+
+
+def analysis_grad2(pyfn, sym, bindings):
+    lbda = bindings[sym]
+    func = evaluate2(lbda)
+
+    G = Grad(sym, a_normal(lbda))
+    g = G.transform()
+    assert G.global_env.bindings is bindings
+
+    gfunc = evaluate2(bindings[g])
+
+    # from .buche import buche
+    # buche(g)
+
+    g2_sym = grad2_transform(g, bindings)
+    G = Grad(g2_sym, a_normal(bindings[g2_sym]))
+    g2 = G.transform()
+    gfunc2 = evaluate2(bindings[g2])
+
+    def test(args):
+        return gfunc2(*args)[1](1)
+
+    return test

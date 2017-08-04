@@ -5,8 +5,10 @@ import traceback
 from . import ast
 from .compile import a_normal
 from .front import parse_source
-from .interpret import evaluate
-from .validate import grad_test, unbound, missing_source
+from .interpret import evaluate2
+from .validate import \
+    grad_test, unbound, missing_source, \
+    analysis
 from .buche import buche
 
 from .event import on_discovery
@@ -30,7 +32,7 @@ def setup_buche(arguments):
     if arguments.stores:
         @on_discovery(VM)
         def on_instruction_store(_, frame, node, var):
-            buche['stores'][str(var)](frame.top())
+            buche['stores'][str(var).replace('/', '.')](frame.top())
 
     if arguments.check:
         checks = set(arguments.check.split(','))
@@ -66,6 +68,7 @@ def setup_buche(arguments):
             add_class(focus, 'error0')
             buche.html('<h2>An error occurred</h2>')
             buche.html('<h3>Node</h3>')
+            buche(vm.frame)
             buche(focus)
             buche.html('<h3>Traceback</h3>')
             for i, frame in enumerate([vm.frame] + vm.frames):
@@ -146,6 +149,8 @@ p_inspect.add_argument(
 p_inspect.add_argument('--args', metavar='ARGS', default='()',
                        dest='args',
                        help='Arguments to provide to the function.')
+p_inspect.add_argument('--mode', dest='mode', default='eval',
+                       help='One of: eval')
 p_inspect.add_argument('--stores', action='store_true',
                        help='Log the values taken by each variable.')
 p_inspect.add_argument('--decls', action='store_true',
@@ -217,7 +222,8 @@ def command_parse(arguments):
         else:
             return x
     url, code = getcode(arguments)
-    r, bindings = parse_source(url, 1, code)
+    r, genv = parse_source(url, 1, code)
+    bindings = genv.bindings
     if bindings:
         display({k: wrap(v) for k, v in bindings.items()},
                 arguments.format)
@@ -230,8 +236,8 @@ def command_parse(arguments):
 
 def command_eval(arguments):
     url, code = getcode(arguments)
-    r, bindings = parse_source(url, 1, code)
-    result = evaluate(r, bindings)
+    r, genv = parse_source(url, 1, code)
+    result = evaluate2(r, genv)
     args = getargs(arguments)
     if args:
         value = result(*args)
@@ -268,15 +274,9 @@ def command_inspect(arguments):
     url, code = getcode(arguments)
     args = getargs(arguments)
     setup_buche(arguments)
-    r, bindings = parse_source(url, 1, code)
-    fn = evaluate(r, bindings)
     if args:
-        try:
-            value = fn(*args)
-        except Exception as exc:
-            print(traceback.format_exc())
-            sys.exit(1)
-        buche['_'].html('<h2>Result</h2>')
+        value = analysis(arguments.mode, (url, 1, code), args)
+        buche['_'].html(f'<h2>Results for: {arguments.mode}</h2>')
         buche['_'](value)
     else:
         buche['_']('Done')

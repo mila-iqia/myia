@@ -732,10 +732,6 @@ class Parser(LocVisitor):
         return Begin(stmts)
 
 
-def parse_function(fn, **kw):
-    return parse_function0(fn, **kw)[1]
-
-
 def parse_function0(fn, **kw):
     _, line = inspect.getsourcelines(fn)
     return parse_source(inspect.getfile(fn),
@@ -755,41 +751,33 @@ def get_global_parse_env(url):
 
 def parse_source(url, line, src, **kw):
     tree = ast.parse(src)
-    # FreeVariablesTagger().visit(tree)
     p = Parser(Locator(url, line),
                get_global_parse_env(url),
                top_level=True,
                **kw)
     r = p.visit(tree, allow_decorator=True)
-
     if isinstance(r, list):
         r, = r
     if isinstance(r, _Assign):
         r = r.value
-
-    # print(p.global_env.bindings)
-    # print(p.globals_accessed)
-
-    # for k, v in p.global_env.bindings.items():
-    #     _validate(v)
-
-    return r, p.global_env.bindings
+    return r, p.global_env
 
 
 def make_error_function(data):
     def _f(*args, **kwargs):
         raise Exception(
-            "Function {} is for internal use only.".format(data["name"])
+            f"Function {data['name']} is for internal use only."
         )
     _f.data = data
     return _f
 
 
 def myia(fn):
-    data = parse_function(fn)
+    _, genv = parse_function0(fn)
+    gbindings = genv.bindings
     glob = fn.__globals__
     bindings = {k: make_error_function({"name": k, "ast": v, "globals": glob})
-                for k, v in data.items()}
+                for k, v in gbindings.items()}
     glob.update(bindings)
     fsym = Symbol(fn.__name__, namespace='global')
     fn.data = bindings[fsym].data

@@ -1,5 +1,5 @@
-from myia.front import parse_function, MyiaSyntaxError
-from myia.interpret import evaluate
+from myia.front import parse_function0, MyiaSyntaxError
+from myia.interpret import evaluate2
 from myia.ast import Symbol
 import pytest
 import inspect
@@ -32,15 +32,15 @@ def myia_test(*tests):
 
         def test(inputs, output, gradOut=None):
             if fsym not in _functions:
-                data = parse_function(fn)
-                _functions.update(data)
+                _, genv = parse_function0(fn)
+                _functions.update(genv.bindings)
             node = _functions[fsym]
 
             if not isinstance(inputs, tuple):
                 inputs = inputs,
 
             python_result = fn(*inputs)
-            myia_result = evaluate(node, _functions)(*inputs)
+            myia_result = evaluate2(node)(*inputs)
 
             assert python_result == output
             assert myia_result == output
@@ -61,7 +61,7 @@ def myia_syntax_error(fn):
 
     def test():
         with pytest.raises(MyiaSyntaxError):
-            parse_function(fn)
+            parse_function0(fn)
 
     return test
 

@@ -1,3 +1,5 @@
+from typing import Dict
+
 from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
@@ -5,6 +7,7 @@ from myia.ast import \
 from .buche import HReprBase
 from .symbols import builtins
 from .event import EventDispatcher
+from functools import reduce
 import inspect
 
 
@@ -18,6 +21,9 @@ myia_builtins = builtins.myia_builtins
 root_globals = {
     myia_builtins: BuiltinCollection()
 }
+
+
+compile_cache: Dict[Symbol, Lambda] = {}
 
 
 ###################
@@ -89,7 +95,8 @@ class FunctionImpl(HReprBase):
 
 class ClosureImpl(HReprBase):
     def __init__(self, fn, args):
-        assert isinstance(fn, (PrimitiveImpl, FunctionImpl))
+        if not isinstance(fn, (PrimitiveImpl, FunctionImpl)):
+            raise TypeError(f'Wrong fn for ClosureImpl: {fn}')
         self.argnames = [a for a in fn.argnames[len(args):]]
         self.nargs = fn.nargs - len(args)
         self.fn = fn
@@ -132,8 +139,8 @@ def impl(sym):
 
 def myia_impl(sym):
     def decorator(orig_fn):
-        r, bindings = parse_function0(orig_fn)
-        fn = evaluate(r, bindings)
+        r, genv = parse_function0(orig_fn)
+        fn = evaluate2(r, genv)
         root_globals[sym] = fn
         setattr(root_globals[myia_builtins],
                 fn.__name__.lstrip('_'),
@@ -220,6 +227,11 @@ def _getattr(obj, attr):
 @impl(builtins.map)
 def _map(f, xs):
     return tuple(map(f, xs))
+
+
+@impl(builtins.reduce)
+def _reduce(f, xs):
+    return reduce(f, xs)
 
 
 @impl(builtins.enumerate)
@@ -339,7 +351,14 @@ class VMFrame(HReprBase):
     def instruction_fetch(self, node, sym):
         for env in self.envs:
             try:
-                self.stack.append(env[sym])
+                v = env[sym]
+                if isinstance(v, Lambda):
+                    cv = compile_cache.get(v, None)
+                    if cv is None:
+                        cv = evaluate2(v)
+                        compile_cache[v] = cv
+                    v = cv
+                self.stack.append(v)
                 return None
             except KeyError as err:
                 pass
@@ -349,7 +368,10 @@ class VMFrame(HReprBase):
         self.stack.append(value)
 
     def instruction_lambda(self, node):
-        self.stack.append(FunctionImpl(node, self.envs))
+        fimpl = FunctionImpl(node, self.envs)
+        if node.primal:
+            fimpl.primal_sym = node.primal
+        self.stack.append(fimpl)
 
     def __hrepr__(self, H, hrepr):
         ref = getattr(self.code.node, 'ref', self.code.node)
@@ -459,13 +481,9 @@ class VMCode(HReprBase):
         return H.table['VMCodeInstructions'](*rows)
 
 
-def evaluate(node, bindings):
-    if isinstance(node, list):
-        node, = node
-    env = {**root_globals}
-    for k, v in bindings.items():
-        if isinstance(v, MyiaASTNode):
-            env[k] = vm(VMCode(v), env)
-        else:
-            env[k] = v
-    return vm(VMCode(node), env)
+def evaluate2(node, parse_env=None):
+    if isinstance(node, Lambda):
+        parse_env = node.global_env
+    assert parse_env is not None
+    envs = (parse_env.bindings, root_globals)
+    return vm(VMCode(node), *envs)
