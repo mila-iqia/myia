@@ -65,7 +65,6 @@ def macro_grad_for(nclos_args):
 
 
 def rgrad(sym):
-    #Symbol(sym.label, namespace='grad:builtin')
     assert isinstance(sym, Symbol)
 
     def decorator(orig_fn):
@@ -103,11 +102,9 @@ def rgrad(sym):
             impl_sym = ast.global_env.gen('TMP')
             ast.global_env[impl_sym] = ast
             ast.ref = impl_sym
+            ast.primal = sym
             impl = FunctionImpl(ast, (root_globals,))
             root_globals[impl_sym] = impl
-            ast.primal = prim
-            impl.primal = prim
-            impl.primal_sym = sym
             root_globals[rsym] = fn
             _cache[nargs_closure] = impl
             return impl
@@ -186,7 +183,6 @@ def JGrad(x):
             bindings.update(env)
 
         gfn = evaluate(bindings[g])
-        gfn.primal = x
         _cache[nargs_closure] = gfn
         return gfn
     return make_grad
@@ -216,7 +212,6 @@ def J(x):
     elif isinstance(x, ClosureImpl):
         c = ClosureImpl(JX(x.fn, len(x.args)),
                         J(tuple(x.args)))
-        c.primal = x
         return c
     elif x is None:
         return None
@@ -230,10 +225,7 @@ def Jinv(x):
         return x
     elif isinstance(x, tuple):
         return tuple(Jinv(a) for a in x)
-    elif isinstance(x, PrimitiveImpl):
-        assert x.primal is not None
-        return x.primal
-    elif isinstance(x, FunctionImpl):
+    elif isinstance(x, (FunctionImpl, PrimitiveImpl)):
         assert x.primal_sym is not None
         if isinstance(x.primal_sym, Symbol):
             primal = evaluate(x.primal_sym, x.ast.global_env)

@@ -38,7 +38,7 @@ class PrimitiveImpl(HReprBase):
         self.nargs = len(self.argnames)
         self.fn = fn
         self.name = name or fn.__name__
-        self.primal = None
+        self.primal_sym = None
         self.grad = None
 
     def __call__(self, *args):
@@ -66,7 +66,7 @@ class FunctionImpl(HReprBase):
         self.ast = ast
         self.code = VMCode(ast.body)
         self.envs = envs
-        self.primal = None
+        self.primal_sym = ast.primal
         self.grad = None
         node = ast
 
@@ -342,7 +342,6 @@ class VMFrame(HReprBase):
         args = self.stack.pop()
         fn = self.stack.pop()
         clos = ClosureImpl(fn, args)
-        clos.primal = fn.primal
         self.stack.append(clos)
 
     def instruction_store(self, node, dest):
