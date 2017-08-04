@@ -577,15 +577,14 @@ class Grad:
 
     def accum(self, vars, value):
         if isinstance(vars, list):
-            vvars = [(i, v) for i, v in enumerate(vars)
-                     if not isinstance(v, Value)]
-            sens = [self.sensitivity_var(v) or
-                    Apply(builtins.zero, Apply(builtins.Jinv, v))
-                    for v in vars]
-            new_sens = [self.new_sensitivity_var(v) for _, v in vvars]
             tmp = self.gensym('tmp')
             rval = [(tmp, value)]
-            for sen, new_sen, (i, _) in zip(sens, new_sens, vvars):
+            for i, v in enumerate(vars):
+                if isinstance(v, Value):
+                    # No accumulation in non-variables.
+                    continue
+                sen = self.sensitivity_var(v)
+                new_sen = self.new_sensitivity_var(v)
                 rval.append((new_sen,
                              Apply(builtins.merge, sen,
                                    Apply(builtins.index, tmp, Value(i)))))

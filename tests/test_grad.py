@@ -127,15 +127,13 @@ def test_shadowing(x, y, z):
 @grad_test((3,))
 def test_constant(x):
     """Test the use of a literal in the expression."""
-    return x * 18
+    return 18 * x
 
 
-@xfail
 @grad_test((3,))
 def test_dup_args_in_call(x):
     """The naive gradient update rule fails when a function's arguments
     contain the same variable more than once."""
-    # TODO: VERY VERY IMPORTANT TO FIX
     return x * x
 
 
@@ -163,7 +161,7 @@ def test_closure(a):
     return x3
 
 
-# TODO: test when a == b (finite diff will return ~0.5, but not our method)
+# TODO: test when a == b (finite diff won't return anything sensible)
 @grad_test((4, 5), (68, -4))
 def test_if(a, b):
     # This is max, but what this is really testing is the most basic
@@ -200,8 +198,7 @@ def test_pow10(x):
 
 @grad2_test((12,))
 def test_g2_simple(x):
-    y = x
-    return (x * y) * (x * y)
+    return x * x * x * x
 
 
 @grad2_test((3,))
