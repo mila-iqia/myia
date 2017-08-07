@@ -4,11 +4,11 @@ from .util import Props
 from typing import Dict
 
 
-def bsym(name):
+def bsym(name: str) -> Symbol:
     return Symbol(name, namespace='builtin')
 
 
-def gsym(name):
+def gsym(name: str) -> Symbol:
     return Symbol(name, namespace='global')
 
 

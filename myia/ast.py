@@ -7,6 +7,7 @@ from copy import copy
 import textwrap
 import traceback
 from .buche import HReprBase
+from .event import EventDispatcher
 
 
 __save_trace__ = False
@@ -46,6 +47,60 @@ def _get_location(x: Locatable) -> Location:
         return x
     else:
         raise TypeError(f'{x} is not a location')
+
+
+class Redirect:
+    def __init__(self, key: str) -> None:
+        self.key = key
+
+
+class ParseEnv:
+    def __init__(self,
+                 parent: 'ParseEnv' = None,
+                 namespace: str = None,
+                 gen: 'GenSym' = None,
+                 url: str = None) -> None:
+        if namespace is None:
+            namespace = str(uuid())
+        if namespace.startswith('global'):
+            self.events = EventDispatcher(self)
+        else:
+            self.events = None
+        self.url = url
+        self.parent = parent
+        self.gen: GenSym = gen or \
+            (parent.gen if parent else GenSym(namespace))
+        self.bindings: Dict[Union[str, Symbol],
+                            Union[MyiaASTNode, Redirect]] = {}
+
+    def get_free(self,
+                 name: str) -> TupleT[bool, 'MyiaASTNode']:
+        if name in self.bindings:
+            free = False
+            result = self.bindings[name]
+        elif self.parent is None:
+            raise NameError("Undeclared variable: {}".format(name))
+        else:
+            free = True
+            result = self.parent[name]
+        if isinstance(result, Redirect):
+            return self.get_free(result.key)
+        else:
+            return (free, result)
+
+    def update(self, bindings) -> None:
+        # self.bindings.update(bindings)
+        for k, v in bindings.items():
+            self[k] = v
+
+    def __getitem__(self, name) -> 'MyiaASTNode':
+        _, x = self.get_free(name)
+        return x
+
+    def __setitem__(self, name, value) -> None:
+        self.bindings[name] = value
+        if self.events:
+            self.events.emit_declare(name, value)
 
 
 T = TypeVar('T', bound='MyiaASTNode')
@@ -208,7 +263,7 @@ class Lambda(MyiaASTNode):
                  args: List[Symbol],
                  body: MyiaASTNode,
                  gen: 'GenSym',
-                 global_env: object = None,
+                 global_env: ParseEnv = None,
                  **kw) -> None:
         super().__init__(**kw)
         self.ref: Symbol = None

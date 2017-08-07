@@ -1,4 +1,5 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple as TupleT, Any, \
+    Union, cast, Optional, Sequence, Iterable, Callable
 
 from .ast import \
     Transformer, GenSym, MyiaASTNode, \
@@ -22,6 +23,9 @@ builtins.merge = gsym('merge')
 builtins.J = gsym('J')
 builtins.JX = gsym('JX')
 builtins.Jinv = gsym('Jinv')
+
+
+LeafType = Union[Symbol, Value]
 
 
 ######################################
@@ -66,18 +70,18 @@ def macro_grad_for(nclos_args):
 #     return decorator
 
 
-def rgrad(sym):
+def rgrad(sym: Symbol) -> Callable[..., Any]:
     assert isinstance(sym, Symbol)
 
     def decorator(orig_fn):
         prim = root_globals[sym]
         assert isinstance(prim, PrimitiveImpl)
 
-        _cache = {}
+        _cache: Dict[int, FunctionImpl] = {}
 
         # Wrap the primitive and a closure-converted backpropagator
         # in a combined method that follows the protocol
-        def mkgrad(nargs_closure):
+        def mkgrad(nargs_closure: int) -> FunctionImpl:
             cached = _cache.get(nargs_closure, None)
             if cached:
                 return cached
@@ -105,7 +109,7 @@ def rgrad(sym):
             ast.global_env[impl_sym] = ast
             ast.ref = impl_sym
             ast.primal = sym
-            impl = FunctionImpl(ast, (root_globals,))
+            impl = FunctionImpl(ast, [root_globals])
             root_globals[impl_sym] = impl
             root_globals[rsym] = fn
             _cache[nargs_closure] = impl
@@ -124,7 +128,7 @@ def rgrad(sym):
 
 
 @impl(builtins.fill)
-def fill(x, value):
+def fill(x: Any, value: Union[int, float]) -> Any:
     if isinstance(x, (int, float)):
         return value
     elif isinstance(x, tuple):
@@ -150,7 +154,7 @@ def one(x):
 
 
 @impl(builtins.merge)
-def merge(x, y):
+def merge(x: Any, y: Any) -> Any:
     if isinstance(x, (int, float)) and isinstance(y, (int, float)):
         return x + y
     elif type(x) is not type(y):
@@ -164,17 +168,19 @@ def merge(x, y):
         raise TypeError(f'Cannot merge values of type {type(x)}')
 
 
-def JGrad(x):
-    _cache = {}
+def JGrad(x) -> Callable[[int], FunctionImpl]:
+    _cache: Dict[int, FunctionImpl] = {}
 
-    def make_grad(nargs_closure):
+    def make_grad(nargs_closure: int) -> FunctionImpl:
         gfn = _cache.get(nargs_closure, None)
         if gfn:
             return gfn
 
+        normalized = a_normal(x.ast)
+        assert isinstance(normalized, Lambda)
         G = Grad(
             name = x.ast.ref or x.ast.gen('???'),
-            primal = a_normal(x.ast),
+            primal = normalized,
             nargs_closure = nargs_closure,
         )
         g = G.transform()
@@ -184,14 +190,17 @@ def JGrad(x):
         for env in reversed(x.envs):
             bindings.update(env)
 
-        gfn = evaluate(bindings[g])
+        lbda = bindings[g]
+        assert isinstance(lbda, Lambda)
+        gfn = evaluate(lbda)
         _cache[nargs_closure] = gfn
         return gfn
     return make_grad
 
 
 @impl(builtins.JX)
-def JX(x, nargs_closure):
+def JX(x: Union[PrimitiveImpl, FunctionImpl],
+       nargs_closure: int) -> FunctionImpl:
     if isinstance(x, PrimitiveImpl):
         assert x.grad is not None
         return x.grad(nargs_closure)
@@ -204,7 +213,7 @@ def JX(x, nargs_closure):
 
 
 @impl(builtins.J)
-def J(x):
+def J(x: Any) -> Any:
     if isinstance(x, (int, float)):
         return x
     elif isinstance(x, tuple):
@@ -222,12 +231,14 @@ def J(x):
 
 
 @impl(builtins.Jinv)
-def Jinv(x):
+def Jinv(x: Any) -> Any:
     if isinstance(x, (int, float)):
         return x
     elif isinstance(x, tuple):
         return tuple(Jinv(a) for a in x)
-    elif isinstance(x, (FunctionImpl, PrimitiveImpl)):
+    elif isinstance(x, PrimitiveImpl):
+        raise Exception('Primitives have no primals.')
+    elif isinstance(x, FunctionImpl):
         assert x.primal_sym is not None
         if isinstance(x.primal_sym, Symbol):
             primal = evaluate(x.primal_sym, x.ast.global_env)
@@ -409,28 +420,27 @@ class Grad:
     def __init__(self,
                  name: Symbol,
                  primal: Lambda,
-                 # global_env: ParseEnv,
                  nargs_closure = 0) -> None:
         self.name = name
-        assert(isinstance(primal, Lambda))
+        assert isinstance(primal, Lambda)
         self.primal = primal
         self.gensym = primal.gen
-        # self.global_env = global_env or ParseEnv(namespace='global')
         assert primal.global_env
         self.global_env = primal.global_env
         self.tagged_map: Dict[Symbol, Symbol] = {}
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
         self.backpropagator_map: Dict[Symbol, Symbol] = {}
-        self.zeroes: List[MyiaASTNode] = []
+        self.zeroes: List[TupleT[Symbol, MyiaASTNode]] = []
         self.nargs_closure = nargs_closure
 
-    def phi(self, var, value):
+    def phi(self, var: Symbol, value: MyiaASTNode) \
+            -> Sequence[TupleT[Symbol, MyiaASTNode]]:
         # phi (p. 26) transformation on let bindings, transforms
         # the forward phase.
 
         if isinstance(value, Symbol):
             # x = y ==> x_up = y_up
-            return [(self.tagged_var(var), self.tagged_var(value)),
+            return [(self.tagged_var(var), self.tagged_expr(value)),
                     (self.backpropagator_var(var), Value(None))]
 
         elif isinstance(value, Value):
@@ -442,8 +452,8 @@ class Grad:
             # x = f(y) ==> (x_up, x_bprop) = f_up(y_up)
             tmp = self.gensym('tmp')
             return [(tmp,
-                     Apply(self.tagged_var(value.fn),
-                           *[self.tagged_var(a) for a in value.args])),
+                     Apply(self.tagged_expr(value.fn),
+                           *[self.tagged_expr(a) for a in value.args])),
                     (self.tagged_var(var),
                      Apply(builtins.index, tmp, Value(0))),
                     (self.backpropagator_var(var),
@@ -463,7 +473,7 @@ class Grad:
                     ' should always be a global variable.'
                 )
 
-            args = [self.tagged_var(a) for a in value.args]
+            args = [self.tagged_expr(a) for a in value.args]
 
             fn = evaluate(value.fn, self.global_env)
             if isinstance(fn, PrimitiveImpl):
@@ -474,7 +484,9 @@ class Grad:
                 expr = Closure(gfn.ast.ref, args)
             else:
                 # sym = self.global_env.gen('TMPG')
-                G = Grad(fn.ast.ref, a_normal(fn.ast), len(value.args))
+                normalized = a_normal(fn.ast)
+                assert isinstance(normalized, Lambda)
+                G = Grad(fn.ast.ref, normalized, len(value.args))
                 grad = G.transform()
                 # self.global_env[sym] = grad
                 expr = Closure(grad, args)
@@ -493,13 +505,18 @@ class Grad:
 
         elif isinstance(value, Tuple):
             return [(self.tagged_var(var),
-                     Tuple(self.tagged_var(a) for a in value.values)),
+                     Tuple(self.tagged_expr(a) for a in value.values)),
                     (self.backpropagator_var(var), Value(None))]
 
         else:
             raise Exception(f'phi is not defined on node type: {value}')
 
-    def rho(self, var, value):
+    def args_cast(self, args: List[MyiaASTNode]) -> List[LeafType]:
+        assert all(isinstance(a, (Symbol, Value)) for a in args)
+        return cast(List[LeafType], args)
+
+    def rho(self, var: Symbol, value: MyiaASTNode) \
+            -> List[TupleT[Symbol, MyiaASTNode]]:
         # rho (p. 26) transformation on let bindings, represents the
         # corresponding operations to do in the backward phase
 
@@ -513,51 +530,54 @@ class Grad:
 
         elif isinstance(value, Apply):
             # x = f(y) ==> (f_sen, y_sen) += x_bprop(x_sen)
-            args = [value.fn, *value.args]
+            args = self.args_cast([value.fn, *value.args])
             increment = Apply(self.backpropagator_var(var),
                               self.sensitivity_var(var))
             return self.accum(args, increment)
 
         elif isinstance(value, Closure):
             # x = Closure(f, w, z) ==> (w_sen, z_sen) += x_sen
-            return self.accum(value.args, self.sensitivity_var(var))
+            args = self.args_cast(value.args)
+            return self.accum(args, self.sensitivity_var(var))
 
         elif isinstance(value, Tuple):
-            return self.accum(value.values, self.sensitivity_var(var))
+            args = self.args_cast(value.values)
+            return self.accum(args, self.sensitivity_var(var))
 
         else:
             raise Exception(f'rho is not defined on node type: {value}')
 
-    def zero_init(self, var):
+    def zero_init(self, var: Symbol) -> Symbol:
         new_var = self.new_sensitivity_var(var)
         init = (new_var,
                 Apply(builtins.zero,
-                      Apply(builtins.Jinv, self.tagged_var(var))))
+                      Apply(builtins.Jinv, self.tagged_expr(var))))
         self.zeroes.append(init)
         return new_var
 
-    def accum(self, vars, value):
-        if isinstance(vars, list):
-            tmp = self.gensym('tmp')
-            rval = [(tmp, value)]
-            for i, v in enumerate(vars):
-                if isinstance(v, Value):
-                    # No accumulation in non-variables.
-                    continue
-                sen = self.sensitivity_var(v)
-                new_sen = self.new_sensitivity_var(v)
-                rval.append((new_sen,
-                             Apply(builtins.merge, sen,
-                                   Apply(builtins.index, tmp, Value(i)))))
-            return rval
-        else:
-            sen = self.sensitivity_var(var)
-            new_sen = self.new_sensitivity_var(var)
-            app = Apply(builtins.merge, sen, value)
-            return [(new_sen, app)]
+    def accum(self, vars: List[LeafType], value: MyiaASTNode) \
+            -> List[TupleT[Symbol, MyiaASTNode]]:
+        tmp = self.gensym('tmp')
+        rval = [(tmp, value)]
+        for i, v in enumerate(vars):
+            if isinstance(v, Value):
+                # No accumulation in non-variables.
+                continue
+            sen = self.sensitivity_var(v)
+            new_sen = self.new_sensitivity_var(v)
+            rval.append((new_sen,
+                         Apply(builtins.merge, sen,
+                               Apply(builtins.index, tmp, Value(i)))))
+        return rval
 
-    def tagged_var(self, v):
+    def tagged_var(self, v: MyiaASTNode) -> Symbol:
         # Maps v to the v_up variable i.e. the tagged variable for v
+        assert isinstance(v, Symbol)
+        assert v.namespace not in {'global', 'builtin'}
+        return copy(self.tagged_map.setdefault(v, self.gensym(v, '↑')))
+
+    def tagged_expr(self, v: MyiaASTNode) -> MyiaASTNode:
+        # Maps expr to expr_up
         assert isinstance(v, (Symbol, Value))
         if isinstance(v, Value):
             return v
@@ -566,11 +586,11 @@ class Grad:
         else:
             return copy(self.tagged_map.setdefault(v, self.gensym(v, '↑')))
 
-    def sensitivity_var(self, v):
+    def sensitivity_var(self, v: MyiaASTNode) -> Optional[Symbol]:
         # Maps v to the v_sen variable i.e. the gradient of v
+        assert isinstance(v, (Symbol, Value))
         if isinstance(v, Value):
             return None
-        assert isinstance(v, Symbol)
         try:
             return copy(self.sensitivity_map[v])
         except KeyError:
@@ -578,7 +598,7 @@ class Grad:
             # return self.new_sensitivity_var(v)
             return self.zero_init(v)
 
-    def new_sensitivity_var(self, v):
+    def new_sensitivity_var(self, v: Symbol) -> Symbol:
         # Create a new sensitivity variable for v. This is used to preserve
         # the single-assignment property: instead of v_sen = v_sen + x,
         # we do v_sen2 = v_sen + x. self.sensitivity_var maps to the latest
@@ -588,11 +608,11 @@ class Grad:
         self.sensitivity_map[v] = new_v
         return new_v
 
-    def backpropagator_var(self, v):
+    def backpropagator_var(self, v: Symbol) -> Symbol:
         # Maps v to the v_bprop variable i.e. the backpropagator for v
         return copy(self.backpropagator_map.setdefault(v, self.gensym(v, '♢')))
 
-    def transform(self):
+    def transform(self) -> Symbol:
         args = self.primal.args
         let = self.primal.body
 
@@ -602,19 +622,23 @@ class Grad:
         assert isinstance(let, Let)  # TODO: could be symbol too
 
         # Create this sensitivity variable first (it's an argument).
+        assert isinstance(let.body, Symbol)
         out_sen = self.new_sensitivity_var(let.body)
 
-        forward = []
-        backward = []
+        forward: List[TupleT[Symbol, MyiaASTNode]] = []
+        backward: List[TupleT[Symbol, MyiaASTNode]] = []
         for s, v in let.bindings:
             forward += self.phi(s, v)
 
         for s, v in reversed(let.bindings):
             backward += self.rho(s, v)
 
-        backp_bargs = [self.backpropagator_var(s) for s, _ in let.bindings]
-        backp_cargs = [self.tagged_var(s) for s, _ in let.bindings]
-        backp_rargs = [self.tagged_var(arg) for arg in args]
+        backp_bargs: List[Symbol] = \
+            [self.backpropagator_var(s) for s, _ in let.bindings]
+        backp_cargs: List[Symbol] = \
+            [self.tagged_var(s) for s, _ in let.bindings]
+        backp_rargs: List[Symbol] = \
+            [self.tagged_var(arg) for arg in args]
         backp_args = backp_bargs + backp_cargs + backp_rargs
         backp_all_ret = [self.sensitivity_var(arg) for arg in args]
         backp_ret = Tuple([
@@ -622,7 +646,9 @@ class Grad:
             *backp_all_ret[self.nargs_closure:]
             # Tuple(backp_all_ret[self.nargs_closure:])
         ])
-        backp_fn = Lambda([*map(copy, backp_args), out_sen],
+
+        backp_args_copy: Iterable[Symbol] = map(copy, backp_args)
+        backp_fn = Lambda([*backp_args_copy, out_sen],
                           Let(self.zeroes + backward, backp_ret),
                           self.gensym)
         backp_sym = self.global_env.gen(self.name, '♢*')
@@ -636,7 +662,7 @@ class Grad:
         backp_clsym = self.gensym(self.name, '♢')
         forward.append((backp_clsym, backp_cl))
         new_body = Let(forward,
-                       Tuple([self.tagged_var(let.body), backp_clsym]))
+                       Tuple([self.tagged_expr(let.body), backp_clsym]))
 
         new_args = list(map(self.tagged_var, args))
         ret_fn = Lambda(new_args, new_body, self.gensym)

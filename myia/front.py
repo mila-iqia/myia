@@ -8,7 +8,7 @@ from myia.ast import \
     Location, Symbol, Value, \
     Let, If, Lambda, Apply, \
     Begin, Tuple, Closure, _Assign, \
-    GenSym
+    GenSym, ParseEnv, Redirect
 from myia.util import group_contiguous
 from myia.symbols import get_operator, builtins
 from uuid import uuid4 as uuid
@@ -40,60 +40,6 @@ def exception_handler(exception_type, exception, traceback):
 
 
 sys.excepthook = exception_handler
-
-
-class Redirect:
-    def __init__(self, key: str) -> None:
-        self.key = key
-
-
-class ParseEnv:
-    def __init__(self,
-                 parent: 'ParseEnv' = None,
-                 namespace: str = None,
-                 gen: GenSym = None,
-                 url: str = None) -> None:
-        if namespace is None:
-            namespace = str(uuid())
-        if namespace.startswith('global'):
-            self.events = EventDispatcher(self)
-        else:
-            self.events = None
-        self.url = url
-        self.parent = parent
-        self.gen: GenSym = gen or \
-            (parent.gen if parent else GenSym(namespace))
-        self.bindings: Dict[Union[str, Symbol],
-                            Union[MyiaASTNode, Redirect]] = {}
-
-    def get_free(self,
-                 name: str) -> TupleT[bool, MyiaASTNode]:
-        if name in self.bindings:
-            free = False
-            result = self.bindings[name]
-        elif self.parent is None:
-            raise NameError("Undeclared variable: {}".format(name))
-        else:
-            free = True
-            result = self.parent[name]
-        if isinstance(result, Redirect):
-            return self.get_free(result.key)
-        else:
-            return (free, result)
-
-    def update(self, bindings) -> None:
-        # self.bindings.update(bindings)
-        for k, v in bindings.items():
-            self[k] = v
-
-    def __getitem__(self, name) -> MyiaASTNode:
-        _, x = self.get_free(name)
-        return x
-
-    def __setitem__(self, name, value) -> None:
-        self.bindings[name] = value
-        if self.events:
-            self.events.emit_declare(name, value)
 
 
 class Locator:
@@ -721,7 +667,7 @@ class Parser(LocVisitor):
         return Begin(stmts)
 
 
-def parse_function(fn, **kw):
+def parse_function(fn, **kw) -> TupleT[Symbol, ParseEnv]:
     _, line = inspect.getsourcelines(fn)
     return parse_source(inspect.getfile(fn),
                         line,
@@ -732,13 +678,16 @@ def parse_function(fn, **kw):
 _global_envs: Dict[str, ParseEnv] = {}
 
 
-def get_global_parse_env(url):
+def get_global_parse_env(url) -> ParseEnv:
     namespace = f'global'  # :{url}'
     env = ParseEnv(namespace=namespace, url=url)
     return _global_envs.setdefault(url, env)
 
 
-def parse_source(url, line, src, **kw):
+def parse_source(url: str,
+                 line: int,
+                 src: str,
+                 **kw) -> TupleT[Symbol, ParseEnv]:
     tree = ast.parse(src)
     p = Parser(Locator(url, line),
                get_global_parse_env(url),
@@ -749,7 +698,10 @@ def parse_source(url, line, src, **kw):
         r, = r
     if isinstance(r, _Assign):
         r = r.value
-    return r, p.global_env
+    genv = p.global_env
+    assert genv is not None
+    assert isinstance(r, Symbol)
+    return r, genv
 
 
 def make_error_function(data):
