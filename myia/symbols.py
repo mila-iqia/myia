@@ -37,8 +37,6 @@ builtins_dict: Dict[str, Symbol] = dict(
     index = bsym('index'),
     getattr = bsym('getattr'),
     setslice = bsym('setslice'),
-    lazy_if = bsym('lazy_if'),
-    half_lazy_if = bsym('half_lazy_if'),
     identity = bsym('identity'),
 
     # Myia's global variables

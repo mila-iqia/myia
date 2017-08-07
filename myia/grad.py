@@ -31,6 +31,8 @@ builtins.Jinv = gsym('Jinv')
 
 def macro_grad_for(nclos_args):
     def macro_grad(*args):
+        # return Tuple([Tuple(args[:nclos_args]),
+        #               Tuple(args[nclos_args:])])
         return Tuple([Tuple(args[:nclos_args]), *args[nclos_args:]])
     return macro_grad
 
@@ -328,39 +330,6 @@ def gless(x, y, dz):
     return GRAD(False, False)
 
 
-@rgrad(builtins.lazy_if)
-def glazy_if(c, t, f, dz):
-    if c:
-        return GRAD(
-            False,
-            t()[1](dz)[0],
-            zero(Jinv(f))
-        )
-    else:
-        return GRAD(
-            False,
-            zero(Jinv(t)),
-            f()[1](dz)[0]
-        )
-
-
-@rgrad(builtins.half_lazy_if)
-def ghalf_lazy_if(c, t, f, dz):
-    if c:
-        return GRAD(
-            (),
-            False,
-            t()[1](dz)[0],
-            zero(Jinv(f))
-        )
-    else:
-        return GRAD(
-            False,
-            zero(Jinv(t)),
-            dz
-        )
-
-
 @rgrad(builtins.switch)
 def gswitch(c, t, f, dz):
     if c:
@@ -649,9 +618,9 @@ class Grad:
         backp_args = backp_bargs + backp_cargs + backp_rargs
         backp_all_ret = [self.sensitivity_var(arg) for arg in args]
         backp_ret = Tuple([
-            # Tuple([self.sensitivity_var(arg.label) for arg in backp_cargs]),
             Tuple(backp_all_ret[:self.nargs_closure]),
             *backp_all_ret[self.nargs_closure:]
+            # Tuple(backp_all_ret[self.nargs_closure:])
         ])
         backp_fn = Lambda([*map(copy, backp_args), out_sen],
                           Let(self.zeroes + backward, backp_ret),

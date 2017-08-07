@@ -253,24 +253,6 @@ def identity(x):
     return x
 
 
-@impl(builtins.lazy_if)
-def lazy_if(cond, t, f):
-    if cond:
-        return t()
-    else:
-        return f()
-
-
-@impl(builtins.half_lazy_if)
-def half_lazy_if(cond, t, f):
-    # First branch is lazy, second is eager
-    # Use case: when a branch is a constant
-    if cond:
-        return t()
-    else:
-        return f
-
-
 ##################################
 # Class to Evaluate MyiaASTNodes #
 ##################################

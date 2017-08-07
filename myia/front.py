@@ -493,11 +493,6 @@ class Parser(LocVisitor):
                 (None, p2.dest)
             )
             else_branch = Closure(else_fn, else_vars)
-            # return Apply(builtins.lazy_if,
-            #              self.visit(node.test),
-            #              then_branch,
-            #              else_branch,
-            #              location=loc)
             return Apply(Apply(builtins.switch,
                                self.visit(node.test),
                                then_branch,
@@ -697,12 +692,6 @@ class Parser(LocVisitor):
             if_args, if_body, self.env.gen, None, "#while_if",
             (None, wbsym)
         )
-        # new_body = Apply(
-        #     builtins.half_lazy_if,
-        #     test,
-        #     Closure(if_fn, in_syms),
-        #     Tuple(initial_values)
-        # )
         new_body = Apply(Apply(
             builtins.switch,
             test,
