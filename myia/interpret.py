@@ -27,7 +27,7 @@ root_globals: Dict[Any, Any] = {
 compile_cache: Dict[Lambda, 'FunctionImpl'] = {}
 
 
-EnvT = Dict[Union[str, Symbol], Any]
+EnvT = Dict[Symbol, Any]
 
 
 ###################

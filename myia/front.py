@@ -8,7 +8,7 @@ from myia.ast import \
     Location, Symbol, Value, \
     Let, If, Lambda, Apply, \
     Begin, Tuple, Closure, _Assign, \
-    GenSym, ParseEnv, Redirect
+    GenSym, ParseEnv
 from myia.util import group_contiguous
 from myia.symbols import get_operator, builtins
 from uuid import uuid4 as uuid
@@ -84,50 +84,69 @@ class LocVisitor:
 InputNode = Union[str, ast.arg, ast.Name]
 
 
+class VariableTracker:
+    def __init__(self, parent: 'VariableTracker' = None) -> None:
+        self.parent = parent
+        self.bindings: Dict[str, Symbol] = {}
+
+    def get_free(self, name: str) -> TupleT[bool, 'Symbol']:
+        if name in self.bindings:
+            return (False, self.bindings[name])
+        elif self.parent is None:
+            raise NameError("Undeclared variable: {}".format(name))
+        else:
+            return (True, self.parent.get_free(name)[1])
+
+    def __getitem__(self, name: str) -> Symbol:
+        return self.get_free(name)[1]
+
+    def __setitem__(self, name: str, value: Symbol) -> None:
+        self.bindings[name] = value
+
+
 class Parser(LocVisitor):
 
     def __init__(self,
-                 parent: Union[Locator, 'Parser'],
+                 locator: Locator,
                  global_env: ParseEnv = None,
-                 dry: bool = None,
+                 macros: Dict[str, Callable[..., MyiaASTNode]] = None,
                  gen: GenSym = None,
+                 dry: bool = None,
                  pull_free_variables: bool = False,
                  top_level: bool = False,
-                 macros: Dict[str, Callable[..., MyiaASTNode]] = None) \
+                 return_error: str = None,
+                 vtrack: VariableTracker = None) \
             -> None:
+
+        super().__init__(locator)
+        self.locator = locator
+        self.global_env = global_env
+        self.gen = gen or GenSym()
+        self.vtrack = vtrack or VariableTracker()
+        self.dry = dry
+        self.pull_free_variables = pull_free_variables
+        self.top_level = top_level
+        self.macros = macros or {}
+
         self.free_variables: Dict[str, Symbol] = {}
         self.local_assignments: Set[str] = set()
         self.returns = False
-        self.pull_free_variables = pull_free_variables
-        self.top_level = top_level
-        self.macros = macros
-
-        if isinstance(parent, Locator):
-            self.parent = None
-            self.env = ParseEnv(gen=gen)
-            # self.globals_accessed: Set[str] = set()
-            self.global_env = global_env
-            self.return_error: str = None
-            self.dry = dry
-            self.macros = macros or {}
-            super().__init__(parent)
-        else:
-            self.parent = parent
-            self.env = ParseEnv(parent.env, gen=gen)
-            # self.globals_accessed = parent.globals_accessed
-            self.global_env = parent.global_env
-            self.return_error: str = parent.return_error
-            self.dry = parent.dry if dry is None else dry
-            self.macros = macros or parent.macros
-            super().__init__(parent.locator)
-
+        self.return_error = return_error
         self.dest = self.gensym('#lambda')
 
     def sub_parser(self, **kw):
-        return Parser(self, **kw)
+        dflts = dict(locator=self.locator,
+                     global_env=self.global_env,
+                     gen=self.gen,
+                     vtrack=VariableTracker(self.vtrack),
+                     dry=self.dry,
+                     return_error=self.return_error,
+                     macros=self.macros)
+        kw = {**dflts, **kw}
+        return Parser(**kw)
 
     def gensym(self, name: str) -> Symbol:
-        return self.env.gen.sym(name)
+        return self.gen.sym(name)
 
     def base_name(self, input: InputNode) -> str:
         if isinstance(input, str):
@@ -157,14 +176,7 @@ class Parser(LocVisitor):
         base_name = self.base_name(input)
         loc = self.make_location(input)
         sym = self.gensym(base_name).at(loc)
-        label = sym.label
-        if isinstance(label, Symbol):
-            raise TypeError('Label should be a string.')
-        self.env.update({base_name: Redirect(label)})
-        # The following statement can override the previous,
-        # if sym.label == base_name
-        # That is fine and intended.
-        self.env.update({label: sym})
+        self.vtrack[base_name] = sym
         return sym
 
     def make_assign(self,
@@ -187,8 +199,9 @@ class Parser(LocVisitor):
             binding = (label, self.global_env.gen.sym(label))
         sinputs = [p.new_variable(i) for i in inputs]
         p.dest = binding[1]
-        p.env[binding[0]] = binding[1]
-        p.env.update({k: v for k, v in zip(inputs, sinputs)})
+        p.vtrack[binding[0]] = binding[1]
+        for k, v in zip(inputs, sinputs):
+            p.vtrack[self.base_name(k)] = v
         if callable(expr):
             body = expr(p)
         elif isinstance(expr, list):
@@ -200,11 +213,11 @@ class Parser(LocVisitor):
         lbda = self.reg_lambda(
             fargs + sinputs,
             body,
-            self.env.gen,
+            self.gen,
             loc=loc,
             binding=binding).at(loc)
         if len(fargs) > 0:
-            return Closure(lbda, [self.env[k] for k in fargnames]).at(loc)
+            return Closure(lbda, [self.vtrack[k] for k in fargnames]).at(loc)
         else:
             return lbda
 
@@ -301,7 +314,7 @@ class Parser(LocVisitor):
         aug = self.visit(node.value)
         op = get_operator(node.op).at(loc)
         self.visit_variable(targ.id)
-        prev = self.env[targ.id]
+        prev = self.vtrack[targ.id]
         val = Apply(op, prev, aug, location=loc)
         return self.make_assign(targ.id, val, loc)
 
@@ -422,20 +435,20 @@ class Parser(LocVisitor):
             self.visit_variable(k)
 
         then_args = [sym for v, sym in p1.free_variables.items()]
-        then_vars = [self.env[v] for v in p1.free_variables]
+        then_vars = [self.vtrack[v] for v in p1.free_variables]
 
         else_args = [sym for v, sym in p2.free_variables.items()]
-        else_vars = [self.env[v] for v in p2.free_variables]
+        else_vars = [self.vtrack[v] for v in p2.free_variables]
 
         def mkapply(then_body, else_body):
             then_fn = self.reg_lambda(
-                then_args, then_body, self.env.gen, None, "#if",
+                then_args, then_body, self.gen, None, "#if",
                 (None, p1.dest)
             )
             then_branch = Closure(then_fn, then_vars)
 
             else_fn = self.reg_lambda(
-                else_args, else_body, self.env.gen, None, "#if",
+                else_args, else_body, self.gen, None, "#if",
                 (None, p2.dest)
             )
             else_branch = Closure(else_fn, else_vars)
@@ -454,13 +467,13 @@ class Parser(LocVisitor):
 
             if len(ass) == 1:
                 a, = ass
-                app = mkapply(body(p1.env[a]), orelse(p2.env[a]))
+                app = mkapply(body(p1.vtrack[a]), orelse(p2.vtrack[a]))
                 return self.make_assign(a, app, None)
 
             else:
                 app = mkapply(
-                    body(Tuple(p1.env[v] for v in ass)),
-                    orelse(Tuple(p2.env[v] for v in ass))
+                    body(Tuple(p1.vtrack[v] for v in ass)),
+                    orelse(Tuple(p2.vtrack[v] for v in ass))
                 )
                 tmp = self.gensym('#tmp')
                 stmts = [_Assign(tmp, app, None)]
@@ -539,8 +552,9 @@ class Parser(LocVisitor):
 
     def visit_variable(self, name: str, loc: Location = None) -> Symbol:
         try:
-            free, v = self.env.get_free(name)
-            assert isinstance(v, Symbol)
+            # free, v = self.env.get_free(name)
+            # assert isinstance(v, Symbol)
+            free, v = self.vtrack.get_free(name)
             if free:
                 if self.pull_free_variables:
                     v = self.new_variable(name)
@@ -628,14 +642,14 @@ class Parser(LocVisitor):
         in_syms = [p.new_variable(v) for v in in_vars]
         # Have to execute this before the body in order to get the right
         # symbols, otherwise they will be shadowed
-        initial_values = [p.env[v] for v in out_vars]
+        initial_values = [p.vtrack[v] for v in out_vars]
         test = p.visit(node.test)
         body = p.body_wrapper(node.body)
 
         if_args = in_syms
-        if_body = body(Apply(wsym, *[p.env[v] for v in in_vars])).at(loc)
+        if_body = body(Apply(wsym, *[p.vtrack[v] for v in in_vars])).at(loc)
         if_fn = self.reg_lambda(
-            if_args, if_body, self.env.gen, None, "#while_if",
+            if_args, if_body, self.gen, None, "#while_if",
             (None, wbsym)
         )
         new_body = Apply(Apply(
@@ -649,7 +663,7 @@ class Parser(LocVisitor):
             l = Lambda(
                 in_syms,
                 new_body,
-                p.env.gen,
+                p.gen,
                 location=loc
             )
             l.ref = wsym
@@ -659,7 +673,7 @@ class Parser(LocVisitor):
         # self.globals_accessed.add(wsym.label)
 
         tmp = self.gensym('#tmp').at(loc)
-        val = Apply(wsym, *[self.env[v] for v in in_vars])
+        val = Apply(wsym, *[self.vtrack[v] for v in in_vars])
         stmts: List[MyiaASTNode] = [_Assign(tmp, val, None)]
         for i, v in enumerate(out_vars):
             stmt = self.make_assign(v, Apply(builtins.index, tmp, Value(i)))

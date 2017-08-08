@@ -49,14 +49,8 @@ def _get_location(x: Locatable) -> Location:
         raise TypeError(f'{x} is not a location')
 
 
-class Redirect:
-    def __init__(self, key: str) -> None:
-        self.key = key
-
-
 class ParseEnv:
     def __init__(self,
-                 parent: 'ParseEnv' = None,
                  namespace: str = None,
                  gen: 'GenSym' = None,
                  url: str = None) -> None:
@@ -67,35 +61,15 @@ class ParseEnv:
         else:
             self.events = None
         self.url = url
-        self.parent = parent
-        self.gen: GenSym = gen or \
-            (parent.gen if parent else GenSym(namespace))
-        self.bindings: Dict[Union[str, Symbol],
-                            Union[MyiaASTNode, Redirect]] = {}
-
-    def get_free(self,
-                 name: str) -> TupleT[bool, 'MyiaASTNode']:
-        if name in self.bindings:
-            free = False
-            result = self.bindings[name]
-        elif self.parent is None:
-            raise NameError("Undeclared variable: {}".format(name))
-        else:
-            free = True
-            result = self.parent[name]
-        if isinstance(result, Redirect):
-            return self.get_free(result.key)
-        else:
-            return (free, result)
+        self.gen: GenSym = gen or GenSym(namespace)
+        self.bindings: Dict[Symbol, Lambda] = {}
 
     def update(self, bindings) -> None:
-        # self.bindings.update(bindings)
         for k, v in bindings.items():
             self[k] = v
 
-    def __getitem__(self, name) -> 'MyiaASTNode':
-        _, x = self.get_free(name)
-        return x
+    def __getitem__(self, name) -> 'Lambda':
+        return self.bindings[name]
 
     def __setitem__(self, name, value) -> None:
         self.bindings[name] = value
