@@ -17,6 +17,15 @@ Locatable = Union['MyiaASTNode', 'Location', None]
 
 
 class Location:
+    """
+    Represents a source code location for an AST node.
+
+    Attributes:
+        url (str): The path of the code file.
+        line (int): The line number in that file.
+        column (int): The column number in that file.
+    """
+
     def __init__(self, url: str, line: int, column: int) -> None:
         self.url = url
         self.line = line
@@ -26,6 +35,18 @@ class Location:
         return '{}@{}:{}'.format(self.url, self.line, self.column)
 
     def traceback(self) -> str:
+        """
+        Print out a "traceback" that corresponds to this location,
+        with the line printed out and a caret at the right column.
+        Basically:
+
+        >>> loc.traceback()
+          File {url}, line {line}, column {column}
+            x = f(y)
+                ^
+
+        This is mostly meant for printing out ``MyiaSyntaxError``s.
+        """
         try:
             with open(self.url) as file:
                 raw_code = file.readlines()[self.line - 1].rstrip("\n")
@@ -41,15 +62,56 @@ class Location:
 
 
 def _get_location(x: Locatable) -> Location:
+    """
+    A helper function that returns a Location corresponding to
+    whatever the argument is (a MyiaASTNode or a Location).
+    """
     if isinstance(x, MyiaASTNode):
         return x.location
     elif isinstance(x, Location) or x is None:
         return x
     else:
-        raise TypeError(f'{x} is not a location')
+        raise TypeError(f'{x} is not a/has no location')
 
 
 class ParseEnv:
+    """
+    A mapping from Symbol instances to Lambda instances. When
+    a function is compiled, a ParseEnv will contain all the
+    functions created during the compilation. These functions
+    will refer to each other with Symbols and the ParseEnv
+    connects them to the relevant code.
+
+    A ParseEnv is associated to a GenSym instance that can
+    generate fresh Symbols, guaranteed not to already be
+    present in the mapping.
+
+    You can index the ParseEnv like a dict:
+
+    >>> parse_env[some_symbol] = some_lambda
+    >>> parse_env[some_symbol]
+    some_lambda
+
+    When a new Symbol is defined, the ParseEnv also emits the
+    ``declare`` event.
+
+    Attributes:
+        namespace (str): The namespace in which this ParseEnv's
+            Symbols live.
+        gen (GenSym): The Symbol generator for this ParseEnv.
+        url (str): The filename in which the compiled code
+            originally came from.
+        bindings ({Symbol: Lambda}}): The mapping.
+        events (EventDispatcher): Events that this object might
+            emit, chiefly the ``declare`` event.
+
+    Events:
+        declare(event, symbol, lbda): Triggered when a new mapping
+            is added. You can listen to this to track the various
+            functions that are being compiled. Use
+            ``@parse_env.events.on_declare`` decorator.
+    """
+
     def __init__(self,
                  namespace: str = None,
                  gen: 'GenSym' = None,
@@ -65,6 +127,11 @@ class ParseEnv:
         self.bindings: Dict[Symbol, Lambda] = {}
 
     def update(self, bindings) -> None:
+        """
+        Set several bindings at once.
+
+        Same as ``self.bindings.update(bindings)``
+        """
         for k, v in bindings.items():
             self[k] = v
 
@@ -81,6 +148,16 @@ T = TypeVar('T', bound='MyiaASTNode')
 
 
 class MyiaASTNode(HReprBase):
+    """
+    Base class for Myia's AST nodes. This does a few bookkeeping
+    operations:
+
+    * If the ``__save_trace__`` global is set, it will save the
+      current trace in the node.
+    * It initializes a set of annotations.
+    * It generates boilerplate HTML for use with ``hrepr``.
+    """
+
     def __init__(self, location: Locatable = None) -> None:
         self.location = _get_location(location)
         if __save_trace__:
@@ -92,6 +169,11 @@ class MyiaASTNode(HReprBase):
         self.annotations: Set[str] = set()
 
     def at(self: T, location: Locatable) -> T:
+        """
+        Returns a copy of the node but which has the same location
+        as the node given as an argument (a new Location can also
+        be given directly). This does not modify the current node.
+        """
         rval = copy(self)
         rval.location = _get_location(location)
         return rval
@@ -121,7 +203,7 @@ class Symbol(MyiaASTNode):
     Attributes:
         label (str or Symbol): the name of the variable. If
             relation is None, this must be a string, otherwise
-            this must be a symbol.
+            this must be a Symbol.
         namespace (str): the namespace in which the variable
             lives. This is usually 'global', 'builtin', or a
             uuid created on a per-Lambda expression basis.
@@ -162,6 +244,8 @@ class Symbol(MyiaASTNode):
         return f'{r}{self.label}{v}'
 
     def __eq__(self, obj) -> bool:
+        """Two symbols are equal if they have the same label,
+        namespace, version and relation to their label."""
         s: Symbol = obj
         return isinstance(s, Symbol) \
             and self.label == s.label \
@@ -188,6 +272,14 @@ class Symbol(MyiaASTNode):
 
 
 class Value(MyiaASTNode):
+    """
+    A literal value, like a literal integer, float or string,
+    or True, False, or None. If you build an AST manually, any
+    value can be put in there.
+
+    Attributes:
+        value: Some value.
+    """
     def __init__(self, value, **kw):
         self.value = value
         super().__init__(**kw)
@@ -200,6 +292,16 @@ class Value(MyiaASTNode):
 
 
 class Let(MyiaASTNode):
+    """
+    A sequence of variable bindings followed by a body expression
+    which is the Let node's return value.
+
+    Fields:
+        bindings ([(Symbol, MyiaASTNode), ...]): a list of variable
+            bindings. The variable in each binding should be distinct.
+        body (MyiaASTNode): The expression to return.
+    """
+
     def __init__(self,
                  bindings: List[TupleT[Symbol, MyiaASTNode]],
                  body: MyiaASTNode,
@@ -209,6 +311,10 @@ class Let(MyiaASTNode):
         self.body = body
 
     def children(self) -> List[MyiaASTNode]:
+        """
+        Return all the variables, binding expressions, and
+        then the body.
+        """
         rval: List[MyiaASTNode] = []
         for a, b in self.bindings:
             rval += [a, b]
@@ -233,6 +339,27 @@ class Let(MyiaASTNode):
 
 
 class Lambda(MyiaASTNode):
+    """
+    A function definition. This is the main unit that we will
+    manipulate and transform and it has a few special fields.
+    Most importantly, ``gen`` is a ``GenSym`` instance that can
+    be used to create fresh symbols in the context of this
+    Lambda, and ``global_env`` contains the necessary bindings
+    to resolve global variables in the body.
+
+    Fields:
+        args ([Symbol]): List of argument variables.
+        body (MyiaASTNode): Expression that the call should return.
+        gen (GenSym): Symbol factory for this Lambda.
+        global_env (ParseEnv): Environment to resolve global
+            variables.
+        ref (Symbol): Symbol that points to this Lambda in the
+            ``global_env``.
+        primal (Symbol): If this Lambda is the output of ``Grad``,
+            then ``primal`` points (in the ``global_env``)
+            to ``Grad``'s original input Lambda. Otherwise, this
+            is None.
+    """
     def __init__(self,
                  args: List[Symbol],
                  body: MyiaASTNode,
@@ -264,6 +391,20 @@ class Lambda(MyiaASTNode):
 
 
 class Apply(MyiaASTNode):
+    """
+    Function application. Note that operations like indexing or
+    getting an attribute do not have their own nodes in Myia's
+    AST. Instead they are applications of ``index`` or ``getattr``.
+
+    Attributes:
+        fn: Expression for the function to call.
+        args: List of arguments to apply the function to.
+        cannot_fail: An annotation added by the parser or
+            compiler that indicates that the call is not supposed
+            to fail (that is, regardless of what the user does),
+            so that when it inevitably does, blame can be assigned
+            properly. This is not widely used yet.
+    """
     def __init__(self,
                  fn: MyiaASTNode,
                  *args: MyiaASTNode,
@@ -272,9 +413,6 @@ class Apply(MyiaASTNode):
         super().__init__(**kw)
         self.fn = fn
         self.args = list(args)
-        # Boilerplate calls added by the parser should be
-        # annotated cannot_fail if they are not supposed to fail,
-        # so that when they inevitably do, blame can be assigned properly.
         self.cannot_fail = cannot_fail
 
     def children(self) -> List[MyiaASTNode]:
@@ -293,6 +431,16 @@ class Apply(MyiaASTNode):
 
 
 class Begin(MyiaASTNode):
+    """
+    A sequence of expressions, the last of which is the return
+    value. Return values from other expressions are simply
+    ignored, so if there are no side-effects this node can be
+    replaced by its last element without issue.
+
+    Attributes:
+        stmts: A list of expressions, the last of which is the
+            return value for Begin.
+    """
     def __init__(self, stmts: List[MyiaASTNode], **kw) -> None:
         super().__init__(**kw)
         self.stmts = stmts
@@ -311,6 +459,12 @@ class Begin(MyiaASTNode):
 
 
 class Tuple(MyiaASTNode):
+    """
+    A tuple of expressions.
+
+    Attributes:
+        values: A list of values in this tuple.
+    """
     def __init__(self, values: Iterable[MyiaASTNode], **kw) -> None:
         super().__init__(**kw)
         self.values = list(values)
@@ -328,6 +482,17 @@ class Tuple(MyiaASTNode):
 
 
 class Closure(MyiaASTNode):
+    """
+    Associates a function with a list of arguments, without calling
+    it. The result is a function that will concatenate the stored
+    arguments to the others it will receive.
+
+    This essentially represents a partial application.
+
+    Attributes:
+        fn: Expression for the function to call.
+        args: Its first arguments.
+    """
     def __init__(self,
                  fn: MyiaASTNode,
                  args: Iterable[MyiaASTNode],
@@ -358,6 +523,9 @@ class GenSym:
 
     If it is given None as its initial namespace, GenSym generates
     a unique namespace with the uuid4 method.
+
+    Attributes:
+        namespace: The namespace in which the symbols are generated.
     """
 
     def __init__(self, namespace: str = None) -> None:
@@ -418,6 +586,11 @@ class GenSym:
 
 
 class _Assign(MyiaASTNode):
+    """
+    This is a "temporary" node that ``front.Parser`` uses to
+    represent a variable assignment. It is then transformed
+    into Let.
+    """
     def __init__(self,
                  varname: Symbol,
                  value: MyiaASTNode,
@@ -431,6 +604,16 @@ class _Assign(MyiaASTNode):
 
 
 class Transformer:
+    """
+    Base class for Myia AST transformers.
+
+    Upon transforming a node, ``Transformer.transform``
+    transfers the original's location to the new node,
+    if it doesn't have a location.
+
+    Define methods called ``transform_<node_type>``,
+    e.g. ``transform_Symbol``.
+    """
     def transform(self, node, **kwargs):
         cls = node.__class__.__name__
         try:

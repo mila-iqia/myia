@@ -333,7 +333,7 @@ class Parser(LocVisitor):
     #     elif isinstance(node.op, ast.Or):
     #         return If(self.visit(left), Value(True), self.visit(right))
     #     else:
-    #         raise MyiaSyntaxError(loc, "Unknown operator: {}".format(node.op))
+    #         raise MyiaSyntaxError(loc, f"Unknown operator: {node.op}"
 
     def visit_Call(self, node: ast.Call, loc: Location) -> MyiaASTNode:
         if (len(node.keywords) > 0):
