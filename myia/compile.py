@@ -4,7 +4,7 @@ from typing import Union, Any, List, cast, \
 import re
 from myia.ast import \
     MyiaASTNode, Apply, Symbol, Value, Let, Lambda, \
-    If, Closure, Tuple, Transformer
+    Closure, Tuple, Transformer
 from myia.front import GenSym
 
 
@@ -116,11 +116,6 @@ class ANormalTransformer(Transformer):
         result.global_env = node.global_env
         return self.stash(stash, result, 'lambda')
 
-    def transform_If(self, node, stash=None) -> MyiaASTNode:
-        return self.transform_arguments([node.cond, node.t, node.f],
-                                        If, stash, 'if',
-                                        ['cond', 'then', 'else'])
-
     def transform_Let(self, node, stash=None) -> MyiaASTNode:
         result = Let([(s, self.transform(b)) for s, b in node.bindings],
                      self.transform(node.body))
@@ -185,11 +180,6 @@ class CollapseLet(Transformer):
 
     def transform_Tuple(self, node) -> MyiaASTNode:
         return Tuple(self.transform(a) for a in node.values)
-
-    def transform_If(self, node) -> MyiaASTNode:
-        return If(self.transform(node.cond),
-                  self.transform(node.t),
-                  self.transform(node.f))
 
     def transform_Closure(self, node) -> MyiaASTNode:
         return node

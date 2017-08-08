@@ -6,7 +6,7 @@ from .event import EventDispatcher
 from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
-    Let, If, Lambda, Apply, \
+    Let, Lambda, Apply, \
     Begin, Tuple, Closure, _Assign, \
     GenSym, ParseEnv
 from myia.util import group_contiguous
@@ -325,15 +325,15 @@ class Parser(LocVisitor):
             self.visit(node.left),
             self.visit(node.right), location=loc)
 
-    def visit_BoolOp(self, node: ast.BoolOp, loc: Location) -> If:
-        raise MyiaSyntaxError(loc, 'Boolean expressions are not supported.')
-        left, right = node.values
-        if isinstance(node.op, ast.And):
-            return If(self.visit(left), self.visit(right), Value(False))
-        elif isinstance(node.op, ast.Or):
-            return If(self.visit(left), Value(True), self.visit(right))
-        else:
-            raise MyiaSyntaxError(loc, "Unknown operator: {}".format(node.op))
+    # def visit_BoolOp(self, node: ast.BoolOp, loc: Location) -> If:
+    #     raise MyiaSyntaxError(loc, 'Boolean expressions are not supported.')
+    #     left, right = node.values
+    #     if isinstance(node.op, ast.And):
+    #         return If(self.visit(left), self.visit(right), Value(False))
+    #     elif isinstance(node.op, ast.Or):
+    #         return If(self.visit(left), Value(True), self.visit(right))
+    #     else:
+    #         raise MyiaSyntaxError(loc, "Unknown operator: {}".format(node.op))
 
     def visit_Call(self, node: ast.Call, loc: Location) -> MyiaASTNode:
         if (len(node.keywords) > 0):
@@ -486,12 +486,12 @@ class Parser(LocVisitor):
                     stmts.append(stmt)
                 return Begin(cast(List[MyiaASTNode], stmts))
 
-    def visit_IfExp(self, node: ast.IfExp, loc: Location) -> If:
-        raise MyiaSyntaxError(loc, 'If expressions are not supported.')
-        return If(self.visit(node.test),
-                  self.visit(node.body),
-                  self.visit(node.orelse),
-                  location=loc)
+    # def visit_IfExp(self, node: ast.IfExp, loc: Location) -> If:
+    #     raise MyiaSyntaxError(loc, 'If expressions are not supported.')
+    #     return If(self.visit(node.test),
+    #               self.visit(node.body),
+    #               self.visit(node.orelse),
+    #               location=loc)
 
     def visit_Index(self, node: ast.Index, loc: Location) -> MyiaASTNode:
         return self.visit(node.value)
@@ -501,50 +501,50 @@ class Parser(LocVisitor):
         return self.make_closure([a for a in node.args.args],
                                  node.body, loc=loc).at(loc)
 
-    def visit_ListComp(self, node: ast.ListComp, loc: Location) \
-            -> MyiaASTNode:
+    # def visit_ListComp(self, node: ast.ListComp, loc: Location) \
+    #         -> MyiaASTNode:
 
-        raise MyiaSyntaxError(loc, 'List comprehensions not supported.')
+    #     raise MyiaSyntaxError(loc, 'List comprehensions not supported.')
 
-        if len(node.generators) > 1:
-            raise MyiaSyntaxError(
-                loc,
-                "List comprehensions can only iterate over a single target"
-            )
+    #     if len(node.generators) > 1:
+    #         raise MyiaSyntaxError(
+    #             loc,
+    #             "List comprehensions can only iterate over a single target"
+    #         )
 
-        gen = node.generators[0]
-        if not isinstance(gen.target, ast.Name):
-            t = gen.target
-            raise MyiaSyntaxError(
-                loc,
-                f'List comprehension target must be a Name, not {t}'
-            )
+    #     gen = node.generators[0]
+    #     if not isinstance(gen.target, ast.Name):
+    #         t = gen.target
+    #         raise MyiaSyntaxError(
+    #             loc,
+    #             f'List comprehension target must be a Name, not {t}'
+    #         )
 
-        arg: MyiaASTNode = None
-        if len(gen.ifs) > 0:
-            test1, *others = reversed(gen.ifs)
+    #     arg: MyiaASTNode = None
+    #     if len(gen.ifs) > 0:
+    #         test1, *others = reversed(gen.ifs)
 
-            def mkcond(p):
-                cond = p.visit(test1)
-                for test in others:
-                    cond = If(p.visit(test), cond, Value(False))
-                return cond
+    #         def mkcond(p):
+    #             cond = p.visit(test1)
+    #             for test in others:
+    #                 cond = If(p.visit(test), cond, Value(False))
+    #             return cond
 
-            arg = Apply(builtins.filter,
-                        self.make_closure([gen.target], mkcond,
-                                          loc=loc, label="#filtercmp"),
-                        self.visit(gen.iter))
-        else:
-            arg = self.visit(gen.iter)
+    #         arg = Apply(builtins.filter,
+    #                     self.make_closure([gen.target], mkcond,
+    #                                       loc=loc, label="#filtercmp"),
+    #                     self.visit(gen.iter))
+    #     else:
+    #         arg = self.visit(gen.iter)
 
-        lbda = self.make_closure(
-            [gen.target],
-            node.elt,
-            loc=loc,
-            label="#listcmp"
-        )
+    #     lbda = self.make_closure(
+    #         [gen.target],
+    #         node.elt,
+    #         loc=loc,
+    #         label="#listcmp"
+    #     )
 
-        return Apply(builtins.map, lbda, arg, location=loc)
+    #     return Apply(builtins.map, lbda, arg, location=loc)
 
     def visit_Module(self, node, loc, allow_decorator=False):
         return [self.visit(stmt, allow_decorator=allow_decorator)

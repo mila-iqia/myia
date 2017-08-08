@@ -263,31 +263,6 @@ class Lambda(MyiaASTNode):
         )
 
 
-class If(MyiaASTNode):
-    def __init__(self,
-                 cond: MyiaASTNode,
-                 t: MyiaASTNode,
-                 f: MyiaASTNode,
-                 **kw) -> None:
-        super().__init__(**kw)
-        self.cond = cond
-        self.t = t
-        self.f = f
-
-    def children(self) -> List[MyiaASTNode]:
-        return [self.cond, self.t, self.f]
-
-    def __str__(self) -> str:
-        return '(if {} {} {})'.format(self.cond, self.t, self.f)
-
-    def __hrepr__(self, H, hrepr):
-        return super().__hrepr__(H, hrepr)(
-            H.div['IfCond'](hrepr(self.cond)),
-            H.div['IfThen'](hrepr(self.t)),
-            H.div['IfElse'](hrepr(self.f))
-        )
-
-
 class Apply(MyiaASTNode):
     def __init__(self,
                  fn: MyiaASTNode,

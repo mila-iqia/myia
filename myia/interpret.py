@@ -3,7 +3,7 @@ from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
-    Let, If, Lambda, Apply, Begin, Tuple, Closure
+    Let, Lambda, Apply, Begin, Tuple, Closure
 from .front import parse_function, ParseEnv
 from .buche import HReprBase
 from .symbols import builtins
