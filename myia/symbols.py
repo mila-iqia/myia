@@ -1,14 +1,40 @@
+"""
+Symbol bank for Myia. Each symbol represents a certain
+functionality, but does not contain it. A symbol is a
+glorified variable name.
 
+The symbols live in two namespaces:
+
+* ``builtin`` is the namespace for functions that are for
+  internal use and are not meant to be referred to by name
+  by the user.
+* ``global`` is the namespace for global functions that the
+  user can refer to by name.
+"""
+
+
+import ast
 from .ast import Symbol, Value
 from .util import Props
 from typing import Dict
 
 
 def bsym(name: str) -> Symbol:
+    """
+    Create a builtin symbol.
+
+    This function is for internal use and are not meant to
+    be referred to by name by the user.
+    """
     return Symbol(name, namespace='builtin')
 
 
 def gsym(name: str) -> Symbol:
+    """
+    Create a global symbol.
+
+    This function can be called by name by the user.
+    """
     return Symbol(name, namespace='global')
 
 
@@ -39,6 +65,15 @@ builtins_dict: Dict[str, Symbol] = dict(
     setslice = bsym('setslice'),
     identity = bsym('identity'),
 
+    # Grad-related builtins
+    fill = gsym('fill'),
+    zero = gsym('zero'),
+    one = gsym('one'),
+    merge = gsym('merge'),
+    J = gsym('J'),
+    JX = gsym('JX'),
+    Jinv = gsym('Jinv'),
+
     # Myia's global variables
     myia_builtins = gsym('myia_builtins'),
     len = gsym('len'),
@@ -56,6 +91,8 @@ builtins_dict: Dict[str, Symbol] = dict(
 builtins = Props(builtins_dict)
 
 
+# Maps the names of Python AST nodes to corresponding
+# builtin operations.
 operator_map: Dict[str, Symbol] = dict(
     Add = builtins.add,
     Sub = builtins.subtract,
@@ -130,7 +167,10 @@ function_map = {
 # END]]]
 
 
-def get_operator(node):
+def get_operator(node: ast.AST) -> Symbol:
+    """
+    Given a Python AST node, return the corresponding Symbol.
+    """
     try:
         return operator_map[node.__class__.__name__]
     except KeyError:

@@ -16,15 +16,6 @@ from .util import Props
 from .buche import buche
 
 
-builtins.fill = gsym('fill')
-builtins.zero = gsym('zero')
-builtins.one = gsym('one')
-builtins.merge = gsym('merge')
-builtins.J = gsym('J')
-builtins.JX = gsym('JX')
-builtins.Jinv = gsym('Jinv')
-
-
 LeafType = Union[Symbol, Value]
 
 
