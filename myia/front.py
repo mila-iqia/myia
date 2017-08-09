@@ -1,3 +1,114 @@
+"""
+Parse Python's AST to produce a Myia AST.
+
+* Parser does the transform.
+* parse_source, parse_function are the nicer API entry points.
+
+== Understanding the output
+
+The Parser rewrites Python to a pure functional form, where loops
+are mapped to recursive calls. Evaluation is eager, therefore
+the branches of conditionals are also mapped to functions.
+
+=== Conditionals
+
+An if statement is, more or less, transformed as follows:
+
+    if test():
+        return f(x)
+    else:
+        return g(y)
+
+Becomes:
+
+    [lambda: g(y), lambda: f(x)][test()]()
+
+Recall that True and False are equivalent to 1 and 0 respectively.
+In any case, Myia uses an operation called ``switch``, which is like
+a non-lazy if, but the principle is the same.
+
+=== Loops
+
+A loop is transformed like this:
+
+    while test():
+        x = f(y)
+        y = g(z)
+
+Becomes:
+
+    def while_fn(x, y):
+        if test():
+            x = f(y)
+            y = g(z)
+            return while_fn(x, y)
+        else:
+            return x, y
+    x, y = while_fn(x, y)
+
+The ``if`` statement is also transformed, as explained earlier, so
+a while loop actually becomes two functions.
+
+=== Variables
+
+The result is a form of SSA, that is to say, all variables are
+set exactly once. Multiple assignments to the same variable in Python
+become assignments to new variables:
+
+    x = 1; x = 2 * x; x = x + x
+    ==>
+    x = 1; x#2 = 2 * x; x#3 = x#2 + x#2
+
+=== Free variables
+
+Myia's transform produces closure-converted functions. What this means
+is that functions have no free variables. Instead, we add the free
+variables as arguments, and we create a data structure (a closure
+object, which is like a partial application) that contains a pointer
+to the function and to a list of values that we can prepend to its
+arguments. In other words:
+
+    def f(x):
+        def g(y):
+            return x + y
+        return g
+
+Becomes something like this:
+
+    def _g(x, y):
+        return x + y
+
+    def f(x):
+        g = functools.partial(_g, x)
+        return g
+
+So the idea is that we pull _g out and we make it a global function
+(with a name chosen to avoid clashes), but then we create a partial
+application object where we can store x. This is equivalent to our
+original g.
+
+=== Auxiliary function names
+
+In order to enhance readability somewhat, the auxiliary functions that
+the parser creates follow this naming scheme:
+
+* ✓f is executed when the condition of the first ``if`` statement of
+  f is True.
+* ✗f is executed when the condition of the first ``if`` statement of
+  f is False.
+* ⤾f is the test for a ``while`` loop. Remember it by the fact it's
+  only half a loop. We're only trying to figure out whether to
+  perform a loop iteration or not.
+* ⥁f is the body for a ``while`` loop. Remember it by the fact it's
+  a complete loop, so at the end of it we performed one full
+  iteration.
+* ✓f#2 is the condition of the second ``if`` statement, and so on.
+
+Other transforms may create other derived functions and variables.
+See ``grad.py`` for gradient-related annotations.
+"""
+
+
 from typing import \
     Dict, Set, List, Tuple as TupleT, \
     cast, Union, Callable, Optional, Any
@@ -227,7 +338,7 @@ class Parser(LocVisitor):
         self.local_assignments: Dict[str, bool] = OrderedDict()
         self.returns = False
 
-    def sub_parser(self, **kw):
+    def sub_parser(self, **kw) -> 'Parser':
         """
         Return a new Parser derived from this one. Variables
         in the current expression will be free variables in
@@ -410,9 +521,36 @@ class Parser(LocVisitor):
             fbody = p.visit(body)
         return self.construct_closure(p, sargs, fbody, loc)
 
+    ###################
+    # Visitor helpers #
+    ###################
+
     def body_wrapper(self,
                      stmts: List[ast.stmt]) \
             -> Callable[[Optional[MyiaASTNode]], MyiaASTNode]:
+        """
+        Process a list of statements as found in the body of a
+        Python function, loop or conditional. Produce a Let node.
+
+        Essentially, each statement is categorized as either an
+        assignment or an expression. ``body_wrapper`` will identify
+        these groups and will appropriately create nested Lets.
+
+        The value of the Let expression can either be a ``return``
+        statement, or a tuple of variables that we want to obtain
+        because e.g. we need to communicate them outside the body
+        of if or while. This is handled by returning a callback:
+
+        Returns:
+            A callback that can be passed either a node to return,
+            or None:
+
+            * Pass a value to make the innermost Let expression
+              return that value.
+            * Pass None to signify that the last statement should
+              be returned (and raise an error if there is no return
+              statement.)
+        """
         results: List[MyiaASTNode] = []
         for stmt in stmts:
             ret = self.returns
@@ -426,35 +564,71 @@ class Parser(LocVisitor):
                 results += r.stmts
             else:
                 results.append(r)
+
+        # We group _Assign nodes together (under the label True),
+        # and anything else together (under the label False).
+        # The order is preserved by this transformation.
         groups = group_contiguous(results, lambda x: isinstance(x, _Assign))
 
         def helper(groups, result=None):
             (isass, grp), *rest = groups
             if isass:
+                # This is a batch of _Assign nodes, we make a Let.
                 bindings = tuple((a.varname, a.value) for a in grp)
                 if len(rest) == 0:
+                    # There are no more groups to process
                     if result is None:
+                        # But we have nothing to return!
                         raise MyiaSyntaxError(
                             grp[-1].location,
                             "Missing return statement."
                         )
                     else:
+                        # Return what was given in the callback
                         return Let(bindings, result)
+                # Process the rest of the groups
                 return Let(bindings, helper(rest, result))
             elif len(rest) == 0:
+                # A batch of normal nodes, and it's the last batch.
+                if result is not None:
+                    # If we want to force a particular result, we
+                    # simply add it at the end.
+                    grp.append(result)
                 if len(grp) == 1:
                     return grp[0]
                 else:
                     return Begin(grp)
             else:
+                # A batch of normal nodes, we must process the rest.
                 return Begin(grp + [helper(rest, result)])
 
         return lambda v: helper(groups, v)
 
     def visit_body(self, stmts: List[ast.stmt]) -> MyiaASTNode:
+        """
+        Visit a list of Python statements.
+        """
+        # Shortcut for telling body_wrapper to return the block's
+        # normal value.
         return self.body_wrapper(stmts)(None)
 
     def visit_variable(self, name: str, loc: Location = None) -> Symbol:
+        """
+        Declare that the code we are parsing needs to access the given
+        variable, and return the appropriate Symbol associated to that
+        variable name.
+
+        This means:
+
+        * If this is a free variable and we want to "pull" free variables,
+          create a fresh Symbol and store it in ``free_variables`` instead
+          of using the one that already exists. The caller will know what
+          to do with them.
+        * If the variable is declared neither here nor in the parent, then
+          we simply assume this is a global variable and we return a
+          Symbol that lives in the global namespace (which might only be
+          defined in the future).
+        """
         try:
             free, v = self.vtrack.get_free(name)
             if free:
@@ -466,54 +640,71 @@ class Parser(LocVisitor):
         except NameError as e:
             return Symbol(name, namespace='global')
 
+    #################################
+    # Visitors for Python AST nodes #
+    #################################
+
     def visit_Assign(self, node: ast.Assign, loc: Location) -> _Assign:
         targ, = node.targets
         if isinstance(targ, ast.Tuple):
+            # UNSUPPORTED: x, y = value
             raise MyiaSyntaxError(
                 loc,
                 "Deconstructing assignment is not supported."
             )
-        if isinstance(targ, ast.Subscript):
-            if not isinstance(targ.value, ast.Name):
+
+        elif isinstance(targ, ast.Subscript):
+            if isinstance(targ.value, ast.Name):
+                # CASE: x[y] = value
+                val = self.visit(node.value)
+                slice = Apply(builtins.setslice,
+                              self.visit(targ.value),
+                              self.visit(targ.slice), val)
+                return self.make_assign(targ.value.id, slice, loc)
+            else:
+                # UNSUPPORTED: f()[x] = value
                 raise MyiaSyntaxError(
                     loc,
                     "You can only set a slice on a variable."
                 )
 
-            val = self.visit(node.value)
-            slice = Apply(builtins.setslice,
-                          self.visit(targ.value),
-                          self.visit(targ.slice), val)
-            return self.make_assign(targ.value.id, slice, loc)
-
         elif isinstance(targ, ast.Name):
+            # CASE: x = y
             val = self.visit(node.value)
             return self.make_assign(targ.id, val, loc)
 
         else:
+            # UNSUPPORTED: x.attr = y
+            # and others, probably
             raise MyiaSyntaxError(loc, f'Unsupported targ for Assign: {targ}')
 
     def visit_Attribute(self, node: ast.Attribute, loc: Location) -> Apply:
+        # CASE: x.attr
         return Apply(builtins.getattr.at(loc),
                      self.visit(node.value),
                      Value(node.attr).at(loc)).at(loc)
 
     def visit_AugAssign(self, node: ast.AugAssign, loc: Location) -> _Assign:
         targ = node.target
-        if not isinstance(targ, ast.Name):
+        if isinstance(targ, ast.Name):
+            # CASE: x += y
+            aug = self.visit(node.value)
+            op = get_operator(node.op).at(loc)
+            self.visit_variable(targ.id)
+            prev = self.vtrack[targ.id]
+            val = Apply(op, prev, aug, location=loc)
+            return self.make_assign(targ.id, val, loc)
+        else:
+            # UNSUPPORTED: x[y] += z
+            # UNSUPPORTED: x.attr += z
             raise MyiaSyntaxError(
                 loc,
                 "Augmented assignment to subscripts or "
                 "slices is not supported."
             )
-        aug = self.visit(node.value)
-        op = get_operator(node.op).at(loc)
-        self.visit_variable(targ.id)
-        prev = self.vtrack[targ.id]
-        val = Apply(op, prev, aug, location=loc)
-        return self.make_assign(targ.id, val, loc)
 
     def visit_BinOp(self, node: ast.BinOp, loc: Location) -> Apply:
+        # CASE: a + b, a - b, etc.
         op = get_operator(node.op).at(loc)
         l = self.visit(node.left)
         r = self.visit(node.right)
@@ -530,8 +721,15 @@ class Parser(LocVisitor):
     #         raise MyiaSyntaxError(loc, f"Unknown operator: {node.op}"
 
     def visit_Call(self, node: ast.Call, loc: Location) -> MyiaASTNode:
+        # CASE: f(x, y)
         if len(node.keywords) > 0:
+            # UNSUPPORTED: f(x = y), f(**xs)
             raise MyiaSyntaxError(loc, "Keyword arguments are not allowed.")
+        for arg in node.args:
+            # UNSUPPORTED: f(*xs)
+            if isinstance(arg, ast.Starred):
+                raise MyiaSyntaxError(self.locator(arg),
+                                      "*args are not allowed.")
         args = [self.visit(arg) for arg in node.args]
         if isinstance(node.func, ast.Name) and node.func.id in self.macros:
             return self.macros[node.func.id](*args)
@@ -539,12 +737,14 @@ class Parser(LocVisitor):
         return Apply(func, *args, location=loc)
 
     def visit_Compare(self, node: ast.Compare, loc: Location) -> Apply:
+        # CASE: x < y, x == y, etc.
         ops = [get_operator(op) for op in node.ops]
         if len(ops) == 1:
             l = self.visit(node.left)
             cmp = self.visit(node.comparators[0])
             return Apply(ops[0], l, cmp)
         else:
+            # UNSUPPORTED: x < y < z
             raise MyiaSyntaxError(
                 loc,
                 "Comparisons must have a maximum of two operands"
@@ -557,6 +757,8 @@ class Parser(LocVisitor):
         return self.visit(node.value)
 
     def visit_ExtSlice(self, node: ast.ExtSlice, loc: Location) -> Tuple:
+        # CASE: x[a, b, c:d]
+        #         ^^^^^^^^^
         return Tuple(self.visit(v) for v in node.dims).at(loc)
 
     # def visit_For(self, node, loc): # TODO
@@ -565,35 +767,73 @@ class Parser(LocVisitor):
                           node: ast.FunctionDef,
                           loc: Location,
                           allow_decorator=False) -> _Assign:
+        # CASE: def f(x, y): ...
         if node.args.vararg or node.args.kwarg:
+            # UNSUPPORTED: def f(x, *y)
             raise MyiaSyntaxError(loc, "Varargs are not allowed.")
         if node.args.kwonlyargs:
+            # UNSUPPORTED: def f(x, *, y)
             raise MyiaSyntaxError(
                 loc,
                 "Keyword-only arguments are not allowed."
             )
         if node.args.defaults or node.args.kw_defaults:
+            # UNSUPPORTED: def f(x=dflt)
             raise MyiaSyntaxError(loc, "Default arguments are not allowed.")
         if not allow_decorator and len(node.decorator_list) > 0:
+            # UNSUPPORTED: @deco def f(x, y)
             raise MyiaSyntaxError(loc, "Functions should not have decorators.")
 
+        # Global handle for the function
         lbl = node.name if self.top_level else '#:' + node.name
-        # binding = (node.name, self.global_env.gen(lbl))
         ref = self.global_env.gen(lbl)
 
+        # Local handle
         sym = self.new_variable(node.name)
+
         clos = self.make_closure([arg for arg in node.args.args],
                                  node.body,
                                  loc=loc,
-                                 label=node.name,
+                                 variable=node.name,
                                  ref=ref)
         return _Assign(sym, clos, loc)
 
     def visit_If(self, node: ast.If, loc: Location) -> MyiaASTNode:
+        """
+        Compile If statement as follows:
 
+        * There must be a then branch *and* an else branch.
+        * Both branches become functions. If the parent function is f:
+          * The then branch will be a function named ✓f
+          * The else branch will be a function named ✗f
+          * Nested ifs may produce functions like ✓✓✗f. The outermost
+            condition is the closest one to the function name, so you
+            should read it right to left.
+        * We make a call to ``switch`` on the condition which returns
+          either ✓f or ✗f.
+        * The result is immediately called with no arguments.
+
+        If an if statement contains assignments to variables:
+
+        * Both branches must assign to the exact same variables.
+        * ✓f and ✗f will return a Tuple of the variables' new values.
+        * The tuple will be used to set them in the current scope.
+        """
+
+        # CASE: if cond: then_branch else: else_branch
+
+        if node.orelse == []:
+            # UNSUPPORTED: if cond: then_branch # no else!
+            raise MyiaSyntaxError(
+                loc,
+                "All if statements must be associated to an else statement."
+            )
+
+        # Prepare the then branch
         p1 = self.prepare_closure(ref=self.global_env.gen(self.dest, '✓'))
         body = p1.body_wrapper(node.body)
 
+        # Prepare the else branch
         p2 = self.prepare_closure(ref=self.global_env.gen(self.dest, '✗'))
         orelse = p2.body_wrapper(node.orelse)
 
@@ -614,15 +854,18 @@ class Parser(LocVisitor):
                 )
             )
 
-        def mkapply(then_finalize, else_finalize):
+        def mkapply(then_finalize, else_finalize) -> Apply:
             then_body = body(then_finalize)
             then_branch = self.construct_closure(
-                p1, [], then_body, loc=then_body
+                p1, [], then_body, loc=then_body.location
             )
             else_body = orelse(else_finalize)
             else_branch = self.construct_closure(
-                p2, [], else_body, loc=else_body
+                p2, [], else_body, loc=else_body.location
             )
+            # In a nutshell, we are doing something similar to this:
+            # if test: x; else: y;
+            # ==> [(lambda: y), (lambda: x)][test]()
             return Apply(Apply(builtins.switch,
                                self.visit(node.test),
                                then_branch,
@@ -637,6 +880,7 @@ class Parser(LocVisitor):
             ass = list(p1.local_assignments)
 
             if len(ass) == 1:
+                # Special case when only one variable is set.
                 a, = ass
                 app = mkapply(p1.vtrack[a], p2.vtrack[a])
                 return self.make_assign(a, app, None)
@@ -656,10 +900,13 @@ class Parser(LocVisitor):
     #               location=loc)
 
     def visit_Index(self, node: ast.Index, loc: Location) -> MyiaASTNode:
+        # CASE: x[y]
+        #         ^
         return self.visit(node.value)
 
     def visit_Lambda(self, node: ast.Lambda, loc: Location) \
             -> Union[Closure, Symbol]:
+        # CASE: lambda x, y: z
         return self.make_closure([a for a in node.args.args],
                                  node.body, loc=loc)
 
@@ -708,40 +955,55 @@ class Parser(LocVisitor):
 
     #     return Apply(builtins.map, lbda, arg, location=loc)
 
-    def visit_Module(self, node, loc, allow_decorator=False):
+    def visit_Module(self, node, loc, allow_decorator=False) \
+            -> List[MyiaASTNode]:
+        # This is usually the outermost node, we don't really care
+        # about it.
         return [self.visit(stmt, allow_decorator=allow_decorator)
                 for stmt in node.body]
 
     def visit_Name(self, node: ast.Name, loc: Location) -> Symbol:
+        # CASE: x
+        # (A variable name.)
         return self.visit_variable(node.id, loc)
 
     def visit_NameConstant(self,
                            node: ast.NameConstant,
                            loc: Location) -> Value:
+        # CASE: True, False, None... is that it?
         return Value(node.value)
 
     def visit_Num(self, node: ast.Num, loc: Location) -> Value:
+        # CASE: 1, 2, 3.45
         return Value(node.n)
 
     def visit_Return(self, node: ast.Return, loc: Location) -> MyiaASTNode:
+        # CASE: return x
         if self.return_error:
+            # In some contexts, e.g. while loops, we ban returning
+            # values. This will be relaxed eventually.
             raise MyiaSyntaxError(loc, self.return_error)
         self.returns = True
         return self.visit(node.value).at(loc)
 
     def visit_Slice(self, node: ast.Slice, loc: Location) -> Apply:
+        # CASE: return x[y:z]
+        #                ^^^
         return Apply(Symbol('slice'),
                      self.visit(node.lower) if node.lower else Value(0),
                      self.visit(node.upper) if node.upper else Value(None),
                      self.visit(node.step) if node.step else Value(1))
 
     def visit_Str(self, node: ast.Str, loc: Location) -> Value:
+        # CASE: "abc", 'defg'
         return Value(node.s)
 
     def visit_Tuple(self, node: ast.Tuple, loc: Location) -> Tuple:
+        # CASE: (x, y, z)
         return Tuple(self.visit(v) for v in node.elts).at(loc)
 
     def visit_Subscript(self, node: ast.Subscript, loc: Location) -> Apply:
+        # CASE: x[y], x[y, z], etc.
         # TODO: test this
         return Apply(builtins.index,
                      self.visit(node.value),
@@ -749,70 +1011,96 @@ class Parser(LocVisitor):
                      location=loc)
 
     def visit_UnaryOp(self, node: ast.UnaryOp, loc: Location) -> Apply:
+        # CASE: -x, +x, ~x
         op = get_operator(node.op).at(loc)
         return Apply(op, self.visit(node.operand), location=loc)
 
-    def explore_vars(self, *exprs, return_error=None):
-        testp = self.sub_parser(global_env=ParseEnv(), dry=True)
-        testp.return_error = return_error
+    # def explore_vars(self, *exprs, return_error=None):
+    #     testp = self.sub_parser(global_env=ParseEnv(), dry=True)
+    #     testp.return_error = return_error
 
-        for expr in exprs:
-            if isinstance(expr, list):
-                testp.body_wrapper(expr)
-            else:
-                testp.visit(expr)
+    #     for expr in exprs:
+    #         if isinstance(expr, list):
+    #             testp.body_wrapper(expr)
+    #         else:
+    #             testp.visit(expr)
 
-        invars = testp.free_variables
-        invars.update(testp.local_assignments)
-        return {
-            'in': list(invars),
-            'out': list(testp.local_assignments)
-        }
+    #     invars = testp.free_variables
+    #     invars.update(testp.local_assignments)
+    #     return {
+    #         'in': list(invars),
+    #         'out': list(testp.local_assignments)
+    #     }
 
     def visit_While(self, node: ast.While, loc: Location) -> MyiaASTNode:
+        """
+        A while loop is compiled into two functions. The first function
+        tests the condition and either calls the second function, which
+        contains the loop body, or returns a tuple of the variables that
+        were set in the loop. Assuming the outer function is called f:
+
+        * The test function is called ⤾f. Remember it by the fact it's
+          only half a loop. We're only trying to figure out whether to
+          perform a loop iteration or not.
+        * The loop body is called ⥁f. Remember it by the fact it's a
+          complete loop, so at the end of it we performed one full
+          iteration.
+        * ⤾f calls ⥁f if the test is true. ⥁f calls ⤾f once it has
+          finished. Both are tail calls.
+
+        There are two functions because we must be able to execute the
+        test without executing the loop body. ⥁f is a sort of shorthand
+        for ✓⤾f, basically.
+        """
+
         assert self.dest
-        wsym = self.global_env.gen(self.dest, '↻')
+        wsym = self.global_env.gen(self.dest, '⤾')
         wbsym = self.global_env.gen(self.dest, '⥁')
 
         # We visit the body once to get the free variables
-        while_vars = self.explore_vars(node.test, node.body)
-        in_vars = while_vars['in']
-        out_vars = while_vars['out']
-
-        for v in in_vars:
-            self.visit_variable(v)
+        testp = self.sub_parser(global_env=ParseEnv(), dry=True)
+        testp.return_error = 'Cannot return in while loops.'
+        testp.visit(node.test)
+        testp.body_wrapper(node.body)
+        in_vars = testp.free_variables
+        in_vars.update(testp.local_assignments)  # type: ignore
+        in_vars = list(in_vars)  # type: ignore
+        out_vars = list(testp.local_assignments)
 
         # We visit once more, this time adding the free vars as parameters
         p = self.sub_parser(dest=wsym)
         in_syms = [p.new_variable(v) for v in in_vars]
+
         # Have to execute this before the body in order to get the right
-        # symbols, otherwise they will be shadowed
+        # symbols, otherwise they will be shadowed. If I recall correctly,
+        # that's why we need to revisit instead of just using testp.
         initial_values = [p.vtrack[v] for v in out_vars]
         test = p.visit(node.test)
         body = p.body_wrapper(node.body)
 
-        if_args = in_syms
-        if_body = body(Apply(wsym, *[p.vtrack[v] for v in in_vars])).at(loc)
-        if_fn = self.reg_lambda(wbsym, if_args, if_body, loc=if_body)
-        new_body = Apply(Apply(
+        loop_args = in_syms
+        loop_body = body(Apply(wsym, *[p.vtrack[v] for v in in_vars])).at(loc)
+        loop_fn = self.reg_lambda(wbsym, loop_args, loop_body,
+                                  loc=loop_body.location)
+        outer_body = Apply(Apply(
             builtins.switch,
             test,
-            Closure(if_fn, in_syms),
+            Closure(loop_fn, in_syms),
+            # Closure on identity is a trick to create a thunk
+            # that returns a pre-defined value (we need this
+            # parameter to be a function with no arguments in
+            # order to match the signature of the other branch).
             Closure(builtins.identity, (Tuple(initial_values),))
         ))
 
-        self.reg_lambda(wsym, in_syms, new_body, loc=loc)
+        self.reg_lambda(wsym, in_syms, outer_body, loc=loc)
 
-        val = Apply(wsym, *[self.vtrack[v] for v in in_vars])
+        # We immediately apply our shiny new function to start
+        # the loop rolling.
+        val = Apply(wsym, *[self.visit_variable(v) for v in in_vars])
+
+        # We get back the variables the while loop sets.
         return self.multi_assign(out_vars, val)
-
-
-def parse_function(fn, **kw) -> TupleT[Symbol, ParseEnv]:
-    _, line = inspect.getsourcelines(fn)
-    return parse_source(inspect.getfile(fn),
-                        line,
-                        textwrap.dedent(inspect.getsource(fn)),
-                        **kw)
 
 
 _global_envs: Dict[str, ParseEnv] = {}
@@ -828,6 +1116,27 @@ def parse_source(url: str,
                  line: int,
                  src: str,
                  **kw) -> TupleT[Symbol, ParseEnv]:
+    """
+    Parse a source string with Myia.
+
+    Arguments:
+        url: The filename from whence the source comes.
+        line: The line number at which the source starts.
+        src: The source code to parse.
+        kw: Keyword arguments passed to Parser.
+
+    Returns:
+        A pair:
+        * The Symbol reference associated to the parsed
+          function.
+        * The ParseEnv that contains all the bindings that
+          were created as a result of parsing. This includes
+          the main function being parsed, but also auxiliary
+          functions for loop bodies etc.
+        To get the Lambda object that corresponds to the
+        given source function, index the ParseEnv with the
+        Symbol.
+    """
     tree = ast.parse(src)
     p = Parser(Locator(url, line),
                get_global_parse_env(url),
@@ -844,6 +1153,24 @@ def parse_source(url: str,
     return r, genv
 
 
+def parse_function(fn, **kw) -> TupleT[Symbol, ParseEnv]:
+    """
+    Parse a function with Myia.
+
+    Arguments:
+        fn: A Python function.
+        kw: Keyword arguments passed to Parser.
+
+    Returns:
+        See ``parse_source``.
+    """
+    _, line = inspect.getsourcelines(fn)
+    return parse_source(inspect.getfile(fn),
+                        line,
+                        textwrap.dedent(inspect.getsource(fn)),
+                        **kw)
+
+
 def make_error_function(data):
     def _f(*args, **kwargs):
         raise Exception(
@@ -854,6 +1181,7 @@ def make_error_function(data):
 
 
 def myia(fn):
+    # This is probably broken.
     _, genv = parse_function(fn)
     gbindings = genv.bindings
     glob = fn.__globals__

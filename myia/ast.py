@@ -1,3 +1,11 @@
+"""
+Myia's AST.
+
+* Definitions for all node types.
+* Symbol handling: GenSym and ParseEnv.
+* Base class for Transformers.
+"""
+
 from typing import \
     List, Tuple as TupleT, Iterable, Dict, Set, Union, \
     cast, TypeVar
