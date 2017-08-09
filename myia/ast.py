@@ -579,10 +579,11 @@ class GenSym:
         )
 
     def __call__(self, s: Union[str, Symbol], rel: str = None) -> Symbol:
-        if isinstance(s, str):
-            return self.sym(s)
-        else:
+        if isinstance(rel, str):
+            assert isinstance(s, Symbol)
             return self.rel(s, rel)
+        else:
+            return self.sym(s)
 
 
 class _Assign(MyiaASTNode):

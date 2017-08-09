@@ -1,8 +1,9 @@
 from typing import \
     Dict, Set, List, Tuple as TupleT, \
-    cast, Union, Callable, Optional
+    cast, Union, Callable, Optional, Any
 
 from .event import EventDispatcher
+from collections import OrderedDict
 from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
@@ -182,6 +183,9 @@ class Parser(LocVisitor):
         return_error: A message string for a MyiaSyntaxError if
             a return statement is encountered (we forbid return
             in some situations).
+        dest: Symbol in which the result of the parsing will be
+            put. Used to generate derived symbols, for e.g.
+            condition/while Lambdas.
 
     Fields:
         vtrack: VariableChecker to track the mapping from Python
@@ -193,9 +197,6 @@ class Parser(LocVisitor):
             of a Lambda to create a Closure.
         local_assignments: Variables this expression sets.
         returns: Whether this expression returns or not.
-        dest: Symbol in which the result of the parsing will be
-            put. Used to generate derived symbols, for e.g.
-            condition/while Lambdas.
     """
 
     def __init__(self,
@@ -206,7 +207,8 @@ class Parser(LocVisitor):
                  dry: bool = None,
                  pull_free_variables: bool = False,
                  top_level: bool = False,
-                 return_error: str = None) \
+                 return_error: str = None,
+                 dest: Symbol = None) \
             -> None:
 
         super().__init__(locator)
@@ -218,12 +220,12 @@ class Parser(LocVisitor):
         self.top_level = top_level
         self.macros = macros or {}
         self.return_error = return_error
+        self.dest = dest or self.gen('#lambda')
 
         self.vtrack = VariableTracker()
-        self.free_variables: Dict[str, Symbol] = {}
-        self.local_assignments: Set[str] = set()
+        self.free_variables: Dict[str, Symbol] = OrderedDict()
+        self.local_assignments: Dict[str, bool] = OrderedDict()
         self.returns = False
-        self.dest = self.gen.sym('#lambda')
 
     def sub_parser(self, **kw):
         """
@@ -234,7 +236,6 @@ class Parser(LocVisitor):
         """
         dflts = dict(locator=self.locator,
                      global_env=self.global_env,
-                     gen=self.gen,
                      dry=self.dry,
                      return_error=self.return_error,
                      macros=self.macros)
@@ -257,22 +258,32 @@ class Parser(LocVisitor):
         return base_name
 
     def reg_lambda(self,
+                   ref: Symbol,
                    args: List[Symbol],
                    body: MyiaASTNode,
-                   gen: GenSym,
-                   loc: Location,
-                   ref: Symbol) -> Symbol:
-        l = Lambda(args, body, gen).at(loc)
+                   loc: Location) -> Symbol:
+        """
+        Create a Lambda with the given args and body, and
+        associate it to ``ref`` in the global_env (unless
+        dry is true). Return ``ref``.
+        """
+        l = Lambda(args, body, self.gen).at(loc)
         l.ref = ref
         l.global_env = self.global_env
         if not self.dry:
             self.global_env[ref] = l
-        return ref
+        return ref.at(loc)
 
     def new_variable(self, input: InputNode) -> Symbol:
+        """
+        Create a fresh variable with the same name as the
+        given node, but distinct from previous variables
+        with the same name. Associate the name to the new
+        variable in vtrack. Return the new variable.
+        """
         base_name = self.base_name(input)
         loc = self.make_location(input)
-        sym = self.gen.sym(base_name).at(loc)
+        sym = self.gen(base_name).at(loc)
         self.vtrack[base_name] = sym
         return sym
 
@@ -280,43 +291,124 @@ class Parser(LocVisitor):
                     base_name: str,
                     value: MyiaASTNode,
                     location: Location = None) -> _Assign:
+        """
+        Helper function for when a variable with the name
+        base_name is set to the given value. Add the name
+        to local_assignments. Return an _Assign instance
+        that will be made into a Let later on.
+        """
         sym = self.new_variable(base_name)
-        self.local_assignments.add(base_name)
+        self.local_assignments[base_name] = True
         return _Assign(sym, value, location)
 
-    def make_closure(self,
-                     inputs: List[InputNode],
-                     expr: Union[Callable, ast.AST, List[ast.stmt]],
-                     loc: Location = None,
-                     label: str = "#lambda",
-                     binding: TupleT[str, Symbol] = None) \
-            -> Union[Closure, Symbol]:
-        p = self.sub_parser(pull_free_variables=True, gen=GenSym())
-        if binding is None:
-            binding = (label, self.global_env.gen.sym(label))
-        sinputs = [p.new_variable(i) for i in inputs]
-        p.dest = binding[1]
-        p.vtrack[binding[0]] = binding[1]
-        for k, v in zip(inputs, sinputs):
-            p.vtrack[self.base_name(k)] = v
-        if callable(expr):
-            body = expr(p)
-        elif isinstance(expr, list):
-            body = p.visit_body(expr)
-        else:
-            body = p.visit(expr)
-        fargnames = list(p.free_variables.keys())
-        fargs = [p.free_variables[k] for k in fargnames]
-        lbda = self.reg_lambda(
-            fargs + sinputs,
-            body,
-            self.gen,
-            loc=loc,
-            ref=binding[1]).at(loc)
-        if len(fargs) > 0:
-            return Closure(lbda, [self.vtrack[k] for k in fargnames]).at(loc)
+    def multi_assign(self,
+                     ass: List[str],
+                     expr: MyiaASTNode) -> MyiaASTNode:
+        """
+        From a list of variables to assign to and an expression
+        that returns a Tuple, build a list of assignments. The
+        expression will be put in a temporary variable, and then
+        each variable is assigned to an index. Basically:
+
+        >>> parser.multi_assign(['a', 'b'], x)
+        Begin([_Assign('tmp', x),
+               _Assign('a', index('tmp', 0)),
+               _Assign('b', index('tmp', 1))])
+
+        It is assumed that we know that x returns a tuple of a
+        certain size, hence the index operations are tagged as
+        ``cannot_fail``.
+        """
+        tmp = self.gen('#tmp')
+        stmts = [_Assign(tmp, expr, None)]
+        for i, a in enumerate(ass):
+            idx = Apply(builtins.index,
+                        tmp,
+                        Value(i),
+                        cannot_fail=True)
+            stmt = self.make_assign(a, idx)
+            stmts.append(stmt)
+        return Begin(cast(List[MyiaASTNode], stmts))
+
+    def prepare_closure(self,
+                        variable: str = None,
+                        ref: Symbol = None) -> 'Parser':
+        """
+        In preparation for generating a Closure, given the name
+        of a variable and a Symbol that will be the real reference,
+        create a Parser for the Closure's body that will create
+        new variables for each free variable it encounters.
+        """
+        if ref is None:
+            ref = self.global_env.gen(variable or '#lambda')
+        p = self.sub_parser(pull_free_variables=True, dest=ref)
+        if variable is not None:
+            p.vtrack[variable] = ref
+        return p
+
+    def construct_closure(self,
+                          p: 'Parser',
+                          args: List[Symbol],
+                          body: MyiaASTNode,
+                          loc: Location) -> Union[Closure, Symbol]:
+        """
+        Construct a Closure as such:
+
+        * Extract the body's free variables. They will be the first
+          arguments to the function we close on.
+        * Resolve the free variables in the current environment. They
+          will be given to Closure so that they can be stored.
+        * Concatenate the free variables to the rest of the argument
+          variables.
+        * Create the Lambda, and the Closure if there is at least one
+          free variable.
+
+        Arguments:
+            p: The Parser returned by a call to ``prepare_closure``.
+            args: The function's remaining argument variables.
+            body: The body of the function.
+            loc: The location in the code.
+        """
+        clos_args = list(p.free_variables.values())
+        clos_values = [self.visit_variable(v) for v in p.free_variables]
+        lbda = self.reg_lambda(p.dest, clos_args + args, body, loc=loc)
+        rval: Any
+        if len(clos_args) > 0:
+            return Closure(lbda, clos_values).at(loc)
         else:
             return lbda
+
+    def make_closure(self,
+                     args: List[InputNode],
+                     body: Union[Callable, ast.AST, List[ast.stmt]],
+                     loc: Location = None,
+                     variable: str = "#lambda",
+                     ref: Symbol = None) \
+            -> Union[Closure, Symbol]:
+        """
+        Given the Python AST for a list of arguments and the body,
+        make the appropriate closure. This combines
+        ``prepare_closure``, visiting the body, and
+        ``construct_closure``.
+
+        Arguments:
+            args: The function's arguments.
+            body: The function's body, or a function that will be
+                passed a fresh Parser and must return a node.
+            loc: Location in source code.
+            variable: The name of the function.
+            ref: The Symbol for the unique, global reference to the
+                function.
+        """
+        p = self.prepare_closure(variable, ref)
+        sargs = [p.new_variable(i) for i in args]
+        if callable(body):
+            fbody = body(p)
+        elif isinstance(body, list):
+            fbody = p.visit_body(body)
+        else:
+            fbody = p.visit(body)
+        return self.construct_closure(p, sargs, fbody, loc)
 
     def body_wrapper(self,
                      stmts: List[ast.stmt]) \
@@ -362,11 +454,17 @@ class Parser(LocVisitor):
     def visit_body(self, stmts: List[ast.stmt]) -> MyiaASTNode:
         return self.body_wrapper(stmts)(None)
 
-    # def visit_arg(self, node, loc):
-    #     return Symbol(node.arg, location=loc)
-
-    # def visit_arguments(self, args):
-    #     return [self.visit(arg) for arg in args.args]
+    def visit_variable(self, name: str, loc: Location = None) -> Symbol:
+        try:
+            free, v = self.vtrack.get_free(name)
+            if free:
+                if self.pull_free_variables:
+                    v = self.new_variable(name)
+                v = v.at(loc)
+                self.free_variables[name] = v
+            return v
+        except NameError as e:
+            return Symbol(name, namespace='global')
 
     def visit_Assign(self, node: ast.Assign, loc: Location) -> _Assign:
         targ, = node.targets
@@ -417,10 +515,9 @@ class Parser(LocVisitor):
 
     def visit_BinOp(self, node: ast.BinOp, loc: Location) -> Apply:
         op = get_operator(node.op).at(loc)
-        return Apply(
-            op,
-            self.visit(node.left),
-            self.visit(node.right), location=loc)
+        l = self.visit(node.left)
+        r = self.visit(node.right)
+        return Apply(op, l, r, location=loc)
 
     # def visit_BoolOp(self, node: ast.BoolOp, loc: Location) -> If:
     #     raise MyiaSyntaxError(loc, 'Boolean expressions are not supported.')
@@ -438,21 +535,15 @@ class Parser(LocVisitor):
         args = [self.visit(arg) for arg in node.args]
         if isinstance(node.func, ast.Name) and node.func.id in self.macros:
             return self.macros[node.func.id](*args)
-        return Apply(
-            self.visit(node.func),
-            *args,
-            # *[self.visit(arg) for arg in node.args],
-            location=loc
-        )
+        func = self.visit(node.func)
+        return Apply(func, *args, location=loc)
 
     def visit_Compare(self, node: ast.Compare, loc: Location) -> Apply:
         ops = [get_operator(op) for op in node.ops]
         if len(ops) == 1:
-            return Apply(
-                ops[0],
-                self.visit(node.left),
-                self.visit(node.comparators[0])
-            )
+            l = self.visit(node.left)
+            cmp = self.visit(node.comparators[0])
+            return Apply(ops[0], l, cmp)
         else:
             raise MyiaSyntaxError(
                 loc,
@@ -474,9 +565,7 @@ class Parser(LocVisitor):
                           node: ast.FunctionDef,
                           loc: Location,
                           allow_decorator=False) -> _Assign:
-        if node.args.vararg:
-            raise MyiaSyntaxError(loc, "Varargs are not allowed.")
-        if node.args.kwarg:
+        if node.args.vararg or node.args.kwarg:
             raise MyiaSyntaxError(loc, "Varargs are not allowed.")
         if node.args.kwonlyargs:
             raise MyiaSyntaxError(
@@ -489,24 +578,23 @@ class Parser(LocVisitor):
             raise MyiaSyntaxError(loc, "Functions should not have decorators.")
 
         lbl = node.name if self.top_level else '#:' + node.name
-        binding = (node.name, self.global_env.gen.sym(lbl))
+        # binding = (node.name, self.global_env.gen(lbl))
+        ref = self.global_env.gen(lbl)
 
         sym = self.new_variable(node.name)
         clos = self.make_closure([arg for arg in node.args.args],
                                  node.body,
                                  loc=loc,
-                                 binding=binding)
+                                 label=node.name,
+                                 ref=ref)
         return _Assign(sym, clos, loc)
 
-    def visit_If(self, node: ast.If, loc: Location) \
-            -> Union[MyiaASTNode, _Assign]:
+    def visit_If(self, node: ast.If, loc: Location) -> MyiaASTNode:
 
-        p1 = self.sub_parser(pull_free_variables=True, gen=GenSym())
-        p1.dest = self.global_env.gen(self.dest, '✓')
+        p1 = self.prepare_closure(ref=self.global_env.gen(self.dest, '✓'))
         body = p1.body_wrapper(node.body)
 
-        p2 = self.sub_parser(pull_free_variables=True, gen=GenSym())
-        p2.dest = self.global_env.gen(self.dest, '✗')
+        p2 = self.prepare_closure(ref=self.global_env.gen(self.dest, '✗'))
         orelse = p2.body_wrapper(node.orelse)
 
         if p1.returns != p2.returns:
@@ -515,7 +603,7 @@ class Parser(LocVisitor):
                 "Either none or all branches of an if statement must return "
                 "a value."
             )
-        if p1.local_assignments != p2.local_assignments:
+        if set(p1.local_assignments) != set(p2.local_assignments):
             raise MyiaSyntaxError(
                 loc,
                 "All branches of an if statement must assign to the same set "
@@ -526,29 +614,15 @@ class Parser(LocVisitor):
                 )
             )
 
-        for k in p1.free_variables:
-            self.visit_variable(k)
-        for k in p2.free_variables:
-            self.visit_variable(k)
-
-        then_args = [sym for v, sym in p1.free_variables.items()]
-        then_vars = [self.vtrack[v] for v in p1.free_variables]
-
-        else_args = [sym for v, sym in p2.free_variables.items()]
-        else_vars = [self.vtrack[v] for v in p2.free_variables]
-
-        def mkapply(then_body, else_body):
-            then_fn = self.reg_lambda(
-                then_args, then_body, self.gen, None,
-                p1.dest
+        def mkapply(then_finalize, else_finalize):
+            then_body = body(then_finalize)
+            then_branch = self.construct_closure(
+                p1, [], then_body, loc=then_body
             )
-            then_branch = Closure(then_fn, then_vars)
-
-            else_fn = self.reg_lambda(
-                else_args, else_body, self.gen, None,
-                p2.dest
+            else_body = orelse(else_finalize)
+            else_branch = self.construct_closure(
+                p2, [], else_body, loc=else_body
             )
-            else_branch = Closure(else_fn, else_vars)
             return Apply(Apply(builtins.switch,
                                self.visit(node.test),
                                then_branch,
@@ -557,31 +631,22 @@ class Parser(LocVisitor):
 
         if p1.returns:
             self.returns = True
-            return mkapply(body(None), orelse(None))
+            return mkapply(None, None)
 
         else:
             ass = list(p1.local_assignments)
 
             if len(ass) == 1:
                 a, = ass
-                app = mkapply(body(p1.vtrack[a]), orelse(p2.vtrack[a]))
+                app = mkapply(p1.vtrack[a], p2.vtrack[a])
                 return self.make_assign(a, app, None)
 
             else:
                 app = mkapply(
-                    body(Tuple(p1.vtrack[v] for v in ass)),
-                    orelse(Tuple(p2.vtrack[v] for v in ass))
+                    Tuple(p1.vtrack[v] for v in ass),
+                    Tuple(p2.vtrack[v] for v in ass)
                 )
-                tmp = self.gen.sym('#tmp')
-                stmts = [_Assign(tmp, app, None)]
-                for i, a in enumerate(ass):
-                    idx = Apply(builtins.index,
-                                tmp,
-                                Value(i),
-                                cannot_fail=True)
-                    stmt = self.make_assign(a, idx)
-                    stmts.append(stmt)
-                return Begin(cast(List[MyiaASTNode], stmts))
+                return self.multi_assign(ass, app)
 
     # def visit_IfExp(self, node: ast.IfExp, loc: Location) -> If:
     #     raise MyiaSyntaxError(loc, 'If expressions are not supported.')
@@ -596,7 +661,7 @@ class Parser(LocVisitor):
     def visit_Lambda(self, node: ast.Lambda, loc: Location) \
             -> Union[Closure, Symbol]:
         return self.make_closure([a for a in node.args.args],
-                                 node.body, loc=loc).at(loc)
+                                 node.body, loc=loc)
 
     # def visit_ListComp(self, node: ast.ListComp, loc: Location) \
     #         -> MyiaASTNode:
@@ -646,22 +711,6 @@ class Parser(LocVisitor):
     def visit_Module(self, node, loc, allow_decorator=False):
         return [self.visit(stmt, allow_decorator=allow_decorator)
                 for stmt in node.body]
-
-    def visit_variable(self, name: str, loc: Location = None) -> Symbol:
-        try:
-            # free, v = self.env.get_free(name)
-            # assert isinstance(v, Symbol)
-            free, v = self.vtrack.get_free(name)
-            if free:
-                if self.pull_free_variables:
-                    v = self.new_variable(name)
-                v = v.at(loc)
-                self.free_variables[name] = v
-            return v
-        except NameError as e:
-            # raise MyiaSyntaxError(loc, e.args[0])
-            # self.globals_accessed.add(name)
-            return Symbol(name, namespace='global')
 
     def visit_Name(self, node: ast.Name, loc: Location) -> Symbol:
         return self.visit_variable(node.id, loc)
@@ -713,14 +762,14 @@ class Parser(LocVisitor):
             else:
                 testp.visit(expr)
 
+        invars = testp.free_variables
+        invars.update(testp.local_assignments)
         return {
-            'in': list(
-                set(testp.free_variables.keys()) | testp.local_assignments
-            ),
+            'in': list(invars),
             'out': list(testp.local_assignments)
         }
 
-    def visit_While(self, node: ast.While, loc: Location) -> Begin:
+    def visit_While(self, node: ast.While, loc: Location) -> MyiaASTNode:
         assert self.dest
         wsym = self.global_env.gen(self.dest, '↻')
         wbsym = self.global_env.gen(self.dest, '⥁')
@@ -734,8 +783,7 @@ class Parser(LocVisitor):
             self.visit_variable(v)
 
         # We visit once more, this time adding the free vars as parameters
-        p = self.sub_parser(gen=GenSym())
-        p.dest = wsym
+        p = self.sub_parser(dest=wsym)
         in_syms = [p.new_variable(v) for v in in_vars]
         # Have to execute this before the body in order to get the right
         # symbols, otherwise they will be shadowed
@@ -745,10 +793,7 @@ class Parser(LocVisitor):
 
         if_args = in_syms
         if_body = body(Apply(wsym, *[p.vtrack[v] for v in in_vars])).at(loc)
-        if_fn = self.reg_lambda(
-            if_args, if_body, self.gen, None,
-            wbsym
-        )
+        if_fn = self.reg_lambda(wbsym, if_args, if_body, loc=if_body)
         new_body = Apply(Apply(
             builtins.switch,
             test,
@@ -756,26 +801,10 @@ class Parser(LocVisitor):
             Closure(builtins.identity, (Tuple(initial_values),))
         ))
 
-        if not self.dry:
-            l = Lambda(
-                in_syms,
-                new_body,
-                p.gen,
-                location=loc
-            )
-            l.ref = wsym
-            l.global_env = self.global_env
-            self.global_env[wsym] = l
-        # assert isinstance(wsym.label, str)
-        # self.globals_accessed.add(wsym.label)
+        self.reg_lambda(wsym, in_syms, new_body, loc=loc)
 
-        tmp = self.gen.sym('#tmp').at(loc)
         val = Apply(wsym, *[self.vtrack[v] for v in in_vars])
-        stmts: List[MyiaASTNode] = [_Assign(tmp, val, None)]
-        for i, v in enumerate(out_vars):
-            stmt = self.make_assign(v, Apply(builtins.index, tmp, Value(i)))
-            stmts.append(stmt)
-        return Begin(stmts)
+        return self.multi_assign(out_vars, val)
 
 
 def parse_function(fn, **kw) -> TupleT[Symbol, ParseEnv]:

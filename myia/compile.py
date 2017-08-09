@@ -2,10 +2,9 @@ from typing import Union, Any, List, cast, \
     Sequence, Tuple as TupleT, Optional, Callable
 
 import re
-from myia.ast import \
+from .ast import \
     MyiaASTNode, Apply, Symbol, Value, Let, Lambda, \
-    Closure, Tuple, Transformer
-from myia.front import GenSym
+    Closure, Tuple, Transformer, GenSym
 
 
 # TODO: Lambda should never be a sub-expression, it should be pulled
