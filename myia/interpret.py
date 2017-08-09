@@ -13,17 +13,23 @@ import inspect
 
 
 class BuiltinCollection:
+    """
+    Implements a "module" of sorts. It has no methods,
+    only fields that are populated by ``impl``.
+    """
     pass
 
 
-myia_builtins = builtins.myia_builtins
-
-
+# Myia's global variables. Used for evaluation.
 root_globals: Dict[Any, Any] = {
-    myia_builtins: BuiltinCollection()
+    builtins.myia_builtins: BuiltinCollection()
 }
 
 
+# When a Lambda is made into a FunctionImpl, we will
+# cache it. This mostly avoids recomputing gradients,
+# since FunctionImpl is the structure that stores
+# pointers to them.
 compile_cache: Dict[Lambda, 'FunctionImpl'] = {}
 
 
@@ -36,13 +42,15 @@ EnvT = Dict[Symbol, Any]
 
 
 class PrimitiveImpl(HReprBase):
-    def __init__(self, fn: Callable, name=None) -> None:
+    """
+    Wrapper around a pure Python implementation of a function.
+    """
+    def __init__(self, fn: Callable, name: str = None) -> None:
         argn = inspect.getargs(fn.__code__).args  # type: ignore
         self.argnames: List[str] = argn
         self.nargs = len(self.argnames)
         self.fn = fn
         self.name = name or fn.__name__
-        self.primal_sym = None
         self.grad: Callable[[int], FunctionImpl] = None
 
     def __call__(self, *args):
@@ -62,22 +70,23 @@ class PrimitiveImpl(HReprBase):
 
 
 class FunctionImpl(HReprBase):
+    """
+    Represents a Myia-transformed function.
+    """
     def __init__(self, ast: Lambda, envs: List[EnvT]) -> None:
         assert isinstance(ast, Lambda)
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
-        self.args = ast.args
         self.ast = ast
         self.code = VMCode(ast.body)
         self.envs = envs
         self.primal_sym = ast.primal
         self.grad: Callable[[int], FunctionImpl] = None
-        node = ast
 
         def func(*args):
-            assert(len(args) == len(node.args))
+            assert len(args) == len(ast.args)
             return vm(self.code,
-                      {s: arg for s, arg in zip(node.args, args)},
+                      {s: arg for s, arg in zip(ast.args, args)},
                       *self.envs)
 
         self._func = func
@@ -99,11 +108,13 @@ class FunctionImpl(HReprBase):
 
 
 class ClosureImpl(HReprBase):
+    """
+    Associates a PrimitiveImpl or a FunctionImpl to a number
+    of arguments in order to create a partial application.
+    """
     def __init__(self,
                  fn: Union[PrimitiveImpl, FunctionImpl],
                  args: List[Any]) -> None:
-        if not isinstance(fn, (PrimitiveImpl, FunctionImpl)):
-            raise TypeError(f'Wrong fn for ClosureImpl: {fn}')
         self.argnames = [a for a in fn.argnames[len(args):]]
         self.nargs = fn.nargs - len(args)
         self.fn = fn
@@ -134,26 +145,33 @@ class ClosureImpl(HReprBase):
 
 
 def impl(sym):
+    """
+    Define the implementation for the given symbol.
+    The implementation will be set in ``root_globals``
+    and in the ``myia_builtins`` global.
+    """
     def decorator(fn):
         prim = PrimitiveImpl(fn)
         root_globals[sym] = prim
-        setattr(root_globals[myia_builtins],
+        setattr(root_globals[builtins.myia_builtins],
                 fn.__name__.lstrip('_'),
                 prim)
         return prim
     return decorator
 
 
-def myia_impl(sym):
-    def decorator(orig_fn):
-        r, genv = parse_function(orig_fn)
-        fn = evaluate(r, genv)
-        root_globals[sym] = fn
-        setattr(root_globals[myia_builtins],
-                fn.__name__.lstrip('_'),
-                fn)
-        return fn
-    return decorator
+# def myia_impl(sym):
+#     # Implement a symbol by parsing it through Myia.
+#     # Unused at the moment.
+#     def decorator(orig_fn):
+#         r, genv = parse_function(orig_fn)
+#         fn = evaluate(r, genv)
+#         root_globals[sym] = fn
+#         setattr(root_globals[builtins.myia_builtins],
+#                 fn.__name__.lstrip('_'),
+#                 fn)
+#         return fn
+#     return decorator
 
 
 ##############################################
@@ -265,6 +283,14 @@ def identity(x):
 
 
 class Instruction:
+    """
+    An instruction for the stack-based VM.
+
+    Attributes:
+        command: The instruction name.
+        node: The Myia node that this instruction is computing.
+        args: Instruction-specific arguments.
+    """
     def __init__(self,
                  command: str,
                  node: MyiaASTNode,
@@ -275,6 +301,18 @@ class Instruction:
 
 
 class VMCode(HReprBase):
+    """
+    Compile a MyiaASTNode into a list of instructions compatible
+    with the stack-based VM.
+
+    See VMFrame's ``instruction_<name>`` methods for more
+    information.
+
+    Attributes:
+        node: The original node.
+        instructions: A list of instructions to implement this
+            node's behavior.
+    """
     def __init__(self, node: MyiaASTNode) -> None:
         self.node = node
         self.instructions: List[Instruction] = []
@@ -284,6 +322,7 @@ class VMCode(HReprBase):
         self.instructions.append(Instruction(name, node, *args))
 
     def process(self, node) -> None:
+        # Dispatch to process_<node_type>
         cls = node.__class__.__name__
         method = getattr(self, 'process_' + cls)
         rval = method(node)
@@ -336,13 +375,30 @@ class VMCode(HReprBase):
 
 
 class VM(EventDispatcher):
+    """
+    Stack-based virtual machine. Evaluates the given code
+    in the constructor and puts the value in the ``result``
+    attribute.
+
+    Arguments:
+        code: The compiled VMCode to run.
+        envs: A list of environments that can be used to resolve
+            the value of a symbol.
+        emit_events: Whether to emit events on each instruction
+            run or not.
+
+    Attributes:
+        result: The result of the evaluation.
+    """
     def __init__(self,
                  code: VMCode,
                  *envs: EnvT,
                  emit_events=True) -> None:
         super().__init__(self, emit_events)
         self.do_emit_events = emit_events
+        # Current frame
         self.frame = VMFrame(self, code, list(envs))
+        # Stack of previous frames (excludes current one)
         self.frames: List[VMFrame] = []
         if self.do_emit_events:
             self.emit_new_frame(self.frame)
@@ -351,17 +407,29 @@ class VM(EventDispatcher):
     def eval(self) -> Any:
         while True:
             try:
+                # VMFrame does most of the work.
                 new_frame = self.frame.next()
                 if new_frame is not None:
-                    self.frames.append(self.frame)
+                    # When the current frame gives us a new frame,
+                    # we push the old one on the stack and start
+                    # processing the new one.
+                    if not self.frame.done():
+                        # We push the current frame only if it's
+                        # not done (this implement tail calls).
+                        self.frames.append(self.frame)
                     self.frame = new_frame
                     if self.do_emit_events:
                         self.emit_new_frame(self.frame)
             except StopIteration:
+                # The result of a frame's evaluation is the value at
+                # the top of its stack.
                 rval = self.frame.top()
                 if not self.frames:
+                    # We are done!
                     return rval
                 else:
+                    # We push the result on the previous frame's stack
+                    # and we resume execution.
                     self.frame = self.frames.pop()
                     self.frame.stack.append(rval)
             except Exception as exc:
@@ -371,6 +439,16 @@ class VM(EventDispatcher):
 
 
 class VMFrame(HReprBase):
+    """
+    Computation frame. There is one frame for each FunctionImpl
+    called. A frame has its own stack, while the VM operates on
+    a stack of VMFrames.
+
+    Compute a frame's next instruction with ``next()``,
+    which may return a new VMFrame to the VM to compute something it
+    needs, or throw StopIteration if it is done, in which case its
+    return value is at the top of its stack.
+    """
     def __init__(self,
                  vm: VM,
                  code: VMCode,
@@ -379,16 +457,31 @@ class VMFrame(HReprBase):
         self.vm = vm
         self.code = code
         self.instructions = code.instructions
+        # Program counter: index of the next instruction to execute.
         self.pc = 0
+        # Environment to store local bindings.
         self.storage_env: EnvT = {}
         self.envs: List[EnvT] = [self.storage_env] + envs
         self.stack: List[Any] = [None]
+        # Node being executed, mostly for debugging.
         self.focus: MyiaASTNode = None
 
+    def done(self) -> bool:
+        """
+        Whether all instructions have been executed or not.
+        """
+        return self.pc >= len(self.instructions)
+
     def top(self) -> Any:
+        """
+        Value at the top of the stack.
+        """
         return self.stack[-1]
 
     def take(self, n: int) -> List[Any]:
+        """
+        Pop n values from the stack and return them.
+        """
         if n == 0:
             return []
         else:
@@ -397,12 +490,29 @@ class VMFrame(HReprBase):
             return args
 
     def next_instruction(self) -> Optional[Instruction]:
+        """
+        Get the next instruction and advance the program
+        counter.
+
+        Returns:
+           * None if we are done.
+           * The next instruction otherwise.
+        """
         if self.pc >= len(self.instructions):
             return None
         self.pc += 1
         return self.instructions[self.pc - 1]
 
     def next(self) -> Optional['VMFrame']:
+        """
+        Execute the next instruction.
+
+        Returns:
+            * ``None`` for most operations.
+            * A ``VMFrame``. The VM should execute that frame
+              and push its result to this frame before resuming
+              execution.
+        """
         instr = self.next_instruction()
         if not instr:
             raise StopIteration()
@@ -416,9 +526,18 @@ class VMFrame(HReprBase):
             return method(instr.node, *instr.args)
 
     def instruction_reduce(self, node, nargs) -> Optional['VMFrame']:
+        """
+        * Pop ``nargs`` values from the stack, call them ``args``
+        * Pop the next value, call it ``fn``
+        * If ``fn`` is a ``FunctionImpl``, we can run it with the VM.
+          Make a new VMFrame for it and return it. This is important
+          because we don't want to grow the Python stack.
+        * Otherwise, it's a primitive. Call ``fn(*args)`` and push
+          the result.
+        """
         fn, *args = self.take(nargs + 1)
         if isinstance(fn, FunctionImpl):
-            bind: EnvT = {k: v for k, v in zip(fn.args, args)}
+            bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
             return VMFrame(self.vm, fn.code, [bind] + fn.envs)
         elif isinstance(fn, ClosureImpl):
             self.stack.append(fn.fn)
@@ -431,19 +550,36 @@ class VMFrame(HReprBase):
             return None
 
     def instruction_tuple(self, node, nelems) -> None:
+        """
+        Pop ``nelems`` values from the stack and push a
+        tuple of these values.
+        """
         self.stack.append(tuple(self.take(nelems)))
 
     def instruction_closure(self, node) -> None:
+        """
+        Pop a tuple of arguments, and a function, and push
+        ``ClosureImpl(fn, args)``
+        """
         args = self.stack.pop()
         fn = self.stack.pop()
         clos = ClosureImpl(fn, args)
         self.stack.append(clos)
 
     def instruction_store(self, node, dest) -> None:
+        """
+        Pop a value and store it in the local environment
+        under the symbol ``dest``.
+        """
         value = self.stack.pop()
         self.envs[0][dest] = value
 
     def instruction_fetch(self, node, sym) -> None:
+        """
+        Get the value for symbol ``sym`` from one of the
+        environments, starting with the local environment,
+        and push it on the stack.
+        """
         for env in self.envs:
             try:
                 v = env[sym]
@@ -461,12 +597,17 @@ class VMFrame(HReprBase):
         raise KeyError(f'Could not resolve {sym}')
 
     def instruction_push(self, node, value) -> None:
+        """
+        Push ``value`` on the stack.
+        """
         self.stack.append(value)
 
     def instruction_lambda(self, node) -> None:
+        """
+        Create a FunctionImpl from the given node and push
+        it on the stack.
+        """
         fimpl = FunctionImpl(node, self.envs)
-        if node.primal:
-            fimpl.primal_sym = node.primal
         self.stack.append(fimpl)
 
     def __hrepr__(self, H, hrepr):
@@ -478,10 +619,19 @@ class VMFrame(HReprBase):
 
 
 def vm(code: VMCode, *binding_groups: EnvT) -> Any:
+    """
+    Execute the VM on the given code.
+    """
     return VM(code, *binding_groups).result
 
 
 def evaluate(node: MyiaASTNode, parse_env: ParseEnv = None) -> Any:
+    """
+    Evaluate the given MyiaASTNode in the given ``parse_env``.
+    If ``parse_env`` is None, it will be extracted from the node
+    itself (Parser stores a Lambda's global environment in its
+    ``global_env`` field).
+    """
     if isinstance(node, Lambda):
         parse_env = node.global_env
     assert parse_env is not None

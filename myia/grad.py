@@ -5,7 +5,7 @@ from .ast import \
     Transformer, GenSym, MyiaASTNode, \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure
 from .interpret import \
-    root_globals, impl, myia_impl, evaluate, \
+    root_globals, impl, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
 from .front import \
     ParseEnv, parse_function, get_global_parse_env
