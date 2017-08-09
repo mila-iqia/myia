@@ -1,3 +1,36 @@
+"""
+Helpers to use the buche logger (https://github.com/breuleux/buche)
+which is used by ``python -m myia inspect``
+
+Buche can log HTML views of objects in multiple tabs, which is useful
+to inspect or debug the monstrous contraptions Grad generates.
+
+Usage:
+
+    from .buche import buche
+
+    buche['mylog'](some_object)  # log in /mylog
+    buche.open('otherlog')
+    other = buche['otherlog']
+    other.markdown('**TODO**: write HTML.')
+    other.html('<s><b>DONE<b><s>: write HTML.')
+
+Then, to run it:
+
+    $ buche -c 'python -u script.py'
+
+Or:
+
+    $ python -u script.py | buche
+
+The ``-u`` flag is not, strictly speaking, necessary, but it forces
+Python to flush its output on every print, so it'll look more
+responsive.
+
+Note: this functionality being somewhat generic, it could eventually
+move to a standalone package.
+"""
+
 
 import os
 import json
@@ -43,7 +76,7 @@ class MasterBuche:
                  contents=str(msg),
                  **params)
 
-    def show(self, obj, path='/', **hrepr_params):
+    def show(self, obj, path='/', kind='log', **hrepr_params):
         r = self.hrepr(obj)  # , **hrepr_params)
         for res in self.hrepr.resources:
             if res not in self.resources:
@@ -51,7 +84,7 @@ class MasterBuche:
                          path='/',
                          format='html')
                 self.resources.add(res)
-        self.log(r, format='html', path=path)
+        self.log(r, format='html', kind=kind, path=path)
 
 
 class Buche:
@@ -101,8 +134,9 @@ class Buche:
             self.open(item, type, force=True, **params)
         return Buche(self.master, subchannel)
 
-    def __call__(self, obj, **params):
-        self.master.show(obj, hrepr_params=params, path=self.channel)
+    def __call__(self, obj, kind="log", **params):
+        self.master.show(obj, hrepr_params=params,
+                         path=self.channel, kind=kind)
 
 
 master = MasterBuche(StdHRepr())
