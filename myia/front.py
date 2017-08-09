@@ -19,6 +19,14 @@ import sys
 
 
 class MyiaSyntaxError(Exception):
+    """
+    Class for syntax errors in Myia. This exception type should be
+    raised for any feature that is not supported.
+
+    Attributes:
+        location: The error's location in the original source.
+        message: A precise assessment of the problem.
+    """
     def __init__(self, location: Location, message: str) -> None:
         self.location = location
         self.message = message
@@ -27,7 +35,11 @@ class MyiaSyntaxError(Exception):
 _prevhook = sys.excepthook
 
 
-def exception_handler(exception_type, exception, traceback):
+def _exception_handler(exception_type, exception, traceback):
+    # We override the default exception handler so that it prints
+    # MyiaSyntaxErrors like a SyntaxError. Not sure how else to do
+    # it.
+    # TODO: actually, maybe inherit from SyntaxError? Investigate.
     if exception_type == MyiaSyntaxError:
         print(
             "{}: {}".format(exception_type.__name__, exception.message),
@@ -39,10 +51,23 @@ def exception_handler(exception_type, exception, traceback):
         _prevhook(exception_type, exception, traceback)
 
 
-sys.excepthook = exception_handler
+sys.excepthook = _exception_handler
 
 
 class Locator:
+    """
+    Call a Locator instance on a Python AST node to get an
+    ``ast.Location`` instance.
+
+    When parsing a function string, locations in the
+    Python AST will start at line 1. Feed ``line_offset`` to
+    the constructor to compensate if you want to get correct line
+    numbers.
+
+    Attributes:
+        url: The source code's filename.
+        line_offset: The line offset at which the code starts.
+    """
     def __init__(self, url: str, line_offset: int) -> None:
         self.url = url
         self.line_offset = line_offset
@@ -59,6 +84,20 @@ class Locator:
 
 
 class LocVisitor:
+    """
+    Base class to visit Python's AST and map it to MyiaASTNodes.
+
+    ``LocVisitor::visit`` automatically transfers source code
+    line/column information from one to the other.
+
+    Subclasses should override ``visit_<class_name>``, e.g.
+    ``visit_Name``. Refer to the ast module's documentation.
+
+    Attributes:
+        locator: The Locator instance to use to translate source
+            code locations.
+    """
+
     def __init__(self, locator: Locator) -> None:
         self.locator = locator
 
@@ -81,15 +120,30 @@ class LocVisitor:
         return rval
 
 
+# Type for AST nodes that can contain a variable name (also str)
 InputNode = Union[str, ast.arg, ast.Name]
 
 
 class VariableTracker:
+    """
+    Track variable names and map them to Symbol instances.
+    """
+
     def __init__(self, parent: 'VariableTracker' = None) -> None:
         self.parent = parent
         self.bindings: Dict[str, Symbol] = {}
 
     def get_free(self, name: str) -> TupleT[bool, 'Symbol']:
+        """
+        Return whether the given variable name is a free variable
+        or not, and the Symbol associated to the variable.
+
+        A variable is free if it is found in this Tracker's parent,
+        or grandparent, etc.
+        It is not free if it is found in ``self.bindings``.
+
+        Raise NameError if the variable was not declared.
+        """
         if name in self.bindings:
             return (False, self.bindings[name])
         elif self.parent is None:
@@ -105,6 +159,44 @@ class VariableTracker:
 
 
 class Parser(LocVisitor):
+    """
+    Transform Python's AST into a Myia expression.
+
+    Arguments:
+        locator: A Locator to track source code locations.
+        global_env: ParseEnv that contains global bindings.
+            The Parser will populate it whenever it encounters
+            or creates a ``Lambda``.
+        macros: A dictionary of macros to customize generation.
+            One such macro (aka the only one) is GRAD, see grad.py.
+        gen: The GenSym to use to generate new variables.
+        dry: Whether to add new symbols to global_env or not.
+        pull_free_variables: When free variables are encountered
+            and this flag is set, new variables will be created,
+            and a mapping will be created in self.free_variables.
+            This is used to facilitate creating closures.
+        top_level: Whether this is a top level function or not.
+            If it isn't top level, its name will be mangled so
+            that it doesn't conflict with an existing one in
+            global_env.
+        return_error: A message string for a MyiaSyntaxError if
+            a return statement is encountered (we forbid return
+            in some situations).
+
+    Fields:
+        vtrack: VariableChecker to track the mapping from Python
+            variables to Symbols. Normally, this is handled
+            automatically.
+        free_variables: Associates variable names to fresh Symbols
+            for each free variable encountered in the expression.
+            These are normally used to populate the argument list
+            of a Lambda to create a Closure.
+        local_assignments: Variables this expression sets.
+        returns: Whether this expression returns or not.
+        dest: Symbol in which the result of the parsing will be
+            put. Used to generate derived symbols, for e.g.
+            condition/while Lambdas.
+    """
 
     def __init__(self,
                  locator: Locator,
@@ -114,41 +206,48 @@ class Parser(LocVisitor):
                  dry: bool = None,
                  pull_free_variables: bool = False,
                  top_level: bool = False,
-                 return_error: str = None,
-                 vtrack: VariableTracker = None) \
+                 return_error: str = None) \
             -> None:
 
         super().__init__(locator)
         self.locator = locator
         self.global_env = global_env
         self.gen = gen or GenSym()
-        self.vtrack = vtrack or VariableTracker()
         self.dry = dry
         self.pull_free_variables = pull_free_variables
         self.top_level = top_level
         self.macros = macros or {}
+        self.return_error = return_error
 
+        self.vtrack = VariableTracker()
         self.free_variables: Dict[str, Symbol] = {}
         self.local_assignments: Set[str] = set()
         self.returns = False
-        self.return_error = return_error
-        self.dest = self.gensym('#lambda')
+        self.dest = self.gen.sym('#lambda')
 
     def sub_parser(self, **kw):
+        """
+        Return a new Parser derived from this one. Variables
+        in the current expression will be free variables in
+        the sub_parser. Keyword arguments are passed through
+        and have priority over inherited ones.
+        """
         dflts = dict(locator=self.locator,
                      global_env=self.global_env,
                      gen=self.gen,
-                     vtrack=VariableTracker(self.vtrack),
                      dry=self.dry,
                      return_error=self.return_error,
                      macros=self.macros)
         kw = {**dflts, **kw}
-        return Parser(**kw)
-
-    def gensym(self, name: str) -> Symbol:
-        return self.gen.sym(name)
+        p = Parser(**kw)
+        p.vtrack = VariableTracker(self.vtrack)
+        return p
 
     def base_name(self, input: InputNode) -> str:
+        """
+        Returns the name of the variable represented by
+        this node.
+        """
         if isinstance(input, str):
             base_name = input
         elif isinstance(input, ast.arg):
@@ -161,10 +260,8 @@ class Parser(LocVisitor):
                    args: List[Symbol],
                    body: MyiaASTNode,
                    gen: GenSym,
-                   loc: Location = None,
-                   label: str = "#lambda",
-                   binding: TupleT[str, Symbol] = None) -> Symbol:
-        ref = binding[1] if binding else self.global_env.gen.sym(label)
+                   loc: Location,
+                   ref: Symbol) -> Symbol:
         l = Lambda(args, body, gen).at(loc)
         l.ref = ref
         l.global_env = self.global_env
@@ -175,7 +272,7 @@ class Parser(LocVisitor):
     def new_variable(self, input: InputNode) -> Symbol:
         base_name = self.base_name(input)
         loc = self.make_location(input)
-        sym = self.gensym(base_name).at(loc)
+        sym = self.gen.sym(base_name).at(loc)
         self.vtrack[base_name] = sym
         return sym
 
@@ -215,7 +312,7 @@ class Parser(LocVisitor):
             body,
             self.gen,
             loc=loc,
-            binding=binding).at(loc)
+            ref=binding[1]).at(loc)
         if len(fargs) > 0:
             return Closure(lbda, [self.vtrack[k] for k in fargnames]).at(loc)
         else:
@@ -336,7 +433,7 @@ class Parser(LocVisitor):
     #         raise MyiaSyntaxError(loc, f"Unknown operator: {node.op}"
 
     def visit_Call(self, node: ast.Call, loc: Location) -> MyiaASTNode:
-        if (len(node.keywords) > 0):
+        if len(node.keywords) > 0:
             raise MyiaSyntaxError(loc, "Keyword arguments are not allowed.")
         args = [self.visit(arg) for arg in node.args]
         if isinstance(node.func, ast.Name) and node.func.id in self.macros:
@@ -442,14 +539,14 @@ class Parser(LocVisitor):
 
         def mkapply(then_body, else_body):
             then_fn = self.reg_lambda(
-                then_args, then_body, self.gen, None, "#if",
-                (None, p1.dest)
+                then_args, then_body, self.gen, None,
+                p1.dest
             )
             then_branch = Closure(then_fn, then_vars)
 
             else_fn = self.reg_lambda(
-                else_args, else_body, self.gen, None, "#if",
-                (None, p2.dest)
+                else_args, else_body, self.gen, None,
+                p2.dest
             )
             else_branch = Closure(else_fn, else_vars)
             return Apply(Apply(builtins.switch,
@@ -475,7 +572,7 @@ class Parser(LocVisitor):
                     body(Tuple(p1.vtrack[v] for v in ass)),
                     orelse(Tuple(p2.vtrack[v] for v in ass))
                 )
-                tmp = self.gensym('#tmp')
+                tmp = self.gen.sym('#tmp')
                 stmts = [_Assign(tmp, app, None)]
                 for i, a in enumerate(ass):
                     idx = Apply(builtins.index,
@@ -649,8 +746,8 @@ class Parser(LocVisitor):
         if_args = in_syms
         if_body = body(Apply(wsym, *[p.vtrack[v] for v in in_vars])).at(loc)
         if_fn = self.reg_lambda(
-            if_args, if_body, self.gen, None, "#while_if",
-            (None, wbsym)
+            if_args, if_body, self.gen, None,
+            wbsym
         )
         new_body = Apply(Apply(
             builtins.switch,
@@ -672,7 +769,7 @@ class Parser(LocVisitor):
         # assert isinstance(wsym.label, str)
         # self.globals_accessed.add(wsym.label)
 
-        tmp = self.gensym('#tmp').at(loc)
+        tmp = self.gen.sym('#tmp').at(loc)
         val = Apply(wsym, *[self.vtrack[v] for v in in_vars])
         stmts: List[MyiaASTNode] = [_Assign(tmp, val, None)]
         for i, v in enumerate(out_vars):
