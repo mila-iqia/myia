@@ -1,3 +1,10 @@
+"""
+Miscellaneous utilities go here.
+"""
+
+
+from typing import Iterable, Callable, List, Tuple as TupleT, TypeVar
+
 
 class Props:
     """
@@ -16,7 +23,13 @@ class Props:
             self.__dict__[attr] = value
 
 
-def group_contiguous(arr, classify):
+T = TypeVar('T')
+U = TypeVar('U')
+
+
+def group_contiguous(arr: Iterable[T],
+                     classify: Callable[[T], U]) \
+        -> List[TupleT[U, List[T]]]:
     """
     Splits the given array into groups according to the classification
     function given. Contiguous elements that have the same classification
@@ -28,7 +41,7 @@ def group_contiguous(arr, classify):
     >>> group_contiguous([1, 2, 4, 6, 7, 9, 10, 12], lambda x: x % 2)
     [(1, [1]), (0, [2, 4, 6]), (1, [7, 9]), (0, [10, 12])]
     """
-    current_c = None
+    current_c: U = None
     results = []
     current = []
     for a in arr:
