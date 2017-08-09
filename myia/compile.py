@@ -1,3 +1,11 @@
+"""
+Several code transformations are implemented here.
+
+* ANormalTransformer: Transform AST to A-Normal form.
+* CollapseLet: Transform nested Lets into a single Let.
+"""
+
+
 from typing import Union, Any, List, cast, \
     Sequence, Tuple as TupleT, Optional, Callable
 
@@ -20,8 +28,27 @@ def a_normal(node: MyiaASTNode) -> MyiaASTNode:
           (out (f tmp)))
       out)
 
-    :param node: The expression to process
-    :return: The expression in A-normal form
+    More precisely:
+
+    * Only bind each variable once, but that's already done
+      by Parser.
+    * A leaf node is Symbol or Value.
+    * All arguments to Apply, Tuple, Closure must be leaf
+      nodes.
+    * Begin is reduced to Let.
+
+    The end result is that all functions become a sequence
+    of bindings, where each binding is a call that only
+    involves bindings, not sub-expressions. They become
+    giant Lets.
+
+    ANF is similar to SSA representation.
+
+    Arguments:
+        node: The expression to process
+
+    Returns:
+        The expression in A-normal form
     """
     node = ANormalTransformer().transform(node)
     node = CollapseLet().transform(node)
@@ -33,6 +60,15 @@ StashType = TupleT[Optional[str], List[BindingType]]
 
 
 class ANormalTransformer(Transformer):
+    """
+    Transform Myia AST to A-Normal form.
+
+    Don't use this directly, use the ``a_normal`` function.
+
+    This transformer allows nested Lets, but CollapseLet
+    can be applied to the result to fix that (which is
+    what the a_normal function does.)
+   """
     def __init__(self, gen: GenSym = None) -> None:
         self.gen = gen
 
@@ -143,6 +179,22 @@ class ANormalTransformer(Transformer):
 
 
 class CollapseLet(Transformer):
+    """
+    Transform nested Lets into a single Let. That is to say:
+
+        (let ((a (let (b c) x))
+              (d y))
+          (let ((e z))
+            w))
+
+    Becomes:
+
+        (let ((b c)
+              (a x)
+              (d y)
+              (e z))
+          w)
+    """
     def __init__(self) -> None:
         pass
 
