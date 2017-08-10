@@ -181,6 +181,7 @@ from copy import copy
 from .compile import a_normal
 from .util import Props
 from .buche import buche
+from collections import OrderedDict
 
 
 LeafType = Union[Symbol, Value]
@@ -636,6 +637,11 @@ def gless(x, y, dz):
 
 @rgrad(builtins.switch)
 def gswitch(c, t, f, dz):
+    # There's a subtlety here, which is that we must return
+    # appropriately-sized gradients for each argument. This
+    # requires the use of zeros_like to match input shapes.
+    # TODO: zeros_like shouldn't be needed for the condition
+    # if it is always boolean (as it should be).
     if c:
         return GRAD(
             zeros_like(Jinv(c)),  # False
@@ -687,6 +693,7 @@ def gmap(f, xs, dz):
     bprops = map(second, results)
     # TODO: THIS IS WRONG, SHOULD BE SOMETHING LIKE THIS:
     # d = map(lambda xy: xy[0](xy[1]), zip(bprops, dz))
+    # but we don't have zip yet.
     d = map(bprops[0], dz)
     df = reduce(mapadd, map(first, d))
     dxs = map(second, d)
@@ -698,10 +705,12 @@ def genumerate(xs, dz):
     return GRAD(map(second, dz))
 
 
-# Following the methodology in the following paper:
-#   http://www.bcl.hamilton.ie/~barak/papers/toplas-reverse.pdf
-
 class Grad:
+    """
+    Transform a Lambda into a Lambda that returns a backpropagator
+    in addition to its normal return value.
+    """
+
     # Notation:
     # x_up is the reverse (backprop-ready) version of x
     # x_bprop is a function that takes the sensitivity of x and
@@ -724,25 +733,46 @@ class Grad:
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
         self.backpropagator_map: Dict[Symbol, Symbol] = {}
         self.zeros: List[TupleT[Symbol, MyiaASTNode]] = []
+        self.bprop_variables: Dict[Symbol, bool] = OrderedDict()
         self.nargs_closure = nargs_closure
 
     def phi(self, var: Symbol, value: MyiaASTNode) \
             -> Sequence[TupleT[Symbol, MyiaASTNode]]:
-        # phi (p. 26) transformation on let bindings, transforms
-        # the forward phase.
+        """
+        Given a variable and the expression it is bound to,
+        return a list of (variable, value) bindings to append to
+        the forward phase. See p. 26 in the P&S paper.
+        """
+
+        # Keep in mind:
+        # self.tagged_var(x)          ==>  ↑x, x must be Symbol
+        # self.tagged_expr(x)         ==>  ↑x, or x if x is a Value
+        # self.backpropagator_var(x)  ==>  ♢x
 
         if isinstance(value, Symbol):
-            # x = y ==> x_up = y_up
+            # Original:     x = y
+            # Transformed:  ↑x = ↑y
             return [(self.tagged_var(var), self.tagged_expr(value)),
                     (self.backpropagator_var(var), Value(None))]
 
         elif isinstance(value, Value):
-            # x = 5 ==> x_up = 5
+            # Original:     x = 5
+            # Transformed:  ↑x = 5
             return [(self.tagged_var(var), value),
                     (self.backpropagator_var(var), Value(None))]
 
+        elif isinstance(value, Tuple):
+            # Original:     x = (y, z)
+            # Transformed:  ↑x = (↑y, ↑z)
+            return [(self.tagged_var(var),
+                     Tuple(self.tagged_expr(a) for a in value.values)),
+                    (self.backpropagator_var(var), Value(None))]
+
         elif isinstance(value, Apply):
-            # x = f(y) ==> (x_up, x_bprop) = f_up(y_up)
+            # Original:     x = f(y)
+            # Transformed:  tmp = ↑f(↑y)
+            #               ↑x = tmp[0]
+            #               ♢x = tmp[1]
             tmp = self.gensym('tmp')
             return [(tmp,
                      Apply(self.tagged_expr(value.fn),
@@ -753,12 +783,16 @@ class Grad:
                      Apply(builtins.index, tmp, Value(1)))]
 
         elif isinstance(value, Closure):
-            # x = lambda y: ... ==> x_up = (lambda y: ...)_up
-            # But in our system, we feed free variables explicitly
-            # through Closure, and lambda has no freevars, so we do:
-            # x = Closure(f, w, z) ==> x_up = Closure(f_up, w_up, z_up) (???)
+            # Original:     x = Closure(f, y, z)
+            # Transformed:  ↑f = JX(f, 2)  # evaluated immediately
+            #               ↑x = Closure(↑f, ↑y, ↑z)
+            # where the last argument to JX is the number of free
+            # variables the function is referring to (y and z in
+            # the example).
 
-            # These assertions ensure that value.fn is resolvable.
+            # We should always statically know ``f`` in order to
+            # apply this rule, but this will always be the case
+            # if we have a closure in the code.
             assert isinstance(value.fn, Symbol)
             if value.fn.namespace not in {'global', 'builtin'}:
                 raise Exception(
@@ -767,80 +801,88 @@ class Grad:
                 )
 
             args = [self.tagged_expr(a) for a in value.args]
-
             fn = evaluate(value.fn, self.global_env)
-            if isinstance(fn, PrimitiveImpl):
-                # fn = Apply(builtins.JX, value.fn, Value(len(args)))
-                # expr = Closure(fn, args)
-                fn = evaluate(value.fn, get_global_parse_env('__root__'))
-                gfn = JX(fn, len(value.args))
-                expr = Closure(gfn.ast.ref, args)
-            else:
-                # sym = self.global_env.gen('TMPG')
-                normalized = a_normal(fn.ast)
-                assert isinstance(normalized, Lambda)
-                G = Grad(fn.ast.ref, normalized, len(value.args))
-                grad = G.transform()
-                # self.global_env[sym] = grad
-                expr = Closure(grad, args)
-
-            # fn = evaluate(value.fn, self.global_env.bindings)
-            # g = JX(fn, len(value.args))
-            # assert g.primal
-            # assert g.ast.ref
-            # expr = Closure(g.ast.ref, args)
-
-            # fn = Apply(builtins.JX, value.fn, Value(len(args)))
-            # expr = Closure(fn, args)
+            jfn = JX(fn, len(value.args))
+            expr = Closure(jfn.ast.ref, args)
 
             return [(self.tagged_var(var), expr),
-                    (self.backpropagator_var(var), Value(None))]
-
-        elif isinstance(value, Tuple):
-            return [(self.tagged_var(var),
-                     Tuple(self.tagged_expr(a) for a in value.values)),
                     (self.backpropagator_var(var), Value(None))]
 
         else:
             raise Exception(f'phi is not defined on node type: {value}')
 
-    def args_cast(self, args: List[MyiaASTNode]) -> List[LeafType]:
-        assert all(isinstance(a, (Symbol, Value)) for a in args)
-        return cast(List[LeafType], args)
-
     def rho(self, var: Symbol, value: MyiaASTNode) \
             -> List[TupleT[Symbol, MyiaASTNode]]:
-        # rho (p. 26) transformation on let bindings, represents the
-        # corresponding operations to do in the backward phase
+        """
+        Given a variable and the expression it is bound to,
+        return a list of (variable, value) bindings to prepend
+        to the backward phase. See p. 26 in the P&S paper.
+        """
+
+        # Keep in mind:
+        # self.sensitivity_var(x)     ==>  ∇x
+        # self.backpropagator_var(x)  ==>  ♢x
+        # x += y means x_2 = mapadd(x, y), where x_2 is a fresh
+        # variable (to keep single assignment property)
+
+        def args_cast(args: List[MyiaASTNode]) -> List[LeafType]:
+            # Just a helper function to satisfy mypy
+            assert all(isinstance(a, (Symbol, Value)) for a in args)
+            return cast(List[LeafType], args)
 
         if isinstance(value, Symbol):
-            # x = y ==> y_sen += x_sen
+            # Original:     x = y
+            # Transformed:  ∇x += ∇y
             return self.accum([value], Tuple([self.sensitivity_var(var)]))
 
         elif isinstance(value, Value):
-            # x = 5 ==> <nothing>
+            # Original:     x = 5
+            # Transformed:  <nothing to do>
             return []
 
+        elif isinstance(value, Tuple):
+            # Original:     x = (y, z)
+            # Transformed:  ∇y += ∇x[0]
+            #               ∇z += ∇x[1]
+            args = args_cast(value.values)
+            return self.accum(args, self.sensitivity_var(var))
+
         elif isinstance(value, Apply):
-            # x = f(y) ==> (f_sen, y_sen) += x_bprop(x_sen)
-            args = self.args_cast([value.fn, *value.args])
+            # Original:     x = f(y)
+            # Transformed:  tmp = ♢x(∇x)
+            #               ∇f += tmp[0]
+            #               ∇y += tmp[1]
+            args = args_cast([value.fn, *value.args])
             increment = Apply(self.backpropagator_var(var),
                               self.sensitivity_var(var))
             return self.accum(args, increment)
 
         elif isinstance(value, Closure):
-            # x = Closure(f, w, z) ==> (w_sen, z_sen) += x_sen
-            args = self.args_cast(value.args)
-            return self.accum(args, self.sensitivity_var(var))
-
-        elif isinstance(value, Tuple):
-            args = self.args_cast(value.values)
+            # Original:     x = Closure(f, y, z)
+            # Transformed:  ∇y += ∇x[0]
+            #               ∇z += ∇x[1]
+            # Why yes, this works the same as Tuple.
+            args = args_cast(value.args)
             return self.accum(args, self.sensitivity_var(var))
 
         else:
             raise Exception(f'rho is not defined on node type: {value}')
 
     def zero_init(self, var: Symbol) -> Symbol:
+        """
+        Handle zero initialization code for a variable's gradient.
+        That code is:
+
+            ∇x = zeros_like(Jinv(↑x))
+
+        ``Jinv(↑x)`` is the same as ``x``, but we don't have access to
+        ``x`` since a transformed function ``↑f`` receives ``↑x``
+        directly as an argument. Thankfully, the transformation is
+        invertible, and that is why we use ``Jinv``.
+
+        The initialization code is stored in ``self.zeros``, and ``∇x``
+        is returned.
+        """
         new_var = self.new_sensitivity_var(var)
         init = (new_var,
                 Apply(builtins.zeros_like,
@@ -850,6 +892,18 @@ class Grad:
 
     def accum(self, vars: List[LeafType], value: MyiaASTNode) \
             -> List[TupleT[Symbol, MyiaASTNode]]:
+        """
+        Return code to accumulate the gradients returned as ``value``
+        into a tuple of ``vars``. In other words:
+
+            tmp = value
+            vars[0] = tmp[0]
+            vars[1] = tmp[1]
+            ...
+
+        Some of the variables may be Values (aka not variables),
+        in which case we simply ignore them.
+        """
         tmp = self.gensym('tmp')
         rval = [(tmp, value)]
         for i, v in enumerate(vars):
@@ -864,45 +918,57 @@ class Grad:
         return rval
 
     def tagged_var(self, v: MyiaASTNode) -> Symbol:
+        """
+        Return ``↑v``. Creates it if it does not exist.
+        """
         # Maps v to the v_up variable i.e. the tagged variable for v
         assert isinstance(v, Symbol)
         assert v.namespace not in {'global', 'builtin'}
         return copy(self.tagged_map.setdefault(v, self.gensym(v, '↑')))
 
     def tagged_expr(self, v: MyiaASTNode) -> MyiaASTNode:
-        # Maps expr to expr_up
+        """
+        * If ``v`` is a Value, return ``v``.
+        * If ``v`` is a global Symbol, return ``J(v)``.
+        * Otherwise return ``↑v``.
+        """
         assert isinstance(v, (Symbol, Value))
         if isinstance(v, Value):
             return v
         if v.namespace in {'global', 'builtin'}:
             return Apply(builtins.J, v)
         else:
-            return copy(self.tagged_map.setdefault(v, self.gensym(v, '↑')))
+            return self.tagged_var(v)
 
     def sensitivity_var(self, v: MyiaASTNode) -> Optional[Symbol]:
-        # Maps v to the v_sen variable i.e. the gradient of v
+        """
+        Return ``∇v``. If it does not exist, create it and perform
+        zero_init.
+        """
         assert isinstance(v, (Symbol, Value))
         if isinstance(v, Value):
             return None
         try:
             return copy(self.sensitivity_map[v])
         except KeyError:
-            # self.zeros.append(self.zero_init(v))
-            # return self.new_sensitivity_var(v)
             return self.zero_init(v)
 
     def new_sensitivity_var(self, v: Symbol) -> Symbol:
-        # Create a new sensitivity variable for v. This is used to preserve
-        # the single-assignment property: instead of v_sen = v_sen + x,
-        # we do v_sen2 = v_sen + x. self.sensitivity_var maps to the latest
-        # return value for this function.
+        """
+        Create a new sensitivity variable for v. This is used to preserve
+        the single-assignment property: instead of ∇v = ∇v + x,
+        we do ∇v_2 = ∇v + x. self.sensitivity_var maps to the latest
+        return value for this function.
+        """
         assert isinstance(v, Symbol)
         new_v = self.gensym(v, '∇')
         self.sensitivity_map[v] = new_v
         return new_v
 
     def backpropagator_var(self, v: Symbol) -> Symbol:
-        # Maps v to the v_bprop variable i.e. the backpropagator for v
+        """
+        Return ``♢v``. Create it if it does not exist.
+        """
         return copy(self.backpropagator_map.setdefault(v, self.gensym(v, '♢')))
 
     def transform(self) -> Symbol:
