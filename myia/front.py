@@ -430,7 +430,7 @@ class Parser(LocVisitor):
         certain size, hence the index operations are tagged as
         ``cannot_fail``.
         """
-        tmp = self.gen('#tmp')
+        tmp = self.gen('◯')
         stmts = [_Assign(tmp, expr, None)]
         for i, a in enumerate(ass):
             idx = Apply(builtins.index,

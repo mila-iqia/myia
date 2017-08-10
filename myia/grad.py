@@ -711,14 +711,6 @@ class Grad:
     in addition to its normal return value.
     """
 
-    # Notation:
-    # x_up is the reverse (backprop-ready) version of x
-    # x_bprop is a function that takes the sensitivity of x and
-    #     returns the sensitivity of the inputs of the function
-    #     that returns x
-    # x_sen is the sensitivity of the gradient to changes in x,
-    #     i.e. the quantity we are ultimately interested in
-
     def __init__(self,
                  name: Symbol,
                  primal: Lambda,
@@ -752,28 +744,25 @@ class Grad:
         if isinstance(value, Symbol):
             # Original:     x = y
             # Transformed:  ↑x = ↑y
-            return [(self.tagged_var(var), self.tagged_expr(value)),
-                    (self.backpropagator_var(var), Value(None))]
+            return [(self.tagged_var(var), self.tagged_expr(value))]
 
         elif isinstance(value, Value):
             # Original:     x = 5
             # Transformed:  ↑x = 5
-            return [(self.tagged_var(var), value),
-                    (self.backpropagator_var(var), Value(None))]
+            return [(self.tagged_var(var), value)]
 
         elif isinstance(value, Tuple):
             # Original:     x = (y, z)
             # Transformed:  ↑x = (↑y, ↑z)
             return [(self.tagged_var(var),
-                     Tuple(self.tagged_expr(a) for a in value.values)),
-                    (self.backpropagator_var(var), Value(None))]
+                     Tuple(self.tagged_expr(a) for a in value.values))]
 
         elif isinstance(value, Apply):
             # Original:     x = f(y)
             # Transformed:  tmp = ↑f(↑y)
             #               ↑x = tmp[0]
             #               ♢x = tmp[1]
-            tmp = self.gensym('tmp')
+            tmp = self.gensym('◯ϕ')
             return [(tmp,
                      Apply(self.tagged_expr(value.fn),
                            *[self.tagged_expr(a) for a in value.args])),
@@ -805,8 +794,7 @@ class Grad:
             jfn = JX(fn, len(value.args))
             expr = Closure(jfn.ast.ref, args)
 
-            return [(self.tagged_var(var), expr),
-                    (self.backpropagator_var(var), Value(None))]
+            return [(self.tagged_var(var), expr)]
 
         else:
             raise Exception(f'phi is not defined on node type: {value}')
@@ -830,10 +818,19 @@ class Grad:
             assert all(isinstance(a, (Symbol, Value)) for a in args)
             return cast(List[LeafType], args)
 
+        sen = self.try_sensitivity_var(var)
+        if sen is None:
+            # In this case we know ∇x's current value is 0.
+            # Consequently, this term cannot possibly contribute
+            # to any other sensitivity variable, so we save
+            # ourselves the trouble.
+            return []
+
         if isinstance(value, Symbol):
             # Original:     x = y
             # Transformed:  ∇x += ∇y
-            return self.accum([value], Tuple([self.sensitivity_var(var)]))
+            # return self.accum([value], Tuple([sen]))
+            return self.accum_helper(value, sen)
 
         elif isinstance(value, Value):
             # Original:     x = 5
@@ -845,7 +842,7 @@ class Grad:
             # Transformed:  ∇y += ∇x[0]
             #               ∇z += ∇x[1]
             args = args_cast(value.values)
-            return self.accum(args, self.sensitivity_var(var))
+            return self.accum(args, sen)
 
         elif isinstance(value, Apply):
             # Original:     x = f(y)
@@ -853,8 +850,9 @@ class Grad:
             #               ∇f += tmp[0]
             #               ∇y += tmp[1]
             args = args_cast([value.fn, *value.args])
-            increment = Apply(self.backpropagator_var(var),
-                              self.sensitivity_var(var))
+            bprop_var = self.backpropagator_var(var)
+            increment = Apply(bprop_var, sen)
+            self.bprop_variables[bprop_var] = True
             return self.accum(args, increment)
 
         elif isinstance(value, Closure):
@@ -863,7 +861,7 @@ class Grad:
             #               ∇z += ∇x[1]
             # Why yes, this works the same as Tuple.
             args = args_cast(value.args)
-            return self.accum(args, self.sensitivity_var(var))
+            return self.accum(args, sen)
 
         else:
             raise Exception(f'rho is not defined on node type: {value}')
@@ -884,10 +882,12 @@ class Grad:
         is returned.
         """
         new_var = self.new_sensitivity_var(var)
+        tagged = self.tagged_var(var)
         init = (new_var,
                 Apply(builtins.zeros_like,
-                      Apply(builtins.Jinv, self.tagged_expr(var))))
+                      Apply(builtins.Jinv, tagged)))
         self.zeros.append(init)
+        self.bprop_variables[tagged] = True
         return new_var
 
     def accum(self, vars: List[LeafType], value: MyiaASTNode) \
@@ -904,18 +904,29 @@ class Grad:
         Some of the variables may be Values (aka not variables),
         in which case we simply ignore them.
         """
-        tmp = self.gensym('tmp')
-        rval = [(tmp, value)]
+        rval: List[TupleT[Symbol, MyiaASTNode]]
+        if isinstance(value, (Symbol, Value)):
+            tmp = value
+            rval = []
+        else:
+            tmp = self.gensym('◯ρ')
+            rval = [(tmp, value)]
+
         for i, v in enumerate(vars):
-            if isinstance(v, Value):
-                # No accumulation in non-variables.
-                continue
-            sen = self.sensitivity_var(v)
-            new_sen = self.new_sensitivity_var(v)
-            rval.append((new_sen,
-                         Apply(builtins.mapadd, sen,
-                               Apply(builtins.index, tmp, Value(i)))))
+            rval += self.accum_helper(v, Apply(builtins.index, tmp, Value(i)))
+
         return rval
+
+    def accum_helper(self, v, value):
+        if isinstance(v, Value):
+            # No accumulation in non-variables.
+            return []
+        sen = self.try_sensitivity_var(v)
+        new_sen = self.new_sensitivity_var(v)
+        if sen is None:
+            return [(new_sen, value)]
+        else:
+            return [(new_sen, Apply(builtins.mapadd, sen, value))]
 
     def tagged_var(self, v: MyiaASTNode) -> Symbol:
         """
@@ -940,10 +951,18 @@ class Grad:
         else:
             return self.tagged_var(v)
 
-    def sensitivity_var(self, v: MyiaASTNode) -> Optional[Symbol]:
+    def sensitivity_var(self, v: Symbol) -> Optional[Symbol]:
         """
         Return ``∇v``. If it does not exist, create it and perform
         zero_init.
+        """
+        return self.try_sensitivity_var(v) \
+            or self.zero_init(v)
+
+    def try_sensitivity_var(self, v: MyiaASTNode) -> Optional[Symbol]:
+        """
+        Return ``∇v``, if it exists. If it does not exist, return
+        None.
         """
         assert isinstance(v, (Symbol, Value))
         if isinstance(v, Value):
@@ -951,7 +970,7 @@ class Grad:
         try:
             return copy(self.sensitivity_map[v])
         except KeyError:
-            return self.zero_init(v)
+            return None
 
     def new_sensitivity_var(self, v: Symbol) -> Symbol:
         """
@@ -972,64 +991,96 @@ class Grad:
         return copy(self.backpropagator_map.setdefault(v, self.gensym(v, '♢')))
 
     def transform(self) -> Symbol:
+        """
+        Perform the code transform on self.primal.
+        """
+
+        # The arguments of the function. We want the gradients of
+        # these.
         args = self.primal.args
+
+        # The body of the function, which we need to be a Let in
+        # a-normal form.
         let = self.primal.body
-
         if isinstance(let, Symbol):
-            tmp = self.gensym('tmp')
+            tmp = self.gensym('◯let')
             let = Let([(tmp, let)], tmp)
-        assert isinstance(let, Let)  # TODO: could be symbol too
+        assert isinstance(let, Let)
 
-        # Create this sensitivity variable first (it's an argument).
+        # We start by creating the sensitivity variable ``∇out``
+        # which is the input to the backpropagator.
         assert isinstance(let.body, Symbol)
         out_sen = self.new_sensitivity_var(let.body)
 
+        # Repeatedly call phi to build the forward pass.
         forward: List[TupleT[Symbol, MyiaASTNode]] = []
-        backward: List[TupleT[Symbol, MyiaASTNode]] = []
         for s, v in let.bindings:
             forward += self.phi(s, v)
 
+        # Repeatedly call rho to build the backprop pass.
+        backward: List[TupleT[Symbol, MyiaASTNode]] = []
         for s, v in reversed(let.bindings):
             backward += self.rho(s, v)
 
-        backp_bargs: List[Symbol] = \
-            [self.backpropagator_var(s) for s, _ in let.bindings]
-        backp_cargs: List[Symbol] = \
-            [self.tagged_var(s) for s, _ in let.bindings]
-        backp_rargs: List[Symbol] = \
-            [self.tagged_var(arg) for arg in args]
-        backp_args = backp_bargs + backp_cargs + backp_rargs
+        ################################
+        # Build the backpropagator ♢*f #
+        ################################
+
+        # We return the sensitivity variables for all of the inputs.
         backp_all_ret = [self.sensitivity_var(arg) for arg in args]
+        # The return value of ♢*f: we group together the first
+        # nargs_closure
         backp_ret = Tuple([
             Tuple(backp_all_ret[:self.nargs_closure]),
             *backp_all_ret[self.nargs_closure:]
-            # Tuple(backp_all_ret[self.nargs_closure:])
         ])
-
+        # Calls to rho had the side effect of populating bprop_variables
+        # with all the variables we need for the bprop. We will need
+        # to feed them in as arguments to ♢*f.
+        backp_args = list(self.bprop_variables.keys())
+        # TODO: copying these args is kind of iffy. They should be
+        # different versions of the symbols, or use a different
+        # namespace.
         backp_args_copy: Iterable[Symbol] = map(copy, backp_args)
+        # ♢*f
+        backp_sym = self.global_env.gen(self.name, '♢*')
         backp_fn = Lambda([*backp_args_copy, out_sen],
                           Let(self.zeros + backward, backp_ret),
                           self.gensym)
-        backp_sym = self.global_env.gen(self.name, '♢*')
         backp_fn.global_env = self.global_env
         backp_fn.ref = backp_sym
         self.global_env[backp_sym] = backp_fn
-        # if self.global_env.url == '__root__':
         root_globals[backp_sym] = backp_fn
 
+        ########################
+        # Build the closure ♢f #
+        ########################
+
+        # First we will make a closure over ♢*f and call it ♢f
         backp_cl = Closure(backp_sym, backp_args)
         backp_clsym = self.gensym(self.name, '♢')
+        # We append the closure binding to forward
         forward.append((backp_clsym, backp_cl))
-        new_body = Let(forward,
-                       Tuple([self.tagged_expr(let.body), backp_clsym]))
 
-        new_args = list(map(self.tagged_var, args))
-        ret_fn = Lambda(new_args, new_body, self.gensym)
-        ret_sym = self.global_env.gen(self.name, '↑')
-        ret_fn.global_env = self.global_env
-        ret_fn.ref = ret_sym
-        self.global_env[ret_sym] = ret_fn
-        # if self.global_env.url == '__root__':
-        root_globals[ret_sym] = ret_fn
-        ret_fn.primal = self.name
-        return ret_sym
+        ###################################
+        # Build the augmented function ↑f #
+        ###################################
+
+        # ↑f returns (↑out, ♢f)
+        augm_ret = Tuple([self.tagged_expr(let.body), backp_clsym])
+        augm_body = Let(forward, augm_ret)
+        # ↑f takes ↑ versions of f's arguments
+        augm_args = list(map(self.tagged_var, args))
+
+        # ↑f
+        augm_fn = Lambda(augm_args, augm_body, self.gensym)
+        augm_sym = self.global_env.gen(self.name, '↑')
+        augm_fn.global_env = self.global_env
+        augm_fn.ref = augm_sym
+        self.global_env[augm_sym] = augm_fn
+        root_globals[augm_sym] = augm_fn
+
+        # Set the primal field to the original function's symbol
+        augm_fn.primal = self.name
+
+        return augm_sym
