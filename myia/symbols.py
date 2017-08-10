@@ -71,7 +71,6 @@ builtins_dict: Dict[str, Symbol] = dict(
     one = gsym('one'),
     merge = gsym('merge'),
     J = gsym('J'),
-    JX = gsym('JX'),
     Jinv = gsym('Jinv'),
 
     # Myia's global variables

@@ -1,3 +1,170 @@
+"""
+Defines a program transformation that can map any function to a
+new function that can compute its own back-propagated gradient
+while reusing intermediate results. This is the transformation
+originally formulated in [1].
+
+## Gradient functions
+
+For each function transformed by Grad, several auxiliary functions
+will be created. These are the ones you need to know about:
+
+* ``↑f`` is the "tagged" version of ``f``. In [1] this is ``f``
+  with a top-left harpoon, i.e. f⃐. ``↑f`` returns two values:
+  first, it returns the "tagged" version of ``f``'s normal
+  output. Second, it returns the backpropagator closure ``♢f``
+  (see below).
+
+* ``♢f`` is the backpropagator for ``f``. In [1] this is ``f``
+  with a bar on top, i.e. f̄. Its input is the
+  gradient with respect to its output (let's call it ``∇f``).
+  Its output is the tuple ```(closure_grads, *argument_grads)``.
+  The latter part is what typically interests us, but the former
+  part is required to make everything run smoothly (see Partial
+  Application section below).
+
+  Note that ``♢f`` is not a top-level function, but a closure over
+  the real top-level function ``♢*f`` (see below).
+
+* ``♢*f`` is the closure-converted backpropagator function for ``f``.
+  Being closure-converted means it has no free variables, hence the
+  ``*``. This is an implementation detail.
+
+## Gradient variables
+
+In the generated code you will see the following variables:
+
+* ``↑x`` is the "tagged" version of ``x``. If ``x`` is a scalar,
+  that's the identity, if ``x`` is a data structure this applies
+  the tag on every member, and if ``x`` is a function, see above.
+
+* ``♢x`` is the "backpropagator" for ``x``.
+
+* ``∇x`` is the "sensitivity" with respect to ``x``. In other
+  words, this is where we accumulate the gradient for ``x``.
+
+In a nutshell, when there is an assignment like ``x = f(y, z)``
+in the code:
+
+* In the forward pass, we generate:
+      ↑x, ♢x = ↑f(↑y, ↑z)   # forward computation
+
+* In the backward pass, we generate:
+      ∇x = zeros_like(x)    # initialization
+      ...
+      ∇f, ∇y, ∇z += ♢x(∇x)  # propagation
+
+Note that the statements for the propagation are generated
+in reverse order, so if ``x`` is an input to other function
+calls later in the code, the gradient will accumulate into
+``∇x`` *before* it is used to accumulate into ``∇f, ∇y, ∇z``,
+starting from ``∇out``, the input to the backpropagator
+function. That's why it's called *back*prop.
+
+## Example
+
+In a nutshell, supposing we have the following function:
+
+    z = 10  # free variable
+    def f(x, y):
+        a = g(x, y, z)
+        b = h(a, x)
+        return b
+
+Then we will get something like this:
+
+    ↑z = 10  # free variable
+
+    def ♢*f(♢a, ♢b, ∇b):
+        # The zeros should be the same "shape" as
+        # g, x, y, ...
+        zero_init(∇g, ∇x, ∇y, ∇z, ∇h, ∇a, ∇h)
+        # Backpropagation, operates in reverse order:
+        # propagate through h, then through g. Notice:
+        # * We have gradient terms for g and h, because they
+        #   could be closures or partial applications, and
+        #   we must track the contributions.
+        # * The left-hand side looks just like the function
+        #   application. h(a, x) becomes ∇h, ∇a, ∇x +=
+        # * The right-hand side is also very easy to remember,
+        #   it's bprop(grad) for each variable you set in the
+        #   original function, in reverse order
+        ∇h, ∇a, ∇x += ♢b(∇b)
+        ∇g, ∇x, ∇y, ∇z += ♢a(∇a)
+        # Note that ∇z is stashed in the first return value.
+        # Gradients for all of f's free variables must go there.
+        return ((∇z,), ∇x, ∇y)
+
+    def ↑f(↑x, ↑y):
+        # The "tagged" functions ↑g and ↑h give us both
+        # tagged forward results and backpropagators.
+        ↑a, ♢a = ↑g(↑x, ↑y, ↑z)
+        ↑b, ♢b = ↑h(↑a, ↑x)
+        def ♢f(∇f):
+            # Closure on ♢*f
+            return ♢*f(♢a, ♢b, ∇f)
+        # We return the tagged original return value
+        # and a backpropagator.
+        return ↑b, ♢f
+
+The reality is a bit more complicated, but not by much. Take
+note that we transform functions to a-normal form before we
+run Grad. In a-normal form, all statements look like
+``variable1 = fn(variable2, ...)``. No nested expressions.
+
+We accumulate gradients for functions as well, because they
+may be closures. If there is a closure ``f`` in the code,
+and ``x`` and ``y`` are its free variables, then we will
+simply generate something like this:
+
+    ∇x, ∇y = ∇f
+
+This allows us to recuperate contributions made by calls
+to ``f``.
+
+## Partial application
+
+Closures in Myia are compiled to partial applications, and we
+allow partial applications to primitives (``while`` generates
+a partial application to ``identity``). This creates a subtlety
+in the interaction with backpropagators.
+
+The backpropagator for ``f`` should return
+``(closure_grads, *argument_grads)``. Now, if ``f`` has no
+free variables then ``closure_grads`` is, quite naturally,
+the empty tuple ``()``. However, note that this is
+the case of all the functions Myia compiles, because the free
+variables are prepended to the list of arguments.
+
+When we make a partial application of ``f`` on its first n
+arguments, we basically state that these n arguments are "free
+variables". Concretely, that means we need the first n elements
+of ``argument_grads`` to *move* to the end of ``closure_grads``
+in the backpropagator for the partial.
+
+We could do this by taking the return value of a backpropagator
+and fudging it appropriately (we did at first), but that creates
+a lot of crud in the graph and it's cleaner to do it directly.
+What this means is:
+
+* The Grad class takes a ``nargs_closure`` argument stating
+  how many arguments at the beginning are free variables.
+* Gradients of primitives *also* require an ``nargs_closure``
+  parameter, because we can--and do--take partials of them,
+  and the same logic must apply. This is implemented using
+  the ``GRAD`` "macro", which generates the right return
+  value depending on an internal parameter.
+* Thus the ``grad`` field of both ``PrimitiveImpl`` and
+  ``FunctionImpl`` is actually a function of one argument,
+  ``nargs_closure`` (integer). Its output is cached to
+  avoid needless recomputation.
+
+[1] B. Pearlmutter, J. Siskind,
+    Reverse-Mode AD in a Functional Framework:
+    Lambda the Ultimate Backpropagator (2008)
+    http://www.bcl.hamilton.ie/~barak/papers/toplas-reverse.pdf
+"""
+
 from typing import Dict, List, Tuple as TupleT, Any, \
     Union, cast, Optional, Sequence, Iterable, Callable
 
@@ -24,11 +191,23 @@ LeafType = Union[Symbol, Value]
 ######################################
 
 
-def macro_grad_for(nclos_args):
+def macro_grad_for(nargs_closure):
+    """
+    This generates a ``GRAD`` function for use in primitive
+    gradients. ``GRAD`` is parameterized by the number of
+    arguments that are closed on.
+
+    See the *Partial Application* section above for a detailed
+    explanation of what this is for.
+    """
     def macro_grad(*args):
-        # return Tuple([Tuple(args[:nclos_args]),
-        #               Tuple(args[nclos_args:])])
-        return Tuple([Tuple(args[:nclos_args]), *args[nclos_args:]])
+        # *args = (a, b, c, ...) =>
+        #   ((), a, b, c, ...)  # If nargs_closure == 0
+        #   ((a,), b, c, ...)  # If nargs_closure == 1
+        #   ((a, b), c, ...)  # If nargs_closure == 2
+        #   etc.
+        return Tuple([Tuple(args[:nargs_closure]),
+                     *args[nargs_closure:]])
     return macro_grad
 
 
@@ -62,17 +241,41 @@ def macro_grad_for(nclos_args):
 
 
 def rgrad(sym: Symbol) -> Callable[..., Any]:
+    """
+    Decorator to declare a function as the backpropagator for
+    the given symbol.
+
+    Usage:
+
+        @rgrad(builtins.whatever)
+        def bprop_whatever(x, y, ..., gwhatever):
+            return GRAD(gx, gy, ...)
+
+    It is important to return ``GRAD(...)``. The ``GRAD`` macro
+    will group the gradients correctly given how many arguments
+    are part of a partial application.
+
+    Refer to the previous section on Partial Application.
+    """
+
     assert isinstance(sym, Symbol)
 
     def decorator(orig_fn: Callable) -> Callable:
+        # This is the implementation for the forward pass
         prim = root_globals[sym]
         assert isinstance(prim, PrimitiveImpl)
 
+        # We will cache the result for each nargs_closure value, to
+        # avoid needless recomputation.
         _cache: Dict[int, FunctionImpl] = {}
 
         # Wrap the primitive and a closure-converted backpropagator
-        # in a combined method that follows the protocol
+        # in a combined method that follows the protocol. Essentially:
+        # (forward_fn, bprop_fn) ==>
+        #   lambda *args: (forward_fn(*args),
+        #                  lambda grad_out: bprop_fn(*args, grad_out))
         def mkgrad(nargs_closure: int) -> FunctionImpl:
+            # Check if we have compiled this before
             cached = _cache.get(nargs_closure, None)
             if cached:
                 return cached
@@ -83,29 +286,46 @@ def rgrad(sym: Symbol) -> Callable[..., Any]:
                           namespace='builtin',
                           relation='♢*')
 
+            # We compile the backpropagator using Myia. We provide
+            # the GRAD macro which will account for nargs_closure
+            # stored arguments.
             r, genv = parse_function(
                 orig_fn,
                 macros={'GRAD': macro_grad_for(nargs_closure)}
             )
+
+            # Create a FunctionImpl.
             fn = evaluate(r, genv)
+
+            # Now we generate a combined function that returns the
+            # result of the forward pass along with a backpropagator
+            # function.
             G = GenSym()
             args = [G.sym(a) for a in prim.argnames]
             forward = Apply(builtins.J,
                             Apply(sym, *[Apply(builtins.Jinv, a)
                                          for a in args]))
             backward = Closure(rsym, args)
+            # Final function:
             ast = Lambda(args, Tuple([forward, backward]), G)
+
+            # Boilerplate stuff that should be properly abstracted
+            # somewhere else.
             ast.global_env = get_global_parse_env('__root__')
-            impl_sym = ast.global_env.gen('TMP')
+            impl_sym = ast.global_env.gen(sym, '↑')
             ast.global_env[impl_sym] = ast
             ast.ref = impl_sym
             ast.primal = sym
             impl = FunctionImpl(ast, [root_globals])
             root_globals[impl_sym] = impl
             root_globals[rsym] = fn
+
+            # Let's not forget to save our work in the cache!
             _cache[nargs_closure] = impl
             return impl
 
+        # prim's gradient is to be compiled lazily using
+        # prim.grad(nclos_args)
         prim.grad = mkgrad
 
         return impl
@@ -120,6 +340,14 @@ def rgrad(sym: Symbol) -> Callable[..., Any]:
 
 @impl(builtins.fill)
 def fill(x: Any, value: Union[int, float]) -> Any:
+    """
+    Creates a structure just like ``x`` but where each scalar element
+    is set to ``value``.
+
+    If ``x`` is a PrimitiveImpl or a FunctionImpl, this returns
+    (). If ``x`` is a ClosureImpl, this returns a filled value
+    for each value in the closure.
+    """
     if isinstance(x, (int, float)):
         return value
     elif isinstance(x, tuple):
@@ -136,16 +364,46 @@ def fill(x: Any, value: Union[int, float]) -> Any:
 
 @impl(builtins.zero)
 def zero(x):
+    """
+    Creates a structure just like ``x`` but "zeroed out."
+
+    If ``x`` is a PrimitiveImpl or a FunctionImpl, this returns
+    (). If ``x`` is a ClosureImpl, this returns a zero
+    for each value in the closure.
+
+    >>> zero(17)
+    0
+    >>> zero((1, 2, (3, 4)))
+    (0, 0, (0, 0))
+    >>> zero(lambda x, y: x + y)  # (metaphorically)
+    ()
+    >>> x = 10; zero(lambda y: x + y)  # (metaphorically)
+    (0,)
+
+    Implements the "0" operator in Pearlmutter & Siskind.
+    """
+    # TODO: rename to zeros_like
     return fill(x, 0)
 
 
 @impl(builtins.one)
 def one(x):
+    # TODO: rename to ones_like
     return fill(x, 1)
 
 
 @impl(builtins.merge)
 def merge(x: Any, y: Any) -> Any:
+    """
+    Element-wise addition.
+
+    >>> merge(10, 9)
+    19
+    >>> merge((1, 2, (3, 4)), (4, 3, (2, 1)))
+    (5, 5, (5, 5))
+
+    Implements the "⊕" (circled plus) operator in Pearlmutter & Siskind.
+    """
     if isinstance(x, (int, float)) and isinstance(y, (int, float)):
         return x + y
     elif type(x) is not type(y):
@@ -159,7 +417,16 @@ def merge(x: Any, y: Any) -> Any:
         raise TypeError(f'Cannot merge values of type {type(x)}')
 
 
-def JGrad(x) -> Callable[[int], FunctionImpl]:
+def JGrad(x: FunctionImpl) -> Callable[[int], FunctionImpl]:
+    """
+    Helper function that creates a gradient factory for
+    a FunctionImpl.
+
+    See previous section on Partial Application for the
+    purpose of the ``nargs_closure`` argument.
+    """
+
+    # We cache the compilation results.
     _cache: Dict[int, FunctionImpl] = {}
 
     def make_grad(nargs_closure: int) -> FunctionImpl:
@@ -169,30 +436,38 @@ def JGrad(x) -> Callable[[int], FunctionImpl]:
 
         normalized = a_normal(x.ast)
         assert isinstance(normalized, Lambda)
+        assert x.ast.ref
+
+        # Generate the gradient expression
         G = Grad(
-            name = x.ast.ref or x.ast.gen('???'),
+            name = x.ast.ref,
             primal = normalized,
-            nargs_closure = nargs_closure,
+            nargs_closure = nargs_closure
         )
         g = G.transform()
 
-        bindings = {}
-        bindings.update(G.global_env.bindings)
-        for env in reversed(x.envs):
-            bindings.update(env)
+        # Create a FunctionImpl
+        gfn = evaluate(g, G.global_env)
 
-        lbda = bindings[g]
-        assert isinstance(lbda, Lambda)
-        gfn = evaluate(lbda)
+        # Don't forget to cache.
         _cache[nargs_closure] = gfn
         return gfn
     return make_grad
 
 
-@impl(builtins.JX)
 def JX(x: Union[PrimitiveImpl, FunctionImpl],
        nargs_closure: int) -> FunctionImpl:
+    """
+    Helper function for the gradient of PrimitiveImpl or
+    FunctionImpl, given nargs_closure closure arguments.
+
+    See previous section on Partial Application for the
+    purpose of the ``nargs_closure`` argument.
+    """
     if isinstance(x, PrimitiveImpl):
+        # x.grad is set by the rgrad decorator. If it is
+        # None, it means no one defined a gradient for that
+        # operation.
         assert x.grad is not None
         return x.grad(nargs_closure)
     elif isinstance(x, FunctionImpl):
@@ -205,6 +480,24 @@ def JX(x: Union[PrimitiveImpl, FunctionImpl],
 
 @impl(builtins.J)
 def J(x: Any) -> Any:
+    """
+    Return a Grad-transformed version of this data.
+
+    * On scalars, this is the identity function.
+    * On a data structure, this applies ``J`` on each element and
+      returns a data structure with the same shape.
+    * On a function of type ``T -> U``, this returns the
+      Grad-transformed function, with signature (more or less)
+      ``J(T) -> (J(U), S(U) -> S(T))``. That is to say, it returns
+      J-transformed outputs and a backpropagator function that
+      takes an output sentisitivity and returns an input
+      sensitivity (don't look for an S type operator, I made that
+      up (J(T) isn't exactly correct either, since it's not a type
+      operator), but for what it's worth, ``zero(x)`` would have
+      the signature ``T -> S(T)``).
+
+    Implements the J operator in Pearlmutter & Siskind.
+    """
     if isinstance(x, (int, float)):
         return x
     elif isinstance(x, tuple):
@@ -223,6 +516,18 @@ def J(x: Any) -> Any:
 
 @impl(builtins.Jinv)
 def Jinv(x: Any) -> Any:
+    """
+    Undo the effect of ``J``.
+
+    * On scalars, this is the identity function.
+    * On a data structure, this applies ``Jinv`` on each element and
+      returns a data structure with the same shape.
+    * On a function, this undoes the effect of ``J``. This should
+      *never* be applied on a function that was not the result of
+      transforming through ``J``.
+
+    Implements the J^{-1} operator in Pearlmutter & Siskind.
+    """
     if isinstance(x, (int, float)):
         return x
     elif isinstance(x, tuple):
@@ -265,11 +570,6 @@ def gzero(x, d):
 @rgrad(builtins.merge)
 def gmerge(x, y, d):
     return GRAD(d, d)
-
-
-@rgrad(builtins.JX)
-def gJX(x, n, d):
-    return GRAD(Jinv(d), 0)
 
 
 @rgrad(builtins.J)
