@@ -1,3 +1,7 @@
+"""
+Test the forward mode of Myia functions (no gradients).
+"""
+
 from myia.front import parse_function, MyiaSyntaxError
 from myia.interpret import evaluate
 from myia.ast import Symbol
@@ -20,10 +24,10 @@ def myia_test(*tests):
     that the pure Python, undecorated function returns that same output.
 
     Arguments:
-    tests -- One or more (inputs, output) pair(s). `inputs` must be
-             a single input or a tuple of input values that will be given
-             as the argument(s) to the function. `output` must be
-             the value the function should return for these inputs.
+        tests: One or more (inputs, output) pair(s). `inputs` must be
+               a single input or a tuple of input values that will be
+               given as the argument(s) to the function. `output` must
+               be the value the function should return for these inputs.
     """
 
     def decorate(fn):
