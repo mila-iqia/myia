@@ -67,9 +67,9 @@ builtins_dict: Dict[str, Symbol] = dict(
 
     # Grad-related builtins
     fill = gsym('fill'),
-    zero = gsym('zero'),
-    one = gsym('one'),
-    merge = gsym('merge'),
+    zeros_like = gsym('zeros_like'),
+    ones_like = gsym('ones_like'),
+    mapadd = gsym('mapadd'),
     J = gsym('J'),
     Jinv = gsym('Jinv'),
 

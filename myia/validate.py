@@ -14,7 +14,7 @@ from typing import Iterable, Set, Tuple as TupleT, \
 from .ast import MyiaASTNode, Symbol, Lambda, Let, ParseEnv
 from .compile import a_normal
 from .front import parse_source, parse_function
-from .grad import Grad, one
+from .grad import Grad
 from .interpret import evaluate, root_globals
 
 

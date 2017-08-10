@@ -18,7 +18,7 @@ will be created. These are the ones you need to know about:
 * ``♢f`` is the backpropagator for ``f``. In [1] this is ``f``
   with a bar on top, i.e. f̄. Its input is the
   gradient with respect to its output (let's call it ``∇f``).
-  Its output is the tuple ```(closure_grads, *argument_grads)``.
+  Its output is the tuple ``(closure_grads, *argument_grads)``.
   The latter part is what typically interests us, but the former
   part is required to make everything run smoothly (see Partial
   Application section below).
@@ -362,8 +362,8 @@ def fill(x: Any, value: Union[int, float]) -> Any:
         raise TypeError(f'Cannot create a {value} conformant with {x}')
 
 
-@impl(builtins.zero)
-def zero(x):
+@impl(builtins.zeros_like)
+def zeros_like(x):
     """
     Creates a structure just like ``x`` but "zeroed out."
 
@@ -371,13 +371,13 @@ def zero(x):
     (). If ``x`` is a ClosureImpl, this returns a zero
     for each value in the closure.
 
-    >>> zero(17)
+    >>> zeros_like(17)
     0
-    >>> zero((1, 2, (3, 4)))
+    >>> zeros_like((1, 2, (3, 4)))
     (0, 0, (0, 0))
-    >>> zero(lambda x, y: x + y)  # (metaphorically)
+    >>> zeros_like(lambda x, y: x + y)  # (metaphorically)
     ()
-    >>> x = 10; zero(lambda y: x + y)  # (metaphorically)
+    >>> x = 10; zeros_like(lambda y: x + y)  # (metaphorically)
     (0,)
 
     Implements the "0" operator in Pearlmutter & Siskind.
@@ -386,35 +386,37 @@ def zero(x):
     return fill(x, 0)
 
 
-@impl(builtins.one)
-def one(x):
+@impl(builtins.ones_like)
+def ones_like(x):
     # TODO: rename to ones_like
     return fill(x, 1)
 
 
-@impl(builtins.merge)
-def merge(x: Any, y: Any) -> Any:
+@impl(builtins.mapadd)
+def mapadd(x: Any, y: Any) -> Any:
     """
     Element-wise addition.
 
-    >>> merge(10, 9)
+    >>> mapadd(10, 9)
     19
-    >>> merge((1, 2, (3, 4)), (4, 3, (2, 1)))
+    >>> mapadd((1, 2, (3, 4)), (4, 3, (2, 1)))
     (5, 5, (5, 5))
 
     Implements the "⊕" (circled plus) operator in Pearlmutter & Siskind.
     """
+    # TODO: this should be add, but add concatenates tuples, whereas
+    # this adds their values element-wise.
     if isinstance(x, (int, float)) and isinstance(y, (int, float)):
         return x + y
     elif type(x) is not type(y):
-        raise TypeError(f'Cannot merge {x} and {y} (not same type).')
+        raise TypeError(f'Cannot mapadd {x} and {y} (not same type).')
     elif isinstance(x, tuple):
         assert len(x) == len(y)
-        return tuple(merge(a, b) for a, b in zip(x, y))
+        return tuple(mapadd(a, b) for a, b in zip(x, y))
     elif x is None:
         return None
     else:
-        raise TypeError(f'Cannot merge values of type {type(x)}')
+        raise TypeError(f'Cannot mapadd values of type {type(x)}')
 
 
 def JGrad(x: FunctionImpl) -> Callable[[int], FunctionImpl]:
@@ -493,8 +495,8 @@ def J(x: Any) -> Any:
       takes an output sentisitivity and returns an input
       sensitivity (don't look for an S type operator, I made that
       up (J(T) isn't exactly correct either, since it's not a type
-      operator), but for what it's worth, ``zero(x)`` would have
-      the signature ``T -> S(T)``).
+      operator), but for what it's worth, ``zeros_like(x)`` would
+      have the signature ``T -> S(T)``).
 
     Implements the J operator in Pearlmutter & Siskind.
     """
@@ -562,13 +564,13 @@ def Jinv(x: Any) -> Any:
 myia_builtins = Props(globals())
 
 
-@rgrad(builtins.zero)
-def gzero(x, d):
-    return GRAD(zero(x))
+@rgrad(builtins.zeros_like)
+def gzeros_like(x, d):
+    return GRAD(zeros_like(x))
 
 
-@rgrad(builtins.merge)
-def gmerge(x, y, d):
+@rgrad(builtins.mapadd)
+def gmapadd(x, y, d):
     return GRAD(d, d)
 
 
@@ -636,14 +638,14 @@ def gless(x, y, dz):
 def gswitch(c, t, f, dz):
     if c:
         return GRAD(
-            zero(Jinv(c)),  # False
+            zeros_like(Jinv(c)),  # False
             dz,
-            zero(Jinv(f))
+            zeros_like(Jinv(f))
         )
     else:
         return GRAD(
-            zero(Jinv(c)),  # False
-            zero(Jinv(t)),
+            zeros_like(Jinv(c)),  # False
+            zeros_like(Jinv(t)),
             dz
         )
 
@@ -662,14 +664,14 @@ def gidentity(v, dz):
 def gindex(tup, idx, dz):
     def f(pair):
         return switch(pair[0] == idx, dz,
-                      zero(Jinv(pair[1])))
+                      zeros_like(Jinv(pair[1])))
     rval = map(f, enumerate(tup))
     return GRAD(rval, 0)
 
 
 @rgrad(builtins.len)
 def glen(xs, dz):
-    return GRAD(zero(Jinv(xs)))
+    return GRAD(zeros_like(Jinv(xs)))
 
 
 @rgrad(builtins.range)
@@ -686,7 +688,7 @@ def gmap(f, xs, dz):
     # TODO: THIS IS WRONG, SHOULD BE SOMETHING LIKE THIS:
     # d = map(lambda xy: xy[0](xy[1]), zip(bprops, dz))
     d = map(bprops[0], dz)
-    df = reduce(merge, map(first, d))
+    df = reduce(mapadd, map(first, d))
     dxs = map(second, d)
     return GRAD(df, dxs)
 
@@ -721,7 +723,7 @@ class Grad:
         self.tagged_map: Dict[Symbol, Symbol] = {}
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
         self.backpropagator_map: Dict[Symbol, Symbol] = {}
-        self.zeroes: List[TupleT[Symbol, MyiaASTNode]] = []
+        self.zeros: List[TupleT[Symbol, MyiaASTNode]] = []
         self.nargs_closure = nargs_closure
 
     def phi(self, var: Symbol, value: MyiaASTNode) \
@@ -841,9 +843,9 @@ class Grad:
     def zero_init(self, var: Symbol) -> Symbol:
         new_var = self.new_sensitivity_var(var)
         init = (new_var,
-                Apply(builtins.zero,
+                Apply(builtins.zeros_like,
                       Apply(builtins.Jinv, self.tagged_expr(var))))
-        self.zeroes.append(init)
+        self.zeros.append(init)
         return new_var
 
     def accum(self, vars: List[LeafType], value: MyiaASTNode) \
@@ -857,7 +859,7 @@ class Grad:
             sen = self.sensitivity_var(v)
             new_sen = self.new_sensitivity_var(v)
             rval.append((new_sen,
-                         Apply(builtins.merge, sen,
+                         Apply(builtins.mapadd, sen,
                                Apply(builtins.index, tmp, Value(i)))))
         return rval
 
@@ -885,7 +887,7 @@ class Grad:
         try:
             return copy(self.sensitivity_map[v])
         except KeyError:
-            # self.zeroes.append(self.zero_init(v))
+            # self.zeros.append(self.zero_init(v))
             # return self.new_sensitivity_var(v)
             return self.zero_init(v)
 
@@ -940,7 +942,7 @@ class Grad:
 
         backp_args_copy: Iterable[Symbol] = map(copy, backp_args)
         backp_fn = Lambda([*backp_args_copy, out_sen],
-                          Let(self.zeroes + backward, backp_ret),
+                          Let(self.zeros + backward, backp_ret),
                           self.gensym)
         backp_sym = self.global_env.gen(self.name, '♢*')
         backp_fn.global_env = self.global_env
