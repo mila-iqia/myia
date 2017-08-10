@@ -64,7 +64,7 @@ def macro_grad_for(nclos_args):
 def rgrad(sym: Symbol) -> Callable[..., Any]:
     assert isinstance(sym, Symbol)
 
-    def decorator(orig_fn):
+    def decorator(orig_fn: Callable) -> Callable:
         prim = root_globals[sym]
         assert isinstance(prim, PrimitiveImpl)
 
