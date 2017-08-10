@@ -1,3 +1,9 @@
+"""
+Command-line interface to Myia, mostly for development and
+testing at the moment. To get help, run the following command:
+
+$ python -m myia -h
+"""
 
 import argparse
 import sys
@@ -17,77 +23,9 @@ from .ast import Symbol
 from .front import ParseEnv
 
 
-def setup_buche(arguments):
-    buche.raw(command='open', path='/', type='tabs', anchor='top')
-    buche.open('_', 'log', force=True)
-    buche.open('decls', 'tabs', force=True, anchor='left')
-    buche.open('stores', 'tabs', force=True, anchor='left')
-    buche.open('problems', 'tabs', force=True, anchor='left')
-
-    def add_class(node, kls):
-        buche.raw(command = 'reprocess',
-                  selector = f'.pyid-{id(node)}',
-                  body = f'this.classList.add("{kls}")')
-
-    if arguments.stores:
-        @on_discovery(VM)
-        def on_instruction_store(_, frame, node, var):
-            buche['stores'][str(var).replace('/', '.')](frame.top())
-
-    if arguments.check:
-        checks = set(arguments.check.split(','))
-
-        @on_discovery(ParseEnv)
-        def on_declare(e, name, value):
-            pbuche = buche['problems']
-            url = e.owner.url.split('/')[-1]
-            if 'unbound' in checks:
-                for node in unbound(value):
-                    node.annotations = node.annotations | {'unbound'}
-                    pbuche['unbound'](node)
-            if 'source' in checks:
-                for node in missing_source(value):
-                    node.annotations = node.annotations | {'missing_source'}
-                    msbuche = pbuche['missing_source']
-                    msbuche(node)
-                    if node.trace:
-                        t = node.trace[-1]
-                        msbuche.pre('  Definition at:')
-                        msbuche.pre(f'    {t.filename} line {t.lineno}')
-                        msbuche.pre(f'    {t.line}')
-
-    if arguments.decls:
-        @on_discovery(ParseEnv)
-        def on_declare(e, name, value):
-            buche['decls'][str(name)](value)
-
-        @on_discovery(VM)
-        def on_error(e, exc):
-            vm = e.owner
-            focus = vm.frame.focus
-            add_class(focus, 'error0')
-            buche.html('<h2>An error occurred</h2>')
-            buche.html('<h3>Node</h3>')
-            buche(vm.frame)
-            buche(focus)
-            buche.html('<h3>Traceback</h3>')
-            for i, frame in enumerate([vm.frame] + vm.frames):
-                node = frame.focus
-                if node:
-                    add_class(node, 'error')
-
-
-def H(node):
-    try:
-        from hrepr import hrepr
-    except ImportError:
-        print('The --format html option requires the \'hrepr\' package',
-              'to be installed.\nTo install the package, use the command:',
-              '\n\n$ pip3 install hrepr',
-              file=sys.stderr)
-        sys.exit(1)
-    return hrepr(node)
-
+###############################
+# Argument parser definitions #
+###############################
 
 parser = argparse.ArgumentParser(prog='myia')
 subparsers = parser.add_subparsers(dest='command')
@@ -162,6 +100,103 @@ p_inspect.add_argument('--check', metavar='PROBLEMS', dest='check',
                        help='One or more of: unbound,source.')
 
 
+####################
+# Helper functions #
+####################
+
+def setup_buche(arguments):
+    """
+    Set up buche tabs for the inspect command.
+    """
+    buche.raw(command='open', path='/', type='tabs', anchor='top')
+
+    # This is where print(...) statements will end up.
+    buche.open('_', 'log', force=True)
+
+    # decls will list all Myia functions, including
+    # auxiliary ones, as they are compiled. --decls option.
+    buche.open('decls', 'tabs', force=True, anchor='left')
+
+    # stores will log the values of each variable through
+    # execution (not cheap) --stores option.
+    buche.open('stores', 'tabs', force=True, anchor='left')
+
+    # problems will list certain problems in the code,
+    # e.g. unbound variables or nodes that lack a source,
+    # and more in the future. --checks option.
+    buche.open('problems', 'tabs', force=True, anchor='left')
+
+    def add_class(node, kls):
+        # Helper function to retroactively add a CSS class
+        # to all the printouts of the given node. These
+        # already have the pyid-{id(node)} class, so we
+        # can select them that way.
+        buche.raw(command = 'reprocess',
+                  selector = f'.pyid-{id(node)}',
+                  body = f'this.classList.add("{kls}")')
+
+    # Set up on_discovery hooks to log everything we need.
+
+    if arguments.stores:
+        @on_discovery(VM)
+        def on_instruction_store(_, frame, node, var):
+            buche['stores'][str(var).replace('/', '.')](frame.top())
+
+    if arguments.check:
+        checks = set(arguments.check.split(','))
+
+        @on_discovery(ParseEnv)
+        def on_declare(e, name, value):
+            pbuche = buche['problems']
+            url = e.owner.url.split('/')[-1]
+            if 'unbound' in checks:
+                for node in unbound(value):
+                    node.annotations = node.annotations | {'unbound'}
+                    pbuche['unbound'](node)
+            if 'source' in checks:
+                for node in missing_source(value):
+                    node.annotations = node.annotations | {'missing_source'}
+                    msbuche = pbuche['missing_source']
+                    msbuche(node)
+                    if node.trace:
+                        t = node.trace[-1]
+                        msbuche.pre('  Definition at:')
+                        msbuche.pre(f'    {t.filename} line {t.lineno}')
+                        msbuche.pre(f'    {t.line}')
+
+    if arguments.decls:
+        @on_discovery(ParseEnv)
+        def on_declare(e, name, value):
+            buche['decls'][str(name)](value)
+
+        @on_discovery(VM)
+        def on_error(e, exc):
+            vm = e.owner
+            focus = vm.frame.focus
+            add_class(focus, 'error0')
+            buche.html('<h2>An error occurred</h2>')
+            buche.html('<h3>Node</h3>')
+            buche(vm.frame)
+            buche(focus)
+            buche.html('<h3>Traceback</h3>')
+            for i, frame in enumerate([vm.frame] + vm.frames):
+                node = frame.focus
+                if node:
+                    add_class(node, 'error')
+
+
+def H(node):
+    try:
+        from hrepr import hrepr
+    except ImportError:
+        print('The --format html option requires the \'hrepr\' package',
+              'to be installed.\nTo install the package, use the command:',
+              '\n\n$ pip3 install hrepr',
+              file=sys.stderr)
+        sys.exit(1)
+    return hrepr(node)
+
+
 def shame():
     raise NotImplementedError(
         'You provided a command to myia that is not yet implemented.'
@@ -209,6 +244,13 @@ def getargs(arguments):
         return args
     else:
         return None
+
+############
+# COMMANDS #
+############
+
+# $ python -m myia <command> <arguments>
+# ==> executes command_<command>(<arguments>)
 
 
 def command_None(arguments):
