@@ -8,6 +8,7 @@ $ python -m myia -h
 import argparse
 import sys
 import traceback
+from importlib import import_module
 from . import ast
 from .compile import a_normal
 from .front import parse_source
@@ -231,9 +232,25 @@ def getcode(arguments):
     if not expr and not file:
         print('Must provide FILE or use -e option.', file=sys.stderr)
         sys.exit(1)
-    code = expr if expr else open(file).read()
-    url = '<command-line>' if expr else file
-    return url, code
+    if expr:
+        return '<command-line>', 1, expr
+    elif ':' in file:
+        file, name = file.split(':')
+        m = import_module(file)
+        f = getattr(m, name)
+        return getattr(f, '__orig__', f)
+    else:
+        code = open(file).read()
+        url = file
+        return url, 1, code
+
+
+def getfn(arguments):
+    data = getcode(arguments)
+    if isinstance(data, tuple):
+        return parse_source(*data)
+    else:
+        return parse_function(data)
 
 
 def getargs(arguments):
@@ -263,8 +280,7 @@ def command_parse(arguments):
             return a_normal(x)
         else:
             return x
-    url, code = getcode(arguments)
-    r, genv = parse_source(url, 1, code)
+    r, genv = getfn(arguments)
     bindings = genv.bindings
     if bindings:
         display({k: wrap(v) for k, v in bindings.items()},
@@ -277,8 +293,7 @@ def command_parse(arguments):
 
 
 def command_eval(arguments):
-    url, code = getcode(arguments)
-    r, genv = parse_source(url, 1, code)
+    r, genv = getfn(arguments)
     result = evaluate(r, genv)
     args = getargs(arguments)
     if args:
@@ -313,11 +328,11 @@ def command_inspect(arguments):
     if arguments.all:
         arguments.decls = True
         arguments.stores = True
-    url, code = getcode(arguments)
-    args = getargs(arguments)
     setup_buche(arguments)
+    code = getcode(arguments)
+    args = getargs(arguments)
     if args:
-        value = analysis(arguments.mode, (url, 1, code), args)
+        value = analysis(arguments.mode, code, args)
         buche['_'].html(f'<h2>Results for: {arguments.mode}</h2>')
         buche['_'](value)
     else:

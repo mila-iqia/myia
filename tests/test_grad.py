@@ -52,7 +52,9 @@ def grad_test(*tests):
                     print(f'\tGradient output:    {d["exact"]}')
                     fail(f'Mismatch in gradients for {arg} (see stdout)')
 
-        return mark.parametrize('test_data', list(tests))(test)
+        m = mark.parametrize('test_data', list(tests))(test)
+        m.__orig__ = fn
+        return m
     return decorate
 
 
@@ -81,7 +83,9 @@ def grad2_test(*tests):
                     print(f'\tGradient output:    {d["computed"]}')
                     fail(f'Mismatch in gradients for {arg} (see stdout)')
 
-        return mark.parametrize('test_data', list(tests))(test)
+        m = mark.parametrize('test_data', list(tests))(test)
+        m.__orig__ = fn
+        return m
     return decorate
 
 

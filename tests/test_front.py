@@ -51,7 +51,9 @@ def myia_test(*tests):
             # TODO:
             #assert grad_result == gradOut
 
-        return pytest.mark.parametrize('inputs,output', list(tests))(test)
+        m = pytest.mark.parametrize('inputs,output', list(tests))(test)
+        m.__orig__ = fn
+        return m
 
     return decorate
 
