@@ -8,6 +8,7 @@ from .front import parse_function, ParseEnv
 from .buche import HReprBase
 from .symbols import builtins
 from .event import EventDispatcher
+from .util import maptup2
 from functools import reduce
 import inspect
 
@@ -569,10 +570,18 @@ class VMFrame(HReprBase):
     def instruction_store(self, node, dest) -> None:
         """
         Pop a value and store it in the local environment
-        under the symbol ``dest``.
+        under ``dest``. ``dest`` may be a Symbol or a tree
+        of Symbols, represented as a Tuple.
         """
         value = self.stack.pop()
-        self.envs[0][dest] = value
+
+        def store(dest, val):
+            if isinstance(dest, Symbol):
+                self.envs[0][dest] = val
+            else:
+                raise TypeError(f'Cannot store into {dest}.')
+
+        maptup2(store, dest, value)
 
     def instruction_fetch(self, node, sym) -> None:
         """

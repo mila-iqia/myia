@@ -49,7 +49,7 @@ def grad_test(*tests):
                 if not d['match']:
                     print(f'Argument {arg}:')
                     print(f'\tFinite differences: {d["difference"]}')
-                    print(f'\tGradient output:    {d["computed"]}')
+                    print(f'\tGradient output:    {d["exact"]}')
                     fail(f'Mismatch in gradients for {arg} (see stdout)')
 
         return mark.parametrize('test_data', list(tests))(test)

@@ -179,12 +179,15 @@ from .front import \
 from .symbols import builtins, bsym, gsym
 from copy import copy
 from .compile import a_normal
-from .util import Props
+from .util import Props, maptup, Keyword
 from .buche import buche
 from collections import OrderedDict
 
 
 LeafType = Union[Symbol, Value]
+
+
+VOID = Keyword('VOID')
 
 
 ######################################
@@ -403,11 +406,15 @@ def mapadd(x: Any, y: Any) -> Any:
     >>> mapadd((1, 2, (3, 4)), (4, 3, (2, 1)))
     (5, 5, (5, 5))
 
+    As a special case, ``mapadd(VOID, x) == x``
+
     Implements the "⊕" (circled plus) operator in Pearlmutter & Siskind.
     """
     # TODO: this should be add, but add concatenates tuples, whereas
     # this adds their values element-wise.
-    if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+    if x is VOID:
+        return y
+    elif isinstance(x, (int, float)) and isinstance(y, (int, float)):
         return x + y
     elif type(x) is not type(y):
         raise TypeError(f'Cannot mapadd {x} and {y} (not same type).')
@@ -551,7 +558,7 @@ def Jinv(x: Any) -> Any:
     elif isinstance(x, ClosureImpl):
         c = ClosureImpl(Jinv(x.fn), Jinv(tuple(x.args)))
         return c
-    elif x is None:
+    elif x is None or x is VOID:
         return x
     else:
         raise TypeError(f'Invalid argument for Jinv: {x}')
@@ -759,17 +766,11 @@ class Grad:
 
         elif isinstance(value, Apply):
             # Original:     x = f(y)
-            # Transformed:  tmp = ↑f(↑y)
-            #               ↑x = tmp[0]
-            #               ♢x = tmp[1]
-            tmp = self.gensym('◯ϕ')
-            return [(tmp,
+            # Transformed:  ↑x, ♢x = ↑f(↑y)
+            return [(Tuple([self.tagged_var(var),
+                            self.backpropagator_var(var)]),
                      Apply(self.tagged_expr(value.fn),
-                           *[self.tagged_expr(a) for a in value.args])),
-                    (self.tagged_var(var),
-                     Apply(builtins.index, tmp, Value(0))),
-                    (self.backpropagator_var(var),
-                     Apply(builtins.index, tmp, Value(1)))]
+                           *[self.tagged_expr(a) for a in value.args]))]
 
         elif isinstance(value, Closure):
             # Original:     x = Closure(f, y, z)
@@ -818,7 +819,7 @@ class Grad:
             assert all(isinstance(a, (Symbol, Value)) for a in args)
             return cast(List[LeafType], args)
 
-        sen = self.try_sensitivity_var(var)
+        sen = self.r_try_sensitivity_var(var)
         if sen is None:
             # In this case we know ∇x's current value is 0.
             # Consequently, this term cannot possibly contribute
@@ -881,12 +882,20 @@ class Grad:
         The initialization code is stored in ``self.zeros``, and ``∇x``
         is returned.
         """
+        if isinstance(var, Value):
+            return None
+        if isinstance(var, Symbol) and var.namespace in {'global', 'builtin'}:
+            return None
+        if isinstance(var, Symbol) and var.label == '_Q_':
+            return Value(VOID)
+
         new_var = self.new_sensitivity_var(var)
         tagged = self.tagged_var(var)
         init = (new_var,
                 Apply(builtins.zeros_like,
                       Apply(builtins.Jinv, tagged)))
         self.zeros.append(init)
+        # TODO: tuple issue here
         self.bprop_variables[tagged] = True
         return new_var
 
@@ -904,25 +913,35 @@ class Grad:
         Some of the variables may be Values (aka not variables),
         in which case we simply ignore them.
         """
-        rval: List[TupleT[Symbol, MyiaASTNode]]
-        if isinstance(value, (Symbol, Value)):
-            tmp = value
-            rval = []
-        else:
-            tmp = self.gensym('◯ρ')
-            rval = [(tmp, value)]
+        seen = set()
+        uniq_vars = []
+        rhs_vars = []
+        rval = []
+        for var in vars:
+            if var in seen:
+                g = self.gensym('_Q_')
+                uniq_vars.append(g)
+                app = Apply(builtins.mapadd,
+                            g,
+                            self.r_sensitivity_var(var))
+                lhs = self.new_sensitivity_var(var)
+                rval.append((lhs, app))
+                rhs_vars.append(Value(VOID))
+            else:
+                rhs = self.r_try_sensitivity_var(var) or Value(VOID)
+                uniq_vars.append(self.new_sensitivity_var(var))
+                seen.add(var)
+                rhs_vars.append(rhs)
 
-        for i, v in enumerate(vars):
-            rval += self.accum_helper(v, Apply(builtins.index, tmp, Value(i)))
+        app = Apply(builtins.mapadd, Tuple(rhs_vars), value)
+        return [(Tuple(uniq_vars), app)] + rval
 
-        return rval
-
-    def accum_helper(self, v, value):
+    def accum_helper(self, v, value, lhs_v=None):
         if isinstance(v, Value):
             # No accumulation in non-variables.
             return []
-        sen = self.try_sensitivity_var(v)
-        new_sen = self.new_sensitivity_var(v)
+        sen = self.r_try_sensitivity_var(v)
+        new_sen = self.new_sensitivity_var(lhs_v or v)
         if sen is None:
             return [(new_sen, value)]
         else:
@@ -933,9 +952,14 @@ class Grad:
         Return ``↑v``. Creates it if it does not exist.
         """
         # Maps v to the v_up variable i.e. the tagged variable for v
-        assert isinstance(v, Symbol)
-        assert v.namespace not in {'global', 'builtin'}
-        return copy(self.tagged_map.setdefault(v, self.gensym(v, '↑')))
+        if isinstance(v, Symbol):
+            assert v.namespace not in {'global', 'builtin'}
+            return copy(self.tagged_map.setdefault(v, self.gensym(v, '↑')))
+        elif isinstance(v, Tuple):
+            rval = maptup(self.tagged_var, v)
+            return rval
+        else:
+            raise TypeError(f'Cannot tag {v} of type {type(v)}')
 
     def tagged_expr(self, v: MyiaASTNode) -> MyiaASTNode:
         """
@@ -951,22 +975,79 @@ class Grad:
         else:
             return self.tagged_var(v)
 
-    def sensitivity_var(self, v: Symbol) -> Optional[Symbol]:
+    def l_sensitivity_var(self, v: Symbol) -> Optional[Symbol]:
         """
         Return ``∇v``. If it does not exist, create it and perform
         zero_init.
         """
-        return self.try_sensitivity_var(v) \
-            or self.zero_init(v)
+        return self.l_try_sensitivity_var(v) \
+            or self.zero_init(v) or Symbol('_X_', namespace='null')
 
-    def try_sensitivity_var(self, v: MyiaASTNode) -> Optional[Symbol]:
+    def r_sensitivity_var(self, v: Symbol) -> Optional[Symbol]:
+        """
+        Return ``∇v``. If it does not exist, create it and perform
+        zero_init.
+        """
+        return self.r_try_sensitivity_var(v) \
+            or self.zero_init(v) or Value(VOID)
+
+    def l_try_sensitivity_var(self, v: MyiaASTNode) -> Optional[Symbol]:
         """
         Return ``∇v``, if it exists. If it does not exist, return
         None.
         """
-        assert isinstance(v, (Symbol, Value))
+        assert isinstance(v, (Symbol, Value, Tuple))
         if isinstance(v, Value):
             return None
+        if isinstance(v, Tuple):
+            m = maptup(self.l_try_sensitivity_var, v)
+            some_none = False
+            all_none = True
+
+            def check_none(x):
+                nonlocal all_none, some_none
+                if x is None:
+                    some_none = True
+                else:
+                    all_none = False
+            maptup(check_none, m)
+            if all_none:
+                return None
+            elif some_none:
+                return maptup(self.l_sensitivity_var, v)
+            else:
+                return m
+        try:
+            return copy(self.sensitivity_map[v])
+        except KeyError:
+            return None
+
+    def r_try_sensitivity_var(self, v: MyiaASTNode) -> Optional[Symbol]:
+        """
+        Return ``∇v``, if it exists. If it does not exist, return
+        None.
+        """
+        assert isinstance(v, (Symbol, Value, Tuple))
+        if isinstance(v, Value):
+            return None
+        if isinstance(v, Tuple):
+            m = maptup(self.r_try_sensitivity_var, v)
+            some_none = False
+            all_none = True
+
+            def check_none(x):
+                nonlocal all_none, some_none
+                if x is None:
+                    some_none = True
+                else:
+                    all_none = False
+            maptup(check_none, m)
+            if all_none:
+                return None
+            elif some_none:
+                return maptup(self.r_sensitivity_var, v)
+            else:
+                return m
         try:
             return copy(self.sensitivity_map[v])
         except KeyError:
@@ -979,8 +1060,20 @@ class Grad:
         we do ∇v_2 = ∇v + x. self.sensitivity_var maps to the latest
         return value for this function.
         """
-        assert isinstance(v, Symbol)
-        new_v = self.gensym(v, '∇')
+
+        # assert isinstance(v, Symbol)
+        # new_v = self.gensym(v, '∇')
+        # self.sensitivity_map[v] = new_v
+        # return new_v
+
+        if isinstance(v, Symbol):
+            new_v = self.gensym(v, '∇')
+        elif isinstance(v, Value):
+            new_v = self.gensym('_XX_')
+        elif isinstance(v, Tuple):
+            new_v = maptup(self.new_sensitivity_var, v)
+        else:
+            raise TypeError(f'Cannot make sensitivity var for {v}')
         self.sensitivity_map[v] = new_v
         return new_v
 
@@ -988,7 +1081,11 @@ class Grad:
         """
         Return ``♢v``. Create it if it does not exist.
         """
-        return copy(self.backpropagator_map.setdefault(v, self.gensym(v, '♢')))
+        if isinstance(v, Tuple):
+            sym = self.gensym(self.gensym('◯$'), '♢')
+        else:
+            sym = self.gensym(v, '♢')
+        return copy(self.backpropagator_map.setdefault(v, sym))
 
     def transform(self) -> Symbol:
         """
@@ -1027,9 +1124,10 @@ class Grad:
         ################################
 
         # We return the sensitivity variables for all of the inputs.
-        backp_all_ret = [self.sensitivity_var(arg) for arg in args]
+        backp_all_ret = [self.r_sensitivity_var(arg) for arg in args]
         # The return value of ♢*f: we group together the first
-        # nargs_closure
+        # nargs_closure gradients because they are the closure's
+        # gradient.
         backp_ret = Tuple([
             Tuple(backp_all_ret[:self.nargs_closure]),
             *backp_all_ret[self.nargs_closure:]

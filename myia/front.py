@@ -113,6 +113,7 @@ from typing import \
     Dict, Set, List, Tuple as TupleT, \
     cast, Union, Callable, Optional, Any
 
+from .buche import buche
 from .event import EventDispatcher
 from collections import OrderedDict
 from myia.ast import \
@@ -398,6 +399,11 @@ class Parser(LocVisitor):
         self.vtrack[base_name] = sym
         return sym
 
+    def declare_new_variable(self, base_name: str):
+        sym = self.new_variable(base_name)
+        self.local_assignments[base_name] = True
+        return sym
+
     def make_assign(self,
                     base_name: str,
                     value: MyiaASTNode,
@@ -408,38 +414,17 @@ class Parser(LocVisitor):
         to local_assignments. Return an _Assign instance
         that will be made into a Let later on.
         """
-        sym = self.new_variable(base_name)
-        self.local_assignments[base_name] = True
+        sym = self.declare_new_variable(base_name)
         return _Assign(sym, value, location)
 
     def multi_assign(self,
                      ass: List[str],
                      expr: MyiaASTNode) -> MyiaASTNode:
         """
-        From a list of variables to assign to and an expression
-        that returns a Tuple, build a list of assignments. The
-        expression will be put in a temporary variable, and then
-        each variable is assigned to an index. Basically:
-
-        >>> parser.multi_assign(['a', 'b'], x)
-        Begin([_Assign('tmp', x),
-               _Assign('a', index('tmp', 0)),
-               _Assign('b', index('tmp', 1))])
-
-        It is assumed that we know that x returns a tuple of a
-        certain size, hence the index operations are tagged as
-        ``cannot_fail``.
+        Create an assignment to a Tuple of variables.
         """
-        tmp = self.gen('◯')
-        stmts = [_Assign(tmp, expr, None)]
-        for i, a in enumerate(ass):
-            idx = Apply(builtins.index,
-                        tmp,
-                        Value(i),
-                        cannot_fail=True)
-            stmt = self.make_assign(a, idx)
-            stmts.append(stmt)
-        return Begin(cast(List[MyiaASTNode], stmts))
+        lhs = Tuple(self.declare_new_variable(var) for var in ass)
+        return _Assign(lhs, expr, None)
 
     def prepare_closure(self,
                         variable: str = None,
@@ -648,10 +633,21 @@ class Parser(LocVisitor):
         targ, = node.targets
         if isinstance(targ, ast.Tuple):
             # UNSUPPORTED: x, y = value
-            raise MyiaSyntaxError(
-                loc,
-                "Deconstructing assignment is not supported."
-            )
+
+            def argtup(targ):
+                if isinstance(targ, ast.Tuple):
+                    return Tuple(argtup(v) for v in targ.elts)
+                elif isinstance(targ, ast.Name):
+                    return self.declare_new_variable(targ.id)
+                else:
+                    raise MyiaSyntaxError(
+                        loc,
+                        "Deconstructing assignment may only contain"
+                        " names and tuples."
+                    )
+
+            val = self.visit(node.value)
+            return _Assign(argtup(targ), val, location=loc)
 
         elif isinstance(targ, ast.Subscript):
             if isinstance(targ.value, ast.Name):

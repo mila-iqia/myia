@@ -4,6 +4,7 @@ Miscellaneous utilities go here.
 
 
 from typing import Iterable, Callable, List, Tuple as TupleT, TypeVar
+from .ast import Tuple
 
 
 class Props:
@@ -56,3 +57,34 @@ def group_contiguous(arr: Iterable[T],
     if current:
         results.append((current_c, current))
     return results
+
+
+# TODO: document
+class Keyword:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return self.name
+
+
+# TODO: document
+def maptup(fn, vals):
+    if isinstance(vals, Tuple):
+        return Tuple(maptup(fn, x) for x in vals.values)
+    else:
+        return fn(vals)
+
+
+# TODO: document
+def maptup2(fn, vals1, vals2):
+    if isinstance(vals1, Tuple):
+        assert type(vals2) is tuple
+        assert len(vals1.values) == len(vals2)
+        return Tuple(maptup2(fn, x, y)
+                     for x, y in zip(vals1.values, vals2))
+    else:
+        return fn(vals1, vals2)
