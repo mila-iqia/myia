@@ -19,6 +19,23 @@ from .util import Props
 from typing import Dict
 
 
+###############################################
+# Special characters to modify function names #
+###############################################
+
+JTAG = '↑'
+BPROP = '♦'
+BPROP_CLOS = '♢'
+SENS = '∇'
+NULLSYM = '×'
+TMP = '◯'
+HIDGLOB = '$'
+
+TMP_SENS = f'{TMP}{SENS}'
+TMP_BPROP = f'{TMP}{BPROP_CLOS}'
+TMP_LET = f'{TMP}let'
+
+
 def bsym(name: str) -> Symbol:
     """
     Create a builtin symbol.

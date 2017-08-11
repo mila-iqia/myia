@@ -24,11 +24,11 @@ will be created. These are the ones you need to know about:
   Application section below).
 
   Note that ``♢f`` is not a top-level function, but a closure over
-  the real top-level function ``♢*f`` (see below).
+  the real top-level function ``♦f`` (see below).
 
-* ``♢*f`` is the closure-converted backpropagator function for ``f``.
-  Being closure-converted means it has no free variables, hence the
-  ``*``. This is an implementation detail.
+* ``♦f`` is the closure-converted backpropagator function for ``f``.
+  Being closure-converted means it has no free variables. This is
+  an implementation detail.
 
 ## Gradient variables
 
@@ -75,7 +75,7 @@ Then we will get something like this:
 
     ↑z = 10  # free variable
 
-    def ♢*f(♢a, ♢b, ∇b):
+    def ♦f(♢a, ♢b, ∇b):
         # The zeros should be the same "shape" as
         # g, x, y, ...
         zero_init(∇g, ∇x, ∇y, ∇z, ∇h, ∇a, ∇h)
@@ -101,8 +101,8 @@ Then we will get something like this:
         ↑a, ♢a = ↑g(↑x, ↑y, ↑z)
         ↑b, ♢b = ↑h(↑a, ↑x)
         def ♢f(∇f):
-            # Closure on ♢*f
-            return ♢*f(♢a, ♢b, ∇f)
+            # Closure on ♦f
+            return ♦f(♢a, ♢b, ∇f)
         # We return the tagged original return value
         # and a backpropagator.
         return ↑b, ♢f
@@ -176,7 +176,10 @@ from .interpret import \
     PrimitiveImpl, FunctionImpl, ClosureImpl
 from .front import \
     ParseEnv, parse_function, get_global_parse_env
-from .symbols import builtins, bsym, gsym
+from .symbols import \
+    builtins, bsym, gsym, \
+    JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
+    TMP_LET, TMP_BPROP, TMP_SENS
 from copy import copy
 from .compile import a_normal
 from .util import Props, maptup, Keyword
@@ -221,7 +224,7 @@ def macro_grad_for(nargs_closure):
 
 # def prim_rgrad(sym):
 #     # Copy symbol to grad namespace
-#     rsym = Symbol(sym, namespace='builtin', relation='♢*')
+#     rsym = Symbol(sym, namespace='builtin', relation='♦')
 #     #Symbol(sym.label, namespace='grad:builtin')
 
 #     prim = root_globals[sym]
@@ -292,7 +295,7 @@ def rgrad(sym: Symbol) -> Callable[..., Any]:
             rsym = Symbol(sym,
                           version=nargs_closure + 1,
                           namespace='builtin',
-                          relation='♢*')
+                          relation=BPROP)
 
             # We compile the backpropagator using Myia. We provide
             # the GRAD macro which will account for nargs_closure
@@ -320,7 +323,7 @@ def rgrad(sym: Symbol) -> Callable[..., Any]:
             # Boilerplate stuff that should be properly abstracted
             # somewhere else.
             ast.global_env = get_global_parse_env('__root__')
-            impl_sym = ast.global_env.gen(sym, '↑')
+            impl_sym = ast.global_env.gen(sym, JTAG)
             ast.global_env[impl_sym] = ast
             ast.ref = impl_sym
             ast.primal = sym
@@ -922,11 +925,11 @@ class Grad:
         for var in vars:
             if isinstance(var, Value):
                 # Dummies
-                lhs_vars.append(Symbol('×', namespace='null'))
+                lhs_vars.append(Symbol(NULLSYM, namespace='null'))
                 rhs_vars.append(Value(ZERO))
             elif var in seen:
                 # We have a duplicate variable, so we make a temp
-                g = self.gensym(var, '◯∇')
+                g = self.gensym(var, TMP_SENS)
                 lhs_vars.append(g)
                 # We must add the temp's value to the sensitivity
                 # variable for var.
@@ -975,7 +978,7 @@ class Grad:
         """
         if isinstance(v, Symbol):
             assert v.namespace not in {'global', 'builtin'}
-            return copy(self.tagged_map.setdefault(v, self.gensym(v, '↑')))
+            return copy(self.tagged_map.setdefault(v, self.gensym(v, JTAG)))
         elif isinstance(v, Tuple):
             rval = maptup(self.tagged_var, v)
             return rval
@@ -1072,7 +1075,7 @@ class Grad:
         return value for this function.
         """
         if isinstance(v, Symbol):
-            new_v = self.gensym(v, '∇')
+            new_v = self.gensym(v, SENS)
         else:
             raise TypeError(f'Cannot make sensitivity var for {v}')
         self.sensitivity_map[v] = new_v
@@ -1087,9 +1090,9 @@ class Grad:
             # only get one backpropagator, so we create a new
             # variable to hold it.
             # TODO: try to derive a readable name from the tuple?
-            sym = self.gensym(self.gensym('◯$'), '♢')
+            sym = self.gensym(self.gensym(TMP_BPROP), BPROP_CLOS)
         else:
-            sym = self.gensym(v, '♢')
+            sym = self.gensym(v, BPROP_CLOS)
         return copy(self.backpropagator_map.setdefault(v, sym))
 
     def transform(self) -> Symbol:
@@ -1105,7 +1108,7 @@ class Grad:
         # a-normal form.
         let = self.primal.body
         if isinstance(let, Symbol):
-            tmp = self.gensym('◯let')
+            tmp = self.gensym(TMP_LET)
             let = Let([(tmp, let)], tmp)
         assert isinstance(let, Let)
 
@@ -1124,14 +1127,14 @@ class Grad:
         for s, v in reversed(let.bindings):
             backward += self.rho(s, v)
 
-        ################################
-        # Build the backpropagator ♢*f #
-        ################################
+        ###############################
+        # Build the backpropagator ♦f #
+        ###############################
 
         # We return the sensitivity variables for all of the inputs.
         backp_all_ret = [self.conformant_sensitivity_value(arg)
                          for arg in args]
-        # The return value of ♢*f: we group together the first
+        # The return value of ♦f: we group together the first
         # nargs_closure gradients because they are the closure's
         # gradient.
         backp_ret = Tuple([
@@ -1140,14 +1143,14 @@ class Grad:
         ])
         # Calls to rho had the side effect of populating bprop_variables
         # with all the variables we need for the bprop. We will need
-        # to feed them in as arguments to ♢*f.
+        # to feed them in as arguments to ♦f.
         backp_args = list(self.bprop_variables.keys())
         # TODO: copying these args is kind of iffy. They should be
         # different versions of the symbols, or use a different
         # namespace.
         backp_args_copy: Iterable[Symbol] = map(copy, backp_args)
-        # ♢*f
-        backp_sym = self.global_env.gen(self.name, '♢*')
+        # ♦f
+        backp_sym = self.global_env.gen(self.name, BPROP)
         backp_fn = Lambda([*backp_args_copy, out_sen],
                           Let(self.zeros + backward, backp_ret),
                           self.gensym)
@@ -1160,9 +1163,9 @@ class Grad:
         # Build the closure ♢f #
         ########################
 
-        # First we will make a closure over ♢*f and call it ♢f
+        # First we will make a closure over ♦f and call it ♢f
         backp_cl = Closure(backp_sym, backp_args)
-        backp_clsym = self.gensym(self.name, '♢')
+        backp_clsym = self.gensym(self.name, BPROP_CLOS)
         # We append the closure binding to forward
         forward.append((backp_clsym, backp_cl))
 
@@ -1180,7 +1183,7 @@ class Grad:
         assert all(isinstance(arg, Symbol) for arg in augm_args)
         augm_fn = Lambda(cast(List[Symbol], augm_args),
                          augm_body, self.gensym)
-        augm_sym = self.global_env.gen(self.name, '↑')
+        augm_sym = self.global_env.gen(self.name, JTAG)
         augm_fn.global_env = self.global_env
         augm_fn.ref = augm_sym
         self.global_env[augm_sym] = augm_fn

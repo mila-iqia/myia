@@ -116,14 +116,14 @@ from typing import \
 from .buche import buche
 from .event import EventDispatcher
 from collections import OrderedDict
-from myia.ast import \
+from .ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
     Let, Lambda, Apply, \
     Begin, Tuple, Closure, _Assign, \
     GenSym, ParseEnv
-from myia.util import group_contiguous
-from myia.symbols import get_operator, builtins
+from .util import group_contiguous
+from .symbols import get_operator, builtins, HIDGLOB
 from uuid import uuid4 as uuid
 import ast
 import inspect
@@ -781,7 +781,7 @@ class Parser(LocVisitor):
             raise MyiaSyntaxError(loc, "Functions should not have decorators.")
 
         # Global handle for the function
-        lbl = node.name if self.top_level else '#:' + node.name
+        lbl = node.name if self.top_level else f'{HIDGLOB}{node.name}'
         ref = self.global_env.gen(lbl)
 
         # Local handle
