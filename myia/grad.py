@@ -251,14 +251,13 @@ def macro_grad_for(nargs_closure):
 #     return decorator
 
 
-def rgrad(sym: Symbol) -> Callable[..., Any]:
+def bprop_impl(orig_fn: Callable) -> Callable[..., Any]:
     """
-    Decorator to declare a function as the backpropagator for
-    the given symbol.
+    Decorator to declare a backpropagator function. For instance,
+    to define the backpropagator for operator builtins.whatever,
+    write:
 
-    Usage:
-
-        @rgrad(builtins.whatever)
+        @bprop_impl
         def bprop_whatever(x, y, ..., gwhatever):
             return GRAD(gx, gy, ...)
 
@@ -268,80 +267,79 @@ def rgrad(sym: Symbol) -> Callable[..., Any]:
 
     Refer to the previous section on Partial Application.
     """
+    assert orig_fn.__name__.startswith('bprop_')
+    fname = orig_fn.__name__[6:]
 
-    assert isinstance(sym, Symbol)
+    sym = getattr(builtins, fname)
 
-    def decorator(orig_fn: Callable) -> Callable:
-        # This is the implementation for the forward pass
-        prim = root_globals[sym]
-        assert isinstance(prim, PrimitiveImpl)
+    # This is the implementation for the forward pass
+    prim = root_globals[sym]
+    assert isinstance(prim, PrimitiveImpl)
 
-        # We will cache the result for each nargs_closure value, to
-        # avoid needless recomputation.
-        _cache: Dict[int, FunctionImpl] = {}
+    # We will cache the result for each nargs_closure value, to
+    # avoid needless recomputation.
+    _cache: Dict[int, FunctionImpl] = {}
 
-        # Wrap the primitive and a closure-converted backpropagator
-        # in a combined method that follows the protocol. Essentially:
-        # (forward_fn, bprop_fn) ==>
-        #   lambda *args: (forward_fn(*args),
-        #                  lambda grad_out: bprop_fn(*args, grad_out))
-        def mkgrad(nargs_closure: int) -> FunctionImpl:
-            # Check if we have compiled this before
-            cached = _cache.get(nargs_closure, None)
-            if cached:
-                return cached
+    # Wrap the primitive and a closure-converted backpropagator
+    # in a combined method that follows the protocol. Essentially:
+    # (forward_fn, bprop_fn) ==>
+    #   lambda *args: (forward_fn(*args),
+    #                  lambda grad_out: bprop_fn(*args, grad_out))
+    def mkgrad(nargs_closure: int) -> FunctionImpl:
+        # Check if we have compiled this before
+        cached = _cache.get(nargs_closure, None)
+        if cached:
+            return cached
 
-            # Copy symbol to grad namespace
-            rsym = Symbol(sym,
-                          version=nargs_closure + 1,
-                          namespace='builtin',
-                          relation=BPROP)
+        # Copy symbol to grad namespace
+        rsym = Symbol(sym,
+                      version=nargs_closure + 1,
+                      namespace='builtin',
+                      relation=BPROP)
 
-            # We compile the backpropagator using Myia. We provide
-            # the GRAD macro which will account for nargs_closure
-            # stored arguments.
-            r, genv = parse_function(
-                orig_fn,
-                macros={'GRAD': macro_grad_for(nargs_closure)}
-            )
+        # We compile the backpropagator using Myia. We provide
+        # the GRAD macro which will account for nargs_closure
+        # stored arguments.
+        r, genv = parse_function(
+            orig_fn,
+            macros={'GRAD': macro_grad_for(nargs_closure)}
+        )
 
-            # Create a FunctionImpl.
-            fn = evaluate(r, genv)
+        # Create a FunctionImpl.
+        fn = evaluate(r, genv)
 
-            # Now we generate a combined function that returns the
-            # result of the forward pass along with a backpropagator
-            # function.
-            G = GenSym()
-            args = [G.sym(a) for a in prim.argnames]
-            forward = Apply(builtins.J,
-                            Apply(sym, *[Apply(builtins.Jinv, a)
-                                         for a in args]))
-            backward = Closure(rsym, args)
-            # Final function:
-            ast = Lambda(args, Tuple([forward, backward]), G)
+        # Now we generate a combined function that returns the
+        # result of the forward pass along with a backpropagator
+        # function.
+        G = GenSym()
+        args = [G.sym(a) for a in prim.argnames]
+        forward = Apply(builtins.J,
+                        Apply(sym, *[Apply(builtins.Jinv, a)
+                                     for a in args]))
+        backward = Closure(rsym, args)
+        # Final function:
+        ast = Lambda(args, Tuple([forward, backward]), G)
 
-            # Boilerplate stuff that should be properly abstracted
-            # somewhere else.
-            ast.global_env = get_global_parse_env('__root__')
-            impl_sym = ast.global_env.gen(sym, JTAG)
-            ast.global_env[impl_sym] = ast
-            ast.ref = impl_sym
-            ast.primal = sym
-            impl = FunctionImpl(ast, [root_globals])
-            root_globals[impl_sym] = impl
-            root_globals[rsym] = fn
+        # Boilerplate stuff that should be properly abstracted
+        # somewhere else.
+        ast.global_env = get_global_parse_env('__root__')
+        impl_sym = ast.global_env.gen(sym, JTAG)
+        ast.global_env[impl_sym] = ast
+        ast.ref = impl_sym
+        ast.primal = sym
+        impl = FunctionImpl(ast, [root_globals])
+        root_globals[impl_sym] = impl
+        root_globals[rsym] = fn
 
-            # Let's not forget to save our work in the cache!
-            _cache[nargs_closure] = impl
-            return impl
-
-        # prim's gradient is to be compiled lazily using
-        # prim.grad(nclos_args)
-        prim.grad = mkgrad
-
+        # Let's not forget to save our work in the cache!
+        _cache[nargs_closure] = impl
         return impl
 
-    return decorator
+    # prim's gradient is to be compiled lazily using
+    # prim.grad(nclos_args)
+    prim.grad = mkgrad
+
+    return prim
 
 
 ################################################
@@ -349,8 +347,8 @@ def rgrad(sym: Symbol) -> Callable[..., Any]:
 ################################################
 
 
-@impl(builtins.fill)
-def fill(x: Any, value: Union[int, float]) -> Any:
+@impl
+def impl_fill(x: Any, value: Union[int, float]) -> Any:
     """
     Creates a structure just like ``x`` but where each scalar element
     is set to ``value``.
@@ -373,8 +371,8 @@ def fill(x: Any, value: Union[int, float]) -> Any:
         raise TypeError(f'Cannot create a {value} conformant with {x}')
 
 
-@impl(builtins.zeros_like)
-def zeros_like(x):
+@impl
+def impl_zeros_like(x):
     """
     Creates a structure just like ``x`` but "zeroed out."
 
@@ -397,14 +395,13 @@ def zeros_like(x):
     return fill(x, 0)
 
 
-@impl(builtins.ones_like)
-def ones_like(x):
-    # TODO: rename to ones_like
+@impl
+def impl_ones_like(x):
     return fill(x, 1)
 
 
-@impl(builtins.mapadd)
-def mapadd(x: Any, y: Any) -> Any:
+@impl
+def impl_mapadd(x: Any, y: Any) -> Any:
     """
     Element-wise addition.
 
@@ -430,7 +427,7 @@ def mapadd(x: Any, y: Any) -> Any:
         raise TypeError(f'Cannot mapadd {x} and {y} (not same type).')
     elif isinstance(x, tuple):
         assert len(x) == len(y)
-        return tuple(mapadd(a, b) for a, b in zip(x, y))
+        return tuple(impl_mapadd(a, b) for a, b in zip(x, y))
     elif x is None:
         return None
     else:
@@ -485,7 +482,7 @@ def JX(x: Union[PrimitiveImpl, FunctionImpl],
     purpose of the ``nargs_closure`` argument.
     """
     if isinstance(x, PrimitiveImpl):
-        # x.grad is set by the rgrad decorator. If it is
+        # x.grad is set by the bprop_impl decorator. If it is
         # None, it means no one defined a gradient for that
         # operation.
         assert x.grad is not None
@@ -498,8 +495,8 @@ def JX(x: Union[PrimitiveImpl, FunctionImpl],
         raise TypeError(f'JX applied on wrong type: {x}')
 
 
-@impl(builtins.J)
-def J(x: Any) -> Any:
+@impl
+def impl_J(x: Any) -> Any:
     """
     Return a Grad-transformed version of this data.
 
@@ -534,8 +531,8 @@ def J(x: Any) -> Any:
         raise TypeError(f'Invalid argument for J: {x}')
 
 
-@impl(builtins.Jinv)
-def Jinv(x: Any) -> Any:
+@impl
+def impl_Jinv(x: Any) -> Any:
     """
     Undo the effect of ``J``.
 
@@ -574,6 +571,13 @@ def Jinv(x: Any) -> Any:
         raise TypeError(f'Invalid argument for Jinv: {x}')
 
 
+fill = impl_fill
+zeros_like = impl_zeros_like
+ones_like = impl_ones_like
+J = impl_J
+Jinv = impl_Jinv
+
+
 ###########################################
 # Gradients of primitives needed for Grad #
 ###########################################
@@ -582,25 +586,25 @@ def Jinv(x: Any) -> Any:
 myia_builtins = Props(globals())
 
 
-@rgrad(builtins.zeros_like)
-def gzeros_like(x, d):
+@bprop_impl
+def bprop_zeros_like(x, d):
     return GRAD(zeros_like(x))
 
 
-@rgrad(builtins.mapadd)
-def gmapadd(x, y, d):
+@bprop_impl
+def bprop_mapadd(x, y, d):
     # TODO: correct when x is ZERO (its shape can be different from y)?
     # Probably unneeded?
     return GRAD(d, d)
 
 
-@rgrad(builtins.J)
-def gJ(x, d):
+@bprop_impl
+def bprop_J(x, d):
     return GRAD(Jinv(d))
 
 
-@rgrad(builtins.Jinv)
-def gJinv(x, d):
+@bprop_impl
+def bprop_Jinv(x, d):
     return GRAD(J(d))
 
 
@@ -609,28 +613,28 @@ def gJinv(x, d):
 ######################################
 
 
-@rgrad(builtins.add)
-def gadd(x, y, dz):
+@bprop_impl
+def bprop_add(x, y, dz):
     return GRAD(dz, dz)
 
 
-@rgrad(builtins.subtract)
-def gsubtract(x, y, dz):
+@bprop_impl
+def bprop_subtract(x, y, dz):
     return GRAD(dz, -dz)
 
 
-@rgrad(builtins.multiply)
-def gmultiply(x, y, dz):
+@bprop_impl
+def bprop_multiply(x, y, dz):
     return GRAD(dz * y, dz * x)
 
 
-@rgrad(builtins.divide)
-def gdivide(x, y, dz):
+@bprop_impl
+def bprop_divide(x, y, dz):
     return GRAD(dz / y, -dz * x / (y * y))
 
 
-@rgrad(builtins.unary_subtract)
-def gunary_subtract(x, dz):
+@bprop_impl
+def bprop_unary_subtract(x, dz):
     return GRAD(-dz)
 
 
@@ -639,23 +643,23 @@ def gunary_subtract(x, dz):
 ###################################################
 
 
-@rgrad(builtins.equal)
-def gequal(x, y, dz):
+@bprop_impl
+def bprop_equal(x, y, dz):
     return GRAD(False, False)
 
 
-@rgrad(builtins.greater)
-def ggreater(x, y, dz):
+@bprop_impl
+def bprop_greater(x, y, dz):
     return GRAD(False, False)
 
 
-@rgrad(builtins.less)
-def gless(x, y, dz):
+@bprop_impl
+def bprop_less(x, y, dz):
     return GRAD(False, False)
 
 
-@rgrad(builtins.switch)
-def gswitch(c, t, f, dz):
+@bprop_impl
+def bprop_switch(c, t, f, dz):
     # There's a subtlety here, which is that we must return
     # appropriately-sized gradients for each argument. This
     # requires the use of zeros_like to match input shapes.
@@ -675,8 +679,8 @@ def gswitch(c, t, f, dz):
         )
 
 
-@rgrad(builtins.identity)
-def gidentity(v, dz):
+@bprop_impl
+def bprop_identity(v, dz):
     return GRAD(dz)
 
 
@@ -685,8 +689,8 @@ def gidentity(v, dz):
 #################################
 
 
-@rgrad(builtins.index)
-def gindex(tup, idx, dz):
+@bprop_impl
+def bprop_index(tup, idx, dz):
     def f(pair):
         return switch(pair[0] == idx, dz,
                       zeros_like(Jinv(pair[1])))
@@ -694,18 +698,18 @@ def gindex(tup, idx, dz):
     return GRAD(rval, 0)
 
 
-@rgrad(builtins.len)
-def glen(xs, dz):
+@bprop_impl
+def bprop_len(xs, dz):
     return GRAD(zeros_like(Jinv(xs)))
 
 
-@rgrad(builtins.range)
-def grange(n, dz):
+@bprop_impl
+def bprop_range(n, dz):
     return GRAD(0)
 
 
-@rgrad(builtins.map)
-def gmap(f, xs, dz):
+@bprop_impl
+def bprop_map(f, xs, dz):
     # I... think that's right?
     # TODO: test it
     results = map(f, xs)
@@ -719,10 +723,14 @@ def gmap(f, xs, dz):
     return GRAD(df, dxs)
 
 
-@rgrad(builtins.enumerate)
-def genumerate(xs, dz):
+@bprop_impl
+def bprop_enumerate(xs, dz):
     return GRAD(map(second, dz))
 
+
+########
+# Grad #
+########
 
 class Grad:
     """

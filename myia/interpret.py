@@ -145,20 +145,22 @@ class ClosureImpl(HReprBase):
 ##########################
 
 
-def impl(sym):
+def impl(fn):
     """
     Define the implementation for the given symbol.
     The implementation will be set in ``root_globals``
     and in the ``myia_builtins`` global.
     """
-    def decorator(fn):
-        prim = PrimitiveImpl(fn)
-        root_globals[sym] = prim
-        setattr(root_globals[builtins.myia_builtins],
-                fn.__name__.lstrip('_'),
-                prim)
-        return prim
-    return decorator
+    assert fn.__name__.startswith('impl_')
+    fname = fn.__name__[5:]
+    assert hasattr(builtins, fname)
+    sym = getattr(builtins, fname)
+    prim = PrimitiveImpl(fn)
+    root_globals[sym] = prim
+    setattr(root_globals[builtins.myia_builtins],
+            fname,
+            prim)
+    return prim
 
 
 # def myia_impl(sym):
@@ -180,101 +182,101 @@ def impl(sym):
 ##############################################
 
 
-@impl(builtins.add)
-def add(x, y):
+@impl
+def impl_add(x, y):
     return x + y
 
 
-@impl(builtins.subtract)
-def subtract(x, y):
+@impl
+def impl_subtract(x, y):
     return x - y
 
 
-@impl(builtins.multiply)
-def multiply(x, y):
+@impl
+def impl_multiply(x, y):
     return x * y
 
 
-@impl(builtins.divide)
-def divide(x, y):
+@impl
+def impl_divide(x, y):
     return x / y
 
 
-@impl(builtins.unary_subtract)
-def unary_subtract(x):
+@impl
+def impl_unary_subtract(x):
     return -x
 
 
-@impl(builtins.equal)
-def equal(x, y):
+@impl
+def impl_equal(x, y):
     return x == y
 
 
-@impl(builtins.less)
-def less(x, y):
+@impl
+def impl_less(x, y):
     return x < y
 
 
-@impl(builtins.greater)
-def greater(x, y):
+@impl
+def impl_greater(x, y):
     return x > y
 
 
-@impl(builtins.len)
-def _len(t):
+@impl
+def impl_len(t):
     return len(t)
 
 
-@impl(builtins.range)
-def _range(t):
+@impl
+def impl_range(t):
     return tuple(range(t))
 
 
-@impl(builtins.index)
-def index(t, i):
+@impl
+def impl_index(t, i):
     return t[i]
 
 
-@impl(builtins.first)
-def first(t):
+@impl
+def impl_first(t):
     return t[0]
 
 
-@impl(builtins.second)
-def second(t):
+@impl
+def impl_second(t):
     return t[1]
 
 
-@impl(builtins.getattr)
-def _getattr(obj, attr):
+@impl
+def impl_getattr(obj, attr):
     return getattr(obj, attr)
 
 
-@impl(builtins.map)
-def _map(f, xs):
+@impl
+def impl_map(f, xs):
     return tuple(map(f, xs))
 
 
-@impl(builtins.reduce)
-def _reduce(f, xs):
+@impl
+def impl_reduce(f, xs):
     return reduce(f, xs)
 
 
-@impl(builtins.enumerate)
-def _enumerate(xs):
+@impl
+def impl_enumerate(xs):
     return tuple(enumerate(xs))
 
 
-@impl(builtins.switch)
-def switch(cond, t, f):
+@impl
+def impl_switch(cond, t, f):
     if cond:
         return t
     else:
         return f
 
 
-@impl(builtins.identity)
-def identity(x):
+@impl
+def impl_identity(x):
     return x
 
 

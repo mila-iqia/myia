@@ -62,6 +62,8 @@ def gsym(name: str) -> Symbol:
 
 
 _ngen = GenSym(namespace='null')
+
+
 def nsym() -> Symbol:
     """
     Create a null symbol.
