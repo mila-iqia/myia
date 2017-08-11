@@ -16,6 +16,7 @@ from .compile import a_normal
 from .front import parse_source, parse_function
 from .grad import Grad
 from .interpret import evaluate, root_globals
+from .util import maptup
 
 
 def missing_source(node: MyiaASTNode) -> Iterable[MyiaASTNode]:
@@ -46,7 +47,7 @@ def unbound(node: MyiaASTNode,
         avail = set(avail)
         for s, v in node.bindings:
             yield from unbound(v, avail)
-            avail.add(s)
+            maptup((lambda x: avail.add(x)), s)
         yield from unbound(node.body, avail)
     else:
         for child in node.children():

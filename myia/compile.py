@@ -12,7 +12,7 @@ from typing import Union, Any, List, cast, \
 import re
 from .ast import \
     MyiaASTNode, Apply, Symbol, Value, Let, Lambda, \
-    Closure, Tuple, Transformer, GenSym
+    Closure, Tuple, Transformer, GenSym, LHS
 
 
 # TODO: Lambda should never be a sub-expression, it should be pulled
@@ -55,7 +55,7 @@ def a_normal(node: MyiaASTNode) -> MyiaASTNode:
     return node
 
 
-BindingType = TupleT[Symbol, MyiaASTNode]
+BindingType = TupleT[LHS, MyiaASTNode]
 StashType = TupleT[Optional[str], List[BindingType]]
 
 
@@ -180,12 +180,13 @@ class ANormalTransformer(Transformer):
                                         rebuild, stash, 'closure')
 
     def transform_Begin(self, node, stash=None) -> MyiaASTNode:
-        stmts = [stmt for stmt in node.stmts[:-1]
+        stmts: List[MyiaASTNode] = \
+                [stmt for stmt in node.stmts[:-1]
                  if not isinstance(stmt, (Symbol, Value))] + node.stmts[-1:]
         if len(stmts) == 1:
             return self.transform(stmts[0], stash=stash)
         else:
-            syms = [self.gen('_') for stmt in stmts]
+            syms: List[LHS] = [self.gen('_') for stmt in stmts]
             bindings = list(zip(syms, stmts))
             return self.transform_Let(Let(bindings, syms[-1]), stash)
 
