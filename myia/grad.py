@@ -746,6 +746,46 @@ class Grad:
         self.zeros: Bindings = []
         self.bprop_variables: Dict[Symbol, bool] = OrderedDict()
         self.nargs_closure = nargs_closure
+        self.relevant: Set[Symbol] = None
+
+    def get_relevant(self,
+                     bindings: Bindings,
+                     of_interest: List[Symbol]) -> Set[Symbol]:
+        """
+        Track which gradients are necessary to compute the gradients
+        of the variables in of_interest. This will mostly prune the
+        gradients of the functions we call.
+        """
+        deps: Dict[Symbol, Set[Symbol]] = {}
+        for var, value in bindings:
+            if isinstance(value, Apply):
+                dependents = [value.fn] + value.args
+            elif isinstance(value, Symbol):
+                dependents = [value]
+            elif isinstance(value, Tuple):
+                dependents = value.values
+            elif isinstance(value, Closure):
+                dependents = [value.fn] + value.args
+            else:
+                dependents = []
+            for var2 in dependents:
+                if isinstance(var2, Symbol):
+                    d = deps.setdefault(var2, set())
+                    maptup(d.add, var)
+
+        def acquire(sym):
+            if sym in relevant:
+                pass
+            else:
+                relevant.add(sym)
+                for sym2 in deps.get(sym, set()):
+                    acquire(sym2)
+
+        relevant: Set[Symbol] = set()
+        for sym in of_interest:
+            acquire(sym)
+
+        return relevant
 
     def phi(self, var: LHS, value: MyiaASTNode) -> Bindings:
         """
@@ -897,6 +937,8 @@ class Grad:
 
         * If ``v`` is a Value, then we accumulate into a dummy variable.
           This will happen with e.g.: ``x = y * 2``
+        * If the gradient of ``v`` is not useful to calculate the gradients
+          we want to return, we also generate a dummy variable.
         * Every ``var`` which is a Value or has no sensitivity value
           at the moment will be represented as ZERO in the first argument
           to ``mapadd``. This will happen if this is the very first
@@ -921,9 +963,9 @@ class Grad:
         bindings: Bindings = []
 
         for var in vars:
-            if isinstance(var, Value):
+            if isinstance(var, Value) or var not in self.relevant:
                 # Dummies
-                lhs_vars.append(Symbol(NULLSYM, namespace='null'))
+                lhs_vars.append(self.gensym(NULLSYM))
                 rhs_vars.append(Value(ZERO))
             elif var in seen:
                 # We have a duplicate variable, so we make a temp
@@ -1108,6 +1150,8 @@ class Grad:
             tmp = self.gensym(TMP_LET)
             let = Let([(tmp, let)], tmp)
         assert isinstance(let, Let)
+
+        self.relevant = self.get_relevant(let.bindings, args)
 
         # We start by creating the sensitivity variable ``∇out``
         # which is the input to the backpropagator.
