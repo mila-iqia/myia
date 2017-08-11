@@ -123,7 +123,9 @@ from .ast import \
     Begin, Tuple, Closure, _Assign, \
     GenSym, ParseEnv
 from .util import group_contiguous
-from .symbols import get_operator, builtins, HIDGLOB
+from .symbols import \
+    get_operator, builtins, HIDGLOB, \
+    THEN, ELSE, WTEST, WLOOP, LBDA
 from uuid import uuid4 as uuid
 import ast
 import inspect
@@ -332,7 +334,7 @@ class Parser(LocVisitor):
         self.top_level = top_level
         self.macros = macros or {}
         self.return_error = return_error
-        self.dest = dest or self.gen('#lambda')
+        self.dest = dest or self.gen(LBDA)
 
         self.vtrack = VariableTracker()
         self.free_variables: Dict[str, Symbol] = OrderedDict()
@@ -436,7 +438,7 @@ class Parser(LocVisitor):
         new variables for each free variable it encounters.
         """
         if ref is None:
-            ref = self.global_env.gen(variable or '#lambda')
+            ref = self.global_env.gen(variable or LBDA)
         p = self.sub_parser(pull_free_variables=True, dest=ref)
         if variable is not None:
             p.vtrack[variable] = ref
@@ -826,11 +828,11 @@ class Parser(LocVisitor):
             )
 
         # Prepare the then branch
-        p1 = self.prepare_closure(ref=self.global_env.gen(self.dest, '✓'))
+        p1 = self.prepare_closure(ref=self.global_env.gen(self.dest, THEN))
         body = p1.body_wrapper(node.body)
 
         # Prepare the else branch
-        p2 = self.prepare_closure(ref=self.global_env.gen(self.dest, '✗'))
+        p2 = self.prepare_closure(ref=self.global_env.gen(self.dest, ELSE))
         orelse = p2.body_wrapper(node.orelse)
 
         if p1.returns != p2.returns:
@@ -1050,8 +1052,8 @@ class Parser(LocVisitor):
         """
 
         assert self.dest
-        wsym = self.global_env.gen(self.dest, '⤾')
-        wbsym = self.global_env.gen(self.dest, '⥁')
+        wsym = self.global_env.gen(self.dest, WTEST)
+        wbsym = self.global_env.gen(self.dest, WLOOP)
 
         # We visit the body once to get the free variables
         testp = self.sub_parser(global_env=ParseEnv(), dry=True)

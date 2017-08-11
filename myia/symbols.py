@@ -23,6 +23,12 @@ from typing import Dict
 # Special characters to modify function names #
 ###############################################
 
+THEN = '✓'
+ELSE = '✗'
+WTEST = '⤾'
+WLOOP = '⥁'
+LBDA = 'λ'
+
 JTAG = '↑'
 BPROP = '♦'
 BPROP_CLOS = '♢'
