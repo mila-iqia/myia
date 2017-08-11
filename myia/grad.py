@@ -166,10 +166,10 @@ What this means is:
 """
 
 from typing import Dict, List, Tuple as TupleT, Any, \
-    Union, cast, Optional, Sequence, Iterable, Callable
+    Union, cast, Optional, Sequence, Iterable, Callable, Set
 
 from .ast import \
-    Transformer, GenSym, MyiaASTNode, \
+    LHS, Transformer, GenSym, MyiaASTNode, \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure
 from .interpret import \
     root_globals, impl, evaluate, \
@@ -187,7 +187,11 @@ from collections import OrderedDict
 LeafType = Union[Symbol, Value]
 
 
-VOID = Keyword('VOID')
+# ZERO serves as a generic zero: mapadd(ZERO, y) == y,
+# whether y is a scalar, a tuple, or whatever else.
+# This is more efficient than creating a zero that has
+# the same shape as y.
+ZERO = Keyword('ZERO')
 
 
 ######################################
@@ -406,13 +410,16 @@ def mapadd(x: Any, y: Any) -> Any:
     >>> mapadd((1, 2, (3, 4)), (4, 3, (2, 1)))
     (5, 5, (5, 5))
 
-    As a special case, ``mapadd(VOID, x) == x``
+    As a special case, ``mapadd(ZERO, x) == x``
 
     Implements the "⊕" (circled plus) operator in Pearlmutter & Siskind.
     """
     # TODO: this should be add, but add concatenates tuples, whereas
     # this adds their values element-wise.
-    if x is VOID:
+    if y is ZERO:
+        raise TypeError(f'ZERO should never be found as the '
+                        'second argument to mapadd.')
+    elif x is ZERO:
         return y
     elif isinstance(x, (int, float)) and isinstance(y, (int, float)):
         return x + y
@@ -518,8 +525,8 @@ def J(x: Any) -> Any:
         c = ClosureImpl(JX(x.fn, len(x.args)),
                         J(tuple(x.args)))
         return c
-    elif x is None:
-        return None
+    elif x is None or x is ZERO:
+        return x
     else:
         raise TypeError(f'Invalid argument for J: {x}')
 
@@ -558,7 +565,7 @@ def Jinv(x: Any) -> Any:
     elif isinstance(x, ClosureImpl):
         c = ClosureImpl(Jinv(x.fn), Jinv(tuple(x.args)))
         return c
-    elif x is None or x is VOID:
+    elif x is None or x is ZERO:
         return x
     else:
         raise TypeError(f'Invalid argument for Jinv: {x}')
@@ -579,6 +586,8 @@ def gzeros_like(x, d):
 
 @rgrad(builtins.mapadd)
 def gmapadd(x, y, d):
+    # TODO: correct when x is ZERO (its shape can be different from y)?
+    # Probably unneeded?
     return GRAD(d, d)
 
 
@@ -730,13 +739,13 @@ class Grad:
         self.global_env = primal.global_env
         self.tagged_map: Dict[Symbol, Symbol] = {}
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
-        self.backpropagator_map: Dict[Symbol, Symbol] = {}
-        self.zeros: List[TupleT[Symbol, MyiaASTNode]] = []
+        self.backpropagator_map: Dict[LHS, Symbol] = {}
+        self.zeros: List[TupleT[LHS, MyiaASTNode]] = []
         self.bprop_variables: Dict[Symbol, bool] = OrderedDict()
         self.nargs_closure = nargs_closure
 
-    def phi(self, var: Symbol, value: MyiaASTNode) \
-            -> Sequence[TupleT[Symbol, MyiaASTNode]]:
+    def phi(self, var: LHS, value: MyiaASTNode) \
+            -> Sequence[TupleT[LHS, MyiaASTNode]]:
         """
         Given a variable and the expression it is bound to,
         return a list of (variable, value) bindings to append to
@@ -744,7 +753,7 @@ class Grad:
         """
 
         # Keep in mind:
-        # self.tagged_var(x)          ==>  ↑x, x must be Symbol
+        # self.tagged_var(x)          ==>  ↑x, x must be LHS
         # self.tagged_expr(x)         ==>  ↑x, or x if x is a Value
         # self.backpropagator_var(x)  ==>  ♢x
 
@@ -800,8 +809,8 @@ class Grad:
         else:
             raise Exception(f'phi is not defined on node type: {value}')
 
-    def rho(self, var: Symbol, value: MyiaASTNode) \
-            -> List[TupleT[Symbol, MyiaASTNode]]:
+    def rho(self, var: LHS, value: MyiaASTNode) \
+            -> List[TupleT[LHS, MyiaASTNode]]:
         """
         Given a variable and the expression it is bound to,
         return a list of (variable, value) bindings to prepend
@@ -819,19 +828,26 @@ class Grad:
             assert all(isinstance(a, (Symbol, Value)) for a in args)
             return cast(List[LeafType], args)
 
-        sen = self.r_try_sensitivity_var(var)
-        if sen is None:
+        sen = self.sensitivity_value(var)
+        if sen == Value(ZERO):
             # In this case we know ∇x's current value is 0.
             # Consequently, this term cannot possibly contribute
             # to any other sensitivity variable, so we save
             # ourselves the trouble.
             return []
+        else:
+            # If ``var`` is a Tuple, some values might be
+            # ZERO and others not, and that can be a problem
+            # because ZERO is not conformant (shape-wise).
+            # Therefore, we must backtrack and get something
+            # that we know is conformant.
+            sen = self.conformant_sensitivity_value(var)
 
         if isinstance(value, Symbol):
             # Original:     x = y
             # Transformed:  ∇x += ∇y
             # return self.accum([value], Tuple([sen]))
-            return self.accum_helper(value, sen)
+            return self.accum_single(value, sen)
 
         elif isinstance(value, Value):
             # Original:     x = 5
@@ -840,118 +856,123 @@ class Grad:
 
         elif isinstance(value, Tuple):
             # Original:     x = (y, z)
-            # Transformed:  ∇y += ∇x[0]
-            #               ∇z += ∇x[1]
+            # Transformed:  ∇y, ∇z += ∇x
             args = args_cast(value.values)
-            return self.accum(args, sen)
+            return self.accum_multi(args, sen)
 
         elif isinstance(value, Apply):
             # Original:     x = f(y)
-            # Transformed:  tmp = ♢x(∇x)
-            #               ∇f += tmp[0]
-            #               ∇y += tmp[1]
+            # Transformed:  ∇f, ∇y = ♢x(∇x)
             args = args_cast([value.fn, *value.args])
             bprop_var = self.backpropagator_var(var)
             increment = Apply(bprop_var, sen)
             self.bprop_variables[bprop_var] = True
-            return self.accum(args, increment)
+            return self.accum_multi(args, increment)
 
         elif isinstance(value, Closure):
             # Original:     x = Closure(f, y, z)
-            # Transformed:  ∇y += ∇x[0]
-            #               ∇z += ∇x[1]
+            # Transformed:  ∇y, ∇z += ∇x
             # Why yes, this works the same as Tuple.
             args = args_cast(value.args)
-            return self.accum(args, sen)
+            return self.accum_multi(args, sen)
 
         else:
             raise Exception(f'rho is not defined on node type: {value}')
 
-    def zero_init(self, var: Symbol) -> Symbol:
-        """
-        Handle zero initialization code for a variable's gradient.
-        That code is:
-
-            ∇x = zeros_like(Jinv(↑x))
-
-        ``Jinv(↑x)`` is the same as ``x``, but we don't have access to
-        ``x`` since a transformed function ``↑f`` receives ``↑x``
-        directly as an argument. Thankfully, the transformation is
-        invertible, and that is why we use ``Jinv``.
-
-        The initialization code is stored in ``self.zeros``, and ``∇x``
-        is returned.
-        """
-        if isinstance(var, Value):
-            return None
-        if isinstance(var, Symbol) and var.namespace in {'global', 'builtin'}:
-            return None
-        if isinstance(var, Symbol) and var.label == '_Q_':
-            return Value(VOID)
-
-        new_var = self.new_sensitivity_var(var)
-        tagged = self.tagged_var(var)
-        init = (new_var,
-                Apply(builtins.zeros_like,
-                      Apply(builtins.Jinv, tagged)))
-        self.zeros.append(init)
-        # TODO: tuple issue here
-        self.bprop_variables[tagged] = True
-        return new_var
-
-    def accum(self, vars: List[LeafType], value: MyiaASTNode) \
-            -> List[TupleT[Symbol, MyiaASTNode]]:
+    def accum_multi(self, vars: List[LeafType], value: MyiaASTNode) \
+            -> List[TupleT[LHS, MyiaASTNode]]:
         """
         Return code to accumulate the gradients returned as ``value``
-        into a tuple of ``vars``. In other words:
+        into a tuple of ``vars``. The result will be one of:
 
-            tmp = value
-            vars[0] = tmp[0]
-            vars[1] = tmp[1]
-            ...
+            A) (∇v1_2, ∇v2_2, ...) = mapadd((∇v1, ∇v2, ...), value)
+            B) (∇v1, ∇v2, ...) = value
+            C) (∇v1_2, tmp, ...) = mapadd((∇v1, ∇v1, ...), value)
+               ∇v1_3 = mapadd(∇v1_2, tmp)
+               ...
 
-        Some of the variables may be Values (aka not variables),
-        in which case we simply ignore them.
+        A is the "normal" case. The following special conditions are
+        handled by ``accum_multi``:
+
+        * If ``v`` is a Value, then we accumulate into a dummy variable.
+          This will happen with e.g.: ``x = y * 2``
+        * Every ``var`` which is a Value or has no sensitivity value
+          at the moment will be represented as ZERO in the first argument
+          to ``mapadd``. This will happen if this is the very first
+          gradient contribution for these variables.
+        * If every ``var`` is ZERO, there is no need for ``mapadd`` and
+          we can optimize to case B.
+        * If two or more ``vars`` are the *same variable*, then we create
+          temporary variables to hold the extra contributions and we
+          append ``mapadd`` statements to merge them. This is case C.
+          If we don't do that, we lose contributions. It's not an edge
+          case, it's quite common, so this is very important to get right.
+          This will happen with e.g.: ``x = y * y``
         """
-        seen = set()
-        uniq_vars = []
-        rhs_vars = []
-        rval = []
+
+        # Track which variables we have already seen (check for case C)
+        seen: Set[Symbol] = set()
+        # Accumulate the variables on the left of =
+        lhs_vars: List[Symbol] = []
+        # Accumulate the variables for the first argument of mapadd
+        rhs_vars: List[MyiaASTNode] = []
+        # Accumulate bindings
+        bindings: List[TupleT[LHS, MyiaASTNode]] = []
+
         for var in vars:
-            if var in seen:
-                g = self.gensym('_Q_')
-                uniq_vars.append(g)
+            if isinstance(var, Value):
+                # Dummies
+                lhs_vars.append(Symbol('×', namespace='null'))
+                rhs_vars.append(Value(ZERO))
+            elif var in seen:
+                # We have a duplicate variable, so we make a temp
+                g = self.gensym(var, '◯∇')
+                lhs_vars.append(g)
+                # We must add the temp's value to the sensitivity
+                # variable for var.
                 app = Apply(builtins.mapadd,
                             g,
-                            self.r_sensitivity_var(var))
+                            self.conformant_sensitivity_value(var))
                 lhs = self.new_sensitivity_var(var)
-                rval.append((lhs, app))
-                rhs_vars.append(Value(VOID))
+                bindings.append((lhs, app))
+                # We make a dummy zero for mapadd's first argument,
+                # so we're only getting the contribution for the
+                # argument into the temp (we wouldn't want to count
+                # its previous value more than once)
+                rhs_vars.append(Value(ZERO))
             else:
-                rhs = self.r_try_sensitivity_var(var) or Value(VOID)
-                uniq_vars.append(self.new_sensitivity_var(var))
+                rhs = self.sensitivity_value(var)
+                lhs_vars.append(self.new_sensitivity_var(var))
                 seen.add(var)
                 rhs_vars.append(rhs)
 
-        app = Apply(builtins.mapadd, Tuple(rhs_vars), value)
-        return [(Tuple(uniq_vars), app)] + rval
+        new_value: MyiaASTNode
+        if all(x == Value(ZERO) for x in rhs_vars):
+            new_value = value
+        else:
+            new_value = Apply(builtins.mapadd, Tuple(rhs_vars), value)
 
-    def accum_helper(self, v, value, lhs_v=None):
+        # We must prepend the main operation to the extra bindings
+        # we created for the duplicates
+        binding: TupleT[LHS, MyiaASTNode] = (Tuple(lhs_vars), new_value)
+        return [binding] + bindings
+
+    def accum_single(self, v: LeafType, value) \
+            -> List[TupleT[LHS, MyiaASTNode]]:
         if isinstance(v, Value):
             # No accumulation in non-variables.
             return []
-        sen = self.r_try_sensitivity_var(v)
-        new_sen = self.new_sensitivity_var(lhs_v or v)
-        if sen is None:
+        sen = self.sensitivity_value(v)
+        new_sen = self.new_sensitivity_var(v)
+        if sen == Value(ZERO):
             return [(new_sen, value)]
         else:
             return [(new_sen, Apply(builtins.mapadd, sen, value))]
 
-    def tagged_var(self, v: MyiaASTNode) -> Symbol:
+    def tagged_var(self, v: LHS) -> LHS:
         """
         Return ``↑v``. Creates it if it does not exist.
         """
-        # Maps v to the v_up variable i.e. the tagged variable for v
         if isinstance(v, Symbol):
             assert v.namespace not in {'global', 'builtin'}
             return copy(self.tagged_map.setdefault(v, self.gensym(v, '↑')))
@@ -975,83 +996,73 @@ class Grad:
         else:
             return self.tagged_var(v)
 
-    def l_sensitivity_var(self, v: Symbol) -> Optional[Symbol]:
+    def sensitivity_value(self, v: LHS) -> MyiaASTNode:
         """
-        Return ``∇v``. If it does not exist, create it and perform
-        zero_init.
-        """
-        return self.l_try_sensitivity_var(v) \
-            or self.zero_init(v) or Symbol('_X_', namespace='null')
+        Returns ``∇v``, the current sensitivity for the variable ``v``.
+        If ``v`` was not set before, the return value will be
+        ``ZERO``, otherwise it will be its current sensitivity
+        variable.
 
-    def r_sensitivity_var(self, v: Symbol) -> Optional[Symbol]:
+        ``ZERO`` is not conformant with ``v``, which can be a problem.
+        Therefore, only use ``sensitivity_value`` to get a suitable
+        argument for the *first* argument to ``mapadd``. This is ok because
+        we know that the second will be conformant and has the appropriate
+        structure. Use ``conformant_sensitivity_value`` anywhere else.
         """
-        Return ``∇v``. If it does not exist, create it and perform
-        zero_init.
-        """
-        return self.r_try_sensitivity_var(v) \
-            or self.zero_init(v) or Value(VOID)
+        if isinstance(v, Symbol):
+            try:
+                return copy(self.sensitivity_map[v])
+            except KeyError:
+                return Value(ZERO)
+        else:
+            rval = maptup(self.sensitivity_value, v)
+            if all(v == Value(ZERO) for v in rval.values):
+                # If all sensitivity values in this tuple are ZERO,
+                # we can summarize the whole tuple with ZERO.
+                return Value(ZERO)
+            return rval
 
-    def l_try_sensitivity_var(self, v: MyiaASTNode) -> Optional[Symbol]:
+    def zero_init(self, var: Symbol) -> Symbol:
         """
-        Return ``∇v``, if it exists. If it does not exist, return
-        None.
-        """
-        assert isinstance(v, (Symbol, Value, Tuple))
-        if isinstance(v, Value):
-            return None
-        if isinstance(v, Tuple):
-            m = maptup(self.l_try_sensitivity_var, v)
-            some_none = False
-            all_none = True
+        Handle zero initialization code for a variable's gradient.
+        That code is:
 
-            def check_none(x):
-                nonlocal all_none, some_none
-                if x is None:
-                    some_none = True
-                else:
-                    all_none = False
-            maptup(check_none, m)
-            if all_none:
-                return None
-            elif some_none:
-                return maptup(self.l_sensitivity_var, v)
-            else:
-                return m
-        try:
-            return copy(self.sensitivity_map[v])
-        except KeyError:
-            return None
+            ∇x = zeros_like(Jinv(↑x))
 
-    def r_try_sensitivity_var(self, v: MyiaASTNode) -> Optional[Symbol]:
-        """
-        Return ``∇v``, if it exists. If it does not exist, return
-        None.
-        """
-        assert isinstance(v, (Symbol, Value, Tuple))
-        if isinstance(v, Value):
-            return None
-        if isinstance(v, Tuple):
-            m = maptup(self.r_try_sensitivity_var, v)
-            some_none = False
-            all_none = True
+        ``Jinv(↑x)`` is the same as ``x``, but we don't have access to
+        ``x`` since a transformed function ``↑f`` receives ``↑x``
+        directly as an argument. Thankfully, the transformation is
+        invertible, and that is why we use ``Jinv``.
 
-            def check_none(x):
-                nonlocal all_none, some_none
-                if x is None:
-                    some_none = True
-                else:
-                    all_none = False
-            maptup(check_none, m)
-            if all_none:
-                return None
-            elif some_none:
-                return maptup(self.r_sensitivity_var, v)
-            else:
-                return m
-        try:
-            return copy(self.sensitivity_map[v])
-        except KeyError:
-            return None
+        The initialization code is stored in ``self.zeros``, and ``∇x``
+        is returned.
+        """
+        new_var = self.new_sensitivity_var(var)
+        tagged = self.tagged_var(var)
+        assert isinstance(tagged, Symbol)
+        init = (new_var,
+                Apply(builtins.zeros_like,
+                      Apply(builtins.Jinv, tagged)))
+        self.zeros.append(init)
+        self.bprop_variables[tagged] = True
+        return new_var
+
+    def conformant_sensitivity_value(self, v: LHS) -> MyiaASTNode:
+        """
+        Return ``∇v`` if it already exists. If it does not, create it
+        and initialize it with ``zero_init``. This differs from
+        ``sensitivity_value`` in one important way, which is that
+        ``sensitivity_value`` returns the ``ZERO`` placeholder if it
+        does not find ``∇v``, whereas this creates a zero that has the
+        same shape as ``v``.
+        """
+        if isinstance(v, Symbol):
+            try:
+                return copy(self.sensitivity_map[v])
+            except KeyError:
+                return self.zero_init(v)
+        else:
+            return maptup(self.conformant_sensitivity_value, v)
 
     def new_sensitivity_var(self, v: Symbol) -> Symbol:
         """
@@ -1060,28 +1071,22 @@ class Grad:
         we do ∇v_2 = ∇v + x. self.sensitivity_var maps to the latest
         return value for this function.
         """
-
-        # assert isinstance(v, Symbol)
-        # new_v = self.gensym(v, '∇')
-        # self.sensitivity_map[v] = new_v
-        # return new_v
-
         if isinstance(v, Symbol):
             new_v = self.gensym(v, '∇')
-        elif isinstance(v, Value):
-            new_v = self.gensym('_XX_')
-        elif isinstance(v, Tuple):
-            new_v = maptup(self.new_sensitivity_var, v)
         else:
             raise TypeError(f'Cannot make sensitivity var for {v}')
         self.sensitivity_map[v] = new_v
         return new_v
 
-    def backpropagator_var(self, v: Symbol) -> Symbol:
+    def backpropagator_var(self, v: LHS) -> Symbol:
         """
         Return ``♢v``. Create it if it does not exist.
         """
         if isinstance(v, Tuple):
+            # If we have a deconstructing assignment, we still
+            # only get one backpropagator, so we create a new
+            # variable to hold it.
+            # TODO: try to derive a readable name from the tuple?
             sym = self.gensym(self.gensym('◯$'), '♢')
         else:
             sym = self.gensym(v, '♢')
@@ -1110,12 +1115,12 @@ class Grad:
         out_sen = self.new_sensitivity_var(let.body)
 
         # Repeatedly call phi to build the forward pass.
-        forward: List[TupleT[Symbol, MyiaASTNode]] = []
+        forward: List[TupleT[LHS, MyiaASTNode]] = []
         for s, v in let.bindings:
             forward += self.phi(s, v)
 
         # Repeatedly call rho to build the backprop pass.
-        backward: List[TupleT[Symbol, MyiaASTNode]] = []
+        backward: List[TupleT[LHS, MyiaASTNode]] = []
         for s, v in reversed(let.bindings):
             backward += self.rho(s, v)
 
@@ -1124,7 +1129,8 @@ class Grad:
         ################################
 
         # We return the sensitivity variables for all of the inputs.
-        backp_all_ret = [self.r_sensitivity_var(arg) for arg in args]
+        backp_all_ret = [self.conformant_sensitivity_value(arg)
+                         for arg in args]
         # The return value of ♢*f: we group together the first
         # nargs_closure gradients because they are the closure's
         # gradient.
@@ -1171,7 +1177,9 @@ class Grad:
         augm_args = list(map(self.tagged_var, args))
 
         # ↑f
-        augm_fn = Lambda(augm_args, augm_body, self.gensym)
+        assert all(isinstance(arg, Symbol) for arg in augm_args)
+        augm_fn = Lambda(cast(List[Symbol], augm_args),
+                         augm_body, self.gensym)
         augm_sym = self.global_env.gen(self.name, '↑')
         augm_fn.global_env = self.global_env
         augm_fn.ref = augm_sym

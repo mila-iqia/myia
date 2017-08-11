@@ -181,8 +181,8 @@ class ANormalTransformer(Transformer):
 
     def transform_Begin(self, node, stash=None) -> MyiaASTNode:
         stmts: List[MyiaASTNode] = \
-                [stmt for stmt in node.stmts[:-1]
-                 if not isinstance(stmt, (Symbol, Value))] + node.stmts[-1:]
+            [stmt for stmt in node.stmts[:-1]
+             if not isinstance(stmt, (Symbol, Value))] + node.stmts[-1:]
         if len(stmts) == 1:
             return self.transform(stmts[0], stash=stash)
         else:

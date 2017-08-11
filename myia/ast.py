@@ -293,6 +293,9 @@ class Value(MyiaASTNode):
         self.value = value
         super().__init__(**kw)
 
+    def __eq__(self, other):
+        return isinstance(other, Value) and self.value == other.value
+
     def __str__(self) -> str:
         return repr(self.value)
 
