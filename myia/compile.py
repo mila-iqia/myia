@@ -78,7 +78,10 @@ class ANormalTransformer(Transformer):
               default_name: str) -> MyiaASTNode:
         if stash is not None:
             name, bindings = stash
-            sym = self.gen.sym(name or default_name)
+            if isinstance(name, (Symbol, Tuple)):
+                sym = name
+            else:
+                sym = self.gen.sym(name or default_name)
             bindings.append((sym, result))
             return sym
         return result
@@ -152,9 +155,18 @@ class ANormalTransformer(Transformer):
         return self.stash(stash, result, 'lambda')
 
     def transform_Let(self, node, stash=None) -> MyiaASTNode:
-        result = Let([(s, self.transform(b)) for s, b in node.bindings],
-                     self.transform(node.body))
-        return self.stash(stash, result, 'if')
+        new_let = []
+        for s, b in node.bindings:
+            bindings: List = []
+            res = self.transform(b, stash=(s, bindings))
+            assert len(bindings) <= 1
+            if len(bindings) == 1:
+                new_let.append(bindings[0])
+            else:
+                new_let.append((s, res))
+
+        result = Let(new_let, self.transform(node.body))
+        return self.stash(stash, result, 'let')
 
     def transform_Tuple(self, node, stash=None) -> MyiaASTNode:
         def _Tuple(*args):
