@@ -93,6 +93,12 @@ def grad2_test(*tests):
 # First-order gradients #
 #########################
 
+@grad_test((13, 14))
+def test_null(x, y):
+    """Test null gradient."""
+    return 10 + 28 / 43
+
+
 @grad_test((3, 4))
 def test_add(x, y):
     """Test the gradient of addition alone."""
@@ -115,6 +121,12 @@ def test_multiply(x, y):
 def test_divide(x, y):
     """Test the gradient of division alone."""
     return x / y
+
+
+@grad_test((3, 4))
+def test_tuple(x, y):
+    """Test multiple outputs."""
+    return (x + y, x - y, x * y, x / y)
 
 
 @grad_test((3, 4, 5))
@@ -152,6 +164,15 @@ def test_dup_args_in_call(x):
     """The naive gradient update rule fails when a function's arguments
     contain the same variable more than once."""
     return x * x
+
+
+@grad_test((3,))
+def test_quadruple_args_in_call(x):
+    """Test that duplicated arguments still cause no problem even if
+    there are four of them."""
+    def g(a, b, c, d):
+        return a * b * c * d
+    return g(x, x, x, x)
 
 
 @grad_test((4, 5))

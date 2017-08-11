@@ -147,6 +147,12 @@ def test_nested_while(x, y):
     return result
 
 
+@myia_test(((10, 20), 10))
+def test_swap(x, y):
+    y, x = x, y
+    return x - y
+
+
 @myia_test((50, 55))
 def test_closure(x):
     def g(y):
