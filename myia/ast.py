@@ -23,6 +23,8 @@ __save_trace__ = False
 
 Locatable = Union['MyiaASTNode', 'Location', None]
 LHS = Union['Symbol', 'Tuple']
+Binding = TupleT[LHS, 'MyiaASTNode']
+Bindings = List[Binding]
 
 
 class Location:
@@ -315,7 +317,7 @@ class Let(MyiaASTNode):
     """
 
     def __init__(self,
-                 bindings: List[TupleT[LHS, MyiaASTNode]],
+                 bindings: Bindings,
                  body: MyiaASTNode,
                  **kw) -> None:
         super().__init__(**kw)

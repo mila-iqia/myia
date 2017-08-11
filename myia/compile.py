@@ -12,7 +12,7 @@ from typing import Union, Any, List, cast, \
 import re
 from .ast import \
     MyiaASTNode, Apply, Symbol, Value, Let, Lambda, \
-    Closure, Tuple, Transformer, GenSym, LHS
+    Closure, Tuple, Transformer, GenSym, LHS, Bindings
 from .symbols import NULLSYM
 
 
@@ -56,8 +56,7 @@ def a_normal(node: MyiaASTNode) -> MyiaASTNode:
     return node
 
 
-BindingType = TupleT[LHS, MyiaASTNode]
-StashType = TupleT[Optional[str], List[BindingType]]
+StashType = TupleT[Optional[str], Bindings]
 
 
 class ANormalTransformer(Transformer):
@@ -95,7 +94,7 @@ class ANormalTransformer(Transformer):
                             tags: Optional[List[str]] = None) \
             -> MyiaASTNode:
 
-        bindings: List[BindingType] = []
+        bindings: Bindings = []
         new_args: List[Symbol] = []
 
         if base_name is None:
@@ -214,7 +213,7 @@ class CollapseLet(Transformer):
         pass
 
     def transform_Let(self, node) -> MyiaASTNode:
-        new_bindings: List[BindingType] = []
+        new_bindings: Bindings = []
         for s, b in node.bindings:
             b = self.transform(b)
             if isinstance(b, Let):

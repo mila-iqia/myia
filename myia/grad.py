@@ -169,7 +169,7 @@ from typing import Dict, List, Tuple as TupleT, Any, \
     Union, cast, Optional, Sequence, Iterable, Callable, Set
 
 from .ast import \
-    LHS, Transformer, GenSym, MyiaASTNode, \
+    LHS, Binding, Bindings, Transformer, GenSym, MyiaASTNode, \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure
 from .interpret import \
     root_globals, impl, evaluate, \
@@ -743,12 +743,11 @@ class Grad:
         self.tagged_map: Dict[Symbol, Symbol] = {}
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
         self.backpropagator_map: Dict[LHS, Symbol] = {}
-        self.zeros: List[TupleT[LHS, MyiaASTNode]] = []
+        self.zeros: Bindings = []
         self.bprop_variables: Dict[Symbol, bool] = OrderedDict()
         self.nargs_closure = nargs_closure
 
-    def phi(self, var: LHS, value: MyiaASTNode) \
-            -> Sequence[TupleT[LHS, MyiaASTNode]]:
+    def phi(self, var: LHS, value: MyiaASTNode) -> Bindings:
         """
         Given a variable and the expression it is bound to,
         return a list of (variable, value) bindings to append to
@@ -812,8 +811,7 @@ class Grad:
         else:
             raise Exception(f'phi is not defined on node type: {value}')
 
-    def rho(self, var: LHS, value: MyiaASTNode) \
-            -> List[TupleT[LHS, MyiaASTNode]]:
+    def rho(self, var: LHS, value: MyiaASTNode) -> Bindings:
         """
         Given a variable and the expression it is bound to,
         return a list of (variable, value) bindings to prepend
@@ -883,7 +881,7 @@ class Grad:
             raise Exception(f'rho is not defined on node type: {value}')
 
     def accum_multi(self, vars: List[LeafType], value: MyiaASTNode) \
-            -> List[TupleT[LHS, MyiaASTNode]]:
+            -> Bindings:
         """
         Return code to accumulate the gradients returned as ``value``
         into a tuple of ``vars``. The result will be one of:
@@ -920,7 +918,7 @@ class Grad:
         # Accumulate the variables for the first argument of mapadd
         rhs_vars: List[MyiaASTNode] = []
         # Accumulate bindings
-        bindings: List[TupleT[LHS, MyiaASTNode]] = []
+        bindings: Bindings = []
 
         for var in vars:
             if isinstance(var, Value):
@@ -957,11 +955,10 @@ class Grad:
 
         # We must prepend the main operation to the extra bindings
         # we created for the duplicates
-        binding: TupleT[LHS, MyiaASTNode] = (Tuple(lhs_vars), new_value)
+        binding: Binding = (Tuple(lhs_vars), new_value)
         return [binding] + bindings
 
-    def accum_single(self, v: LeafType, value) \
-            -> List[TupleT[LHS, MyiaASTNode]]:
+    def accum_single(self, v: LeafType, value) -> Bindings:
         if isinstance(v, Value):
             # No accumulation in non-variables.
             return []
@@ -1118,12 +1115,12 @@ class Grad:
         out_sen = self.new_sensitivity_var(let.body)
 
         # Repeatedly call phi to build the forward pass.
-        forward: List[TupleT[LHS, MyiaASTNode]] = []
+        forward: Bindings = []
         for s, v in let.bindings:
             forward += self.phi(s, v)
 
         # Repeatedly call rho to build the backprop pass.
-        backward: List[TupleT[LHS, MyiaASTNode]] = []
+        backward: Bindings = []
         for s, v in reversed(let.bindings):
             backward += self.rho(s, v)
 
