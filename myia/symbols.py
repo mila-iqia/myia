@@ -14,7 +14,7 @@ The symbols live in two namespaces:
 
 
 import ast
-from .ast import Symbol, Value
+from .ast import Symbol, Value, GenSym
 from .util import Props
 from typing import Dict
 
@@ -59,6 +59,17 @@ def gsym(name: str) -> Symbol:
     This function can be called by name by the user.
     """
     return Symbol(name, namespace='global')
+
+
+_ngen = GenSym(namespace='null')
+def nsym() -> Symbol:
+    """
+    Create a null symbol.
+
+    Use as a placeholder in destructuring assignments for
+    irrelevant elements.
+    """
+    return _ngen(NULLSYM)
 
 
 builtins_dict: Dict[str, Symbol] = dict(

@@ -165,6 +165,14 @@
 	border: 1px solid blue;
 }
 
+.myia-ns-null {
+	color: #bbb;
+}
+
+.myia-ns-null .SymbolIndex {
+	display: none;
+}
+
 .class_title {
 	color: white;
 	font-weight: bold;

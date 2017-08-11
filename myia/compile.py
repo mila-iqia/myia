@@ -13,7 +13,7 @@ import re
 from .ast import \
     MyiaASTNode, Apply, Symbol, Value, Let, Lambda, \
     Closure, Tuple, Transformer, GenSym, LHS, Bindings
-from .symbols import NULLSYM
+from .symbols import nsym
 
 
 # TODO: Lambda should never be a sub-expression, it should be pulled
@@ -186,8 +186,7 @@ class ANormalTransformer(Transformer):
         if len(stmts) == 1:
             return self.transform(stmts[0], stash=stash)
         else:
-            syms: List[LHS] = [Symbol(NULLSYM, namespace='null')
-                               for stmt in stmts]
+            syms: List[LHS] = [nsym() for stmt in stmts]
             bindings = list(zip(syms, stmts))
             return self.transform_Let(Let(bindings, syms[-1]), stash)
 

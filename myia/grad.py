@@ -177,7 +177,7 @@ from .interpret import \
 from .front import \
     ParseEnv, parse_function, get_global_parse_env
 from .symbols import \
-    builtins, bsym, gsym, \
+    builtins, bsym, gsym, nsym, \
     JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
     TMP_LET, TMP_BPROP, TMP_SENS
 from copy import copy
@@ -965,7 +965,7 @@ class Grad:
         for var in vars:
             if isinstance(var, Value) or var not in self.relevant:
                 # Dummies
-                lhs_vars.append(self.gensym(NULLSYM))
+                lhs_vars.append(nsym())
                 rhs_vars.append(Value(ZERO))
             elif var in seen:
                 # We have a duplicate variable, so we make a temp
