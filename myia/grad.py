@@ -251,7 +251,7 @@ def macro_grad_for(nargs_closure):
 #     return decorator
 
 
-def bprop_impl(orig_fn: Callable) -> Callable[..., Any]:
+def bprop_impl(orig_fn: Callable) -> Callable:
     """
     Decorator to declare a backpropagator function. For instance,
     to define the backpropagator for operator builtins.whatever,
@@ -339,7 +339,7 @@ def bprop_impl(orig_fn: Callable) -> Callable[..., Any]:
     # prim.grad(nclos_args)
     prim.grad = mkgrad
 
-    return prim
+    return orig_fn
 
 
 ################################################
