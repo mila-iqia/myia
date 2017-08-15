@@ -4,6 +4,10 @@
  * outputting to an html file or to a Jupyter notebook.
  */
 
+:root {
+	--hover-border-color: blue;
+}
+
 .myia-ns-builtin {
 	background: lightgreen;
 }
@@ -44,6 +48,10 @@
 	padding: 2px;
 }
 
+.Apply:hover {
+	border: 1px solid var(--hover-border-color);
+}
+
 .Apply > :nth-child(1) {
 	font-weight: bold;
 	color: #008;
@@ -57,6 +65,10 @@
 	margin-left: 2px;
 }
 
+.Begin:hover, .Lambda:hover, .Let:hover {
+	border-left: 1px solid var(--hover-border-color);
+}
+
 .Lambda > :nth-child(3),
 .Begin > :nth-child(2),
 .Let > :nth-child(2),
@@ -65,6 +77,13 @@
 	border-left: 3px solid black;
 	padding-left: 5px;
 	margin-left: 5px;
+}
+
+.Lambda > :nth-child(3):hover,
+.Begin > :nth-child(2):hover,
+.Let > :nth-child(2):hover,
+.Let > :nth-child(4):hover {
+	border-left: 3px solid var(--hover-border-color);
 }
 
 .Begin > :nth-child(2) > * {
@@ -148,7 +167,7 @@
 }
 
 .Closure {
-	border: 1px dotted black;
+	border: 2px dotted black;
 	margin: 2px;
 	padding: 2px;
 }
@@ -202,5 +221,9 @@
 
 .error.error0 {
 	background: #faa;
+}
+
+.hrepr-Exception {
+	max-width: 800px;
 }
 

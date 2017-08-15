@@ -33,12 +33,20 @@ move to a standalone package.
 
 
 import os
+import sys
 import json
+import weakref
+import traceback
 from hrepr import StdHRepr
+from .util import Props
+from .event import EventDispatcher
 
 
 _css_path = f'{os.path.dirname(__file__)}/myia.css'
 _css = None
+
+
+id_registry = weakref.WeakValueDictionary()
 
 
 class HReprBase:
@@ -57,6 +65,13 @@ class HRepr(StdHRepr):
             Exception: self.handle_Exception
         })
         return h
+
+    def __call__(self, obj, **kwargs):
+        res = super().__call__(obj, **kwargs)
+        if 'obj-id' in res.attributes:
+            the_id = int(res.attributes['obj-id'])
+            id_registry[the_id] = obj
+        return res
 
     def handle_Exception(self, obj, H, hrepr):
         return repr(obj)
@@ -80,9 +95,12 @@ class MasterBuche:
         r = self.hrepr(obj)  # , **hrepr_params)
         for res in self.hrepr.resources:
             if res not in self.resources:
-                self.log(res,
-                         path='/',
-                         format='html')
+                self.raw(
+                    command = 'resource',
+                    path = '/',
+                    type = 'direct',
+                    contents = str(res)
+                )
                 self.resources.add(res)
         self.log(r, format='html', kind=kind, path=path)
 
@@ -96,9 +114,11 @@ class Buche:
     def raw(self, path=None, **params):
         if path is None:
             path = self.channel
+        elif path.startswith('/'):
+            pass
         else:
             path = self.join_path(path)
-        self.master.raw(path=self.channel, **params)
+        self.master.raw(path=path, **params)
 
     def pre(self, message):
         self.raw(command = 'log', format = 'pre', contents = message)
@@ -141,3 +161,58 @@ class Buche:
 
 master = MasterBuche(StdHRepr())
 buche = Buche(master, '/')
+
+
+def handle_exception(e, H, hrepr):
+    tb = e.__traceback__
+    entries = traceback.extract_tb(tb)
+    iss = isinstance(e.args[0], str)
+    args_table = H.table()
+    for i in range(1 if iss else 0, len(e.args)):
+        arg = e.args[i]
+        tr = H.tr(H.td(i), H.td(hrepr(arg)))
+        args_table = args_table(tr)
+
+    views = H.tabbedView['hrepr-Exception'](
+        H.strong(type(e).__name__),
+        f': {e.args[0]}' if iss else '',
+        args_table
+    )
+    last = entries[-1]
+    for entry in entries:
+        filename, lineno, funcname, line = entry
+        absfile = os.path.abspath(filename)
+        view = H.view()
+        tab = H.tab(
+            f'{funcname}@{os.path.basename(absfile)}'
+        )
+        snippet = H.codeSnippet(
+            src = absfile,
+            language = "python",
+            line = lineno,
+            context = 4
+        )
+        if filename.startswith('<'):
+            snippet = snippet(getattr(e, '__repl_string__', ""))
+
+        pane = H.pane(snippet)
+        if entry is last:
+            view = view(active = True)
+        views = views(view(tab, pane))
+
+    return views
+
+
+master.hrepr.register(Exception, handle_exception)
+
+
+class Reader(EventDispatcher):
+    def __init__(self, source=sys.stdin):
+        super().__init__()
+        self.source = source
+
+    def run(self):
+        for line in self.source:
+            cmd = json.loads(line)
+            self.emit(cmd['command'], Props(cmd))
+
