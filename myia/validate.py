@@ -11,12 +11,11 @@ Validation and testing functionality.
 from typing import Iterable, Set, Tuple as TupleT, \
     Callable, Dict, List, Any, Union
 
-from .ast import MyiaASTNode, Symbol, Lambda, Let, ParseEnv
+from .ast import MyiaASTNode, Symbol, Lambda, Let, ParseEnv, maptup
 from .compile import a_normal
 from .front import parse_source, parse_function
 from .grad import Grad
 from .interpret import evaluate, root_globals
-from .util import maptup
 
 
 def missing_source(node: MyiaASTNode) -> Iterable[MyiaASTNode]:

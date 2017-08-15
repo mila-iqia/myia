@@ -3,12 +3,11 @@ from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 from myia.ast import \
     MyiaASTNode, \
     Location, Symbol, Value, \
-    Let, Lambda, Apply, Begin, Tuple, Closure
+    Let, Lambda, Apply, Begin, Tuple, Closure, maptup2
 from .front import parse_function, ParseEnv
-from .buche import HReprBase
+from .buche import HReprBase, buche
 from .symbols import builtins
 from .event import EventDispatcher
-from .util import maptup2
 from functools import reduce
 import inspect
 

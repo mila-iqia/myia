@@ -1066,7 +1066,7 @@ class Parser(LocVisitor):
         out_vars = list(testp.local_assignments)
 
         # We visit once more, this time adding the free vars as parameters
-        p = self.sub_parser(dest=wsym)
+        p = self.sub_parser(dest=wbsym)
         in_syms = [p.new_variable(v) for v in in_vars]
 
         # Have to execute this before the body in order to get the right

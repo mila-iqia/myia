@@ -170,7 +170,7 @@ from typing import Dict, List, Tuple as TupleT, Any, \
 
 from .ast import \
     LHS, Binding, Bindings, Transformer, GenSym, MyiaASTNode, \
-    Symbol, Value, Lambda, Let, Apply, Tuple, Closure
+    Symbol, Value, Lambda, Let, Apply, Tuple, Closure, maptup
 from .interpret import \
     root_globals, impl, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
@@ -182,7 +182,7 @@ from .symbols import \
     TMP_LET, TMP_BPROP, TMP_SENS
 from copy import copy
 from .compile import a_normal
-from .util import Props, maptup, Keyword
+from .util import Props, Keyword
 from .buche import buche
 from collections import OrderedDict
 

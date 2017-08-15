@@ -642,3 +642,22 @@ class Transformer:
         if not rval.location:
             rval.location = node.location
         return rval
+
+
+# TODO: document
+def maptup(fn, vals):
+    if isinstance(vals, Tuple):
+        return Tuple(maptup(fn, x) for x in vals.values)
+    else:
+        return fn(vals)
+
+
+# TODO: document
+def maptup2(fn, vals1, vals2):
+    if isinstance(vals1, Tuple):
+        assert type(vals2) is tuple
+        assert len(vals1.values) == len(vals2)
+        return Tuple(maptup2(fn, x, y)
+                     for x, y in zip(vals1.values, vals2))
+    else:
+        return fn(vals1, vals2)
