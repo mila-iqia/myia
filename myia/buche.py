@@ -31,6 +31,7 @@ Note: this functionality being somewhat generic, it could eventually
 move to a standalone package.
 """
 
+from typing import Any
 
 import os
 import sys
@@ -46,7 +47,7 @@ _css_path = f'{os.path.dirname(__file__)}/myia.css'
 _css = None
 
 
-id_registry = weakref.WeakValueDictionary()
+id_registry: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
 
 
 class HReprBase:
@@ -120,17 +121,21 @@ class Buche:
             path = self.join_path(path)
         self.master.raw(path=path, **params)
 
-    def pre(self, message):
-        self.raw(command = 'log', format = 'pre', contents = message)
+    def pre(self, message, **kwargs):
+        self.raw(command = 'log', format = 'pre',
+                 contents = message, **kwargs)
 
-    def text(self, message):
-        self.raw(command = 'log', format = 'text', contents = message)
+    def text(self, message, **kwargs):
+        self.raw(command = 'log', format = 'text',
+                 contents = message, **kwargs)
 
-    def html(self, message):
-        self.raw(command = 'log', format = 'html', contents = message)
+    def html(self, message, **kwargs):
+        self.raw(command = 'log', format = 'html',
+                 contents = message, **kwargs)
 
-    def markdown(self, message):
-        self.raw(command = 'log', format = 'markdown', contents = message)
+    def markdown(self, message, **kwargs):
+        self.raw(command = 'log', format = 'markdown',
+                 contents = message, **kwargs)
 
     def open(self, name, type, force=False, **params):
         if force:
@@ -139,6 +144,7 @@ class Buche:
                             path=subchannel,
                             type=type,
                             **params)
+            return self[name]
         else:
             self.to_open[name] = (type, params)
 
@@ -166,7 +172,8 @@ buche = Buche(master, '/')
 def handle_exception(e, H, hrepr):
     tb = e.__traceback__
     entries = traceback.extract_tb(tb)
-    iss = isinstance(e.args[0], str)
+    first = e.args[0] if len(e.args) > 0 else None
+    iss = isinstance(first, str)
     args_table = H.table()
     for i in range(1 if iss else 0, len(e.args)):
         arg = e.args[i]
@@ -175,7 +182,7 @@ def handle_exception(e, H, hrepr):
 
     views = H.tabbedView['hrepr-Exception'](
         H.strong(type(e).__name__),
-        f': {e.args[0]}' if iss else '',
+        f': {first}' if iss else '',
         args_table
     )
     last = entries[-1]
@@ -211,8 +218,15 @@ class Reader(EventDispatcher):
         super().__init__()
         self.source = source
 
+    def read(self):
+        line = self.source.readline()
+        return self.parse(line)
+
+    def parse(self, line):
+        cmd = Props(json.loads(line))
+        self.emit(cmd.command, cmd)
+        return cmd
+
     def run(self):
         for line in self.source:
-            cmd = json.loads(line)
-            self.emit(cmd['command'], Props(cmd))
-
+            self.parse(line)

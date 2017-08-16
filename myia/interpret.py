@@ -8,6 +8,7 @@ from .front import parse_function, ParseEnv
 from .buche import HReprBase, buche
 from .symbols import builtins
 from .event import EventDispatcher
+from .debug import BucheDb
 from functools import reduce
 import inspect
 
@@ -83,16 +84,16 @@ class FunctionImpl(HReprBase):
         self.primal_sym = ast.primal
         self.grad: Callable[[int], FunctionImpl] = None
 
-        def func(*args):
-            assert len(args) == len(ast.args)
-            return vm(self.code,
-                      {s: arg for s, arg in zip(ast.args, args)},
-                      *self.envs)
-
-        self._func = func
+    def debug(self, args, debugger):
+        ast = self.ast
+        assert len(args) == len(ast.args)
+        return vm(self.code,
+                  {s: arg for s, arg in zip(ast.args, args)},
+                  *self.envs,
+                  debugger=debugger)
 
     def __call__(self, *args):
-        return self._func(*args)
+        return self.debug(args, None)
 
     def __str__(self):
         return f'Func({self.ast.ref or self.ast})'
@@ -368,9 +369,9 @@ class VMCode(HReprBase):
 
     def __hrepr__(self, H, hrepr):
         rows = []
-        for cmd, _, *args in self.instructions:
+        for instr in self.instructions:
             row = H.tr()
-            for x in (cmd, *args):
+            for x in (instr.command, *instr.args):
                 row = row(H.td(hrepr(x)))
             rows.append(row)
         return H.table['VMCodeInstructions'](*rows)
@@ -395,8 +396,10 @@ class VM(EventDispatcher):
     def __init__(self,
                  code: VMCode,
                  *envs: EnvT,
+                 debugger: BucheDb = None,
                  emit_events=True) -> None:
         super().__init__(self, emit_events)
+        self.debugger = debugger
         self.do_emit_events = emit_events
         # Current frame
         self.frame = VMFrame(self, code, list(envs))
@@ -521,6 +524,10 @@ class VMFrame(HReprBase):
         else:
             self.focus = instr.node
             mname = 'instruction_' + instr.command
+            if self.vm.debugger:
+                if 'break' in self.focus.annotations:
+                    self.vm.debugger.buche(self)
+                    self.vm.debugger.set_trace()
             if self.vm.do_emit_events:
                 self.vm.emit(mname, self, instr.node, *instr.args)
                 self.vm.emit_instruction(self, instr)
@@ -621,21 +628,34 @@ class VMFrame(HReprBase):
         self.stack.append(fimpl)
 
     def __hrepr__(self, H, hrepr):
-        ref = getattr(self.code.node, 'ref', self.code.node)
-        return H.div['VMFrame'](
-            H.div['class_title']('VMFrame'),
-            H.div['class_contents'](hrepr(ref))
-        )
+        views = H.tabbedView['hrepr-VMFrame']()
+        env = {}
+        for e in reversed(self.envs):
+            env.update(e)
+        eviews = H.tabbedView()
+        for k, v in env.items():
+            view = H.view(H.tab(hrepr(k)), H.pane(hrepr(v)))
+            eviews = eviews(view)
+        views = views(H.view(H.tab('Focus'), H.pane(hrepr(self.focus))))
+        views = views(H.view(H.tab('Node'), H.pane(hrepr(self.code.node))))
+        views = views(H.view(H.tab('Code'), H.pane(hrepr(self.code))))
+        views = views(H.view(H.tab('Stack'), H.pane(hrepr(self.stack))))
+        views = views(H.view(H.tab('Env'), H.pane(eviews)))
+        return views
 
 
-def vm(code: VMCode, *binding_groups: EnvT) -> Any:
+def vm(code: VMCode,
+       *binding_groups: EnvT,
+       debugger: BucheDb = None) -> Any:
     """
     Execute the VM on the given code.
     """
-    return VM(code, *binding_groups).result
+    return VM(code, *binding_groups, debugger=debugger).result
 
 
-def evaluate(node: MyiaASTNode, parse_env: ParseEnv = None) -> Any:
+def evaluate(node: MyiaASTNode,
+             parse_env: ParseEnv = None,
+             debugger: BucheDb = None) -> Any:
     """
     Evaluate the given MyiaASTNode in the given ``parse_env``.
     If ``parse_env`` is None, it will be extracted from the node
@@ -646,4 +666,4 @@ def evaluate(node: MyiaASTNode, parse_env: ParseEnv = None) -> Any:
         parse_env = node.global_env
     assert parse_env is not None
     envs = (parse_env.bindings, root_globals)
-    return vm(VMCode(node), *envs)
+    return vm(VMCode(node), *envs, debugger=debugger)

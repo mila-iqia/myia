@@ -16,12 +16,13 @@ from .interpret import evaluate
 from .validate import \
     unbound, missing_source, \
     analysis
-from .buche import buche
+from .buche import buche, Reader, id_registry
 
 from .event import on_discovery
 from .interpret import VM
 from .ast import Symbol
 from .front import ParseEnv
+from .debug import BucheDb
 
 
 ###############################
@@ -101,15 +102,35 @@ p_inspect.add_argument('--check', metavar='PROBLEMS', dest='check',
                        help='One or more of: unbound,source.')
 
 
+p_debug = subparsers.add_parser('debug',
+                                help='debug/evaluate an expression')
+p_debug.add_argument('FILE', nargs='?', help='The file to evaluate.')
+p_debug.add_argument(
+    '--expr',
+    '-e',
+    metavar='EXPR',
+    dest='expr',
+    help='The expression to evaluate.'
+)
+p_debug.add_argument('--args', metavar='ARGS', default='()',
+                     dest='args',
+                     help='Arguments to provide to the function.')
+
+
 ####################
 # Helper functions #
 ####################
+
+burepl = buche.open('repl', 'log', hasInput=True, force=True)
+reader = Reader()
+budb = BucheDb(burepl, reader)
+
 
 def setup_buche(arguments):
     """
     Set up buche tabs for the inspect command.
     """
-    buche.raw(command='open', path='/', type='tabs', anchor='top')
+    # buche.raw(command='open', path='/', type='tabs', anchor='top')
 
     # This is where print(...) statements will end up.
     buche.open('_', 'log', force=True)
@@ -337,6 +358,48 @@ def command_inspect(arguments):
         buche['_'](value)
     else:
         buche['_']('Done')
+
+    reader = Reader()
+
+    @reader.on_click
+    def handle(e, cmd):
+        try:
+            obj = id_registry[int(cmd.objId)]
+            buche[cmd.path](obj.about)
+            buche[cmd.path](obj.find_location())
+        except Exception as exc:
+            buche[cmd.path](exc)
+    reader.run()
+
+
+def command_debug(arguments):
+    ast.__save_trace__ = True
+    arguments.decls = True
+    arguments.stores = False
+    arguments.checks = False
+    setup_buche(arguments)
+    args = getargs(arguments)
+    r, genv = getfn(arguments)
+
+    @reader.on_click
+    def handle(e, cmd):
+        try:
+            obj = id_registry[int(cmd.objId)]
+            if 'break' in obj.annotations:
+                obj.annotations.remove('break')
+                buche[cmd.path]('Unset breakpoint.')
+            else:
+                obj.annotations.add('break')
+                buche[cmd.path]('Set breakpoint.')
+        except Exception as exc:
+            buche[cmd.path](exc)
+
+    budb.set_trace()
+    fn = evaluate(genv[r])
+    try:
+        buche(fn.debug(args, budb), kind='result')
+    except Exception as exc:
+        buche(exc, kind='error')
 
 
 if __name__ == '__main__':
