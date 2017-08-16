@@ -1,28 +1,15 @@
 from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 
-from .stx import \
+from ..stx import \
     MyiaASTNode, \
     Location, Symbol, Value, \
     Let, Lambda, Apply, Begin, Tuple, Closure, maptup2
-from .front import parse_function, ParseEnv
-from .symbols import builtins
-from .util import EventDispatcher, BucheDb, HReprBase, buche
+from ..front import parse_function, ParseEnv
+from ..symbols import builtins
+from ..util import EventDispatcher, BucheDb, HReprBase, buche
+from .runtime import FunctionImpl, ClosureImpl, root_globals
 from functools import reduce
 import inspect
-
-
-class BuiltinCollection:
-    """
-    Implements a "module" of sorts. It has no methods,
-    only fields that are populated by ``impl``.
-    """
-    pass
-
-
-# Myia's global variables. Used for evaluation.
-root_globals: Dict[Any, Any] = {
-    builtins.myia_builtins: BuiltinCollection()
-}
 
 
 # When a Lambda is made into a FunctionImpl, we will
@@ -30,252 +17,7 @@ root_globals: Dict[Any, Any] = {
 # since FunctionImpl is the structure that stores
 # pointers to them.
 compile_cache: Dict[Lambda, 'FunctionImpl'] = {}
-
-
 EnvT = Dict[Symbol, Any]
-
-
-###################
-# Special objects #
-###################
-
-
-class PrimitiveImpl(HReprBase):
-    """
-    Wrapper around a pure Python implementation of a function.
-    """
-    def __init__(self, fn: Callable, name: str = None) -> None:
-        argn = inspect.getargs(fn.__code__).args  # type: ignore
-        self.argnames: List[str] = argn
-        self.nargs = len(self.argnames)
-        self.fn = fn
-        self.name = name or fn.__name__
-        self.grad: Callable[[int], FunctionImpl] = None
-
-    def __call__(self, *args):
-        return self.fn(*args)
-
-    def __str__(self):
-        return f'Prim({self.name or self.fn})'
-
-    def __repr__(self):
-        return str(self)
-
-    def __hrepr__(self, H, hrepr):
-        return H.div['PrimitiveImpl'](
-            H.div['class_title']('Primitive'),
-            H.div['class_contents'](self.name or hrepr(self.fn))
-        )
-
-
-class FunctionImpl(HReprBase):
-    """
-    Represents a Myia-transformed function.
-    """
-    def __init__(self, ast: Lambda, envs: List[EnvT]) -> None:
-        assert isinstance(ast, Lambda)
-        self.argnames = [a.label for a in ast.args]
-        self.nargs = len(ast.args)
-        self.ast = ast
-        self.code = VMCode(ast.body)
-        self.envs = envs
-        self.primal_sym = ast.primal
-        self.grad: Callable[[int], FunctionImpl] = None
-
-    def debug(self, args, debugger):
-        ast = self.ast
-        assert len(args) == len(ast.args)
-        return vm(self.code,
-                  {s: arg for s, arg in zip(ast.args, args)},
-                  *self.envs,
-                  debugger=debugger)
-
-    def __call__(self, *args):
-        return self.debug(args, None)
-
-    def __str__(self):
-        return f'Func({self.ast.ref or self.ast})'
-
-    def __repr__(self):
-        return str(self)
-
-    def __hrepr__(self, H, hrepr):
-        return H.div['FunctionImpl'](
-            H.div['class_title']('Function'),
-            H.div['class_contents'](hrepr(self.ast.ref or self.ast))
-        )
-
-
-class ClosureImpl(HReprBase):
-    """
-    Associates a PrimitiveImpl or a FunctionImpl to a number
-    of arguments in order to create a partial application.
-    """
-    def __init__(self,
-                 fn: Union[PrimitiveImpl, FunctionImpl],
-                 args: List[Any]) -> None:
-        self.argnames = [a for a in fn.argnames[len(args):]]
-        self.nargs = fn.nargs - len(args)
-        self.fn = fn
-        self.args = args
-
-    def __call__(self, *args):
-        return self.fn(*self.args, *args)
-
-    def __str__(self):
-        return f'Clos({self.fn}, {self.args})'
-
-    def __repr__(self):
-        return str(self)
-
-    def __hrepr__(self, H, hrepr):
-        return H.div['ClosureImpl'](
-            H.div['class_title']('Closure'),
-            H.div['class_contents'](
-                hrepr(self.fn),
-                hrepr(self.args)
-            )
-        )
-
-
-##########################
-# Implementation helpers #
-##########################
-
-
-def impl(fn):
-    """
-    Define the implementation for the given symbol.
-    The implementation will be set in ``root_globals``
-    and in the ``myia_builtins`` global.
-    """
-    assert fn.__name__.startswith('impl_')
-    fname = fn.__name__[5:]
-    assert hasattr(builtins, fname)
-    sym = getattr(builtins, fname)
-    prim = PrimitiveImpl(fn)
-    root_globals[sym] = prim
-    setattr(root_globals[builtins.myia_builtins],
-            fname,
-            prim)
-    return prim
-
-
-# def myia_impl(sym):
-#     # Implement a symbol by parsing it through Myia.
-#     # Unused at the moment.
-#     def decorator(orig_fn):
-#         r, genv = parse_function(orig_fn)
-#         fn = evaluate(r, genv)
-#         root_globals[sym] = fn
-#         setattr(root_globals[builtins.myia_builtins],
-#                 fn.__name__.lstrip('_'),
-#                 fn)
-#         return fn
-#     return decorator
-
-
-##############################################
-# Implementations of myia's global functions #
-##############################################
-
-
-@impl
-def impl_add(x, y):
-    return x + y
-
-
-@impl
-def impl_subtract(x, y):
-    return x - y
-
-
-@impl
-def impl_multiply(x, y):
-    return x * y
-
-
-@impl
-def impl_divide(x, y):
-    return x / y
-
-
-@impl
-def impl_unary_subtract(x):
-    return -x
-
-
-@impl
-def impl_equal(x, y):
-    return x == y
-
-
-@impl
-def impl_less(x, y):
-    return x < y
-
-
-@impl
-def impl_greater(x, y):
-    return x > y
-
-
-@impl
-def impl_len(t):
-    return len(t)
-
-
-@impl
-def impl_range(t):
-    return tuple(range(t))
-
-
-@impl
-def impl_index(t, i):
-    return t[i]
-
-
-@impl
-def impl_first(t):
-    return t[0]
-
-
-@impl
-def impl_second(t):
-    return t[1]
-
-
-@impl
-def impl_getattr(obj, attr):
-    return getattr(obj, attr)
-
-
-@impl
-def impl_map(f, xs):
-    return tuple(map(f, xs))
-
-
-@impl
-def impl_reduce(f, xs):
-    return reduce(f, xs)
-
-
-@impl
-def impl_enumerate(xs):
-    return tuple(enumerate(xs))
-
-
-@impl
-def impl_switch(cond, t, f):
-    if cond:
-        return t
-    else:
-        return f
-
-
-@impl
-def impl_identity(x):
-    return x
 
 
 ##################################
@@ -642,9 +384,9 @@ class VMFrame(HReprBase):
         return views
 
 
-def vm(code: VMCode,
-       *binding_groups: EnvT,
-       debugger: BucheDb = None) -> Any:
+def run_vm(code: VMCode,
+           *binding_groups: EnvT,
+           debugger: BucheDb = None) -> Any:
     """
     Execute the VM on the given code.
     """
@@ -664,4 +406,10 @@ def evaluate(node: MyiaASTNode,
         parse_env = node.global_env
     assert parse_env is not None
     envs = (parse_env.bindings, root_globals)
-    return vm(VMCode(node), *envs, debugger=debugger)
+    return run_vm(VMCode(node), *envs, debugger=debugger)
+
+
+# from .runtime import EnvT
+from . import runtime
+runtime.run_vm = run_vm
+runtime.VMCode = VMCode
