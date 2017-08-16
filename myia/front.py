@@ -121,13 +121,14 @@ from .ast import \
     Location, Symbol, Value, \
     Let, Lambda, Apply, \
     Begin, Tuple, Closure, _Assign, \
-    GenSym, ParseEnv
+    GenSym, ParseEnv, About, VariableTracker
 from .util import group_contiguous
 from .symbols import \
     get_operator, builtins, HIDGLOB, \
     THEN, ELSE, WTEST, WLOOP, LBDA
 from uuid import uuid4 as uuid
 import ast
+from copy import copy
 import inspect
 import textwrap
 import sys
@@ -192,7 +193,8 @@ class Locator:
             return Location(
                 self.url,
                 node.lineno + self.line_offset - 1,
-                node.col_offset
+                node.col_offset,
+                node
             )
         except AttributeError:
             return None
@@ -229,7 +231,8 @@ class LocVisitor:
                 loc,
                 "Unrecognized Python AST node type: {}".format(cls)
             )
-        rval = method(node, loc, **kwargs)
+        with About(loc, 'parse'):
+            rval = method(node, loc, **kwargs)
         if isinstance(rval, MyiaASTNode):
             rval = rval.at(loc)
         return rval
@@ -237,40 +240,6 @@ class LocVisitor:
 
 # Type for AST nodes that can contain a variable name (also str)
 InputNode = Union[str, ast.arg, ast.Name]
-
-
-class VariableTracker:
-    """
-    Track variable names and map them to Symbol instances.
-    """
-
-    def __init__(self, parent: 'VariableTracker' = None) -> None:
-        self.parent = parent
-        self.bindings: Dict[str, Symbol] = {}
-
-    def get_free(self, name: str) -> TupleT[bool, 'Symbol']:
-        """
-        Return whether the given variable name is a free variable
-        or not, and the Symbol associated to the variable.
-
-        A variable is free if it is found in this Tracker's parent,
-        or grandparent, etc.
-        It is not free if it is found in ``self.bindings``.
-
-        Raise NameError if the variable was not declared.
-        """
-        if name in self.bindings:
-            return (False, self.bindings[name])
-        elif self.parent is None:
-            raise NameError("Undeclared variable: {}".format(name))
-        else:
-            return (True, self.parent.get_free(name)[1])
-
-    def __getitem__(self, name: str) -> Symbol:
-        return self.get_free(name)[1]
-
-    def __setitem__(self, name: str, value: Symbol) -> None:
-        self.bindings[name] = value
 
 
 class Parser(LocVisitor):
@@ -621,7 +590,7 @@ class Parser(LocVisitor):
             if free:
                 if self.pull_free_variables:
                     v = self.new_variable(name)
-                v = v.at(loc)
+                # v = v.at(loc)
                 self.free_variables[name] = v
             return v
         except NameError as e:
@@ -689,7 +658,8 @@ class Parser(LocVisitor):
             aug = self.visit(node.value)
             op = get_operator(node.op).at(loc)
             self.visit_variable(targ.id)
-            prev = self.vtrack[targ.id]
+            with About(self.locator(targ), 'parse'):
+                prev = self.vtrack.get(targ.id, False)
             val = Apply(op, prev, aug, location=loc)
             return self.make_assign(targ.id, val, loc)
         else:
@@ -963,7 +933,9 @@ class Parser(LocVisitor):
     def visit_Name(self, node: ast.Name, loc: Location) -> Symbol:
         # CASE: x
         # (A variable name.)
-        return self.visit_variable(node.id, loc)
+        v = self.visit_variable(node.id, loc)
+        v.about = About(loc, 'parse')
+        return v
 
     def visit_NameConstant(self,
                            node: ast.NameConstant,

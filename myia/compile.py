@@ -51,8 +51,12 @@ def a_normal(node: MyiaASTNode) -> MyiaASTNode:
     Returns:
         The expression in A-normal form
     """
+    assert isinstance(node, Lambda)
+    orig = node
     node = ANormalTransformer().transform(node)
     node = CollapseLet().transform(node)
+    sym = orig.global_env.gen(orig.ref, 'α')
+    orig.global_env[sym] = node
     return node
 
 
@@ -68,7 +72,9 @@ class ANormalTransformer(Transformer):
     This transformer allows nested Lets, but CollapseLet
     can be applied to the result to fix that (which is
     what the a_normal function does.)
-   """
+    """
+    __transform__ = 'a-normal'
+
     def __init__(self, gen: GenSym = None) -> None:
         self.gen = gen
 
@@ -208,6 +214,8 @@ class CollapseLet(Transformer):
               (e z))
           w)
     """
+    __transform__ = 'collapse-let'
+
     def __init__(self) -> None:
         pass
 

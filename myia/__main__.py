@@ -365,8 +365,11 @@ def command_inspect(arguments):
     def handle(e, cmd):
         try:
             obj = id_registry[int(cmd.objId)]
-            buche[cmd.path](obj.about)
-            buche[cmd.path](obj.find_location())
+            # buche[cmd.path](obj.about)
+            # buche[cmd.path](obj.trace)
+            # buche[cmd.path](obj.find_location())
+            from .ast import AboutPrinter
+            buche[cmd.path](AboutPrinter(obj))
         except Exception as exc:
             buche[cmd.path](exc)
     reader.run()
@@ -376,7 +379,7 @@ def command_debug(arguments):
     ast.__save_trace__ = True
     arguments.decls = True
     arguments.stores = False
-    arguments.checks = False
+    arguments.check = False
     setup_buche(arguments)
     args = getargs(arguments)
     r, genv = getfn(arguments)

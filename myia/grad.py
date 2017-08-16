@@ -170,7 +170,8 @@ from typing import Dict, List, Tuple as TupleT, Any, \
 
 from .ast import \
     LHS, Binding, Bindings, Transformer, GenSym, MyiaASTNode, \
-    Symbol, Value, Lambda, Let, Apply, Tuple, Closure, maptup
+    Symbol, Value, Lambda, Let, Apply, Tuple, Closure, maptup, \
+    About, transformer_method
 from .interpret import \
     root_globals, impl, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
@@ -795,6 +796,7 @@ class Grad:
 
         return relevant
 
+    @transformer_method('g:phi', 2)
     def phi(self, var: LHS, value: MyiaASTNode) -> Bindings:
         """
         Given a variable and the expression it is bound to,
@@ -859,6 +861,7 @@ class Grad:
         else:
             raise Exception(f'phi is not defined on node type: {value}')
 
+    @transformer_method('g:rho', 2)
     def rho(self, var: LHS, value: MyiaASTNode) -> Bindings:
         """
         Given a variable and the expression it is bound to,
@@ -971,43 +974,46 @@ class Grad:
         bindings: Bindings = []
 
         for var in vars:
-            if isinstance(var, Value) or var not in self.relevant:
-                # Dummies
-                lhs_vars.append(nsym())
-                rhs_vars.append(Value(ZERO))
-            elif var in seen:
-                # We have a duplicate variable, so we make a temp
-                g = self.gensym(var, TMP_SENS)
-                lhs_vars.append(g)
-                # We must add the temp's value to the sensitivity
-                # variable for var.
-                app = Apply(builtins.mapadd,
-                            g,
-                            self.conformant_sensitivity_value(var))
-                lhs = self.new_sensitivity_var(var)
-                bindings.append((lhs, app))
-                # We make a dummy zero for mapadd's first argument,
-                # so we're only getting the contribution for the
-                # argument into the temp (we wouldn't want to count
-                # its previous value more than once)
-                rhs_vars.append(Value(ZERO))
-            else:
-                rhs = self.sensitivity_value(var)
-                lhs_vars.append(self.new_sensitivity_var(var))
-                seen.add(var)
-                rhs_vars.append(rhs)
+            with About(var, 'g:sens_acc'):
+                if isinstance(var, Value) or var not in self.relevant:
+                    # Dummies
+                    lhs_vars.append(nsym())
+                    rhs_vars.append(Value(ZERO))
+                elif var in seen:
+                    # We have a duplicate variable, so we make a temp
+                    g = self.gensym(var, TMP_SENS)
+                    lhs_vars.append(g)
+                    # We must add the temp's value to the sensitivity
+                    # variable for var.
+                    app = Apply(builtins.mapadd,
+                                g,
+                                self.conformant_sensitivity_value(var))
+                    lhs = self.new_sensitivity_var(var)
+                    bindings.append((lhs, app))
+                    # We make a dummy zero for mapadd's first argument,
+                    # so we're only getting the contribution for the
+                    # argument into the temp (we wouldn't want to count
+                    # its previous value more than once)
+                    rhs_vars.append(Value(ZERO))
+                else:
+                    rhs = self.sensitivity_value(var)
+                    lhs_vars.append(self.new_sensitivity_var(var))
+                    seen.add(var)
+                    rhs_vars.append(rhs)
 
         new_value: MyiaASTNode
-        if all(x == Value(ZERO) for x in rhs_vars):
-            new_value = value
-        else:
-            new_value = Apply(builtins.mapadd, Tuple(rhs_vars), value)
+        with About(value, 'g:sens_rhs'):
+            if all(x == Value(ZERO) for x in rhs_vars):
+                new_value = value
+            else:
+                new_value = Apply(builtins.mapadd, Tuple(rhs_vars), value)
 
         # We must prepend the main operation to the extra bindings
         # we created for the duplicates
         binding: Binding = (Tuple(lhs_vars), new_value)
         return [binding] + bindings
 
+    @transformer_method('g:sens_acc', 2)
     def accum_single(self, v: LeafType, value) -> Bindings:
         if isinstance(v, Value):
             # No accumulation in non-variables.
@@ -1019,6 +1025,7 @@ class Grad:
         else:
             return [(new_sen, Apply(builtins.mapadd, sen, value))]
 
+    @transformer_method('g:tag')
     def tagged_var(self, v: LHS) -> LHS:
         """
         Return ``↑v``. Creates it if it does not exist.
@@ -1032,6 +1039,7 @@ class Grad:
         else:
             raise TypeError(f'Cannot tag {v} of type {type(v)}')
 
+    @transformer_method('g:tag')
     def tagged_expr(self, v: MyiaASTNode) -> MyiaASTNode:
         """
         * If ``v`` is a Value, return ``v``.
@@ -1046,6 +1054,7 @@ class Grad:
         else:
             return self.tagged_var(v)
 
+    @transformer_method('g:sens')
     def sensitivity_value(self, v: LHS) -> MyiaASTNode:
         """
         Returns ``∇v``, the current sensitivity for the variable ``v``.
@@ -1072,6 +1081,7 @@ class Grad:
                 return Value(ZERO)
             return rval
 
+    @transformer_method('g:zinit')
     def zero_init(self, var: Symbol) -> Symbol:
         """
         Handle zero initialization code for a variable's gradient.
@@ -1097,6 +1107,7 @@ class Grad:
         self.bprop_variables[tagged] = True
         return new_var
 
+    @transformer_method('g:sens')
     def conformant_sensitivity_value(self, v: LHS) -> MyiaASTNode:
         """
         Return ``∇v`` if it already exists. If it does not, create it
@@ -1114,6 +1125,7 @@ class Grad:
         else:
             return maptup(self.conformant_sensitivity_value, v)
 
+    @transformer_method('g:sens')
     def new_sensitivity_var(self, v: Symbol) -> Symbol:
         """
         Create a new sensitivity variable for v. This is used to preserve
@@ -1128,6 +1140,7 @@ class Grad:
         self.sensitivity_map[v] = new_v
         return new_v
 
+    @transformer_method('g:bprop')
     def backpropagator_var(self, v: LHS) -> Symbol:
         """
         Return ``♢v``. Create it if it does not exist.

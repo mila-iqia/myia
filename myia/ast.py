@@ -8,7 +8,7 @@ Myia's AST.
 
 from typing import \
     List, Tuple as TupleT, Iterable, Dict, Set, Union, \
-    cast, TypeVar
+    cast, TypeVar, Any
 
 from uuid import uuid4 as uuid
 from copy import copy
@@ -16,6 +16,7 @@ import textwrap
 import traceback
 from .buche import HReprBase
 from .event import EventDispatcher
+import threading
 
 
 __save_trace__ = False
@@ -37,13 +38,15 @@ class Location:
         column (int): The column number in that file.
     """
 
-    def __init__(self, url: str, line: int, column: int) -> None:
+    def __init__(self,
+                 url: str,
+                 line: int,
+                 column: int,
+                 node: Any = None) -> None:
         self.url = url
         self.line = line
         self.column = column
-
-    def __str__(self) -> str:
-        return '{}@{}:{}'.format(self.url, self.line, self.column)
+        self.node = node
 
     def traceback(self) -> str:
         """
@@ -70,6 +73,18 @@ class Location:
         except FileNotFoundError:
             return '  File "{}", line {}, column {}'.format(
                 self.url, self.line, self.column)
+
+    def __str__(self) -> str:
+        return '{}@{}:{}'.format(self.url, self.line, self.column)
+
+    def __hrepr__(self, H, hrepr):
+        return H.codeSnippet(
+            src = self.url,
+            language = "python",
+            line = self.line,
+            column = self.column + 1,
+            context = 4
+        )
 
 
 def _get_location(x: Locatable) -> Location:
@@ -172,11 +187,22 @@ class MyiaASTNode(HReprBase):
     def __init__(self, location: Locatable = None) -> None:
         self.location = _get_location(location)
         if __save_trace__:
-            # TODO: make sure that we're always removing the right
-            # number of entries
-            self.trace = traceback.extract_stack()[:-2]
+            frames = traceback.extract_stack()
+            frame = frames.pop()
+            # We skip all frames from helper functions defined
+            # in this file.
+            while frames and frame.filename == __file__:  # type: ignore
+                frame = frames.pop()
+            self.trace = Location(
+                frame.filename,  # type: ignore
+                frame.lineno,  # type: ignore
+                -1,
+                None
+            )
         else:
             self.trace = None
+        about = _about.stack[-1]
+        self.about = about
         self.annotations: Set[str] = set()
 
     def at(self: T, location: Locatable) -> T:
@@ -191,6 +217,14 @@ class MyiaASTNode(HReprBase):
 
     def children(self) -> List['MyiaASTNode']:
         return []
+
+    def find_location(self) -> Location:
+        node = self
+        while getattr(node, 'about', None):
+            node = node.about.node
+        if isinstance(node, Location):
+            return node
+        return None
 
     def __repr__(self) -> str:
         return str(self)
@@ -248,6 +282,15 @@ class Symbol(MyiaASTNode):
         self.namespace = namespace
         self.version = version
         self.relation = relation
+
+    def copy(self, preserve_about=True) -> 'Symbol':
+        rval = Symbol(self.label,
+                      namespace=self.namespace,
+                      version=self.version,
+                      relation=self.relation)
+        if preserve_about:
+            rval.about = self.about
+        return rval
 
     def __str__(self) -> str:
         v = f'#{self.version}' if self.version > 1 else ''
@@ -619,6 +662,66 @@ class _Assign(MyiaASTNode):
         return f'(_assign {self.varname} {self.value})'
 
 
+_about = threading.local()
+_about.stack = [None]
+
+
+class About:
+    def __init__(self, node, transform):
+        self.node = node
+        self.transform = transform
+
+    def __enter__(self):
+        _about.stack.append(self)
+
+    def __exit__(self, etype, evalue, etraceback):
+        _about.stack.pop()
+
+
+class AboutPrinter:
+    def __init__(self, node):
+        self.node = node
+
+    def node_hrepr(self, node, H, hrepr):
+        if isinstance(node, MyiaASTNode):
+            views = H.tabbedView()
+            views = views(H.view(H.tab('node'), H.pane(hrepr(node))))
+            views = views(H.view(H.tab('trace'), H.pane(hrepr(node.trace))))
+            return views
+        else:
+            return hrepr(node)
+
+    def __hrepr__(self, H, hrepr):
+        views = H.tabbedView()
+        node = self.node
+
+        nodes = [self.node_hrepr(node, H, hrepr)]
+        transforms = []
+
+        while node and getattr(node, 'about', None):
+            about = node.about
+            node = about.node
+            nodes.append(self.node_hrepr(node, H, hrepr))
+            transforms.append(about.transform)
+        transforms.append('orig')
+
+        for transform, node in reversed(list(zip(transforms, nodes))):
+            tab = H.tab(transform)
+            pane = H.pane(node)
+            views = views(H.view(tab, pane))
+
+        return views
+
+
+def transformer_method(transform, arg_index=1):
+    def decorator(fn):
+        def decorated(*args, **kw):
+            with About(args[arg_index], transform):
+                return fn(*args, **kw)
+        return decorated
+    return decorator
+
+
 class Transformer:
     """
     Base class for Myia AST transformers.
@@ -630,6 +733,8 @@ class Transformer:
     Define methods called ``transform_<node_type>``,
     e.g. ``transform_Symbol``.
     """
+    __transform__: str = None
+
     def transform(self, node, **kwargs):
         cls = node.__class__.__name__
         try:
@@ -639,7 +744,8 @@ class Transformer:
                 "Unrecognized node type in {}: {}".format(
                     self.__class__.__name__, cls)
             )
-        rval = method(node, **kwargs)
+        with About(node, self.__transform__):
+            rval = method(node, **kwargs)
         if not rval.location:
             rval.location = node.location
         return rval
@@ -662,3 +768,41 @@ def maptup2(fn, vals1, vals2):
                      for x, y in zip(vals1.values, vals2))
     else:
         return fn(vals1, vals2)
+
+
+class VariableTracker:
+    """
+    Track variable names and map them to Symbol instances.
+    """
+
+    def __init__(self, parent: 'VariableTracker' = None) -> None:
+        self.parent = parent
+        self.bindings: Dict[str, Symbol] = {}
+
+    def get_free(self, name: str, preserve_about: bool = True) \
+            -> TupleT[bool, 'Symbol']:
+        """
+        Return whether the given variable name is a free variable
+        or not, and the Symbol associated to the variable.
+
+        A variable is free if it is found in this Tracker's parent,
+        or grandparent, etc.
+        It is not free if it is found in ``self.bindings``.
+
+        Raise NameError if the variable was not declared.
+        """
+        if name in self.bindings:
+            return (False, self.bindings[name].copy(preserve_about))
+        elif self.parent is None:
+            raise NameError("Undeclared variable: {}".format(name))
+        else:
+            return (True, self.parent.get_free(name)[1])
+
+    def get(self, name: str, preserve_about: bool = True) -> Symbol:
+        return self.get_free(name, preserve_about)[1]
+
+    def __getitem__(self, name: str) -> Symbol:
+        return self.get_free(name)[1]
+
+    def __setitem__(self, name: str, value: Symbol) -> None:
+        self.bindings[name] = value
