@@ -10,12 +10,10 @@ from typing import \
     List, Tuple as TupleT, Iterable, Dict, Set, Union, \
     cast, TypeVar, Any
 
-from uuid import uuid4 as uuid
 from copy import copy
-import textwrap
 import traceback
-from .util import EventDispatcher, HReprBase
-import threading
+from ..util import HReprBase
+from .about import Location, top as about_top
 
 
 __save_trace__ = False
@@ -25,65 +23,6 @@ Locatable = Union['MyiaASTNode', 'Location', None]
 LHS = Union['Symbol', 'Tuple']
 Binding = TupleT[LHS, 'MyiaASTNode']
 Bindings = List[Binding]
-
-
-class Location:
-    """
-    Represents a source code location for an AST node.
-
-    Attributes:
-        url (str): The path of the code file.
-        line (int): The line number in that file.
-        column (int): The column number in that file.
-    """
-
-    def __init__(self,
-                 url: str,
-                 line: int,
-                 column: int,
-                 node: Any = None) -> None:
-        self.url = url
-        self.line = line
-        self.column = column
-        self.node = node
-
-    def traceback(self) -> str:
-        """
-        Print out a "traceback" that corresponds to this location,
-        with the line printed out and a caret at the right column.
-        Basically:
-
-        >>> loc.traceback()
-          File {url}, line {line}, column {column}
-            x = f(y)
-                ^
-
-        This is mostly meant for printing out ``MyiaSyntaxError``s.
-        """
-        try:
-            with open(self.url) as file:
-                raw_code = file.readlines()[self.line - 1].rstrip("\n")
-                raw_caret = ' ' * self.column + '^'
-                code, caret = textwrap.dedent(
-                    raw_code + '\n' + raw_caret
-                ).split("\n")
-            return '  File "{}", line {}, column {}\n    {}\n    {}'.format(
-                self.url, self.line, self.column, code, caret)
-        except FileNotFoundError:
-            return '  File "{}", line {}, column {}'.format(
-                self.url, self.line, self.column)
-
-    def __str__(self) -> str:
-        return '{}@{}:{}'.format(self.url, self.line, self.column)
-
-    def __hrepr__(self, H, hrepr):
-        return H.codeSnippet(
-            src = self.url,
-            language = "python",
-            line = self.line,
-            column = self.column + 1,
-            context = 4
-        )
 
 
 def _get_location(x: Locatable) -> Location:
@@ -97,76 +36,6 @@ def _get_location(x: Locatable) -> Location:
         return x
     else:
         raise TypeError(f'{x} is not a/has no location')
-
-
-class ParseEnv:
-    """
-    A mapping from Symbol instances to Lambda instances. When
-    a function is compiled, a ParseEnv will contain all the
-    functions created during the compilation. These functions
-    will refer to each other with Symbols and the ParseEnv
-    connects them to the relevant code.
-
-    A ParseEnv is associated to a GenSym instance that can
-    generate fresh Symbols, guaranteed not to already be
-    present in the mapping.
-
-    You can index the ParseEnv like a dict:
-
-    >>> parse_env[some_symbol] = some_lambda
-    >>> parse_env[some_symbol]
-    some_lambda
-
-    When a new Symbol is defined, the ParseEnv also emits the
-    ``declare`` event.
-
-    Attributes:
-        namespace (str): The namespace in which this ParseEnv's
-            Symbols live.
-        gen (GenSym): The Symbol generator for this ParseEnv.
-        url (str): The filename in which the compiled code
-            originally came from.
-        bindings ({Symbol: Lambda}}): The mapping.
-        events (EventDispatcher): Events that this object might
-            emit, chiefly the ``declare`` event.
-
-    Events:
-        declare(event, symbol, lbda): Triggered when a new mapping
-            is added. You can listen to this to track the various
-            functions that are being compiled. Use
-            ``@parse_env.events.on_declare`` decorator.
-    """
-
-    def __init__(self,
-                 namespace: str = None,
-                 gen: 'GenSym' = None,
-                 url: str = None) -> None:
-        if namespace is None:
-            namespace = str(uuid())
-        if namespace.startswith('global'):
-            self.events = EventDispatcher(self)
-        else:
-            self.events = None
-        self.url = url
-        self.gen: GenSym = gen or GenSym(namespace)
-        self.bindings: Dict[Symbol, Lambda] = {}
-
-    def update(self, bindings) -> None:
-        """
-        Set several bindings at once.
-
-        Same as ``self.bindings.update(bindings)``
-        """
-        for k, v in bindings.items():
-            self[k] = v
-
-    def __getitem__(self, name) -> 'Lambda':
-        return self.bindings[name]
-
-    def __setitem__(self, name, value) -> None:
-        self.bindings[name] = value
-        if self.events:
-            self.events.emit_declare(name, value)
 
 
 T = TypeVar('T', bound='MyiaASTNode')
@@ -200,8 +69,7 @@ class MyiaASTNode(HReprBase):
             )
         else:
             self.trace = None
-        about = _about.stack[-1]
-        self.about = about
+        self.about = about_top()
         self.annotations: Set[str] = set()
 
     def at(self: T, location: Locatable) -> T:
@@ -421,7 +289,7 @@ class Lambda(MyiaASTNode):
                  args: List[Symbol],
                  body: MyiaASTNode,
                  gen: 'GenSym',
-                 global_env: ParseEnv = None,
+                 global_env: 'ParseEnv' = None,
                  **kw) -> None:
         super().__init__(**kw)
         self.ref: Symbol = None
@@ -572,77 +440,6 @@ class Closure(MyiaASTNode):
         )
 
 
-class GenSym:
-    """
-    Symbol generator. The generator creates unique Symbols in the
-    given namespace, assuming that it is the only generator (to ever
-    exist) for that namespace.
-
-    If it is given None as its initial namespace, GenSym generates
-    a unique namespace with the uuid4 method.
-
-    Attributes:
-        namespace: The namespace in which the symbols are generated.
-    """
-
-    def __init__(self, namespace: str = None) -> None:
-        self.varcounts: Dict[str, int] = {}
-        self.namespace: str = namespace or str(uuid())
-
-    def inc_version(self, ref: str) -> int:
-        """
-        Increment the current version number for the variable
-        name given as ref.
-        """
-        if ref in self.varcounts:
-            self.varcounts[ref] += 1
-            return self.varcounts[ref]
-        else:
-            self.varcounts[ref] = 1
-            return 1
-
-    def sym(self, name: str) -> Symbol:
-        """
-        Create a unique Symbol with the given name. If one or more
-        Symbols with the same name exists, the new Symbol will have
-        a higher version number than any of them.
-        """
-        return Symbol(
-            name,
-            namespace=self.namespace,
-            version=self.inc_version(name),
-            relation=None
-        )
-
-    def rel(self, orig: Symbol, relation: str) -> Symbol:
-        """
-        Create a new Symbol that relates to the orig Symbol with
-        the given relation. The new Symbol is guaranteed not to
-        already exist.
-        """
-        # Note: str(a) == str(b) if a == b, but it is possible (I think?)
-        #  that str(a) == str(b) if a != b. This is okay, it just means that
-        #  some symbols may have a higher version than strictly
-        #  necessary (note that we could use the same count for all
-        #  variables, and everything would still work)
-        ref = f'{str(orig)}/{relation}'
-        version = self.inc_version(ref)
-        # print(f'{ref} {version}<br/>')
-        return Symbol(
-            orig,
-            namespace=self.namespace,
-            version=version,
-            relation=relation
-        )
-
-    def __call__(self, s: Union[str, Symbol], rel: str = None) -> Symbol:
-        if isinstance(rel, str):
-            assert isinstance(s, Symbol)
-            return self.rel(s, rel)
-        else:
-            return self.sym(s)
-
-
 class _Assign(MyiaASTNode):
     """
     This is a "temporary" node that ``front.Parser`` uses to
@@ -661,147 +458,5 @@ class _Assign(MyiaASTNode):
         return f'(_assign {self.varname} {self.value})'
 
 
-_about = threading.local()
-_about.stack = [None]
-
-
-class About:
-    def __init__(self, node, transform):
-        self.node = node
-        self.transform = transform
-
-    def __enter__(self):
-        _about.stack.append(self)
-
-    def __exit__(self, etype, evalue, etraceback):
-        _about.stack.pop()
-
-
-class AboutPrinter:
-    def __init__(self, node):
-        self.node = node
-
-    def node_hrepr(self, node, H, hrepr):
-        if isinstance(node, MyiaASTNode):
-            views = H.tabbedView()
-            views = views(H.view(H.tab('node'), H.pane(hrepr(node))))
-            views = views(H.view(H.tab('trace'), H.pane(hrepr(node.trace))))
-            return views
-        else:
-            return hrepr(node)
-
-    def __hrepr__(self, H, hrepr):
-        views = H.tabbedView()
-        node = self.node
-
-        nodes = [self.node_hrepr(node, H, hrepr)]
-        transforms = []
-
-        while node and getattr(node, 'about', None):
-            about = node.about
-            node = about.node
-            nodes.append(self.node_hrepr(node, H, hrepr))
-            transforms.append(about.transform)
-        transforms.append('orig')
-
-        for transform, node in reversed(list(zip(transforms, nodes))):
-            tab = H.tab(transform)
-            pane = H.pane(node)
-            views = views(H.view(tab, pane))
-
-        return views
-
-
-def transformer_method(transform, arg_index=1):
-    def decorator(fn):
-        def decorated(*args, **kw):
-            with About(args[arg_index], transform):
-                return fn(*args, **kw)
-        return decorated
-    return decorator
-
-
-class Transformer:
-    """
-    Base class for Myia AST transformers.
-
-    Upon transforming a node, ``Transformer.transform``
-    transfers the original's location to the new node,
-    if it doesn't have a location.
-
-    Define methods called ``transform_<node_type>``,
-    e.g. ``transform_Symbol``.
-    """
-    __transform__: str = None
-
-    def transform(self, node, **kwargs):
-        cls = node.__class__.__name__
-        try:
-            method = getattr(self, 'transform_' + cls)
-        except AttributeError:
-            raise Exception(
-                "Unrecognized node type in {}: {}".format(
-                    self.__class__.__name__, cls)
-            )
-        with About(node, self.__transform__):
-            rval = method(node, **kwargs)
-        if not rval.location:
-            rval.location = node.location
-        return rval
-
-
-# TODO: document
-def maptup(fn, vals):
-    if isinstance(vals, Tuple):
-        return Tuple(maptup(fn, x) for x in vals.values)
-    else:
-        return fn(vals)
-
-
-# TODO: document
-def maptup2(fn, vals1, vals2):
-    if isinstance(vals1, Tuple):
-        assert type(vals2) is tuple
-        assert len(vals1.values) == len(vals2)
-        return Tuple(maptup2(fn, x, y)
-                     for x, y in zip(vals1.values, vals2))
-    else:
-        return fn(vals1, vals2)
-
-
-class VariableTracker:
-    """
-    Track variable names and map them to Symbol instances.
-    """
-
-    def __init__(self, parent: 'VariableTracker' = None) -> None:
-        self.parent = parent
-        self.bindings: Dict[str, Symbol] = {}
-
-    def get_free(self, name: str, preserve_about: bool = True) \
-            -> TupleT[bool, 'Symbol']:
-        """
-        Return whether the given variable name is a free variable
-        or not, and the Symbol associated to the variable.
-
-        A variable is free if it is found in this Tracker's parent,
-        or grandparent, etc.
-        It is not free if it is found in ``self.bindings``.
-
-        Raise NameError if the variable was not declared.
-        """
-        if name in self.bindings:
-            return (False, self.bindings[name].copy(preserve_about))
-        elif self.parent is None:
-            raise NameError("Undeclared variable: {}".format(name))
-        else:
-            return (True, self.parent.get_free(name)[1])
-
-    def get(self, name: str, preserve_about: bool = True) -> Symbol:
-        return self.get_free(name, preserve_about)[1]
-
-    def __getitem__(self, name: str) -> Symbol:
-        return self.get_free(name)[1]
-
-    def __setitem__(self, name: str, value: Symbol) -> None:
-        self.bindings[name] = value
+# For type annotations:
+from .env import GenSym, ParseEnv

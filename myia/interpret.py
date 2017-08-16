@@ -1,6 +1,6 @@
 from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 
-from myia.ast import \
+from .stx import \
     MyiaASTNode, \
     Location, Symbol, Value, \
     Let, Lambda, Apply, Begin, Tuple, Closure, maptup2

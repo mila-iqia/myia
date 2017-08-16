@@ -10,7 +10,7 @@ from typing import Union, Any, List, cast, \
     Sequence, Tuple as TupleT, Optional, Callable
 
 import re
-from .ast import \
+from .stx import \
     MyiaASTNode, Apply, Symbol, Value, Let, Lambda, \
     Closure, Tuple, Transformer, GenSym, LHS, Bindings
 from .symbols import nsym

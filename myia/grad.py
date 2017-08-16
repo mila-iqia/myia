@@ -168,7 +168,7 @@ What this means is:
 from typing import Dict, List, Tuple as TupleT, Any, \
     Union, cast, Optional, Sequence, Iterable, Callable, Set
 
-from .ast import \
+from .stx import \
     LHS, Binding, Bindings, Transformer, GenSym, MyiaASTNode, \
     Symbol, Value, Lambda, Let, Apply, Tuple, Closure, maptup, \
     About, transformer_method

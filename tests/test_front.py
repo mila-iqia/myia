@@ -4,7 +4,7 @@ Test the forward mode of Myia functions (no gradients).
 
 from myia.front import parse_function, MyiaSyntaxError
 from myia.interpret import evaluate
-from myia.ast import Symbol
+from myia.stx import Symbol
 import pytest
 import inspect
 

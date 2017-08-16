@@ -11,7 +11,7 @@ Validation and testing functionality.
 from typing import Iterable, Set, Tuple as TupleT, \
     Callable, Dict, List, Any, Union
 
-from .ast import MyiaASTNode, Symbol, Lambda, Let, ParseEnv, maptup
+from .stx import MyiaASTNode, Symbol, Lambda, Let, ParseEnv, maptup
 from .compile import a_normal
 from .front import parse_source, parse_function
 from .grad import Grad
@@ -314,7 +314,7 @@ def grad2_transform(rsym, bindings):
     gen = rlbda.gen
     rrsym = genv.gen('GG')
 
-    from .ast import Lambda, Apply, Value, Let
+    from .stx import Lambda, Apply, Value, Let
     from .symbols import builtins
 
     sym_arg = gen('ARG')

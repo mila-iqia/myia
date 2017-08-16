@@ -115,7 +115,7 @@ from typing import \
 
 from .util import buche, EventDispatcher, group_contiguous
 from collections import OrderedDict
-from .ast import \
+from .stx import \
     MyiaASTNode, \
     Location, Symbol, Value, \
     Let, Lambda, Apply, \

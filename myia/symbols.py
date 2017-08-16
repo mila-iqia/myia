@@ -14,7 +14,7 @@ The symbols live in two namespaces:
 
 
 import ast
-from .ast import Symbol, Value, GenSym
+from .stx import Symbol, Value, GenSym
 from .util import Props
 from typing import Dict
 
