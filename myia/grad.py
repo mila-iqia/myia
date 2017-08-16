@@ -183,8 +183,7 @@ from .symbols import \
     TMP_LET, TMP_BPROP, TMP_SENS
 from copy import copy
 from .compile import a_normal
-from .util import Props, Keyword
-from .buche import buche
+from .util import Props, Keyword, buche
 from collections import OrderedDict
 
 

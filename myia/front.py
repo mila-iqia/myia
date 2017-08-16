@@ -113,8 +113,7 @@ from typing import \
     Dict, Set, List, Tuple as TupleT, \
     cast, Union, Callable, Optional, Any
 
-from .buche import buche
-from .event import EventDispatcher
+from .util import buche, EventDispatcher, group_contiguous
 from collections import OrderedDict
 from .ast import \
     MyiaASTNode, \
@@ -122,7 +121,6 @@ from .ast import \
     Let, Lambda, Apply, \
     Begin, Tuple, Closure, _Assign, \
     GenSym, ParseEnv, About, VariableTracker
-from .util import group_contiguous
 from .symbols import \
     get_operator, builtins, HIDGLOB, \
     THEN, ELSE, WTEST, WLOOP, LBDA

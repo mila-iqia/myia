@@ -1,7 +1,3 @@
-"""
-Miscellaneous utilities go here.
-"""
-
 
 from typing import Iterable, Callable, List, Tuple as TupleT, TypeVar
 

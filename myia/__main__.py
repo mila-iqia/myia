@@ -180,11 +180,7 @@ def setup_buche(arguments):
                     node.annotations = node.annotations | {'missing_source'}
                     msbuche = pbuche['missing_source']
                     msbuche(node)
-                    if node.trace:
-                        t = node.trace[-1]
-                        msbuche.pre('  Definition at:')
-                        msbuche.pre(f'    {t.filename} line {t.lineno}')
-                        msbuche.pre(f'    {t.line}')
+                    msbuche(node.trace)
 
     if arguments.decls:
         @on_discovery(ParseEnv)
@@ -379,7 +375,7 @@ def command_debug(arguments):
     ast.__save_trace__ = True
     arguments.decls = True
     arguments.stores = False
-    arguments.check = False
+    arguments.check = True
     setup_buche(arguments)
     args = getargs(arguments)
     r, genv = getfn(arguments)

@@ -349,9 +349,6 @@ def analysis_grad2(pyfn, sym, bindings):
 
     gfunc = evaluate(bindings[g])
 
-    # from .buche import buche
-    # buche(g)
-
     g2_sym = grad2_transform(g, bindings)
     G = Grad(g2_sym, a_normal(bindings[g2_sym]))
     g2 = G.transform()

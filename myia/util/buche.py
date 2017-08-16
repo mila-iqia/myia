@@ -39,7 +39,7 @@ import json
 import weakref
 import traceback
 from hrepr import StdHRepr
-from .util import Props
+from .misc import Props
 from .event import EventDispatcher
 
 

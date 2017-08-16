@@ -167,6 +167,7 @@
 }
 
 .Closure {
+	display: inline-block;
 	border: 2px dotted black;
 	margin: 2px;
 	padding: 2px;
@@ -176,7 +177,6 @@
 	color: #008;
 	margin-right: 5px;
 }
-
 
 .ClosureImpl, .FunctionImpl, .PrimitiveImpl, .VMFrame {
 	display: inline-flex;

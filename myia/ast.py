@@ -14,8 +14,7 @@ from uuid import uuid4 as uuid
 from copy import copy
 import textwrap
 import traceback
-from .buche import HReprBase
-from .event import EventDispatcher
+from .util import EventDispatcher, HReprBase
 import threading
 
 

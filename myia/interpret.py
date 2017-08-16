@@ -5,10 +5,8 @@ from myia.ast import \
     Location, Symbol, Value, \
     Let, Lambda, Apply, Begin, Tuple, Closure, maptup2
 from .front import parse_function, ParseEnv
-from .buche import HReprBase, buche
 from .symbols import builtins
-from .event import EventDispatcher
-from .debug import BucheDb
+from .util import EventDispatcher, BucheDb, HReprBase, buche
 from functools import reduce
 import inspect
 
