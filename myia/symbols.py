@@ -15,7 +15,7 @@ The symbols live in two namespaces:
 
 import ast
 from .stx import Symbol, Value, GenSym
-from .util import Props
+from .util import Props, Keyword
 from typing import Dict
 
 
@@ -72,6 +72,13 @@ def nsym() -> Symbol:
     irrelevant elements.
     """
     return _ngen(NULLSYM)
+
+
+# ZERO serves as a generic zero: mapadd(ZERO, y) == y,
+# whether y is a scalar, a tuple, or whatever else.
+# This is more efficient than creating a zero that has
+# the same shape as y.
+ZERO = Keyword('ZERO')
 
 
 builtins_dict: Dict[str, Symbol] = dict(

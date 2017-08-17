@@ -2,8 +2,10 @@
 from typing import Callable, List, Dict, Any, Union
 import inspect
 from ..util import HReprBase
-from ..stx import Lambda, Symbol
-from ..symbols import builtins
+from ..stx import Lambda, Symbol, Tuple, Apply, Closure, \
+    GenSym
+from ..symbols import builtins, BPROP, JTAG
+from ..front import parse_function, get_global_parse_env
 
 
 EnvT = Dict[Symbol, Any]
@@ -167,4 +169,121 @@ class ClosureImpl(HReprBase):
             )
         )
 
-from .vm import VMCode, run_vm
+
+############################
+# Gradient-related methods #
+############################
+
+
+def macro_grad_for(nargs_closure):
+    """
+    This generates a ``GRAD`` function for use in primitive
+    gradients. ``GRAD`` is parameterized by the number of
+    arguments that are closed on.
+
+    See the *Partial Application* section above for a detailed
+    explanation of what this is for.
+    """
+    def macro_grad(*args):
+        # *args = (a, b, c, ...) =>
+        #   ((), a, b, c, ...)  # If nargs_closure == 0
+        #   ((a,), b, c, ...)  # If nargs_closure == 1
+        #   ((a, b), c, ...)  # If nargs_closure == 2
+        #   etc.
+        return Tuple([Tuple(args[:nargs_closure]),
+                     *args[nargs_closure:]])
+    return macro_grad
+
+
+def bprop_impl(orig_fn: Callable) -> Callable:
+    """
+    Decorator to declare a backpropagator function. For instance,
+    to define the backpropagator for operator builtins.whatever,
+    write:
+
+        @bprop_impl
+        def bprop_whatever(x, y, ..., gwhatever):
+            return GRAD(gx, gy, ...)
+
+    It is important to return ``GRAD(...)``. The ``GRAD`` macro
+    will group the gradients correctly given how many arguments
+    are part of a partial application.
+
+    Refer to the previous section on Partial Application.
+    """
+    assert orig_fn.__name__.startswith('bprop_')
+    fname = orig_fn.__name__[6:]
+
+    sym = getattr(builtins, fname)
+
+    # This is the implementation for the forward pass
+    prim = root_globals[sym]
+    assert isinstance(prim, PrimitiveImpl)
+
+    # We will cache the result for each nargs_closure value, to
+    # avoid needless recomputation.
+    _cache: Dict[int, FunctionImpl] = {}
+
+    # Wrap the primitive and a closure-converted backpropagator
+    # in a combined method that follows the protocol. Essentially:
+    # (forward_fn, bprop_fn) ==>
+    #   lambda *args: (forward_fn(*args),
+    #                  lambda grad_out: bprop_fn(*args, grad_out))
+    def mkgrad(nargs_closure: int) -> FunctionImpl:
+        # Check if we have compiled this before
+        cached = _cache.get(nargs_closure, None)
+        if cached:
+            return cached
+
+        # Copy symbol to grad namespace
+        rsym = Symbol(sym,
+                      version=nargs_closure + 1,
+                      namespace='builtin',
+                      relation=BPROP)
+
+        # We compile the backpropagator using Myia. We provide
+        # the GRAD macro which will account for nargs_closure
+        # stored arguments.
+        r, genv = parse_function(
+            orig_fn,
+            macros={'GRAD': macro_grad_for(nargs_closure)}
+        )
+
+        # Create a FunctionImpl.
+        fn = evaluate(r, genv)
+
+        # Now we generate a combined function that returns the
+        # result of the forward pass along with a backpropagator
+        # function.
+        G = GenSym()
+        args = [G.sym(a) for a in prim.argnames]
+        forward = Apply(builtins.J,
+                        Apply(sym, *[Apply(builtins.Jinv, a)
+                                     for a in args]))
+        backward = Closure(rsym, args)
+        # Final function:
+        ast = Lambda(args, Tuple([forward, backward]), G)
+
+        # Boilerplate stuff that should be properly abstracted
+        # somewhere else.
+        ast.global_env = get_global_parse_env('__root__')
+        impl_sym = ast.global_env.gen(sym, JTAG)
+        ast.global_env[impl_sym] = ast
+        ast.ref = impl_sym
+        ast.primal = sym
+        impl = FunctionImpl(ast, [root_globals])
+        root_globals[impl_sym] = impl
+        root_globals[rsym] = fn
+
+        # Let's not forget to save our work in the cache!
+        _cache[nargs_closure] = impl
+        return impl
+
+    # prim's gradient is to be compiled lazily using
+    # prim.grad(nclos_args)
+    prim.grad = mkgrad
+
+    return orig_fn
+
+
+from .vm import VMCode, run_vm, evaluate
