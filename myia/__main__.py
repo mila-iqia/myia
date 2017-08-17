@@ -9,20 +9,20 @@ import argparse
 import sys
 import traceback
 from importlib import import_module
-from . import ast
+from . import stx
 from .compile import a_normal
 from .front import parse_source
 from .interpret import evaluate
 from .validate import \
     unbound, missing_source, \
     analysis
-from .buche import buche, Reader, id_registry
+from .util import buche, Reader, id_registry
 
-from .event import on_discovery
+from .util import on_discovery
 from .interpret import VM
-from .ast import Symbol
+from .stx import Symbol
 from .front import ParseEnv
-from .debug import BucheDb
+from .util import BucheDb
 
 
 ###############################
@@ -341,7 +341,7 @@ def command_eval(arguments):
 
 
 def command_inspect(arguments):
-    ast.__save_trace__ = True
+    stx.__save_trace__ = True
     if arguments.all:
         arguments.decls = True
         arguments.stores = True
@@ -372,7 +372,7 @@ def command_inspect(arguments):
 
 
 def command_debug(arguments):
-    ast.__save_trace__ = True
+    stx.__save_trace__ = True
     arguments.decls = True
     arguments.stores = False
     arguments.check = True
