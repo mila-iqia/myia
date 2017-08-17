@@ -118,9 +118,9 @@ class FunctionImpl(HReprBase):
         ast = self.ast
         assert len(args) == len(ast.args)
         return run_vm(self.code,
-                  	  {s: arg for s, arg in zip(ast.args, args)},
-                  	  *self.envs,
-                  	  debugger=debugger)
+                      {s: arg for s, arg in zip(ast.args, args)},
+                      *self.envs,
+                      debugger=debugger)
 
     def __call__(self, *args):
         return self.debug(args, None)

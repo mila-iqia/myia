@@ -243,4 +243,3 @@ class VariableTracker:
 
     def __setitem__(self, name: str, value: Symbol) -> None:
         self.bindings[name] = value
-

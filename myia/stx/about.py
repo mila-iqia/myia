@@ -9,7 +9,7 @@ _about.stack = [None]
 
 
 def top():
-	return _about.stack[-1]
+    return _about.stack[-1]
 
 
 class About:
@@ -57,6 +57,7 @@ class AboutPrinter:
             views = views(H.view(tab, pane))
 
         return views
+
 
 class Location:
     """

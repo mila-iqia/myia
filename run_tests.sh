@@ -4,8 +4,10 @@
 set -e
 
 # Run PEP8 linter
+# Ignore E402 because circular imports sometimes requires imports at the bottom
+#     of the file
 # Ignore E701 for now because it triggers on some type annotations in Py3.6
-pep8 --ignore=E265,E251,E701 --show-source --show-pep8 myia/*.py tests/*.py
+pep8 --ignore=E265,E251,E402,E701 --show-source --show-pep8 myia tests
 
 # Run mypy type checker
 mypy --ignore-missing-imports myia

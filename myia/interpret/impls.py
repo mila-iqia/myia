@@ -103,6 +103,7 @@ def impl_switch(cond, t, f):
     else:
         return f
 
+
 @impl
 def impl_identity(x):
     return x
