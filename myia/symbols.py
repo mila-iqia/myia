@@ -14,64 +14,9 @@ The symbols live in two namespaces:
 
 
 import ast
-from .stx import Symbol, Value, GenSym
-from .util import Props, Keyword
+from .stx import Symbol, Value, GenSym, bsym, gsym
+from .util import Props, Keyword, SymbolsMeta
 from typing import Dict
-
-
-###############################################
-# Special characters to modify function names #
-###############################################
-
-THEN = '✓'
-ELSE = '✗'
-WTEST = '⤾'
-WLOOP = '⥁'
-LBDA = 'λ'
-
-JTAG = '↑'
-BPROP = '♦'
-BPROP_CLOS = '♢'
-SENS = '∇'
-NULLSYM = '×'
-TMP = '◯'
-HIDGLOB = '$'
-
-TMP_SENS = f'{TMP}{SENS}'
-TMP_BPROP = f'{TMP}{BPROP_CLOS}'
-TMP_LET = f'{TMP}let'
-
-
-def bsym(name: str) -> Symbol:
-    """
-    Create a builtin symbol.
-
-    This function is for internal use and are not meant to
-    be referred to by name by the user.
-    """
-    return Symbol(name, namespace='builtin')
-
-
-def gsym(name: str) -> Symbol:
-    """
-    Create a global symbol.
-
-    This function can be called by name by the user.
-    """
-    return Symbol(name, namespace='global')
-
-
-_ngen = GenSym(namespace='null')
-
-
-def nsym() -> Symbol:
-    """
-    Create a null symbol.
-
-    Use as a placeholder in destructuring assignments for
-    irrelevant elements.
-    """
-    return _ngen(NULLSYM)
 
 
 # ZERO serves as a generic zero: mapadd(ZERO, y) == y,
@@ -81,56 +26,49 @@ def nsym() -> Symbol:
 ZERO = Keyword('ZERO')
 
 
-builtins_dict: Dict[str, Symbol] = dict(
-    # Builtins that correspond to operator applications,
-    # or are inserted by the compiler. They are not accessible
-    # in the user's global namespace
-    add = bsym('add'),
-    subtract = bsym('subtract'),
-    multiply = bsym('multiply'),
-    divide = bsym('divide'),
-    power = bsym('power'),
-    dot = bsym('dot'),
-    bitwise_or = bsym('bitwise_or'),
-    bitwise_and = bsym('bitwise_and'),
-    bitwise_xor = bsym('bitwise_xor'),
-    unary_add = bsym('unary_add'),
-    unary_subtract = bsym('unary_subtract'),
-    bitwise_not = bsym('bitwise_not'),
-    negate = bsym('negate'),
-    less = bsym('less'),
-    greater = bsym('greater'),
-    less_equal = bsym('less_equal'),
-    greater_equal = bsym('greater_equal'),
-    equal = bsym('equal'),
-    index = bsym('index'),
-    getattr = bsym('getattr'),
-    setslice = bsym('setslice'),
-    identity = bsym('identity'),
+class builtins(metaclass=SymbolsMeta):
+    add = bsym('add')
+    subtract = bsym('subtract')
+    multiply = bsym('multiply')
+    divide = bsym('divide')
+    power = bsym('power')
+    dot = bsym('dot')
+    bitwise_or = bsym('bitwise_or')
+    bitwise_and = bsym('bitwise_and')
+    bitwise_xor = bsym('bitwise_xor')
+    unary_add = bsym('unary_add')
+    unary_subtract = bsym('unary_subtract')
+    bitwise_not = bsym('bitwise_not')
+    negate = bsym('negate')
+    less = bsym('less')
+    greater = bsym('greater')
+    less_equal = bsym('less_equal')
+    greater_equal = bsym('greater_equal')
+    equal = bsym('equal')
+    index = bsym('index')
+    getattr = bsym('getattr')
+    setslice = bsym('setslice')
+    identity = bsym('identity')
 
     # Grad-related builtins
-    fill = gsym('fill'),
-    zeros_like = gsym('zeros_like'),
-    ones_like = gsym('ones_like'),
-    mapadd = gsym('mapadd'),
-    J = gsym('J'),
-    Jinv = gsym('Jinv'),
+    fill = gsym('fill')
+    zeros_like = gsym('zeros_like')
+    ones_like = gsym('ones_like')
+    mapadd = gsym('mapadd')
+    J = gsym('J')
+    Jinv = gsym('Jinv')
 
     # Myia's global variables
-    myia_builtins = gsym('myia_builtins'),
-    len = gsym('len'),
-    range = gsym('range'),
-    enumerate = gsym('enumerate'),
-    map = gsym('map'),
-    reduce = gsym('reduce'),
-    filter = gsym('filter'),
-    switch = gsym('switch'),
-    first = gsym('first'),
-    second = gsym('second'),
-)
-
-
-builtins = Props(builtins_dict)
+    myia_builtins = gsym('myia_builtins')
+    len = gsym('len')
+    range = gsym('range')
+    enumerate = gsym('enumerate')
+    map = gsym('map')
+    reduce = gsym('reduce')
+    filter = gsym('filter')
+    switch = gsym('switch')
+    first = gsym('first')
+    second = gsym('second')
 
 
 # Maps the names of Python AST nodes to corresponding

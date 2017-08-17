@@ -3,8 +3,8 @@ from typing import Callable, List, Dict, Any, Union
 import inspect
 from ..util import HReprBase
 from ..stx import Lambda, Symbol, Tuple, Apply, Closure, \
-    GenSym
-from ..symbols import builtins, BPROP, JTAG
+    GenSym, BPROP, JTAG
+from ..symbols import builtins
 from ..front import parse_function, get_global_parse_env
 
 

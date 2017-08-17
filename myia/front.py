@@ -120,10 +120,9 @@ from .stx import \
     Location, Symbol, Value, \
     Let, Lambda, Apply, \
     Begin, Tuple, Closure, _Assign, \
-    GenSym, ParseEnv, About, VariableTracker
-from .symbols import \
-    get_operator, builtins, HIDGLOB, \
-    THEN, ELSE, WTEST, WLOOP, LBDA
+    GenSym, ParseEnv, About, VariableTracker, \
+    HIDGLOB, THEN, ELSE, WTEST, WLOOP, LBDA
+from .symbols import get_operator, builtins
 from uuid import uuid4 as uuid
 import ast
 from copy import copy

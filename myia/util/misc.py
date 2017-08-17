@@ -9,6 +9,12 @@ class Props:
     def __init__(self, d):
         self.__dict__ = d
 
+    def __getitem__(self, item):
+        return self.__dict__[item]
+
+    def __setitem__(self, item, value):
+        self.__dict__[item] = value
+
     def __getattr__(self, attr):
         return self.__dict__[attr]
 
@@ -17,6 +23,12 @@ class Props:
             super().__setattr__(attr, value)
         else:
             self.__dict__[attr] = value
+
+
+class SymbolsMeta(type):
+    def __new__(cls, name, bases, attributes):
+        return Props({k: v for k, v in attributes.items()
+                      if not k.startswith('_')})
 
 
 T = TypeVar('T')

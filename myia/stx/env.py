@@ -7,6 +7,33 @@ from ..util import EventDispatcher
 from uuid import uuid4 as uuid
 
 
+###############################################
+# Special characters to modify function names #
+###############################################
+
+THEN = '✓'
+ELSE = '✗'
+WTEST = '⤾'
+WLOOP = '⥁'
+LBDA = 'λ'
+
+JTAG = '↑'
+BPROP = '♦'
+BPROP_CLOS = '♢'
+SENS = '∇'
+NULLSYM = '×'
+TMP = '◯'
+HIDGLOB = '$'
+
+TMP_SENS = f'{TMP}{SENS}'
+TMP_BPROP = f'{TMP}{BPROP_CLOS}'
+TMP_LET = f'{TMP}let'
+
+
+#####################
+# Symbol generation #
+#####################
+
 class GenSym:
     """
     Symbol generator. The generator creates unique Symbols in the
@@ -76,6 +103,38 @@ class GenSym:
             return self.rel(s, rel)
         else:
             return self.sym(s)
+
+
+def bsym(name: str) -> Symbol:
+    """
+    Create a builtin symbol.
+
+    This function is for internal use and are not meant to
+    be referred to by name by the user.
+    """
+    return Symbol(name, namespace='builtin')
+
+
+def gsym(name: str) -> Symbol:
+    """
+    Create a global symbol.
+
+    This function can be called by name by the user.
+    """
+    return Symbol(name, namespace='global')
+
+
+_ngen = GenSym(namespace='null')
+
+
+def nsym() -> Symbol:
+    """
+    Create a null symbol.
+
+    Use as a placeholder in destructuring assignments for
+    irrelevant elements.
+    """
+    return _ngen(NULLSYM)
 
 
 class ParseEnv:

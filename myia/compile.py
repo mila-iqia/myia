@@ -13,7 +13,7 @@ import re
 from .stx import \
     MyiaASTNode, Apply, Symbol, Value, Let, Lambda, \
     Closure, Tuple, Transformer, GenSym, LHS, Bindings
-from .symbols import nsym
+from .stx import nsym
 
 
 # TODO: Lambda should never be a sub-expression, it should be pulled
