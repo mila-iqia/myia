@@ -20,7 +20,7 @@ from .util import buche, Reader, id_registry
 
 from .util import on_discovery
 from .interpret import VM
-from .stx import Symbol
+from .stx import Symbol, AboutPrinter
 from .front import ParseEnv
 from .util import BucheDb
 
@@ -361,10 +361,6 @@ def command_inspect(arguments):
     def handle(e, cmd):
         try:
             obj = id_registry[int(cmd.objId)]
-            # buche[cmd.path](obj.about)
-            # buche[cmd.path](obj.trace)
-            # buche[cmd.path](obj.find_location())
-            from .ast import AboutPrinter
             buche[cmd.path](AboutPrinter(obj))
         except Exception as exc:
             buche[cmd.path](exc)

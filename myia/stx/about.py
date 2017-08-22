@@ -29,7 +29,7 @@ class AboutPrinter:
         self.node = node
 
     def node_hrepr(self, node, H, hrepr):
-        if isinstance(node, MyiaASTNode):
+        if hasattr(node, 'trace'):
             views = H.tabbedView()
             views = views(H.view(H.tab('node'), H.pane(hrepr(node))))
             views = views(H.view(H.tab('trace'), H.pane(hrepr(node.trace))))
