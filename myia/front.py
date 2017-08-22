@@ -215,7 +215,7 @@ class LocVisitor:
                 location=loc
             )
         with About(loc, 'parse'):
-            rval = method(node, loc, **kwargs)
+            rval = method(node, **kwargs)
         return rval
 
 
@@ -357,8 +357,7 @@ class Parser(LocVisitor):
 
     def make_assign(self,
                     base_name: str,
-                    value: MyiaASTNode,
-                    location: Location = None) -> _Assign:
+                    value: MyiaASTNode) -> _Assign:
         """
         Helper function for when a variable with the name
         base_name is set to the given value. Add the name
@@ -544,7 +543,7 @@ class Parser(LocVisitor):
         # normal value.
         return self.body_wrapper(stmts)(None)
 
-    def visit_variable(self, name: str, loc: Location = None) -> Symbol:
+    def visit_variable(self, name: str) -> Symbol:
         """
         Declare that the code we are parsing needs to access the given
         variable, and return the appropriate Symbol associated to that
@@ -575,12 +574,12 @@ class Parser(LocVisitor):
     # Visitors for Python AST nodes #
     #################################
 
-    def visit_Assert(self, node: ast.Assert, loc: Location) -> Apply:
+    def visit_Assert(self, node: ast.Assert) -> Apply:
         return Apply(builtins.assert_true,
                      self.visit(node.test),
                      self.visit(node.msg))
 
-    def visit_Assign(self, node: ast.Assign, loc: Location) -> _Assign:
+    def visit_Assign(self, node: ast.Assign) -> _Assign:
         targ, = node.targets
         if isinstance(targ, ast.Tuple):
             # UNSUPPORTED: x, y = value
@@ -606,7 +605,7 @@ class Parser(LocVisitor):
                 slice = Apply(builtins.setslice,
                               self.visit(targ.value),
                               self.visit(targ.slice), val)
-                return self.make_assign(targ.value.id, slice, loc)
+                return self.make_assign(targ.value.id, slice)
             else:
                 # UNSUPPORTED: f()[x] = value
                 raise MyiaSyntaxError(
@@ -616,7 +615,7 @@ class Parser(LocVisitor):
         elif isinstance(targ, ast.Name):
             # CASE: x = y
             val = self.visit(node.value)
-            return self.make_assign(targ.id, val, loc)
+            return self.make_assign(targ.id, val)
 
         else:
             # UNSUPPORTED: x.attr = y
@@ -625,13 +624,13 @@ class Parser(LocVisitor):
                 f'Unsupported targ for Assign: {targ}'
             )
 
-    def visit_Attribute(self, node: ast.Attribute, loc: Location) -> Apply:
+    def visit_Attribute(self, node: ast.Attribute) -> Apply:
         # CASE: x.attr
         return Apply(builtins.getattr,
                      self.visit(node.value),
                      Value(node.attr))
 
-    def visit_AugAssign(self, node: ast.AugAssign, loc: Location) -> _Assign:
+    def visit_AugAssign(self, node: ast.AugAssign) -> _Assign:
         targ = node.target
         if isinstance(targ, ast.Name):
             # CASE: x += y
@@ -641,7 +640,7 @@ class Parser(LocVisitor):
             with About(self.locator(targ), 'parse'):
                 prev = self.vtrack.get(targ.id, False)
             val = Apply(op, prev, aug)
-            return self.make_assign(targ.id, val, loc)
+            return self.make_assign(targ.id, val)
         else:
             # UNSUPPORTED: x[y] += z
             # UNSUPPORTED: x.attr += z
@@ -650,14 +649,14 @@ class Parser(LocVisitor):
                 "slices is not supported."
             )
 
-    def visit_BinOp(self, node: ast.BinOp, loc: Location) -> Apply:
+    def visit_BinOp(self, node: ast.BinOp) -> Apply:
         # CASE: a + b, a - b, etc.
         op = get_operator(node.op)
         l = self.visit(node.left)
         r = self.visit(node.right)
         return Apply(op, l, r)
 
-    # def visit_BoolOp(self, node: ast.BoolOp, loc: Location) -> If:
+    # def visit_BoolOp(self, node: ast.BoolOp) -> If:
     #     raise MyiaSyntaxError(loc, 'Boolean expressions are not supported.')
     #     left, right = node.values
     #     if isinstance(node.op, ast.And):
@@ -667,7 +666,7 @@ class Parser(LocVisitor):
     #     else:
     #         raise MyiaSyntaxError(loc, f"Unknown operator: {node.op}"
 
-    def visit_Call(self, node: ast.Call, loc: Location) -> MyiaASTNode:
+    def visit_Call(self, node: ast.Call) -> MyiaASTNode:
         # CASE: f(x, y)
         if len(node.keywords) > 0:
             # UNSUPPORTED: f(x = y), f(**xs)
@@ -683,7 +682,7 @@ class Parser(LocVisitor):
         func = self.visit(node.func)
         return Apply(func, *args)
 
-    def visit_Compare(self, node: ast.Compare, loc: Location) -> Apply:
+    def visit_Compare(self, node: ast.Compare) -> Apply:
         # CASE: x < y, x == y, etc.
         ops = [get_operator(op) for op in node.ops]
         if len(ops) == 1:
@@ -698,20 +697,18 @@ class Parser(LocVisitor):
 
     def visit_Expr(self,
                    node: ast.Expr,
-                   loc: Location,
                    allow_decorator='dummy_parameter') -> MyiaASTNode:
         return self.visit(node.value)
 
-    def visit_ExtSlice(self, node: ast.ExtSlice, loc: Location) -> Tuple:
+    def visit_ExtSlice(self, node: ast.ExtSlice) -> Tuple:
         # CASE: x[a, b, c:d]
         #         ^^^^^^^^^
         return Tuple(self.visit(v) for v in node.dims)
 
-    # def visit_For(self, node, loc): # TODO
+    # def visit_For(self, node): # TODO
 
     def visit_FunctionDef(self,
                           node: ast.FunctionDef,
-                          loc: Location,
                           allow_decorator=False) -> _Assign:
         # CASE: def f(x, y): ...
         if node.args.vararg or node.args.kwarg:
@@ -742,7 +739,7 @@ class Parser(LocVisitor):
                                  ref=ref)
         return _Assign(sym, clos)
 
-    def visit_If(self, node: ast.If, loc: Location) -> MyiaASTNode:
+    def visit_If(self, node: ast.If) -> MyiaASTNode:
         """
         Compile If statement as follows:
 
@@ -825,7 +822,7 @@ class Parser(LocVisitor):
                 # Special case when only one variable is set.
                 a, = ass
                 app = mkapply(p1.vtrack[a], p2.vtrack[a])
-                return self.make_assign(a, app, None)
+                return self.make_assign(a, app)
 
             else:
                 app = mkapply(
@@ -834,25 +831,25 @@ class Parser(LocVisitor):
                 )
                 return self.multi_assign(ass, app)
 
-    # def visit_IfExp(self, node: ast.IfExp, loc: Location) -> If:
+    # def visit_IfExp(self, node: ast.IfExp) -> If:
     #     raise MyiaSyntaxError(loc, 'If expressions are not supported.')
     #     return If(self.visit(node.test),
     #               self.visit(node.body),
     #               self.visit(node.orelse),
     #               location=loc)
 
-    def visit_Index(self, node: ast.Index, loc: Location) -> MyiaASTNode:
+    def visit_Index(self, node: ast.Index) -> MyiaASTNode:
         # CASE: x[y]
         #         ^
         return self.visit(node.value)
 
-    def visit_Lambda(self, node: ast.Lambda, loc: Location) \
+    def visit_Lambda(self, node: ast.Lambda) \
             -> Union[Closure, Symbol]:
         # CASE: lambda x, y: z
         return self.make_closure([a for a in node.args.args],
                                  node.body)
 
-    # def visit_ListComp(self, node: ast.ListComp, loc: Location) \
+    # def visit_ListComp(self, node: ast.ListComp) \
     #         -> MyiaASTNode:
 
     #     raise MyiaSyntaxError(loc, 'List comprehensions not supported.')
@@ -897,31 +894,30 @@ class Parser(LocVisitor):
 
     #     return Apply(builtins.map, lbda, arg)
 
-    def visit_Module(self, node, loc, allow_decorator=False) \
+    def visit_Module(self, node, allow_decorator=False) \
             -> List[MyiaASTNode]:
         # This is usually the outermost node, we don't really care
         # about it.
         return [self.visit(stmt, allow_decorator=allow_decorator)
                 for stmt in node.body]
 
-    def visit_Name(self, node: ast.Name, loc: Location) -> Symbol:
+    def visit_Name(self, node: ast.Name) -> Symbol:
         # CASE: x
         # (A variable name.)
-        v = self.visit_variable(node.id, loc)
-        v.about = About(loc, 'parse')
+        v = self.visit_variable(node.id)
+        v.about = About(current_location(), 'parse')
         return v
 
     def visit_NameConstant(self,
-                           node: ast.NameConstant,
-                           loc: Location) -> Value:
+                           node: ast.NameConstant) -> Value:
         # CASE: True, False, None... is that it?
         return Value(node.value)
 
-    def visit_Num(self, node: ast.Num, loc: Location) -> Value:
+    def visit_Num(self, node: ast.Num) -> Value:
         # CASE: 1, 2, 3.45
         return Value(node.n)
 
-    def visit_Return(self, node: ast.Return, loc: Location) -> MyiaASTNode:
+    def visit_Return(self, node: ast.Return) -> MyiaASTNode:
         # CASE: return x
         if self.return_error:
             # In some contexts, e.g. while loops, we ban returning
@@ -930,7 +926,7 @@ class Parser(LocVisitor):
         self.returns = True
         return self.visit(node.value)
 
-    def visit_Slice(self, node: ast.Slice, loc: Location) -> Apply:
+    def visit_Slice(self, node: ast.Slice) -> Apply:
         # CASE: return x[y:z]
         #                ^^^
         return Apply(Symbol('slice'),
@@ -938,22 +934,22 @@ class Parser(LocVisitor):
                      self.visit(node.upper) if node.upper else Value(None),
                      self.visit(node.step) if node.step else Value(1))
 
-    def visit_Str(self, node: ast.Str, loc: Location) -> Value:
+    def visit_Str(self, node: ast.Str) -> Value:
         # CASE: "abc", 'defg'
         return Value(node.s)
 
-    def visit_Tuple(self, node: ast.Tuple, loc: Location) -> Tuple:
+    def visit_Tuple(self, node: ast.Tuple) -> Tuple:
         # CASE: (x, y, z)
         return Tuple(self.visit(v) for v in node.elts)
 
-    def visit_Subscript(self, node: ast.Subscript, loc: Location) -> Apply:
+    def visit_Subscript(self, node: ast.Subscript) -> Apply:
         # CASE: x[y], x[y, z], etc.
         # TODO: test this
         return Apply(builtins.index,
                      self.visit(node.value),
                      self.visit(node.slice))
 
-    def visit_UnaryOp(self, node: ast.UnaryOp, loc: Location) -> Apply:
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> Apply:
         # CASE: -x, +x, ~x
         op = get_operator(node.op)
         return Apply(op, self.visit(node.operand))
@@ -975,7 +971,7 @@ class Parser(LocVisitor):
     #         'out': list(testp.local_assignments)
     #     }
 
-    def visit_While(self, node: ast.While, loc: Location) -> MyiaASTNode:
+    def visit_While(self, node: ast.While) -> MyiaASTNode:
         """
         A while loop is compiled into two functions. The first function
         tests the condition and either calls the second function, which
