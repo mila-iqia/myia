@@ -70,6 +70,11 @@ class builtins(metaclass=SymbolsMeta):
     first = gsym('first')
     second = gsym('second')
 
+    # For type system
+    assert_true = gsym('assert_true')
+    type = gsym('type')
+    shape = gsym('shape')
+
 
 # Maps the names of Python AST nodes to corresponding
 # builtin operations.

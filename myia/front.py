@@ -597,6 +597,11 @@ class Parser(LocVisitor):
     # Visitors for Python AST nodes #
     #################################
 
+    def visit_Assert(self, node: ast.Assert, loc: Location) -> Apply:
+        return Apply(builtins.assert_true,
+                     self.visit(node.test),
+                     self.visit(node.msg))
+
     def visit_Assign(self, node: ast.Assign, loc: Location) -> _Assign:
         targ, = node.targets
         if isinstance(targ, ast.Tuple):

@@ -32,6 +32,11 @@ def impl_divide(x, y):
 
 
 @impl
+def impl_dot(x, y):
+    return x @ y
+
+
+@impl
 def impl_unary_subtract(x):
     return -x
 
@@ -204,6 +209,21 @@ def impl_mapadd(x: Any, y: Any) -> Any:
 fill = impl_fill
 zeros_like = impl_zeros_like
 ones_like = impl_ones_like
+
+
+@impl
+def impl_assert_true(x, msg):
+    assert x, msg
+
+
+@impl
+def impl_type(x):
+    return type(x)
+
+
+@impl
+def impl_shape(x):
+    return x.shape
 
 
 __all__: List[Any] = []
