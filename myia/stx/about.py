@@ -4,12 +4,40 @@ import threading
 import textwrap
 
 
+class MyiaSyntaxError(Exception):
+    """
+    Class for syntax errors in Myia. This exception type should be
+    raised for any feature that is not supported.
+
+    Attributes:
+        location: The error's location in the original source.
+        message: A precise assessment of the problem.
+    """
+    def __init__(self, message: str, location: 'Location' = None) -> None:
+        self.location = location or current_location()
+        self.message = message
+        super().__init__(self.message, self.location)
+
+
 _about = threading.local()
 _about.stack = [None]
 
 
 def top():
     return _about.stack[-1]
+
+
+def current_location():
+    abt = top()
+    while abt:
+        node = abt.node
+        if getattr(node, 'about', None):
+            abt = node.about
+        else:
+            abt = None
+    if isinstance(node, Location):
+        return node
+    return None
 
 
 class About:

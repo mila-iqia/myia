@@ -25,19 +25,6 @@ Binding = TupleT[LHS, 'MyiaASTNode']
 Bindings = List[Binding]
 
 
-def _get_location(x: Locatable) -> Location:
-    """
-    A helper function that returns a Location corresponding to
-    whatever the argument is (a MyiaASTNode or a Location).
-    """
-    if isinstance(x, MyiaASTNode):
-        return x.location
-    elif isinstance(x, Location) or x is None:
-        return x
-    else:
-        raise TypeError(f'{x} is not a/has no location')
-
-
 T = TypeVar('T', bound='MyiaASTNode')
 
 
@@ -51,9 +38,7 @@ class MyiaASTNode(HReprBase):
     * It initializes a set of annotations.
     * It generates boilerplate HTML for use with ``hrepr``.
     """
-
-    def __init__(self, location: Locatable = None) -> None:
-        self.location = _get_location(location)
+    def __init__(self, **kw) -> None:
         if __save_trace__:
             frames = traceback.extract_stack()
             frame = frames.pop()
@@ -71,16 +56,6 @@ class MyiaASTNode(HReprBase):
             self.trace = None
         self.about = about_top()
         self.annotations: Set[str] = set()
-
-    def at(self: T, location: Locatable) -> T:
-        """
-        Returns a copy of the node but which has the same location
-        as the node given as an argument (a new Location can also
-        be given directly). This does not modify the current node.
-        """
-        rval = copy(self)
-        rval.location = _get_location(location)
-        return rval
 
     def children(self) -> List['MyiaASTNode']:
         return []
@@ -448,11 +423,9 @@ class _Assign(MyiaASTNode):
     """
     def __init__(self,
                  varname: LHS,
-                 value: MyiaASTNode,
-                 location: Location) -> None:
+                 value: MyiaASTNode) -> None:
         self.varname = varname
         self.value = value
-        self.location = location
 
     def __str__(self):
         return f'(_assign {self.varname} {self.value})'

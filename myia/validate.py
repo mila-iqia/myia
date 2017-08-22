@@ -22,7 +22,7 @@ def missing_source(node: MyiaASTNode) -> Iterable[MyiaASTNode]:
     """
     Yield all nodes that don't have a location set.
     """
-    if not node.location:
+    if not node.find_location():
         yield node
     for child in node.children():
         yield from missing_source(child)

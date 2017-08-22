@@ -36,8 +36,6 @@ class Transformer:
             )
         with About(node, self.__transform__):
             rval = method(node, **kwargs)
-        if not rval.location:
-            rval.location = node.location
         return rval
 
 

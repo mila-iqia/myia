@@ -116,7 +116,7 @@ from typing import \
 from .util import buche, EventDispatcher, group_contiguous
 from collections import OrderedDict
 from .stx import \
-    MyiaASTNode, \
+    MyiaASTNode, MyiaSyntaxError, current_location, \
     Location, Symbol, Value, \
     Let, Lambda, Apply, \
     Begin, Tuple, Closure, _Assign, \
@@ -129,20 +129,6 @@ from copy import copy
 import inspect
 import textwrap
 import sys
-
-
-class MyiaSyntaxError(Exception):
-    """
-    Class for syntax errors in Myia. This exception type should be
-    raised for any feature that is not supported.
-
-    Attributes:
-        location: The error's location in the original source.
-        message: A precise assessment of the problem.
-    """
-    def __init__(self, location: Location, message: str) -> None:
-        self.location = location
-        self.message = message
 
 
 _prevhook = sys.excepthook
@@ -225,13 +211,11 @@ class LocVisitor:
             method = getattr(self, 'visit_' + cls)
         except AttributeError:
             raise MyiaSyntaxError(
-                loc,
-                "Unrecognized Python AST node type: {}".format(cls)
+                "Unrecognized Python AST node type: {}".format(cls),
+                location=loc
             )
         with About(loc, 'parse'):
             rval = method(node, loc, **kwargs)
-        if isinstance(rval, MyiaASTNode):
-            rval = rval.at(loc)
         return rval
 
 
@@ -340,19 +324,18 @@ class Parser(LocVisitor):
     def reg_lambda(self,
                    ref: Symbol,
                    args: List[Symbol],
-                   body: MyiaASTNode,
-                   loc: Location) -> Symbol:
+                   body: MyiaASTNode) -> Symbol:
         """
         Create a Lambda with the given args and body, and
         associate it to ``ref`` in the global_env (unless
         dry is true). Return ``ref``.
         """
-        l = Lambda(args, body, self.gen).at(loc)
+        l = Lambda(args, body, self.gen)
         l.ref = ref
         l.global_env = self.global_env
         if not self.dry:
             self.global_env[ref] = l
-        return ref.at(loc)
+        return ref
 
     def new_variable(self, input: InputNode) -> Symbol:
         """
@@ -363,7 +346,7 @@ class Parser(LocVisitor):
         """
         base_name = self.base_name(input)
         loc = self.make_location(input)
-        sym = self.gen(base_name).at(loc)
+        sym = self.gen(base_name)
         self.vtrack[base_name] = sym
         return sym
 
@@ -383,7 +366,7 @@ class Parser(LocVisitor):
         that will be made into a Let later on.
         """
         sym = self.declare_new_variable(base_name)
-        return _Assign(sym, value, location)
+        return _Assign(sym, value)
 
     def multi_assign(self,
                      ass: List[str],
@@ -392,7 +375,7 @@ class Parser(LocVisitor):
         Create an assignment to a Tuple of variables.
         """
         lhs = Tuple(self.declare_new_variable(var) for var in ass)
-        return _Assign(lhs, expr, None)
+        return _Assign(lhs, expr)
 
     def prepare_closure(self,
                         variable: str = None,
@@ -413,8 +396,7 @@ class Parser(LocVisitor):
     def construct_closure(self,
                           p: 'Parser',
                           args: List[Symbol],
-                          body: MyiaASTNode,
-                          loc: Location) -> Union[Closure, Symbol]:
+                          body: MyiaASTNode) -> Union[Closure, Symbol]:
         """
         Construct a Closure as such:
 
@@ -431,21 +413,19 @@ class Parser(LocVisitor):
             p: The Parser returned by a call to ``prepare_closure``.
             args: The function's remaining argument variables.
             body: The body of the function.
-            loc: The location in the code.
         """
         clos_args = list(p.free_variables.values())
         clos_values = [self.visit_variable(v) for v in p.free_variables]
-        lbda = self.reg_lambda(p.dest, clos_args + args, body, loc=loc)
+        lbda = self.reg_lambda(p.dest, clos_args + args, body)
         rval: Any
         if len(clos_args) > 0:
-            return Closure(lbda, clos_values).at(loc)
+            return Closure(lbda, clos_values)
         else:
             return lbda
 
     def make_closure(self,
                      args: List[InputNode],
                      body: Union[Callable, ast.AST, List[ast.stmt]],
-                     loc: Location = None,
                      variable: str = "#lambda",
                      ref: Symbol = None) \
             -> Union[Closure, Symbol]:
@@ -459,7 +439,6 @@ class Parser(LocVisitor):
             args: The function's arguments.
             body: The function's body, or a function that will be
                 passed a fresh Parser and must return a node.
-            loc: Location in source code.
             variable: The name of the function.
             ref: The Symbol for the unique, global reference to the
                 function.
@@ -472,7 +451,7 @@ class Parser(LocVisitor):
             fbody = p.visit_body(body)
         else:
             fbody = p.visit(body)
-        return self.construct_closure(p, sargs, fbody, loc)
+        return self.construct_closure(p, sargs, fbody)
 
     ###################
     # Visitor helpers #
@@ -510,8 +489,8 @@ class Parser(LocVisitor):
             r = self.visit(stmt)
             if ret:
                 raise MyiaSyntaxError(
-                    r.location,
-                    "There should be no statements after return."
+                    "There should be no statements after return.",
+                    location=r.find_location()
                 )
             if isinstance(r, Begin):
                 results += r.stmts
@@ -533,8 +512,8 @@ class Parser(LocVisitor):
                     if result is None:
                         # But we have nothing to return!
                         raise MyiaSyntaxError(
-                            grp[-1].location,
-                            "Missing return statement."
+                            "Missing return statement.",
+                            location=grp[-1].find_location()
                         )
                     else:
                         # Return what was given in the callback
@@ -587,7 +566,6 @@ class Parser(LocVisitor):
             if free:
                 if self.pull_free_variables:
                     v = self.new_variable(name)
-                # v = v.at(loc)
                 self.free_variables[name] = v
             return v
         except NameError as e:
@@ -614,13 +592,12 @@ class Parser(LocVisitor):
                     return self.declare_new_variable(targ.id)
                 else:
                     raise MyiaSyntaxError(
-                        loc,
                         "Deconstructing assignment may only contain"
                         " names and tuples."
                     )
 
             val = self.visit(node.value)
-            return _Assign(argtup(targ), val, location=loc)
+            return _Assign(argtup(targ), val)
 
         elif isinstance(targ, ast.Subscript):
             if isinstance(targ.value, ast.Name):
@@ -633,7 +610,6 @@ class Parser(LocVisitor):
             else:
                 # UNSUPPORTED: f()[x] = value
                 raise MyiaSyntaxError(
-                    loc,
                     "You can only set a slice on a variable."
                 )
 
@@ -645,40 +621,41 @@ class Parser(LocVisitor):
         else:
             # UNSUPPORTED: x.attr = y
             # and others, probably
-            raise MyiaSyntaxError(loc, f'Unsupported targ for Assign: {targ}')
+            raise MyiaSyntaxError(
+                f'Unsupported targ for Assign: {targ}'
+            )
 
     def visit_Attribute(self, node: ast.Attribute, loc: Location) -> Apply:
         # CASE: x.attr
-        return Apply(builtins.getattr.at(loc),
+        return Apply(builtins.getattr,
                      self.visit(node.value),
-                     Value(node.attr).at(loc)).at(loc)
+                     Value(node.attr))
 
     def visit_AugAssign(self, node: ast.AugAssign, loc: Location) -> _Assign:
         targ = node.target
         if isinstance(targ, ast.Name):
             # CASE: x += y
             aug = self.visit(node.value)
-            op = get_operator(node.op).at(loc)
+            op = get_operator(node.op)
             self.visit_variable(targ.id)
             with About(self.locator(targ), 'parse'):
                 prev = self.vtrack.get(targ.id, False)
-            val = Apply(op, prev, aug, location=loc)
+            val = Apply(op, prev, aug)
             return self.make_assign(targ.id, val, loc)
         else:
             # UNSUPPORTED: x[y] += z
             # UNSUPPORTED: x.attr += z
             raise MyiaSyntaxError(
-                loc,
                 "Augmented assignment to subscripts or "
                 "slices is not supported."
             )
 
     def visit_BinOp(self, node: ast.BinOp, loc: Location) -> Apply:
         # CASE: a + b, a - b, etc.
-        op = get_operator(node.op).at(loc)
+        op = get_operator(node.op)
         l = self.visit(node.left)
         r = self.visit(node.right)
-        return Apply(op, l, r, location=loc)
+        return Apply(op, l, r)
 
     # def visit_BoolOp(self, node: ast.BoolOp, loc: Location) -> If:
     #     raise MyiaSyntaxError(loc, 'Boolean expressions are not supported.')
@@ -694,17 +671,17 @@ class Parser(LocVisitor):
         # CASE: f(x, y)
         if len(node.keywords) > 0:
             # UNSUPPORTED: f(x = y), f(**xs)
-            raise MyiaSyntaxError(loc, "Keyword arguments are not allowed.")
+            raise MyiaSyntaxError("Keyword arguments are not allowed.")
         for arg in node.args:
             # UNSUPPORTED: f(*xs)
             if isinstance(arg, ast.Starred):
-                raise MyiaSyntaxError(self.locator(arg),
-                                      "*args are not allowed.")
+                raise MyiaSyntaxError("*args are not allowed.",
+                                      location=self.locator(arg))
         args = [self.visit(arg) for arg in node.args]
         if isinstance(node.func, ast.Name) and node.func.id in self.macros:
             return self.macros[node.func.id](*args)
         func = self.visit(node.func)
-        return Apply(func, *args, location=loc)
+        return Apply(func, *args)
 
     def visit_Compare(self, node: ast.Compare, loc: Location) -> Apply:
         # CASE: x < y, x == y, etc.
@@ -716,7 +693,6 @@ class Parser(LocVisitor):
         else:
             # UNSUPPORTED: x < y < z
             raise MyiaSyntaxError(
-                loc,
                 "Comparisons must have a maximum of two operands"
             )
 
@@ -729,7 +705,7 @@ class Parser(LocVisitor):
     def visit_ExtSlice(self, node: ast.ExtSlice, loc: Location) -> Tuple:
         # CASE: x[a, b, c:d]
         #         ^^^^^^^^^
-        return Tuple(self.visit(v) for v in node.dims).at(loc)
+        return Tuple(self.visit(v) for v in node.dims)
 
     # def visit_For(self, node, loc): # TODO
 
@@ -740,19 +716,18 @@ class Parser(LocVisitor):
         # CASE: def f(x, y): ...
         if node.args.vararg or node.args.kwarg:
             # UNSUPPORTED: def f(x, *y)
-            raise MyiaSyntaxError(loc, "Varargs are not allowed.")
+            raise MyiaSyntaxError("Varargs are not allowed.")
         if node.args.kwonlyargs:
             # UNSUPPORTED: def f(x, *, y)
             raise MyiaSyntaxError(
-                loc,
                 "Keyword-only arguments are not allowed."
             )
         if node.args.defaults or node.args.kw_defaults:
             # UNSUPPORTED: def f(x=dflt)
-            raise MyiaSyntaxError(loc, "Default arguments are not allowed.")
+            raise MyiaSyntaxError("Default arguments are not allowed.")
         if not allow_decorator and len(node.decorator_list) > 0:
             # UNSUPPORTED: @deco def f(x, y)
-            raise MyiaSyntaxError(loc, "Functions should not have decorators.")
+            raise MyiaSyntaxError("Functions should not have decorators.")
 
         # Global handle for the function
         lbl = node.name if self.top_level else f'{HIDGLOB}{node.name}'
@@ -763,10 +738,9 @@ class Parser(LocVisitor):
 
         clos = self.make_closure([arg for arg in node.args.args],
                                  node.body,
-                                 loc=loc,
                                  variable=node.name,
                                  ref=ref)
-        return _Assign(sym, clos, loc)
+        return _Assign(sym, clos)
 
     def visit_If(self, node: ast.If, loc: Location) -> MyiaASTNode:
         """
@@ -795,7 +769,6 @@ class Parser(LocVisitor):
         if node.orelse == []:
             # UNSUPPORTED: if cond: then_branch # no else!
             raise MyiaSyntaxError(
-                loc,
                 "All if statements must be associated to an else statement."
             )
 
@@ -809,13 +782,11 @@ class Parser(LocVisitor):
 
         if p1.returns != p2.returns:
             raise MyiaSyntaxError(
-                loc,
                 "Either none or all branches of an if statement must return "
                 "a value."
             )
         if set(p1.local_assignments) != set(p2.local_assignments):
             raise MyiaSyntaxError(
-                loc,
                 "All branches of an if statement must assign to the same set "
                 " of variables.\nTrue branch sets: {}\nElse branch sets: {}"
                 .format(
@@ -826,21 +797,22 @@ class Parser(LocVisitor):
 
         def mkapply(then_finalize, else_finalize) -> Apply:
             then_body = body(then_finalize)
-            then_branch = self.construct_closure(
-                p1, [], then_body, loc=then_body.location
-            )
+            with About(then_body.find_location(), 'parse'):
+                then_branch = self.construct_closure(
+                    p1, [], then_body
+                )
             else_body = orelse(else_finalize)
-            else_branch = self.construct_closure(
-                p2, [], else_body, loc=else_body.location
-            )
+            with About(then_body.find_location(), 'parse'):
+                else_branch = self.construct_closure(
+                    p2, [], else_body
+                )
             # In a nutshell, we are doing something similar to this:
             # if test: x; else: y;
             # ==> [(lambda: y), (lambda: x)][test]()
             return Apply(Apply(builtins.switch,
                                self.visit(node.test),
                                then_branch,
-                               else_branch,
-                               location=loc), location=loc)
+                               else_branch))
 
         if p1.returns:
             self.returns = True
@@ -878,7 +850,7 @@ class Parser(LocVisitor):
             -> Union[Closure, Symbol]:
         # CASE: lambda x, y: z
         return self.make_closure([a for a in node.args.args],
-                                 node.body, loc=loc)
+                                 node.body)
 
     # def visit_ListComp(self, node: ast.ListComp, loc: Location) \
     #         -> MyiaASTNode:
@@ -923,7 +895,7 @@ class Parser(LocVisitor):
     #         label="#listcmp"
     #     )
 
-    #     return Apply(builtins.map, lbda, arg, location=loc)
+    #     return Apply(builtins.map, lbda, arg)
 
     def visit_Module(self, node, loc, allow_decorator=False) \
             -> List[MyiaASTNode]:
@@ -954,9 +926,9 @@ class Parser(LocVisitor):
         if self.return_error:
             # In some contexts, e.g. while loops, we ban returning
             # values. This will be relaxed eventually.
-            raise MyiaSyntaxError(loc, self.return_error)
+            raise MyiaSyntaxError(self.return_error)
         self.returns = True
-        return self.visit(node.value).at(loc)
+        return self.visit(node.value)
 
     def visit_Slice(self, node: ast.Slice, loc: Location) -> Apply:
         # CASE: return x[y:z]
@@ -972,20 +944,19 @@ class Parser(LocVisitor):
 
     def visit_Tuple(self, node: ast.Tuple, loc: Location) -> Tuple:
         # CASE: (x, y, z)
-        return Tuple(self.visit(v) for v in node.elts).at(loc)
+        return Tuple(self.visit(v) for v in node.elts)
 
     def visit_Subscript(self, node: ast.Subscript, loc: Location) -> Apply:
         # CASE: x[y], x[y, z], etc.
         # TODO: test this
         return Apply(builtins.index,
                      self.visit(node.value),
-                     self.visit(node.slice),
-                     location=loc)
+                     self.visit(node.slice))
 
     def visit_UnaryOp(self, node: ast.UnaryOp, loc: Location) -> Apply:
         # CASE: -x, +x, ~x
-        op = get_operator(node.op).at(loc)
-        return Apply(op, self.visit(node.operand), location=loc)
+        op = get_operator(node.op)
+        return Apply(op, self.visit(node.operand))
 
     # def explore_vars(self, *exprs, return_error=None):
     #     testp = self.sub_parser(global_env=ParseEnv(), dry=True)
@@ -1051,9 +1022,9 @@ class Parser(LocVisitor):
         body = p.body_wrapper(node.body)
 
         loop_args = in_syms
-        loop_body = body(Apply(wsym, *[p.vtrack[v] for v in in_vars])).at(loc)
-        loop_fn = self.reg_lambda(wbsym, loop_args, loop_body,
-                                  loc=loop_body.location)
+        loop_body = body(Apply(wsym, *[p.vtrack[v] for v in in_vars]))
+        with About(loop_body.find_location(), 'parse'):
+            loop_fn = self.reg_lambda(wbsym, loop_args, loop_body)
         outer_body = Apply(Apply(
             builtins.switch,
             test,
@@ -1065,7 +1036,7 @@ class Parser(LocVisitor):
             Closure(builtins.identity, (Tuple(initial_values),))
         ))
 
-        self.reg_lambda(wsym, in_syms, outer_body, loc=loc)
+        self.reg_lambda(wsym, in_syms, outer_body)
 
         # We immediately apply our shiny new function to start
         # the loop rolling.
