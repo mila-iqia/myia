@@ -577,7 +577,7 @@ class Parser(LocVisitor):
     def visit_Assert(self, node: ast.Assert) -> Apply:
         return Apply(builtins.assert_true,
                      self.visit(node.test),
-                     self.visit(node.msg))
+                     self.visit(node.msg) if node.msg else Value(None))
 
     def visit_Assign(self, node: ast.Assign) -> _Assign:
         targ, = node.targets

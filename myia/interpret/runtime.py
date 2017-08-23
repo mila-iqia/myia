@@ -35,21 +35,28 @@ root_globals: Dict[Any, Any] = {
 ##########################
 
 
-def impl(fn):
+def symbol_associator(prefix):
+    def associator_deco(process):
+        def deco(fn):
+            assert fn.__name__.startswith(prefix)
+            fname = fn.__name__[len(prefix):]
+            assert hasattr(builtins, fname)
+            sym = getattr(builtins, fname)
+            return process(sym, fname, fn)
+        return deco
+    return associator_deco
+
+
+@symbol_associator('impl_')
+def impl(sym, name, fn):
     """
     Define the implementation for the given symbol.
     The implementation will be set in ``root_globals``
     and in the ``myia_builtins`` global.
     """
-    assert fn.__name__.startswith('impl_')
-    fname = fn.__name__[5:]
-    assert hasattr(builtins, fname)
-    sym = getattr(builtins, fname)
     prim = PrimitiveImpl(fn)
     root_globals[sym] = prim
-    setattr(root_globals[builtins.myia_builtins],
-            fname,
-            prim)
+    setattr(root_globals[builtins.myia_builtins], name, prim)
     return prim
 
 
@@ -195,7 +202,8 @@ def macro_grad_for(nargs_closure):
     return macro_grad
 
 
-def bprop_impl(orig_fn: Callable) -> Callable:
+@symbol_associator('bprop_')
+def bprop_impl(sym, name, orig_fn: Callable) -> Callable:
     """
     Decorator to declare a backpropagator function. For instance,
     to define the backpropagator for operator builtins.whatever,
@@ -211,10 +219,6 @@ def bprop_impl(orig_fn: Callable) -> Callable:
 
     Refer to the previous section on Partial Application.
     """
-    assert orig_fn.__name__.startswith('bprop_')
-    fname = orig_fn.__name__[6:]
-
-    sym = getattr(builtins, fname)
 
     # This is the implementation for the forward pass
     prim = root_globals[sym]
