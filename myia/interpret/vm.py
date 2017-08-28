@@ -7,8 +7,8 @@ from ..stx import \
 from ..front import parse_function, ParseEnv
 from ..symbols import builtins
 from ..util import EventDispatcher, BucheDb, HReprBase, buche
-from .runtime import FunctionImpl, ClosureImpl, root_globals
 from functools import reduce
+from ..impl.main import impl_bank
 import inspect
 
 
@@ -18,6 +18,124 @@ import inspect
 # pointers to them.
 compile_cache: Dict[Lambda, 'FunctionImpl'] = {}
 EnvT = Dict[Symbol, Any]
+root_globals = impl_bank['interp']
+
+
+_loaded = False
+
+
+def load():
+    global _loaded
+    if not _loaded:
+        _loaded = True
+        from ..impl.impl_interp import _
+        from ..impl.impl_bprop import _
+        # root_globals.update(impl_bank['interp'])
+        global root_globals
+        root_globals = impl_bank['interp']
+
+
+###################
+# Special objects #
+###################
+
+
+class PrimitiveImpl(HReprBase):
+    """
+    Wrapper around a pure Python implementation of a function.
+    """
+    def __init__(self, fn: Callable, name: str = None) -> None:
+        argn = inspect.getargs(fn.__code__).args  # type: ignore
+        self.argnames: List[str] = argn
+        self.nargs = len(self.argnames)
+        self.fn = fn
+        self.name = name or fn.__name__
+        self.grad: Callable[[int], FunctionImpl] = None
+
+    def __call__(self, *args):
+        return self.fn(*args)
+
+    def __str__(self):
+        return f'Prim({self.name or self.fn})'
+
+    def __repr__(self):
+        return str(self)
+
+    def __hrepr__(self, H, hrepr):
+        return H.div['PrimitiveImpl'](
+            H.div['class_title']('Primitive'),
+            H.div['class_contents'](self.name or hrepr(self.fn))
+        )
+
+
+class FunctionImpl(HReprBase):
+    """
+    Represents a Myia-transformed function.
+    """
+    def __init__(self, ast: Lambda, envs: List[EnvT]) -> None:
+        assert isinstance(ast, Lambda)
+        self.argnames = [a.label for a in ast.args]
+        self.nargs = len(ast.args)
+        self.ast = ast
+        self.code = VMCode(ast.body)
+        self.envs = envs
+        self.primal_sym = ast.primal
+        self.grad: Callable[[int], FunctionImpl] = None
+
+    def debug(self, args, debugger):
+        ast = self.ast
+        assert len(args) == len(ast.args)
+        return run_vm(self.code,
+                      {s: arg for s, arg in zip(ast.args, args)},
+                      *self.envs,
+                      debugger=debugger)
+
+    def __call__(self, *args):
+        return self.debug(args, None)
+
+    def __str__(self):
+        return f'Func({self.ast.ref or self.ast})'
+
+    def __repr__(self):
+        return str(self)
+
+    def __hrepr__(self, H, hrepr):
+        return H.div['FunctionImpl'](
+            H.div['class_title']('Function'),
+            H.div['class_contents'](hrepr(self.ast.ref or self.ast))
+        )
+
+
+class ClosureImpl(HReprBase):
+    """
+    Associates a PrimitiveImpl or a FunctionImpl to a number
+    of arguments in order to create a partial application.
+    """
+    def __init__(self,
+                 fn: Union[PrimitiveImpl, FunctionImpl],
+                 args: List[Any]) -> None:
+        self.argnames = [a for a in fn.argnames[len(args):]]
+        self.nargs = fn.nargs - len(args)
+        self.fn = fn
+        self.args = args
+
+    def __call__(self, *args):
+        return self.fn(*self.args, *args)
+
+    def __str__(self):
+        return f'Clos({self.fn}, {self.args})'
+
+    def __repr__(self):
+        return str(self)
+
+    def __hrepr__(self, H, hrepr):
+        return H.div['ClosureImpl'](
+            H.div['class_title']('Closure'),
+            H.div['class_contents'](
+                hrepr(self.fn),
+                hrepr(self.args)
+            )
+        )
 
 
 ##################################
@@ -402,14 +520,9 @@ def evaluate(node: MyiaASTNode,
     itself (Parser stores a Lambda's global environment in its
     ``global_env`` field).
     """
+    load()
     if isinstance(node, Lambda):
         parse_env = node.global_env
     assert parse_env is not None
     envs = (parse_env.bindings, root_globals)
     return run_vm(VMCode(node), *envs, debugger=debugger)
-
-
-# from .runtime import EnvT
-from . import runtime
-runtime.run_vm = run_vm
-runtime.VMCode = VMCode

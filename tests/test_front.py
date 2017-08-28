@@ -6,7 +6,6 @@ from myia.front import parse_function, MyiaSyntaxError
 from myia.interpret import evaluate
 from myia.stx import Symbol
 import pytest
-import inspect
 
 mark = pytest.mark
 xfail = pytest.mark.xfail

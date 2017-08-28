@@ -175,7 +175,7 @@ from .stx import \
     JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
     TMP_LET, TMP_BPROP, TMP_SENS
 from .interpret import \
-    root_globals, impl, evaluate, \
+    root_globals, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
 from .front import \
     ParseEnv, parse_function, get_global_parse_env
@@ -185,15 +185,14 @@ from .compile import a_normal
 from .util import Props, Keyword, buche
 from collections import OrderedDict
 from .symbols import ZERO
-from .interpret.runtime import bprop_impl
 
 
 LeafType = Union[Symbol, Value]
 
 
-############################
-# Implementation of J/Jinv #
-############################
+#################
+# Helpers for J #
+#################
 
 
 def JGrad(x: FunctionImpl) -> Callable[[int], FunctionImpl]:
@@ -257,103 +256,10 @@ def JX(x: Union[PrimitiveImpl, FunctionImpl],
         raise TypeError(f'JX applied on wrong type: {x}')
 
 
-@impl
-def impl_J(x: Any) -> Any:
-    """
-    Return a Grad-transformed version of this data.
-
-    * On scalars, this is the identity function.
-    * On a data structure, this applies ``J`` on each element and
-      returns a data structure with the same shape.
-    * On a function of type ``T -> U``, this returns the
-      Grad-transformed function, with signature (more or less)
-      ``J(T) -> (J(U), S(U) -> S(T))``. That is to say, it returns
-      J-transformed outputs and a backpropagator function that
-      takes an output sentisitivity and returns an input
-      sensitivity (don't look for an S type operator, I made that
-      up (J(T) isn't exactly correct either, since it's not a type
-      operator), but for what it's worth, ``zeros_like(x)`` would
-      have the signature ``T -> S(T)``).
-
-    Implements the J operator in Pearlmutter & Siskind.
-    """
-    if isinstance(x, (int, float)):
-        return x
-    elif isinstance(x, tuple):
-        return tuple(J(a) for a in x)
-    elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
-        return JX(x, 0)
-    elif isinstance(x, ClosureImpl):
-        c = ClosureImpl(JX(x.fn, len(x.args)),
-                        J(tuple(x.args)))
-        return c
-    elif x is None or x is ZERO:
-        return x
-    else:
-        raise TypeError(f'Invalid argument for J: {x}')
-
-
-@impl
-def impl_Jinv(x: Any) -> Any:
-    """
-    Undo the effect of ``J``.
-
-    * On scalars, this is the identity function.
-    * On a data structure, this applies ``Jinv`` on each element and
-      returns a data structure with the same shape.
-    * On a function, this undoes the effect of ``J``. This should
-      *never* be applied on a function that was not the result of
-      transforming through ``J``.
-
-    Implements the J^{-1} operator in Pearlmutter & Siskind.
-    """
-    if isinstance(x, (int, float)):
-        return x
-    elif isinstance(x, tuple):
-        return tuple(Jinv(a) for a in x)
-    elif isinstance(x, PrimitiveImpl):
-        raise Exception('Primitives have no primals.')
-    elif isinstance(x, FunctionImpl):
-        assert x.primal_sym is not None
-        if isinstance(x.primal_sym, Symbol):
-            primal = evaluate(x.primal_sym, x.ast.global_env)
-        else:
-            primal = x.primal_sym
-        if not isinstance(primal, (FunctionImpl, PrimitiveImpl)):
-            raise Exception('Should be FunctionImpl, but found:'
-                            f' {primal}, type {type(primal)},'
-                            f' for {x.primal_sym}')
-        return primal
-    elif isinstance(x, ClosureImpl):
-        c = ClosureImpl(Jinv(x.fn), Jinv(tuple(x.args)))
-        return c
-    elif x is None or x is ZERO:
-        return x
-    else:
-        raise TypeError(f'Invalid argument for Jinv: {x}')
-
-
-J = impl_J
-Jinv = impl_Jinv
-
-
-#######################
-# Gradients of J/Jinv #
-#######################
-
-@bprop_impl
-def bprop_J(x, d):
-    return GRAD(Jinv(d))
-
-
-@bprop_impl
-def bprop_Jinv(x, d):
-    return GRAD(J(d))
-
-
 ########
 # Grad #
 ########
+
 
 class Grad:
     """
