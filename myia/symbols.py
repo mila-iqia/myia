@@ -60,6 +60,8 @@ class builtins(metaclass=SymbolsMeta):
 
     # Myia's global variables
     myia_builtins = gsym('myia_builtins')
+    raise_exception = gsym('raise_exception')
+    Exception = gsym('Exception')
     len = gsym('len')
     range = gsym('range')
     enumerate = gsym('enumerate')

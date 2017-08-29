@@ -780,7 +780,7 @@ class Parser(LocVisitor):
         if p1.returns != p2.returns:
             raise MyiaSyntaxError(
                 "Either none or all branches of an if statement must return "
-                "a value."
+                "a value or raise an exception."
             )
         if set(p1.local_assignments) != set(p2.local_assignments):
             raise MyiaSyntaxError(
@@ -916,6 +916,16 @@ class Parser(LocVisitor):
     def visit_Num(self, node: ast.Num) -> Value:
         # CASE: 1, 2, 3.45
         return Value(node.n)
+
+    def visit_Raise(self, node: ast.Raise) -> MyiaASTNode:
+        # CASE: raise x
+        if self.return_error:
+            # In some contexts, e.g. while loops, we ban returning
+            # values. This will be relaxed eventually.
+            raise MyiaSyntaxError(self.return_error)
+        self.returns = True
+        return Apply(builtins.raise_exception,
+                     self.visit(node.exc))
 
     def visit_Return(self, node: ast.Return) -> MyiaASTNode:
         # CASE: return x

@@ -131,6 +131,19 @@ def interp_identity(x):
     return x
 
 
+@impl_interp
+def interp_raise_exception(x):
+    # TODO: wrap the exception, and have the interpreter catch it
+    # and display the Myia stack trace instead of the Python
+    # interpreter's own stack trace.
+    raise x
+
+
+@impl_interp
+def interp_Exception(x):
+    return Exception(x)
+
+
 ################################################
 # Implementation of primitives needed for Grad #
 ################################################
