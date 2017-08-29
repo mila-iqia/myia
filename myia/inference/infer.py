@@ -1,23 +1,78 @@
 
 from typing import Dict
 from ..symbols import builtins, Keyword
-from ..stx import Tuple, maptup2
+from ..stx import Tuple, Lambda, maptup2
 # from .unify import Variable, OrVariable
 from unification import var, Var, isvar, unify, reify
 from unification.core import _unify, _reify
 from unification.utils import transitive_get as walk
-from ..interpret.runtime import symbol_associator
 from itertools import product
 from ..front import parse_function
 from ..util.buche import buche
+from copy import copy
+from ..impl.main import impl_bank
 
 
-############################
-# Top of the value lattice #
-############################
+########
+# Misc #
+########
 
 
+aroot_globals = impl_bank['abstract']
+projector_set = set()
+
+
+def load():
+    from ..impl.impl_abstract import _
+    from ..impl.proj_shape import _
+    from ..impl.proj_type import _
+    for p in ('shape', 'type'):
+        projector_set.add(aroot_globals[builtins[p]])
+
+
+class Unsatisfiable(Exception):
+    pass
+
+
+class Not:
+    def __init__(self, unif):
+        self.unif = unif
+
+    def __repr__(self):
+        return f'~{self.unif}'
+
+
+collector = None
+
+
+class AbstractCollect:
+    def __init__(self):
+        self.cache = []
+        self.watchlists = {}
+        self.errors = []
+
+    def __enter__(self):
+        global collector
+        collector = self
+
+    def __exit__(self, exc_type, exc, tb):
+        global collector
+        collector = None
+
+
+############
+# Keywords #
+############
+
+
+# Top of the value lattice
 ANY = Keyword('ANY')
+# Principal value
+VALUE = Keyword('VALUE')
+# Unifications
+UNIFY = Keyword('UNIFY')
+# Error associated to the operation
+ERROR = Keyword('ERROR')
 
 
 #########################
@@ -98,56 +153,44 @@ unify.add((Var, Union, dict), unify_var_union)
 _reify.add((Union, dict), reify_union)
 
 
+def merge(*ds):
+    """
+    Merge unification dictionaries (TODO: improve this
+    naive implementation).
+    """
+    if len(ds) == 0:
+        return {}
+    rval, *ds = ds
+    for d in ds:
+        for k, v in d.items():
+            if not rval:
+                return rval
+            rval = unify(k, v, rval)
+    return rval
+
+
 ############
 # Builtins #
 ############
 
 
-class BuiltinCollection:
-    """
-    Implements a "module" of sorts. It has no methods,
-    only fields that are populated by ``impl``.
-    """
-    pass
-
-
-# Myia's global variables. Used for evaluation.
-aroot_globals = {
-    builtins.myia_builtins: BuiltinCollection()
-}
-
-
 class AImpl:
     def __init__(self):
-        self.mem = {}
-
-    def __call__(self, *args, proj=None):
-        assert proj is None
-        return self.run(*args)
-        # args2 = [arg.opts if isinstance(arg, Union) else [arg]
-        #          for arg in args]
-        # results = []
-        # for args in product(*args2):
-        #     try:
-        #         res = self.mem[args]
-        #     except TypeError:
-        #         res = self.run(*args)
-        #     except KeyError:
-        #         self.mem[args] = var()
-        #         res = self.run(*args)
-        #         self.mem[args] = res
-        #     results.append(res)
-        # if len(results) == 1:
-        #     return results[0]
-        # else:
-        #     return Union(results)
+        pass
 
 
 class PrimitiveAImpl(AImpl):
     def __init__(self, run, sym=None):
         super().__init__()
         self.sym = sym
-        self.run = run
+        self._run = run
+
+    def __call__(self, *args, proj=VALUE):
+        assert proj is VALUE
+        return self._run(*args)
+
+    def __str__(self):
+        return f'Prim({self.sym})'
 
 
 class FunctionAImpl(AImpl):
@@ -166,12 +209,12 @@ class FunctionAImpl(AImpl):
         self.lbda = lbda
         self.genv = genv
 
-    def __call__(self, *args, proj=None):
-        return self.run(*args, proj=proj)
-
-    def run(self, *args, proj=None):
+    def __call__(self, *args, proj=VALUE):
         node = self.lbda
-        env = {sym: value if isinstance(value, AValue) else AValue(value)
+        # env = {sym: value if isinstance(value, AbstractValue) \
+        #                   else AbstractValue(value)
+        #        for sym, value in zip(node.args, args)}
+        env = {sym: wrap_abstract(value)
                for sym, value in zip(node.args, args)}
         return AbstractInterpreter(env, self.genv).eval(node.body, proj)
 
@@ -181,133 +224,8 @@ class ClosureAImpl(AImpl):
         self.fn = fn
         self.args = args
 
-    def __call__(self, *args, proj=None):
-        return self.run(*args, proj=proj)
-
-    def run(self, *args, proj=None):
+    def __call__(self, *args, proj=VALUE):
         return self.fn(*self.args, *args, proj=proj)
-
-
-##########################
-# Implementation helpers #
-##########################
-
-
-@symbol_associator("aimpl_")
-def aimpl(sym, name, fn):
-    prim = PrimitiveAImpl(fn, sym)
-    aroot_globals[sym] = prim
-    return prim
-
-
-def std_aimpl(fn):
-    def deco(*args):
-        unwrapped = [arg[None] for arg in args]
-        rval = fn(*unwrapped)
-        return AValue(rval)
-        # if any(isinstance(arg, Var) for arg in args):
-        #     return var()
-        # else:
-        #     return fn(*args)
-    deco.__name__ = fn.__name__
-    return aimpl(deco)
-
-
-@std_aimpl
-def aimpl_add(x, y):
-    return x + y
-
-
-@std_aimpl
-def aimpl_subtract(x, y):
-    return x - y
-
-
-@std_aimpl
-def aimpl_dot(x, y):
-    return x @ y
-
-
-@std_aimpl
-def aimpl_index(xs, idx):
-    return xs[idx]
-
-
-@std_aimpl
-def aimpl_shape(xs):
-    return xs.shape
-
-
-@std_aimpl
-def aimpl_assert_true(v, message):
-    assert v, message
-
-
-@std_aimpl
-def aimpl_equal(x, y):
-    return x == y
-
-
-@std_aimpl
-def aimpl_greater(x, y):
-    return x > y
-
-
-@aimpl
-def aimpl_identity(x):
-    return x[None]
-
-
-@aimpl
-def aimpl_switch(cond, t, f):
-    cond = cond[None]
-    if isinstance(cond, bool):
-        return t[None] if cond else f[None]
-    elif isinstance(cond, Var):
-        return Union([t, f])
-    else:
-        raise TypeError(f'Cannot switch on {cond}')
-
-
-##############
-# Projectors #
-##############
-
-
-projector_set = {aimpl_shape}
-
-
-projectors: Dict = {}
-
-
-def proj(psym):
-    projs = projectors.setdefault(psym, {})
-
-    @symbol_associator('proj_')
-    def pimpl(sym, name, fn):
-        fsym, fenv = parse_function(fn)
-        projs[aroot_globals[sym]] = FunctionAImpl(fenv[fsym], aroot_globals)
-        return fn
-
-    return pimpl
-
-
-@proj(builtins.shape)
-def proj_add(x, y):
-    assert shape(x) == shape(y)
-    return shape(x)
-
-
-@proj(builtins.shape)
-def proj_dot(x, y):
-    # sx = shape(x)
-    # sy = shape(y)
-    # assert sx[1] == sy[0]
-    # return sx[0], sy[1]
-    a, b = shape(x)
-    c, d = shape(y)
-    assert b == c
-    return a, d
 
 
 ########################
@@ -315,58 +233,90 @@ def proj_dot(x, y):
 ########################
 
 
-class AValue:
-    def __init__(self, interpreter, node=None):
-        if node is None:
-            self.interpreter = None
-            self.node = None
-            values = interpreter
-            if isinstance(values, dict):
-                self.values = values
-            elif isinstance(values, AValue):
-                self.node = values.node
-                self.interpreter = values.interpreter
-                self.values = values.values
-            else:
-                self.values = {None: values}
-        else:
-            self.interpreter = interpreter
-            self.node = node
-            self.values = {}
+class AbstractData:
+    def __init__(self, values=None):
+        self.values = values or {}
 
     def __getitem__(self, proj):
         if proj not in self.values:
-            if self.node:
-                v = self.interpreter.eval(self.node, proj)
-            elif proj is None:
-                v = self.values[None]
+            if proj is UNIFY:
+                u = {}
+                self.values[proj] = u
+                return u
+            res = self.acquire(proj)
+            if proj is VALUE and isinstance(res, AbstractData):
+                self.values = copy(res.values)
+                return self[VALUE]
             else:
-                v = aroot_globals[proj](self)
-            while isinstance(v, AValue):
-                v = v[None]
-            self.values[proj] = v
+                self.values[proj] = res
         return self.values[proj]
 
     def __call__(self, proj):
         rval = self[proj]
-        if proj is None:
+        if proj is VALUE:
             return self
         else:
             return rval
 
+    def __repr__(self):
+        return repr(self.values)
 
-# class Delayed:
-#     def __init__(self, interpreter, node):
-#         self.interpreter = interpreter
-#         self.node = node
 
-#     def __call__(self, proj):
-#         return self.interpreter.eval(self.node, proj)
+class AbstractComputation(AbstractData):
+    def __init__(self, interpreter, node):
+        super().__init__()
+        self.interpreter = interpreter
+        self.node = node
+
+    def acquire(self, proj):
+        return self.interpreter.eval(self.node, proj)
+
+
+class AbstractValue(AbstractData):
+    def __init__(self, value):
+        if isinstance(value, dict):
+            assert not isinstance(value.get(VALUE, None), Union)
+            super().__init__(value)
+        else:
+            assert not isinstance(value, Union)
+            super().__init__({VALUE: value})
+
+    def acquire(self, proj):
+        if proj is VALUE:
+            return self.values[VALUE]
+        else:
+            return aroot_globals[proj](self)
+
+
+unify.add((AbstractData, AbstractData, dict),
+          lambda a, b, d: unify(a[None], b[None], d))
+unify.add((AbstractData, object, dict),
+          lambda a, x, d: unify(a[None], x, d))
+unify.add((object, AbstractData, dict),
+          lambda x, a, d: unify(x, a[None], d))
+
+
+def wrap_abstract(v):
+    if isinstance(v, AbstractData):
+        return v
+    else:
+        return AbstractValue(v)
+
+
+def unwrap_abstract(v):
+    if isinstance(v, AbstractData):
+        return v[VALUE]
+    else:
+        return v
+
 
 def find_projector(proj, fn):
+    if proj is VALUE:
+        return fn
     if isinstance(fn, PrimitiveAImpl):
         try:
-            return projectors[proj][fn]
+            # return projectors[proj][fn]
+            return impl_bank['project'][proj][fn]
         except KeyError:
             raise Exception(f'Missing prim projector "{proj}" for {fn}.')
     elif isinstance(fn, ClosureAImpl):
@@ -386,7 +336,7 @@ class AbstractInterpreter:
         self.global_env = global_env
         self.env = env
 
-    def eval(self, node, proj=None):
+    def eval(self, node, proj=VALUE):
         cls = node.__class__.__name__
         try:
             method = getattr(self, 'eval_' + cls)
@@ -404,13 +354,13 @@ class AbstractInterpreter:
         return rval
 
     def eval_Apply(self, node, proj):
-        fn = self.eval(node.fn)
+        fn = unwrap_abstract(self.eval(node.fn))
 
         # args = list(map(self.eval, node.args))
-        args = [AValue(self, arg) for arg in node.args]
+        args = [AbstractComputation(self, arg) for arg in node.args]
 
         if fn in projector_set:
-            assert proj is None
+            assert proj is VALUE
             assert len(node.args) == 1
             assert fn.sym
             return self.eval(node.args[0], proj=fn.sym)
@@ -426,11 +376,7 @@ class AbstractInterpreter:
 
         # return helper(fn, args)
 
-        if proj is None:
-            return fn(*args)
-        else:
-            pfn = find_projector(proj, fn)
-            return pfn(*args)
+        return find_projector(proj, fn)(*args)
 
     def eval_Begin(self, node, proj):
         for stmt in node.stmts[:-1]:
@@ -439,7 +385,7 @@ class AbstractInterpreter:
 
     def eval_Closure(self, node, proj):
         fn = self.eval(node.fn)
-        args = [AValue(self, arg) for arg in node.args]
+        args = [AbstractComputation(self, arg) for arg in node.args]
         return ClosureAImpl(fn, args)
 
     def eval_Lambda(self, node, proj):
@@ -448,15 +394,21 @@ class AbstractInterpreter:
         return fn
 
     def eval_Let(self, node, proj):
-        def stash(k, v):
-            self.env[k] = v
+        def _maptup(vals1, vals2):
+            if isinstance(vals1, Tuple):
+                vals2 = unwrap_abstract(vals2)
+                assert len(vals1.values) == len(vals2)
+                return Tuple(_maptup(x, y)
+                             for x, y in zip(vals1.values, vals2))
+            else:
+                self.env[vals1] = vals2
 
         for k, v in node.bindings:
             if isinstance(k, Tuple):
                 v = self.eval(v)
-                maptup2(stash, k, v)
+                _maptup(k, v)
             else:
-                self.env[k] = AValue(self, v)
+                self.env[k] = AbstractComputation(self, v)
         return self.eval(node.body, proj)
 
     def eval_Symbol(self, node, proj):
@@ -464,17 +416,25 @@ class AbstractInterpreter:
             v = self.env[node]
         except KeyError:
             v = self.global_env[node]
-        if isinstance(v, AValue):
+        if isinstance(v, AbstractData):
             return v[proj]
         else:
-            assert proj is None
+            assert proj is VALUE
             return v
 
     def eval_Tuple(self, node, proj):
-        assert proj is None
-        # return tuple(self.eval(x) for x in node.values)
-        return tuple(AValue(self, x) for x in node.values)
+        assert proj is VALUE
+        return tuple(AbstractComputation(self, x) for x in node.values)
 
     def eval_Value(self, node, proj):
-        assert proj is None
+        assert proj is VALUE
         return node.value
+
+
+def abstract_evaluate(lbda, args, proj=None):
+    load()
+    parse_env = lbda.global_env
+    assert parse_env is not None
+    fn = AbstractInterpreter(parse_env).eval(lbda)
+    with AbstractCollect():
+        return fn(*args, proj=proj)
