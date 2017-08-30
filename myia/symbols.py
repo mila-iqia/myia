@@ -62,6 +62,7 @@ class builtins(metaclass=SymbolsMeta):
     myia_builtins = gsym('myia_builtins')
     raise_exception = gsym('raise_exception')
     Exception = gsym('Exception')
+    print = gsym('print')
     len = gsym('len')
     range = gsym('range')
     enumerate = gsym('enumerate')

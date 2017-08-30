@@ -574,10 +574,15 @@ class Parser(LocVisitor):
     # Visitors for Python AST nodes #
     #################################
 
-    def visit_Assert(self, node: ast.Assert) -> Apply:
-        return Apply(builtins.assert_true,
-                     self.visit(node.test),
-                     self.visit(node.msg) if node.msg else Value(None))
+    # TODO: assert x == y; ... should behave like
+    # if x == y: raise AssertionError; else: ...
+    # That is to say, the dataflow path to the return value
+    # should include the assertion (the type of raise should
+    # be bottom, since it does not return).
+    # def visit_Assert(self, node: ast.Assert) -> Apply:
+    #     return Apply(builtins.assert_true,
+    #                  self.visit(node.test),
+    #                  self.visit(node.msg) if node.msg else Value(None))
 
     def visit_Assign(self, node: ast.Assign) -> _Assign:
         targ, = node.targets

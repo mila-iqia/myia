@@ -144,6 +144,11 @@ def interp_Exception(x):
     return Exception(x)
 
 
+@impl_interp
+def interp_print(x):
+    print(x)
+
+
 ################################################
 # Implementation of primitives needed for Grad #
 ################################################
