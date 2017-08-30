@@ -184,6 +184,9 @@ class Value(MyiaASTNode):
     def __eq__(self, other):
         return isinstance(other, Value) and self.value == other.value
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __str__(self) -> str:
         return repr(self.value)
 

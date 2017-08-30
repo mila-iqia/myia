@@ -28,6 +28,8 @@ def load():
     global _loaded
     if not _loaded:
         _loaded = True
+        # The following two imports fill impl_bank['interp']
+        # as a side-effect.
         from ..impl.impl_interp import _
         from ..impl.impl_bprop import _
         # root_globals.update(impl_bank['interp'])
