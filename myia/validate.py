@@ -214,10 +214,15 @@ def analysis(mode: str, spec, args=None) -> Union[Callable, Dict]:
     pyfn, sym, bindings = get_functions(spec)
     method = globals()[f'analysis_{mode}']
     test = method(pyfn, sym, bindings)
+    rval = {
+        'test': test,
+        'sym': sym,
+        'bindings': bindings,
+        'lbda': bindings[sym]
+    }
     if args:
-        return test(args)
-    else:
-        return test
+        rval['result'] = test(args)
+    return rval
 
 
 def compare_calls(funcs: Dict[str, Callable],

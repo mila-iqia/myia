@@ -32,7 +32,7 @@ def grad_test(*tests):
     def decorate(fn):
         try:
             exc = None
-            testfn = analysis('grad', fn)
+            testfn = analysis('grad', fn)['test']
         except Exception as e:
             exc = e
 
@@ -67,7 +67,7 @@ def grad2_test(*tests):
     def decorate(fn):
         try:
             exc = None
-            testfn = analysis('grad2', fn)
+            testfn = analysis('grad2', fn)['test']
         except Exception as e:
             exc = e
 

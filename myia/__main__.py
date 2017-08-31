@@ -121,9 +121,9 @@ p_debug.add_argument('--args', metavar='ARGS', default='()',
 # Helper functions #
 ####################
 
-burepl = buche.open('repl', 'log', hasInput=True, force=True)
-reader = Reader()
-budb = BucheDb(burepl, reader)
+# burepl = buche.open('repl', 'log', hasInput=True, force=True)
+# reader = Reader()
+# budb = BucheDb(burepl, reader)
 
 
 def setup_buche(arguments):
@@ -348,8 +348,9 @@ def command_inspect(arguments):
     setup_buche(arguments)
     code = getcode(arguments)
     args = getargs(arguments)
+    results = analysis(arguments.mode, code, args)
     if args:
-        value = analysis(arguments.mode, code, args)
+        value = results['result']
         buche['_'].html(f'<h2>Results for: {arguments.mode}</h2>')
         buche['_'](value)
     else:
@@ -357,11 +358,21 @@ def command_inspect(arguments):
 
     reader = Reader()
 
+    from .inference.dfa import DFA, TypeTrack, ValueTrack, NeedsTrack
+    d = DFA([TypeTrack, ValueTrack, lambda dfa: NeedsTrack(dfa, ['type'])],
+            results['bindings'])
+    d.visit(results['lbda'])
+
     @reader.on_click
     def handle(e, cmd):
         try:
             obj = id_registry[int(cmd.objId)]
-            buche[cmd.path](AboutPrinter(obj))
+            if cmd.alt:
+                res = {t: d.values[t][obj] for t in d.tracks.values()}
+                res['Node'] = obj
+                buche[cmd.path](res)
+            else:
+                buche[cmd.path](AboutPrinter(obj))
         except Exception as exc:
             buche[cmd.path](exc)
     reader.run()
