@@ -10,6 +10,7 @@ from itertools import product
 from ..front import parse_function
 from ..util.buche import buche
 from copy import copy
+from collections import defaultdict
 from ..impl.main import impl_bank
 
 
@@ -32,6 +33,12 @@ def load():
 
 class Unsatisfiable(Exception):
     pass
+
+
+class ErrorValueException(Exception):
+    def __init__(self, error):
+        super().__init__()
+        self.error = error
 
 
 class Not:
@@ -82,22 +89,28 @@ ERROR = Keyword('ERROR')
 
 class Union:
     def __new__(cls, opts):
-        if len(set(opts)) == 1:
+        sopts = set(opts)
+        if len(sopts) == 1:
             # Union([a]) => a
             for o in opts:
                 if not isinstance(o, Union):
                     # Just a trick to return the one element in
                     # opts even if it's not indexable
                     return o
+        # elif len(sopts) == 0:
+        #     raise Exception('Not enough options for Union.')
         return super().__new__(cls)
 
     def __init__(self, opts):
+        opts = list(opts)
         self.opts = set()
         for opt in opts:
             if isinstance(opt, Union):
                 self.opts.update(opt.opts)
             else:
                 self.opts.add(opt)
+        # if len(self.opts) == 0:
+        #     raise Exception('Not enough options for Union.')
 
     def __repr__(self):
         return f'Union({", ".join(map(str, self.opts))})'
@@ -246,6 +259,8 @@ class AbstractData:
             res = self.acquire(proj)
             if proj is VALUE and isinstance(res, AbstractData):
                 self.values = copy(res.values)
+                if VALUE not in self.values:
+                    raise ErrorValueException(self)
                 return self[VALUE]
             else:
                 self.values[proj] = res
@@ -283,17 +298,25 @@ class AbstractValue(AbstractData):
 
     def acquire(self, proj):
         if proj is VALUE:
-            return self.values[VALUE]
+            if VALUE in self.values:
+                return self.values[VALUE]
+            else:
+                raise ErrorValueException(self)
         else:
+            assert proj
             return aroot_globals[proj](self)
 
 
+def iserror(x):
+    return isinstance(x, AbstractValue) and ERROR in x.values and x[ERROR]
+
+
 unify.add((AbstractData, AbstractData, dict),
-          lambda a, b, d: unify(a[None], b[None], d))
+          lambda a, b, d: unify(a[VALUE], b[VALUE], d))
 unify.add((AbstractData, object, dict),
-          lambda a, x, d: unify(a[None], x, d))
+          lambda a, x, d: unify(a[VALUE], x, d))
 unify.add((object, AbstractData, dict),
-          lambda x, a, d: unify(x, a[None], d))
+          lambda x, a, d: unify(x, a[VALUE], d))
 
 
 def wrap_abstract(v):
@@ -304,7 +327,10 @@ def wrap_abstract(v):
 
 
 def unwrap_abstract(v):
+    # if iserror(v):
+    #     return v
     if isinstance(v, AbstractData):
+        # print(v)
         return v[VALUE]
     else:
         return v
@@ -354,29 +380,41 @@ class AbstractInterpreter:
         return rval
 
     def eval_Apply(self, node, proj):
-        fn = unwrap_abstract(self.eval(node.fn))
 
-        # args = list(map(self.eval, node.args))
         args = [AbstractComputation(self, arg) for arg in node.args]
 
-        if fn in projector_set:
-            assert proj is VALUE
-            assert len(node.args) == 1
-            assert fn.sym
-            return self.eval(node.args[0], proj=fn.sym)
+        def helper(fn):
+            try:
+                fn = unwrap_abstract(fn)
+            except ErrorValueException as exc:
+                return exc.error
 
-        # def helper(fn, args):
-        #     if isinstance(fn, Union):
-        #         return Union(helper(poss, args) for poss in fn.opts)
-        #     elif isinstance(fn, Var):
-        #         # raise TypeError('Cannot call a Var.')
-        #         return var()
-        #     else:
-        #         return fn(*args)
+            if isinstance(fn, Union):
+                return Union([helper(f) for f in fn.opts])
+            elif isinstance(fn, Var):
+                raise TypeError('Cannot call a Var.')
+                # return var()
+            elif fn is ANY:
+                raise TypeError('Cannot call ANY.')
+            elif fn in projector_set:
+                assert proj is VALUE
+                assert len(node.args) == 1
+                assert fn.sym
+                return self.eval(node.args[0], proj=fn.sym)
+            else:
+                return find_projector(proj, fn)(*args, proj=VALUE)
 
-        # return helper(fn, args)
+        return helper(self.eval(node.fn))
 
-        return find_projector(proj, fn)(*args)
+        # args = [AbstractComputation(self, arg) for arg in node.args]
+
+        # if fn in projector_set:
+        #     assert proj is VALUE
+        #     assert len(node.args) == 1
+        #     assert fn.sym
+        #     return self.eval(node.args[0], proj=fn.sym)
+
+        # return find_projector(proj, fn)(*args)
 
     def eval_Begin(self, node, proj):
         for stmt in node.stmts[:-1]:
@@ -394,21 +432,40 @@ class AbstractInterpreter:
         return fn
 
     def eval_Let(self, node, proj):
+        print(node)
+
         def _maptup(vals1, vals2):
             if isinstance(vals1, Tuple):
                 vals2 = unwrap_abstract(vals2)
+                if isinstance(vals2, Union):
+                    for opt in vals2.opts:
+                        _maptup(vals1, opt)
+                    return
+                if iserror(vals2):
+                    vals2 = tuple(vals2 for x in vals1.values)
                 assert len(vals1.values) == len(vals2)
                 return Tuple(_maptup(x, y)
                              for x, y in zip(vals1.values, vals2))
             else:
-                self.env[vals1] = vals2
+                accum[vals1].append(vals2)
+                # self.env[vals1] = vals2
 
+        for k, v in node.bindings:
+            print(k)
+        print('---')
         for k, v in node.bindings:
             if isinstance(k, Tuple):
                 v = self.eval(v)
+                accum = defaultdict(list)
                 _maptup(k, v)
+                print(k, '==>', v)
+                for _k, _v in accum.items():
+                    print(k, _k, _v)
+                    self.env[_k] = Union(_v)
             else:
+                print('sole', k)
                 self.env[k] = AbstractComputation(self, v)
+        print('---')
         return self.eval(node.body, proj)
 
     def eval_Symbol(self, node, proj):
@@ -416,11 +473,19 @@ class AbstractInterpreter:
             v = self.env[node]
         except KeyError:
             v = self.global_env[node]
-        if isinstance(v, AbstractData):
-            return v[proj]
-        else:
-            assert proj is VALUE
-            return v
+
+        def process(v):
+            if isinstance(v, AbstractData):
+                if iserror(v):
+                    return v
+                return v[proj]
+            elif isinstance(v, Union):
+                return Union([process(o) for o in v.opts])
+            else:
+                assert proj is VALUE
+                return v
+
+        return process(v)
 
     def eval_Tuple(self, node, proj):
         assert proj is VALUE

@@ -13,13 +13,17 @@ _ = True
 
 @proj(builtins.shape)
 def proj_add(x, y):
-    assert shape(x) == shape(y)
-    return shape(x)
+    if shape(x) == shape(y):
+        return shape(x)
+    else:
+        raise Exception('Shape error (add).')
 
 
 @proj(builtins.shape)
 def proj_dot(x, y):
     a, b = shape(x)
     c, d = shape(y)
-    assert b == c
-    return a, d
+    if b == c:
+        return a, d
+    else:
+        raise Exception('Shape error (dot).')
