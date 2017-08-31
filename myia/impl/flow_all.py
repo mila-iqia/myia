@@ -11,7 +11,8 @@ ANY = Keyword('ANY')
 
 impl_bank['flow'] = {
     'value': {},
-    'type': {}
+    'type': {},
+    'needs': {}
 }
 
 

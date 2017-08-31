@@ -36,7 +36,13 @@ class DFA:
     def flow_to(self, a, b):
         @self.on_flow_from(a)
         def flow(track, value):
-            self.propagate(b, track, value)
+            if track.direction == 'forwards':
+                self.propagate(b, track, value)
+
+        @self.on_flow_from(b)
+        def flow(track, value):
+            if track.direction == 'backwards':
+                self.propagate(a, track, value)
 
     def on_flow_from(self, node, require_track=None):
         if isinstance(require_track, str):
@@ -98,9 +104,11 @@ class DFA:
             self.visit(a)
 
         self.on_function_flow(node.fn, node, True, 0)
+        self.run_flows('Apply', node)
 
     def visit_Begin(self, node):
         raise Exception('Begin not supported')
+        self.run_flows('Begin', node)
 
     def visit_Closure(self, node):
         self.visit(node.fn)
@@ -108,12 +116,14 @@ class DFA:
             self.visit(arg)
         self.on_function_flow(node.fn, node, False, 0)
         self.propagate_value(node, node)
+        self.run_flows('Closure', node)
 
     def visit_Lambda(self, node):
         for arg in node.args:
             self.visit(arg)
         self.visit(node.body)
         self.propagate_value(node, node)
+        self.run_flows('Lambda', node)
 
     def visit_Let(self, node):
         def _visit(v):
@@ -151,6 +161,7 @@ class DFA:
             _bind(v, value)
         self.visit(node.body)
         self.flow_to(node.body, node)
+        self.run_flows('Let', node)
 
     def visit_Symbol(self, node):
         if node in self.genv.bindings:
@@ -159,6 +170,7 @@ class DFA:
             self.propagate_value(node, b)
         elif node in builtins.__dict__.values():
             self.propagate_value(node, node)
+        self.run_flows('Symbol', node)
 
     def visit_Tuple(self, node):
         for v in node.values:
@@ -170,9 +182,11 @@ class DFA:
 
 
 class Track:
-    def __init__(self, name, dfa):
+    def __init__(self, name, dfa, direction='forwards'):
         self.name = name
         self.dfa = dfa
+        assert direction in {'forwards', 'backwards'}
+        self.direction = direction
 
     def propagate(self, node, value):
         self.dfa.propagate(node, self, value)
@@ -206,8 +220,8 @@ class Track:
         flow = impls.get(prim, self.flow_default)
         flow(self.dfa, node)
 
-    def flow_default(self, prim, node):
-        pass
+    def flow_default(self, _, node):
+        self.propagate(node, ANY)
 
     def __str__(self):
         return f'<Track:{self.name}>'
@@ -223,9 +237,6 @@ class ValueTrack(Track):
     def flow_Value(self, node):
         self.propagate(node, node)
 
-    def flow_default(self, _, node):
-        self.propagate(node, ANY)
-
 
 class TypeTrack(Track):
     def __init__(self, dfa):
@@ -237,5 +248,82 @@ class TypeTrack(Track):
         elif isinstance(node.value, float):
             self.propagate(node, Float64)
 
+
+needs_map = {
+    builtins.add: {
+        'type': ('type', 'type'),
+        'shape': ('shape', 'shape')
+    },
+    builtins.subtract: {
+        'type': ('type', 'type'),
+        'shape': ('shape', 'shape')
+    },
+    builtins.less: {
+        'type': ('type', 'type'),
+        'shape': False
+    },
+    builtins.index: {
+        'type': ('value', 'type')
+    },
+    builtins.switch: {
+        'type': ('type', 'type', 'type'),
+        'value': ((), 'value', 'value')
+    },
+    'default': {
+    }
+}
+
+
+class NeedsTrack(Track):
+    def __init__(self, dfa, autoflow=[]):
+        super().__init__('needs', dfa, 'backwards')
+        self.autoflow = autoflow
+
+    def flow_auto(self, node):
+        for prop in self.autoflow:
+            self.propagate(node, prop)
+
+    def flow_Apply(self, node):
+        self.propagate(node.fn, 'value')
+        self.flow_auto(node)
+
+    def flow_Begin(self, node):
+        self.flow_auto(node)
+
+    def flow_Closure(self, node):
+        self.flow_auto(node)
+
+    def flow_Lambda(self, node):
+        self.flow_auto(node)
+
+    def flow_Let(self, node):
+        self.flow_auto(node)
+
+    def flow_Tuple(self, node):
+        self.flow_auto(node)
+
+    def flow_Symbol(self, node):
+        self.flow_auto(node)
+
+    def flow_Value(self, node):
+        self.flow_auto(node)
+
+    def flow_prim(self, prim, node):
+        m = needs_map.get(prim, needs_map['default'])
+
+        @self.dfa.on_flow_from(node, 'needs')
+        def on_need(track, value):
+            needs = m.get(value, None)
+            if needs is None:
+                needs = ['value' for arg in node.args]
+            elif needs is False:
+                return
+
+            for arg, ns in zip(node.args, needs):
+                if not isinstance(ns, (list, tuple)):
+                    ns = [ns]
+                for n in ns:
+                    self.propagate(arg, n)
+
     def flow_default(self, _, node):
-        self.propagate(node, ANY)
+        pass
