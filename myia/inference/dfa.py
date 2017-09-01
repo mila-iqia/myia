@@ -1,5 +1,5 @@
 
-from ..util import Event, Keyword
+from ..util import Event, Keyword, buche
 from ..stx import Lambda, Closure, Tuple, Symbol
 from collections import defaultdict
 from ..impl.flow_all import default_flow, ANY
@@ -60,23 +60,22 @@ class DFA:
                     flow(None, track, v)
         return deco
 
-    def on_function_flow(self, fn, node, flow_body=True, closure_args=0):
-        args = node.args
+    def on_function_flow(self, fn, args, node, flow_body=True):
 
         def on_new_fn_value(track, new_value):
+            nonlocal args
             assert track is self.value_track
             if isinstance(new_value, Lambda):
                 if flow_body:
                     self.flow_to(new_value.body, node)
-                lbda_args = new_value.args[closure_args:]
-                for arg, lbda_arg in zip(args, lbda_args):
+                for arg, lbda_arg in zip(args, new_value.args):
                     self.flow_to(arg, lbda_arg)
             elif isinstance(new_value, Closure):
-                nargs = closure_args + len(new_value.args)
-                self.on_function_flow(new_value.fn, node, flow_body, nargs)
+                args = new_value.args + args
+                self.on_function_flow(new_value.fn, args, node, flow_body)
             elif new_value in builtins.__dict__.values():
                 if flow_body:
-                    self.run_flows('prim', new_value, node)
+                    self.run_flows('prim', new_value, args, node)
             elif new_value is ANY:
                 self.propagate_value(node, ANY)
             else:
@@ -103,7 +102,7 @@ class DFA:
         for a in node.args:
             self.visit(a)
 
-        self.on_function_flow(node.fn, node, True, 0)
+        self.on_function_flow(node.fn, node.args, node, True)
         self.run_flows('Apply', node)
 
     def visit_Begin(self, node):
@@ -114,7 +113,7 @@ class DFA:
         self.visit(node.fn)
         for arg in node.args:
             self.visit(arg)
-        self.on_function_flow(node.fn, node, False, 0)
+        self.on_function_flow(node.fn, node.args, node, False)
         self.propagate_value(node, node)
         self.run_flows('Closure', node)
 
@@ -215,12 +214,12 @@ class Track:
     def flow_Value(self, node):
         pass
 
-    def flow_prim(self, prim, node):
+    def flow_prim(self, prim, args, node):
         impls = impl_bank['flow'][self.name]
         flow = impls.get(prim, self.flow_default)
-        flow(self.dfa, node)
+        flow(self.dfa, args, node)
 
-    def flow_default(self, _, node):
+    def flow_default(self, _, args, node):
         self.propagate(node, ANY)
 
     def __str__(self):
@@ -249,25 +248,41 @@ class TypeTrack(Track):
             self.propagate(node, Float64)
 
 
+_type = builtins.type
+_shape = builtins.shape
+from .infer import VALUE
+
 needs_map = {
     builtins.add: {
-        'type': ('type', 'type'),
-        'shape': ('shape', 'shape')
+        _type: (_type, _type),
+        _shape: (_shape, _shape)
     },
     builtins.subtract: {
-        'type': ('type', 'type'),
-        'shape': ('shape', 'shape')
+        _type: (_type, _type),
+        _shape: (_shape, _shape)
+    },
+    builtins.dot: {
+        _type: (_type, _type),
+        _shape: (_shape, _shape)
     },
     builtins.less: {
-        'type': ('type', 'type'),
-        'shape': False
+        _type: (_type, _type),
+        _shape: False
+    },
+    builtins.greater: {
+        _type: (_type, _type),
+        _shape: False
     },
     builtins.index: {
-        'type': ('value', 'type')
+        _type: (VALUE, _type)
+    },
+    builtins.identity: {
+        _type: (_type,),
+        _shape: (_shape,)
     },
     builtins.switch: {
-        'type': ('type', 'type', 'type'),
-        'value': ((), 'value', 'value')
+        _type: (_type, _type, _type),
+        VALUE: ((), VALUE, VALUE)
     },
     'default': {
     }
@@ -280,21 +295,22 @@ class NeedsTrack(Track):
         self.autoflow = autoflow
 
     def flow_auto(self, node):
+        assert not isinstance(node, Closure)
         for prop in self.autoflow:
             self.propagate(node, prop)
 
     def flow_Apply(self, node):
-        self.propagate(node.fn, 'value')
+        self.propagate(node.fn, VALUE)
         self.flow_auto(node)
 
     def flow_Begin(self, node):
         self.flow_auto(node)
 
     def flow_Closure(self, node):
-        self.flow_auto(node)
+        pass
 
     def flow_Lambda(self, node):
-        self.flow_auto(node)
+        pass
 
     def flow_Let(self, node):
         self.flow_auto(node)
@@ -308,14 +324,15 @@ class NeedsTrack(Track):
     def flow_Value(self, node):
         self.flow_auto(node)
 
-    def flow_prim(self, prim, node):
+    def flow_prim(self, prim, args, node):
         m = needs_map.get(prim, needs_map['default'])
+        # print(prim)
 
         @self.dfa.on_flow_from(node, 'needs')
         def on_need(track, value):
             needs = m.get(value, None)
             if needs is None:
-                needs = ['value' for arg in node.args]
+                needs = [VALUE for arg in node.args]
             elif needs is False:
                 return
 
@@ -325,5 +342,5 @@ class NeedsTrack(Track):
                 for n in ns:
                     self.propagate(arg, n)
 
-    def flow_default(self, _, node):
+    def flow_default(self, _, args, node):
         pass

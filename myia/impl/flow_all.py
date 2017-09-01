@@ -24,21 +24,21 @@ def impl_flow(sym, name, fn):
 
 @symbol_associator('flow_type')
 def impl_flow_type(sym, name, fn):
-    def flow(dfa, node):
+    def flow(dfa, args, node):
         ttrack = dfa.tracks['type']
 
         # TODO: this is basically redoing a brute force test
         # every time, it's super inefficient
         def signature_present(sig):
             ins, out = sig
-            for i, arg in zip(ins, node.args):
+            for i, arg in zip(ins, args):
                 if i not in dfa.values[ttrack][arg]:
                     break
             else:
                 return out
             return False
 
-        for arg in node.args:
+        for arg in args:
             @dfa.on_flow_from(arg)
             def on_arg(track, value):
                 if isinstance(value, Type):
@@ -52,26 +52,31 @@ def impl_flow_type(sym, name, fn):
 
 
 @impl_flow
-def flow_switch(dfa, node):
-    @dfa.on_flow_from(node.args[0], 'value')
+def flow_identity(dfa, args, node):
+    dfa.flow_to(args[0], node)
+
+
+@impl_flow
+def flow_switch(dfa, args, node):
+    @dfa.on_flow_from(args[0], 'value')
     def on_cond(track, value):
         if value == Value(True):
-            dfa.flow_to(node.args[1], node)
+            dfa.flow_to(args[1], node)
         elif value == Value(False):
-            dfa.flow_to(node.args[2], node)
+            dfa.flow_to(args[2], node)
         elif value == ANY:
-            dfa.flow_to(node.args[1], node)
-            dfa.flow_to(node.args[2], node)
+            dfa.flow_to(args[1], node)
+            dfa.flow_to(args[2], node)
         else:
             raise TypeError('Condition for switch is not boolean.')
 
 
 @impl_flow
-def flow_index(dfa, node):
+def flow_index(dfa, args, node):
     indexes = set()
     tups = set()
     track = dfa.value_track
-    dat, idx = node.args
+    dat, idx = args
 
     @dfa.on_flow_from(idx, track)
     def on_index(track, value):
