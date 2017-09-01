@@ -1,6 +1,6 @@
 
 from .main import symbol_associator, impl_bank
-from ..inference.infer import FunctionAImpl
+from ..interpret import FunctionImpl
 from ..front import parse_function
 
 
@@ -18,9 +18,9 @@ def proj(psym):
         fsym, fenv = parse_function(fn)
         for s, lbda in fenv.bindings.items():
             impl_bank['abstract'][s] = \
-                FunctionAImpl(lbda, impl_bank['abstract'])
+                FunctionImpl(lbda, [impl_bank['abstract']])
         projs[impl_bank['abstract'][sym]] = \
-            FunctionAImpl(fenv[fsym], impl_bank['abstract'])
+            FunctionImpl(fenv[fsym], [impl_bank['abstract']])
         return fn
 
     return pimpl

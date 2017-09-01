@@ -12,11 +12,24 @@ _ = True
 
 
 @proj(builtins.shape)
+def proj_identity(x):
+    return shape(x)
+
+
+@proj(builtins.shape)
 def proj_add(x, y):
     if shape(x) == shape(y):
         return shape(x)
     else:
         raise Exception('Shape error (add).')
+
+
+@proj(builtins.shape)
+def proj_subtract(x, y):
+    if shape(x) == shape(y):
+        return shape(x)
+    else:
+        raise Exception('Shape error (subtract).')
 
 
 @proj(builtins.shape)

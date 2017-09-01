@@ -2,7 +2,7 @@
 from ..util import Event, Keyword, buche
 from ..stx import Lambda, Closure, Tuple, Symbol
 from collections import defaultdict
-from ..impl.flow_all import default_flow, ANY
+from ..impl.flow_all import default_flow, ANY, VALUE
 from ..impl.main import impl_bank
 from ..symbols import builtins
 from .types import Int64
@@ -250,7 +250,6 @@ class TypeTrack(Track):
 
 _type = builtins.type
 _shape = builtins.shape
-from .infer import VALUE
 
 needs_map = {
     builtins.add: {

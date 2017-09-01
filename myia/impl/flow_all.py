@@ -6,7 +6,19 @@ from unification import var
 from ..inference.types import Array, Bool, Float64, Int64, Type
 
 
+############
+# Keywords #
+############
+
+
+# Top of the value lattice
 ANY = Keyword('ANY')
+# Principal value
+VALUE = Keyword('VALUE')
+# Error associated to the operation
+ERROR = Keyword('ERROR')
+# Tag for function executions that are not completed
+OPEN = Keyword('OPEN')
 
 
 impl_bank['flow'] = {

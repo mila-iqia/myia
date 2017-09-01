@@ -18,7 +18,7 @@ def impl_interp(sym, name, fn):
     The implementation will be set in ``root_globals``
     and in the ``myia_builtins`` global.
     """
-    prim = PrimitiveImpl(fn)
+    prim = PrimitiveImpl(fn, name=sym)
     impl_bank['interp'][sym] = prim
     return prim
 

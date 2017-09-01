@@ -1,11 +1,11 @@
 
 
 from .main import symbol_associator, impl_bank
-from ..inference.infer import \
-    PrimitiveAImpl, unify, AbstractValue, AbstractData, Not, Union, \
-    VALUE, UNIFY, ERROR, ANY, isvar, iserror, unwrap_abstract, merge, \
-    ErrorValueException
+from ..inference.avm import Fork, WrappedException, \
+    AbstractValue, unwrap_abstract
+from .flow_all import ANY, VALUE, ERROR
 from ..inference.types import typeof
+from ..interpret import PrimitiveImpl
 from itertools import product
 
 
@@ -17,16 +17,10 @@ _ = True
 ##########################
 
 
-class WrappedException(Exception):
-    def __init__(self, error):
-        super().__init__()
-        self.error = error
-
-
-def args_product(args, which):
-    opts = [arg.opts if w and isinstance(arg, Union) else [arg]
-            for arg, w in zip(args, which)]
-    return product(*opts)
+# class WrappedException(Exception):
+#     def __init__(self, error):
+#         super().__init__()
+#         self.error = error
 
 
 def complete_switches(args, sw):
@@ -38,109 +32,53 @@ def complete_switches(args, sw):
 
 @symbol_associator("abstract")
 def impl_abstract(sym, name, fn):
-    prim = PrimitiveAImpl(fn, sym)
+    prim = PrimitiveImpl(fn, sym)
     impl_bank['abstract'][sym] = prim
     return prim
 
 
 def aimpl_factory(unwrap_args=True,
-                  unwrap_union=None,
                   any_to_any=None,
                   var_to_any=None,
                   wrap_result=True):
-    if unwrap_union is None:
-        unwrap_union = unwrap_args
     if any_to_any is None:
         any_to_any = unwrap_args
     if var_to_any is None:
         var_to_any = unwrap_args
 
     def deco(fn):
-        def newfn(*_args):
+        def newfn(*args):
             # TODO: do the complete_switches when deco() is called.
-            c_unwrap_union = complete_switches(_args, unwrap_union)
-            c_any_to_any = complete_switches(_args, any_to_any)
-            c_var_to_any = complete_switches(_args, var_to_any)
+            c_any_to_any = complete_switches(args, any_to_any)
+            c_var_to_any = complete_switches(args, var_to_any)
             opts = []
 
-            def process(args):
-                try:
-                    unwrapped = [unwrap_abstract(arg) for arg in args]
-                    # u = merge(*[arg[UNIFY] for arg in args])
-                    # if u is False:
-                    #     raise Unsatisfiable()
-                except ErrorValueException as exc:
-                    unwrapped = None
-                    result = exc.error
+            unwrapped = [unwrap_abstract(arg) for arg in args]
 
-                if unwrapped is not None:
-                    prod = list(args_product(unwrapped, c_unwrap_union))
-                    if len(prod) > 1:
-                        for args in prod:
-                            process(args)
-                        return
+            if unwrapped is None:
+                pass
+            elif any((a2a and a is ANY)
+                     for (a, a2a) in zip(unwrapped, c_any_to_any)):
+                result = ANY
+            # elif any((v2a and isvar(v))
+            #          for (v, v2a) in zip(unwrapped, c_var_to_any)):
+            #     result = ANY
+            else:
+                result = fn(*unwrapped)
+                # try:
+                #     result = fn(*unwrapped)
+                # except WrappedException as exc:
+                #     result = AbstractValue({ERROR: exc.error})
 
-                # errors = [a for a in unwrapped if iserror(a)]
-                # if errors:
-                #     result = errors[0]
-                if unwrapped is None:
-                    pass
-                elif any((a2a and a is ANY)
-                         for (a, a2a) in zip(unwrapped, c_any_to_any)):
-                    result = ANY
-                elif any((v2a and isvar(v))
-                         for (v, v2a) in zip(unwrapped, c_var_to_any)):
-                    result = ANY
-                else:
-                    try:
-                        result = fn(*unwrapped)
-                    except WrappedException as exc:
-                        result = AbstractValue({ERROR: exc.error})
+            if wrap_result:
+                result = AbstractValue(result)
 
-                if wrap_result:
-                    result = AbstractValue(result)
-
-                # TODO: Merge u:
-                # u = And(arg[UNIFY] for arg in args)
-                # merge(result, u)
-                opts.append(result)
-
-            for args in args_product(_args, c_unwrap_union):
-                process(args)
-
-            return Union(opts)
+            return result
 
         newfn.__name__ = fn.__name__
         return impl_abstract(newfn)
 
     return deco
-
-
-# def aimpl_factory(unwrap_union=True,
-#                   any_to_any=True,
-#                   var_to_any=True):
-#     def deco(fn):
-#         def newfn(*_args):
-#             opts = []
-#             for args in args_product(_args):
-#                 unwrapped = [unwrap_abstract(arg) for arg in args]
-#                 u = merge(*[arg[UNIFY] for arg in args])
-#                 if u is False:
-#                     raise Unsatisfiable()
-
-#                 if any_to_any and any(a is ANY for a in unwrapped):
-#                     result = ANY
-#                 elif var_to_any and any(isvar(a) for a in unwrapped):
-#                     result = ANY
-#                 else:
-#                     result = fn(*unwrapped)
-#                 opts.append(AbstractValue(result))
-#             return Union(opts)
-
-#         newfn.__name__ = fn.__name__
-#         return impl_abstract(newfn)
-
-#     return deco
 
 
 def std_aimpl(fn):
@@ -229,21 +167,27 @@ def abstract_print(x):
 #                               UNIFY: v[UNIFY]})
 
 
-@aimpl_factory(wrap_result=False)
+# @aimpl_factory(wrap_result=False)
+# def abstract_equal(x, y):
+#     d = unify(x, y)
+#     # print('Unify', x, y, d)
+#     if d is False:
+#         # Not unifiable
+#         return AbstractValue(False)
+#     elif d == {}:
+#         # Always unifiable
+#         return AbstractValue(True)
+#     else:
+#         raise Exception('No.')
+#         # # Non-trivial unification
+#         # t = AbstractValue({VALUE: True, UNIFY: d})
+#         # f = AbstractValue({VALUE: False, UNIFY: Not(d)})
+#         # return Union([t, f])
+
+
+@std_aimpl
 def abstract_equal(x, y):
-    d = unify(x, y)
-    print('Unify', x, y, d)
-    if d is False:
-        # Not unifiable
-        return AbstractValue(False)
-    elif d == {}:
-        # Always unifiable
-        return AbstractValue(True)
-    else:
-        # Non-trivial unification
-        t = AbstractValue({VALUE: True, UNIFY: d})
-        f = AbstractValue({VALUE: False, UNIFY: Not(d)})
-        return Union([t, f])
+    return x == y
 
 
 @impl_abstract
@@ -261,7 +205,7 @@ def abstract_switch(cond, t, f):
     if isinstance(cond, bool):
         # return t[VALUE] if cond else f[VALUE]
         return t if cond else f
-    elif isvar(cond) or cond is ANY:
-        return Union([t, f])
+    elif cond is ANY:  # or isvar(cond):
+        return Fork([t, f])
     else:
         raise TypeError(f'Cannot switch on {cond}')
