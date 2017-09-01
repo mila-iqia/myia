@@ -46,7 +46,7 @@ class PrimitiveImpl(HReprBase):
     """
     Wrapper around a pure Python implementation of a function.
     """
-    def __init__(self, fn: Callable, name: str = None) -> None:
+    def __init__(self, fn: Callable, name: Union[str, Symbol] = None) -> None:
         argn = inspect.getargs(fn.__code__).args  # type: ignore
         self.argnames: List[str] = argn
         self.nargs = len(self.argnames)
@@ -76,6 +76,7 @@ class FunctionImpl(HReprBase):
     """
     def __init__(self, ast: Lambda, envs: List[EnvT]) -> None:
         assert isinstance(ast, Lambda)
+        assert isinstance(envs, list)
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
         self.ast = ast
@@ -162,6 +163,10 @@ class Instruction:
         self.node = node
         self.args = args
 
+    def __str__(self):
+        args = ", ".join(map(str, self.args))
+        return f'{self.command}:{args}'
+
 
 class VMCode(HReprBase):
     """
@@ -176,10 +181,15 @@ class VMCode(HReprBase):
         instructions: A list of instructions to implement this
             node's behavior.
     """
-    def __init__(self, node: MyiaASTNode) -> None:
+    def __init__(self,
+                 node: MyiaASTNode,
+                 instructions: List[Instruction] = None) -> None:
         self.node = node
-        self.instructions: List[Instruction] = []
-        self.process(self.node)
+        if instructions is None:
+            self.instructions: List[Instruction] = []
+            self.process(self.node)
+        else:
+            self.instructions = instructions
 
     def instr(self, name, node, *args) -> None:
         self.instructions.append(Instruction(name, node, *args))
@@ -259,6 +269,7 @@ class VM(EventDispatcher):
                  debugger: BucheDb = None,
                  emit_events=True) -> None:
         super().__init__(self, emit_events)
+        self.compile_cache = compile_cache
         self.debugger = debugger
         self.do_emit_events = emit_events
         # Current frame
@@ -268,6 +279,9 @@ class VM(EventDispatcher):
         if self.do_emit_events:
             self.emit_new_frame(self.frame)
         self.result = self.eval()
+
+    def evaluate(self, v):
+        return evaluate(v)
 
     def eval(self) -> Any:
         while True:
@@ -330,6 +344,7 @@ class VMFrame(HReprBase):
         self.stack: List[Any] = [None]
         # Node being executed, mostly for debugging.
         self.focus: MyiaASTNode = None
+        self.signature: Any = None
 
     def done(self) -> bool:
         """
@@ -353,6 +368,12 @@ class VMFrame(HReprBase):
             args = self.stack[-n:]
             del self.stack[-n:]
             return args
+
+    def push(self, *values):
+        self.stack += list(values)
+
+    def pop(self):
+        return self.stack.pop()
 
     def next_instruction(self) -> Optional[Instruction]:
         """
@@ -407,15 +428,13 @@ class VMFrame(HReprBase):
         fn, *args = self.take(nargs + 1)
         if isinstance(fn, FunctionImpl):
             bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
-            return VMFrame(self.vm, fn.code, [bind] + fn.envs)
+            return self.__class__(self.vm, fn.code, [bind] + fn.envs)
         elif isinstance(fn, ClosureImpl):
-            self.stack.append(fn.fn)
-            self.stack += fn.args
-            self.stack += args
+            self.push(fn.fn, *fn.args, *args)
             return self.instruction_reduce(node, nargs + len(fn.args))
         else:
             value = fn(*args)
-            self.stack.append(value)
+            self.push(value)
             return None
 
     def instruction_tuple(self, node, nelems) -> None:
@@ -423,15 +442,14 @@ class VMFrame(HReprBase):
         Pop ``nelems`` values from the stack and push a
         tuple of these values.
         """
-        self.stack.append(tuple(self.take(nelems)))
+        self.push(tuple(self.take(nelems)))
 
     def instruction_closure(self, node) -> None:
         """
         Pop a tuple of arguments, and a function, and push
         ``ClosureImpl(fn, args)``
         """
-        args = self.stack.pop()
-        fn = self.stack.pop()
+        fn, args = self.take(2)
         clos = ClosureImpl(fn, args)
         self.stack.append(clos)
 
@@ -441,7 +459,7 @@ class VMFrame(HReprBase):
         under ``dest``. ``dest`` may be a Symbol or a tree
         of Symbols, represented as a Tuple.
         """
-        value = self.stack.pop()
+        value = self.pop()
 
         def store(dest, val):
             if isinstance(dest, Symbol):
@@ -461,13 +479,13 @@ class VMFrame(HReprBase):
             try:
                 v = env[sym]
                 if isinstance(v, Lambda):
-                    cv = compile_cache.get(v, None)
+                    cv = self.vm.compile_cache.get(v, None)
                     if cv is None:
-                        cv = evaluate(v)
+                        cv = self.vm.evaluate(v)
                         assert isinstance(cv, FunctionImpl)
-                        compile_cache[v] = cv
+                        self.vm.compile_cache[v] = cv
                     v = cv
-                self.stack.append(v)
+                self.push(v)
                 return None
             except KeyError as err:
                 pass
@@ -477,7 +495,7 @@ class VMFrame(HReprBase):
         """
         Push ``value`` on the stack.
         """
-        self.stack.append(value)
+        self.push(value)
 
     def instruction_lambda(self, node) -> None:
         """
@@ -485,7 +503,7 @@ class VMFrame(HReprBase):
         it on the stack.
         """
         fimpl = FunctionImpl(node, self.envs)
-        self.stack.append(fimpl)
+        self.push(fimpl)
 
     def __hrepr__(self, H, hrepr):
         views = H.tabbedView['hrepr-VMFrame']()
