@@ -121,6 +121,11 @@ def abstract_greater(x, y):
 
 
 @std_aimpl
+def abstract_less(x, y):
+    return x < y
+
+
+@std_aimpl
 def abstract_type(x):
     return typeof(x)
 

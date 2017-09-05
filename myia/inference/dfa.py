@@ -5,7 +5,7 @@ from collections import defaultdict
 from ..impl.flow_all import default_flow, ANY, VALUE
 from ..impl.main import impl_bank
 from ..symbols import builtins
-from .types import Int64
+from .types import Int64, Float64
 
 
 class DFA:

@@ -38,28 +38,27 @@ class AbstractValue:
         else:
             self.values = {VALUE: value}
 
-    def acquire(self, proj):
-        print(self, proj)
-        if proj is VALUE:
-            if VALUE in self.values:
-                return self.values[VALUE]
-            else:
-                # raise ErrorValueException(self)
-                raise Exception(f'No VALUE for {self}')
-        else:
-            assert proj
-            return aroot_globals[proj](self)
+    # def acquire(self, proj):
+    #     print(self, proj)
+    #     if proj is VALUE:
+    #         if VALUE in self.values:
+    #             return self.values[VALUE]
+    #         else:
+    #             raise Exception(f'No VALUE for {self}')
+    #     else:
+    #         assert proj
+    #         return aroot_globals[proj](self)
 
     def __getitem__(self, proj):
-        if proj not in self.values:
-            res = self.acquire(proj)
-            if proj is VALUE and isinstance(res, AbstractData):
-                self.values = copy(res.values)
-                if VALUE not in self.values:
-                    raise ErrorValueException(self)
-                return self[VALUE]
-            else:
-                self.values[proj] = res
+        # if proj not in self.values:
+        #     res = self.acquire(proj)
+        #     if proj is VALUE and isinstance(res, AbstractValue):
+        #         self.values = copy(res.values)
+        #         if VALUE not in self.values:
+        #             raise Exception(f'No VALUE for {self}')
+        #         return self[VALUE]
+        #     else:
+        #         self.values[proj] = res
         return self.values[proj]
 
     def __call__(self, proj):
@@ -71,6 +70,9 @@ class AbstractValue:
 
     def __repr__(self):
         return repr(self.values)
+
+    def __hrepr__(self, H, hrepr):
+        return hrepr(self.values)
 
     def __hash__(self):
         return hash(tuple(self.values.items()))
@@ -148,6 +150,14 @@ class AVMFrame(VMFrame):
 
     def pop(self):
         return self.take(1)[0]
+
+    def push(self, *values):
+        super().push(*values)
+        for v in values:
+            if isinstance(v, AbstractValue):
+                for proj, value in v.values.items():
+                    if proj != VALUE:
+                        self.vm.annotate(proj, value)
 
     def aux(self, node, fn, args, projs):
         nargs = len(args)
@@ -235,6 +245,7 @@ class AVM(EventDispatcher):
                  code: VMCode,
                  needs: Dict,
                  *envs: EnvT,
+                 signature=None,
                  debugger: BucheDb = None,
                  emit_events=True) -> None:
         super().__init__(self, emit_events)
@@ -245,7 +256,7 @@ class AVM(EventDispatcher):
         self.debugger = debugger
         self.do_emit_events = emit_events
         # Current frame
-        self.frame = AVMFrame(self, code, list(envs), None)
+        self.frame = AVMFrame(self, code, list(envs), signature)
         # Stack of previous frames (excludes current one)
         self.frames: List[AVMFrame] = []
         if self.do_emit_events:
@@ -254,6 +265,15 @@ class AVM(EventDispatcher):
         self.checkpoints: List = []
         self.checkpoints_on: Dict = defaultdict(list)
         self.sig_stack: List = []
+        self.annotations: Dict = \
+            defaultdict(lambda: defaultdict(lambda: defaultdict(set)))
+
+    def annotate(self, track, value):
+        # path = [f.focus for f in self.frames]
+        node = self.frame.focus
+        path = tuple(f.signature[0].ast.ref or '?' if f.signature else '?'
+                     for f in self.frames + [self.frame])
+        self.annotations[node][track][path].add(value)
 
     def consult_cache(self, key):
         try:
@@ -269,16 +289,18 @@ class AVM(EventDispatcher):
             return False, None
 
     def add_cache(self, sig, value):
+        if sig not in self.results_cache:
+            return
         if value in self.results_cache[sig]:
             return
         self.results_cache[sig].add(value)
         for (frs, fr, sig_stack) in self.checkpoints_on[sig]:
             self.checkpoints.append((frs, fr, sig_stack, [[value]]))
 
-    def checkpoint(self, paths):
+    def checkpoint(self, paths, step_back=-1):
         # fr = AVMFrame(self, self.frame.code, self.frame.envs)
         # fr.pc = self.frame.pc - 1
-        fr = self.frame.copy(-1)
+        fr = self.frame.copy(step_back)
         frs = [f.copy() for f in self.frames]
         self.checkpoints.append((frs, fr, set(self.sig_stack), paths))
 
@@ -291,7 +313,7 @@ class AVM(EventDispatcher):
         parse_env = lbda.global_env
         assert parse_env is not None
         envs = (parse_env.bindings, aroot_globals)
-        fn, = list(run_avm(VMCode(lbda), *envs))
+        fn, = list(run_avm(VMCode(lbda), *envs).result)
         return fn
 
     def go(self) -> Any:
@@ -320,8 +342,8 @@ class AVM(EventDispatcher):
                 rval = self.frame.top()
                 if isinstance(rval, Fork):
                     self.frame.pop()
-                    self.checkpoint([[p] for p in rval.paths])
-                    raise Escape()
+                    self.checkpoint([[p] for p in rval.paths], 0)
+                    return None
 
                 sig = self.frame.signature
                 if sig is not None:
@@ -344,7 +366,7 @@ class AVM(EventDispatcher):
             #         self.emit_error(exc)
             #     raise exc from None
             except WrappedException as exc:
-                return {ERROR: exc.error}
+                return AbstractValue({ERROR: exc.error})
 
     def eval(self) -> Any:
         while True:
@@ -365,11 +387,12 @@ class AVM(EventDispatcher):
 
 def run_avm(code: VMCode,
             *binding_groups: EnvT,
-            debugger: BucheDb = None) -> Any:
+            debugger: BucheDb = None,
+            signature=None) -> Any:
     """
     Execute the VM on the given code.
     """
-    return AVM(code, *binding_groups, debugger=debugger).result
+    return AVM(code, *binding_groups, debugger=debugger, signature=signature)
 
 
 def abstract_evaluate(lbda, args, proj=None):
@@ -385,8 +408,9 @@ def abstract_evaluate(lbda, args, proj=None):
     d.visit(lbda)
     d.propagate(lbda.body, 'needs', proj or VALUE)
 
-    fn, = list(run_avm(VMCode(lbda), *envs))
+    fn, = list(run_avm(VMCode(lbda), *envs).result)
     return run_avm(fn.code,
                    d.values[d.tracks['needs']],
                    {s: arg for s, arg in zip(lbda.args, args)},
-                   *fn.envs)
+                   *fn.envs,
+                   signature=(fn, args))
