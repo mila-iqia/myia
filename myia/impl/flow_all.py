@@ -2,7 +2,7 @@
 from .main import symbol_associator, impl_bank
 from ..stx import Value, Tuple
 from ..util import Keyword
-from unification import var
+# from unification import var
 from ..inference.types import Array, Bool, Float64, Int64, Type
 
 
