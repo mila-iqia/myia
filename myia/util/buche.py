@@ -92,7 +92,7 @@ class MasterBuche:
                  contents=str(msg),
                  **params)
 
-    def show(self, obj, path='/', kind='log', **hrepr_params):
+    def show(self, obj, path='/', kind='log', location='', **hrepr_params):
         r = self.hrepr(obj)  # , **hrepr_params)
         for res in self.hrepr.resources:
             if res not in self.resources:
@@ -103,7 +103,7 @@ class MasterBuche:
                     contents = str(res)
                 )
                 self.resources.add(res)
-        self.log(r, format='html', kind=kind, path=path)
+        self.log(r, format='html', kind=kind, location=location, path=path)
 
 
 class Buche:
@@ -160,9 +160,9 @@ class Buche:
             self.open(item, type, force=True, **params)
         return Buche(self.master, subchannel)
 
-    def __call__(self, obj, kind="log", **params):
+    def __call__(self, obj, kind="log", location="", **params):
         self.master.show(obj, hrepr_params=params,
-                         path=self.channel, kind=kind)
+                         path=self.channel, kind=kind, location=location)
 
 
 master = MasterBuche(StdHRepr())
@@ -185,6 +185,9 @@ def handle_exception(e, H, hrepr):
         f': {first}' if iss else '',
         args_table
     )
+    if not entries:
+        return views
+
     last = entries[-1]
     for entry in entries:
         filename, lineno, funcname, line = entry

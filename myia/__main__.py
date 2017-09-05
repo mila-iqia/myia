@@ -359,9 +359,11 @@ def command_inspect(arguments):
     reader = Reader()
 
     from .inference.dfa import DFA, TypeTrack, ValueTrack, NeedsTrack
-    d = DFA([TypeTrack, ValueTrack, lambda dfa: NeedsTrack(dfa, ['type'])],
+    d = DFA([TypeTrack, ValueTrack, lambda dfa: NeedsTrack(dfa, [])],
             results['bindings'])
     d.visit(results['lbda'])
+    from .symbols import builtins
+    d.propagate(results['lbda'].body, 'needs', builtins.type)
 
     @reader.on_click
     def handle(e, cmd):
@@ -370,9 +372,9 @@ def command_inspect(arguments):
             if cmd.alt:
                 res = {t: d.values[t][obj] for t in d.tracks.values()}
                 res['Node'] = obj
-                buche[cmd.path](res)
+                buche[cmd.path](res, location='overlay')
             else:
-                buche[cmd.path](AboutPrinter(obj))
+                buche[cmd.path](AboutPrinter(obj), location='overlay')
         except Exception as exc:
             buche[cmd.path](exc)
     reader.run()
