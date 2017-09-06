@@ -21,8 +21,12 @@ from .util import buche, Reader, id_registry
 from .util import on_discovery
 from .interpret import VM
 from .stx import Symbol, AboutPrinter
+from .stx import nodes
 from .front import ParseEnv
 from .util import BucheDb
+
+
+nodes.__save_trace__ = True
 
 
 ###############################

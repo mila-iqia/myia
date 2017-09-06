@@ -9,7 +9,7 @@ Myia's AST.
 from typing import \
     List, Tuple as TupleT, Iterable, Dict, Set, Union, \
     cast, TypeVar, Any
-
+import os
 from copy import copy
 import traceback
 from ..util import HReprBase
@@ -19,6 +19,7 @@ from .about import Location, top as about_top
 __save_trace__ = False
 
 
+stx_dir = os.path.dirname(__file__)
 Locatable = Union['MyiaASTNode', 'Location', None]
 LHS = Union['Symbol', 'Tuple']
 Binding = TupleT[LHS, 'MyiaASTNode']
@@ -44,7 +45,7 @@ class MyiaASTNode(HReprBase):
             frame = frames.pop()
             # We skip all frames from helper functions defined
             # in this file.
-            while frames and frame.filename == __file__:  # type: ignore
+            while frames and frame.filename.startswith(stx_dir):  # type: ignore
                 frame = frames.pop()
             self.trace = Location(
                 frame.filename,  # type: ignore
