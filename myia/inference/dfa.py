@@ -1,3 +1,9 @@
+"""
+Dataflow analysis, akin to 0-CFA.
+
+See Inference section of DEVELOPERS.md for some more information.
+"""
+
 
 from ..util import Event, Keyword, buche
 from ..stx import Lambda, Closure, Tuple, Symbol
@@ -9,31 +15,68 @@ from .types import Int64, Float64
 
 
 class DFA:
+    """
+    Create a DFA instance.
+
+    The DFA can propagates information on "tracks". Each track
+    can define custom behavior, and can work together.
+    The main track is a ValueTrack, which propagates values such
+    as Lambdas and Closures, but there are also TypeTracks and
+    NeedsTracks.
+
+    Attributes:
+        tracks: Associates track names to Track instances.
+        value_track: Shortcut for ``dva.values['value']``
+        genv: ParseEnv containing the global environment, in
+            order to resolve constant symbols.
+        flow_events: Maps MyiaASTNodes to Event instances that
+            can be called when a value must be propagated to
+            that node, and can be listened to.
+        values: Maps each track to a map of each node to a set
+            of possible values flowing to that node.
+    """
     def __init__(self, tracks, genv):
         tracks = [track(self) for track in tracks]
         self.tracks = {track.name: track for track in tracks}
         self.value_track = self.tracks['value']
         self.genv = genv
-        self.flow_graph = {}
+        self.flow_events = {}
         self.values = {track: defaultdict(set)
                        for track in self.tracks.values()}
 
     def propagate(self, node, track, value):
+        """
+        Declare that the given node has the given value on the
+        given track, and propagate that information.
+        """
         if isinstance(track, str):
             track = self.tracks[track]
         vals = self.values[track]
         if value not in vals[node]:
             vals[node].add(value)
-            self.flow_graph[node](track, value)
+            self.flow_events[node](track, value)
 
     def propagate_value(self, node, value):
+        """
+        Shorthand for ``dfa.propagate(node, 'value', value)``
+        """
         self.propagate(node, self.value_track, value)
 
     def run_flows(self, method, *args):
+        """
+        Run the ``flow_<method>`` method for each track on
+        the given arguments.
+        """
         for track in self.tracks.values():
             getattr(track, f'flow_{method}')(*args)
 
     def flow_to(self, a, b):
+        """
+        Declare that all values that flow to ``a`` also flow to
+        ``b`` on all tracks marked as ``'forwards'``. On tracks
+        marked as ``'backwards'``, values flow from ``b`` to
+        ``a`` instead.
+        """
         @self.on_flow_from(a)
         def flow(track, value):
             if track.direction == 'forwards':
@@ -45,51 +88,85 @@ class DFA:
                 self.propagate(a, track, value)
 
     def on_flow_from(self, node, require_track=None):
+        """
+        Returns a decorator for a function that must be triggered
+        every time a value is propagated to ``node``, optionally
+        filtering by track. If values are already associated to
+        ``node``, the function will be called immediately for each
+        of them.
+        """
         if isinstance(require_track, str):
             require_track = self.tracks[require_track]
 
         def deco(fn):
-            reg = self.flow_graph[node].register
+            reg = self.flow_events[node].register
 
             @reg
             def flow(_, track, value):
+                # The first argument is the event instance, we
+                # don't need it.
                 if not require_track or track is require_track:
                     fn(track, value)
+
+            # Call the function for all tracks and values
+            # TODO: avoid doing this for tracks that are not
+            # required!
             for track in self.tracks.values():
                 for v in self.values[track][node]:
                     flow(None, track, v)
         return deco
 
-    def on_function_flow(self, fn, args, node, flow_body=True):
+    def function_flow(self, fn, args, node, flow_body=True):
+        """
+        Properly wire the flow around a function application.
+
+        Arguments:
+            fn: A node to which functions will flow.
+            args: Nodes that are given to fn as arguments.
+            node: The node for the whole application.
+            flow_body: Whether a function's body ought to
+                flow to the node (this will be False for
+                closures).
+        """
 
         def on_new_fn_value(track, new_value):
             nonlocal args
             assert track is self.value_track
             if isinstance(new_value, Lambda):
                 if flow_body:
+                    # The Lambda's body flows to its application's
+                    # result.
                     self.flow_to(new_value.body, node)
                 for arg, lbda_arg in zip(args, new_value.args):
+                    # Each argument to the function flows to the
+                    # Lambda's corresponding argument.
                     self.flow_to(arg, lbda_arg)
             elif isinstance(new_value, Closure):
+                # If we get a Closure, we accumulate the args in front
+                # and we repeat the procedure for the Closure's function,
+                # which will receive the totality of the arguments.
                 args = new_value.args + args
-                self.on_function_flow(new_value.fn, args, node, flow_body)
+                self.function_flow(new_value.fn, args, node, flow_body)
             elif new_value in builtins.__dict__.values():
+                # If we get a Primitive, we dispatch to the tracks.
                 if flow_body:
                     self.run_flows('prim', new_value, args, node)
             elif new_value is ANY:
+                # Whatever goes.
                 self.propagate_value(node, ANY)
             else:
+                # TODO: This is more brutal than necessary.
                 raise Exception(
                     f'Cannot flow a non-function here: {new_value}'
                 )
         self.on_flow_from(fn, self.value_track)(on_new_fn_value)
 
     def visit(self, node):
-        if node in self.flow_graph:
-            return self.flow_graph[node]
+        if node in self.flow_events:
+            return self.flow_events[node]
         cls = node.__class__.__name__
         flow = Event(f'flow_{cls}')
-        self.flow_graph[node] = flow
+        self.flow_events[node] = flow
         method = getattr(self, f'visit_{cls}')
         return method(node)
 
@@ -97,12 +174,12 @@ class DFA:
         # (f a)
         # If (lambda (x) body) ~> f and v ~> a, v ~> x
         # If (lambda (x) body) ~> f and v ~> body, v ~> (f a)
-        flow = self.flow_graph[node]
+        flow = self.flow_events[node]
         self.visit(node.fn)
         for a in node.args:
             self.visit(a)
 
-        self.on_function_flow(node.fn, node.args, node, True)
+        self.function_flow(node.fn, node.args, node, True)
         self.run_flows('Apply', node)
 
     def visit_Begin(self, node):
@@ -110,14 +187,16 @@ class DFA:
         self.run_flows('Begin', node)
 
     def visit_Closure(self, node):
+        # Closures flow to themselves.
         self.visit(node.fn)
         for arg in node.args:
             self.visit(arg)
-        self.on_function_flow(node.fn, node.args, node, False)
+        self.function_flow(node.fn, node.args, node, False)
         self.propagate_value(node, node)
         self.run_flows('Closure', node)
 
     def visit_Lambda(self, node):
+        # Lambdas flow to themselves.
         for arg in node.args:
             self.visit(arg)
         self.visit(node.body)
@@ -125,7 +204,11 @@ class DFA:
         self.run_flows('Lambda', node)
 
     def visit_Let(self, node):
+        # There is some complex behavior here, mainly because it is possible
+        # to bind to tuples, and we want the analysis to deconstruct them
+        # whenever possible.
         def _visit(v):
+            # Visit all variables through tuples.
             if isinstance(v, Tuple):
                 for _v in v.values:
                     _visit(_v)
@@ -133,6 +216,7 @@ class DFA:
                 self.visit(v)
 
         def _vars(v):
+            # Return a flattened list of all variables defined here.
             if isinstance(v, Tuple):
                 rval = []
                 for _v in v.values:
@@ -143,15 +227,23 @@ class DFA:
 
         def _bind(var, value):
             if isinstance(var, Tuple):
+                # If the value is bound to a Tuple, we check what
+                # flows to the value.
                 @self.on_flow_from(value)
                 def flow_tuple(track, new_value):
                     if isinstance(new_value, Tuple):
+                        # If a Tuple flows, we can deconstruct it and
+                        # bind each variable to the corresponding
+                        # Tuple element, gaining precision.
                         for v, sub_value in zip(var.values, new_value.values):
                             _bind(v, sub_value)
                     else:
+                        # Otherwise, we flow ANY to all variables
+                        # in the Tuple.
                         for v in _vars(var):
                             self.propagate_value(v, ANY)
             else:
+                # The single variable case. Quite straightforward.
                 self.flow_to(value, var)
 
         for v, value in node.bindings:
@@ -164,23 +256,36 @@ class DFA:
 
     def visit_Symbol(self, node):
         if node in self.genv.bindings:
+            # If the symbol is associated to a global variable (which
+            # are constant), we fetch the value and propagate it.
             b = self.genv[node]
             self.visit(b)
             self.propagate_value(node, b)
         elif node in builtins.__dict__.values():
+            # We propagate builtin symbols, although it may be better
+            # to do this another way.
             self.propagate_value(node, node)
         self.run_flows('Symbol', node)
 
     def visit_Tuple(self, node):
+        # Tuples flow to themselves, which allows us to flow individual
+        # elements in deconstructing assignments or constant indexing.
         for v in node.values:
             self.visit(v)
+        self.propagate_value(node, node)
         self.run_flows('Tuple', node)
 
     def visit_Value(self, node):
+        # Values flow to themselves.
+        self.propagate_value(node, node)
         self.run_flows('Value', node)
 
 
 class Track:
+    """
+    A Track supplements a DFA by defining extra flow rules
+    for various node types and/or for primitives.
+    """
     def __init__(self, name, dfa, direction='forwards'):
         self.name = name
         self.dfa = dfa
@@ -230,11 +335,11 @@ class ValueTrack(Track):
     def __init__(self, dfa):
         super().__init__('value', dfa)
 
-    def flow_Tuple(self, node):
-        self.propagate(node, node)
+    # def flow_Tuple(self, node):
+    #     self.propagate(node, node)
 
-    def flow_Value(self, node):
-        self.propagate(node, node)
+    # def flow_Value(self, node):
+    #     self.propagate(node, node)
 
 
 class TypeTrack(Track):
@@ -325,7 +430,6 @@ class NeedsTrack(Track):
 
     def flow_prim(self, prim, args, node):
         m = needs_map.get(prim, needs_map['default'])
-        # print(prim)
 
         @self.dfa.on_flow_from(node, 'needs')
         def on_need(track, value):

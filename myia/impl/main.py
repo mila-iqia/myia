@@ -1,3 +1,12 @@
+"""
+Defines a decorator for implementations. See myia.impl.impl_interp
+for a use of ``symbol_associator``.
+
+Take note of the ``impl_bank`` dictionary. It maps keys such as 'interp'
+or 'abstract' to a set of implementations. This is where all implementations
+are stored, in fact.
+"""
+
 
 from typing import Dict, Any
 from collections import defaultdict

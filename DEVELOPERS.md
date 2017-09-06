@@ -23,7 +23,7 @@ myia/                           # Source code for Myia
         impl_abstract      F    # Implementations for inference/avm
         impl_bprop       IG     # Backpropagators for interpret/vm
         impl_interp      IG     # Implementations for interpret/vm
-        main             I      # Utilities for implementations
+        main           ! I      # Utilities for implementations
         proj               F    # Utilities for inferrers
         proj_shape         F    # Shape inference for inference/avm
         proj_type          F    # Type inference for inference/avm
@@ -95,7 +95,7 @@ For each function transformed by Grad, several auxiliary functions will be creat
 
 * `♦f` is the closure-converted backpropagator function for `f`. Being closure-converted means it has no free variables. This is an implementation detail.
 
-## Gradient variables
+### Gradient variables
 
 In the generated code you will see the following variables:
 
@@ -139,35 +139,31 @@ Then we will get something like this:
 ↑z = 10  # free variable
 
 def ♦f(♢a, ♢b, ∇b):
-    # The zeros should be the same "shape" as
-    # g, x, y, ...
+    # The zeros should be the same "shape" as g, x, y, ...
     zero_init(∇g, ∇x, ∇y, ∇z, ∇h, ∇a)
-    # Backpropagation, operates in reverse order:
-    # propagate through h, then through g. Notice:
-    # * We have gradient terms for g and h, because they
-    #   could be closures or partial applications, and
-    #   we must track the contributions.
-    # * The left-hand side looks just like the function
-    #   application. h(a, x) becomes ∇h, ∇a, ∇x +=
-    # * The right-hand side is also very easy to remember,
-    #   it's bprop(grad) for each variable you set in the
-    #   original function, in reverse order
+    # Backpropagation, operates in reverse order: propagate through h, then
+    # through g. Notice:
+    # * We have gradient terms for g and h, because they could be closures
+    #   or partial applications, and we must track the contributions.
+    # * The left-hand side looks just like the function application.
+    #   h(a, x) becomes ∇h, ∇a, ∇x += ...
+    # * The right-hand side is also very easy to remember, it's bprop(grad)
+    #   for each variable you set in the original function, in reverse order.
     ∇h, ∇a, ∇x += ♢b(∇b)
     ∇g, ∇x, ∇y, ∇z += ♢a(∇a)
-    # Note that ∇z is stashed in the first return value.
-    # Gradients for all of f's free variables must go there.
+    # Note that ∇z is stashed in the first return value. Gradients for all
+    # of f's free variables must go there.
     return ((∇z,), ∇x, ∇y)
 
 def ↑f(↑x, ↑y):
-    # The "tagged" functions ↑g and ↑h give us both
-    # tagged forward results and backpropagators.
+    # The "tagged" functions ↑g and ↑h give us both tagged forward results
+    # and backpropagators.
     ↑a, ♢a = ↑g(↑x, ↑y, ↑z)
     ↑b, ♢b = ↑h(↑a, ↑x)
     def ♢f(∇f):
         # Closure on ♦f
         return ♦f(♢a, ♢b, ∇f)
-    # We return the tagged original return value
-    # and a backpropagator.
+    # We return the tagged original return value and a backpropagator.
     return ↑b, ♢f
 ```
 
