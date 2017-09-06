@@ -1,6 +1,4 @@
 from myia.front import parse_function, MyiaSyntaxError
-# from myia.inference.infer import \
-#     abstract_evaluate, AbstractValue, AbstractData, VALUE
 from myia.inference.avm import \
     aroot_globals, abstract_evaluate, AbstractValue, ERROR, ANY
 from myia.interpret import FunctionImpl
@@ -15,15 +13,6 @@ xfail = pytest.mark.xfail
 
 
 _functions = {}
-
-
-# def _unwrap(results):
-#     if isinstance(results, AbstractData):
-#         return _unwrap(results[VALUE])
-#     elif isinstance(results, tuple):
-#         return tuple(_unwrap(x) for x in results)
-#     else:
-#         return results
 
 
 def val(x):
@@ -76,28 +65,9 @@ def infer(**tests):
 #################
 
 
-# # @xfail
-# @infer(type=[(Array[Float32], Array[Float32], Array[Float32]),
-#              (Array[Float32], Bool, False)],
-#        shape=[((5, 6), (5, 6), (5, 6)),
-#               ((5, 6), (7, 6), False)])
-# def test_add(x, y):
-#     return x + y
-
-
-# @xfail
-# @infer(type=[(Array[Float32], Array[Float32], Array[Float32]),
-#              (Array[Float32], Bool, False)],
-#        shape=[((5, 6), (6, 10), (5, 10)),
-#               ((5, 6), (5, 6), False)])
-# def test_dot(x, y):
-#     return x @ y
-
-
-# type=[(Array[Float32], Array[Float32], Array[Float32]),
-#       (Array[Float32], Bool, False)],
-
-@infer(shape=[((5, 6), (5, 6), (5, 6)),
+@infer(type=[(Array[Float32], Array[Float32], Array[Float32]),
+             (Array[Float32], Bool, False)],
+       shape=[((5, 6), (5, 6), (5, 6)),
               ((5, 3), (5, 9), False)])
 def test_add(x, y):
     return x + y
@@ -146,7 +116,7 @@ def test_unknown(x, y):
               (val(1), (5, 6), (6, 8), (5, 8)),
               (val(2), (5, 6), (6, 8), False),
               (val(3), (5, 6), (6, 6), (5, 6)),
-              # The following should **not** be executing 1,000,000 loops
+              # The following should **not** be executing 1,000,000 iterations
               (val(1_000_000), (5, 6), (6, 6), (5, 6)),
               (val(ANY), (5, 6), (6, 6), (5, 6)),
               (val(ANY), (5, 6), (6, 8), {False, (5, 6), (5, 8)})])
@@ -155,3 +125,17 @@ def test_precise_loop(n, x, y):
         x = x @ y
         n = n - 1
     return x
+
+
+@xfail
+@infer(shape=[(val(ANY), (5, 6), (10, 12), {(5, 6), (10, 12)})])
+def test_precise_tracking(n, x, y):
+    # The analysis thinks that this code can produce a shape
+    # error because it does not understand that both occurrences
+    # of f(x, y) must return the same value, even if n is unknown.
+    def f(x, y):
+        if n < 0:
+            return x
+        else:
+            return y
+    return f(x, y) + f(x, y)

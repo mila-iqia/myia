@@ -1,6 +1,6 @@
 
 from .main import symbol_associator, impl_bank
-from ..interpret import FunctionImpl
+from ..interpret import PrimitiveImpl, FunctionImpl
 from ..front import parse_function
 
 
@@ -21,6 +21,19 @@ def proj(psym):
                 FunctionImpl(lbda, [impl_bank['abstract']])
         projs[impl_bank['abstract'][sym]] = \
             FunctionImpl(fenv[fsym], [impl_bank['abstract']])
+        return fn
+
+    return pimpl
+
+
+def natproj(psym):
+    projectors = impl_bank['project']
+    projs = projectors.setdefault(psym, {})
+
+    @symbol_associator('proj')
+    def pimpl(sym, name, fn):
+        projs[impl_bank['abstract'][sym]] = \
+            PrimitiveImpl(fn)
         return fn
 
     return pimpl

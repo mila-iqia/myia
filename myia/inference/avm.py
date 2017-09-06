@@ -188,7 +188,7 @@ class AVMFrame(VMFrame):
             instrs.append(Instruction('push', node.fn, pfn))
             for arg in args:
                 instrs.append(Instruction('push', None, arg))
-            instrs.append(Instruction('reduce', node, nargs))
+            instrs.append(Instruction('reduce', node, nargs, False))
         instrs.append(Instruction('assemble', node, projs))
         vmc = VMCode(node, instrs)
         return self.__class__(self.vm, vmc, [], None)
@@ -218,7 +218,7 @@ class AVMFrame(VMFrame):
         value = AbstractValue({p: v for p, v in zip(projs, values)})
         self.push(value)
 
-    def instruction_reduce(self, node, nargs):
+    def instruction_reduce(self, node, nargs, has_projs=True):
         fn, *args = self.take(nargs + 1)
         fn = unwrap_abstract(fn)
         if isinstance(fn, FunctionImpl):
@@ -248,7 +248,7 @@ class AVMFrame(VMFrame):
                     self.push(arg[fn.name])
                     return None
 
-            projs = self.vm.needs[node]
+            projs = self.vm.needs[node] if has_projs else []
             if VALUE in projs or len(projs) == 0:
                 value = fn(*args)
                 self.push(value)

@@ -6,6 +6,7 @@ from ..interpret import \
     PrimitiveImpl, FunctionImpl, ClosureImpl, evaluate
 from ..symbols import ZERO
 from ..grad import JX
+from ..inference.types import typeof
 
 
 _ = True
@@ -325,7 +326,7 @@ def interp_assert_true(x, msg):
 
 @impl_interp
 def interp_type(x):
-    return type(x)
+    return typeof(x)
 
 
 @impl_interp
