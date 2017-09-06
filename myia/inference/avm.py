@@ -15,6 +15,21 @@ from ..impl.flow_all import ANY, VALUE, ERROR, OPEN
 compile_cache: Dict = {}
 aroot_globals = impl_bank['abstract']
 projector_set = set()
+max_depth = 5
+
+
+class SetDepth:
+    def __init__(self, depth):
+        self.prev_depth = max_depth
+        self.depth = depth
+
+    def __enter__(self):
+        global max_depth
+        max_depth = self.depth
+
+    def __exit__(self, excv, exct, exctb):
+        global max_depth
+        max_depth = self.prev_depth
 
 
 def wrap_abstract(v):
@@ -32,7 +47,10 @@ def unwrap_abstract(v):
 
 
 class AbstractValue:
-    def __init__(self, value):
+    def __init__(self, value, depth=0):
+        self.depth = depth
+        if depth > max_depth:
+            value = ANY
         if isinstance(value, dict):
             self.values = value
         else:
@@ -152,6 +170,8 @@ class AVMFrame(VMFrame):
         return self.take(1)[0]
 
     def push(self, *values):
+        # values = [value if isinstance(value, AbstractValue)
+        #           else AbstractValue(value) for value in values]
         super().push(*values)
         for v in values:
             if isinstance(v, AbstractValue):
@@ -173,6 +193,13 @@ class AVMFrame(VMFrame):
         vmc = VMCode(node, instrs)
         return self.__class__(self.vm, vmc, [], None)
 
+    def instruction_closure(self, node) -> None:
+        fn, args = self.take(2)
+        fn = unwrap_abstract(fn)
+        args = unwrap_abstract(args)
+        clos = ClosureImpl(fn, args)
+        self.stack.append(clos)
+
     def instruction_store(self, node, dest) -> None:
         value = self.pop()
         if isinstance(dest, Tuple) and isinstance(value, AbstractValue):
@@ -193,6 +220,7 @@ class AVMFrame(VMFrame):
 
     def instruction_reduce(self, node, nargs):
         fn, *args = self.take(nargs + 1)
+        fn = unwrap_abstract(fn)
         if isinstance(fn, FunctionImpl):
             bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
             sig = (fn, tuple(args))
@@ -409,6 +437,7 @@ def abstract_evaluate(lbda, args, proj=None):
     d.propagate(lbda.body, 'needs', proj or VALUE)
 
     fn, = list(run_avm(VMCode(lbda), *envs).result)
+    fn = unwrap_abstract(fn)
     return run_avm(fn.code,
                    d.values[d.tracks['needs']],
                    {s: arg for s, arg in zip(lbda.args, args)},

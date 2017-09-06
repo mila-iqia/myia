@@ -53,6 +53,8 @@ def aimpl_factory(unwrap_args=True,
             c_var_to_any = complete_switches(args, var_to_any)
             opts = []
 
+            max_depth = max(arg.depth if isinstance(arg, AbstractValue)
+                            else 0 for arg in args)
             unwrapped = [unwrap_abstract(arg) for arg in args]
 
             if unwrapped is None:
@@ -71,7 +73,7 @@ def aimpl_factory(unwrap_args=True,
                 #     result = AbstractValue({ERROR: exc.error})
 
             if wrap_result:
-                result = AbstractValue(result)
+                result = AbstractValue(result, max_depth + 1)
 
             return result
 

@@ -146,6 +146,8 @@ def test_unknown(x, y):
               (val(1), (5, 6), (6, 8), (5, 8)),
               (val(2), (5, 6), (6, 8), False),
               (val(3), (5, 6), (6, 6), (5, 6)),
+              # The following should **not** be executing 1,000,000 loops
+              (val(1_000_000), (5, 6), (6, 6), (5, 6)),
               (val(ANY), (5, 6), (6, 6), (5, 6)),
               (val(ANY), (5, 6), (6, 8), {False, (5, 6), (5, 8)})])
 def test_precise_loop(n, x, y):
