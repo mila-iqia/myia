@@ -1,3 +1,12 @@
+"""
+This file contains essentially everything that's about Symbol
+manipulation.
+
+* An assortment of special characters to modify symbols.
+* ``GenSym``: generate Symbols.
+* ``ParseEnv``: map Symbols to Lambda or Value.
+"""
+
 
 from typing import \
     List, Tuple as TupleT, Iterable, Dict, Set, Union, \
@@ -10,6 +19,7 @@ from uuid import uuid4 as uuid
 ###############################################
 # Special characters to modify function names #
 ###############################################
+
 
 THEN = '✓'
 ELSE = '✗'
@@ -33,6 +43,7 @@ TMP_LET = f'{TMP}let'
 #####################
 # Symbol generation #
 #####################
+
 
 class GenSym:
     """
@@ -109,8 +120,12 @@ def bsym(name: str) -> Symbol:
     """
     Create a builtin symbol.
 
-    This function is for internal use and are not meant to
-    be referred to by name by the user.
+    A builtin symbol points to a function for internal use
+    which is not meant to be referred to by name by the user.
+    Accordingly, it will not be present in the user namespace.
+
+    It is the case that ``bsym(x) == bsym(x)``, because
+    builtins are indexed by name only.
     """
     return Symbol(name, namespace='builtin')
 
@@ -119,7 +134,10 @@ def gsym(name: str) -> Symbol:
     """
     Create a global symbol.
 
-    This function can be called by name by the user.
+    A global symbol can be called by name by the user.
+
+    It is the case that ``gsym(x) == gsym(x)``, because
+    globals are indexed by name only.
     """
     return Symbol(name, namespace='global')
 
@@ -133,6 +151,10 @@ def nsym() -> Symbol:
 
     Use as a placeholder in destructuring assignments for
     irrelevant elements.
+
+    It is **not** the case that ``nsym() == nsym()``. Each
+    null symbol is different. That might be something to
+    fix.
     """
     return _ngen(NULLSYM)
 
@@ -172,7 +194,7 @@ class ParseEnv:
         declare(event, symbol, lbda): Triggered when a new mapping
             is added. You can listen to this to track the various
             functions that are being compiled. Use
-            ``@parse_env.events.on_declare`` decorator.
+            ``@parse_env.events.on_declare`` as a decorator.
     """
 
     def __init__(self,

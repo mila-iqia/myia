@@ -2,7 +2,6 @@
 Myia's AST.
 
 * Definitions for all node types.
-* Symbol handling: GenSym and ParseEnv.
 * Base class for Transformers.
 """
 

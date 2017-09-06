@@ -1,3 +1,23 @@
+"""
+Helpers to track the evolution of a node through transformations,
+notably source code location.
+
+Consider:
+
+    with About(original_node, 'my-transform'):
+        return f(original_node)
+
+Any node (as defined in myia.stx.nodes) created while the ``with``
+block is active, in this case during the execution of ``f``, will have
+its ``about`` field set to the ``About`` instance. This will mark it
+as being "about" ``original_node``, with the tag ``my-transform``. The
+``about`` field can thus form a chain going all the way back to the
+original node made during parsing.
+
+All code transforms should use ``with About(...)`` in their implementation
+in order to preserve this chain, with as fine a granularity as possible.
+"""
+
 
 from typing import Any
 import threading
@@ -10,8 +30,10 @@ class MyiaSyntaxError(Exception):
     raised for any feature that is not supported.
 
     Attributes:
-        location: The error's location in the original source.
         message: A precise assessment of the problem.
+        location: The error's location in the original source. If not
+            provided, it will be extracted from the node we are currently
+            About.
     """
     def __init__(self, message: str, location: 'Location' = None) -> None:
         self.location = location or current_location()
@@ -19,15 +41,23 @@ class MyiaSyntaxError(Exception):
         super().__init__(self.message, self.location)
 
 
+# We use per-thread storage for the about stack.
 _about = threading.local()
 _about.stack = [None]
 
 
 def top():
+    """
+    Return the currently active ``About`` instance.
+    """
     return _about.stack[-1]
 
 
 def current_location():
+    """
+    Follow the about chain of the node we are currently about in order
+    to find where in the source code it ultimately came from.
+    """
     abt = top()
     while abt:
         node = abt.node
@@ -41,6 +71,15 @@ def current_location():
 
 
 class About:
+    """
+    Any code executed during the ``About`` context manager is understood
+    to be "about" the node given in the constructor. It is up to
+    compliant object constructors to consult what node they are about and
+    to store that information. This is done by ``MyiaASTNode`` instances.
+
+    ``About`` instances are pushed on a per-thread stack, therefore
+    ``with`` calls to ``About`` can be nested.
+    """
     def __init__(self, node, transform):
         self.node = node
         self.transform = transform
@@ -53,6 +92,12 @@ class About:
 
 
 class AboutPrinter:
+    """
+    Through its ``__hrepr__`` representation, an AboutPrinter can be
+    printed out to Buche and will display a chain of about nodes that
+    can be navigated, along with stack traces for the creation of each
+    node when they are available.
+    """
     def __init__(self, node):
         self.node = node
 
