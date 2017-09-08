@@ -220,6 +220,14 @@ def test_while(x, y, z):
     return rval
 
 
+@grad_test((2,), (4,), (8,))
+def test_for(n):
+    y = 0
+    for x in range(10):
+        y += n
+    return y
+
+
 @grad_test((2,), (3,))
 def test_pow10(x):
     v = x

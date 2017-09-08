@@ -231,6 +231,43 @@ def test_pow10(x):
 #testGrad(pow10, [2], [1024], [5120])
 
 
+# Test for loops
+@myia_test(
+    (2, 1),
+    (10, 45)
+)
+def test_for(n):
+    y = 0
+    for x in range(n):
+        y += x
+    return y
+
+
+@myia_test(
+    (((),), 0),
+    (((54,),), 54),
+    (((1, 2, 3, 4),), 10)
+)
+def test_sum(xs):
+    y = 0
+    for x in xs:
+        y += x
+    return y
+
+
+@myia_test(
+    (((),), 0),
+    (((54,),), 1),
+    (((1, 2, 3, 4),), 16)
+)
+def test_nested_for(xs):
+    y = 0
+    for x1 in xs:
+        for x2 in xs:
+            y += 1
+    return y
+
+
 ##########
 # Errors #
 ##########

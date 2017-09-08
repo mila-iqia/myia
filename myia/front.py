@@ -710,7 +710,80 @@ class Parser(LocVisitor):
         #         ^^^^^^^^^
         return Tuple(self.visit(v) for v in node.dims)
 
-    # def visit_For(self, node): # TODO
+    def visit_For(self, node):
+        # CASE: for x in xs: ...
+
+        # TODO: this is c/p from while, maybe try to abstract the common
+        # parts.
+
+        if node.orelse:
+            raise MyiaSyntaxError("For loops may not have an else: clause.")
+
+        assert self.dest
+        wsym = self.global_env.gen(self.dest, WTEST)
+        wbsym = self.global_env.gen(self.dest, WLOOP)
+
+        augm_body = node.body + [ast.Assign()]
+
+        # We visit the body once to get the free variables
+        testp = self.sub_parser(global_env=ParseEnv(), dry=True)
+        testp.return_error = 'Cannot return in while loops.'
+        testp.body_wrapper(node.body)
+        in_vars = testp.free_variables
+        in_vars.update(testp.local_assignments)  # type: ignore
+        in_vars = list(in_vars)  # type: ignore
+        out_vars = list(testp.local_assignments)
+
+        # We visit once more, this time adding the free vars as parameters
+        p = self.sub_parser(dest=wbsym)
+        in_iter = p.new_variable('~it~')
+        in_list = p.new_variable('~li~')
+        loopvar = p.new_variable(node.target)
+        in_syms = [in_iter, in_list] + [p.new_variable(v) for v in in_vars]
+
+        # Have to execute this before the body in order to get the right
+        # symbols, otherwise they will be shadowed. If I recall correctly,
+        # that's why we need to revisit instead of just using testp.
+        initial_values = [p.vtrack[v] for v in out_vars]
+        test = Apply(builtins.less, in_iter, Apply(builtins.len, in_list))
+        body = p.body_wrapper(node.body)
+
+        loop_args = in_syms
+        loop_body = body(Apply(wsym,
+                               Apply(builtins.add, in_iter, Value(1)),
+                               in_list,
+                               *[p.vtrack[v] for v in in_vars]))
+        loop_ass = Apply(builtins.index, in_list, in_iter)
+        loop_body = Let(((loopvar, loop_ass),), loop_body)
+        with About(loop_body.find_location(), 'parse'):
+            loop_fn = self.reg_lambda(wbsym, loop_args, loop_body)
+        outer_body = Apply(Apply(
+            builtins.switch,
+            test,
+            Closure(loop_fn, in_syms),
+            # Closure on identity is a trick to create a thunk
+            # that returns a pre-defined value (we need this
+            # parameter to be a function with no arguments in
+            # order to match the signature of the other branch).
+            Closure(builtins.identity, (Tuple(initial_values),))
+        ))
+
+        self.reg_lambda(wsym, in_syms, outer_body)
+
+        # We immediately apply our shiny new function to start
+        # the loop rolling.
+        listvar = self.gen('~li~')
+        val = Apply(wsym,
+                    Value(0),
+                    listvar,
+                    *[self.visit_variable(v) for v in in_vars])
+
+        # We get back the variables the while loop sets.
+        listass = _Assign(listvar, self.visit(node.iter))
+        return Begin([
+            listass,
+            self.multi_assign(out_vars, val)
+        ])
 
     def visit_FunctionDef(self,
                           node: ast.FunctionDef,
