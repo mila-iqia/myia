@@ -212,9 +212,11 @@ class VMCode(HReprBase):
 
     def process_Closure(self, node) -> None:
         self.process(node.fn)
+        self.process(builtins.mktuple)
         for arg in node.args:
             self.process(arg)
-        self.instr('tuple', node, len(node.args))
+        # self.instr('tuple', node, len(node.args))
+        self.instr('reduce', node, len(node.args))
         self.instr('closure', node)
 
     def process_Lambda(self, node) -> None:
@@ -230,9 +232,13 @@ class VMCode(HReprBase):
         self.instr('fetch', node, node)
 
     def process_Tuple(self, node) -> None:
-        for x in node.values:
-            self.process(x)
-        self.instr('tuple', node, len(node.values))
+        # for x in node.values:
+        #     self.process(x)
+        # self.instr('tuple', node, len(node.values))
+        self.process(builtins.mktuple)
+        for arg in node.values:
+            self.process(arg)
+        self.instr('reduce', node, len(node.values))
 
     def process_Value(self, node) -> None:
         self.instr('push', node, node.value)
@@ -437,12 +443,12 @@ class VMFrame(HReprBase):
             self.push(value)
             return None
 
-    def instruction_tuple(self, node, nelems) -> None:
-        """
-        Pop ``nelems`` values from the stack and push a
-        tuple of these values.
-        """
-        self.push(tuple(self.take(nelems)))
+    # def instruction_tuple(self, node, nelems) -> None:
+    #     """
+    #     Pop ``nelems`` values from the stack and push a
+    #     tuple of these values.
+    #     """
+    #     self.push(tuple(self.take(nelems)))
 
     def instruction_closure(self, node) -> None:
         """

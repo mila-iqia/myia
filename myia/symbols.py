@@ -49,6 +49,7 @@ class builtins(metaclass=SymbolsMeta):
     getattr = bsym('getattr')
     setslice = bsym('setslice')
     identity = bsym('identity')
+    mktuple = bsym('mktuple')
 
     # Grad-related builtins
     fill = gsym('fill')

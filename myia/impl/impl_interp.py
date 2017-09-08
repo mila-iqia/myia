@@ -85,6 +85,11 @@ def interp_range(t):
 
 
 @impl_interp
+def interp_mktuple(*args):
+    return tuple(args)
+
+
+@impl_interp
 def interp_index(t, i):
     return t[i]
 
