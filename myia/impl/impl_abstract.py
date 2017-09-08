@@ -4,8 +4,8 @@ from .main import symbol_associator, impl_bank
 from ..inference.avm import Fork, WrappedException, \
     AbstractValue, unwrap_abstract
 from .flow_all import ANY, VALUE, ERROR
-from ..inference.types import typeof
-from ..interpret import PrimitiveImpl
+from ..inference.types import typeof, type_map, Tuple
+from ..interpret import PrimitiveImpl, ClosureImpl
 from itertools import product
 
 
@@ -15,12 +15,6 @@ _ = True
 ##########################
 # Implementation helpers #
 ##########################
-
-
-# class WrappedException(Exception):
-#     def __init__(self, error):
-#         super().__init__()
-#         self.error = error
 
 
 def complete_switches(args, sw):
@@ -55,6 +49,16 @@ def aimpl_factory(unwrap_args=True,
 
             max_depth = max(arg.depth if isinstance(arg, AbstractValue)
                             else 0 for arg in args)
+
+            errors = tuple(arg[ERROR] for arg in args
+                           if isinstance(arg, AbstractValue) and
+                           ERROR in arg.values)
+
+            if errors:
+                if len(errors) == 1:
+                    errors, = errors
+                return AbstractValue({ERROR: errors})
+
             unwrapped = [unwrap_abstract(arg) for arg in args]
 
             if unwrapped is None:
@@ -114,7 +118,10 @@ def abstract_index(xs, idx):
 
 @std_aimpl
 def abstract_shape(xs):
-    return xs.shape
+    try:
+        return xs.shape
+    except AttributeError as e:
+        raise WrappedException(e)
 
 
 @std_aimpl
@@ -129,7 +136,15 @@ def abstract_less(x, y):
 
 @std_aimpl
 def abstract_type(x):
-    return typeof(x)
+    t = type(x)
+    res = type_map.get(type(x), None)
+    if res:
+        return res
+    if isinstance(x, tuple):
+        return Tuple[tuple(map(abstract_type, x))]
+    if t.__name__ == 'ndarray' and hasattr(x, 'dtype'):
+        return Array[type_map.get(x.dtype.name)]
+    raise WrappedException(TypeError(f'Unknown data type: {type(x)}'))
 
 
 @std_aimpl
@@ -147,51 +162,6 @@ def abstract_print(x):
     print(x)
 
 
-# @std_aimpl
-# def abstract_assert_true(v, message):
-#     if message:
-#         assert v, message
-#     else:
-#         assert v
-
-
-# @std_aimpl
-# def abstract_equal(x, y):
-#     return x == y
-
-
-# @impl_abstract
-# def abstract_assert_true(v, message):
-#     # print('One', v)
-#     vv = v[VALUE]
-#     # assert vv, message
-#     # print('Two', v)
-#     if vv:
-#         return AbstractValue({VALUE: True,
-#                               UNIFY: v[UNIFY]})
-#     else:
-#         return AbstractValue({ERROR: AssertionError(message),
-#                               UNIFY: v[UNIFY]})
-
-
-# @aimpl_factory(wrap_result=False)
-# def abstract_equal(x, y):
-#     d = unify(x, y)
-#     # print('Unify', x, y, d)
-#     if d is False:
-#         # Not unifiable
-#         return AbstractValue(False)
-#     elif d == {}:
-#         # Always unifiable
-#         return AbstractValue(True)
-#     else:
-#         raise Exception('No.')
-#         # # Non-trivial unification
-#         # t = AbstractValue({VALUE: True, UNIFY: d})
-#         # f = AbstractValue({VALUE: False, UNIFY: Not(d)})
-#         # return Union([t, f])
-
-
 @std_aimpl
 def abstract_equal(x, y):
     return x == y
@@ -199,8 +169,12 @@ def abstract_equal(x, y):
 
 @impl_abstract
 def abstract_identity(x):
-    # return x[VALUE]
     return x
+
+
+@impl_abstract
+def abstract_mktuple(*args):
+    return tuple(args)
 
 
 @aimpl_factory(unwrap_args=[True],
@@ -208,9 +182,7 @@ def abstract_identity(x):
                any_to_any=False,
                wrap_result=False)
 def abstract_switch(cond, t, f):
-    # cond = cond[VALUE]
     if isinstance(cond, bool):
-        # return t[VALUE] if cond else f[VALUE]
         return t if cond else f
     elif cond is ANY:  # or isvar(cond):
         return Fork([t, f])

@@ -1,6 +1,7 @@
 
-from .proj import proj
+from .proj import proj, natproj
 from ..symbols import builtins
+from ..inference.avm import WrappedException
 
 
 _ = True
@@ -14,6 +15,11 @@ _ = True
 @proj(builtins.shape)
 def proj_identity(x):
     return shape(x)
+
+
+@natproj(builtins.shape)
+def proj_mktuple(*args):
+    raise WrappedException(Exception('Tuples have no shape.'))
 
 
 @proj(builtins.shape)
@@ -40,3 +46,18 @@ def proj_dot(x, y):
         return a, d
     else:
         raise Exception('Shape error (dot).')
+
+
+@proj(builtins.shape)
+def proj_greater(x, y):
+    raise Exception('No shape (greater).')
+
+
+@proj(builtins.shape)
+def proj_less(x, y):
+    raise Exception('No shape (less).')
+
+
+@proj(builtins.shape)
+def proj_switch(cond, x, y):
+    raise Exception('No shape (switch).')

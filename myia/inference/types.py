@@ -1,8 +1,65 @@
 
+from unification import Var, unifiable, unify as _unify, reify
+from unification import isvar  # type: ignore
+from unification.dispatch import dispatch
+
+
 # TODO: use the typing module instead. Int8 etc. would have to be defined
 # as types in order to appear in typing.Tuple and so on.
 
 
+class RestrictedVar:
+    # unification.Var does some magic with __new__ and its __eq__
+    # is not compatible with what we are trying to do here, so it's
+    # best not to subclass it.
+    def __init__(self, token, legal_values):
+        self.token = token
+        self.legal_values = legal_values
+
+    def __str__(self):
+        return "~" + str(self.token)
+
+    __repr__ = __str__
+
+
+@dispatch(RestrictedVar)
+def isvar(v):  # type: ignore
+    # Extend unification.isvar to recognize RestrictedVar.
+    return True
+
+
+def var(token, legal_values=None):
+    """
+    Create a variable for unification purposes.
+
+    Arguments:
+        token: The name of the variable.
+        legal_values: A set of values the variable is allowed to
+            take.
+    """
+    if legal_values:
+        return RestrictedVar(token, legal_values)
+    else:
+        return Var(token)
+
+
+def unify(a, b):
+    """
+    Unify a and b and return a dictionary associating variables to
+    values that can unify a and b. This takes into account the legal
+    values a RestrictedVar can take.
+    """
+    d = _unify(a, b)
+    if not d:
+        return d
+    for v, value in d.items():
+        if isinstance(v, RestrictedVar):
+            if value not in v.legal_values:
+                return False
+    return d
+
+
+@unifiable
 class Type:
     def __init__(self, name, elem_types=None):
         self.name = name
@@ -48,6 +105,20 @@ Array = Type('Array', ())
 Tuple = Type('Tuple', ())
 
 
+Number = {
+    Float32,
+    Float64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64
+}
+
+
 type_map = {
     bool: Bool,
     float: Float64,
@@ -70,6 +141,8 @@ def typeof(x):
     res = type_map.get(type(x), None)
     if res:
         return res
+    if isinstance(x, tuple):
+        return Tuple[tuple(map(typeof, x))]
     if t.__name__ == 'ndarray' and hasattr(x, 'dtype'):
         return Array[type_map.get(x.dtype.name)]
     raise TypeError(f'Unknown data type: {type(x)}')

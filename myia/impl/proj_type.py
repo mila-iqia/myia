@@ -1,18 +1,13 @@
 
-from .proj import natproj
+from .proj import natproj, getprop
 from ..symbols import builtins
+from ..interpret import PrimitiveImpl
 from ..inference.avm import AbstractValue, WrappedException
-from ..inference.types import typeof
+from ..inference.types import *
+from .main import impl_bank
 
 
 _ = True
-
-
-def getprop(v, sym):
-    if isinstance(v, AbstractValue):
-        return v[sym]
-    else:
-        raise Exception(v)
 
 
 ##################
@@ -20,25 +15,59 @@ def getprop(v, sym):
 ##################
 
 
+T = var('T')
+N = var('N', Number)
+
+
+numeric_bin = [
+    (N, N, N),
+    (Array[N], Array[N], Array[N])
+]
+
+
+type_signatures = {
+    builtins.add: numeric_bin,
+    # builtins.subtract: numeric_bin,
+    # builtins.multiply: numeric_bin,
+    # builtins.divide: numeric_bin,
+    builtins.dot: numeric_bin,
+    builtins.equal: (T, T, Bool),
+    builtins.less: (N, N, Bool),
+    builtins.greater: (N, N, Bool),
+    builtins.switch: (Bool, T, T, T),
+    builtins.identity: (T, T)
+}
+
+
+def std_type(sym, sigs):
+    if not isinstance(sigs, list):
+        sigs = [sigs]
+
+    def check_type(*args):
+        args = tuple(getprop(arg, builtins.type) for arg in args)
+        for sig in sigs:
+            *isig, osig = sig
+            d = unify(isig, args)
+            if d is not False:
+                return reify(osig, d)
+        raise WrappedException(TypeError(f'Type error ({sym}).'))
+
+    return check_type
+
+
+type_projs = impl_bank['project'].setdefault(builtins.type, {})
+
+
+for sym, sigs in type_signatures.items():
+    type_projs[impl_bank['abstract'][sym]] = \
+        PrimitiveImpl(std_type(sym, sigs))
+
+
 @natproj(builtins.type)
-def proj_add(x, y):
-    # tx = typeof(x)
-    # ty = typeof(y)
-    tx = getprop(x, builtins.type)
-    ty = getprop(y, builtins.type)
-    assert tx.name == 'Array'
-    if tx == ty:
-        return tx
-    else:
-        raise WrappedException(TypeError('Type error (add).'))
-
-
-# @proj(builtins.type)
-# def proj_dot(x, y):
-#     tx = type(x)
-#     ty = type(y)
-#     #assert tx.name == 'Array'
-#     if tx == ty:
-#         return tx
-#     else:
-#         raise Exception('Type error (dot).')
+def proj_mktuple(*args):
+    def gettype(arg):
+        if builtins.type in arg.values:
+            return arg[builtins.type]
+        else:
+            return impl_bank['abstract'][builtins.types](arg)
+    return Tuple[tuple(map(gettype, args))]

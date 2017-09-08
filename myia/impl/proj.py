@@ -1,6 +1,7 @@
 
 from .main import symbol_associator, impl_bank
 from ..interpret import PrimitiveImpl, FunctionImpl
+from ..inference.avm import AbstractValue, VALUE, ERROR
 from ..front import parse_function
 
 
@@ -24,6 +25,19 @@ def proj(psym):
         return fn
 
     return pimpl
+
+
+def getprop(v, sym):
+    fn = impl_bank['abstract'][sym]
+    if isinstance(v, AbstractValue):
+        if sym in v.values:
+            return v[sym]
+        elif ERROR in v.values:
+            raise v[ERROR]
+        else:
+            return fn(v[VALUE])
+    else:
+        raise fn(v)
 
 
 def natproj(psym):

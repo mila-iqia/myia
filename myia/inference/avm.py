@@ -41,7 +41,10 @@ def wrap_abstract(v):
 
 def unwrap_abstract(v):
     if isinstance(v, AbstractValue):
-        return v[VALUE]
+        if VALUE in v.values:
+            return unwrap_abstract(v[VALUE])
+        else:
+            return ANY
     else:
         return v
 
@@ -55,6 +58,11 @@ class AbstractValue:
             self.values = value
         else:
             self.values = {VALUE: value}
+        if VALUE in self.values:
+            while isinstance(self[VALUE], AbstractValue):
+                v = self[VALUE]
+                self.depth = max(v.depth, self.depth)
+                self.values[VALUE] = v[VALUE]
 
     # def acquire(self, proj):
     #     print(self, proj)
@@ -101,6 +109,7 @@ class AbstractValue:
 
 
 def load():
+    from ..impl.impl_interp import _
     from ..impl.impl_abstract import _
     from ..impl.proj_shape import _
     from ..impl.proj_type import _
@@ -110,8 +119,15 @@ def load():
 
 class WrappedException(Exception):
     def __init__(self, error):
-        super().__init__()
+        super().__init__(error)
         self.error = error
+
+    def __hash__(self):
+        return hash(str(self.error))
+
+    def __eq__(self, other):
+        return type(self) is type(other) \
+            and str(self.error) == str(other.error)
 
 
 class Escape(Exception):
@@ -180,12 +196,16 @@ class AVMFrame(VMFrame):
                         self.vm.annotate(proj, value)
 
     def aux(self, node, fn, args, projs):
+        if isinstance(node, Tuple):
+            nfn = builtins.mktuple
+        else:
+            nfn = node.fn
         nargs = len(args)
         args = [wrap_abstract(arg) for arg in args]
         instrs = []
         for proj in projs:
             pfn = find_projector(proj, fn)
-            instrs.append(Instruction('push', node.fn, pfn))
+            instrs.append(Instruction('push', nfn, pfn))
             for arg in args:
                 instrs.append(Instruction('push', None, arg))
             instrs.append(Instruction('reduce', node, nargs, False))
@@ -201,15 +221,32 @@ class AVMFrame(VMFrame):
         self.stack.append(clos)
 
     def instruction_store(self, node, dest) -> None:
-        value = self.pop()
-        if isinstance(dest, Tuple) and isinstance(value, AbstractValue):
-            value = value[VALUE]
-
         def store(dest, val):
             if isinstance(dest, Symbol):
                 self.envs[0][dest] = val
             else:
                 raise TypeError(f'Cannot store into {dest}.')
+
+        def spread_error(x):
+            if isinstance(x, Tuple):
+                for y in x.values:
+                    spread_error(y)
+            else:
+                store(x, err)
+
+        value = self.pop()
+        if isinstance(dest, Tuple) and isinstance(value, AbstractValue):
+            if ERROR in value.values:
+                err = value[ERROR]
+                spread_error(dest)
+                return
+            elif VALUE in value.values:
+                value = value[VALUE]
+            else:
+                print(dest, value)
+                err = AbstractValue({ERROR: WrappedException("No VALUE.")})
+                spread_error(dest)
+                return
 
         maptup2(store, dest, value)
 
@@ -248,13 +285,18 @@ class AVMFrame(VMFrame):
                     self.push(arg[fn.name])
                     return None
 
-            projs = self.vm.needs[node] if has_projs else []
-            if VALUE in projs or len(projs) == 0:
-                value = fn(*args)
+            projs = self.vm.needs[node] if has_projs else set()
+            if projs == {VALUE} or len(projs) == 0:
+                try:
+                    value = fn(*args)
+                except WrappedException as exc:
+                    value = AbstractValue({ERROR: exc})
                 self.push(value)
                 return None
             else:
                 return self.aux(node, fn, args, projs)
+        elif fn is ANY:
+            self.push(ANY)
         else:
             raise TypeError(f'Cannot reduce on {fn}.')
 
@@ -429,12 +471,20 @@ def abstract_evaluate(lbda, args, proj=None):
     assert parse_env is not None
     envs = (parse_env.bindings, aroot_globals)
 
-    # d = DFA([ValueTrack, lambda dfa: NeedsTrack(dfa, [proj or VALUE])],
+    if not proj:
+        proj = [VALUE]
+    elif not isinstance(proj, list):
+        proj = [proj]
+
+    # d = DFA([ValueTrack, lambda dfa: NeedsTrack(dfa, [])],
     #         parse_env)
-    d = DFA([ValueTrack, lambda dfa: NeedsTrack(dfa, [])],
+    # d.visit(lbda)
+    # for p in proj:
+    #     d.propagate(lbda.body, 'needs', p)
+
+    d = DFA([ValueTrack, lambda dfa: NeedsTrack(dfa, proj)],
             parse_env)
     d.visit(lbda)
-    d.propagate(lbda.body, 'needs', proj or VALUE)
 
     fn, = list(run_avm(VMCode(lbda), *envs).result)
     fn = unwrap_abstract(fn)

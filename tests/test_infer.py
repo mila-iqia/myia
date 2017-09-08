@@ -20,7 +20,16 @@ def val(x):
 
 
 def iserror(av):
+    print('error', av, av.values, ERROR in av.values)
     return ERROR in av.values
+
+
+def getproj(av, proj):
+    if proj in av.values:
+        av = av[proj]
+    if isinstance(av, AbstractValue) and ERROR in av.values:
+        return False
+    return av
 
 
 def infer(**tests):
@@ -50,7 +59,7 @@ def infer(**tests):
                            else AbstractValue({proj: i})
                            for i in inputs)
             vm = abstract_evaluate(node, inputs, proj=proj)
-            results = set(not iserror(r) and r[proj] for r in vm.result)
+            results = set(getproj(r, proj) for r in vm.result)
             assert results == expected
 
         m = pytest.mark.parametrize('proj,inputs,expected', list(tests))(test)
@@ -65,7 +74,10 @@ def infer(**tests):
 #################
 
 
-@infer(type=[(Array[Float32], Array[Float32], Array[Float32]),
+@infer(type=[(Int8, Int8, Int8),
+             (Int8, Int32, False),
+             (Array[Float32], Array[Float32], Array[Float32]),
+             (Array[Float32], Array[Float64], False),
              (Array[Float32], Bool, False)],
        shape=[((5, 6), (5, 6), (5, 6)),
               ((5, 3), (5, 9), False)])
@@ -78,10 +90,26 @@ def test_dot(x, y):
     return x @ y
 
 
-@infer(shape=[(val(-1), (5, 6), (6, 10), (5, 10)),
+@infer(type=[(val(-1), Float32, Float64, Float32),
+             (val(1), Float32, Float64, Float64),
+             (val(ANY), Float32, Float64, {Float32, Float64})],
+       shape=[(val(-1), (5, 6), (7, 10), (5, 6)),
+              (val(1), (5, 6), (7, 10), (7, 10)),
+              (val(ANY), (5, 6), (7, 10), {(5, 6), (7, 10)})])
+def test_if(sel, x, y):
+    if sel < 0:
+        return x + x
+    else:
+        return y + y
+
+
+@infer(type=[(val(-1), Array[Float32], Array[Float32], Array[Float32]),
+             # (Array[Float32], Array[Float32], Array[Float32], False)
+             ],
+       shape=[(val(-1), (5, 6), (6, 10), (5, 10)),
               (val(1), (10, 6), (3, 10), (3, 6)),
               (val(ANY), (10, 6), (3, 10), {False, (3, 6)})])
-def test_if(sel, x, y):
+def test_if2(sel, x, y):
     if sel < 0:
         a = x @ y
     else:

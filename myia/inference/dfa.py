@@ -79,12 +79,15 @@ class DFA:
         """
         @self.on_flow_from(a)
         def flow(track, value):
-            if track.direction == 'forwards':
+            d = track.direction
+            if d == 'forwards' or d == 'bidirectional':
                 self.propagate(b, track, value)
+            self.propagate(b, track, value)
 
         @self.on_flow_from(b)
         def flow(track, value):
-            if track.direction == 'backwards':
+            d = track.direction
+            if d == 'backwards' or d == 'bidirectional':
                 self.propagate(a, track, value)
 
     def on_flow_from(self, node, require_track=None):
@@ -289,7 +292,7 @@ class Track:
     def __init__(self, name, dfa, direction='forwards'):
         self.name = name
         self.dfa = dfa
-        assert direction in {'forwards', 'backwards'}
+        assert direction in {'forwards', 'backwards', 'bidirectional'}
         self.direction = direction
 
     def propagate(self, node, value):
@@ -385,7 +388,7 @@ needs_map = {
         _shape: (_shape,)
     },
     builtins.switch: {
-        _type: (_type, _type, _type),
+        _type: ((_type, VALUE), _type, _type),
         VALUE: ((), VALUE, VALUE)
     },
     'default': {
@@ -395,7 +398,7 @@ needs_map = {
 
 class NeedsTrack(Track):
     def __init__(self, dfa, autoflow=[]):
-        super().__init__('needs', dfa, 'backwards')
+        super().__init__('needs', dfa, 'bidirectional')
         self.autoflow = autoflow
 
     def flow_auto(self, node):
@@ -420,6 +423,7 @@ class NeedsTrack(Track):
         self.flow_auto(node)
 
     def flow_Tuple(self, node):
+        self.propagate(node, VALUE)
         self.flow_auto(node)
 
     def flow_Symbol(self, node):
