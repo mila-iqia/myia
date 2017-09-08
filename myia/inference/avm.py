@@ -186,14 +186,23 @@ class AVMFrame(VMFrame):
         return self.take(1)[0]
 
     def push(self, *values):
-        # values = [value if isinstance(value, AbstractValue)
-        #           else AbstractValue(value) for value in values]
-        super().push(*values)
-        for v in values:
+        def ann(v):
             if isinstance(v, AbstractValue):
                 for proj, value in v.values.items():
                     if proj != VALUE:
                         self.vm.annotate(proj, value)
+            elif isinstance(v, Fork):
+                for vv in v.paths:
+                    ann(vv)
+
+        # values = [value if isinstance(value, AbstractValue)
+        #           else AbstractValue(value) for value in values]
+        super().push(*values)
+        for v in values:
+            ann(v)
+
+    def push_no_annotate(self, *values):
+        super().push(*values)
 
     def aux(self, node, fn, args, projs):
         if isinstance(node, Tuple):
@@ -243,7 +252,6 @@ class AVMFrame(VMFrame):
             elif VALUE in value.values:
                 value = value[VALUE]
             else:
-                print(dest, value)
                 err = AbstractValue({ERROR: WrappedException("No VALUE.")})
                 spread_error(dest)
                 return
@@ -276,7 +284,7 @@ class AVMFrame(VMFrame):
 
             # return self.__class__(self.vm, fn.code, [bind] + fn.envs, sig)
         elif isinstance(fn, ClosureImpl):
-            self.push(fn.fn, *fn.args, *args)
+            self.push_no_annotate(fn.fn, *fn.args, *args)
             return self.instruction_reduce(node, nargs + len(fn.args))
         elif isinstance(fn, PrimitiveImpl):
             if nargs == 1:
@@ -338,9 +346,9 @@ class AVM(EventDispatcher):
         self.annotations: Dict = \
             defaultdict(lambda: defaultdict(lambda: defaultdict(set)))
 
-    def annotate(self, track, value):
+    def annotate(self, track, value, node=None):
         # path = [f.focus for f in self.frames]
-        node = self.frame.focus
+        node = node or self.frame.focus
         path = tuple(f.signature[0].ast.ref or '?' if f.signature else '?'
                      for f in self.frames + [self.frame])
         self.annotations[node][track][path].add(value)
@@ -365,14 +373,14 @@ class AVM(EventDispatcher):
             return
         self.results_cache[sig].add(value)
         for (frs, fr, sig_stack) in self.checkpoints_on[sig]:
-            self.checkpoints.append((frs, fr, sig_stack, [[value]]))
+            self.checkpoints.append((frs, fr, sig_stack, [[value]], True))
 
     def checkpoint(self, paths, step_back=-1):
         # fr = AVMFrame(self, self.frame.code, self.frame.envs)
         # fr.pc = self.frame.pc - 1
         fr = self.frame.copy(step_back)
         frs = [f.copy() for f in self.frames]
-        self.checkpoints.append((frs, fr, set(self.sig_stack), paths))
+        self.checkpoints.append((frs, fr, set(self.sig_stack), paths, False))
 
     def checkpoint_on(self, sig):
         fr = self.frame.copy()
@@ -417,6 +425,8 @@ class AVM(EventDispatcher):
 
                 sig = self.frame.signature
                 if sig is not None:
+                    # TODO: reintegrate this code to close open
+                    # function evaluations when possible.
                     # self.sig_stack.pop()
                     # if all(sig not in sigs
                     #        for _, _, sigs, _ in self.checkpoints):
@@ -430,7 +440,7 @@ class AVM(EventDispatcher):
                     # We push the result on the previous frame's stack
                     # and we resume execution.
                     self.frame = self.frames.pop()
-                    self.frame.stack.append(rval)
+                    self.frame.push(rval)
             # except Exception as exc:
             #     if self.do_emit_events:
             #         self.emit_error(exc)
@@ -444,11 +454,15 @@ class AVM(EventDispatcher):
             if rval is not None:
                 yield rval
             if self.checkpoints:
-                frames, frame, sig_stack, paths = self.checkpoints.pop()
+                frames, frame, sig_stack, paths, annotate = \
+                    self.checkpoints.pop()
                 p, *rest = paths
                 self.frames = [f.copy() for f in frames]
                 self.frame = frame.copy()
-                self.frame.push(*p)
+                if annotate:
+                    self.frame.push(*p)
+                else:
+                    self.frame.push_no_annotate(*p)
                 if rest:
                     self.checkpoints.append((frames, frame, sig_stack, rest))
             else:

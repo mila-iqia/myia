@@ -24,13 +24,16 @@ numeric_bin = [
     (Array[N], Array[N], Array[N])
 ]
 
+numarray_bin = [
+    (Array[N], Array[N], Array[N])
+]
 
 type_signatures = {
     builtins.add: numeric_bin,
-    # builtins.subtract: numeric_bin,
+    builtins.subtract: numeric_bin,
     # builtins.multiply: numeric_bin,
     # builtins.divide: numeric_bin,
-    builtins.dot: numeric_bin,
+    builtins.dot: numarray_bin,
     builtins.equal: (T, T, Bool),
     builtins.less: (N, N, Bool),
     builtins.greater: (N, N, Bool),
@@ -69,5 +72,5 @@ def proj_mktuple(*args):
         if builtins.type in arg.values:
             return arg[builtins.type]
         else:
-            return impl_bank['abstract'][builtins.types](arg)
+            return impl_bank['abstract'][builtins.type](arg)
     return Tuple[tuple(map(gettype, args))]
