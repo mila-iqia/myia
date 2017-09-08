@@ -4,7 +4,7 @@ python:
 
 # Command to install dependencies
 install:
-  pip install mypy pep8 hrepr
+  pip install mypy pep8 hrepr unification
 
 # Command to run tests
 script: ./run_tests.sh
