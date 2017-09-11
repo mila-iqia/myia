@@ -246,6 +246,7 @@ def test_pow10(x):
 # Second-order gradients #
 ##########################
 
+
 @grad2_test((12,))
 def test_g2_simple(x):
     return x * x * x * x

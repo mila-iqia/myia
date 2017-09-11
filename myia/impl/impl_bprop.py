@@ -2,11 +2,11 @@
 from typing import List, Any, Union, Callable, Dict
 from .main import symbol_associator, impl_bank
 from ..interpret import \
-    PrimitiveImpl, FunctionImpl, ClosureImpl, parse_function, evaluate
+    PrimitiveImpl, FunctionImpl, ClosureImpl, evaluate
 from ..stx import Symbol, Apply, Closure, Lambda, Tuple, \
     GenSym, BPROP, JTAG
 from ..symbols import builtins
-from ..front import get_global_parse_env
+from ..front import parse_function, get_global_parse_env
 
 
 _ = True

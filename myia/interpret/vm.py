@@ -1,10 +1,9 @@
 from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 
 from ..stx import \
-    MyiaASTNode, \
+    MyiaASTNode, ParseEnv, \
     Location, Symbol, Value, \
     Let, Lambda, Apply, Begin, Tuple, Closure, maptup2
-from ..front import parse_function, ParseEnv
 from ..symbols import builtins
 from ..util import EventDispatcher, BucheDb, HReprBase, buche
 from functools import reduce

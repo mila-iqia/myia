@@ -1,4 +1,5 @@
-from myia.front import parse_function, MyiaSyntaxError
+from myia.front import parse_function
+from myia.parse import MyiaSyntaxError
 from myia.inference.avm import \
     aroot_globals, abstract_evaluate, AbstractValue, ERROR, ANY
 from myia.interpret import FunctionImpl
@@ -104,6 +105,9 @@ def test_if(sel, x, y):
 
 
 @infer(type=[(val(-1), Array[Float32], Array[Float32], Array[Float32]),
+             # TODO: not sure how to express this one, because there is
+             # a type error on the comparison, but the inferrer propagates
+             # the return type anyway (which is not a bad thing).
              # (Array[Float32], Array[Float32], Array[Float32], False)
              ],
        shape=[(val(-1), (5, 6), (6, 10), (5, 10)),
@@ -140,7 +144,8 @@ def test_unknown(x, y):
     return x @ y
 
 
-@infer(shape=[(val(0), (5, 6), (6, 8), (5, 6)),
+@infer(type=[(val(1_000_000), Array[Float64], Array[Float64], Array[Float64])],
+       shape=[(val(0), (5, 6), (6, 8), (5, 6)),
               (val(1), (5, 6), (6, 8), (5, 8)),
               (val(2), (5, 6), (6, 8), False),
               (val(3), (5, 6), (6, 6), (5, 6)),

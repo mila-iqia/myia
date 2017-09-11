@@ -16,7 +16,7 @@ To help grok the structure, project files are tagged in the following listing:
 myia/                           # Source code for Myia
     __main__                T   # Entry point for myia's CLI
     compile             S G     # Convert IR to A-normal form
-    front               S       # Parse Python code, produce IR
+    front              !        # @myia decorator
     grad               !  G     # Gradient transform
     impl/                       # Implementations of primitives
         flow_all           F    # Implementations for inference/dfa
@@ -33,6 +33,7 @@ myia/                           # Source code for Myia
         types              F    # Type representations
     interpret/                  # Interpreter
         vm               I F    # Stack-based virtual machine
+    parse               S       # Parse Python code, produce IR
     stx/                        # IR
         about          !S       # Track what nodes are about what other nodes
         env            !S       # Environments and symbol generation
