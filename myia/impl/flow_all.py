@@ -1,24 +1,8 @@
 
 from .main import symbol_associator, impl_bank
 from ..stx import ValueNode, TupleNode
-from ..util import Keyword
-# from unification import var
 from ..inference.types import Array, Bool, Float64, Int64, Type
-
-
-############
-# Keywords #
-############
-
-
-# Top of the value lattice
-ANY = Keyword('ANY')
-# Principal value
-VALUE = Keyword('VALUE')
-# Error associated to the operation
-ERROR = Keyword('ERROR')
-# Tag for function executions that are not completed
-OPEN = Keyword('OPEN')
+from ..lib import ANY, VALUE, ERROR
 
 
 impl_bank['flow'] = {

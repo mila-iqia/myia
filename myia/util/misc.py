@@ -67,12 +67,18 @@ def group_contiguous(arr: Iterable[T],
 
 
 # TODO: document
-class Keyword:
-    def __init__(self, name):
-        self.name = name
+class Singleton:
+    __instance__ = None
+
+    def __new__(cls):
+        if cls.__instance__ is not None:
+            return cls.__instance__
+        else:
+            inst = super().__new__(cls)
+            cls.__instance__ = inst
+            return inst
 
     def __str__(self):
-        return self.name
+        return self.__class__.__name__
 
-    def __repr__(self):
-        return self.name
+    __repr__ = __str__

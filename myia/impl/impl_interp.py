@@ -4,7 +4,7 @@ from .main import symbol_associator, impl_bank
 from ..stx import Symbol
 from ..interpret import \
     PrimitiveImpl, FunctionImpl, ClosureImpl, evaluate
-from ..symbols import ZERO
+from ..lib import ZERO
 from ..grad import JX
 from ..inference.types import typeof
 from ..lib import StructuralMap

@@ -5,7 +5,7 @@ See Inference section of DEVELOPERS.md for some more information.
 """
 
 
-from ..util import Event, Keyword, buche
+from ..util import Event, buche
 from ..stx import LambdaNode, ClosureNode, TupleNode, Symbol
 from collections import defaultdict
 from ..impl.flow_all import default_flow, ANY, VALUE

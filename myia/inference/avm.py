@@ -2,14 +2,14 @@
 from typing import List, Any, Dict
 from ..interpret import VMCode, VMFrame, EnvT, \
     PrimitiveImpl, FunctionImpl, ClosureImpl, Instruction
-from ..util import EventDispatcher, BucheDb, Keyword
+from ..util import EventDispatcher, BucheDb
 from ..symbols import builtins
 from ..impl.main import impl_bank
 from itertools import product
 from .dfa import DFA, ValueTrack, NeedsTrack
 from ..stx import maptup2, Symbol, TupleNode
 from collections import defaultdict
-from ..impl.flow_all import ANY, VALUE, ERROR, OPEN
+from ..lib import ANY, VALUE, ERROR
 
 
 compile_cache: Dict = {}

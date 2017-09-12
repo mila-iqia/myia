@@ -15,15 +15,8 @@ The symbols live in two namespaces:
 
 import ast
 from .stx import Symbol, bsym, gsym
-from .util import Props, Keyword, SymbolsMeta
+from .util import Props, SymbolsMeta
 from typing import Dict
-
-
-# ZERO serves as a generic zero: mapadd(ZERO, y) == y,
-# whether y is a scalar, a tuple, or whatever else.
-# This is more efficient than creating a zero that has
-# the same shape as y.
-ZERO = Keyword('ZERO')
 
 
 class builtins(metaclass=SymbolsMeta):

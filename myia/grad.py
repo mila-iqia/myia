@@ -29,9 +29,9 @@ from .interpret import \
 from .symbols import builtins
 from copy import copy
 from .compile import a_normal
-from .util import Props, Keyword, buche
+from .util import Props, buche
 from collections import OrderedDict
-from .symbols import ZERO
+from .lib import ZERO
 
 
 LeafType = Union[Symbol, Value]
