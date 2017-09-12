@@ -16,7 +16,7 @@
 	background: orange;
 }
 
-.Lambda {
+.LambdaNode {
 	font-family: monospace;
 }
 
@@ -24,7 +24,7 @@
 	display: none;
 }
 
-.Symbol, .Value {
+.Symbol, .ValueNode {
 	display: inline-block;
 	padding: 2px;
 }
@@ -41,63 +41,63 @@
 	padding: 2px;
 }
 
-.Apply {
+.ApplyNode {
 	display: inline-block;
 	border: 1px solid black;
 	margin: 2px;
 	padding: 2px;
 }
 
-.Apply:hover {
+.ApplyNode:hover {
 	border: 1px solid var(--hover-border-color);
 }
 
-.Apply > :nth-child(1) {
+.ApplyNode > :nth-child(1) {
 	font-weight: bold;
 	color: #008;
 	margin-right: 5px;
 }
 
-.Begin, .Lambda, .Let {
+.BeginNode, .LambdaNode, .LetNode {
 	display: inline-block;
 	border-left: 1px solid black;
 	padding-left: 2px;
 	margin-left: 2px;
 }
 
-.Begin:hover, .Lambda:hover, .Let:hover {
+.BeginNode:hover, .LambdaNode:hover, .LetNode:hover {
 	border-left: 1px solid var(--hover-border-color);
 }
 
-.Lambda > :nth-child(3),
-.Begin > :nth-child(2),
-.Let > :nth-child(2),
-.Let > :nth-child(4) {
+.LambdaNode > :nth-child(3),
+.BeginNode > :nth-child(2),
+.LetNode > :nth-child(2),
+.LetNode > :nth-child(4) {
 	display: block;
 	border-left: 3px solid black;
 	padding-left: 5px;
 	margin-left: 5px;
 }
 
-.Lambda > :nth-child(3):hover,
-.Begin > :nth-child(2):hover,
-.Let > :nth-child(2):hover,
-.Let > :nth-child(4):hover {
+.LambdaNode > :nth-child(3):hover,
+.BeginNode > :nth-child(2):hover,
+.LetNode > :nth-child(2):hover,
+.LetNode > :nth-child(4):hover {
 	border-left: 3px solid var(--hover-border-color);
 }
 
-.Begin > :nth-child(2) > * {
+.BeginNode > :nth-child(2) > * {
 	display: block;
 }
 
-.Tuple {
+.TupleNode {
 	display: inline-block;
 	border: 2px dotted green;
 	margin: 2px;
 	padding: 2px;
 }
 
-.Tuple > * {
+.TupleNode > * {
 	margin-left: 5px;
 	margin-right: 5px;
 }
@@ -114,7 +114,7 @@
 
 .IfCond:before, .IfThen:before, .IfElse:before {
 	font-weight: bold;
-	padding-right: 5px;	
+	padding-right: 5px;
 }
 
 .IfCond:before {
@@ -144,7 +144,7 @@
 	vertical-align: middle;
 }
 
-.Let > * {
+.LetNode > * {
 	display: block;
 }
 
@@ -166,14 +166,14 @@
 	font-weight: bold;
 }
 
-.Closure {
+.ClosureNode {
 	display: inline-block;
 	border: 2px dotted black;
 	margin: 2px;
 	padding: 2px;
 }
 
-.Closure > :nth-child(1) {
+.ClosureNode > :nth-child(1) {
 	color: #008;
 	margin-right: 5px;
 }
@@ -226,4 +226,3 @@
 .hrepr-Exception {
 	max-width: 800px;
 }
-
