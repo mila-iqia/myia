@@ -12,7 +12,7 @@ from ..front import parse_function, get_global_parse_env
 _ = True
 
 
-def macro_grad_for(nargs_closure):
+def macro_grad_for(sym, nargs_closure):
     """
     This generates a ``GRAD`` function for use in primitive
     gradients. ``GRAD`` is parameterized by the number of
@@ -27,7 +27,9 @@ def macro_grad_for(nargs_closure):
         #   ((a,), b, c, ...)  # If nargs_closure == 1
         #   ((a, b), c, ...)  # If nargs_closure == 2
         #   etc.
-        return TupleNode([TupleNode(args[:nargs_closure]),
+        # return TupleNode([TupleNode(args[:nargs_closure]),
+        #                   *args[nargs_closure:]])
+        return TupleNode([ClosureNode(sym, args[:nargs_closure]),
                           *args[nargs_closure:]])
     return macro_grad
 
@@ -81,7 +83,7 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
         # stored arguments.
         r, genv = parse_function(
             orig_fn,
-            macros={'GRAD': macro_grad_for(nargs_closure)}
+            macros={'GRAD': macro_grad_for(sym, nargs_closure)}
         )
 
         # Create a FunctionImpl.
@@ -222,6 +224,11 @@ def bprop_identity(v, dz):
 #################################
 # Gradients of other primitives #
 #################################
+
+
+@impl_bprop
+def bprop_closure_args(clos, dz):
+    return GRAD(Closure(Jinv(closure_fn(clos)), dz))
 
 
 @impl_bprop

@@ -262,3 +262,12 @@ def test_g2_loop(x):
         rval *= x
         y -= 1
     return rval
+
+
+@grad2_test((5,))
+def test_g2_range(n):
+    # Even slower :(
+    y = 0
+    for x in range(10):
+        y += x * n * n * n
+    return y

@@ -4,7 +4,8 @@ from ..stx import \
     MyiaASTNode, ParseEnv, \
     Location, Symbol, \
     LambdaNode, maptup2
-from ..lib import Closure as ClosureImpl, Primitive as PrimitiveImpl
+from ..lib import Closure as ClosureImpl, Primitive as PrimitiveImpl, \
+    IdempotentMappable
 from ..symbols import builtins
 from ..util import EventDispatcher, BucheDb, HReprBase, buche
 from functools import reduce
@@ -41,7 +42,7 @@ def load():
 ###################
 
 
-class FunctionImpl(HReprBase):
+class FunctionImpl(HReprBase, IdempotentMappable):
     """
     Represents a Myia-transformed function.
     """
@@ -73,8 +74,20 @@ class FunctionImpl(HReprBase):
     def __repr__(self):
         return str(self)
 
-    def __map__(self, smap, *others):
-        return smap.fn(self, *others)
+    def __hash__(self):
+        return hash(self.ast)
+
+    def __eq__(self, other):
+        return type(other) is FunctionImpl \
+            and self.ast == other.ast
+
+    def __add__(self, other):
+        # TODO: Fix the following issue, which happens sometimes.
+        #       I believe the main reason is that for the backpropagator,
+        #       Grad builds a closure on the wrong function (?)
+        # if self != other:
+        #     raise Exception('The functions being added are different.')
+        return self
 
     def __hrepr__(self, H, hrepr):
         return H.div['FunctionImpl'](

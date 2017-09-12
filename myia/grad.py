@@ -302,7 +302,9 @@ class Grad:
             # Transformed:  ∇y, ∇z += ∇x
             # Why yes, this works the same as TupleNode.
             args = args_cast(value.args)
-            return self.accum_multi(args, sen)
+            sen_extract = Apply(builtins.closure_args, sen)
+            return self.accum_multi(args, sen_extract)
+            # return self.accum_multi(args, sen)
 
         else:
             raise Exception(f'rho is not defined on node type: {value}')
@@ -535,6 +537,7 @@ class Grad:
         """
         Perform the code transform on self.primal.
         """
+        augm_sym = self.global_env.gen(self.name, JTAG)
 
         # The arguments of the function. We want the gradients of
         # these.
@@ -576,7 +579,8 @@ class Grad:
         # nargs_closure gradients because they are the closure's
         # gradient.
         backp_ret = TupleNode([
-            TupleNode(backp_all_ret[:self.nargs_closure]),
+            # TupleNode(backp_all_ret[:self.nargs_closure]),
+            ClosureNode(self.name, backp_all_ret[:self.nargs_closure]),
             *backp_all_ret[self.nargs_closure:]
         ])
         # Calls to rho had the side effect of populating bprop_variables
@@ -621,7 +625,6 @@ class Grad:
         assert all(isinstance(arg, Symbol) for arg in augm_args)
         augm_fn = Lambda(cast(List[Symbol], augm_args),
                          augm_body, self.gensym)
-        augm_sym = self.global_env.gen(self.name, JTAG)
         augm_fn.global_env = self.global_env
         augm_fn.ref = augm_sym
         self.global_env[augm_sym] = augm_fn

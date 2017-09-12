@@ -20,7 +20,7 @@ from typing import Dict
 
 
 class builtins(metaclass=SymbolsMeta):
-    add = bsym('add')
+    add = gsym('add')
     subtract = bsym('subtract')
     multiply = bsym('multiply')
     divide = bsym('divide')
@@ -42,6 +42,9 @@ class builtins(metaclass=SymbolsMeta):
     getattr = bsym('getattr')
     setslice = bsym('setslice')
     identity = bsym('identity')
+    Closure = gsym('Closure')
+    closure_fn = gsym('closure_fn')
+    closure_args = gsym('closure_args')
     mktuple = bsym('mktuple')
 
     # Grad-related builtins

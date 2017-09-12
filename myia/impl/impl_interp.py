@@ -25,14 +25,6 @@ def impl_interp(sym, name, fn):
     return prim
 
 
-@symbol_associator('interp_smap')
-def impl_interp_smap(sym, name, fn):
-    mfn = StructuralMap(fn)
-    prim = PrimitiveImpl(mfn, name=sym)
-    impl_bank['interp'][sym] = prim
-    return prim
-
-
 def impl_interp_smap(dispatch):
     @symbol_associator('interp_smap')
     def deco(sym, name, fn):
@@ -125,6 +117,21 @@ def interp_range(t):
 
 
 @impl_interp
+def interp_Closure(fn, args):
+    return Closure(fn, args)
+
+
+@impl_interp
+def interp_closure_fn(clos):
+    return clos.fn
+
+
+@impl_interp
+def interp_closure_args(clos):
+    return clos.args
+
+
+@impl_interp
 def interp_mktuple(*args):
     return tuple(args)
 
@@ -151,17 +158,20 @@ def interp_getattr(obj, attr):
 
 @impl_interp
 def interp_map(f, xs):
-    return tuple(map(f, xs))
+    return type(xs)(map(f, xs))
 
 
 @impl_interp
 def interp_reduce(f, xs):
-    return reduce(f, xs)
+    v = xs[0]
+    for x in xs[1:]:
+        v = f(v, x)
+    return v
 
 
 @impl_interp
 def interp_enumerate(xs):
-    return tuple(enumerate(xs))
+    return type(xs)(enumerate(xs))
 
 
 @impl_interp
@@ -272,34 +282,8 @@ def interp_smap_Jinv(x):
         raise TypeError(f'Invalid argument for Jinv: {x}')
 
 
-@impl_interp
-def interp_fill(x: Any, value: Union[int, float]) -> Any:
-    """
-    Creates a structure just like ``x`` but where each scalar element
-    is set to ``value``.
-
-    If ``x`` is a PrimitiveImpl or a FunctionImpl, this returns
-    (). If ``x`` is a ClosureImpl, this returns a filled value
-    for each value in the closure.
-    """
-    if isinstance(x, (int, float)):
-        return value
-    elif isinstance(x, tuple):
-        return tuple(interp_fill(a, value) for a in x)
-    elif isinstance(x, list):
-        return list(interp_fill(a, value) for a in x)
-    elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
-        return ()
-    elif isinstance(x, ClosureImpl):
-        return tuple(interp_fill(a, value) for a in x.args)
-    elif x is None:
-        return None
-    else:
-        raise TypeError(f'Cannot create a {value} conformant with {x}')
-
-
-@impl_interp
-def interp_zeros_like(x):
+@impl_interp_smap
+def interp_smap_zeros_like(x):
     """
     Creates a structure just like ``x`` but "zeroed out."
 
@@ -315,20 +299,15 @@ def interp_zeros_like(x):
     ()
     >>> x = 10; zeros_like(lambda y: x + y)  # (metaphorically)
     (0,)
-
-    Implements the "0" operator in Pearlmutter & Siskind.
     """
-    return interp_fill(x, 0)
-
-
-@impl_interp
-def interp_ones_like(x):
-    return interp_fill(x, 1)
-
-
-# @impl_interp_smap
-# def interp_smap_mapadd(x, y):
-#     return x + y
+    if isinstance(x, (int, float, bool)):
+        return 0
+    elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
+        return x
+    elif x is None:
+        return None
+    else:
+        raise TypeError(f'Cannot create a {value} conformant with {x}')
 
 
 @impl_interp
