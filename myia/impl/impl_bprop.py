@@ -132,13 +132,6 @@ def bprop_zeros_like(x, d):
 
 
 @impl_bprop
-def bprop_mapadd(x, y, d):
-    # TODO: correct when x is ZERO (its shape can be different from y)?
-    # Probably unneeded?
-    return GRAD(d, d)
-
-
-@impl_bprop
 def bprop_J(x, d):
     return GRAD(Jinv(d))
 
@@ -155,6 +148,8 @@ def bprop_Jinv(x, d):
 
 @impl_bprop
 def bprop_add(x, y, dz):
+    # TODO: correct when x is ZERO (its shape can be different from y)?
+    # Probably unneeded?
     return GRAD(dz, dz)
 
 
@@ -258,7 +253,7 @@ def bprop_map(f, xs, dz):
     # d = map(lambda xy: xy[0](xy[1]), zip(bprops, dz))
     # but we don't have zip yet.
     d = map(bprops[0], dz)
-    df = reduce(mapadd, map(first, d))
+    df = reduce(add, map(first, d))
     dxs = map(second, d)
     return GRAD(df, dxs)
 

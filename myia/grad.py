@@ -35,6 +35,7 @@ from .lib import ZERO
 
 
 LeafType = Union[Symbol, Value]
+mapadd = builtins.add
 
 
 #################
@@ -360,7 +361,7 @@ class Grad:
                     lhs_vars.append(g)
                     # We must add the temp's value to the sensitivity
                     # variable for var.
-                    app = Apply(builtins.mapadd,
+                    app = Apply(mapadd,
                                 g,
                                 self.conformant_sensitivity_value(var))
                     lhs = self.new_sensitivity_var(var)
@@ -381,7 +382,7 @@ class Grad:
             if all(x == Value(ZERO) for x in rhs_vars):
                 new_value = value
             else:
-                new_value = Apply(builtins.mapadd, TupleNode(rhs_vars), value)
+                new_value = Apply(mapadd, TupleNode(rhs_vars), value)
 
         # We must prepend the main operation to the extra bindings
         # we created for the duplicates
@@ -398,7 +399,7 @@ class Grad:
         if sen == Value(ZERO):
             return [(new_sen, value)]
         else:
-            return [(new_sen, Apply(builtins.mapadd, sen, value))]
+            return [(new_sen, Apply(mapadd, sen, value))]
 
     @transformer_method('g:tag')
     def tagged_var(self, v: LHS) -> LHS:

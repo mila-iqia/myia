@@ -7,7 +7,7 @@ from ..interpret import \
 from ..lib import ZERO
 from ..grad import JX
 from ..inference.types import typeof
-from ..lib import StructuralMap
+from ..lib import StructuralMap, Closure, default_structural_map_dispatch
 
 
 _ = True
@@ -33,6 +33,23 @@ def impl_interp_smap(sym, name, fn):
     return prim
 
 
+def impl_interp_smap(dispatch):
+    @symbol_associator('interp_smap')
+    def deco(sym, name, fn):
+        mfn = StructuralMap(fn, dispatch)
+        prim = PrimitiveImpl(mfn, name=sym)
+        impl_bank['interp'][sym] = prim
+        return prim
+
+    if not isinstance(dispatch, dict):
+        fn = dispatch
+        dispatch = default_structural_map_dispatch
+        return deco(fn)
+    else:
+        dispatch = {**dispatch, **default_structural_map_dispatch}
+        return deco
+
+
 ##############################################
 # Implementations of myia's global functions #
 ##############################################
@@ -40,6 +57,20 @@ def impl_interp_smap(sym, name, fn):
 
 @impl_interp_smap
 def interp_smap_add(x, y):
+    """
+    Element-wise addition. Note that unlike Python's addition, this
+    adds tuples element-by-element. ``add`` also works on Records and
+    Closures. Addition of a primitive to itself, ``P + P``, is legal and
+    yields ``P``.
+
+    >>> add(10, 9)
+    19
+    >>> add((1, 2, (3, 4)), (4, 3, (2, 1)))
+    (5, 5, (5, 5))
+
+    As a special case, ``add(ZERO, x) == x``. The converse, ``add(x, ZERO)``,
+    is considered an error.
+    """
     return x + y
 
 
@@ -169,8 +200,19 @@ def interp_print(x):
 ################################################
 
 
-@impl_interp
-def interp_J(x: Any) -> Any:
+def J_dispatch_closure(smap, clos):
+    """
+    Implements a special case for J on closures -- the transform
+    of clos.fn depends on clos.args, whereas the default behavior for
+    StructuralMap considers them separately.
+    """
+    c = Closure(JX(clos.fn, len(clos.args)),
+                smap(tuple(clos.args)))
+    return c
+
+
+@impl_interp_smap({Closure: J_dispatch_closure})
+def interp_smap_J(x):
     """
     Return a Grad-transformed version of this data.
 
@@ -189,26 +231,16 @@ def interp_J(x: Any) -> Any:
 
     Implements the J operator in Pearlmutter & Siskind.
     """
-    if isinstance(x, (int, float)):
-        return x
-    elif isinstance(x, tuple):
-        return tuple(interp_J(a) for a in x)
-    elif isinstance(x, list):
-        return list(interp_J(a) for a in x)
-    elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
+    if isinstance(x, (PrimitiveImpl, FunctionImpl)):
         return JX(x, 0)
-    elif isinstance(x, ClosureImpl):
-        c = ClosureImpl(JX(x.fn, len(x.args)),
-                        interp_J(tuple(x.args)))
-        return c
-    elif x is None or x is ZERO:
+    elif isinstance(x, (int, float, bool)) or x is None or x is ZERO:
         return x
     else:
         raise TypeError(f'Invalid argument for J: {x}')
 
 
-@impl_interp
-def interp_Jinv(x: Any) -> Any:
+@impl_interp_smap
+def interp_smap_Jinv(x):
     """
     Undo the effect of ``J``.
 
@@ -221,13 +253,7 @@ def interp_Jinv(x: Any) -> Any:
 
     Implements the J^{-1} operator in Pearlmutter & Siskind.
     """
-    if isinstance(x, (int, float)):
-        return x
-    elif isinstance(x, tuple):
-        return tuple(interp_Jinv(a) for a in x)
-    elif isinstance(x, list):
-        return list(interp_Jinv(a) for a in x)
-    elif isinstance(x, PrimitiveImpl):
+    if isinstance(x, PrimitiveImpl):
         raise Exception('Primitives have no primals.')
     elif isinstance(x, FunctionImpl):
         assert x.primal_sym is not None
@@ -240,11 +266,7 @@ def interp_Jinv(x: Any) -> Any:
                             f' {primal}, type {type(primal)},'
                             f' for {x.primal_sym}')
         return primal
-    elif isinstance(x, ClosureImpl):
-        c = ClosureImpl(interp_Jinv(x.fn),
-                        interp_Jinv(tuple(x.args)))
-        return c
-    elif x is None or x is ZERO:
+    elif isinstance(x, (int, float, bool)) or x is None or x is ZERO:
         return x
     else:
         raise TypeError(f'Invalid argument for Jinv: {x}')
@@ -296,7 +318,6 @@ def interp_zeros_like(x):
 
     Implements the "0" operator in Pearlmutter & Siskind.
     """
-    # TODO: rename to zeros_like
     return interp_fill(x, 0)
 
 
@@ -305,41 +326,9 @@ def interp_ones_like(x):
     return interp_fill(x, 1)
 
 
-@impl_interp
-def interp_mapadd(x: Any, y: Any) -> Any:
-    """
-    Element-wise addition.
-
-    >>> mapadd(10, 9)
-    19
-    >>> mapadd((1, 2, (3, 4)), (4, 3, (2, 1)))
-    (5, 5, (5, 5))
-
-    As a special case, ``mapadd(ZERO, x) == x``
-
-    Implements the "⊕" (circled plus) operator in Pearlmutter & Siskind.
-    """
-    # TODO: this should be add, but add concatenates tuples, whereas
-    # this adds their values element-wise.
-    if y is ZERO:
-        raise TypeError(f'ZERO should never be found as the '
-                        'second argument to mapadd.')
-    elif x is ZERO:
-        return y
-    elif isinstance(x, (int, float)) and isinstance(y, (int, float)):
-        return x + y
-    elif type(x) is not type(y):
-        raise TypeError(f'Cannot mapadd {x} and {y} (not same type).')
-    elif isinstance(x, tuple):
-        assert len(x) == len(y)
-        return tuple(interp_mapadd(a, b) for a, b in zip(x, y))
-    elif isinstance(x, list):
-        assert len(x) == len(y)
-        return list(interp_mapadd(a, b) for a, b in zip(x, y))
-    elif x is None:
-        return None
-    else:
-        raise TypeError(f'Cannot mapadd values of type {type(x)}')
+# @impl_interp_smap
+# def interp_smap_mapadd(x, y):
+#     return x + y
 
 
 @impl_interp

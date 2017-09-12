@@ -73,6 +73,9 @@ class FunctionImpl(HReprBase):
     def __repr__(self):
         return str(self)
 
+    def __map__(self, smap, *others):
+        return smap.fn(self, *others)
+
     def __hrepr__(self, H, hrepr):
         return H.div['FunctionImpl'](
             H.div['class_title']('Function'),

@@ -48,7 +48,6 @@ class builtins(metaclass=SymbolsMeta):
     fill = gsym('fill')
     zeros_like = gsym('zeros_like')
     ones_like = gsym('ones_like')
-    mapadd = gsym('mapadd')
     J = gsym('J')
     Jinv = gsym('Jinv')
 

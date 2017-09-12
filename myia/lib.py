@@ -227,6 +227,8 @@ def sequence_map(smap, *seqs):
 default_structural_map_dispatch = {
     int: scalar_map,
     float: scalar_map,
+    bool: scalar_map,
+    type(None): scalar_map,
     tuple: sequence_map,
     list: sequence_map,
     # numpy.ndarray: ndarray_map
