@@ -11,8 +11,9 @@ from typing import Union, Any, List, cast, \
 
 import re
 from .stx import \
-    MyiaASTNode, Apply, Symbol, Value, Let, Lambda, \
-    Closure, Tuple, Transformer, GenSym, LHS, Bindings
+    MyiaASTNode, ApplyNode as Apply, Symbol, ValueNode as Value, \
+    LetNode as Let, LambdaNode as Lambda, ClosureNode as Closure, \
+    TupleNode as Tuple, Transformer, GenSym, LHS, Bindings
 from .stx import nsym
 
 
@@ -142,16 +143,16 @@ class ANormalTransformer(Transformer):
 
         return self.stash(stash, result, base_name + '/out')
 
-    def transform_Apply(self, node, stash=None) -> MyiaASTNode:
+    def transform_ApplyNode(self, node, stash=None) -> MyiaASTNode:
         return self.transform_arguments([node.fn] + node.args, Apply, stash)
 
     def transform_Symbol(self, node, stash=None) -> MyiaASTNode:
         return node
 
-    def transform_Value(self, node, stash=None) -> MyiaASTNode:
+    def transform_ValueNode(self, node, stash=None) -> MyiaASTNode:
         return node
 
-    def transform_Lambda(self, node, stash=None) -> MyiaASTNode:
+    def transform_LambdaNode(self, node, stash=None) -> MyiaASTNode:
         tr = ANormalTransformer(node.gen)
         result = Lambda(node.args,
                         tr.transform(node.body),
@@ -160,7 +161,7 @@ class ANormalTransformer(Transformer):
         result.global_env = node.global_env
         return self.stash(stash, result, 'lambda')
 
-    def transform_Let(self, node, stash=None) -> MyiaASTNode:
+    def transform_LetNode(self, node, stash=None) -> MyiaASTNode:
         new_let = []
         for s, b in node.bindings:
             bindings: List = []
@@ -174,18 +175,18 @@ class ANormalTransformer(Transformer):
         result = Let(new_let, self.transform(node.body))
         return self.stash(stash, result, 'let')
 
-    def transform_Tuple(self, node, stash=None) -> MyiaASTNode:
+    def transform_TupleNode(self, node, stash=None) -> MyiaASTNode:
         def _Tuple(*args):
             return Tuple(args)
         return self.transform_arguments(node.values, _Tuple, stash, 'tup')
 
-    def transform_Closure(self, node, stash=None) -> MyiaASTNode:
+    def transform_ClosureNode(self, node, stash=None) -> MyiaASTNode:
         def rebuild(f, *args):
             return Closure(f, args)
         return self.transform_arguments([node.fn, *node.args],
                                         rebuild, stash, 'closure')
 
-    def transform_Begin(self, node, stash=None) -> MyiaASTNode:
+    def transform_BeginNode(self, node, stash=None) -> MyiaASTNode:
         stmts: List[MyiaASTNode] = \
             [stmt for stmt in node.stmts[:-1]
              if not isinstance(stmt, (Symbol, Value))] + node.stmts[-1:]
@@ -194,7 +195,7 @@ class ANormalTransformer(Transformer):
         else:
             syms: List[LHS] = [nsym() for stmt in stmts]
             bindings = list(zip(syms, stmts))
-            return self.transform_Let(Let(bindings, syms[-1]), stash)
+            return self.transform_LetNode(Let(bindings, syms[-1]), stash)
 
 
 class CollapseLet(Transformer):
@@ -219,7 +220,7 @@ class CollapseLet(Transformer):
     def __init__(self) -> None:
         pass
 
-    def transform_Let(self, node) -> MyiaASTNode:
+    def transform_LetNode(self, node) -> MyiaASTNode:
         new_bindings: Bindings = []
         for s, b in node.bindings:
             b = self.transform(b)
@@ -235,10 +236,10 @@ class CollapseLet(Transformer):
     def transform_Symbol(self, node) -> MyiaASTNode:
         return node
 
-    def transform_Value(self, node) -> MyiaASTNode:
+    def transform_ValueNode(self, node) -> MyiaASTNode:
         return node
 
-    def transform_Lambda(self, node) -> MyiaASTNode:
+    def transform_LambdaNode(self, node) -> MyiaASTNode:
         result = Lambda(node.args,
                         self.transform(node.body),
                         node.gen)
@@ -246,12 +247,12 @@ class CollapseLet(Transformer):
         result.global_env = node.global_env
         return result
 
-    def transform_Apply(self, node) -> MyiaASTNode:
+    def transform_ApplyNode(self, node) -> MyiaASTNode:
         return Apply(self.transform(node.fn),
                      *[self.transform(a) for a in node.args])
 
-    def transform_Tuple(self, node) -> MyiaASTNode:
+    def transform_TupleNode(self, node) -> MyiaASTNode:
         return Tuple(self.transform(a) for a in node.values)
 
-    def transform_Closure(self, node) -> MyiaASTNode:
+    def transform_ClosureNode(self, node) -> MyiaASTNode:
         return node

@@ -3,8 +3,8 @@ from typing import List, Any, Union, Callable, Dict
 from .main import symbol_associator, impl_bank
 from ..interpret import \
     PrimitiveImpl, FunctionImpl, ClosureImpl, evaluate
-from ..stx import Symbol, Apply, Closure, Lambda, Tuple, \
-    GenSym, BPROP, JTAG
+from ..stx import Symbol, ApplyNode as Apply, ClosureNode, \
+    LambdaNode, TupleNode, GenSym, BPROP, JTAG
 from ..symbols import builtins
 from ..front import parse_function, get_global_parse_env
 
@@ -27,8 +27,8 @@ def macro_grad_for(nargs_closure):
         #   ((a,), b, c, ...)  # If nargs_closure == 1
         #   ((a, b), c, ...)  # If nargs_closure == 2
         #   etc.
-        return Tuple([Tuple(args[:nargs_closure]),
-                     *args[nargs_closure:]])
+        return TupleNode([TupleNode(args[:nargs_closure]),
+                          *args[nargs_closure:]])
     return macro_grad
 
 
@@ -95,9 +95,9 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
         forward = Apply(builtins.J,
                         Apply(sym, *[Apply(builtins.Jinv, a)
                                      for a in args]))
-        backward = Closure(rsym, args)
+        backward = ClosureNode(rsym, args)
         # Final function:
-        ast = Lambda(args, Tuple([forward, backward]), G)
+        ast = LambdaNode(args, TupleNode([forward, backward]), G)
 
         # Boilerplate stuff that should be properly abstracted
         # somewhere else.

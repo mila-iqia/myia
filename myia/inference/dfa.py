@@ -6,7 +6,7 @@ See Inference section of DEVELOPERS.md for some more information.
 
 
 from ..util import Event, Keyword, buche
-from ..stx import Lambda, Closure, Tuple, Symbol
+from ..stx import LambdaNode, ClosureNode, TupleNode, Symbol
 from collections import defaultdict
 from ..impl.flow_all import default_flow, ANY, VALUE
 from ..impl.main import impl_bank
@@ -21,7 +21,7 @@ class DFA:
     The DFA can propagates information on "tracks". Each track
     can define custom behavior, and can work together.
     The main track is a ValueTrack, which propagates values such
-    as Lambdas and Closures, but there are also TypeTracks and
+    as LambdaNodes and ClosureNodes, but there are also TypeTracks and
     NeedsTracks.
 
     Attributes:
@@ -135,18 +135,18 @@ class DFA:
         def on_new_fn_value(track, new_value):
             nonlocal args
             assert track is self.value_track
-            if isinstance(new_value, Lambda):
+            if isinstance(new_value, LambdaNode):
                 if flow_body:
-                    # The Lambda's body flows to its application's
+                    # The LambdaNode's body flows to its application's
                     # result.
                     self.flow_to(new_value.body, node)
                 for arg, lbda_arg in zip(args, new_value.args):
                     # Each argument to the function flows to the
-                    # Lambda's corresponding argument.
+                    # LambdaNode's corresponding argument.
                     self.flow_to(arg, lbda_arg)
-            elif isinstance(new_value, Closure):
-                # If we get a Closure, we accumulate the args in front
-                # and we repeat the procedure for the Closure's function,
+            elif isinstance(new_value, ClosureNode):
+                # If we get a ClosureNode, we accumulate the args in front
+                # and we repeat the procedure for the ClosureNode's function,
                 # which will receive the totality of the arguments.
                 args = new_value.args + args
                 self.function_flow(new_value.fn, args, node, flow_body)
@@ -173,7 +173,7 @@ class DFA:
         method = getattr(self, f'visit_{cls}')
         return method(node)
 
-    def visit_Apply(self, node):
+    def visit_ApplyNode(self, node):
         # (f a)
         # If (lambda (x) body) ~> f and v ~> a, v ~> x
         # If (lambda (x) body) ~> f and v ~> body, v ~> (f a)
@@ -183,36 +183,36 @@ class DFA:
             self.visit(a)
 
         self.function_flow(node.fn, node.args, node, True)
-        self.run_flows('Apply', node)
+        self.run_flows('ApplyNode', node)
 
-    def visit_Begin(self, node):
+    def visit_BeginNode(self, node):
         raise Exception('Begin not supported')
-        self.run_flows('Begin', node)
+        self.run_flows('BeginNode', node)
 
-    def visit_Closure(self, node):
-        # Closures flow to themselves.
+    def visit_ClosureNode(self, node):
+        # ClosureNodes flow to themselves.
         self.visit(node.fn)
         for arg in node.args:
             self.visit(arg)
         self.function_flow(node.fn, node.args, node, False)
         self.propagate_value(node, node)
-        self.run_flows('Closure', node)
+        self.run_flows('ClosureNode', node)
 
-    def visit_Lambda(self, node):
-        # Lambdas flow to themselves.
+    def visit_LambdaNode(self, node):
+        # LambdaNodes flow to themselves.
         for arg in node.args:
             self.visit(arg)
         self.visit(node.body)
         self.propagate_value(node, node)
-        self.run_flows('Lambda', node)
+        self.run_flows('LambdaNode', node)
 
-    def visit_Let(self, node):
+    def visit_LetNode(self, node):
         # There is some complex behavior here, mainly because it is possible
         # to bind to tuples, and we want the analysis to deconstruct them
         # whenever possible.
         def _visit(v):
             # Visit all variables through tuples.
-            if isinstance(v, Tuple):
+            if isinstance(v, TupleNode):
                 for _v in v.values:
                     _visit(_v)
             else:
@@ -220,7 +220,7 @@ class DFA:
 
         def _vars(v):
             # Return a flattened list of all variables defined here.
-            if isinstance(v, Tuple):
+            if isinstance(v, TupleNode):
                 rval = []
                 for _v in v.values:
                     rval += _vars(_v)
@@ -229,20 +229,20 @@ class DFA:
                 return [v]
 
         def _bind(var, value):
-            if isinstance(var, Tuple):
-                # If the value is bound to a Tuple, we check what
+            if isinstance(var, TupleNode):
+                # If the value is bound to a TupleNode, we check what
                 # flows to the value.
                 @self.on_flow_from(value)
                 def flow_tuple(track, new_value):
-                    if isinstance(new_value, Tuple):
-                        # If a Tuple flows, we can deconstruct it and
+                    if isinstance(new_value, TupleNode):
+                        # If a TupleNode flows, we can deconstruct it and
                         # bind each variable to the corresponding
-                        # Tuple element, gaining precision.
+                        # TupleNode element, gaining precision.
                         for v, sub_value in zip(var.values, new_value.values):
                             _bind(v, sub_value)
                     else:
                         # Otherwise, we flow ANY to all variables
-                        # in the Tuple.
+                        # in the TupleNode.
                         for v in _vars(var):
                             self.propagate_value(v, ANY)
             else:
@@ -255,7 +255,7 @@ class DFA:
             _bind(v, value)
         self.visit(node.body)
         self.flow_to(node.body, node)
-        self.run_flows('Let', node)
+        self.run_flows('LetNode', node)
 
     def visit_Symbol(self, node):
         if node in self.genv.bindings:
@@ -270,18 +270,18 @@ class DFA:
             self.propagate_value(node, node)
         self.run_flows('Symbol', node)
 
-    def visit_Tuple(self, node):
-        # Tuples flow to themselves, which allows us to flow individual
+    def visit_TupleNode(self, node):
+        # TupleNodes flow to themselves, which allows us to flow individual
         # elements in deconstructing assignments or constant indexing.
         for v in node.values:
             self.visit(v)
         self.propagate_value(node, node)
-        self.run_flows('Tuple', node)
+        self.run_flows('TupleNode', node)
 
-    def visit_Value(self, node):
+    def visit_ValueNode(self, node):
         # Values flow to themselves.
         self.propagate_value(node, node)
-        self.run_flows('Value', node)
+        self.run_flows('ValueNode', node)
 
 
 class Track:
@@ -298,28 +298,28 @@ class Track:
     def propagate(self, node, value):
         self.dfa.propagate(node, self, value)
 
-    def flow_Apply(self, node):
+    def flow_ApplyNode(self, node):
         pass
 
-    def flow_Begin(self, node):
+    def flow_BeginNode(self, node):
         pass
 
-    def flow_Closure(self, node):
+    def flow_ClosureNode(self, node):
         pass
 
-    def flow_Lambda(self, node):
+    def flow_LambdaNode(self, node):
         pass
 
-    def flow_Let(self, node):
+    def flow_LetNode(self, node):
         pass
 
-    def flow_Tuple(self, node):
+    def flow_TupleNode(self, node):
         pass
 
     def flow_Symbol(self, node):
         pass
 
-    def flow_Value(self, node):
+    def flow_ValueNode(self, node):
         pass
 
     def flow_prim(self, prim, args, node):
@@ -338,7 +338,7 @@ class ValueTrack(Track):
     def __init__(self, dfa):
         super().__init__('value', dfa)
 
-    # def flow_Tuple(self, node):
+    # def flow_TupleNode(self, node):
     #     self.propagate(node, node)
 
     # def flow_Value(self, node):
@@ -402,34 +402,34 @@ class NeedsTrack(Track):
         self.autoflow = autoflow
 
     def flow_auto(self, node):
-        assert not isinstance(node, Closure)
+        assert not isinstance(node, ClosureNode)
         for prop in self.autoflow:
             self.propagate(node, prop)
 
-    def flow_Apply(self, node):
+    def flow_ApplyNode(self, node):
         self.propagate(node.fn, VALUE)
         self.flow_auto(node)
 
-    def flow_Begin(self, node):
+    def flow_BeginNode(self, node):
         self.flow_auto(node)
 
-    def flow_Closure(self, node):
+    def flow_ClosureNode(self, node):
         pass
 
-    def flow_Lambda(self, node):
+    def flow_LambdaNode(self, node):
         pass
 
-    def flow_Let(self, node):
+    def flow_LetNode(self, node):
         self.flow_auto(node)
 
-    def flow_Tuple(self, node):
+    def flow_TupleNode(self, node):
         self.propagate(node, VALUE)
         self.flow_auto(node)
 
     def flow_Symbol(self, node):
         self.flow_auto(node)
 
-    def flow_Value(self, node):
+    def flow_ValueNode(self, node):
         self.flow_auto(node)
 
     def flow_prim(self, prim, args, node):

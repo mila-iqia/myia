@@ -1,5 +1,5 @@
 
-from .nodes import Tuple
+from .nodes import TupleNode
 from .about import About
 
 
@@ -41,18 +41,18 @@ class Transformer:
 
 # TODO: document
 def maptup(fn, vals):
-    if isinstance(vals, Tuple):
-        return Tuple(maptup(fn, x) for x in vals.values)
+    if isinstance(vals, TupleNode):
+        return TupleNode(maptup(fn, x) for x in vals.values)
     else:
         return fn(vals)
 
 
 # TODO: document
 def maptup2(fn, vals1, vals2):
-    if isinstance(vals1, Tuple):
+    if isinstance(vals1, TupleNode):
         assert type(vals2) is tuple
         assert len(vals1.values) == len(vals2)
-        return Tuple(maptup2(fn, x, y)
-                     for x, y in zip(vals1.values, vals2))
+        return TupleNode(maptup2(fn, x, y)
+                         for x, y in zip(vals1.values, vals2))
     else:
         return fn(vals1, vals2)

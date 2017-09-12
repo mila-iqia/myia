@@ -18,8 +18,9 @@ from typing import Dict, List, Tuple as TupleT, Any, \
 
 from .stx import \
     LHS, Binding, Bindings, Transformer, GenSym, MyiaASTNode, \
-    Symbol, Value, Lambda, Let, Apply, Tuple, Closure, maptup, \
-    About, transformer_method, bsym, gsym, nsym, \
+    Symbol, ValueNode as Value, LambdaNode as Lambda, LetNode as Let, \
+    ApplyNode as Apply, TupleNode, ClosureNode, \
+    maptup, About, transformer_method, bsym, gsym, nsym, \
     JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
     TMP_LET, TMP_BPROP, TMP_SENS
 from .interpret import \
@@ -145,9 +146,9 @@ class Grad:
                 dependents = [value.fn] + value.args
             elif isinstance(value, Symbol):
                 dependents = [value]
-            elif isinstance(value, Tuple):
+            elif isinstance(value, TupleNode):
                 dependents = value.values
-            elif isinstance(value, Closure):
+            elif isinstance(value, ClosureNode):
                 dependents = [value.fn] + value.args
             else:
                 dependents = []
@@ -193,24 +194,24 @@ class Grad:
             # Transformed:  ↑x = 5
             return [(self.tagged_var(var), value)]
 
-        elif isinstance(value, Tuple):
+        elif isinstance(value, TupleNode):
             # Original:     x = (y, z)
             # Transformed:  ↑x = (↑y, ↑z)
             return [(self.tagged_var(var),
-                     Tuple(self.tagged_expr(a) for a in value.values))]
+                     TupleNode(self.tagged_expr(a) for a in value.values))]
 
         elif isinstance(value, Apply):
             # Original:     x = f(y)
             # Transformed:  ↑x, ♢x = ↑f(↑y)
-            return [(Tuple([self.tagged_var(var),
-                            self.backpropagator_var(var)]),
+            return [(TupleNode([self.tagged_var(var),
+                                self.backpropagator_var(var)]),
                      Apply(self.tagged_expr(value.fn),
                            *[self.tagged_expr(a) for a in value.args]))]
 
-        elif isinstance(value, Closure):
-            # Original:     x = Closure(f, y, z)
+        elif isinstance(value, ClosureNode):
+            # Original:     x = ClosureNode(f, y, z)
             # Transformed:  ↑f = JX(f, 2)  # evaluated immediately
-            #               ↑x = Closure(↑f, ↑y, ↑z)
+            #               ↑x = ClosureNode(↑f, ↑y, ↑z)
             # where the last argument to JX is the number of free
             # variables the function is referring to (y and z in
             # the example).
@@ -221,14 +222,14 @@ class Grad:
             assert isinstance(value.fn, Symbol)
             if value.fn.namespace not in {'global', 'builtin'}:
                 raise Exception(
-                    'First argument to Closure'
+                    'First argument to ClosureNode'
                     ' should always be a global variable.'
                 )
 
             args = [self.tagged_expr(a) for a in value.args]
             fn = evaluate(value.fn, self.global_env)
             jfn = JX(fn, len(value.args))
-            expr = Closure(jfn.ast.ref, args)
+            expr = ClosureNode(jfn.ast.ref, args)
 
             return [(self.tagged_var(var), expr)]
 
@@ -262,7 +263,7 @@ class Grad:
             # ourselves the trouble.
             return []
         else:
-            # If ``var`` is a Tuple, some values might be
+            # If ``var`` is a TupleNode, some values might be
             # ZERO and others not, and that can be a problem
             # because ZERO is not conformant (shape-wise).
             # Therefore, we must backtrack and get something
@@ -272,7 +273,7 @@ class Grad:
         if isinstance(value, Symbol):
             # Original:     x = y
             # Transformed:  ∇x += ∇y
-            # return self.accum([value], Tuple([sen]))
+            # return self.accum([value], TupleNode([sen]))
             return self.accum_single(value, sen)
 
         elif isinstance(value, Value):
@@ -280,7 +281,7 @@ class Grad:
             # Transformed:  <nothing to do>
             return []
 
-        elif isinstance(value, Tuple):
+        elif isinstance(value, TupleNode):
             # Original:     x = (y, z)
             # Transformed:  ∇y, ∇z += ∇x
             args = args_cast(value.values)
@@ -295,10 +296,10 @@ class Grad:
             self.bprop_variables[bprop_var] = True
             return self.accum_multi(args, increment)
 
-        elif isinstance(value, Closure):
-            # Original:     x = Closure(f, y, z)
+        elif isinstance(value, ClosureNode):
+            # Original:     x = ClosureNode(f, y, z)
             # Transformed:  ∇y, ∇z += ∇x
-            # Why yes, this works the same as Tuple.
+            # Why yes, this works the same as TupleNode.
             args = args_cast(value.args)
             return self.accum_multi(args, sen)
 
@@ -380,11 +381,11 @@ class Grad:
             if all(x == Value(ZERO) for x in rhs_vars):
                 new_value = value
             else:
-                new_value = Apply(builtins.mapadd, Tuple(rhs_vars), value)
+                new_value = Apply(builtins.mapadd, TupleNode(rhs_vars), value)
 
         # We must prepend the main operation to the extra bindings
         # we created for the duplicates
-        binding: Binding = (Tuple(lhs_vars), new_value)
+        binding: Binding = (TupleNode(lhs_vars), new_value)
         return [binding] + bindings
 
     @transformer_method('g:sens_acc', 2)
@@ -407,7 +408,7 @@ class Grad:
         if isinstance(v, Symbol):
             assert v.namespace not in {'global', 'builtin'}
             return copy(self.tagged_map.setdefault(v, self.gensym(v, JTAG)))
-        elif isinstance(v, Tuple):
+        elif isinstance(v, TupleNode):
             rval = maptup(self.tagged_var, v)
             return rval
         else:
@@ -519,7 +520,7 @@ class Grad:
         """
         Return ``♢v``. Create it if it does not exist.
         """
-        if isinstance(v, Tuple):
+        if isinstance(v, TupleNode):
             # If we have a deconstructing assignment, we still
             # only get one backpropagator, so we create a new
             # variable to hold it.
@@ -573,8 +574,8 @@ class Grad:
         # The return value of ♦f: we group together the first
         # nargs_closure gradients because they are the closure's
         # gradient.
-        backp_ret = Tuple([
-            Tuple(backp_all_ret[:self.nargs_closure]),
+        backp_ret = TupleNode([
+            TupleNode(backp_all_ret[:self.nargs_closure]),
             *backp_all_ret[self.nargs_closure:]
         ])
         # Calls to rho had the side effect of populating bprop_variables
@@ -600,7 +601,7 @@ class Grad:
         ########################
 
         # First we will make a closure over ♦f and call it ♢f
-        backp_cl = Closure(backp_sym, backp_args)
+        backp_cl = ClosureNode(backp_sym, backp_args)
         backp_clsym = self.gensym(self.name, BPROP_CLOS)
         # We append the closure binding to forward
         forward.append((backp_clsym, backp_cl))
@@ -610,7 +611,7 @@ class Grad:
         ###################################
 
         # ↑f returns (↑out, ♢f)
-        augm_ret = Tuple([self.tagged_expr(let.body), backp_clsym])
+        augm_ret = TupleNode([self.tagged_expr(let.body), backp_clsym])
         augm_body = Let(forward, augm_ret)
         # ↑f takes ↑ versions of f's arguments
         augm_args = list(map(self.tagged_var, args))

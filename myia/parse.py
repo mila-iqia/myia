@@ -117,10 +117,10 @@ from .util import buche, EventDispatcher, group_contiguous
 from collections import OrderedDict
 from .stx import \
     MyiaASTNode, MyiaSyntaxError, current_location, \
-    Location, Symbol, Value, \
-    Let, Lambda, Apply, \
-    Begin, Tuple, Closure, _Assign, \
-    GenSym, ParseEnv, About, VariableTracker, \
+    Location, Symbol, ValueNode as Value, \
+    LetNode as Let, LambdaNode as Lambda, ApplyNode as Apply, \
+    BeginNode as Begin, TupleNode as Tuple, ClosureNode as Closure, \
+    _Assign, GenSym, ParseEnv, About, VariableTracker, \
     HIDGLOB, THEN, ELSE, WTEST, WLOOP, LBDA
 from .symbols import get_operator, builtins
 from uuid import uuid4 as uuid

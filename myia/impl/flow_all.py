@@ -1,6 +1,6 @@
 
 from .main import symbol_associator, impl_bank
-from ..stx import Value, Tuple
+from ..stx import ValueNode, TupleNode
 from ..util import Keyword
 # from unification import var
 from ..inference.types import Array, Bool, Float64, Int64, Type
@@ -72,9 +72,9 @@ def flow_identity(dfa, args, node):
 def flow_switch(dfa, args, node):
     @dfa.on_flow_from(args[0], 'value')
     def on_cond(track, value):
-        if value == Value(True):
+        if value == ValueNode(True):
             dfa.flow_to(args[1], node)
-        elif value == Value(False):
+        elif value == ValueNode(False):
             dfa.flow_to(args[2], node)
         elif value == ANY:
             dfa.flow_to(args[1], node)
@@ -92,7 +92,7 @@ def flow_index(dfa, args, node):
 
     @dfa.on_flow_from(idx, track)
     def on_index(track, value):
-        if isinstance(value, Value):
+        if isinstance(value, ValueNode):
             vidx = value.value
             indexes.add(vidx)
             for tup in tups:
@@ -100,7 +100,7 @@ def flow_index(dfa, args, node):
 
     @dfa.on_flow_from(dat, track)
     def on_data(track, value):
-        if isinstance(value, Tuple):
+        if isinstance(value, TupleNode):
             tups.add(value)
             for vidx in indexes:
                 dfa.flow_to(value.values[vidx], node)

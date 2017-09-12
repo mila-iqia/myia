@@ -11,7 +11,7 @@ Validation and testing functionality.
 from typing import Iterable, Set, Tuple as TupleT, \
     Callable, Dict, List, Any, Union
 
-from .stx import MyiaASTNode, Symbol, Lambda, Let, ParseEnv, maptup
+from .stx import MyiaASTNode, Symbol, LambdaNode, LetNode, ParseEnv, maptup
 from .compile import a_normal
 from .front import parse_source, parse_function
 from .grad import Grad
@@ -32,7 +32,7 @@ def unbound(node: MyiaASTNode,
             avail: Set[Symbol] = None) -> Iterable[Symbol]:
     """
     Yield all symbols that are not bound by their enclosing
-    Lambda (excluding globals/builtins).
+    LambdaNode (excluding globals/builtins).
     """
     if avail is None:
         avail = set()
@@ -40,9 +40,9 @@ def unbound(node: MyiaASTNode,
         if node.namespace not in {'global', 'builtin'} \
                 and node not in avail:
             yield node
-    elif isinstance(node, Lambda):
+    elif isinstance(node, LambdaNode):
         yield from unbound(node.body, set(node.args))
-    elif isinstance(node, Let):
+    elif isinstance(node, LetNode):
         avail = set(avail)
         for s, v in node.bindings:
             yield from unbound(v, avail)
@@ -176,7 +176,7 @@ def get_functions(data) -> TupleT[Callable, Symbol, ParseEnv]:
     Returns:
         (pyfn, sym, bindings) where pyfn is a Python function,
         sym is the symbol for the Myia version of the function,
-        and bindings contains all symbol/Lambda mappings it needs.
+        and bindings contains all symbol/LambdaNode mappings it needs.
     """
     if isinstance(data, tuple):
         url, line_offset, code = data
@@ -288,7 +288,7 @@ def analysis_grad(pyfn: Callable,
 
     lbda = bindings[sym]
     albda = a_normal(lbda)
-    assert isinstance(albda, Lambda)
+    assert isinstance(albda, LambdaNode)
     G = Grad(sym, albda)
     g = G.transform()
     assert G.global_env is bindings
@@ -319,7 +319,8 @@ def grad2_transform(rsym, bindings):
     gen = rlbda.gen
     rrsym = genv.gen('GG')
 
-    from .stx import Lambda, Apply, Value, Let
+    from .stx import LambdaNode as Lambda, ApplyNode as Apply, \
+        ValueNode as Value, LetNode as Let
     from .symbols import builtins
 
     sym_arg = gen('ARG')
@@ -335,7 +336,7 @@ def grad2_transform(rsym, bindings):
 
     return rrsym
 
-    # return Lambda(
+    # return LambdaNode(
     #     ARGS,
     #     Let((gen('X'), Apply()))
     #     Apply(builtins.index, Apply())

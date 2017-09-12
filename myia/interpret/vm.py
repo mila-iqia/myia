@@ -2,8 +2,8 @@ from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 
 from ..stx import \
     MyiaASTNode, ParseEnv, \
-    Location, Symbol, Value, \
-    Let, Lambda, Apply, Begin, Tuple, Closure, maptup2
+    Location, Symbol, \
+    LambdaNode, maptup2
 from ..symbols import builtins
 from ..util import EventDispatcher, BucheDb, HReprBase, buche
 from functools import reduce
@@ -11,11 +11,11 @@ from ..impl.main import impl_bank
 import inspect
 
 
-# When a Lambda is made into a FunctionImpl, we will
+# When a LambdaNode is made into a FunctionImpl, we will
 # cache it. This mostly avoids recomputing gradients,
 # since FunctionImpl is the structure that stores
 # pointers to them.
-compile_cache: Dict[Lambda, 'FunctionImpl'] = {}
+compile_cache: Dict[LambdaNode, 'FunctionImpl'] = {}
 EnvT = Dict[Symbol, Any]
 root_globals = impl_bank['interp']
 
@@ -73,8 +73,8 @@ class FunctionImpl(HReprBase):
     """
     Represents a Myia-transformed function.
     """
-    def __init__(self, ast: Lambda, envs: List[EnvT]) -> None:
-        assert isinstance(ast, Lambda)
+    def __init__(self, ast: LambdaNode, envs: List[EnvT]) -> None:
+        assert isinstance(ast, LambdaNode)
         assert isinstance(envs, list)
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
@@ -116,8 +116,8 @@ class ClosureImpl(HReprBase):
     def __init__(self,
                  fn: Union[PrimitiveImpl, FunctionImpl],
                  args: List[Any]) -> None:
-        self.argnames = [a for a in fn.argnames[len(args):]]
-        self.nargs = fn.nargs - len(args)
+        # self.argnames = [a for a in fn.argnames[len(args):]]
+        # self.nargs = fn.nargs - len(args)
         self.fn = fn
         self.args = args
 
@@ -199,17 +199,17 @@ class VMCode(HReprBase):
         method = getattr(self, 'process_' + cls)
         rval = method(node)
 
-    def process_Apply(self, node) -> None:
+    def process_ApplyNode(self, node) -> None:
         self.process(node.fn)
         for arg in node.args:
             self.process(arg)
         self.instr('reduce', node, len(node.args))
 
-    def process_Begin(self, node) -> None:
+    def process_BeginNode(self, node) -> None:
         for stmt in node.stmts:
             self.process(stmt)
 
-    def process_Closure(self, node) -> None:
+    def process_ClosureNode(self, node) -> None:
         self.process(node.fn)
         self.process(builtins.mktuple)
         for arg in node.args:
@@ -218,10 +218,10 @@ class VMCode(HReprBase):
         self.instr('reduce', node, len(node.args))
         self.instr('closure', node)
 
-    def process_Lambda(self, node) -> None:
+    def process_LambdaNode(self, node) -> None:
         self.instr('lambda', node)
 
-    def process_Let(self, node) -> None:
+    def process_LetNode(self, node) -> None:
         for k, v in node.bindings:
             self.process(v)
             self.instr('store', node, k)
@@ -230,7 +230,7 @@ class VMCode(HReprBase):
     def process_Symbol(self, node) -> None:
         self.instr('fetch', node, node)
 
-    def process_Tuple(self, node) -> None:
+    def process_TupleNode(self, node) -> None:
         # for x in node.values:
         #     self.process(x)
         # self.instr('tuple', node, len(node.values))
@@ -239,7 +239,7 @@ class VMCode(HReprBase):
             self.process(arg)
         self.instr('reduce', node, len(node.values))
 
-    def process_Value(self, node) -> None:
+    def process_ValueNode(self, node) -> None:
         self.instr('push', node, node.value)
 
     def __hrepr__(self, H, hrepr):
@@ -483,7 +483,7 @@ class VMFrame(HReprBase):
         for env in self.envs:
             try:
                 v = env[sym]
-                if isinstance(v, Lambda):
+                if isinstance(v, LambdaNode):
                     cv = self.vm.compile_cache.get(v, None)
                     if cv is None:
                         cv = self.vm.evaluate(v)
@@ -542,11 +542,11 @@ def evaluate(node: MyiaASTNode,
     """
     Evaluate the given MyiaASTNode in the given ``parse_env``.
     If ``parse_env`` is None, it will be extracted from the node
-    itself (Parser stores a Lambda's global environment in its
+    itself (Parser stores a LambdaNode's global environment in its
     ``global_env`` field).
     """
     load()
-    if isinstance(node, Lambda):
+    if isinstance(node, LambdaNode):
         parse_env = node.global_env
     assert parse_env is not None
     envs = (parse_env.bindings, root_globals)

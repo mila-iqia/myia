@@ -18,9 +18,9 @@ from .about import Location, top as about_top
 __save_trace__ = False
 
 
-stx_dir = os.path.dirname(__file__)
+stxdir = os.path.dirname(__file__)
 Locatable = Union['MyiaASTNode', 'Location', None]
-LHS = Union['Symbol', 'Tuple']
+LHS = Union['Symbol', 'TupleNode']
 Binding = TupleT[LHS, 'MyiaASTNode']
 Bindings = List[Binding]
 
@@ -44,7 +44,7 @@ class MyiaASTNode(HReprBase):
             frame = frames.pop()
             # We skip all frames from helper functions defined
             # in this file.
-            while frames and frame.filename.startswith(stx_dir):
+            while frames and frame.filename.startswith(stxdir):  # type: ignore
                 frame = frames.pop()
             self.trace = Location(
                 frame.filename,  # type: ignore
@@ -94,7 +94,7 @@ class Symbol(MyiaASTNode):
             this must be a Symbol.
         namespace (str): the namespace in which the variable
             lives. This is usually 'global', 'builtin', or a
-            uuid created on a per-Lambda expression basis.
+            uuid created on a per-LambdaNode expression basis.
         version (int): differentiates variables with the same
             name and namespace. This can happen when there are
             multiple writes to the same variable in Python.
@@ -168,7 +168,10 @@ class Symbol(MyiaASTNode):
         return rval
 
 
-class Value(MyiaASTNode):
+SymbolNode = Symbol
+
+
+class ValueNode(MyiaASTNode):
     """
     A literal value, like a literal integer, float or string,
     or True, False, or None. If you build an AST manually, any
@@ -182,7 +185,7 @@ class Value(MyiaASTNode):
         super().__init__(**kw)
 
     def __eq__(self, other):
-        return isinstance(other, Value) and self.value == other.value
+        return isinstance(other, ValueNode) and self.value == other.value
 
     def __hash__(self):
         return hash(self.value)
@@ -194,10 +197,10 @@ class Value(MyiaASTNode):
         return super().__hrepr__(H, hrepr)(hrepr(self.value))
 
 
-class Let(MyiaASTNode):
+class LetNode(MyiaASTNode):
     """
     A sequence of variable bindings followed by a body expression
-    which is the Let node's return value.
+    which is the LetNode node's return value.
 
     Fields:
         bindings ([(Symbol, MyiaASTNode), ...]): a list of variable
@@ -241,26 +244,26 @@ class Let(MyiaASTNode):
         )
 
 
-class Lambda(MyiaASTNode):
+class LambdaNode(MyiaASTNode):
     """
     A function definition. This is the main unit that we will
     manipulate and transform and it has a few special fields.
     Most importantly, ``gen`` is a ``GenSym`` instance that can
     be used to create fresh symbols in the context of this
-    Lambda, and ``global_env`` contains the necessary bindings
+    LambdaNode, and ``global_env`` contains the necessary bindings
     to resolve global variables in the body.
 
     Fields:
         args ([Symbol]): List of argument variables.
         body (MyiaASTNode): Expression that the call should return.
-        gen (GenSym): Symbol factory for this Lambda.
+        gen (GenSym): Symbol factory for this LambdaNode.
         global_env (ParseEnv): Environment to resolve global
             variables.
-        ref (Symbol): Symbol that points to this Lambda in the
+        ref (Symbol): Symbol that points to this LambdaNode in the
             ``global_env``.
-        primal (Symbol): If this Lambda is the output of ``Grad``,
+        primal (Symbol): If this LambdaNode is the output of ``Grad``,
             then ``primal`` points (in the ``global_env``)
-            to ``Grad``'s original input Lambda. Otherwise, this
+            to ``Grad``'s original input LambdaNode. Otherwise, this
             is None.
     """
     def __init__(self,
@@ -293,7 +296,7 @@ class Lambda(MyiaASTNode):
         )
 
 
-class Apply(MyiaASTNode):
+class ApplyNode(MyiaASTNode):
     """
     Function application. Note that operations like indexing or
     getting an attribute do not have their own nodes in Myia's
@@ -333,7 +336,7 @@ class Apply(MyiaASTNode):
         )
 
 
-class Begin(MyiaASTNode):
+class BeginNode(MyiaASTNode):
     """
     A sequence of expressions, the last of which is the return
     value. Return values from other expressions are simply
@@ -342,7 +345,7 @@ class Begin(MyiaASTNode):
 
     Attributes:
         stmts: A list of expressions, the last of which is the
-            return value for Begin.
+            return value for BeginNode.
     """
     def __init__(self, stmts: List[MyiaASTNode], **kw) -> None:
         super().__init__(**kw)
@@ -361,7 +364,7 @@ class Begin(MyiaASTNode):
         )
 
 
-class Tuple(MyiaASTNode):
+class TupleNode(MyiaASTNode):
     """
     A tuple of expressions.
 
@@ -384,7 +387,7 @@ class Tuple(MyiaASTNode):
         )
 
 
-class Closure(MyiaASTNode):
+class ClosureNode(MyiaASTNode):
     """
     Associates a function with a list of arguments, without calling
     it. The result is a function that will concatenate the stored
@@ -422,7 +425,7 @@ class _Assign(MyiaASTNode):
     """
     This is a "temporary" node that ``front.Parser`` uses to
     represent a variable assignment. It is then transformed
-    into Let.
+    into LetNode.
     """
     def __init__(self,
                  varname: LHS,

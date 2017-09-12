@@ -4,14 +4,14 @@ manipulation.
 
 * An assortment of special characters to modify symbols.
 * ``GenSym``: generate Symbols.
-* ``ParseEnv``: map Symbols to Lambda or Value.
+* ``ParseEnv``: map Symbols to LambdaNode or ValueNode.
 """
 
 
 from typing import \
     List, Tuple as TupleT, Iterable, Dict, Set, Union, \
     cast, TypeVar, Any
-from .nodes import Symbol, Lambda
+from .nodes import Symbol, LambdaNode
 from ..util import EventDispatcher
 from uuid import uuid4 as uuid
 
@@ -161,7 +161,7 @@ def nsym() -> Symbol:
 
 class ParseEnv:
     """
-    A mapping from Symbol instances to Lambda instances. When
+    A mapping from Symbol instances to LambdaNode instances. When
     a function is compiled, a ParseEnv will contain all the
     functions created during the compilation. These functions
     will refer to each other with Symbols and the ParseEnv
@@ -186,7 +186,7 @@ class ParseEnv:
         gen (GenSym): The Symbol generator for this ParseEnv.
         url (str): The filename in which the compiled code
             originally came from.
-        bindings ({Symbol: Lambda}}): The mapping.
+        bindings ({Symbol: LambdaNode}}): The mapping.
         events (EventDispatcher): Events that this object might
             emit, chiefly the ``declare`` event.
 
@@ -209,7 +209,7 @@ class ParseEnv:
             self.events = None
         self.url = url
         self.gen: GenSym = gen or GenSym(namespace)
-        self.bindings: Dict[Symbol, Lambda] = {}
+        self.bindings: Dict[Symbol, LambdaNode] = {}
 
     def update(self, bindings) -> None:
         """
@@ -220,7 +220,7 @@ class ParseEnv:
         for k, v in bindings.items():
             self[k] = v
 
-    def __getitem__(self, name) -> 'Lambda':
+    def __getitem__(self, name) -> LambdaNode:
         return self.bindings[name]
 
     def __setitem__(self, name, value) -> None:

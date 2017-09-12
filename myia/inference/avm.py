@@ -7,7 +7,7 @@ from ..symbols import builtins
 from ..impl.main import impl_bank
 from itertools import product
 from .dfa import DFA, ValueTrack, NeedsTrack
-from ..stx import maptup2, Symbol, Tuple
+from ..stx import maptup2, Symbol, TupleNode
 from collections import defaultdict
 from ..impl.flow_all import ANY, VALUE, ERROR, OPEN
 
@@ -205,7 +205,7 @@ class AVMFrame(VMFrame):
         super().push(*values)
 
     def aux(self, node, fn, args, projs):
-        if isinstance(node, Tuple):
+        if isinstance(node, TupleNode):
             nfn = builtins.mktuple
         else:
             nfn = node.fn
@@ -237,14 +237,14 @@ class AVMFrame(VMFrame):
                 raise TypeError(f'Cannot store into {dest}.')
 
         def spread_error(x):
-            if isinstance(x, Tuple):
+            if isinstance(x, TupleNode):
                 for y in x.values:
                     spread_error(y)
             else:
                 store(x, err)
 
         value = self.pop()
-        if isinstance(dest, Tuple) and isinstance(value, AbstractValue):
+        if isinstance(dest, TupleNode) and isinstance(value, AbstractValue):
             if ERROR in value.values:
                 err = value[ERROR]
                 spread_error(dest)
