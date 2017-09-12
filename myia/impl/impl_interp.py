@@ -7,6 +7,7 @@ from ..interpret import \
 from ..symbols import ZERO
 from ..grad import JX
 from ..inference.types import typeof
+from ..lib import StructuralMap
 
 
 _ = True
@@ -24,28 +25,36 @@ def impl_interp(sym, name, fn):
     return prim
 
 
+@symbol_associator('interp_smap')
+def impl_interp_smap(sym, name, fn):
+    mfn = StructuralMap(fn)
+    prim = PrimitiveImpl(mfn, name=sym)
+    impl_bank['interp'][sym] = prim
+    return prim
+
+
 ##############################################
 # Implementations of myia's global functions #
 ##############################################
 
 
-@impl_interp
-def interp_add(x, y):
+@impl_interp_smap
+def interp_smap_add(x, y):
     return x + y
 
 
-@impl_interp
-def interp_subtract(x, y):
+@impl_interp_smap
+def interp_smap_subtract(x, y):
     return x - y
 
 
-@impl_interp
-def interp_multiply(x, y):
+@impl_interp_smap
+def interp_smap_multiply(x, y):
     return x * y
 
 
-@impl_interp
-def interp_divide(x, y):
+@impl_interp_smap
+def interp_smap_divide(x, y):
     return x / y
 
 
@@ -54,8 +63,8 @@ def interp_dot(x, y):
     return x @ y
 
 
-@impl_interp
-def interp_unary_subtract(x):
+@impl_interp_smap
+def interp_smap_unary_subtract(x):
     return -x
 
 
@@ -81,7 +90,7 @@ def interp_len(t):
 
 @impl_interp
 def interp_range(t):
-    return tuple(range(t))
+    return list(range(t))
 
 
 @impl_interp
@@ -184,6 +193,8 @@ def interp_J(x: Any) -> Any:
         return x
     elif isinstance(x, tuple):
         return tuple(interp_J(a) for a in x)
+    elif isinstance(x, list):
+        return list(interp_J(a) for a in x)
     elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
         return JX(x, 0)
     elif isinstance(x, ClosureImpl):
@@ -214,6 +225,8 @@ def interp_Jinv(x: Any) -> Any:
         return x
     elif isinstance(x, tuple):
         return tuple(interp_Jinv(a) for a in x)
+    elif isinstance(x, list):
+        return list(interp_Jinv(a) for a in x)
     elif isinstance(x, PrimitiveImpl):
         raise Exception('Primitives have no primals.')
     elif isinstance(x, FunctionImpl):
@@ -251,6 +264,8 @@ def interp_fill(x: Any, value: Union[int, float]) -> Any:
         return value
     elif isinstance(x, tuple):
         return tuple(interp_fill(a, value) for a in x)
+    elif isinstance(x, list):
+        return list(interp_fill(a, value) for a in x)
     elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
         return ()
     elif isinstance(x, ClosureImpl):
@@ -318,6 +333,9 @@ def interp_mapadd(x: Any, y: Any) -> Any:
     elif isinstance(x, tuple):
         assert len(x) == len(y)
         return tuple(interp_mapadd(a, b) for a, b in zip(x, y))
+    elif isinstance(x, list):
+        assert len(x) == len(y)
+        return list(interp_mapadd(a, b) for a, b in zip(x, y))
     elif x is None:
         return None
     else:

@@ -102,7 +102,9 @@ UInt16 = Type('UInt16')
 UInt32 = Type('UInt32')
 UInt64 = Type('UInt64')
 Array = Type('Array', ())
+List = Type('List', ())
 Tuple = Type('Tuple', ())
+Record = Type('Record', ())
 
 
 Number = {

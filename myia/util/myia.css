@@ -4,7 +4,7 @@
  * outputting to an html file or to a Jupyter notebook.
  */
 
-:root {
+:root, :host {
 	--hover-border-color: blue;
 }
 

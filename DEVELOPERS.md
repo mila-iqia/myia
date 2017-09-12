@@ -33,6 +33,7 @@ myia/                           # Source code for Myia
         types              F    # Type representations
     interpret/                  # Interpreter
         vm               I F    # Stack-based virtual machine
+    lib                ! I      # Impl of Record, Closure, StructuralMap
     parse               S       # Parse Python code, produce IR
     stx/                        # IR
         about          !S       # Track what nodes are about what other nodes

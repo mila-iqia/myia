@@ -44,8 +44,7 @@ class MyiaASTNode(HReprBase):
             frame = frames.pop()
             # We skip all frames from helper functions defined
             # in this file.
-            filename = frame.filename  # type: ignore
-            while frames and filename.startswith(stx_dir):
+            while frames and frame.filename.startswith(stx_dir):
                 frame = frames.pop()
             self.trace = Location(
                 frame.filename,  # type: ignore
