@@ -278,6 +278,7 @@ class LambdaNode(MyiaASTNode):
         self.body = body
         self.gen = gen
         self.global_env = global_env
+        self.globals: Dict[Symbol, Any] = None
         self.primal: Symbol = None
 
     def children(self) -> List[MyiaASTNode]:

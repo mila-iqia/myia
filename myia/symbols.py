@@ -14,7 +14,8 @@ The symbols live in two namespaces:
 
 
 import ast
-from .stx import Symbol, bsym, gsym
+import sys
+from .stx import Symbol, ValueNode, bsym, gsym
 from .util import Props, SymbolsMeta
 from typing import Dict
 
@@ -104,51 +105,54 @@ operator_map: Dict[str, Symbol] = dict(
 )
 
 
-function_map = {
+object_map = {
+    len: builtins.len,
     range: builtins.range,
+    map: builtins.map,
+    filter: builtins.filter,
+    enumerate: builtins.enumerate,
+    # Closure: builtins.Closure,
+    # closure_args: builtins.closure_args,
+    # closure_fn: builtins.closure_fn
 }
 
 
-# Not yet used [[[BEGIN
-
-# _maps = {
-#     'builtin': True,
-#     'numpy': False
-# }
+_maps = {
+    'builtin': True,
+    'numpy': False
+}
 
 
-# def _add_numpy_map():
-#     # Note: we will only run this if numpy has already been
-#     # imported by the user
-#     import numpy as _
-#     numpy_map = {
-#         _.add: builtins.add,
-#         _.arange: builtins.range,
-#         _.divide: builtins.divide,
-#         _.dot: builtins.dot,
-#         _.multiply: builtins.multiply,
-#         _.subtract: builtins.subtract
-#     }
-#     numpy_map[_] = Value(_)
+def _add_numpy_map():
+    # Note: we will only run this if numpy has already been
+    # imported by the user
+    import numpy as _
+    numpy_map = {
+        _.add: builtins.add,
+        _.arange: builtins.range,
+        _.divide: builtins.divide,
+        _.dot: builtins.dot,
+        _.multiply: builtins.multiply,
+        _.subtract: builtins.subtract
+    }
+    numpy_map[_] = ValueNode(_)
 
-#     global function_map
-#     function_map = {**function_map, **numpy_map}
+    global object_map
+    object_map = {**object_map, **numpy_map}
 
 
-# def _update_function_map():
-#     # This populates function_map with <function> => <Symbol> mappings,
-#     # e.g. numpy.add => Symbol("+")
-#     # However, we don't want to add mappings for a package if that package
-#     # has not been imported by the user, so we first check if it is present
-#     # in sys.modules, then we call the corresponding _add function
-#     # defined above.
-#     for package, added in _maps.items():
-#         if not added and sys.modules[package]:
-#             # TODO: error handling
-#             globals()['_add_{}_map'.format(package)]()
-#             _maps[package] = True
-
-# END]]]
+def update_object_map():
+    # This populates object_map with <object> => <Symbol/Value> mappings,
+    # e.g. numpy.add => Symbol("+")
+    # However, we don't want to add mappings for a package if that package
+    # has not been imported by the user, so we first check if it is present
+    # in sys.modules, then we call the corresponding _add function
+    # defined above.
+    for package, added in _maps.items():
+        if not added and package in sys.modules:
+            # TODO: error handling
+            globals()['_add_{}_map'.format(package)]()
+            _maps[package] = True
 
 
 def get_operator(node: ast.AST) -> Symbol:

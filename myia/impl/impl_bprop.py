@@ -104,6 +104,7 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
         # Boilerplate stuff that should be properly abstracted
         # somewhere else.
         ast.global_env = get_global_parse_env('__root__')
+        ast.globals = {}
         impl_sym = ast.global_env.gen(sym, JTAG)
         ast.global_env[impl_sym] = ast
         ast.ref = impl_sym

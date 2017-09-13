@@ -333,6 +333,7 @@ def grad2_transform(rsym, bindings):
     genv[rrsym] = glbda
     glbda.ref = rrsym
     glbda.global_env = rlbda.global_env
+    glbda.globals = {**glbda.global_env.bindings}
 
     return rrsym
 

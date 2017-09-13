@@ -17,7 +17,7 @@ impl_bank: Dict[str, Dict[Any, Any]] = defaultdict(dict)
 
 
 def symbol_associator(kind):
-    prefix = f'{kind}_'
+    prefix = f'{kind}_' if kind else ''
 
     def associator_deco(process):
         def deco(fn):

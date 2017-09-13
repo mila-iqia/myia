@@ -1,15 +1,16 @@
 from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 
+from types import FunctionType
 from ..stx import \
-    MyiaASTNode, ParseEnv, \
-    Location, Symbol, \
-    LambdaNode, maptup2
+    MyiaASTNode, ParseEnv, gsym, \
+    Location, Symbol, ValueNode, LambdaNode, maptup2
 from ..lib import Closure as ClosureImpl, Primitive as PrimitiveImpl, \
     IdempotentMappable
-from ..symbols import builtins
+from ..symbols import builtins, object_map, update_object_map
 from ..util import EventDispatcher, BucheDb, HReprBase, buche
 from functools import reduce
 from ..impl.main import impl_bank
+from ..parse import parse_function
 
 
 # When a LambdaNode is made into a FunctionImpl, we will
@@ -25,6 +26,7 @@ _loaded = False
 
 
 def load():
+    update_object_map()
     global _loaded
     if not _loaded:
         _loaded = True
@@ -40,6 +42,62 @@ def load():
 ###################
 # Special objects #
 ###################
+
+
+class Unprocessed:
+    def __init__(self, value):
+        self.value = value
+
+    def translate(self):
+        v = self.value
+        if isinstance(v, MyiaASTNode):
+            return v, {}
+
+        try:
+            return object_map[v], {}
+        except:
+            pass
+
+        if isinstance(v, (int, float, FunctionImpl)):
+            return ValueNode(v), {}
+        elif isinstance(v, (type, FunctionType)):
+            try:
+                sym, genv = parse_function(v)
+            except (TypeError, OSError):
+                raise ValueError(f'Myia cannot translate function: {v}')
+            return genv[sym], genv
+
+        raise ValueError(f'Myia cannot process value: {v}')
+
+    def process(self, vm):
+        node, bindings = self.translate()
+        if isinstance(node, LambdaNode):
+            cv = vm.compile_cache.get(node, None)
+            if cv is None:
+                if node.globals is None:
+                    print(node)
+                    assert node.globals
+                cv = evaluate2(node, wrap_globals(node.globals))
+                assert isinstance(cv, FunctionImpl)
+                vm.compile_cache[node] = cv
+            return cv
+
+        elif isinstance(node, ValueNode):
+            return node.value
+
+        elif isinstance(node, Symbol):
+            return root_globals[node]
+
+        else:
+            raise ValueError(f'Myia cannot process: {self.value}')
+
+
+def wrap_globals(glob):
+    rval = {gsym(k): Unprocessed(v)
+            for k, v in __builtins__.items()}
+    rval.update({gsym(k) if isinstance(k, str) else k: Unprocessed(v)
+                 for k, v in glob.items()})
+    return rval
 
 
 class FunctionImpl(HReprBase, IdempotentMappable):
@@ -440,17 +498,15 @@ class VMFrame(HReprBase):
             try:
                 v = env[sym]
                 if isinstance(v, LambdaNode):
-                    cv = self.vm.compile_cache.get(v, None)
-                    if cv is None:
-                        cv = self.vm.evaluate(v)
-                        assert isinstance(cv, FunctionImpl)
-                        self.vm.compile_cache[v] = cv
-                    v = cv
+                    v = Unprocessed(v)
+                if isinstance(v, Unprocessed):
+                    v = v.process(self.vm)
+                    env[sym] = v
                 self.push(v)
                 return None
             except KeyError as err:
                 pass
-        raise KeyError(f'Could not resolve {sym}')
+        raise KeyError(f'Could not resolve {sym} ({sym.namespace})')
 
     def instruction_push(self, node, value) -> None:
         """
@@ -506,4 +562,12 @@ def evaluate(node: MyiaASTNode,
         parse_env = node.global_env
     assert parse_env is not None
     envs = (parse_env.bindings, root_globals)
+    return run_vm(VMCode(node), *envs, debugger=debugger)
+
+
+def evaluate2(node: MyiaASTNode,
+              env: Dict[Symbol, Any],
+              debugger: BucheDb = None) -> Any:
+    load()
+    envs = (env, root_globals)
     return run_vm(VMCode(node), *envs, debugger=debugger)

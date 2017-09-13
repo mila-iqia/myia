@@ -8,12 +8,26 @@ from ..lib import ZERO
 from ..grad import JX
 from ..inference.types import typeof
 from ..lib import StructuralMap, Closure, default_structural_map_dispatch
+from ..symbols import object_map
 
 
 _ = True
 
 
-@symbol_associator('interp')
+pylen = len
+pylist = list
+pyrange = range
+myiaClosure = Closure
+pytuple = tuple
+pygetattr = getattr
+pytype = type
+pymap = map
+pyenumerate = enumerate
+pyException = Exception
+pyprint = print
+
+
+@symbol_associator('')
 def impl_interp(sym, name, fn):
     """
     Define the implementation for the given symbol.
@@ -22,15 +36,17 @@ def impl_interp(sym, name, fn):
     """
     prim = PrimitiveImpl(fn, name=sym)
     impl_bank['interp'][sym] = prim
+    object_map[prim] = sym
     return prim
 
 
 def impl_interp_smap(dispatch):
-    @symbol_associator('interp_smap')
+    @symbol_associator('')
     def deco(sym, name, fn):
         mfn = StructuralMap(fn, dispatch)
         prim = PrimitiveImpl(mfn, name=sym)
         impl_bank['interp'][sym] = prim
+        object_map[prim] = sym
         return prim
 
     if not isinstance(dispatch, dict):
@@ -48,7 +64,7 @@ def impl_interp_smap(dispatch):
 
 
 @impl_interp_smap
-def interp_smap_add(x, y):
+def add(x, y):
     """
     Element-wise addition. Note that unlike Python's addition, this
     adds tuples element-by-element. ``add`` also works on Records and
@@ -67,102 +83,102 @@ def interp_smap_add(x, y):
 
 
 @impl_interp_smap
-def interp_smap_subtract(x, y):
+def subtract(x, y):
     return x - y
 
 
 @impl_interp_smap
-def interp_smap_multiply(x, y):
+def multiply(x, y):
     return x * y
 
 
 @impl_interp_smap
-def interp_smap_divide(x, y):
+def divide(x, y):
     return x / y
 
 
 @impl_interp
-def interp_dot(x, y):
+def dot(x, y):
     return x @ y
 
 
 @impl_interp_smap
-def interp_smap_unary_subtract(x):
+def unary_subtract(x):
     return -x
 
 
 @impl_interp
-def interp_equal(x, y):
+def equal(x, y):
     return x == y
 
 
 @impl_interp
-def interp_less(x, y):
+def less(x, y):
     return x < y
 
 
 @impl_interp
-def interp_greater(x, y):
+def greater(x, y):
     return x > y
 
 
 @impl_interp
-def interp_len(t):
-    return len(t)
+def len(t):
+    return pylen(t)
 
 
 @impl_interp
-def interp_range(t):
-    return list(range(t))
+def range(t):
+    return pylist(pyrange(t))
 
 
 @impl_interp
-def interp_Closure(fn, args):
-    return Closure(fn, args)
+def Closure(fn, args):
+    return myiaClosure(fn, args)
 
 
 @impl_interp
-def interp_closure_fn(clos):
+def closure_fn(clos):
     return clos.fn
 
 
 @impl_interp
-def interp_closure_args(clos):
+def closure_args(clos):
     return clos.args
 
 
 @impl_interp
-def interp_mktuple(*args):
-    return tuple(args)
+def mktuple(*args):
+    return pytuple(args)
 
 
 @impl_interp
-def interp_index(t, i):
+def index(t, i):
     return t[i]
 
 
 @impl_interp
-def interp_first(t):
+def first(t):
     return t[0]
 
 
 @impl_interp
-def interp_second(t):
+def second(t):
     return t[1]
 
 
 @impl_interp
-def interp_getattr(obj, attr):
-    return getattr(obj, attr)
+def getattr(obj, attr):
+    return pygetattr(obj, attr)
 
 
 @impl_interp
-def interp_map(f, xs):
-    return type(xs)(map(f, xs))
+def map(f, xs):
+    return pytype(xs)(pymap(f, xs))
 
 
 @impl_interp
-def interp_reduce(f, xs):
+def reduce(f, xs):
     v = xs[0]
     for x in xs[1:]:
         v = f(v, x)
@@ -170,12 +186,12 @@ def interp_reduce(f, xs):
 
 
 @impl_interp
-def interp_enumerate(xs):
-    return type(xs)(enumerate(xs))
+def enumerate(xs):
+    return pytype(xs)(pyenumerate(xs))
 
 
 @impl_interp
-def interp_switch(cond, t, f):
+def switch(cond, t, f):
     if cond:
         return t
     else:
@@ -183,12 +199,12 @@ def interp_switch(cond, t, f):
 
 
 @impl_interp
-def interp_identity(x):
+def identity(x):
     return x
 
 
 @impl_interp
-def interp_raise_exception(x):
+def raise_exception(x):
     # TODO: wrap the exception, and have the interpreter catch it
     # and display the Myia stack trace instead of the Python
     # interpreter's own stack trace.
@@ -196,13 +212,13 @@ def interp_raise_exception(x):
 
 
 @impl_interp
-def interp_Exception(x):
-    return Exception(x)
+def Exception(x):
+    return pyException(x)
 
 
 @impl_interp
-def interp_print(x):
-    print(x)
+def print(x):
+    pyprint(x)
 
 
 ################################################
@@ -216,13 +232,13 @@ def J_dispatch_closure(smap, clos):
     of clos.fn depends on clos.args, whereas the default behavior for
     StructuralMap considers them separately.
     """
-    c = Closure(JX(clos.fn, len(clos.args)),
-                smap(tuple(clos.args)))
+    c = myiaClosure(JX(clos.fn, pylen(clos.args)),
+                    smap(pytuple(clos.args)))
     return c
 
 
-@impl_interp_smap({Closure: J_dispatch_closure})
-def interp_smap_J(x):
+@impl_interp_smap({myiaClosure: J_dispatch_closure})
+def J(x):
     """
     Return a Grad-transformed version of this data.
 
@@ -250,7 +266,7 @@ def interp_smap_J(x):
 
 
 @impl_interp_smap
-def interp_smap_Jinv(x):
+def Jinv(x):
     """
     Undo the effect of ``J``.
 
@@ -283,7 +299,7 @@ def interp_smap_Jinv(x):
 
 
 @impl_interp_smap
-def interp_smap_zeros_like(x):
+def zeros_like(x):
     """
     Creates a structure just like ``x`` but "zeroed out."
 
@@ -311,15 +327,15 @@ def interp_smap_zeros_like(x):
 
 
 @impl_interp
-def interp_assert_true(x, msg):
+def assert_true(x, msg):
     assert x, msg
 
 
 @impl_interp
-def interp_type(x):
+def type(x):
     return typeof(x)
 
 
 @impl_interp
-def interp_shape(x):
+def shape(x):
     return x.shape

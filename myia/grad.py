@@ -125,6 +125,7 @@ class Grad:
         self.gensym = primal.gen
         assert primal.global_env
         self.global_env = primal.global_env
+        self.globals = primal.globals
         self.tagged_map: Dict[Symbol, Symbol] = {}
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
         self.backpropagator_map: Dict[LHS, Symbol] = {}
@@ -221,7 +222,9 @@ class Grad:
             # apply this rule, but this will always be the case
             # if we have a closure in the code.
             assert isinstance(value.fn, Symbol)
-            if value.fn.namespace not in {'global', 'builtin'}:
+            # if value.fn.namespace not in {'global', 'builtin'}:
+            if value.fn.namespace != 'builtin' and \
+                    not value.fn.namespace.startswith('global'):
                 raise Exception(
                     'First argument to ClosureNode'
                     ' should always be a global variable.'
@@ -597,6 +600,7 @@ class Grad:
                           Let(self.zeros + backward, backp_ret),
                           self.gensym)
         backp_fn.global_env = self.global_env
+        backp_fn.globals = self.globals
         backp_fn.ref = backp_sym
         self.global_env[backp_sym] = backp_fn
         root_globals[backp_sym] = backp_fn  # TODO: obviate
@@ -626,6 +630,7 @@ class Grad:
         augm_fn = Lambda(cast(List[Symbol], augm_args),
                          augm_body, self.gensym)
         augm_fn.global_env = self.global_env
+        augm_fn.globals = self.globals
         augm_fn.ref = augm_sym
         self.global_env[augm_sym] = augm_fn
         root_globals[augm_sym] = augm_fn  # TODO: obviate

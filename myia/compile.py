@@ -159,6 +159,7 @@ class ANormalTransformer(Transformer):
                         node.gen)
         result.ref = node.ref
         result.global_env = node.global_env
+        result.globals = node.globals
         return self.stash(stash, result, 'lambda')
 
     def transform_LetNode(self, node, stash=None) -> MyiaASTNode:
@@ -245,6 +246,7 @@ class CollapseLet(Transformer):
                         node.gen)
         result.ref = node.ref
         result.global_env = node.global_env
+        result.globals = node.globals
         return result
 
     def transform_ApplyNode(self, node) -> MyiaASTNode:

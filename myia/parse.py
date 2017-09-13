@@ -1130,11 +1130,13 @@ class Parser(LocVisitor):
         return self.multi_assign(out_vars, val)
 
 
+global_pool: Dict[Symbol, Any] = {}
 _global_envs: Dict[str, ParseEnv] = {}
 
 
 def get_global_parse_env(url) -> ParseEnv:
     namespace = f'global'  # :{url}'
+    # namespace = f'global:{url}'
     env = ParseEnv(namespace=namespace, url=url)
     return _global_envs.setdefault(url, env)
 
@@ -1192,7 +1194,11 @@ def parse_function(fn, **kw) -> TupleT[Symbol, ParseEnv]:
         See ``parse_source``.
     """
     _, line = inspect.getsourcelines(fn)
-    return parse_source(inspect.getfile(fn),
-                        line,
-                        textwrap.dedent(inspect.getsource(fn)),
-                        **kw)
+    sym, genv = parse_source(inspect.getfile(fn),
+                             line,
+                             textwrap.dedent(inspect.getsource(fn)),
+                             **kw)
+    g = {**fn.__globals__, **genv.bindings}
+    for sym2, lbda in genv.bindings.items():
+        lbda.globals = g
+    return sym, genv
