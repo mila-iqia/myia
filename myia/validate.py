@@ -13,7 +13,7 @@ from typing import Iterable, Set, Tuple as TupleT, \
 
 from .stx import MyiaASTNode, Symbol, LambdaNode, LetNode, ParseEnv, maptup
 from .compile import a_normal
-from .front import parse_source, parse_function
+from .parse import parse_source, parse_function
 from .grad import Grad
 from .interpret import evaluate, root_globals
 

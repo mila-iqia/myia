@@ -1,5 +1,4 @@
-from myia.front import parse_function
-from myia.parse import MyiaSyntaxError
+from myia.parse import MyiaSyntaxError, parse_function
 from myia.inference.avm import \
     aroot_globals, abstract_evaluate, AbstractValue, ERROR, ANY
 from myia.interpret import FunctionImpl

@@ -1137,3 +1137,62 @@ def get_global_parse_env(url) -> ParseEnv:
     namespace = f'global'  # :{url}'
     env = ParseEnv(namespace=namespace, url=url)
     return _global_envs.setdefault(url, env)
+
+
+def parse_source(url: str,
+                 line: int,
+                 src: str,
+                 **kw) -> TupleT[Symbol, ParseEnv]:
+    """
+    Parse a source string with Myia.
+
+    Arguments:
+        url: The filename from whence the source comes.
+        line: The line number at which the source starts.
+        src: The source code to parse.
+        kw: Keyword arguments passed to Parser.
+
+    Returns:
+        A pair:
+        * The Symbol reference associated to the parsed
+          function.
+        * The ParseEnv that contains all the bindings that
+          were created as a result of parsing. This includes
+          the main function being parsed, but also auxiliary
+          functions for loop bodies etc.
+        To get the Lambda object that corresponds to the
+        given source function, index the ParseEnv with the
+        Symbol.
+    """
+    tree = ast.parse(src)
+    p = Parser(Locator(url, line),
+               get_global_parse_env(url),
+               top_level=True,
+               **kw)
+    r = p.visit(tree, allow_decorator=True)
+    if isinstance(r, list):
+        r, = r
+    if isinstance(r, _Assign):
+        r = r.value
+    genv = p.global_env
+    assert genv is not None
+    assert isinstance(r, Symbol)
+    return r, genv
+
+
+def parse_function(fn, **kw) -> TupleT[Symbol, ParseEnv]:
+    """
+    Parse a function with Myia.
+
+    Arguments:
+        fn: A Python function.
+        kw: Keyword arguments passed to Parser.
+
+    Returns:
+        See ``parse_source``.
+    """
+    _, line = inspect.getsourcelines(fn)
+    return parse_source(inspect.getfile(fn),
+                        line,
+                        textwrap.dedent(inspect.getsource(fn)),
+                        **kw)

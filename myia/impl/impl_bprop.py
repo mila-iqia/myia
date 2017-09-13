@@ -6,7 +6,7 @@ from ..interpret import \
 from ..stx import Symbol, ApplyNode as Apply, ClosureNode, \
     LambdaNode, TupleNode, GenSym, BPROP, JTAG
 from ..symbols import builtins
-from ..front import parse_function, get_global_parse_env
+from ..parse import parse_function, get_global_parse_env
 
 
 _ = True

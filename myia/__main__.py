@@ -11,7 +11,7 @@ import traceback
 from importlib import import_module
 from . import stx
 from .compile import a_normal
-from .front import parse_source
+from .parse import parse_source, ParseEnv
 from .interpret import evaluate
 from .validate import \
     unbound, missing_source, \
@@ -22,7 +22,6 @@ from .util import on_discovery
 from .interpret import VM
 from .stx import Symbol, AboutPrinter
 from .stx import nodes
-from .front import ParseEnv
 from .util import BucheDb
 
 

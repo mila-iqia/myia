@@ -2,7 +2,7 @@
 from .main import symbol_associator, impl_bank
 from ..interpret import PrimitiveImpl, FunctionImpl
 from ..inference.avm import AbstractValue, VALUE, ERROR
-from ..front import parse_function
+from ..parse import parse_function
 
 
 ######################
