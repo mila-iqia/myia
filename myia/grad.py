@@ -22,11 +22,11 @@ from .stx import \
     ApplyNode as Apply, TupleNode, ClosureNode, \
     maptup, About, transformer_method, bsym, nsym, \
     JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
-    TMP_LET, TMP_BPROP, TMP_SENS, create_lambda
+    TMP_LET, TMP_BPROP, TMP_SENS, create_lambda, is_global
 from .interpret import \
     root_globals, evaluate, \
     PrimitiveImpl, FunctionImpl, ClosureImpl
-from .symbols import builtins, is_global
+from .symbols import builtins
 from copy import copy
 from .compile import a_normal
 from .util import Props, buche

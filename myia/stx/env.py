@@ -131,7 +131,7 @@ def bsym(name: str) -> Symbol:
     It is the case that ``bsym(x) == bsym(x)``, because
     builtins are indexed by name only.
     """
-    return Symbol(name, namespace='builtin')
+    return Symbol(name, namespace='global::builtin')
 
 
 _ngen = GenSym(namespace='null')
@@ -149,6 +149,11 @@ def nsym() -> Symbol:
     fix.
     """
     return _ngen(NULLSYM)
+
+
+def is_global(sym):
+    ns = sym.namespace
+    return ns.startswith('global')
 
 
 class ParseEnv:

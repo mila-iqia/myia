@@ -20,11 +20,6 @@ from .util import Props, SymbolsMeta
 from typing import Dict
 
 
-def is_global(sym):
-    ns = sym.namespace
-    return ns == 'builtin' or ns.startswith('global')
-
-
 class builtins(metaclass=SymbolsMeta):
     add = bsym('add')
     subtract = bsym('subtract')

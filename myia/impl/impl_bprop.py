@@ -77,7 +77,7 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
         # Copy symbol to grad namespace
         rsym = Symbol(sym,
                       version=nargs_closure + 1,
-                      namespace='builtin',
+                      namespace='global::builtin_bprop',
                       relation=BPROP)
 
         # We compile the backpropagator using Myia. We provide
