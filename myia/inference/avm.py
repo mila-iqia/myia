@@ -8,7 +8,7 @@ from ..symbols import builtins
 from ..impl.main import impl_bank
 from itertools import product
 from .dfa import DFA, ValueTrack, NeedsTrack
-from ..stx import maptup2, Symbol, TupleNode
+from ..stx import maptup2, Symbol, TupleNode, globals_pool
 from collections import defaultdict
 from ..lib import ANY, VALUE, ERROR
 
@@ -394,11 +394,9 @@ class AVM(EventDispatcher):
         self.checkpoints_on[sig].append((frs, fr, set(self.sig_stack)))
 
     def evaluate(self, lbda):
-        parse_env = lbda.global_env
-        assert parse_env is not None
-        # envs = (parse_env.bindings, avm_genv)
         envs = ({}, avm_genv)
-        fn, = list(run_avm(VMCode(lbda), self.needs, *envs).result)
+        res = run_avm(VMCode(lbda), self.needs, {}, avm_genv)
+        fn, = list(res.result)
         return fn
 
     def go(self) -> Any:
@@ -491,9 +489,6 @@ def run_avm(code: VMCode,
 
 def abstract_evaluate(lbda, args, proj=None):
     load()
-    parse_env = lbda.global_env
-    assert parse_env is not None
-    # envs = (parse_env.bindings, aroot_globals)
 
     if not proj:
         proj = [VALUE]
@@ -506,8 +501,7 @@ def abstract_evaluate(lbda, args, proj=None):
     # for p in proj:
     #     d.propagate(lbda.body, 'needs', p)
 
-    d = DFA([ValueTrack, lambda dfa: NeedsTrack(dfa, proj)],
-            parse_env)
+    d = DFA([ValueTrack, lambda dfa: NeedsTrack(dfa, proj)], globals_pool)
     d.visit(lbda)
 
     fn, = list(run_avm(VMCode(lbda), {}, {}, avm_genv).result)

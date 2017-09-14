@@ -17,16 +17,9 @@ def proj(psym):
 
     @symbol_associator('proj')
     def pimpl(sym, name, fn):
-        # fsym, fenv = parse_function(fn)
-        # for s, lbda in fenv.bindings.items():
-        #     impl_bank['abstract'][s] = \
-        #         FunctionImpl(lbda, [impl_bank['abstract']])
-        # projs[impl_bank['abstract'][sym]] = \
-        #     FunctionImpl(fenv[fsym], [impl_bank['abstract']])
-        # return fn
-        fsym, fenv = parse_function(fn)
+        lbda = parse_function(fn)
         projs[impl_bank['abstract'][sym]] = \
-            FunctionImpl(fenv[fsym], abstract_globals)
+            FunctionImpl(lbda, abstract_globals)
         return fn
 
     return pimpl

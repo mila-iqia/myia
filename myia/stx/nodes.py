@@ -270,15 +270,12 @@ class LambdaNode(MyiaASTNode):
                  args: List[Symbol],
                  body: MyiaASTNode,
                  gen: 'GenSym',
-                 global_env: 'ParseEnv' = None,
                  **kw) -> None:
         super().__init__(**kw)
         self.ref: Symbol = None
         self.args = args
         self.body = body
         self.gen = gen
-        self.global_env = global_env
-        self.globals: Dict[Symbol, Any] = None
         self.primal: Symbol = None
 
     def children(self) -> List[MyiaASTNode]:

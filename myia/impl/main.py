@@ -37,7 +37,6 @@ class GlobalEnv(dict):
         self.primitives = primitives
 
     def __getitem__(self, item):
-        print('consult', item)
         try:
             return super().__getitem__(item)
         except KeyError:

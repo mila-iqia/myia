@@ -3,9 +3,9 @@ from typing import Tuple as TupleT
 import inspect
 import textwrap
 import ast
-from .parse import Parser, Locator, get_global_parse_env, parse_function
-from .stx import Symbol, ParseEnv, _Assign, gsym
-from .interpret import evaluate2, wrap_globals
+from .parse import Parser, Locator, parse_function
+from .stx import Symbol, ParseEnv, _Assign
+from .interpret import evaluate
 from .lib import Pending
 
 
@@ -35,13 +35,8 @@ from .lib import Pending
 class MyiaFunction:
     def __init__(self, **options):
         fn = options['fn']
-        sym, genv = parse_function(fn)
-        glob = fn.__globals__
-        self.globals = wrap_globals(glob)
-        for k in genv.bindings.keys():
-            print(k.namespace)
-        self.lbda = genv[sym]
-        self.fn = evaluate2(self.lbda, self.globals)
+        self.lbda = parse_function(fn)
+        self.fn = evaluate(self.lbda)
 
     def __call__(self, *args):
         return self.fn(*args)

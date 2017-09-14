@@ -20,12 +20,11 @@ from .stx import \
     LHS, Binding, Bindings, Transformer, GenSym, MyiaASTNode, \
     Symbol, ValueNode as Value, LambdaNode as Lambda, LetNode as Let, \
     ApplyNode as Apply, TupleNode, ClosureNode, \
-    maptup, About, transformer_method, bsym, nsym, \
+    maptup, About, transformer_method, bsym, nsym, GenSym, \
     JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
     TMP_LET, TMP_BPROP, TMP_SENS, create_lambda, is_global
 from .interpret import \
-    root_globals, evaluate, \
-    PrimitiveImpl, FunctionImpl, ClosureImpl
+    evaluate, PrimitiveImpl, FunctionImpl, ClosureImpl
 from .symbols import builtins
 from copy import copy
 from .compile import a_normal
@@ -36,6 +35,9 @@ from .lib import ZERO
 
 LeafType = Union[Symbol, Value]
 mapadd = builtins.add
+
+
+ggen = GenSym('global::grad')
 
 
 #################
@@ -123,9 +125,6 @@ class Grad:
         assert isinstance(primal, Lambda)
         self.primal = primal
         self.gensym = primal.gen
-        assert primal.global_env
-        self.global_env = primal.global_env
-        self.globals = primal.globals
         self.tagged_map: Dict[Symbol, Symbol] = {}
         self.sensitivity_map: Dict[Symbol, Symbol] = {}
         self.backpropagator_map: Dict[LHS, Symbol] = {}
@@ -222,7 +221,6 @@ class Grad:
             # apply this rule, but this will always be the case
             # if we have a closure in the code.
             assert isinstance(value.fn, Symbol)
-            # if value.fn.namespace not in {'global', 'builtin'}:
             if not is_global(value.fn):
                 raise Exception(
                     'First argument to ClosureNode'
@@ -539,7 +537,7 @@ class Grad:
         """
         Perform the code transform on self.primal.
         """
-        augm_sym = self.global_env.gen(self.name, JTAG)
+        augm_sym = ggen(self.name, JTAG)
 
         # The arguments of the function. We want the gradients of
         # these.
@@ -594,19 +592,10 @@ class Grad:
         # namespace.
         backp_args_copy: Iterable[Symbol] = map(copy, backp_args)
         # ♦f
-        backp_sym = self.global_env.gen(self.name, BPROP)
+        backp_sym = ggen(self.name, BPROP)
         backp_fn = create_lambda(backp_sym, [*backp_args_copy, out_sen],
                                  Let(self.zeros + backward, backp_ret),
-                                 self.gensym, self.global_env,
-                                 self.globals, commit=True)
-        # backp_fn = Lambda([*backp_args_copy, out_sen],
-        #                   Let(self.zeros + backward, backp_ret),
-        #                   self.gensym)
-        # backp_fn.global_env = self.global_env
-        # backp_fn.globals = self.globals
-        # backp_fn.ref = backp_sym
-        self.global_env[backp_sym] = backp_fn
-        root_globals[backp_sym] = backp_fn  # TODO: obviate
+                                 self.gensym, commit=True)
 
         ########################
         # Build the closure ♢f #
@@ -631,17 +620,9 @@ class Grad:
         # ↑f
         assert all(isinstance(arg, Symbol) for arg in augm_args)
         augm_fn = create_lambda(augm_sym, cast(List[Symbol], augm_args),
-                                augm_body, self.gensym, self.global_env,
-                                self.globals, commit=True)
-        # augm_fn = Lambda(cast(List[Symbol], augm_args),
-        #                  augm_body, self.gensym)
-        # augm_fn.global_env = self.global_env
-        # augm_fn.globals = self.globals
-        # augm_fn.ref = augm_sym
-        self.global_env[augm_sym] = augm_fn
-        root_globals[augm_sym] = augm_fn  # TODO: obviate
+                                augm_body, self.gensym, commit=True)
 
         # Set the primal field to the original function's symbol
         augm_fn.primal = self.name
 
-        return augm_sym
+        return augm_fn

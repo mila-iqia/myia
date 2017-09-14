@@ -274,12 +274,10 @@ globals_sources: Dict[str, Dict[str, Any]] = {}
 
 
 def add_source(file, globals):
-    print('add_source', file)
     globals_sources[file] = globals
 
 
 def acquire(sym):
-    print('acquire', sym)
     if sym.namespace.startswith('global:'):
         file = sym.namespace[7:]
     else:
@@ -299,7 +297,6 @@ def acquire(sym):
 
 
 def resolve(sym):
-    print('resolve', sym)
     try:
         return globals_pool[sym]
     except KeyError:
@@ -312,12 +309,9 @@ def associate(sym, node):
     globals_pool[sym] = node
 
 
-def create_lambda(ref, args, body, gen=None,
-                  global_env=None, globals=None,
+def create_lambda(ref, args, body, gen=None, *,
                   commit=True, **kw):
-    # global_env = None
-    lbda = LambdaNode(args, body, gen, global_env, **kw)
-    # lbda.globals = globals
+    lbda = LambdaNode(args, body, gen, **kw)
     if commit:
         associate(ref, lbda)
     return lbda

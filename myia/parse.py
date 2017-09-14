@@ -127,6 +127,7 @@ from .symbols import get_operator, builtins
 from uuid import uuid4 as uuid
 import ast
 from copy import copy
+from collections import defaultdict
 import inspect
 import textwrap
 import sys
@@ -331,10 +332,7 @@ class Parser(LocVisitor):
         associate it to ``ref`` in the global_env (unless
         dry is true). Return ``ref``.
         """
-        # l = Lambda(args, body, self.gen)
-        # l.ref = ref
-        # l.global_env = self.global_env
-        l = create_lambda(ref, args, body, self.gen, self.global_env)
+        l = create_lambda(ref, args, body, self.gen)
         if not self.dry:
             self.global_env[ref] = l
         return ref
@@ -1184,7 +1182,10 @@ def parse_source(url: str,
     return r, genv
 
 
-def parse_function(fn, **kw) -> TupleT[Symbol, ParseEnv]:
+fn_cache = defaultdict(list)
+
+
+def parse_function(fn, **kw) -> Lambda:
     """
     Parse a function with Myia.
 
@@ -1195,6 +1196,9 @@ def parse_function(fn, **kw) -> TupleT[Symbol, ParseEnv]:
     Returns:
         See ``parse_source``.
     """
+    for kw2, lbda in fn_cache[fn]:
+        if kw == kw2:
+            return lbda
     _, line = inspect.getsourcelines(fn)
     filename = inspect.getfile(fn)
     sym, genv = parse_source(filename,
@@ -1202,7 +1206,6 @@ def parse_function(fn, **kw) -> TupleT[Symbol, ParseEnv]:
                              textwrap.dedent(inspect.getsource(fn)),
                              **kw)
     add_source(filename, fn.__globals__)
-    g = {**fn.__globals__, **genv.bindings}
-    for sym2, lbda in genv.bindings.items():
-        lbda.globals = g
-    return sym, genv
+    lbda = genv[sym]
+    fn_cache[fn].append((kw, lbda))
+    return lbda

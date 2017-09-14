@@ -52,27 +52,26 @@ def load():
 
 def translate_node(v):
     if isinstance(v, MyiaASTNode):
-        return v, {}
+        return v
 
     try:
-        return object_map[v], {}
+        return object_map[v]
     except:
         pass
 
     if isinstance(v, (int, float, FunctionImpl, PrimitiveImpl)):
-        return ValueNode(v), {}
+        return ValueNode(v)
     elif isinstance(v, (type, FunctionType)):
         try:
-            sym, genv = parse_function(v)
+            return parse_function(v)
         except (TypeError, OSError):
             raise ValueError(f'Myia cannot translate function: {v}')
-        return genv[sym], genv
 
     raise ValueError(f'Myia cannot process value: {v}')
 
 
 def process_value(value, vm):
-    node, bindings = translate_node(value)
+    node = translate_node(value)
     if isinstance(node, LambdaNode):
         cv = vm.compile_cache.get(node, None)
         if cv is None:

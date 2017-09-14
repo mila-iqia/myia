@@ -12,6 +12,7 @@ from ..impl.flow_all import default_flow, ANY, VALUE
 from ..impl.main import impl_bank
 from ..symbols import builtins
 from .types import Int64, Float64
+from ..lib import Pending, Primitive
 
 
 class DFA:
@@ -258,16 +259,17 @@ class DFA:
         self.run_flows('LetNode', node)
 
     def visit_Symbol(self, node):
-        if node in self.genv.bindings:
-            # If the symbol is associated to a global variable (which
-            # are constant), we fetch the value and propagate it.
-            b = self.genv[node]
-            self.visit(b)
-            self.propagate_value(node, b)
-        elif node in builtins.__dict__.values():
+        if node in builtins.__dict__.values():
             # We propagate builtin symbols, although it may be better
             # to do this another way.
             self.propagate_value(node, node)
+        else:
+            try:
+                b = self.genv[node]
+                self.visit(b)
+                self.propagate_value(node, b)
+            except KeyError:
+                pass
         self.run_flows('Symbol', node)
 
     def visit_TupleNode(self, node):

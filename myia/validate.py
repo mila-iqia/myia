@@ -12,11 +12,11 @@ from typing import Iterable, Set, Tuple as TupleT, \
     Callable, Dict, List, Any, Union
 
 from .stx import MyiaASTNode, Symbol, LambdaNode, LetNode, \
-    ParseEnv, maptup, create_lambda
+    ParseEnv, maptup, create_lambda, is_global
 from .compile import a_normal
 from .parse import parse_source, parse_function
-from .grad import Grad
-from .interpret import evaluate, root_globals
+from .grad import Grad, ggen
+from .interpret import evaluate
 
 
 def missing_source(node: MyiaASTNode) -> Iterable[MyiaASTNode]:
@@ -38,8 +38,7 @@ def unbound(node: MyiaASTNode,
     if avail is None:
         avail = set()
     if isinstance(node, Symbol):
-        if node.namespace not in {'global', 'builtin'} \
-                and node not in avail:
+        if not is_global(node) and node not in avail:
             yield node
     elif isinstance(node, LambdaNode):
         yield from unbound(node.body, set(node.args))
@@ -180,17 +179,17 @@ def get_functions(data) -> TupleT[Callable, Symbol, ParseEnv]:
         and bindings contains all symbol/LambdaNode mappings it needs.
     """
     if isinstance(data, tuple):
-        url, line_offset, code = data
-        _globals: Dict = {}
-        exec(code, _globals)
-        sym, genv = parse_source(url, line_offset, code)
-        pyfn = _globals[sym.label]
+        # url, line_offset, code = data
+        # _globals: Dict = {}
+        # exec(code, _globals)
+        # sym, genv = parse_source(url, line_offset, code)
+        # pyfn = _globals[sym.label]
+        raise NotImplementedError('TODO')
     else:
         pyfn = data
-        sym, genv = parse_function(pyfn)
+        lbda = parse_function(pyfn)
 
-    pyfn.__globals__.update({str(k): v for k, v in root_globals.items()})
-    return pyfn, sym, genv
+    return pyfn, lbda
 
 
 def analysis(mode: str, spec, args=None) -> Union[Callable, Dict]:
@@ -212,14 +211,12 @@ def analysis(mode: str, spec, args=None) -> Union[Callable, Dict]:
         or a function that takes a list of arguments and
         returns the results.
     """
-    pyfn, sym, bindings = get_functions(spec)
+    pyfn, lbda = get_functions(spec)
     method = globals()[f'analysis_{mode}']
-    test = method(pyfn, sym, bindings)
+    test = method(pyfn, lbda)
     rval = {
         'test': test,
-        'sym': sym,
-        'bindings': bindings,
-        'lbda': bindings[sym]
+        'lbda': lbda
     }
     if args:
         rval['result'] = test(args)
@@ -258,14 +255,13 @@ def compare_calls(funcs: Dict[str, Callable],
 
 
 def analysis_eval(pyfn: Callable,
-                  sym: Symbol,
-                  bindings: ParseEnv) -> Callable:
+                  lbda) -> Callable:
     """
     Return a function that takes a list of arguments ``args`` and
     compares the result of the pure function ``pyfn`` to its Myia
     implementation in ``bindings[sym]``.
     """
-    func = evaluate(bindings[sym])
+    func = evaluate(lbda)
 
     def test(args):
         return compare_calls(dict(python = pyfn, myia = func), args)
@@ -274,8 +270,7 @@ def analysis_eval(pyfn: Callable,
 
 
 def analysis_grad(pyfn: Callable,
-                  sym: Symbol,
-                  bindings: ParseEnv) -> Callable:
+                  lbda) -> Callable:
     """
     Return a function that takes a list of arguments ``args`` and
     compares:
@@ -285,16 +280,13 @@ def analysis_grad(pyfn: Callable,
     * The finite-differences estimation of the derivative of
       ``pyfn`` and the Myia-computed gradient.
     """
-    func = evaluate(bindings[sym])
-
-    lbda = bindings[sym]
+    func = evaluate(lbda)
     albda = a_normal(lbda)
     assert isinstance(albda, LambdaNode)
-    G = Grad(sym, albda)
-    g = G.transform()
-    assert G.global_env is bindings
+    G = Grad(lbda.ref, albda)
+    glbda = G.transform()
 
-    gfunc = evaluate(bindings[g])
+    gfunc = evaluate(glbda)
 
     def test(args):
         myiag, bprop = gfunc(*args)
@@ -314,11 +306,10 @@ def analysis_grad(pyfn: Callable,
 
 # TODO: The following is not fully solid yet.
 
-def grad2_transform(rsym, bindings):
-    rlbda = bindings[rsym]
-    genv = rlbda.global_env
+def grad2_transform(rlbda):
+    rsym = rlbda.ref
     gen = rlbda.gen
-    rrsym = genv.gen('GG')
+    rrsym = ggen('GG')
 
     from .stx import LambdaNode as Lambda, ApplyNode as Apply, \
         ValueNode as Value, LetNode as Let
@@ -330,46 +321,28 @@ def grad2_transform(rsym, bindings):
     sym_grads = (gen("grads"), Apply(sym_bprop[0], Value(1)))
     sym_grad = (gen("grad"), Apply(builtins.index, sym_grads[0], Value(1)))
     ret = Let((sym_values, sym_bprop, sym_grads, sym_grad), sym_grad[0])
-    glbda = create_lambda(rrsym, [sym_arg], ret, gen,
-                          rlbda.global_env, {**rlbda.global_env.bindings})
-    # glbda = Lambda([sym_arg], ret, gen)
-    genv[rrsym] = glbda
-    # glbda.ref = rrsym
-    # glbda.global_env = rlbda.global_env
-    # glbda.globals = {**glbda.global_env.bindings}
-
-    return rrsym
-
-    # return LambdaNode(
-    #     ARGS,
-    #     Let((gen('X'), Apply()))
-    #     Apply(builtins.index, Apply())
-    # )
-    # glbda.global_env[]
-    # return glbda
+    glbda = create_lambda(rrsym, [sym_arg], ret, gen)
+    return glbda
 
 
-def analysis_grad2(pyfn, sym, bindings):
-    lbda = bindings[sym]
+def analysis_grad2(pyfn, lbda):
+    sym = lbda.ref
     func = evaluate(lbda)
 
     G = Grad(sym, a_normal(lbda))
-    g = G.transform()
-    assert G.global_env is bindings
+    glbda = G.transform()
 
-    gfunc = evaluate(bindings[g])
+    gfunc = evaluate(glbda)
 
-    g2_sym = grad2_transform(g, bindings)
-    G = Grad(g2_sym, a_normal(bindings[g2_sym]))
-    g2 = G.transform()
-    gfunc2 = evaluate(bindings[g2])
+    gwrap = grad2_transform(glbda)
+    G = Grad(gwrap.ref, a_normal(gwrap))
+    g2lbda = G.transform()
+    gfunc2 = evaluate(g2lbda)
 
     def gradients(*args):
         return gfunc(*args)[1](1)[1]
 
     def test(args):
-        # return gfunc2(*args)[1](1)
-
         myiag2, bprop = gfunc2(*args)
         gt = GradTester(gradients, bprop, args,
                         func.argnames, ('(df/dx)',))

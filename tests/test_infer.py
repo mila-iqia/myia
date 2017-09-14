@@ -1,4 +1,4 @@
-from myia.parse import MyiaSyntaxError, parse_function, get_global_parse_env
+from myia.parse import MyiaSyntaxError, parse_function
 from myia.inference.avm import \
     aroot_globals, abstract_evaluate, AbstractValue, ERROR, ANY
 from myia.interpret import FunctionImpl
@@ -9,9 +9,6 @@ import pytest
 
 mark = pytest.mark
 xfail = pytest.mark.xfail
-
-
-_functions = {}
 
 
 def val(x):
@@ -38,14 +35,8 @@ def infer(**tests):
              for t in ts]
 
     def decorate(fn):
-        fname = fn.__name__
-        fsym = get_global_parse_env(__file__).gen(fname, version=1)
-
         def test(proj, inputs, expected):
-            if fsym not in _functions:
-                _, genv = parse_function(fn)
-                _functions.update(genv.bindings)
-            node = _functions[fsym]
+            node = parse_function(fn)
 
             if not isinstance(inputs, tuple):
                 inputs = inputs,

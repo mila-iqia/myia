@@ -4,11 +4,12 @@ from .main import symbol_associator, impl_bank
 from ..interpret import \
     PrimitiveImpl, FunctionImpl, ClosureImpl, evaluate
 from ..stx import Symbol, ApplyNode as Apply, ClosureNode, \
-    LambdaNode, TupleNode, GenSym, BPROP, JTAG
+    LambdaNode, TupleNode, GenSym, BPROP, JTAG, create_lambda
 from ..symbols import builtins
 from ..parse import parse_function, get_global_parse_env
 from .impl_interp import zeros_like, J, Jinv, switch, first, second, \
     Closure, closure_fn, reduce, add
+from ..grad import ggen
 
 
 _ = True
@@ -83,13 +84,13 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
         # We compile the backpropagator using Myia. We provide
         # the GRAD macro which will account for nargs_closure
         # stored arguments.
-        r, genv = parse_function(
+        lbda = parse_function(
             orig_fn,
             macros={'GRAD': macro_grad_for(sym, nargs_closure)}
         )
 
         # Create a FunctionImpl.
-        fn = evaluate(r)
+        fn = evaluate(lbda)
 
         # Now we generate a combined function that returns the
         # result of the forward pass along with a backpropagator
@@ -100,16 +101,10 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
                         Apply(sym, *[Apply(builtins.Jinv, a)
                                      for a in args]))
         backward = ClosureNode(rsym, args)
-        # Final function:
-        ast = LambdaNode(args, TupleNode([forward, backward]), G)
 
-        # Boilerplate stuff that should be properly abstracted
-        # somewhere else.
-        ast.global_env = get_global_parse_env('__root__')
-        ast.globals = {}
-        impl_sym = ast.global_env.gen(sym, JTAG)
-        ast.global_env[impl_sym] = ast
-        ast.ref = impl_sym
+        # Final function:
+        impl_sym = ggen(sym, JTAG)
+        ast = create_lambda(impl_sym, args, TupleNode([forward, backward]), G)
         ast.primal = sym
         impl = FunctionImpl(ast, root_globals)
         root_globals[impl_sym] = impl

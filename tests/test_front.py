@@ -2,15 +2,13 @@
 Test the forward mode of Myia functions (no gradients).
 """
 
-from myia.parse import MyiaSyntaxError, parse_function, get_global_parse_env
+from myia.parse import MyiaSyntaxError, parse_function
 from myia.interpret import evaluate
 from myia.stx import Symbol
 import pytest
 
 mark = pytest.mark
 xfail = pytest.mark.xfail
-
-_functions = {}
 
 
 def myia_test(*tests):
@@ -30,15 +28,8 @@ def myia_test(*tests):
     """
 
     def decorate(fn):
-        fname = fn.__name__
-
-        fsym = get_global_parse_env(__file__).gen(fname, version=1)
-
         def test(inputs, output, gradOut=None):
-            if fsym not in _functions:
-                _, genv = parse_function(fn)
-                _functions.update(genv.bindings)
-            node = _functions[fsym]
+            node = parse_function(fn)
 
             if not isinstance(inputs, tuple):
                 inputs = inputs,
