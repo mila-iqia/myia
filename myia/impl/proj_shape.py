@@ -1,5 +1,6 @@
 
 from .proj import proj, natproj
+from .impl_abstract import abstract_shape as shape
 from ..symbols import builtins
 from ..inference.avm import WrappedException
 

@@ -7,6 +7,7 @@ from myia.util import HReprBase, Singleton
 # Singletons #
 ##############
 
+
 class ZERO(Singleton):
     """
     ZERO serves as a generic zero: add(ZERO, y) == y, whether y is a scalar,
@@ -267,3 +268,13 @@ class StructuralMap:
 
 def structural_map(fn, *args):
     return StructuralMap(fn)(*args)
+
+
+########
+# Misc #
+########
+
+
+class Pending:
+    def __init__(self, value):
+        self.value = value

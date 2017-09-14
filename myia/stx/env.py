@@ -13,6 +13,7 @@ from typing import \
     cast, TypeVar, Any
 from .nodes import Symbol, LambdaNode
 from ..util import EventDispatcher
+from ..lib import Pending
 from uuid import uuid4 as uuid
 
 
@@ -34,6 +35,7 @@ SENS = '∇'
 NULLSYM = '×'
 TMP = '◯'
 HIDGLOB = '$'
+ANORM = 'α'
 
 TMP_SENS = f'{TMP}{SENS}'
 TMP_BPROP = f'{TMP}{BPROP_CLOS}'
@@ -74,7 +76,7 @@ class GenSym:
             self.varcounts[ref] = 1
             return 1
 
-    def sym(self, name: str) -> Symbol:
+    def sym(self, name: str, version: int = None) -> Symbol:
         """
         Create a unique Symbol with the given name. If one or more
         Symbols with the same name exists, the new Symbol will have
@@ -83,11 +85,11 @@ class GenSym:
         return Symbol(
             name,
             namespace=self.namespace,
-            version=self.inc_version(name),
+            version=version or self.inc_version(name),
             relation=None
         )
 
-    def rel(self, orig: Symbol, relation: str) -> Symbol:
+    def rel(self, orig: Symbol, relation: str, version: int = None) -> Symbol:
         """
         Create a new Symbol that relates to the orig Symbol with
         the given relation. The new Symbol is guaranteed not to
@@ -98,9 +100,9 @@ class GenSym:
         #  some symbols may have a higher version than strictly
         #  necessary (note that we could use the same count for all
         #  variables, and everything would still work)
-        ref = f'{str(orig)}/{relation}'
-        version = self.inc_version(ref)
-        # print(f'{ref} {version}<br/>')
+        if not version:
+            ref = f'{str(orig)}/{relation}'
+            version = self.inc_version(ref)
         return Symbol(
             orig,
             namespace=self.namespace,
@@ -108,12 +110,14 @@ class GenSym:
             relation=relation
         )
 
-    def __call__(self, s: Union[str, Symbol], rel: str = None) -> Symbol:
+    def __call__(self, s: Union[str, Symbol],
+                 rel: str = None, *,
+                 version: int = None) -> Symbol:
         if isinstance(rel, str):
             assert isinstance(s, Symbol)
-            return self.rel(s, rel)
+            return self.rel(s, rel, version)
         else:
-            return self.sym(s)
+            return self.sym(s, version)
 
 
 def bsym(name: str) -> Symbol:
@@ -265,3 +269,61 @@ class VariableTracker:
 
     def __setitem__(self, name: str, value: Symbol) -> None:
         self.bindings[name] = value
+
+
+###########################################
+# Global pool to resolve global variables #
+###########################################
+
+
+globals_pool: Dict[Symbol, Any] = {}
+globals_sources: Dict[str, Dict[str, Any]] = {}
+
+
+def add_source(file, globals):
+    print('add_source', file)
+    globals_sources[file] = globals
+
+
+def acquire(sym):
+    print('acquire', sym)
+    if sym.namespace.startswith('global:'):
+        file = sym.namespace[7:]
+    else:
+        file = ':' + sym.namespace
+    globs = globals_sources[file]
+    try:
+        v = globs[sym.label]
+    except KeyError as err:
+        builtins = globs['__builtins__']
+        if isinstance(builtins, dict):
+            # I don't know why this ever happens, but it does.
+            v = builtins[sym.label]
+        else:
+            v = getattr(builtins, sym.label)
+    globals_pool = v
+    return v
+
+
+def resolve(sym):
+    print('resolve', sym)
+    try:
+        return globals_pool[sym]
+    except KeyError:
+        return acquire(sym)
+
+
+def associate(sym, node):
+    if isinstance(node, LambdaNode):
+        node.ref = sym
+    globals_pool[sym] = node
+
+
+def create_lambda(ref, args, body, gen=None,
+                  global_env=None, globals=None,
+                  commit=True, **kw):
+    lbda = LambdaNode(args, body, gen, global_env, **kw)
+    lbda.globals = globals
+    if commit:
+        associate(ref, lbda)
+    return lbda

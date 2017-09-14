@@ -20,8 +20,7 @@ from .util import buche, Reader, id_registry
 
 from .util import on_discovery
 from .interpret import VM
-from .stx import Symbol, AboutPrinter
-from .stx import nodes
+from .stx import Symbol, AboutPrinter, nodes
 from .util import BucheDb
 
 

@@ -3,6 +3,7 @@ from .main import symbol_associator, impl_bank
 from ..interpret import PrimitiveImpl, FunctionImpl
 from ..inference.avm import AbstractValue, VALUE, ERROR
 from ..parse import parse_function
+from .impl_abstract import abstract_globals
 
 
 ######################
@@ -16,12 +17,16 @@ def proj(psym):
 
     @symbol_associator('proj')
     def pimpl(sym, name, fn):
+        # fsym, fenv = parse_function(fn)
+        # for s, lbda in fenv.bindings.items():
+        #     impl_bank['abstract'][s] = \
+        #         FunctionImpl(lbda, [impl_bank['abstract']])
+        # projs[impl_bank['abstract'][sym]] = \
+        #     FunctionImpl(fenv[fsym], [impl_bank['abstract']])
+        # return fn
         fsym, fenv = parse_function(fn)
-        for s, lbda in fenv.bindings.items():
-            impl_bank['abstract'][s] = \
-                FunctionImpl(lbda, [impl_bank['abstract']])
         projs[impl_bank['abstract'][sym]] = \
-            FunctionImpl(fenv[fsym], [impl_bank['abstract']])
+            FunctionImpl(fenv[fsym], [abstract_globals])
         return fn
 
     return pimpl

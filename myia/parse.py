@@ -121,7 +121,8 @@ from .stx import \
     LetNode as Let, LambdaNode as Lambda, ApplyNode as Apply, \
     BeginNode as Begin, TupleNode as Tuple, ClosureNode as Closure, \
     _Assign, GenSym, ParseEnv, About, VariableTracker, \
-    HIDGLOB, THEN, ELSE, WTEST, WLOOP, LBDA
+    HIDGLOB, THEN, ELSE, WTEST, WLOOP, LBDA, \
+    create_lambda, add_source
 from .symbols import get_operator, builtins
 from uuid import uuid4 as uuid
 import ast
@@ -330,9 +331,10 @@ class Parser(LocVisitor):
         associate it to ``ref`` in the global_env (unless
         dry is true). Return ``ref``.
         """
-        l = Lambda(args, body, self.gen)
-        l.ref = ref
-        l.global_env = self.global_env
+        # l = Lambda(args, body, self.gen)
+        # l.ref = ref
+        # l.global_env = self.global_env
+        l = create_lambda(ref, args, body, self.gen, self.global_env)
         if not self.dry:
             self.global_env[ref] = l
         return ref
@@ -568,7 +570,8 @@ class Parser(LocVisitor):
                 self.free_variables[name] = v
             return v
         except NameError as e:
-            return Symbol(name, namespace='global')
+            # return Symbol(name, namespace='global')
+            return self.global_env.gen(name, version=1)
 
     #################################
     # Visitors for Python AST nodes #
@@ -1130,13 +1133,12 @@ class Parser(LocVisitor):
         return self.multi_assign(out_vars, val)
 
 
-global_pool: Dict[Symbol, Any] = {}
 _global_envs: Dict[str, ParseEnv] = {}
 
 
 def get_global_parse_env(url) -> ParseEnv:
-    namespace = f'global'  # :{url}'
-    # namespace = f'global:{url}'
+    # namespace = f'global'  # :{url}'
+    namespace = f'global:{url}'
     env = ParseEnv(namespace=namespace, url=url)
     return _global_envs.setdefault(url, env)
 
@@ -1194,10 +1196,12 @@ def parse_function(fn, **kw) -> TupleT[Symbol, ParseEnv]:
         See ``parse_source``.
     """
     _, line = inspect.getsourcelines(fn)
-    sym, genv = parse_source(inspect.getfile(fn),
+    filename = inspect.getfile(fn)
+    sym, genv = parse_source(filename,
                              line,
                              textwrap.dedent(inspect.getsource(fn)),
                              **kw)
+    add_source(filename, fn.__globals__)
     g = {**fn.__globals__, **genv.bindings}
     for sym2, lbda in genv.bindings.items():
         lbda.globals = g

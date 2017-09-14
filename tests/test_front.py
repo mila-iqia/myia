@@ -2,7 +2,7 @@
 Test the forward mode of Myia functions (no gradients).
 """
 
-from myia.parse import MyiaSyntaxError, parse_function
+from myia.parse import MyiaSyntaxError, parse_function, get_global_parse_env
 from myia.interpret import evaluate
 from myia.stx import Symbol
 import pytest
@@ -31,7 +31,9 @@ def myia_test(*tests):
 
     def decorate(fn):
         fname = fn.__name__
-        fsym = Symbol(fname, namespace='global')
+
+        # fsym = Symbol(fname, namespace='global')
+        fsym = get_global_parse_env(__file__).gen(fname, version=1)
 
         def test(inputs, output, gradOut=None):
             if fsym not in _functions:

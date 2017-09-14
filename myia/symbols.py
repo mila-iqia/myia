@@ -20,6 +20,12 @@ from .util import Props, SymbolsMeta
 from typing import Dict
 
 
+def is_global(sym):
+    ns = sym.namespace
+    return ns == 'builtin' or ns.startswith('global')
+
+
+gsym = bsym
 class builtins(metaclass=SymbolsMeta):
     add = gsym('add')
     subtract = bsym('subtract')
@@ -58,7 +64,7 @@ class builtins(metaclass=SymbolsMeta):
     # Myia's global variables
     myia_builtins = gsym('myia_builtins')
     raise_exception = gsym('raise_exception')
-    Exception = gsym('Exception')
+    Exception = bsym('Exception')
     print = gsym('print')
     len = gsym('len')
     range = gsym('range')
@@ -111,6 +117,7 @@ object_map = {
     map: builtins.map,
     filter: builtins.filter,
     enumerate: builtins.enumerate,
+    Exception: builtins.Exception,
     # Closure: builtins.Closure,
     # closure_args: builtins.closure_args,
     # closure_fn: builtins.closure_fn

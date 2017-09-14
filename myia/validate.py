@@ -11,7 +11,8 @@ Validation and testing functionality.
 from typing import Iterable, Set, Tuple as TupleT, \
     Callable, Dict, List, Any, Union
 
-from .stx import MyiaASTNode, Symbol, LambdaNode, LetNode, ParseEnv, maptup
+from .stx import MyiaASTNode, Symbol, LambdaNode, LetNode, \
+    ParseEnv, maptup, create_lambda
 from .compile import a_normal
 from .parse import parse_source, parse_function
 from .grad import Grad
@@ -329,11 +330,13 @@ def grad2_transform(rsym, bindings):
     sym_grads = (gen("grads"), Apply(sym_bprop[0], Value(1)))
     sym_grad = (gen("grad"), Apply(builtins.index, sym_grads[0], Value(1)))
     ret = Let((sym_values, sym_bprop, sym_grads, sym_grad), sym_grad[0])
-    glbda = Lambda([sym_arg], ret, gen)
+    glbda = create_lambda(rrsym, [sym_arg], ret, gen,
+                          rlbda.global_env, {**rlbda.global_env.bindings})
+    # glbda = Lambda([sym_arg], ret, gen)
     genv[rrsym] = glbda
-    glbda.ref = rrsym
-    glbda.global_env = rlbda.global_env
-    glbda.globals = {**glbda.global_env.bindings}
+    # glbda.ref = rrsym
+    # glbda.global_env = rlbda.global_env
+    # glbda.globals = {**glbda.global_env.bindings}
 
     return rrsym
 

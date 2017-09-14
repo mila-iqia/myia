@@ -7,6 +7,8 @@ from ..stx import Symbol, ApplyNode as Apply, ClosureNode, \
     LambdaNode, TupleNode, GenSym, BPROP, JTAG
 from ..symbols import builtins
 from ..parse import parse_function, get_global_parse_env
+from .impl_interp import zeros_like, J, Jinv, switch, first, second, \
+    Closure, closure_fn, reduce, add
 
 
 _ = True

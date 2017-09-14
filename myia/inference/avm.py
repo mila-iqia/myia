@@ -1,7 +1,8 @@
 
 from typing import List, Any, Dict
 from ..interpret import VMCode, VMFrame, EnvT, \
-    PrimitiveImpl, FunctionImpl, ClosureImpl, Instruction
+    PrimitiveImpl, FunctionImpl, ClosureImpl, Instruction, \
+    GlobalEnv
 from ..util import EventDispatcher, BucheDb
 from ..symbols import builtins
 from ..impl.main import impl_bank
@@ -16,6 +17,9 @@ compile_cache: Dict = {}
 aroot_globals = impl_bank['abstract']
 projector_set = set()
 max_depth = 5
+
+
+avm_genv = GlobalEnv(aroot_globals)
 
 
 class SetDepth:
@@ -390,7 +394,8 @@ class AVM(EventDispatcher):
     def evaluate(self, lbda):
         parse_env = lbda.global_env
         assert parse_env is not None
-        envs = (parse_env.bindings, aroot_globals)
+        # envs = (parse_env.bindings, avm_genv)
+        envs = ({}, avm_genv)
         fn, = list(run_avm(VMCode(lbda), *envs).result)
         return fn
 
@@ -483,7 +488,8 @@ def abstract_evaluate(lbda, args, proj=None):
     load()
     parse_env = lbda.global_env
     assert parse_env is not None
-    envs = (parse_env.bindings, aroot_globals)
+    # envs = (parse_env.bindings, aroot_globals)
+    envs = ({}, avm_genv)
 
     if not proj:
         proj = [VALUE]

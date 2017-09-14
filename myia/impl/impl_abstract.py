@@ -1,6 +1,6 @@
 
 
-from .main import symbol_associator, impl_bank
+from .main import symbol_associator, impl_bank, GlobalEnv
 from ..inference.avm import Fork, WrappedException, \
     AbstractValue, unwrap_abstract
 from .flow_all import ANY, VALUE, ERROR
@@ -10,6 +10,9 @@ from itertools import product
 
 
 _ = True
+
+
+abstract_globals = GlobalEnv(impl_bank['abstract'])
 
 
 ##########################

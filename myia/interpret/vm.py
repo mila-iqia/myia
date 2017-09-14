@@ -3,14 +3,16 @@ from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 from types import FunctionType
 from ..stx import \
     MyiaASTNode, ParseEnv, gsym, \
-    Location, Symbol, ValueNode, LambdaNode, maptup2
+    Location, Symbol, ValueNode, LambdaNode, maptup2, \
+    add_source
 from ..lib import Closure as ClosureImpl, Primitive as PrimitiveImpl, \
     IdempotentMappable
 from ..symbols import builtins, object_map, update_object_map
 from ..util import EventDispatcher, BucheDb, HReprBase, buche
 from functools import reduce
-from ..impl.main import impl_bank
+from ..impl.main import impl_bank, GlobalEnv
 from ..parse import parse_function
+from ..lib import Pending
 
 
 # When a LambdaNode is made into a FunctionImpl, we will
@@ -20,6 +22,10 @@ from ..parse import parse_function
 compile_cache: Dict[LambdaNode, 'FunctionImpl'] = {}
 EnvT = Dict[Symbol, Any]
 root_globals = impl_bank['interp']
+add_source(':builtin', root_globals)
+
+
+vm_genv = GlobalEnv(impl_bank['interp'])
 
 
 _loaded = False
@@ -44,60 +50,54 @@ def load():
 ###################
 
 
-class Unprocessed:
-    def __init__(self, value):
-        self.value = value
+def translate_node(v):
+    if isinstance(v, MyiaASTNode):
+        return v, {}
 
-    def translate(self):
-        v = self.value
-        if isinstance(v, MyiaASTNode):
-            return v, {}
+    try:
+        return object_map[v], {}
+    except:
+        pass
 
+    if isinstance(v, (int, float, FunctionImpl, PrimitiveImpl)):
+        return ValueNode(v), {}
+    elif isinstance(v, (type, FunctionType)):
         try:
-            return object_map[v], {}
-        except:
-            pass
+            sym, genv = parse_function(v)
+        except (TypeError, OSError):
+            raise ValueError(f'Myia cannot translate function: {v}')
+        return genv[sym], genv
 
-        if isinstance(v, (int, float, FunctionImpl)):
-            return ValueNode(v), {}
-        elif isinstance(v, (type, FunctionType)):
-            try:
-                sym, genv = parse_function(v)
-            except (TypeError, OSError):
-                raise ValueError(f'Myia cannot translate function: {v}')
-            return genv[sym], genv
+    raise ValueError(f'Myia cannot process value: {v}')
 
-        raise ValueError(f'Myia cannot process value: {v}')
 
-    def process(self, vm):
-        node, bindings = self.translate()
-        if isinstance(node, LambdaNode):
-            cv = vm.compile_cache.get(node, None)
-            if cv is None:
-                if node.globals is None:
-                    print(node)
-                    assert node.globals
-                cv = evaluate2(node, wrap_globals(node.globals))
-                assert isinstance(cv, FunctionImpl)
-                vm.compile_cache[node] = cv
-            return cv
+def process_value(value, vm):
+    node, bindings = translate_node(value)
+    if isinstance(node, LambdaNode):
+        cv = vm.compile_cache.get(node, None)
+        if cv is None:
+            cv = vm.evaluate(node)
+            assert isinstance(cv, FunctionImpl)
+            vm.compile_cache[node] = cv
+        return cv
 
-        elif isinstance(node, ValueNode):
-            return node.value
+    elif isinstance(node, ValueNode):
+        return node.value
 
-        elif isinstance(node, Symbol):
-            return root_globals[node]
+    elif isinstance(node, Symbol):
+        return root_globals[node]
 
-        else:
-            raise ValueError(f'Myia cannot process: {self.value}')
+    else:
+        raise ValueError(f'Myia cannot process: {self.value}')
 
 
 def wrap_globals(glob):
-    rval = {gsym(k): Unprocessed(v)
-            for k, v in __builtins__.items()}
-    rval.update({gsym(k) if isinstance(k, str) else k: Unprocessed(v)
-                 for k, v in glob.items()})
-    return rval
+    # rval = {gsym(k): Pending(v)
+    #         for k, v in __builtins__.items()}
+    # rval.update({gsym(k) if isinstance(k, str) else k: Pending(v)
+    #              for k, v in glob.items()})
+    # return rval
+    return {}
 
 
 class FunctionImpl(HReprBase, IdempotentMappable):
@@ -498,9 +498,9 @@ class VMFrame(HReprBase):
             try:
                 v = env[sym]
                 if isinstance(v, LambdaNode):
-                    v = Unprocessed(v)
-                if isinstance(v, Unprocessed):
-                    v = v.process(self.vm)
+                    v = Pending(v)
+                if isinstance(v, Pending):
+                    v = process_value(v.value, self.vm)
                     env[sym] = v
                 self.push(v)
                 return None
@@ -561,7 +561,8 @@ def evaluate(node: MyiaASTNode,
     if isinstance(node, LambdaNode):
         parse_env = node.global_env
     assert parse_env is not None
-    envs = (parse_env.bindings, root_globals)
+    # envs = (parse_env.bindings, root_globals)
+    envs = (vm_genv,)
     return run_vm(VMCode(node), *envs, debugger=debugger)
 
 
@@ -569,5 +570,6 @@ def evaluate2(node: MyiaASTNode,
               env: Dict[Symbol, Any],
               debugger: BucheDb = None) -> Any:
     load()
-    envs = (env, root_globals)
+    # envs = (env, root_globals)
+    envs = (vm_genv,)
     return run_vm(VMCode(node), *envs, debugger=debugger)

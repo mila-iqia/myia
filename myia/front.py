@@ -5,7 +5,8 @@ import textwrap
 import ast
 from .parse import Parser, Locator, get_global_parse_env, parse_function
 from .stx import Symbol, ParseEnv, _Assign, gsym
-from .interpret import evaluate2, Unprocessed, wrap_globals
+from .interpret import evaluate2, wrap_globals
+from .lib import Pending
 
 
 # def make_error_function(data):

@@ -11,6 +11,8 @@ are stored, in fact.
 from typing import Dict, Any
 from collections import defaultdict
 from ..symbols import builtins
+from ..stx import resolve
+from ..lib import Pending
 
 
 impl_bank: Dict[str, Dict[Any, Any]] = defaultdict(dict)
@@ -28,3 +30,19 @@ def symbol_associator(kind):
             return process(sym, fname, fn)
         return deco
     return associator_deco
+
+
+class GlobalEnv(dict):
+    def __init__(self, primitives):
+        self.primitives = primitives
+
+    def __getitem__(self, item):
+        print('consult', item)
+        try:
+            return super().__getitem__(item)
+        except KeyError:
+            try:
+                self[item] = self.primitives[item]
+            except KeyError:
+                self[item] = Pending(resolve(item))
+            return self[item]

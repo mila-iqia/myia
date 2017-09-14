@@ -13,8 +13,9 @@ import re
 from .stx import \
     MyiaASTNode, ApplyNode as Apply, Symbol, ValueNode as Value, \
     LetNode as Let, LambdaNode as Lambda, ClosureNode as Closure, \
-    TupleNode as Tuple, Transformer, GenSym, LHS, Bindings
-from .stx import nsym
+    TupleNode as Tuple, Transformer, GenSym, LHS, Bindings, \
+    associate, create_lambda
+from .stx import nsym, ANORM
 
 
 # TODO: Lambda should never be a sub-expression, it should be pulled
@@ -56,8 +57,9 @@ def a_normal(node: MyiaASTNode) -> MyiaASTNode:
     orig = node
     node = ANormalTransformer().transform(node)
     node = CollapseLet().transform(node)
-    sym = orig.global_env.gen(orig.ref, 'α')
+    sym = orig.global_env.gen(orig.ref, ANORM)
     orig.global_env[sym] = node
+    associate(sym, node)
     return node
 
 
@@ -154,12 +156,15 @@ class ANormalTransformer(Transformer):
 
     def transform_LambdaNode(self, node, stash=None) -> MyiaASTNode:
         tr = ANormalTransformer(node.gen)
-        result = Lambda(node.args,
-                        tr.transform(node.body),
-                        node.gen)
-        result.ref = node.ref
-        result.global_env = node.global_env
-        result.globals = node.globals
+        result = create_lambda(node.ref, node.args, tr.transform(node.body),
+                               node.gen, node.global_env,
+                               node.globals, commit=False)
+        # result = Lambda(node.args,
+        #                 tr.transform(node.body),
+        #                 node.gen)
+        # result.ref = node.ref
+        # result.global_env = node.global_env
+        # result.globals = node.globals
         return self.stash(stash, result, 'lambda')
 
     def transform_LetNode(self, node, stash=None) -> MyiaASTNode:
@@ -241,12 +246,15 @@ class CollapseLet(Transformer):
         return node
 
     def transform_LambdaNode(self, node) -> MyiaASTNode:
-        result = Lambda(node.args,
-                        self.transform(node.body),
-                        node.gen)
-        result.ref = node.ref
-        result.global_env = node.global_env
-        result.globals = node.globals
+        result = create_lambda(node.ref, node.args, self.transform(node.body),
+                               node.gen, node.global_env,
+                               node.globals, commit=False)
+        # result = Lambda(node.args,
+        #                 self.transform(node.body),
+        #                 node.gen)
+        # result.ref = node.ref
+        # result.global_env = node.global_env
+        # result.globals = node.globals
         return result
 
     def transform_ApplyNode(self, node) -> MyiaASTNode:
