@@ -134,18 +134,6 @@ def bsym(name: str) -> Symbol:
     return Symbol(name, namespace='builtin')
 
 
-def gsym(name: str) -> Symbol:
-    """
-    Create a global symbol.
-
-    A global symbol can be called by name by the user.
-
-    It is the case that ``gsym(x) == gsym(x)``, because
-    globals are indexed by name only.
-    """
-    return Symbol(name, namespace='global')
-
-
 _ngen = GenSym(namespace='null')
 
 

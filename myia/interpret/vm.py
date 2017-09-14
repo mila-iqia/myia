@@ -2,7 +2,7 @@ from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 
 from types import FunctionType
 from ..stx import \
-    MyiaASTNode, ParseEnv, gsym, \
+    MyiaASTNode, ParseEnv, \
     Location, Symbol, ValueNode, LambdaNode, maptup2, \
     add_source
 from ..lib import Closure as ClosureImpl, Primitive as PrimitiveImpl, \
@@ -89,15 +89,6 @@ def process_value(value, vm):
 
     else:
         raise ValueError(f'Myia cannot process: {self.value}')
-
-
-def wrap_globals(glob):
-    # rval = {gsym(k): Pending(v)
-    #         for k, v in __builtins__.items()}
-    # rval.update({gsym(k) if isinstance(k, str) else k: Pending(v)
-    #              for k, v in glob.items()})
-    # return rval
-    return {}
 
 
 class FunctionImpl(HReprBase, IdempotentMappable):

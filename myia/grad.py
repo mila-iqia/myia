@@ -20,7 +20,7 @@ from .stx import \
     LHS, Binding, Bindings, Transformer, GenSym, MyiaASTNode, \
     Symbol, ValueNode as Value, LambdaNode as Lambda, LetNode as Let, \
     ApplyNode as Apply, TupleNode, ClosureNode, \
-    maptup, About, transformer_method, bsym, gsym, nsym, \
+    maptup, About, transformer_method, bsym, nsym, \
     JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
     TMP_LET, TMP_BPROP, TMP_SENS, create_lambda
 from .interpret import \

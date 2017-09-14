@@ -15,7 +15,7 @@ The symbols live in two namespaces:
 
 import ast
 import sys
-from .stx import Symbol, ValueNode, bsym, gsym
+from .stx import Symbol, ValueNode, bsym
 from .util import Props, SymbolsMeta
 from typing import Dict
 
@@ -25,9 +25,8 @@ def is_global(sym):
     return ns == 'builtin' or ns.startswith('global')
 
 
-gsym = bsym
 class builtins(metaclass=SymbolsMeta):
-    add = gsym('add')
+    add = bsym('add')
     subtract = bsym('subtract')
     multiply = bsym('multiply')
     divide = bsym('divide')
@@ -49,37 +48,37 @@ class builtins(metaclass=SymbolsMeta):
     getattr = bsym('getattr')
     setslice = bsym('setslice')
     identity = bsym('identity')
-    Closure = gsym('Closure')
-    closure_fn = gsym('closure_fn')
-    closure_args = gsym('closure_args')
+    Closure = bsym('Closure')
+    closure_fn = bsym('closure_fn')
+    closure_args = bsym('closure_args')
     mktuple = bsym('mktuple')
 
     # Grad-related builtins
-    fill = gsym('fill')
-    zeros_like = gsym('zeros_like')
-    ones_like = gsym('ones_like')
-    J = gsym('J')
-    Jinv = gsym('Jinv')
+    fill = bsym('fill')
+    zeros_like = bsym('zeros_like')
+    ones_like = bsym('ones_like')
+    J = bsym('J')
+    Jinv = bsym('Jinv')
 
     # Myia's global variables
-    myia_builtins = gsym('myia_builtins')
-    raise_exception = gsym('raise_exception')
+    myia_builtins = bsym('myia_builtins')
+    raise_exception = bsym('raise_exception')
     Exception = bsym('Exception')
-    print = gsym('print')
-    len = gsym('len')
-    range = gsym('range')
-    enumerate = gsym('enumerate')
-    map = gsym('map')
-    reduce = gsym('reduce')
-    filter = gsym('filter')
-    switch = gsym('switch')
-    first = gsym('first')
-    second = gsym('second')
+    print = bsym('print')
+    len = bsym('len')
+    range = bsym('range')
+    enumerate = bsym('enumerate')
+    map = bsym('map')
+    reduce = bsym('reduce')
+    filter = bsym('filter')
+    switch = bsym('switch')
+    first = bsym('first')
+    second = bsym('second')
 
     # For type system
-    assert_true = gsym('assert_true')
-    type = gsym('type')
-    shape = gsym('shape')
+    assert_true = bsym('assert_true')
+    type = bsym('type')
+    shape = bsym('shape')
 
 
 # Maps the names of Python AST nodes to corresponding

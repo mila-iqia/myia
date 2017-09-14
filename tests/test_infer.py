@@ -3,7 +3,6 @@ from myia.inference.avm import \
     aroot_globals, abstract_evaluate, AbstractValue, ERROR, ANY
 from myia.interpret import FunctionImpl
 from myia.inference.types import *
-from myia.stx import gsym
 from myia.symbols import builtins
 import pytest
 
@@ -41,7 +40,6 @@ def infer(**tests):
     def decorate(fn):
         fname = fn.__name__
         fsym = get_global_parse_env(__file__).gen(fname, version=1)
-        # fsym = gsym(fname)
 
         def test(proj, inputs, expected):
             if fsym not in _functions:
