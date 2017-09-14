@@ -316,7 +316,8 @@ class AVMFrame(VMFrame):
     def copy(self, pc_offset=0):
         local_env = {**self.local_env}
         global_env = self.global_env
-        fr = AVMFrame(self.vm, self.code, local_env, global_env, self.signature)
+        fr = AVMFrame(self.vm, self.code,
+                      local_env, global_env, self.signature)
         fr.stack = [s for s in self.stack]
         fr.pc = self.pc + pc_offset
         fr.focus = self.focus

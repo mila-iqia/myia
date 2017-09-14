@@ -167,16 +167,15 @@ class GradTester:
         return results
 
 
-def get_functions(data) -> TupleT[Callable, Symbol, ParseEnv]:
+def get_functions(data) -> TupleT[Callable, LambdaNode]:
     """
     Arguments:
         data: Either a Python function or an (url, lineno, source_code)
             tuple.
 
     Returns:
-        (pyfn, sym, bindings) where pyfn is a Python function,
-        sym is the symbol for the Myia version of the function,
-        and bindings contains all symbol/LambdaNode mappings it needs.
+        (pyfn, lbda) where pyfn is a Python function,
+        and lbda is the LambdaNode compiled from it.
     """
     if isinstance(data, tuple):
         # url, line_offset, code = data

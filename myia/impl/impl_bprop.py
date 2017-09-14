@@ -61,9 +61,9 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
     def mkgrad(nargs_closure: int) -> LambdaNode:
         # Copy symbol to grad namespace
         bprop_sym = Symbol(sym,
-                      version=nargs_closure + 1,
-                      namespace='global::builtin_bprop',
-                      relation=BPROP)
+                           version=nargs_closure + 1,
+                           namespace='global::builtin_bprop',
+                           relation=BPROP)
 
         # We compile the backpropagator using Myia. We provide
         # the GRAD macro which will account for nargs_closure

@@ -44,8 +44,8 @@ ggen = GenSym('global::grad')
 ################
 
 
-grad_computers = {}
-grad_cache = defaultdict(dict)
+grad_computers: Dict[Symbol, Callable] = {}
+grad_cache: Dict[Symbol, Dict[int, Lambda]] = defaultdict(dict)
 
 
 def find_grad(ref, nargs_closure):

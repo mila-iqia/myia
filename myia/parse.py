@@ -1182,7 +1182,7 @@ def parse_source(url: str,
     return r, genv
 
 
-fn_cache = defaultdict(list)
+fn_cache: Dict[Callable, Any] = defaultdict(list)
 
 
 def parse_function(fn, **kw) -> Lambda:
