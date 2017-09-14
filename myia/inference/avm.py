@@ -171,11 +171,12 @@ class AVMFrame(VMFrame):
     def __init__(self,
                  vm,
                  code,
-                 envs,
-                 signature) -> None:
+                 local_env,
+                 global_env,
+                 signature=None) -> None:
         from ..symbols import builtins
         from ..interpret import PrimitiveImpl
-        super().__init__(vm, code, envs)
+        super().__init__(vm, code, local_env, global_env)
         self.signature = signature
 
     def take(self, n):
@@ -224,7 +225,7 @@ class AVMFrame(VMFrame):
             instrs.append(Instruction('reduce', node, nargs, False))
         instrs.append(Instruction('assemble', node, projs))
         vmc = VMCode(node, instrs)
-        return self.__class__(self.vm, vmc, [], None)
+        return self.__class__(self.vm, vmc, {}, {}, None)
 
     def instruction_closure(self, node) -> None:
         fn, args = self.take(2)
@@ -276,7 +277,7 @@ class AVMFrame(VMFrame):
 
             open, cached = self.vm.consult_cache(sig)
             if cached is None:
-                return self.__class__(self.vm, fn.code, [bind] + fn.envs, sig)
+                return self.__class__(self.vm, fn.code, bind, fn.globals, sig)
             elif open:
                 self.vm.checkpoint_on(sig)
                 if not cached:
@@ -286,10 +287,10 @@ class AVMFrame(VMFrame):
             else:
                 self.push(Fork(cached))
 
-            # return self.__class__(self.vm, fn.code, [bind] + fn.envs, sig)
         elif isinstance(fn, ClosureImpl):
             self.push_no_annotate(fn.fn, *fn.args, *args)
             return self.instruction_reduce(node, nargs + len(fn.args))
+
         elif isinstance(fn, PrimitiveImpl):
             if nargs == 1:
                 arg, = args
@@ -313,9 +314,9 @@ class AVMFrame(VMFrame):
             raise TypeError(f'Cannot reduce on {fn}.')
 
     def copy(self, pc_offset=0):
-        fr = AVMFrame(self.vm, self.code, self.envs, self.signature)
-        fr.envs = list(self.envs)
-        fr.envs[0] = {k: v for k, v in self.envs[0].items()}
+        local_env = {**self.local_env}
+        global_env = self.global_env
+        fr = AVMFrame(self.vm, self.code, local_env, global_env, self.signature)
         fr.stack = [s for s in self.stack]
         fr.pc = self.pc + pc_offset
         fr.focus = self.focus
@@ -325,10 +326,11 @@ class AVMFrame(VMFrame):
 class AVM(EventDispatcher):
     def __init__(self,
                  code: VMCode,
-                 needs: Dict,
-                 *envs: EnvT,
+                 local_env: EnvT,
+                 global_env: EnvT,
                  signature=None,
                  debugger: BucheDb = None,
+                 needs: Dict = {},
                  emit_events=True) -> None:
         super().__init__(self, emit_events)
         self.results_cache: Dict = {}
@@ -338,7 +340,7 @@ class AVM(EventDispatcher):
         self.debugger = debugger
         self.do_emit_events = emit_events
         # Current frame
-        self.frame = AVMFrame(self, code, list(envs), signature)
+        self.frame = AVMFrame(self, code, local_env, global_env, signature)
         # Stack of previous frames (excludes current one)
         self.frames: List[AVMFrame] = []
         if self.do_emit_events:
@@ -396,7 +398,7 @@ class AVM(EventDispatcher):
         assert parse_env is not None
         # envs = (parse_env.bindings, avm_genv)
         envs = ({}, avm_genv)
-        fn, = list(run_avm(VMCode(lbda), *envs).result)
+        fn, = list(run_avm(VMCode(lbda), self.needs, *envs).result)
         return fn
 
     def go(self) -> Any:
@@ -475,13 +477,16 @@ class AVM(EventDispatcher):
 
 
 def run_avm(code: VMCode,
-            *binding_groups: EnvT,
+            needs: Dict,
+            local_env: EnvT,
+            global_env: EnvT,
             debugger: BucheDb = None,
             signature=None) -> Any:
     """
     Execute the VM on the given code.
     """
-    return AVM(code, *binding_groups, debugger=debugger, signature=signature)
+    return AVM(code, local_env, global_env,
+               needs=needs, debugger=debugger, signature=signature)
 
 
 def abstract_evaluate(lbda, args, proj=None):
@@ -489,7 +494,6 @@ def abstract_evaluate(lbda, args, proj=None):
     parse_env = lbda.global_env
     assert parse_env is not None
     # envs = (parse_env.bindings, aroot_globals)
-    envs = ({}, avm_genv)
 
     if not proj:
         proj = [VALUE]
@@ -506,10 +510,10 @@ def abstract_evaluate(lbda, args, proj=None):
             parse_env)
     d.visit(lbda)
 
-    fn, = list(run_avm(VMCode(lbda), *envs).result)
+    fn, = list(run_avm(VMCode(lbda), {}, {}, avm_genv).result)
     fn = unwrap_abstract(fn)
     return run_avm(fn.code,
                    d.values[d.tracks['needs']],
                    {s: arg for s, arg in zip(lbda.args, args)},
-                   *fn.envs,
+                   fn.globals,
                    signature=(fn, args))

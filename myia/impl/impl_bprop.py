@@ -89,7 +89,7 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
         )
 
         # Create a FunctionImpl.
-        fn = evaluate(r, genv)
+        fn = evaluate(r)
 
         # Now we generate a combined function that returns the
         # result of the forward pass along with a backpropagator
@@ -111,7 +111,7 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
         ast.global_env[impl_sym] = ast
         ast.ref = impl_sym
         ast.primal = sym
-        impl = FunctionImpl(ast, [root_globals])
+        impl = FunctionImpl(ast, root_globals)
         root_globals[impl_sym] = impl
         root_globals[rsym] = fn
 

@@ -315,8 +315,9 @@ def associate(sym, node):
 def create_lambda(ref, args, body, gen=None,
                   global_env=None, globals=None,
                   commit=True, **kw):
+    # global_env = None
     lbda = LambdaNode(args, body, gen, global_env, **kw)
-    lbda.globals = globals
+    # lbda.globals = globals
     if commit:
         associate(ref, lbda)
     return lbda

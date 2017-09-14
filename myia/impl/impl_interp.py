@@ -284,7 +284,7 @@ def Jinv(x):
     elif isinstance(x, FunctionImpl):
         assert x.primal_sym is not None
         if isinstance(x.primal_sym, Symbol):
-            primal = evaluate(x.primal_sym, x.ast.global_env)
+            primal = evaluate(x.primal_sym)
         else:
             primal = x.primal_sym
         if not isinstance(primal, (FunctionImpl, PrimitiveImpl)):

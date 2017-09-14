@@ -313,7 +313,7 @@ def command_parse(arguments):
 
 def command_eval(arguments):
     r, genv = getfn(arguments)
-    result = evaluate(r, genv)
+    result = evaluate(r)
     args = getargs(arguments)
     if args:
         value = result(*args)

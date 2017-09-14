@@ -73,7 +73,7 @@ def JGrad(x: FunctionImpl) -> Callable[[int], FunctionImpl]:
         g = G.transform()
 
         # Create a FunctionImpl
-        gfn = evaluate(g, G.global_env)
+        gfn = evaluate(g)
 
         # Don't forget to cache.
         _cache[nargs_closure] = gfn
@@ -230,7 +230,7 @@ class Grad:
                 )
 
             args = [self.tagged_expr(a) for a in value.args]
-            fn = evaluate(value.fn, self.global_env)
+            fn = evaluate(value.fn)
             jfn = JX(fn, len(value.args))
             expr = ClosureNode(jfn.ast.ref, args)
 

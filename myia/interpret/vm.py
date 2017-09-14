@@ -95,14 +95,13 @@ class FunctionImpl(HReprBase, IdempotentMappable):
     """
     Represents a Myia-transformed function.
     """
-    def __init__(self, ast: LambdaNode, envs: List[EnvT]) -> None:
+    def __init__(self, ast: LambdaNode, globals: EnvT) -> None:
         assert isinstance(ast, LambdaNode)
-        assert isinstance(envs, list)
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
         self.ast = ast
         self.code = VMCode(ast.body)
-        self.envs = envs
+        self.globals = globals
         self.primal_sym = ast.primal
         self.grad: Callable[[int], FunctionImpl] = None
 
@@ -111,7 +110,7 @@ class FunctionImpl(HReprBase, IdempotentMappable):
         assert len(args) == len(ast.args)
         return run_vm(self.code,
                       {s: arg for s, arg in zip(ast.args, args)},
-                      *self.envs,
+                      self.globals,
                       debugger=debugger)
 
     def __call__(self, *args):
@@ -275,7 +274,8 @@ class VM(EventDispatcher):
     """
     def __init__(self,
                  code: VMCode,
-                 *envs: EnvT,
+                 local_env: EnvT,
+                 global_env: EnvT,
                  debugger: BucheDb = None,
                  emit_events=True) -> None:
         super().__init__(self, emit_events)
@@ -283,7 +283,7 @@ class VM(EventDispatcher):
         self.debugger = debugger
         self.do_emit_events = emit_events
         # Current frame
-        self.frame = VMFrame(self, code, list(envs))
+        self.frame = VMFrame(self, code, local_env, global_env)
         # Stack of previous frames (excludes current one)
         self.frames: List[VMFrame] = []
         if self.do_emit_events:
@@ -341,16 +341,17 @@ class VMFrame(HReprBase):
     def __init__(self,
                  vm: VM,
                  code: VMCode,
-                 envs: List[EnvT]) -> None:
-        envs = list(envs)  # TODO: remove
+                 local_env: EnvT,
+                 global_env: EnvT) -> None:
         self.vm = vm
         self.code = code
         self.instructions = code.instructions
         # Program counter: index of the next instruction to execute.
         self.pc = 0
         # Environment to store local bindings.
-        self.storage_env: EnvT = {}
-        self.envs: List[EnvT] = [self.storage_env] + envs
+        self.envs: List[EnvT] = [local_env, global_env]
+        self.local_env = local_env
+        self.global_env = global_env
         self.stack: List[Any] = [None]
         # Node being executed, mostly for debugging.
         self.focus: MyiaASTNode = None
@@ -438,7 +439,7 @@ class VMFrame(HReprBase):
         fn, *args = self.take(nargs + 1)
         if isinstance(fn, FunctionImpl):
             bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
-            return self.__class__(self.vm, fn.code, [bind] + fn.envs)
+            return self.__class__(self.vm, fn.code, bind, fn.globals)
         elif isinstance(fn, ClosureImpl):
             self.push(fn.fn, *fn.args, *args)
             return self.instruction_reduce(node, nargs + len(fn.args))
@@ -473,7 +474,7 @@ class VMFrame(HReprBase):
 
         def store(dest, val):
             if isinstance(dest, Symbol):
-                self.envs[0][dest] = val
+                self.local_env[dest] = val
             else:
                 raise TypeError(f'Cannot store into {dest}.')
 
@@ -510,14 +511,15 @@ class VMFrame(HReprBase):
         Create a FunctionImpl from the given node and push
         it on the stack.
         """
-        fimpl = FunctionImpl(node, self.envs)
+        fimpl = FunctionImpl(node, self.global_env)
         self.push(fimpl)
 
     def __hrepr__(self, H, hrepr):
         views = H.tabbedView['hrepr-VMFrame']()
-        env = {}
-        for e in reversed(self.envs):
-            env.update(e)
+        # env = {}
+        # for e in reversed(self.envs):
+        #     env.update(e)
+        env = self.global_env
         eviews = H.tabbedView()
         for k, v in env.items():
             view = H.view(H.tab(hrepr(k)), H.pane(hrepr(v)))
@@ -531,36 +533,19 @@ class VMFrame(HReprBase):
 
 
 def run_vm(code: VMCode,
-           *binding_groups: EnvT,
+           local_env: EnvT,
+           global_env: EnvT,
            debugger: BucheDb = None) -> Any:
     """
     Execute the VM on the given code.
     """
-    return VM(code, *binding_groups, debugger=debugger).result
+    return VM(code, local_env, global_env, debugger=debugger).result
 
 
-def evaluate(node: MyiaASTNode,
-             parse_env: ParseEnv = None,
+def evaluate(node: MyiaASTNode, *,
              debugger: BucheDb = None) -> Any:
     """
-    Evaluate the given MyiaASTNode in the given ``parse_env``.
-    If ``parse_env`` is None, it will be extracted from the node
-    itself (Parser stores a LambdaNode's global environment in its
-    ``global_env`` field).
+    Evaluate the given MyiaASTNode in the VM environment.
     """
     load()
-    if isinstance(node, LambdaNode):
-        parse_env = node.global_env
-    assert parse_env is not None
-    # envs = (parse_env.bindings, root_globals)
-    envs = (vm_genv,)
-    return run_vm(VMCode(node), *envs, debugger=debugger)
-
-
-def evaluate2(node: MyiaASTNode,
-              env: Dict[Symbol, Any],
-              debugger: BucheDb = None) -> Any:
-    load()
-    # envs = (env, root_globals)
-    envs = (vm_genv,)
-    return run_vm(VMCode(node), *envs, debugger=debugger)
+    return run_vm(VMCode(node), {}, vm_genv, debugger=debugger)

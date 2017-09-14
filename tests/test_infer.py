@@ -45,8 +45,6 @@ def infer(**tests):
             if fsym not in _functions:
                 _, genv = parse_function(fn)
                 _functions.update(genv.bindings)
-                for s, _lbda in genv.bindings.items():
-                    aroot_globals[s] = FunctionImpl(_lbda, [aroot_globals])
             node = _functions[fsym]
 
             if not isinstance(inputs, tuple):

@@ -26,7 +26,7 @@ def proj(psym):
         # return fn
         fsym, fenv = parse_function(fn)
         projs[impl_bank['abstract'][sym]] = \
-            FunctionImpl(fenv[fsym], [abstract_globals])
+            FunctionImpl(fenv[fsym], abstract_globals)
         return fn
 
     return pimpl
