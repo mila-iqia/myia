@@ -5,7 +5,7 @@ from ..stx import Symbol
 from ..interpret import \
     PrimitiveImpl, FunctionImpl, ClosureImpl, evaluate
 from ..lib import ZERO
-from ..grad import JX
+from ..grad import find_grad
 from ..inference.types import typeof
 from ..lib import StructuralMap, Closure, default_structural_map_dispatch
 from ..symbols import object_map
@@ -232,9 +232,26 @@ def J_dispatch_closure(smap, clos):
     of clos.fn depends on clos.args, whereas the default behavior for
     StructuralMap considers them separately.
     """
-    c = myiaClosure(JX(clos.fn, pylen(clos.args)),
+    c = myiaClosure(J_fn(clos.fn, pylen(clos.args)),
                     smap(pytuple(clos.args)))
     return c
+
+
+def J_fn(x, nargs_closure):
+    """
+    Helper function for the gradient of PrimitiveImpl or
+    FunctionImpl, given nargs_closure closure arguments.
+
+    See previous section on Partial Application for the
+    purpose of the ``nargs_closure`` argument.
+    """
+    if isinstance(x, PrimitiveImpl):
+        ref = x.name
+    elif isinstance(x, FunctionImpl):
+        ref = x.ast.ref
+    else:
+        raise TypeError(f'J_fn applied on wrong type: {x}')
+    return evaluate(find_grad(ref, nargs_closure))
 
 
 @impl_interp_smap({myiaClosure: J_dispatch_closure})
@@ -258,7 +275,7 @@ def J(x):
     Implements the J operator in Pearlmutter & Siskind.
     """
     if isinstance(x, (PrimitiveImpl, FunctionImpl)):
-        return JX(x, 0)
+        return J_fn(x, 0)
     elif isinstance(x, (int, float, bool)) or x is None or x is ZERO:
         return x
     else:

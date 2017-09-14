@@ -22,14 +22,13 @@ from .stx import \
     ApplyNode as Apply, TupleNode, ClosureNode, \
     maptup, About, transformer_method, bsym, nsym, GenSym, \
     JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
-    TMP_LET, TMP_BPROP, TMP_SENS, create_lambda, is_global
-from .interpret import \
-    evaluate, PrimitiveImpl, FunctionImpl, ClosureImpl
+    TMP_LET, TMP_BPROP, TMP_SENS, create_lambda, is_global, \
+    globals_pool
 from .symbols import builtins
 from copy import copy
 from .compile import a_normal
 from .util import Props, buche
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from .lib import ZERO
 
 
@@ -40,70 +39,30 @@ mapadd = builtins.add
 ggen = GenSym('global::grad')
 
 
-#################
-# Helpers for J #
-#################
+################
+# Helper for J #
+################
 
 
-def JGrad(x: FunctionImpl) -> Callable[[int], FunctionImpl]:
-    """
-    Helper function that creates a gradient factory for
-    a FunctionImpl.
-
-    See previous section on Partial Application for the
-    purpose of the ``nargs_closure`` argument.
-    """
-
-    # We cache the compilation results.
-    _cache: Dict[int, FunctionImpl] = {}
-
-    def make_grad(nargs_closure: int) -> FunctionImpl:
-        gfn = _cache.get(nargs_closure, None)
-        if gfn:
-            return gfn
-
-        normalized = a_normal(x.ast)
-        assert isinstance(normalized, Lambda)
-        assert x.ast.ref
-
-        # Generate the gradient expression
-        G = Grad(
-            name = x.ast.ref,
-            primal = normalized,
-            nargs_closure = nargs_closure
-        )
-        g = G.transform()
-
-        # Create a FunctionImpl
-        gfn = evaluate(g)
-
-        # Don't forget to cache.
-        _cache[nargs_closure] = gfn
-        return gfn
-    return make_grad
+grad_computers = {}
+grad_cache = defaultdict(dict)
 
 
-def JX(x: Union[PrimitiveImpl, FunctionImpl],
-       nargs_closure: int) -> FunctionImpl:
-    """
-    Helper function for the gradient of PrimitiveImpl or
-    FunctionImpl, given nargs_closure closure arguments.
+def find_grad(ref, nargs_closure):
+    assert isinstance(ref, Symbol)
 
-    See previous section on Partial Application for the
-    purpose of the ``nargs_closure`` argument.
-    """
-    if isinstance(x, PrimitiveImpl):
-        # x.grad is set by the bprop_impl decorator. If it is
-        # None, it means no one defined a gradient for that
-        # operation.
-        assert x.grad is not None
-        return x.grad(nargs_closure)
-    elif isinstance(x, FunctionImpl):
-        if not x.grad:
-            x.grad = JGrad(x)
-        return x.grad(nargs_closure)
-    else:
-        raise TypeError(f'JX applied on wrong type: {x}')
+    def default_grad(n):
+        lbda = globals_pool[ref]
+        normalized = a_normal(lbda)
+        return Grad(ref, normalized, n).transform()
+
+    if nargs_closure in grad_cache[ref]:
+        return grad_cache[ref][nargs_closure]
+
+    G = grad_computers.setdefault(ref, default_grad)
+    glbda = G(nargs_closure)
+    grad_cache[ref][nargs_closure] = glbda
+    return glbda
 
 
 ########
@@ -211,9 +170,9 @@ class Grad:
 
         elif isinstance(value, ClosureNode):
             # Original:     x = ClosureNode(f, y, z)
-            # Transformed:  ↑f = JX(f, 2)  # evaluated immediately
+            # Transformed:  ↑f = J_fn(f, 2)  # evaluated immediately
             #               ↑x = ClosureNode(↑f, ↑y, ↑z)
-            # where the last argument to JX is the number of free
+            # where the last argument to J_fn is the number of free
             # variables the function is referring to (y and z in
             # the example).
 
@@ -228,9 +187,8 @@ class Grad:
                 )
 
             args = [self.tagged_expr(a) for a in value.args]
-            fn = evaluate(value.fn)
-            jfn = JX(fn, len(value.args))
-            expr = ClosureNode(jfn.ast.ref, args)
+            ast = find_grad(value.fn, len(value.args))
+            expr = ClosureNode(ast.ref, args)
 
             return [(self.tagged_var(var), expr)]
 

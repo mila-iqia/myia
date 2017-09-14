@@ -1,15 +1,15 @@
 
 from typing import List, Any, Union, Callable, Dict
 from .main import symbol_associator, impl_bank
-from ..interpret import \
-    PrimitiveImpl, FunctionImpl, ClosureImpl, evaluate
 from ..stx import Symbol, ApplyNode as Apply, ClosureNode, \
-    LambdaNode, TupleNode, GenSym, BPROP, JTAG, create_lambda
+    LambdaNode, TupleNode, GenSym, BPROP, JTAG, create_lambda, \
+    associate
 from ..symbols import builtins
 from ..parse import parse_function, get_global_parse_env
 from .impl_interp import zeros_like, J, Jinv, switch, first, second, \
     Closure, closure_fn, reduce, add
-from ..grad import ggen
+from ..grad import ggen, grad_computers
+from ..lib import Primitive
 
 
 _ = True
@@ -30,8 +30,6 @@ def macro_grad_for(sym, nargs_closure):
         #   ((a,), b, c, ...)  # If nargs_closure == 1
         #   ((a, b), c, ...)  # If nargs_closure == 2
         #   etc.
-        # return TupleNode([TupleNode(args[:nargs_closure]),
-        #                   *args[nargs_closure:]])
         return TupleNode([ClosureNode(sym, args[:nargs_closure]),
                           *args[nargs_closure:]])
     return macro_grad
@@ -58,25 +56,11 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
     # This is the implementation for the forward pass
     root_globals = impl_bank['interp']
     prim = root_globals[sym]
-    assert isinstance(prim, PrimitiveImpl)
+    assert isinstance(prim, Primitive)
 
-    # We will cache the result for each nargs_closure value, to
-    # avoid needless recomputation.
-    _cache: Dict[int, FunctionImpl] = {}
-
-    # Wrap the primitive and a closure-converted backpropagator
-    # in a combined method that follows the protocol. Essentially:
-    # (forward_fn, bprop_fn) ==>
-    #   lambda *args: (forward_fn(*args),
-    #                  lambda grad_out: bprop_fn(*args, grad_out))
-    def mkgrad(nargs_closure: int) -> FunctionImpl:
-        # Check if we have compiled this before
-        cached = _cache.get(nargs_closure, None)
-        if cached:
-            return cached
-
+    def mkgrad(nargs_closure: int) -> LambdaNode:
         # Copy symbol to grad namespace
-        rsym = Symbol(sym,
+        bprop_sym = Symbol(sym,
                       version=nargs_closure + 1,
                       namespace='global::builtin_bprop',
                       relation=BPROP)
@@ -89,9 +73,6 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
             macros={'GRAD': macro_grad_for(sym, nargs_closure)}
         )
 
-        # Create a FunctionImpl.
-        fn = evaluate(lbda)
-
         # Now we generate a combined function that returns the
         # result of the forward pass along with a backpropagator
         # function.
@@ -100,23 +81,16 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
         forward = Apply(builtins.J,
                         Apply(sym, *[Apply(builtins.Jinv, a)
                                      for a in args]))
-        backward = ClosureNode(rsym, args)
+        backward = ClosureNode(bprop_sym, args)
 
         # Final function:
-        impl_sym = ggen(sym, JTAG)
-        ast = create_lambda(impl_sym, args, TupleNode([forward, backward]), G)
+        augm_sym = ggen(sym, JTAG)
+        ast = create_lambda(augm_sym, args, TupleNode([forward, backward]), G)
         ast.primal = sym
-        impl = FunctionImpl(ast, root_globals)
-        root_globals[impl_sym] = impl
-        root_globals[rsym] = fn
+        associate(bprop_sym, lbda)
+        return ast
 
-        # Let's not forget to save our work in the cache!
-        _cache[nargs_closure] = impl
-        return impl
-
-    # prim's gradient is to be compiled lazily using
-    # prim.grad(nclos_args)
-    prim.grad = mkgrad
+    grad_computers[sym] = mkgrad
 
     return orig_fn
 
