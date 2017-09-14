@@ -340,6 +340,7 @@ class AVM(EventDispatcher):
         self.debugger = debugger
         self.do_emit_events = emit_events
         # Current frame
+        self.global_env = global_env
         self.frame = AVMFrame(self, code, local_env, global_env, signature)
         # Stack of previous frames (excludes current one)
         self.frames: List[AVMFrame] = []
@@ -398,6 +399,13 @@ class AVM(EventDispatcher):
         res = run_avm(VMCode(lbda), self.needs, {}, avm_genv)
         fn, = list(res.result)
         return fn
+
+    def compile(self, lbda):
+        fimpl = self.compile_cache.get(lbda, None)
+        if fimpl is None:
+            fimpl = FunctionImpl(lbda, self.global_env)
+            self.compile_cache[lbda] = fimpl
+        return fimpl
 
     def go(self) -> Any:
         while True:

@@ -73,12 +73,7 @@ def translate_node(v):
 def process_value(value, vm):
     node = translate_node(value)
     if isinstance(node, LambdaNode):
-        cv = vm.compile_cache.get(node, None)
-        if cv is None:
-            cv = vm.evaluate(node)
-            assert isinstance(cv, FunctionImpl)
-            vm.compile_cache[node] = cv
-        return cv
+        return vm.compile(node)
 
     elif isinstance(node, ValueNode):
         return node.value
@@ -282,6 +277,7 @@ class VM(EventDispatcher):
         self.debugger = debugger
         self.do_emit_events = emit_events
         # Current frame
+        self.global_env = global_env
         self.frame = VMFrame(self, code, local_env, global_env)
         # Stack of previous frames (excludes current one)
         self.frames: List[VMFrame] = []
@@ -291,6 +287,13 @@ class VM(EventDispatcher):
 
     def evaluate(self, v):
         return evaluate(v)
+
+    def compile(self, lbda):
+        fimpl = self.compile_cache.get(lbda, None)
+        if fimpl is None:
+            fimpl = FunctionImpl(lbda, self.global_env)
+            self.compile_cache[lbda] = fimpl
+        return fimpl
 
     def eval(self) -> Any:
         while True:
@@ -510,7 +513,7 @@ class VMFrame(HReprBase):
         Create a FunctionImpl from the given node and push
         it on the stack.
         """
-        fimpl = FunctionImpl(node, self.global_env)
+        fimpl = self.vm.compile(node)
         self.push(fimpl)
 
     def __hrepr__(self, H, hrepr):
