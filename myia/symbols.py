@@ -47,6 +47,7 @@ class builtins(metaclass=SymbolsMeta):
     closure_fn = bsym('closure_fn')
     closure_args = bsym('closure_args')
     mktuple = bsym('mktuple')
+    mklist = bsym('mklist')
 
     # Grad-related builtins
     fill = bsym('fill')
@@ -54,8 +55,9 @@ class builtins(metaclass=SymbolsMeta):
     ones_like = bsym('ones_like')
     J = bsym('J')
     Jinv = bsym('Jinv')
+    grad = bsym('grad')
 
-    # Myia's global variables
+    # Others
     myia_builtins = bsym('myia_builtins')
     raise_exception = bsym('raise_exception')
     Exception = bsym('Exception')
@@ -69,6 +71,8 @@ class builtins(metaclass=SymbolsMeta):
     switch = bsym('switch')
     first = bsym('first')
     second = bsym('second')
+    concat = bsym('concat')
+    slice = bsym('slice')
 
     # For type system
     assert_true = bsym('assert_true')
@@ -111,6 +115,7 @@ object_map = {
     map: builtins.map,
     filter: builtins.filter,
     enumerate: builtins.enumerate,
+    slice: builtins.slice,
     Exception: builtins.Exception,
     # Closure: builtins.Closure,
     # closure_args: builtins.closure_args,

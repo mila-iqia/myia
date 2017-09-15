@@ -31,8 +31,7 @@ pyprint = print
 def impl_interp(sym, name, fn):
     """
     Define the implementation for the given symbol.
-    The implementation will be set in ``root_globals``
-    and in the ``myia_builtins`` global.
+    The implementation will be set in ``root_globals``.
     """
     prim = Primitive(fn, name=sym)
     impl_bank['interp'][sym] = prim
@@ -150,6 +149,11 @@ def closure_args(clos):
 @impl_interp
 def mktuple(*args):
     return pytuple(args)
+
+
+@impl_interp
+def mklist(*args):
+    return pylist(args)
 
 
 @impl_interp
@@ -354,3 +358,10 @@ def type(x):
 @impl_interp
 def shape(x):
     return x.shape
+
+
+@impl_interp
+def concat(*xs):
+    assert all(isinstance(x, list) for x in xs) or \
+        all(isinstance(x, tuple) for x in xs)
+    return sum(xs, pytype(xs[0])())

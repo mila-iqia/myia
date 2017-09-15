@@ -1020,7 +1020,7 @@ class Parser(LocVisitor):
     def visit_Slice(self, node: ast.Slice) -> Apply:
         # CASE: return x[y:z]
         #                ^^^
-        return Apply(Symbol('slice'),
+        return Apply(builtins.slice,
                      self.visit(node.lower) if node.lower else Value(0),
                      self.visit(node.upper) if node.upper else Value(None),
                      self.visit(node.step) if node.step else Value(1))
