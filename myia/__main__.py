@@ -11,7 +11,7 @@ import traceback
 from importlib import import_module
 from . import stx
 from .compile import a_normal
-from .parse import parse_source, ParseEnv
+from .parse import parse_source
 from .interpret import evaluate
 from .validate import \
     unbound, missing_source, \
@@ -169,25 +169,25 @@ def setup_buche(arguments):
     if arguments.check:
         checks = set(arguments.check.split(','))
 
-        @on_discovery(ParseEnv)
-        def on_declare(e, name, value):
-            pbuche = buche['problems']
-            url = e.owner.url.split('/')[-1]
-            if 'unbound' in checks:
-                for node in unbound(value):
-                    node.annotations = node.annotations | {'unbound'}
-                    pbuche['unbound'](node)
-            if 'source' in checks:
-                for node in missing_source(value):
-                    node.annotations = node.annotations | {'missing_source'}
-                    msbuche = pbuche['missing_source']
-                    msbuche(node)
-                    msbuche(node.trace)
+        # @on_discovery(ParseEnv)
+        # def on_declare(e, name, value):
+        #     pbuche = buche['problems']
+        #     url = e.owner.url.split('/')[-1]
+        #     if 'unbound' in checks:
+        #         for node in unbound(value):
+        #             node.annotations = node.annotations | {'unbound'}
+        #             pbuche['unbound'](node)
+        #     if 'source' in checks:
+        #         for node in missing_source(value):
+        #             node.annotations = node.annotations | {'missing_source'}
+        #             msbuche = pbuche['missing_source']
+        #             msbuche(node)
+        #             msbuche(node.trace)
 
     if arguments.decls:
-        @on_discovery(ParseEnv)
-        def on_declare(e, name, value):
-            buche['decls'][str(name)](value)
+        # @on_discovery(ParseEnv)
+        # def on_declare(e, name, value):
+        #     buche['decls'][str(name)](value)
 
         @on_discovery(VM)
         def on_error(e, exc):

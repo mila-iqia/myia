@@ -120,9 +120,9 @@ from .stx import \
     Location, Symbol, ValueNode as Value, \
     LetNode as Let, LambdaNode as Lambda, ApplyNode as Apply, \
     BeginNode as Begin, TupleNode as Tuple, ClosureNode as Closure, \
-    _Assign, GenSym, ParseEnv, About, VariableTracker, \
+    _Assign, GenSym, About, VariableTracker, \
     HIDGLOB, THEN, ELSE, WTEST, WLOOP, LBDA, \
-    create_lambda, add_source
+    create_lambda, globals_pool
 from .symbols import get_operator, builtins
 from uuid import uuid4 as uuid
 import ast
@@ -231,13 +231,11 @@ class Parser(LocVisitor):
 
     Arguments:
         locator: A Locator to track source code locations.
-        global_env: ParseEnv that contains global bindings.
-            The Parser will populate it whenever it encounters
-            or creates a ``Lambda``.
         macros: A dictionary of macros to customize generation.
             One such macro (aka the only one) is GRAD, see grad.py.
-        gen: The GenSym to use to generate new variables.
-        dry: Whether to add new symbols to global_env or not.
+        gen: The GenSym to use to generate new (non-global)
+            variables.
+        dry: Whether to add new symbols to the globals_pool or not.
         pull_free_variables: When free variables are encountered
             and this flag is set, new variables will be created,
             and a mapping will be created in self.free_variables.
@@ -267,7 +265,6 @@ class Parser(LocVisitor):
 
     def __init__(self,
                  locator: Locator,
-                 global_env: ParseEnv = None,
                  macros: Dict[str, Callable[..., MyiaASTNode]] = None,
                  gen: GenSym = None,
                  dry: bool = None,
@@ -279,7 +276,14 @@ class Parser(LocVisitor):
 
         super().__init__(locator)
         self.locator = locator
-        self.global_env = global_env
+        # global_gen is used to generate global variable names:
+        # * When a new Lambda is created. The new global is also
+        #   stored in globals_pool.
+        # * When an unresolved variable is encountered.
+        if dry:
+            self.global_gen = GenSym()
+        else:
+            self.global_gen = get_global_gen(locator.url)
         self.gen = gen or GenSym()
         self.dry = dry
         self.pull_free_variables = pull_free_variables
@@ -301,7 +305,6 @@ class Parser(LocVisitor):
         and have priority over inherited ones.
         """
         dflts = dict(locator=self.locator,
-                     global_env=self.global_env,
                      dry=self.dry,
                      return_error=self.return_error,
                      macros=self.macros)
@@ -328,13 +331,11 @@ class Parser(LocVisitor):
                    args: List[Symbol],
                    body: MyiaASTNode) -> Symbol:
         """
-        Create a Lambda with the given args and body, and
-        associate it to ``ref`` in the global_env (unless
-        dry is true). Return ``ref``.
+        Create a Lambda with the given args and body.
+        Return ``ref``.
         """
-        l = create_lambda(ref, args, body, self.gen)
-        if not self.dry:
-            self.global_env[ref] = l
+        l = create_lambda(ref, args, body, self.gen,
+                          commit=not self.dry)
         return ref
 
     def new_variable(self, input: InputNode) -> Symbol:
@@ -386,7 +387,7 @@ class Parser(LocVisitor):
         new variables for each free variable it encounters.
         """
         if ref is None:
-            ref = self.global_env.gen(variable or LBDA)
+            ref = self.global_gen(variable or LBDA)
         p = self.sub_parser(pull_free_variables=True, dest=ref)
         if variable is not None:
             p.vtrack[variable] = ref
@@ -557,8 +558,7 @@ class Parser(LocVisitor):
           to do with them.
         * If the variable is declared neither here nor in the parent, then
           we simply assume this is a global variable and we return a
-          Symbol that lives in the global namespace (which might only be
-          defined in the future).
+          Symbol that lives in the global namespace.
         """
         try:
             free, v = self.vtrack.get_free(name)
@@ -568,8 +568,10 @@ class Parser(LocVisitor):
                 self.free_variables[name] = v
             return v
         except NameError as e:
-            # return Symbol(name, namespace='global')
-            return self.global_env.gen(name, version=1)
+            # All Python globals are considered to be version 1, because
+            # we can only see their current values, not previously
+            # shadowed values.
+            return self.global_gen(name, version=1)
 
     #################################
     # Visitors for Python AST nodes #
@@ -721,13 +723,13 @@ class Parser(LocVisitor):
             raise MyiaSyntaxError("For loops may not have an else: clause.")
 
         assert self.dest
-        wsym = self.global_env.gen(self.dest, WTEST)
-        wbsym = self.global_env.gen(self.dest, WLOOP)
+        wsym = self.global_gen(self.dest, WTEST)
+        wbsym = self.global_gen(self.dest, WLOOP)
 
         augm_body = node.body + [ast.Assign()]
 
         # We visit the body once to get the free variables
-        testp = self.sub_parser(global_env=ParseEnv(), dry=True)
+        testp = self.sub_parser(dry=True)
         testp.return_error = 'Cannot return in while loops.'
         testp.body_wrapper(node.body)
         in_vars = testp.free_variables
@@ -807,7 +809,7 @@ class Parser(LocVisitor):
 
         # Global handle for the function
         lbl = node.name if self.top_level else f'{HIDGLOB}{node.name}'
-        ref = self.global_env.gen(lbl)
+        ref = self.global_gen(lbl)
 
         # Local handle
         sym = self.new_variable(node.name)
@@ -849,11 +851,11 @@ class Parser(LocVisitor):
             )
 
         # Prepare the then branch
-        p1 = self.prepare_closure(ref=self.global_env.gen(self.dest, THEN))
+        p1 = self.prepare_closure(ref=self.global_gen(self.dest, THEN))
         body = p1.body_wrapper(node.body)
 
         # Prepare the else branch
-        p2 = self.prepare_closure(ref=self.global_env.gen(self.dest, ELSE))
+        p2 = self.prepare_closure(ref=self.global_gen(self.dest, ELSE))
         orelse = p2.body_wrapper(node.orelse)
 
         if p1.returns != p2.returns:
@@ -1044,7 +1046,7 @@ class Parser(LocVisitor):
         return Apply(op, self.visit(node.operand))
 
     # def explore_vars(self, *exprs, return_error=None):
-    #     testp = self.sub_parser(global_env=ParseEnv(), dry=True)
+    #     testp = self.sub_parser(global_gen=ParseEnv(), dry=True)
     #     testp.return_error = return_error
 
     #     for expr in exprs:
@@ -1082,11 +1084,11 @@ class Parser(LocVisitor):
         """
 
         assert self.dest
-        wsym = self.global_env.gen(self.dest, WTEST)
-        wbsym = self.global_env.gen(self.dest, WLOOP)
+        wsym = self.global_gen(self.dest, WTEST)
+        wbsym = self.global_gen(self.dest, WLOOP)
 
         # We visit the body once to get the free variables
-        testp = self.sub_parser(global_env=ParseEnv(), dry=True)
+        testp = self.sub_parser(dry=True)
         testp.return_error = 'Cannot return in while loops.'
         testp.visit(node.test)
         testp.body_wrapper(node.body)
@@ -1131,20 +1133,19 @@ class Parser(LocVisitor):
         return self.multi_assign(out_vars, val)
 
 
-_global_envs: Dict[str, ParseEnv] = {}
+_global_gens: Dict[str, GenSym] = {}
 
 
-def get_global_parse_env(url) -> ParseEnv:
-    # namespace = f'global'  # :{url}'
+def get_global_gen(url) -> GenSym:
     namespace = f'global:{url}'
-    env = ParseEnv(namespace=namespace, url=url)
-    return _global_envs.setdefault(url, env)
+    gen = GenSym(namespace=namespace)
+    return _global_gens.setdefault(url, gen)
 
 
 def parse_source(url: str,
                  line: int,
                  src: str,
-                 **kw) -> TupleT[Symbol, ParseEnv]:
+                 **kw) -> Symbol:
     """
     Parse a source string with Myia.
 
@@ -1155,20 +1156,14 @@ def parse_source(url: str,
         kw: Keyword arguments passed to Parser.
 
     Returns:
-        A pair:
         * The Symbol reference associated to the parsed
           function.
-        * The ParseEnv that contains all the bindings that
-          were created as a result of parsing. This includes
-          the main function being parsed, but also auxiliary
-          functions for loop bodies etc.
         To get the Lambda object that corresponds to the
-        given source function, index the ParseEnv with the
-        Symbol.
+        given source function, index stx.globals_pool with
+        the Symbol.
     """
     tree = ast.parse(src)
     p = Parser(Locator(url, line),
-               get_global_parse_env(url),
                top_level=True,
                **kw)
     r = p.visit(tree, allow_decorator=True)
@@ -1176,10 +1171,8 @@ def parse_source(url: str,
         r, = r
     if isinstance(r, _Assign):
         r = r.value
-    genv = p.global_env
-    assert genv is not None
     assert isinstance(r, Symbol)
-    return r, genv
+    return r
 
 
 fn_cache: Dict[Callable, Any] = defaultdict(list)
@@ -1201,11 +1194,11 @@ def parse_function(fn, **kw) -> Lambda:
             return lbda
     _, line = inspect.getsourcelines(fn)
     filename = inspect.getfile(fn)
-    sym, genv = parse_source(filename,
-                             line,
-                             textwrap.dedent(inspect.getsource(fn)),
-                             **kw)
-    add_source(filename, fn.__globals__)
-    lbda = genv[sym]
+    sym = parse_source(filename,
+                       line,
+                       textwrap.dedent(inspect.getsource(fn)),
+                       **kw)
+    globals_pool.add_source(f'global:{filename}', fn.__globals__)
+    lbda = globals_pool[sym]
     fn_cache[fn].append((kw, lbda))
     return lbda

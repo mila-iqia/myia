@@ -4,7 +4,7 @@ import inspect
 import textwrap
 import ast
 from .parse import Parser, Locator, parse_function
-from .stx import Symbol, ParseEnv, _Assign
+from .stx import Symbol, _Assign
 from .interpret import evaluate
 from .lib import Pending
 

@@ -2,9 +2,7 @@ from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 
 from types import FunctionType
 from ..stx import \
-    MyiaASTNode, ParseEnv, \
-    Location, Symbol, ValueNode, LambdaNode, maptup2, \
-    add_source
+    MyiaASTNode, Location, Symbol, ValueNode, LambdaNode, maptup2
 from ..lib import Closure as ClosureImpl, Primitive as PrimitiveImpl, \
     IdempotentMappable
 from ..symbols import builtins, object_map, update_object_map
@@ -22,10 +20,7 @@ from ..lib import Pending
 compile_cache: Dict[LambdaNode, 'FunctionImpl'] = {}
 EnvT = Dict[Symbol, Any]
 root_globals = impl_bank['interp']
-add_source(':builtin', root_globals)
-
-
-vm_genv = GlobalEnv(impl_bank['interp'])
+vm_genv = GlobalEnv(root_globals)
 
 
 _loaded = False
@@ -40,9 +35,6 @@ def load():
         # as a side-effect.
         from ..impl.impl_interp import _
         from ..impl.impl_bprop import _
-        # root_globals.update(impl_bank['interp'])
-        global root_globals
-        root_globals = impl_bank['interp']
 
 
 ###################

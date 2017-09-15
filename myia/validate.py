@@ -12,7 +12,7 @@ from typing import Iterable, Set, Tuple as TupleT, \
     Callable, Dict, List, Any, Union
 
 from .stx import MyiaASTNode, Symbol, LambdaNode, LetNode, \
-    ParseEnv, maptup, create_lambda, is_global
+    maptup, create_lambda, is_global
 from .compile import a_normal
 from .parse import parse_source, parse_function
 from .grad import Grad, ggen

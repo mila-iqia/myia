@@ -11,7 +11,7 @@ are stored, in fact.
 from typing import Dict, Any
 from collections import defaultdict
 from ..symbols import builtins
-from ..stx import resolve
+from ..stx import globals_pool
 from ..lib import Pending
 
 
@@ -43,5 +43,5 @@ class GlobalEnv(dict):
             try:
                 self[item] = self.primitives[item]
             except KeyError:
-                self[item] = Pending(resolve(item))
+                self[item] = Pending(globals_pool[item])
             return self[item]

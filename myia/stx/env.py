@@ -4,7 +4,11 @@ manipulation.
 
 * An assortment of special characters to modify symbols.
 * ``GenSym``: generate Symbols.
-* ``ParseEnv``: map Symbols to LambdaNode or ValueNode.
+* ``globals_pool``: all Lambda nodes that are associated to a
+  global symbol (i.e. all of them) are mapped in that dictionary,
+  among other things.
+* ``create_lambda``: create a new Lambda and register it in the
+  globals_pool.
 """
 
 
@@ -153,77 +157,7 @@ def nsym() -> Symbol:
 
 def is_global(sym):
     ns = sym.namespace
-    return ns.startswith('global')
-
-
-class ParseEnv:
-    """
-    A mapping from Symbol instances to LambdaNode instances. When
-    a function is compiled, a ParseEnv will contain all the
-    functions created during the compilation. These functions
-    will refer to each other with Symbols and the ParseEnv
-    connects them to the relevant code.
-
-    A ParseEnv is associated to a GenSym instance that can
-    generate fresh Symbols, guaranteed not to already be
-    present in the mapping.
-
-    You can index the ParseEnv like a dict:
-
-    >>> parse_env[some_symbol] = some_lambda
-    >>> parse_env[some_symbol]
-    some_lambda
-
-    When a new Symbol is defined, the ParseEnv also emits the
-    ``declare`` event.
-
-    Attributes:
-        namespace (str): The namespace in which this ParseEnv's
-            Symbols live.
-        gen (GenSym): The Symbol generator for this ParseEnv.
-        url (str): The filename in which the compiled code
-            originally came from.
-        bindings ({Symbol: LambdaNode}}): The mapping.
-        events (EventDispatcher): Events that this object might
-            emit, chiefly the ``declare`` event.
-
-    Events:
-        declare(event, symbol, lbda): Triggered when a new mapping
-            is added. You can listen to this to track the various
-            functions that are being compiled. Use
-            ``@parse_env.events.on_declare`` as a decorator.
-    """
-
-    def __init__(self,
-                 namespace: str = None,
-                 gen: 'GenSym' = None,
-                 url: str = None) -> None:
-        if namespace is None:
-            namespace = str(uuid())
-        if namespace.startswith('global'):
-            self.events = EventDispatcher(self)
-        else:
-            self.events = None
-        self.url = url
-        self.gen: GenSym = gen or GenSym(namespace)
-        self.bindings: Dict[Symbol, LambdaNode] = {}
-
-    def update(self, bindings) -> None:
-        """
-        Set several bindings at once.
-
-        Same as ``self.bindings.update(bindings)``
-        """
-        for k, v in bindings.items():
-            self[k] = v
-
-    def __getitem__(self, name) -> LambdaNode:
-        return self.bindings[name]
-
-    def __setitem__(self, name, value) -> None:
-        self.bindings[name] = value
-        if self.events:
-            self.events.emit_declare(name, value)
+    return ns.startswith('global:')
 
 
 class VariableTracker:
@@ -269,49 +203,91 @@ class VariableTracker:
 ###########################################
 
 
-globals_pool: Dict[Symbol, Any] = {}
-globals_sources: Dict[str, Dict[str, Any]] = {}
+class BackedPool:
+    """
+    Represents a pool of Symbol->value associations, backed by a store
+    of namespace->dict associations. In a nutshell, this is used to map
+    Symbols from global namespaces (e.g. the namespace `global:file.py`)
+    to the values of corresponding global variables.
+    """
+
+    def __init__(self) -> None:
+        self.pool: Dict[Symbol, Any] = {}
+        self.sources: Dict[str, Dict[str, Any]] = {}
+
+    def add_source(self, namespace, contents):
+        self.sources[namespace] = contents
+
+    def acquire(self, sym):
+        """
+        Acquire the value corresponding to the given symbol from the
+        source dictionary corresponding to the symbol's namespace and
+        throw a `KeyError` if there is no such value.
+
+        Most of the time, you want to call `pool.resolve(sym)`.
+        """
+        globs = self.sources[sym.namespace]
+        try:
+            v = globs[sym.label]
+        except KeyError as err:
+            builtins = globs['__builtins__']
+            if isinstance(builtins, dict):
+                # I don't know why this ever happens, but it does.
+                v = builtins[sym.label]
+            else:
+                v = getattr(builtins, sym.label)
+        self.pool[sym] = v
+        return v
+
+    def resolve(self, sym):
+        """
+        Returns the value associated with the symbol. In a nutshell:
+
+        >>> resolve(Symbol('x', namespace='global:file.py'))
+        <global variable x from file.py>
+
+        As an exception, any function processed by Myia will be associated
+        to its LambdaNode in this dictionary (even though it is a FunctionImpl
+        instance as seen from Python's globals), and some additional entries
+        (gradients, etc.) are present here that are not in Python's globals
+        (these entries' Symbols are engineered so they cannot clash with
+        anything else).
+        """
+        try:
+            return self.pool[sym]
+        except KeyError:
+            return self.acquire(sym)
+
+    def associate(self, sym, node):
+        """
+        Associate the given symbol to the given node (typically a LambdaNode)
+        in this pool. The LambdaNode's `ref` field will be set to the
+        symbol.
+        """
+        if isinstance(node, LambdaNode):
+            node.ref = sym
+        self.pool[sym] = node
+
+    def __getitem__(self, sym):
+        return self.resolve(sym)
 
 
-def add_source(file, globals):
-    globals_sources[file] = globals
-
-
-def acquire(sym):
-    if sym.namespace.startswith('global:'):
-        file = sym.namespace[7:]
-    else:
-        file = ':' + sym.namespace
-    globs = globals_sources[file]
-    try:
-        v = globs[sym.label]
-    except KeyError as err:
-        builtins = globs['__builtins__']
-        if isinstance(builtins, dict):
-            # I don't know why this ever happens, but it does.
-            v = builtins[sym.label]
-        else:
-            v = getattr(builtins, sym.label)
-    globals_pool = v
-    return v
-
-
-def resolve(sym):
-    try:
-        return globals_pool[sym]
-    except KeyError:
-        return acquire(sym)
-
-
-def associate(sym, node):
-    if isinstance(node, LambdaNode):
-        node.ref = sym
-    globals_pool[sym] = node
+# Maps global Symbols to whatever it is they resolve to. When compiling
+# a function, its LambdaNodes will be registered in there directly.
+# Values coming from Python globals are registered there when they are
+# requested. Globals from all global namespaces are pooled together,
+# which is fine because namespaces avoid clashes.
+globals_pool: BackedPool = BackedPool()
 
 
 def create_lambda(ref, args, body, gen=None, *,
                   commit=True, **kw):
+    """
+    Create a LambdaNode named according to the `ref` Symbol and return it.
+    If `commit` is `True`, `ref` will be associated to the `LambdaNode` in
+    `globals_pool`.
+    """
     lbda = LambdaNode(args, body, gen, **kw)
     if commit:
-        associate(ref, lbda)
+        globals_pool.associate(ref, lbda)
     return lbda

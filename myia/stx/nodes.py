@@ -257,8 +257,6 @@ class LambdaNode(MyiaASTNode):
         args ([Symbol]): List of argument variables.
         body (MyiaASTNode): Expression that the call should return.
         gen (GenSym): Symbol factory for this LambdaNode.
-        global_env (ParseEnv): Environment to resolve global
-            variables.
         ref (Symbol): Symbol that points to this LambdaNode in the
             ``global_env``.
         primal (Symbol): If this LambdaNode is the output of ``Grad``,
@@ -436,4 +434,4 @@ class _Assign(MyiaASTNode):
 
 
 # For type annotations:
-from .env import GenSym, ParseEnv
+from .env import GenSym
