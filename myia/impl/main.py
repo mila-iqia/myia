@@ -30,18 +30,3 @@ def symbol_associator(kind):
             return process(sym, fname, fn)
         return deco
     return associator_deco
-
-
-class GlobalEnv(dict):
-    def __init__(self, primitives):
-        self.primitives = primitives
-
-    def __getitem__(self, item):
-        try:
-            return super().__getitem__(item)
-        except KeyError:
-            try:
-                self[item] = self.primitives[item]
-            except KeyError:
-                self[item] = Pending(globals_pool[item])
-            return self[item]

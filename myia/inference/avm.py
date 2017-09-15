@@ -2,24 +2,20 @@
 from typing import List, Any, Dict
 from ..interpret import VMCode, VMFrame, EnvT, \
     PrimitiveImpl, FunctionImpl, ClosureImpl, Instruction, \
-    GlobalEnv
+    EvaluationEnv, EvaluationEnvCollection
 from ..util import EventDispatcher, BucheDb
 from ..symbols import builtins
 from ..impl.main import impl_bank
 from itertools import product
 from .dfa import DFA, ValueTrack, NeedsTrack
-from ..stx import maptup2, Symbol, TupleNode, globals_pool
+from ..stx import maptup2, Symbol, TupleNode, LambdaNode, globals_pool
 from collections import defaultdict
 from ..lib import ANY, VALUE, ERROR
 
 
-compile_cache: Dict = {}
 aroot_globals = impl_bank['abstract']
 projector_set = set()
 max_depth = 5
-
-
-avm_genv = GlobalEnv(aroot_globals)
 
 
 class SetDepth:
@@ -68,27 +64,7 @@ class AbstractValue:
                 self.depth = max(v.depth, self.depth)
                 self.values[VALUE] = v[VALUE]
 
-    # def acquire(self, proj):
-    #     print(self, proj)
-    #     if proj is VALUE:
-    #         if VALUE in self.values:
-    #             return self.values[VALUE]
-    #         else:
-    #             raise Exception(f'No VALUE for {self}')
-    #     else:
-    #         assert proj
-    #         return aroot_globals[proj](self)
-
     def __getitem__(self, proj):
-        # if proj not in self.values:
-        #     res = self.acquire(proj)
-        #     if proj is VALUE and isinstance(res, AbstractValue):
-        #         self.values = copy(res.values)
-        #         if VALUE not in self.values:
-        #             raise Exception(f'No VALUE for {self}')
-        #         return self[VALUE]
-        #     else:
-        #         self.values[proj] = res
         return self.values[proj]
 
     def __call__(self, proj):
@@ -156,12 +132,7 @@ def find_projector(proj, fn):
             return impl_bank['project'][proj][fn]
         except KeyError:
             raise Exception(f'Missing prim projector "{proj}" for {fn}.')
-    # elif isinstance(fn, ClosureAImpl):
-    #     return ClosureAImpl(find_projector(proj, fn.fn), fn.args)
     elif isinstance(fn, FunctionImpl):
-        # def fn2(*args, **kw):
-        #     return fn(*args, proj=proj)
-        # return fn2
         return fn
     else:
         raise Exception(f'Cannot project "{proj}" with {fn}.')
@@ -172,11 +143,11 @@ class AVMFrame(VMFrame):
                  vm,
                  code,
                  local_env,
-                 global_env,
+                 eval_env,
                  signature=None) -> None:
         from ..symbols import builtins
         from ..interpret import PrimitiveImpl
-        super().__init__(vm, code, local_env, global_env)
+        super().__init__(vm, code, local_env, eval_env)
         self.signature = signature
 
     def take(self, n):
@@ -225,7 +196,7 @@ class AVMFrame(VMFrame):
             instrs.append(Instruction('reduce', node, nargs, False))
         instrs.append(Instruction('assemble', node, projs))
         vmc = VMCode(node, instrs)
-        return self.__class__(self.vm, vmc, {}, {}, None)
+        return self.__class__(self.vm, vmc, {}, self.eval_env, None)
 
     def instruction_closure(self, node) -> None:
         fn, args = self.take(2)
@@ -271,13 +242,16 @@ class AVMFrame(VMFrame):
     def instruction_reduce(self, node, nargs, has_projs=True):
         fn, *args = self.take(nargs + 1)
         fn = unwrap_abstract(fn)
+        if isinstance(fn, LambdaNode):
+            fn = self.eval_env.compile(fn)
         if isinstance(fn, FunctionImpl):
             bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
             sig = (fn, tuple(args))
 
             open, cached = self.vm.consult_cache(sig)
             if cached is None:
-                return self.__class__(self.vm, fn.code, bind, fn.globals, sig)
+                return self.__class__(self.vm, fn.code, bind,
+                                      fn.eval_env, sig)
             elif open:
                 self.vm.checkpoint_on(sig)
                 if not cached:
@@ -315,9 +289,9 @@ class AVMFrame(VMFrame):
 
     def copy(self, pc_offset=0):
         local_env = {**self.local_env}
-        global_env = self.global_env
+        eval_env = self.eval_env
         fr = AVMFrame(self.vm, self.code,
-                      local_env, global_env, self.signature)
+                      local_env, eval_env, self.signature)
         fr.stack = [s for s in self.stack]
         fr.pc = self.pc + pc_offset
         fr.focus = self.focus
@@ -328,21 +302,21 @@ class AVM(EventDispatcher):
     def __init__(self,
                  code: VMCode,
                  local_env: EnvT,
-                 global_env: EnvT,
+                 eval_env: EnvT,
                  signature=None,
                  debugger: BucheDb = None,
                  needs: Dict = {},
+                 projs=None,
                  emit_events=True) -> None:
         super().__init__(self, emit_events)
         self.results_cache: Dict = {}
         self.open_cache: Dict = {}
-        self.compile_cache = compile_cache
         self.needs = needs
         self.debugger = debugger
         self.do_emit_events = emit_events
         # Current frame
-        self.global_env = global_env
-        self.frame = AVMFrame(self, code, local_env, global_env, signature)
+        self.eval_env = eval_env
+        self.frame = AVMFrame(self, code, local_env, eval_env, signature)
         # Stack of previous frames (excludes current one)
         self.frames: List[AVMFrame] = []
         if self.do_emit_events:
@@ -384,8 +358,6 @@ class AVM(EventDispatcher):
             self.checkpoints.append((frs, fr, sig_stack, [[value]], True))
 
     def checkpoint(self, paths, step_back=-1):
-        # fr = AVMFrame(self, self.frame.code, self.frame.envs)
-        # fr.pc = self.frame.pc - 1
         fr = self.frame.copy(step_back)
         frs = [f.copy() for f in self.frames]
         self.checkpoints.append((frs, fr, set(self.sig_stack), paths, False))
@@ -394,19 +366,6 @@ class AVM(EventDispatcher):
         fr = self.frame.copy()
         frs = [f.copy() for f in self.frames]
         self.checkpoints_on[sig].append((frs, fr, set(self.sig_stack)))
-
-    def evaluate(self, lbda):
-        envs = ({}, avm_genv)
-        res = run_avm(VMCode(lbda), self.needs, {}, avm_genv)
-        fn, = list(res.result)
-        return fn
-
-    def compile(self, lbda):
-        fimpl = self.compile_cache.get(lbda, None)
-        if fimpl is None:
-            fimpl = FunctionImpl(lbda, self.global_env)
-            self.compile_cache[lbda] = fimpl
-        return fimpl
 
     def go(self) -> Any:
         while True:
@@ -483,40 +442,36 @@ class AVM(EventDispatcher):
                 return
 
 
-def run_avm(code: VMCode,
-            needs: Dict,
-            local_env: EnvT,
-            global_env: EnvT,
-            debugger: BucheDb = None,
-            signature=None) -> Any:
-    """
-    Execute the VM on the given code.
-    """
-    return AVM(code, local_env, global_env,
-               needs=needs, debugger=debugger, signature=signature)
+class AEvaluationEnv(EvaluationEnv):
+    def __init__(self, primitives, pool, vm_class, setup, config={}):
+        super().__init__(primitives, pool, vm_class, setup, config)
+        projs = config['projs']
+        self.projs = projs
+        self.dfa = DFA([ValueTrack, self.needs_track], self.pool)
+        self.config['needs'] = self.dfa.values[self.dfa.tracks['needs']]
+
+    def needs_track(self, dfa):
+        return NeedsTrack(dfa, self.projs)
+
+    def evaluate(self, lbda):
+        self.setup()
+        self.dfa.visit(lbda)
+        fn, = list(super().evaluate(lbda))
+        return unwrap_abstract(fn)
 
 
-def abstract_evaluate(lbda, args, proj=None):
-    load()
+eenvs = EvaluationEnvCollection(AEvaluationEnv, aroot_globals,
+                                globals_pool, AVM, load, cache=False)
 
+
+def abstract_evaluate(node, proj=None):
     if not proj:
-        proj = [VALUE]
-    elif not isinstance(proj, list):
-        proj = [proj]
+        proj = (VALUE,)
+    elif not isinstance(proj, (list, tuple)):
+        proj = (proj,)
+    elif isinstance(proj, list):
+        proj = tuple(proj)
+    return eenvs.run_env(node, projs=proj)
 
-    # d = DFA([ValueTrack, lambda dfa: NeedsTrack(dfa, [])],
-    #         parse_env)
-    # d.visit(lbda)
-    # for p in proj:
-    #     d.propagate(lbda.body, 'needs', p)
 
-    d = DFA([ValueTrack, lambda dfa: NeedsTrack(dfa, proj)], globals_pool)
-    d.visit(lbda)
-
-    fn, = list(run_avm(VMCode(lbda), {}, {}, avm_genv).result)
-    fn = unwrap_abstract(fn)
-    return run_avm(fn.code,
-                   d.values[d.tracks['needs']],
-                   {s: arg for s, arg in zip(lbda.args, args)},
-                   fn.globals,
-                   signature=(fn, args))
+avm_eenv = AEvaluationEnv

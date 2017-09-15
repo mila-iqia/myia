@@ -2,15 +2,14 @@ from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 
 from types import FunctionType
 from ..stx import \
-    MyiaASTNode, Location, Symbol, ValueNode, LambdaNode, maptup2
+    MyiaASTNode, Location, Symbol, ValueNode, LambdaNode, maptup2, globals_pool
 from ..lib import Closure as ClosureImpl, Primitive as PrimitiveImpl, \
     IdempotentMappable
 from ..symbols import builtins, object_map, update_object_map
 from ..util import EventDispatcher, BucheDb, HReprBase, buche
 from functools import reduce
-from ..impl.main import impl_bank, GlobalEnv
+from ..impl.main import impl_bank
 from ..parse import parse_function
-from ..lib import Pending
 
 
 # When a LambdaNode is made into a FunctionImpl, we will
@@ -20,7 +19,6 @@ from ..lib import Pending
 compile_cache: Dict[LambdaNode, 'FunctionImpl'] = {}
 EnvT = Dict[Symbol, Any]
 root_globals = impl_bank['interp']
-vm_genv = GlobalEnv(root_globals)
 
 
 _loaded = False
@@ -42,65 +40,27 @@ def load():
 ###################
 
 
-def translate_node(v):
-    if isinstance(v, MyiaASTNode):
-        return v
-
-    try:
-        return object_map[v]
-    except:
-        pass
-
-    if isinstance(v, (int, float, FunctionImpl, PrimitiveImpl)):
-        return ValueNode(v)
-    elif isinstance(v, (type, FunctionType)):
-        try:
-            return parse_function(v)
-        except (TypeError, OSError):
-            raise ValueError(f'Myia cannot translate function: {v}')
-
-    raise ValueError(f'Myia cannot process value: {v}')
-
-
-def process_value(value, vm):
-    node = translate_node(value)
-    if isinstance(node, LambdaNode):
-        return vm.compile(node)
-
-    elif isinstance(node, ValueNode):
-        return node.value
-
-    elif isinstance(node, Symbol):
-        return root_globals[node]
-
-    else:
-        raise ValueError(f'Myia cannot process: {self.value}')
-
-
 class FunctionImpl(HReprBase, IdempotentMappable):
     """
     Represents a Myia-transformed function.
     """
-    def __init__(self, ast: LambdaNode, globals: EnvT) -> None:
+    def __init__(self,
+                 ast: LambdaNode,
+                 eval_env: 'EvaluationEnv') -> None:
         assert isinstance(ast, LambdaNode)
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
         self.ast = ast
         self.code = VMCode(ast.body)
-        self.globals = globals
+        self.eval_env = eval_env
         self.primal_sym = ast.primal
         self.grad: Callable[[int], FunctionImpl] = None
 
-    def debug(self, args, debugger):
+    def __call__(self, *args):
         ast = self.ast
         assert len(args) == len(ast.args)
-        return run_vm(self.code,
-                      {s: arg for s, arg in zip(ast.args, args)},
-                      self.globals,
-                      debugger=debugger)
-
-    def __call__(self, *args):
-        return self.debug(args, None)
+        return self.eval_env.run(self.code,
+                                {s: arg for s, arg in zip(ast.args, args)})
 
     def __str__(self):
         return f'Func({self.ast.ref or self.ast})'
@@ -261,31 +221,20 @@ class VM(EventDispatcher):
     def __init__(self,
                  code: VMCode,
                  local_env: EnvT,
-                 global_env: EnvT,
+                 eval_env: 'EvaluationEnv',
                  debugger: BucheDb = None,
                  emit_events=True) -> None:
         super().__init__(self, emit_events)
-        self.compile_cache = compile_cache
         self.debugger = debugger
         self.do_emit_events = emit_events
         # Current frame
-        self.global_env = global_env
-        self.frame = VMFrame(self, code, local_env, global_env)
+        self.eval_env = eval_env
+        self.frame = VMFrame(self, code, local_env, eval_env)
         # Stack of previous frames (excludes current one)
         self.frames: List[VMFrame] = []
         if self.do_emit_events:
             self.emit_new_frame(self.frame)
         self.result = self.eval()
-
-    def evaluate(self, v):
-        return evaluate(v)
-
-    def compile(self, lbda):
-        fimpl = self.compile_cache.get(lbda, None)
-        if fimpl is None:
-            fimpl = FunctionImpl(lbda, self.global_env)
-            self.compile_cache[lbda] = fimpl
-        return fimpl
 
     def eval(self) -> Any:
         while True:
@@ -336,16 +285,16 @@ class VMFrame(HReprBase):
                  vm: VM,
                  code: VMCode,
                  local_env: EnvT,
-                 global_env: EnvT) -> None:
+                 eval_env: 'EvaluationEnv') -> None:
         self.vm = vm
         self.code = code
         self.instructions = code.instructions
         # Program counter: index of the next instruction to execute.
         self.pc = 0
         # Environment to store local bindings.
-        self.envs: List[EnvT] = [local_env, global_env]
+        self.envs: List[EnvT] = [local_env, eval_env]
         self.local_env = local_env
-        self.global_env = global_env
+        self.eval_env = eval_env
         self.stack: List[Any] = [None]
         # Node being executed, mostly for debugging.
         self.focus: MyiaASTNode = None
@@ -431,9 +380,11 @@ class VMFrame(HReprBase):
           the result.
         """
         fn, *args = self.take(nargs + 1)
+        if isinstance(fn, LambdaNode):
+            fn = self.eval_env.compile(fn)
         if isinstance(fn, FunctionImpl):
             bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
-            return self.__class__(self.vm, fn.code, bind, fn.globals)
+            return self.__class__(self.vm, fn.code, bind, fn.eval_env)
         elif isinstance(fn, ClosureImpl):
             self.push(fn.fn, *fn.args, *args)
             return self.instruction_reduce(node, nargs + len(fn.args))
@@ -483,11 +434,6 @@ class VMFrame(HReprBase):
         for env in self.envs:
             try:
                 v = env[sym]
-                if isinstance(v, LambdaNode):
-                    v = Pending(v)
-                if isinstance(v, Pending):
-                    v = process_value(v.value, self.vm)
-                    env[sym] = v
                 self.push(v)
                 return None
             except KeyError as err:
@@ -505,7 +451,7 @@ class VMFrame(HReprBase):
         Create a FunctionImpl from the given node and push
         it on the stack.
         """
-        fimpl = self.vm.compile(node)
+        fimpl = self.eval_env.compile(node)
         self.push(fimpl)
 
     def __hrepr__(self, H, hrepr):
@@ -513,7 +459,7 @@ class VMFrame(HReprBase):
         # env = {}
         # for e in reversed(self.envs):
         #     env.update(e)
-        env = self.global_env
+        env = self.eval_env
         eviews = H.tabbedView()
         for k, v in env.items():
             view = H.view(H.tab(hrepr(k)), H.pane(hrepr(v)))
@@ -526,20 +472,96 @@ class VMFrame(HReprBase):
         return views
 
 
-def run_vm(code: VMCode,
-           local_env: EnvT,
-           global_env: EnvT,
-           debugger: BucheDb = None) -> Any:
-    """
-    Execute the VM on the given code.
-    """
-    return VM(code, local_env, global_env, debugger=debugger).result
+class EvaluationEnv(dict):
+    def __init__(self, primitives, pool, vm_class, setup, config={}):
+        self.compile_cache = {}
+        self.primitives = primitives
+        self.pool = pool
+        self.vm_class = vm_class
+        self.setup = setup
+        self.config = config
+
+    def compile(self, lbda):
+        fimpl = self.compile_cache.get(lbda, None)
+        if fimpl is None:
+            fimpl = FunctionImpl(lbda, self)
+            self.compile_cache[lbda] = fimpl
+        return fimpl
+
+    def translate_node(self, v):
+        if isinstance(v, MyiaASTNode):
+            return v
+
+        try:
+            return object_map[v]
+        except:
+            pass
+
+        if isinstance(v, (int, float, FunctionImpl, PrimitiveImpl)):
+            return ValueNode(v)
+        elif isinstance(v, (type, FunctionType)):
+            try:
+                return parse_function(v)
+            except (TypeError, OSError):
+                raise ValueError(f'Myia cannot translate function: {v}')
+
+        raise ValueError(f'Myia cannot process value: {v}')
+
+    def process_value(self, value):
+        node = self.translate_node(value)
+        if isinstance(node, LambdaNode):
+            return self.compile(node)
+
+        elif isinstance(node, ValueNode):
+            return node.value
+
+        elif isinstance(node, Symbol):
+            return self.primitives[node]
+
+        else:
+            raise ValueError(f'Myia cannot process: {self.value}')
+
+    def run(self, code, local_env):
+        return self.vm_class(code, local_env, self, **self.config).result
+
+    def evaluate(self, node):
+        self.setup()
+        return self.run(VMCode(node), {})
+
+    def __getitem__(self, item):
+        try:
+            return super().__getitem__(item)
+        except KeyError:
+            try:
+                self[item] = self.primitives[item]
+            except KeyError:
+                self[item] = self.process_value(self.pool[item])
+            return self[item]
 
 
-def evaluate(node: MyiaASTNode, *,
-             debugger: BucheDb = None) -> Any:
-    """
-    Evaluate the given MyiaASTNode in the VM environment.
-    """
-    load()
-    return run_vm(VMCode(node), {}, vm_genv, debugger=debugger)
+class EvaluationEnvCollection:
+    def __init__(self, eenv_class, *args, cache=True):
+        self.args = args
+        self.eenv_class = eenv_class
+        self.eenvs = {}
+        self.cache = cache
+
+    def get_env(self, **config):
+        cfg = frozenset(config.items())
+        if self.cache and cfg in self.eenvs:
+            return self.eenvs[cfg]
+        else:
+            eenv = self.eenv_class(*self.args, config=config)
+            self.eenvs[cfg] = eenv
+            return eenv
+
+    def run_env(self, node, **config):
+        return self.get_env(**config).evaluate(node)
+
+
+eenvs = EvaluationEnvCollection(EvaluationEnv, root_globals,
+                                globals_pool, VM, load)
+
+
+def evaluate(node, debugger=None):
+    return eenvs.run_env(node, debugger=debugger)

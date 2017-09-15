@@ -46,8 +46,8 @@ def infer(**tests):
             inputs = tuple(i if isinstance(i, AbstractValue)
                            else AbstractValue({proj: i})
                            for i in inputs)
-            vm = abstract_evaluate(node, inputs, proj=proj)
-            results = set(getproj(r, proj) for r in vm.result)
+            afn = abstract_evaluate(node, proj=proj)
+            results = set(getproj(r, proj) for r in afn(*inputs))
             assert results == expected
 
         m = pytest.mark.parametrize('proj,inputs,expected', list(tests))(test)

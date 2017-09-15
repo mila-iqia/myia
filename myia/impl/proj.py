@@ -3,7 +3,6 @@ from .main import symbol_associator, impl_bank
 from ..interpret import PrimitiveImpl, FunctionImpl
 from ..inference.avm import AbstractValue, VALUE, ERROR
 from ..parse import parse_function
-from .impl_abstract import abstract_globals
 
 
 ######################
@@ -18,8 +17,7 @@ def proj(psym):
     @symbol_associator('proj')
     def pimpl(sym, name, fn):
         lbda = parse_function(fn)
-        projs[impl_bank['abstract'][sym]] = \
-            FunctionImpl(lbda, abstract_globals)
+        projs[impl_bank['abstract'][sym]] = lbda
         return fn
 
     return pimpl
