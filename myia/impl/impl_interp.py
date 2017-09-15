@@ -3,7 +3,7 @@ from typing import List, Any, Union
 from .main import symbol_associator, impl_bank
 from ..stx import Symbol
 from ..interpret import \
-    PrimitiveImpl, FunctionImpl, ClosureImpl, evaluate
+    Primitive, Function, Closure, evaluate
 from ..lib import ZERO
 from ..grad import find_grad
 from ..inference.types import typeof
@@ -34,7 +34,7 @@ def impl_interp(sym, name, fn):
     The implementation will be set in ``root_globals``
     and in the ``myia_builtins`` global.
     """
-    prim = PrimitiveImpl(fn, name=sym)
+    prim = Primitive(fn, name=sym)
     impl_bank['interp'][sym] = prim
     object_map[prim] = sym
     return prim
@@ -44,7 +44,7 @@ def impl_interp_smap(dispatch):
     @symbol_associator('')
     def deco(sym, name, fn):
         mfn = StructuralMap(fn, dispatch)
-        prim = PrimitiveImpl(mfn, name=sym)
+        prim = Primitive(mfn, name=sym)
         impl_bank['interp'][sym] = prim
         object_map[prim] = sym
         return prim
@@ -239,15 +239,15 @@ def J_dispatch_closure(smap, clos):
 
 def J_fn(x, nargs_closure):
     """
-    Helper function for the gradient of PrimitiveImpl or
-    FunctionImpl, given nargs_closure closure arguments.
+    Helper function for the gradient of Primitive or
+    Function, given nargs_closure closure arguments.
 
     See previous section on Partial Application for the
     purpose of the ``nargs_closure`` argument.
     """
-    if isinstance(x, PrimitiveImpl):
+    if isinstance(x, Primitive):
         ref = x.name
-    elif isinstance(x, FunctionImpl):
+    elif isinstance(x, Function):
         ref = x.ast.ref
     else:
         raise TypeError(f'J_fn applied on wrong type: {x}')
@@ -274,7 +274,7 @@ def J(x):
 
     Implements the J operator in Pearlmutter & Siskind.
     """
-    if isinstance(x, (PrimitiveImpl, FunctionImpl)):
+    if isinstance(x, (Primitive, Function)):
         return J_fn(x, 0)
     elif isinstance(x, (int, float, bool)) or x is None or x is ZERO:
         return x
@@ -296,16 +296,16 @@ def Jinv(x):
 
     Implements the J^{-1} operator in Pearlmutter & Siskind.
     """
-    if isinstance(x, PrimitiveImpl):
+    if isinstance(x, Primitive):
         raise Exception('Primitives have no primals.')
-    elif isinstance(x, FunctionImpl):
+    elif isinstance(x, Function):
         assert x.primal_sym is not None
         if isinstance(x.primal_sym, Symbol):
             primal = evaluate(x.primal_sym)
         else:
             primal = x.primal_sym
-        if not isinstance(primal, (FunctionImpl, PrimitiveImpl)):
-            raise Exception('Should be FunctionImpl, but found:'
+        if not isinstance(primal, (Function, Primitive)):
+            raise Exception('Should be Function, but found:'
                             f' {primal}, type {type(primal)},'
                             f' for {x.primal_sym}')
         return primal
@@ -320,22 +320,20 @@ def zeros_like(x):
     """
     Creates a structure just like ``x`` but "zeroed out."
 
-    If ``x`` is a PrimitiveImpl or a FunctionImpl, this returns
-    (). If ``x`` is a ClosureImpl, this returns a zero
-    for each value in the closure.
+    If ``x`` is a Primitive or a Function, this returns
+    (). If ``x`` is a Closure, this returns a Closure on
+    a zeroed environment.
 
     >>> zeros_like(17)
     0
     >>> zeros_like((1, 2, (3, 4)))
     (0, 0, (0, 0))
-    >>> zeros_like(lambda x, y: x + y)  # (metaphorically)
-    ()
     >>> x = 10; zeros_like(lambda y: x + y)  # (metaphorically)
-    (0,)
+    lambda y: 0 + y
     """
     if isinstance(x, (int, float, bool)):
         return 0
-    elif isinstance(x, (PrimitiveImpl, FunctionImpl)):
+    elif isinstance(x, (Primitive, Function)):
         return x
     elif x is None:
         return None

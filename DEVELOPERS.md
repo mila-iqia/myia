@@ -32,7 +32,8 @@ myia/                           # Source code for Myia
         dfa                FT   # Dataflow analysis
         types              F    # Type representations
     interpret/                  # Interpreter
-        vm               I F    # Stack-based virtual machine
+        vmutil           I F    # Translate AST to VM instructions
+        vm               I      # Stack-based virtual machine
     lib                ! I      # Impl of Record, Closure, StructuralMap
     parse               S       # Parse Python code, produce IR
     stx/                        # IR

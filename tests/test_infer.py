@@ -1,7 +1,6 @@
 from myia.parse import MyiaSyntaxError, parse_function
 from myia.inference.avm import \
     aroot_globals, abstract_evaluate, AbstractValue, ERROR, ANY
-from myia.interpret import FunctionImpl
 from myia.inference.types import *
 from myia.symbols import builtins
 import pytest

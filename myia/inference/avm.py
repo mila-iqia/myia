@@ -1,7 +1,7 @@
 
 from typing import List, Any, Dict
 from ..interpret import VMCode, VMFrame, EnvT, \
-    PrimitiveImpl, FunctionImpl, ClosureImpl, Instruction, \
+    Primitive, Function, Closure, Instruction, \
     EvaluationEnv, EvaluationEnvCollection
 from ..util import EventDispatcher, BucheDb
 from ..symbols import builtins
@@ -127,12 +127,12 @@ class Fork:
 def find_projector(proj, fn):
     if proj is VALUE:
         return fn
-    if isinstance(fn, PrimitiveImpl):
+    if isinstance(fn, Primitive):
         try:
             return impl_bank['project'][proj][fn]
         except KeyError:
             raise Exception(f'Missing prim projector "{proj}" for {fn}.')
-    elif isinstance(fn, FunctionImpl):
+    elif isinstance(fn, Function):
         return fn
     else:
         raise Exception(f'Cannot project "{proj}" with {fn}.')
@@ -146,7 +146,7 @@ class AVMFrame(VMFrame):
                  eval_env,
                  signature=None) -> None:
         from ..symbols import builtins
-        from ..interpret import PrimitiveImpl
+        from ..interpret import Primitive
         super().__init__(vm, code, local_env, eval_env)
         self.signature = signature
 
@@ -202,7 +202,7 @@ class AVMFrame(VMFrame):
         fn, args = self.take(2)
         fn = unwrap_abstract(fn)
         args = unwrap_abstract(args)
-        clos = ClosureImpl(fn, args)
+        clos = Closure(fn, args)
         self.stack.append(clos)
 
     def instruction_store(self, node, dest) -> None:
@@ -244,7 +244,7 @@ class AVMFrame(VMFrame):
         fn = unwrap_abstract(fn)
         if isinstance(fn, LambdaNode):
             fn = self.eval_env.compile(fn)
-        if isinstance(fn, FunctionImpl):
+        if isinstance(fn, Function):
             bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
             sig = (fn, tuple(args))
 
@@ -261,11 +261,11 @@ class AVMFrame(VMFrame):
             else:
                 self.push(Fork(cached))
 
-        elif isinstance(fn, ClosureImpl):
+        elif isinstance(fn, Closure):
             self.push_no_annotate(fn.fn, *fn.args, *args)
             return self.instruction_reduce(node, nargs + len(fn.args))
 
-        elif isinstance(fn, PrimitiveImpl):
+        elif isinstance(fn, Primitive):
             if nargs == 1:
                 arg, = args
                 if isinstance(arg, AbstractValue) and fn.name in arg.values:

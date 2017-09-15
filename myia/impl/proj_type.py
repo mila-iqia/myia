@@ -1,7 +1,7 @@
 
 from .proj import natproj, getprop
 from ..symbols import builtins
-from ..interpret import PrimitiveImpl
+from ..interpret import Primitive
 from ..inference.avm import AbstractValue, WrappedException
 from ..inference.types import *
 from .main import impl_bank
@@ -63,7 +63,7 @@ type_projs = impl_bank['project'].setdefault(builtins.type, {})
 
 for sym, sigs in type_signatures.items():
     type_projs[impl_bank['abstract'][sym]] = \
-        PrimitiveImpl(std_type(sym, sigs))
+        Primitive(std_type(sym, sigs))
 
 
 @natproj(builtins.type)

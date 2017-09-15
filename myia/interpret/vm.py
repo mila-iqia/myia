@@ -3,20 +3,21 @@ from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 from types import FunctionType
 from ..stx import \
     MyiaASTNode, Location, Symbol, ValueNode, LambdaNode, maptup2, globals_pool
-from ..lib import Closure as ClosureImpl, Primitive as PrimitiveImpl, \
-    IdempotentMappable
+from ..lib import Closure, IdempotentMappable
 from ..symbols import builtins, object_map, update_object_map
 from ..util import EventDispatcher, BucheDb, HReprBase, buche
 from functools import reduce
 from ..impl.main import impl_bank
 from ..parse import parse_function
+from .vmutil import EvaluationEnv, EvaluationEnvCollection, Function, \
+    VMCode, Instruction
 
 
-# When a LambdaNode is made into a FunctionImpl, we will
+# When a LambdaNode is made into a Function, we will
 # cache it. This mostly avoids recomputing gradients,
-# since FunctionImpl is the structure that stores
+# since Function is the structure that stores
 # pointers to them.
-compile_cache: Dict[LambdaNode, 'FunctionImpl'] = {}
+compile_cache: Dict[LambdaNode, 'Function'] = {}
 EnvT = Dict[Symbol, Any]
 root_globals = impl_bank['interp']
 
@@ -33,173 +34,6 @@ def load():
         # as a side-effect.
         from ..impl.impl_interp import _
         from ..impl.impl_bprop import _
-
-
-###################
-# Special objects #
-###################
-
-
-class FunctionImpl(HReprBase, IdempotentMappable):
-    """
-    Represents a Myia-transformed function.
-    """
-    def __init__(self,
-                 ast: LambdaNode,
-                 eval_env: 'EvaluationEnv') -> None:
-        assert isinstance(ast, LambdaNode)
-        self.argnames = [a.label for a in ast.args]
-        self.nargs = len(ast.args)
-        self.ast = ast
-        self.code = VMCode(ast.body)
-        self.eval_env = eval_env
-        self.primal_sym = ast.primal
-        self.grad: Callable[[int], FunctionImpl] = None
-
-    def __call__(self, *args):
-        ast = self.ast
-        assert len(args) == len(ast.args)
-        return self.eval_env.run(self.code,
-                                {s: arg for s, arg in zip(ast.args, args)})
-
-    def __str__(self):
-        return f'Func({self.ast.ref or self.ast})'
-
-    def __repr__(self):
-        return str(self)
-
-    def __hash__(self):
-        return hash(self.ast)
-
-    def __eq__(self, other):
-        return type(other) is FunctionImpl \
-            and self.ast == other.ast
-
-    def __add__(self, other):
-        # TODO: Fix the following issue, which happens sometimes.
-        #       I believe the main reason is that for the backpropagator,
-        #       Grad builds a closure on the wrong function (?)
-        # if self != other:
-        #     raise Exception('The functions being added are different.')
-        return self
-
-    def __hrepr__(self, H, hrepr):
-        return H.div['FunctionImpl'](
-            H.div['class_title']('Function'),
-            H.div['class_contents'](hrepr(self.ast.ref or self.ast))
-        )
-
-
-##################################
-# Class to Evaluate MyiaASTNodes #
-##################################
-
-
-class Instruction:
-    """
-    An instruction for the stack-based VM.
-
-    Attributes:
-        command: The instruction name.
-        node: The Myia node that this instruction is computing.
-        args: Instruction-specific arguments.
-    """
-    def __init__(self,
-                 command: str,
-                 node: MyiaASTNode,
-                 *args: Any) -> None:
-        self.command = command
-        self.node = node
-        self.args = args
-
-    def __str__(self):
-        args = ", ".join(map(str, self.args))
-        return f'{self.command}:{args}'
-
-
-class VMCode(HReprBase):
-    """
-    Compile a MyiaASTNode into a list of instructions compatible
-    with the stack-based VM.
-
-    See VMFrame's ``instruction_<name>`` methods for more
-    information.
-
-    Attributes:
-        node: The original node.
-        instructions: A list of instructions to implement this
-            node's behavior.
-    """
-    def __init__(self,
-                 node: MyiaASTNode,
-                 instructions: List[Instruction] = None) -> None:
-        self.node = node
-        if instructions is None:
-            self.instructions: List[Instruction] = []
-            self.process(self.node)
-        else:
-            self.instructions = instructions
-
-    def instr(self, name, node, *args) -> None:
-        self.instructions.append(Instruction(name, node, *args))
-
-    def process(self, node) -> None:
-        # Dispatch to process_<node_type>
-        cls = node.__class__.__name__
-        method = getattr(self, 'process_' + cls)
-        rval = method(node)
-
-    def process_ApplyNode(self, node) -> None:
-        self.process(node.fn)
-        for arg in node.args:
-            self.process(arg)
-        self.instr('reduce', node, len(node.args))
-
-    def process_BeginNode(self, node) -> None:
-        for stmt in node.stmts:
-            self.process(stmt)
-
-    def process_ClosureNode(self, node) -> None:
-        self.process(node.fn)
-        self.process(builtins.mktuple)
-        for arg in node.args:
-            self.process(arg)
-        # self.instr('tuple', node, len(node.args))
-        self.instr('reduce', node, len(node.args))
-        self.instr('closure', node)
-
-    def process_LambdaNode(self, node) -> None:
-        self.instr('lambda', node)
-
-    def process_LetNode(self, node) -> None:
-        for k, v in node.bindings:
-            self.process(v)
-            self.instr('store', node, k)
-        self.process(node.body)
-
-    def process_Symbol(self, node) -> None:
-        self.instr('fetch', node, node)
-
-    def process_TupleNode(self, node) -> None:
-        # for x in node.values:
-        #     self.process(x)
-        # self.instr('tuple', node, len(node.values))
-        self.process(builtins.mktuple)
-        for arg in node.values:
-            self.process(arg)
-        self.instr('reduce', node, len(node.values))
-
-    def process_ValueNode(self, node) -> None:
-        self.instr('push', node, node.value)
-
-    def __hrepr__(self, H, hrepr):
-        rows = []
-        for instr in self.instructions:
-            row = H.tr()
-            for x in (instr.command, *instr.args):
-                row = row(H.td(hrepr(x)))
-            rows.append(row)
-        return H.table['VMCodeInstructions'](*rows)
 
 
 class VM(EventDispatcher):
@@ -221,7 +55,7 @@ class VM(EventDispatcher):
     def __init__(self,
                  code: VMCode,
                  local_env: EnvT,
-                 eval_env: 'EvaluationEnv',
+                 eval_env: EvaluationEnv,
                  debugger: BucheDb = None,
                  emit_events=True) -> None:
         super().__init__(self, emit_events)
@@ -272,7 +106,7 @@ class VM(EventDispatcher):
 
 class VMFrame(HReprBase):
     """
-    Computation frame. There is one frame for each FunctionImpl
+    Computation frame. There is one frame for each Function
     called. A frame has its own stack, while the VM operates on
     a stack of VMFrames.
 
@@ -285,7 +119,7 @@ class VMFrame(HReprBase):
                  vm: VM,
                  code: VMCode,
                  local_env: EnvT,
-                 eval_env: 'EvaluationEnv') -> None:
+                 eval_env: EvaluationEnv) -> None:
         self.vm = vm
         self.code = code
         self.instructions = code.instructions
@@ -373,7 +207,7 @@ class VMFrame(HReprBase):
         """
         * Pop ``nargs`` values from the stack, call them ``args``
         * Pop the next value, call it ``fn``
-        * If ``fn`` is a ``FunctionImpl``, we can run it with the VM.
+        * If ``fn`` is a ``Function``, we can run it with the VM.
           Make a new VMFrame for it and return it. This is important
           because we don't want to grow the Python stack.
         * Otherwise, it's a primitive. Call ``fn(*args)`` and push
@@ -382,10 +216,10 @@ class VMFrame(HReprBase):
         fn, *args = self.take(nargs + 1)
         if isinstance(fn, LambdaNode):
             fn = self.eval_env.compile(fn)
-        if isinstance(fn, FunctionImpl):
+        if isinstance(fn, Function):
             bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
             return self.__class__(self.vm, fn.code, bind, fn.eval_env)
-        elif isinstance(fn, ClosureImpl):
+        elif isinstance(fn, Closure):
             self.push(fn.fn, *fn.args, *args)
             return self.instruction_reduce(node, nargs + len(fn.args))
         else:
@@ -403,10 +237,10 @@ class VMFrame(HReprBase):
     def instruction_closure(self, node) -> None:
         """
         Pop a tuple of arguments, and a function, and push
-        ``ClosureImpl(fn, args)``
+        ``Closure(fn, args)``
         """
         fn, args = self.take(2)
-        clos = ClosureImpl(fn, args)
+        clos = Closure(fn, args)
         self.stack.append(clos)
 
     def instruction_store(self, node, dest) -> None:
@@ -448,7 +282,7 @@ class VMFrame(HReprBase):
 
     def instruction_lambda(self, node) -> None:
         """
-        Create a FunctionImpl from the given node and push
+        Create a Function from the given node and push
         it on the stack.
         """
         fimpl = self.eval_env.compile(node)
@@ -470,93 +304,6 @@ class VMFrame(HReprBase):
         views = views(H.view(H.tab('Stack'), H.pane(hrepr(self.stack))))
         views = views(H.view(H.tab('Env'), H.pane(eviews)))
         return views
-
-
-class EvaluationEnv(dict):
-    def __init__(self, primitives, pool, vm_class, setup, config={}):
-        self.compile_cache = {}
-        self.primitives = primitives
-        self.pool = pool
-        self.vm_class = vm_class
-        self.setup = setup
-        self.config = config
-
-    def compile(self, lbda):
-        fimpl = self.compile_cache.get(lbda, None)
-        if fimpl is None:
-            fimpl = FunctionImpl(lbda, self)
-            self.compile_cache[lbda] = fimpl
-        return fimpl
-
-    def translate_node(self, v):
-        if isinstance(v, MyiaASTNode):
-            return v
-
-        try:
-            return object_map[v]
-        except:
-            pass
-
-        if isinstance(v, (int, float, FunctionImpl, PrimitiveImpl)):
-            return ValueNode(v)
-        elif isinstance(v, (type, FunctionType)):
-            try:
-                return parse_function(v)
-            except (TypeError, OSError):
-                raise ValueError(f'Myia cannot translate function: {v}')
-
-        raise ValueError(f'Myia cannot process value: {v}')
-
-    def process_value(self, value):
-        node = self.translate_node(value)
-        if isinstance(node, LambdaNode):
-            return self.compile(node)
-
-        elif isinstance(node, ValueNode):
-            return node.value
-
-        elif isinstance(node, Symbol):
-            return self.primitives[node]
-
-        else:
-            raise ValueError(f'Myia cannot process: {self.value}')
-
-    def run(self, code, local_env):
-        return self.vm_class(code, local_env, self, **self.config).result
-
-    def evaluate(self, node):
-        self.setup()
-        return self.run(VMCode(node), {})
-
-    def __getitem__(self, item):
-        try:
-            return super().__getitem__(item)
-        except KeyError:
-            try:
-                self[item] = self.primitives[item]
-            except KeyError:
-                self[item] = self.process_value(self.pool[item])
-            return self[item]
-
-
-class EvaluationEnvCollection:
-    def __init__(self, eenv_class, *args, cache=True):
-        self.args = args
-        self.eenv_class = eenv_class
-        self.eenvs = {}
-        self.cache = cache
-
-    def get_env(self, **config):
-        cfg = frozenset(config.items())
-        if self.cache and cfg in self.eenvs:
-            return self.eenvs[cfg]
-        else:
-            eenv = self.eenv_class(*self.args, config=config)
-            self.eenvs[cfg] = eenv
-            return eenv
-
-    def run_env(self, node, **config):
-        return self.get_env(**config).evaluate(node)
 
 
 eenvs = EvaluationEnvCollection(EvaluationEnv, root_globals,

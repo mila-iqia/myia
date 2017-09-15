@@ -1,6 +1,6 @@
 
 from .main import symbol_associator, impl_bank
-from ..interpret import PrimitiveImpl, FunctionImpl
+from ..lib import Primitive
 from ..inference.avm import AbstractValue, VALUE, ERROR
 from ..parse import parse_function
 
@@ -43,7 +43,7 @@ def natproj(psym):
     @symbol_associator('proj')
     def pimpl(sym, name, fn):
         projs[impl_bank['abstract'][sym]] = \
-            PrimitiveImpl(fn)
+            Primitive(fn)
         return fn
 
     return pimpl

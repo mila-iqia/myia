@@ -5,7 +5,7 @@ from ..inference.avm import Fork, WrappedException, \
     AbstractValue, unwrap_abstract
 from .flow_all import ANY, VALUE, ERROR
 from ..inference.types import typeof, type_map, Tuple
-from ..interpret import PrimitiveImpl, ClosureImpl
+from ..interpret import Primitive
 from itertools import product
 
 
@@ -26,7 +26,7 @@ def complete_switches(args, sw):
 
 @symbol_associator("abstract")
 def impl_abstract(sym, name, fn):
-    prim = PrimitiveImpl(fn, sym)
+    prim = Primitive(fn, sym)
     impl_bank['abstract'][sym] = prim
     return prim
 
