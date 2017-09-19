@@ -1,8 +1,9 @@
 
 from typing import Any, List, Callable
 from types import FunctionType
+from numpy import ndarray
 from ..util import EventDispatcher, BucheDb, HReprBase, buche
-from ..lib import Closure, Primitive, IdempotentMappable
+from ..lib import Closure, Primitive, IdempotentMappable, Record, ZERO
 from ..stx import MyiaASTNode, Symbol, ValueNode, LambdaNode
 from ..symbols import builtins, object_map
 from ..parse import parse_function
@@ -201,6 +202,8 @@ class EvaluationEnv(dict):
         self.vm_class = vm_class
         self.setup = setup
         self.config = config
+        self.accepted_types = (bool, int, float, Primitive, Function, Closure,
+                               ndarray, list, tuple, Record, str)
 
     def compile(self, lbda):
         fimpl = self.compile_cache.get(lbda, None)
@@ -209,39 +212,42 @@ class EvaluationEnv(dict):
             self.compile_cache[lbda] = fimpl
         return fimpl
 
-    def translate_node(self, v):
-        if isinstance(v, MyiaASTNode):
-            return v
+    def import_value(self, v):
+        try:
+            x = object_map[v]
+        except (TypeError, KeyError):
+            pass
+        else:
+            return self.import_value(x)
 
         try:
-            return object_map[v]
-        except:
+            x = self.primitives[v]
+        except (TypeError, KeyError):
             pass
+        else:
+            if isinstance(x, LambdaNode):
+                return self.compile(x)
+            return x
 
-        if isinstance(v, (int, float, Function, Primitive)):
-            return ValueNode(v)
+        if isinstance(v, self.accepted_types) or v in {ZERO, None}:
+            return v
         elif isinstance(v, (type, FunctionType)):
             # Note: Python's FunctionType, i.e. actual Python functions
             try:
-                return parse_function(v)
+                lbda = parse_function(v)
             except (TypeError, OSError):
-                raise ValueError(f'Myia cannot translate function: {v}')
-
-        raise ValueError(f'Myia cannot process value: {v}')
-
-    def process_value(self, value):
-        node = self.translate_node(value)
-        if isinstance(node, LambdaNode):
-            return self.compile(node)
-
-        elif isinstance(node, ValueNode):
-            return node.value
-
-        elif isinstance(node, Symbol):
-            return self.primitives[node]
-
+                raise ValueError(f'Myia cannot interpret value: {v}')
+            return self.import_value(lbda)
+        elif isinstance(v, LambdaNode):
+            return self.compile(v)
+        elif isinstance(v, Symbol):
+            raise ValueError(f'Myia cannot resolve {v} '
+                             f'from namespace {v.namespace}')
         else:
-            raise ValueError(f'Myia cannot process: {self.value}')
+            raise ValueError(f'Myia cannot interpret value: {v}')
+
+    def export_value(self, value):
+        return value
 
     def run(self, code, local_env):
         return self.vm_class(code, local_env, self, **self.config).result
@@ -257,7 +263,7 @@ class EvaluationEnv(dict):
             try:
                 self[item] = self.primitives[item]
             except KeyError:
-                self[item] = self.process_value(self.pool[item])
+                self[item] = self.import_value(self.pool[item])
             return self[item]
 
 

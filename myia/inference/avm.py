@@ -11,6 +11,7 @@ from .dfa import DFA, ValueTrack, NeedsTrack
 from ..stx import maptup2, Symbol, TupleNode, LambdaNode, globals_pool
 from collections import defaultdict
 from ..lib import ANY, VALUE, ERROR
+from .types import Type
 
 
 aroot_globals = impl_bank['abstract']
@@ -242,8 +243,6 @@ class AVMFrame(VMFrame):
     def instruction_reduce(self, node, nargs, has_projs=True):
         fn, *args = self.take(nargs + 1)
         fn = unwrap_abstract(fn)
-        if isinstance(fn, LambdaNode):
-            fn = self.eval_env.compile(fn)
         if isinstance(fn, Function):
             bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
             sig = (fn, tuple(args))
@@ -458,6 +457,13 @@ class AEvaluationEnv(EvaluationEnv):
         self.dfa.visit(lbda)
         fn, = list(super().evaluate(lbda))
         return unwrap_abstract(fn)
+
+    def import_value(self, v):
+        accepted_types = (AbstractValue, Fork, WrappedException, Type)
+        if isinstance(v, accepted_types) or v is ANY:
+            return v
+        else:
+            return super().import_value(v)
 
 
 eenvs = EvaluationEnvCollection(AEvaluationEnv, aroot_globals,

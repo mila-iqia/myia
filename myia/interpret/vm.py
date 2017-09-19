@@ -97,7 +97,7 @@ class VM(EventDispatcher):
                     # We push the result on the previous frame's stack
                     # and we resume execution.
                     self.frame = self.frames.pop()
-                    self.frame.stack.append(rval)
+                    self.frame.push(rval)
             except Exception as exc:
                 if self.do_emit_events:
                     self.emit_error(exc)
@@ -158,7 +158,10 @@ class VMFrame(HReprBase):
             return args
 
     def push(self, *values):
-        self.stack += list(values)
+        # self.stack += list(values)
+        for value in values:
+            value = self.eval_env.import_value(value)
+            self.stack.append(value)
 
     def pop(self):
         return self.stack.pop()
@@ -214,8 +217,6 @@ class VMFrame(HReprBase):
           the result.
         """
         fn, *args = self.take(nargs + 1)
-        if isinstance(fn, LambdaNode):
-            fn = self.eval_env.compile(fn)
         if isinstance(fn, Function):
             bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
             return self.__class__(self.vm, fn.code, bind, fn.eval_env)
@@ -241,7 +242,7 @@ class VMFrame(HReprBase):
         """
         fn, args = self.take(2)
         clos = Closure(fn, args)
-        self.stack.append(clos)
+        self.push(clos)
 
     def instruction_store(self, node, dest) -> None:
         """

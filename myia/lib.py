@@ -1,6 +1,7 @@
 
 import inspect
 from myia.util import HReprBase, Singleton
+import numpy
 
 
 ##############
@@ -221,8 +222,8 @@ def sequence_map(smap, *seqs):
     return t(smap(*[s[i] for s in seqs]) for i in range(len(s0)))
 
 
-# def ndarray_map(smap, *arrs):
-#     return numpy.vectorize(smap.fn)(*arrs)
+def ndarray_map(smap, *arrs):
+    return numpy.vectorize(smap.fn)(*arrs)
 
 
 default_structural_map_dispatch = {
@@ -232,7 +233,11 @@ default_structural_map_dispatch = {
     type(None): scalar_map,
     tuple: sequence_map,
     list: sequence_map,
-    # numpy.ndarray: ndarray_map
+    numpy.float64: scalar_map,
+    numpy.float32: scalar_map,
+    numpy.int64: scalar_map,
+    numpy.int32: scalar_map,
+    numpy.ndarray: ndarray_map
 }
 
 

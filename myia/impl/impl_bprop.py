@@ -7,7 +7,7 @@ from ..stx import Symbol, ApplyNode as Apply, ClosureNode, \
 from ..symbols import builtins
 from ..parse import parse_function
 from .impl_interp import zeros_like, J, Jinv, switch, first, second, \
-    Closure, closure_fn, reduce, add
+    Closure, closure_fn, reduce, add, exp, log, transpose
 from ..grad import ggen, grad_computers
 from ..lib import Primitive
 
@@ -143,8 +143,43 @@ def bprop_divide(x, y, dz):
 
 
 @impl_bprop
+def bprop_power(x, y, dz):
+    # Note: this will often give a warning because the second element
+    # in the pair is ill-defined when x < 0 and it is calculated even
+    # if we do not care about it (we usually want the derivative wrt x,
+    # not wrt y). An optimization pass will need to prune it out.
+    return GRAD(dz * y * x ** (y - 1),
+                dz * log(x) * x ** y)
+
+
+@impl_bprop
 def bprop_unary_subtract(x, dz):
     return GRAD(-dz)
+
+
+@impl_bprop
+def bprop_dot(x, y, dz):
+    return GRAD(dz @ transpose(y), transpose(x) @ dz)
+
+
+@impl_bprop
+def bprop_transpose(x, dz):
+    return GRAD(transpose(dz))
+
+
+@impl_bprop
+def bprop_exp(x, dz):
+    return GRAD(dz * exp(x))
+
+
+@impl_bprop
+def bprop_log(x, dz):
+    return GRAD(dz / x)
+
+
+@impl_bprop
+def bprop_sum(xs, dz):
+    return GRAD(zeros_like(xs) + dz)
 
 
 ###################################################

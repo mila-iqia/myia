@@ -1,14 +1,16 @@
 
 from typing import List, Any, Union
+import numpy
 from .main import symbol_associator, impl_bank
 from ..stx import Symbol
 from ..interpret import \
-    Primitive, Function, Closure, evaluate
+    Primitive, Function, Closure, evaluate, eenvs
 from ..lib import ZERO
 from ..grad import find_grad
 from ..inference.types import typeof
 from ..lib import StructuralMap, Closure, default_structural_map_dispatch
 from ..symbols import object_map
+from ..parse import parse_function
 
 
 _ = True
@@ -35,6 +37,19 @@ def impl_interp(sym, name, fn):
     """
     prim = Primitive(fn, name=sym)
     impl_bank['interp'][sym] = prim
+    object_map[prim] = sym
+    return prim
+
+
+@symbol_associator('')
+def impl_interp_myia(sym, name, fn):
+    """
+    Define the implementation for the given symbol using
+    Myia. The implementation will be set in ``root_globals``.
+    """
+    lbda = parse_function(fn)
+    impl_bank['interp'][sym] = lbda
+    prim = lbda  # eenvs.run_env(lbda)
     object_map[prim] = sym
     return prim
 
@@ -101,9 +116,34 @@ def dot(x, y):
     return x @ y
 
 
+@impl_interp
+def transpose(x):
+    return x.T
+
+
 @impl_interp_smap
 def unary_subtract(x):
     return -x
+
+
+@impl_interp_smap
+def power(x, y):
+    return x ** y
+
+
+@impl_interp_smap
+def exp(x):
+    return numpy.exp(x)
+
+
+@impl_interp_smap
+def log(x):
+    return numpy.log(x)
+
+
+@impl_interp
+def sum(xs):
+    return numpy.sum(xs)
 
 
 @impl_interp
@@ -282,6 +322,8 @@ def J(x):
         return J_fn(x, 0)
     elif isinstance(x, (int, float, bool)) or x is None or x is ZERO:
         return x
+    elif isinstance(x, (numpy.ndarray, numpy.generic)):
+        return x
     else:
         raise TypeError(f'Invalid argument for J: {x}')
 
@@ -315,8 +357,40 @@ def Jinv(x):
         return primal
     elif isinstance(x, (int, float, bool)) or x is None or x is ZERO:
         return x
+    elif isinstance(x, (numpy.ndarray, numpy.generic)):
+        return x
     else:
-        raise TypeError(f'Invalid argument for Jinv: {x}')
+        raise TypeError(f'Invalid argument for Jinv: {x} ({pytype(x)})')
+
+
+@impl_interp_myia
+def grad1(fn):
+    jfn = J(fn)
+
+    def g(x):
+        _, bprop = jfn(J(x))
+        return bprop(1)[1]
+    return g
+
+
+@impl_interp_myia
+def grad2(fn):
+    jfn = J(fn)
+
+    def g(x, y):
+        _, bprop = jfn(J(x), J(y))
+        return bprop(1)[1]
+    return g
+
+
+@impl_interp_myia
+def grad3(fn):
+    jfn = J(fn)
+
+    def g(x, y, z):
+        _, bprop = jfn(J(x), J(y), J(z))
+        return bprop(1)[1]
+    return g
 
 
 @impl_interp_smap

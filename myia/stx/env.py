@@ -231,11 +231,15 @@ class BackedPool:
             v = globs[sym.label]
         except KeyError as err:
             builtins = globs['__builtins__']
-            if isinstance(builtins, dict):
-                # I don't know why this ever happens, but it does.
-                v = builtins[sym.label]
-            else:
-                v = getattr(builtins, sym.label)
+            try:
+                if isinstance(builtins, dict):
+                    # I don't know why this ever happens, but it does.
+                    v = builtins[sym.label]
+                else:
+                    v = getattr(builtins, sym.label)
+            except (KeyError, AttributeError):
+                raise NameError(f"Could not resolve global: '{sym}' "
+                                f"in namespace: '{sym.namespace}'.")
         self.pool[sym] = v
         return v
 

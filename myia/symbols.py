@@ -15,6 +15,7 @@ The symbols live in two namespaces:
 
 import ast
 import sys
+import math
 from .stx import Symbol, ValueNode, bsym
 from .util import Props, SymbolsMeta
 from typing import Dict
@@ -26,7 +27,11 @@ class builtins(metaclass=SymbolsMeta):
     multiply = bsym('multiply')
     divide = bsym('divide')
     power = bsym('power')
+    log = bsym('log')
+    exp = bsym('exp')
     dot = bsym('dot')
+    transpose = bsym('transpose')
+    sum = bsym('sum')
     bitwise_or = bsym('bitwise_or')
     bitwise_and = bsym('bitwise_and')
     bitwise_xor = bsym('bitwise_xor')
@@ -55,7 +60,9 @@ class builtins(metaclass=SymbolsMeta):
     ones_like = bsym('ones_like')
     J = bsym('J')
     Jinv = bsym('Jinv')
-    grad = bsym('grad')
+    grad1 = bsym('grad1')
+    grad2 = bsym('grad2')
+    grad3 = bsym('grad3')
 
     # Others
     myia_builtins = bsym('myia_builtins')
@@ -116,6 +123,7 @@ object_map = {
     filter: builtins.filter,
     enumerate: builtins.enumerate,
     slice: builtins.slice,
+    sum: builtins.sum,
     Exception: builtins.Exception,
     # Closure: builtins.Closure,
     # closure_args: builtins.closure_args,
@@ -138,13 +146,14 @@ def _add_numpy_map():
         _.arange: builtins.range,
         _.divide: builtins.divide,
         _.dot: builtins.dot,
+        _.exp: builtins.exp,
+        _.log: builtins.log,
         _.multiply: builtins.multiply,
         _.subtract: builtins.subtract
     }
     numpy_map[_] = ValueNode(_)
 
-    global object_map
-    object_map = {**object_map, **numpy_map}
+    object_map.update(numpy_map)
 
 
 def update_object_map():

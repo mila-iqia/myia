@@ -52,7 +52,10 @@ def find_grad(ref, nargs_closure):
     assert isinstance(ref, Symbol)
 
     def default_grad(n):
-        lbda = globals_pool[ref]
+        try:
+            lbda = globals_pool[ref]
+        except KeyError:
+            raise NameError(f"No gradient defined for primitive '{ref}'.")
         normalized = a_normal(lbda)
         return Grad(ref, normalized, n).transform()
 

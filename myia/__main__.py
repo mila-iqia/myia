@@ -312,8 +312,8 @@ def command_parse(arguments):
 
 
 def command_eval(arguments):
-    r, genv = getfn(arguments)
-    result = evaluate(r)
+    lbda = getfn(arguments)
+    result = evaluate(lbda)
     args = getargs(arguments)
     if args:
         value = result(*args)
