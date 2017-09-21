@@ -7,7 +7,8 @@ from ..stx import Symbol, ApplyNode as Apply, ClosureNode, \
 from ..symbols import builtins
 from ..parse import parse_function
 from .impl_interp import zeros_like, J, Jinv, switch, first, second, \
-    Closure, closure_fn, reduce, add, exp, log, transpose
+    Closure, closure_fn, reduce, add, exp, log, transpose, \
+    broadcast, shape, fit
 from ..grad import ggen, grad_computers
 from ..lib import Primitive
 
@@ -179,7 +180,22 @@ def bprop_log(x, dz):
 
 @impl_bprop
 def bprop_sum(xs, dz):
-    return GRAD(zeros_like(xs) + dz)
+    bxs, _ = broadcast((xs, dz))
+    return GRAD(bxs)
+    # return GRAD(zeros_like(xs) + dz)
+
+
+@impl_bprop
+def bprop_shape(arr, dz):
+    # TODO: We should mark this kind of gradient somehow to indicate that
+    # it's nonsensical.
+    return GRAD(zeros_like(arr))
+
+
+@impl_bprop
+def bprop_fit(arr, shp, dz):
+    return GRAD(fit(dz, shape(arr)),
+                zeros_like(shp))
 
 
 ###################################################

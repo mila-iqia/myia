@@ -162,6 +162,32 @@ def greater(x, y):
 
 
 @impl_interp
+def broadcast(arrs):
+    return tuple(numpy.broadcast_arrays(*arrs))
+
+
+@impl_interp
+def fit(arr, shp):
+    if isinstance(arr, (int, float)):
+        arr = numpy.asarray(arr)
+    orig_shp = shp
+    shp0 = arr.shape
+    n0 = len(shp0)
+    n = len(shp)
+    if n0 > n:
+        shp = ((1,) * (n0 - n)) + shp
+    if n > n0:
+        shp0 = ((1,) * (n - n0)) + shp0
+    arr = arr.reshape(shp0)
+    sum_axes = tuple(i for i, (s0, s1) in enumerate(list(zip(shp0, shp)))
+                     if s1 == 1 and s0 != 1)
+    arr = arr.sum(axis=sum_axes, keepdims=True)
+    arr, _ = numpy.broadcast_arrays(arr, numpy.zeros(shp))
+    arr = arr.reshape(orig_shp)
+    return arr
+
+
+@impl_interp
 def len(t):
     return pylen(t)
 
@@ -369,7 +395,7 @@ def grad1(fn):
 
     def g(x):
         _, bprop = jfn(J(x))
-        return bprop(1)[1]
+        return bprop(1.0)[1]
     return g
 
 
@@ -379,7 +405,7 @@ def grad2(fn):
 
     def g(x, y):
         _, bprop = jfn(J(x), J(y))
-        return bprop(1)[1]
+        return bprop(1.0)[1]
     return g
 
 
@@ -389,7 +415,7 @@ def grad3(fn):
 
     def g(x, y, z):
         _, bprop = jfn(J(x), J(y), J(z))
-        return bprop(1)[1]
+        return bprop(1.0)[1]
     return g
 
 

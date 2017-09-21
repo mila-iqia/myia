@@ -53,6 +53,8 @@ class builtins(metaclass=SymbolsMeta):
     closure_args = bsym('closure_args')
     mktuple = bsym('mktuple')
     mklist = bsym('mklist')
+    fit = bsym('fit')
+    broadcast = bsym('broadcast')
 
     # Grad-related builtins
     fill = bsym('fill')
@@ -125,6 +127,7 @@ object_map = {
     slice: builtins.slice,
     sum: builtins.sum,
     Exception: builtins.Exception,
+    print: builtins.print,
     # Closure: builtins.Closure,
     # closure_args: builtins.closure_args,
     # closure_fn: builtins.closure_fn
