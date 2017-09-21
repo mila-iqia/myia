@@ -5,7 +5,7 @@ See Inference section of DEVELOPERS.md for some more information.
 """
 
 
-from ..util import Event, buche
+from ..util import Event, EventDispatcher, buche
 from ..stx import LambdaNode, ClosureNode, TupleNode, Symbol
 from collections import defaultdict
 from ..impl.flow_all import default_flow, ANY, VALUE
@@ -15,7 +15,7 @@ from .types import Int64, Float64
 from ..lib import Pending, Primitive
 
 
-class DFA:
+class DFA(EventDispatcher):
     """
     Create a DFA instance.
 
@@ -37,6 +37,7 @@ class DFA:
             of possible values flowing to that node.
     """
     def __init__(self, tracks, genv):
+        super().__init__(self)
         tracks = [track(self) for track in tracks]
         self.tracks = {track.name: track for track in tracks}
         self.value_track = self.tracks['value']
@@ -168,6 +169,7 @@ class DFA:
     def visit(self, node):
         if node in self.flow_events:
             return self.flow_events[node]
+        self.emit_visit(node)
         cls = node.__class__.__name__
         flow = Event(f'flow_{cls}')
         self.flow_events[node] = flow

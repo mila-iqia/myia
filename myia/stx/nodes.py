@@ -72,8 +72,7 @@ class MyiaASTNode(HReprBase):
         return str(self)
 
     def __hrepr__(self, H, hrepr):
-        rval = H.replObject[self.__class__.__name__][f'pyid-{id(self)}']
-        rval = rval({"obj-id": id(self)})
+        rval = H.div[self.__class__.__name__]
         if self.annotations:
             rval = rval.__getitem__(tuple(self.annotations))
         return rval

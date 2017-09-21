@@ -1,8 +1,6 @@
 
 from bdb import Bdb
 import pdb
-from .buche import buche, Reader
-from types import FrameType
 
 
 class BucheDb(Bdb):
@@ -108,26 +106,3 @@ class BucheDb(Bdb):
         self.buche('An exception occurred.')
         self.buche(exc_info)
         self.set_frame(frame)
-
-
-def handle_frame(fr, H, hrepr):
-    views = H.tabbedView()
-    code = fr.f_code
-    info = dict(
-        name=code.co_name,
-        filename=code.co_filename,
-        firstlineno=code.co_firstlineno,
-        lineno=fr.f_lineno
-    )
-    snippet = H.codeSnippet(
-        src = code.co_filename,
-        language = "python",
-        line = fr.f_lineno,
-        context = 4
-    )
-    views = views(H.view(H.tab('code'), H.pane(snippet)))
-    views = views(H.view(H.tab('info'), H.pane(hrepr(info))))
-    return views
-
-
-buche.master.hrepr.register(FrameType, handle_frame)

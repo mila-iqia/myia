@@ -178,12 +178,11 @@ def get_functions(data) -> TupleT[Callable, LambdaNode]:
         and lbda is the LambdaNode compiled from it.
     """
     if isinstance(data, tuple):
-        # url, line_offset, code = data
-        # _globals: Dict = {}
-        # exec(code, _globals)
-        # sym, genv = parse_source(url, line_offset, code)
-        # pyfn = _globals[sym.label]
-        raise NotImplementedError('TODO')
+        url, line_offset, code = data
+        _globals: Dict = {}
+        exec(code, _globals)
+        lbda = parse_source(url, line_offset, code)
+        pyfn = _globals[lbda.ref.label]
     else:
         pyfn = data
         lbda = parse_function(pyfn)

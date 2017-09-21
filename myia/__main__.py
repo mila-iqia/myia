@@ -16,11 +16,12 @@ from .interpret import evaluate
 from .validate import \
     unbound, missing_source, \
     analysis
-from .util import buche, Reader, id_registry
+from buche import buche, reader
 
 from .util import on_discovery
 from .interpret import VM
-from .stx import Symbol, AboutPrinter, nodes
+from .stx import Symbol, MyiaASTNode, LambdaNode, \
+    AboutPrinter, nodes, globals_pool
 from .util import BucheDb
 
 
@@ -134,21 +135,21 @@ def setup_buche(arguments):
     """
     # buche.raw(command='open', path='/', type='tabs', anchor='top')
 
-    # This is where print(...) statements will end up.
-    buche.open('_', 'log', force=True)
+    # # This is where print(...) statements will end up.
+    # buche.open('_', 'log', force=True)
 
     # decls will list all Myia functions, including
     # auxiliary ones, as they are compiled. --decls option.
-    buche.open('decls', 'tabs', force=True, anchor='left')
+    buche.open_tabs('decls', anchor='left')
 
     # stores will log the values of each variable through
     # execution (not cheap) --stores option.
-    buche.open('stores', 'tabs', force=True, anchor='left')
+    buche.open_tabs('stores', anchor='left')
 
     # problems will list certain problems in the code,
     # e.g. unbound variables or nodes that lack a source,
     # and more in the future. --checks option.
-    buche.open('problems', 'tabs', force=True, anchor='left')
+    buche.open_tabs('problems', anchor='left')
 
     def add_class(node, kls):
         # Helper function to retroactively add a CSS class
@@ -351,18 +352,23 @@ def command_inspect(arguments):
     code = getcode(arguments)
     args = getargs(arguments)
     results = analysis(arguments.mode, code, args)
+    b = buche
     if args:
         value = results['result']
-        buche['_'].html(f'<h2>Results for: {arguments.mode}</h2>')
-        buche['_'](value)
+        b.html(f'<h2>Results for: {arguments.mode}</h2>')
+        b(value)
     else:
-        buche['_']('Done')
-
-    reader = Reader()
+        b('Done')
 
     from .inference.dfa import DFA, TypeTrack, ValueTrack, NeedsTrack
     d = DFA([TypeTrack, ValueTrack, lambda dfa: NeedsTrack(dfa, [])],
-            results['bindings'])
+            globals_pool)
+
+    @d.on_visit
+    def log_defn(_, node):
+        if isinstance(node, LambdaNode):
+            buche['decls'][str(node.ref)](node)
+
     d.visit(results['lbda'])
     from .symbols import builtins
     d.propagate(results['lbda'].body, 'needs', builtins.type)
@@ -370,16 +376,17 @@ def command_inspect(arguments):
     @reader.on_click
     def handle(e, cmd):
         try:
-            obj = id_registry[int(cmd.objId)]
-            if cmd.alt:
-                res = {t: d.values[t][obj] for t in d.tracks.values()}
-                res['Node'] = obj
-                buche[cmd.path](res, location='overlay')
-            else:
-                buche[cmd.path](AboutPrinter(obj), location='overlay')
+            obj = cmd.obj
+            if isinstance(obj, MyiaASTNode):
+                if cmd.alt:
+                    res = {t: d.values[t][obj] for t in d.tracks.values()}
+                    res['Node'] = obj
+                    buche[cmd.path].show(res, location='overlay')
+                else:
+                    buche[cmd.path].show(AboutPrinter(obj), location='overlay')
         except Exception as exc:
             buche[cmd.path](exc)
-    reader.run()
+    reader.start()
 
 
 def command_debug(arguments):
