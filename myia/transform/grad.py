@@ -15,8 +15,9 @@ better understand the contents of this file.
 
 from typing import Dict, List, Tuple as TupleT, Any, \
     Union, cast, Optional, Sequence, Iterable, Callable, Set
-
-from .stx import \
+from copy import copy
+from collections import OrderedDict, defaultdict
+from ..stx import \
     LHS, Binding, Bindings, Transformer, GenSym, MyiaASTNode, \
     Symbol, ValueNode as Value, LambdaNode as Lambda, LetNode as Let, \
     ApplyNode as Apply, TupleNode, ClosureNode, \
@@ -24,12 +25,10 @@ from .stx import \
     JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
     TMP_LET, TMP_BPROP, TMP_SENS, create_lambda, is_global, \
     globals_pool
-from .symbols import builtins
-from copy import copy
-from .compile import a_normal
-from .util import Props, buche
-from collections import OrderedDict, defaultdict
-from .lib import ZERO
+from ..symbols import builtins
+from .a_normal import a_normal
+from ..util import Props, buche
+from ..lib import ZERO
 
 
 LeafType = Union[Symbol, Value]

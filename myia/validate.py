@@ -13,9 +13,8 @@ from typing import Iterable, Set, Tuple as TupleT, \
 
 from .stx import MyiaASTNode, Symbol, LambdaNode, LetNode, \
     maptup, create_lambda, is_global
-from .compile import a_normal
+from .transform import a_normal, Grad, ggen
 from .parse import parse_source, parse_function
-from .grad import Grad, ggen
 from .interpret import evaluate
 
 

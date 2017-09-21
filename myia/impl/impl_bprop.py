@@ -9,7 +9,7 @@ from ..parse import parse_function
 from .impl_interp import zeros_like, J, Jinv, switch, first, second, \
     Closure, closure_fn, reduce, add, exp, log, transpose, \
     broadcast, shape, fit
-from ..grad import ggen, grad_computers
+from ..transform.grad import ggen, grad_computers
 from ..lib import Primitive
 
 

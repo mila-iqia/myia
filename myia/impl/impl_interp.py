@@ -6,7 +6,7 @@ from ..stx import Symbol
 from ..interpret import \
     Primitive, Function, Closure, evaluate, eenvs
 from ..lib import ZERO
-from ..grad import find_grad
+from ..transform import find_grad
 from ..inference.types import typeof
 from ..lib import StructuralMap, Closure, default_structural_map_dispatch
 from ..symbols import object_map

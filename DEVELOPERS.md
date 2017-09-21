@@ -15,9 +15,7 @@ To help grok the structure, project files are tagged in the following listing:
 ```
 myia/                           # Source code for Myia
     __main__                T   # Entry point for myia's CLI
-    compile             S G     # Convert IR to A-normal form
     front              !        # @myia decorator
-    grad               !  G     # Gradient transform
     impl/                       # Implementations of primitives
         flow_all           F    # Implementations for inference/dfa
         impl_abstract      F    # Implementations for inference/avm
@@ -42,6 +40,9 @@ myia/                           # Source code for Myia
         nodes          !S       # Definitions of the IR's nodes
         transform               # Boilerplate for transforms
     symbols            !SIG     # Symbols for builtins
+    transform/                  # Code transformations
+        compile         S G     # Convert IR to A-normal form
+        grad           !  G     # Gradient transform
     util/                       # Utilities
         buche               T   # Helpers for the Buche logger
         debug               T   # Buche-based debugger
