@@ -21,6 +21,11 @@ from .lib import Record, structural_map
 from .impl import impl_interp as M
 
 
+class NoTestGrad:
+    def __init__(self, value):
+        self.value = value
+
+
 def missing_source(node: MyiaASTNode) -> Iterable[MyiaASTNode]:
     """
     Yield all nodes that don't have a location set.
@@ -64,8 +69,14 @@ eps = 1e-10
 rel_error = 1e-03
 
 
+def clean_args(args):
+    return tuple(a.value if isinstance(a, NoTestGrad) else a for a in args)
+
+
 def gen_paths(obj, path):
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, NoTestGrad):
+        pass
+    elif isinstance(obj, (list, tuple)):
         for i, x in enumerate(obj):
             yield from gen_paths(x, path + (i,))
     elif isinstance(obj, Record):
@@ -102,7 +113,9 @@ def gen_variants(obj, gen, path):
     element, and to generate output sensitivities to do backprop of the
     gradient of each output.
     """
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, NoTestGrad):
+        pass
+    elif isinstance(obj, (list, tuple)):
         T = type(obj)
         for i, x in enumerate(obj):
             for variants, p in gen_variants(x, gen, path + (i,)):
@@ -153,7 +166,7 @@ class GradTester:
         self.gfn = gfn
         self.args = args
         self.argnames = argnames
-        out = fn(*args)
+        out = fn(*clean_args(args))
         outname = fn.__name__
         if isinstance(out, tuple):
             self.outnames = list(f'{outname}_{i+1}' for i in range(len(out)))
@@ -191,6 +204,8 @@ class GradTester:
         for (out_sen,), opath in gen_variants(z, lambda x: [1], ()):
             grads = self.gfn(self.unwrap(out_sen))[1:]
             for ipath in gen_paths(grads, ()):
+                if isinstance(resolve_path(self.args, ipath), NoTestGrad):
+                    continue
                 self.set_result(results, opath, ipath,
                                 resolve_path(grads, ipath))
         self.exact = results
@@ -209,6 +224,9 @@ class GradTester:
         """
         results: Dict[str, float] = {}
         for (under, over), ipath in gen_variants(self.args, self.wiggle, ()):
+            under = clean_args(under)
+            over = clean_args(over)
+
             under_res = self.wrap(self.fn(*under))
             over_res = self.wrap(self.fn(*over))
 
@@ -377,12 +395,13 @@ def analysis_grad(pyfn: Callable,
     gfunc = evaluate(glbda)
 
     def test(args):
-        myiag, bprop = gfunc(*args)
+        args2 = clean_args(args)
+        myiag, bprop = gfunc(*args2)
         comparison = compare_calls(dict(
             python = pyfn,
             myia = func,
             myiag = lambda *args: myiag
-        ), args)
+        ), args2)
         gt = GradTester(pyfn, bprop, args, func.argnames, None)
         comparison.update(dict(
             derivatives = gt.compare()
