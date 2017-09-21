@@ -10,12 +10,15 @@ Validation and testing functionality.
 
 from typing import Iterable, Set, Tuple as TupleT, \
     Callable, Dict, List, Any, Union
-
+import numpy
+import itertools
 from .stx import MyiaASTNode, Symbol, LambdaNode, LetNode, \
     maptup, create_lambda, is_global
 from .transform import a_normal, Grad, ggen
 from .parse import parse_source, parse_function
 from .interpret import evaluate
+from .lib import Record, structural_map
+from .impl import impl_interp as M
 
 
 def missing_source(node: MyiaASTNode) -> Iterable[MyiaASTNode]:
@@ -61,6 +64,72 @@ eps = 1e-10
 rel_error = 1e-03
 
 
+def gen_paths(obj, path):
+    if isinstance(obj, (list, tuple)):
+        for i, x in enumerate(obj):
+            yield from gen_paths(x, path + (i,))
+    elif isinstance(obj, Record):
+        for k, v in obj.__dict__.items():
+            yield from gen_paths(v, path + (k,))
+    elif isinstance(obj, numpy.ndarray):
+        for coord in itertools.product(*[range(d) for d in obj.shape]):
+            yield path + (coord,)
+    elif isinstance(obj, (int, float)):
+        yield path
+    else:
+        pass
+
+
+def resolve_path(obj, path):
+    for p in path:
+        obj = obj[p]
+    return obj
+
+
+def gen_variants(obj, gen, path):
+    """
+    For each scalar element in obj, generate a list of copies obj where that
+    element has been modified by gen, and the path to that element.
+    Basically:
+
+    >>> res = gen_variants((10, 20, 30), lambda x: (x-1, x+1), ())
+    >>> for x in res: print(x)
+    ([(9, 20, 30), (11, 20, 30)], (0,))
+    ([(10, 19, 30), (10, 21, 30)], (1,))
+    ([(10, 20, 29), (10, 20, 31)], (2,))
+
+    This is used to generate modified inputs to estimate the gradient wrt each
+    element, and to generate output sensitivities to do backprop of the
+    gradient of each output.
+    """
+    if isinstance(obj, (list, tuple)):
+        T = type(obj)
+        for i, x in enumerate(obj):
+            for variants, p in gen_variants(x, gen, path + (i,)):
+                yield ([T(variant if i == j else y for j, y in enumerate(obj))
+                        for variant in variants], p)
+    elif isinstance(obj, Record):
+        d = obj.__dict__
+        for k, v in d.items():
+            for variants, p in gen_variants(v, gen, path + (k,)):
+                yield ([Record(**{kk: (variant if k == kk else vv)
+                                  for kk, vv in d.items()})
+                        for variant in variants], p)
+    elif isinstance(obj, numpy.ndarray):
+        for coord in itertools.product(*[range(d) for d in obj.shape]):
+            for variants, p in gen_variants(obj[coord], gen, path + (coord,)):
+                res = []
+                for variant in variants:
+                    obj2 = obj.copy()
+                    obj2[coord] = variant
+                    res.append(obj2)
+                yield (res, p)
+    elif isinstance(obj, (int, float)):
+        yield (gen(obj), path)
+    else:
+        pass
+
+
 class GradTester:
     """
     Test a computed gradient against a finite differences estimate
@@ -99,11 +168,15 @@ class GradTester:
             self.out = (out,)
             self.wrap = lambda x: (x,)
             self.unwrap = lambda x: x[0]
-        if any(not isinstance(x, (int, float)) for x in self.out):
-            raise TypeError('Can only compute gradient'
-                            ' for a tuple of outputs.')
         self.nin = len(self.argnames)
         self.nout = len(self.outnames)
+
+    def set_result(self, results, opath, ipath, value):
+        opath = (self.outnames[opath[0]],) + opath[1:]
+        ipath = (self.argnames[ipath[0]],) + ipath[1:]
+        outname = '.'.join(map(str, opath))
+        argname = '.'.join(map(str, ipath))
+        results[f'd{outname}/d{argname}'] = value
 
     def compute_exact(self) -> Dict[str, float]:
         """
@@ -113,14 +186,18 @@ class GradTester:
             A dictionary that maps d<outname>/d<argname> to the
             gradient computed by gfn on args.
         """
-        results = {}
-        for i, outname in enumerate(self.outnames):
-            out_sen = tuple((1 if k == i else 0) for k in range(self.nout))
+        results: Dict[str, float] = {}
+        z = M.zeros_like(self.out)
+        for (out_sen,), opath in gen_variants(z, lambda x: [1], ()):
             grads = self.gfn(self.unwrap(out_sen))[1:]
-            for j, argname in enumerate(self.argnames):
-                results[f'd{outname}/d{argname}'] = grads[j]
+            for ipath in gen_paths(grads, ()):
+                self.set_result(results, opath, ipath,
+                                resolve_path(grads, ipath))
         self.exact = results
         return results
+
+    def wiggle(self, x):
+        return x - eps, x + eps
 
     def compute_finite_diff(self) -> Dict[str, float]:
         """
@@ -130,16 +207,19 @@ class GradTester:
             A dictionary that maps d<outname>/d<argname> to the
             gradient computed by finite difference with fn on args.
         """
-        results = {}
-        for i, argname in enumerate(self.argnames):
-            argsl = list(self.args)
-            argsl[i] -= eps
-            tup_r1 = self.wrap(self.fn(*argsl))
-            argsl[i] += 2 * eps
-            tup_r2 = self.wrap(self.fn(*argsl))
-            d = tuple((r2 - r1) / (2 * eps) for r1, r2 in zip(tup_r1, tup_r2))
-            for j, outname in enumerate(self.outnames):
-                results[f'd{outname}/d{argname}'] = d[j]
+        results: Dict[str, float] = {}
+        for (under, over), ipath in gen_variants(self.args, self.wiggle, ()):
+            under_res = self.wrap(self.fn(*under))
+            over_res = self.wrap(self.fn(*over))
+
+            def mkdiff(a, b):
+                return (b - a) / (2 * eps)
+
+            diff = structural_map(mkdiff, under_res, over_res)
+            for opath in gen_paths(diff, ()):
+                self.set_result(results, opath, ipath,
+                                resolve_path(diff, opath))
+
         self.finite_diff = results
         return results
 
@@ -247,7 +327,18 @@ def compare_calls(funcs: Dict[str, Callable],
             r = exc
         rval[f'{k}_result'] = r
     vals = list(rval.values())
-    rval['match'] = all(x == y for x, y in zip(vals[:-1], vals[1:]))
+
+    def same(a, b):
+        def ass(x, y):
+            assert x == y
+        try:
+            structural_map(ass, a, b)
+        except AssertionError:
+            return False
+        else:
+            return True
+
+    rval['match'] = all(same(x, y) for x, y in zip(vals[:-1], vals[1:]))
     return rval
 
 

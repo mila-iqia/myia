@@ -10,7 +10,7 @@ import sys
 import traceback
 from importlib import import_module
 from . import stx
-from .compile import a_normal
+from .transform import a_normal
 from .parse import parse_source
 from .interpret import evaluate
 from .validate import \

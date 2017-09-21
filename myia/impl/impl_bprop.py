@@ -180,8 +180,8 @@ def bprop_log(x, dz):
 
 @impl_bprop
 def bprop_sum(xs, dz):
-    bxs, _ = broadcast((xs, dz))
-    return GRAD(bxs)
+    _, bdz = broadcast((xs, dz))
+    return GRAD(bdz)
     # return GRAD(zeros_like(xs) + dz)
 
 
