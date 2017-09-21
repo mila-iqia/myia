@@ -259,7 +259,7 @@ class GradTester:
             results[k] = dict(
                 exact = e,
                 difference = f,
-                match = abs(e - f) <= threshold
+                match = bool(abs(e - f) <= threshold)
             )
         return results
 
@@ -308,13 +308,9 @@ def analysis(mode: str, spec, args=None) -> Union[Callable, Dict]:
     """
     pyfn, lbda = get_functions(spec)
     method = globals()[f'analysis_{mode}']
-    test = method(pyfn, lbda)
-    rval = {
-        'test': test,
-        'lbda': lbda
-    }
+    rval = method(pyfn, lbda) | Record(lbda=lbda)
     if args:
-        rval['result'] = test(args)
+        rval = rval | Record(result = rval.test(args))
     return rval
 
 
@@ -360,8 +356,7 @@ def compare_calls(funcs: Dict[str, Callable],
     return rval
 
 
-def analysis_eval(pyfn: Callable,
-                  lbda) -> Callable:
+def analysis_eval(pyfn: Callable, lbda: LambdaNode) -> Record:
     """
     Return a function that takes a list of arguments ``args`` and
     compares the result of the pure function ``pyfn`` to its Myia
@@ -372,11 +367,10 @@ def analysis_eval(pyfn: Callable,
     def test(args):
         return compare_calls(dict(python = pyfn, myia = func), args)
 
-    return test
+    return Record(test=test, lbdas=[lbda])
 
 
-def analysis_grad(pyfn: Callable,
-                  lbda) -> Callable:
+def analysis_grad(pyfn: Callable, lbda: LambdaNode) -> Record:
     """
     Return a function that takes a list of arguments ``args`` and
     compares:
@@ -408,7 +402,7 @@ def analysis_grad(pyfn: Callable,
         ))
         return comparison
 
-    return test
+    return Record(test=test, lbdas=[lbda, glbda])
 
 
 # TODO: The following is not fully solid yet.
@@ -455,4 +449,4 @@ def analysis_grad2(pyfn, lbda):
                         func.argnames, ('(df/dx)',))
         return gt.compare()
 
-    return test
+    return Record(test=test, lbdas=[lbda, glbda, g2lbda])

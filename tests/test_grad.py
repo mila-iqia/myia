@@ -53,7 +53,7 @@ def grad_test(*tests):
     def decorate(fn):
         try:
             exc = None
-            testfn = analysis('grad', fn)['test']
+            testfn = analysis('grad', fn).test
         except Exception as e:
             exc = e
 
@@ -88,7 +88,7 @@ def grad2_test(*tests):
     def decorate(fn):
         try:
             exc = None
-            testfn = analysis('grad2', fn)['test']
+            testfn = analysis('grad2', fn).test
         except Exception as e:
             exc = e
 
@@ -296,7 +296,7 @@ def test_sum(x):
 @grad_test((M55, M15), (M15, M55), (M55, M11), (M51, M15),
            (M5, M55), (M55, M5))
 def test_fit(x, y):
-    return sum(fit(x, shape(y)))
+    return fit(x, shape(y))
 
 
 ##########################
