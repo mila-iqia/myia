@@ -203,7 +203,7 @@ class VariableTracker:
 ###########################################
 
 
-class BackedPool:
+class BackedPool(EventDispatcher):
     """
     Represents a pool of Symbol->value associations, backed by a store
     of namespace->dict associations. In a nutshell, this is used to map
@@ -212,6 +212,7 @@ class BackedPool:
     """
 
     def __init__(self) -> None:
+        self.events = EventDispatcher()
         self.pool: Dict[Symbol, Any] = {}
         self.sources: Dict[str, Dict[str, Any]] = {}
 
@@ -240,6 +241,7 @@ class BackedPool:
             except (KeyError, AttributeError):
                 raise NameError(f"Could not resolve global: '{sym}' "
                                 f"in namespace: '{sym.namespace}'.")
+        self.events.emit_acquire(sym, v)
         self.pool[sym] = v
         return v
 
@@ -270,6 +272,7 @@ class BackedPool:
         """
         if isinstance(node, LambdaNode):
             node.ref = sym
+        self.events.emit_acquire(sym, node)
         self.pool[sym] = node
 
     def __getitem__(self, sym):

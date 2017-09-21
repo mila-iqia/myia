@@ -5,14 +5,35 @@ See Inference section of DEVELOPERS.md for some more information.
 """
 
 
+from types import FunctionType
 from ..util import Event, EventDispatcher, buche
-from ..stx import LambdaNode, ClosureNode, TupleNode, Symbol
+from ..stx import MyiaASTNode, LambdaNode, ClosureNode, TupleNode, Symbol
 from collections import defaultdict
 from ..impl.flow_all import default_flow, ANY, VALUE
 from ..impl.main import impl_bank
-from ..symbols import builtins
+from ..symbols import builtins, object_map
 from .types import Int64, Float64
 from ..lib import Pending, Primitive
+
+
+def import_node(x):
+    try:
+        return object_map[x]
+    except (TypeError, KeyError):
+        pass
+
+    if isinstance(x, MyiaASTNode):
+        return x
+    elif isinstance(x, Primitive):
+        return x.name
+    elif isinstance(x, FunctionType):
+        try:
+            lbda = parse_function(v)
+        except (TypeError, OSError):
+            raise ValueError(f'myia.dfa cannot interpret value: {v}')
+        return lbda
+    else:
+        raise ValueError(f'myia.dfa cannot interpret value: {v}')
 
 
 class DFA(EventDispatcher):
@@ -268,6 +289,7 @@ class DFA(EventDispatcher):
         else:
             try:
                 b = self.genv[node]
+                b = import_node(b)
                 self.visit(b)
                 self.propagate_value(node, b)
             except KeyError:
