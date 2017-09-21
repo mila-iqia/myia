@@ -194,6 +194,13 @@ class Record(HReprBase, StructuralMappable):
         entries = ", ".join(f'{k}={repr(v)}' for k, v in self.__dict__.items())
         return f'Record({entries})'
 
+    def __or__(self, other):
+        if not isinstance(other, Record):
+            return NotImplemented
+        d = {**self.__dict__}
+        d.update(other.__dict__)
+        return Record(**d)
+
     __repr__ = __str__
 
     def __hrepr__(self, H, hrepr):
