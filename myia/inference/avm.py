@@ -320,7 +320,6 @@ class AVM(EventDispatcher):
         self.frames: List[AVMFrame] = []
         if self.do_emit_events:
             self.emit_new_frame(self.frame)
-        self.result = self.eval()
         self.checkpoints: List = []
         self.checkpoints_on: Dict = defaultdict(list)
         self.sig_stack: List = []
@@ -439,6 +438,10 @@ class AVM(EventDispatcher):
                     self.checkpoints.append((frames, frame, sig_stack, rest))
             else:
                 return
+
+    def run(self) -> Any:
+        self.result = self.eval()
+        return self.result
 
 
 class AEvaluationEnv(EvaluationEnv):

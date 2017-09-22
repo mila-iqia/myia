@@ -57,6 +57,7 @@ class VM(EventDispatcher):
                  local_env: EnvT,
                  eval_env: EvaluationEnv,
                  debugger: BucheDb = None,
+                 controller: Any = None,
                  emit_events=True) -> None:
         super().__init__(self, emit_events)
         self.debugger = debugger
@@ -68,7 +69,6 @@ class VM(EventDispatcher):
         self.frames: List[VMFrame] = []
         if self.do_emit_events:
             self.emit_new_frame(self.frame)
-        self.result = self.eval()
 
     def eval(self) -> Any:
         while True:
@@ -102,6 +102,10 @@ class VM(EventDispatcher):
                 if self.do_emit_events:
                     self.emit_error(exc)
                 raise exc from None
+
+    def run(self) -> Any:
+        self.result = self.eval()
+        return self.result
 
 
 class VMFrame(HReprBase):
@@ -202,7 +206,7 @@ class VMFrame(HReprBase):
                     self.vm.debugger.set_trace()
             if self.vm.do_emit_events:
                 self.vm.emit(mname, self, instr.node, *instr.args)
-                self.vm.emit_instruction(self, instr)
+                self.vm.emit_step(self, instr)
             method = getattr(self, mname)
             return method(instr.node, *instr.args)
 

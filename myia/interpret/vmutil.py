@@ -250,7 +250,7 @@ class EvaluationEnv(dict):
         return value
 
     def run(self, code, local_env):
-        return self.vm_class(code, local_env, self, **self.config).result
+        return self.vm_class(code, local_env, self, **self.config).run()
 
     def evaluate(self, node):
         self.setup()
