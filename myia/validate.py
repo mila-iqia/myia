@@ -17,8 +17,11 @@ from .stx import MyiaASTNode, Symbol, LambdaNode, LetNode, \
 from .transform import a_normal, Grad, ggen
 from .parse import parse_source, parse_function
 from .interpret import evaluate
-from .lib import Record, structural_map
+from .lib import Atom, Record, structural_map
 from .impl import impl_interp as M
+
+
+results_record = Atom('results')
 
 
 class NoTestGrad:
@@ -122,11 +125,11 @@ def gen_variants(obj, gen, path):
                 yield ([T(variant if i == j else y for j, y in enumerate(obj))
                         for variant in variants], p)
     elif isinstance(obj, Record):
-        d = obj.__dict__
-        for k, v in d.items():
+        for k, v in obj:
             for variants, p in gen_variants(v, gen, path + (k,)):
-                yield ([Record(**{kk: (variant if k == kk else vv)
-                                  for kk, vv in d.items()})
+                yield ([Record(obj.__tag__,
+                               {kk: (variant if k == kk else vv)
+                                for kk, vv in d.items()})
                         for variant in variants], p)
     elif isinstance(obj, numpy.ndarray):
         for coord in itertools.product(*[range(d) for d in obj.shape]):
@@ -308,9 +311,9 @@ def analysis(mode: str, spec, args=None) -> Union[Callable, Dict]:
     """
     pyfn, lbda = get_functions(spec)
     method = globals()[f'analysis_{mode}']
-    rval = method(pyfn, lbda) | Record(lbda=lbda)
+    rval = method(pyfn, lbda) | results_record(lbda=lbda)
     if args:
-        rval = rval | Record(result = rval.test(args))
+        rval = rval | results_record(result = rval.test(args))
     return rval
 
 
@@ -369,7 +372,7 @@ def analysis_eval(pyfn: Callable, lbda: LambdaNode) -> Record:
     def test(args):
         return compare_calls(dict(python = pyfn, myia = func), args)
 
-    return Record(test=test, lbdas=[lbda])
+    return results_record(test=test, lbdas=[lbda])
 
 
 def analysis_grad(pyfn: Callable, lbda: LambdaNode) -> Record:
@@ -404,7 +407,7 @@ def analysis_grad(pyfn: Callable, lbda: LambdaNode) -> Record:
         ))
         return comparison
 
-    return Record(test=test, lbdas=[lbda, glbda])
+    return results_record(test=test, lbdas=[lbda, glbda])
 
 
 # TODO: The following is not fully solid yet.
@@ -451,4 +454,4 @@ def analysis_grad2(pyfn, lbda):
                         func.argnames, ('(df/dx)',))
         return gt.compare()
 
-    return Record(test=test, lbdas=[lbda, glbda, g2lbda])
+    return results_record(test=test, lbdas=[lbda, glbda, g2lbda])

@@ -172,9 +172,26 @@ class Closure(HReprBase, StructuralMappable):
         )
 
 
+class Atom:
+    def __init__(self, identifier):
+        self.identifier = identifier
+
+    def __str__(self):
+        return str(self.identifier)
+
+    __repr__ = __str__
+
+    def __hrepr__(self, H, hrepr):
+        return hrepr(self.identifier)
+
+    def __call__(self, **kw):
+        return Record(self, kw)
+
+
 class Record(HReprBase, StructuralMappable):
-    def __init__(self, **kw):
-        self.__dict__.update(kw)
+    def __init__(self, tag, kw):
+        assert isinstance(tag, Atom)
+        self.__dict__.update(kw, __tag__=tag)
 
     def __setattr__(self, attr, value):
         raise AttributeError(f"Cannot set attribute '{attr}' of {self}"
@@ -184,28 +201,35 @@ class Record(HReprBase, StructuralMappable):
         return getattr(self, item)
 
     def __map__(self, smap, *recs):
-        smap.require_same([type, lambda r: r.__dict__.keys()], [self, *recs])
+        smap.require_same([type, lambda r: (r.__tag__, r.__dict__.keys())],
+                          [self, *recs])
         acc = {}
-        for k in self.__dict__.keys():
-            acc[k] = smap(self[k], *[rec[k] for rec in recs])
-        return Record(**acc)
+        for k, v in self:
+            acc[k] = smap(v, *[rec[k] for rec in recs])
+        return Record(self.__tag__, acc)
+
+    def __iter__(self):
+        for k, v in self.__dict__.items():
+            if k != '__tag__':
+                yield k, v
 
     def __str__(self):
-        entries = ", ".join(f'{k}={repr(v)}' for k, v in self.__dict__.items())
-        return f'Record({entries})'
+        entries = ", ".join(f'{k}={repr(v)}' for k, v in self)
+        return f'{self.__tag__}({entries})'
 
     def __or__(self, other):
         if not isinstance(other, Record):
             return NotImplemented
+        assert other.__tag__ is self.__tag__
         d = {**self.__dict__}
         d.update(other.__dict__)
-        return Record(**d)
+        return Record(self.__tag__, d)
 
     __repr__ = __str__
 
     def __hrepr__(self, H, hrepr):
         return H.div['Record'](
-            H.div['class_title']('Record'),
+            H.div['class_title'](self.__tag__),
             H.div['class_contents'](
                 hrepr(self.__dict__)
             )
@@ -280,3 +304,23 @@ class StructuralMap:
 
 def structural_map(fn, *args):
     return StructuralMap(fn)(*args)
+
+
+#########
+# Atoms #
+#########
+
+TrueAtom = Atom('True')
+FalseAtom = Atom('False')
+NoneAtom = Atom('None')
+
+
+################
+# Record types #
+################
+
+record = Atom('record')
+TupleAtom = Atom('tuple')
+
+def tuple_record(*args):
+    return Record(TupleAtom, {i: v for i, v in enumerate(args)})
