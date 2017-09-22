@@ -156,9 +156,9 @@ def setup_buche(arguments):
         # to all the printouts of the given node. These
         # already have the pyid-{id(node)} class, so we
         # can select them that way.
-        buche.raw(command = 'reprocess',
-                  selector = f'.pyid-{id(node)}',
-                  body = f'this.classList.add("{kls}")')
+        buche.send(command = 'reprocess',
+                   selector = f'.pyid-{id(node)}',
+                   body = f'this.classList.add("{kls}")')
 
     # Set up on_discovery hooks to log everything we need.
 

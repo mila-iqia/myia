@@ -229,7 +229,7 @@ class EvaluationEnv(dict):
                 return self.compile(x)
             return x
 
-        if isinstance(v, self.accepted_types) or v in {ZERO, None}:
+        if isinstance(v, self.accepted_types) or v is ZERO or v is None:
             return v
         elif isinstance(v, (type, FunctionType)):
             # Note: Python's FunctionType, i.e. actual Python functions

@@ -13,7 +13,7 @@ from ..impl.flow_all import default_flow, ANY, VALUE
 from ..impl.main import impl_bank
 from ..symbols import builtins, object_map
 from .types import Int64, Float64
-from ..lib import Pending, Primitive
+from ..lib import Primitive
 
 
 def import_node(x):

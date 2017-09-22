@@ -280,13 +280,3 @@ class StructuralMap:
 
 def structural_map(fn, *args):
     return StructuralMap(fn)(*args)
-
-
-########
-# Misc #
-########
-
-
-class Pending:
-    def __init__(self, value):
-        self.value = value

@@ -17,7 +17,6 @@ from typing import \
     cast, TypeVar, Any
 from .nodes import Symbol, LambdaNode
 from ..util import EventDispatcher
-from ..lib import Pending
 from uuid import uuid4 as uuid
 
 
