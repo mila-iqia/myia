@@ -310,6 +310,7 @@ def structural_map(fn, *args):
 # Atoms #
 #########
 
+
 TrueAtom = Atom('True')
 FalseAtom = Atom('False')
 NoneAtom = Atom('None')
@@ -319,8 +320,10 @@ NoneAtom = Atom('None')
 # Record types #
 ################
 
+
 record = Atom('record')
 TupleAtom = Atom('tuple')
+
 
 def tuple_record(*args):
     return Record(TupleAtom, {i: v for i, v in enumerate(args)})

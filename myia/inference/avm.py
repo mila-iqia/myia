@@ -369,7 +369,7 @@ class AVM(EventDispatcher):
         while True:
             try:
                 # AVMFrame does most of the work.
-                new_frame = self.frame.next()
+                new_frame = self.frame.advance()
                 if new_frame is not None:
                     if new_frame.signature:
                         self.sig_stack.append(new_frame.signature)

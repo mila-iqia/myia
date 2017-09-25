@@ -74,7 +74,7 @@ class VM(EventDispatcher):
         while True:
             try:
                 # VMFrame does most of the work.
-                new_frame = self.frame.next()
+                new_frame = self.frame.advance()
                 if new_frame is not None:
                     # When the current frame gives us a new frame,
                     # we push the old one on the stack and start
@@ -114,7 +114,7 @@ class VMFrame(HReprBase):
     called. A frame has its own stack, while the VM operates on
     a stack of VMFrames.
 
-    Compute a frame's next instruction with ``next()``,
+    Compute a frame's next instruction with ``advance()``,
     which may return a new VMFrame to the VM to compute something it
     needs, or throw StopIteration if it is done, in which case its
     return value is at the top of its stack.
@@ -170,10 +170,9 @@ class VMFrame(HReprBase):
     def pop(self):
         return self.stack.pop()
 
-    def next_instruction(self) -> Optional[Instruction]:
+    def current_instruction(self) -> Optional[Instruction]:
         """
-        Get the next instruction and advance the program
-        counter.
+        Get the next instruction to execute.
 
         Returns:
            * None if we are done.
@@ -181,10 +180,9 @@ class VMFrame(HReprBase):
         """
         if self.pc >= len(self.instructions):
             return None
-        self.pc += 1
-        return self.instructions[self.pc - 1]
+        return self.instructions[self.pc]
 
-    def next(self) -> Optional['VMFrame']:
+    def advance(self) -> Optional['VMFrame']:
         """
         Execute the next instruction.
 
@@ -194,10 +192,11 @@ class VMFrame(HReprBase):
               and push its result to this frame before resuming
               execution.
         """
-        instr = self.next_instruction()
+        instr = self.current_instruction()
         if not instr:
             raise StopIteration()
         else:
+            self.pc += 1
             self.focus = instr.node
             mname = 'instruction_' + instr.command
             if self.vm.debugger:

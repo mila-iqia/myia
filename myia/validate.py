@@ -348,6 +348,7 @@ def compare_calls(funcs: Dict[str, Callable],
     def same(a, b):
         if isinstance(a, Exception) or isinstance(b, Exception):
             return False
+
         def ass(x, y):
             assert x == y
         try:
