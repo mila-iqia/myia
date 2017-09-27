@@ -70,7 +70,7 @@ class VM:
         while True:
             try:
                 # VMFrame does most of the work.
-                if stop_on == True or \
+                if stop_on is True or \
                         stop_on is self.frame or \
                         stop_on is self.frame.focus:
                     stop_on = yield stop_on
@@ -106,7 +106,7 @@ class VM:
             while True:
                 policy = gen.send(await self.controller(self, policy))
         except StopIteration as exc:
-            return exc.value        
+            return exc.value
 
     def run(self):
         if self.controller:

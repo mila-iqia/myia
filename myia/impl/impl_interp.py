@@ -27,6 +27,7 @@ pymap = map
 pyenumerate = enumerate
 pyException = Exception
 pyprint = print
+pyslice = slice
 
 
 @symbol_associator('')
@@ -465,3 +466,8 @@ def concat(*xs):
     assert all(isinstance(x, list) for x in xs) or \
         all(isinstance(x, tuple) for x in xs)
     return sum(xs, pytype(xs[0])())
+
+
+@impl_interp
+def slice(start, stop=None, step=None):
+    return pyslice(start, stop, step)
