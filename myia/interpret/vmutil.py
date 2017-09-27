@@ -25,16 +25,22 @@ class Function(HReprBase, IdempotentMappable):
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
         self.ast = ast
-        self.code = VMCode(ast.body)
+        self.code = VMCode(ast.body, lbda=ast)
         self.eval_env = eval_env
         self.primal_sym = ast.primal
         self.grad: Callable[[int], Function] = None
 
+    def configure(self, **config):
+        env = self.eval_env.reconfigure(config)
+        return Function(self.ast, env)
+
     def __call__(self, *args):
         ast = self.ast
         assert len(args) == len(ast.args)
-        return self.eval_env.run(self.code,
-                                 {s: arg for s, arg in zip(ast.args, args)})
+        return self.eval_env.run(
+            self.code,
+            {s: arg for s, arg in zip(ast.args, args)}
+        )
 
     def __str__(self):
         return f'Func({self.ast.ref or self.ast})'
@@ -106,8 +112,10 @@ class VMCode(HReprBase):
     """
     def __init__(self,
                  node: MyiaASTNode,
-                 instructions: List[Instruction] = None) -> None:
+                 instructions: List[Instruction] = None,
+                 lbda: LambdaNode = None) -> None:
         self.node = node
+        self.lbda = lbda
         if instructions is None:
             self.instructions: List[Instruction] = []
             self.process(self.node)
@@ -202,8 +210,15 @@ class EvaluationEnv(dict):
         self.vm_class = vm_class
         self.setup = setup
         self.config = config
-        self.accepted_types = (bool, int, float, Primitive, Function, Closure,
+        self.accepted_types = (bool, int, float,
+                               Primitive, Function, Closure,
                                ndarray, list, tuple, Record, str)
+
+    def reconfigure(self, new_config):
+        cfg = {**self.config}
+        cfg.update(new_config)
+        return EvaluationEnv(self.primitives, self.pool, self.vm_class,
+                             self.setup, cfg)
 
     def compile(self, lbda):
         fimpl = self.compile_cache.get(lbda, None)

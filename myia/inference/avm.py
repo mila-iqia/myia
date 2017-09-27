@@ -293,7 +293,6 @@ class AVMFrame(VMFrame):
                       local_env, eval_env, self.signature)
         fr.stack = [s for s in self.stack]
         fr.pc = self.pc + pc_offset
-        fr.focus = self.focus
         return fr
 
 

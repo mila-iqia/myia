@@ -34,12 +34,16 @@ from .interpret import evaluate
 class MyiaFunction:
     def __init__(self, **options):
         fn = options['fn']
+        ctrl = options.get('controller', None)
         self.lbda = parse_function(fn)
-        self.fn = evaluate(self.lbda)
+        self.fn = evaluate(self.lbda, controller=ctrl)
 
     def __call__(self, *args):
         return self.fn(*args)
 
+    def configure(self, **config):
+        return self.fn.configure(**config)
 
-def myia(fn):
-    return MyiaFunction(fn=fn)
+
+def myia(fn, **options):
+    return MyiaFunction(fn=fn, **options)

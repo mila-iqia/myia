@@ -1,5 +1,6 @@
 from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 
+import asyncio
 from types import FunctionType
 from ..stx import \
     MyiaASTNode, Location, Symbol, ValueNode, LambdaNode, maptup2, globals_pool
@@ -36,7 +37,7 @@ def load():
         from ..impl.impl_bprop import _
 
 
-class VM(EventDispatcher):
+class VM:
     """
     Stack-based virtual machine. Evaluates the given code
     in the constructor and puts the value in the ``result``
@@ -56,24 +57,23 @@ class VM(EventDispatcher):
                  code: VMCode,
                  local_env: EnvT,
                  eval_env: EvaluationEnv,
-                 debugger: BucheDb = None,
-                 controller: Any = None,
-                 emit_events=True) -> None:
-        super().__init__(self, emit_events)
-        self.debugger = debugger
-        self.do_emit_events = emit_events
+                 controller = None) -> None:
+        self.controller = controller
+        self.do_emit_events = False
         # Current frame
         self.eval_env = eval_env
         self.frame = VMFrame(self, code, local_env, eval_env)
         # Stack of previous frames (excludes current one)
         self.frames: List[VMFrame] = []
-        if self.do_emit_events:
-            self.emit_new_frame(self.frame)
 
-    def eval(self) -> Any:
+    def eval(self, stop_on=True) -> Any:
         while True:
             try:
                 # VMFrame does most of the work.
+                if stop_on == True or \
+                        stop_on is self.frame or \
+                        stop_on is self.frame.focus:
+                    stop_on = yield stop_on
                 new_frame = self.frame.advance()
                 if new_frame is not None:
                     # When the current frame gives us a new frame,
@@ -84,28 +84,39 @@ class VM(EventDispatcher):
                         # not done (this implement tail calls).
                         self.frames.append(self.frame)
                     self.frame = new_frame
-                    if self.do_emit_events:
-                        self.emit_new_frame(self.frame)
             except StopIteration:
                 # The result of a frame's evaluation is the value at
                 # the top of its stack.
                 rval = self.frame.top()
                 if not self.frames:
                     # We are done!
-                    return rval
+                    return self.frame.top()
                 else:
                     # We push the result on the previous frame's stack
                     # and we resume execution.
                     self.frame = self.frames.pop()
                     self.frame.push(rval)
             except Exception as exc:
-                if self.do_emit_events:
-                    self.emit_error(exc)
                 raise exc from None
 
-    def run(self) -> Any:
-        self.result = self.eval()
-        return self.result
+    async def run_async(self):
+        gen = self.eval()
+        policy = gen.send(None)
+        try:
+            while True:
+                policy = gen.send(await self.controller(self, policy))
+        except StopIteration as exc:
+            return exc.value        
+
+    def run(self):
+        if self.controller:
+            return self.run_async()
+        gen = self.eval()
+        try:
+            while True:
+                next(gen)
+        except StopIteration as exc:
+            return exc.value
 
 
 class VMFrame(HReprBase):
@@ -135,7 +146,6 @@ class VMFrame(HReprBase):
         self.eval_env = eval_env
         self.stack: List[Any] = [None]
         # Node being executed, mostly for debugging.
-        self.focus: MyiaASTNode = None
         self.signature: Any = None
 
     def done(self) -> bool:
@@ -180,7 +190,19 @@ class VMFrame(HReprBase):
         """
         if self.pc >= len(self.instructions):
             return None
-        return self.instructions[self.pc]
+        instr = self.instructions[self.pc]
+        return instr
+
+    @property
+    def focus(self):
+        return self.rel_node(0)
+
+    def rel_node(self, i=0):
+        idx = self.pc + i
+        if idx >= len(self.instructions) or idx < 0:
+            return None
+        instr = self.instructions[idx]
+        return instr and instr.node
 
     def advance(self) -> Optional['VMFrame']:
         """
@@ -197,15 +219,7 @@ class VMFrame(HReprBase):
             raise StopIteration()
         else:
             self.pc += 1
-            self.focus = instr.node
             mname = 'instruction_' + instr.command
-            if self.vm.debugger:
-                if 'break' in self.focus.annotations:
-                    self.vm.debugger.buche(self)
-                    self.vm.debugger.set_trace()
-            if self.vm.do_emit_events:
-                self.vm.emit(mname, self, instr.node, *instr.args)
-                self.vm.emit_step(self, instr)
             method = getattr(self, mname)
             return method(instr.node, *instr.args)
 
@@ -314,5 +328,5 @@ eenvs = EvaluationEnvCollection(EvaluationEnv, root_globals,
                                 globals_pool, VM, load)
 
 
-def evaluate(node, debugger=None):
-    return eenvs.run_env(node, debugger=debugger)
+def evaluate(node, controller=None):
+    return eenvs.run_env(node, controller=controller)
