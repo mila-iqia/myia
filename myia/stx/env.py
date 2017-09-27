@@ -37,7 +37,6 @@ BPROP_CLOS = '♢'
 SENS = '∇'
 NULLSYM = '×'
 TMP = '◯'
-HIDGLOB = '$'
 ANORM = 'α'
 
 TMP_SENS = f'{TMP}{SENS}'

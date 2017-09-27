@@ -121,7 +121,7 @@ from .stx import \
     LetNode as Let, LambdaNode as Lambda, ApplyNode as Apply, \
     BeginNode as Begin, TupleNode as Tuple, ClosureNode as Closure, \
     _Assign, GenSym, About, VariableTracker, \
-    HIDGLOB, THEN, ELSE, WTEST, WLOOP, LBDA, \
+    THEN, ELSE, WTEST, WLOOP, LBDA, \
     create_lambda, globals_pool
 from .symbols import get_operator, builtins
 from uuid import uuid4 as uuid
@@ -808,7 +808,7 @@ class Parser(LocVisitor):
             raise MyiaSyntaxError("Functions should not have decorators.")
 
         # Global handle for the function
-        lbl = node.name if self.top_level else f'{HIDGLOB}{node.name}'
+        lbl = node.name if self.top_level else f'{self.dest}.{node.name}'
         ref = self.global_gen(lbl)
 
         # Local handle
