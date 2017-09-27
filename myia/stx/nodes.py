@@ -285,7 +285,10 @@ class LambdaNode(MyiaASTNode):
 
     def __hrepr__(self, H, hrepr):
         return super().__hrepr__(H, hrepr)(
-            H.div['Keyword']('λ'),
+            H.div['Keyword'](
+                hrepr(self.ref), " = ",
+                H.div['Keyword']('λ'),
+            ),
             H.div['LambdaArguments'](*[hrepr(a) for a in self.args]),
             hrepr(self.body)
         )
