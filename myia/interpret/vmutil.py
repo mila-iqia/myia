@@ -2,7 +2,7 @@
 from typing import Any, List, Callable
 from types import FunctionType
 from numpy import ndarray
-from ..util import EventDispatcher, BucheDb, HReprBase, buche
+from ..util import EventDispatcher, HReprBase
 from ..lib import Closure, Primitive, IdempotentMappable, Record, ZERO
 from ..stx import MyiaASTNode, Symbol, ValueNode, LambdaNode
 from ..symbols import builtins, object_map

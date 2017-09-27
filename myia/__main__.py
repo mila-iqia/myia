@@ -22,7 +22,7 @@ from .util import on_discovery
 from .interpret import VM
 from .stx import Symbol, MyiaASTNode, LambdaNode, \
     AboutPrinter, nodes, globals_pool
-from .util import BucheDb
+# from .util import BucheDb
 
 
 nodes.__save_trace__ = True

@@ -6,7 +6,7 @@ from ..stx import \
     MyiaASTNode, Location, Symbol, ValueNode, LambdaNode, maptup2, globals_pool
 from ..lib import Closure, IdempotentMappable
 from ..symbols import builtins, object_map, update_object_map
-from ..util import EventDispatcher, BucheDb, HReprBase, buche
+from ..util import EventDispatcher, HReprBase, buche
 from functools import reduce
 from ..impl.main import impl_bank
 from ..parse import parse_function

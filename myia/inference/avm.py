@@ -3,7 +3,7 @@ from typing import List, Any, Dict
 from ..interpret import VMCode, VMFrame, EnvT, \
     Primitive, Function, Closure, Instruction, \
     EvaluationEnv, EvaluationEnvCollection
-from ..util import EventDispatcher, BucheDb
+from ..util import EventDispatcher
 from ..symbols import builtins
 from ..impl.main import impl_bank
 from itertools import product
@@ -302,7 +302,6 @@ class AVM(EventDispatcher):
                  local_env: EnvT,
                  eval_env: EnvT,
                  signature=None,
-                 debugger: BucheDb = None,
                  needs: Dict = {},
                  projs=None,
                  emit_events=True) -> None:
@@ -310,7 +309,6 @@ class AVM(EventDispatcher):
         self.results_cache: Dict = {}
         self.open_cache: Dict = {}
         self.needs = needs
-        self.debugger = debugger
         self.do_emit_events = emit_events
         # Current frame
         self.eval_env = eval_env
