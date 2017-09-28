@@ -16,8 +16,8 @@ The symbols live in two namespaces:
 import ast
 import sys
 import math
-from .stx import Symbol, ValueNode, bsym
-from .util import Props, SymbolsMeta
+from .stx import Symbol, ValueNode, bsym  # type: ignore
+from .util.misc import Props, SymbolsMeta
 from typing import Dict
 
 
@@ -87,6 +87,9 @@ class builtins(metaclass=SymbolsMeta):
     assert_true = bsym('assert_true')
     type = bsym('type')
     shape = bsym('shape')
+
+    # Debugging
+    breakpoint = bsym('breakpoint')
 
 
 # Maps the names of Python AST nodes to corresponding

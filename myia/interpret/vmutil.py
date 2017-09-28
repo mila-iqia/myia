@@ -3,6 +3,7 @@ from typing import Any, List, Callable
 from types import FunctionType
 from numpy import ndarray
 from ..util import EventDispatcher, HReprBase
+from ..util.debug import Breakpoint
 from ..lib import Closure, Primitive, IdempotentMappable, Record, ZERO
 from ..stx import MyiaASTNode, Symbol, ValueNode, LambdaNode
 from ..symbols import builtins, object_map
@@ -212,7 +213,8 @@ class EvaluationEnv(dict):
         self.config = config
         self.accepted_types = (bool, int, float,
                                Primitive, Function, Closure,
-                               ndarray, list, tuple, Record, str)
+                               ndarray, list, tuple, Record, str,
+                               Breakpoint)
 
     def reconfigure(self, new_config):
         cfg = {**self.config}

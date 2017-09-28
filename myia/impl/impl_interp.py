@@ -11,6 +11,7 @@ from ..inference.types import typeof
 from ..lib import StructuralMap, Closure, default_structural_map_dispatch
 from ..symbols import object_map
 from ..parse import parse_function
+from ..util.debug import Breakpoint, BreakpointMode
 
 
 _ = True
@@ -471,3 +472,8 @@ def concat(*xs):
 @impl_interp
 def slice(start, stop=None, step=None):
     return pyslice(start, stop, step)
+
+
+@impl_interp
+def breakpoint(mode=BreakpointMode.FORWARD):
+    return Breakpoint(mode)

@@ -1,6 +1,7 @@
 
 import inspect
-from myia.util import HReprBase, Singleton
+from .util.buche import HReprBase
+from .util.misc import Singleton
 import numpy
 
 
