@@ -328,6 +328,21 @@ class ApplyNode(MyiaASTNode):
         )
 
     def __hrepr__(self, H, hrepr):
+        if len(self.args) == 0 and \
+                isinstance(self.fn, ApplyNode) and \
+                isinstance(self.fn.fn, Symbol) and \
+                len(self.fn.args) == 3 and \
+                self.fn.fn.label == 'switch':
+            # This is a special case for ((switch cond thn els)),
+            # which is an if statement.
+            cond, thn, els = self.fn.args
+            if isinstance(thn, ClosureNode) and isinstance(els, ClosureNode):
+                return super().__hrepr__(H, hrepr)['If'](
+                    H.div['IfCond'](hrepr(cond)),
+                    H.div['IfThen'](hrepr(ApplyNode(thn.fn, *thn.args))),
+                    H.div['IfElse'](hrepr(ApplyNode(els.fn, *els.args)))
+                )
+
         return super().__hrepr__(H, hrepr)(
             hrepr(self.fn),
             *[hrepr(a) for a in self.args]
