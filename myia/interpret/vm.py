@@ -70,10 +70,7 @@ class VM:
         while True:
             try:
                 # VMFrame does most of the work.
-                if stop_on is True or \
-                        stop_on is self.frame or \
-                        stop_on is self.frame.focus:
-                    stop_on = yield stop_on
+                yield
                 new_frame = self.frame.advance()
                 if new_frame is not None:
                     # When the current frame gives us a new frame,
@@ -90,7 +87,8 @@ class VM:
                 rval = self.frame.top()
                 if not self.frames:
                     # We are done!
-                    return self.frame.top()
+                    self.result = self.frame.top()
+                    return self.result
                 else:
                     # We push the result on the previous frame's stack
                     # and we resume execution.
@@ -100,23 +98,16 @@ class VM:
                 raise exc from None
 
     async def run_async(self):
-        gen = self.eval()
-        policy = gen.send(None)
-        try:
-            while True:
-                policy = gen.send(await self.controller(self, policy))
-        except StopIteration as exc:
-            return exc.value
+        for _ in self.eval():
+            await self.controller(self)
+        return self.result
 
     def run(self):
         if self.controller:
             return self.run_async()
-        gen = self.eval()
-        try:
-            while True:
-                next(gen)
-        except StopIteration as exc:
-            return exc.value
+        for _ in self.eval():
+            pass
+        return self.result
 
 
 class VMFrame(HReprBase):
