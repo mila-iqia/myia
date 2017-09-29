@@ -149,6 +149,12 @@ class DebugController:
                 return True
         return False
 
+    async def error(self, vm, error):
+        self.db.log('An error occurred!', kind='error')
+        self.db.show(error, kind='error')
+        self.dbf(VMPrinter(vm))
+        await self.wait_for_command(vm)
+
     async def __call__(self, vm):
         instr = vm.frame.current_instruction()
         # self.db(instr)

@@ -70,8 +70,13 @@ class VM:
         while True:
             try:
                 # VMFrame does most of the work.
-                yield
-                new_frame = self.frame.advance()
+                yield True
+                try:
+                    new_frame = self.frame.advance()
+                except StopIteration:
+                    raise
+                except Exception as e:
+                    yield e
                 if new_frame is not None:
                     # When the current frame gives us a new frame,
                     # we push the old one on the stack and start
@@ -98,15 +103,22 @@ class VM:
                 raise exc from None
 
     async def run_async(self):
-        for _ in self.eval():
-            await self.controller(self)
+        for status in self.eval():
+            if status is True:
+                await self.controller(self)
+            else:
+                await self.controller.error(self, status)
+                break
         return self.result
 
     def run(self):
         if self.controller:
             return self.run_async()
-        for _ in self.eval():
-            pass
+        for status in self.eval():
+            if status is True:
+                pass
+            else:
+                raise status
         return self.result
 
 
@@ -212,7 +224,15 @@ class VMFrame(HReprBase):
             self.pc += 1
             mname = 'instruction_' + instr.command
             method = getattr(self, mname)
-            return method(instr.node, *instr.args)
+            try:
+                return method(instr.node, *instr.args)
+            except Exception as e:
+                # There's something in the inferrer somewhere that
+                # prevents simply incrementing pc after calling
+                # method, so I need to do this roundabout thing
+                # to reset pc on exception. TODO: investigate.
+                self.pc -= 1
+                raise
 
     def instruction_reduce(self, node, nargs) -> Optional['VMFrame']:
         """
