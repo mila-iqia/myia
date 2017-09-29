@@ -232,6 +232,13 @@ def index(t, i):
 
 
 @impl_interp
+def setslice(t, i, v):
+    typ = pytype(t)
+    return typ(v if i == j else orig
+               for j, orig in enumerate(t))
+
+
+@impl_interp
 def first(t):
     return t[0]
 

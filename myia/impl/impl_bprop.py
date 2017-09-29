@@ -8,7 +8,7 @@ from ..symbols import builtins
 from ..parse import parse_function
 from .impl_interp import zeros_like, J, Jinv, switch, first, second, \
     Closure, closure_fn, reduce, add, exp, log, transpose, \
-    broadcast, shape, fit
+    broadcast, shape, fit, setslice
 from ..transform.grad import ggen, grad_computers
 from ..lib import Primitive
 
@@ -256,11 +256,15 @@ def bprop_closure_args(clos, dz):
 
 @impl_bprop
 def bprop_index(tup, idx, dz):
-    def f(pair):
-        return switch(pair[0] == idx, dz,
-                      zeros_like(Jinv(pair[1])))
-    rval = map(f, enumerate(tup))
+    rval = zeros_like(tup)
+    rval[idx] = dz
     return GRAD(rval, 0)
+
+
+@impl_bprop
+def bprop_setslice(tup, idx, value, dz):
+    dtup = setslice(dz, idx, zeros_like(tup[idx]))
+    return GRAD(dtup, 0, dz[idx])
 
 
 @impl_bprop
