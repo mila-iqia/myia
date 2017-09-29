@@ -35,7 +35,14 @@ class VMPrinter:
             c = fr.code
             l = c.lbda
             tab = H.tab(hrepr(l.ref))
-            pane = H.pane(hrepr(l or c.node))
+            pcont = H.tabbedView()
+            pcont = pcont(H.view(H.tab('Node'),
+                                 H.pane(hrepr(l))))
+            loc = foc and foc.find_location()
+            if loc:
+                pcont = pcont(H.view(H.tab('Source'),
+                                     H.pane(hrepr(loc))))
+            pane = H.pane(pcont)
             v = H.view(tab, pane)(active=offset == 0)
             res = res(v)
             if foc:
