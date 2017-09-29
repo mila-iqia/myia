@@ -1,9 +1,13 @@
 
 import re
+import os
 from enum import Enum, auto
 from ..stx.nodes import Symbol
 from ..lib import Primitive
 from ..symbols import builtins
+
+
+_template_path = f'{os.path.dirname(__file__)}/debug-template.html'
 
 
 class BreakpointMode(Enum):
@@ -50,11 +54,11 @@ def parse_command_specs(specs):
                 if main is None:
                     main = full
                 for i in range(len(sfx) + 1):
-                    command_map[pfx + sfx[:i]] = main
+                    command_map[pfx + sfx[:i]] = (main, spec)
             else:
                 if main is None:
                     main = x
-                command_map[x] = main
+                command_map[x] = (main, spec)
     return command_map
 
 
@@ -65,37 +69,54 @@ class DebugController:
         'c:ontinue',
         'u:p',
         'd:own',
-        'ex:pression;x;?',
-        'vars;?*',
-        't:op'
+        'v:ar;?',
+        't:op',
+        'h:elp'
     ])
 
     def __init__(self, buche, reader, next_breakpoint=True):
-        self.dbf = buche.open_slides('frame')
-        self.db = buche.open_log('debug', force=True, hasInput=True)
-        self.db.log('-- Debug --')
+        buche.configure('template', src=_template_path)
+        self.dbf = buche['frames']
+        self.db = buche['interact']
+        self.db.html('<h3>Debug session start</h3>')
+        self.db.markdown('Type `help` for a list of available commands.',
+                         inline=True)
         self.next_breakpoint = next_breakpoint
         self.reader = reader
 
     async def command_step(self, vm, *args):
+        """
+        Step into the next instruction.
+        """
         self.next_breakpoint = True
         return True
 
     async def command_next(self, vm, *args):
+        """
+        Execute the next instruction and stop.
+        """
         self.next_breakpoint = vm.frame
         return True
 
     async def command_continue(self, vm, *args):
+        """
+        Continue until the next breakpoint or to the end.
+        """
         self.next_breakpoint = False
         return True
 
     async def command_up(self, vm, *args):
+        "TODO"
         self.db.log('TODO: UP FRAME', kind='error')
 
     async def command_down(self, vm, *args):
+        "TODO"
         self.db.log('TODO: DOWN FRAME', kind='error')
 
     async def command_top(self, vm, n):
+        """
+        `top [n]`, inspect the n topmost elements of the stack.
+        """
         if n.strip() == '':
             n = 1
         else:
@@ -105,7 +126,11 @@ class DebugController:
         else:
             self.db(vm.frame.stack[-n:])
 
-    async def command_expression(self, vm, expr):
+    async def command_var(self, vm, expr):
+        """
+        `v <var1> <var2> ...`, print out the value of each named
+        variable. All versions of the variable will be shown.
+        """
         fr = vm.frame
         all_results = {}
         for vname in expr.split():
@@ -119,10 +144,28 @@ class DebugController:
                 if s == vname:
                     results[sym] = value
             if not results:
-                self.db.log(f'Could not find a variable named `{vname}`',
-                            kind='error')
+                self.db.markdown(f'Could not find a variable named `{vname}`',
+                                 kind='error', inline=True)
             all_results.update(results)
         self.db.show(all_results, kind='result')
+
+    async def command_help(self, vm, cmd):
+        """
+        List available commands.
+        """
+        class _:
+            def __hrepr__(_, H, hrepr):
+                t = H.table()
+                t = t(H.tr(H.th("Command"), H.th("Description")))
+                rev = {}
+                for cmd, (canon, spec) in self.__commands__.items():
+                    rev[canon] = spec
+                for canon, spec in rev.items():
+                    m = getattr(self, f'command_{canon}')
+                    doc = m.__doc__ or "No documentation."
+                    t = t(H.tr(H.td(canon), H.td(doc)))
+                return t
+        self.db(_())
 
     async def wait_for_command(self, vm):
         message = await self.reader.read_async()
@@ -132,7 +175,7 @@ class DebugController:
                                     message.contents.strip() or ' ')
             cmd = cmd.strip()
             arg = ''.join(rest)
-            canon = self.__commands__.get(cmd, None)
+            canon, _ = self.__commands__.get(cmd, None)
             self.db.log(message.contents or canon, kind='echo')
             if canon is None:
                 self.db.log(f'Unknown command: {cmd}', kind='error')

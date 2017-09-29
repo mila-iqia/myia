@@ -1,0 +1,27 @@
+<style>
+    .debug-body {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        height: 100%;
+    }
+
+    div.interact {
+        flex: 1;
+        background: white;
+    }
+
+    div.frames {
+        flex: 1;
+        background: #f8f8f8;
+    }
+</style>
+
+<div class="debug-body">
+    <div class="interact">
+        <channel type="log" path="interact" has-input="has-input" />
+    </div>
+    <div class="frames">
+        <channel type="slides" path="frames" />
+    </div>
+</div>
