@@ -127,7 +127,8 @@ def gen_variants(obj, gen, path):
     elif isinstance(obj, Record):
         for k, v in obj:
             for variants, p in gen_variants(v, gen, path + (k,)):
-                yield ([obj.__variant__(k, variant) for variant in variants], p)
+                yield ([obj.__variant__(k, variant)
+                        for variant in variants], p)
     elif isinstance(obj, numpy.ndarray):
         for coord in itertools.product(*[range(d) for d in obj.shape]):
             for variants, p in gen_variants(obj[coord], gen, path + (coord,)):

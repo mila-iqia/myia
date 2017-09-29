@@ -65,9 +65,9 @@
 	margin-left: 2px;
 }
 
-.BeginNode:hover, .LambdaNode:hover, .LetNode:hover {
+/* .BeginNode:hover, .LambdaNode:hover, .LetNode:hover {
 	border-left: 1px solid var(--hover-border-color);
-}
+} */
 
 .LambdaNode > :nth-child(3),
 .BeginNode > :nth-child(2),
@@ -213,8 +213,8 @@
 	color: white;
 }
 
-.missing_source {
-}
+/* .missing_source {
+} */
 
 .error {
 	background: #fdd;
