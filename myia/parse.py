@@ -626,11 +626,18 @@ class Parser(LocVisitor):
             return self.make_assign(targ.id, val)
 
         elif isinstance(targ, ast.Attribute):
-            # CAST: x.attr = y
-            return Apply(builtins.setattr,
-                         self.visit(targ.value),
-                         Value(targ.attr),
-                         self.visit(node.value))
+            if isinstance(targ.value, ast.Name):
+                # CASE: x.attr = y
+                obj = Apply(builtins.setattr,
+                            self.visit(targ.value),
+                            Value(targ.attr),
+                            self.visit(node.value))
+                return self.make_assign(targ.value.id, obj)
+            else:
+                # UNSUPPORTED: f().attr = value
+                raise MyiaSyntaxError(
+                    "You can only set attributes on a variable."
+                )
 
         else:
             # UNSUPPORTED: whatever else
