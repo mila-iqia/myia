@@ -1,5 +1,6 @@
 
 from typing import List, Any, Union
+from copy import copy
 import numpy
 from .main import symbol_associator, impl_bank
 from ..stx import Symbol
@@ -23,6 +24,7 @@ pyrange = range
 myiaClosure = Closure
 pytuple = tuple
 pygetattr = getattr
+pysetattr = setattr
 pytype = type
 pymap = map
 pyenumerate = enumerate
@@ -245,6 +247,16 @@ def getattr(obj, attr):
 
 
 @impl_interp
+def setattr(obj, attr, value):
+    if hasattr(obj, '__variant__'):
+        return obj.__variant__(attr, value)
+    else:
+        obj2 = copy(obj)
+        pysetattr(obj2, attr, value)
+        return obj2
+
+
+@impl_interp
 def map(f, xs):
     return pytype(xs)(pymap(f, xs))
 
@@ -383,7 +395,7 @@ def Jinv(x):
                             f' {primal}, type {type(primal)},'
                             f' for {x.primal_sym}')
         return primal
-    elif isinstance(x, (int, float, bool)) or x is None or x is ZERO:
+    elif isinstance(x, (int, float, bool, str)) or x is None or x is ZERO:
         return x
     elif isinstance(x, (numpy.ndarray, numpy.generic)):
         return x

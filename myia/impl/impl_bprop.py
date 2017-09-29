@@ -291,3 +291,16 @@ def bprop_map(f, xs, dz):
 @impl_bprop
 def bprop_enumerate(xs, dz):
     return GRAD(map(second, dz))
+
+
+@impl_bprop
+def bprop_getattr(rec, field, dz):
+    rval = zeros_like(Jinv(rec))
+    rval = setattr(rval, field, dz)
+    return GRAD(rval, 0)
+
+
+@impl_bprop
+def bprop_setattr(rec, field, value, dz):
+    drec = setattr(dz, field, zeros_like(getattr(rec, field)))
+    return GRAD(drec, 0, getattr(dz, field))

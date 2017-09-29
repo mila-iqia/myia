@@ -625,9 +625,15 @@ class Parser(LocVisitor):
             val = self.visit(node.value)
             return self.make_assign(targ.id, val)
 
+        elif isinstance(targ, ast.Attribute):
+            # CAST: x.attr = y
+            return Apply(builtins.setattr,
+                         self.visit(targ.value),
+                         Value(targ.attr),
+                         self.visit(node.value))
+
         else:
-            # UNSUPPORTED: x.attr = y
-            # and others, probably
+            # UNSUPPORTED: whatever else
             raise MyiaSyntaxError(
                 f'Unsupported targ for Assign: {targ}'
             )

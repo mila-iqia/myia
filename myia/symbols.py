@@ -46,6 +46,7 @@ class builtins(metaclass=SymbolsMeta):
     equal = bsym('equal')
     index = bsym('index')
     getattr = bsym('getattr')
+    setattr = bsym('setattr')
     setslice = bsym('setslice')
     identity = bsym('identity')
     Closure = bsym('Closure')
@@ -131,6 +132,8 @@ object_map = {
     sum: builtins.sum,
     Exception: builtins.Exception,
     print: builtins.print,
+    getattr: builtins.getattr,
+    setattr: builtins.setattr,
     # Closure: builtins.Closure,
     # closure_args: builtins.closure_args,
     # closure_fn: builtins.closure_fn

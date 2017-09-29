@@ -1,5 +1,6 @@
 
 import inspect
+from copy import copy
 from .util.buche import HReprBase
 from .util.misc import Singleton
 import numpy
@@ -201,6 +202,11 @@ class Record(HReprBase, StructuralMappable):
     def __getitem__(self, item):
         return getattr(self, item)
 
+    def __variant__(self, field, value):
+        obj = copy(self)
+        obj.__dict__[field] = value
+        return obj
+
     def __map__(self, smap, *recs):
         smap.require_same([type, lambda r: (r.__tag__, r.__dict__.keys())],
                           [self, *recs])
@@ -262,6 +268,7 @@ default_structural_map_dispatch = {
     int: scalar_map,
     float: scalar_map,
     bool: scalar_map,
+    str: scalar_map,
     type(None): scalar_map,
     tuple: sequence_map,
     list: sequence_map,
