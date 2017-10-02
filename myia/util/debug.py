@@ -182,7 +182,7 @@ class DebugController:
                                     message.contents.strip() or ' ')
             cmd = cmd.strip()
             arg = ''.join(rest)
-            canon, _ = self.__commands__.get(cmd, None)
+            canon, _ = self.__commands__.get(cmd, (None, None))
             self.db.log(message.contents or canon, kind='echo')
             if canon is None:
                 self.db.log(f'Unknown command: {cmd}', kind='error')

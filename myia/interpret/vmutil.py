@@ -65,10 +65,7 @@ class Function(HReprBase, IdempotentMappable):
         return self
 
     def __hrepr__(self, H, hrepr):
-        return H.div['Function'](
-            H.div['class_title']('Function'),
-            H.div['class_contents'](hrepr(self.ast.ref or self.ast))
-        )
+        return hrepr.titled_box('Func', [hrepr(self.ast.ref or self.ast)])
 
 
 ##########################################

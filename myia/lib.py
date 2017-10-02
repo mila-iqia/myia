@@ -136,10 +136,7 @@ class Primitive(HReprBase, IdempotentMappable):
         return smap.fn(self, *others)
 
     def __hrepr__(self, H, hrepr):
-        return H.div['Primitive'](
-            H.div['class_title']('Primitive'),
-            H.div['class_contents'](self.name or hrepr(self.fn))
-        )
+        return hrepr.titled_box('Prim', [hrepr(self.name or self.fn)])
 
 
 class Closure(HReprBase, StructuralMappable):
@@ -165,13 +162,9 @@ class Closure(HReprBase, StructuralMappable):
     __repr__ = __str__
 
     def __hrepr__(self, H, hrepr):
-        return H.div['ClosureImpl'](
-            H.div['class_title']('Closure'),
-            H.div['class_contents'](
-                hrepr(self.fn),
-                hrepr(self.args)
-            )
-        )
+        return hrepr.titled_box('Closure',
+                                [hrepr(self.fn),
+                                 hrepr(self.args)], 'v')
 
 
 class Atom:
@@ -235,11 +228,9 @@ class Record(HReprBase, StructuralMappable):
     __repr__ = __str__
 
     def __hrepr__(self, H, hrepr):
-        return H.div['Record'](
-            H.div['class_title'](self.__tag__),
-            H.div['class_contents'](
-                hrepr(self.__dict__)
-            )
+        return hrepr.stdrepr_object(
+            str(self.__tag__),
+            [(k, v) for k, v in self]
         )
 
 
