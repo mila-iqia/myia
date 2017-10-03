@@ -25,7 +25,7 @@ from ..stx import \
     JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
     TMP_LET, TMP_BPROP, TMP_SENS, create_lambda, is_global, \
     globals_pool
-from ..symbols import builtins
+from ..symbols import builtins, inst_builtin
 from .a_normal import a_normal
 from ..util import Props, buche
 from ..lib import ZERO
@@ -262,7 +262,7 @@ class Grad:
             # Transformed:  ∇y, ∇z += ∇x
             # Why yes, this works the same as TupleNode.
             args = args_cast(value.args)
-            sen_extract = Apply(builtins.closure_args, sen)
+            sen_extract = Apply(inst_builtin.closure_args, sen)
             return self.accum_multi(args, sen_extract)
             # return self.accum_multi(args, sen)
 
@@ -323,7 +323,7 @@ class Grad:
                     lhs_vars.append(g)
                     # We must add the temp's value to the sensitivity
                     # variable for var.
-                    app = Apply(mapadd,
+                    app = Apply(mapadd.copy(),
                                 g,
                                 self.conformant_sensitivity_value(var))
                     lhs = self.new_sensitivity_var(var)
@@ -344,7 +344,7 @@ class Grad:
             if all(x == Value(ZERO) for x in rhs_vars):
                 new_value = value
             else:
-                new_value = Apply(mapadd, TupleNode(rhs_vars), value)
+                new_value = Apply(mapadd.copy(), TupleNode(rhs_vars), value)
 
         # We must prepend the main operation to the extra bindings
         # we created for the duplicates
@@ -361,7 +361,7 @@ class Grad:
         if sen == Value(ZERO):
             return [(new_sen, value)]
         else:
-            return [(new_sen, Apply(mapadd, sen, value))]
+            return [(new_sen, Apply(mapadd.copy(), sen, value))]
 
     @transformer_method('g:tag')
     def tagged_var(self, v: LHS) -> LHS:
@@ -388,7 +388,7 @@ class Grad:
         if isinstance(v, Value):
             return v
         if is_global(v):
-            return Apply(builtins.J, v)
+            return Apply(inst_builtin.J, v)
         else:
             return self.tagged_var(v)
 
@@ -439,8 +439,8 @@ class Grad:
         tagged = self.tagged_var(var)
         assert isinstance(tagged, Symbol)
         init = (new_var,
-                Apply(builtins.zeros_like,
-                      Apply(builtins.Jinv, tagged)))
+                Apply(inst_builtin.zeros_like,
+                      Apply(inst_builtin.Jinv, tagged)))
         self.zeros.append(init)
         self.bprop_variables[tagged] = True
         return new_var

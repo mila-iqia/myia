@@ -184,6 +184,17 @@ def get_operator(node: ast.AST) -> Symbol:
     Given a Python AST node, return the corresponding Symbol.
     """
     try:
-        return operator_map[node.__class__.__name__]
+        return operator_map[node.__class__.__name__].copy()
     except KeyError:
         raise NotImplementedError("Unknown operator: {}".format(node))
+
+
+class InstBuiltin:
+    def __init__(self, builtins):
+        self._builtins = builtins
+
+    def __getattr__(self, attr):
+        return getattr(self._builtins, attr).copy()
+
+
+inst_builtin = InstBuiltin(builtins)

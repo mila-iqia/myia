@@ -418,13 +418,14 @@ def grad2_transform(rlbda):
 
     from .stx import LambdaNode as Lambda, ApplyNode as Apply, \
         ValueNode as Value, LetNode as Let
-    from .symbols import builtins
+    from .symbols import inst_builtin
 
     sym_arg = gen('ARG')
     sym_values = (gen("values"), Apply(rsym, sym_arg))
-    sym_bprop = (gen("bprop"), Apply(builtins.index, sym_values[0], Value(1)))
+    sym_bprop = (gen("bprop"),
+                 Apply(inst_builtin.index, sym_values[0], Value(1)))
     sym_grads = (gen("grads"), Apply(sym_bprop[0], Value(1)))
-    sym_grad = (gen("grad"), Apply(builtins.index, sym_grads[0], Value(1)))
+    sym_grad = (gen("grad"), Apply(inst_builtin.index, sym_grads[0], Value(1)))
     ret = Let((sym_values, sym_bprop, sym_grads, sym_grad), sym_grad[0])
     glbda = create_lambda(rrsym, [sym_arg], ret, gen)
     return glbda

@@ -4,7 +4,7 @@ from .main import symbol_associator, impl_bank
 from ..stx import Symbol, ApplyNode as Apply, ClosureNode, \
     LambdaNode, TupleNode, GenSym, BPROP, JTAG, create_lambda, \
     globals_pool
-from ..symbols import builtins
+from ..symbols import inst_builtin
 from ..parse import parse_function
 from .impl_interp import zeros_like, J, Jinv, switch, first, second, \
     Closure, closure_fn, reduce, add, exp, log, transpose, \
@@ -79,8 +79,8 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
         # function.
         G = GenSym()
         args = [G.sym(a) for a in prim.argnames]
-        forward = Apply(builtins.J,
-                        Apply(sym, *[Apply(builtins.Jinv, a)
+        forward = Apply(inst_builtin.J,
+                        Apply(sym, *[Apply(inst_builtin.Jinv, a)
                                      for a in args]))
         backward = ClosureNode(bprop_sym, args)
 

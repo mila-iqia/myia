@@ -123,7 +123,7 @@ from .stx import \
     _Assign, GenSym, About, VariableTracker, \
     THEN, ELSE, WTEST, WLOOP, LBDA, \
     create_lambda, globals_pool
-from .symbols import get_operator, builtins
+from .symbols import get_operator, inst_builtin
 from uuid import uuid4 as uuid
 import ast
 from copy import copy
@@ -583,7 +583,7 @@ class Parser(LocVisitor):
     # should include the assertion (the type of raise should
     # be bottom, since it does not return).
     # def visit_Assert(self, node: ast.Assert) -> Apply:
-    #     return Apply(builtins.assert_true,
+    #     return Apply(inst_builtin.assert_true,
     #                  self.visit(node.test),
     #                  self.visit(node.msg) if node.msg else Value(None))
 
@@ -610,7 +610,7 @@ class Parser(LocVisitor):
             if isinstance(targ.value, ast.Name):
                 # CASE: x[y] = value
                 val = self.visit(node.value)
-                slice = Apply(builtins.setslice,
+                slice = Apply(inst_builtin.setslice,
                               self.visit(targ.value),
                               self.visit(targ.slice), val)
                 return self.make_assign(targ.value.id, slice)
@@ -628,7 +628,7 @@ class Parser(LocVisitor):
         elif isinstance(targ, ast.Attribute):
             if isinstance(targ.value, ast.Name):
                 # CASE: x.attr = y
-                obj = Apply(builtins.setattr,
+                obj = Apply(inst_builtin.setattr,
                             self.visit(targ.value),
                             Value(targ.attr),
                             self.visit(node.value))
@@ -647,7 +647,7 @@ class Parser(LocVisitor):
 
     def visit_Attribute(self, node: ast.Attribute) -> Apply:
         # CASE: x.attr
-        return Apply(builtins.getattr,
+        return Apply(inst_builtin.getattr,
                      self.visit(node.value),
                      Value(node.attr))
 
@@ -761,27 +761,29 @@ class Parser(LocVisitor):
         # symbols, otherwise they will be shadowed. If I recall correctly,
         # that's why we need to revisit instead of just using testp.
         initial_values = [p.vtrack[v] for v in out_vars]
-        test = Apply(builtins.less, in_iter, Apply(builtins.len, in_list))
+        test = Apply(inst_builtin.less,
+                     in_iter,
+                     Apply(inst_builtin.len, in_list))
         body = p.body_wrapper(node.body)
 
         loop_args = in_syms
         loop_body = body(Apply(wsym,
-                               Apply(builtins.add, in_iter, Value(1)),
+                               Apply(inst_builtin.add, in_iter, Value(1)),
                                in_list,
                                *[p.vtrack[v] for v in in_vars]))
-        loop_ass = Apply(builtins.index, in_list, in_iter)
+        loop_ass = Apply(inst_builtin.index, in_list, in_iter)
         loop_body = Let(((loopvar, loop_ass),), loop_body)
         with About(loop_body.find_location(), 'parse'):
             loop_fn = self.reg_lambda(wbsym, loop_args, loop_body)
         outer_body = Apply(Apply(
-            builtins.switch,
+            inst_builtin.switch,
             test,
             Closure(loop_fn, in_syms),
             # Closure on identity is a trick to create a thunk
             # that returns a pre-defined value (we need this
             # parameter to be a function with no arguments in
             # order to match the signature of the other branch).
-            Closure(builtins.identity, (Tuple(initial_values),))
+            Closure(inst_builtin.identity, (Tuple(initial_values),))
         ))
 
         self.reg_lambda(wsym, in_syms, outer_body)
@@ -900,7 +902,7 @@ class Parser(LocVisitor):
             # In a nutshell, we are doing something similar to this:
             # if test: x; else: y;
             # ==> [(lambda: y), (lambda: x)][test]()
-            return Apply(Apply(builtins.switch,
+            return Apply(Apply(inst_builtin.switch,
                                self.visit(node.test),
                                then_branch,
                                else_branch))
@@ -972,7 +974,7 @@ class Parser(LocVisitor):
     #                 cond = If(p.visit(test), cond, Value(False))
     #             return cond
 
-    #         arg = Apply(builtins.filter,
+    #         arg = Apply(inst_builtin.filter,
     #                     self.make_closure([gen.target], mkcond,
     #                                       loc=loc, label="#filtercmp"),
     #                     self.visit(gen.iter))
@@ -986,7 +988,7 @@ class Parser(LocVisitor):
     #         label="#listcmp"
     #     )
 
-    #     return Apply(builtins.map, lbda, arg)
+    #     return Apply(inst_builtin.map, lbda, arg)
 
     def visit_Module(self, node, allow_decorator=False) \
             -> List[MyiaASTNode]:
@@ -1018,7 +1020,7 @@ class Parser(LocVisitor):
             # values. This will be relaxed eventually.
             raise MyiaSyntaxError(self.return_error)
         self.returns = True
-        return Apply(builtins.raise_exception,
+        return Apply(inst_builtin.raise_exception,
                      self.visit(node.exc))
 
     def visit_Return(self, node: ast.Return) -> MyiaASTNode:
@@ -1033,7 +1035,7 @@ class Parser(LocVisitor):
     def visit_Slice(self, node: ast.Slice) -> Apply:
         # CASE: return x[y:z]
         #                ^^^
-        return Apply(builtins.slice,
+        return Apply(inst_builtin.slice,
                      self.visit(node.lower) if node.lower else Value(0),
                      self.visit(node.upper) if node.upper else Value(None),
                      self.visit(node.step) if node.step else Value(1))
@@ -1049,7 +1051,7 @@ class Parser(LocVisitor):
     def visit_Subscript(self, node: ast.Subscript) -> Apply:
         # CASE: x[y], x[y, z], etc.
         # TODO: test this
-        return Apply(builtins.index,
+        return Apply(inst_builtin.index,
                      self.visit(node.value),
                      self.visit(node.slice))
 
@@ -1126,14 +1128,14 @@ class Parser(LocVisitor):
         with About(loop_body.find_location(), 'parse'):
             loop_fn = self.reg_lambda(wbsym, loop_args, loop_body)
         outer_body = Apply(Apply(
-            builtins.switch,
+            inst_builtin.switch,
             test,
             Closure(loop_fn, in_syms),
             # Closure on identity is a trick to create a thunk
             # that returns a pre-defined value (we need this
             # parameter to be a function with no arguments in
             # order to match the signature of the other branch).
-            Closure(builtins.identity, (Tuple(initial_values),))
+            Closure(inst_builtin.identity, (Tuple(initial_values),))
         ))
 
         self.reg_lambda(wsym, in_syms, outer_body)

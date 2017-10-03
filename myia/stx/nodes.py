@@ -129,7 +129,7 @@ class Symbol(MyiaASTNode):
                       namespace=self.namespace,
                       version=self.version,
                       relation=self.relation)
-        if preserve_about:
+        if preserve_about and self.about:
             rval.about = self.about
         return rval
 
