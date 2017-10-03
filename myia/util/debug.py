@@ -114,11 +114,11 @@ class DebugController:
 
     async def command_up(self, vm, *args):
         "TODO"
-        self.db.log('TODO: UP FRAME', kind='error')
+        self.db.log('TODO: UP FRAME', gutter='error')
 
     async def command_down(self, vm, *args):
         "TODO"
-        self.db.log('TODO: DOWN FRAME', kind='error')
+        self.db.log('TODO: DOWN FRAME', gutter='error')
 
     async def command_top(self, vm, n):
         """
@@ -131,7 +131,7 @@ class DebugController:
         if n == 1:
             self.db(vm.frame.top())
         else:
-            self.db(vm.frame.stack[-n:])
+            self.db(list(reversed(vm.frame.stack[-n:])))
 
     async def command_var(self, vm, expr):
         """
@@ -152,9 +152,9 @@ class DebugController:
                     results[sym] = value
             if not results:
                 self.db.markdown(f'Could not find a variable named `{vname}`',
-                                 kind='error', inline=True)
+                                 gutter='error', inline=True)
             all_results.update(results)
-        self.db.show(all_results, kind='result')
+        self.db.show(all_results, gutter='result')
 
     async def command_help(self, vm, cmd):
         """
@@ -183,9 +183,9 @@ class DebugController:
             cmd = cmd.strip()
             arg = ''.join(rest)
             canon, _ = self.__commands__.get(cmd, (None, None))
-            self.db.log(message.contents or canon, kind='echo')
+            self.db.log(message.contents or canon, gutter='echo')
             if canon is None:
-                self.db.log(f'Unknown command: {cmd}', kind='error')
+                self.db.log(f'Unknown command: {cmd}', gutter='error')
             else:
                 method = getattr(self, f'command_{canon}')
                 if await method(vm, arg):
@@ -200,8 +200,8 @@ class DebugController:
         return False
 
     async def error(self, vm, error):
-        self.db.log('An error occurred!', kind='error')
-        self.db.show(error, kind='error')
+        self.db.log('An error occurred!', gutter='error')
+        self.db.show(error, gutter='error')
         self.dbf(VMPrinter(vm))
         await self.wait_for_command(vm)
 

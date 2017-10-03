@@ -414,9 +414,9 @@ def command_debug(arguments):
     budb.set_trace()
     fn = evaluate(genv[r])
     try:
-        buche(fn.debug(args, budb), kind='result')
+        buche(fn.debug(args, budb), gutter='result')
     except Exception as exc:
-        buche(exc, kind='error')
+        buche(exc, gutter='error')
 
 
 if __name__ == '__main__':
