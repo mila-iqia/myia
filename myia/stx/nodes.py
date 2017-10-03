@@ -395,9 +395,8 @@ class TupleNode(MyiaASTNode):
         return "{{{}}}".format(" ".join(map(str, self.values)))
 
     def __hrepr__(self, H, hrepr):
-        return super().__hrepr__(H, hrepr)(
-            *[hrepr(a) for a in self.values]
-        )
+        return hrepr.stdrepr_iterable(self.values, before='(', after=')',
+                                      cls='TupleNode')
 
 
 class ClosureNode(MyiaASTNode):

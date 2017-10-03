@@ -90,7 +90,7 @@
 	display: block;
 }
 
-.TupleNode {
+/* .TupleNode {
 	display: inline-block;
 	border: 2px dotted green;
 	margin: 2px;
@@ -100,7 +100,13 @@
 .TupleNode > * {
 	margin-left: 5px;
 	margin-right: 5px;
+} */
+
+.TupleNode > .hrepr-title {
+	background: black;
+	padding: 0px;
 }
+
 
 .LambdaArguments {
 	display: inline-block;
