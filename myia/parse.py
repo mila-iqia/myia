@@ -1160,6 +1160,7 @@ def get_global_gen(url) -> GenSym:
 def parse_source(url: str,
                  line: int,
                  src: str,
+                 add_source: bool = True,
                  **kw) -> Lambda:
     """
     Parse a source string with Myia.
@@ -1188,6 +1189,9 @@ def parse_source(url: str,
         r = r.value
     assert isinstance(r, Symbol)
     lbda = globals_pool[r]
+    if add_source:
+        glb = {'__builtins__': __builtins__}
+        globals_pool.add_source(f'global:{url}', glb)
     return lbda
 
 
@@ -1213,6 +1217,7 @@ def parse_function(fn, **kw) -> Lambda:
     lbda = parse_source(filename,
                         line,
                         textwrap.dedent(inspect.getsource(fn)),
+                        False,
                         **kw)
     globals_pool.add_source(f'global:{filename}', fn.__globals__)
     fn_cache[fn].append((kw, lbda))
