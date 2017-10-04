@@ -17,12 +17,13 @@ from .validate import \
     unbound, missing_source, \
     analysis
 from buche import buche, reader
-
+from .impl.impl_interp import type as typeof
 from .util import on_discovery
 from .interpret import VM
 from .stx import Symbol, MyiaASTNode, LambdaNode, \
     AboutPrinter, nodes, globals_pool
 # from .util import BucheDb
+from .symbols import builtins
 
 
 nodes.__save_trace__ = True
@@ -369,9 +370,14 @@ def command_inspect(arguments):
         if isinstance(node, LambdaNode):
             buche['decls'][str(node.ref)](node)
 
-    d.visit(results['lbda'])
-    from .symbols import builtins
-    d.propagate(results['lbda'].body, 'needs', builtins.type)
+    for lbda in results.lbdas:
+        d.visit(lbda)
+        d.propagate(lbda.body, 'needs', builtins.type)
+
+    if args:
+        for lbda in results.called_lbdas:
+            for arg, value in zip(lbda.args, args):
+                d.propagate(arg, 'type', typeof(value))
 
     @reader.on_click
     def handle(e, cmd):

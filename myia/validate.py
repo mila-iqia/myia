@@ -371,7 +371,7 @@ def analysis_eval(pyfn: Callable, lbda: LambdaNode) -> Record:
     def test(args):
         return compare_calls(dict(python = pyfn, myia = func), args)
 
-    return results_record(test=test, lbdas=[lbda])
+    return results_record(test=test, lbdas=[lbda], called_lbdas=[lbda])
 
 
 def analysis_grad(pyfn: Callable, lbda: LambdaNode) -> Record:
@@ -406,7 +406,9 @@ def analysis_grad(pyfn: Callable, lbda: LambdaNode) -> Record:
         ))
         return comparison
 
-    return results_record(test=test, lbdas=[lbda, glbda])
+    return results_record(test=test,
+                          lbdas=[lbda, glbda],
+                          called_lbdas=[lbda, glbda])
 
 
 # TODO: The following is not fully solid yet.
@@ -454,4 +456,6 @@ def analysis_grad2(pyfn, lbda):
                         func.argnames, ('(df/dx)',))
         return gt.compare()
 
-    return results_record(test=test, lbdas=[lbda, glbda, g2lbda])
+    return results_record(test=test,
+                          lbdas=[lbda, glbda, g2lbda],
+                          called_lbdas=[])
