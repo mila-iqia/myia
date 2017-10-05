@@ -166,6 +166,9 @@ class Symbol(MyiaASTNode):
             rval = rval(H.span['SymbolIndex'](self.version))
         return rval
 
+    def __hrepr_short__(self, H, hrepr):
+        return self.__hrepr__(H, hrepr)
+
 
 SymbolNode = Symbol
 

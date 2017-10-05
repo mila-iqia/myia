@@ -154,7 +154,7 @@ class DebugController:
                 self.db.markdown(f'Could not find a variable named `{vname}`',
                                  gutter='error', inline=True)
             all_results.update(results)
-        self.db.show(all_results, gutter='result')
+        self.db.show(all_results, {'max_depth': 3}, gutter='result')
 
     async def command_help(self, vm, cmd):
         """
