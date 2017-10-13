@@ -52,6 +52,7 @@ class builtins(metaclass=SymbolsMeta):
     Closure = bsym('Closure')
     closure_fn = bsym('closure_fn')
     closure_args = bsym('closure_args')
+    partial = bsym('partial')
     mktuple = bsym('mktuple')
     mklist = bsym('mklist')
     fit = bsym('fit')

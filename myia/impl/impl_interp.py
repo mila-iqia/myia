@@ -217,6 +217,11 @@ def closure_args(clos):
 
 
 @impl_interp
+def partial(fn, *args):
+    return myiaClosure(fn, args)
+
+
+@impl_interp
 def mktuple(*args):
     return pytuple(args)
 
@@ -367,7 +372,7 @@ def J(x):
     """
     if isinstance(x, (Primitive, Function)):
         return J_fn(x, 0)
-    elif isinstance(x, (int, float, bool)) or x is None or x is ZERO:
+    elif isinstance(x, (int, float, bool, str)) or x is None or x is ZERO:
         return x
     elif isinstance(x, (numpy.ndarray, numpy.generic)):
         return x
@@ -460,10 +465,10 @@ def zeros_like(x):
         return 0
     elif isinstance(x, (Primitive, Function)):
         return x
-    elif x is None:
-        return None
+    elif x is None or x is ZERO:
+        return x
     else:
-        raise TypeError(f'Cannot create a {value} conformant with {x}')
+        raise TypeError(f'Cannot create a zero conformant with {x}')
 
 
 @impl_interp

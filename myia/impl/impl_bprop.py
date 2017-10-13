@@ -7,7 +7,7 @@ from ..stx import Symbol, ApplyNode as Apply, ClosureNode, \
 from ..symbols import inst_builtin
 from ..parse import parse_function
 from .impl_interp import zeros_like, J, Jinv, switch, first, second, \
-    Closure, closure_fn, reduce, add, exp, log, transpose, \
+    Closure, closure_fn, closure_args, reduce, add, exp, log, transpose, \
     broadcast, shape, fit, setslice
 from ..transform.grad import ggen, grad_computers
 from ..lib import Primitive
@@ -247,6 +247,16 @@ def bprop_identity(v, dz):
 #################################
 # Gradients of other primitives #
 #################################
+
+
+@impl_bprop
+def bprop_Closure(fn, args, dz):
+    return GRAD(closure_fn(dz), closure_args(dz))
+
+
+@impl_bprop
+def bprop_closure_fn(clos, dz):
+    return GRAD(Closure(dz, Jinv(zeros_like(closure_args(clos)))))
 
 
 @impl_bprop
