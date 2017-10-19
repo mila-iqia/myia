@@ -270,9 +270,10 @@ class LambdaNode(MyiaASTNode):
                  args: List[Symbol],
                  body: MyiaASTNode,
                  gen: 'GenSym',
+                 ref: Symbol = None,
                  **kw) -> None:
         super().__init__(**kw)
-        self.ref: Symbol = None
+        self.ref = ref
         self.args = args
         self.body = body
         self.gen = gen

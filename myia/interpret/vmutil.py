@@ -126,7 +126,11 @@ class VMCode(HReprBase):
     def process(self, node) -> None:
         # Dispatch to process_<node_type>
         cls = node.__class__.__name__
-        method = getattr(self, 'process_' + cls)
+        try:
+            method = getattr(self, 'process_' + cls)
+        except AttributeError:
+            msg = f"No 'process_{cls}' method to process {node!r}."
+            raise AttributeError(msg)
         rval = method(node)
 
     def process_ApplyNode(self, node) -> None:

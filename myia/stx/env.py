@@ -112,6 +112,13 @@ class GenSym:
             relation=relation
         )
 
+    def dup(self, orig: Symbol) -> Symbol:
+        """
+        Make a new Symbol that has the same name/relation/etc. as the
+        original, but a new version.
+        """
+        return self(orig.label, orig.relation or None)
+
     def __call__(self, s: Union[str, Symbol],
                  rel: str = None, *,
                  version: int = None) -> Symbol:
@@ -156,6 +163,10 @@ def nsym() -> Symbol:
 def is_global(sym):
     ns = sym.namespace
     return ns.startswith('global:')
+
+
+def is_builtin(sym):
+    return sym.namespace == 'global::builtin'
 
 
 class VariableTracker:

@@ -54,7 +54,7 @@ def impl_interp_myia(sym, name, fn):
     lbda = parse_function(fn)
     impl_bank['interp'][sym] = lbda
     prim = lbda  # eenvs.run_env(lbda)
-    object_map[prim] = sym
+    # object_map[prim] = lbda #sym
     return prim
 
 
@@ -461,7 +461,7 @@ def zeros_like(x):
     >>> x = 10; zeros_like(lambda y: x + y)  # (metaphorically)
     lambda y: 0 + y
     """
-    if isinstance(x, (int, float, bool)):
+    if isinstance(x, (int, float, bool, numpy.int64)):
         return 0
     elif isinstance(x, (Primitive, Function)):
         return x
