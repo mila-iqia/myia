@@ -13,6 +13,8 @@ from copy import copy
 import traceback
 from ..util import HReprBase
 from .about import Location, top as about_top
+import colorsys
+from hashlib import md5
 
 
 __save_trace__ = False
@@ -153,9 +155,36 @@ class Symbol(MyiaASTNode):
         return hash((self.label, self.namespace,
                      self.version, self.relation))
 
+    def __style__(self):
+        """
+        Generate the color associated to the symbol's namespace.
+        The color is generated using the md5-encoding of the namespace
+        and is uniform in the YIQ color space where Y=0.5 (Y being the
+        brightness, so the color should contrast nicely on a white
+        background).
+        """
+        if isinstance(self.label, Symbol):
+            return self.label.__style__()
+        hn = int(md5(self.namespace.encode()).hexdigest(), 16)
+        # The offsets were cherry-picked to make global::builtin blue.
+        hn1 = ((hn >> 32) & 0xFF) / 256
+        hn2 = ((hn >> 16) & 0xFF) / 256
+        y = 0.5
+        i = (hn1 * 2 - 1) * 0.5957
+        q = (hn2 * 2 - 1) * 0.5226
+        r, g, b = colorsys.yiq_to_rgb(y, i, q)
+        r = int(r * 256)
+        g = int(g * 256)
+        b = int(b * 256)
+        style = f'color:rgb({r}, {g}, {b})'
+        if self.namespace.startswith('global:'):
+            style += ';font-style:italic'
+        return style
+
     def __hrepr__(self, H, hrepr):
         ns = f'myia-ns-{self.namespace or "-none"}'
         rval = super().__hrepr__(H, hrepr)[ns]
+        rval = rval(style=self.__style__())
         if self.relation:
             rval = rval(H.span['SymbolRelation'](self.relation))
         if isinstance(self.label, str):
