@@ -44,9 +44,9 @@ class COPY(Singleton):
     pass
 
 
-FN = FN()
-CL = CL()
-COPY = COPY()
+FN = FN()  # type: ignore
+CL = CL()  # type: ignore
+COPY = COPY()  # type: ignore
 
 
 class IN:
