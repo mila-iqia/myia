@@ -94,14 +94,90 @@ class GET:
             self.index == other.index
 
 
+#####################
+# Computation types #
+#####################
+
+
+class Operation:
+    def install(self, graph, node):
+        graph.clear_out(node)
+        node.operation = self
+
+
+class ApplyOperation(Operation):
+    def __init__(self, fn, args):
+        self.fn = fn
+        self.args = tuple(args)
+
+    def install(self, graph, node):
+        super().install(graph, node)
+        graph.add_edge(node, self.fn, FN)
+        for i, arg in enumerate(self.args):
+            graph.add_edge(node, arg, IN(i))
+
+
+class ClosureOperation(Operation):
+    def __init__(self, fn, args):
+        self.fn = fn
+        self.args = tuple(args)
+
+    def install(self, graph, node):
+        super().install(graph, node)
+        graph.add_edge(node, self.fn, CL)
+        for i, arg in enumerate(self.args):
+            graph.add_edge(node, arg, IN(i))
+
+
+class TupleOperation(Operation):
+    def __init__(self, values):
+        self.values = tuple(values)
+
+    def install(self, graph, node):
+        super().install(graph, node)
+        for i, value in enumerate(self.values):
+            graph.add_edge(node, value, ELEM(i))
+
+
+class GetOperation(Operation):
+    def __init__(self, arg, index):
+        self.arg = arg
+        self.index = index
+
+    def install(self, graph, node):
+        super().install(graph, node)
+        graph.add_edge(node, self.arg, GET(self.index))
+
+
+class CopyOperation(Operation):
+    def __init__(self, arg):
+        self.arg = arg
+
+    def install(self, graph, node):
+        super().install(graph, node)
+        graph.add_edge(node, self.arg, COPY)
+
+
+#########################
+# Graph class and nodes #
+#########################
+
+
 class IRGraph(nx.MultiDiGraph):
+
+    def clear_out(self, node):
+        if not self.has_node(node):
+            return
+        prev = list(self.edges(node, keys=True))
+        if prev:
+            self.remove_edges_from(prev)
 
     def link(self, dest, source, role):
         assert not isinstance(dest, Symbol)
         assert not isinstance(source, Symbol)
         self.add_edge(dest, source, role)
 
-    def productor(self, node):
+    def sync(self, node):
         e = self.edges(node, keys=True)
         fn = None
         cl = None
@@ -127,17 +203,22 @@ class IRGraph(nx.MultiDiGraph):
         if len([x for x in [fn, cl, elems, idx, cp] if x]) > 1:
             raise Exception('Same node cannot be produced in multiple ways.')
         if fn:
-            return 'apply', fn, tuple(inputs[i] for i in range(len(inputs)))
+            op = ApplyOperation(fn, tuple(inputs[i] for i in range(len(inputs))))
         elif cl:
-            return 'closure', cl, tuple(inputs[i] for i in range(len(inputs)))
+            op = ClosureOperation(cl, tuple(inputs[i] for i in range(len(inputs))))
         elif elems:
-            return 'tuple', tuple(elems[i] for i in range(len(elems)))
+            op = TupleOperation(tuple(elems[i] for i in range(len(elems))))
         elif idx:
-            return tuple(['index', *idx])
+            op = GetOperation(*idx)
         elif cp:
-            return tuple(['copy', cp])
+            op = CopyOperation(cp)
         else:
-            return None,
+            op = None
+        node.operation = op
+
+    def productor(self, node):
+        self.sync(node)
+        return node.operation
 
     def toposort(self):
         return nx.topological_sort(self)
@@ -147,6 +228,7 @@ class IRNode:
     def __init__(self, tag):
         self.tag = tag
         self.values = None
+        self.operation = None
 
     def to_ast(self):
         return self.tag
@@ -158,6 +240,7 @@ class IRNode:
             return self
         n = copy(self)
         n.tag = gen.dup(self.tag)
+        n.operation = None
         return n
 
     @property
@@ -206,10 +289,9 @@ class PatternOpt:
 
     def _match(self, lbda, node, pattern, U):
         if isinstance(pattern, tuple):
-            mode, *args = lbda.graph.productor(node)
-            if mode == 'apply':
-                fn, args = args
-                sexp = (fn,) + args
+            prod = lbda.graph.productor(node)
+            if isinstance(prod, ApplyOperation):
+                sexp = (prod.fn,) + prod.args
                 if len(sexp) != len(pattern):
                     return False
                 for p, e in zip(pattern, sexp):
@@ -258,8 +340,7 @@ def multiply_by_one(lbda, node, X):
 
 @pattern_opt(builtins.index, X, 1)
 def index_equiv(lbda, node, X):
-    lbda.graph.remove_edges_from(list(lbda.graph.edges(node, keys=True)))
-    lbda.graph.add_edge(node, X, GET(1))
+    GetOperation(X, 1).install(lbda.graph, node)
     return True
 
 
@@ -270,12 +351,9 @@ def J_cancel(lbda, node, X):
 
 @pattern_opt(builtins.closure_args, X)
 def take_closure_args(lbda, node, X):
-    mode, *args = lbda.graph.productor(X)
-    if mode is 'closure':
-        _, args = args
-        lbda.graph.remove_edges_from(list(lbda.graph.edges(node, keys=True)))
-        for i, a in enumerate(args):
-            lbda.graph.link(node, a, ELEM(i))
+    prod = lbda.graph.productor(X)
+    if isinstance(prod, ClosureOperation):
+        TupleOperation(prod.args).install(lbda.graph, node)
         return True
     else:
         return False
@@ -301,6 +379,8 @@ class IRLambda(IRNode):
         g2 = nx.relabel_nodes(g, corresp, copy=True)
         lbda.graph = IRGraph()
         lbda.graph.add_edges_from(g2.edges(keys=True))
+        # for node in lbda.graph.nodes:
+        #     lbda.graph.sync(node)
         lbda.inputs = [corresp[i] for i in self.inputs]
         lbda.output = corresp[self.output]
         return lbda
@@ -356,17 +436,16 @@ class IRLambda(IRNode):
 
     def _inline_data(self, node):
         g = self.graph
-        mode, *args = g.productor(node)
-        if mode == 'apply':
-            fn, args = args
+        prod = g.productor(node)
+        if isinstance(prod, ApplyOperation):
+            fn = prod.fn
             if isinstance(fn, IRLambda):
-                return fn, args
+                return fn, prod.args
             else:
-                mode2, *args2 = g.productor(fn)
-                if mode2 == 'closure':
-                    fn2, args2 = args2
-                    if isinstance(fn2, IRLambda):
-                        return fn2, args2 + args
+                prod2 = g.productor(fn)
+                if isinstance(prod2, ClosureOperation):
+                    if isinstance(prod2.fn, IRLambda):
+                        return prod2.fn, prod2.args + prod.args
         return None
 
     def inlinable(self, node):
@@ -385,8 +464,7 @@ class IRLambda(IRNode):
         for input, arg in zip(f2.inputs, args):
             g.link(input, arg, COPY)
 
-        g.remove_edges_from(list(g.edges(node, keys=True)))
-        g.link(node, f2.output, COPY)
+        CopyOperation(f2.output).install(g, node)
 
         return True
 
@@ -433,9 +511,10 @@ class IRLambda(IRNode):
     def evaluate_constants(self):
         changes = False
         for n in list(self.graph.nodes):
-            mode, *args = self.graph.productor(n)
-            if mode == 'apply':
-                f, args = args
+            prod = self.graph.productor(n)
+            if isinstance(prod, ApplyOperation):
+                f = prod.fn
+                args = prod.args
                 all_constant = all(self._is_constant(x) for x in (f,) + args)
                 if all_constant:
                     eenv = self.universe.eenv
@@ -623,18 +702,16 @@ class Universe:
                 return
 
             if isinstance(v, ApplyNode):
-                g.link(wk, wrap(v.fn), FN)
-                for i, arg in enumerate(v.args):
-                    g.link(wk, wrap(arg), IN(i))
+                args = [wrap(a) for a in v.args]
+                ApplyOperation(wrap(v.fn), args).install(g, wk)
             elif isinstance(v, (Symbol, ValueNode)):
-                g.link(wk, wrap(v), COPY)
+                CopyOperation(wrap(v)).install(g, wk)
             elif isinstance(v, ClosureNode):
-                g.link(wk, wrap(v.fn), CL)
-                for i, arg in enumerate(v.args):
-                    g.link(wk, wrap(arg), IN(i))
+                args = [wrap(a) for a in v.args]
+                ClosureOperation(wrap(v.fn), args).install(g, wk)
             elif isinstance(v, TupleNode):
-                for i, value in enumerate(v.values):
-                    g.link(wk, wrap(value), ELEM(i))
+                args = [wrap(a) for a in v.values]
+                TupleOperation(args).install(g, wk)
             else:
                 raise MyiaSyntaxError('Illegal ANF clause.', node=v)
 
@@ -671,27 +748,22 @@ class GraphToANF:
                 pass
 
             else:
-                mode, *args = g.productor(node)
-                if mode == 'apply':
-                    f, args = args
-                    args = [a.to_ast() for a in args]
-                    val = ApplyNode(f.to_ast(), *args)
-                elif mode == 'closure':
-                    f, args = args
-                    args = [a.to_ast() for a in args]
-                    val = ClosureNode(f.to_ast(), args)
-                elif mode == 'tuple':
-                    args, = args
-                    args = [a.to_ast() for a in args]
+                prod = g.productor(node)
+                if isinstance(prod, ApplyOperation):
+                    args = [a.to_ast() for a in prod.args]
+                    val = ApplyNode(prod.fn.to_ast(), *args)
+                elif isinstance(prod, ClosureOperation):
+                    args = [a.to_ast() for a in prod.args]
+                    val = ClosureNode(prod.fn.to_ast(), args)
+                elif isinstance(prod, TupleOperation):
+                    args = [a.to_ast() for a in prod.values]
                     val = TupleNode(args)
-                elif mode == 'index':
-                    arg, idx = args
+                elif isinstance(prod, GetOperation):
                     val = ApplyNode(inst_builtin.index,
-                                    arg.to_ast(),
-                                    ValueNode(idx))
-                elif mode == 'copy':
-                    arg, = args
-                    val = arg.to_ast()
+                                    prod.arg.to_ast(),
+                                    ValueNode(prod.index))
+                elif isinstance(prod, CopyOperation):
+                    val = prod.arg.to_ast()
                 else:
                     continue
                 bindings.append((node.tag, val))
