@@ -22,39 +22,64 @@ class RestrictedVar:
     __repr__ = __str__
 
 
-@dispatch(RestrictedVar)
-def isvar(v):  # type: ignore
+class FilterVar:
+    def __init__(self, token, filter):
+        self.token = token
+        self.filter = filter
+
+    def __str__(self):
+        return "~" + str(self.token)
+
+    __repr__ = __str__
+
+
+@dispatch(RestrictedVar)  # type: ignore
+def isvar(v):
     # Extend unification.isvar to recognize RestrictedVar.
     return True
 
 
-def var(token, legal_values=None):
+@dispatch(FilterVar)  # type: ignore
+def isvar(v):
+    # Extend unification.isvar to recognize FilterVar.
+    return True
+
+
+def var(token, filter=None):
     """
     Create a variable for unification purposes.
 
     Arguments:
         token: The name of the variable.
-        legal_values: A set of values the variable is allowed to
-            take.
+        filter: A predicate, or a set of values the variable is
+            allowed to take.
     """
-    if legal_values:
-        return RestrictedVar(token, legal_values)
+    if callable(filter):
+        return FilterVar(token, filter)
+    elif filter:
+        return RestrictedVar(token, filter)
     else:
         return Var(token)
 
 
-def unify(a, b):
+def unify(a, b, U=None):
     """
     Unify a and b and return a dictionary associating variables to
     values that can unify a and b. This takes into account the legal
     values a RestrictedVar can take.
     """
-    d = _unify(a, b)
+    if U is None:
+        d = _unify(a, b)
+    else:
+        d = _unify(a, b, U)
     if not d:
         return d
     for v, value in d.items():
         if isinstance(v, RestrictedVar):
             if value not in v.legal_values:
+                return False
+        elif isinstance(v, FilterVar):
+            if not v.filter(value):
                 return False
     return d
 

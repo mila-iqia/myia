@@ -13,7 +13,7 @@ from numpy import ndarray
 from ..transform import a_normal
 from copy import copy
 from buche import buche
-from unification import var, unify
+from ..inference.types import var, unify, isvar
 from collections import defaultdict
 
 
@@ -117,45 +117,61 @@ class ApplyOperation(Operation):
             graph.add_edge(node, arg, IN(i))
 
 
-class ClosureOperation(Operation):
-    def __init__(self, fn, args):
-        self.fn = fn
-        self.args = tuple(args)
+# class ClosureOperation(Operation):
+#     def __init__(self, fn, args):
+#         self.fn = fn
+#         self.args = tuple(args)
 
-    def install(self, graph, node):
-        super().install(graph, node)
-        graph.add_edge(node, self.fn, CL)
-        for i, arg in enumerate(self.args):
-            graph.add_edge(node, arg, IN(i))
-
-
-class TupleOperation(Operation):
-    def __init__(self, values):
-        self.values = tuple(values)
-
-    def install(self, graph, node):
-        super().install(graph, node)
-        for i, value in enumerate(self.values):
-            graph.add_edge(node, value, ELEM(i))
+#     def install(self, graph, node):
+#         super().install(graph, node)
+#         graph.add_edge(node, self.fn, CL)
+#         for i, arg in enumerate(self.args):
+#             graph.add_edge(node, arg, IN(i))
 
 
-class GetOperation(Operation):
-    def __init__(self, arg, index):
-        self.arg = arg
-        self.index = index
-
-    def install(self, graph, node):
-        super().install(graph, node)
-        graph.add_edge(node, self.arg, GET(self.index))
+def ClosureOperation(fn, args):
+    return ApplyOperation(IRValue(builtins.partial), (fn,) + tuple(args))
 
 
-class CopyOperation(Operation):
-    def __init__(self, arg):
-        self.arg = arg
+# class TupleOperation(Operation):
+#     def __init__(self, values):
+#         self.values = tuple(values)
 
-    def install(self, graph, node):
-        super().install(graph, node)
-        graph.add_edge(node, self.arg, COPY)
+#     def install(self, graph, node):
+#         super().install(graph, node)
+#         for i, value in enumerate(self.values):
+#             graph.add_edge(node, value, ELEM(i))
+
+
+def TupleOperation(values):
+    return ApplyOperation(IRValue(builtins.mktuple), values)
+
+
+# class GetOperation(Operation):
+#     def __init__(self, arg, index):
+#         self.arg = arg
+#         self.index = index
+
+#     def install(self, graph, node):
+#         super().install(graph, node)
+#         graph.add_edge(node, self.arg, GET(self.index))
+
+
+def GetOperation(arg, index):
+    return ApplyOperation(IRValue(builtins.index), (arg, IRValue(index)))
+
+
+# class CopyOperation(Operation):
+#     def __init__(self, arg):
+#         self.arg = arg
+
+#     def install(self, graph, node):
+#         super().install(graph, node)
+#         graph.add_edge(node, self.arg, COPY)
+
+
+def CopyOperation(arg):
+    return ApplyOperation(IRValue(builtins.identity), (arg,))
 
 
 #########################
@@ -178,6 +194,8 @@ class IRGraph(nx.MultiDiGraph):
         self.add_edge(dest, source, role)
 
     def sync(self, node):
+        if not self.has_node(node):
+            self.add_node(node)
         e = self.edges(node, keys=True)
         fn = None
         cl = None
@@ -203,9 +221,11 @@ class IRGraph(nx.MultiDiGraph):
         if len([x for x in [fn, cl, elems, idx, cp] if x]) > 1:
             raise Exception('Same node cannot be produced in multiple ways.')
         if fn:
-            op = ApplyOperation(fn, tuple(inputs[i] for i in range(len(inputs))))
+            args = tuple(inputs[i] for i in range(len(inputs)))
+            op = ApplyOperation(fn, args)
         elif cl:
-            op = ClosureOperation(cl, tuple(inputs[i] for i in range(len(inputs))))
+            args = tuple(inputs[i] for i in range(len(inputs)))
+            op = ClosureOperation(cl, args)
         elif elems:
             op = TupleOperation(tuple(elems[i] for i in range(len(elems))))
         elif idx:
@@ -248,6 +268,9 @@ class IRNode:
         v, = self.values
         return v
 
+    def has_value(self):
+        return self.values and len(self.values) == 1
+
     def __str__(self):
         return str(f'{self.__class__.__name__}({self.tag})')
 
@@ -267,7 +290,7 @@ class IRComputation(IRNode):
 
 class IRValue(IRNode):
     def __init__(self, value):
-        super().__init__(str(value))
+        super().__init__(value)
         self.values = [value]
 
     def to_ast(self):
@@ -280,6 +303,11 @@ class IRValue(IRNode):
 
 X = var('X')
 Y = var('Y')
+Z = var('Z')
+V = var('V', lambda x: x.has_value())
+V1 = var('V1', lambda x: x.has_value())
+V2 = var('V2', lambda x: x.has_value())
+L = var('L', lambda x: isinstance(x, IRLambda))
 
 
 class PatternOpt:
@@ -292,6 +320,13 @@ class PatternOpt:
             prod = lbda.graph.productor(node)
             if isinstance(prod, ApplyOperation):
                 sexp = (prod.fn,) + prod.args
+                if ... in pattern:
+                    idx = pattern.index(...)
+                    ntail = len(pattern) - idx - 1
+                    pattern = pattern[:idx] + pattern[idx + 1:]
+                    idx_last = len(sexp) - ntail
+                    mid = list(sexp[idx - 1:idx_last])
+                    sexp = sexp[:idx - 1] + (mid,) + sexp[idx_last:]
                 if len(sexp) != len(pattern):
                     return False
                 for p, e in zip(pattern, sexp):
@@ -301,7 +336,17 @@ class PatternOpt:
                 return U
             else:
                 return False
-        elif node.values and len(node.values) == 1:
+        elif isinstance(node, list):
+            if isvar(pattern):
+                for x in node:
+                    if not unify(pattern, x, U):
+                        return False
+                return {**U, var(pattern.token): node}
+            else:
+                return False
+        elif isvar(pattern):
+            return unify(pattern, node, U)
+        elif node.has_value():
             return unify(pattern, node.value, U)
         else:
             return unify(pattern, node, U)
@@ -316,6 +361,9 @@ class PatternOpt:
             repl = self.handler(lbda, node, **kwargs)
             if repl is True or repl is False:
                 return repl
+            elif isinstance(repl, Operation):
+                repl.install(lbda.graph, node)
+                return True
             else:
                 lbda.replace(node, repl)
                 return True
@@ -333,30 +381,104 @@ def pattern_opt(*pattern):
     return wrap
 
 
+@pattern_opt(builtins.add, (builtins.mktuple, X, ...),
+                           (builtins.mktuple, Y, ...))
+def add_tuples(lbda, node, X, Y):
+    adds = []
+    for x, y in zip(X, Y):
+        tmp = IRComputation(ogen('T'))
+        op = ApplyOperation(IRValue(builtins.add), (x, y))
+        op.install(lbda.graph, tmp)
+        adds.append(tmp)
+    return TupleOperation(adds)
+
+
 @pattern_opt(builtins.multiply, 1.0, X)
 def multiply_by_one(lbda, node, X):
     return X
 
 
-@pattern_opt(builtins.index, X, 1)
-def index_equiv(lbda, node, X):
-    GetOperation(X, 1).install(lbda.graph, node)
-    return True
+@pattern_opt(builtins.index, (builtins.mktuple, X, ...), V)
+def take_index(lbda, node, X, V):
+    return X[V.value]
+
+
+@pattern_opt(builtins.J, (builtins.switch, X, Y, Z))
+def J_switch(lbda, node, X, Y, Z):
+    tmps = []
+    for v in (X, Y, Z):
+        t = IRComputation(ogen(v.tag, 'T'))
+        tmps.append(t)
+        ApplyOperation(IRValue(builtins.J), (v,)).install(lbda.graph, t)
+    return ApplyOperation(IRValue(builtins.switch), tmps)
 
 
 @pattern_opt(builtins.Jinv, (builtins.J, X))
-def J_cancel(lbda, node, X):
+def Jinv_J_cancel(lbda, node, X):
     return X
 
 
-@pattern_opt(builtins.closure_args, X)
-def take_closure_args(lbda, node, X):
-    prod = lbda.graph.productor(X)
-    if isinstance(prod, ClosureOperation):
-        TupleOperation(prod.args).install(lbda.graph, node)
-        return True
-    else:
+@pattern_opt(builtins.J, (builtins.Jinv, X))
+def J_Jinv_cancel(lbda, node, X):
+    return X
+
+
+@pattern_opt(L, X, ...)
+def inline(lbda, node, L, X):
+    f = L
+    args = X
+
+    g = lbda.graph
+
+    f2 = f.dup()
+    g.add_edges_from(f2.graph.edges(keys=True))
+
+    for input, arg in zip(f2.inputs, args):
+        CopyOperation(arg).install(g, input)
+    CopyOperation(f2.output).install(g, node)
+
+    return True
+
+
+@pattern_opt((builtins.partial, X, Y, ...), Z, ...)
+def call_partial(lbda, node, X, Y, Z):
+    return ApplyOperation(X, Y + Z)
+
+
+@pattern_opt(V1, V2, ...)
+def eval_constant(lbda, node, V1, V2):
+    if V1.value == builtins.partial:
         return False
+    f = V1
+    args = V2
+    eenv = lbda.universe.eenv
+    fn = eenv.evaluate(f.value)
+    res = fn(*[eenv.import_value(arg.value) for arg in args])
+    return lbda.value_to_node(res)
+
+
+@pattern_opt(builtins.identity, X)
+def drop_copy(lbda, node, X):
+    return X
+
+
+@pattern_opt(L, V, ...)
+def eval_constant2(lbda, node, V1, V2):
+    f = L
+    args = V
+    eenv = lbda.universe.eenv
+    fn = eenv.evaluate(f.lbda)
+    res = fn(*[eenv.import_value(arg.value) for arg in args])
+    return lbda.value_to_node(res)
+
+
+# @pattern_opt(builtins.closure_args, X)
+# def take_closure_args(lbda, node, X):
+#     prod = lbda.graph.productor(X)
+#     if isinstance(prod, ClosureOperation):
+#         return TupleOperation(prod.args)
+#     else:
+#         return False
 
 
 class IRLambda(IRNode):
@@ -434,47 +556,6 @@ class IRLambda(IRNode):
             for n in nodes:
                 self.merge(n, node0)
 
-    def _inline_data(self, node):
-        g = self.graph
-        prod = g.productor(node)
-        if isinstance(prod, ApplyOperation):
-            fn = prod.fn
-            if isinstance(fn, IRLambda):
-                return fn, prod.args
-            else:
-                prod2 = g.productor(fn)
-                if isinstance(prod2, ClosureOperation):
-                    if isinstance(prod2.fn, IRLambda):
-                        return prod2.fn, prod2.args + prod.args
-        return None
-
-    def inlinable(self, node):
-        return self._inline_data(node) is not None
-
-    def inline(self, node):
-        g = self.graph
-        _d = self._inline_data(node)
-        if _d is None:
-            return False
-        f, args = _d
-        f2 = f.dup()
-
-        g.add_edges_from(f2.graph.edges(keys=True))
-
-        for input, arg in zip(f2.inputs, args):
-            g.link(input, arg, COPY)
-
-        CopyOperation(f2.output).install(g, node)
-
-        return True
-
-    def inline_all(self):
-        changes = False
-        for node in list(self.graph.nodes):
-            if self.inline(node):
-                changes = True
-        return changes
-
     def replace(self, old, new):
         g = self.graph
         for n, _, k in list(g.in_edges(old, keys=True)):
@@ -507,44 +588,6 @@ class IRLambda(IRNode):
             return IRValue(v)
         else:
             raise Exception(f'Do not recognize value: {v}')
-
-    def evaluate_constants(self):
-        changes = False
-        for n in list(self.graph.nodes):
-            prod = self.graph.productor(n)
-            if isinstance(prod, ApplyOperation):
-                f = prod.fn
-                args = prod.args
-                all_constant = all(self._is_constant(x) for x in (f,) + args)
-                if all_constant:
-                    eenv = self.universe.eenv
-                    if isinstance(f, IRLambda):
-                        fn = eenv.evaluate(f.lbda)
-                    else:
-                        fn = eenv.evaluate(f.value)
-                    res = fn(*[eenv.import_value(arg.value)
-                               for arg in args])
-                    n2 = self.value_to_node(res)
-                    self.replace(n, n2)
-        return changes
-
-    def collapse_copies(self):
-        changes = False
-        for a, b, k in list(self.graph.edges(keys=True)):
-            if k is COPY:
-                changes = True
-                self.replace(a, b)
-        return changes
-
-    def collapse_index(self):
-        changes = False
-        for a, b, k in list(self.graph.edges(keys=True)):
-            if isinstance(k, GET):
-                for _, d, k2 in list(self.graph.edges(b, keys=True)):
-                    if isinstance(k2, ELEM) and k.index == k2.index:
-                        changes = True
-                        self.replace(a, d)
-        return changes
 
     def simplify(self):
         changes = False
@@ -630,14 +673,10 @@ class Universe:
         while changes:
             # Run until equilibrium (all the optimizations below
             # are normalizing)
-            opers = [lbda.evaluate_constants(),
-                     lbda.inline_all(),
-                     lbda.collapse_copies(),
-                     lbda.collapse_index(),
-                     lbda.simplify(),
-                     lbda.prune(),
+            opers = [lbda.simplify(),
                      lbda.cse()]
             changes = any(opers)
+            lbda.prune()
 
     def _graph_transform(self, lbda):
         let = lbda.body
@@ -751,19 +790,16 @@ class GraphToANF:
                 prod = g.productor(node)
                 if isinstance(prod, ApplyOperation):
                     args = [a.to_ast() for a in prod.args]
-                    val = ApplyNode(prod.fn.to_ast(), *args)
-                elif isinstance(prod, ClosureOperation):
-                    args = [a.to_ast() for a in prod.args]
-                    val = ClosureNode(prod.fn.to_ast(), args)
-                elif isinstance(prod, TupleOperation):
-                    args = [a.to_ast() for a in prod.values]
-                    val = TupleNode(args)
-                elif isinstance(prod, GetOperation):
-                    val = ApplyNode(inst_builtin.index,
-                                    prod.arg.to_ast(),
-                                    ValueNode(prod.index))
-                elif isinstance(prod, CopyOperation):
-                    val = prod.arg.to_ast()
+                    fn = prod.fn.to_ast()
+                    if fn == builtins.identity:
+                        val, = args
+                    elif fn == builtins.mktuple:
+                        val = TupleNode(args)
+                    elif fn == builtins.partial:
+                        fn, *args = args
+                        val = ClosureNode(fn, args)
+                    else:
+                        val = ApplyNode(fn, *args)
                 else:
                     continue
                 bindings.append((node.tag, val))
