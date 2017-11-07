@@ -442,12 +442,18 @@ class AVM(EventDispatcher):
 
 
 class AEvaluationEnv(EvaluationEnv):
-    def __init__(self, primitives, pool, vm_class, setup, config={}):
-        super().__init__(primitives, pool, vm_class, setup, config)
+    def __init__(self, primitives, pool, config={}):
+        super().__init__(primitives, pool, config)
         projs = config['projs']
         self.projs = projs
         self.dfa = DFA([ValueTrack, self.needs_track], self.pool)
         self.config['needs'] = self.dfa.values[self.dfa.tracks['needs']]
+
+    def setup(self):
+        load()
+
+    def vm(self, code, local_env):
+        return AVM(code, local_env, self, **self.config)
 
     def needs_track(self, dfa):
         return NeedsTrack(dfa, self.projs)
@@ -467,7 +473,7 @@ class AEvaluationEnv(EvaluationEnv):
 
 
 eenvs = EvaluationEnvCollection(AEvaluationEnv, aroot_globals,
-                                globals_pool, AVM, load, cache=False)
+                                globals_pool, cache=False)
 
 
 def abstract_evaluate(node, proj=None):

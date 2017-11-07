@@ -36,6 +36,7 @@ class MyiaFunction:
         fn = options['fn']
         ctrl = options.get('controller', None)
         self.lbda = parse_function(fn)
+        self.__myia_lambda__ = self.lbda
         self.fn = evaluate(self.lbda, controller=ctrl)
 
     def __call__(self, *args):

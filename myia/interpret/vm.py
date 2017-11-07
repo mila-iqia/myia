@@ -335,8 +335,16 @@ class VMFrame(HReprBase):
         return views
 
 
-eenvs = EvaluationEnvCollection(EvaluationEnv, root_globals,
-                                globals_pool, VM, load)
+class StandardEvaluationEnv(EvaluationEnv):
+    def vm(self, code, local_env):
+        return VM(code, local_env, self, **self.config)
+
+    def setup(self):
+        load()
+
+
+eenvs = EvaluationEnvCollection(StandardEvaluationEnv, root_globals,
+                                globals_pool)
 
 
 def evaluate(node, controller=None):

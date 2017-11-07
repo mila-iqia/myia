@@ -205,51 +205,68 @@ class EvaluationEnv(dict):
         config: Configuration that will be given to VM's constructor
             as keyword arguments.
     """
-    def __init__(self, primitives, pool, vm_class, setup, config={}):
+    def __init__(self, primitives, pool, config={}):
         self.compile_cache = {}
         self.primitives = primitives
         self.pool = pool
-        self.vm_class = vm_class
-        self.setup = setup
         self.config = config
-        self.accepted_types = (bool, int, float,
-                               Primitive, Function, Closure,
-                               ndarray, list, tuple, Record, str,
-                               Breakpoint)
 
-    def reconfigure(self, new_config):
-        cfg = {**self.config}
-        cfg.update(new_config)
-        return EvaluationEnv(self.primitives, self.pool, self.vm_class,
-                             self.setup, cfg)
+    def devolve_value(self, v):
+        """
+        Convert a value to a corresponding ``Symbol`` or ``LambdaNode``,
+        if one can be found, otherwise return the value unchanged.
 
-    def compile(self, lbda):
-        fimpl = self.compile_cache.get(lbda, None)
-        if fimpl is None:
-            fimpl = Function(lbda, self)
-            self.compile_cache[lbda] = fimpl
-        return fimpl
-
-    def import_value(self, v):
+        * Check if the value is mapped to a symbol in ``symbols.object_map``
+        * Check for the ``__myia_symbol__`` or ``__myia_lambda__`` field.
+        """
         try:
             x = object_map[v]
         except (TypeError, KeyError):
             pass
         else:
-            return self.import_value(x)
+            return x
+        if hasattr(v, '__myia_symbol__'):
+            return v.__myia_symbol__
+        if hasattr(v, '__myia_lambda__'):
+            return v.__myia_lambda__
+        return v
 
+    def convert_value(self, v):
+        """
+        Convert a value to a value compatible with the VM. This differs
+        from ``import_value`` by not handling callables.
+        """
+        # TODO: convert recursively with smap...
+        accepted_types = (bool, int, float,
+                          Primitive, Function, Closure,
+                          ndarray, list, tuple, Record, str,
+                          Breakpoint)
+        if isinstance(v, accepted_types) or v is ZERO or v is None:
+            return v
+        elif isinstance(v, Symbol):
+            raise ValueError(f'Myia cannot resolve {v} '
+                             f'from namespace {v.namespace}')
+        else:
+            raise TypeError(f'Myia cannot convert value: {v}')
+
+    def import_value(self, v):
+        """
+        Import the Python value v into the corresponding format that is
+        suitable for the environment's VM. This proceeds as follows:
+
+        * If v is a ``Symbol``, we check if it is in ``primitives``.
+        * If v is a ``LambdaNode``, we compile it with ``self.compile``.
+        * If v is a Python function, we parse it and convert it to a
+          ``LambdaNode``, which we import.
+        """
         try:
             x = self.primitives[v]
         except (TypeError, KeyError):
             pass
         else:
-            if isinstance(x, LambdaNode):
-                return self.compile(x)
-            return x
+            return self.import_value(x)
 
-        if isinstance(v, self.accepted_types) or v is ZERO or v is None:
-            return v
-        elif isinstance(v, (type, FunctionType)):
+        if isinstance(v, (type, FunctionType)):
             # Note: Python's FunctionType, i.e. actual Python functions
             try:
                 lbda = parse_function(v)
@@ -257,18 +274,36 @@ class EvaluationEnv(dict):
                 raise ValueError(f'Myia cannot interpret value: {v}')
             return self.import_value(lbda)
         elif isinstance(v, LambdaNode):
-            return self.compile(v)
-        elif isinstance(v, Symbol):
-            raise ValueError(f'Myia cannot resolve {v} '
-                             f'from namespace {v.namespace}')
+            return self.get_compiled(v)
         else:
-            raise ValueError(f'Myia cannot interpret value: {v}')
+            return self.convert_value(v)
 
     def export_value(self, value):
         return value
 
+    def get_compiled(self, lbda):
+        fimpl = self.compile_cache.get(lbda, None)
+        if fimpl is None:
+            fimpl = self.compile(lbda)
+            self.compile_cache[lbda] = fimpl
+        return fimpl
+
+    def compile(self, lbda):
+        return Function(lbda, self)
+
+    def setup(self):
+        pass
+
+    def vm(self, code, local_env):
+        raise NotImplementedError('Must override vm method in subclass.')
+
+    def reconfigure(self, new_config):
+        cfg = {**self.config}
+        cfg.update(new_config)
+        return self.__class__(self.primitives, self.pool, cfg)
+
     def run(self, code, local_env):
-        return self.vm_class(code, local_env, self, **self.config).run()
+        return self.vm(code, local_env).run()
 
     def evaluate(self, node):
         self.setup()
@@ -279,9 +314,11 @@ class EvaluationEnv(dict):
             return super().__getitem__(item)
         except KeyError:
             try:
-                self[item] = self.primitives[item]
-            except KeyError:
-                self[item] = self.import_value(self.pool[item])
+                raw_value = self.pool[item]
+            except (KeyError, NameError):
+                raw_value = item
+            value = self.devolve_value(raw_value)
+            self[item] = self.import_value(value)
             return self[item]
 
 

@@ -120,7 +120,11 @@ class Primitive(HReprBase, IdempotentMappable):
         self.argnames: List[str] = argn
         self.nargs = len(self.argnames)
         self.fn = fn
-        self.name = name or fn.__name__
+        if name:
+            self.name = name
+            self.__myia_symbol__ = name
+        else:
+            self.name = fn.__name__
         self.grad = None
 
     def __call__(self, *args):
