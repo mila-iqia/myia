@@ -1,0 +1,48 @@
+node {
+    color: white;
+    background-color: blue;
+    content: data(label);
+    text-valign: center;
+    text-halign: center;
+    shape: rectangle;
+    width: label;
+    padding: 3;
+}
+node.function {
+    padding: 10px;
+    text-valign: top;
+    text-halign: center;
+    color: black;
+    background-color: #ddd;
+}
+edge {
+    target-label: data(label);
+    target-text-offset: 10;
+    color: white;
+    font-size: 12;
+    text-outline-color: #aaa;
+    text-outline-width: 3;
+    curve-style: bezier;
+    source-arrow-shape: triangle;
+    line-color: #aaa;
+    /* source-arrow-shape: circle; */
+}
+/* :selected {
+    background-color: black;
+    line-color: black;
+    target-arrow-color: black;
+    source-arrow-color: black;
+} */
+node.input {
+    background-color: green;
+}
+node.output {
+    background-color: orange;
+}
+node.intermediate {
+    background-color: blue;
+}
+node.constant {
+    background-color: orchid;
+}
+
