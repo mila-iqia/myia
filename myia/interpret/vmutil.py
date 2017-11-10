@@ -313,9 +313,12 @@ class EvaluationEnv(dict):
         try:
             return super().__getitem__(item)
         except KeyError:
-            try:
-                raw_value = self.pool[item]
-            except (KeyError, NameError):
+            if isinstance(item, Symbol):
+                try:
+                    raw_value = self.pool[item]
+                except (TypeError, KeyError, NameError):
+                    raw_value = item
+            else:
                 raw_value = item
             value = self.devolve_value(raw_value)
             self[item] = self.import_value(value)
