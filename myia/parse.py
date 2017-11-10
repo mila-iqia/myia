@@ -1113,18 +1113,22 @@ class Parser(LocVisitor):
         out_vars = list(testp.local_assignments)
 
         # We visit once more, this time adding the free vars as parameters
-        p = self.sub_parser(dest=wbsym)
+        p = self.sub_parser(dest=wsym)
         in_syms = [p.new_variable(v) for v in in_vars]
+
+        # We need different input variables for the loop
+        pp = self.sub_parser(dest=wbsym)
+        in_syms2 = [pp.new_variable(v) for v in in_vars]
 
         # Have to execute this before the body in order to get the right
         # symbols, otherwise they will be shadowed. If I recall correctly,
         # that's why we need to revisit instead of just using testp.
         initial_values = [p.vtrack[v] for v in out_vars]
         test = p.visit(node.test)
-        body = p.body_wrapper(node.body)
+        body = pp.body_wrapper(node.body)
 
-        loop_args = in_syms
-        loop_body = body(Apply(wsym, *[p.vtrack[v] for v in in_vars]))
+        loop_args = in_syms2
+        loop_body = body(Apply(wsym, *[pp.vtrack[v] for v in in_vars]))
         with About(loop_body.find_location(), 'parse'):
             loop_fn = self.reg_lambda(wbsym, loop_args, loop_body)
         outer_body = Apply(Apply(
