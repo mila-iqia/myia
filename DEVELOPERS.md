@@ -33,6 +33,9 @@ myia/                           # Source code for Myia
         vmutil           I F    # Translate AST to VM instructions
         vm               I      # Stack-based virtual machine
     lib                ! I      # Impl of Record, Closure, StructuralMap
+WIP optimize                    # Where the graph IR currently lives
+WIP     graph           S       # First version of graph IR + opts
+WIP     graph2          S       # Second version of graph IR + opts
     parse               S       # Parse Python code, produce IR
     stx/                        # IR
         about          !S       # Track what nodes are about what other nodes
@@ -244,13 +247,23 @@ def test_pow10(x):
 Then you can test its gradient and also view all the intermediate functions created by Myia as well as their transforms with the following command:
 
 ```bash
-buche -c 'python -m myia inspect mytest.py --args 4 --mode grad --decls'
+buche python -m myia inspect mytest.py --args 4 --mode grad --decls
 ```
 
 Alternatively, you can test functions from the test suite directly, if you are in the project's root directory:
 
 ```bash
-buche -c 'python -m myia inspect tests.test_grad:test_pow10 --args 4 --mode grad --decls'
+buche python -m myia inspect tests.test_grad:test_pow10 --args 4 --mode grad --decls
 ```
 
 An object's representation in Buche is returned by its `__hrepr__(H, hrepr)` method. Documentation on how to implement that method can be found [here](https://github.com/breuleux/hrepr).
+
+You can use buche in your code to print pretty much any Python object. See [here](https://github.com/breuleux/pybuche) for some sample code.
+
+The following classes have special display methods for Buche:
+
+* `buche(myia.stx.nodes.Lambda(...))` shows Myia's functional IR.
+* `buche(myia.optimize.graph2.IRGraph(...))` displays Myia's graph IR using the JavaScript library `cytoscape`, BUT before you can use it, you need to import a plugin into Buche. From Myia's root directory, write:
+
+      buche.require('viz/graph-channel.js')
+      buche(graph)
