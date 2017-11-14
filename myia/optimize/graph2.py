@@ -11,6 +11,7 @@ from ..stx import top as about_top, Transformer, \
 from ..lib import Record, ZERO, Primitive
 from ..symbols import builtins
 from numpy import ndarray
+from ..inference.types import var, unify, isvar
 import json
 import os
 
@@ -32,10 +33,16 @@ _css = open(_css_path).read()
 
 
 class FN(Singleton):
+    """
+    Edge label for the FN relation between two nodes.
+    """
     pass
 
 
 class IN:
+    """
+    Edge label for the IN(i) relation between two nodes.
+    """
     def __init__(self, index):
         self.index = index
 
@@ -54,10 +61,35 @@ FN = FN()    # type: ignore
 
 
 class IRNode:
-    def __init__(self, graph, tag):
+    """
+    Node in the intermediate representation. It can represent:
+
+    * A computation:
+      - fn != None, inputs == list of inputs, value == NO_VALUE
+    * A numeric/string/etc. constant
+      - fn == None, value == the constant
+    * A builtin function like add or multiply
+      - fn == None, value == the Symbol for the builtin
+    * A pointer to another Myia function
+      - fn == None, value == an IRGraph
+
+    Attributes:
+        graph: Parent IRGraph for this node. This should be None for
+            constant nodes.
+        tag: Symbol representing the node name.
+        fn: Points to an IRNode providing the function to call.
+        inputs: List of IRNode arguments.
+        users: Set of incoming edges. Each edge is a (role, node)
+            tuple where role is FN or IN(i)
+        value: Value taken by this node.
+        inferred: TODO
+        about: Tracks source code location and sequence of
+            transformations and optimizations for this node.
+    """
+    def __init__(self, graph, tag, value=NO_VALUE):
         # Graph the node belongs to
         self.graph = graph
-        # Node name
+        # Node name (Symbol instance)
         self.tag = tag
         # Outgoing edges
         self.fn = None
@@ -65,13 +97,37 @@ class IRNode:
         # Incoming edges as (role, node) tuples
         self.users = set()
         # Value this node will take, if it can be determined
-        self.value = NO_VALUE
+        self.value = value
         # Information inferred about this node (type, shape, etc.)
         self.inferred = {}
         # Optimization/source code trace
         self.about = about_top()
 
+    def successors(self):
+        """
+        List of nodes that this node depends on.
+        """
+        succ = [self.fn] + self.inputs
+        return [s for s in succ if s]
+
+    def app(self):
+        """
+        If this node is an application, return:
+
+            (n.fn, *n.inputs)
+
+        Otherwise, return None.
+        """
+        if not self.fn:
+            return None
+        else:
+            return (self.fn,) + tuple(self.inputs)
+
     def succ(self, role):
+        """
+        If role is FN, return node.fn, if role is IN(i), return
+        node.inputs[i].
+        """
         if role is FN:
             return {self.fn}
         elif isinstance(role, IN):
@@ -79,41 +135,105 @@ class IRNode:
         else:
             raise KeyError(f'Invalid role: {role}')
 
-    def set_succ(self, role, node, old_node=None):
-        assert isinstance(node, IRNode) or node is None
-        if role is FN:
-            old_node = self.fn
-            self.fn = node
-        elif isinstance(role, IN):
-            old_node = self.inputs[role.index]
-            self.inputs[role.index] = node
-        else:
-            raise KeyError(f'Invalid role: {role}')
-        if old_node is not None:
-            old_node.users.remove((role, self))
-        if node is not None:
-            node.users.add((role, self))
+    def set_succ(self, role, node):
+        """
+        Create an edge toward node with given role (FN or IN(i))
+        """
+        return self._commit(self.set_succ_operations, (role, node))
 
-    def set_operation(self, fn, inputs=None):
-        self.set_succ(FN, fn)
-        for i, inp in enumerate(self.inputs):
-            if inp is not None:
-                inp.users.remove((IN(i), self))
-        if fn is None:
-            self.inputs = []
-        else:
-            self.inputs = list(inputs)
-            for i, inp in enumerate(self.inputs):
-                inp.users.add((IN(i), self))
-
-    def subsume(self, node):
-        self.users |= node.users
-        for role, n in set(node.users):
-            n.set_succ(role, self, node)
-        node.users = set()
+    def set_app(self, fn, inputs):
+        """
+        Make this node an application of fn on the specified inputs.
+        fn and the inputs must be IRNode instances.
+        """
+        return self._commit(self.set_app_operations, (fn, inputs))
 
     def redirect(self, new_node):
-        new_node.subsume(self)
+        """
+        Transfer every user of this node to new_node.
+        """
+        return self._commit(self.redirect_operations, (new_node,))
+
+    def subsume(self, node):
+        """
+        Transfer every user of the given node to this one.
+        """
+        return node.redirect(self)
+
+    # The following methods return a list of atomic "operations" to
+    # execute in order to perform the task. Atomic operations are
+    # ('link', from, to, role) and ('unlink', from, to, node)
+
+    def set_succ_operations(self, role, node):
+        assert isinstance(node, IRNode) or node is None
+        if role is FN:
+            unl = self.fn
+        elif isinstance(role, IN):
+            unl = self.inputs[role.index]
+        else:
+            raise KeyError(f'Invalid role: {role}')
+        rval = []
+        if unl:
+            if unl == node:
+                # Nothing to do because the new successor is the
+                # same as the old one.
+                return []
+            else:
+                rval.append(('unlink', self, unl, role))
+        if node is not None:
+            rval.append(('link', self, node, role))
+        return rval
+
+    def set_app_operations(self, fn, inputs):
+        rval = self.set_succ_operations(FN, fn)
+        if fn:
+            for i, inp in enumerate(self.inputs):
+                if inp is not None:
+                    rval.append(('unlink', self, inp, IN(i)))
+            for i, inp in enumerate(inputs):
+                if inp is not None:
+                    rval.append(('link', self, inp, IN(i)))
+        return rval
+
+    def redirect_operations(self, node):
+        rval = []
+        for role, n in set(self.users):
+            rval += n.set_succ_operations(role, node)
+        rval.append(('redirect', self, node, None))
+        return rval
+
+    def process_operation(self, op, node, role):
+        # Execute a 'link' or 'unlink' operation.
+        if op == 'link':
+            if role is FN:
+                assert self.fn is None
+                self.fn = node
+            elif isinstance(role, IN):
+                idx = role.index
+                nin = len(self.inputs)
+                if nin <= idx:
+                    self.inputs += [None for _ in range(idx - nin + 1)]
+                assert self.inputs[idx] is None
+                self.inputs[idx] = node
+            node.users.add((role, self))
+        elif op == 'unlink':
+            if role is FN:
+                assert self.fn is node
+                self.fn = None
+            elif isinstance(role, IN):
+                idx = role.index
+                nin = len(self.inputs)
+                assert self.inputs[idx] is node
+                self.inputs[idx] = None
+            node.users.remove((role, self))
+        elif op == 'redirect':
+            pass
+        else:
+            raise ValueError('Operation must be link or unlink.')
+
+    def _commit(self, fn, args):
+        for op, n1, n2, r in fn(*args):
+            n1.process_operation(op, n2, r)
 
     def __getitem__(self, role):
         if role is FN:
@@ -134,12 +254,53 @@ class IRNode:
 
 
 class IRGraph:
+    """
+    Graph with inputs and an output. Represents a Myia function or
+    a closure.
+
+    Attributes:
+        parent: The IRGraph for the parent function, if this graph
+            represents a closure. Otherwise, None.
+        tag: A Symbol representing the name of this graph.
+        inputs: A tuple of input IRNodes for this graph.
+        output: The IRNode representing the output of this graph.
+        gen: A GenSym instance to generate new tags within this
+            graph.
+    """
     def __init__(self, parent, tag, inputs, output, gen):
         self.parent = parent
         self.tag = tag
         self.inputs = tuple(inputs)
         self.output = output
         self.gen = gen
+
+    def dup(self, g=None):
+        """
+        Duplicate this graph, optionally setting g as the parent of
+        every node in the graph.
+
+        Return the new graph (or g), a list of inputs, and the output
+        node.
+        """
+        set_io = g is None
+        if not g:
+            g = IRGraph(self.parent, self.tag, [], None, self.gen)
+        mapping = {}
+        for node in self.inputs + tuple(self.iternodes()):
+            mapping[node] = IRNode(g, g.gen(node.tag, '+'), node.value)
+        for n1, n2 in mapping.items():
+            sexp = n1.app()
+            if sexp:
+                f, *args = sexp
+                f2 = mapping.get(f, f)
+                args2 = [mapping.get(a, a) for a in args]
+                n2.set_app(f2, args2)
+        output = mapping[self.output]
+        inputs = [mapping[i] for i in self.inputs]
+        if set_io:
+            g.output = output
+            g.inputs = inputs
+        return g, inputs, output
 
     def contained_in(self, parent):
         g = self
@@ -208,18 +369,37 @@ class IRGraph:
 
 
 class GraphPrinter:
+    """
+    Helper class to print Myia graphs.
+
+    Arguments:
+        entry_points: A collection of graphs to print.
+        duplicate_constants: If True, each use of a constant will
+            be shown as a different node.
+        function_in_node: If True, applications of a known function
+            will display the function's name in the node like this:
+            "node_name:function_name". If False, the function will
+            be a separate constant node, with a "F" edge pointing to
+            it.
+        follow_references: If True, graphs encountered while walking
+            the initial graphs will also be processed.
+    """
     def __init__(self,
                  entry_points,
                  duplicate_constants=True,
                  function_in_node=True,
                  follow_references=True):
+        # Graphs left to process
         self.graphs = set(entry_points)
         self.duplicate_constants = duplicate_constants
         self.function_in_node = function_in_node
         self.follow_references = follow_references
+        # Nodes left to process
         self.pool = set()
+        # ID system for the nodes that will be sent to buche
         self.currid = 0
         self.ids = {}
+        # Nodes and edges are accumulated in these lists
         self.nodes = []
         self.edges = []
 
@@ -342,13 +522,9 @@ class IREvaluationEnv(EvaluationEnv):
         accepted_types = (bool, int, float,
                           ndarray, list, tuple, Record, str)
         if isinstance(v, accepted_types) or v is ZERO or v is None:
-            n = IRNode(None, ggen('value'))
-            n.value = v
-            return n
+            return IRNode(None, ggen('value'), v)
         elif isinstance(v, Symbol) and is_builtin(v):
-            n = IRNode(None, v)
-            n.value = v
-            return n
+            return IRNode(None, v, v)
         elif isinstance(v, Symbol):
             return IRNode(None, v)
             # raise ValueError(f'Myia cannot resolve {v} '
@@ -385,20 +561,20 @@ class IREvaluationEnv(EvaluationEnv):
 
             wk = self.wrap_local(k, g)
             if idx is not None:
-                wk.set_operation(self[builtins.index], [self[v], self[idx]])
+                wk.set_app(self[builtins.index], [self[v], self[idx]])
                 return
 
             if isinstance(v, ApplyNode):
                 args = [self[a] for a in v.args]
-                wk.set_operation(self[v.fn], args)
+                wk.set_app(self[v.fn], args)
             elif isinstance(v, (Symbol, ValueNode)):
-                wk.set_operation(self[builtins.identity], [self[v]])
+                wk.set_app(self[builtins.identity], [self[v]])
             elif isinstance(v, ClosureNode):
                 args = [self[v.fn]] + [self[a] for a in v.args]
-                wk.set_operation(self[builtins.partial], args)
+                wk.set_app(self[builtins.partial], args)
             elif isinstance(v, TupleNode):
                 args = [self[a] for a in v.values]
-                wk.set_operation(self[builtins.mktuple], args)
+                wk.set_app(self[builtins.mktuple], args)
             else:
                 raise MyiaSyntaxError('Illegal ANF clause.', node=v)
 
@@ -409,17 +585,180 @@ class IREvaluationEnv(EvaluationEnv):
         return rval
 
 
+def valuevar(name):
+    return var(name, lambda x: x.value is not NO_VALUE)
+
+
+def fnvar(name):
+    return var(name, lambda x: x.value and isinstance(x.value, IRGraph))
+
+
+X = var('X')
+Y = var('Y')
+Z = var('Z')
+V = valuevar('V')
+V1 = valuevar('V1')
+V2 = valuevar('V2')
+L = fnvar('L')
+
+
+class PatternOpt:
+    def __init__(self, pattern, handler):
+        self.pattern = pattern
+        self.handler = handler
+
+    def _match(self, node, pattern, U):
+        if isinstance(node, IRNode):
+            touches = {node}
+        else:
+            touches = set()
+        if isinstance(pattern, tuple):
+            sexp = node.app()
+            if sexp:
+                if ... in pattern:
+                    idx = pattern.index(...)
+                    ntail = len(pattern) - idx - 1
+                    pattern = pattern[:idx] + pattern[idx + 1:]
+                    idx_last = len(sexp) - ntail
+                    mid = list(sexp[idx - 1:idx_last])
+                    sexp = sexp[:idx - 1] + (mid,) + sexp[idx_last:]
+                if len(sexp) != len(pattern):
+                    return touches, False
+                for p, e in zip(pattern, sexp):
+                    t2, U = self._match(e, p, U)
+                    touches |= t2
+                    if U is False:
+                        return touches, False
+                return touches, U
+            else:
+                return touches, False
+        elif isinstance(node, list):
+            if isvar(pattern):
+                for x in node:
+                    if not unify(pattern, x, U):
+                        return touches, False
+                return touches, {**U, var(pattern.token): node}
+            else:
+                return touches, False
+        elif isvar(pattern):
+            return touches, unify(pattern, node, U)
+        elif node.value is not NO_VALUE:
+            return touches, unify(pattern, node.value, U)
+        else:
+            return touches, unify(pattern, node, U)
+
+    def match(self, node):
+        return self._match(node, self.pattern, {})
+
+    def __call__(self, univ, node):
+        touches, m = self.match(node)
+        if m:
+            kwargs = {k.token: v for k, v in m.items()}
+            repl = self.handler(univ, node, **kwargs)
+            if isinstance(repl, list):
+                return touches, repl
+            elif isinstance(repl, tuple):
+                return touches, node.set_app_operations(repl[0], repl[1:])
+            elif isinstance(repl, IRNode):
+                return touches, node.redirect_operations(repl)
+        return touches, []
+
+
+all_patterns = {}
+
+
+def pattern_opt(*pattern):
+    def wrap(handler):
+        opt = PatternOpt(pattern, handler)
+        all_patterns[handler.__name__] = opt
+        return opt
+    return wrap
+
+
+@pattern_opt(builtins.multiply, 1.0, X)
+def multiply_by_one_l(univ, node, X):
+    return X
+
+
+@pattern_opt(builtins.multiply, X, 1.0)
+def multiply_by_one_r(univ, node, X):
+    return X
+
+
+@pattern_opt(builtins.identity, X)
+def drop_copy(univ, node, X):
+    return X
+
+
+from ..interpret import evaluate
+
+
+@pattern_opt(V1, V2, ...)
+def eval_constant(univ, node, V1, V2):
+    if V1.value == builtins.partial:
+        return False
+    f = V1
+    args = V2
+    fn = evaluate(f.value)
+    res = fn(*[arg.value for arg in args])
+    n = IRNode(None, None)
+    n.value = res
+    return n
+
+
 class EquilibriumTransformer:
     def __init__(self,
-                 roots,
-                 taggers,
+                 universe,
+                 graphs,
                  transformers,
-                 follow=lambda _: True):
-        self.roots = roots
-        self.tags = {}
+                 follow=lambda a, b: True):
+        self.universe = universe
+        self.graphs = graphs
+        self.roots = [g.output for g in graphs]
+        self.transformers = transformers
+        self.follow = follow
+        self.repools = defaultdict(set)
+
+    def mark_change(self, node):
+        assert node
+        for n in self.repools[node]:
+            self.processed.discard(n)
+            self.pool.add(n)
+        self.repools[node] = set()
+
+    def process(self, node):
+        touches = set()
+        assert node
+        for transformer in self.transformers:
+            ts, changes = transformer(self.universe, node)
+            touches |= ts
+            if changes:
+                for op, node1, node2, role in changes:
+                    self.mark_change(node1)
+                    # self.mark_change(node2)
+                    node1.process_operation(op, node2, role)
+                    if op is 'redirect':
+                        for g in self.graphs:
+                            if g.output is node1:
+                                g.output = node2
+                                self.pool.add(node2)
+                break
+        else:
+            self.processed.add(node)
+            for succ in node.successors():
+                assert succ
+                if succ not in self.processed and self.follow(node, succ):
+                    self.pool.add(succ)
+            for n in touches:
+                self.repools[n].add(node)
 
     def run(self):
-        pass
+        self.pool = set(self.roots)
+        self.processed = set()
+        while self.pool:
+            buche(self.pool)
+            node = self.pool.pop()
+            self.process(node)
 
 
 class Universe:
@@ -468,7 +807,7 @@ class Universe:
                             g2.inputs = clins + argins
                             o = IRNode(g2, ogen('/out'))
                             g2.output = o
-                            o.set_operation(fnn, g2.inputs)
+                            o.set_app(fnn, g2.inputs)
                             g2n = IRNode(None, g2.tag)
                             g2n.value = g2
                             g.replace(node, g2n)
@@ -477,8 +816,10 @@ class Universe:
                 elif node.fn and isinstance(node.fn.value, IRGraph):
                     pool.add(node.fn.value)
 
-    def equilibrium_transform(self, transformers, follow_nodes):
-        pass
+    def equilibrium_transform(self):
+        transformers = list(all_patterns.values())
+        eqt = EquilibriumTransformer(self, self.entry_points, transformers)
+        eqt.run()
 
     # def _closure_convert(self, g):
     #     closure_args = []
@@ -491,7 +832,7 @@ class Universe:
 
     #                 new = IRNode(g, ogen('CLOS'))
     #                 g.replace(node, new)
-    #                 new.set_operation(partial, [node] + clos)
+    #                 new.set_app(partial, [node] + clos)
 
     #         if not changes:
     #             break
@@ -508,7 +849,7 @@ class Universe:
     #             clos = self._closure_convert(node.value)
     #             new = IRNode(g, ogen('CLOS'))
     #             g.replace(node, new)
-    #             new.set_operation(partial, [node] + clos)
+    #             new.set_app(partial, [node] + clos)
     #     g.inputs = closure_args + g.inputs
     #     return closure_args
 
