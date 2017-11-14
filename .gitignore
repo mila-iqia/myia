@@ -101,3 +101,6 @@ ENV/
 
 # mypy cache
 .mypy_cache
+
+# Node.js stuff
+node_modules
