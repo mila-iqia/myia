@@ -28,4 +28,8 @@ setup(name='Myia',
       version='0.0.1dev0',
       packages=find_packages(),
       install_requires=['buche', 'hrepr', 'numpy', 'unification', 'networkx', 'mypy', 'pep8'],
+      package_data={
+        'myia.optimize': ['graph.css'],
+        'myia.util': ['debug-template.html', 'myia.css'],
+        },
       )
