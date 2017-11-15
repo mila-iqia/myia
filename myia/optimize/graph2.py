@@ -262,16 +262,16 @@ class IRGraph:
         parent: The IRGraph for the parent function, if this graph
             represents a closure. Otherwise, None.
         tag: A Symbol representing the name of this graph.
-        inputs: A tuple of input IRNodes for this graph.
-        output: The IRNode representing the output of this graph.
         gen: A GenSym instance to generate new tags within this
             graph.
+        inputs: A tuple of input IRNodes for this graph.
+        output: The IRNode representing the output of this graph.
     """
-    def __init__(self, parent, tag, inputs, output, gen):
+    def __init__(self, parent, tag, gen):
         self.parent = parent
         self.tag = tag
-        self.inputs = tuple(inputs)
-        self.output = output
+        self.inputs = []
+        self.output = None
         self.gen = gen
 
     def dup(self, g=None):
@@ -284,7 +284,7 @@ class IRGraph:
         """
         set_io = g is None
         if not g:
-            g = IRGraph(self.parent, self.tag, [], None, self.gen)
+            g = IRGraph(self.parent, self.tag, self.gen)
         mapping = {}
         for node in self.inputs + tuple(self.iternodes()):
             mapping[node] = IRNode(g, g.gen(node.tag, '+'), node.value)
@@ -544,8 +544,7 @@ class IREvaluationEnv(EvaluationEnv):
         if ref.relation is ANORM:
             ref = ref.label
 
-        g = IRGraph(None, ref,
-                    [], None, lbda.gen)
+        g = IRGraph(None, ref, lbda.gen)
         g.inputs = tuple(self.wrap_local(sym, g) for sym in lbda.args)
         g.output = self.wrap_local(let.body, g)
         rval = IRNode(None, g.tag)
@@ -756,7 +755,6 @@ class EquilibriumTransformer:
         self.pool = set(self.roots)
         self.processed = set()
         while self.pool:
-            buche(self.pool)
             node = self.pool.pop()
             self.process(node)
 
@@ -799,8 +797,7 @@ class Universe:
                         sym = fn
                         fn = self.eenv.primitives[fn]
                         if isinstance(fn, Primitive):
-                            g2 = IRGraph(None, ogen(sym, '~'),
-                                         [], None, g.gen)
+                            g2 = IRGraph(None, ogen(sym, '~'), g.gen)
                             clins = node.inputs[1:]
                             argins = [IRNode(g2, ogen(argn))
                                       for argn in fn.argnames[len(clins):]]
