@@ -80,6 +80,7 @@ class builtins(metaclass=SymbolsMeta):
     reduce = bsym('reduce')
     filter = bsym('filter')
     switch = bsym('switch')
+    if_ = bsym('if')
     first = bsym('first')
     second = bsym('second')
     concat = bsym('concat')

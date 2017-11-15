@@ -295,6 +295,14 @@ def switch(cond, t, f):
 
 
 @impl_interp
+def if_(cond, t, f):
+    if cond:
+        return t()
+    else:
+        return f()
+
+
+@impl_interp
 def identity(x):
     return x
 
