@@ -16,7 +16,11 @@ import json
 import os
 
 
-NO_VALUE = None
+class NO_VALUE(Singleton):
+    pass
+
+
+NO_VALUE = NO_VALUE()   # type: ignore
 
 
 ogen = GenSym('global::optimized')
@@ -72,6 +76,8 @@ class IRNode:
       - fn == None, value == the Symbol for the builtin
     * A pointer to another Myia function
       - fn == None, value == an IRGraph
+    * An input
+      - fn == None, value == NO_VALUE
 
     Attributes:
         graph: Parent IRGraph for this node. This should be None for
@@ -485,7 +491,7 @@ class GraphPrinter:
                 edges = []
             else:
                 edges = [(node, FN, node.fn)] \
-                    if node.fn is not NO_VALUE \
+                    if node.fn is not None \
                     else []
             edges += [(node, IN(i), inp)
                       for i, inp in enumerate(node.inputs) or []]
