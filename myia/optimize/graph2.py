@@ -353,8 +353,12 @@ class IRGraph:
     def iterboundary(self):
         return self.iternodes(self, True)
 
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        return H.bucheRequire(name='cytoscape')
+
     def __hrepr__(self, H, hrepr):
-        rval = H.graphElement(H.style(_css))
+        rval = H.cytoscapeGraph(H.style(_css))
         options = {
             'layout': {
                 'name': 'dagre',

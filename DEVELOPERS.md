@@ -263,7 +263,4 @@ You can use buche in your code to print pretty much any Python object. See [here
 The following classes have special display methods for Buche:
 
 * `buche(myia.stx.nodes.Lambda(...))` shows Myia's functional IR.
-* `buche(myia.optimize.graph2.IRGraph(...))` displays Myia's graph IR using the JavaScript library `cytoscape`, BUT before you can use it, you need to import a plugin into Buche. From Myia's root directory, write:
-
-      buche.require('viz/graph-channel.js')
-      buche(graph)
+* `buche(myia.optimize.graph2.IRGraph(...))` displays Myia's graph IR using the JavaScript library `cytoscape`.
