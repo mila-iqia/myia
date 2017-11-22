@@ -109,6 +109,21 @@ class IRNode:
         # Optimization/source code trace
         self.about = about_top()
 
+    def is_input(self):
+        return self.fn is None and self.value is NO_VALUE
+
+    def is_computation(self):
+        return self.fn is not None
+
+    def is_constant(self):
+        return self.value is not NO_VALUE
+
+    def is_builtin(self):
+        return is_builtin(self.value)
+
+    def is_graph(self):
+        return isinstance(self.value, IRGraph)
+
     def successors(self):
         """
         List of nodes that this node depends on.
@@ -124,7 +139,7 @@ class IRNode:
 
         Otherwise, return None.
         """
-        if not self.fn:
+        if self.fn is None:
             return None
         else:
             return (self.fn,) + tuple(self.inputs)
@@ -426,8 +441,8 @@ class GraphPrinter:
 
     def const_fn(self, node):
         cond = self.function_in_node \
-            and node.fn \
-            and node.fn.value is not NO_VALUE
+            and node.is_computation() \
+            and node.fn.is_constant()
         if cond:
             return node.fn.tag
 
@@ -452,14 +467,14 @@ class GraphPrinter:
         if not g:
             g = node.graph
 
-        if node.value is NO_VALUE:
-            lbl = str(node.tag)
-        elif isinstance(node.value, IRGraph):
+        if node.is_graph():
             if self.follow_references:
                 self.graphs.add(node.value)
             lbl = str(node.tag)
-        else:
+        elif node.is_constant():
             lbl = str(node.value)
+        else:
+            lbl = str(node.tag)
 
         if node.graph is None:
             cl = 'constant'
@@ -495,7 +510,7 @@ class GraphPrinter:
                 edges = []
             else:
                 edges = [(node, FN, node.fn)] \
-                    if node.fn is not None \
+                    if node.is_computation() \
                     else []
             edges += [(node, IN(i), inp)
                       for i, inp in enumerate(node.inputs) or []]
