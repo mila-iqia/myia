@@ -161,12 +161,14 @@ def nsym() -> Symbol:
 
 
 def is_global(sym):
+    if not isinstance(sym, Symbol):
+        return False
     ns = sym.namespace
     return ns.startswith('global:')
 
 
 def is_builtin(sym):
-    return sym.namespace == 'global::builtin'
+    return isinstance(sym, Symbol) and sym.namespace == 'global::builtin'
 
 
 class VariableTracker:
