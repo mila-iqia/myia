@@ -312,7 +312,6 @@ def test_forward_ref(x):
 @xfail
 @myia_test((10, 0))
 def test_while_blockvar(x):
-    result = 0
     while x > 0:
         # The local block variable y causes the bug, because myia
         # requires it to be set outside the block so that it is
@@ -321,4 +320,4 @@ def test_while_blockvar(x):
         # isn't in this case, so we want to fix this eventually.
         y = x * x
         x -= y
-    return result
+    return x
