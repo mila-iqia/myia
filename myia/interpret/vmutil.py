@@ -8,6 +8,7 @@ from ..lib import Closure, Primitive, IdempotentMappable, Record, ZERO
 from ..stx import MyiaASTNode, Symbol, ValueNode, LambdaNode
 from ..symbols import builtins, object_map
 from ..parse import parse_function
+from ..ir.convert import lambda_to_ir
 
 
 ###################
@@ -26,8 +27,7 @@ class Function(HReprBase, IdempotentMappable):
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
         self.ast = ast
-        # self.code = VMCode(ast.body, lbda=ast)
-        self.code = VMCode(ast)
+        self.code = eval_env.vmc(ast)
         self.eval_env = eval_env
         self.primal_sym = ast.primal
         self.grad: Callable[[int], Function] = None
@@ -96,6 +96,47 @@ class Instruction:
         return f'{self.command}:{args}'
 
 
+def make_instructions(graph):
+    instrs = []
+    assoc = {}
+
+    def instr(name, node, *args):
+        instrs.append(Instruction(name, node, *args))
+
+    def convert(node):
+        if node in assoc:
+            instr('fetch', node, assoc[node])
+        elif node.is_computation():
+            succ = node.app()
+            for x in succ:
+                convert(x)
+            instr('reduce', node, len(succ) - 1)
+            if len(node.users) > 1:
+                # This computation is used more than once, so
+                # we store it (and immediately put it back on
+                # the stack)
+                instr('store', node, node.tag)
+                instr('fetch', node, node.tag)
+                assoc[node] = node.tag
+        elif node.is_builtin():
+            assert node.value
+            instr('fetch', node, node.value)
+        elif node.is_global():
+            assert node.value
+            instr('fetch', node, node.value)
+        elif node.is_graph():
+            raise Exception('Unsupported at the moment')
+        elif node.is_constant():
+            instr('push', node, node.value)
+        elif node.is_input():
+            instr('fetch', node, node.tag)
+        else:
+            raise Exception(f'What is this node? {node}')
+
+    convert(graph.output)
+    return instrs
+
+
 class VMCode(HReprBase):
     """
     Compile a MyiaASTNode into a list of instructions compatible
@@ -111,13 +152,19 @@ class VMCode(HReprBase):
     """
     def __init__(self,
                  lbda: LambdaNode,
-                 instructions: List[Instruction] = None) -> None:
+                 instructions: List[Instruction] = None,
+                 use_new_ir: bool = True) -> None:
         assert instructions or isinstance(lbda, LambdaNode)
         self.node = None if instructions else lbda.body
         self.lbda = lbda
+        self.graph = None
         if instructions is None:
             self.instructions: List[Instruction] = []
-            self.process(self.node)
+            if use_new_ir:
+                self.graph = lambda_to_ir(self.lbda).value
+                self.instructions = make_instructions(self.graph)
+            else:
+                self.process(self.node)
         else:
             self.instructions = instructions
 
@@ -245,7 +292,8 @@ class EvaluationEnv(dict):
             raise ValueError(f'Myia cannot resolve {v} '
                              f'from namespace {v.namespace}')
         else:
-            raise TypeError(f'Myia cannot convert value: {v}')
+            raise TypeError(f'Myia cannot convert value: {v}'
+                            f' of type {type(v)}')
 
     def import_value(self, v):
         """
@@ -294,6 +342,9 @@ class EvaluationEnv(dict):
 
     def vm(self, code, local_env):
         raise NotImplementedError('Must override vm method in subclass.')
+
+    def vmc(self, ast, instructions=None):
+        return VMCode(ast, instructions, use_new_ir=True)
 
     def reconfigure(self, new_config):
         cfg = {**self.config}

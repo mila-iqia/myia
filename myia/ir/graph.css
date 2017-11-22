@@ -45,4 +45,10 @@ node.intermediate {
 node.constant {
     background-color: orchid;
 }
+node.const_output {
+    shape: ellipse;
+    width: 10;
+    height: 10;
+    background-color: orange;
+}
 

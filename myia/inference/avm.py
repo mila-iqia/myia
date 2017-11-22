@@ -455,6 +455,9 @@ class AEvaluationEnv(EvaluationEnv):
     def vm(self, code, local_env):
         return AVM(code, local_env, self, **self.config)
 
+    def vmc(self, ast, instructions=None):
+        return VMCode(ast, instructions, use_new_ir=False)
+
     def needs_track(self, dfa):
         return NeedsTrack(dfa, self.projs)
 
