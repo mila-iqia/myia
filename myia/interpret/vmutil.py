@@ -26,7 +26,8 @@ class Function(HReprBase, IdempotentMappable):
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
         self.ast = ast
-        self.code = VMCode(ast.body, lbda=ast)
+        # self.code = VMCode(ast.body, lbda=ast)
+        self.code = VMCode(ast)
         self.eval_env = eval_env
         self.primal_sym = ast.primal
         self.grad: Callable[[int], Function] = None
@@ -109,11 +110,10 @@ class VMCode(HReprBase):
             node's behavior.
     """
     def __init__(self,
-                 node: MyiaASTNode,
-                 instructions: List[Instruction] = None,
-                 lbda: LambdaNode = None) -> None:
-        assert instructions or (lbda and lbda.body is node)
-        self.node = node
+                 lbda: LambdaNode,
+                 instructions: List[Instruction] = None) -> None:
+        assert instructions or isinstance(lbda, LambdaNode)
+        self.node = None if instructions else lbda.body
         self.lbda = lbda
         if instructions is None:
             self.instructions: List[Instruction] = []
@@ -305,10 +305,8 @@ class EvaluationEnv(dict):
 
     def evaluate(self, node):
         self.setup()
-        if isinstance(node, (Symbol, LambdaNode)):
-            return self[node]
-        else:
-            return self.run(VMCode(node), {})
+        assert isinstance(node, (Symbol, LambdaNode))
+        return self[node]
 
     def __getitem__(self, item):
         try:
