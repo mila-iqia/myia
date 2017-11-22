@@ -461,7 +461,7 @@ class AEvaluationEnv(EvaluationEnv):
     def evaluate(self, lbda):
         self.setup()
         self.dfa.visit(lbda)
-        fn, = list(super().evaluate(lbda))
+        fn = self[lbda]
         return unwrap_abstract(fn)
 
     def import_value(self, v):

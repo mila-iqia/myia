@@ -112,6 +112,7 @@ class VMCode(HReprBase):
                  node: MyiaASTNode,
                  instructions: List[Instruction] = None,
                  lbda: LambdaNode = None) -> None:
+        assert instructions or (lbda and lbda.body is node)
         self.node = node
         self.lbda = lbda
         if instructions is None:
@@ -151,9 +152,6 @@ class VMCode(HReprBase):
         # self.instr('tuple', node, len(node.args))
         self.instr('reduce', node, len(node.args))
         self.instr('closure', node)
-
-    def process_LambdaNode(self, node) -> None:
-        self.instr('lambda', node)
 
     def process_LetNode(self, node) -> None:
         for k, v in node.bindings:
@@ -307,7 +305,10 @@ class EvaluationEnv(dict):
 
     def evaluate(self, node):
         self.setup()
-        return self.run(VMCode(node), {})
+        if isinstance(node, (Symbol, LambdaNode)):
+            return self[node]
+        else:
+            return self.run(VMCode(node), {})
 
     def __getitem__(self, item):
         try:

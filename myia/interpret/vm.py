@@ -309,14 +309,6 @@ class VMFrame(HReprBase):
         """
         self.push(value)
 
-    def instruction_lambda(self, node) -> None:
-        """
-        Create a Function from the given node and push
-        it on the stack.
-        """
-        fimpl = self.eval_env.compile(node)
-        self.push(fimpl)
-
     def __hrepr__(self, H, hrepr):
         views = H.tabbedView['hrepr-VMFrame']()
         # env = {}
