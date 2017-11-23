@@ -4,12 +4,12 @@ from copy import copy
 import numpy
 from .main import symbol_associator, impl_bank
 from ..stx import Symbol
-from ..interpret import \
-    Primitive, Function, Closure, evaluate, eenvs
 from ..lib import ZERO
 from ..transform import find_grad
 from ..inference.types import typeof
-from ..lib import StructuralMap, Closure, default_structural_map_dispatch
+from ..lib import \
+    Primitive, Closure, Function, \
+    StructuralMap, default_structural_map_dispatch
 from ..symbols import object_map
 from ..parse import parse_function
 from ..util.debug import Breakpoint, BreakpointMode
@@ -355,7 +355,7 @@ def J_fn(x, nargs_closure):
         ref = x.ast.ref
     else:
         raise TypeError(f'J_fn applied on wrong type: {x}')
-    return evaluate(find_grad(ref, nargs_closure))
+    return x.eval_env.evaluate(find_grad(ref, nargs_closure))
 
 
 @impl_interp_smap({myiaClosure: J_dispatch_closure})
@@ -405,11 +405,8 @@ def Jinv(x):
     if isinstance(x, Primitive):
         raise Exception('Primitives have no primals.')
     elif isinstance(x, Function):
-        assert x.primal_sym is not None
-        if isinstance(x.primal_sym, Symbol):
-            primal = evaluate(x.primal_sym)
-        else:
-            primal = x.primal_sym
+        assert isinstance(x.primal_sym, Symbol)
+        primal = x.eval_env.evaluate(x.primal_sym)
         if not isinstance(primal, (Function, Primitive)):
             raise Exception('Should be Function, but found:'
                             f' {primal}, type {type(primal)},'

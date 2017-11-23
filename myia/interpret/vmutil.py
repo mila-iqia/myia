@@ -4,7 +4,9 @@ from types import FunctionType
 from numpy import ndarray
 from ..util import EventDispatcher, HReprBase
 from ..util.debug import Breakpoint
-from ..lib import Closure, Primitive, IdempotentMappable, Record, ZERO
+from ..lib import \
+    Closure, Primitive, Function as _Function, \
+    IdempotentMappable, Record, ZERO, StructuralMap
 from ..stx import MyiaASTNode, Symbol, ValueNode, LambdaNode
 from ..symbols import builtins, object_map
 from ..parse import parse_function
@@ -16,7 +18,7 @@ from ..ir.convert import lambda_to_ir
 ###################
 
 
-class Function(HReprBase, IdempotentMappable):
+class Function(_Function):
     """
     Represents a Myia-transformed function.
     """
@@ -30,7 +32,6 @@ class Function(HReprBase, IdempotentMappable):
         self.code = eval_env.vmc(ast)
         self.eval_env = eval_env
         self.primal_sym = ast.primal
-        self.grad: Callable[[int], Function] = None
 
     def configure(self, **config):
         env = self.eval_env.reconfigure(config)
@@ -67,6 +68,12 @@ class Function(HReprBase, IdempotentMappable):
 
     def __hrepr__(self, H, hrepr):
         return hrepr.titled_box('Func', [hrepr(self.ast.ref or self.ast)])
+
+
+class VMPrimitive(Primitive):
+    def __init__(self, fn, name, eval_env):
+        super().__init__(fn, name)
+        self.eval_env = eval_env
 
 
 ##########################################
@@ -283,11 +290,15 @@ class EvaluationEnv(dict):
         """
         # TODO: convert recursively with smap...
         accepted_types = (bool, int, float,
-                          Primitive, Function, Closure,
+                          Function, Closure,
                           ndarray, list, tuple, Record, str,
                           Breakpoint)
         if isinstance(v, accepted_types) or v is ZERO or v is None:
             return v
+        elif isinstance(v, VMPrimitive):
+            return v
+        elif isinstance(v, Primitive):
+            return VMPrimitive(v.fn, v.name, self)
         elif isinstance(v, Symbol):
             raise ValueError(f'Myia cannot resolve {v} '
                              f'from namespace {v.namespace}')
@@ -362,7 +373,7 @@ class EvaluationEnv(dict):
     def __getitem__(self, item):
         try:
             return super().__getitem__(item)
-        except KeyError:
+        except (KeyError, TypeError):
             if isinstance(item, Symbol):
                 try:
                     raw_value = self.pool[item]
@@ -370,9 +381,13 @@ class EvaluationEnv(dict):
                     raw_value = item
             else:
                 raw_value = item
-            value = self.devolve_value(raw_value)
-            self[item] = self.import_value(value)
-            return self[item]
+            dvalue = self.devolve_value(raw_value)
+            value = self.import_value(dvalue)
+            if isinstance(item, (Symbol, FunctionType, LambdaNode)):
+                self[item] = value
+            else:
+                pass
+            return value
 
 
 class EvaluationEnvCollection:

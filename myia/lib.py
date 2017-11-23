@@ -130,6 +130,14 @@ class Primitive(HReprBase, IdempotentMappable):
     def __call__(self, *args):
         return self.fn(*args)
 
+    def __hash__(self):
+        return hash((self.fn, self.name))
+
+    def __eq__(self, other):
+        return isinstance(other, Primitive) \
+            and self.fn == other.fn \
+            and self.name == other.name
+
     def __str__(self):
         return f'Prim({self.name or self.fn})'
 
@@ -169,6 +177,10 @@ class Closure(HReprBase, StructuralMappable):
         return hrepr.titled_box('Closure',
                                 [hrepr(self.fn),
                                  hrepr(self.args)], 'v')
+
+
+class Function(HReprBase, IdempotentMappable):
+    pass
 
 
 class Atom:

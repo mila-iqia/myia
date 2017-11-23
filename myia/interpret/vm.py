@@ -4,14 +4,18 @@ import asyncio
 from types import FunctionType
 from ..stx import \
     MyiaASTNode, Location, Symbol, ValueNode, LambdaNode, maptup2, globals_pool
-from ..lib import Closure, IdempotentMappable
+from ..lib import Closure, IdempotentMappable, StructuralMap
 from ..symbols import builtins, object_map, update_object_map
 from ..util import EventDispatcher, HReprBase, buche
 from functools import reduce
 from ..impl.main import impl_bank
 from ..parse import parse_function
 from .vmutil import EvaluationEnv, EvaluationEnvCollection, Function, \
-    VMCode, Instruction
+    VMCode, Instruction, VMFunction
+# The following two imports fill impl_bank['interp']
+# as a side-effect.
+from ..impl.impl_interp import _
+from ..impl.impl_bprop import _
 
 
 # When a LambdaNode is made into a Function, we will
@@ -21,20 +25,6 @@ from .vmutil import EvaluationEnv, EvaluationEnvCollection, Function, \
 compile_cache: Dict[LambdaNode, 'Function'] = {}
 EnvT = Dict[Symbol, Any]
 root_globals = impl_bank['interp']
-
-
-_loaded = False
-
-
-def load():
-    update_object_map()
-    global _loaded
-    if not _loaded:
-        _loaded = True
-        # The following two imports fill impl_bank['interp']
-        # as a side-effect.
-        from ..impl.impl_interp import _
-        from ..impl.impl_bprop import _
 
 
 class VM:
@@ -177,7 +167,7 @@ class VMFrame(HReprBase):
     def push(self, *values):
         # self.stack += list(values)
         for value in values:
-            value = self.eval_env.import_value(value)
+            value = self.eval_env[value]
             self.stack.append(value)
 
     def pop(self):
@@ -332,7 +322,7 @@ class StandardEvaluationEnv(EvaluationEnv):
         return VM(code, local_env, self, **self.config)
 
     def setup(self):
-        load()
+        update_object_map()
 
 
 eenvs = EvaluationEnvCollection(StandardEvaluationEnv, root_globals,
