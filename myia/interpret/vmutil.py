@@ -5,7 +5,7 @@ from numpy import ndarray
 from ..util import EventDispatcher, HReprBase
 from ..util.debug import Breakpoint
 from ..lib import \
-    Closure, Primitive, Function as _Function, \
+    Universe, Closure, Primitive, Function as _Function, \
     IdempotentMappable, Record, ZERO, StructuralMap
 from ..stx import MyiaASTNode, Symbol, ValueNode, LambdaNode
 from ..symbols import builtins, object_map
@@ -24,23 +24,23 @@ class Function(_Function):
     """
     def __init__(self,
                  ast: LambdaNode,
-                 eval_env: 'EvaluationEnv') -> None:
+                 universe: Universe) -> None:
         assert isinstance(ast, LambdaNode)
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)
         self.ast = ast
-        self.code = eval_env.vmc(ast)
-        self.eval_env = eval_env
+        self.code = universe.vmc(ast)
+        self.universe = universe
         self.primal_sym = ast.primal
 
     def configure(self, **config):
-        env = self.eval_env.reconfigure(config)
+        env = self.universe.reconfigure(config)
         return Function(self.ast, env)
 
     def __call__(self, *args):
         ast = self.ast
         assert len(args) == len(ast.args)
-        return self.eval_env.run(
+        return self.universe.run(
             self.code,
             {s: arg for s, arg in zip(ast.args, args)}
         )
@@ -71,9 +71,9 @@ class Function(_Function):
 
 
 class VMPrimitive(Primitive):
-    def __init__(self, fn, name, eval_env):
+    def __init__(self, fn, name, universe):
         super().__init__(fn, name)
-        self.eval_env = eval_env
+        self.universe = universe
 
 
 class VMFunction(_Function):
@@ -85,7 +85,6 @@ class VMFunction(_Function):
         self.args = [n.tag for n in graph.inputs]
         self.graph = graph
         self.universe = universe
-        self.eval_env = universe
         self.code = VMCode(ast, instrs, False)
         self.primal_sym = ast.primal
 

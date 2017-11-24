@@ -144,11 +144,11 @@ class AVMFrame(VMFrame):
                  vm,
                  code,
                  local_env,
-                 eval_env,
+                 universe,
                  signature=None) -> None:
         from ..symbols import builtins
         from ..interpret import Primitive
-        super().__init__(vm, code, local_env, eval_env)
+        super().__init__(vm, code, local_env, universe)
         self.signature = signature
 
     def take(self, n):
@@ -197,7 +197,7 @@ class AVMFrame(VMFrame):
             instrs.append(Instruction('reduce', node, nargs, False))
         instrs.append(Instruction('assemble', node, projs))
         vmc = VMCode(node, instrs)
-        return self.__class__(self.vm, vmc, {}, self.eval_env, None)
+        return self.__class__(self.vm, vmc, {}, self.universe, None)
 
     def instruction_closure(self, node) -> None:
         fn, args = self.take(2)
@@ -250,7 +250,7 @@ class AVMFrame(VMFrame):
             open, cached = self.vm.consult_cache(sig)
             if cached is None:
                 return self.__class__(self.vm, fn.code, bind,
-                                      fn.eval_env, sig)
+                                      fn.universe, sig)
             elif open:
                 self.vm.checkpoint_on(sig)
                 if not cached:
@@ -288,9 +288,9 @@ class AVMFrame(VMFrame):
 
     def copy(self, pc_offset=0):
         local_env = {**self.local_env}
-        eval_env = self.eval_env
+        universe = self.universe
         fr = AVMFrame(self.vm, self.code,
-                      local_env, eval_env, self.signature)
+                      local_env, universe, self.signature)
         fr.stack = [s for s in self.stack]
         fr.pc = self.pc + pc_offset
         return fr
@@ -300,7 +300,7 @@ class AVM(EventDispatcher):
     def __init__(self,
                  code: VMCode,
                  local_env: EnvT,
-                 eval_env: EnvT,
+                 universe: EnvT,
                  signature=None,
                  needs: Dict = {},
                  projs=None,
@@ -311,8 +311,8 @@ class AVM(EventDispatcher):
         self.needs = needs
         self.do_emit_events = emit_events
         # Current frame
-        self.eval_env = eval_env
-        self.frame = AVMFrame(self, code, local_env, eval_env, signature)
+        self.universe = universe
+        self.frame = AVMFrame(self, code, local_env, universe, signature)
         # Stack of previous frames (excludes current one)
         self.frames: List[AVMFrame] = []
         if self.do_emit_events:

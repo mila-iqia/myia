@@ -355,7 +355,7 @@ def J_fn(x, nargs_closure):
         ref = x.ast.ref
     else:
         raise TypeError(f'J_fn applied on wrong type: {x}')
-    return x.eval_env.evaluate(find_grad(ref, nargs_closure))
+    return x.universe[find_grad(ref, nargs_closure)]
 
 
 @impl_interp_smap({myiaClosure: J_dispatch_closure})
@@ -406,7 +406,7 @@ def Jinv(x):
         raise Exception('Primitives have no primals.')
     elif isinstance(x, Function):
         assert isinstance(x.primal_sym, Symbol)
-        primal = x.eval_env.evaluate(x.primal_sym)
+        primal = x.universe[x.primal_sym]
         if not isinstance(primal, (Function, Primitive)):
             raise Exception('Should be Function, but found:'
                             f' {primal}, type {type(primal)},'

@@ -13,7 +13,7 @@ from ..util import EventDispatcher, HReprBase, buche
 from functools import reduce
 from ..impl.main import impl_bank
 from ..parse import parse_function
-from .vmutil import EvaluationEnv, EvaluationEnvCollection, Function, \
+from .vmutil import EvaluationEnvCollection, \
     VMCode, Instruction, VMFunction, VMPrimitive
 from ..ir import ir_universe, IRGraph
 
@@ -27,7 +27,6 @@ from ..impl.impl_bprop import _
 # cache it. This mostly avoids recomputing gradients,
 # since Function is the structure that stores
 # pointers to them.
-compile_cache: Dict[LambdaNode, 'Function'] = {}
 EnvT = Dict[Symbol, Any]
 root_globals = impl_bank['interp']
 
@@ -51,13 +50,13 @@ class VM:
     def __init__(self,
                  code: VMCode,
                  local_env: EnvT,
-                 eval_env: EvaluationEnv,
+                 universe: Universe,
                  controller = None) -> None:
         self.controller = controller
         self.do_emit_events = False
         # Current frame
-        self.eval_env = eval_env
-        self.frame = VMFrame(self, code, local_env, eval_env)
+        self.universe = universe
+        self.frame = VMFrame(self, code, local_env, universe)
         # Stack of previous frames (excludes current one)
         self.frames: List[VMFrame] = []
 
@@ -132,16 +131,16 @@ class VMFrame(HReprBase):
                  vm: VM,
                  code: VMCode,
                  local_env: EnvT,
-                 eval_env: EvaluationEnv) -> None:
+                 universe: Universe) -> None:
         self.vm = vm
         self.code = code
         self.instructions = code.instructions
         # Program counter: index of the next instruction to execute.
         self.pc = 0
         # Environment to store local bindings.
-        self.envs: List[EnvT] = [local_env, eval_env]
+        self.envs: List[EnvT] = [local_env, universe]
         self.local_env = local_env
-        self.eval_env = eval_env
+        self.universe = universe
         self.stack: List[Any] = [None]
         # Node being executed, mostly for debugging.
         self.signature: Any = None
@@ -172,10 +171,10 @@ class VMFrame(HReprBase):
     def push(self, *values):
         # self.stack += list(values)
         for value in values:
-            # TODO: eliminate this use of eval_env. Seems to only
+            # TODO: eliminate this use of universe. Seems to only
             # be relevant for avm.
             if isinstance(value, LambdaNode):
-                value = self.eval_env[value]
+                value = self.universe[value]
             self.stack.append(value)
 
     def pop(self):
@@ -243,15 +242,15 @@ class VMFrame(HReprBase):
           the result.
         """
         fn, *args = self.take(nargs + 1)
-        if isinstance(fn, Function):
-            bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
-            return self.__class__(self.vm, fn.code, bind, fn.eval_env)
-        elif isinstance(fn, Closure):
+        # if isinstance(fn, Function):
+        #     bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
+        #     return self.__class__(self.vm, fn.code, bind, fn.universe)
+        if isinstance(fn, Closure):
             self.push(fn.fn, *fn.args, *args)
             return self.instruction_reduce(node, nargs + len(fn.args))
         elif isinstance(fn, VMFunction):
             bind2: EnvT = {k: v for k, v in zip(fn.args, args)}
-            return self.__class__(self.vm, fn.code, bind2, self.eval_env)
+            return self.__class__(self.vm, fn.code, bind2, self.universe)
         else:
             value = fn(*args)
             self.push(value)
@@ -315,7 +314,7 @@ class VMFrame(HReprBase):
         # env = {}
         # for e in reversed(self.envs):
         #     env.update(e)
-        env = self.eval_env
+        env = self.universe
         eviews = H.tabbedView()
         for k, v in env.items():
             view = H.view(H.tab(hrepr(k)), H.pane(hrepr(v)))
@@ -328,12 +327,16 @@ class VMFrame(HReprBase):
         return views
 
 
-class StandardEvaluationEnv(EvaluationEnv):
-    def vm(self, code, local_env):
-        return VM(code, local_env, self, **self.config)
+# class StandardEvaluationEnv(EvaluationEnv):
+#     def vm(self, code, local_env):
+#         return VM(code, local_env, self, **self.config)
 
-    def setup(self):
-        update_object_map()
+#     def setup(self):
+#         update_object_map()
+
+
+class StandardEvaluationEnv:
+    pass
 
 
 eenvs = EvaluationEnvCollection(StandardEvaluationEnv, root_globals,
@@ -359,9 +362,6 @@ class VMUniverse(BackedUniverse):
             return StructuralMap(self.acquire)(x)
         else:
             return x
-
-    def evaluate(self, x):
-        return self[x]
 
     def run(self, fn, args):
         env = {name: self[arg] for name, arg in zip(fn.args, args)}
