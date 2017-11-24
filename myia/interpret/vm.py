@@ -8,14 +8,13 @@ from ..stx import \
 from ..lib import \
     Closure, IdempotentMappable, StructuralMap, \
     Universe, BackedUniverse, is_struct, StructuralMap
-from ..symbols import builtins, object_map, update_object_map
+from ..symbols import builtins
 from ..util import EventDispatcher, HReprBase, buche
 from functools import reduce
-from ..impl.main import impl_bank
 from ..parse import parse_function
-from .vmutil import EvaluationEnvCollection, \
+from .vmutil import EvaluationEnv, EvaluationEnvCollection, \
     VMCode, Instruction, VMFunction, VMPrimitive
-from ..ir import ir_universe, IRGraph
+from ..ir import IRGraph
 
 # The following two imports fill impl_bank['interp']
 # as a side-effect.
@@ -28,7 +27,6 @@ from ..impl.impl_bprop import _
 # since Function is the structure that stores
 # pointers to them.
 EnvT = Dict[Symbol, Any]
-root_globals = impl_bank['interp']
 
 
 class VM:
@@ -138,7 +136,7 @@ class VMFrame(HReprBase):
         # Program counter: index of the next instruction to execute.
         self.pc = 0
         # Environment to store local bindings.
-        self.envs: List[EnvT] = [local_env, universe]
+        self.envs: List[EnvT] = [local_env, universe]  # type: ignore
         self.local_env = local_env
         self.universe = universe
         self.stack: List[Any] = [None]
@@ -327,22 +325,6 @@ class VMFrame(HReprBase):
         return views
 
 
-# class StandardEvaluationEnv(EvaluationEnv):
-#     def vm(self, code, local_env):
-#         return VM(code, local_env, self, **self.config)
-
-#     def setup(self):
-#         update_object_map()
-
-
-class StandardEvaluationEnv:
-    pass
-
-
-eenvs = EvaluationEnvCollection(StandardEvaluationEnv, root_globals,
-                                python_universe)
-
-
 class VMUniverse(BackedUniverse):
     def __init__(self, parent, primitives, vm_config={}):
         super().__init__(parent)
@@ -353,8 +335,8 @@ class VMUniverse(BackedUniverse):
         x = self.parent[x]
         if isinstance(x, IRGraph):
             return VMFunction(x, self)
-        elif isinstance(x, CallableVMFunction):
-            return x.vmf
+        elif hasattr(x, '__myia_vmfunction__'):
+            return x.__myia_vmfunction__
         elif is_builtin(x):
             prim = self.primitives[x]
             return VMPrimitive(prim.fn, prim.name, self)
@@ -366,40 +348,3 @@ class VMUniverse(BackedUniverse):
     def run(self, fn, args):
         env = {name: self[arg] for name, arg in zip(fn.args, args)}
         return VM(fn.code, env, self).run()
-
-
-class CallableVMFunction:
-    def __init__(self, vmf, vmu, eu):
-        self.argnames = vmf.argnames
-        self.vmf = vmf
-        self.vm_universe = vmu
-        self.eval_universe = eu
-
-    def __call__(self, *args):
-        assert self.eval_universe
-        result = self.vm_universe.run(self.vmf, args)
-        return self.eval_universe.export_value(result)
-
-
-class EvaluationUniverse(BackedUniverse):
-    def acquire(self, x):
-        x = self.parent[x]
-        return self.export_value(x)
-
-    def export_value(self, x):
-        if isinstance(x, VMFunction):
-            return CallableVMFunction(x, self.parent, self)
-        elif is_struct(x):
-            return StructuralMap(self.export_value)(x)
-        else:
-            return x
-
-
-def evaluate(node):
-    vmu = VMUniverse(ir_universe, root_globals, {})
-    eu = EvaluationUniverse(vmu)
-    return eu[node]
-
-
-# def evaluate(node, controller=None):
-#     return eenvs.run_env(node, controller=controller)

@@ -3,7 +3,7 @@ Test the forward mode of Myia functions (no gradients).
 """
 
 from myia.parse import MyiaSyntaxError, parse_function
-from myia.interpret import evaluate
+from myia.front import compile
 from myia.stx import Symbol
 import pytest
 
@@ -35,7 +35,7 @@ def myia_test(*tests):
                 inputs = inputs,
 
             python_result = fn(*inputs)
-            myia_result = evaluate(node)(*inputs)
+            myia_result = compile(node)(*inputs)
 
             assert python_result == output
             assert myia_result == output

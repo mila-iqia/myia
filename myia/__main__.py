@@ -12,7 +12,7 @@ from importlib import import_module
 from . import stx
 from .transform import a_normal
 from .parse import parse_source
-from .interpret import evaluate
+from .front import compile
 from .validate import \
     unbound, missing_source, \
     analysis
@@ -315,7 +315,7 @@ def command_parse(arguments):
 
 def command_eval(arguments):
     lbda = getfn(arguments)
-    result = evaluate(lbda)
+    result = compile(lbda)
     args = getargs(arguments)
     if args:
         value = result(*args)
@@ -418,7 +418,7 @@ def command_debug(arguments):
             buche[cmd.path](exc)
 
     budb.set_trace()
-    fn = evaluate(genv[r])
+    fn = compile(genv[r])
     try:
         buche(fn.debug(args, budb), gutter='result')
     except Exception as exc:

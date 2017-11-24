@@ -16,7 +16,7 @@ from .stx import MyiaASTNode, Symbol, LambdaNode, LetNode, \
     maptup, create_lambda, is_global
 from .transform import a_normal, Grad, ggen
 from .parse import parse_source, parse_function
-from .interpret import evaluate
+from .front import compile
 from .lib import Atom, Record, structural_map
 from .impl import impl_interp as M
 
@@ -366,7 +366,7 @@ def analysis_eval(pyfn: Callable, lbda: LambdaNode) -> Record:
     compares the result of the pure function ``pyfn`` to its Myia
     implementation in ``bindings[sym]``.
     """
-    func = evaluate(lbda)
+    func = compile(lbda)
 
     def test(args):
         return compare_calls(dict(python = pyfn, myia = func), args)
@@ -384,13 +384,13 @@ def analysis_grad(pyfn: Callable, lbda: LambdaNode) -> Record:
     * The finite-differences estimation of the derivative of
       ``pyfn`` and the Myia-computed gradient.
     """
-    func = evaluate(lbda)
+    func = compile(lbda)
     albda = a_normal(lbda)
     assert isinstance(albda, LambdaNode)
     G = Grad(lbda.ref, albda)
     glbda = G.transform()
 
-    gfunc = evaluate(glbda)
+    gfunc = compile(glbda)
 
     def test(args):
         args2 = clean_args(args)
@@ -435,17 +435,17 @@ def grad2_transform(rlbda):
 
 def analysis_grad2(pyfn, lbda):
     sym = lbda.ref
-    func = evaluate(lbda)
+    func = compile(lbda)
 
     G = Grad(sym, a_normal(lbda))
     glbda = G.transform()
 
-    gfunc = evaluate(glbda)
+    gfunc = compile(glbda)
 
     gwrap = grad2_transform(glbda)
     G = Grad(gwrap.ref, a_normal(gwrap))
     g2lbda = G.transform()
-    gfunc2 = evaluate(g2lbda)
+    gfunc2 = compile(g2lbda)
 
     def gradients(*args):
         return gfunc(*args)[1](1)[1]

@@ -3,11 +3,11 @@ from types import FunctionType
 from ..stx import GenSym, ANORM, TMP, is_global, \
     MyiaASTNode, Symbol, LetNode, LambdaNode, TupleNode, \
     ApplyNode, ValueNode, ClosureNode, \
-    BackedUniverse, python_universe, is_struct
+    BackedUniverse, is_struct
 from ..parse import parse_function
 from ..transform import a_normal
 from .graph import IRNode, IRGraph
-from ..symbols import builtins, object_map
+from ..symbols import builtins
 from ..lib import StructuralMap
 
 
@@ -125,7 +125,3 @@ class IRUniverse(BackedUniverse):
             return StructuralMap(self.acquire)(x)
         else:
             return x
-
-
-symbolic_universe = SymbolicUniverse(python_universe, object_map)
-ir_universe = IRUniverse(symbolic_universe)

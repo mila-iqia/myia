@@ -3,6 +3,7 @@ import inspect
 import numpy
 from types import FunctionType
 from copy import copy
+from collections import defaultdict
 from .util.buche import HReprBase
 from .util.misc import Singleton
 
@@ -365,12 +366,6 @@ class Universe:
     def acquire(self, item):
         raise NotImplementedError()
 
-    def __copy__(self):
-        raise Exception('COP')
-
-    def __deepcopy__(self):
-        raise Exception('DCOP')
-
     def __getitem__(self, item):
         if isinstance(item, Universe.__cachable__):
             try:
@@ -387,3 +382,59 @@ class BackedUniverse(Universe):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+
+
+class UniverseGenerator:
+    def __init__(self, builder, cache=True):
+        self.builder = builder
+        self.universes = {}
+        self.cache = cache
+
+    def signature(self, x):
+        if isinstance(x, dict):
+            return frozenset(map(self.signature, x.items()))
+        elif isinstance(x, tuple):
+            return tuple(map(self.signature, x))
+        elif isinstance(x, set):
+            return frozenset(map(self.signature, x))
+        elif isinstance(x, list):
+            return tuple(map(self.signature, x))
+        else:
+            return x
+
+    def get_universe(self, **config):
+        cfg = self.signature(config)
+        if self.cache and cfg in self.universes:
+            return self.universes[cfg]
+        else:
+            u = self.builder(**config)
+            self.universes[cfg] = u
+            return u
+
+    def __call__(self, **config):
+        return self.get_universe(**config)
+
+
+class UniversePipelineGenerator:
+    def __init__(self, *pipeline):
+        self.pipeline = pipeline
+        self.stage_names = set(spec['name'] for spec in pipeline)
+
+    def get_universe(self, **config):
+        real_config = defaultdict(dict)
+        for k, v in config.items():
+            pfx = None
+            if '_' in k:
+                pfx, key = k.split('_', 1)
+            if pfx not in self.stage_names:
+                raise ValueError(f'Each configuration key must start with '
+                                 f' one of {self.stage_names}')
+            real_config[pfx][key] = v
+
+        last = None
+        for spec in self.pipeline:
+            cfg = real_config.get(spec['name'], {})
+            if last:
+                cfg['parent'] = last
+            last = spec['generator'](**cfg)
+        return last

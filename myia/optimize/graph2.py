@@ -714,7 +714,7 @@ def drop_copy(univ, node, X):
     return X
 
 
-from ..interpret import evaluate
+from ..front import compile as evaluate
 
 
 @pattern_opt(V1, V2, ...)

@@ -24,7 +24,7 @@ class Function(_Function):
     """
     def __init__(self,
                  ast: LambdaNode,
-                 universe: Universe) -> None:
+                 universe: 'EvaluationEnv') -> None:
         assert isinstance(ast, LambdaNode)
         self.argnames = [a.label for a in ast.args]
         self.nargs = len(ast.args)

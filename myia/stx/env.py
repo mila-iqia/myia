@@ -260,7 +260,9 @@ class PythonUniverse(Universe):
                 except (KeyError, AttributeError):
                     raise NameError(f"Could not resolve global: '{sym}' "
                                     f"in namespace: '{sym.namespace}'.")
-            return v
+            return self.acquire(v)
+        elif hasattr(x, '__myia_base__'):
+            return x.__myia_base__
         elif isinstance(x, FunctionType):
             fn = x
             filename = inspect.getfile(fn)
