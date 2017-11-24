@@ -1,9 +1,10 @@
 
 import inspect
+import numpy
+from types import FunctionType
 from copy import copy
 from .util.buche import HReprBase
 from .util.misc import Singleton
-import numpy
 
 
 ##############
@@ -313,8 +314,9 @@ class StructuralMap:
         elif hasattr(d0, '__map__'):
             return d0.__map__(self, *data[1:])
         else:
-            raise TypeError(f"'structural_map' is not defined for data"
-                            f" of type {t}.")
+            return self.fn(*data)
+            # raise TypeError(f"'structural_map' is not defined for data"
+            #                 f" of type {t}.")
 
 
 def structural_map(fn, *args):
@@ -342,3 +344,46 @@ TupleAtom = Atom('tuple')
 
 def tuple_record(*args):
     return Record(TupleAtom, {i: v for i, v in enumerate(args)})
+
+
+############
+# Universe #
+############
+
+
+def is_struct(x):
+    # set, frozenset, dict
+    return isinstance(x, (list, tuple, Record))
+
+
+class Universe:
+    __cachable__ = (FunctionType,)
+
+    def __init__(self):
+        self.cache = {}
+
+    def acquire(self, item):
+        raise NotImplementedError()
+
+    def __copy__(self):
+        raise Exception('COP')
+
+    def __deepcopy__(self):
+        raise Exception('DCOP')
+
+    def __getitem__(self, item):
+        if isinstance(item, Universe.__cachable__):
+            try:
+                return self.cache[item]
+            except KeyError:
+                v = self.acquire(item)
+                self.cache[item] = v
+                return v
+        else:
+            return self.acquire(item)
+
+
+class BackedUniverse(Universe):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent

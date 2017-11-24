@@ -7,7 +7,8 @@ See Inference section of DEVELOPERS.md for some more information.
 
 from types import FunctionType
 from ..util import Event, EventDispatcher, buche
-from ..stx import MyiaASTNode, LambdaNode, ClosureNode, TupleNode, Symbol
+from ..stx import \
+    MyiaASTNode, LambdaNode, ClosureNode, TupleNode, Symbol, is_global
 from collections import defaultdict
 from ..impl.flow_all import default_flow, ANY, VALUE
 from ..impl.main import impl_bank
@@ -183,7 +184,8 @@ class DFA(EventDispatcher):
             else:
                 # TODO: This is more brutal than necessary.
                 raise Exception(
-                    f'Cannot flow a non-function here: {new_value}'
+                    f'Cannot flow a non-function here: {new_value}: '
+                    f'{type(new_value)}'
                 )
         self.on_flow_from(fn, self.value_track)(on_new_fn_value)
 
@@ -286,7 +288,7 @@ class DFA(EventDispatcher):
             # We propagate builtin symbols, although it may be better
             # to do this another way.
             self.propagate_value(node, node)
-        else:
+        elif is_global(node):
             try:
                 b = self.genv[node]
                 b = import_node(b)

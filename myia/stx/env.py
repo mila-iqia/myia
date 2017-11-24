@@ -11,12 +11,15 @@ manipulation.
   globals_pool.
 """
 
-
 from typing import \
     List, Tuple as TupleT, Iterable, Dict, Set, Union, \
     cast, TypeVar, Any
+import inspect
+from types import FunctionType
 from .nodes import Symbol, LambdaNode
 from ..util import EventDispatcher
+from ..lib import \
+    Record, StructuralMap, Universe, BackedUniverse, is_struct
 from uuid import uuid4 as uuid
 
 
@@ -209,12 +212,15 @@ class VariableTracker:
         self.bindings[name] = value
 
 
-###########################################
-# Global pool to resolve global variables #
-###########################################
+###############################################
+# Global universe to resolve global variables #
+###############################################
 
 
-class BackedPool(EventDispatcher):
+Universe.__cachable__ += (Symbol, LambdaNode)  # type: ignore
+
+
+class PythonUniverse(Universe):
     """
     Represents a pool of Symbol->value associations, backed by a store
     of namespace->dict associations. In a nutshell, this is used to map
@@ -222,72 +228,58 @@ class BackedPool(EventDispatcher):
     to the values of corresponding global variables.
     """
 
-    def __init__(self) -> None:
-        self.events = EventDispatcher()
-        self.pool: Dict[Symbol, Any] = {}
-        self.sources: Dict[str, Dict[str, Any]] = {}
+    def __init__(self):
+        super().__init__()
+        self.sources = {}
 
     def add_source(self, namespace, contents):
-        self.sources[namespace] = contents
+        if namespace not in self.sources:
+            self.sources[namespace] = contents
 
-    def acquire(self, sym):
+    def acquire(self, x):
         """
         Acquire the value corresponding to the given symbol from the
         source dictionary corresponding to the symbol's namespace and
         throw a `KeyError` if there is no such value.
-
-        Most of the time, you want to call `pool.resolve(sym)`.
         """
-        globs = self.sources[sym.namespace]
-        try:
-            v = globs[sym.label]
-        except KeyError as err:
-            builtins = globs['__builtins__']
+        if is_builtin(x):
+            return x
+        elif is_global(x):
+            sym = x
+            globs = self.sources[sym.namespace]
             try:
-                if isinstance(builtins, dict):
-                    # I don't know why this ever happens, but it does.
-                    v = builtins[sym.label]
-                else:
-                    v = getattr(builtins, sym.label)
-            except (KeyError, AttributeError):
-                raise NameError(f"Could not resolve global: '{sym}' "
-                                f"in namespace: '{sym.namespace}'.")
-        self.events.emit_acquire(sym, v)
-        self.pool[sym] = v
-        return v
-
-    def resolve(self, sym):
-        """
-        Returns the value associated with the symbol. In a nutshell:
-
-        >>> resolve(Symbol('x', namespace='global:file.py'))
-        <global variable x from file.py>
-
-        As an exception, any function processed by Myia will be associated
-        to its LambdaNode in this dictionary (even though it is a FunctionImpl
-        instance as seen from Python's globals), and some additional entries
-        (gradients, etc.) are present here that are not in Python's globals
-        (these entries' Symbols are engineered so they cannot clash with
-        anything else).
-        """
-        try:
-            return self.pool[sym]
-        except KeyError:
-            return self.acquire(sym)
+                v = globs[sym.label]
+            except KeyError as err:
+                builtins = globs['__builtins__']
+                try:
+                    if isinstance(builtins, dict):
+                        # I don't know why this ever happens, but it does.
+                        v = builtins[sym.label]
+                    else:
+                        v = getattr(builtins, sym.label)
+                except (KeyError, AttributeError):
+                    raise NameError(f"Could not resolve global: '{sym}' "
+                                    f"in namespace: '{sym.namespace}'.")
+            return v
+        elif isinstance(x, FunctionType):
+            fn = x
+            filename = inspect.getfile(fn)
+            self.add_source(f'global:{filename}', fn.__globals__)
+            return x
+        elif is_struct(x):
+            return StructuralMap(self.acquire)(x)
+        else:
+            return x
 
     def associate(self, sym, node):
         """
         Associate the given symbol to the given node (typically a LambdaNode)
-        in this pool. The LambdaNode's `ref` field will be set to the
+        in this universe. The LambdaNode's `ref` field will be set to the
         symbol.
         """
         if isinstance(node, LambdaNode):
             node.ref = sym
-        self.events.emit_acquire(sym, node)
-        self.pool[sym] = node
-
-    def __getitem__(self, sym):
-        return self.resolve(sym)
+        self.cache[sym] = node
 
 
 # Maps global Symbols to whatever it is they resolve to. When compiling
@@ -295,7 +287,7 @@ class BackedPool(EventDispatcher):
 # Values coming from Python globals are registered there when they are
 # requested. Globals from all global namespaces are pooled together,
 # which is fine because namespaces avoid clashes.
-globals_pool: BackedPool = BackedPool()
+globals_pool = PythonUniverse()
 
 
 def create_lambda(ref, args, body, gen=None, *,
