@@ -3,7 +3,7 @@ from typing import List, Any, Union, Callable, Dict
 from .main import symbol_associator, impl_bank
 from ..stx import Symbol, ApplyNode as Apply, ClosureNode, \
     LambdaNode, TupleNode, GenSym, BPROP, JTAG, create_lambda, \
-    globals_pool
+    python_universe
 from ..symbols import inst_builtin
 from ..parse import parse_function
 from .impl_interp import zeros_like, J, Jinv, switch, first, second, \
@@ -88,7 +88,7 @@ def impl_bprop(sym, name, orig_fn: Callable) -> Callable:
         augm_sym = ggen(sym, JTAG)
         ast = create_lambda(augm_sym, args, TupleNode([forward, backward]), G)
         ast.primal = sym
-        globals_pool.associate(bprop_sym, lbda)
+        python_universe.associate(bprop_sym, lbda)
         return ast
 
     grad_computers[sym] = mkgrad

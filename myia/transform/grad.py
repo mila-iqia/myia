@@ -24,7 +24,7 @@ from ..stx import \
     maptup, About, transformer_method, bsym, nsym, GenSym, \
     JTAG, SENS, BPROP, BPROP_CLOS, NULLSYM, \
     TMP_LET, TMP_BPROP, TMP_SENS, create_lambda, is_global, \
-    globals_pool
+    python_universe
 from ..symbols import builtins, inst_builtin
 from .a_normal import a_normal
 from ..util import Props, buche
@@ -52,7 +52,7 @@ def find_grad(ref, nargs_closure):
 
     def default_grad(n):
         try:
-            lbda = globals_pool[ref]
+            lbda = python_universe[ref]
         except KeyError:
             raise NameError(f"No gradient defined for primitive '{ref}'.")
         normalized = a_normal(lbda)

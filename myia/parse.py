@@ -122,7 +122,7 @@ from .stx import \
     BeginNode as Begin, TupleNode as Tuple, ClosureNode as Closure, \
     _Assign, GenSym, About, VariableTracker, \
     THEN, ELSE, WTEST, WLOOP, LBDA, \
-    create_lambda, globals_pool
+    create_lambda, python_universe
 from .symbols import get_operator, inst_builtin
 from uuid import uuid4 as uuid
 import ast
@@ -235,7 +235,7 @@ class Parser(LocVisitor):
             One such macro (aka the only one) is GRAD, see grad.py.
         gen: The GenSym to use to generate new (non-global)
             variables.
-        dry: Whether to add new symbols to the globals_pool or not.
+        dry: Whether to add new symbols to the python_universe or not.
         pull_free_variables: When free variables are encountered
             and this flag is set, new variables will be created,
             and a mapping will be created in self.free_variables.
@@ -278,7 +278,7 @@ class Parser(LocVisitor):
         self.locator = locator
         # global_gen is used to generate global variable names:
         # * When a new Lambda is created. The new global is also
-        #   stored in globals_pool.
+        #   stored in python_universe.
         # * When an unresolved variable is encountered.
         if dry:
             self.global_gen = GenSym()
@@ -1179,7 +1179,7 @@ def parse_source(url: str,
         * The Symbol reference associated to the parsed
           function.
         To get the Lambda object that corresponds to the
-        given source function, index stx.globals_pool with
+        given source function, index stx.python_universe with
         the Symbol.
     """
     tree = ast.parse(src)
@@ -1192,10 +1192,10 @@ def parse_source(url: str,
     if isinstance(r, _Assign):
         r = r.value
     assert isinstance(r, Symbol)
-    lbda = globals_pool[r]
+    lbda = python_universe[r]
     if add_source:
         glb = {'__builtins__': __builtins__}
-        globals_pool.add_source(f'global:{url}', glb)
+        python_universe.add_source(f'global:{url}', glb)
     return lbda
 
 
@@ -1223,6 +1223,6 @@ def parse_function(fn, **kw) -> Lambda:
                         textwrap.dedent(inspect.getsource(fn)),
                         False,
                         **kw)
-    globals_pool.add_source(f'global:{filename}', fn.__globals__)
+    python_universe.add_source(f'global:{filename}', fn.__globals__)
     fn_cache[fn].append((kw, lbda))
     return lbda

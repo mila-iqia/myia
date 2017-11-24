@@ -4,7 +4,7 @@ import asyncio
 from types import FunctionType
 from ..stx import \
     MyiaASTNode, Location, Symbol, ValueNode, LambdaNode, \
-    maptup2, globals_pool, is_builtin
+    maptup2, python_universe, is_builtin
 from ..lib import \
     Closure, IdempotentMappable, StructuralMap, \
     Universe, BackedUniverse, is_struct, StructuralMap
@@ -340,7 +340,7 @@ class StandardEvaluationEnv:
 
 
 eenvs = EvaluationEnvCollection(StandardEvaluationEnv, root_globals,
-                                globals_pool)
+                                python_universe)
 
 
 class VMUniverse(BackedUniverse):

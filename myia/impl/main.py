@@ -11,7 +11,6 @@ are stored, in fact.
 from typing import Dict, Any
 from collections import defaultdict
 from ..symbols import builtins
-from ..stx import globals_pool
 
 
 impl_bank: Dict[str, Dict[Any, Any]] = defaultdict(dict)

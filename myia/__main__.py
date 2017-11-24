@@ -21,7 +21,7 @@ from .impl.impl_interp import type as typeof
 from .util import on_discovery
 from .interpret import VM
 from .stx import Symbol, MyiaASTNode, LambdaNode, \
-    AboutPrinter, nodes, globals_pool
+    AboutPrinter, nodes, python_universe
 # from .util import BucheDb
 from .symbols import builtins
 
@@ -363,7 +363,7 @@ def command_inspect(arguments):
 
     from .inference.dfa import DFA, TypeTrack, ValueTrack, NeedsTrack
     d = DFA([TypeTrack, ValueTrack, lambda dfa: NeedsTrack(dfa, [])],
-            globals_pool)
+            python_universe)
 
     @d.on_visit
     def log_defn(_, node):

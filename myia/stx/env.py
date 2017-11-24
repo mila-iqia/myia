@@ -4,11 +4,11 @@ manipulation.
 
 * An assortment of special characters to modify symbols.
 * ``GenSym``: generate Symbols.
-* ``globals_pool``: all Lambda nodes that are associated to a
+* ``python_universe``: all Lambda nodes that are associated to a
   global symbol (i.e. all of them) are mapped in that dictionary,
   among other things.
 * ``create_lambda``: create a new Lambda and register it in the
-  globals_pool.
+  python_universe.
 """
 
 from typing import \
@@ -287,7 +287,7 @@ class PythonUniverse(Universe):
 # Values coming from Python globals are registered there when they are
 # requested. Globals from all global namespaces are pooled together,
 # which is fine because namespaces avoid clashes.
-globals_pool = PythonUniverse()
+python_universe = PythonUniverse()
 
 
 def create_lambda(ref, args, body, gen=None, *,
@@ -295,9 +295,9 @@ def create_lambda(ref, args, body, gen=None, *,
     """
     Create a LambdaNode named according to the `ref` Symbol and return it.
     If `commit` is `True`, `ref` will be associated to the `LambdaNode` in
-    `globals_pool`.
+    `python_universe`.
     """
     lbda = LambdaNode(args, body, gen, **kw)
     if commit:
-        globals_pool.associate(ref, lbda)
+        python_universe.associate(ref, lbda)
     return lbda

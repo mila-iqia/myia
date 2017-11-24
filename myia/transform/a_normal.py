@@ -14,7 +14,7 @@ from ..stx import \
     MyiaASTNode, ApplyNode as Apply, Symbol, ValueNode as Value, \
     LetNode as Let, LambdaNode as Lambda, ClosureNode as Closure, \
     TupleNode as Tuple, Transformer, GenSym, LHS, Bindings, \
-    globals_pool, create_lambda, GenSym, nsym, ANORM
+    python_universe, create_lambda, GenSym, nsym, ANORM
 
 
 # TODO: Lambda should never be a sub-expression, it should be pulled
@@ -60,7 +60,7 @@ def a_normal(node: MyiaASTNode) -> MyiaASTNode:
     node = ANormalTransformer().transform(node)
     node = CollapseLet().transform(node)
     sym = agen(orig.ref, ANORM)
-    globals_pool.associate(sym, node)
+    python_universe.associate(sym, node)
     return node
 
 

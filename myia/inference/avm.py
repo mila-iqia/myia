@@ -8,7 +8,7 @@ from ..symbols import builtins
 from ..impl.main import impl_bank
 from itertools import product
 from .dfa import DFA, ValueTrack, NeedsTrack
-from ..stx import maptup2, Symbol, TupleNode, LambdaNode, globals_pool
+from ..stx import maptup2, Symbol, TupleNode, LambdaNode, python_universe
 from collections import defaultdict
 from ..lib import ANY, VALUE, ERROR
 from .types import Type
@@ -476,7 +476,7 @@ class AEvaluationEnv(EvaluationEnv):
 
 
 eenvs = EvaluationEnvCollection(AEvaluationEnv, aroot_globals,
-                                globals_pool, cache=False)
+                                python_universe, cache=False)
 
 
 def abstract_evaluate(node, proj=None):
