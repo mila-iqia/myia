@@ -353,7 +353,7 @@ def tuple_record(*args):
 
 def is_struct(x):
     # set, frozenset, dict
-    return isinstance(x, (list, tuple, Record))
+    return isinstance(x, (list, tuple, Record, Closure))
 
 
 class Universe:

@@ -1,16 +1,20 @@
 
+from types import FunctionType
 from ..stx import GenSym, ANORM, TMP, is_global, \
-    Symbol, LetNode, LambdaNode, TupleNode, \
-    ApplyNode, ValueNode, ClosureNode
+    MyiaASTNode, Symbol, LetNode, LambdaNode, TupleNode, \
+    ApplyNode, ValueNode, ClosureNode, \
+    BackedUniverse, globals_pool, is_struct
+from ..parse import parse_function
 from ..transform import a_normal
 from .graph import IRNode, IRGraph
-from ..symbols import builtins
+from ..symbols import builtins, object_map
+from ..lib import StructuralMap
 
 
 gen = GenSym(':value')
 
 
-def lambda_to_ir(lbda):
+def lambda_to_ir(orig_lbda):
 
     assoc = {}
 
@@ -26,7 +30,7 @@ def lambda_to_ir(lbda):
                 assoc[x] = IRNode(None, gen('value'), x)
         return assoc[x]
 
-    lbda = a_normal(lbda)
+    lbda = a_normal(orig_lbda)
 
     let = lbda.body
 
@@ -35,6 +39,7 @@ def lambda_to_ir(lbda):
         ref = ref.label
 
     g = IRGraph(None, ref, lbda.gen)
+    g.lbda = orig_lbda
     g.inputs = tuple(fetch(sym) for sym in lbda.args)
     rval = IRNode(None, g.tag, g)
 
@@ -79,3 +84,48 @@ def lambda_to_ir(lbda):
         assign(k, v)
 
     return rval
+
+
+class SymbolicUniverse(BackedUniverse):
+    """
+    Maps certain values to Symbols, functions to LambdaNodes.
+    """
+    def __init__(self, parent, object_map={}):
+        super().__init__(parent)
+        self.object_map = object_map
+
+    def acquire(self, x):
+        x = self.parent[x]
+        if isinstance(x, FunctionType):
+            fn = parse_function(x)
+            return fn
+        elif hasattr(x, '__myia_symbol__'):
+            return x.__myia_symbol__
+        elif hasattr(x, '__myia_lambda__'):
+            return x.__myia_lambda__
+        elif isinstance(x, MyiaASTNode):
+            return x
+        elif is_struct(x):
+            return StructuralMap(self.acquire)(x)
+        try:
+            return self.object_map[x]
+        except (KeyError, TypeError, ValueError):
+            return x
+
+
+class IRUniverse(BackedUniverse):
+    """
+    Maps everything to IRNodes.
+    """
+    def acquire(self, x):
+        x = self.parent[x]
+        if isinstance(x, LambdaNode):
+            return lambda_to_ir(x).value
+        elif is_struct(x):
+            return StructuralMap(self.acquire)(x)
+        else:
+            return x
+
+
+symbolic_universe = SymbolicUniverse(globals_pool, object_map)
+ir_universe = IRUniverse(symbolic_universe)

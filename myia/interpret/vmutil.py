@@ -76,6 +76,45 @@ class VMPrimitive(Primitive):
         self.eval_env = eval_env
 
 
+class VMFunction(_Function):
+    def __init__(self, graph, universe):
+        ast = graph.lbda
+        instrs = make_instructions(graph)
+        self.ast = ast
+        self.argnames = [a.label for a in ast.args]
+        self.args = [n.tag for n in graph.inputs]
+        self.graph = graph
+        self.universe = universe
+        self.eval_env = universe
+        self.code = VMCode(ast, instrs, False)
+        self.primal_sym = ast.primal
+
+    def __str__(self):
+        return f'VMFunc({self.graph.tag or self.graph})'
+
+    def __repr__(self):
+        return str(self)
+
+    def __hash__(self):
+        return hash(self.graph)
+
+    def __eq__(self, other):
+        return type(other) is VMFunction \
+            and self.graph is other.graph
+
+    def __add__(self, other):
+        # TODO: Fix the following issue, which happens sometimes.
+        #       I believe the main reason is that for the backpropagator,
+        #       Grad builds a closure on the wrong function (?)
+        # if self != other:
+        #     raise Exception('The functions being added are different.')
+        return self
+
+    def __hrepr__(self, H, hrepr):
+        return hrepr.titled_box('VMFunc',
+                                [hrepr(self.graph.tag or self.graph)])
+
+
 ##########################################
 # Code representation for stack-based VM #
 ##########################################

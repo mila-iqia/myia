@@ -3,15 +3,20 @@ from typing import Dict, Callable, List, Any, Union, Tuple as TupType, Optional
 import asyncio
 from types import FunctionType
 from ..stx import \
-    MyiaASTNode, Location, Symbol, ValueNode, LambdaNode, maptup2, globals_pool
-from ..lib import Closure, IdempotentMappable, StructuralMap
+    MyiaASTNode, Location, Symbol, ValueNode, LambdaNode, \
+    maptup2, globals_pool, is_builtin
+from ..lib import \
+    Closure, IdempotentMappable, StructuralMap, \
+    Universe, BackedUniverse, is_struct, StructuralMap
 from ..symbols import builtins, object_map, update_object_map
 from ..util import EventDispatcher, HReprBase, buche
 from functools import reduce
 from ..impl.main import impl_bank
 from ..parse import parse_function
 from .vmutil import EvaluationEnv, EvaluationEnvCollection, Function, \
-    VMCode, Instruction, VMFunction
+    VMCode, Instruction, VMFunction, VMPrimitive
+from ..ir import ir_universe, IRGraph
+
 # The following two imports fill impl_bank['interp']
 # as a side-effect.
 from ..impl.impl_interp import _
@@ -167,7 +172,10 @@ class VMFrame(HReprBase):
     def push(self, *values):
         # self.stack += list(values)
         for value in values:
-            value = self.eval_env[value]
+            # TODO: eliminate this use of eval_env. Seems to only
+            # be relevant for avm.
+            if isinstance(value, LambdaNode):
+                value = self.eval_env[value]
             self.stack.append(value)
 
     def pop(self):
@@ -241,6 +249,9 @@ class VMFrame(HReprBase):
         elif isinstance(fn, Closure):
             self.push(fn.fn, *fn.args, *args)
             return self.instruction_reduce(node, nargs + len(fn.args))
+        elif isinstance(fn, VMFunction):
+            bind2: EnvT = {k: v for k, v in zip(fn.args, args)}
+            return self.__class__(self.vm, fn.code, bind2, self.eval_env)
         else:
             value = fn(*args)
             self.push(value)
@@ -329,5 +340,66 @@ eenvs = EvaluationEnvCollection(StandardEvaluationEnv, root_globals,
                                 globals_pool)
 
 
-def evaluate(node, controller=None):
-    return eenvs.run_env(node, controller=controller)
+class VMUniverse(BackedUniverse):
+    def __init__(self, parent, primitives, vm_config={}):
+        super().__init__(parent)
+        self.primitives = primitives
+        self.vm_config = vm_config
+
+    def acquire(self, x):
+        x = self.parent[x]
+        if isinstance(x, IRGraph):
+            return VMFunction(x, self)
+        elif isinstance(x, CallableVMFunction):
+            return x.vmf
+        elif is_builtin(x):
+            prim = self.primitives[x]
+            return VMPrimitive(prim.fn, prim.name, self)
+        elif is_struct(x):
+            return StructuralMap(self.acquire)(x)
+        else:
+            return x
+
+    def evaluate(self, x):
+        return self[x]
+
+    def run(self, fn, args):
+        env = {name: self[arg] for name, arg in zip(fn.args, args)}
+        return VM(fn.code, env, self).run()
+
+
+class CallableVMFunction:
+    def __init__(self, vmf, vmu, eu):
+        self.argnames = vmf.argnames
+        self.vmf = vmf
+        self.vm_universe = vmu
+        self.eval_universe = eu
+
+    def __call__(self, *args):
+        assert self.eval_universe
+        result = self.vm_universe.run(self.vmf, args)
+        return self.eval_universe.export_value(result)
+
+
+class EvaluationUniverse(BackedUniverse):
+    def acquire(self, x):
+        x = self.parent[x]
+        return self.export_value(x)
+
+    def export_value(self, x):
+        if isinstance(x, VMFunction):
+            return CallableVMFunction(x, self.parent, self)
+        elif is_struct(x):
+            return StructuralMap(self.export_value)(x)
+        else:
+            return x
+
+
+def evaluate(node):
+    vmu = VMUniverse(ir_universe, root_globals, {})
+    eu = EvaluationUniverse(vmu)
+    return eu[node]
+
+
+# def evaluate(node, controller=None):
+#     return eenvs.run_env(node, controller=controller)
