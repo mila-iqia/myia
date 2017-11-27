@@ -416,25 +416,51 @@ class UniverseGenerator:
 
 
 class UniversePipelineGenerator:
-    def __init__(self, *pipeline):
-        self.pipeline = pipeline
-        self.stage_names = set(spec['name'] for spec in pipeline)
+    def __init__(self, **generators):
+        self.pipelines = {name: gen for name, gen in generators.items()
+                          if isinstance(gen, str)}
+        self.generators = {name: gen for name, gen in generators.items()
+                           if not isinstance(gen, str)}
+        self.names = set(self.generators.keys())
 
-    def get_universe(self, **config):
+    def get_universes(self, **config):
         real_config = defaultdict(dict)
         for k, v in config.items():
-            pfx = None
-            if '_' in k:
-                pfx, key = k.split('_', 1)
-            if pfx not in self.stage_names:
-                raise ValueError(f'Each configuration key must start with '
-                                 f' one of {self.stage_names}')
-            real_config[pfx][key] = v
+            if k in self.names:
+                real_config[k] = v
+            else:
+                pfx = None
+                if '_' in k:
+                    pfx, key = k.split('_', 1)
+                if pfx not in self.names:
+                    raise ValueError(f'Each configuration key must start with '
+                                     f' one of {self.names}')
+                real_config[pfx][key] = v
 
-        last = None
-        for spec in self.pipeline:
-            cfg = real_config.get(spec['name'], {})
-            if last:
-                cfg['parent'] = last
-            last = spec['generator'](**cfg)
-        return last
+        universes = {}
+        rval = {}
+
+        def get_pipeline(path, steps):
+            path = tuple(path)
+            if path in universes:
+                return universes[path]
+            else:
+                *prev, p = path
+                cfg = real_config.get(p, {})
+                if len(prev) > 0:
+                    cfg['parent'] = get_pipeline(prev, steps)
+                u = self.generators[p](**cfg)
+                universes[path] = u
+                steps[p] = u
+                u.universes = steps
+                return u
+
+        for pname, pipeline in self.pipelines.items():
+            path = tuple(pipeline.split('->'))
+            steps = {}
+            rval[pname] = get_pipeline(path, steps)
+
+        for u in rval.values():
+            u.universes.update(rval)
+
+        return rval

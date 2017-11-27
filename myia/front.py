@@ -9,7 +9,7 @@ from .lib import \
     BackedUniverse, StructuralMap, is_struct, \
     UniverseGenerator, UniversePipelineGenerator
 from .stx import PythonUniverse
-from .ir import SymbolicUniverse, IRUniverse
+from .ir import SymbolicUniverse, IRUniverse, OptimizedUniverse
 from .interpret import VMFunction, VMUniverse
 from .symbols import object_map
 from .impl.main import impl_bank
@@ -43,24 +43,29 @@ class EvaluationUniverse(BackedUniverse):
             return x
 
 
-pipeline = UniversePipelineGenerator(
+standard_pipeline = UniversePipelineGenerator(
+    const_prop='py->sy->ir->vm->ev',
+    full='py->sy->ir->opt->vm->ev',
     # TODO: permit future customization of python_universe
-    # {'name': 'py', 'generator': UniverseGenerator(PythonUniverse)},
-    {'name': 'py', 'generator': lambda: python_universe},
-    {'name': 'sy', 'generator': UniverseGenerator(SymbolicUniverse)},
-    {'name': 'ir', 'generator': UniverseGenerator(IRUniverse)},
-    {'name': 'vm', 'generator': UniverseGenerator(VMUniverse)},
-    {'name': 'ev', 'generator': UniverseGenerator(EvaluationUniverse)}
+    # py=UniverseGenerator(PythonUniverse)
+    py=lambda: python_universe,
+    sy=UniverseGenerator(SymbolicUniverse),
+    ir=UniverseGenerator(IRUniverse),
+    opt=UniverseGenerator(OptimizedUniverse),
+    vm=UniverseGenerator(VMUniverse),
+    ev=UniverseGenerator(EvaluationUniverse)
 )
 
 
 standard_configuration = dict(
     sy_object_map = object_map,
-    vm_primitives = impl_bank['interp']
+    vm_primitives = impl_bank['interp'],
+    opt_passes = []
 )
 
 
-standard_universe = pipeline.get_universe(**standard_configuration)
+standard_universe = standard_pipeline \
+    .get_universes(**standard_configuration)['full']
 
 
 class MyiaFunction:
@@ -73,7 +78,8 @@ class MyiaFunction:
 
     def __call__(self, *args):
         if not self.universe:
-            self.universe = pipeline.get_universe(**self.options)
+            self.universe = standard_pipeline \
+                .get_universes(**self.options)['full']
         if not self.mfn:
             self.mfn = self.universe[self.fn]
         assert isinstance(self.mfn, CallableVMFunction)
