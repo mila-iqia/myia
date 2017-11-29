@@ -17,9 +17,9 @@ def fnvar(name):
 
 
 def globalvar(name):
-    return var(name, lambda x: x.is_constant() \
-            and is_global(x.value) \
-            and not is_builtin(x.value))
+    return var(name, lambda x: x.is_constant() and
+               is_global(x.value) and
+               not is_builtin(x.value))
 
 
 X = var('X')
@@ -100,6 +100,7 @@ pattern_bank = {}
 def pattern_opt(*pattern):
     if len(pattern) == 2 and pattern[0] == 'just':
         pattern = pattern[1]
+
     def wrap(handler):
         opt = PatternOpt(pattern, handler)
         pattern_bank[handler.__name__] = opt
