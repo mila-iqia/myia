@@ -1,4 +1,5 @@
 
+from ..stx import is_global, is_builtin
 from ..inference.types import var, unify, isvar
 from ..symbols import builtins
 from .graph import IRNode, IRGraph, NO_VALUE
@@ -15,12 +16,19 @@ def fnvar(name):
     return var(name, lambda x: x.is_graph())
 
 
+def globalvar(name):
+    return var(name, lambda x: x.is_constant() \
+            and is_global(x.value) \
+            and not is_builtin(x.value))
+
+
 X = var('X')
 Y = var('Y')
 Z = var('Z')
 V = valuevar('V')
 V1 = valuevar('V1')
 V2 = valuevar('V2')
+GV = globalvar('GV')
 L = fnvar('L')
 
 
@@ -90,6 +98,8 @@ pattern_bank = {}
 
 
 def pattern_opt(*pattern):
+    if len(pattern) == 2 and pattern[0] == 'just':
+        pattern = pattern[1]
     def wrap(handler):
         opt = PatternOpt(pattern, handler)
         pattern_bank[handler.__name__] = opt
@@ -114,14 +124,22 @@ def drop_copy(univ, node, X):
 
 @pattern_opt(V1, V2, ...)
 def eval_constant(univ, node, V1, V2):
+    univ = univ.universes['const_prop']
     if V1.value == builtins.partial:
         return False
     f = V1
     args = V2
-    fn = evaluate(f.value)
+    fn = univ[f.value]
     res = fn(*[arg.value for arg in args])
     n = IRNode(None, None)
     n.value = res
+    return n
+
+
+@pattern_opt('just', GV)
+def resolve_global(univ, node, GV):
+    univ = univ.universes['opt']
+    n = IRNode(None, GV.value, univ[GV.value])
     return n
 
 
