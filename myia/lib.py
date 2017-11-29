@@ -443,15 +443,17 @@ class UniversePipelineGenerator:
         def get_pipeline(path, steps):
             path = tuple(path)
             if path in universes:
-                return universes[path]
+                u, steps2 = universes[path]
+                steps.update(steps2)
+                return u
             else:
                 *prev, p = path
                 cfg = real_config.get(p, {})
                 if len(prev) > 0:
                     cfg['parent'] = get_pipeline(prev, steps)
                 u = self.generators[p](**cfg)
-                universes[path] = u
                 steps[p] = u
+                universes[path] = u, {**steps}
                 u.universes = steps
                 return u
 
