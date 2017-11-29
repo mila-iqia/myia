@@ -8,10 +8,10 @@ class OptimizedUniverse(BackedUniverse):
         super().__init__(parent)
         self.passes = passes
 
-    def acquire(self, x):
-        x = self.parent[x]
+    def acquire(self, orig_x):
+        x = self.parent[orig_x]
         if isinstance(x, IRGraph):
-            self.cache[x] = x
+            self.cache[orig_x] = x
             self.optimize(x)
             return x
         elif is_struct(x):
