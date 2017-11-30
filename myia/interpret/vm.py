@@ -249,10 +249,12 @@ class VMFrame(HReprBase):
         elif isinstance(fn, VMFunction):
             bind2: EnvT = {k: v for k, v in zip(fn.args, args)}
             return self.__class__(self.vm, fn.code, bind2, self.universe)
-        else:
+        elif callable(fn):
             value = fn(*args)
             self.push(value)
             return None
+        else:
+            raise Exception(f'Cannot reduce with function: {fn}')
 
     # def instruction_tuple(self, node, nelems) -> None:
     #     """
