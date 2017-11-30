@@ -212,6 +212,10 @@ class IRNode:
         rval.append(('redirect', self, node, None))
         return rval
 
+    def trim_inputs(self):
+        while self.inputs and self.inputs[-1] is None:
+            self.inputs.pop()
+
     def process_operation(self, op, node, role):
         # Execute a 'link' or 'unlink' operation.
         if op == 'link':
@@ -235,6 +239,7 @@ class IRNode:
                 nin = len(self.inputs)
                 assert self.inputs[idx] is node
                 self.inputs[idx] = None
+                self.trim_inputs()
             node.users.remove((role, self))
         elif op == 'redirect':
             pass
@@ -284,7 +289,7 @@ class IRGraph:
         self.output = None
         self.gen = gen
 
-    def dup(self, g=None):
+    def dup(self, g=None, no_mangle=False):
         """
         Duplicate this graph, optionally setting g as the parent of
         every node in the graph.
@@ -297,7 +302,10 @@ class IRGraph:
             g = IRGraph(self.parent, self.tag, self.gen)
         mapping = {}
         for node in self.inputs + tuple(self.iternodes()):
-            mapping[node] = IRNode(g, g.gen(node.tag, '+'), node.value)
+            if no_mangle:
+                mapping[node] = IRNode(g, node.tag, node.value)
+            else:
+                mapping[node] = IRNode(g, g.gen(node.tag, '+'), node.value)
         for n1, n2 in mapping.items():
             sexp = n1.app()
             if sexp:
@@ -305,7 +313,7 @@ class IRGraph:
                 f2 = mapping.get(f, f)
                 args2 = [mapping.get(a, a) for a in args]
                 n2.set_app(f2, args2)
-        output = mapping[self.output]
+        output = mapping.get(self.output, self.output)
         inputs = [mapping[i] for i in self.inputs]
         if set_io:
             g.output = output
@@ -370,10 +378,9 @@ class IRGraph:
             if not node or node in seen:
                 continue
             if node.graph is not self:
-                if boundary and node.graph:
+                if boundary:
                     yield node
-                else:
-                    continue
+                continue
             yield node
             seen.add(node)
             to_visit.add(node.fn)
@@ -381,7 +388,13 @@ class IRGraph:
                 to_visit.add(inp)
 
     def iterboundary(self):
-        return self.iternodes(self, True)
+        return self.iternodes(True)
+
+    def iterparents(self, stop=None):
+        g = self
+        while g and g is not stop:
+            yield g
+            g = g.parent
 
     @classmethod
     def __hrepr_resources__(cls, H):
