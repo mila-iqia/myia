@@ -450,7 +450,11 @@ def grad3(fn):
     return g
 
 
-@impl_interp_smap
+def zeros_like_closure(smap, x):
+    return smap(x.args)
+
+
+@impl_interp_smap({myiaClosure: zeros_like_closure})
 def zeros_like(x):
     """
     Creates a structure just like ``x`` but "zeroed out."

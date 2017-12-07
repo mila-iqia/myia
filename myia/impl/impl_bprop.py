@@ -31,7 +31,9 @@ def macro_grad_for(sym, nargs_closure):
         #   ((a,), b, c, ...)  # If nargs_closure == 1
         #   ((a, b), c, ...)  # If nargs_closure == 2
         #   etc.
-        return TupleNode([ClosureNode(sym, args[:nargs_closure]),
+        # return TupleNode([ClosureNode(sym, args[:nargs_closure]),
+        #                   *args[nargs_closure:]])
+        return TupleNode([TupleNode(args[:nargs_closure]),
                           *args[nargs_closure:]])
     return macro_grad
 

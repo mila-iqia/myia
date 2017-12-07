@@ -262,9 +262,9 @@ class Grad:
             # Transformed:  ∇y, ∇z += ∇x
             # Why yes, this works the same as TupleNode.
             args = args_cast(value.args)
-            sen_extract = Apply(inst_builtin.closure_args, sen)
-            return self.accum_multi(args, sen_extract)
-            # return self.accum_multi(args, sen)
+            # sen_extract = Apply(inst_builtin.closure_args, sen)
+            # return self.accum_multi(args, sen_extract)
+            return self.accum_multi(args, sen)
 
         else:
             raise Exception(f'rho is not defined on node type: {value}')
@@ -539,8 +539,8 @@ class Grad:
         # nargs_closure gradients because they are the closure's
         # gradient.
         backp_ret = TupleNode([
-            # TupleNode(backp_all_ret[:self.nargs_closure]),
-            ClosureNode(self.name, backp_all_ret[:self.nargs_closure]),
+            TupleNode(backp_all_ret[:self.nargs_closure]),
+            # ClosureNode(self.name, backp_all_ret[:self.nargs_closure]),
             *backp_all_ret[self.nargs_closure:]
         ])
         # Calls to rho had the side effect of populating bprop_variables
