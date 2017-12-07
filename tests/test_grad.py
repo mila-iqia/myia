@@ -57,15 +57,8 @@ def grad_test(*tests):
     TODO: allow specifying the gradient values explicitly.
     """
     def decorate(fn):
-        try:
-            exc = None
-            testfn = analysis('grad', fn).test
-        except Exception as e:
-            exc = e
-
         def test(test_data):
-            if exc:
-                raise exc
+            testfn = analysis('grad', fn).test
             results = testfn(test_data)
             print(results)
             if not results['match']:

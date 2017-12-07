@@ -28,19 +28,15 @@ def myia_test(*tests):
     """
 
     def decorate(fn):
-        def test(inputs, output, gradOut=None):
-            node = parse_function(fn)
-
+        def test(inputs, output):
             if not isinstance(inputs, tuple):
                 inputs = inputs,
 
             python_result = fn(*inputs)
-            myia_result = compile(node)(*inputs)
+            myia_result = compile(fn)(*inputs)
 
             assert python_result == output
             assert myia_result == output
-            # TODO:
-            #assert grad_result == gradOut
 
         m = pytest.mark.parametrize('inputs,output', list(tests))(test)
         m.__orig__ = fn
@@ -169,9 +165,6 @@ def test_relu(x):
         return x
     else:
         return 0
-#testGrad(relu, [5], [5], [1])
-#testGrad(relu, [0], [0], [0])
-#testGrad(relu, [-1], [0], [0])
 
 
 # If x > y, then dx/dy = 1, else 0
@@ -184,8 +177,6 @@ def test_max(x, y):
         return x
     else:
         return y
-#testGrad(max, [7, 3], [7], [1, 0])
-#testGrad(max, [1, 3], [3], [0, 1])
 
 
 # Computes x^8, d/dx = 8x^7
@@ -199,8 +190,6 @@ def test_pow8(x):
         x = x * x
         i = i + 1
     return x
-#testGrad(pow8, [2], [256], [1024])
-#testGrad(pow8, [1], [1], [8])
 
 
 # Test nested loops
@@ -220,7 +209,6 @@ def test_pow10(x):
             i = i + 1
         j = j + 1
     return v
-#testGrad(pow10, [2], [1024], [5120])
 
 
 # Test for loops
