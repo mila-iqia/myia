@@ -1,7 +1,7 @@
 
 from buche import buche
 from ..util import Singleton
-from ..stx import top as about_top, is_builtin, is_global
+from ..stx import top as about_top, is_builtin, is_global, Symbol, TMP
 import json
 import os
 
@@ -314,7 +314,7 @@ class IRGraph:
                 args2 = [mapping.get(a, a) for a in args]
                 n2.set_app(f2, args2)
         output = mapping.get(self.output, self.output)
-        inputs = [mapping[i] for i in self.inputs]
+        inputs = tuple(mapping[i] for i in self.inputs)
         if set_io:
             g.output = output
             g.inputs = inputs
@@ -486,6 +486,27 @@ class GraphPrinter:
                                'classes': 'function'})
         return id
 
+    def label(self, node):
+        if node.is_constant() and not node.is_graph():
+            return str(node.value)
+        rels = ''
+        tag = node.tag
+        while tag.relation:
+            if tag.relation != '+':
+                rels = rels + tag.relation
+            tag = tag.label
+        lbl = tag.label
+        if '/out' in lbl or '/in' in lbl or lbl == TMP:
+            lbl = "•"
+        lbl = rels + lbl
+        cfn = self.const_fn(node)
+        if cfn:
+            if lbl == "•":
+                lbl = f'{cfn}'
+            else:
+                lbl = f'{lbl}←{cfn}'
+        return lbl
+
     def add_node(self, node, g=None):
 
         new, id = self.register(node)
@@ -498,11 +519,6 @@ class GraphPrinter:
         if node.is_graph():
             if self.follow_references:
                 self.graphs.add(node.value)
-            lbl = str(node.tag)
-        elif node.is_constant():
-            lbl = str(node.value)
-        else:
-            lbl = str(node.tag)
 
         if node.graph is None:
             cl = 'constant'
@@ -513,11 +529,7 @@ class GraphPrinter:
         else:
             cl = 'intermediate'
 
-        cfn = self.const_fn(node)
-        if cfn:
-            if '/out' in lbl or '/in' in lbl:
-                lbl = ""
-            lbl = f'{lbl}:{cfn}'
+        lbl = self.label(node)
 
         data = {'id': id, 'label': lbl}
         if g:
