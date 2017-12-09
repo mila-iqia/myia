@@ -1,8 +1,8 @@
-# Myia
+# What is Myia?
 
-[![Build Status](https://travis-ci.com/mila-udem/myia.svg?token=p8b613NdVqVa9KeL48d5&branch=master)](https://travis-ci.com/mila-udem/myia)
+<!-- [![Build Status](https://travis-ci.com/mila-udem/myia.svg?token=p8b613NdVqVa9KeL48d5&branch=master)](https://travis-ci.com/mila-udem/myia) -->
 
-## What is it?
+<!-- ## What is it? -->
 
 Myia is a new deep learning framework that aims to combine:
 

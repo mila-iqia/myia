@@ -1,9 +1,14 @@
 
-from ..stx import is_global, is_builtin
+from ..lib import Closure
+from ..stx import is_global, is_builtin, GenSym
 from ..inference.types import var, unify, isvar
 from ..symbols import builtins
 from .graph import IRNode, IRGraph, NO_VALUE
 from collections import defaultdict
+from buche import buche
+
+
+ogen = GenSym('opt::pattern')
 
 
 def valuevar(name):
@@ -125,16 +130,31 @@ def drop_copy(univ, node, X):
 
 @pattern_opt(V1, V2, ...)
 def eval_constant(univ, node, V1, V2):
+    def acq(value):
+        if hasattr(value, '__myia_graph__'):
+            value = value.__myia_graph__
+            tag = value.lbda.ref
+            return IRNode(None, tag, value)
+        elif isinstance(value, Closure):
+            ptial = IRNode(None, builtins.partial, builtins.partial)
+            n = IRNode(None, node.tag)
+            n.set_app(ptial,
+                      [acq(value.fn)] + [acq(arg) for arg in value.args])
+            return n
+        elif isinstance(value, IRGraph):
+            return IRNode(None, value.lbda.ref, value)
+        else:
+            return IRNode(None, ogen(node.tag, '@'), value)
+
     univ = univ.universes['const_prop']
     if V1.value == builtins.partial:
         return False
     f = V1
     args = V2
     fn = univ[f.value]
-    res = fn(*[arg.value for arg in args])
-    n = IRNode(None, None)
-    n.value = res
-    return n
+    res = fn(*[univ[arg.value] for arg in args])
+    tag = None
+    return acq(res)
 
 
 @pattern_opt('just', GV)
@@ -149,13 +169,15 @@ class EquilibriumTransformer:
                  universe,
                  graphs,
                  transformers,
-                 follow=lambda a, b: True):
+                 follow=lambda a, b: True,
+                 follow_references=True):
         self.universe = universe
         self.graphs = graphs
         self.roots = [g.output for g in graphs]
         self.transformers = transformers
         self.follow = follow
         self.repools = defaultdict(set)
+        self.follow_references = follow_references
 
     def mark_change(self, node):
         assert node
@@ -167,6 +189,9 @@ class EquilibriumTransformer:
     def process(self, node):
         touches = set()
         assert node
+        if node.is_graph() and self.follow_references:
+            self.pool.add(node.value.output)
+            return
         for transformer in self.transformers:
             ts, changes = transformer(self.universe, node)
             touches |= ts
