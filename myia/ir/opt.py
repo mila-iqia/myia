@@ -3,6 +3,7 @@ from ..lib import BackedUniverse, is_struct, StructuralMap, Primitive
 from .graph import IRGraph, IRNode
 from ..symbols import builtins
 from ..stx import GenSym, is_builtin
+from buche import buche
 
 
 ogen = GenSym('::opt')
@@ -32,6 +33,31 @@ class OptimizedUniverse(BackedUniverse):
     def optimize(self, graph):
         for passs in self.passes:
             passs(self, graph)
+
+
+class DisplayPass:
+    def __init__(self, label):
+        self.label = label
+
+    def __call__(self, universe, graph):
+        buche(self.label, graph,
+              function_in_node=True,
+              duplicate_constants=True,
+              follow_references=True)
+
+
+class ResolveGlobalsPass:
+    def __call__(self, universe, graph):
+        univ = universe.universes['ir']
+        subs = {}
+        for node in graph.iternodes(boundary=True):
+            if node.is_global():
+                n = IRNode(None, node.value, univ[node.value])
+                subs[node] = n
+        for n1, n2 in subs.items():
+            graph.replace(n1, n2)
+            if isinstance(n2.value, IRGraph):
+                self(universe, n2.value)
 
 
 class ClosureUnconversionPass:
