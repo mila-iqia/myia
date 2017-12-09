@@ -164,6 +164,39 @@ def resolve_global(univ, node, GV):
     return n
 
 
+@pattern_opt(L, X, ...)
+def inline(univ, node, L, X):
+    g = L.value
+    args = X
+
+    g2, inputs, output = g.dup(node.graph)
+
+    idn = IRNode(None, builtins.identity, builtins.identity)
+    chgs = []
+    for arg, inp in zip(args, inputs):
+        chgs += inp.set_app_operations(idn, [arg])
+    chgs += node.redirect_operations(output)
+    return chgs
+
+
+@pattern_opt((builtins.partial, X, Y, ...), Z, ...)
+def expand_partial_app(univ, node, X, Y, Z):
+    f = X
+    args = Y + Z
+    node2 = IRNode(node.graph, node.tag, node.value)
+    ops = node2.set_app_operations(f, args)
+    ops += node.redirect_operations(node2)
+    return ops
+
+
+@pattern_opt(builtins.index, (builtins.mktuple, X, ...), Y)
+def index_into_tuple(univ, node, X, Y):
+    if Y.is_constant():
+        return X[int(Y.value)]
+    else:
+        return None
+
+
 class EquilibriumTransformer:
     def __init__(self,
                  universe,
