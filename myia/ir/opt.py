@@ -9,13 +9,18 @@ ogen = GenSym('::opt')
 
 
 class OptimizedUniverse(BackedUniverse):
-    def __init__(self, parent, passes):
+    def __init__(self, parent, passes, duplicate=False):
         super().__init__(parent)
         self.passes = passes
+        self.duplicate = duplicate
 
     def acquire(self, orig_x):
         x = self.parent[orig_x]
         if isinstance(x, IRGraph):
+            if self.duplicate:
+                g, _, _ = x.dup(no_mangle=True)
+                g.lbda = x.lbda
+                x = g
             self.cache[orig_x] = x
             self.optimize(x)
             return x
