@@ -87,6 +87,7 @@ class VMFunction(_Function):
         self.universe = universe
         self.code = VMCode(ast, instrs, False)
         self.primal_sym = ast.primal
+        self.__myia_graph__ = graph
 
     def __str__(self):
         return f'VMFunc({self.graph.tag or self.graph})'
@@ -170,7 +171,8 @@ def make_instructions(graph):
             assert node.value
             instr('fetch', node, node.value)
         elif node.is_graph():
-            raise Exception('Unsupported at the moment')
+            # raise Exception('Unsupported at the moment')
+            instr('fetch', node, node.tag)
         elif node.is_constant():
             instr('push', node, node.value)
         elif node.is_input():
