@@ -1,18 +1,39 @@
 # Myia
 
+[![Build Status](https://travis-ci.com/mila-udem/myia.svg?token=p8b613NdVqVa9KeL48d5&branch=master)](https://travis-ci.com/mila-udem/myia)
+
+## What is it?
+
+Myia is a new deep learning framework that aims to combine:
+
+* Flexibility and ease of use.
+* Automatic differentiation.
+* Advanced optimization and high performance.
+
+It works by parsing a subset of the Python language, running type and shape inference as well as static analysis, and plugging into various backends in order to produce performant code.
+
+**Current state of the project (2017/12/07):** not in a usable state. The internal representation is being redesigned, the optimization engine and backend are very rough. Most of the pieces are there in some form, however.
+
+
 ## Usage
 
-### Command line
+**This is pre-alpha software**, so don't rely on it for anything important, and don't expect it to be fast.
 
-At this stage of development, the `parse` and `eval` commands are available. To get help:
+Myia works by decorating a function with `@myia`:
 
-```bash
-$ python -m myia -h
-$ python -m myia parse -h
-$ python -m myia eval -h
+```python
+from myia.front import myia
+
+@myia
+def square(x):
+    return x * x
+
+print(square(1234))
 ```
 
-### Tests
+Myia will compile that function for you, as well as any functions called by that function (so you only need to decorate the top-level function(s) you are going to call directly).
+
+## Tests
 
 Run tests with:
 
@@ -22,11 +43,7 @@ $ ./run_tests.sh
 
 Make sure that pytest is installed (`pip install pytest`).
 
-## About Myia
-
-[![Build Status](https://travis-ci.com/mila-udem/myia.svg?token=p8b613NdVqVa9KeL48d5&branch=master)](https://travis-ci.com/mila-udem/myia)
-
-Myia is a research/prototyping project to develop a new toolchain for array programming with GPU support and automatic differentiation.
+## Planned features and comparison
 
 Feature                        | Myia | Theano | TensorFlow | PyTorch | Autograd | CUDA | Torch
 ------------------------------ | ---- | ------ | ---------- | ------- | -------- | ---- | -----
