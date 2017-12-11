@@ -1,0 +1,5 @@
+ignore:
+  - "tests"
+  - "docs"
+  - "setup.py"
+comment: false
