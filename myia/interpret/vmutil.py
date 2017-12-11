@@ -176,7 +176,9 @@ def make_instructions(graph):
         elif node.is_constant():
             instr('push', node, node.value)
         elif node.is_input():
-            instr('fetch', node, node.tag)
+            idx = graph.inputs.index(node)
+            assert idx >= 0
+            instr('dup', node, idx)
         else:
             raise Exception(f'What is this node? {node}')
 

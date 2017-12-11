@@ -47,14 +47,14 @@ class VM:
     """
     def __init__(self,
                  code: VMCode,
-                 local_env: EnvT,
+                 args: List[Any],
                  universe: Universe,
                  controller = None) -> None:
         self.controller = controller
         self.do_emit_events = False
         # Current frame
         self.universe = universe
-        self.frame = VMFrame(self, code, local_env, universe)
+        self.frame = VMFrame(self, code, args, universe)
         # Stack of previous frames (excludes current one)
         self.frames: List[VMFrame] = []
 
@@ -128,7 +128,7 @@ class VMFrame(HReprBase):
     def __init__(self,
                  vm: VM,
                  code: VMCode,
-                 local_env: EnvT,
+                 args,
                  universe: Universe) -> None:
         self.vm = vm
         self.code = code
@@ -136,10 +136,10 @@ class VMFrame(HReprBase):
         # Program counter: index of the next instruction to execute.
         self.pc = 0
         # Environment to store local bindings.
-        self.envs: List[EnvT] = [local_env, universe]  # type: ignore
-        self.local_env = local_env
+        self.local_env = {}
+        self.envs: List[EnvT] = [self.local_env, universe]  # type: ignore
         self.universe = universe
-        self.stack: List[Any] = [None]
+        self.stack: List[Any] = list(args)
         # Node being executed, mostly for debugging.
         self.signature: Any = None
 
@@ -240,28 +240,17 @@ class VMFrame(HReprBase):
           the result.
         """
         fn, *args = self.take(nargs + 1)
-        # if isinstance(fn, Function):
-        #     bind: EnvT = {k: v for k, v in zip(fn.ast.args, args)}
-        #     return self.__class__(self.vm, fn.code, bind, fn.universe)
         if isinstance(fn, Closure):
             self.push(fn.fn, *fn.args, *args)
             return self.instruction_reduce(node, nargs + len(fn.args))
         elif isinstance(fn, VMFunction):
-            bind2: EnvT = {k: v for k, v in zip(fn.args, args)}
-            return self.__class__(self.vm, fn.code, bind2, self.universe)
+            return self.__class__(self.vm, fn.code, args, self.universe)
         elif callable(fn):
             value = fn(*args)
             self.push(value)
             return None
         else:
             raise Exception(f'Cannot reduce with function: {fn}')
-
-    # def instruction_tuple(self, node, nelems) -> None:
-    #     """
-    #     Pop ``nelems`` values from the stack and push a
-    #     tuple of these values.
-    #     """
-    #     self.push(tuple(self.take(nelems)))
 
     def instruction_closure(self, node) -> None:
         """
@@ -302,6 +291,12 @@ class VMFrame(HReprBase):
             except KeyError as err:
                 pass
         raise KeyError(f'Could not resolve {sym} ({sym.namespace})')
+
+    def instruction_dup(self, node, i) -> None:
+        """
+        Duplicate the ith element in the stack and push it on top.
+        """
+        self.push(self.stack[i])
 
     def instruction_push(self, node, value) -> None:
         """
@@ -348,5 +343,5 @@ class VMUniverse(BackedUniverse):
             return x
 
     def run(self, fn, args):
-        env = {name: self[arg] for name, arg in zip(fn.args, args)}
-        return VM(fn.code, env, self).run()
+        newargs = [self[arg] for arg in args]
+        return VM(fn.code, newargs, self).run()
