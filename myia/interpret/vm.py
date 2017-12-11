@@ -12,8 +12,7 @@ from ..symbols import builtins
 from ..util import EventDispatcher, HReprBase, buche
 from functools import reduce
 from ..parse import parse_function
-from .vmutil import EvaluationEnv, EvaluationEnvCollection, \
-    VMCode, Instruction, VMFunction, VMPrimitive
+from .vmutil import VMCode, Instruction, VMFunction, VMPrimitive
 from ..ir import IRGraph
 
 # The following two imports fill impl_bank['interp']
