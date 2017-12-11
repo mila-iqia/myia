@@ -1,0 +1,6 @@
+ignore:
+  - "tests"
+  - "docs"
+  - "setup.py"
+codecov:
+  branch: clean
