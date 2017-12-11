@@ -1,6 +1,6 @@
 
 from typing import List, Any, Dict
-from ..interpret import VMCode, VMFrame, EnvT, \
+from ..legacy_interpret import VMCode, VMFrame, EnvT, \
     Primitive, Function, Closure, Instruction, \
     EvaluationEnv, EvaluationEnvCollection
 from ..util import EventDispatcher
