@@ -10,6 +10,7 @@ from ..lib import \
 from ..stx import MyiaASTNode, Symbol, ValueNode, LambdaNode
 from ..symbols import builtins, object_map
 from ..parse import parse_function
+from ..ir.graph import IRGraph
 from ..ir.convert import lambda_to_ir
 
 
@@ -27,13 +28,12 @@ class VMPrimitive(Primitive):
 class VMFunction(Function):
     def __init__(self, graph, universe):
         ast = graph.lbda
-        instrs = make_instructions(graph)
         self.ast = ast
         self.argnames = [a.label for a in ast.args]
         self.args = [n.tag for n in graph.inputs]
         self.graph = graph
         self.universe = universe
-        self.code = VMCode(ast, instrs, False)
+        self.code = VMCode(graph)
         self.primal_sym = ast.primal
         self.__myia_graph__ = graph
 
@@ -148,17 +148,13 @@ class VMCode(HReprBase):
             node's behavior.
     """
     def __init__(self,
-                 lbda: LambdaNode,
-                 instructions: List[Instruction] = None,
-                 use_new_ir: bool = True) -> None:
-        assert instructions or isinstance(lbda, LambdaNode)
-        self.node = None if instructions else lbda.body
-        self.lbda = lbda
-        self.graph = None
+                 graph: IRGraph,
+                 instructions: List[Instruction] = None) -> None:
+        self.graph = graph
+        self.lbda = graph.lbda
+        self.node = None if instructions else self.lbda.body
         if instructions is None:
-            assert use_new_ir
             self.instructions: List[Instruction] = []
-            self.graph = lambda_to_ir(self.lbda).value
             self.instructions = make_instructions(self.graph)
         else:
             self.instructions = instructions
