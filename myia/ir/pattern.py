@@ -189,12 +189,14 @@ def expand_partial_app(univ, node, X, Y, Z):
     return ops
 
 
-@pattern_opt(builtins.index, (builtins.mktuple, X, ...), Y)
-def index_into_tuple(univ, node, X, Y):
-    if Y.is_constant():
-        return X[int(Y.value)]
-    else:
-        return None
+@pattern_opt(builtins.index, (builtins.mktuple, X, ...), V)
+def index_into_tuple(univ, node, X, V):
+    return X[int(V.value)]
+
+
+# TODO: (a, b, c) + (d, e, f) => (a+d, b+e, c+f)
+# TODO: cancel J/Jinv
+# TODO: J(switch)?
 
 
 class EquilibriumTransformer:

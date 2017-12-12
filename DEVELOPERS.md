@@ -10,52 +10,77 @@ To help grok the structure, project files are tagged in the following listing:
 * `I` means this file contains code related to **the interpreter**.
 * `G` means this file contains code related to **gradients**.
 * `F` means this file contains code related to **inference**.
+* `O` means this file contains code related to **optimization**.
 * `T` means this file contains code related to **testing**.
 
 ```
-myia/                           # Source code for Myia
-    __main__                T   # Entry point for myia's CLI
-    front              !        # @myia decorator
-    impl/                       # Implementations of primitives
-        flow_all           F    # Implementations for inference/dfa
-        impl_abstract      F    # Implementations for inference/avm
-        impl_bprop       IG     # Backpropagators for interpret/vm
-        impl_interp      IG     # Implementations for interpret/vm
-        main           ! I      # Utilities for implementations
-        proj               F    # Utilities for inferrers
-        proj_shape         F    # Shape inference for inference/avm
-        proj_type          F    # Type inference for inference/avm
-    inference/                  # Inference (values, types, shapes)
-        avm                FT   # Abstract virtual machine
-        dfa                FT   # Dataflow analysis
-        types              F    # Type representations
-    interpret/                  # Interpreter
-        vmutil           I F    # Translate AST to VM instructions
-        vm               I      # Stack-based virtual machine
-    lib                ! I      # Impl of Record, Closure, StructuralMap
-WIP optimize                    # Where the graph IR currently lives
-WIP     graph           S       # First version of graph IR + opts
-WIP     graph2          S       # Second version of graph IR + opts
-    parse               S       # Parse Python code, produce IR
-    stx/                        # IR
-        about          !S       # Track what nodes are about what other nodes
-        env            !S       # Environments and symbol generation
-        nodes          !S       # Definitions of the IR's nodes
-        transform               # Boilerplate for transforms
-    symbols            !SIG     # Symbols for builtins
-    transform/                  # Code transformations
-        compile         S G     # Convert IR to A-normal form
-        grad           !  G     # Gradient transform
-    util/                       # Utilities
-        buche               T   # Helpers for the Buche logger
-        debug               T   # Buche-based debugger
-        event              FT   # Event framework (listeners, emit events)
-        misc                    # Various helper functions
-        myia.css                # Stylesheet to display the IR with Buche
-    validate             IG T   # Miscellaneous validators
+myia/                            # Source code for Myia
+    __main__                 T   # Entry point for myia's CLI
+    front              !         # @myia decorator
+    impl/                        # Implementations of primitives
+        flow_all           F     # Implementations for inference/dfa
+        impl_abstract      F     # Implementations for inference/avm
+        impl_bprop       IG      # Backpropagators for interpret/vm
+        impl_interp      IG      # Implementations for interpret/vm
+        main           ! I       # Utilities for implementations
+        proj               F     # Utilities for inferrers
+        proj_shape         F     # Shape inference for inference/avm
+        proj_type          F     # Type inference for inference/avm
+    inference/                   # Inference (values, types, shapes)
+        avm                F T   # Abstract virtual machine
+        dfa                F T   # Dataflow analysis
+        types              F     # Type representations
+    interpret/                   # Interpreter
+        vmutil           I F     # Translate AST to VM instructions
+        vm               I       # Stack-based virtual machine
+    ir/                          # Graph IR and opts
+        convert         S        # Convert from LambdaNode to IRGraph
+        graph          !S        # Definition of IRNode and IRGraph
+        graph.css                # Stylesheet for display of IRGraph
+        opt                 O    # Closure (un)conversion
+        pattern             O    # Implements pattern optimizations
+    legacy_interpret/...         # Legacy vesion of interpret/ for inference/
+    lib                ! I       # Impl of Record, Closure, StructuralMap
+    parse               S        # Parse Python code, produce IR
+    stx/                         # IR
+        about          !S        # Track what nodes are about what other nodes
+        env            !S        # Environments and symbol generation
+        nodes          !S        # Definitions of the IR's nodes
+        transform                # Boilerplate for transforms
+    symbols            !SIG      # Symbols for builtins
+    transform/                   # Code transformations
+        a_normal        S G      # Convert IR to A-normal form
+        grad           !  G      # Gradient transform
+    util/                        # Utilities
+        buche                T   # Helpers for the Buche logger
+        debug                T   # Buche-based debugger
+        event              F T   # Event framework (listeners, emit events)
+        misc                     # Various helper functions
+        myia.css                 # Stylesheet to display the IR with Buche
+    validate             IG  T   # Miscellaneous validators
 ```
 
-## Representation
+## Pipeline
+
+The current pipeline for Myia is defined in `myia/front.py` as an instance of `UniversePipelineGenerator` (defined in `myia/lib.py`). The `@myia` decorator of a function `f` is roughly equivalent to the statement `f = myia.front.standard_universe[f]`.
+
+A pipeline is a stack of `Universe`. What a `Universe` does is that it transforms a value into a suitable representation at this stage in the pipeline, and caches the result. For example, the `IRUniverse` transforms a function into an instance of `IRGraph`, and caches the graph to avoid generating it more than once.
+
+A `Universe` can have another universe as a parent, which means that it first transforms a value through its parent, and then transforms the result. The current pipeline is as follows, with each Universe having the previous one as a parent:
+
+* `PythonUniverse` (no parent): Resolves a global `Symbol` to the corresponding value. For example, the global symbol with label `f` and namespace `global::file.py` resolves to the value of the global variable `f` in the module defined by `file.py`. It does not resolve symbols with namespace `global::builtin`.
+* `SymbolicUniverse`: Transforms functions into `LambdaNode` instances, which is the old IR. This is a temporary stopgap.
+* `IRUniverse`: Transforms `LambdaNode` into `IRGraph`, which is the new IR.
+* `OptimizedUniverse`: Optimizes `IRGraph` through various passes. More than one `OptimizedUniverse` can be stacked, since they operate on the same representation.
+* `VMUniverse`: Makes `VMFunction` from `IRGraph`, where operations are linearized and expressed in a way that can be run with a `VM`. While this is not the case at the moment, `VMUniverse` is also intended to transform values such as scalars or numpy arrays into the representation understood by the primitives.
+* `EvaluationUniverse`: Makes `CallableVMFunction`, which is the interface meant for the end user. When applicable, values from the `VMUniverse` are converted to Python scalars, numpy ndarrays, etc. as expected by the user.
+
+Each universe type may have options, although most don't at the moment. It is possible (although untested) to have multiple independent pipelines running at the same time, and they may share the first few stages, so it is possible to test e.g. multiple optimization schemes on the same code without reparsing.
+
+
+## Old representation
+
+(See next section for new representation)
 
 Myia's representation is defined in `myia/stx/nodes.py` and consists of eight node types:
 
@@ -70,7 +95,48 @@ Myia's representation is defined in `myia/stx/nodes.py` and consists of eight no
 
 This should probably be simplified (`Begin` is sort of redundant with `Let`).
 
-All transforms and analyses so far are defined on that representation.
+The `Grad` transform is defined on this representation. This representation is transformed into the new representation prior to being run in the VM.
+
+
+## New representation
+
+Myia's representation is defined in `myia/ir/graph.py`. It consists of one node type (`IRNode`) and one graph class (`IRGraph`).
+
+### IRNode
+
+`IRNode` has the following fields:
+
+* `graph: IRGraph` points to the graph to which this node belongs.
+* `tag: Symbol` is the name of this node, e.g. the name of a corresponding input or intermediate variable in the original source code.
+* `fn: IRNode` points to a node returning the function to call to compute this node's value.
+* `inputs: List[IRNode]` points to the arguments of the call.
+* `value: Any` is the (static) value that this node always returns, or the special token `NO_VALUE`.
+* `users: Set[(Role, IRNode)]` is a set of nodes that depend on this one. `Role` is one of `FN` (this node returns a callable for another node) or `IN(i)` (this node is the ith input of another node).
+
+An `IRNode` can be:
+
+* A computation (`node.is_computation()`)
+  - fn != None, inputs == list of inputs, value == NO_VALUE
+* A numeric/string/etc. constant (`node.is_constant()`)
+  - fn == None, value == the constant
+* A builtin function like add or multiply (`node.is_builtin()`)
+  - fn == None, value == the Symbol for the builtin
+* A pointer to another Myia function (`node.is_graph()`)
+  - fn == None, value == an IRGraph
+* An input (`node.is_input()`)
+  - fn == None, value == NO_VALUE
+
+Note that `node.is_constant()` is true if the node is a builtin or a graph, so it is a superset of those conditions.
+
+### IRGraph
+
+`IRGraph` has the following fields:
+
+* `parent: IRGraph` points to the graph to which this graph belongs (if this graph is a closure), or `None` (if this graph is a top-level function).
+* `tag: Symbol` is the name of this graph (i.e. the name of the function it represents).
+* `inputs: List[IRNode]` is a list of inputs for this graph. `node.is_input()` must be true for all of them.
+* `output: IRNode` is the output of this graph. To return multiple outputs, they must be wrapped in a tuple.
+
 
 ## Symbols and implementations
 
@@ -82,9 +148,11 @@ Notably, `myia.impl.impl_abstract` defines "abstract" implementations that can o
 
 In essence, this design choice makes it easier to experiment with new inferrers and new ways to interpret operations, because they can be isolated and fully defined at a single location. On the other hand, code related to any particular primitive has to be split into many files.
 
+
 ## Interpreter
 
 `myia.interpret.vm` defines a stack-based virtual machine for Myia, which is not intended to be high performance, but performs tail call optimization and thus does not suffer from Python's small stack.
+
 
 ## Gradients
 
@@ -198,6 +266,7 @@ We could do this by taking the return value of a backpropagator and fudging it a
 * Gradients of primitives *also* require an `nargs_closure` parameter, because we can--and do--take partials of them, and the same logic must apply. This is implemented using the `GRAD` "macro", which generates the right return value depending on an internal parameter.
 * Thus the `grad` field of both `PrimitiveImpl` and `FunctionImpl` is actually a function of one argument, `nargs_closure` (integer). Its output is cached to avoid needless recomputation.
 
+
 ## Inference
 
 Two modules in Myia perform inference, although they do it a bit differently.
@@ -225,6 +294,33 @@ The AVM memoizes the results of function calls, with a caveat: since it may oper
 Next improvement (partly done as of 2017/09/06 -- there are some complications to making it more general) would be value decay: when the values of `a` and `b` are known, the abstract interpreter will compute the value of `a + b`, but it should keep track of how many operations were executed to obtain a value, and widen the result to `ANY` after a certain number of steps. That would bound the possible exploration depth by making sure that all of the arguments to all functions either stagnate or become `ANY`.
 
 The current implementation still has issues, e.g. if `f(x)` may either return `1` or `2`, it will yield `3` as a possible value for `f(x) + f(x)`, although that's not possible, because it doesn't keep track of inconsistent instantiations. Unclear whether that's a big deal.
+
+
+## Optimization
+
+Optimizations operate on the graph IR (new representation). Multiple optimization passes can be run by `OptimizedUniverse`. By default, no passes are run, but `myia/ir/pattern.py` contains a few optimizations that are known to work, such as copy elimination, inlining, `(x, y, ...)[0] => x` or multiplication by one.
+
+Most optimizations are pattern optimizations, which require a pattern in s-expression form and are run by an `EquilibriumPass`. For example, this is the code for the pattern that does `(x, y, ...)[0] => x`:
+
+```python
+@pattern_opt(builtins.index, (builtins.mktuple, X, ...), V)
+def index_into_tuple(univ, node, X, V):
+    return X[int(V.value)]
+```
+
+`X` and `V` are pre-defined variables. `X` matches anything, and when followed by `...` it matches an arbitrary number of arguments. `V` matches a constant. They are defined as follows:
+
+```python
+from ..inference.types import var
+
+X = var('X')
+V = var('V', lambda node: node.is_constant())
+```
+
+The variables used in a pattern become arguments with the same name in the decorated function. They are always either `IRNode` instances, or a `list` of zero or more `IRNode` if they are followed by `...` in the pattern.
+
+`EquilibriumPass` is meant to take a set of `PatternOpt` (functions as decorated above) and apply them over and over in some arbitrary order until none can be applied. It is therefore important to make sure the set of optimizations is strongly normalizing (invariant to the order in which they are applied). This being said, `EquilibriumPass` is not very well tested and may still be buggy.
+
 
 ## Buche
 
@@ -263,4 +359,4 @@ You can use buche in your code to print pretty much any Python object. See [here
 The following classes have special display methods for Buche:
 
 * `buche(myia.stx.nodes.Lambda(...))` shows Myia's functional IR.
-* `buche(myia.optimize.graph2.IRGraph(...))` displays Myia's graph IR using the JavaScript library `cytoscape`.
+* `buche(myia.ir.graph.IRGraph(...))` displays Myia's graph IR using the JavaScript library `cytoscape`.
