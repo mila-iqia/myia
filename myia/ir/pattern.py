@@ -207,7 +207,7 @@ class EquilibriumTransformer:
                  follow=lambda a, b: True,
                  follow_references=True):
         self.universe = universe
-        self.graphs = graphs
+        self.graphs = set(graphs)
         self.roots = [g.output for g in graphs]
         self.transformers = transformers
         self.follow = follow
@@ -221,26 +221,53 @@ class EquilibriumTransformer:
             self.pool.add(n)
         self.repools[node] = set()
 
+    def check_eliminate(self, node):
+        if len(node.users) > 0:
+            return
+        if any(g.output is node for g in self.graphs):
+            return
+
+        succ = node.successors(True)
+        for r, s in succ:
+            s.users.remove((r, node))
+        for _, s in succ:
+            self.check_eliminate(s)
+
     def process(self, node):
-        touches = set()
         assert node
+        # Whenever a node changes in the touches set, patterns that
+        # failed to run on the current node might now succeed.
+        touches = set()
         if node.is_graph() and self.follow_references:
-            self.pool.add(node.value.output)
+            # Run until equilibrium on graphs this graph uses.
+            graph = node.value
+            self.graphs.add(graph)
+            self.pool.add(graph.output)
             return
         for transformer in self.transformers:
+            # Transformer returns the nodes it has touched, and a
+            # list of operations.
             ts, changes = transformer(self.universe, node)
-            touches |= ts
             if changes:
                 for op, node1, node2, role in changes:
+                    # We notify that a change happened to the first node.
+                    # This will re-trigger any pattern that looked at this
+                    # node but failed to change anything.
                     self.mark_change(node1)
-                    # self.mark_change(node2)
                     node1.process_operation(op, node2, role)
                     if op is 'redirect':
+                        # We need to adjust graph outputs on redirections.
+                        # This should probably be considered a design flaw
+                        # in IRNode.
                         for g in self.graphs:
                             if g.output is node1:
                                 g.output = node2
                                 self.pool.add(node2)
+                # Check if this node should be eliminated
+                self.check_eliminate(node)
+                # Done with this node
                 break
+            touches |= ts
         else:
             self.processed.add(node)
             for succ in node.successors():
