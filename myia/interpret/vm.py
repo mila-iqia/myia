@@ -135,8 +135,6 @@ class VMFrame(HReprBase):
         # Program counter: index of the next instruction to execute.
         self.pc = 0
         # Environment to store local bindings.
-        self.local_env = {}
-        self.envs: List[EnvT] = [self.local_env, universe]  # type: ignore
         self.universe = universe
         self.stack: List[Any] = list(args)
         # Node being executed, mostly for debugging.
@@ -166,13 +164,7 @@ class VMFrame(HReprBase):
             return args
 
     def push(self, *values):
-        # self.stack += list(values)
-        for value in values:
-            # TODO: eliminate this use of universe. Seems to only
-            # be relevant for avm.
-            if isinstance(value, LambdaNode):
-                value = self.universe[value]
-            self.stack.append(value)
+        self.stack.extend(values)
 
     def pop(self):
         return self.stack.pop()
@@ -278,18 +270,11 @@ class VMFrame(HReprBase):
 
     def instruction_fetch(self, node, sym) -> None:
         """
-        Get the value for symbol ``sym`` from one of the
-        environments, starting with the local environment,
-        and push it on the stack.
+        Get the value for symbol ``sym`` from the universe and
+        push it on the stack.
         """
-        for env in self.envs:
-            try:
-                v = env[sym]
-                self.push(v)
-                return None
-            except KeyError as err:
-                pass
-        raise KeyError(f'Could not resolve {sym} ({sym.namespace})')
+        v = self.universe[sym]
+        self.push(v)
 
     def instruction_dup(self, node, i) -> None:
         """

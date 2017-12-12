@@ -93,44 +93,58 @@ class Instruction:
 def make_instructions(graph):
     instrs = []
     assoc = {}
+    stack_size = len(graph.inputs)
+
+    order = [node for node in graph.toposort()
+             if len(node.users) > 1]
 
     def instr(name, node, *args):
         instrs.append(Instruction(name, node, *args))
 
-    def convert(node):
+    def convert(node, top=False):
+        nonlocal stack_size
         if node in assoc:
-            instr('fetch', node, assoc[node])
+            instr('dup', node, assoc[node])
+            stack_size += 1
         elif node.is_computation():
             succ = node.app()
+            assert all(node for node in succ)
             for x in succ:
                 convert(x)
-            instr('reduce', node, len(succ) - 1)
+            nargs = len(succ) - 1
+            instr('reduce', node, nargs)
+            stack_size -= nargs
             if len(node.users) > 1:
-                # This computation is used more than once, so
-                # we store it (and immediately put it back on
-                # the stack)
-                instr('store', node, node.tag)
-                instr('fetch', node, node.tag)
-                assoc[node] = node.tag
+                # Sanity check. Bad things will happen if this fails.
+                assert top
         elif node.is_builtin():
             assert node.value
             instr('fetch', node, node.value)
+            stack_size += 1
         elif node.is_global():
             assert node.value
             instr('fetch', node, node.value)
+            stack_size += 1
         elif node.is_graph():
-            # raise Exception('Unsupported at the moment')
             instr('fetch', node, node.tag)
+            stack_size += 1
         elif node.is_constant():
             instr('push', node, node.value)
+            stack_size += 1
         elif node.is_input():
             idx = graph.inputs.index(node)
             assert idx >= 0
             instr('dup', node, idx)
+            stack_size += 1
         else:
             raise Exception(f'What is this node? {node}')
 
-    convert(graph.output)
+    for node in order:
+        convert(node, True)
+        assoc[node] = stack_size - 1
+
+    convert(graph.output, True)
+
     return instrs
 
 
