@@ -9,7 +9,10 @@ from .lib import \
     BackedUniverse, StructuralMap, is_struct, \
     UniverseGenerator, UniversePipelineGenerator
 from .stx import PythonUniverse
-from .ir import SymbolicUniverse, IRUniverse, OptimizedUniverse
+from .ir import \
+    SymbolicUniverse, IRUniverse, OptimizedUniverse, \
+    ResolveGlobalsPass  # , ClosureUnconversionPass, ClosureConversionPass
+from .ir.pattern import EquilibriumPass, drop_copy
 from .interpret import VMFunction, VMUniverse
 from .symbols import object_map
 from .impl.main import impl_bank
@@ -19,6 +22,7 @@ class CallableVMFunction:
     def __init__(self, vmf, vmu, eu):
         self.argnames = vmf.argnames
         self.vmf = vmf
+        self.__myia_graph__ = vmf.graph
         self.__myia_vmfunction__ = vmf
         self.vm_universe = vmu
         self.eval_universe = eu
@@ -45,12 +49,13 @@ class EvaluationUniverse(BackedUniverse):
 
 standard_pipeline = UniversePipelineGenerator(
     const_prop='py->sy->ir->vm->ev',
-    full='py->sy->ir->opt->vm->ev',
+    full='py->sy->ir->irg->opt->vm->ev',
     # TODO: permit future customization of python_universe
     # py=UniverseGenerator(PythonUniverse)
     py=lambda: python_universe,
     sy=UniverseGenerator(SymbolicUniverse),
     ir=UniverseGenerator(IRUniverse),
+    irg=UniverseGenerator(OptimizedUniverse),
     opt=UniverseGenerator(OptimizedUniverse),
     vm=UniverseGenerator(VMUniverse),
     ev=UniverseGenerator(EvaluationUniverse)
@@ -60,7 +65,13 @@ standard_pipeline = UniversePipelineGenerator(
 standard_configuration = dict(
     sy_object_map = object_map,
     vm_primitives = impl_bank['interp'],
-    opt_passes = []
+    irg_duplicate = True,
+    irg_passes = [ResolveGlobalsPass()],
+    opt_passes = [
+        EquilibriumPass(
+            drop_copy
+        )
+    ]
 )
 
 
