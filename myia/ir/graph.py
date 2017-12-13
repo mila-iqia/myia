@@ -58,7 +58,27 @@ FN = FN()    # type: ignore
 OUT = OUT()  # type: ignore
 
 
-class IRNode:
+def commit(ops):
+    for op, n1, n2, r in ops:
+        n1.process_operation(op, n2, r)
+
+
+class AbstractNode:
+    def process_operation(self, op, node, role):
+        method = getattr(self, f'process_operation_{op}')
+        method(node, role)
+
+    def commit(self, ops):
+        commit(ops)
+
+    def set_succ(self, role, node):
+        """
+        Create an edge toward node with given role
+        """
+        return commit(self.set_succ_operations(role, node))
+
+
+class IRNode(AbstractNode):
     """
     Node in the intermediate representation. It can represent:
 
@@ -146,36 +166,18 @@ class IRNode:
         else:
             return (self.fn,) + tuple(self.inputs)
 
-    def succ(self, role):
-        """
-        If role is FN, return node.fn, if role is IN(i), return
-        node.inputs[i].
-        """
-        if role is FN:
-            return {self.fn}
-        elif isinstance(role, IN):
-            return {self.inputs[role.index]}
-        else:
-            raise KeyError(f'Invalid role: {role}')
-
-    def set_succ(self, role, node):
-        """
-        Create an edge toward node with given role (FN or IN(i))
-        """
-        return self._commit(self.set_succ_operations, (role, node))
-
     def set_app(self, fn, inputs):
         """
         Make this node an application of fn on the specified inputs.
         fn and the inputs must be IRNode instances.
         """
-        return self._commit(self.set_app_operations, (fn, inputs))
+        return commit(self.set_app_operations(fn, inputs))
 
     def redirect(self, new_node):
         """
         Transfer every user of this node to new_node.
         """
-        return self._commit(self.redirect_operations, (new_node,))
+        return commit(self.redirect_operations(new_node,))
 
     def subsume(self, node):
         """
@@ -228,37 +230,30 @@ class IRNode:
         while self.inputs and self.inputs[-1] is None:
             self.inputs.pop()
 
-    def process_operation(self, op, node, role):
-        # Execute a 'link' or 'unlink' operation.
-        if op == 'link':
-            if role is FN:
-                assert self.fn is None
-                self.fn = node
-            elif isinstance(role, IN):
-                idx = role.index
-                nin = len(self.inputs)
-                if nin <= idx:
-                    self.inputs += [None for _ in range(idx - nin + 1)]
-                assert self.inputs[idx] is None
-                self.inputs[idx] = node
-            node.users.add((role, self))
-        elif op == 'unlink':
-            if role is FN:
-                assert self.fn is node
-                self.fn = None
-            elif isinstance(role, IN):
-                idx = role.index
-                nin = len(self.inputs)
-                assert self.inputs[idx] is node
-                self.inputs[idx] = None
-                self.trim_inputs()
-            node.users.remove((role, self))
-        else:
-            raise ValueError('Operation must be link or unlink.')
+    def process_operation_link(self, node, role):
+        if role is FN:
+            assert self.fn is None
+            self.fn = node
+        elif isinstance(role, IN):
+            idx = role.index
+            nin = len(self.inputs)
+            if nin <= idx:
+                self.inputs += [None for _ in range(idx - nin + 1)]
+            assert self.inputs[idx] is None
+            self.inputs[idx] = node
+        node.users.add((role, self))
 
-    def _commit(self, fn, args):
-        for op, n1, n2, r in fn(*args):
-            n1.process_operation(op, n2, r)
+    def process_operation_unlink(self, node, role):
+        if role is FN:
+            assert self.fn is node
+            self.fn = None
+        elif isinstance(role, IN):
+            idx = role.index
+            nin = len(self.inputs)
+            assert self.inputs[idx] is node
+            self.inputs[idx] = None
+            self.trim_inputs()
+        node.users.remove((role, self))
 
     def __getitem__(self, role):
         if role is FN:
@@ -278,7 +273,7 @@ class IRNode:
             return hrepr(self.value)
 
 
-class IRGraph:
+class IRGraph(AbstractNode):
     """
     Graph with inputs and an output. Represents a Myia function or
     a closure.
@@ -321,20 +316,17 @@ class IRGraph:
         else:
             raise ValueError(f'Invalid outgoing edge type for IRGraph: {role}')
 
-    def process_operation(self, op, node, role):
-        # Execute a 'link' or 'unlink' operation.
-        if op == 'link':
-            if role is OUT:
-                assert self._output is None
-                self._output = node
-            node.users.add((role, self))
-        elif op == 'unlink':
-            if role is OUT:
-                assert self._output is node
-                self._output = None
-            node.users.remove((role, self))
-        else:
-            raise ValueError('Operation must be link or unlink.')
+    def process_operation_link(self, node, role):
+        if role is OUT:
+            assert self._output is None
+            self._output = node
+        node.users.add((role, self))
+
+    def process_operation_unlink(self, node, role):
+        if role is OUT:
+            assert self._output is node
+            self._output = None
+        node.users.remove((role, self))
 
     def dup(self, g=None, no_mangle=False):
         """
@@ -367,14 +359,6 @@ class IRGraph:
             g.inputs = inputs
         return g, inputs, output
 
-    def contained_in(self, parent):
-        g = self
-        while g:
-            if g is parent:
-                return True
-            g = g.parent
-        return False
-
     def toposort(self):
         if not self.output.is_computation():
             return []
@@ -400,21 +384,6 @@ class IRGraph:
                     pred[succ] = None
         results.reverse()
         return results
-
-    def link(self, node1, node2, role):
-        for node in [node1, node2]:
-            if not isinstance(node, IRNode):
-                raise TypeError(f'link(...) must be called on IRNode'
-                                ' instances.')
-            # if node.graph is not self:
-            #     raise ValueError(f'link(...) must be called on nodes that'
-            #                      ' belong to the graph.')
-        node1.succ(role, node2)
-
-    def replace(self, node1, node2):
-        node1.redirect(node2)
-        if node1 is self.output:
-            self.output = node2
 
     def iternodes(self, boundary=False):
         # Basic BFS from output node

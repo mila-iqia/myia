@@ -55,7 +55,7 @@ class ResolveGlobalsPass:
                 n = IRNode(None, node.value, univ[node.value])
                 subs[node] = n
         for n1, n2 in subs.items():
-            graph.replace(n1, n2)
+            n1.redirect(n2)
             if isinstance(n2.value, IRGraph):
                 self(universe, n2.value)
 
