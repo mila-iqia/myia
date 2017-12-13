@@ -224,8 +224,6 @@ class EquilibriumTransformer:
     def check_eliminate(self, node):
         if len(node.users) > 0:
             return
-        if any(g.output is node for g in self.graphs):
-            return
 
         succ = node.successors(True)
         for r, s in succ:
@@ -234,7 +232,7 @@ class EquilibriumTransformer:
             self.check_eliminate(s)
 
     def process(self, node):
-        assert node
+        assert isinstance(node, IRNode)
         # Whenever a node changes in the touches set, patterns that
         # failed to run on the current node might now succeed.
         touches = set()
@@ -255,14 +253,6 @@ class EquilibriumTransformer:
                     # node but failed to change anything.
                     self.mark_change(node1)
                     node1.process_operation(op, node2, role)
-                    if op is 'redirect':
-                        # We need to adjust graph outputs on redirections.
-                        # This should probably be considered a design flaw
-                        # in IRNode.
-                        for g in self.graphs:
-                            if g.output is node1:
-                                g.output = node2
-                                self.pool.add(node2)
                 # Check if this node should be eliminated
                 self.check_eliminate(node)
                 # Done with this node

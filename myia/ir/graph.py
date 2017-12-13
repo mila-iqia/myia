@@ -47,7 +47,15 @@ class IN:
             self.index == other.index
 
 
+class OUT(Singleton):
+    """
+    Edge label for the OUT relation between a graph and a node.
+    """
+    pass
+
+
 FN = FN()    # type: ignore
+OUT = OUT()  # type: ignore
 
 
 class IRNode:
@@ -113,12 +121,17 @@ class IRNode:
     def is_graph(self):
         return isinstance(self.value, IRGraph)
 
-    def successors(self):
+    def successors(self, include_roles=False):
         """
         List of nodes that this node depends on.
         """
-        succ = [self.fn] + self.inputs
-        return {s for s in succ if s}
+        if include_roles:
+            succ = [(FN, self.fn)] + \
+                [(IN(i), inp) for i, inp in enumerate(self.inputs)]
+            return {(r, s) for r, s in succ if s}
+        else:
+            succ = [self.fn] + self.inputs
+            return {s for s in succ if s}
 
     def app(self):
         """
@@ -209,7 +222,6 @@ class IRNode:
         rval = []
         for role, n in set(self.users):
             rval += n.set_succ_operations(role, node)
-        rval.append(('redirect', self, node, None))
         return rval
 
     def trim_inputs(self):
@@ -241,8 +253,6 @@ class IRNode:
                 self.inputs[idx] = None
                 self.trim_inputs()
             node.users.remove((role, self))
-        elif op == 'redirect':
-            pass
         else:
             raise ValueError('Operation must be link or unlink.')
 
@@ -286,8 +296,45 @@ class IRGraph:
         self.parent = parent
         self.tag = tag
         self.inputs = []
-        self.output = None
+        self._output = None
         self.gen = gen
+        # Legacy
+        self.lbda = None
+
+    @property
+    def output(self):
+        return self._output
+
+    @output.setter
+    def output(self, out):
+        if self._output:
+            self.process_operation('unlink', self._output, OUT)
+        self.process_operation('link', out, OUT)
+
+    def set_succ_operations(self, role, node):
+        if role is OUT:
+            lnk = ('link', self, node, role)
+            if self._output:
+                return [('unlink', self, self._output, role), lnk]
+            else:
+                return [lnk]
+        else:
+            raise ValueError(f'Invalid outgoing edge type for IRGraph: {role}')
+
+    def process_operation(self, op, node, role):
+        # Execute a 'link' or 'unlink' operation.
+        if op == 'link':
+            if role is OUT:
+                assert self._output is None
+                self._output = node
+            node.users.add((role, self))
+        elif op == 'unlink':
+            if role is OUT:
+                assert self._output is node
+                self._output = None
+            node.users.remove((role, self))
+        else:
+            raise ValueError('Operation must be link or unlink.')
 
     def dup(self, g=None, no_mangle=False):
         """
