@@ -63,20 +63,20 @@ def lambda_to_ir(orig_lbda):
 
         wk = fetch(k)
         if idx is not None:
-            wk.set_app(fetch(builtins.index), [fetch(v), fetch(idx)])
+            wk.set_sexp(fetch(builtins.index), [fetch(v), fetch(idx)])
             return
 
         if isinstance(v, ApplyNode):
             args = [fetch(a) for a in v.args]
-            wk.set_app(fetch(v.fn), args)
+            wk.set_sexp(fetch(v.fn), args)
         elif isinstance(v, (Symbol, ValueNode)):
-            wk.set_app(fetch(builtins.identity), [fetch(v)])
+            wk.set_sexp(fetch(builtins.identity), [fetch(v)])
         elif isinstance(v, ClosureNode):
             args = [fetch(v.fn)] + [fetch(a) for a in v.args]
-            wk.set_app(fetch(builtins.partial), args)
+            wk.set_sexp(fetch(builtins.partial), args)
         elif isinstance(v, TupleNode):
             args = [fetch(a) for a in v.values]
-            wk.set_app(fetch(builtins.mktuple), args)
+            wk.set_sexp(fetch(builtins.mktuple), args)
         else:
             raise MyiaSyntaxError('Illegal ANF clause.', node=v)
 

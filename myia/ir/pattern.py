@@ -48,7 +48,7 @@ class PatternOpt:
         else:
             touches = set()
         if isinstance(pattern, tuple):
-            sexp = node.app()
+            sexp = node.sexp()
             if sexp:
                 if ... in pattern:
                     idx = pattern.index(...)
@@ -138,8 +138,8 @@ def eval_constant(univ, node, V1, V2):
         elif isinstance(value, Closure):
             ptial = IRNode(None, builtins.partial, builtins.partial)
             n = IRNode(None, node.tag)
-            n.set_app(ptial,
-                      [acq(value.fn)] + [acq(arg) for arg in value.args])
+            n.set_sexp(ptial,
+                       [acq(value.fn)] + [acq(arg) for arg in value.args])
             return n
         elif isinstance(value, IRGraph):
             return IRNode(None, value.lbda.ref, value)
@@ -225,10 +225,10 @@ class EquilibriumTransformer:
         if len(node.users) > 0:
             return
 
-        succ = node.successors(True)
-        for r, s in succ:
+        edges = node.edges()
+        for r, s in edges:
             s.users.remove((r, node))
-        for _, s in succ:
+        for _, s in edges:
             self.check_eliminate(s)
 
     def process(self, node):

@@ -107,7 +107,7 @@ def make_instructions(graph):
             instr('dup', node, assoc[node])
             stack_size += 1
         elif node.is_computation():
-            succ = node.app()
+            succ = node.sexp()
             assert all(node for node in succ)
             for x in succ:
                 convert(x)

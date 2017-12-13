@@ -141,19 +141,22 @@ class IRNode(AbstractNode):
     def is_graph(self):
         return isinstance(self.value, IRGraph)
 
-    def successors(self, include_roles=False):
+    def edges(self):
         """
         List of nodes that this node depends on.
         """
-        if include_roles:
-            succ = [(FN, self.fn)] + \
-                [(IN(i), inp) for i, inp in enumerate(self.inputs)]
-            return {(r, s) for r, s in succ if s}
-        else:
-            succ = [self.fn] + self.inputs
-            return {s for s in succ if s}
+        succ = [(FN, self.fn)] + \
+            [(IN(i), inp) for i, inp in enumerate(self.inputs)]
+        return {(r, s) for r, s in succ if s}
 
-    def app(self):
+    def successors(self):
+        succ = [self.fn] + list(self.inputs)
+        return {s for s in succ if s}
+
+    def predecessors(self):
+        return {s for _, s in self.users}
+
+    def sexp(self):
         """
         If this node is an application, return:
 
@@ -166,12 +169,12 @@ class IRNode(AbstractNode):
         else:
             return (self.fn,) + tuple(self.inputs)
 
-    def set_app(self, fn, inputs):
+    def set_sexp(self, fn, inputs):
         """
         Make this node an application of fn on the specified inputs.
         fn and the inputs must be IRNode instances.
         """
-        return commit(self.set_app_operations(fn, inputs))
+        return commit(self.set_sexp_operations(fn, inputs))
 
     def redirect(self, new_node):
         """
@@ -209,7 +212,7 @@ class IRNode(AbstractNode):
             rval.append(('link', self, node, role))
         return rval
 
-    def set_app_operations(self, fn, inputs):
+    def set_sexp_operations(self, fn, inputs):
         rval = self.set_succ_operations(FN, fn)
         if fn:
             for i, inp in enumerate(self.inputs):
@@ -346,12 +349,12 @@ class IRGraph(AbstractNode):
             else:
                 mapping[node] = IRNode(g, g.gen(node.tag, '+'), node.value)
         for n1, n2 in mapping.items():
-            sexp = n1.app()
+            sexp = n1.sexp()
             if sexp:
                 f, *args = sexp
                 f2 = mapping.get(f, f)
                 args2 = [mapping.get(a, a) for a in args]
-                n2.set_app(f2, args2)
+                n2.set_sexp(f2, args2)
         output = mapping.get(self.output, self.output)
         inputs = tuple(mapping[i] for i in self.inputs)
         if set_io:
