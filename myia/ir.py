@@ -10,9 +10,9 @@ returning a nested function creates a closure.
 
 """
 from enum import Enum, auto
-from typing import List, Union, Dict
+from typing import List, Dict, Any, Optional
 
-LiteralType = Union[str, int, float, 'PrimitiveOperation', 'Graph', None]
+PARAMETER = object()
 
 
 class Graph:
@@ -32,13 +32,17 @@ class Graph:
 class Node:
     """A node in the graph-based ANF IR.
 
-    There are three types of nodes: Values, which are the result of function
-    applications; parameters; and constants such as numbers and functions.
+    There are three types of nodes: Function applications; parameters; and
+    constants such as numbers and functions.
 
     Attributes:
-        inputs: If the node is a value, the first node input is the function to
-            apply, followed by the arguments.
-        value: The value of this node, if it is a constant.
+        inputs: If the node is a function application, the first node input is
+            the function to apply, followed by the arguments.
+        uses: A list of function applications that use this node as a function
+            or argument. This attribute is optional and initially set to
+            `None`.
+        value: The value of this node, if it is a constant. Parameters have the
+            special value `PARAMETER`.
         graph: The function definition graph that this node belongs to for
             values and parameters.
         debug: A dictionary with debug information about this node e.g. a
@@ -49,22 +53,23 @@ class Node:
     def __init__(self) -> None:
         """Construct a node."""
         self.inputs: List[Node] = []
-        self.value: LiteralType = None
+        self.uses: Optional[List[Node]] = None
+        self.value: Any = None
         self.graph: Graph = None
         self.debug: Dict = {}
 
 
-class Value(Node):
-    """A value.
+class Apply(Node):
+    """A function application.
 
-    A value is the result of function application.
+    This node represents the application of a function to a set of arguments.
 
     """
 
     def __init__(self, inputs: List[Node], graph: 'Graph') -> None:
-        """Construct a value."""
+        """Construct an application."""
         if len(inputs) < 1:
-            raise ValueError
+            raise ValueError("at least one input must be provided")
         super().__init__()
         self.inputs = inputs
         self.graph = graph
@@ -82,6 +87,7 @@ class Parameter(Node):
     def __init__(self, graph: Graph) -> None:
         """Construct the parameter."""
         super().__init__()
+        self.value = PARAMETER
         self.graph = graph
 
 
@@ -93,50 +99,22 @@ class Constant(Node):
     entirely by its value. Unlike parameters and values, constants do not
     belong to any particular function graph.
 
+    Two "special" constants are those whose value is a `Primitive`
+    (representing primitive operations) or whose value is a `Graph` instance
+    (representing functions).
+
     """
 
-    def __init__(self, value: LiteralType) -> None:
+    def __init__(self, value: Any) -> None:
         """Construct a literal."""
         super().__init__()
         self.value = value
 
 
-class Literal(Constant):
-    """A literal.
-
-    A literal is a string or a numeric value.
-
-    """
-
-    def __init__(self, value: Union[str, float, int]) -> None:
-        """Construct a literal."""
-        super().__init__(value)
-
-
-class PrimitiveOperation(Enum):
+class Primitive(Enum):
     """Built-in primitive operations."""
 
     ADD = auto()
     SUB = auto()
     MULT = auto()
     DIV = auto()
-
-
-class Primitive(Constant):
-    """A primitive.
-
-    A primitive operation is a built-in such as addition and multiplication.
-
-    """
-
-    def __init__(self, value: PrimitiveOperation) -> None:
-        """Construct the primitive."""
-        super().__init__(value)
-
-
-class Function(Constant):
-    """A user-defined function."""
-
-    def __init__(self, value: Graph) -> None:
-        """Construct the function."""
-        super().__init__(value)
