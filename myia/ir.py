@@ -9,7 +9,6 @@ implicitly creates a nested function. Functions are first-class objects, so
 returning a nested function creates a closure.
 
 """
-from enum import Enum, auto
 from typing import List, Dict, Any, Optional
 
 from myia.utils import Named
@@ -111,12 +110,3 @@ class Constant(Node):
         """Construct a literal."""
         super().__init__()
         self.value = value
-
-
-class Primitive(Enum):
-    """Built-in primitive operations."""
-
-    ADD = auto()
-    SUB = auto()
-    MULT = auto()
-    DIV = auto()
