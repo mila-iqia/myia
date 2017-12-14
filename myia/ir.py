@@ -12,7 +12,9 @@ returning a nested function creates a closure.
 from enum import Enum, auto
 from typing import List, Dict, Any, Optional
 
-PARAMETER = object()
+from myia.utils import Named
+
+PARAMETER = Named('PARAMETER')
 
 
 class Graph:
