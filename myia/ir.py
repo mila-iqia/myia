@@ -9,7 +9,7 @@ implicitly creates a nested function. Functions are first-class objects, so
 returning a nested function creates a closure.
 
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Set, Dict, Any, Optional
 
 from myia.utils import Named
 
@@ -39,7 +39,7 @@ class Node:
     Attributes:
         inputs: If the node is a function application, the first node input is
             the function to apply, followed by the arguments.
-        uses: A list of function applications that use this node as a function
+        uses: A set of function applications that use this node as a function
             or argument. This attribute is optional and initially set to
             `None`.
         value: The value of this node, if it is a constant. Parameters have the
@@ -54,7 +54,7 @@ class Node:
     def __init__(self) -> None:
         """Construct a node."""
         self.inputs: List[Node] = []
-        self.uses: Optional[List[Node]] = None
+        self.uses: Optional[Set[Node]] = None
         self.value: Any = None
         self.graph: Graph = None
         self.debug: Dict = {}
