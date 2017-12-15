@@ -9,8 +9,8 @@ implicitly creates a nested function. Functions are first-class objects, so
 returning a nested function creates a closure.
 
 """
-from typing import (List, Set, Tuple, Dict, Any, Optional, Sequence,
-                    MutableSequence, overload, Iterable)
+from typing import (List, Set, Tuple, Dict, Any, Sequence, MutableSequence,
+                    overload, Iterable)
 
 from myia.utils import Named
 
@@ -35,7 +35,7 @@ class Graph:
     def __init__(self) -> None:
         """Construct a graph."""
         self.parameters: List[Parameter] = []
-        self.return_: Optional[Return] = None
+        self.return_: Return = None
         self.debug: Dict = {}
 
 
@@ -61,8 +61,7 @@ class Node:
 
     """
 
-    def __init__(self, inputs: List['Node'], value: Any,
-                 graph: Optional[Graph]) -> None:
+    def __init__(self, inputs: List['Node'], value: Any, graph: Graph) -> None:
         """Construct a node."""
         self.inputs = Inputs(self, inputs)
         self.value = value
