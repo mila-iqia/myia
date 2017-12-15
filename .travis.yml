@@ -7,7 +7,7 @@ env:
   - TEST_SUITE=static
   - TEST_SUITE=unit
 script:
-  - if [[ $TEST_SUITE == "static" ]]; then flake8; mypy myia; pydocstyle myia; fi
+  - if [[ $TEST_SUITE == "static" ]]; then flake8; mypy myia; pydocstyle --ignore-decorators=overload myia; fi
   - if [[ $TEST_SUITE == "unit" ]]; then pytest --cov=./ tests; fi
 after_success:
   - if [[ $TEST_SUITE == "unit" ]]; then codecov; fi
