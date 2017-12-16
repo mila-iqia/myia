@@ -102,7 +102,7 @@ class Inputs(MutableSequence[Node]):
 
     def __getitem__(self, index):  # noqa: F811
         """Get an input by its index."""
-        return self.data.__getitem__(index)
+        return self.data[index]
 
     @overload
     def __setitem__(self, index: int, value: Node) -> None:
@@ -115,14 +115,11 @@ class Inputs(MutableSequence[Node]):
     def __setitem__(self, index, value):  # noqa: F811
         """Replace an input with another."""
         if isinstance(index, slice):
-            for i, v in zip(range(*index.indices(len(self))), value):
-                self[i] = v
+            raise ValueError("slice assignment not supported")
         old_value = self.data[index]
-        if old_value.uses is not None:
-            old_value.uses.remove((self.node, index))
-        if value.uses is not None:
-            value.uses.add((self.node, index))
-        self.data.__setitem__(index, value)
+        old_value.uses.remove((self.node, index))
+        value.uses.add((self.node, index))
+        self.data[index] = value
 
     @overload
     def __delitem__(self, index: int) -> None:
@@ -135,12 +132,13 @@ class Inputs(MutableSequence[Node]):
     def __delitem__(self, index):  # noqa: F811
         """Delete an input."""
         if isinstance(index, slice):
-            for i in range(*index.indices(len(self))):
-                del self[i]
+            raise ValueError("slice deletion not supported")
         value = self.data[index]
-        if value.uses is not None:
-            value.uses.remove((self.node, index))
-        self.data.__delitem__(index)
+        value.uses.remove((self.node, index))
+        for i, next_value in enumerate(self.data[index + 1:]):
+            next_value.uses.remove((self.node, i + index + 1))
+            next_value.uses.add((self.node, i + index))
+        del self.data[index]
 
     def __len__(self) -> int:
         """Get the number of inputs."""
@@ -149,11 +147,9 @@ class Inputs(MutableSequence[Node]):
     def insert(self, index: int, value: Node) -> None:
         """Insert an input at a given location."""
         for i, next_value in enumerate(reversed(self.data[index:])):
-            if next_value.uses is not None:
-                next_value.uses.remove((self.node, len(self) - i - 1))
-                next_value.uses.add((self.node, len(self) - i))
-        if value.uses is not None:
-            value.uses.add((self.node, index))
+            next_value.uses.remove((self.node, len(self) - i - 1))
+            next_value.uses.add((self.node, len(self) - i))
+        value.uses.add((self.node, index))
         self.data.insert(index, value)
 
     def __repr__(self) -> str:
