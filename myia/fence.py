@@ -1,5 +1,9 @@
 """Check Python code for compatibility with Myia."""
 import ast
+import copy
+import inspect
+import textwrap
+
 from typing import Sequence
 
 
@@ -35,6 +39,11 @@ class MyiaSyntaxError(SyntaxError):
         self.lineno = lineno
         self.offset = offset
         self.text = text
+        self.message = message
+
+    def __copy__(self):
+        return self.__class__(self.filename, self.lineno, self.offset,
+                              self.text, self.message)
 
 
 class Fence(ast.NodeVisitor):
@@ -92,10 +101,6 @@ class Fence(ast.NodeVisitor):
                 return visitor(node)
             self.raise_()
 
-    def visit_Pass(self, node: ast.Pass):
-        """No pass."""
-        self.raise_("you shall not pass")
-
     def raise_(self, message: str = None):
         """Raise a syntax error for an unsupported node.
 
@@ -108,12 +113,21 @@ class Fence(ast.NodeVisitor):
                               self.lines[self.lineno - 1], message)
 
 
-if __name__ == '__main__':
-    def f(x):
-        pass
+def fence(func):
+    """Check if a function can be compiled with Myia.
 
-    import ast
-    import inspect
-    import textwrap
-    fence = Fence(inspect.getsourcefile(f), *inspect.getsourcelines(f))
-    fence.visit(ast.parse(textwrap.dedent(inspect.getsource(f))))
+    This function gets the AST of a function and uses `Fence` to determine
+    whether all statements and expressions are supported by Myia.
+
+    Args:
+        func: The function to inspect.
+
+    """
+    filename = inspect.getsourcefile(func)
+    lines, line_offset = inspect.getsourcelines(func)
+    checker = Fence(filename, lines, line_offset)
+    try:
+        checker.visit(ast.parse(textwrap.dedent(inspect.getsource(func))))
+    except MyiaSyntaxError as err:
+        # Reraise for cleaner traceback
+        raise copy.copy(err)
