@@ -72,11 +72,13 @@ class Node:
 
     @property
     def inputs(self) -> 'Inputs':
+        """Return the list of inputs."""
         return self._inputs
 
     @inputs.setter
     def inputs(self, value: Iterable['Node']) -> None:
-        self._inputs.clear()
+        """Set the list of inputs."""
+        self._inputs.clear()  # type: ignore
         self._inputs = Inputs(self, value)
 
 
