@@ -61,13 +61,23 @@ class Node:
 
     """
 
-    def __init__(self, inputs: List['Node'], value: Any, graph: Graph) -> None:
+    def __init__(self, inputs: Iterable['Node'], value: Any,
+                 graph: Graph) -> None:
         """Construct a node."""
-        self.inputs = Inputs(self, inputs)
+        self._inputs = Inputs(self, inputs)
         self.value = value
         self.graph = graph
         self.uses: Set[Tuple[Node, int]] = set()
         self.debug: Dict = {}
+
+    @property
+    def inputs(self) -> 'Inputs':
+        return self._inputs
+
+    @inputs.setter
+    def inputs(self, value: Iterable['Node']) -> None:
+        self._inputs.clear()
+        self._inputs = Inputs(self, value)
 
 
 class Inputs(MutableSequence[Node]):
@@ -97,7 +107,7 @@ class Inputs(MutableSequence[Node]):
         pass
 
     @overload  # noqa: F811
-    def __getitem__(self, s: slice) -> Sequence[Node]:
+    def __getitem__(self, index: slice) -> Sequence[Node]:
         pass
 
     def __getitem__(self, index):  # noqa: F811
@@ -116,6 +126,8 @@ class Inputs(MutableSequence[Node]):
         """Replace an input with another."""
         if isinstance(index, slice):
             raise ValueError("slice assignment not supported")
+        if index < 0:
+            index += len(self)
         old_value = self.data[index]
         old_value.uses.remove((self.node, index))
         value.uses.add((self.node, index))
@@ -133,6 +145,8 @@ class Inputs(MutableSequence[Node]):
         """Delete an input."""
         if isinstance(index, slice):
             raise ValueError("slice deletion not supported")
+        if index < 0:
+            index += len(self)
         value = self.data[index]
         value.uses.remove((self.node, index))
         for i, next_value in enumerate(self.data[index + 1:]):
@@ -146,6 +160,8 @@ class Inputs(MutableSequence[Node]):
 
     def insert(self, index: int, value: Node) -> None:
         """Insert an input at a given location."""
+        if index < 0:
+            index += len(self)
         for i, next_value in enumerate(reversed(self.data[index:])):
             next_value.uses.remove((self.node, len(self) - i - 1))
             next_value.uses.add((self.node, len(self) - i))
@@ -166,8 +182,6 @@ class Apply(Node):
 
     def __init__(self, inputs: List[Node], graph: 'Graph') -> None:
         """Construct an application."""
-        if len(inputs) < 1:
-            raise ValueError("at least one input must be provided")
         super().__init__(inputs, None, graph)
 
 
