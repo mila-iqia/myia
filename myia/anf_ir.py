@@ -246,6 +246,16 @@ class Inputs(MutableSequence[ANFNode]):
         return f"Inputs({self.data})"
 
     def __eq__(self, other) -> bool:
+        """Test whether a list of inputs is equal to another list.
+
+        Note:
+            The goal of `Inputs` is to behave exactly like a list, but track
+            insertions and deletions to keep the bidirectional graph structure
+            up to date. As such, which node an `Inputs` object is attached to
+            is irrelevant to the equality test. Instead, a simple element by
+            element test is performed.
+
+        """
         return all(x == y for x, y in zip(self, other))
 
 
