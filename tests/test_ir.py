@@ -1,7 +1,7 @@
 import pytest
 
-from myia.ir import (Graph, Apply, Return, Parameter, Constant,
-                     PARAMETER, RETURN)
+from myia.anf_ir import (Graph, Apply, Return, Parameter, Constant,
+                         PARAMETER, RETURN)
 
 
 def test_init_inputs():
