@@ -132,7 +132,7 @@ class ANFNode(Node):
         """
         other.inputs = self.inputs
         self.inputs.clear()  # type: ignore
-        for node, index in self.uses:
+        for node, index in list(self.uses):
             node.inputs[index] = other
 
 
@@ -244,6 +244,9 @@ class Inputs(MutableSequence[ANFNode]):
     def __repr__(self) -> str:
         """Return a string representation of the inputs."""
         return f"Inputs({self.data})"
+
+    def __eq__(self, other) -> bool:
+        return all(x == y for x, y in zip(self, other))
 
 
 class Apply(ANFNode):

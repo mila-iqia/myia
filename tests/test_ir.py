@@ -1,3 +1,5 @@
+import copy
+
 import pytest
 
 from myia.anf_ir import (Graph, Apply, Return, Parameter, Constant,
@@ -45,6 +47,41 @@ def test_set_inputs(index):
     assert value.inputs[0] is in1
     assert in0.uses == set()
     assert in1.uses == {(value, 0)}
+
+
+def test_incoming():
+    in0 = Constant(0)
+    value = Apply([in0], Graph())
+    assert list(value.incoming) == [in0]
+    assert list(in0.incoming) == []
+
+
+def test_copy():
+    in0 = Constant(0)
+    value0 = Apply([in0], Graph())
+    value1 = copy.copy(value0)
+    in1 = copy.copy(in0)
+    assert value1.inputs == value0.inputs
+    assert value1.inputs is not value0.inputs
+    assert in0.uses == {(value0, 0), (value1, 0)}
+    assert in1.uses == set()
+
+
+def test_replace():
+    in0 = Constant(0)
+    in1 = Constant(1)
+    value = Apply([in0], Graph())
+    in0.replace(in1)
+    assert in0.uses == set()
+    assert in1.uses == {(value, 0)}
+    assert value.inputs == [in1]
+
+
+def test_outgoing():
+    in0 = Constant(0)
+    value = Apply([in0], Graph())
+    assert list(value.outgoing) == []
+    assert list(in0.outgoing) == [value]
 
 
 @pytest.mark.parametrize('index', [0, -2])
