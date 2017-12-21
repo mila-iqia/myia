@@ -18,6 +18,7 @@ from myia.ir import Node
 from myia.utils import Named
 
 PARAMETER = Named('PARAMETER')
+APPLY = Named('APPLY')
 
 
 class Graph:
@@ -68,8 +69,9 @@ class ANFNode(Node):
         inputs: If the node is a function application, the first node input is
             the function to apply, followed by the arguments. These are use-def
             edges. For other nodes, this attribute is empty.
-        value: The value of this node, if it is a constant. Parameters have the
-            special value `PARAMETER`.
+        value: The value of this node if it is a constant. Parameters and
+            function applications have the special values `PARAMETER` and
+            `APPLY`.
         graph: The function definition graph that this node belongs to for
             values and parameters (constants don't belong to any function).
         uses: A set of tuples with the nodes that use this node alongside with
@@ -256,7 +258,7 @@ class Apply(ANFNode):
 
     def __init__(self, inputs: List[ANFNode], graph: 'Graph') -> None:
         """Construct an application."""
-        super().__init__(inputs, None, graph)
+        super().__init__(inputs, APPLY, graph)
 
 
 class Parameter(ANFNode):

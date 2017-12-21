@@ -66,16 +66,6 @@ def test_copy():
     assert in1.uses == set()
 
 
-def test_replace():
-    in0 = Constant(0)
-    in1 = Constant(1)
-    value = Apply([in0], Graph())
-    in0.replace(in1)
-    assert in0.uses == set()
-    assert in1.uses == {(value, 0)}
-    assert value.inputs == [in1]
-
-
 def test_outgoing():
     in0 = Constant(0)
     value = Apply([in0], Graph())
