@@ -123,19 +123,6 @@ class ANFNode(Node):
         ANFNode.__init__(obj, self.inputs, self.value, self.graph)
         return obj
 
-    def replace(self, other: 'ANFNode') -> None:
-        """Replace one node in the graph with another.
-
-        Args:
-            other: The node to replace this one with. All incoming and outgoing
-                edges will be replaced.
-
-        """
-        other.inputs = self.inputs
-        self.inputs.clear()  # type: ignore
-        for node, index in list(self.uses):
-            node.inputs[index] = other
-
 
 class NodeDebug(types.SimpleNamespace):
     """Debug information for a node.
