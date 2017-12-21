@@ -61,21 +61,22 @@ class GraphDebug(types.SimpleNamespace):
 class ANFNode(Node):
     """A node in the graph-based ANF IR.
 
-    There are four types of nodes: Function applications; parameters; return
-    values; and constants such as numbers and functions.
+    There are three types of nodes: Function applications; parameters; and
+    constants such as numbers and functions.
 
     Attributes:
         inputs: If the node is a function application, the first node input is
             the function to apply, followed by the arguments. These are use-def
-            edges.
+            edges. For other nodes, this attribute is empty.
         value: The value of this node, if it is a constant. Parameters have the
             special value `PARAMETER`.
         graph: The function definition graph that this node belongs to for
-            values and parameters.
+            values and parameters (constants don't belong to any function).
         uses: A set of tuples with the nodes that use this node alongside with
             the index. These def-use edges are the reverse of the `inputs`
-            attribute, creating a doubly linked graph structure.
-        debug: A dictionary with debug information about this node e.g. a
+            attribute, creating a doubly linked graph structure. Note that this
+            container is updated automatically; do not manipulate it manually.
+        debug: An object with debug information about this node e.g. a
             human-readable name and the Python source code.
 
     """
@@ -157,7 +158,7 @@ class Inputs(MutableSequence[ANFNode]):
 
     This mutable sequence data structure can be used to keep track of a node's
     inputs. Any insertion or deletion of edges will be reflected in the inputs'
-    `uses` attribute.
+    `uses` attributes.
 
     """
 
