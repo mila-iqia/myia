@@ -83,12 +83,6 @@ class Graph:
         """Return readable string representation."""
         return self.debug.debug_name
 
-    def __repr__(self) -> str:
-        """Return unique string representation."""
-        return repr_(self, name=self.debug.debug_name,
-                     parameters=list_str(self.parameters),
-                     return_=self.return_)
-
 
 class GraphDebug(Debug):
     """Debug information for a graph.
@@ -136,7 +130,7 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.uses: Set[Tuple[ANFNode, int]] = set()
-        self.debug = ANFNodeDebug(self)
+        self.debug = ANFNodeDebug()
 
     @property
     def inputs(self) -> 'Inputs':
@@ -285,8 +279,8 @@ class Inputs(MutableSequence[ANFNode]):
         return list_str(self.data)
 
     def __repr__(self) -> str:
-        """Return unique string representation."""
-        return f"Inputs({self.node}, {list_str(self.data)})"
+        """Return a string representation of the inputs."""
+        return f"Inputs({[str(el) for el in self.data]})"
 
     def __eq__(self, other) -> bool:
         """Test whether a list of inputs is equal to another list.
