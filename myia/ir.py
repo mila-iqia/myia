@@ -3,11 +3,11 @@
 This module defines the basic interface for the graph-based IR(s) used in Myia.
 
 """
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from typing import Iterable
 
 
-class Node(metaclass=ABCMeta):
+class Node(ABC):
     """A node in a graph IR.
 
     Attributes:
