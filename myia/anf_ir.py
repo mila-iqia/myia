@@ -9,7 +9,9 @@ implicitly creates a nested function. Functions are first-class objects, so
 returning a nested function creates a closure.
 
 """
-from typing import (List, Set, Tuple, Dict, Any, Sequence, MutableSequence,
+import types
+from ast import AST
+from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
                     overload, Iterable)
 
 from myia.ir import Node
@@ -37,7 +39,23 @@ class Graph:
         """Construct a graph."""
         self.parameters: List[Parameter] = []
         self.return_: Return = None
-        self.debug: Dict = {}
+        self.debug = GraphDebug()
+
+
+class GraphDebug(types.SimpleNamespace):
+    """Debug information for a graph.
+
+    Any information that is used for debugging e.g. plotting, printing, etc.
+    can be stored in this class.
+
+    Attributes:
+        ast: The AST node that created this graph.
+        name: The function name.
+
+    """
+
+    ast: AST
+    name: str
 
 
 class ANFNode(Node):
@@ -69,7 +87,7 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.uses: Set[Tuple[ANFNode, int]] = set()
-        self.debug: Dict = {}
+        self.debug = NodeDebug()
 
     @property
     def inputs(self) -> 'Inputs':
@@ -83,20 +101,28 @@ class ANFNode(Node):
         self._inputs = Inputs(self, value)
 
     @property
-    def incoming(self):
+    def incoming(self) -> Iterable['ANFNode']:
+        """Return incoming nodes in order."""
         return iter(self.inputs)
 
     @property
-    def outgoing(self):
+    def outgoing(self) -> Iterable['ANFNode']:
+        """Return uses of this node in random order."""
         return (node for node, index in self.uses)
 
-    def __copy__(self):
+    def __copy__(self) -> 'ANFNode':
+        """Copy this node.
+
+        This method is used by the `copy` module. It ensures that copied nodes
+        will have correct `uses` information. Debug information is not copied.
+
+        """
         cls = self.__class__
-        obj = cls.__new__(cls)
-        Node.__init__(obj, self.inputs, self.value, self.graph)
+        obj = cls.__new__(cls)  # type: ignore
+        ANFNode.__init__(obj, self.inputs, self.value, self.graph)
         return obj
 
-    def replace(self, other: Node) -> None:
+    def replace(self, other: 'ANFNode') -> None:
         """Replace one node in the graph with another.
 
         Args:
@@ -108,6 +134,22 @@ class ANFNode(Node):
         self.inputs.clear()  # type: ignore
         for node, index in self.uses:
             node.inputs[index] = other
+
+
+class NodeDebug(types.SimpleNamespace):
+    """Debug information for a node.
+
+    Any information that is used for debugging e.g. plotting, printing, etc.
+    can be stored in this class.
+
+    Attributes:
+        ast: The AST node that generated this node.
+        name: The name of this variable.
+
+    """
+
+    ast: AST
+    name: str
 
 
 class Inputs(MutableSequence[ANFNode]):
