@@ -128,7 +128,7 @@ class ANFNode(Node):
 
         Args:
             other: The node to replace this one with. All incoming and outgoing
-                edges will be replace.
+                edges will be replaced.
 
         """
         other.inputs = self.inputs
