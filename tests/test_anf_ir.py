@@ -2,8 +2,7 @@ import copy
 
 import pytest
 
-from myia.anf_ir import (Graph, Apply, Return, Parameter, Constant,
-                         PARAMETER, RETURN)
+from myia.anf_ir import Graph, Apply, Parameter, Constant, PARAMETER
 
 
 def test_init_inputs():
@@ -130,13 +129,18 @@ def test_set_inputs_property():
 
 
 def test_graph():
+    """Construct a small graph.
+
+    Note that this graph is strictly speaking nonsensical, because it doesn't
+    use any actual primitive operations.
+    """
     g = Graph()
     x = Parameter(g)
     assert x.value is PARAMETER
     one = Constant(1)
     add = Constant('add')
+    return_ = Constant('return')
     value = Apply([add, x, one], g)
-    return_ = Return(value, g)
-    assert return_.value is RETURN
+    return_ = Apply([return_, value], g)
     g.return_ = return_
     g.parameters.append(x)

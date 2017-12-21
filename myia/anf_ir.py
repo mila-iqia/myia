@@ -18,7 +18,6 @@ from myia.ir import Node
 from myia.utils import Named
 
 PARAMETER = Named('PARAMETER')
-RETURN = Named('RETURN')
 
 
 class Graph:
@@ -28,17 +27,18 @@ class Graph:
         parameters: The parameters of this function as a list of `Parameter`
             nodes. Parameter nodes that are unreachable by walking from the
             output node correspond to unused parameters.
-        return_: The `Return` node whose value will be returned by this
-            function. A graph initially has no output node (because it won't be
-            known e.g. until the function has completed parsing), but it must
-            be set afterwards for the graph instance to be valid.
+        return_: The `Apply` node that calls the `Return` primitive. The input
+            to this node will be returned by this function. A graph initially
+            has no output node (because it won't be known e.g. until the
+            function has completed parsing), but it must be set afterwards for
+            the graph instance to be valid.
 
     """
 
     def __init__(self) -> None:
         """Construct a graph."""
         self.parameters: List[Parameter] = []
-        self.return_: Return = None
+        self.return_: Apply = None
         self.debug = GraphDebug()
 
 
@@ -283,19 +283,6 @@ class Parameter(ANFNode):
     def __init__(self, graph: Graph) -> None:
         """Construct the parameter."""
         super().__init__([], PARAMETER, graph)
-
-
-class Return(ANFNode):
-    """The value returned by a function.
-
-    Return nodes have exactly one input, which points to the value that the
-    function will return. They are a root node in the function graph.
-
-    """
-
-    def __init__(self, input_: ANFNode, graph: Graph) -> None:
-        """Construct a return node."""
-        super().__init__([input_], RETURN, graph)
 
 
 class Constant(ANFNode):
