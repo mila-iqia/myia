@@ -21,6 +21,29 @@ PARAMETER = Named('PARAMETER')
 APPLY = Named('APPLY')
 
 
+class Debug(types.SimpleNamespace):
+    """Debug information for an object.
+
+    Attributes:
+        name: The name of the object.
+    """
+    __curr_id__ = 0
+
+    def __init__(self, **kw):
+        self.name = None
+        super().__init__(**kw)
+
+    def force_name(self):
+        """Return the name, create a fresh name if needed."""
+        if self.name:
+            return self.name
+        Debug.__curr_id__ += 1
+        self.name = f'#{Debug.__curr_id__}'
+        return self.name
+
+    name: str
+
+
 class Graph:
     """A function graph.
 
@@ -42,8 +65,16 @@ class Graph:
         self.return_: Apply = None
         self.debug = GraphDebug()
 
+    def __str__(self) -> str:
+        return self.debug.force_name()
 
-class GraphDebug(types.SimpleNamespace):
+    def __repr__(self) -> str:
+        pfx = f'{self.debug.name}=' if self.debug.name else ''
+        ret = self.return_ and self.return_.inputs[1]
+        return f'{pfx}Graph(parameters={self.parameters}, return_={ret!r})'
+
+
+class GraphDebug(Debug):
     """Debug information for a graph.
 
     Any information that is used for debugging e.g. plotting, printing, etc.
@@ -56,7 +87,6 @@ class GraphDebug(types.SimpleNamespace):
     """
 
     ast: AST
-    name: str
 
 
 class ANFNode(Node):
@@ -125,8 +155,13 @@ class ANFNode(Node):
         ANFNode.__init__(obj, self.inputs, self.value, self.graph)
         return obj
 
+    def __str__(self) -> str:
+        return self.debug.force_name()
 
-class NodeDebug(types.SimpleNamespace):
+    __repr__ = __str__
+
+
+class NodeDebug(Debug):
     """Debug information for a node.
 
     Any information that is used for debugging e.g. plotting, printing, etc.
@@ -139,7 +174,6 @@ class NodeDebug(types.SimpleNamespace):
     """
 
     ast: AST
-    name: str
 
 
 class Inputs(MutableSequence[ANFNode]):
@@ -260,6 +294,10 @@ class Apply(ANFNode):
         """Construct an application."""
         super().__init__(inputs, APPLY, graph)
 
+    def __repr__(self) -> str:
+        pfx = f'{self.debug.name}=' if self.debug.name else ''
+        return f'Apply({[str(x) for x in self.inputs]})'
+
 
 class Parameter(ANFNode):
     """A parameter to a function.
@@ -292,3 +330,9 @@ class Constant(ANFNode):
     def __init__(self, value: Any) -> None:
         """Construct a literal."""
         super().__init__([], value, None)
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+    def __repr__(self) -> str:
+        return repr(self.value)
