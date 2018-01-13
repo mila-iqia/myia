@@ -296,7 +296,7 @@ class Apply(ANFNode):
 
     def __repr__(self) -> str:
         pfx = f'{self.debug.name}=' if self.debug.name else ''
-        return f'Apply({[str(x) for x in self.inputs]})'
+        return f'{pfx}Apply({[str(x) for x in self.inputs]})'
 
 
 class Parameter(ANFNode):
