@@ -27,22 +27,24 @@ class Debug(types.SimpleNamespace):
 
     Attributes:
         name: The name of the object.
+
     """
-    __curr_id__ = 0
 
-    def __init__(self, **kw):
-        self.name = None
-        super().__init__(**kw)
+    _curr_id = 0
 
-    def force_name(self):
+    def __init__(self, **kwargs):
+        """Construct a Debug object."""
+        self.name: str = None
+        super().__init__(**kwargs)
+
+    @property
+    def debug_name(self):
         """Return the name, create a fresh name if needed."""
         if self.name:
             return self.name
-        Debug.__curr_id__ += 1
-        self.name = f'#{Debug.__curr_id__}'
+        Debug._curr_id += 1
+        self.name = f'#{Debug._curr_id}'
         return self.name
-
-    name: str
 
 
 class Graph:
@@ -67,21 +69,24 @@ class Graph:
         self.debug = GraphDebug()
 
     def __str__(self) -> str:
-        return self.debug.force_name()
+        """Return string representation."""
+        pfx = f'{self.debug.name}=' if self.debug.name else ''
+        return f'{pfx}Graph(parameters={self.parameters})'
 
     def __repr__(self) -> str:
-        pfx = f'{self.debug.name}=' if self.debug.name else ''
-        ret = self.return_ and self.return_.inputs[1]
-        return f'{pfx}Graph(parameters={self.parameters}, return_={ret!r})'
+        """Return representation."""
+        return str(self)
 
     @classmethod
     def __hrepr_resources__(cls, H):
+        """Require the cytoscape plugin for buche."""
         return H.bucheRequire(name='cytoscape',
                               channels='cytoscape',
                               components='cytoscape-graph')
 
     def __hrepr__(self, H, hrepr):
-        from .debug.gprint import GraphPrinter, css
+        """Return HTML representation (uses buche-cytoscape)."""
+        from .debug.gprint import GraphPrinter, css  # type: ignore
         rval = H.cytoscapeGraph(H.style(css))
 
         options = {
@@ -188,9 +193,12 @@ class ANFNode(Node):
         return obj
 
     def __str__(self) -> str:
-        return self.debug.force_name()
+        """Return string representation."""
+        return self.debug.debug_name
 
-    __repr__ = __str__
+    def __repr__(self) -> str:
+        """Return representation."""
+        return str(self)
 
 
 class NodeDebug(Debug):
@@ -327,6 +335,7 @@ class Apply(ANFNode):
         super().__init__(inputs, APPLY, graph)
 
     def __repr__(self) -> str:
+        """Return representation."""
         pfx = f'{self.debug.name}=' if self.debug.name else ''
         return f'{pfx}Apply({[str(x) for x in self.inputs]})'
 
@@ -364,7 +373,12 @@ class Constant(ANFNode):
         super().__init__([], value, None)
 
     def __str__(self) -> str:
-        return str(self.value)
+        """Return string representation."""
+        if self.debug.name:
+            return self.debug.name
+        else:
+            return f'Constant({self.value!r})'
 
     def __repr__(self) -> str:
-        return repr(self.value)
+        """Return representation."""
+        return str(self)

@@ -1,5 +1,5 @@
 
-from ..anf_ir import ANFNode, Graph, Apply, Parameter, Constant
+from ..anf_ir import Graph, Apply, Constant
 import os
 
 
@@ -79,7 +79,7 @@ class GraphPrinter:
         fn = node.inputs[0] if node.inputs else None
         if fn and is_constant(fn):
             if is_graph(fn):
-                return fn.value.debug.force_name()
+                return fn.value.debug.debug_name
             else:
                 return str(fn.value)
         else:
@@ -88,15 +88,15 @@ class GraphPrinter:
     def add_graph(self, g):
         if g in self.processed:
             return
-        name = g.debug.force_name()
-        argnames = [p.debug.force_name() for p in g.parameters]
+        name = g.debug.debug_name
+        argnames = [p.debug.debug_name for p in g.parameters]
         lbl = f'{name}({", ".join(argnames)})'
         self.cynode(id=g, label=lbl, classes='function')
         self.processed.add(g)
 
     def label(self, node):
         if is_graph(node):
-            lbl = node.value.debug.force_name()
+            lbl = node.value.debug.debug_name
         elif is_constant(node):
             lbl = str(node.value)
         else:
