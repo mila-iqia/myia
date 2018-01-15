@@ -16,6 +16,7 @@ from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
 
 from myia.ir import Node
 from myia.utils import Named
+import json
 
 PARAMETER = Named('PARAMETER')
 APPLY = Named('APPLY')
@@ -72,6 +73,37 @@ class Graph:
         pfx = f'{self.debug.name}=' if self.debug.name else ''
         ret = self.return_ and self.return_.inputs[1]
         return f'{pfx}Graph(parameters={self.parameters}, return_={ret!r})'
+
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        return H.bucheRequire(name='cytoscape',
+                              channels='cytoscape',
+                              components='cytoscape-graph')
+
+    def __hrepr__(self, H, hrepr):
+        from .debug.gprint import GraphPrinter, css
+        rval = H.cytoscapeGraph(H.style(css))
+
+        options = {
+            'layout': {
+                'name': 'dagre',
+                'rankDir': 'TB'
+            }
+        }
+        rval = rval(H.options(json.dumps(options)))
+        dc = hrepr.config.duplicate_constants
+        fin = hrepr.config.function_in_node
+        fr = hrepr.config.follow_references
+        gpr = GraphPrinter(
+            {self},
+            duplicate_constants=True if dc is None else dc,
+            function_in_node=True if fin is None else fin,
+            follow_references=True if fr is None else fr
+        )
+        gpr.process()
+        for elem in gpr.nodes + gpr.edges:
+            rval = rval(H.element(json.dumps(elem)))
+        return rval
 
 
 class GraphDebug(Debug):
