@@ -1,3 +1,4 @@
+"""Utilities to generate a graphical representation for a graph."""
 
 from ..anf_ir import Graph, Apply, Constant
 import os
@@ -8,23 +9,42 @@ css = open(css_path).read()
 
 
 def is_computation(x):
+    """Check if x is a computation."""
     return isinstance(x, Apply)
 
 
 def is_constant(x):
+    """Check if x is a constant."""
     return isinstance(x, Constant)
 
 
 def is_graph(x):
+    """Check if x is a constant that contains a graph."""
     return isinstance(x, Constant) and isinstance(x.value, Graph)
 
 
 class GraphPrinter:
+    """
+    Utility to generate a graphical representation for a graph.
+
+    Attributes:
+        duplicate_constants: Whether to create a separate node for
+            every instance of the same constant.
+        function_in_node: Whether to print, when possible, the name
+            of a node's operation directly in the node's label instead
+            of creating a node for the operation and drawing an edge
+            to it.
+        follow_references: Whether to also print graphs that are
+            called by this graph.
+
+    """
+
     def __init__(self,
                  entry_points,
                  duplicate_constants=False,
                  function_in_node=False,
                  follow_references=False):
+        """Initialize a GraphPrinter."""
         # Graphs left to process
         self.graphs = set(entry_points)
         self.duplicate_constants = duplicate_constants
@@ -47,13 +67,16 @@ class GraphPrinter:
         }
 
     def id(self, x):
+        """Return the id associated to x."""
         return f'X{id(x)}'
 
     def fresh_id(self):
+        """Return sequential identifier for duplicated constants."""
         self.currid += 1
         return f'Y{self.currid}'
 
     def cynode(self, id, label, classes, parent=None):
+        """Build data structure for a node in cytoscape."""
         if not isinstance(id, str):
             id = self.id(id)
         data = {'id': id, 'label': str(label)}
@@ -63,6 +86,7 @@ class GraphPrinter:
         self.nodes.append({'data': data, 'classes': classes})
 
     def cyedge(self, src_id, dest_id, label):
+        """Build data structure for an edge in cytoscape."""
         if not isinstance(dest_id, str):
             dest_id = self.id(dest_id)
         if not isinstance(src_id, str):
@@ -76,6 +100,12 @@ class GraphPrinter:
         self.edges.append({'data': data})
 
     def const_fn(self, node):
+        """
+        Return name of function, if constant.
+
+        Given an `Apply` node of a constant function, return the
+        name of that function, otherwise return None.
+        """
         fn = node.inputs[0] if node.inputs else None
         if fn and is_constant(fn):
             if is_graph(fn):
@@ -86,6 +116,7 @@ class GraphPrinter:
             return None
 
     def add_graph(self, g):
+        """Create a node for a graph."""
         if g in self.processed:
             return
         name = g.debug.debug_name
@@ -95,6 +126,7 @@ class GraphPrinter:
         self.processed.add(g)
 
     def label(self, node):
+        """Return the label to give to a node."""
         if is_graph(node):
             lbl = node.value.debug.debug_name
         elif is_constant(node):
@@ -114,11 +146,13 @@ class GraphPrinter:
         return lbl or '·'
 
     def process_node_return(self, node, g, cl):
+        """Create node and edges for `return ...`."""
         self.cynode(id=node, label='', parent=g, classes='const_output')
         ret = node.inputs[1]
         self.process_edges([(node, '', ret)])
 
     def process_node_generic(self, node, g, cl):
+        """Create node and edges for a node."""
         lbl = self.label(node)
 
         self.cynode(id=node, label=lbl, parent=g, classes=cl)
@@ -137,6 +171,7 @@ class GraphPrinter:
         self.process_edges(edges)
 
     def process_node(self, node):
+        """Create node and edges for a node."""
         if node in self.processed:
             return
 
@@ -164,6 +199,7 @@ class GraphPrinter:
         self.processed.add(node)
 
     def process_edges(self, edges):
+        """Create edges."""
         for edge in edges:
             src, lbl, dest = edge
             if is_constant(dest) and self.duplicate_constants:
@@ -179,6 +215,7 @@ class GraphPrinter:
                 self.cyedge(src_id=src, dest_id=dest, label=lbl)
 
     def process_graph(self, g):
+        """Process a graph."""
         self.add_graph(g)
         for inp in g.parameters:
             self.process_node(inp)
@@ -195,6 +232,7 @@ class GraphPrinter:
             self.process_node(node)
 
     def process(self):
+        """Process all graphs in entry_points."""
         if self.nodes or self.edges:
             return
         while self.graphs:
@@ -203,5 +241,6 @@ class GraphPrinter:
         return self.nodes, self.edges
 
     def follow(self, node):
+        """Add this node's graph if follow_references is True."""
         if is_graph(node) and self.follow_references:
             self.graphs.add(node.value)
