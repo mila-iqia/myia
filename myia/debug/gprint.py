@@ -2,6 +2,7 @@
 
 from ..anf_ir import Graph, Apply, Constant
 import os
+import json
 
 
 css_path = f'{os.path.dirname(__file__)}/graph.css'
@@ -244,3 +245,41 @@ class GraphPrinter:
         """Add this node's graph if follow_references is True."""
         if is_graph(node) and self.follow_references:
             self.graphs.add(node.value)
+
+
+@classmethod
+def _Graph__hrepr_resources__(cls, H):
+    """Require the cytoscape plugin for buche."""
+    return H.bucheRequire(name='cytoscape',
+                          channels='cytoscape',
+                          components='cytoscape-graph')
+
+
+def _Graph__hrepr__(self, H, hrepr):
+    """Return HTML representation (uses buche-cytoscape)."""
+    rval = H.cytoscapeGraph(H.style(css))
+
+    options = {
+        'layout': {
+            'name': 'dagre',
+            'rankDir': 'TB'
+        }
+    }
+    rval = rval(H.options(json.dumps(options)))
+    dc = hrepr.config.duplicate_constants
+    fin = hrepr.config.function_in_node
+    fr = hrepr.config.follow_references
+    gpr = GraphPrinter(
+        {self},
+        duplicate_constants=True if dc is None else dc,
+        function_in_node=True if fin is None else fin,
+        follow_references=True if fr is None else fr
+    )
+    gpr.process()
+    for elem in gpr.nodes + gpr.edges:
+        rval = rval(H.element(json.dumps(elem)))
+    return rval
+
+
+Graph.__hrepr__ = _Graph__hrepr__
+Graph.__hrepr_resources__ = _Graph__hrepr_resources__
