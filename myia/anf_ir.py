@@ -67,14 +67,10 @@ class Graph:
         self.return_: Apply = None
         self.debug = GraphDebug()
 
-    def __str__(self) -> str:
-        """Return string representation."""
-        pfx = f'{self.debug.name}=' if self.debug.name else ''
-        return f'{pfx}Graph(parameters={self.parameters})'
-
     def __repr__(self) -> str:
-        """Return representation."""
-        return str(self)
+        """Return string representation."""
+        prefix = f'{self.debug.name} = ' if self.debug.name else ''
+        return f'<{prefix}Graph(parameters={self.parameters})>'
 
 
 class GraphDebug(Debug):
@@ -161,10 +157,6 @@ class ANFNode(Node):
     def __str__(self) -> str:
         """Return string representation."""
         return self.debug.debug_name
-
-    def __repr__(self) -> str:
-        """Return representation."""
-        return str(self)
 
 
 class NodeDebug(Debug):
@@ -302,8 +294,9 @@ class Apply(ANFNode):
 
     def __repr__(self) -> str:
         """Return representation."""
-        pfx = f'{self.debug.name}=' if self.debug.name else ''
-        return f'{pfx}Apply({[str(x) for x in self.inputs]})'
+        prefix = f'{self.debug.name} = ' if self.debug.name else ''
+        return (f'{prefix}{self.__class__.__name__}'
+                f'({self.inputs!r}, {self.graph!r})')
 
 
 class Parameter(ANFNode):
@@ -318,6 +311,11 @@ class Parameter(ANFNode):
     def __init__(self, graph: Graph) -> None:
         """Construct the parameter."""
         super().__init__([], PARAMETER, graph)
+
+    def __repr__(self) -> str:
+        """Return representation."""
+        prefix = f'{self.debug.name} = ' if self.debug.name else ''
+        return f'{prefix}{self.__class__.__name__}({self.graph!r})'
 
 
 class Constant(ANFNode):
@@ -338,13 +336,7 @@ class Constant(ANFNode):
         """Construct a literal."""
         super().__init__([], value, None)
 
-    def __str__(self) -> str:
-        """Return string representation."""
-        if self.debug.name:
-            return self.debug.name
-        else:
-            return f'Constant({self.value!r})'
-
     def __repr__(self) -> str:
         """Return representation."""
-        return str(self)
+        prefix = f'{self.debug.name} = ' if self.debug.name else ''
+        return f'{prefix}{self.__class__.__name__}({self.value!r})'

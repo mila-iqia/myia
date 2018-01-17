@@ -2,4 +2,5 @@ ignore:
   - "tests"
   - "docs"
   - "setup.py"
+  - "myia/debug"
 comment: false
