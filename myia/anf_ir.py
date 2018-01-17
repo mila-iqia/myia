@@ -336,6 +336,10 @@ class Constant(ANFNode):
         """Construct a literal."""
         super().__init__([], value, None)
 
+    def __str__(self) -> str:
+        """Return string representation."""
+        return str(self.value)
+
     def __repr__(self) -> str:
         """Return representation."""
         prefix = f'{self.debug.name} = ' if self.debug.name else ''
