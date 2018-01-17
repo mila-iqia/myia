@@ -134,3 +134,19 @@ def test_graph():
     return_ = Apply([return_, value], g)
     g.return_ = return_
     g.parameters.append(x)
+
+
+def test_str_coverage():
+    """Just a coverage test for __str__ and __repr__
+
+    Doesn't check that they take particular values since that could change
+    easily.
+    """
+    g = Graph()
+    p = Parameter(g)
+    p.name = 'param'
+    objects = [g, Apply([], g), p, Parameter(g), Constant(0)]
+    for o in objects:
+        str(o)
+        repr(o)
+        o.debug.debug_name

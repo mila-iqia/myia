@@ -21,6 +21,31 @@ PARAMETER = Named('PARAMETER')
 APPLY = Named('APPLY')
 
 
+class Debug(types.SimpleNamespace):
+    """Debug information for an object.
+
+    Attributes:
+        name: The name of the object.
+
+    """
+
+    _curr_id = 0
+
+    def __init__(self, **kwargs):
+        """Construct a Debug object."""
+        self.name: str = None
+        super().__init__(**kwargs)
+
+    @property
+    def debug_name(self):
+        """Return the name, create a fresh name if needed."""
+        if self.name:
+            return self.name
+        Debug._curr_id += 1
+        self.name = f'#{Debug._curr_id}'
+        return self.name
+
+
 class Graph:
     """A function graph.
 
@@ -42,8 +67,13 @@ class Graph:
         self.return_: Apply = None
         self.debug = GraphDebug()
 
+    def __repr__(self) -> str:
+        """Return string representation."""
+        prefix = f'{self.debug.name} = ' if self.debug.name else ''
+        return f'<{prefix}Graph(parameters={self.parameters})>'
 
-class GraphDebug(types.SimpleNamespace):
+
+class GraphDebug(Debug):
     """Debug information for a graph.
 
     Any information that is used for debugging e.g. plotting, printing, etc.
@@ -56,7 +86,6 @@ class GraphDebug(types.SimpleNamespace):
     """
 
     ast: AST
-    name: str
 
 
 class ANFNode(Node):
@@ -125,8 +154,12 @@ class ANFNode(Node):
         ANFNode.__init__(obj, self.inputs, self.value, self.graph)
         return obj
 
+    def __str__(self) -> str:
+        """Return string representation."""
+        return self.debug.debug_name
 
-class NodeDebug(types.SimpleNamespace):
+
+class NodeDebug(Debug):
     """Debug information for a node.
 
     Any information that is used for debugging e.g. plotting, printing, etc.
@@ -139,7 +172,6 @@ class NodeDebug(types.SimpleNamespace):
     """
 
     ast: AST
-    name: str
 
 
 class Inputs(MutableSequence[ANFNode]):
@@ -260,6 +292,12 @@ class Apply(ANFNode):
         """Construct an application."""
         super().__init__(inputs, APPLY, graph)
 
+    def __repr__(self) -> str:
+        """Return representation."""
+        prefix = f'{self.debug.name} = ' if self.debug.name else ''
+        return (f'{prefix}{self.__class__.__name__}'
+                f'({self.inputs!r}, {self.graph!r})')
+
 
 class Parameter(ANFNode):
     """A parameter to a function.
@@ -273,6 +311,11 @@ class Parameter(ANFNode):
     def __init__(self, graph: Graph) -> None:
         """Construct the parameter."""
         super().__init__([], PARAMETER, graph)
+
+    def __repr__(self) -> str:
+        """Return representation."""
+        prefix = f'{self.debug.name} = ' if self.debug.name else ''
+        return f'{prefix}{self.__class__.__name__}({self.graph!r})'
 
 
 class Constant(ANFNode):
@@ -292,3 +335,12 @@ class Constant(ANFNode):
     def __init__(self, value: Any) -> None:
         """Construct a literal."""
         super().__init__([], value, None)
+
+    def __str__(self) -> str:
+        """Return string representation."""
+        return str(self.value)
+
+    def __repr__(self) -> str:
+        """Return representation."""
+        prefix = f'{self.debug.name} = ' if self.debug.name else ''
+        return f'{prefix}{self.__class__.__name__}({self.value!r})'
