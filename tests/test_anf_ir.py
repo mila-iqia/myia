@@ -143,9 +143,10 @@ def test_str_coverage():
     easily.
     """
     g = Graph()
-    ct = Constant(1)
-    ct.debug.name = 'one'
-    objects = [g, Apply([], g), Parameter(g), Constant(0), ct]
+    p = Parameter(g)
+    p.name = 'param'
+    objects = [g, Apply([], g), p, Parameter(g), Constant(0)]
     for o in objects:
         str(o)
         repr(o)
+        o.debug.debug_name
