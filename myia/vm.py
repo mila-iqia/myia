@@ -133,7 +133,7 @@ class VMFrame:
         execution in a different frame and jump back to this one later.
         """
         frame = self
-        while frame and node.graph is not frame.graph:
+        while frame and node.graph and node.graph is not frame.graph:
             frame = frame.closure
         if node not in frame.values:
             # we set up a fake node to jump back to this frame after
@@ -216,17 +216,17 @@ class VMFrame:
                 elif isinstance(fn, Return):
                     # If we return a graph, we wrap it in a VMFrame to
                     # capture the closure
-                    if isinstance(args[1], Graph):
-                        val = self.Closure(args[1], self)
+                    if isinstance(args[0], Graph):
+                        val = self.Closure(args[0], self)
                     else:
-                        val = args[1]
+                        val = args[0]
                     self.values[node] = val
                 elif isinstance(fn, If):
-                    cond = args[1]
+                    cond = args[0]
                     if cond:
-                        inner = args[2]
+                        inner = args[1]
                     else:
-                        inner = args[3]
+                        inner = args[2]
                     self.do_call(inner, [])
                 else:
                     raise ValueError('Unknown primitive')
