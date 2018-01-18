@@ -30,3 +30,11 @@ def test_simple3(x):
 @parse_compare([2, 3])
 def test_simple4(x, y):
     return x + y
+
+
+@parse_compare([2])
+def test_fn1(x):
+    def g(x):
+        return x
+    y = g(x)
+    return y
