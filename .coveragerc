@@ -2,3 +2,4 @@
 exclude_lines =
     @overload
     @abstractmethod
+    pragma: no cover
