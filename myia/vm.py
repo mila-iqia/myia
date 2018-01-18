@@ -7,6 +7,7 @@ implementation.
 from typing import List, Dict, Any, Union
 
 from myia.anf_ir import Graph, ANFNode, Constant, Parameter, Apply
+from myia.ir_utils import dfs
 from myia.primops import Primitive, Add, If, Return
 
 
@@ -79,19 +80,9 @@ class VMFrame:
         self.graph = graph
         self.args = args
         self.parent = parent
-        self._closure = closure
+        self.closure = closure
         self.values: Dict[ANFNode, Any] = dict()
         self.todo: List[ANFNode] = [self.graph.return_]
-
-    @property
-    def closure(self) -> 'VMFrame':
-        """Return the parent namespace.
-
-        This is either a closure that was captured or the calling function.
-        """
-        if self._closure is not None:
-            return self._closure
-        return self.parent
 
     def run(self) -> 'VMFrame':
         """Run the graph to completion and return the result."""
@@ -109,11 +100,11 @@ class VMFrame:
             if res is not None:
                 return res
 
-    def tail(self):
+    def tail(self) -> bool:
         """Are we in a tail call?."""
         return self.todo[-2] is self.graph.return_
 
-    def done(self):
+    def done(self) -> bool:
         """Are we done?."""
         return len(self.todo) == 0
 
@@ -147,6 +138,14 @@ class VMFrame:
                 raise self.Continue()
         return frame.values[node]
 
+    def wrap_closure(self, value):
+        """Wrap graphs that are closures."""
+        if isinstance(value, Graph):
+            if any(n.graph and n.graph is not value
+                   for n in dfs(value.return_)):
+                return self.Closure(value, self)
+        return value
+
     def do_call(self, graph: Union[Graph, 'VMFrame.Closure'], args: List[Any]):
         """Perform a call.
 
@@ -177,10 +176,7 @@ class VMFrame:
 
         while True:
             node = self.todo[-1]
-            # Skip nodes that have already been evaluated
-            if node in self.values:
-                self.todo.pop()
-                continue
+            assert node not in self.values
 
             try:
                 self.eval_node(node)
@@ -200,7 +196,7 @@ class VMFrame:
         enter into a call.
         """
         if isinstance(node, Constant):
-            self.values[node] = node.value
+            self.values[node] = self.wrap_closure(node.value)
         elif isinstance(node, Parameter):
             idx = self.graph.parameters.index(node)
             self.values[node] = self.args[idx]
@@ -214,13 +210,7 @@ class VMFrame:
                 if isinstance(fn, Add):
                     self.values[node] = sum(args[1:], args[0])
                 elif isinstance(fn, Return):
-                    # If we return a graph, we wrap it in a VMFrame to
-                    # capture the closure
-                    if isinstance(args[0], Graph):
-                        val = self.Closure(args[0], self)
-                    else:
-                        val = args[0]
-                    self.values[node] = val
+                    self.values[node] = args[0]
                 elif isinstance(fn, If):
                     cond = args[0]
                     if cond:
@@ -229,6 +219,6 @@ class VMFrame:
                         inner = args[2]
                     self.do_call(inner, [])
                 else:
-                    raise ValueError('Unknown primitive')
+                    raise ValueError('Unknown primitive')  # pragma: no cover
             else:
                 self.do_call(fn, args)
