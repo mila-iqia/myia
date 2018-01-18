@@ -4,16 +4,14 @@ This VM will directly execute a graph so it should be suitable for
 testing or debugging.  Don't expect stellar performance from this
 implementation.
 """
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 
 from myia.anf_ir import Graph, ANFNode, Constant, Parameter, Apply
 from myia.primops import Primitive, Add, If, Return
 
 
 class VM:
-    """
-    Virtual Machine interface.
-    """
+    """Virtual Machine interface."""
 
     def evaluate(self, graph: Graph, args: List[Any]):
         """
@@ -23,8 +21,11 @@ class VM:
         resulting value.
 
         """
-        frame = VMFrame(graph, args)
-        return frame.evaluate()
+        root_frame = VMFrame(graph, args, None)
+        frame = root_frame
+        while frame is not None:
+            frame = frame.run()
+        return root_frame.result()
 
 
 class VMFrame:
@@ -38,6 +39,8 @@ class VMFrame:
         graph: The currently executing graph.  This can change due to
             a tail call.
         args: Argument array for the current call.
+        parent: VMFrame that we return to.
+        closure: VMFrame to look up free variables in.
         values: Mapping of every node in the graph to its computed
             value.  Currently all the values are always kept live.
         todo: List of node that have to be visited.  Evaluation starts
@@ -51,30 +54,60 @@ class VMFrame:
     class Return(Exception):
         """End step."""
 
-    def __init__(self, graph: Graph, args: List[Any]) -> None:
+        def __init__(self, value: 'VMFrame' = None) -> None:
+            """Which value to return."""
+            self.value: VMFrame = value
+
+    class Closure:
+        """Representation of a closure."""
+
+        def __init__(self, graph: Graph, frame: 'VMFrame') -> None:
+            """Build a closure."""
+            self.graph = graph
+            self.frame = frame
+
+    class Jump(ANFNode):
+        """Jump Node for out of scope values."""
+
+        def __init__(self, frame: 'VMFrame') -> None:
+            """Set a jump."""
+            super().__init__([], frame, None)
+
+    def __init__(self, graph: Graph, args: List[Any], parent: 'VMFrame',
+                 closure: 'VMFrame' = None) -> None:
         """Build a frame."""
-        self.values: Dict[ANFNode, Any] = dict()
-        self.reset(graph, args)
-        self.calling: VMFrame = None
-
-    def reset(self, graph: Graph, args: List[Any]) -> None:
-        """
-        Set up a call.
-
-        This is used while the frame is executing a graph to implement
-        tail calls.
-        """
         self.graph = graph
         self.args = args
+        self.parent = parent
+        self._closure = closure
+        self.values: Dict[ANFNode, Any] = dict()
         self.todo: List[ANFNode] = [self.graph.return_]
 
-    def evaluate(self):
+    @property
+    def closure(self) -> 'VMFrame':
+        """Return the parent namespace.
+
+        This is either a closure that was captured or the calling function.
+        """
+        if self._closure is not None:
+            return self._closure
+        return self.parent
+
+    def run(self) -> 'VMFrame':
         """Run the graph to completion and return the result."""
         while True:
             try:
-                self.advance()
+                res = self.advance()
             except StopIteration:
-                return self.values[self.graph.return_]
+                # Return is handled here because the flow control is a bit
+                # too complex for the parent frame to get a value back
+                # from the called frame.
+                if self.parent is not None:
+                    self.parent.values[self.parent.todo[-1]] = self.result()
+                    self.parent.todo.pop()
+                return self.parent
+            if res is not None:
+                return res
 
     def tail(self):
         """Are we in a tail call?."""
@@ -82,34 +115,55 @@ class VMFrame:
 
     def done(self):
         """Are we done?."""
-        return self.graph.return_ in self.values
+        return len(self.todo) == 0
+
+    def result(self):
+        """Get this frame's result."""
+        return self.values[self.graph.return_]
 
     def get_value(self, node: ANFNode):
-        """
-        Get the value for a node.
+        """Get the value for a node.
 
         This will check if we've already computed a value for it and
         add it to the queue otherwise. If there was no value, we stop
         the evaluation of the current node and restart the step, since
         no useful work was done.
-        """
-        if node not in self.values:
-            self.todo.append(node)
-            raise self.Continue()
-        return self.values[node]
 
-    def do_call(self, graph: Graph, args: List[Any]):
+        If the value we want is in another graph, we will resume
+        execution in a different frame and jump back to this one later.
         """
-        Perform a call.
+        frame = self
+        while frame and node.graph is not frame.graph:
+            frame = frame.closure
+        if node not in frame.values:
+            # we set up a fake node to jump back to this frame after
+            # the value that we need has been evaluated.
+            if frame is not self:
+                frame.todo.append(self.Jump(self))
+            frame.todo.append(node)
+            if frame is not self:
+                raise self.Return(frame)
+            else:
+                raise self.Continue()
+        return frame.values[node]
 
-        This will handle tail calls correctly by reusing the current VMFrame.
+    def do_call(self, graph: Union[Graph, 'VMFrame.Closure'], args: List[Any]):
+        """Perform a call.
+
+        This will handle tail calls and closures.
+
         """
-        if self.tail():
-            self.reset(graph, args)
-            raise self.Return()
-        self.calling = VMFrame(graph, args)
+        if self.tail() and self.parent is not None:
+            parent = self.parent
+        else:
+            parent = self
+        if isinstance(graph, self.Closure):
+            new_frame = VMFrame(graph.graph, args, parent, graph.frame)
+        else:
+            new_frame = VMFrame(graph, args, parent)
+        raise self.Return(new_frame)
 
-    def advance(self):
+    def advance(self) -> 'VMFrame':
         """
         Take a step.
 
@@ -120,17 +174,6 @@ class VMFrame:
         """
         if self.done():
             raise StopIteration()
-
-        # This hackish section is to handle single-stepping through calls.
-        if self.calling:
-            try:
-                self.calling.advance()
-            except StopIteration:
-                retval = self.calling.values[self.graph.return_]
-                self.values[self.todo[-1]] = retval
-                self.todo.pop()
-                self.calling = None
-                return
 
         while True:
             node = self.todo[-1]
@@ -143,11 +186,11 @@ class VMFrame:
                 self.eval_node(node)
             except self.Continue:
                 continue
-            except self.Return:
-                return
+            except self.Return as e:
+                return e.value
 
             self.todo.pop()
-            return
+            return None
 
     def eval_node(self, node: ANFNode):
         """
@@ -161,23 +204,31 @@ class VMFrame:
         elif isinstance(node, Parameter):
             idx = self.graph.parameters.index(node)
             self.values[node] = self.args[idx]
+        elif isinstance(node, self.Jump):
+            self.todo.pop()
+            raise self.Return(node.value)
         elif isinstance(node, Apply):
             fn = self.get_value(node.inputs[0])
+            args = [self.get_value(i) for i in node.inputs[1:]]
             if isinstance(fn, Primitive):
                 if isinstance(fn, Add):
-                    args = [self.get_value(i) for i in node.inputs[1:]]
                     self.values[node] = sum(args[1:], args[0])
                 elif isinstance(fn, Return):
-                    self.values[node] = self.get_value(node.inputs[1])
-                elif isinstance(fn, If):
-                    cond = self.get_value(node.inputs[1])
-                    if cond:
-                        inner = self.get_value(node.inputs[2])
+                    # If we return a graph, we wrap it in a VMFrame to
+                    # capture the closure
+                    if isinstance(args[1], Graph):
+                        val = self.Closure(args[1], self)
                     else:
-                        inner = self.get_value(node.inputs[3])
+                        val = args[1]
+                    self.values[node] = val
+                elif isinstance(fn, If):
+                    cond = args[1]
+                    if cond:
+                        inner = args[2]
+                    else:
+                        inner = args[3]
                     self.do_call(inner, [])
                 else:
                     raise ValueError('Unknown primitive')
             else:
-                args = [self.get_value(i) for i in node.inputs[1:]]
                 self.do_call(fn, args)
