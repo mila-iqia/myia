@@ -313,7 +313,6 @@ class Parser:
         header_block = Block(self)
         body_block = Block(self)
         after_block = Block(self)
-        header_block.preds.extend([block, body_block])
         body_block.preds.append(header_block)
         after_block.preds.append(header_block)
         block.jump(header_block)

@@ -39,11 +39,13 @@ def draw(graphs: Iterable[Graph]) -> pgv.AGraph:
     subgraphs = defaultdict(list)
     for graph in graphs:
         for node in dfs(graph.return_):
-            plot.add_node(repr(node), label=name(node))
+            plot.add_node(repr(node),
+                          label=f'{node.debug.debug_name}: {name(node)}')
             if node.graph:
                 subgraphs[node.graph].append(repr(node))
             for i in node.inputs:
-                plot.add_node(repr(i), label=name(i))
+                plot.add_node(repr(i),
+                              label=f'{node.debug.debug_name}: {name(i)}')
                 plot.add_edge(repr(i), repr(node))
     for graph, nodes in subgraphs.items():
         plot.add_subgraph(nodes, f"cluster_{repr(graph)}", label=name(graph))
