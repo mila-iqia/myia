@@ -4,7 +4,7 @@ This VM will directly execute a graph so it should be suitable for
 testing or debugging.  Don't expect stellar performance from this
 implementation.
 """
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Set
 
 from myia.anf_ir import Graph, ANFNode, Constant, Parameter, Apply
 from myia.ir_utils import dfs
@@ -141,9 +141,24 @@ class VMFrame:
     def wrap_closure(self, value):
         """Wrap graphs that are closures."""
         if isinstance(value, Graph):
-            if any(n.graph and n.graph is not value
-                   for n in dfs(value.return_)):
-                return self.Closure(value, self)
+            subgraphs: Set[Graph] = set([value])
+            seen: Set[Graph] = set()
+            targets: Set[Graph] = set()
+            while len(subgraphs) != 0:
+                g = subgraphs.pop()
+                seen.add(g)
+                for n in dfs(g.return_):
+                    if n.graph and n.graph is not self and n.graph not in seen:
+                        targets.add(n.graph)
+                    if (isinstance(n, Constant) and
+                            isinstance(n.value, Graph)):
+                        subgraphs.add(n.value)
+            if len(targets) > 0:
+                frame = self
+                while frame and frame.graph not in targets:
+                    frame = frame.parent
+                    assert frame is not None
+                return self.Closure(value, frame)
         return value
 
     def do_call(self, graph: Union[Graph, 'VMFrame.Closure'], args: List[Any]):

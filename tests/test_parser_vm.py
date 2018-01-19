@@ -85,12 +85,21 @@ def test_fn5():
 
 
 @parse_compare([])
-def test_closure():
+def test_closure1():
     def g(x):
         def f():
             return x
         return f
     return g(2)()
+
+
+@parse_compare([1])
+def test_closure2(x):
+    def g():
+        def h():
+            return x
+        return h
+    return g()()
 
 
 @parse_compare([0])
