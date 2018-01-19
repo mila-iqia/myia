@@ -160,6 +160,7 @@ class VMFrame:
             new_frame = VMFrame(graph.graph, args, parent, graph.frame)
         else:
             new_frame = VMFrame(graph, args, parent)
+        assert len(new_frame.graph.parameters) == len(new_frame.args)
         raise self.Return(new_frame)
 
     def advance(self) -> 'VMFrame':
