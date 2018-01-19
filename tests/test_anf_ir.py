@@ -106,7 +106,8 @@ def test_repr_inputs():
     in0 = Constant(0)
     in1 = Constant(1)
     value = Apply([in0, in1], Graph())
-    assert str(value.inputs) == f"Inputs({repr([in0, in1])})"
+    assert repr(value.inputs)
+    assert str(value.inputs)
 
 
 def test_set_inputs_property():
@@ -145,7 +146,7 @@ def test_str_coverage():
     g = Graph()
     p = Parameter(g)
     p.name = 'param'
-    objects = [g, Apply([], g), p, Parameter(g), Constant(0)]
+    objects = [g, Apply([], g), p, Parameter(g), Constant(0), Constant(g)]
     for o in objects:
         str(o)
         repr(o)
