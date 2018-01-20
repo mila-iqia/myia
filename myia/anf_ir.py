@@ -15,10 +15,12 @@ from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
                     overload, Iterable)
 
 from myia.ir import Node
-from myia.utils import Named
+from myia.utils import Named, repr_, list_str
 
 PARAMETER = Named('PARAMETER')
 APPLY = Named('APPLY')
+
+LITERALS = (bool, int, str, float)
 
 
 class Debug(types.SimpleNamespace):
@@ -31,18 +33,28 @@ class Debug(types.SimpleNamespace):
 
     _curr_id = 0
 
-    def __init__(self, **kwargs):
+    def __init__(self, obj, **kwargs):
         """Construct a Debug object."""
+        self.obj: Any = obj
         self.name: str = None
+        self._id: int = None
         super().__init__(**kwargs)
+
+    @property
+    def id(self):
+        """Generate a unique, sequential ID number."""
+        if self._id is None:
+            self._id = self._curr_id
+            self.__class__._curr_id += 1
+        return self._id
 
     @property
     def debug_name(self):
         """Return the name, create a fresh name if needed."""
         if self.name:
             return self.name
-        Debug._curr_id += 1
-        self.name = f'#{Debug._curr_id}'
+        prefix = self.obj.__class__.__name__.lower()
+        self.name = f'_{prefix}{self.id}'
         return self.name
 
 
@@ -65,12 +77,17 @@ class Graph:
         """Construct a graph."""
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
-        self.debug = GraphDebug()
+        self.debug = GraphDebug(self)
+
+    def __str__(self) -> str:
+        """Return readable string representation."""
+        return self.debug.debug_name
 
     def __repr__(self) -> str:
-        """Return string representation."""
-        prefix = f'{self.debug.name} = ' if self.debug.name else ''
-        return f'<{prefix}Graph(parameters={self.parameters})>'
+        """Return unique string representation."""
+        return repr_(self, name=self.debug.debug_name,
+                     parameters=list_str(self.parameters),
+                     return_=self.return_)
 
 
 class GraphDebug(Debug):
@@ -119,7 +136,7 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.uses: Set[Tuple[ANFNode, int]] = set()
-        self.debug = NodeDebug()
+        self.debug = ANFNodeDebug(self)
 
     @property
     def inputs(self) -> 'Inputs':
@@ -155,11 +172,11 @@ class ANFNode(Node):
         return obj
 
     def __str__(self) -> str:
-        """Return string representation."""
+        """Return readable string representation."""
         return self.debug.debug_name
 
 
-class NodeDebug(Debug):
+class ANFNodeDebug(Debug):
     """Debug information for a node.
 
     Any information that is used for debugging e.g. plotting, printing, etc.
@@ -263,9 +280,13 @@ class Inputs(MutableSequence[ANFNode]):
         value.uses.add((self.node, index))
         self.data.insert(index, value)
 
+    def __str__(self) -> str:
+        """Return readable string representation."""
+        return list_str(self.data)
+
     def __repr__(self) -> str:
-        """Return a string representation of the inputs."""
-        return f"Inputs({self.data})"
+        """Return unique string representation."""
+        return f"Inputs({self.node}, {list_str(self.data)})"
 
     def __eq__(self, other) -> bool:
         """Test whether a list of inputs is equal to another list.
@@ -293,10 +314,9 @@ class Apply(ANFNode):
         super().__init__(inputs, APPLY, graph)
 
     def __repr__(self) -> str:
-        """Return representation."""
-        prefix = f'{self.debug.name} = ' if self.debug.name else ''
-        return (f'{prefix}{self.__class__.__name__}'
-                f'({self.inputs!r}, {self.graph!r})')
+        """Return unique string representation."""
+        return repr_(self, name=self.debug.debug_name, inputs=self.inputs,
+                     graph=self.graph)
 
 
 class Parameter(ANFNode):
@@ -313,9 +333,8 @@ class Parameter(ANFNode):
         super().__init__([], PARAMETER, graph)
 
     def __repr__(self) -> str:
-        """Return representation."""
-        prefix = f'{self.debug.name} = ' if self.debug.name else ''
-        return f'{prefix}{self.__class__.__name__}({self.graph!r})'
+        """Return unique string representation."""
+        return repr_(self, name=self.debug.debug_name, graph=self.graph)
 
 
 class Constant(ANFNode):
@@ -337,10 +356,11 @@ class Constant(ANFNode):
         super().__init__([], value, None)
 
     def __str__(self) -> str:
-        """Return string representation."""
-        return str(self.value)
+        """Return readable string representation."""
+        if isinstance(self.value, LITERALS):
+            return str(self.value)
+        return super().__str__()
 
     def __repr__(self) -> str:
-        """Return representation."""
-        prefix = f'{self.debug.name} = ' if self.debug.name else ''
-        return f'{prefix}{self.__class__.__name__}({self.value!r})'
+        """Return unique string representation."""
+        return repr_(self, name=self.debug.debug_name, value=self.value)

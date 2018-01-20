@@ -1,4 +1,5 @@
 """General utilities and design patterns."""
+from typing import Any, List
 
 
 class Named:
@@ -21,3 +22,32 @@ class Named:
     def __repr__(self):
         """Return the object's name."""
         return self.name
+
+
+def repr_(obj: Any, **kwargs: Any):
+    """Return unique string representation of object with additional info.
+
+    The usual representation is `<module.Class object at address>`. This
+    function returns `<module.Class(key=value) object at address>` instead, to
+    make objects easier to identify by their attributes.
+
+    Args:
+        **kwargs: The attributes and their values that will be printed as part
+            of the string representation.
+
+    """
+    name = f'{obj.__module__}.{obj.__class__.__name__}'
+    info = ', '.join(f'{key}={value}' for key, value in kwargs.items())
+    address = str(hex(id(obj)))
+    return f'<{name}({info}) object at {address}>'
+
+
+def list_str(lst: List):
+    """Return string representation of a list.
+
+    Unlike the default string representation, this calls `str` instead of
+    `repr` on each element.
+
+    """
+    elements = ', '.join(str(elem) for elem in lst)
+    return f'[{elements}]'
