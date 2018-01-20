@@ -101,7 +101,6 @@ class Environment:
             parser = Parser(self, obj)
             graph = parser.parse()
             node = Constant(graph)
-            self.object_map[id(obj)] = node
             return node
         raise ValueError(obj)
 
@@ -178,6 +177,9 @@ class Parser:
                           node: ast.FunctionDef) -> Tuple['Block', 'Block']:
         """Process a function definition and return first and final blocks."""
         function_block = Block(self)
+        # Add this mapping immediately so that recursive calls can be resolved
+        self.environment.object_map[id(self.function)] = \
+            self.get_block_function(function_block)
         if block:
             function_block.preds.append(block)
         function_block.mature()
