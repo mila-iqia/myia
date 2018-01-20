@@ -106,6 +106,7 @@ def test_repr_inputs():
     in0 = Constant(0)
     in1 = Constant(1)
     value = Apply([in0, in1], Graph())
+    assert repr(value.inputs)
     assert str(value.inputs)
 
 

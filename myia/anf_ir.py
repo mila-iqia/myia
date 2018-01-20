@@ -20,7 +20,7 @@ from myia.utils import Named, repr_, list_str
 PARAMETER = Named('PARAMETER')
 APPLY = Named('APPLY')
 
-LITERALS = (int, str, float)
+LITERALS = (bool, int, str, float)
 
 
 class Debug(types.SimpleNamespace):
@@ -53,8 +53,8 @@ class Debug(types.SimpleNamespace):
         """Return the name, create a fresh name if needed."""
         if self.name:
             return self.name
-        Debug._curr_id += 1
-        self.name = f'_{Debug._curr_id}'
+        prefix = self.obj.__class__.__name__.lower()
+        self.name = f'_{prefix}{self.id}'
         return self.name
 
 
@@ -83,14 +83,11 @@ class Graph:
         """Return readable string representation."""
         return self.debug.debug_name
 
-    def __str__(self) -> str:
-        """String representation."""
-        return self.debug.debug_name
-
     def __repr__(self) -> str:
-        """Unique string representation."""
+        """Return unique string representation."""
         return repr_(self, name=self.debug.debug_name,
-                     parameters=list_str(self.parameters))
+                     parameters=list_str(self.parameters),
+                     return_=self.return_)
 
 
 class GraphDebug(Debug):
@@ -139,7 +136,7 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.uses: Set[Tuple[ANFNode, int]] = set()
-        self.debug = ANFNodeDebug()
+        self.debug = ANFNodeDebug(self)
 
     @property
     def inputs(self) -> 'Inputs':
@@ -284,11 +281,11 @@ class Inputs(MutableSequence[ANFNode]):
         self.data.insert(index, value)
 
     def __str__(self) -> str:
-        """Return a string representation."""
+        """Return readable string representation."""
         return list_str(self.data)
 
     def __repr__(self) -> str:
-        """Return a string representation of the inputs."""
+        """Return unique string representation."""
         return f"Inputs({self.node}, {list_str(self.data)})"
 
     def __eq__(self, other) -> bool:
@@ -317,7 +314,7 @@ class Apply(ANFNode):
         super().__init__(inputs, APPLY, graph)
 
     def __repr__(self) -> str:
-        """Return representation."""
+        """Return unique string representation."""
         return repr_(self, name=self.debug.debug_name, inputs=self.inputs,
                      graph=self.graph)
 
@@ -336,7 +333,7 @@ class Parameter(ANFNode):
         super().__init__([], PARAMETER, graph)
 
     def __repr__(self) -> str:
-        """Return representation."""
+        """Return unique string representation."""
         return repr_(self, name=self.debug.debug_name, graph=self.graph)
 
 
@@ -359,12 +356,11 @@ class Constant(ANFNode):
         super().__init__([], value, None)
 
     def __str__(self) -> str:
-        """Return string representation."""
+        """Return readable string representation."""
         if isinstance(self.value, LITERALS):
             return str(self.value)
-        else:
-            return self.debug.debug_name
+        return super().__str__()
 
     def __repr__(self) -> str:
-        """Return representation."""
+        """Return unique string representation."""
         return repr_(self, name=self.debug.debug_name, value=self.value)
