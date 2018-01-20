@@ -57,6 +57,7 @@ class VMFrame:
 
         def __init__(self, value: 'VMFrame' = None) -> None:
             """Which value to return."""
+            super().__init__()
             self.value: VMFrame = value
 
     class Closure:
@@ -85,7 +86,14 @@ class VMFrame:
         self.todo: List[ANFNode] = [self.graph.return_]
 
     def run(self) -> 'VMFrame':
-        """Run the graph to completion and return the result."""
+        """Run the graph to completion and return the result.
+
+        Returns:
+            The next frame to execute. Can be either the frame of a (tail)
+            call, the frame of the parent (if the current frame completed), or
+            `None` (if the program terminated).
+
+        """
         while True:
             try:
                 res = self.advance()
@@ -101,12 +109,12 @@ class VMFrame:
                 return res
 
     def tail(self) -> bool:
-        """Are we in a tail call?."""
+        """Determine whether the current call is a tail call."""
         return self.todo[-2] is self.graph.return_
 
     def done(self) -> bool:
-        """Are we done?."""
-        return len(self.todo) == 0
+        """Determine whether this function has fully evaluated."""
+        return not self.todo
 
     def result(self):
         """Get this frame's result."""
@@ -115,13 +123,25 @@ class VMFrame:
     def get_value(self, node: ANFNode):
         """Get the value for a node.
 
-        This will check if we've already computed a value for it and
-        add it to the queue otherwise. If there was no value, we stop
-        the evaluation of the current node and restart the step, since
-        no useful work was done.
+        If the value for a node is not available, the node will be added to the
+        todo list. Evaluation of the current node in `eval_node` will be halted
+        (by raising `Continue`) and control will be returned to the `advance`
+        method in order to evaluate the last item on the todo list.
 
-        If the value we want is in another graph, we will resume
-        execution in a different frame and jump back to this one later.
+        If the value is not available and the node belongs another graph, we
+        will evaluate that node in a different frame (by raising `Return`). A
+        `Jump` instruction will be added to that frame to jump back to the
+        current one.
+
+        Returns:
+            The value of the node.
+
+        Raises:
+            Continue: If the node's value is not available and its calculation
+                has been added to the todo list.
+            Return: If the node's value is not available and must be retreived
+                from an enclosing frame, or from a closure.
+
         """
         frame = self
         while frame and node.graph and node.graph is not frame.graph:
@@ -135,7 +155,7 @@ class VMFrame:
             if frame is not self:
                 raise self.Return(frame)
             else:
-                raise self.Continue()
+                raise self.Continue
         return frame.values[node]
 
     def wrap_closure(self, value):
@@ -166,6 +186,10 @@ class VMFrame:
 
         This will handle tail calls and closures.
 
+        Raises:
+            Return: Giving control to the new frame in which the function
+                (graph) will be evaluated.
+
         """
         if self.tail() and self.parent is not None:
             parent = self.parent
@@ -179,16 +203,25 @@ class VMFrame:
         raise self.Return(new_frame)
 
     def advance(self) -> 'VMFrame':
-        """
-        Take a step.
+        """Take a step.
 
-        This will perform one "step" of execution.  This corresponds
-        roughly to evaluating one node of the graph.  In the case of
-        function calls, we single-step through the called function
-        even though the apply is a single node in our graph.
+        This will perform one "step" of execution.  This corresponds roughly to
+        evaluating one node of the graph. In the case of function calls, we
+        single-step through the called function even though the apply is a
+        single node in our graph.
+
+        Returns:
+            The next frame to execute. Can be either a new function call, a
+            tail call, or a parent frame in the case of closures/accessing the
+            enclosed scope. Returns `None` when the program terminated.
+
+        Raises:
+            StopIteration: If there are no more steps to take and control
+                should be returned to the `run` function.
+
         """
         if self.done():
-            raise StopIteration()
+            raise StopIteration
 
         while True:
             node = self.todo[-1]
@@ -205,11 +238,16 @@ class VMFrame:
             return None
 
     def eval_node(self, node: ANFNode):
-        """
-        Compute the value for a node.
+        """Compute the value for a node.
 
-        This may fail and ask for a missing value to be computed or
-        enter into a call.
+        This may fail and ask for a missing value to be computed or enter into
+        a call.
+
+        Raises:
+            Return: If the node is a jump instruction (see `get_value`),
+                returning control to another frame.
+            ValueError: If the node is the application of an unknown primitive.
+
         """
         if isinstance(node, Constant):
             self.values[node] = self.wrap_closure(node.value)
@@ -217,6 +255,9 @@ class VMFrame:
             idx = self.graph.parameters.index(node)
             self.values[node] = self.args[idx]
         elif isinstance(node, self.Jump):
+            # Normally `advance` pops the last node after `eval_node`
+            # completes, but here we do it ourselves because control will be
+            # returned to `run` directly
             self.todo.pop()
             raise self.Return(node.value)
         elif isinstance(node, Apply):
