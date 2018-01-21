@@ -115,3 +115,11 @@ def test_unsupported():
         assert False
     with pytest.raises(NotImplementedError):
         parse(f)
+
+
+def test_expression_statements():
+    def f(x):
+        """Foo."""
+        print(x)
+        return x
+    parse(f)

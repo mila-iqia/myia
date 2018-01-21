@@ -264,6 +264,8 @@ class Parser:
             return self.process_if(block, node)
         elif isinstance(node, ast.While):
             return self.process_while(block, node)
+        elif isinstance(node, ast.Expr):
+            return block
         else:
             raise NotImplementedError(node)
 
