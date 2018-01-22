@@ -131,7 +131,8 @@ class Parser:
         self.function = function
         self.block_map: Dict[Block, Constant] = {}
         if globals_ is None:
-            free_vars = inspect.getclosurevars(function)
+            free_vars = inspect.getclosurevars(function)  # type: ignore
+            assert isinstance(free_vars.builtins, Dict)
             globals_ = free_vars.builtins
             globals_.update(free_vars.globals)
             globals_.update(free_vars.nonlocals)
