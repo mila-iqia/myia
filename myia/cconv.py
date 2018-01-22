@@ -5,14 +5,23 @@ I.e. retrieving nesting structure and listing free variables.
 """
 
 
+from typing import Set, Dict, Optional, Union
 from collections import defaultdict
-from .anf_ir import Constant, Graph
+from .anf_ir import ANFNode, Constant, Graph
 from .anf_ir_utils import dfs
 
 
-def is_graph(x):
+def is_graph(x: ANFNode) -> bool:
     """Return whether x is a Constant with a Graph value."""
     return isinstance(x, Constant) and isinstance(x.value, Graph)
+
+
+class ParentProxy:
+    """Represents a graph's immediate parent."""
+
+    def __init__(self, graph: Graph) -> None:
+        """Initialize the ParentProxy."""
+        self.graph = graph
 
 
 class NestingAnalyzer:
@@ -30,29 +39,23 @@ class NestingAnalyzer:
 
     """
 
-    class ParentProxy:
-        """Represents a graph's immediate parent."""
-
-        def __init__(self, graph):
-            """Initialize the ParentProxy."""
-            self.graph = graph
-
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the NestingAnalyzer."""
-        self.processed = set()
-        self.parents = {}
-        self.fvs = defaultdict(set)
+        self.processed: Set[Graph] = set()
+        self.parents: Dict[Graph, Optional[Graph]] = {}
+        self.fvs: Dict[Graph, Set[ANFNode]] = defaultdict(set)
 
-    def run(self, root):
+    def run(self, root: Graph) -> 'NestingAnalyzer':
         """Run the analysis. Populates `self.parents` and `self.fvs`."""
         if root in self.processed:
             return self
 
         # Initialize temporary structures
-        self.prox = {}
-        self.graphs = set()
-        self.nodes = set()
-        self.deps = defaultdict(set)
+        self.prox: Dict[Graph, ParentProxy] = {}
+        self.graphs: Set[Graph] = set()
+        self.nodes: Set[ANFNode] = set()
+        self.deps: Dict[Graph, Set[Union[Graph, ParentProxy]]] = \
+            defaultdict(set)
 
         # We get all nodes that could possibly be executed within this
         # graph.
@@ -76,10 +79,11 @@ class NestingAnalyzer:
         # We remove all but the most immediate parent of a graph.
         self.simplify()
 
-        # We update the parents
+        # We update the parents. ParentProxy instances were removed, so
+        # the typing's correct.
         new_parents = {g: None if len(gs) == 0 else list(gs)[0]
                        for g, gs in self.deps.items()}
-        self.parents.update(new_parents)
+        self.parents.update(new_parents)  # type: ignore
 
         # We find all free variables (could be interleaved with other
         # phases, probably)
@@ -87,10 +91,10 @@ class NestingAnalyzer:
 
         return self
 
-    def compute_deps(self):
+    def compute_deps(self) -> None:
         """Compute which graphs depend on which other graphs."""
         for g in self.graphs:
-            prox = self.ParentProxy(g)
+            prox = ParentProxy(g)
             self.prox[g] = prox
         for node in self.nodes:
             orig = node.graph
@@ -100,7 +104,7 @@ class NestingAnalyzer:
                 elif inp.graph and inp.graph is not orig:
                     self.deps[orig].add(inp.graph)
 
-    def resolve_proxies(self):
+    def resolve_proxies(self) -> None:
         """Resolve the ParentProxy nodes."""
         def seek_parents(g, path=None):
             if path is None:
@@ -110,7 +114,7 @@ class NestingAnalyzer:
             deps = self.deps[g]
             parents = set()
             for dep in deps:
-                if isinstance(dep, self.ParentProxy):
+                if isinstance(dep, ParentProxy):
                     parents |= seek_parents(dep.graph, path | {g})
                 else:
                     parents.add(dep)
@@ -121,7 +125,7 @@ class NestingAnalyzer:
             newdeps[g] = seek_parents(g)
         self.deps = newdeps
 
-    def simplify(self):
+    def simplify(self) -> None:
         """Keep only the closest dependency for each graph."""
         to_cull = {list(deps)[0]
                    for g, deps in self.deps.items()
@@ -136,7 +140,7 @@ class NestingAnalyzer:
         if not done:
             self.simplify()
 
-    def associate_free_variables(self):
+    def associate_free_variables(self) -> None:
         """Associate a set of free variables to each graph."""
         for node in self.nodes:
             for inp in node.inputs:
