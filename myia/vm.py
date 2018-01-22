@@ -7,7 +7,7 @@ implementation.
 from typing import List, Dict, Any, Union, Set
 
 from myia.anf_ir import Graph, ANFNode, Constant, Parameter, Apply
-from myia.ir_utils import dfs
+from myia.anf_ir_utils import dfs
 from myia.primops import Primitive, Add, If, Return
 
 
@@ -165,12 +165,12 @@ class VMFrame:
             seen: Set[Graph] = set()
             targets: Set[Graph] = set()
             while len(subgraphs) != 0:
-                g = subgraphs.pop()
-                if g in seen:
+                curg = subgraphs.pop()
+                if curg in seen:
                     continue
-                seen.add(g)
-                for n in dfs(g.return_):
-                    if n.graph and n.graph is not self and n.graph not in seen:
+                seen.add(curg)
+                for n in dfs(curg.return_):
+                    if n.graph and n.graph is not curg and n.graph not in seen:
                         targets.add(n.graph)
                     if (isinstance(n, Constant) and
                             isinstance(n.value, Graph)):
