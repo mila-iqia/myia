@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from myia.anf_ir import Graph, Apply, Parameter, Constant, PARAMETER
+from myia.anf_ir import Graph, Apply, Parameter, Constant, PARAMETER, RETURN
 
 
 def test_init_inputs():
@@ -135,6 +135,20 @@ def test_graph():
     return_ = Apply([return_, value], g)
     g.return_ = return_
     g.parameters.append(x)
+
+
+def test_graph_output():
+    g = Graph()
+    with pytest.raises(Exception):
+        print(g.output)
+    one = Constant(1)
+    g.output = one
+    assert g.output is one
+    assert isinstance(g.return_, Apply) and \
+        len(g.return_.inputs) == 2 and \
+        isinstance(g.return_.inputs[0], Constant) and \
+        g.return_.inputs[0].value is RETURN and \
+        g.return_.inputs[1] is one
 
 
 def test_str_coverage():
