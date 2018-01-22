@@ -145,9 +145,10 @@ def test_calls2(x):
     return g()
 
 
-@check_nest('X,f->X,g->X,h->X', 'f:a,b; g:b; h:b,c,f,g')
+@check_nest('X,f->X,g->X,h->X,i->X,j->i',
+            'f:a,b; g:b; h:b,c,f,g; i:a; j:a,w')
 def test_fvs(x):
-    """Test listing of free variables"""
+    """Test listing of free variables."""
     a = x + 1
     b = x + 2
     c = a + b
@@ -158,4 +159,33 @@ def test_fvs(x):
         return b
     def h(x):
         return f(c) + g(b)
-    return h(3)
+    def i(w):
+        def j(y):
+            return w + y + a
+        return j
+    return h(3) + i(4)
+
+
+def test_multiple_analysis():
+    """Test reusing the same NestingAnalyzer."""
+    def f(x):
+        def g():
+            return x
+        return g
+
+    def f2(x, y):
+        def g2():
+            return x + y
+        return g2
+
+    a = NestingAnalyzer()
+    gf = parse(f)
+    gf2 = parse(f2)
+
+    a.run(gf)
+    a.run(gf2)
+    a.run(gf)
+
+    parents = {g.debug.debug_name: pg and pg.debug.debug_name
+               for g, pg in a.parents.items()}
+    assert parents == {'f': None, 'f2': None, 'g': 'f', 'g2': 'f2'}
