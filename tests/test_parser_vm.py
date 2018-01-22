@@ -84,6 +84,16 @@ def test_fn5():
     return g(2)
 
 
+@parse_compare([-10])
+def test_rec1(x):
+    def f(x):
+        if x:
+            return f(x + 1)
+        else:
+            return x
+    return f(x)
+
+
 @parse_compare([])
 def test_closure1():
     def g(x):

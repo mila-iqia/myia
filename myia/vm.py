@@ -166,6 +166,8 @@ class VMFrame:
             targets: Set[Graph] = set()
             while len(subgraphs) != 0:
                 g = subgraphs.pop()
+                if g in seen:
+                    continue
                 seen.add(g)
                 for n in dfs(g.return_):
                     if n.graph and n.graph is not self and n.graph not in seen:
