@@ -37,8 +37,11 @@ class GraphPrinter:
 
     This is intended to be used as a base class for classes that
     specialize over particular graph structures.
+
     """
+
     def __init__(self, cyoptions):
+        """Initialize GraphPrinter."""
         # Nodes and edges are accumulated in these lists
         self.nodes = []
         self.edges = []
@@ -84,11 +87,13 @@ class GraphPrinter:
 
     @classmethod
     def __hrepr_resources__(cls, H):
+        """Require the cytoscape plugin for buche."""
         return H.bucheRequire(name='cytoscape',
                               channels='cytoscape',
                               components='cytoscape-graph')
 
     def __hrepr__(self, H, hrepr):
+        """Return HTML representation (uses buche-cytoscape)."""
         rval = H.cytoscapeGraph(H.style(css))
         rval = rval(H.options(json.dumps(self.cyoptions)))
         for elem in self.nodes + self.edges:
@@ -123,7 +128,6 @@ class MyiaGraphPrinter(GraphPrinter):
                  function_in_node=False,
                  follow_references=False):
         """Initialize a MyiaGraphPrinter."""
-
         super().__init__({
             'layout': {
                 'name': 'dagre',
@@ -152,12 +156,14 @@ class MyiaGraphPrinter(GraphPrinter):
         }
 
     def label_constant(self, ct):
+        """Return a label for constants."""
         if isinstance(ct, Primitive):
             return ct.__class__.__name__.lower()
         else:
             return str(ct)
 
     def name(self, x):
+        """Return the name of a node."""
         if x.debug.name:
             return x.debug.name
         else:
@@ -238,7 +244,7 @@ class MyiaGraphPrinter(GraphPrinter):
             lbl = self.label(node, f'(...)')
             self.cynode(id=node, label=lbl, parent=g, classes=cl)
             edges = [(node, i + 1, inp)
-                        for i, inp in enumerate(node.inputs[1:]) or []]
+                     for i, inp in enumerate(node.inputs[1:]) or []]
             self.process_edges(edges)
         else:
             return self.process_node_generic(node, g, cl)
@@ -309,7 +315,7 @@ class MyiaGraphPrinter(GraphPrinter):
                 cid = self.fresh_id()
                 self.cynode(id=cid,
                             parent=src.graph,
-                            label=self.name(dest), #self.label(dest),
+                            label=self.name(dest),
                             classes='freevar')
                 self.cyedge(src_id=src, dest_id=cid, label=lbl)
                 self.cyedge(src_id=cid, dest_id=dest, label=(lbl, 'link-edge'))
@@ -353,10 +359,13 @@ class MyiaGraphPrinter(GraphPrinter):
 
 
 class Empty:
+    """Bogus class."""
+
     pass
 
 
 def mixin(target):
+    """Class decorator to add methods to the target class."""
     def apply(cls):
         methods = set(dir(cls))
         methods.difference_update(set(dir(Empty)))
@@ -398,17 +407,20 @@ class _NestingAnalyzer:
         return GraphPrinter.__hrepr_resources__(H)
 
     def __hrepr__(self, H, hrepr):
+        """Return HTML representation (uses buche-cytoscape)."""
         pr = GraphPrinter({
             'layout': {
                 'name': 'dagre',
                 'rankDir': 'TB'
             }
         })
+
         def lbl(x):
             if isinstance(x, self.ParentProxy):
                 return f"{x.graph.debug.debug_name}'"
             else:
                 return x.debug.debug_name
+
         for g, deps in self.deps.items():
             pr.cynode(g, lbl(g), 'intermediate')
             for dep in deps:
