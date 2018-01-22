@@ -16,4 +16,5 @@ def dfs(root: ANFNode, follow_graph: bool = False) -> Iterable[ANFNode]:
             if in_ not in seen:
                 to_visit.append(in_)
         if isinstance(node.value, Graph) and follow_graph:
-            to_visit.append(node.value.return_)
+            if node.value.return_ not in seen:
+                to_visit.append(node.value.return_)
