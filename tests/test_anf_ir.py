@@ -149,6 +149,11 @@ def test_graph_output():
         isinstance(g.return_.inputs[0], Constant) and \
         g.return_.inputs[0].value is RETURN and \
         g.return_.inputs[1] is one
+    old_return = g.return_
+    two = Constant(2)
+    g.output = two
+    assert g.return_ is old_return
+    assert g.return_.inputs[1] is two
 
 
 def test_str_coverage():

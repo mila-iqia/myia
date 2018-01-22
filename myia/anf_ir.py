@@ -97,7 +97,10 @@ class Graph:
     @output.setter
     def output(self, value: 'ANFNode') -> None:
         """Set the graph's output."""
-        self.return_ = Apply([Constant(RETURN), value], self)
+        if self.return_:
+            self.return_.inputs[1] = value
+        else:
+            self.return_ = Apply([Constant(RETURN), value], self)
 
     def __str__(self) -> str:
         """Return readable string representation."""
