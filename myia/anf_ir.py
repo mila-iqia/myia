@@ -16,7 +16,7 @@ from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
 
 from myia.ir import Node
 from myia.utils import Named, repr_, list_str
-from .primops import Return
+from myia.primops import Return
 
 PARAMETER = Named('PARAMETER')
 APPLY = Named('APPLY')
