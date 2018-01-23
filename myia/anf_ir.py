@@ -16,11 +16,14 @@ from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
 
 from myia.ir import Node
 from myia.utils import Named, repr_, list_str
+from myia.primops import Return
 
 PARAMETER = Named('PARAMETER')
 APPLY = Named('APPLY')
 
 LITERALS = (bool, int, str, float)
+
+RETURN = Return()
 
 
 class Debug(types.SimpleNamespace):
@@ -78,6 +81,26 @@ class Graph:
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
         self.debug = GraphDebug(self)
+
+    @property
+    def output(self) -> 'ANFNode':
+        """
+        Return the graph's output.
+
+        Equal to `self.return_.inputs[1]`, if it exists. Unlike `return_`,
+        `output' may be a constant or belong to a different graph.
+        """
+        if not self.return_ or len(self.return_.inputs) != 2:
+            raise Exception('Graph has no output.')
+        return self.return_.inputs[1]
+
+    @output.setter
+    def output(self, value: 'ANFNode') -> None:
+        """Set the graph's output."""
+        if self.return_:
+            self.return_.inputs[1] = value
+        else:
+            self.return_ = Apply([Constant(RETURN), value], self)
 
     def __str__(self) -> str:
         """Return readable string representation."""
