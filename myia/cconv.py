@@ -154,3 +154,12 @@ class NestingAnalyzer:
                 while g is not owner:
                     self.fvs[g].add(inp)
                     g = self.parents[g]
+
+    def nested_in(self, g1: Graph, g2: Graph) -> bool:
+        """Return whether g1 is nested in g2."""
+        while g1:
+            g1 = self.parents[g1]
+            if g1 is g2:
+                return True
+        else:
+            return False
