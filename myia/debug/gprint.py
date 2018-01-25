@@ -94,6 +94,8 @@ class GraphPrinter:
     def __hrepr__(self, H, hrepr):
         """Return HTML representation (uses buche-cytoscape)."""
         rval = H.cytoscapeGraph(H.style(css))
+        rval = rval(width=hrepr.config.graph_width or '800px',
+                    height=hrepr.config.graph_height or '500px')
         rval = rval(H.options(json.dumps(self.cyoptions)))
         for elem in self.nodes + self.edges:
             rval = rval(H.element(json.dumps(elem)))
@@ -383,6 +385,8 @@ class _Graph:
 
     def __hrepr__(self, H, hrepr):
         """Return HTML representation (uses buche-cytoscape)."""
+        if hrepr.config.depth > 1 and not hrepr.config.graph_expand_all:
+            return str(self)
         dc = hrepr.config.duplicate_constants
         dfv = hrepr.config.duplicate_free_variables
         fin = hrepr.config.function_in_node
