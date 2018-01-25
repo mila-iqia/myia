@@ -2,7 +2,7 @@
 
 from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter, Debug
 from myia.primops import Primitive, Return
-from myia.cconv import NestingAnalyzer
+from myia.cconv import NestingAnalyzer, ParentProxy
 import os
 import json
 
@@ -482,7 +482,7 @@ class _NestingAnalyzer:
         })
 
         def lbl(x):
-            if isinstance(x, self.ParentProxy):
+            if isinstance(x, ParentProxy):
                 return f"{x.graph.debug.debug_name}'"
             else:
                 return x.debug.debug_name
