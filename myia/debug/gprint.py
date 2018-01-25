@@ -1,6 +1,7 @@
 """Utilities to generate a graphical representation for a graph."""
 
-from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter, Debug
+from myia.info import DebugInfo
+from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter
 from myia.primops import Primitive, Return
 import os
 import json
@@ -33,12 +34,31 @@ def is_graph(x):
     return isinstance(x, Constant) and isinstance(x.value, Graph)
 
 
+short_relation_symbols = {
+    'phi': 'Φ',
+    'if_true': '✓',
+    'if_false': '✗',
+    'if_after': '↓',
+    'while_header': '⤾',
+    'while_body': '⥁',
+    'while_after': '↓'
+}
+
+
 class NodeLabeler:
     """Utility to label a node."""
 
-    def __init__(self, function_in_node=True):
+    def __init__(self,
+                 function_in_node=True,
+                 relation_symbols={}):
         """Initialize a NodeLabeler."""
         self.function_in_node = function_in_node
+        self.relation_symbols = relation_symbols
+
+    def combine_relation(self, name, relation):
+        """Combine a name and a relation in a single string."""
+        rel = self.relation_symbols.get(relation, f'{relation}:')
+        return f'{rel}{name}'
 
     def const_fn(self, node):
         """
@@ -55,9 +75,14 @@ class NodeLabeler:
 
     def name(self, node, force=False):
         """Return a node's name."""
-        if isinstance(node, Debug):
+        if isinstance(node, DebugInfo):
             if node.name:
                 return node.name
+            elif node.about:
+                return self.combine_relation(
+                    self.name(node.about),
+                    node.relation
+                )
             elif force:
                 return f'#{node.id}'
             else:
@@ -67,7 +92,7 @@ class NodeLabeler:
 
     def label(self, node, force=None, fn_label=None):
         """Label a node."""
-        if isinstance(node, Debug):
+        if isinstance(node, DebugInfo):
             return self.name(node, True if force is None else force)
         elif isinstance(node, Graph):
             return self.name(node.debug,
@@ -103,7 +128,9 @@ class NodeLabeler:
             return lbl or '·'
 
 
-standard_node_labeler = NodeLabeler()
+standard_node_labeler = NodeLabeler(
+    relation_symbols=short_relation_symbols
+)
 
 
 class GraphPrinter:
@@ -216,7 +243,10 @@ class MyiaGraphPrinter(GraphPrinter):
         self.duplicate_free_variables = duplicate_free_variables
         self.function_in_node = function_in_node
         self.follow_references = follow_references
-        self.labeler = NodeLabeler(function_in_node=function_in_node)
+        self.labeler = NodeLabeler(
+            function_in_node=function_in_node,
+            relation_symbols=short_relation_symbols
+        )
         # Nodes processed
         self.processed = set()
         # Nodes left to process
