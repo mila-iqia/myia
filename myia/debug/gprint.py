@@ -1,14 +1,17 @@
 """Utilities to generate a graphical representation for a graph."""
 
-from ..anf_ir import Graph, Apply, Constant, Parameter
-from ..primops import Primitive
-from ..cconv import NestingAnalyzer
+from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter, Debug
+from myia.primops import Primitive, Return
+from myia.cconv import NestingAnalyzer
 import os
 import json
 
 
-css_path = f'{os.path.dirname(__file__)}/graph.css'
-css = open(css_path).read()
+gcss_path = f'{os.path.dirname(__file__)}/graph.css'
+gcss = open(gcss_path).read()
+
+mcss_path = f'{os.path.dirname(__file__)}/myia.css'
+mcss = open(mcss_path).read()
 
 
 def is_computation(x):
@@ -31,9 +34,81 @@ def is_graph(x):
     return isinstance(x, Constant) and isinstance(x.value, Graph)
 
 
+class NodeLabeler:
+    """Utility to label a node."""
+
+    def __init__(self, function_in_node=True):
+        """Initialize a NodeLabeler."""
+        self.function_in_node = function_in_node
+
+    def const_fn(self, node):
+        """
+        Return name of function, if constant.
+
+        Given an `Apply` node of a constant function, return the
+        name of that function, otherwise return None.
+        """
+        fn = node.inputs[0] if node.inputs else None
+        if fn and is_constant(fn):
+            return self.label(fn, False)
+        else:
+            return None
+
+    def name(self, node, force=False):
+        """Return a node's name."""
+        if isinstance(node, Debug):
+            if node.name:
+                return node.name
+            elif force:
+                return f'#{node.id}'
+            else:
+                return None
+        else:
+            return self.name(node.debug, force)
+
+    def label(self, node, force=None, fn_label=None):
+        """Label a node."""
+        if isinstance(node, Debug):
+            return self.name(node, True if force is None else force)
+        elif isinstance(node, Graph):
+            return self.name(node.debug,
+                             True if force is None else force)
+        elif is_graph(node):
+            return self.name(node.value.debug,
+                             True if force is None else force)
+        elif is_constant(node):
+            v = node.value
+            if isinstance(v, (int, float, str)):
+                return repr(v)
+            elif isinstance(v, Primitive):
+                return v.__class__.__name__.lower()
+            else:
+                class_name = v.__class__.__name__
+                return f'{self.label(node.debug, True)}:{class_name}'
+        elif is_parameter(node):
+            return self.label(node.debug, True)
+        else:
+            lbl = ''
+            if self.function_in_node:
+                if fn_label is None:
+                    fn_label = self.const_fn(node)
+                if fn_label:
+                    lbl = fn_label
+
+            name = self.name(node, force)
+            if name:
+                if lbl:
+                    lbl += f'→{name}'
+                else:
+                    lbl = name
+            return lbl or '·'
+
+
+standard_node_labeler = NodeLabeler()
+
+
 class GraphPrinter:
-    """
-    Utility to generate a graphical representation for a graph.
+    """Utility to generate a graphical representation for a graph.
 
     This is intended to be used as a base class for classes that
     specialize over particular graph structures.
@@ -94,7 +169,9 @@ class GraphPrinter:
 
     def __hrepr__(self, H, hrepr):
         """Return HTML representation (uses buche-cytoscape)."""
-        rval = H.cytoscapeGraph(H.style(css))
+        rval = H.cytoscapeGraph(H.style(gcss))
+        rval = rval(width=hrepr.config.graph_width or '800px',
+                    height=hrepr.config.graph_height or '500px')
         rval = rval(H.options(json.dumps(self.cyoptions)))
         for elem in self.nodes + self.edges:
             rval = rval(H.element(json.dumps(elem)))
@@ -140,6 +217,7 @@ class MyiaGraphPrinter(GraphPrinter):
         self.duplicate_free_variables = duplicate_free_variables
         self.function_in_node = function_in_node
         self.follow_references = follow_references
+        self.labeler = NodeLabeler(function_in_node=function_in_node)
         # Nodes processed
         self.processed = set()
         # Nodes left to process
@@ -155,19 +233,13 @@ class MyiaGraphPrinter(GraphPrinter):
             'make_tuple': self.process_node_make_tuple
         }
 
-    def label_constant(self, ct):
-        """Return a label for constants."""
-        if isinstance(ct, Primitive):
-            return ct.__class__.__name__.lower()
-        else:
-            return str(ct)
-
     def name(self, x):
         """Return the name of a node."""
-        if x.debug.name:
-            return x.debug.name
-        else:
-            return f'#{x.debug.id}'
+        return self.labeler.name(x, force=True)
+
+    def label(self, node, fn_label=None):
+        """Return the label to give to a node."""
+        return self.labeler.label(node, None, fn_label=fn_label)
 
     def const_fn(self, node):
         """
@@ -176,16 +248,7 @@ class MyiaGraphPrinter(GraphPrinter):
         Given an `Apply` node of a constant function, return the
         name of that function, otherwise return None.
         """
-        fn = node.inputs[0] if node.inputs else None
-        if fn and is_constant(fn):
-            if is_graph(fn):
-                return self.name(fn.value)
-            elif isinstance(fn.value, Primitive):
-                return fn.value.__class__.__name__.lower()
-            else:
-                return str(fn.value)
-        else:
-            return None
+        return self.labeler.const_fn(node)
 
     def add_graph(self, g):
         """Create a node for a graph."""
@@ -196,29 +259,6 @@ class MyiaGraphPrinter(GraphPrinter):
         lbl = f'{name}({", ".join(argnames)})'
         self.cynode(id=g, label=lbl, classes='function')
         self.processed.add(g)
-
-    def label(self, node, fn_label=None):
-        """Return the label to give to a node."""
-        if is_graph(node):
-            lbl = self.name(node.value)
-        elif is_constant(node):
-            lbl = self.label_constant(node.value)
-        elif is_parameter(node):
-            lbl = self.name(node)
-        else:
-            lbl = ''
-            if self.function_in_node:
-                if fn_label is None:
-                    fn_label = self.const_fn(node)
-                if fn_label:
-                    lbl = fn_label
-
-            if node.debug.name:
-                if lbl:
-                    lbl += f'→{node.debug.name}'
-                else:
-                    lbl = node.debug.name
-        return lbl or '·'
 
     def process_node_return(self, node, g, cl):
         """Create node and edges for `return ...`."""
@@ -384,6 +424,8 @@ class _Graph:
 
     def __hrepr__(self, H, hrepr):
         """Return HTML representation (uses buche-cytoscape)."""
+        if hrepr.config.depth > 1 and not hrepr.config.graph_expand_all:
+            return hrepr(Constant(self))
         dc = hrepr.config.duplicate_constants
         dfv = hrepr.config.duplicate_free_variables
         fin = hrepr.config.function_in_node
@@ -397,6 +439,30 @@ class _Graph:
         )
         gpr.process()
         return gpr.__hrepr__(H, hrepr)
+
+
+@mixin(ANFNode)
+class _ANFNode:
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        """Require the cytoscape plugin for buche."""
+        return H.style(mcss)
+
+    def __hrepr__(self, H, hrepr):
+        class_name = self.__class__.__name__.lower()
+        label = standard_node_labeler.label(self, True)
+        return H.span['node', f'node-{class_name}'](label)
+
+
+@mixin(Apply)
+class _Apply:
+    def __hrepr__(self, H, hrepr):
+        if len(self.inputs) == 2 and \
+                isinstance(self.inputs[0], Constant) and \
+                isinstance(self.inputs[0].value, Return):
+            return hrepr.hrepr_nowrap(self.inputs[1])['node-return']
+        else:
+            return super(Apply, self).__hrepr__(H, hrepr)
 
 
 @mixin(NestingAnalyzer)
