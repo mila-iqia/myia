@@ -16,23 +16,46 @@ node.function {
     background-color: #ddd;
 }
 edge {
-    target-label: data(label);
     target-text-offset: 10;
     color: white;
     font-size: 12;
-    text-outline-color: #aaa;
     text-outline-width: 3;
     curve-style: bezier;
     source-arrow-shape: triangle;
     line-color: #aaa;
-    /* source-arrow-shape: circle; */
 }
-/* :selected {
-    background-color: black;
+edge.input-edge {
+    target-label: data(label);
+    text-outline-color: #aaa;
+    color: white;
+}
+edge.fn-edge {
+    label: data(label);
+    text-outline-color: #ddd;
+    color: blue;
+    font-size: 14;
+}
+/* edge.link-edge {
+    width: 0.00000001;
     line-color: black;
+    source-arrow-shape: none;
+    target-arrow-shape: diamond;
     target-arrow-color: black;
-    source-arrow-color: black;
+    line-style: dashed;
+}
+edge.link-edge:selected {
+    width: 1;
 } */
+edge.link-edge {
+    width: 1;
+    line-color: black;
+    source-arrow-shape: none;
+    line-style: dashed;
+    opacity: 0.1;
+}
+edge.link-edge:selected {
+    opacity: 1;
+}
 node.input {
     background-color: green;
 }
@@ -51,4 +74,6 @@ node.const_output {
     height: 10;
     background-color: orange;
 }
-
+node.freevar {
+    background-color: blueviolet;
+}
