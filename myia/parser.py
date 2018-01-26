@@ -48,6 +48,27 @@ from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
 from .info import DebugInfo, about
 
 
+class Location:
+    """A location in source code.
+
+    Attributes:
+        url: The filename.
+        line: The line number.
+        column: The column number.
+
+    """
+
+    def __init__(self, url, line, column):
+        """Initialize a Location."""
+        self.url = url
+        self.line = line
+        self.column = column
+
+    def __str__(self):
+        """Represent a Location."""
+        return f'File "{self.url}", line {self.line}, column {self.column}"'
+
+
 class Environment:
     """Environment to parse a function in.
 
@@ -130,6 +151,8 @@ class Parser:
         """Construct a parser."""
         self.environment = environment
         self.function = function
+        _, self.line_offset = inspect.getsourcelines(function)
+        self.url: str = inspect.getfile(function)
         self.block_map: Dict[Block, Constant] = {}
         if globals_ is None:
             free_vars = inspect.getclosurevars(function)  # type: ignore
@@ -138,6 +161,15 @@ class Parser:
             globals_.update(free_vars.globals)
             globals_.update(free_vars.nonlocals)
         self.globals_ = globals_
+
+    def make_location(self, node: ast.AST) -> Location:
+        """Create a Location from an AST node."""
+        if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
+            return Location(self.url,
+                            node.lineno + self.line_offset - 1,  # type: ignore
+                            node.col_offset)  # type: ignore
+        else:
+            return None
 
     def parse(self) -> Graph:
         """Parse the function into a Myia graph."""
@@ -187,7 +219,8 @@ class Parser:
         function_block.mature()
         function_block.graph.debug.name = node.name
         for arg in node.args.args:
-            anf_node = Parameter(function_block.graph)
+            with DebugInfo(ast=arg, location=self.make_location(arg)):
+                anf_node = Parameter(function_block.graph)
             anf_node.debug.name = arg.arg
             function_block.graph.parameters.append(anf_node)
             function_block.write(arg.arg, anf_node)
@@ -209,7 +242,7 @@ class Parser:
         method_name = f'process_{node.__class__.__name__}'
         method = getattr(self, method_name, None)
         if method:
-            with DebugInfo(ast=node):
+            with DebugInfo(ast=node, location=self.make_location(node)):
                 return method(block, node)
         else:
             raise NotImplementedError(node)  # pragma: no cover

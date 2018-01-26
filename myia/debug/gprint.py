@@ -2,7 +2,9 @@
 
 from myia.info import DebugInfo
 from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter
+from myia.parser import Location
 from myia.primops import Primitive, Return
+from hrepr import hrepr
 import os
 import json
 
@@ -492,3 +494,18 @@ class _Apply:
             return hrepr.hrepr_nowrap(self.inputs[1])['node-return']
         else:
             return super(Apply, self).__hrepr__(H, hrepr)
+
+
+@mixin(Location)
+class _Location:
+    def __hrepr__(self, H, hrepr):
+        return H.div(
+            H.style('.hljs, .hljs-linenos { font-size: 10px !IMPORTANT; }'),
+            H.codeSnippet(
+                src=self.url,
+                language="python",
+                line=self.line,
+                column=self.column + 1,
+                context=hrepr.config.snippet_context or 4
+            )
+        )
