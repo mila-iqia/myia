@@ -143,12 +143,13 @@ class GraphPrinter:
 
     """
 
-    def __init__(self, cyoptions):
+    def __init__(self, cyoptions, tooltip_gen=None):
         """Initialize GraphPrinter."""
         # Nodes and edges are accumulated in these lists
         self.nodes = []
         self.edges = []
         self.cyoptions = cyoptions
+        self.tooltip_gen = tooltip_gen
 
     def id(self, x):
         """Return the id associated to x."""
@@ -159,11 +160,19 @@ class GraphPrinter:
         self.currid += 1
         return f'Y{self.currid}'
 
-    def cynode(self, id, label, classes, parent=None):
+    def cynode(self, id, label, classes, parent=None, node=None):
         """Build data structure for a node in cytoscape."""
         if not isinstance(id, str):
+            if node is None:
+                node = id
             id = self.id(id)
         data = {'id': id, 'label': str(label)}
+        if self.tooltip_gen and node:
+            ttip = self.tooltip_gen(node)
+            if ttip is not None:
+                if not isinstance(ttip, str):
+                    ttip = str(hrepr(ttip))
+                data['tooltip'] = ttip
         if parent:
             parent = parent if isinstance(parent, str) else self.id(parent)
             data['parent'] = parent
@@ -231,14 +240,18 @@ class MyiaGraphPrinter(GraphPrinter):
                  duplicate_constants=False,
                  duplicate_free_variables=False,
                  function_in_node=False,
-                 follow_references=False):
+                 follow_references=False,
+                 tooltip_gen=None):
         """Initialize a MyiaGraphPrinter."""
-        super().__init__({
-            'layout': {
-                'name': 'dagre',
-                'rankDir': 'TB'
-            }
-        })
+        super().__init__(
+            {
+                'layout': {
+                    'name': 'dagre',
+                    'rankDir': 'TB'
+                }
+            },
+            tooltip_gen=tooltip_gen
+        )
         # Graphs left to process
         self.graphs = set(entry_points)
         self.duplicate_constants = duplicate_constants
@@ -377,7 +390,8 @@ class MyiaGraphPrinter(GraphPrinter):
                 self.cynode(id=cid,
                             parent=src.graph,
                             label=self.label(dest),
-                            classes='constant')
+                            classes='constant',
+                            node=dest)
                 self.cyedge(src_id=src, dest_id=cid, label=lbl)
             elif self.duplicate_free_variables and \
                     src.graph and dest.graph and \
@@ -387,7 +401,8 @@ class MyiaGraphPrinter(GraphPrinter):
                 self.cynode(id=cid,
                             parent=src.graph,
                             label=self.name(dest),
-                            classes='freevar')
+                            classes='freevar',
+                            node=dest)
                 self.cyedge(src_id=src, dest_id=cid, label=lbl)
                 self.cyedge(src_id=cid, dest_id=dest, label=(lbl, 'link-edge'))
             else:
@@ -461,12 +476,14 @@ class _Graph:
         dfv = hrepr.config.duplicate_free_variables
         fin = hrepr.config.function_in_node
         fr = hrepr.config.follow_references
+        tgen = hrepr.config.node_tooltip
         gpr = MyiaGraphPrinter(
             {self},
             duplicate_constants=True if dc is None else dc,
             duplicate_free_variables=True if dfv is None else dfv,
             function_in_node=True if fin is None else fin,
-            follow_references=True if fr is None else fr
+            follow_references=True if fr is None else fr,
+            tooltip_gen=tgen
         )
         gpr.process()
         return gpr.__hrepr__(H, hrepr)
