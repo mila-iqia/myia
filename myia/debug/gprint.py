@@ -143,13 +143,17 @@ class GraphPrinter:
 
     """
 
-    def __init__(self, cyoptions, tooltip_gen=None):
+    def __init__(self,
+                 cyoptions,
+                 tooltip_gen=None,
+                 extra_style=None):
         """Initialize GraphPrinter."""
         # Nodes and edges are accumulated in these lists
         self.nodes = []
         self.edges = []
         self.cyoptions = cyoptions
         self.tooltip_gen = tooltip_gen
+        self.extra_style = extra_style or ''
 
     def id(self, x):
         """Return the id associated to x."""
@@ -206,7 +210,7 @@ class GraphPrinter:
 
     def __hrepr__(self, H, hrepr):
         """Return HTML representation (uses buche-cytoscape)."""
-        rval = H.cytoscapeGraph(H.style(gcss))
+        rval = H.cytoscapeGraph(H.style(gcss + self.extra_style))
         rval = rval(width=hrepr.config.graph_width or '800px',
                     height=hrepr.config.graph_height or '500px')
         rval = rval(H.options(json.dumps(self.cyoptions)))
@@ -241,7 +245,9 @@ class MyiaGraphPrinter(GraphPrinter):
                  duplicate_free_variables=False,
                  function_in_node=False,
                  follow_references=False,
-                 tooltip_gen=None):
+                 tooltip_gen=None,
+                 class_gen=None,
+                 extra_style=None):
         """Initialize a MyiaGraphPrinter."""
         super().__init__(
             {
@@ -250,7 +256,8 @@ class MyiaGraphPrinter(GraphPrinter):
                     'rankDir': 'TB'
                 }
             },
-            tooltip_gen=tooltip_gen
+            tooltip_gen=tooltip_gen,
+            extra_style=extra_style
         )
         # Graphs left to process
         self.graphs = set(entry_points)
@@ -262,6 +269,7 @@ class MyiaGraphPrinter(GraphPrinter):
             function_in_node=function_in_node,
             relation_symbols=short_relation_symbols
         )
+        self._class_gen = class_gen
         # Nodes processed
         self.processed = set()
         # Nodes left to process
@@ -352,15 +360,11 @@ class MyiaGraphPrinter(GraphPrinter):
 
         self.process_edges(edges)
 
-    def process_node(self, node):
-        """Create node and edges for a node."""
-        if node in self.processed:
-            return
-
+    def class_gen(self, node, cl=None):
         g = node.graph
-        self.follow(node)
-
-        if node in self.returns:
+        if cl is not None:
+            pass
+        elif node in self.returns:
             cl = 'output'
         elif g and node in g.parameters:
             cl = 'input'
@@ -368,6 +372,19 @@ class MyiaGraphPrinter(GraphPrinter):
             cl = 'constant'
         else:
             cl = 'intermediate'
+        if self._class_gen:
+            return self._class_gen(node, cl)
+        else:
+            return cl
+
+    def process_node(self, node):
+        """Create node and edges for a node."""
+        if node in self.processed:
+            return
+
+        g = node.graph
+        self.follow(node)
+        cl = self.class_gen(node)
 
         ctfn = self.const_fn(node)
         if ctfn:
@@ -390,7 +407,7 @@ class MyiaGraphPrinter(GraphPrinter):
                 self.cynode(id=cid,
                             parent=src.graph,
                             label=self.label(dest),
-                            classes='constant',
+                            classes=self.class_gen(dest, 'constant'),
                             node=dest)
                 self.cyedge(src_id=src, dest_id=cid, label=lbl)
             elif self.duplicate_free_variables and \
@@ -401,7 +418,7 @@ class MyiaGraphPrinter(GraphPrinter):
                 self.cynode(id=cid,
                             parent=src.graph,
                             label=self.name(dest),
-                            classes='freevar',
+                            classes=self.class_gen(dest, 'freevar'),
                             node=dest)
                 self.cyedge(src_id=src, dest_id=cid, label=lbl)
                 self.cyedge(src_id=cid, dest_id=dest, label=(lbl, 'link-edge'))
@@ -477,13 +494,17 @@ class _Graph:
         fin = hrepr.config.function_in_node
         fr = hrepr.config.follow_references
         tgen = hrepr.config.node_tooltip
+        cgen = hrepr.config.node_class
+        xsty = hrepr.config.graph_style
         gpr = MyiaGraphPrinter(
             {self},
             duplicate_constants=True if dc is None else dc,
             duplicate_free_variables=True if dfv is None else dfv,
             function_in_node=True if fin is None else fin,
             follow_references=True if fr is None else fr,
-            tooltip_gen=tgen
+            tooltip_gen=tgen,
+            class_gen=cgen,
+            extra_style=xsty
         )
         gpr.process()
         return gpr.__hrepr__(H, hrepr)
