@@ -8,7 +8,8 @@ from typing import List, Dict, Any, Union, Set
 
 from myia.anf_ir import Graph, ANFNode, Constant, Parameter, Apply
 from myia.anf_ir_utils import dfs
-from myia.primops import Primitive, Add, If, Return
+from myia.primops import Primitive
+from myia import primops
 
 
 class VM:
@@ -266,11 +267,11 @@ class VMFrame:
             fn = self.get_value(node.inputs[0])
             args = [self.get_value(i) for i in node.inputs[1:]]
             if isinstance(fn, Primitive):
-                if isinstance(fn, Add):
+                if fn is primops.add:
                     self.values[node] = sum(args[1:], args[0])
-                elif isinstance(fn, Return):
+                elif fn is primops.return_:
                     self.values[node] = args[0]
-                elif isinstance(fn, If):
+                elif fn is primops.if_:
                     cond = args[0]
                     if cond:
                         inner = args[1]

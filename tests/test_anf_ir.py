@@ -2,7 +2,8 @@ import copy
 
 import pytest
 
-from myia.anf_ir import Graph, Apply, Parameter, Constant, PARAMETER, RETURN
+from myia.anf_ir import Graph, Apply, Parameter, Constant, PARAMETER
+from myia import primops
 
 
 def test_init_inputs():
@@ -147,7 +148,7 @@ def test_graph_output():
     assert isinstance(g.return_, Apply) and \
         len(g.return_.inputs) == 2 and \
         isinstance(g.return_.inputs[0], Constant) and \
-        g.return_.inputs[0].value is RETURN and \
+        g.return_.inputs[0].value is primops.return_ and \
         g.return_.inputs[1] is one
     old_return = g.return_
     two = Constant(2)
