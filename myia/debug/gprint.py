@@ -361,6 +361,7 @@ class MyiaGraphPrinter(GraphPrinter):
         self.process_edges(edges)
 
     def class_gen(self, node, cl=None):
+        """Generate the class name for this node."""
         g = node.graph
         if cl is not None:
             pass
