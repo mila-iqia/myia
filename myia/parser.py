@@ -64,7 +64,7 @@ class Location:
         self.line = line
         self.column = column
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         """Represent a Location."""
         return f'File "{self.url}", line {self.line}, column {self.column}"'
 
@@ -169,7 +169,7 @@ class Parser:
                             node.lineno + self.line_offset - 1,  # type: ignore
                             node.col_offset)  # type: ignore
         else:
-            return None
+            return None  # pragma: no cover
 
     def parse(self) -> Graph:
         """Parse the function into a Myia graph."""
