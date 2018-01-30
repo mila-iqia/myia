@@ -8,6 +8,7 @@ from myia import parser
 from myia.anf_ir import Graph, Constant, ANFNode
 from myia import primops as P
 from myia.vm import VM as VM_
+from myia.impl_py import implementations
 
 
 def default_ast_map() -> Dict[Type[ast.AST], ANFNode]:
@@ -53,7 +54,7 @@ def default_object_map() -> Dict[Any, ANFNode]:
 
 
 ENV = parser.Environment(default_object_map(), default_ast_map())
-VM = VM_()
+VM = VM_(implementations)
 
 
 def parse(func: FunctionType) -> Graph:
