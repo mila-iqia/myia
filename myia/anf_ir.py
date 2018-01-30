@@ -16,14 +16,12 @@ from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
 
 from myia.ir import Node
 from myia.utils import Named, repr_, list_str
-from myia.primops import Return
+from myia import primops
 
 PARAMETER = Named('PARAMETER')
 APPLY = Named('APPLY')
 
 LITERALS = (bool, int, str, float)
-
-RETURN = Return()
 
 
 class Debug(types.SimpleNamespace):
@@ -100,7 +98,7 @@ class Graph:
         if self.return_:
             self.return_.inputs[1] = value
         else:
-            self.return_ = Apply([Constant(RETURN), value], self)
+            self.return_ = Apply([Constant(primops.return_), value], self)
 
     def __str__(self) -> str:
         """Return readable string representation."""
