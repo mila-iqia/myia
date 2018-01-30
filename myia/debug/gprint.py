@@ -1,7 +1,8 @@
 """Utilities to generate a graphical representation for a graph."""
 
 from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter, Debug
-from myia.primops import Primitive, Return
+from myia.primops import Primitive
+from myia import primops
 import os
 import json
 
@@ -80,7 +81,7 @@ class NodeLabeler:
             if isinstance(v, (int, float, str)):
                 return repr(v)
             elif isinstance(v, Primitive):
-                return v.__class__.__name__.lower()
+                return v.name
             else:
                 class_name = v.__class__.__name__
                 return f'{self.label(node.debug, True)}:{class_name}'
@@ -229,7 +230,7 @@ class MyiaGraphPrinter(GraphPrinter):
         self.custom_rules = {
             'return': self.process_node_return,
             'index': self.process_node_index,
-            'make_tuple': self.process_node_make_tuple
+            'tuple': self.process_node_tuple
         }
 
     def name(self, x):
@@ -277,7 +278,7 @@ class MyiaGraphPrinter(GraphPrinter):
         else:
             self.process_node_generic(node, g, cl)
 
-    def process_node_make_tuple(self, node, g, cl):
+    def process_node_tuple(self, node, g, cl):
         """Create node and edges for `(a, b, c, ...)`."""
         if self.function_in_node:
             lbl = self.label(node, f'(...)')
@@ -458,7 +459,7 @@ class _Apply:
     def __hrepr__(self, H, hrepr):
         if len(self.inputs) == 2 and \
                 isinstance(self.inputs[0], Constant) and \
-                isinstance(self.inputs[0].value, Return):
+                self.inputs[0].value is primops.return_:
             return hrepr.hrepr_nowrap(self.inputs[1])['node-return']
         else:
             return super(Apply, self).__hrepr__(H, hrepr)
