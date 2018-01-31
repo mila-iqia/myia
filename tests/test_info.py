@@ -1,13 +1,13 @@
 
 import pytest
-from myia.info import DebugInfo
+from myia.info import DebugInfo, DebugInherit, NamedDebugInfo
 
 
 def test_nested_info():
-    """Test DebugInfo as context manager."""
-    with DebugInfo(a=1):
-        with DebugInfo(b=2):
-            with DebugInfo(c=3):
+    """Test DebugInherit as context manager."""
+    with DebugInherit(a=1):
+        with DebugInherit(b=2):
+            with DebugInherit(c=3):
                 info = DebugInfo(d=4)
                 assert info.a == 1
                 assert info.b == 2
@@ -20,19 +20,19 @@ def test_nested_info():
 
 
 def test_info_trace():
-    """Test that DebugInfo saves a trace."""
-    d = DebugInfo()
+    """Test that NamedDebugInfo saves a trace."""
+    d = NamedDebugInfo()
     assert d.trace is None
-    with DebugInfo(save_trace=True):
-        d = DebugInfo()
+    with DebugInherit(save_trace=True):
+        d = NamedDebugInfo()
         assert d.trace is not None
 
 
 def test_info_obj():
-    """Test that DebugInfo only holds a weak reference to its object."""
+    """Test that NamedDebugInfo only holds a weak reference to its object."""
     class O: pass
     o = O()
-    d = DebugInfo(o)
+    d = NamedDebugInfo(o)
     assert d.obj is o
     del o
     assert d.obj is None

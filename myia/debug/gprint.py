@@ -83,8 +83,8 @@ class NodeLabeler:
                 return node.name
             elif node.about:
                 return self.combine_relation(
-                    self.name(node.about),
-                    node.relation
+                    self.name(node.about.debug),
+                    node.about.relation
                 )
             elif force:
                 return f'#{node.id}'

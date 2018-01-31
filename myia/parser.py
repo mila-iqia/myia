@@ -46,7 +46,7 @@ from typing import \
     overload, Any, Dict, List, Optional, Tuple, Type, NamedTuple
 
 from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
-from .info import DebugInfo, about
+from .info import DebugInherit, About
 
 
 class Location(NamedTuple):
@@ -214,7 +214,7 @@ class Parser:
         function_block.mature()
         function_block.graph.debug.name = node.name
         for arg in node.args.args:
-            with DebugInfo(ast=arg, location=self.make_location(arg)):
+            with DebugInherit(ast=arg, location=self.make_location(arg)):
                 anf_node = Parameter(function_block.graph)
             anf_node.debug.name = arg.arg
             function_block.graph.parameters.append(anf_node)
@@ -237,7 +237,7 @@ class Parser:
         method_name = f'process_{node.__class__.__name__}'
         method = getattr(self, method_name, None)
         if method:
-            with DebugInfo(ast=node, location=self.make_location(node)):
+            with DebugInherit(ast=node, location=self.make_location(node)):
                 return method(block, node)
         else:
             raise NotImplementedError(node)  # pragma: no cover
@@ -321,9 +321,9 @@ class Parser:
         cond = self.process_node(block, node.test)
 
         # Create two branches
-        with about(block.graph, 'if_true'):
+        with About(block.graph.debug, 'if_true'):
             true_block = Block(self)
-        with about(block.graph, 'if_false'):
+        with About(block.graph.debug, 'if_false'):
             false_block = Block(self)
         true_block.preds.append(block)
         false_block.preds.append(block)
@@ -331,7 +331,7 @@ class Parser:
         false_block.mature()
 
         # Create the continuation
-        with about(block.graph, 'if_after'):
+        with About(block.graph.debug, 'if_after'):
             after_block = Block(self)
 
         # Process the first branch
@@ -358,11 +358,11 @@ class Parser:
         continuation.
 
         """
-        with about(block.graph, 'while_header'):
+        with About(block.graph.debug, 'while_header'):
             header_block = Block(self)
-        with about(block.graph, 'while_body'):
+        with About(block.graph.debug, 'while_body'):
             body_block = Block(self)
-        with about(block.graph, 'while_after'):
+        with About(block.graph.debug, 'while_after'):
             after_block = Block(self)
         body_block.preds.append(header_block)
         after_block.preds.append(header_block)
@@ -475,7 +475,7 @@ class Block:
             elif not self.preds:
                 return self.parser.read(varnum)
         # TODO: point to the original definition
-        with about(DebugInfo(name=varnum), 'phi'):
+        with About(DebugInherit(name=varnum), 'phi'):
             phi = Parameter(self.graph)
         self.graph.parameters.append(phi)
         self.phi_nodes[phi] = varnum

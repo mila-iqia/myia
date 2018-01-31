@@ -1,6 +1,6 @@
 """Objects and routines to track debug information."""
 
-from typing import Any
+from typing import Any, NamedTuple
 import types
 import threading
 import traceback
@@ -20,32 +20,19 @@ def current_info():
 class DebugInfo(types.SimpleNamespace):
     """Debug information for an object.
 
-    If used with the `with` statement, any `DebugInfo` created
-    while inside the `with` body will inherit all attributes:
+    The `DebugInherit` context manager can be used to automatically
+    set certain attributes:
 
-    >>> with DebugInfo(a=1, b=2):
+    >>> with DebugInherit(a=1, b=2):
     ...     info = DebugInfo(c=3)
     ...     assert info.a == 1
     ...     assert info.b == 2
     ...     assert info.c == 3
 
-    Attributes:
-        about: DebugInfo of a different object, that this
-            object is derived from in some way
-        relation: How the object relates to `about`
-        save_trace: Whether the trace of the DebugInfo's
-            creation should be saved.
-        trace: The trace at the moment of the DebugInfo's
-            creation, or None.
-
     """
 
     def __init__(self, obj=None, **kwargs):
         """Construct a DebugInfo object."""
-        self.about = None
-        self.relation = None
-        self.save_trace: bool = False
-        self.trace: Any = None
         top = current_info()
         if top:
             # Only need to look at the top of the stack
@@ -53,19 +40,19 @@ class DebugInfo(types.SimpleNamespace):
 
         super().__init__(**kwargs)
 
-        self._obj = weakref.ref(obj) if obj else None
-        if self.save_trace:
-            # We remove the last entry that corresponds to
-            # this line in the code.
-            self.trace = traceback.extract_stack()[:-1]
 
-    @property
-    def obj(self):
-        """Return the object that this DebugInfo is about."""
-        return self._obj and self._obj()
+class DebugInherit(DebugInfo):
+    """Context manager to automatically set attributes on DebugInfo.
+
+    >>> with DebugInherit(a=1, b=2):
+    ...     info = DebugInfo(c=3)
+    ...     assert info.a == 1
+    ...     assert info.b == 2
+    ...     assert info.c == 3
+    """
 
     def __enter__(self):
-        """Set this `DebugInfo` as a template in this context.
+        """Set this `DebugInherit` as a template in this context.
 
         Any `DebugInfo` created within the context of
         `with self: ...` will inherit all attributes of `self`.
@@ -73,7 +60,7 @@ class DebugInfo(types.SimpleNamespace):
         _about.stack.append(self)
 
     def __exit__(self, type, value, tb):
-        """Exit the context of this `DebugInfo`."""
+        """Exit the context of this `DebugInherit`."""
         assert _about.stack[-1] is self
         _about.stack.pop()
 
@@ -83,16 +70,37 @@ class NamedDebugInfo(DebugInfo):
 
     Attributes:
         name: The name of the object.
+        about: `About` object pointing to the `DebugInfo` of
+            a different object, that this one is about.
+        save_trace: Whether the trace of the DebugInfo's
+            creation should be saved.
+        trace: The trace at the moment of the DebugInfo's
+            creation, or None.
 
     """
 
     _curr_id = 0
 
     def __init__(self, obj=None, **kwargs):
-        """Construct an NamedDebugInfo object."""
+        """Construct a NamedDebugInfo object."""
         self._id: int = None
         self.name: str = None
+        self.about = None
+        self.save_trace: bool = False
+        self.trace: Any = None
+        self._obj = weakref.ref(obj) if obj else None
+
         super().__init__(obj, **kwargs)
+
+        if self.save_trace:
+            # We remove the last entry that corresponds to
+            # this line in the code.
+            self.trace = traceback.extract_stack()[:-1]
+
+    @property
+    def obj(self):
+        """Return the object that this DebugInfo is about."""
+        return self._obj and self._obj()
 
     @property
     def id(self):
@@ -114,17 +122,32 @@ class NamedDebugInfo(DebugInfo):
         return self.name
 
 
-def about(obj, relation=None):
-    """Set context as being about the given object.
+class About(NamedTuple):
+    """Represent a relationship to an object.
 
-    `about(obj, rel)` is equivalent to
-    `DebugInfo(about=obj, relation=rel)` and can be used as
-    a context manager:
+    It can be used as a context manager, in which case any `DebugInfo`
+    created in the scope will have its `about` field set to the `About`
+    object.
 
-    >>> with about(x, 'purpose'):
-    ...     info = DebugInfo(a=3)
-    ...     assert info.about is x
-    ...     assert info.relation == 'purpose'
-    ...     assert info.a == 3
+    >>> with About(x, 'purpose') as a:
+    ...     info = DebugInfo()
+    ...     assert info.about is a
+
+    Attributes:
+        debug: The `DebugInfo` of the object.
+        relation: Some arbitrary relation with respect to the object.
+
     """
-    return DebugInfo(about=obj, relation=relation)
+
+    debug: DebugInfo
+    relation: str
+
+    def __enter__(self):
+        """Enter the context of this `About`."""
+        _about.stack.append(DebugInherit(about=self))
+
+    def __exit__(self, type, value, tb):
+        """Exit the context of this `About`."""
+        top = _about.stack[-1]
+        assert isinstance(top, DebugInfo) and top.about is self
+        _about.stack.pop()
