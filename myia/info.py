@@ -23,11 +23,11 @@ class DebugInfo(types.SimpleNamespace):
     If used with the `with` statement, any `DebugInfo` created
     while inside the `with` body will inherit all attributes:
 
-        with DebugInfo(a=1, b=2):
-            info = DebugInfo(c=3)
-            assert info.a == 1
-            assert info.b == 2
-            assert info.c == 3
+    >>> with DebugInfo(a=1, b=2):
+    ...     info = DebugInfo(c=3)
+    ...     assert info.a == 1
+    ...     assert info.b == 2
+    ...     assert info.c == 3
 
     Attributes:
         about: DebugInfo of a different object, that this
@@ -121,10 +121,10 @@ def about(obj, relation=None):
     `DebugInfo(about=obj, relation=rel)` and can be used as
     a context manager:
 
-        with about(x, 'purpose'):
-            info = DebugInfo(a=3)
-            assert info.about is x
-            assert info.relation == 'purpose'
-            assert info.a == 3
+    >>> with about(x, 'purpose'):
+    ...     info = DebugInfo(a=3)
+    ...     assert info.about is x
+    ...     assert info.relation == 'purpose'
+    ...     assert info.a == 3
     """
     return DebugInfo(about=obj, relation=relation)
