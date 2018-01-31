@@ -227,6 +227,22 @@ class Parser:
                                                               node.right)]
             expr = Apply(inputs_, block.graph)
             expr.debug.ast = node
+        elif isinstance(node, ast.UnaryOp):
+            inputs_: List[ANFNode] = [self.environment.ast_map[type(node.op)],
+                                      self.process_expression(block,
+                                                              node.operand)]
+            expr = Apply(inputs_, block.graph)
+            expr.debug.ast = node
+        elif isinstance(node, ast.Compare):
+            ops = [self.environment.ast_map[type(op)] for op in node.ops]
+            assert len(ops) == 1
+            inputs_: List[ANFNode] = [
+                ops[0],
+                self.process_expression(block, node.left),
+                self.process_expression(block, node.comparators[0])
+            ]
+            expr = Apply(inputs_, block.graph)
+            expr.debug.ast = node
         elif isinstance(node, ast.Name):
             expr = block.read(node.id)
         elif isinstance(node, ast.Num):
@@ -237,6 +253,8 @@ class Parser:
             expr = Apply([func] + args, block.graph)
         elif isinstance(node, ast.NameConstant):
             expr = self.environment.map(node.value)
+        else:
+            raise ValueError(f'Unknown expression: {node}')
         return expr
 
     def process_statements(self, block: 'Block',
