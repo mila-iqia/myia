@@ -9,138 +9,136 @@ from myia import primops
 implementations: Dict[primops.Primitive, Callable] = {}
 
 
-def registrar(pfx, store):
+def make_registrar(store):
     """Create a decorator to associate a function to a primitive.
 
-    The function name will need to start with `pfx`, followed by
-    the primitive's name in `primops`. It will then be associated
-    to that Primitive in `store`.
+    The primitive will be associated to the function in the given
+    `store`.
     """
-    def deco(fn):
-        """Decorate the function."""
-        name = fn.__name__
-        assert name.startswith(pfx)
-        name = name.split(pfx)[1]
-        prim = getattr(primops, name)
-        store[prim] = fn
-        return fn
-    return deco
+    def deco1(prim):
+        """Take the primitive."""
+        def deco2(fn):
+            """Decorate the function."""
+            store[prim] = fn
+            return fn
+        return deco2
+    return deco1
 
 
-impl = registrar('impl_', implementations)
+register = make_registrar(implementations)
 
 
-@impl
-def impl_add(x, y):
+@register(primops.add)
+def add(x, y):
     """Implement `add`."""
     return x + y
 
 
-@impl
-def impl_sub(x, y):
+@register(primops.sub)
+def sub(x, y):
     """Implement `sub`."""
     return x - y
 
 
-@impl
-def impl_mul(x, y):
+@register(primops.mul)
+def mul(x, y):
     """Implement `mul`."""
     return x * y
 
 
-@impl
-def impl_div(x, y):
+@register(primops.div)
+def div(x, y):
     """Implement `div`."""
     return x / y
 
 
-@impl
-def impl_mod(x, y):
+@register(primops.mod)
+def mod(x, y):
     """Implement `mod`."""
     return x % y
 
 
-@impl
-def impl_pow(x, y):
+@register(primops.pow)
+def pow(x, y):
     """Implement `pow`."""
     return x ** y
 
 
-@impl
-def impl_uadd(x):
+@register(primops.uadd)
+def uadd(x):
     """Implement `iadd`."""
     return x
 
 
-@impl
-def impl_usub(x):
+@register(primops.usub)
+def usub(x):
     """Implement `isub`."""
     return -x
 
 
-@impl
-def impl_eq(x, y):
+@register(primops.eq)
+def eq(x, y):
     """Implement `eq`."""
     return x == y
 
 
-@impl
-def impl_lt(x, y):
+@register(primops.lt)
+def lt(x, y):
     """Implement `lt`."""
     return x < y
 
 
-@impl
-def impl_gt(x, y):
+@register(primops.gt)
+def gt(x, y):
     """Implement `gt`."""
     return x > y
 
 
-@impl
-def impl_ne(x, y):
+@register(primops.ne)
+def ne(x, y):
     """Implement `ne`."""
     return x != y
 
 
-@impl
-def impl_le(x, y):
+@register(primops.le)
+def le(x, y):
     """Implement `le`."""
     return x <= y
 
 
-@impl
-def impl_ge(x, y):
+@register(primops.ge)
+def ge(x, y):
     """Implement `ge`."""
     return x >= y
 
 
-@impl
-def impl_not_(x):
+@register(primops.not_)
+def not_(x):
     """Implement `not_`."""
     return not x
 
 
-@impl
-def impl_tuple(*elems):
+@register(primops.tuple)
+def tuple(*elems):
     """Implement `tuple`."""
     return elems
 
 
-@impl
-def impl_getitem(data, item):
+@register(primops.getitem)
+def getitem(data, item):
     """Implement `getitem`."""
     return data[item]
 
 
-@impl
-def impl_setitem(data, item, value):
+@register(primops.setitem)
+def setitem(data, item, value):
     """Implement `setitem`."""
     data2 = copy(data)
     data2[item] = value
     return data2
 
 
-@impl
-def impl_return_(x):
+@register(primops.return_)
+def return_(x):
     """Implement `return_`."""
     return x
