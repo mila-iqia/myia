@@ -42,31 +42,17 @@ import ast
 import inspect
 import textwrap
 from types import FunctionType
-from typing import overload, Any, Dict, List, Optional, Tuple, Type
+from typing import \
+    overload, Any, Dict, List, Optional, Tuple, Type, NamedTuple
 
 from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
 from .info import DebugInfo, about
 
 
-class Location:
-    """A location in source code.
-
-    Attributes:
-        url: The filename.
-        line: The line number.
-        column: The column number.
-
-    """
-
-    def __init__(self, url, line, column):
-        """Initialize a Location."""
-        self.url = url
-        self.line = line
-        self.column = column
-
-    def __str__(self):  # pragma: no cover
-        """Represent a Location."""
-        return f'File "{self.url}", line {self.line}, column {self.column}"'
+class Location(NamedTuple):
+    filename: str
+    line: str
+    column: int
 
 
 class Environment:
@@ -169,7 +155,7 @@ class Parser:
                             node.lineno + self.line_offset - 1,  # type: ignore
                             node.col_offset)  # type: ignore
         else:
-            return None  # pragma: no cover
+            raise TypeError(f'No location for {node}')  # pragma: no cover
 
     def parse(self) -> Graph:
         """Parse the function into a Myia graph."""
