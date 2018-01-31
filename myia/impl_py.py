@@ -2,6 +2,7 @@
 
 
 from typing import Dict, Callable
+from copy import copy
 from myia import primops
 
 
@@ -126,9 +127,31 @@ def impl_tuple(*elems):
 
 
 @impl
-def impl_index(tup, idx):
-    """Implement `index`."""
-    return tup[idx]
+def impl_getitem(data, item):
+    """Implement `getitem`."""
+    return data[item]
+
+
+@impl
+def impl_setitem(data, item, value):
+    """Implement `setitem`."""
+    data2 = copy(data)
+    data2[item] = value
+    return data2
+
+
+@impl
+def impl_getattr(data, attr):
+    """Implement `getattr`."""
+    return getattr(data, attr)
+
+
+@impl
+def impl_setattr(data, attr, value):
+    """Implement `setattr`."""
+    data2 = copy(data)
+    setattr(data2, attr, value)
+    return data2
 
 
 @impl
