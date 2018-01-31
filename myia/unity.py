@@ -1,0 +1,503 @@
+"""Unification module."""
+from typing import (Dict, Tuple, List, Iterable, Union, Callable, cast,
+                    TypeVar, Generic, Any, Type)
+from functools import reduce
+
+
+T = TypeVar('T')
+U = TypeVar('U')
+
+Value = Union['Var[U]', U]
+FnFiltT = Callable[[Value[U]], bool]
+FilterT = Union[Iterable[Value[U]], FnFiltT[U]]
+EquivT = Dict['Var[U]', Value[U]]
+
+
+class UnificationError(Exception):
+    """Exception raised for errors in unification."""
+
+
+class Var(Generic[U]):
+    """Basic universal variable type."""
+
+    __slots__ = ('tag',)
+
+    def __init__(self, tag: str) -> None:
+        """Create a Var."""
+        self.tag = tag
+
+    @classmethod
+    def _parse_args(self, args: Tuple[Any, ...], kwargs: Dict[Any, Any]):
+        assert len(kwargs) == 0
+        assert len(args) == 1
+        assert isinstance(args[0], str)
+        return args
+
+    def matches(self, value: Value[U]) -> bool:
+        """Return True if the variable matches the value given.
+
+        Note that this relation is transitive, but not associative.
+        """
+        return True
+
+    def __str__(self) -> str:
+        return self.tag
+
+    def __repr__(self) -> str:
+        return f"Var({self.tag})"
+
+
+class Seq(tuple):
+    """Class to mark sequence of values matched by an SVar."""
+
+    def __repr__(self) -> str:
+        return "Seq" + super().__repr__()
+
+
+class SVar(Var[U]):
+    """Variable to represent a variable length of values."""
+
+    __slots__ = ()
+
+    def matches(self, value: Value[U]) -> bool:
+        """Only does special matching."""
+        return isinstance(value, (Seq, SVar))
+
+    def __str__(self) -> str:
+        return f"*{self.tag}"
+
+    def __repr__(self) -> str:
+        return f"SVar({self.tag})"
+
+
+class UnionVar(Var[U]):
+    """Variable for a possible set of values."""
+
+    __slots__ = ('values',)
+
+    def __init__(self, tag: str, values: Iterable[Value[U]]) -> None:
+        """Create a UnionVar."""
+        super().__init__(tag)
+        self.values = set(values)
+
+    @classmethod
+    def _parse_args(self, args: Tuple[Any, ...], kwargs: Dict[Any, Any]):
+        assert len(kwargs) == 0
+        assert len(args) == 2
+        assert isinstance(args[0], str)
+        return (args[0], tuple(sorted(set(args[1]), key=id)))
+
+    def matches(self, value) -> bool:
+        """Engine bypasses this."""
+        raise UnificationError("matches called on a UnionVar")
+
+    def __repr__(self) -> str:
+        return f"UnionVar({self.tag}, {self.values})"
+
+
+class RestrictedVar(Var[U]):
+    """Variable restricted to a set of values."""
+
+    __slots__ = ('legal_values',)
+
+    def __init__(self, tag: str,
+                 legal_values: Tuple[Value[U], ...]) -> None:
+        """Create a RestrictedVar."""
+        super().__init__(tag)
+        self.legal_values = legal_values
+
+    @classmethod
+    def _parse_args(cls, args: Tuple[Any, ...], kwargs: Dict[Any, Any]):
+        assert len(kwargs) == 0
+        assert len(args) == 2
+        assert isinstance(args[0], str)
+        return (args[0], tuple(sorted(args[1], key=id)))
+
+    def matches(self, value: Value[U]) -> bool:
+        """Return True if the variable matches the value."""
+        if isinstance(value, RestrictedVar):
+            return all(v in self.legal_values for v in value.legal_values)
+        return value in self.legal_values
+
+    def __repr__(self) -> str:
+        return f"RestrictedVar({self.tag}, {self.legal_values})"
+
+
+class FilterVar(Var[U]):
+    """Variable restricted to values that pass a filter function."""
+
+    __slots__ = ('filter',)
+
+    def __init__(self, tag: str, filter: FnFiltT[U]) -> None:
+        """Create a FilterVar."""
+        super().__init__(tag)
+        self.filter = filter
+
+    @classmethod
+    def _parse_args(cls, args: Tuple[Any, ...], kwargs: Dict[Any, Any]):
+        assert len(kwargs) == 0
+        assert len(args) == 2
+        assert isinstance(args[0], str)
+        return args
+
+    def matches(self, value: Value[U]) -> bool:
+        """Return True if the variable matches the value."""
+        if isinstance(value, RestrictedVar):
+            return all(self.filter(v) for v in value.legal_values)
+        if isinstance(value, FilterVar):
+            return self.filter == value.filter
+        return self.filter(value)
+
+    def __repr__(self) -> str:
+        return f"FilterVar({self.tag}, {self.filter})"
+
+
+def expandlist(lst: Iterable[Value[U]]) -> List[Value[U]]:
+    """Flatten the Seq instances in a sequence."""
+    lst = list(lst)
+    off = 0
+    for i, e in enumerate(list(lst)):
+        if isinstance(e, Seq):
+            lst[off + i:off + i + 1] = e
+            off += len(e) - 1
+    return lst
+
+
+def noseq(fn: Callable[[Value[U]], Value[U]], u: Value[U]) -> Value[U]:
+    """Make sure that there are no Seq in the value."""
+    um = fn(u)
+    if isinstance(um, Seq):
+        raise TypeError("Multiple values in single-value position")
+    return um
+
+
+class Unification(Generic[T]):
+    """Unification engine."""
+
+    def __init__(self) -> None:
+        """Create a unification engine."""
+        self._seq = 1
+        self._vars: Dict[Any, Var[T]] = dict()
+
+    def _get_var(self, cls: Type[Var[T]], args: Tuple[Any, ...]) -> Var[T]:
+        pargs = cls._parse_args(args, dict())
+        if pargs not in self._vars:
+            self._vars[pargs] = cls(*pargs)
+        return self._vars[pargs]
+
+    def _get_tag(self, tag: str):
+        if tag is None:
+            tag = '_{}'.format(self._seq)
+            self._seq += 1
+        else:
+            if tag.startswith('_'):
+                raise ValueError('tag starting with _')
+        return tag
+
+    def var(self, tag: str = None,
+            filter: FilterT[T] = None)-> Var[T]:
+        """Create a variable for unification purposes.
+
+        Arguments:
+            tag: An identifier for the variable. Two variables with the
+                same filter and identifier will return the same object.
+            filter: A predicate, or a set of values the variable is
+                allowed to take.
+        """
+        tag = self._get_tag(tag)
+        if callable(filter):
+            return self._get_var(FilterVar, (tag, filter))
+        elif filter:
+            return self._get_var(RestrictedVar, (tag, filter))
+        else:
+            return self._get_var(Var, (tag,))
+
+    def svar(self, tag: str = None) -> SVar[T]:
+        """Create an SVar (can match 0 or more items)."""
+        return self._get_var(SVar, (self._get_tag(tag),))  # type: ignore
+
+    def uvar(self, values: Iterable[Value[T]], tag: str = None) -> UnionVar[T]:
+        """Create a UnionVar (represents multiple possibilities)."""
+        return self._get_var(UnionVar,  # type: ignore
+                             (self._get_tag(tag), values))
+
+    class VisitError(Exception):
+        """Report unvisitable object."""
+
+    def visit(self, fn: Callable[[Value[T]], Value[T]],
+              value: Value[T]) -> Value[T]:
+        """Apply `fn`to each element of `value` and return the result."""
+        raise self.VisitError
+
+    def clone(self, v: Value[T], copy_map: Dict[Any, Any] = None) -> Value[T]:
+        """Return a copy of a templated type structure.
+
+        Type are passed through without modification, variables are
+        duplicated with a new id.
+
+        This preserves relationships between variables like this::
+
+            clone(Tuple(v1, v1)) -> Tuple(v2, v2)
+
+        Arguments:
+            v: expression
+            copy_map: Dictionnary of variable mapping
+
+        """
+        if copy_map is None:
+            copy_map = {}
+        return self._clone(v, copy_map)
+
+    def _clone(self, v: Value[T], copy_map: Dict[Any, Any]) -> Value[T]:
+        if v in copy_map:
+            return copy_map[v]
+
+        if isinstance(v, Var):
+            if isinstance(v, SVar):
+                copy_map[v] = self.svar()
+            elif isinstance(v, UnionVar):
+                copy_map[v] = self.uvar(self._clone(v, copy_map)
+                                        for v in v.values)
+            else:
+                filter: FilterT[T] = None
+                if isinstance(v, FilterVar):
+                    filter = v.filter
+                elif isinstance(v, RestrictedVar):
+                    filter = v.legal_values
+                copy_map[v] = self.var(filter=filter)
+
+        elif isinstance(v, Seq):
+            copy_map[v] = Seq(self._clone(val, copy_map) for val in v)
+
+        else:
+            try:
+                return self.visit(lambda v: self._clone(v, copy_map), v)
+            except self.VisitError:
+                return v
+
+        return copy_map[v]
+
+    def unify_union(self, w: UnionVar[T], v: Value[T],
+                    equiv: EquivT[T]) -> EquivT[T]:
+        """Perform UnionVar unification.
+
+        This is called as required from `unify_raw`, but can also be
+        called directly.
+        """
+        ok: Dict[Value[T], EquivT[T]] = dict()
+        for vw in w.values:
+            equiv_copy = dict(equiv)
+            # try each of the possible alternatives
+            try:
+                ok[vw] = self.unify_raw(vw, v, equiv_copy)
+            except UnificationError:
+                pass
+        if len(ok) == 0:
+            # if none match we fail
+            raise UnificationError("All values unmatched for UnionVar")
+        elif len(ok) == 1:
+            # if there is a single match, we record it as the union value
+            equiv.update(ok.popitem()[1])
+            return equiv
+        else:
+            # if there were multiple matches, we try to find the
+            # differences between them and see if we can find
+            # common ground.
+
+            # Essentially we are looking for match differences and
+            # those differences should at most be for a single variable.
+
+            # get the set of keys in common between all matches
+            initial_keys = set(equiv.keys())
+            ok_values = [v for v in ok.values()]
+            comm_keys = [set(en.keys()) - initial_keys for en in ok_values]
+            common_ground = reduce(lambda x, v: x & v, comm_keys)
+
+            # check if common keys have the same values
+            rej = set()
+            for k in common_ground:
+                if any(okv[k] != ok_values[0][k] for okv in ok_values):
+                    rej.add(k)
+            common_ground = common_ground - rej
+
+            # get the difference between matches
+            common_diffs = map(lambda x: x - common_ground, comm_keys)
+            common_diff = reduce(lambda x, v: x & v, common_diffs)
+            if len(common_diff) != 1:
+                raise UnificationError("More than one match difference "
+                                       "for UnionVar")
+            diff = common_diff.pop()
+            assert not isinstance(diff, UnionVar)
+
+            # lift the UnionVar
+            equiv[diff] = self.uvar(set(okv[diff] for okv in ok_values))
+            return equiv
+
+    def unify_raw(self, w: Value[T], v: Value[T],
+                  equiv: EquivT[T]) -> EquivT[T]:
+        """'raw' interface for unification.
+
+        The `equiv` argument is modified in-place.
+
+        Arguments:
+            w: An expression
+            v: An expression
+            equiv: A dictionary of variable equivalences.
+
+        Returns:
+            The equivalence dictionary
+
+        Raises:
+            UnificationError
+                If the expressions are not compatible.  The dictionary may
+                contain partial matching in this case and should no longer
+                be used for further unification.
+
+        Note:
+            There must not be loops in the equivalence relationships
+            described by `equiv` or this function might never return.
+
+        """
+        while w in equiv:
+            w = equiv[cast(Var[T], w)]
+        while v in equiv:
+            v = equiv[cast(Var[T], v)]
+
+        if w == v:
+            return equiv
+
+        if isinstance(w, UnionVar):
+            return self.unify_union(w, v, equiv)
+
+        if isinstance(v, UnionVar):
+            return self.unify_union(v, w, equiv)
+
+        if isinstance(w, Var):
+            if w.matches(v):
+                equiv[w] = v
+                return equiv
+
+        if isinstance(v, Var):
+            if v.matches(w):
+                equiv[v] = w
+                return equiv
+
+        if type(v) != type(w):
+            raise UnificationError("Type match error")
+
+        if isinstance(v, Seq) and isinstance(w, Seq):
+            values_v = list(v)
+            values_w = list(w)
+        else:
+            try:
+                values_v = []
+                self.visit(lambda u: values_v.append(u), v)
+                values_w = []
+                self.visit(lambda u: values_w.append(u), w)
+            except self.VisitError:
+                raise UnificationError("Cannot visit elements")
+
+        sv = -1
+        sw = -1
+
+        for i, vv in enumerate(values_v):
+            if isinstance(vv, SVar):
+                if sv != -1:
+                    raise UnificationError("Multiple SVars in sequence")
+                sv = i
+
+        for i, vw in enumerate(values_w):
+            if isinstance(vw, SVar):
+                if sw != -1:
+                    raise UnificationError("Multiple SVars in sequence")
+                sw = i
+
+        if sv != -1 and sw != -1:
+            if len(values_v) == len(values_w) and sv == sw:
+                self.unify_raw(values_w[sw], values_v[sv], equiv)
+                values_v.pop(sv)
+                values_w.pop(sw)
+            else:
+                raise UnificationError("SVars in both sides of the match")
+
+        if sv != -1:
+            wb = values_w[:sv]
+            diff = len(values_w) - len(values_v) + 1
+            wm = Seq(values_w[sv:sv+diff])
+            we = values_w[sv+diff:]
+            values_w = wb + [wm] + we
+
+        if sw != -1:
+            vb = values_v[:sw]
+            diff = len(values_v) - len(values_w) + 1
+            vm = Seq(values_v[sw:sw+diff])
+            ve = values_v[sw+diff:]
+            values_v = vb + [vm] + ve
+
+        if len(values_w) != len(values_v):
+            raise UnificationError("Structures of differing size")
+
+        for wi, vi in zip(values_w, values_v):
+            equiv = self.unify_raw(wi, vi, equiv)
+
+        return equiv
+
+    def unify(self, w: Value[T], v: Value[T],
+              equiv: EquivT[T] = None) -> EquivT[T]:
+        """Unify two expressions.
+
+        After a match is found, this will post-process the dictionary to
+        set all the equivalences to their transitive values.
+
+        Arguments:
+            w: expression
+            v: expression
+            equiv: Dictionary of pre-existing equivalences.
+
+        Returns:
+            The equivalence dictionary if a match is found,
+            None otherwise.
+
+        Note:
+            There must not be loops in the equivalence relationships
+            described by `equiv` or this function will never return.
+
+        """
+        if equiv is None:
+            equiv = {}
+        try:
+            equiv = self.unify_raw(w, v, equiv)
+        except UnificationError:
+            return None
+
+        # Set all keys to their transitive values
+        ks = set(equiv.keys())
+        for k in ks:
+            init_k = k
+            while k in equiv:
+                k = cast(Var[T], equiv[k])
+                equiv[init_k] = k
+
+        return equiv
+
+    def reify(self, v: Value[T], equiv: EquivT[T]) -> Value[T]:
+        """Fill in a expression according to the equivalences given.
+
+        Arguments:
+            v: expression
+            equiv: equivalence relationships (transitively mapped)
+
+        Note:
+            This expects the dictionary of equivalences to be transitively
+            transformed to work properly.  `unify` does this automatically
+            on its return value, but if you use unify_raw directly, you
+            have to take care of this.
+
+        """
+        if v in equiv:
+            v = equiv[cast(Var[T], v)]
+
+        try:
+            return self.visit(lambda v: self.reify(v, equiv), v)
+        except self.VisitError:
+            return v
