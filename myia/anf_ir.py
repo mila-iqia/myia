@@ -42,7 +42,7 @@ class Graph:
         """Construct a graph."""
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
-        self.debug = NamedDebugInfo(type=self.__class__.__name__.lower())
+        self.debug = NamedDebugInfo(self)
 
     @property
     def output(self) -> 'ANFNode':
@@ -106,7 +106,7 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.uses: Set[Tuple[ANFNode, int]] = set()
-        self.debug = NamedDebugInfo(type=self.__class__.__name__.lower())
+        self.debug = NamedDebugInfo(self)
 
     @property
     def inputs(self) -> 'Inputs':

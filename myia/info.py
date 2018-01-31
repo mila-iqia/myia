@@ -4,6 +4,7 @@ from typing import Any
 import types
 import threading
 import traceback
+import weakref
 
 
 # We use per-thread storage for the about stack.
@@ -39,7 +40,7 @@ class DebugInfo(types.SimpleNamespace):
 
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, obj=None, **kwargs):
         """Construct a DebugInfo object."""
         self.about = None
         self.relation = None
@@ -52,10 +53,16 @@ class DebugInfo(types.SimpleNamespace):
 
         super().__init__(**kwargs)
 
+        self._obj = weakref.ref(obj) if obj else None
         if self.save_trace:
             # We remove the last entry that corresponds to
             # this line in the code.
             self.trace = traceback.extract_stack()[:-1]
+
+    @property
+    def obj(self):
+        """Return the object that this DebugInfo is about."""
+        return self._obj and self._obj()
 
     def __enter__(self):
         """Set this `DebugInfo` as a template in this context.
@@ -75,19 +82,17 @@ class NamedDebugInfo(DebugInfo):
     """Debug information for an object.
 
     Attributes:
-        type: The type name of the object.
         name: The name of the object.
 
     """
 
     _curr_id = 0
 
-    def __init__(self, **kwargs):
+    def __init__(self, obj=None, **kwargs):
         """Construct an NamedDebugInfo object."""
         self._id: int = None
         self.name: str = None
-        self.type: str = None
-        super().__init__(**kwargs)
+        super().__init__(obj, **kwargs)
 
     @property
     def id(self):
@@ -102,7 +107,9 @@ class NamedDebugInfo(DebugInfo):
         """Return the name, create a fresh name if needed."""
         if self.name:
             return self.name
-        prefix = self.type or ''
+        prefix = ''
+        if self.obj is not None:
+            prefix = self.obj.__class__.__name__.lower()
         self.name = f'_{prefix}{self.id}'
         return self.name
 
