@@ -14,7 +14,7 @@ from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
 
 from myia.ir import Node
 from myia.utils import Named, repr_, list_str
-from myia.info import AutoNamedDebugInfo
+from myia.info import NamedDebugInfo
 from myia import primops
 
 PARAMETER = Named('PARAMETER')
@@ -42,7 +42,7 @@ class Graph:
         """Construct a graph."""
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
-        self.debug = AutoNamedDebugInfo(type=self.__class__.__name__.lower())
+        self.debug = NamedDebugInfo(type=self.__class__.__name__.lower())
 
     @property
     def output(self) -> 'ANFNode':
@@ -106,7 +106,7 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.uses: Set[Tuple[ANFNode, int]] = set()
-        self.debug = AutoNamedDebugInfo(type='graph')
+        self.debug = NamedDebugInfo(type=self.__class__.__name__.lower())
 
     @property
     def inputs(self) -> 'Inputs':

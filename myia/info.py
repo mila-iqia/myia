@@ -19,6 +19,15 @@ def current_info():
 class DebugInfo(types.SimpleNamespace):
     """Debug information for an object.
 
+    If used with the `with` statement, any `DebugInfo` created
+    while inside the `with` body will inherit all attributes:
+
+        with DebugInfo(a=1, b=2):
+            info = DebugInfo(c=3)
+            assert info.a == 1
+            assert info.b == 2
+            assert info.c == 3
+
     Attributes:
         about: DebugInfo of a different object, that this
             object is derived from in some way
@@ -41,8 +50,7 @@ class DebugInfo(types.SimpleNamespace):
             # Only need to look at the top of the stack
             self.__dict__.update(top.__dict__)
 
-        self._id: int = None
-        self.__dict__.update(kwargs)
+        super().__init__(**kwargs)
 
         if self.save_trace:
             # We remove the last entry that corresponds to
@@ -63,7 +71,7 @@ class DebugInfo(types.SimpleNamespace):
         _about.stack.pop()
 
 
-class AutoNamedDebugInfo(DebugInfo):
+class NamedDebugInfo(DebugInfo):
     """Debug information for an object.
 
     Attributes:
@@ -75,7 +83,8 @@ class AutoNamedDebugInfo(DebugInfo):
     _curr_id = 0
 
     def __init__(self, **kwargs):
-        """Construct an AutoNamedDebugInfo object."""
+        """Construct an NamedDebugInfo object."""
+        self._id: int = None
         self.name: str = None
         self.type: str = None
         super().__init__(**kwargs)
@@ -85,7 +94,7 @@ class AutoNamedDebugInfo(DebugInfo):
         """Generate a unique, sequential ID number."""
         if self._id is None:
             self._id = self._curr_id
-            AutoNamedDebugInfo._curr_id += 1
+            NamedDebugInfo._curr_id += 1
         return self._id
 
     @property
@@ -99,5 +108,16 @@ class AutoNamedDebugInfo(DebugInfo):
 
 
 def about(obj, relation=None):
-    """Set context as being about the given object."""
+    """Set context as being about the given object.
+
+    `about(obj, rel)` is equivalent to
+    `DebugInfo(about=obj, relation=rel)` and can be used as
+    a context manager:
+
+        with about(x, 'purpose'):
+            info = DebugInfo(a=3)
+            assert info.about is x
+            assert info.relation == 'purpose'
+            assert info.a == 3
+    """
     return DebugInfo(about=obj, relation=relation)
