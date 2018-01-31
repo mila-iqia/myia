@@ -254,7 +254,8 @@ class Parser:
         elif isinstance(node, ast.NameConstant):
             expr = self.environment.map(node.value)
         else:
-            raise ValueError(f'Unknown expression: {node}')
+            raise ValueError(f'Unknown expression: {node}') \
+                # pragma: no cover
         return expr
 
     def process_statements(self, block: 'Block',

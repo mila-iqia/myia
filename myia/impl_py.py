@@ -141,20 +141,6 @@ def impl_setitem(data, item, value):
 
 
 @impl
-def impl_getattr(data, attr):
-    """Implement `getattr`."""
-    return getattr(data, attr)
-
-
-@impl
-def impl_setattr(data, attr, value):
-    """Implement `setattr`."""
-    data2 = copy(data)
-    setattr(data2, attr, value)
-    return data2
-
-
-@impl
 def impl_return_(x):
     """Implement `return_`."""
     return x

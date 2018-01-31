@@ -53,8 +53,6 @@ not_ = Primitive('not')
 tuple = Primitive('tuple')
 getitem = Primitive('getitem')
 setitem = Primitive('setitem')
-getattr = Primitive('getattr')
-setattr = Primitive('setattr')
 
 
 ##############
