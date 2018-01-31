@@ -50,6 +50,15 @@ from .info import DebugInfo, about
 
 
 class Location(NamedTuple):
+    """A location in source code.
+
+    Attributes:
+        filename: The filename.
+        line: The line number.
+        column: The column number.
+
+    """
+
     filename: str
     line: str
     column: int
