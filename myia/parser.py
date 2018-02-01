@@ -147,7 +147,7 @@ class Parser:
         self.environment = environment
         self.function = function
         _, self.line_offset = inspect.getsourcelines(function)
-        self.url: str = inspect.getfile(function)
+        self.filename: str = inspect.getfile(function)
         self.block_map: Dict[Block, Constant] = {}
         if globals_ is None:
             free_vars = inspect.getclosurevars(function)  # type: ignore
@@ -160,7 +160,7 @@ class Parser:
     def make_location(self, node: ast.AST) -> Location:
         """Create a Location from an AST node."""
         if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
-            return Location(self.url,
+            return Location(self.filename,
                             node.lineno + self.line_offset - 1,  # type: ignore
                             node.col_offset)  # type: ignore
         else:
