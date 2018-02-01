@@ -333,3 +333,27 @@ def test_fact(x):
         else:
             return n * fact(n - 1)
     return fact(x)
+
+
+##########
+# Issues #
+##########
+
+
+@mark.xfail(reason='The return is not triggered (#29)')
+@parse_compare(10)
+def test_return_in_while(x):
+    while x > 0:
+        x = x - 1
+        return x
+    return -1
+
+
+@mark.xfail(reason='The return is not triggered (#29)')
+@parse_compare(10)
+def test_return_in_double_while(x):
+    while x > 0:
+        while x > 0:
+            x = x - 1
+            return x
+    return -1
