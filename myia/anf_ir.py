@@ -101,11 +101,9 @@ class Graph:
             self.return_ = Apply([Constant(primops.return_), value], self)
 
     def __str__(self) -> str:
-        """Return readable string representation."""
         return self.debug.debug_name
 
     def __repr__(self) -> str:
-        """Return unique string representation."""
         return repr_(self, name=self.debug.debug_name,
                      parameters=list_str(self.parameters),
                      return_=self.return_)
@@ -193,7 +191,6 @@ class ANFNode(Node):
         return obj
 
     def __str__(self) -> str:
-        """Return readable string representation."""
         return self.debug.debug_name
 
 
@@ -302,11 +299,9 @@ class Inputs(MutableSequence[ANFNode]):
         self.data.insert(index, value)
 
     def __str__(self) -> str:
-        """Return readable string representation."""
         return list_str(self.data)
 
     def __repr__(self) -> str:
-        """Return unique string representation."""
         return f"Inputs({self.node}, {list_str(self.data)})"
 
     def __eq__(self, other) -> bool:
@@ -335,7 +330,6 @@ class Apply(ANFNode):
         super().__init__(inputs, APPLY, graph)
 
     def __repr__(self) -> str:
-        """Return unique string representation."""
         return repr_(self, name=self.debug.debug_name, inputs=self.inputs,
                      graph=self.graph)
 
@@ -354,7 +348,6 @@ class Parameter(ANFNode):
         super().__init__([], PARAMETER, graph)
 
     def __repr__(self) -> str:
-        """Return unique string representation."""
         return repr_(self, name=self.debug.debug_name, graph=self.graph)
 
 
@@ -377,11 +370,9 @@ class Constant(ANFNode):
         super().__init__([], value, None)
 
     def __str__(self) -> str:
-        """Return readable string representation."""
         if isinstance(self.value, LITERALS):
             return str(self.value)
         return super().__str__()
 
     def __repr__(self) -> str:
-        """Return unique string representation."""
         return repr_(self, name=self.debug.debug_name, value=self.value)
