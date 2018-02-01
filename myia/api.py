@@ -8,6 +8,7 @@ from myia import parser
 from myia.anf_ir import Graph, Constant, ANFNode
 from myia import primops as P
 from myia.vm import VM as VM_
+from myia.py_implementations import implementations
 
 
 def default_ast_map() -> Dict[Type[ast.AST], ANFNode]:
@@ -33,9 +34,9 @@ def default_ast_map() -> Dict[Type[ast.AST], ANFNode]:
     }
 
 
-def default_object_map() -> Dict[Any, ANFNode]:
+def default_object_map() -> Dict[int, ANFNode]:
     """Get a mapping from Python objects to nodes."""
-    return {
+    mapping = {
         operator.add: Constant(P.add),
         operator.sub: Constant(P.sub),
         operator.mul: Constant(P.mul),
@@ -48,12 +49,18 @@ def default_object_map() -> Dict[Any, ANFNode]:
         operator.gt: Constant(P.gt),
         operator.le: Constant(P.le),
         operator.ge: Constant(P.ge),
-        operator.not_: Constant(P.not_)
+        operator.not_: Constant(P.not_),
+        operator.getitem: Constant(P.getitem),
+        operator.setitem: Constant(P.setitem)
     }
+    for prim, impl in implementations.items():
+        mapping[impl] = Constant(prim)
+
+    return {id(k): v for k, v in mapping.items()}
 
 
 ENV = parser.Environment(default_object_map(), default_ast_map())
-VM = VM_()
+VM = VM_(implementations)
 
 
 def parse(func: FunctionType) -> Graph:

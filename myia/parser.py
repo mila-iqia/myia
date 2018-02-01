@@ -251,6 +251,20 @@ class Parser:
         right = self.process_node(block, node.right)
         return Apply([func, left, right], block.graph)
 
+    def process_UnaryOp(self, block: 'Block', node: ast.UnaryOp) -> ANFNode:
+        """Process unary operators: `+a`, `-a`, etc."""
+        func = self.environment.ast_map[type(node.op)]
+        operand = self.process_node(block, node.operand)
+        return Apply([func, operand], block.graph)
+
+    def process_Compare(self, block: 'Block', node: ast.Compare) -> ANFNode:
+        """Process comparison operators: `a == b`, `a > b`, etc."""
+        ops = [self.environment.ast_map[type(op)] for op in node.ops]
+        assert len(ops) == 1
+        left = self.process_node(block, node.left)
+        right = self.process_node(block, node.comparators[0])
+        return Apply([ops[0], left, right], block.graph)
+
     def process_Name(self, block: 'Block', node: ast.Name) -> ANFNode:
         """Process variables: `variable_name`."""
         return block.read(node.id)

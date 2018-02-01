@@ -1,5 +1,9 @@
 """General utilities and design patterns."""
-from typing import Any, List
+from typing import Any, List, Dict, TypeVar
+
+
+T1 = TypeVar('T1')
+T2 = TypeVar('T2')
 
 
 class Named:
@@ -22,6 +26,22 @@ class Named:
     def __repr__(self):
         """Return the object's name."""
         return self.name
+
+
+class Registry(Dict[T1, T2]):
+    """Associates primitives to implementations."""
+
+    def __init__(self) -> None:
+        """Initialize a Registry."""
+        super().__init__()
+
+    def register(self, prim):
+        """Register a primitive."""
+        def deco(fn):
+            """Decorate the function."""
+            self[prim] = fn
+            return fn
+        return deco
 
 
 def repr_(obj: Any, **kwargs: Any):
