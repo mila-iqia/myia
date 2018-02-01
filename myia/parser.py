@@ -41,6 +41,7 @@ Block
 import ast
 import inspect
 import textwrap
+import operator
 from types import FunctionType
 from typing import \
     overload, Any, Dict, List, Optional, Tuple, Type, NamedTuple
@@ -164,7 +165,9 @@ class Parser:
                             node.lineno + self.line_offset - 1,  # type: ignore
                             node.col_offset)  # type: ignore
         else:
-            raise TypeError(f'No location for {node}')  # pragma: no cover
+            # Some nodes like Index carry no location information, but
+            # we basically just pass through them.
+            return None  # pragma: no cover
 
     def parse(self) -> Graph:
         """Parse the function into a Myia graph."""
@@ -229,6 +232,10 @@ class Parser:
         pass
 
     @overload  # noqa
+    def process_node(self, block: 'Block', node: ast.slice) -> ANFNode:
+        pass
+
+    @overload  # noqa
     def process_node(self, block: 'Block', node: ast.stmt) -> 'Block':
         pass
 
@@ -284,6 +291,31 @@ class Parser:
         """Process special constants: `True`, `False`, `None`, etc."""
         return self.environment.map(node.value)
 
+    def process_Tuple(self, block: 'Block', node: ast.Tuple) -> ANFNode:
+        """Process tuple literals."""
+        op = self.environment.ast_map[ast.Tuple]
+        elts = [self.process_node(block, e) for e in node.elts]
+        return Apply([op, *elts], block.graph)
+
+    def process_Subscript(self, block: 'Block',
+                          node: ast.Subscript) -> ANFNode:
+        """Process subscripts: `x[y]`."""
+        op = self.environment.ast_map[ast.Subscript]
+        value = self.process_node(block, node.value)
+        slice = self.process_node(block, node.slice)
+        return Apply([op, value, slice], block.graph)
+
+    def process_Index(self, block: 'Block', node: ast.Index) -> ANFNode:
+        """Process subscripts with simple index: `x[y]`."""
+        return self.process_node(block, node.value)
+
+    def process_Attribute(self, block: 'Block',
+                          node: ast.Attribute) -> ANFNode:
+        """Process attributes: `x.y`."""
+        op = self.environment.ast_map[ast.Attribute]
+        value = self.process_node(block, node.value)
+        return Apply([op, value, Constant(node.attr)], block.graph)
+
     # Statement implementations
 
     def process_statements(self, block: 'Block',
@@ -311,12 +343,72 @@ class Parser:
     def process_Assign(self, block: 'Block', node: ast.Assign) -> 'Block':
         """Process an assignment."""
         anf_node = self.process_node(block, node.value)
-        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            anf_node.debug.name = node.targets[0].id
-            block.write(node.targets[0].id, anf_node)
-        else:
-            raise NotImplementedError(node.targets)
+        targ, = node.targets
+
+        def write(targ, anf_node):
+
+            if isinstance(targ, ast.Name):
+                # CASE: x = value
+                anf_node.debug.name = targ.id
+                block.write(targ.id, anf_node)
+
+            elif isinstance(targ, ast.Tuple):
+                # CASE: x, y = value
+                for i, elt in enumerate(targ.elts):
+                    op = self.environment.ast_map[ast.Subscript]
+                    new_node = Apply([op, anf_node, Constant(i)], block.graph)
+                    write(elt, new_node)
+
+            elif isinstance(targ, ast.Subscript):
+                if isinstance(targ.value, ast.Name):
+                    # CASE: x[y] = value
+                    op = self.environment.object_map[id(operator.setitem)]
+                    obj = self.process_node(block, targ.value)
+                    idx = self.process_node(block, targ.slice)
+                    new_node = Apply([op, obj, idx, anf_node], block.graph)
+                    write(targ.value, new_node)
+                else:
+                    # UNSUPPORTED: f()[x] = value
+                    raise NotImplementedError(
+                        "You can only set a slice on a variable."
+                    )  # pragma: no cover
+
+            elif isinstance(targ, ast.Attribute):
+                if isinstance(targ.value, ast.Name):
+                    # CASE: x.y = value
+                    op = self.environment.object_map[id(setattr)]
+                    obj = self.process_node(block, targ.value)
+                    idx = Constant(targ.attr)
+                    new_node = Apply([op, obj, idx, anf_node], block.graph)
+                    write(targ.value, new_node)
+                else:
+                    # UNSUPPORTED: f().x = value
+                    raise NotImplementedError(
+                        "You can only set an attribute on a variable."
+                    )  # pragma: no cover
+
+            else:
+                raise NotImplementedError(node.targets)  # pragma: no cover
+
+        write(targ, anf_node)
         return block
+
+    def process_AugAssign(self, block: 'Block',
+                          node: ast.AugAssign) -> 'Block':
+        """Process an augmented assignment `x += y`."""
+        # We just transform it into an Assign node that applies a BinOp,
+        # i.e. the AST for `x = x + y`
+        # This may repeat computations, e.g. for `x[a * a] += 1` it will
+        # create two multiplication nodes, but if we integrate CSE later
+        # that problem will go away on its own.
+        app = ast.BinOp()
+        app.op = node.op
+        app.left = node.target
+        app.right = node.value
+        ass = ast.Assign()
+        ass.targets = [node.target]
+        ass.value = app
+        return self.process_Assign(block, ass)
 
     def process_Expr(self, block: 'Block', node: ast.Expr) -> 'Block':
         """Process an expression statement.

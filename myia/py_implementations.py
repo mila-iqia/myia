@@ -121,6 +121,24 @@ def setitem(data, item, value):
     return data2
 
 
+py_getattr = getattr
+py_setattr = setattr
+
+
+@register(primops.getattr)
+def getattr(data, attr):
+    """Implement `getattr`."""
+    return py_getattr(data, attr)
+
+
+@register(primops.setattr)
+def setattr(data, attr, value):
+    """Implement `setattr`."""
+    data2 = copy(data)
+    py_setattr(data2, attr, value)
+    return data2
+
+
 @register(primops.return_)
 def return_(x):
     """Implement `return_`."""

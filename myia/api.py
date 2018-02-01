@@ -29,6 +29,9 @@ def default_ast_map() -> Dict[Type[ast.AST], ANFNode]:
         ast.LtE: Constant(P.le),
         ast.GtE: Constant(P.ge),
         ast.Not: Constant(P.not_),
+        ast.Tuple: Constant(P.make_tuple),
+        ast.Subscript: Constant(P.getitem),
+        ast.Attribute: Constant(P.getattr),
         ast.If: Constant(P.if_),
         ast.Return: Constant(P.return_)
     }
@@ -51,7 +54,9 @@ def default_object_map() -> Dict[int, ANFNode]:
         operator.ge: Constant(P.ge),
         operator.not_: Constant(P.not_),
         operator.getitem: Constant(P.getitem),
-        operator.setitem: Constant(P.setitem)
+        operator.setitem: Constant(P.setitem),
+        getattr: Constant(P.getattr),
+        setattr: Constant(P.setattr)
     }
     for prim, impl in implementations.items():
         mapping[impl] = Constant(prim)

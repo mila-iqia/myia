@@ -1,6 +1,8 @@
 
 from pytest import mark
+from types import SimpleNamespace
 from myia.api import parse, run
+from copy import copy
 
 
 def parse_compare(*tests):
@@ -20,8 +22,8 @@ def parse_compare(*tests):
                 args = (args,)
             # TODO: avoid re-parsing every time
             fn2 = parse(fn)
-            py_result = fn(*args)
-            myia_result = run(fn2, args)
+            py_result = fn(*map(copy, args))
+            myia_result = run(fn2, tuple(map(copy, args)))
             assert py_result == myia_result
 
         m = mark.parametrize('args', list(tests))(test)
@@ -102,6 +104,64 @@ def _f(x):
 @parse_compare(5)
 def test_call_global(x):
     return _f(x)
+
+
+@parse_compare(5)
+def test_augassign(x):
+    x += 3
+    x *= 8
+    return x
+
+
+@parse_compare((4, 7))
+def test_swap(x, y):
+    x, y = y + 3, x - 8
+    return x, y
+
+
+@parse_compare(([1, 2, 3], 1))
+def test_setitem(x, y):
+    x[y] = 21
+    return x
+
+
+@parse_compare(([1, 2, 3], 1))
+def test_augsetitem(x, y):
+    x[y] += 21
+    return x
+
+
+@parse_compare((SimpleNamespace(x=5, y=2)))
+def test_setattr(pt):
+    pt.x = 3
+    pt.y = 21
+    return pt
+
+
+@parse_compare((SimpleNamespace(x=5, y=2)))
+def test_augsetattr(pt):
+    pt.x += 4
+    return pt
+
+
+###################
+# Data structures #
+###################
+
+
+@parse_compare(13)
+def test_tuple(x):
+    return x, x + 1, x + 2
+
+
+@parse_compare(((1, 2, 3, 4),))
+def test_getitem(x):
+    return x[1]
+
+
+@parse_compare((SimpleNamespace(x=5, y=2)))
+def test_getattr(pt):
+    return pt.x
 
 
 ################
@@ -307,8 +367,8 @@ def test_rec1(x):
 def test_pow8(x):
     i = 0
     while i < 3:
-        x = x * x
-        i = i + 1
+        x *= x
+        i += 1
     return x
 
 
@@ -319,9 +379,9 @@ def test_pow10(x):
     while j < 3:
         i = 0
         while i < 3:
-            v = v * x
-            i = i + 1
-        j = j + 1
+            v *= x
+            i += 1
+        j += 1
     return v
 
 

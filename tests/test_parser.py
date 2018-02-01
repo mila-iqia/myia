@@ -19,13 +19,6 @@ def test_undefined():
         parse(f)
 
 
-def test_unpacking():
-    def f():
-        x, y = f()
-    with pytest.raises(NotImplementedError):
-        parse(f)
-
-
 @pytest.mark.xfail(reason='x is possibly undefined')
 def test_maybe():
     def f():

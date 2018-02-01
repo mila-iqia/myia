@@ -282,8 +282,8 @@ class MyiaGraphPrinter(GraphPrinter):
         # Custom rules for nodes that represent certain calls
         self.custom_rules = {
             'return': self.process_node_return,
-            'index': self.process_node_index,
-            'tuple': self.process_node_tuple
+            'getitem': self.process_node_getitem,
+            'make_tuple': self.process_node_make_tuple
         }
 
     def name(self, x):
@@ -319,7 +319,7 @@ class MyiaGraphPrinter(GraphPrinter):
         ret = node.inputs[1]
         self.process_edges([(node, '', ret)])
 
-    def process_node_index(self, node, g, cl):
+    def process_node_getitem(self, node, g, cl):
         """Create node and edges for `x[ct]`."""
         idx = node.inputs[2]
         if self.function_in_node and is_constant(idx):
@@ -331,7 +331,7 @@ class MyiaGraphPrinter(GraphPrinter):
         else:
             self.process_node_generic(node, g, cl)
 
-    def process_node_tuple(self, node, g, cl):
+    def process_node_make_tuple(self, node, g, cl):
         """Create node and edges for `(a, b, c, ...)`."""
         if self.function_in_node:
             lbl = self.label(node, f'(...)')
