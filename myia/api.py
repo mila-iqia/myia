@@ -49,7 +49,9 @@ def default_object_map() -> Dict[int, ANFNode]:
         operator.gt: Constant(P.gt),
         operator.le: Constant(P.le),
         operator.ge: Constant(P.ge),
-        operator.not_: Constant(P.not_)
+        operator.not_: Constant(P.not_),
+        operator.getitem: Constant(P.getitem),
+        operator.setitem: Constant(P.setitem)
     }
     for prim, impl in implementations.items():
         mapping[impl] = Constant(prim)

@@ -1,31 +1,14 @@
 """Implementations for the debug VM."""
 
 
-from typing import Dict, Callable
+from typing import Callable
 from copy import copy
 from myia import primops
+from myia.utils import Registry
 
 
-implementations: Dict[primops.Primitive, Callable] = {}
-
-
-def make_registrar(store):
-    """Create a decorator to associate a function to a primitive.
-
-    The primitive will be associated to the function in the given
-    `store`.
-    """
-    def deco1(prim):
-        """Take the primitive."""
-        def deco2(fn):
-            """Decorate the function."""
-            store[prim] = fn
-            return fn
-        return deco2
-    return deco1
-
-
-register = make_registrar(implementations)
+implementations: Registry[primops.Primitive, Callable] = Registry()
+register = implementations.register
 
 
 @register(primops.add)
