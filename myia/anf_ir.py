@@ -9,54 +9,18 @@ implicitly creates a nested function. Functions are first-class objects, so
 returning a nested function creates a closure.
 
 """
-import types
-from ast import AST
 from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
                     overload, Iterable)
 
 from myia.ir import Node
 from myia.utils import Named, repr_, list_str
+from myia.info import NamedDebugInfo
 from myia import primops
 
 PARAMETER = Named('PARAMETER')
 APPLY = Named('APPLY')
 
 LITERALS = (bool, int, str, float)
-
-
-class Debug(types.SimpleNamespace):
-    """Debug information for an object.
-
-    Attributes:
-        name: The name of the object.
-
-    """
-
-    _curr_id = 0
-
-    def __init__(self, obj, **kwargs):
-        """Construct a Debug object."""
-        self.obj: Any = obj
-        self.name: str = None
-        self._id: int = None
-        super().__init__(**kwargs)
-
-    @property
-    def id(self):
-        """Generate a unique, sequential ID number."""
-        if self._id is None:
-            self._id = self._curr_id
-            self.__class__._curr_id += 1
-        return self._id
-
-    @property
-    def debug_name(self):
-        """Return the name, create a fresh name if needed."""
-        if self.name:
-            return self.name
-        prefix = self.obj.__class__.__name__.lower()
-        self.name = f'_{prefix}{self.id}'
-        return self.name
 
 
 class Graph:
@@ -78,7 +42,7 @@ class Graph:
         """Construct a graph."""
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
-        self.debug = GraphDebug(self)
+        self.debug = NamedDebugInfo(self)
 
     @property
     def output(self) -> 'ANFNode':
@@ -107,21 +71,6 @@ class Graph:
         return repr_(self, name=self.debug.debug_name,
                      parameters=list_str(self.parameters),
                      return_=self.return_)
-
-
-class GraphDebug(Debug):
-    """Debug information for a graph.
-
-    Any information that is used for debugging e.g. plotting, printing, etc.
-    can be stored in this class.
-
-    Attributes:
-        ast: The AST node that created this graph.
-        name: The function name.
-
-    """
-
-    ast: AST
 
 
 class ANFNode(Node):
@@ -155,7 +104,7 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.uses: Set[Tuple[ANFNode, int]] = set()
-        self.debug = ANFNodeDebug(self)
+        self.debug = NamedDebugInfo(self)
 
     @property
     def inputs(self) -> 'Inputs':
@@ -192,21 +141,6 @@ class ANFNode(Node):
 
     def __str__(self) -> str:
         return self.debug.debug_name
-
-
-class ANFNodeDebug(Debug):
-    """Debug information for a node.
-
-    Any information that is used for debugging e.g. plotting, printing, etc.
-    can be stored in this class.
-
-    Attributes:
-        ast: The AST node that generated this node.
-        name: The name of this variable.
-
-    """
-
-    ast: AST
 
 
 class Inputs(MutableSequence[ANFNode]):
