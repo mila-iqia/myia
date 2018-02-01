@@ -228,15 +228,15 @@ class Parser:
             expr = Apply(inputs_, block.graph)
             expr.debug.ast = node
         elif isinstance(node, ast.UnaryOp):
-            inputs_: List[ANFNode] = [self.environment.ast_map[type(node.op)],
-                                      self.process_expression(block,
-                                                              node.operand)]
+            inputs_ = [self.environment.ast_map[type(node.op)],
+                       self.process_expression(block,
+                       node.operand)]
             expr = Apply(inputs_, block.graph)
             expr.debug.ast = node
         elif isinstance(node, ast.Compare):
             ops = [self.environment.ast_map[type(op)] for op in node.ops]
             assert len(ops) == 1
-            inputs_: List[ANFNode] = [
+            inputs_ = [
                 ops[0],
                 self.process_expression(block, node.left),
                 self.process_expression(block, node.comparators[0])

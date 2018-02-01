@@ -1,5 +1,11 @@
 
 from pytest import mark
+from myia.py_implementations import (
+    tuple as myia_tuple,
+    getitem as myia_getitem,
+    setitem as myia_setitem
+)
+
 
 from .test_lang import parse_compare
 
@@ -96,3 +102,21 @@ def test_prim_getitem(data, item):
 def test_prim_setitem(data, item, value):
     data[item] = value
     return data[item]
+
+
+# Temporary test until there is parser support for tuples
+@parse_compare((2, 7), (4, -6))
+def test_prim_tuple_temp(x, y):
+    return myia_tuple(x, y)
+
+
+# Temporary test until there is parser support for x[y]
+@parse_compare(((1, 2, 3), 0), ((4, -6, 7), 2))
+def test_prim_getitem_temp(data, item):
+    return myia_getitem(data, item)
+
+
+# Temporary test until there is parser support for x[y] = z
+@parse_compare(([1, 2, 3], 0, 33), ([4, -6, 7], 2, 41))
+def test_prim_setitem_temp(data, item, value):
+    return myia_setitem(data, item, value)
