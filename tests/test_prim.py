@@ -1,7 +1,7 @@
 
 from pytest import mark
 from myia.py_implementations import (
-    tuple as myia_tuple,
+    make_tuple,
     getitem as myia_getitem,
     setitem as myia_setitem
 )
@@ -107,7 +107,7 @@ def test_prim_setitem(data, item, value):
 # Temporary test until there is parser support for tuples
 @parse_compare((2, 7), (4, -6))
 def test_prim_tuple_temp(x, y):
-    return myia_tuple(x, y)
+    return make_tuple(x, y)
 
 
 # Temporary test until there is parser support for x[y]

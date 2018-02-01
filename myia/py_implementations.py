@@ -101,9 +101,9 @@ def not_(x):
     return not x
 
 
-@register(primops.tuple)
-def tuple(*elems):
-    """Implement `tuple`."""
+@register(primops.make_tuple)
+def make_tuple(*elems):
+    """Implement `make_tuple`."""
     return elems
 
 

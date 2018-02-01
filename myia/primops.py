@@ -50,7 +50,7 @@ not_ = Primitive('not')
 ###################
 
 
-tuple = Primitive('tuple')
+make_tuple = Primitive('make_tuple')
 getitem = Primitive('getitem')
 setitem = Primitive('setitem')
 
