@@ -71,3 +71,73 @@ def list_str(lst: List):
     """
     elements = ', '.join(str(elem) for elem in lst)
     return f'[{elements}]'
+
+
+def _sequence_map(smap, *seqs):
+    """Structural map on a sequence (list, tuple, etc.)."""
+    s0 = seqs[0]
+    t = type(s0)
+    # Each sequence must have the same type and the same length.
+    smap.require_same([type, len], seqs)
+    return t(smap(*[s[i] for s in seqs]) for i in range(len(s0)))
+
+
+default_smap_dispatch = {
+    tuple: _sequence_map,
+    list: _sequence_map
+}
+
+
+class StructuralMap:
+    """Map a function recursively over all scalars in a structure.
+
+    Attributes:
+        fn: The function to map.
+        dispatch: A type->handler dictionary to determine how to
+            map structurally over that type. A handler is given the
+            StructuralMap instance as its first argument, and then
+            the arguments to the function.
+
+    """
+
+    def __init__(self, fn, dispatch=default_smap_dispatch):
+        """Initialize a StructuralMap."""
+        self.fn = fn
+        self.dispatch = dispatch
+
+    def require_same(self, fns, objs):
+        """Check that all objects have the same properties.
+
+        Arguments:
+            fns: A collection of functions. Each function must return the same
+                result when applied to each object. For example, the functions
+                may be `[type, len]`.
+            objs: Objects that must be invariant with respect to the given
+                functions.
+        """
+        o, *rest = objs
+        for fn in fns:
+            for obj in rest:
+                if fn(o) != fn(obj):
+                    raise TypeError("Arguments to 'smap' do not"
+                                    f" have the same properties:"
+                                    f" `{o}` and `{obj}` are not conformant.")
+
+    def __call__(self, *data):
+        """Apply the StructuralMap on data.
+
+        Each item in data corresponds to one argument of self.fns.
+        """
+        d0 = data[0]
+        t = type(d0)
+        if t in self.dispatch:
+            return self.dispatch[t](self, *data)
+        # elif hasattr(d0, '__smap__'):
+        #     return d0.__smap__(self, *data[1:])
+        else:
+            return self.fn(*data)
+
+
+def smap(fn, *args):
+    """Map a function recursively over all scalars in a structure."""
+    return StructuralMap(fn)(*args)
