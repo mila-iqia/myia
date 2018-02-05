@@ -1,13 +1,15 @@
 """Utilities to generate a graphical representation for a graph."""
 
+from hrepr import hrepr
+import os
+import json
+
 from myia.info import DebugInfo
 from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter
 from myia.parser import Location
 from myia.primops import Primitive
 from myia import primops
-from hrepr import hrepr
-import os
-import json
+from myia.cconv import NestingAnalyzer
 
 
 gcss_path = f'{os.path.dirname(__file__)}/graph.css'
@@ -549,3 +551,33 @@ class _Location:
                 context=hrepr.config.snippet_context or 4
             )
         )
+
+
+@mixin(NestingAnalyzer)
+class _NestingAnalyzer:
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        """Require the cytoscape plugin for buche."""
+        return GraphPrinter.__hrepr_resources__(H)
+
+    def __hrepr__(self, H, hrepr):
+        """Return HTML representation (uses buche-cytoscape)."""
+        pr = GraphPrinter({
+            'layout': {
+                'name': 'dagre',
+                'rankDir': 'TB'
+            }
+        })
+
+        def lbl(x):
+            if isinstance(x, self.ParentProxy):
+                return f"{x.graph.debug.debug_name}'"
+            else:
+                return x.debug.debug_name
+        for g, deps in self.deps.items():
+            pr.cynode(g, lbl(g), 'intermediate')
+            for dep in deps:
+                pr.cynode(dep, lbl(dep), 'intermediate')
+                pr.cynode(dep, lbl(dep), 'intermediate')
+                pr.cyedge(g, dep, '')
+        return pr.__hrepr__(H, hrepr)
