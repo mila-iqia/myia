@@ -42,9 +42,26 @@ import ast
 import inspect
 import textwrap
 from types import FunctionType
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import \
+    overload, Any, Dict, List, Optional, Tuple, Type, NamedTuple
 
 from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
+from .info import DebugInherit, About
+
+
+class Location(NamedTuple):
+    """A location in source code.
+
+    Attributes:
+        filename: The filename.
+        line: The line number.
+        column: The column number.
+
+    """
+
+    filename: str
+    line: str
+    column: int
 
 
 class Environment:
@@ -129,6 +146,8 @@ class Parser:
         """Construct a parser."""
         self.environment = environment
         self.function = function
+        _, self.line_offset = inspect.getsourcelines(function)
+        self.filename: str = inspect.getfile(function)
         self.block_map: Dict[Block, Constant] = {}
         if globals_ is None:
             free_vars = inspect.getclosurevars(function)  # type: ignore
@@ -137,6 +156,15 @@ class Parser:
             globals_.update(free_vars.globals)
             globals_.update(free_vars.nonlocals)
         self.globals_ = globals_
+
+    def make_location(self, node: ast.AST) -> Location:
+        """Create a Location from an AST node."""
+        if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
+            return Location(self.filename,
+                            node.lineno + self.line_offset - 1,  # type: ignore
+                            node.col_offset)  # type: ignore
+        else:
+            raise TypeError(f'No location for {node}')  # pragma: no cover
 
     def parse(self) -> Graph:
         """Parse the function into a Myia graph."""
@@ -160,8 +188,8 @@ class Parser:
             return self.environment.map(self.globals_[varnum])
         raise ValueError(varnum)
 
-    def process_function(self, block: 'Block',
-                         node: ast.FunctionDef) -> 'Block':
+    def process_FunctionDef(self, block: 'Block',
+                            node: ast.FunctionDef) -> 'Block':
         """Process a function definition.
 
         Args:
@@ -185,11 +213,10 @@ class Parser:
             function_block.preds.append(block)
         function_block.mature()
         function_block.graph.debug.name = node.name
-        function_block.graph.debug.ast = node
         for arg in node.args.args:
-            anf_node = Parameter(function_block.graph)
+            with DebugInherit(ast=arg, location=self.make_location(arg)):
+                anf_node = Parameter(function_block.graph)
             anf_node.debug.name = arg.arg
-            anf_node.debug.ast = arg
             function_block.graph.parameters.append(anf_node)
             function_block.write(arg.arg, anf_node)
         function_block.write(node.name,
@@ -197,47 +224,67 @@ class Parser:
         final_block = self.process_statements(function_block, node.body)
         return final_block, function_block
 
-    def process_return(self, block: 'Block', node: ast.Return) -> 'Block':
-        """Process a return statement."""
-        inputs = [self.environment.ast_map[ast.Return],
-                  self.process_expression(block, node.value)]
-        return_ = Apply(inputs, block.graph)
-        block.graph.return_ = return_
-        return_.debug.ast = node
-        return block
+    @overload
+    def process_node(self, block: 'Block', node: ast.expr) -> ANFNode:
+        pass
 
-    def process_assign(self, block: 'Block', node: ast.Assign) -> 'Block':
-        """Process an assignment."""
-        anf_node = self.process_expression(block, node.value)
-        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            anf_node.debug.name = node.targets[0].id
-            block.write(node.targets[0].id, anf_node)
+    @overload  # noqa
+    def process_node(self, block: 'Block', node: ast.stmt) -> 'Block':
+        pass
+
+    def process_node(self, block, node):  # noqa
+        """Process an ast node."""
+        method_name = f'process_{node.__class__.__name__}'
+        method = getattr(self, method_name, None)
+        if method:
+            with DebugInherit(ast=node, location=self.make_location(node)):
+                return method(block, node)
         else:
-            raise NotImplementedError(node.targets)
-        return block
+            raise NotImplementedError(node)  # pragma: no cover
 
-    def process_expression(self, block: 'Block', node: ast.expr) -> ANFNode:
-        """Process an expression."""
-        expr: ANFNode
-        if isinstance(node, ast.BinOp):
-            inputs_: List[ANFNode] = [self.environment.ast_map[type(node.op)],
-                                      self.process_expression(block,
-                                                              node.left),
-                                      self.process_expression(block,
-                                                              node.right)]
-            expr = Apply(inputs_, block.graph)
-            expr.debug.ast = node
-        elif isinstance(node, ast.Name):
-            expr = block.read(node.id)
-        elif isinstance(node, ast.Num):
-            expr = self.environment.map(node.n)
-        elif isinstance(node, ast.Call):
-            func = self.process_expression(block, node.func)
-            args = [self.process_expression(block, arg) for arg in node.args]
-            expr = Apply([func] + args, block.graph)
-        elif isinstance(node, ast.NameConstant):
-            expr = self.environment.map(node.value)
-        return expr
+    # Expression implementations
+
+    def process_BinOp(self, block: 'Block', node: ast.BinOp) -> ANFNode:
+        """Process binary operators: `a + b`, `a | b`, etc."""
+        func = self.environment.ast_map[type(node.op)]
+        left = self.process_node(block, node.left)
+        right = self.process_node(block, node.right)
+        return Apply([func, left, right], block.graph)
+
+    def process_UnaryOp(self, block: 'Block', node: ast.UnaryOp) -> ANFNode:
+        """Process unary operators: `+a`, `-a`, etc."""
+        func = self.environment.ast_map[type(node.op)]
+        operand = self.process_node(block, node.operand)
+        return Apply([func, operand], block.graph)
+
+    def process_Compare(self, block: 'Block', node: ast.Compare) -> ANFNode:
+        """Process comparison operators: `a == b`, `a > b`, etc."""
+        ops = [self.environment.ast_map[type(op)] for op in node.ops]
+        assert len(ops) == 1
+        left = self.process_node(block, node.left)
+        right = self.process_node(block, node.comparators[0])
+        return Apply([ops[0], left, right], block.graph)
+
+    def process_Name(self, block: 'Block', node: ast.Name) -> ANFNode:
+        """Process variables: `variable_name`."""
+        return block.read(node.id)
+
+    def process_Num(self, block: 'Block', node: ast.Num) -> ANFNode:
+        """Process numbers: `1`, `2.5`, etc."""
+        return self.environment.map(node.n)
+
+    def process_Call(self, block: 'Block', node: ast.Call) -> ANFNode:
+        """Process function calls: `f(x)`, etc."""
+        func = self.process_node(block, node.func)
+        args = [self.process_node(block, arg) for arg in node.args]
+        return Apply([func] + args, block.graph)
+
+    def process_NameConstant(self, block: 'Block',
+                             node: ast.NameConstant) -> ANFNode:
+        """Process special constants: `True`, `False`, `None`, etc."""
+        return self.environment.map(node.value)
+
+    # Statement implementations
 
     def process_statements(self, block: 'Block',
                            nodes: List[ast.stmt]) -> 'Block':
@@ -250,46 +297,56 @@ class Parser:
 
         """
         for node in nodes:
-            block = self.process_statement(block, node)
+            block = self.process_node(block, node)
         return block
 
-    def process_statement(self, block: 'Block', node: ast.stmt) -> 'Block':
-        """Process a single statement."""
-        if isinstance(node, ast.Assign):
-            return self.process_assign(block, node)
-        elif isinstance(node, ast.FunctionDef):
-            return self.process_function(block, node)
-        elif isinstance(node, ast.Return):
-            return self.process_return(block, node)
-        elif isinstance(node, ast.If):
-            return self.process_if(block, node)
-        elif isinstance(node, ast.While):
-            return self.process_while(block, node)
-        elif isinstance(node, ast.Expr):
-            return block
-        else:
-            raise NotImplementedError(node)
+    def process_Return(self, block: 'Block', node: ast.Return) -> 'Block':
+        """Process a return statement."""
+        inputs = [self.environment.ast_map[ast.Return],
+                  self.process_node(block, node.value)]
+        return_ = Apply(inputs, block.graph)
+        block.graph.return_ = return_
+        return block
 
-    def process_if(self, block: 'Block', node: ast.If) -> 'Block':
+    def process_Assign(self, block: 'Block', node: ast.Assign) -> 'Block':
+        """Process an assignment."""
+        anf_node = self.process_node(block, node.value)
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            anf_node.debug.name = node.targets[0].id
+            block.write(node.targets[0].id, anf_node)
+        else:
+            raise NotImplementedError(node.targets)
+        return block
+
+    def process_Expr(self, block: 'Block', node: ast.Expr) -> 'Block':
+        """Process an expression statement.
+
+        This ignores the statement.
+        """
+        return block
+
+    def process_If(self, block: 'Block', node: ast.If) -> 'Block':
         """Process a conditional statement.
 
         A conditional statement generates 3 functions: The true branch, the
         false branch, and the continuation.
-
         """
         # Process the condition
-        cond = self.process_expression(block, node.test)
+        cond = self.process_node(block, node.test)
 
         # Create two branches
-        true_block = Block(self)
-        false_block = Block(self)
+        with About(block.graph.debug, 'if_true'):
+            true_block = Block(self)
+        with About(block.graph.debug, 'if_false'):
+            false_block = Block(self)
         true_block.preds.append(block)
         false_block.preds.append(block)
         true_block.mature()
         false_block.mature()
 
         # Create the continuation
-        after_block = Block(self)
+        with About(block.graph.debug, 'if_after'):
+            after_block = Block(self)
 
         # Process the first branch
         true_end = self.process_statements(true_block, node.body)
@@ -308,20 +365,23 @@ class Parser:
         after_block.mature()
         return after_block
 
-    def process_while(self, block: 'Block', node: ast.While) -> 'Block':
+    def process_While(self, block: 'Block', node: ast.While) -> 'Block':
         """Process a while loop.
 
         A while loop will generate 3 functions: The test, the body, and the
         continuation.
 
         """
-        header_block = Block(self)
-        body_block = Block(self)
-        after_block = Block(self)
+        with About(block.graph.debug, 'while_header'):
+            header_block = Block(self)
+        with About(block.graph.debug, 'while_body'):
+            body_block = Block(self)
+        with About(block.graph.debug, 'while_after'):
+            after_block = Block(self)
         body_block.preds.append(header_block)
         after_block.preds.append(header_block)
         block.jump(header_block)
-        cond = self.process_expression(header_block, node.test)
+        cond = self.process_node(header_block, node.test)
         body_block.mature()
         header_block.cond(cond, body_block, after_block)
         after_body = self.process_statements(body_block, node.body)
@@ -428,7 +488,9 @@ class Block:
                 return self.preds[0].read(varnum)
             elif not self.preds:
                 return self.parser.read(varnum)
-        phi = Parameter(self.graph)
+        # TODO: point to the original definition
+        with About(DebugInherit(name=varnum), 'phi'):
+            phi = Parameter(self.graph)
         self.graph.parameters.append(phi)
         self.phi_nodes[phi] = varnum
         self.write(varnum, phi)

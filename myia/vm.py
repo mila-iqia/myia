@@ -4,15 +4,20 @@ This VM will directly execute a graph so it should be suitable for
 testing or debugging.  Don't expect stellar performance from this
 implementation.
 """
-from typing import List, Dict, Any, Union, Set
+from typing import List, Dict, Any, Union, Set, Callable
 
 from myia.anf_ir import Graph, ANFNode, Constant, Parameter, Apply
 from myia.anf_ir_utils import dfs
-from myia.primops import Primitive, Add, If, Return
+from myia.primops import Primitive
+from myia import primops
 
 
 class VM:
     """Virtual Machine interface."""
+
+    def __init__(self, implementations: Dict[Primitive, Callable]) -> None:
+        """Initialize the VM."""
+        self.implementations = implementations
 
     def evaluate(self, graph: Graph, args: List[Any]):
         """
@@ -22,7 +27,7 @@ class VM:
         resulting value.
 
         """
-        root_frame = VMFrame(graph, args, None)
+        root_frame = VMFrame(self, graph, args, None)
         frame = root_frame
         while frame is not None:
             frame = frame.run()
@@ -75,9 +80,14 @@ class VMFrame:
             """Set a jump."""
             super().__init__([], frame, None)
 
-    def __init__(self, graph: Graph, args: List[Any], parent: 'VMFrame',
+    def __init__(self,
+                 vm: VM,
+                 graph: Graph,
+                 args: List[Any],
+                 parent: 'VMFrame',
                  closure: 'VMFrame' = None) -> None:
         """Build a frame."""
+        self.vm = vm
         self.graph = graph
         self.args = args
         self.parent = parent
@@ -198,9 +208,10 @@ class VMFrame:
         else:
             parent = self
         if isinstance(graph, self.Closure):
-            new_frame = VMFrame(graph.graph, args, parent, graph.frame)
+            new_frame = VMFrame(self.vm, graph.graph, args, parent,
+                                graph.frame)
         else:
-            new_frame = VMFrame(graph, args, parent)
+            new_frame = VMFrame(self.vm, graph, args, parent)
         assert len(new_frame.graph.parameters) == len(new_frame.args)
         raise self.Return(new_frame)
 
@@ -266,18 +277,14 @@ class VMFrame:
             fn = self.get_value(node.inputs[0])
             args = [self.get_value(i) for i in node.inputs[1:]]
             if isinstance(fn, Primitive):
-                if isinstance(fn, Add):
-                    self.values[node] = sum(args[1:], args[0])
-                elif isinstance(fn, Return):
-                    self.values[node] = args[0]
-                elif isinstance(fn, If):
-                    cond = args[0]
-                    if cond:
-                        inner = args[1]
-                    else:
-                        inner = args[2]
-                    self.do_call(inner, [])
+                if fn is primops.if_:
+                    cond, tb, fb = args
+                    self.do_call(tb if cond else fb, [])
+                elif fn in self.vm.implementations:
+                    impl = self.vm.implementations[fn]
+                    self.values[node] = impl(*args)
                 else:
-                    raise ValueError('Unknown primitive')  # pragma: no cover
+                    raise ValueError(f'Unknown primitive: {fn}') \
+                        # pragma: no cover
             else:
                 self.do_call(fn, args)

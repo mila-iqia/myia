@@ -1,8 +1,11 @@
 """Utilities to generate a graphical representation for a graph."""
 
-from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter, Debug
-from myia.primops import Primitive, Return
-from myia.cconv import NestingAnalyzer, ParentProxy
+from myia.info import DebugInfo
+from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter
+from myia.parser import Location
+from myia.primops import Primitive
+from myia import primops
+from hrepr import hrepr
 import os
 import json
 
@@ -34,12 +37,31 @@ def is_graph(x):
     return isinstance(x, Constant) and isinstance(x.value, Graph)
 
 
+short_relation_symbols = {
+    'phi': 'Φ',
+    'if_true': '✓',
+    'if_false': '✗',
+    'if_after': '↓',
+    'while_header': '⤾',
+    'while_body': '⥁',
+    'while_after': '↓'
+}
+
+
 class NodeLabeler:
     """Utility to label a node."""
 
-    def __init__(self, function_in_node=True):
+    def __init__(self,
+                 function_in_node=True,
+                 relation_symbols={}):
         """Initialize a NodeLabeler."""
         self.function_in_node = function_in_node
+        self.relation_symbols = relation_symbols
+
+    def combine_relation(self, name, relation):
+        """Combine a name and a relation in a single string."""
+        rel = self.relation_symbols.get(relation, f'{relation}:')
+        return f'{rel}{name}'
 
     def const_fn(self, node):
         """
@@ -56,9 +78,14 @@ class NodeLabeler:
 
     def name(self, node, force=False):
         """Return a node's name."""
-        if isinstance(node, Debug):
+        if isinstance(node, DebugInfo):
             if node.name:
                 return node.name
+            elif node.about:
+                return self.combine_relation(
+                    self.name(node.about.debug),
+                    node.about.relation
+                )
             elif force:
                 return f'#{node.id}'
             else:
@@ -68,7 +95,7 @@ class NodeLabeler:
 
     def label(self, node, force=None, fn_label=None):
         """Label a node."""
-        if isinstance(node, Debug):
+        if isinstance(node, DebugInfo):
             return self.name(node, True if force is None else force)
         elif isinstance(node, Graph):
             return self.name(node.debug,
@@ -81,7 +108,7 @@ class NodeLabeler:
             if isinstance(v, (int, float, str)):
                 return repr(v)
             elif isinstance(v, Primitive):
-                return v.__class__.__name__.lower()
+                return v.name
             else:
                 class_name = v.__class__.__name__
                 return f'{self.label(node.debug, True)}:{class_name}'
@@ -104,7 +131,9 @@ class NodeLabeler:
             return lbl or '·'
 
 
-standard_node_labeler = NodeLabeler()
+standard_node_labeler = NodeLabeler(
+    relation_symbols=short_relation_symbols
+)
 
 
 class GraphPrinter:
@@ -115,12 +144,17 @@ class GraphPrinter:
 
     """
 
-    def __init__(self, cyoptions):
+    def __init__(self,
+                 cyoptions,
+                 tooltip_gen=None,
+                 extra_style=None):
         """Initialize GraphPrinter."""
         # Nodes and edges are accumulated in these lists
         self.nodes = []
         self.edges = []
         self.cyoptions = cyoptions
+        self.tooltip_gen = tooltip_gen
+        self.extra_style = extra_style or ''
 
     def id(self, x):
         """Return the id associated to x."""
@@ -131,11 +165,19 @@ class GraphPrinter:
         self.currid += 1
         return f'Y{self.currid}'
 
-    def cynode(self, id, label, classes, parent=None):
+    def cynode(self, id, label, classes, parent=None, node=None):
         """Build data structure for a node in cytoscape."""
         if not isinstance(id, str):
+            if node is None:
+                node = id
             id = self.id(id)
         data = {'id': id, 'label': str(label)}
+        if self.tooltip_gen and node:
+            ttip = self.tooltip_gen(node)
+            if ttip is not None:
+                if not isinstance(ttip, str):
+                    ttip = str(hrepr(ttip))
+                data['tooltip'] = ttip
         if parent:
             parent = parent if isinstance(parent, str) else self.id(parent)
             data['parent'] = parent
@@ -169,7 +211,7 @@ class GraphPrinter:
 
     def __hrepr__(self, H, hrepr):
         """Return HTML representation (uses buche-cytoscape)."""
-        rval = H.cytoscapeGraph(H.style(gcss))
+        rval = H.cytoscapeGraph(H.style(gcss + self.extra_style))
         rval = rval(width=hrepr.config.graph_width or '800px',
                     height=hrepr.config.graph_height or '500px')
         rval = rval(H.options(json.dumps(self.cyoptions)))
@@ -203,21 +245,32 @@ class MyiaGraphPrinter(GraphPrinter):
                  duplicate_constants=False,
                  duplicate_free_variables=False,
                  function_in_node=False,
-                 follow_references=False):
+                 follow_references=False,
+                 tooltip_gen=None,
+                 class_gen=None,
+                 extra_style=None):
         """Initialize a MyiaGraphPrinter."""
-        super().__init__({
-            'layout': {
-                'name': 'dagre',
-                'rankDir': 'TB'
-            }
-        })
+        super().__init__(
+            {
+                'layout': {
+                    'name': 'dagre',
+                    'rankDir': 'TB'
+                }
+            },
+            tooltip_gen=tooltip_gen,
+            extra_style=extra_style
+        )
         # Graphs left to process
         self.graphs = set(entry_points)
         self.duplicate_constants = duplicate_constants
         self.duplicate_free_variables = duplicate_free_variables
         self.function_in_node = function_in_node
         self.follow_references = follow_references
-        self.labeler = NodeLabeler(function_in_node=function_in_node)
+        self.labeler = NodeLabeler(
+            function_in_node=function_in_node,
+            relation_symbols=short_relation_symbols
+        )
+        self._class_gen = class_gen
         # Nodes processed
         self.processed = set()
         # Nodes left to process
@@ -230,7 +283,7 @@ class MyiaGraphPrinter(GraphPrinter):
         self.custom_rules = {
             'return': self.process_node_return,
             'index': self.process_node_index,
-            'make_tuple': self.process_node_make_tuple
+            'tuple': self.process_node_tuple
         }
 
     def name(self, x):
@@ -278,7 +331,7 @@ class MyiaGraphPrinter(GraphPrinter):
         else:
             self.process_node_generic(node, g, cl)
 
-    def process_node_make_tuple(self, node, g, cl):
+    def process_node_tuple(self, node, g, cl):
         """Create node and edges for `(a, b, c, ...)`."""
         if self.function_in_node:
             lbl = self.label(node, f'(...)')
@@ -308,15 +361,12 @@ class MyiaGraphPrinter(GraphPrinter):
 
         self.process_edges(edges)
 
-    def process_node(self, node):
-        """Create node and edges for a node."""
-        if node in self.processed:
-            return
-
+    def class_gen(self, node, cl=None):
+        """Generate the class name for this node."""
         g = node.graph
-        self.follow(node)
-
-        if node in self.returns:
+        if cl is not None:
+            pass
+        elif node in self.returns:
             cl = 'output'
         elif g and node in g.parameters:
             cl = 'input'
@@ -324,6 +374,19 @@ class MyiaGraphPrinter(GraphPrinter):
             cl = 'constant'
         else:
             cl = 'intermediate'
+        if self._class_gen:
+            return self._class_gen(node, cl)
+        else:
+            return cl
+
+    def process_node(self, node):
+        """Create node and edges for a node."""
+        if node in self.processed:
+            return
+
+        g = node.graph
+        self.follow(node)
+        cl = self.class_gen(node)
 
         ctfn = self.const_fn(node)
         if ctfn:
@@ -346,7 +409,8 @@ class MyiaGraphPrinter(GraphPrinter):
                 self.cynode(id=cid,
                             parent=src.graph,
                             label=self.label(dest),
-                            classes='constant')
+                            classes=self.class_gen(dest, 'constant'),
+                            node=dest)
                 self.cyedge(src_id=src, dest_id=cid, label=lbl)
             elif self.duplicate_free_variables and \
                     src.graph and dest.graph and \
@@ -356,7 +420,8 @@ class MyiaGraphPrinter(GraphPrinter):
                 self.cynode(id=cid,
                             parent=src.graph,
                             label=self.name(dest),
-                            classes='freevar')
+                            classes=self.class_gen(dest, 'freevar'),
+                            node=dest)
                 self.cyedge(src_id=src, dest_id=cid, label=lbl)
                 self.cyedge(src_id=cid, dest_id=dest, label=(lbl, 'link-edge'))
             else:
@@ -430,12 +495,18 @@ class _Graph:
         dfv = hrepr.config.duplicate_free_variables
         fin = hrepr.config.function_in_node
         fr = hrepr.config.follow_references
+        tgen = hrepr.config.node_tooltip
+        cgen = hrepr.config.node_class
+        xsty = hrepr.config.graph_style
         gpr = MyiaGraphPrinter(
             {self},
             duplicate_constants=True if dc is None else dc,
             duplicate_free_variables=True if dfv is None else dfv,
             function_in_node=True if fin is None else fin,
-            follow_references=True if fr is None else fr
+            follow_references=True if fr is None else fr,
+            tooltip_gen=tgen,
+            class_gen=cgen,
+            extra_style=xsty
         )
         gpr.process()
         return gpr.__hrepr__(H, hrepr)
@@ -459,38 +530,22 @@ class _Apply:
     def __hrepr__(self, H, hrepr):
         if len(self.inputs) == 2 and \
                 isinstance(self.inputs[0], Constant) and \
-                isinstance(self.inputs[0].value, Return):
+                self.inputs[0].value is primops.return_:
             return hrepr.hrepr_nowrap(self.inputs[1])['node-return']
         else:
             return super(Apply, self).__hrepr__(H, hrepr)
 
 
-@mixin(NestingAnalyzer)
-class _NestingAnalyzer:
-    @classmethod
-    def __hrepr_resources__(cls, H):
-        """Require the cytoscape plugin for buche."""
-        return GraphPrinter.__hrepr_resources__(H)
-
+@mixin(Location)
+class _Location:
     def __hrepr__(self, H, hrepr):
-        """Return HTML representation (uses buche-cytoscape)."""
-        pr = GraphPrinter({
-            'layout': {
-                'name': 'dagre',
-                'rankDir': 'TB'
-            }
-        })
-
-        def lbl(x):
-            if isinstance(x, ParentProxy):
-                return f"{x.graph.debug.debug_name}'"
-            else:
-                return x.debug.debug_name
-
-        for g, deps in self.deps.items():
-            pr.cynode(g, lbl(g), 'intermediate')
-            for dep in deps:
-                pr.cynode(dep, lbl(dep), 'intermediate')
-                pr.cynode(dep, lbl(dep), 'intermediate')
-                pr.cyedge(g, dep, '')
-        return pr.__hrepr__(H, hrepr)
+        return H.div(
+            H.style('.hljs, .hljs-linenos { font-size: 10px !IMPORTANT; }'),
+            H.codeSnippet(
+                src=self.url,
+                language="python",
+                line=self.line,
+                column=self.column + 1,
+                context=hrepr.config.snippet_context or 4
+            )
+        )

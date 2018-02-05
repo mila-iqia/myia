@@ -7,37 +7,58 @@ subclass.
 """
 
 
-class Primitive:
+from myia.utils import Named
+
+
+class Primitive(Named):
     """Base class for primitives."""
 
     pass
 
 
-class Add(Primitive):
-    """Scalar addition."""
-
-    pass
-
-
-class If(Primitive):
-    """An if-else expression.
-
-    This is a special primitive which takes 3 values: A boolean and two
-    anonymous functions without parameters (thunks). This primitive will
-    execute one of the two functions, depending on the boolean value, and
-    return the result.
-
-    """
-
-    pass
+##############
+# Arithmetic #
+##############
 
 
-class Return(Primitive):
-    """Return primitive.
+add = Primitive('add')
+sub = Primitive('sub')
+mul = Primitive('mul')
+div = Primitive('div')
+mod = Primitive('mod')
+pow = Primitive('pow')
+uadd = Primitive('uadd')
+usub = Primitive('usub')
 
-    Each function must end with a call to this primitive, the arguments to
-    which will be the values returned by the function.
 
-    """
+###############
+# Comparisons #
+###############
 
-    pass
+
+eq = Primitive('eq')
+lt = Primitive('lt')
+gt = Primitive('gt')
+ne = Primitive('ne')
+le = Primitive('le')
+ge = Primitive('ge')
+not_ = Primitive('not')
+
+
+###################
+# Data structures #
+###################
+
+
+make_tuple = Primitive('make_tuple')
+getitem = Primitive('getitem')
+setitem = Primitive('setitem')
+
+
+##############
+# Statements #
+##############
+
+
+if_ = Primitive('if')
+return_ = Primitive('return')
