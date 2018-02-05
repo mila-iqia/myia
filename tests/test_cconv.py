@@ -42,6 +42,10 @@ def check_nest(rels, fvspecs):
                 if g2:
                    assert analysis.nested_in(g1, g2)
                    assert not analysis.nested_in(g2, g1)
+            for g1, children in analysis.children.items():
+                for child in children:
+                   assert analysis.nested_in(child, g1)
+                   assert not analysis.nested_in(g1, child)
 
             fvs = {}
             for g, vs in analysis.fvs.items():

@@ -43,6 +43,7 @@ class NestingAnalyzer:
         """Initialize the NestingAnalyzer."""
         self.processed: Set[Graph] = set()
         self.parents: Dict[Graph, Optional[Graph]] = {}
+        self.children: Dict[Graph, Set[Graph]] = defaultdict(set)
         self.fvs: Dict[Graph, Set[ANFNode]] = defaultdict(set)
 
     def run(self, root: Graph) -> 'NestingAnalyzer':
@@ -84,6 +85,12 @@ class NestingAnalyzer:
         new_parents = {g: None if len(gs) == 0 else list(gs)[0]
                        for g, gs in self.deps.items()}
         self.parents.update(new_parents)  # type: ignore
+
+        # We update the children
+        for g, parent in new_parents.items():
+            if parent:
+                assert isinstance(parent, Graph)
+                self.children[parent].add(g)
 
         # We find all free variables (could be interleaved with other
         # phases, probably)
