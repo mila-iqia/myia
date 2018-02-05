@@ -1,9 +1,8 @@
 """Utilities for manipulating and inspecting the IR."""
-
 from typing import Iterable
 
 from myia.anf_ir import ANFNode, Constant, Graph
-from myia.graph_utils import dfs as _dfs
+from myia.graph_utils import dfs as _dfs, toposort as _toposort
 
 
 #######################
@@ -36,6 +35,11 @@ def succ_incoming(node):
 def dfs(root: ANFNode, follow_graph: bool = False) -> Iterable[ANFNode]:
     """Perform a depth-first search."""
     return _dfs(root, succ_deep if follow_graph else succ_incoming)
+
+
+def toposort(root: ANFNode) -> Iterable[ANFNode]:
+    """Order the nodes topologically."""
+    return _toposort(root, succ_incoming)
 
 
 ##################
