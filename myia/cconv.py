@@ -8,12 +8,7 @@ I.e. retrieving nesting structure and listing free variables.
 from typing import Set, Dict, Optional, Union
 from collections import defaultdict
 from .anf_ir import ANFNode, Constant, Graph
-from .anf_ir_utils import dfs
-
-
-def is_graph(x: ANFNode) -> bool:
-    """Return whether x is a Constant with a Graph value."""
-    return isinstance(x, Constant) and isinstance(x.value, Graph)
+from .anf_ir_utils import dfs, is_constant_graph
 
 
 class ParentProxy:
@@ -63,7 +58,8 @@ class NestingAnalyzer:
         self.nodes = set(dfs(Constant(root), True))
 
         # We get all graphs possibly accessed.
-        self.graphs = {node.value for node in self.nodes if is_graph(node)}
+        self.graphs = {node.value for node in self.nodes
+                       if is_constant_graph(node)}
         self.processed |= self.graphs
 
         # We compute the dependencies:
@@ -72,13 +68,13 @@ class NestingAnalyzer:
         # * If a node in graph g refers to a graph g', then g depends on
         #   whatever the parent scope of g' is. That parent scope is
         #   represented by a ParentProxy.
-        self.compute_deps()
+        self._compute_deps()
 
         # We complete the dependency graph by following proxies.
-        self.resolve_proxies()
+        self._resolve_proxies()
 
         # We remove all but the most immediate parent of a graph.
-        self.simplify()
+        self._simplify()
 
         # We update the parents. ParentProxy instances were removed, so
         # the typing's correct.
@@ -94,11 +90,11 @@ class NestingAnalyzer:
 
         # We find all free variables (could be interleaved with other
         # phases, probably)
-        self.associate_free_variables()
+        self._associate_free_variables()
 
         return self
 
-    def compute_deps(self) -> None:
+    def _compute_deps(self) -> None:
         """Compute which graphs depend on which other graphs."""
         for g in self.graphs:
             prox = ParentProxy(g)
@@ -106,12 +102,12 @@ class NestingAnalyzer:
         for node in self.nodes:
             orig = node.graph
             for inp in node.inputs:
-                if is_graph(inp):
+                if is_constant_graph(inp):
                     self.deps[orig].add(self.prox[inp.value])
                 elif inp.graph and inp.graph is not orig:
                     self.deps[orig].add(inp.graph)
 
-    def resolve_proxies(self) -> None:
+    def _resolve_proxies(self) -> None:
         """Resolve the ParentProxy nodes."""
         def seek_parents(g, path=None):
             if path is None:
@@ -132,7 +128,7 @@ class NestingAnalyzer:
             newdeps[g] = seek_parents(g)
         self.deps = newdeps
 
-    def simplify(self) -> None:
+    def _simplify(self) -> None:
         """Keep only the closest dependency for each graph."""
         to_cull = {list(deps)[0]
                    for g, deps in self.deps.items()
@@ -145,13 +141,13 @@ class NestingAnalyzer:
                 done = False
 
         if not done:
-            self.simplify()
+            self._simplify()
 
-    def associate_free_variables(self) -> None:
+    def _associate_free_variables(self) -> None:
         """Associate a set of free variables to each graph."""
         for node in self.nodes:
             for inp in node.inputs:
-                if is_graph(inp):
+                if is_constant_graph(inp):
                     owner = self.parents[inp.value]
                 else:
                     owner = inp.graph
