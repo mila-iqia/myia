@@ -5,10 +5,13 @@ I.e. retrieving nesting structure and listing free variables.
 """
 
 
-from typing import Set, Dict, Optional, Union
+from typing import Dict, Iterable, Optional, Set
 from collections import defaultdict
-from .anf_ir import ANFNode, Constant, Graph
-from .anf_ir_utils import dfs, is_constant_graph
+
+from myia.anf_ir import ANFNode, Constant, Graph
+from myia.anf_ir_utils import is_constant_graph, succ_deep, succ_stop_at_fv
+from myia.graph_utils import dfs
+from myia.utils import memoize_method
 
 
 class ParentProxy:
@@ -20,101 +23,77 @@ class ParentProxy:
 
 
 class NestingAnalyzer:
-    """
-    Analyzes the nesting structure of a graph.
+    """Analyzes the nesting structure of a graph."""
 
-    Call the `run(root_graph)` method to populate the data structures.
+    def __init__(self, root):
+        """Initialize a NestingAnalyzer."""
+        self.root = root
 
-    Attributes:
-        deps: Maps a graph to the set of graphs that it depends on.
-        parents: Maps a graph to its immediate parent or `None` if
-            it has no parent.
-        fvs: Maps a graph to a set of nodes it refers to from other
-            graphs, including nodes nested graphs have to access.
+    @memoize_method
+    def coverage(self) -> Iterable[Graph]:
+        """Return a collection of graphs accessible from the root."""
+        nodes = dfs(Constant(self.root), succ_deep)
+        return [node.value for node in nodes
+                if is_constant_graph(node)]
 
-    """
+    @memoize_method
+    def free_variables_direct(self) -> Dict[Graph, Iterable[ANFNode]]:
+        """Return a mapping from each graph to its free variables.
 
-    def __init__(self) -> None:
-        """Initialize the NestingAnalyzer."""
-        self.processed: Set[Graph] = set()
-        self.parents: Dict[Graph, Optional[Graph]] = {}
-        self.children: Dict[Graph, Set[Graph]] = defaultdict(set)
-        self.fvs: Dict[Graph, Set[ANFNode]] = defaultdict(set)
+        The free variables returned are those that the graph refers
+        to directly. Nested graphs are not taken into account, but
+        they are in `free_variables_total`.
+        """
+        coverage = self.coverage()
+        return {g: [node for node in dfs(g.return_,
+                                         succ_stop_at_fv(g))
+                    if node.graph and node.graph is not g]
+                for g in coverage}
 
-    def run(self, root: Graph) -> 'NestingAnalyzer':
-        """Run the analysis. Populates `self.parents` and `self.fvs`."""
-        if root in self.processed:
-            return self
+    @memoize_method
+    def graph_dependencies_direct(self) -> Dict[Graph, Set[Graph]]:
+        """Map each graph to the graphs it gets free variables from.
 
-        # Initialize temporary structures
-        self.prox: Dict[Graph, ParentProxy] = {}
-        self.graphs: Set[Graph] = set()
-        self.nodes: Set[ANFNode] = set()
-        self.deps: Dict[Graph, Set[Union[Graph, ParentProxy]]] = \
-            defaultdict(set)
+        This is the set of graphs that own the nodes returned by
+        `free_variables_direct`, for each graph.
+        """
+        fvdict = self.free_variables_direct()
+        return {g: {node.graph for node in fvs}
+                for g, fvs in fvdict.items()}
 
-        # We get all nodes that could possibly be executed within this
-        # graph.
-        self.nodes = set(dfs(Constant(root), True))
+    @memoize_method
+    def graphs_used(self) -> Dict[Graph, Set[Graph]]:
+        """Map each graph to the set of graphs it uses.
 
-        # We get all graphs possibly accessed.
-        self.graphs = {node.value for node in self.nodes
-                       if is_constant_graph(node)}
-        self.processed |= self.graphs
+        For each graph, this is the set of graphs that it refers to
+        directly.
+        """
+        coverage = self.coverage()
+        return {g: {node.value for node in dfs(g.return_,
+                                               succ_stop_at_fv(g))
+                    if is_constant_graph(node)}
+                for g in coverage}
 
-        # We compute the dependencies:
-        # * If a node in graph g has an input from graph g', then g depends
-        #   on g'
-        # * If a node in graph g refers to a graph g', then g depends on
-        #   whatever the parent scope of g' is. That parent scope is
-        #   represented by a ParentProxy.
-        self._compute_deps()
+    @memoize_method
+    def graph_dependencies_total(self) -> Dict[Graph, Set[Graph]]:
+        """Map each graph to the set of graphs it depends on.
 
-        # We complete the dependency graph by following proxies.
-        self._resolve_proxies()
+        This is a superset of `graph_dependencies_direct` which also
+        includes the graphs from which nested graphs need free
+        variables.
+        """
+        gdir = self.graph_dependencies_direct()
+        used = self.graphs_used()
+        all_deps = {g: deps | {ParentProxy(g)
+                               for g in used.get(g, set())}
+                    for g, deps in gdir.items()}
 
-        # We remove all but the most immediate parent of a graph.
-        self._simplify()
-
-        # We update the parents. ParentProxy instances were removed, so
-        # the typing's correct.
-        new_parents = {g: None if len(gs) == 0 else list(gs)[0]
-                       for g, gs in self.deps.items()}
-        self.parents.update(new_parents)  # type: ignore
-
-        # We update the children
-        for g, parent in new_parents.items():
-            if parent:
-                assert isinstance(parent, Graph)
-                self.children[parent].add(g)
-
-        # We find all free variables (could be interleaved with other
-        # phases, probably)
-        self._associate_free_variables()
-
-        return self
-
-    def _compute_deps(self) -> None:
-        """Compute which graphs depend on which other graphs."""
-        for g in self.graphs:
-            prox = ParentProxy(g)
-            self.prox[g] = prox
-        for node in self.nodes:
-            orig = node.graph
-            for inp in node.inputs:
-                if is_constant_graph(inp):
-                    self.deps[orig].add(self.prox[inp.value])
-                elif inp.graph and inp.graph is not orig:
-                    self.deps[orig].add(inp.graph)
-
-    def _resolve_proxies(self) -> None:
-        """Resolve the ParentProxy nodes."""
         def seek_parents(g, path=None):
             if path is None:
                 path = set()
             if g in path:
                 return set()
-            deps = self.deps[g]
+            deps = all_deps[g]
             parents = set()
             for dep in deps:
                 if isinstance(dep, ParentProxy):
@@ -123,45 +102,82 @@ class NestingAnalyzer:
                     parents.add(dep)
             return parents - {g}
 
-        newdeps = {}
-        for g in self.graphs:
-            newdeps[g] = seek_parents(g)
-        self.deps = newdeps
+        new_deps = {}
+        for g in all_deps.keys():
+            new_deps[g] = seek_parents(g)
+        return new_deps
 
-    def _simplify(self) -> None:
-        """Keep only the closest dependency for each graph."""
-        to_cull = {list(deps)[0]
-                   for g, deps in self.deps.items()
-                   if len(deps) == 1}
+    @memoize_method
+    def parents(self) -> Dict[Graph, Optional[Graph]]:
+        """Map each graph to its parent graph.
 
-        done = True
-        for g, deps in self.deps.items():
-            if len(deps) > 1:
-                deps.difference_update(to_cull)
-                done = False
+        Top-level graphs are associated to `None` in the returned
+        dictionary.
+        """
+        all_deps = self.graph_dependencies_total()
+        all_deps = {g: set(deps) for g, deps in all_deps.items()}
 
-        if not done:
-            self._simplify()
+        buckets: Dict[int, Set[Graph]] = defaultdict(set)
+        for g, deps in all_deps.items():
+            buckets[len(deps)].add(g)
 
-    def _associate_free_variables(self) -> None:
-        """Associate a set of free variables to each graph."""
-        for node in self.nodes:
+        rm: Set[Graph] = set()
+        next_rm: Set[Graph] = set()
+        for n, graphs in sorted(buckets.items()):
+            for g in graphs:
+                all_deps[g] -= rm
+                assert len(all_deps[g]) <= 1
+                next_rm |= all_deps[g]
+            rm |= next_rm
+
+        parents = {g: None if len(gs) == 0 else list(gs)[0]
+                   for g, gs in all_deps.items()}
+
+        return parents
+
+    @memoize_method
+    def children(self) -> Dict[Graph, Set[Graph]]:
+        """Map each graph to the graphs immediately nested in it.
+
+        This is the inverse map of `parents`.
+        """
+        children: Dict[Graph, Set[Graph]] = defaultdict(set)
+        for g, parent in self.parents().items():
+            if parent:
+                children[parent].add(g)
+        return children
+
+    @memoize_method
+    def free_variables_total(self) -> Dict[Graph, Set[ANFNode]]:
+        """Map each graph to its free variables.
+
+        This differs from `free_variables_direct` in that it also
+        includes free variables needed by children graphs.
+        Furthermore, graph Constants may figure as free variables.
+        """
+        parents = self.parents()
+        fvs: Dict[Graph, Set[ANFNode]] = defaultdict(set)
+
+        for node in dfs(self.root.return_, succ_deep):
             for inp in node.inputs:
                 if is_constant_graph(inp):
-                    owner = self.parents[inp.value]
+                    owner = parents[inp.value]
                 else:
                     owner = inp.graph
                 if owner is None:
                     continue
                 g = node.graph
                 while g is not owner:
-                    self.fvs[g].add(inp)
-                    g = self.parents[g]
+                    fvs[g].add(inp)
+                    g = parents[g]
+
+        return fvs
 
     def nested_in(self, g1: Graph, g2: Graph) -> bool:
         """Return whether g1 is nested in g2."""
+        parents = self.parents()
         while g1:
-            g1 = self.parents[g1]
+            g1 = parents[g1]
             if g1 is g2:
                 return True
         else:

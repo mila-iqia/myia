@@ -2,22 +2,58 @@
 from typing import Iterable
 
 from myia.anf_ir import ANFNode, Constant, Graph
+from myia.graph_utils import dfs as _dfs
+
+
+#######################
+# Successor functions #
+#######################
+
+
+def succ_deep(node):
+    """Follow node.incoming and graph references.
+
+    A node's successors are its `incoming` set, or the return node of a graph
+    when a graph Constant is encountered.
+    """
+    if is_constant_graph(node):
+        return [node.value.return_]
+    else:
+        return node.incoming
+
+
+def succ_incoming(node):
+    """Follow node.incoming."""
+    return node.incoming
+
+
+def succ_stop_at_fv(graph):
+    """Follow node.incoming for nodes that belong to graph.
+
+    This successor function does not follow nodes that belong to other graphs
+    (i.e. free variables). These nodes can be successors, however.
+    """
+    def succ(node):
+        if node.graph is graph:
+            return node.incoming
+        else:
+            return []
+    return succ
+
+
+#####################
+# Search algorithms #
+#####################
 
 
 def dfs(root: ANFNode, follow_graph: bool = False) -> Iterable[ANFNode]:
     """Perform a depth-first search."""
-    seen = set()
-    to_visit = [root]
-    while to_visit:
-        node = to_visit.pop()
-        seen.add(node)
-        yield node
-        for in_ in node.incoming:
-            if in_ not in seen:
-                to_visit.append(in_)
-        if isinstance(node.value, Graph) and follow_graph:
-            if node.value.return_ not in seen:
-                to_visit.append(node.value.return_)
+    return _dfs(root, succ_deep if follow_graph else succ_incoming)
+
+
+##################
+# Misc utilities #
+##################
 
 
 def is_constant_graph(x: ANFNode) -> bool:
