@@ -5,11 +5,26 @@ testing or debugging.  Don't expect stellar performance from this
 implementation.
 """
 from typing import List, Dict, Any, Union, Set, Callable
+from types import FunctionType
 
 from myia.anf_ir import Graph, ANFNode, Constant, Parameter, Apply
 from myia.anf_ir_utils import dfs
+from myia.utils import smap
 from myia.primops import Primitive
 from myia import primops
+
+
+class CallableClosure:
+    """Callable closure."""
+
+    def __init__(self, closure):
+        """Initialize the CallableClosure."""
+        self.closure = closure
+
+    def __call__(self, *args):
+        """Call the CallableClosure."""
+        vm = self.closure.frame.vm
+        return vm.evaluate(self.closure.graph, args, self.closure.frame)
 
 
 class VM:
@@ -19,19 +34,44 @@ class VM:
         """Initialize the VM."""
         self.implementations = implementations
 
-    def evaluate(self, graph: Graph, args: List[Any]):
-        """
-        Run a graph.
+    def make_callable(self, g):
+        """Return an object that executes `g` when called on arguments."""
+        return CallableClosure(VMFrame.Closure(g, VMFrame(self, g, [], None)))
+
+    def convert_value(self, value):
+        """Translate the value to a format that the VM understands."""
+        if isinstance(value, FunctionType):
+            from myia.api import parse
+            return parse(value)
+        elif isinstance(value, CallableClosure):
+            return value.closure
+        else:
+            return value
+
+    def unconvert_value(self, value):
+        """Translate a VM-produced value to a user-faced format."""
+        if isinstance(value, VMFrame.Closure):
+            return CallableClosure(value)
+        elif isinstance(value, Primitive):
+            return self.implementations[value]
+        else:
+            return value
+
+    def evaluate(self,
+                 graph: Graph,
+                 args: List[Any],
+                 closure: 'VMFrame' = None) -> Any:
+        """Run a graph.
 
         This will evaluate the passed-in graph and return the
         resulting value.
-
         """
-        root_frame = VMFrame(self, graph, args, None)
+        args = smap(self.convert_value, args)
+        root_frame = VMFrame(self, graph, args, None, closure)
         frame = root_frame
         while frame is not None:
             frame = frame.run()
-        return root_frame.result()
+        return smap(self.unconvert_value, root_frame.result())
 
 
 class VMFrame:
