@@ -47,7 +47,8 @@ from typing import \
     overload, Any, Dict, List, Optional, Tuple, Type, NamedTuple
 
 from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
-from .info import DebugInherit, About
+from myia.info import DebugInherit, About
+from myia import primops
 
 
 class Location(NamedTuple):
@@ -293,9 +294,16 @@ class Parser:
 
     def process_Tuple(self, block: 'Block', node: ast.Tuple) -> ANFNode:
         """Process tuple literals."""
-        op = self.environment.ast_map[ast.Tuple]
+        op = Constant(primops.cons_tuple)
         elts = [self.process_node(block, e) for e in node.elts]
-        return Apply([op, *elts], block.graph)
+
+        def cons(elts):
+            if len(elts) == 0:
+                return Constant(())
+            else:
+                x, *rest = elts
+                return Apply([op, x, cons(rest)], block.graph)
+        return cons(elts)
 
     def process_Subscript(self, block: 'Block',
                           node: ast.Subscript) -> ANFNode:

@@ -29,7 +29,6 @@ def default_ast_map() -> Dict[Type[ast.AST], ANFNode]:
         ast.LtE: Constant(P.le),
         ast.GtE: Constant(P.ge),
         ast.Not: Constant(P.not_),
-        ast.Tuple: Constant(P.make_tuple),
         ast.Subscript: Constant(P.getitem),
         ast.Attribute: Constant(P.getattr),
         ast.If: Constant(P.if_),

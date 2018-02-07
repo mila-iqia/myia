@@ -101,10 +101,22 @@ def not_(x):
     return not x
 
 
-@register(primops.make_tuple)
-def make_tuple(*elems):
-    """Implement `make_tuple`."""
-    return elems
+@register(primops.cons_tuple)
+def cons_tuple(head, tail):
+    """Implement `cons_tuple`."""
+    return (head,) + tail
+
+
+@register(primops.head)
+def head(tup):
+    """Implement `head`."""
+    return tup[0]
+
+
+@register(primops.tail)
+def tail(tup):
+    """Implement `tail`."""
+    return tup[1:]
 
 
 @register(primops.getitem)

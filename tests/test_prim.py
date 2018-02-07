@@ -1,10 +1,6 @@
 
 from pytest import mark
-from myia.py_implementations import (
-    make_tuple,
-    getitem as myia_getitem,
-    setitem as myia_setitem
-)
+from myia.py_implementations import head, tail
 
 
 from .test_lang import parse_compare
@@ -99,3 +95,9 @@ def test_prim_getitem(data, item):
 def test_prim_setitem(data, item, value):
     data[item] = value
     return data[item]
+
+
+def test_prim_head_tail():
+    tup = (1, 2, 3, 4)
+    assert head(tup) == 1
+    assert tail(tup) == (2, 3, 4)
