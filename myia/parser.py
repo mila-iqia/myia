@@ -105,12 +105,12 @@ class Environment:
     convert it into a Myia object e.g. create a Myia constant or parse a Python
     function into a Myia function.
 
+    Note that the parser uses the mapping for ``operator.<op>`` to determine
+    which primitive to use for operation ``<op>``.
+
     The environment is also in charge of resolving variable names that could
     not be resolved in the function's local and global namespace i.e. for
     built-ins and for undefined variable names.
-
-    Lastly, the environment has a mapping from AST nodes to Myia nodes that the
-    parser uses e.g. for mapping binary operators to the correct primitives.
 
     Functions parsed in different environments will have no nodes in common.
     Functions parsed in the same environment will use the same Myia objects for
