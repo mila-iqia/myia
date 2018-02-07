@@ -44,7 +44,7 @@ import textwrap
 import operator
 from types import FunctionType
 from typing import \
-    overload, Any, Dict, List, Optional, Tuple, Type, NamedTuple
+    overload, Any, Dict, List, Optional, Tuple, NamedTuple
 
 from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
 from myia.info import DebugInherit, About
@@ -83,7 +83,7 @@ ast_map = {
     ast.UAdd: operator.pos,
     ast.USub: operator.neg,
     ast.Invert: operator.invert,
-    ast.Not: operator.not_
+    ast.Not: operator.not_,
     ast.Eq: operator.eq,
     ast.NotEq: operator.ne,
     ast.Lt: operator.lt,

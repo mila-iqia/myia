@@ -1,8 +1,7 @@
 """User-friendly interfaces to Myia machinery."""
-import ast
 import operator
 from types import FunctionType
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List
 
 from myia import parser
 from myia.anf_ir import Graph, Constant, ANFNode
