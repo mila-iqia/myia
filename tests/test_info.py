@@ -1,5 +1,3 @@
-
-import pytest
 from myia.info import DebugInfo, DebugInherit, NamedDebugInfo
 
 
@@ -30,8 +28,9 @@ def test_info_trace():
 
 def test_info_obj():
     """Test that NamedDebugInfo only holds a weak reference to its object."""
-    class O: pass
-    o = O()
+    class Ob:
+        pass
+    o = Ob()
     d = NamedDebugInfo(o)
     assert d.obj is o
     del o

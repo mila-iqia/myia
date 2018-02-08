@@ -1,7 +1,7 @@
 """User-friendly interfaces to Myia machinery."""
 import operator
 from types import FunctionType
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 
 from myia import parser
 from myia.anf_ir import Graph, Constant, ANFNode
@@ -51,3 +51,9 @@ def parse(func: FunctionType) -> Graph:
 def run(g: Graph, args: List[Any]) -> Any:
     """Evaluate a graph on a set of arguments."""
     return VM.evaluate(g, args)
+
+
+def compile(func: FunctionType) -> Callable:
+    """Return a version of the function that runs using Myia's VM."""
+    g = parse(func)
+    return VM.make_callable(g)
