@@ -75,6 +75,12 @@ def test_variable(x, y):
     return z
 
 
+@parse_compare((4, 6))
+def test_multiple_targets(x, y):
+    a, b = c = x, y
+    return (a, b, c)
+
+
 @parse_compare(2)
 def test_multiple_variables(x):
     y = x + 1

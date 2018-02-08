@@ -381,7 +381,6 @@ class Parser:
     def process_Assign(self, block: 'Block', node: ast.Assign) -> 'Block':
         """Process an assignment."""
         anf_node = self.process_node(block, node.value)
-        targ, = node.targets
 
         def write(targ, anf_node):
 
@@ -428,7 +427,9 @@ class Parser:
             else:
                 raise NotImplementedError(node.targets)  # pragma: no cover
 
-        write(targ, anf_node)
+        for targ in node.targets:
+            write(targ, anf_node)
+
         return block
 
     def process_AugAssign(self, block: 'Block',
