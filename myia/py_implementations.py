@@ -128,9 +128,13 @@ def getitem(data, item):
 @register(primops.setitem)
 def setitem(data, item, value):
     """Implement `setitem`."""
-    data2 = copy(data)
-    data2[item] = value
-    return data2
+    if isinstance(data, tuple):
+        return tuple(value if i == item else x
+                     for i, x in enumerate(data))
+    else:
+        data2 = copy(data)
+        data2[item] = value
+        return data2
 
 
 py_getattr = getattr
