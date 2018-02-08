@@ -1,6 +1,6 @@
 
 from myia.api import compile
-from myia.py_implementations import getitem, make_tuple as tup
+from myia.py_implementations import getitem
 
 
 def test_function_arg():
@@ -25,8 +25,7 @@ def test_function_in_tuple():
 
     @compile
     def f(fns, x, y):
-        f0 = getitem(fns, 0)
-        f1 = getitem(fns, 1)
+        f0, f1 = fns
         return f1(f0(x + y))
 
     assert f((square, double), 10, 5) == 450
@@ -53,7 +52,7 @@ def test_return_closure_tuple():
 
         def h():
             return x * y
-        return tup(g, h)
+        return (g, h)
 
     g, h = f(4, 5)
     assert g() == 9

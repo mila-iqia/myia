@@ -101,10 +101,22 @@ def not_(x):
     return not x
 
 
-@register(primops.make_tuple)
-def make_tuple(*elems):
-    """Implement `make_tuple`."""
-    return elems
+@register(primops.cons_tuple)
+def cons_tuple(head, tail):
+    """Implement `cons_tuple`."""
+    return (head,) + tail
+
+
+@register(primops.head)
+def head(tup):
+    """Implement `head`."""
+    return tup[0]
+
+
+@register(primops.tail)
+def tail(tup):
+    """Implement `tail`."""
+    return tup[1:]
 
 
 @register(primops.getitem)
@@ -116,8 +128,30 @@ def getitem(data, item):
 @register(primops.setitem)
 def setitem(data, item, value):
     """Implement `setitem`."""
+    if isinstance(data, tuple):
+        return tuple(value if i == item else x
+                     for i, x in enumerate(data))
+    else:
+        data2 = copy(data)
+        data2[item] = value
+        return data2
+
+
+py_getattr = getattr
+py_setattr = setattr
+
+
+@register(primops.getattr)
+def getattr(data, attr):
+    """Implement `getattr`."""
+    return py_getattr(data, attr)
+
+
+@register(primops.setattr)
+def setattr(data, attr, value):
+    """Implement `setattr`."""
     data2 = copy(data)
-    data2[item] = value
+    py_setattr(data2, attr, value)
     return data2
 
 
