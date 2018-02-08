@@ -64,6 +64,22 @@ class Graph:
         else:
             self.return_ = Apply([Constant(primops.return_), value], self)
 
+    def add_parameter(self):
+        """Add a new parameter to this graph (appended to the end)."""
+        p = Parameter(self)
+        self.parameters.append(p)
+        return p
+
+    def constant(self, obj):
+        """Create a constant for the given object."""
+        return Constant(obj)
+
+    def apply(self, inputs, graph):
+        """Create an Apply node with given inputs, bound to this graph."""
+        inputs = [i if isinstance(i, ANFNode) else self.constant(i)
+                  for i in inputs]
+        return Apply(inputs, self)
+
     def __str__(self) -> str:
         return self.debug.debug_name
 
