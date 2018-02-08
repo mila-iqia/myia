@@ -50,6 +50,7 @@ def test_return_closure_tuple():
     def f(x, y):
         def g():
             return x + y
+
         def h():
             return x * y
         return tup(g, h)
