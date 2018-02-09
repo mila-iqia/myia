@@ -48,6 +48,7 @@ from typing import \
 from weakref import finalize
 
 from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
+from myia.anf_ir_utils import destroy_disconnected_nodes
 from myia.info import DebugInherit, About
 from myia import primops
 
@@ -208,12 +209,15 @@ class Parser:
             # we basically just pass through them.
             return None  # pragma: no cover
 
-    def parse(self) -> Graph:
+    def parse(self, clean=True) -> Graph:
         """Parse the function into a Myia graph."""
         tree = ast.parse(textwrap.dedent(inspect.getsource(self.function)))
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
-        return self._process_function(None, function_def)[1].graph
+        graph = self._process_function(None, function_def)[1].graph
+        if clean:
+            destroy_disconnected_nodes(graph)
+        return graph
 
     def get_block_function(self, block: 'Block') -> Constant:
         """Return node representing the function corresponding to a block."""

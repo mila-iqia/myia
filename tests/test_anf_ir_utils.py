@@ -1,5 +1,12 @@
 from myia.anf_ir import Constant, Apply, Graph
-from myia.anf_ir_utils import dfs, toposort, succ_incoming
+from myia.graph_utils import dfs as _dfs
+from myia.anf_ir_utils import \
+    dfs, toposort, accessible_graphs, destroy_disconnected_nodes, \
+    is_constant_graph, \
+    succ_incoming, succ_deep, succ_bidirectional
+
+from myia.api import ENV
+from myia.parser import Parser
 
 from .test_graph_utils import _check_toposort
 
@@ -46,3 +53,42 @@ def test_toposort2():
 
     order = list(toposort(g1.return_))
     _check_toposort(order, g1.return_, succ_incoming)
+
+
+def _name_nodes(nodes):
+    def name(node):
+        if is_constant_graph(node):
+            return node.value.debug.name or '.'
+        elif isinstance(node, Constant):
+            return str(node.value)
+        else:
+            return node.debug.name or '.'
+
+    return set(map(name, nodes))
+
+
+def test_disconnect():
+    def f(x):
+        a = x * x
+        _b = a + x  # Not connected to any output
+        c = a * a
+        d = c * c   # Connected to g's output
+        def g(y):
+            return d * y
+        return g(c)
+
+    g = Parser(ENV, f).parse(False)
+
+    # Include {None} to get Constants (makes it easier to compare to live)
+    cov = {None} | accessible_graphs(g)
+
+    live = _name_nodes(_dfs(g.return_, succ_deep))
+    assert live == set('x a mul c return . g d y'.split())
+
+    total = _name_nodes(_dfs(g.return_, succ_bidirectional(cov)))
+    assert total == set('x a mul c return . g d y _b add'.split())
+
+    destroy_disconnected_nodes(g)
+
+    total2 = _name_nodes(_dfs(g.return_, succ_bidirectional(cov)))
+    assert total2 == live
