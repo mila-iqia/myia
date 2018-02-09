@@ -396,6 +396,34 @@ class Parser:
                     new_node = Apply([op, anf_node, Constant(i)], block.graph)
                     write(elt, new_node)
 
+            elif isinstance(targ, ast.Subscript):
+                if isinstance(targ.value, ast.Name):
+                    # CASE: x[y] = value
+                    op = self.environment.map(operator.setitem)
+                    obj = self.process_node(block, targ.value)
+                    idx = self.process_node(block, targ.slice)
+                    new_node = Apply([op, obj, idx, anf_node], block.graph)
+                    write(targ.value, new_node)
+                else:
+                    # UNSUPPORTED: f()[x] = value
+                    raise NotImplementedError(
+                        "You can only set a slice on a variable."
+                    )  # pragma: no cover
+
+            elif isinstance(targ, ast.Attribute):
+                if isinstance(targ.value, ast.Name):
+                    # CASE: x.y = value
+                    op = self.environment.map(setattr)
+                    obj = self.process_node(block, targ.value)
+                    idx = Constant(targ.attr)
+                    new_node = Apply([op, obj, idx, anf_node], block.graph)
+                    write(targ.value, new_node)
+                else:
+                    # UNSUPPORTED: f().x = value
+                    raise NotImplementedError(
+                        "You can only set an attribute on a variable."
+                    )  # pragma: no cover
+
             else:
                 raise NotImplementedError(node.targets)  # pragma: no cover
 
@@ -403,6 +431,23 @@ class Parser:
             write(targ, anf_node)
 
         return block
+
+    def process_AugAssign(self, block: 'Block',
+                          node: ast.AugAssign) -> 'Block':
+        """Process an augmented assignment `x += y`."""
+        # We just transform it into an Assign node that applies a BinOp,
+        # i.e. the AST for `x = x + y`
+        # This may repeat computations, e.g. for `x[a * a] += 1` it will
+        # create two multiplication nodes, but if we integrate CSE later
+        # that problem will go away on its own.
+        app = ast.BinOp()
+        app.op = node.op
+        app.left = node.target
+        app.right = node.value
+        ass = ast.Assign()
+        ass.targets = [node.target]
+        ass.value = app
+        return self.process_Assign(block, ass)
 
     def process_Expr(self, block: 'Block', node: ast.Expr) -> 'Block':
         """Process an expression statement.

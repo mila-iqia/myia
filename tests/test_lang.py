@@ -114,10 +114,42 @@ def test_call_global(x):
     return _f(x)
 
 
+@parse_compare(5)
+def test_augassign(x):
+    x += 3
+    x *= 8
+    return x
+
+
 @parse_compare((4, 7))
 def test_swap(x, y):
     x, y = y + 3, x - 8
     return x, y
+
+
+@parse_compare(([1, 2, 3], 1))
+def test_setitem(x, y):
+    x[y] = 21
+    return x
+
+
+@parse_compare(([1, 2, 3], 1))
+def test_augsetitem(x, y):
+    x[y] += 21
+    return x
+
+
+@parse_compare((SimpleNamespace(x=5, y=2)))
+def test_setattr(pt):
+    pt.x = 3
+    pt.y = 21
+    return pt
+
+
+@parse_compare((SimpleNamespace(x=5, y=2)))
+def test_augsetattr(pt):
+    pt.x += 4
+    return pt
 
 
 ###################
