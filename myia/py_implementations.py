@@ -137,8 +137,8 @@ def setitem(data, item, value):
         return data2
 
 
-py_getattr = getattr
-py_setattr = setattr
+py_getattr = getattr  # type: ignore
+py_setattr = setattr  # type: ignore
 
 
 @register(primops.getattr)
