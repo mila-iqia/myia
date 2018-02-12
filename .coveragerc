@@ -1,5 +1,10 @@
+[run]
+omit =
+    setup.py
+
 [report]
 exclude_lines =
     @overload
     @abstractmethod
+    @compile
     pragma: no cover

@@ -6,14 +6,14 @@ from myia.api import parse
 def test_unsupported_object():
     c = object()
 
-    def f():
+    def f():  # pragma: no cover
         return c
     with pytest.raises(ValueError):
         parse(f)
 
 
 def test_undefined():
-    def f():
+    def f():  # pragma: no cover
         return c  # noqa
     with pytest.raises(ValueError):
         parse(f)
@@ -21,7 +21,7 @@ def test_undefined():
 
 @pytest.mark.xfail(reason='x is possibly undefined')
 def test_maybe():
-    def f():
+    def f():  # pragma: no cover
         while True:
             x = 2
         return x
@@ -29,14 +29,14 @@ def test_maybe():
 
 
 def test_unsupported():
-    def f():
+    def f():  # pragma: no cover
         assert False
     with pytest.raises(NotImplementedError):
         parse(f)
 
 
 def test_expression_statements():
-    def f(x):
+    def f(x):  # pragma: no cover
         """Foo."""
         print(x)
         return x
