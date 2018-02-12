@@ -24,7 +24,7 @@ setup(
     packages=find_packages(exclude=['docs', 'tests']),
     install_requires=[],
     extras_require={
-        'test': ['flake8', 'pytest', 'codecov', 'pytest-cov', 'mypy',
-                 'pydocstyle'],
+        'test': ['flake8==3.5.0', 'pytest', 'codecov',
+                 'pytest-cov', 'mypy==0.560', 'pydocstyle==2.1.1'],
     }
 )
