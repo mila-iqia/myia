@@ -1,13 +1,15 @@
 """Utilities to generate a graphical representation for a graph."""
 
+from hrepr import hrepr
+import os
+import json
+
 from myia.info import DebugInfo
 from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter
 from myia.parser import Location
 from myia.primops import Primitive
 from myia import primops
-from hrepr import hrepr
-import os
-import json
+from myia.cconv import NestingAnalyzer, ParentProxy
 
 
 gcss_path = f'{os.path.dirname(__file__)}/graph.css'
@@ -549,3 +551,48 @@ class _Location:
                 context=hrepr.config.snippet_context or 4
             )
         )
+
+
+@mixin(NestingAnalyzer)
+class _NestingAnalyzer:
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        return GraphPrinter.__hrepr_resources__(H)
+
+    def __hrepr__(self, H, hrepr):
+        pr = GraphPrinter({
+            'layout': {
+                'name': 'dagre',
+                'rankDir': 'TB'
+            }
+        })
+
+        mode = hrepr.config.nesting_analyzer_mode or 'parents'
+
+        def lbl(x):
+            if isinstance(x, ParentProxy):
+                return f"{x.graph.debug.debug_name}'"
+            else:
+                return x.debug.debug_name
+
+        if mode == 'parents':
+            graph = {g: set() if parent is None else {parent}
+                     for g, parent in self.parents().items()}
+        elif mode == 'children':
+            graph = self.children()
+        elif mode == 'graph_dependencies_direct':
+            graph = self.graph_dependencies_direct()
+        elif mode == 'graph_dependencies_total':
+            graph = self.graph_dependencies_total()
+        else:
+            raise Exception(
+                f'Unknown display mode for NestingAnalyzer: "{mode}"'
+            )
+
+        for g, deps in graph.items():
+            pr.cynode(g, lbl(g), 'intermediate')
+            for dep in deps:
+                pr.cynode(dep, lbl(dep), 'intermediate')
+                pr.cynode(dep, lbl(dep), 'intermediate')
+                pr.cyedge(g, dep, '')
+        return pr.__hrepr__(H, hrepr)
