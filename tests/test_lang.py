@@ -256,6 +256,27 @@ def test_closure(x):
     return h()
 
 
+def test_closure_recur():
+    # This cannot run with parse_compare since we need to reference the
+    # top-level function
+
+    def f(x, y):
+        return fn(x - 1, y)
+
+    def fn(x, y):
+        def g(x):
+            return x + 1
+        if x == 0:
+            return g(y)
+        else:
+            return f(x, g(y))
+
+    fn2 = parse(fn)
+    py_result = fn(1, 2)
+    myia_result = run(fn2, (1, 2))
+    assert py_result == myia_result
+
+
 @parse_compare(())
 def test_closure2():
     def g(x):

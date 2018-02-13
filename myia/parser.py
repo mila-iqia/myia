@@ -151,10 +151,6 @@ class Environment:
             return self._object_map[id(obj)]
         raise ValueError(obj)
 
-    def remove(self, obj: Any) -> None:
-        """Remove an object from the environment."""
-        self._remove(id(obj))
-
     def _remove(self, id: int) -> None:
         if id in self._object_map:
             del self._object_map[id]
