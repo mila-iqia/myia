@@ -1,5 +1,3 @@
-
-from pytest import mark
 from types import SimpleNamespace
 
 from myia.py_implementations import (
@@ -107,10 +105,10 @@ def test_prim_setitem():
     tup = (1, 2, 3, 4)
     assert myia_setitem(tup, 1, 22) == (1, 22, 3, 4)
 
-    l = [1, 2, 3, 4]
-    l2 = [1, 22, 3, 4]
-    assert myia_setitem(l, 1, 22) == l2
-    assert l != l2  # test that this is not inplace
+    L = [1, 2, 3, 4]
+    L2 = [1, 22, 3, 4]
+    assert myia_setitem(L, 1, 22) == L2
+    assert L != L2  # test that this is not inplace
 
 
 def test_prim_setattr():

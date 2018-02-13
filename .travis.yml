@@ -2,7 +2,8 @@ language: python
 python:
   - 3.6
 install:
-  pip install -e .[test]
+  - pip install -r requirements.txt
+  - pip install -e . --no-deps
 env:
   - TEST_SUITE=static
   - TEST_SUITE=unit

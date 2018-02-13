@@ -5,7 +5,7 @@ from myia.py_implementations import getitem
 
 def test_function_arg():
     """Give a Python function as an argument."""
-    def square(x):
+    def square(x):  # pragma: no cover
         return x * x
 
     @compile
@@ -17,10 +17,10 @@ def test_function_arg():
 
 def test_function_in_tuple():
     """Give a tuple of functions as an argument."""
-    def square(x):
+    def square(x):  # pragma: no cover
         return x * x
 
-    def double(x):
+    def double(x):  # pragma: no cover
         return x + x
 
     @compile
