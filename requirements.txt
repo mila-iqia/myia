@@ -1,0 +1,6 @@
+pytest
+pytest-cov
+codecov
+flake8==3.5.0
+mypy==0.560
+pydocstyle==2.1.1
