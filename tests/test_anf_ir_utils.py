@@ -70,9 +70,10 @@ def _name_nodes(nodes):
 def test_disconnect():
     def f(x):
         a = x * x
-        _b = a + x  # Not connected to any output
+        _b = a + x  # Not connected to any output # noqa
         c = a * a
         d = c * c   # Connected to g's output
+
         def g(y):
             return d * y
         return g(c)
