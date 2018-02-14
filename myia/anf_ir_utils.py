@@ -16,7 +16,7 @@ def succ_deep(node: ANFNode) -> Iterable[ANFNode]:
     A node's successors are its `incoming` set, or the return node of a graph
     when a graph Constant is encountered.
     """
-    if is_constant_graph(node):
+    if is_constant_graph(node) and node.value.return_:
         return [node.value.return_]
     else:
         return node.incoming
@@ -38,6 +38,8 @@ def succ_stop_at_fv(graph):
             return node.incoming
         else:
             return []
+
+    return succ
 
 
 def succ_bidirectional(scope: Set[Graph]) -> Callable:
