@@ -44,7 +44,8 @@ import textwrap
 import operator
 from types import FunctionType
 from typing import \
-    overload, Any, Dict, List, Optional, Tuple, NamedTuple
+    overload, Any, Dict, List, Optional, Tuple, NamedTuple, Iterable
+from weakref import finalize
 
 from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
 from myia.info import DebugInherit, About
@@ -118,17 +119,17 @@ class Environment:
 
     """
 
-    def __init__(self, object_map: Dict[int, ANFNode]) -> None:
+    def __init__(self, object_map: Iterable[Tuple[Any, ANFNode]]) -> None:
         """Construct an environment.
 
         Args:
-            object_map: The object map maps Python object id's to their
-                corresponding Myia nodes. The dictionary uses ids instead of
-                the object itself so that different objects that are equal
-                don't have to share a node.
+            object_map: The object map maps Python objects to their
+                corresponding Myia nodes.
 
         """
-        self.object_map = object_map
+        self._object_map: Dict[int, ANFNode] = dict()
+        for o, n in object_map:
+            self.insert(o, n)
 
     def map(self, obj: Any) -> ANFNode:
         """Map a Python object to an ANF node.
@@ -137,18 +138,28 @@ class Environment:
         returned.
 
         """
-        if id(obj) in self.object_map:
-            return self.object_map[id(obj)]
+        if id(obj) in self._object_map:
+            return self._object_map[id(obj)]
         if isinstance(obj, (bool, float, int, str)):
             node = Constant(obj)
-            self.object_map[id(obj)] = node
+            self._object_map[id(obj)] = node
             return node
         if isinstance(obj, FunctionType):
             parser = Parser(self, obj)
-            graph = parser.parse()
-            node = Constant(graph)
-            return node
+            # This will insert object into the map
+            parser.parse()
+            return self._object_map[id(obj)]
         raise ValueError(obj)
+
+    def _remove(self, id: int) -> None:
+        if id in self._object_map:
+            del self._object_map[id]
+
+    def insert(self, obj: Any, node: ANFNode) -> None:
+        """Add a mapping in the environement, rejecting duplicates."""
+        assert id(obj) not in self._object_map
+        self._object_map[id(obj)] = node
+        finalize(obj, self._remove, id(obj))
 
 
 class Parser:
@@ -237,11 +248,13 @@ class Parser:
                           node: ast.FunctionDef) -> Tuple['Block', 'Block']:
         """Process a function definition and return first and final blocks."""
         function_block = Block(self)
-        # Add this mapping immediately so that recursive calls can be resolved
-        self.environment.object_map[id(self.function)] = \
-            self.get_block_function(function_block)
         if block:
             function_block.preds.append(block)
+        else:
+            # Add mapping for the top level so that recursive calls can resolve
+            self.environment.insert(self.function,
+                                    self.get_block_function(function_block))
+
         function_block.mature()
         function_block.graph.debug.name = node.name
         for arg in node.args.args:

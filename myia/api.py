@@ -10,7 +10,7 @@ from myia.vm import VM as VM_
 from myia.py_implementations import implementations
 
 
-def default_object_map() -> Dict[int, ANFNode]:
+def default_object_map() -> Dict[Any, ANFNode]:
     """Get a mapping from Python objects to nodes."""
     mapping = {
         operator.add: Constant(P.add),
@@ -36,16 +36,16 @@ def default_object_map() -> Dict[int, ANFNode]:
     for prim, impl in implementations.items():
         mapping[impl] = Constant(prim)
 
-    return {id(k): v for k, v in mapping.items()}
+    return mapping
 
 
-ENV = parser.Environment(default_object_map())
+ENV = parser.Environment(default_object_map().items())
 VM = VM_(implementations)
 
 
 def parse(func: FunctionType) -> Graph:
     """Parse a function into ANF."""
-    return parser.Parser(ENV, func).parse()
+    return ENV.map(func).value
 
 
 def run(g: Graph, args: List[Any]) -> Any:
