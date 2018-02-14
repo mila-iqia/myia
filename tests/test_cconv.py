@@ -1,4 +1,3 @@
-
 from myia.api import parse
 from myia.cconv import NestingAnalyzer
 
@@ -30,6 +29,7 @@ def check_nest(rels, fv_direct, fv_total):
     def check(fn):
         def test():
             gfn = parse(fn)
+
             def name(g):
                 from myia.anf_ir import Constant, Graph
                 if isinstance(g, Constant) and isinstance(g.value, Graph):
@@ -42,13 +42,13 @@ def check_nest(rels, fv_direct, fv_total):
             analysis = NestingAnalyzer(gfn)
             for g1, g2 in analysis.parents().items():
                 if g2:
-                   assert analysis.nested_in(g1, g2)
-                   assert not analysis.nested_in(g2, g1)
+                    assert analysis.nested_in(g1, g2)
+                    assert not analysis.nested_in(g2, g1)
 
             for g1, children in analysis.children().items():
                 for child in children:
-                   assert analysis.nested_in(child, g1)
-                   assert not analysis.nested_in(g1, child)
+                    assert analysis.nested_in(child, g1)
+                    assert not analysis.nested_in(g1, child)
 
             fvs = {}
             for g, vs in analysis.free_variables_total().items():
@@ -146,8 +146,10 @@ def test_fake_deep_nest(x):
 def test_calls(x):
     """g has the same nesting as h, h nested in X"""
     a = x + x
+
     def h():
         return a
+
     def g():
         return h()
     return g()
@@ -156,8 +158,10 @@ def test_calls(x):
 @check_nest('X,g,h', '', '')
 def test_calls2(x):
     """g has the same nesting as h, h not nested in X"""
+
     def h(x):
         return x
+
     def g():
         return h(3)
     return g()
@@ -171,18 +175,22 @@ def test_fvs(x):
     a = x + 1
     b = x + 2
     c = a + b
-    d = c + 4
+
     def f(x):
         return a + b + x
+
     def g(x):
         return b
+
     def h(x):
         return f(c) + g(b)
+
     def i(w):
         def j(y):
             return w + y + a
         return j
     return h(3) + i(4)
+
 
 @check_nest('X,f->X,g->f,h->g', 'f:x; h:y,z', 'f:x; g:y; h:y,z')
 def test_deep2(x):

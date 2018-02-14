@@ -94,7 +94,7 @@ class NestingAnalyzer:
             if g in path:
                 return set()
             deps = all_deps[g]
-            parents = set()
+            parents: Set[Graph] = set()
             for dep in deps:
                 if isinstance(dep, ParentProxy):
                     parents |= seek_parents(dep.graph, path | {g})

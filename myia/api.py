@@ -12,7 +12,7 @@ from myia.py_implementations import implementations
 
 def default_object_map() -> Dict[Any, ANFNode]:
     """Get a mapping from Python objects to nodes."""
-    mapping = {
+    mapping: Dict[Any, ANFNode] = {
         operator.add: Constant(P.add),
         operator.sub: Constant(P.sub),
         operator.mul: Constant(P.mul),
