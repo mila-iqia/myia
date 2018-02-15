@@ -74,7 +74,7 @@ class Graph:
         """Create a constant for the given object."""
         return Constant(obj)
 
-    def apply(self, inputs, graph):
+    def apply(self, *inputs):
         """Create an Apply node with given inputs, bound to this graph."""
         inputs = [i if isinstance(i, ANFNode) else self.constant(i)
                   for i in inputs]
