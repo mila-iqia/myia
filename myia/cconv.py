@@ -32,7 +32,8 @@ class NestingAnalyzer:
     @memoize_method
     def coverage(self) -> Iterable[Graph]:
         """Return a collection of graphs accessible from the root."""
-        nodes = dfs(Constant(self.root), succ_deep)
+        root: ANFNode = Constant(self.root)
+        nodes = dfs(root, succ_deep)
         return [node.value for node in nodes
                 if is_constant_graph(node)]
 
