@@ -1,6 +1,6 @@
 """Unification module."""
-from typing import (Dict, Tuple, List, Iterable, Union, Callable, cast,
-                    TypeVar, Generic, Any, Type)
+from typing import (Dict, List, Iterable, Union, Callable, cast, TypeVar,
+                    Generic, Any)
 from functools import reduce
 
 
@@ -17,21 +17,19 @@ class UnificationError(Exception):
     """Exception raised for errors in unification."""
 
 
+_ID = 0
+
+
+def _get_next_tag():
+    global _ID
+    _ID += 1
+    return f"_{_ID}"
+
+
 class Var(Generic[U]):
     """Basic universal variable type."""
 
     __slots__ = ('tag',)
-
-    def __init__(self, tag: str) -> None:
-        """Create a Var."""
-        self.tag = tag
-
-    @classmethod
-    def _parse_args(self, args: Tuple[Any, ...], kwargs: Dict[Any, Any]):
-        assert len(kwargs) == 0
-        assert len(args) == 1
-        assert isinstance(args[0], str)
-        return args
 
     def matches(self, value: Value[U]) -> bool:
         """Return True if the variable matches the value given.
@@ -40,10 +38,17 @@ class Var(Generic[U]):
         """
         return True
 
+    def ensure_tag(self) -> None:
+        """Make sure that tag is set."""
+        if not hasattr(self, 'tag'):
+            self.tag = _get_next_tag()
+
     def __str__(self) -> str:
+        self.ensure_tag()
         return self.tag
 
     def __repr__(self) -> str:
+        self.ensure_tag()
         return f"Var({self.tag})"
 
 
@@ -64,9 +69,11 @@ class SVar(Var[U]):
         return isinstance(value, (Seq, SVar))
 
     def __str__(self) -> str:
+        self.ensure_tag()
         return f"*{self.tag}"
 
     def __repr__(self) -> str:
+        self.ensure_tag()
         return f"SVar({self.tag})"
 
 
@@ -75,23 +82,16 @@ class UnionVar(Var[U]):
 
     __slots__ = ('values',)
 
-    def __init__(self, tag: str, values: Iterable[Value[U]]) -> None:
+    def __init__(self, values: Iterable[Value[U]]) -> None:
         """Create a UnionVar."""
-        super().__init__(tag)
         self.values = set(values)
-
-    @classmethod
-    def _parse_args(self, args: Tuple[Any, ...], kwargs: Dict[Any, Any]):
-        assert len(kwargs) == 0
-        assert len(args) == 2
-        assert isinstance(args[0], str)
-        return (args[0], tuple(sorted(set(args[1]), key=id)))
 
     def matches(self, value) -> bool:
         """Engine bypasses this."""
         raise UnificationError("matches called on a UnionVar")
 
     def __repr__(self) -> str:
+        self.ensure_tag()
         return f"UnionVar({self.tag}, {self.values})"
 
 
@@ -100,18 +100,9 @@ class RestrictedVar(Var[U]):
 
     __slots__ = ('legal_values',)
 
-    def __init__(self, tag: str,
-                 legal_values: Tuple[Value[U], ...]) -> None:
+    def __init__(self, legal_values: Iterable[Value[U]]) -> None:
         """Create a RestrictedVar."""
-        super().__init__(tag)
-        self.legal_values = legal_values
-
-    @classmethod
-    def _parse_args(cls, args: Tuple[Any, ...], kwargs: Dict[Any, Any]):
-        assert len(kwargs) == 0
-        assert len(args) == 2
-        assert isinstance(args[0], str)
-        return (args[0], tuple(sorted(args[1], key=id)))
+        self.legal_values = tuple(legal_values)
 
     def matches(self, value: Value[U]) -> bool:
         """Return True if the variable matches the value."""
@@ -120,6 +111,7 @@ class RestrictedVar(Var[U]):
         return value in self.legal_values
 
     def __repr__(self) -> str:
+        self.ensure_tag()
         return f"RestrictedVar({self.tag}, {self.legal_values})"
 
 
@@ -128,17 +120,9 @@ class FilterVar(Var[U]):
 
     __slots__ = ('filter',)
 
-    def __init__(self, tag: str, filter: FnFiltT[U]) -> None:
+    def __init__(self, filter: FnFiltT[U]) -> None:
         """Create a FilterVar."""
-        super().__init__(tag)
         self.filter = filter
-
-    @classmethod
-    def _parse_args(cls, args: Tuple[Any, ...], kwargs: Dict[Any, Any]):
-        assert len(kwargs) == 0
-        assert len(args) == 2
-        assert isinstance(args[0], str)
-        return args
 
     def matches(self, value: Value[U]) -> bool:
         """Return True if the variable matches the value."""
@@ -149,7 +133,35 @@ class FilterVar(Var[U]):
         return self.filter(value)
 
     def __repr__(self) -> str:
+        self.ensure_tag()
         return f"FilterVar({self.tag}, {self.filter})"
+
+
+def var(filter: FilterT[U] = None)-> Var[U]:
+    """Create a variable for unification purposes.
+
+    Arguments:
+        tag: An identifier for the variable. Two variables with the
+            same filter and identifier will return the same object.
+        filter: A predicate, or a set of values the variable is
+            allowed to take.
+    """
+    if callable(filter):
+        return FilterVar(filter)
+    elif filter is not None:
+        return RestrictedVar(filter)
+    else:
+        return Var()
+
+
+def svar() -> SVar[U]:
+    """Create an SVar (can match 0 or more items)."""
+    return SVar()
+
+
+def uvar(values: Iterable[Value[U]]) -> UnionVar[U]:
+    """Create a UnionVar (represents multiple possibilities)."""
+    return UnionVar(values)
 
 
 def expandlist(lst: Iterable[Value[U]]) -> List[Value[U]]:
@@ -174,59 +186,12 @@ def noseq(fn: Callable[[Value[U]], Value[U]], u: Value[U]) -> Value[U]:
 class Unification(Generic[T]):
     """Unification engine."""
 
-    def __init__(self) -> None:
-        """Create a unification engine."""
-        self._seq = 1
-        self._vars: Dict[Any, Var[T]] = dict()
-
-    def _get_var(self, cls: Type[Var[T]], args: Tuple[Any, ...]) -> Var[T]:
-        pargs = cls._parse_args(args, dict())
-        if pargs not in self._vars:
-            self._vars[pargs] = cls(*pargs)
-        return self._vars[pargs]
-
-    def _get_tag(self, tag: str):
-        if tag is None:
-            tag = '_{}'.format(self._seq)
-            self._seq += 1
-        else:
-            if tag.startswith('_'):
-                raise ValueError('tag starting with _')
-        return tag
-
-    def var(self, tag: str = None,
-            filter: FilterT[T] = None)-> Var[T]:
-        """Create a variable for unification purposes.
-
-        Arguments:
-            tag: An identifier for the variable. Two variables with the
-                same filter and identifier will return the same object.
-            filter: A predicate, or a set of values the variable is
-                allowed to take.
-        """
-        tag = self._get_tag(tag)
-        if callable(filter):
-            return self._get_var(FilterVar, (tag, filter))
-        elif filter:
-            return self._get_var(RestrictedVar, (tag, filter))
-        else:
-            return self._get_var(Var, (tag,))
-
-    def svar(self, tag: str = None) -> SVar[T]:
-        """Create an SVar (can match 0 or more items)."""
-        return self._get_var(SVar, (self._get_tag(tag),))  # type: ignore
-
-    def uvar(self, values: Iterable[Value[T]], tag: str = None) -> UnionVar[T]:
-        """Create a UnionVar (represents multiple possibilities)."""
-        return self._get_var(UnionVar,  # type: ignore
-                             (self._get_tag(tag), values))
-
     class VisitError(Exception):
         """Report unvisitable object."""
 
     def visit(self, fn: Callable[[Value[T]], Value[T]],
               value: Value[T]) -> Value[T]:
-        """Apply `fn`to each element of `value` and return the result."""
+        """Apply `fn` to each element of `value` and return the result."""
         raise self.VisitError
 
     def clone(self, v: Value[T], copy_map: Dict[Any, Any] = None) -> Value[T]:
@@ -241,7 +206,7 @@ class Unification(Generic[T]):
 
         Arguments:
             v: expression
-            copy_map: Dictionnary of variable mapping
+            copy_map: Dictionary of variable mappings
 
         """
         if copy_map is None:
@@ -254,24 +219,23 @@ class Unification(Generic[T]):
 
         if isinstance(v, Var):
             if isinstance(v, SVar):
-                copy_map[v] = self.svar()
+                copy_map[v] = SVar()
             elif isinstance(v, UnionVar):
-                copy_map[v] = self.uvar(self._clone(v, copy_map)
-                                        for v in v.values)
+                copy_map[v] = UnionVar(self._clone(v, copy_map)
+                                       for v in v.values)
+            elif isinstance(v, FilterVar):
+                copy_map[v] = FilterVar(v.filter)
+            elif isinstance(v, RestrictedVar):
+                copy_map[v] = RestrictedVar(v.legal_values)
             else:
-                filter: FilterT[T] = None
-                if isinstance(v, FilterVar):
-                    filter = v.filter
-                elif isinstance(v, RestrictedVar):
-                    filter = v.legal_values
-                copy_map[v] = self.var(filter=filter)
+                copy_map[v] = Var()
 
         elif isinstance(v, Seq):
             copy_map[v] = Seq(self._clone(val, copy_map) for val in v)
 
         else:
             try:
-                return self.visit(lambda v: self._clone(v, copy_map), v)
+                copy_map[v] = self.visit(lambda v: self._clone(v, copy_map), v)
             except self.VisitError:
                 return v
 
@@ -330,7 +294,7 @@ class Unification(Generic[T]):
             assert not isinstance(diff, UnionVar)
 
             # lift the UnionVar
-            equiv[diff] = self.uvar(set(okv[diff] for okv in ok_values))
+            equiv[diff] = UnionVar(set(okv[diff] for okv in ok_values))
             return equiv
 
     def unify_raw(self, w: Value[T], v: Value[T],
