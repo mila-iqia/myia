@@ -91,6 +91,10 @@ def test_SVar():
     ssv = str(sv)
     assert ssv == f'*{sv.tag}'
     assert repr(sv) == f'SVar({sv.tag})'
+    sv2 = SVar(var(filter=(True, False, 0, 1)))
+    assert sv.matches(sv2)
+    assert sv2.matches(Seq((True, False, 1)))
+    assert not sv2.matches(Seq((1, 2)))
 
 
 def test_UnionVar():

@@ -62,11 +62,22 @@ class Seq(tuple):
 class SVar(Var[U]):
     """Variable to represent a variable length of values."""
 
-    __slots__ = ()
+    __slots__ = ('subtype',)
+
+    def __init__(self, subtype: Var[U] = None) -> None:
+        """Create an SVar."""
+        if subtype is None:
+            subtype = Var()
+        self.subtype = subtype
 
     def matches(self, value: Value[U]) -> bool:
-        """Only does special matching."""
-        return isinstance(value, (Seq, SVar))
+        """Check if the provided value matches the SVar."""
+        if isinstance(value, SVar):
+            return self.subtype.matches(value.subtype)
+        elif isinstance(value, Seq):
+            return all(self.subtype.matches(v) for v in value)
+        else:
+            return False
 
     def __str__(self) -> str:
         self.ensure_tag()
