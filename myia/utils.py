@@ -40,6 +40,7 @@ class Registry(Dict[T1, T2]):
         """Register a primitive."""
         def deco(fn):
             """Decorate the function."""
+            assert prim not in self
             self[prim] = fn
             return fn
         return deco

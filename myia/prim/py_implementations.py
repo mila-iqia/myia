@@ -1,8 +1,9 @@
 """Implementations for the debug VM."""
 
-
+from typing import Callable, Dict
 from copy import copy
-from typing import Callable
+from .signatures import SIGNATURES
+from myia.dtype import Bool, Int, Float, Tuple, Type
 
 from ..utils import Registry
 
@@ -154,6 +155,30 @@ def setattr(data, attr, value):
     data2 = copy(data)
     py_setattr(data2, attr, value)
     return data2
+
+
+TYPE_MAP: Dict[type, Type] = {
+    bool: Bool(),
+    float: Float(64),
+    int: Int(64),
+}
+
+
+@register(primops.typeof)
+def typeof(value) -> Type:
+    """Return the Type for a python constant.
+
+    This doesn't support deeply nested or recursive values.
+    """
+    tt = type(value)
+    if tt in TYPE_MAP:
+        return TYPE_MAP[tt]
+    if tt == tuple:
+        etts = tuple(typeof(e) for e in value)
+        return Tuple(etts)
+    if tt is primops.Primitive:
+        return SIGNATURES[value]
+    raise TypeError(f"Cannot assign type to: {value}")
 
 
 @register(primops.return_)
