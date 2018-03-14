@@ -2,12 +2,8 @@
 from typing import Any, Iterable, Callable, Set
 
 from myia.anf_ir import ANFNode, Apply, Constant, Graph, Parameter
-<<<<<<< HEAD
 from myia.graph_utils import dfs as _dfs, toposort as _toposort, \
     FOLLOW, NOFOLLOW, EXCLUDE
-=======
-from myia.graph_utils import dfs as _dfs, toposort as _toposort
->>>>>>> Add include argument to dfs, inclusion functions, helpers
 
 
 #######################
@@ -72,11 +68,7 @@ def exclude_from_set(stops):
         stops = frozenset(stops)
 
     def include(node):
-<<<<<<< HEAD
         return EXCLUDE if node in stops else FOLLOW
-=======
-        return node not in stops
->>>>>>> Add include argument to dfs, inclusion functions, helpers
 
     return include
 
@@ -88,7 +80,6 @@ def freevars_boundary(graph, include_boundary=True):
         graph: The main graph from which we want to include nodes.
         include_boundary: Whether to yield the free variables or not.
     """
-<<<<<<< HEAD
     def include(node):
         g = node.graph
         if g is None or g is graph:
@@ -97,17 +88,6 @@ def freevars_boundary(graph, include_boundary=True):
             return NOFOLLOW
         else:
             return EXCLUDE
-=======
-
-    def include(node):
-        g = node.graph
-        if g is None or g is graph:
-            return True
-        elif include_boundary:
-            return None
-        else:
-            return False
->>>>>>> Add include argument to dfs, inclusion functions, helpers
 
     return include
 
