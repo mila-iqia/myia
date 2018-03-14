@@ -5,20 +5,25 @@ the notion of successor.
 """
 
 
-from typing import Any, Callable, Iterable, Set, TypeVar, List, Optional
+from typing import Any, Callable, Iterable, Set, TypeVar, List
+
+
+FOLLOW = 'follow'
+NOFOLLOW = 'nofollow'
+EXCLUDE = 'exclude'
 
 
 T = TypeVar('T')
 
 
-def always_include(node: Any) -> bool:
+def always_include(node: Any) -> str:
     """Include a node in the search unconditionally."""
-    return True
+    return FOLLOW
 
 
 def dfs(root: T,
         succ: Callable[[T], Iterable[T]],
-        include: Callable[[T], Optional[bool]] = always_include) \
+        include: Callable[[T], str] = always_include) \
             -> Iterable[T]:
     """Perform a depth-first search.
 
@@ -27,9 +32,9 @@ def dfs(root: T,
         succ: A function that returns a node's successors.
         include: A function that returns whether to include a node
                  in the search.
-            * Return True to include the node and follow its edges.
-            * Return None to include the node but not follow its edges.
-            * Return False to not include the node, nor follow its edges.
+            * Return 'follow' to include the node and follow its edges.
+            * Return 'nofollow' to include the node but not follow its edges.
+            * Return 'exclude' to not include the node, nor follow its edges.
     """
     seen: Set[T] = set()
     to_visit = [root]
@@ -39,10 +44,17 @@ def dfs(root: T,
             continue
         seen.add(node)
         incl = include(node)
-        if incl is not False:
+        if incl == FOLLOW:
             yield node
-        if incl:
             to_visit += succ(node)
+        elif incl == NOFOLLOW:
+            yield node
+        elif incl == EXCLUDE:
+            pass
+        else:
+            raise ValueError('include(node) must return one of: '
+                             '"follow", "nofollow", "exclude"') \
+                # pragma: no cover
 
 
 def toposort(root: T, succ: Callable[[T], Iterable[T]]) -> Iterable[T]:
