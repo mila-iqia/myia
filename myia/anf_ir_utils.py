@@ -141,17 +141,17 @@ def destroy_disconnected_nodes(root: Graph) -> None:
 ##################
 
 
-def is_apply(x):
+def is_apply(x: ANFNode) -> bool:
     """Return whether x is an Apply."""
     return isinstance(x, Apply)
 
 
-def is_parameter(x):
+def is_parameter(x: ANFNode) -> bool:
     """Return whether x is a Parameter."""
     return isinstance(x, Parameter)
 
 
-def is_constant(x):
+def is_constant(x: ANFNode) -> bool:
     """Return whether x is a Constant."""
     return isinstance(x, Constant)
 
