@@ -1,7 +1,7 @@
 """Utilities for manipulating and inspecting the IR."""
 from typing import Iterable, Callable, Set
 
-from myia.anf_ir import ANFNode, Constant, Graph
+from myia.anf_ir import ANFNode, Apply, Constant, Graph, Parameter
 from myia.graph_utils import dfs as _dfs, toposort as _toposort
 
 
@@ -16,8 +16,22 @@ def succ_deep(node: ANFNode) -> Iterable[ANFNode]:
     A node's successors are its `incoming` set, or the return node of a graph
     when a graph Constant is encountered.
     """
-    if is_constant_graph(node) and node.value.return_:
-        return [node.value.return_]
+    if is_constant_graph(node):
+        return [node.value.return_] if node.value.return_ else []
+    else:
+        return node.incoming
+
+
+def succ_deeper(node: ANFNode) -> Iterable[ANFNode]:
+    """Follow node.incoming and graph references.
+
+    Unlike `succ_deep` this visits all encountered graphs thoroughly, including
+    those found through free variables.
+    """
+    if is_constant_graph(node):
+        return [node.value.return_] if node.value.return_ else []
+    elif node.graph:
+        return list(node.incoming) + [node.graph.return_]
     else:
         return node.incoming
 
@@ -25,21 +39,6 @@ def succ_deep(node: ANFNode) -> Iterable[ANFNode]:
 def succ_incoming(node: ANFNode) -> Iterable[ANFNode]:
     """Follow node.incoming."""
     return node.incoming
-
-
-def succ_stop_at_fv(graph):
-    """Follow node.incoming for nodes that belong to graph.
-
-    This successor function does not follow nodes that belong to other graphs
-    (i.e. free variables). These nodes can be successors, however.
-    """
-    def succ(node):
-        if node.graph is graph:
-            return node.incoming
-        else:
-            return []
-
-    return succ
 
 
 def succ_bidirectional(scope: Set[Graph]) -> Callable:
@@ -55,6 +54,42 @@ def succ_bidirectional(scope: Set[Graph]) -> Callable:
         return {x for x in rval if x.graph in scope}
 
     return succ
+
+
+#################################
+# Inclusion/exclusion functions #
+#################################
+
+
+def exclude_from_set(stops):
+    """Avoid visiting nodes in the stops set."""
+    if not isinstance(stops, (set, frozenset, dict)):
+        stops = frozenset(stops)
+
+    def include(node):
+        return node not in stops
+
+    return include
+
+
+def freevars_boundary(graph, include_boundary=True):
+    """Stop visiting when encountering free variables.
+
+    Arguments:
+        graph: The main graph from which we want to include nodes.
+        include_boundary: Whether to yield the free variables or not.
+    """
+
+    def include(node):
+        g = node.graph
+        if g is None or g is graph:
+            return True
+        elif include_boundary:
+            return None
+        else:
+            return False
+
+    return include
 
 
 #####################
@@ -104,6 +139,21 @@ def destroy_disconnected_nodes(root: Graph) -> None:
 ##################
 # Misc utilities #
 ##################
+
+
+def is_apply(x):
+    """Return whether x is an Apply."""
+    return isinstance(x, Apply)
+
+
+def is_parameter(x):
+    """Return whether x is a Parameter."""
+    return isinstance(x, Parameter)
+
+
+def is_constant(x):
+    """Return whether x is a Constant."""
+    return isinstance(x, Constant)
 
 
 def is_constant_graph(x: ANFNode) -> bool:

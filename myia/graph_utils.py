@@ -5,18 +5,31 @@ the notion of successor.
 """
 
 
-from typing import Callable, Iterable, Set, TypeVar, List
+from typing import Any, Callable, Iterable, Set, TypeVar, List, Optional
 
 
 T = TypeVar('T')
 
 
-def dfs(root: T, succ: Callable[[T], Iterable[T]]) -> Iterable[T]:
+def always_include(node: Any) -> bool:
+    """Include a node in the search unconditionally."""
+    return True
+
+
+def dfs(root: T,
+        succ: Callable[[T], Iterable[T]],
+        include: Callable[[T], Optional[bool]] = always_include) \
+            -> Iterable[T]:
     """Perform a depth-first search.
 
     Arguments:
         root: The node to start from.
         succ: A function that returns a node's successors.
+        include: A function that returns whether to include a node
+                 in the search.
+            * Return True to include the node and follow its edges.
+            * Return None to include the node but not follow its edges.
+            * Return False to not include the node, nor follow its edges.
     """
     seen: Set[T] = set()
     to_visit = [root]
@@ -25,8 +38,11 @@ def dfs(root: T, succ: Callable[[T], Iterable[T]]) -> Iterable[T]:
         if node in seen:
             continue
         seen.add(node)
-        yield node
-        to_visit += succ(node)
+        incl = include(node)
+        if incl is not False:
+            yield node
+        if incl:
+            to_visit += succ(node)
 
 
 def toposort(root: T, succ: Callable[[T], Iterable[T]]) -> Iterable[T]:
