@@ -1,7 +1,8 @@
 """User-friendly interfaces to Myia machinery."""
 import operator
+import math
 from types import FunctionType
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Union
 
 from myia import parser
 from myia.anf_ir import Graph, Constant, ANFNode
@@ -18,6 +19,8 @@ def default_object_map() -> Dict[Any, ANFNode]:
         operator.truediv: Constant(P.div),
         operator.mod: Constant(P.mod),
         operator.pow: Constant(P.pow),
+        math.log: Constant(P.log),
+        math.exp: Constant(P.exp),
         operator.eq: Constant(P.eq),
         operator.ne: Constant(P.ne),
         operator.lt: Constant(P.lt),
@@ -52,7 +55,8 @@ def run(g: Graph, args: List[Any]) -> Any:
     return VM.evaluate(g, args)
 
 
-def compile(func: FunctionType) -> Callable:
+def compile(func: Union[Graph, FunctionType]) -> Callable:
     """Return a version of the function that runs using Myia's VM."""
-    g = parse(func)
-    return VM.make_callable(g)
+    if not isinstance(func, Graph):
+        func = parse(func)
+    return VM.make_callable(func)

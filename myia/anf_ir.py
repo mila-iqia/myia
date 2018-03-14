@@ -43,6 +43,7 @@ class Graph:
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
         self.debug = NamedDebugInfo(self)
+        self.primal = None
 
     @property
     def output(self) -> 'ANFNode':

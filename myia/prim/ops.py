@@ -27,6 +27,8 @@ mul = Primitive('mul')
 div = Primitive('div')
 mod = Primitive('mod')
 pow = Primitive('pow')
+log = Primitive('log')
+exp = Primitive('exp')
 uadd = Primitive('uadd')
 usub = Primitive('usub')
 
@@ -66,3 +68,12 @@ setattr = Primitive('setattr')
 
 if_ = Primitive('if')
 return_ = Primitive('return')
+
+
+##############################
+# Gradient-related operations #
+##############################
+
+J = Primitive('J')
+Jinv = Primitive('Jinv')
+zeros_like = Primitive('zeros_like')

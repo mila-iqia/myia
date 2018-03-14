@@ -422,6 +422,23 @@ class Parser:
 
         return block
 
+    def process_AugAssign(self, block: 'Block',
+                          node: ast.AugAssign) -> 'Block':
+        """Process an augmented assignment `x += y`."""
+        # We just transform it into an Assign node that applies a BinOp,
+        # i.e. the AST for `x = x + y`
+        # This may repeat computations, e.g. for `x[a * a] += 1` it will
+        # create two multiplication nodes, but if we integrate CSE later
+        # that problem will go away on its own.
+        app = ast.BinOp()
+        app.op = node.op
+        app.left = node.target
+        app.right = node.value
+        ass = ast.Assign()
+        ass.targets = [node.target]
+        ass.value = app
+        return self.process_Assign(block, ass)
+
     def process_Expr(self, block: 'Block', node: ast.Expr) -> 'Block':
         """Process an expression statement.
 

@@ -1,10 +1,14 @@
 """Implementations for the debug VM."""
 
 
+import math
 from typing import Callable
+from types import FunctionType
 from copy import copy
 from . import ops as primops
-from myia.utils import Registry
+from myia.anf_ir import Graph
+from myia.utils import Registry, smap
+from myia.vm import VMFrame
 
 
 implementations: Registry[primops.Primitive, Callable] = Registry()
@@ -14,7 +18,18 @@ register = implementations.register
 @register(primops.add)
 def add(x, y):
     """Implement `add`."""
-    return x + y
+    if x is ZERO:
+        return y
+    elif y is ZERO:
+        return x
+    elif isinstance(x, tuple):
+        # assert len(x) == len(y)
+        l = max(len(x), len(y))
+        x = Zero.pad(x, l)
+        y = Zero.pad(y, l)
+        return tuple(add(x2, y2) for x2, y2 in zip(x, y))
+    else:
+        return x + y
 
 
 @register(primops.sub)
@@ -45,6 +60,18 @@ def mod(x, y):
 def pow(x, y):
     """Implement `pow`."""
     return x ** y
+
+
+@register(primops.log)
+def log(x):
+    """Implement `log`."""
+    return math.log(x)
+
+
+@register(primops.exp)
+def exp(x):
+    """Implement `exp`."""
+    return math.exp(x)
 
 
 @register(primops.uadd)
@@ -131,6 +158,11 @@ def setitem(data, item, value):
     if isinstance(data, tuple):
         return tuple(value if i == item else x
                      for i, x in enumerate(data))
+    elif data is ZERO:
+        l = [ZERO for i in range(item + 1)]
+        l[item] = value
+        print('value is:', value)
+        return tuple(l)
     else:
         data2 = copy(data)
         data2[item] = value
@@ -159,3 +191,88 @@ def setattr(data, attr, value):
 def return_(x):
     """Implement `return_`."""
     return x
+
+
+@register(primops.J)
+def J(x):
+    from myia.grad_implementations import implementations
+    from myia.anf_ir import Graph
+    from myia.grad import grad
+
+    if isinstance(x, primops.Primitive):
+        return implementations[x]
+    elif isinstance(x, Graph):
+        return grad(x)
+    elif isinstance(x, FunctionType):
+        from myia.api import parse, compile
+        g = parse(x)
+        return compile(grad(g))
+    elif isinstance(x, VMFrame.Closure):
+        return VMFrame.Closure(J(x.graph), x.frame)
+    elif isinstance(x, (int, float)):
+        return x
+    elif isinstance(x, tuple):
+        return smap(J, x)
+    elif x is ZERO:
+        return ZERO
+    else:
+        raise TypeError(f'J is not defined on {type(x)}')
+
+
+@register(primops.Jinv)
+def Jinv(x):
+    if isinstance(x, (int, float)):
+        return x
+    elif isinstance(x, tuple):
+        return smap(Jinv, x)
+    elif isinstance(x, Graph):
+        assert x.primal
+        return x.primal
+    elif isinstance(x, VMFrame.Closure):
+        return VMFrame.Closure(Jinv(x.graph), x.frame)
+    elif x is ZERO:
+        return ZERO
+    else:
+        raise TypeError(f'Jinv is not defined on {type(x)}')
+
+
+class Zero:
+    """Null object for addition.
+
+    * ZERO + x is x
+    * x + ZERO is x
+    * ZERO[i] is ZERO
+    """
+
+    def __add__(self, z):
+        return z
+
+    def __radd__(self, z):
+        return z
+
+    def __getitem__(self, item):
+        return self
+
+    @staticmethod
+    def pad(arr, n):
+        m = len(arr)
+        if m < n:
+            return arr + type(arr)(ZERO for _ in range(n - m))
+        else:
+            return arr
+
+
+ZERO = Zero()
+
+
+@register(primops.zeros_like)
+def zeros_like(x):
+    def zero(x):
+        if isinstance(x, VMFrame.Closure) or x is ZERO:
+            return ZERO
+        elif isinstance(x, (Graph, primops.Primitive)):
+            return ()
+        else:
+            return type(x)(0)
+
+    return smap(zero, x)
