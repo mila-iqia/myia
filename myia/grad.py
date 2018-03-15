@@ -155,7 +155,7 @@ class Grad:
         else:
             # Note: Parameters were all added to tagged_nodes in
             # scaffold_graph, so they won't trigger this branch.
-            raise Exception('This should be unreachable.')
+            raise Exception('This should be unreachable.')  # pragma: no cover
 
         self.tagged_nodes[node] = tagged
         self.backpropagator_nodes[node] = bprop
@@ -195,7 +195,8 @@ class Grad:
             rval = self._apply(bg, bprop, self.rho(node, node.graph))
             self.step_nodes[node] = rval
             if not rval.debug.about:
-                rval.debug.about = About(node.debug, 'grad_bprop_step')
+                rval.debug.about = About(node.debug, 'grad_bprop_step') \
+                    # pragma: no cover
             return rval
         else:
             return None

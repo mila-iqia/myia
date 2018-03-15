@@ -5,7 +5,7 @@ from copy import copy
 from myia.api import parse, compile
 from myia.grad import grad
 from myia.debug.finite_diff import GradTester
-from myia.py_implementations import J, tail
+from myia.py_implementations import J, tail, ZERO
 
 
 def grad_test(*tests):
@@ -70,6 +70,36 @@ def test_null(x, y):
 def test_tuple(x, y):
     """Test multiple outputs."""
     return (x + y, x - y, x * y, x / y)
+
+
+@grad_test((7, 2), (3, -4))
+def test_grad_add(x, y):
+    return x + y
+
+
+@grad_test((7, 2), (3, -4))
+def test_grad_sub(x, y):
+    return x - y
+
+
+@grad_test((7, 2), (3, -4))
+def test_grad_mul(x, y):
+    return x * y
+
+
+@grad_test((7, 2), (3, -4))
+def test_grad_div(x, y):
+    return x / y
+
+
+@grad_test((7,), (-4))
+def test_grad_uadd(x):
+    return +x
+
+
+@grad_test((7,), (-4))
+def test_grad_usub(x):
+    return -x
 
 
 @grad_test((3, 4, 5))
@@ -253,3 +283,12 @@ def test_grad2_pow(x):
     all_res = bprop(1)
     res = tail(all_res)
     return res
+
+
+def test_zero():
+    assert ZERO + 10 == 10
+    assert 10 + ZERO == 10
+    assert ZERO[0] is ZERO
+    assert ZERO[1000] is ZERO
+    assert ZERO.pad([1, 2, 3], 5) == [1, 2, 3, ZERO, ZERO]
+    assert ZERO.pad([1, 2, 3], 2) == [1, 2, 3]

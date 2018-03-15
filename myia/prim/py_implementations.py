@@ -208,7 +208,7 @@ def J(x):
     elif x is ZERO:
         return ZERO
     else:
-        raise TypeError(f'J is not defined on {type(x)}')
+        raise TypeError(f'J is not defined on {type(x)}')  # pragma: no cover
 
 
 @register(primops.Jinv)
@@ -229,7 +229,8 @@ def Jinv(x):
     elif x is ZERO:
         return ZERO
     else:
-        raise TypeError(f'Jinv is not defined on {type(x)}')
+        raise TypeError(f'Jinv is not defined on {type(x)}') \
+            # pragma: no cover
 
 
 class Zero:
