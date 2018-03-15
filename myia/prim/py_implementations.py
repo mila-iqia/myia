@@ -194,6 +194,12 @@ def return_(x):
 
 @register(primops.J)
 def J(x):
+    """Implement `J`.
+
+    On a function, this returns an augmented function that returns the original
+    output and a backpropagator. On structured data, this applies `J`
+    recursively on each element. On scalars, this is a no-op.
+    """
     from myia.grad_implementations import implementations
     from myia.anf_ir import Graph
     from myia.grad import grad
@@ -220,6 +226,10 @@ def J(x):
 
 @register(primops.Jinv)
 def Jinv(x):
+    """Implement `Jinv`.
+
+    This is the inverse of `J`: `Jinv(J(x)) == x`.
+    """
     if isinstance(x, (int, float)):
         return x
     elif isinstance(x, tuple):
@@ -254,6 +264,7 @@ class Zero:
 
     @staticmethod
     def pad(arr, n):
+        """Pad the given array with `ZERO` up to length `n`."""
         m = len(arr)
         if m < n:
             return arr + type(arr)(ZERO for _ in range(n - m))
@@ -266,6 +277,7 @@ ZERO = Zero()
 
 @register(primops.zeros_like)
 def zeros_like(x):
+    """Implement `zeros_like`."""
     def zero(x):
         if isinstance(x, VMFrame.Closure) or x is ZERO:
             return ZERO

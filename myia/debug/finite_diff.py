@@ -10,7 +10,13 @@ from myia.py_implementations import zeros_like
 
 
 class NoTestGrad:
+    """Class to signify that a value's gradient shouldn't be tested.
+
+    I don't fully remember how this is supposed to work.
+    """
+
     def __init__(self, value):
+        """Initialize NoTestGrad."""
         self.value = value
 
 
@@ -24,10 +30,16 @@ rel_error = 1e-03
 
 
 def clean_args(args):
+    """Remove instances of NoTestGrad in the given arguments."""
     return tuple(a.value if isinstance(a, NoTestGrad) else a for a in args)
 
 
 def gen_paths(obj, path):
+    """Generate all paths to a scalar through an object.
+
+    For example, ((a, b), {'x': c}) would generate the paths
+    (0, 0), (0, 1) and (1, 'x') for a, b and c.
+    """
     if isinstance(obj, NoTestGrad):
         pass
     elif isinstance(obj, (list, tuple)):
@@ -46,6 +58,7 @@ def gen_paths(obj, path):
 
 
 def resolve_path(obj, path):
+    """Follow the given path on the given object."""
     for p in path:
         obj = obj[p]
     return obj
@@ -53,6 +66,8 @@ def resolve_path(obj, path):
 
 def gen_variants(obj, gen, path):
     """
+    Generate perturbated variants of the given object.
+
     For each scalar element in obj, generate a list of copies obj where that
     element has been modified by gen, and the path to that element.
     Basically:
@@ -97,8 +112,7 @@ def gen_variants(obj, gen, path):
 
 class GradTester:
     """
-    Test a computed gradient against a finite differences estimate
-    of the gradient.
+    Test computed gradient against finite differences estimate.
 
     Arguments:
         fn: The function to test against.
@@ -107,13 +121,16 @@ class GradTester:
             to estimate the gradient.
         argnames: The names of the arguments.
         outnames: The names of the outputs.
+
     """
+
     def __init__(self,
                  fn: Callable,
                  gfn: Callable,
                  args: List[Any],
                  argnames: List[str],
                  outnames: List[str] = None) -> None:
+        """Initialize a GradTester."""
         self.fn = fn
         self.gfn = gfn
         self.args = args
@@ -136,7 +153,7 @@ class GradTester:
         self.nin = len(self.argnames)
         self.nout = len(self.outnames)
 
-    def set_result(self, results, opath, ipath, value):
+    def _set_result(self, results, opath, ipath, value):
         opath = (self.outnames[opath[0]],) + opath[1:]
         ipath = (self.argnames[ipath[0]],) + ipath[1:]
         outname = '.'.join(map(str, opath))
@@ -150,6 +167,7 @@ class GradTester:
         Returns:
             A dictionary that maps d<outname>/d<argname> to the
             gradient computed by gfn on args.
+
         """
         results: Dict[str, float] = {}
         z = zeros_like(self.out)
@@ -158,12 +176,13 @@ class GradTester:
             for ipath in gen_paths(grads, ()):
                 if isinstance(resolve_path(self.args, ipath), NoTestGrad):
                     continue
-                self.set_result(results, opath, ipath,
-                                resolve_path(grads, ipath))
+                self._set_result(results, opath, ipath,
+                                 resolve_path(grads, ipath))
         self.exact = results
         return results
 
     def wiggle(self, x):
+        """Return x +- some epsilon."""
         return x - eps, x + eps
 
     def compute_finite_diff(self) -> Dict[str, float]:
@@ -173,6 +192,7 @@ class GradTester:
         Returns:
             A dictionary that maps d<outname>/d<argname> to the
             gradient computed by finite difference with fn on args.
+
         """
         results: Dict[str, float] = {}
         for (under, over), ipath in gen_variants(self.args, self.wiggle, ()):
@@ -187,8 +207,8 @@ class GradTester:
 
             diff = smap(mkdiff, under_res, over_res)
             for opath in gen_paths(diff, ()):
-                self.set_result(results, opath, ipath,
-                                resolve_path(diff, opath))
+                self._set_result(results, opath, ipath,
+                                 resolve_path(diff, opath))
 
         self.finite_diff = results
         return results
@@ -200,6 +220,7 @@ class GradTester:
         Returns:
             A dictionary that maps d<outname>/d<argname> to a dictionary
             that contains both gradients and a boolean 'match' field.
+
         """
         exact = self.compute_exact()
         fin = self.compute_finite_diff()

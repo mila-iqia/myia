@@ -1,3 +1,5 @@
+"""Generate the gradient graph (augmented graph)."""
+
 
 from typing import Set, Dict, Tuple
 from collections import defaultdict
@@ -17,6 +19,7 @@ cons = Constant(primops.cons_tuple)
 
 
 def grad(graph):
+    """Return the augmented graph. This is the same as the J primitive."""
     if hasattr(graph, 'grad'):
         return graph.grad
     gr = Grad(graph)
@@ -24,7 +27,16 @@ def grad(graph):
 
 
 class Grad:
+    """Class to generate the gradient graph (augmented graph).
+
+    Arguments:
+        root: The root graph for which we want an augmented graph.
+            We will operate on every graph in its scope, plus every
+            graph called in its scope.
+    """
+
     def __init__(self, root: Graph) -> None:
+        """Initialize everything and process the gradient."""
         self.nest = NestingAnalyzer(root)
         assert not self.nest.parents()[root]
 
@@ -84,30 +96,29 @@ class Grad:
             bparam = bgraph.add_parameter()
             self.sensitivity_nodes[(graph.output, graph)] = bparam
 
-    def make_cons(self, graph, *elems):
+    def _make_cons(self, graph, *elems):
         if len(elems) == 0:
             return Constant(())
         else:
             x, *rest = elems
             return graph.apply(primops.cons_tuple,
                                x,
-                               self.make_cons(graph, *rest))
+                               self._make_cons(graph, *rest))
 
-    def apply(self, graph, *inputs):
+    def _apply(self, graph, *inputs):
         inputs = [i if isinstance(i, ANFNode) else Constant(i)
                   for i in inputs]
         return Apply(inputs, graph)
 
     def _process_graph_forward(self, graph):
         """Create the forward graph."""
-
         tgraph = self.tagged_graphs[graph]
         bgraph = self.backpropagator_graphs[graph]
 
         # Return (↑graph.output, ♢graph). The first element is given
         # by the `phi` method.
 
-        tgraph.output = self.make_cons(
+        tgraph.output = self._make_cons(
             tgraph,
             self.phi(graph.output),
             bgraph
@@ -128,19 +139,19 @@ class Grad:
         elif is_constant(node):
             # Note that this application will have its graph set to None, which
             # makes sense since it's basically a constant expression.
-            tagged, bprop = self.apply(tg, J, node), None
+            tagged, bprop = self._apply(tg, J, node), None
         elif is_apply(node) and node.graph not in self.tagged_graphs:
-            tagged, bprop = self.apply(tg, J, node), None
+            tagged, bprop = self._apply(tg, J, node), None
         elif is_apply(node):
             # a = f(x, y) -> ↑a, ♢a = ↑f(↑x, ↑y)
             tagged_args = [self.phi(n) for n in node.inputs]
-            app = self.apply(tg, *tagged_args)
+            app = self._apply(tg, *tagged_args)
             # ↑a (the first element)
-            tagged = self.apply(tg, index, app, 0)
+            tagged = self._apply(tg, index, app, 0)
             # ♢a (the second element)
             # Note that ♢a is not part of the forward graph, however,
             # it will be a free variable of the backpropagator graph.
-            bprop = self.apply(tg, index, app, 1)
+            bprop = self._apply(tg, index, app, 1)
         else:
             # Note: Parameters were all added to tagged_nodes in
             # scaffold_graph, so they won't trigger this branch.
@@ -161,11 +172,11 @@ class Grad:
         # Return ((∇fv1, ∇fv2, ...), ∇arg1, ∇arg2, ...)
         # Where ∇x is given by `rho(x, graph)`
 
-        bgraph.output = self.make_cons(
+        bgraph.output = self._make_cons(
             bgraph,
-            self.make_cons(bgraph,
-                           *[self.rho(p, graph)
-                             for p in self.fv_order[graph]]),
+            self._make_cons(bgraph,
+                            *[self.rho(p, graph)
+                              for p in self.fv_order[graph]]),
             *[self.rho(p, graph) for p in graph.parameters]
         )
 
@@ -181,7 +192,7 @@ class Grad:
         bg = node.graph and self.backpropagator_graphs[node.graph]
         bprop = self.backpropagator_nodes[node]
         if bprop:
-            rval = self.apply(bg, bprop, self.rho(node, node.graph))
+            rval = self._apply(bg, bprop, self.rho(node, node.graph))
             self.step_nodes[node] = rval
             if not rval.debug.about:
                 rval.debug.about = About(node.debug, 'grad_bprop_step')
@@ -191,7 +202,6 @@ class Grad:
 
     def rho(self, node, graph):
         """Compute expression for gradient wrt node and graph."""
-
         # We index with node and graph because the same node may have multiple
         # sensitivity variables, one for each graph that refers to the
         # original.
@@ -211,7 +221,9 @@ class Grad:
                 # and we use the argument index to extract the right
                 # contribution.
                 with About(node.debug, 'grad_bw'):
-                    contrib = self.apply(bg, index, self.bprop_step(user), idx)
+                    contrib = self._apply(bg,
+                                          index,
+                                          self.bprop_step(user), idx)
                 contribs.append(contrib)
             else:
                 # Uses in different graphs are ignored here. We take them
@@ -237,10 +249,10 @@ class Grad:
                 # closure is returned, this will be the sensitivity wrt the
                 # output. We index this sensitivity with idx to get the
                 # contribution we seek.
-                contrib = self.apply(bg,
-                                     index,
-                                     self.rho(graph_ct, graph),
-                                     idx)
+                contrib = self._apply(bg,
+                                      index,
+                                      self.rho(graph_ct, graph),
+                                      idx)
                 contribs.append(contrib)
 
         # NOTE: The order of nodes in contribs is not deterministic, because
@@ -250,11 +262,11 @@ class Grad:
 
         if len(contribs) == 0:
             # No contributions means a gradient of zero, naturally.
-            sens = self.apply(bg, primops.zeros_like, self.tagged_nodes[node])
+            sens = self._apply(bg, primops.zeros_like, self.tagged_nodes[node])
         else:
             # Contributions must be added together.
             def mkadd(x, y):
-                return self.apply(bg, add, x, y)
+                return self._apply(bg, add, x, y)
             sens = reduce(mkadd, contribs)
 
         if not sens.debug.about:

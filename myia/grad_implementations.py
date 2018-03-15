@@ -1,3 +1,9 @@
+"""Implementations of the primitives' gradients.
+
+Each primitive is associated to an augmented function, which returns a pair of
+the (augmented) original primitive's output and a backpropagator function.
+"""
+
 
 from myia.utils import Registry
 from myia.api import parse
@@ -9,7 +15,8 @@ from myia.py_implementations import \
     Jinv, J, zeros_like, cons_tuple, head, tail, setitem, log, exp
 
 
-def transform_bprop(prim, fn):
+def bprop_to_augm(prim, fn):
+    """Given a function for the bprop, make the augmented function."""
     info = NamedDebugInfo(prim=prim, name=prim.name)
 
     bprop = parse(fn)
@@ -55,13 +62,15 @@ register = implementations.register
 
 
 def register_bprop(prim):
+    """Register an augmented function for prim, given a backpropagator."""
     def deco(fn):
-        fn2 = transform_bprop(prim, fn)
+        fn2 = bprop_to_augm(prim, fn)
         return register(prim)(fn2)
     return deco
 
 
-def register_grad(prim):
+def register_augm(prim):
+    """Register an augmented function for prim."""
     def deco(fn):
         fn2 = parse(fn)
         return register(prim)(fn2)
@@ -70,26 +79,31 @@ def register_grad(prim):
 
 @register_bprop(primops.add)
 def bprop_add(x, y, dz):
+    """Backpropagator for primitive `add`."""
     return (dz, dz)
 
 
 @register_bprop(primops.sub)
 def bprop_sub(x, y, dz):
+    """Backpropagator for primitive `sub`."""
     return (dz, -dz)
 
 
 @register_bprop(primops.mul)
 def bprop_mul(x, y, dz):
+    """Backpropagator for primitive `mul`."""
     return (dz * y, dz * x)
 
 
 @register_bprop(primops.div)
 def bprop_div(x, y, dz):
+    """Backpropagator for primitive `div`."""
     return (dz / y, -dz * x / (y * y))
 
 
 @register_bprop(primops.pow)
 def bprop_pow(x, y, dz):
+    """Backpropagator for primitive `pow`."""
     # Note: this will often give a warning because the second element
     # in the pair is ill-defined when x < 0 and it is calculated even
     # if we do not care about it (we usually want the derivative wrt x,
@@ -100,71 +114,85 @@ def bprop_pow(x, y, dz):
 
 @register_bprop(primops.log)
 def bprop_log(x, dz):
+    """Backpropagator for primitive `log`."""
     return (dz / x,)
 
 
 @register_bprop(primops.exp)
 def bprop_exp(x, dz):
+    """Backpropagator for primitive `exp`."""
     return (dz * exp(x),)
 
 
 @register_bprop(primops.uadd)
 def bprop_uadd(x, dz):
+    """Backpropagator for primitive `uadd`."""
     return (dz,)
 
 
 @register_bprop(primops.usub)
 def bprop_usub(x, dz):
+    """Backpropagator for primitive `usub`."""
     return (-dz,)
 
 
 @register_bprop(primops.gt)
 def bprop_gt(x, y, dz):
+    """Backpropagator for primitive `gt`."""
     return (zeros_like(x), zeros_like(y))
 
 
 @register_bprop(primops.lt)
 def bprop_lt(x, y, dz):
+    """Backpropagator for primitive `lt`."""
     return (zeros_like(x), zeros_like(y))
 
 
 @register_bprop(primops.cons_tuple)
 def bprop_cons_tuple(_head, _tail, dz):
+    """Backpropagator for primitive `cons_tuple`."""
     return (head(dz), tail(dz))
 
 
 @register_bprop(primops.head)
 def bprop_head(tup, dz):
+    """Backpropagator for primitive `head`."""
     return (cons_tuple(dz, zeros_like(tail(tup))),)
 
 
 @register_bprop(primops.tail)
 def bprop_tail(tup, dz):
+    """Backpropagator for primitive `tail`."""
     return (cons_tuple(zeros_like(head(tup)), dz),)
 
 
 @register_bprop(primops.getitem)
 def bprop_getitem(data, idx, dz):
+    """Backpropagator for primitive `getitem`."""
     return (setitem(zeros_like(data), idx, dz), zeros_like(idx))
 
 
 @register_bprop(primops.J)
 def bprop_J(x, dz):
+    """Backpropagator for primitive `J`."""
     return (Jinv(dz),)
 
 
 @register_bprop(primops.Jinv)
 def bprop_Jinv(x, dz):
+    """Backpropagator for primitive `Jinv`."""
     return (J(dz),)
 
 
 @register_bprop(primops.zeros_like)
 def bprop_zeros_like(x, dz):
+    """Backpropagator for primitive `zeros_like`."""
     return (zeros_like(x),)
 
 
-@register_grad(primops.if_)
+@register_augm(primops.if_)
 def bprop_if_(c, tb, fb):
+    """Backpropagator for primitive `if`."""
     zeros_like  # Currently required for parser to see it in bprop()
 
     if Jinv(c):
