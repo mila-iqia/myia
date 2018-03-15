@@ -1,12 +1,12 @@
 
-from typing import Set
+from typing import Set, Dict, Tuple
 from collections import defaultdict
 from functools import reduce
-from myia.anf_ir import Apply, Constant, Parameter, Graph, ANFNode
+from myia.anf_ir import Apply, Constant, Graph, ANFNode
 from myia.info import About
 from myia import primops
 from myia.anf_ir_utils import \
-    dfs, is_apply, is_constant, is_constant_graph
+    is_apply, is_constant, is_constant_graph
 from myia.cconv import NestingAnalyzer
 
 
@@ -164,7 +164,8 @@ class Grad:
         bgraph.output = self.make_cons(
             bgraph,
             self.make_cons(bgraph,
-                           *[self.rho(p, graph) for p in self.fv_order[graph]]),
+                           *[self.rho(p, graph)
+                             for p in self.fv_order[graph]]),
             *[self.rho(p, graph) for p in graph.parameters]
         )
 
@@ -192,7 +193,8 @@ class Grad:
         """Compute expression for gradient wrt node and graph."""
 
         # We index with node and graph because the same node may have multiple
-        # sensitivity variables, one for each graph that refers to the original.
+        # sensitivity variables, one for each graph that refers to the
+        # original.
         key = (node, graph)
         if key in self.sensitivity_nodes:
             return self.sensitivity_nodes[key]
@@ -217,9 +219,9 @@ class Grad:
                 pass
 
         # We list all graphs that are immediately nested in this one and have
-        # this node as a free variable. These graphs may not technically contain
-        # a use of node, but they contain graphs that do, so there is a gradient
-        # of the node with respect to them.
+        # this node as a free variable. These graphs may not technically
+        # contain a use of node, but they contain graphs that do, so there
+        # is a gradient of the node with respect to them.
         children = {g for g in self.nest.coverage()
                     if self.nest.parents()[g] is graph
                     and node in self.nest.free_variables_total()[g]}

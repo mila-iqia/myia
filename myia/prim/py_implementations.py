@@ -24,9 +24,9 @@ def add(x, y):
         return x
     elif isinstance(x, tuple):
         # assert len(x) == len(y)
-        l = max(len(x), len(y))
-        x = Zero.pad(x, l)
-        y = Zero.pad(y, l)
+        maxl = max(len(x), len(y))
+        x = Zero.pad(x, maxl)
+        y = Zero.pad(y, maxl)
         return tuple(add(x2, y2) for x2, y2 in zip(x, y))
     else:
         return x + y
@@ -159,10 +159,9 @@ def setitem(data, item, value):
         return tuple(value if i == item else x
                      for i, x in enumerate(data))
     elif data is ZERO:
-        l = [ZERO for i in range(item + 1)]
-        l[item] = value
-        print('value is:', value)
-        return tuple(l)
+        zeros = [ZERO for i in range(item + 1)]
+        zeros[item] = value
+        return tuple(zeros)
     else:
         data2 = copy(data)
         data2[item] = value

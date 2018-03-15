@@ -6,7 +6,7 @@ from myia.anf_ir import Graph, Apply, Constant, Parameter
 from myia import primops
 from myia.anf_ir_utils import replace
 from myia.py_implementations import \
-    Jinv, J, zeros_like, cons_tuple, head, tail, getitem, setitem, log, exp
+    Jinv, J, zeros_like, cons_tuple, head, tail, setitem, log, exp
 
 
 def transform_bprop(prim, fn):

@@ -1,8 +1,7 @@
 """Estimate gradients with finite differences."""
 
 
-from typing import Iterable, Set, Tuple as TupleT, \
-    Callable, Dict, List, Any, Union
+from typing import Callable, Dict, List, Any
 import numpy
 import itertools
 
@@ -210,8 +209,8 @@ class GradTester:
             f = fin[k]
             threshold = max(abs(rel_error * e), abs(rel_error * f))
             results[k] = dict(
-                exact = e,
-                difference = f,
-                match = bool(abs(e - f) <= threshold)
+                exact=e,
+                difference=f,
+                match=bool(abs(e - f) <= threshold)
             )
         return results
