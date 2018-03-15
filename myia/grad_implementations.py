@@ -12,7 +12,7 @@ from myia.anf_ir import Graph, Apply, Constant, Parameter
 from myia import primops
 from myia.anf_ir_utils import replace
 from myia.py_implementations import \
-    Jinv, J, zeros_like, cons_tuple, head, tail, setitem, log, exp
+    Jinv, J, zeros_like, cons_tuple, head, tail, setitem
 
 
 def bprop_to_augm(prim, fn):
@@ -99,29 +99,6 @@ def bprop_mul(x, y, dz):
 def bprop_div(x, y, dz):
     """Backpropagator for primitive `div`."""
     return (dz / y, -dz * x / (y * y))
-
-
-@register_bprop(primops.pow)
-def bprop_pow(x, y, dz):
-    """Backpropagator for primitive `pow`."""
-    # Note: this will often give a warning because the second element
-    # in the pair is ill-defined when x < 0 and it is calculated even
-    # if we do not care about it (we usually want the derivative wrt x,
-    # not wrt y). An optimization pass will need to prune it out.
-    return (dz * y * x ** (y - 1),
-            dz * log(x) * x ** y)
-
-
-@register_bprop(primops.log)
-def bprop_log(x, dz):
-    """Backpropagator for primitive `log`."""
-    return (dz / x,)
-
-
-@register_bprop(primops.exp)
-def bprop_exp(x, dz):
-    """Backpropagator for primitive `exp`."""
-    return (dz * exp(x),)
 
 
 @register_bprop(primops.uadd)

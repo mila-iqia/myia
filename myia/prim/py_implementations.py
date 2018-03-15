@@ -1,7 +1,6 @@
 """Implementations for the debug VM."""
 
 
-import math
 from typing import Callable
 from types import FunctionType
 from copy import copy
@@ -60,18 +59,6 @@ def mod(x, y):
 def pow(x, y):
     """Implement `pow`."""
     return x ** y
-
-
-@register(primops.log)
-def log(x):
-    """Implement `log`."""
-    return math.log(x)
-
-
-@register(primops.exp)
-def exp(x):
-    """Implement `exp`."""
-    return math.exp(x)
 
 
 @register(primops.uadd)

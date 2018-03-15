@@ -1,6 +1,5 @@
 """User-friendly interfaces to Myia machinery."""
 import operator
-import math
 from types import FunctionType
 from typing import Any, Callable, Dict, List, Union
 
@@ -19,8 +18,6 @@ def default_object_map() -> Dict[Any, ANFNode]:
         operator.truediv: Constant(P.div),
         operator.mod: Constant(P.mod),
         operator.pow: Constant(P.pow),
-        math.log: Constant(P.log),
-        math.exp: Constant(P.exp),
         operator.eq: Constant(P.eq),
         operator.ne: Constant(P.ne),
         operator.lt: Constant(P.lt),
