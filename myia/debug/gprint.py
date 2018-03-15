@@ -5,7 +5,9 @@ import os
 import json
 
 from myia.info import DebugInfo
-from myia.anf_ir import Graph, ANFNode, Apply, Constant, Parameter
+from myia.anf_ir import Graph, ANFNode, Apply, Constant
+from myia.anf_ir_utils import \
+    is_apply, is_constant, is_parameter, is_constant_graph
 from myia.parser import Location
 from myia.primops import Primitive
 from myia import primops
@@ -17,26 +19,6 @@ gcss = open(gcss_path).read()
 
 mcss_path = f'{os.path.dirname(__file__)}/myia.css'
 mcss = open(mcss_path).read()
-
-
-def is_computation(x):
-    """Check if x is a computation."""
-    return isinstance(x, Apply)
-
-
-def is_constant(x):
-    """Check if x is a constant."""
-    return isinstance(x, Constant)
-
-
-def is_parameter(x):
-    """Check if x is a parameter."""
-    return isinstance(x, Parameter)
-
-
-def is_graph(x):
-    """Check if x is a constant that contains a graph."""
-    return isinstance(x, Constant) and isinstance(x.value, Graph)
 
 
 short_relation_symbols = {
@@ -102,7 +84,7 @@ class NodeLabeler:
         elif isinstance(node, Graph):
             return self.name(node.debug,
                              True if force is None else force)
-        elif is_graph(node):
+        elif is_constant_graph(node):
             return self.name(node.value.debug,
                              True if force is None else force)
         elif is_constant(node):
@@ -351,7 +333,7 @@ class MyiaGraphPrinter(GraphPrinter):
         self.cynode(id=node, label=lbl, parent=g, classes=cl)
 
         fn = node.inputs[0] if node.inputs else None
-        if fn and is_graph(fn):
+        if fn and is_constant_graph(fn):
             self.graphs.add(fn.value)
 
         edges = []
@@ -440,7 +422,7 @@ class MyiaGraphPrinter(GraphPrinter):
             return
 
         ret = g.return_.inputs[1]
-        if not is_computation(ret) or ret.graph is not g:
+        if not is_apply(ret) or ret.graph is not g:
             ret = g.return_
 
         self.returns.add(ret)
@@ -461,7 +443,7 @@ class MyiaGraphPrinter(GraphPrinter):
 
     def follow(self, node):
         """Add this node's graph if follow_references is True."""
-        if is_graph(node) and self.follow_references:
+        if is_constant_graph(node) and self.follow_references:
             self.graphs.add(node.value)
 
 
