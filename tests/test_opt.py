@@ -14,8 +14,8 @@ R = Primitive('R')
 
 
 idempotent_P = simple_sub(
-    (P, X << (P, Y)),
-    X
+    (P, (P, X)),
+    (P, X)
 )
 
 elim_R = simple_sub(

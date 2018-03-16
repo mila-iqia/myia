@@ -6,7 +6,6 @@ import operator
 from .anf_ir import ANFNode, Constant, Graph
 from . import primops as P
 from .unify import var, Unification, Var
-from .debug.utils import mixin
 from .graph_utils import dfs
 from .anf_ir_utils import \
     succ_deep, exclude_from_set, is_constant, is_constant_graph
@@ -18,18 +17,6 @@ unify = _unification.unify
 
 def isvar(x):
     return isinstance(x, Var)
-
-
-@mixin(Var)
-class _Var:
-    def __lshift__(self, pattern):
-        return SubPattern(self, pattern)
-
-
-class SubPattern:
-    def __init__(self, var, pattern):
-        self.var = var
-        self.pattern = pattern
 
 
 def valuevar():
@@ -65,13 +52,7 @@ class PatternOpt:
             touches = {node}
         else:
             touches = set()
-        if isinstance(pattern, SubPattern):
-            touches, U = self._match(node, pattern.pattern, U)
-            if U:
-                U = unify(pattern.var, node, U)
-                return touches, U
-            return touches, False
-        elif isinstance(pattern, tuple):
+        if isinstance(pattern, tuple):
             sexp = list(node.inputs)
             if sexp:
                 if ... in pattern:
