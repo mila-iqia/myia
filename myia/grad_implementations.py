@@ -9,7 +9,7 @@ from types import FunctionType
 from myia.utils import Registry
 from myia.api import parse
 from myia.info import NamedDebugInfo, About
-from myia.anf_ir import Graph, Apply, Constant, Parameter
+from myia.anf_ir import Graph
 from myia import primops
 from myia.primops import Primitive
 from myia.anf_ir_utils import replace
@@ -24,11 +24,7 @@ def bprop_to_augm(prim: Primitive, fn: FunctionType) -> Graph:
     bprop = parse(fn)
     bprop.debug.name = None
     bprop.debug.about = About(info, 'grad_bprop')
-    # empty_tuple = Apply([Constant(primops.make_tuple)], bprop)
-    # bprop.output.inputs.insert(1, empty_tuple)
-    bprop.output = Apply([Constant(primops.cons_tuple),
-                          Constant(()),
-                          bprop.output], bprop)
+    bprop.output = bprop.apply(primops.cons_tuple, (), bprop.output)
 
     *args, dout = bprop.parameters
 
@@ -36,26 +32,25 @@ def bprop_to_augm(prim: Primitive, fn: FunctionType) -> Graph:
         outer = Graph()
         outer.transforms['primal'] = prim
 
-    def app(prim, *args):
-        return Apply([Constant(prim), *args], outer)
-
     transf_args = []
     for p in args:
         with About(p.debug, 'grad_fw'):
-            outer_p = Parameter(outer)
-            outer.parameters.append(outer_p)
+            outer_p = outer.add_parameter()
         replace(p, outer_p)
-        transf_args.append(app(primops.Jinv, outer_p))
+        transf_args.append(outer.apply(primops.Jinv, outer_p))
 
     with About(dout.debug, 'grad_bw'):
-        new_dout = Parameter(bprop)
+        new_dout = bprop.add_parameter()
         replace(dout, new_dout)
+        # We remove all parameters except new_dout
         bprop.parameters = [new_dout]
 
-    result = app(primops.J, app(prim, *transf_args))
-    # outer.output = app(primops.make_tuple, result, Constant(bprop))
-    outer.output = app(primops.cons_tuple, result,
-                       app(primops.cons_tuple, Constant(bprop), Constant(())))
+    result = outer.apply(primops.J, outer.apply(prim, *transf_args))
+    outer.output = outer.apply(
+        primops.cons_tuple,
+        result,
+        outer.apply(primops.cons_tuple, bprop, ())
+    )
     return outer
 
 
