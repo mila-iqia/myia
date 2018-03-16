@@ -5,17 +5,19 @@ the (augmented) original primitive's output and a backpropagator function.
 """
 
 
+from types import FunctionType
 from myia.utils import Registry
 from myia.api import parse
 from myia.info import NamedDebugInfo, About
 from myia.anf_ir import Graph, Apply, Constant, Parameter
 from myia import primops
+from myia.primops import Primitive
 from myia.anf_ir_utils import replace
 from myia.py_implementations import \
     Jinv, J, zeros_like, cons_tuple, head, tail, setitem
 
 
-def bprop_to_augm(prim, fn):
+def bprop_to_augm(prim: Primitive, fn: FunctionType) -> Graph:
     """Given a function for the bprop, make the augmented function."""
     info = NamedDebugInfo(prim=prim, name=prim.name)
 
@@ -57,8 +59,8 @@ def bprop_to_augm(prim, fn):
     return outer
 
 
-implementations = Registry()
-register = implementations.register
+augmented_graphs: Registry[primops.Primitive, Graph] = Registry()
+register = augmented_graphs.register
 
 
 def register_bprop(prim):

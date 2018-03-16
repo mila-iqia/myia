@@ -10,12 +10,12 @@ returning a nested function creates a closure.
 
 """
 from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
-                    overload, Iterable)
+                    overload, Iterable, Union)
 
 from myia.ir import Node
 from myia.utils import Named, repr_, list_str
 from myia.info import NamedDebugInfo
-from myia.prim import ops as primops
+from myia.prim import Primitive, ops as primops
 
 PARAMETER = Named('PARAMETER')
 APPLY = Named('APPLY')
@@ -43,7 +43,8 @@ class Graph:
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
         self.debug = NamedDebugInfo(self)
-        self.primal = None
+        self.grad: Graph = None
+        self.primal: Union[Graph, Primitive] = None
 
     @property
     def output(self) -> 'ANFNode':

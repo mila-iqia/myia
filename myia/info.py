@@ -85,7 +85,7 @@ class NamedDebugInfo(DebugInfo):
         """Construct a NamedDebugInfo object."""
         self._id: int = None
         self.name: str = None
-        self.about = None
+        self.about: About = None
         self.save_trace: bool = False
         self.trace: Any = None
         self._obj = weakref.ref(obj) if obj else None

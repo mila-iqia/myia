@@ -187,12 +187,12 @@ def J(x):
     output and a backpropagator. On structured data, this applies `J`
     recursively on each element. On scalars, this is a no-op.
     """
-    from myia.grad_implementations import implementations
+    from myia.grad_implementations import augmented_graphs
     from myia.anf_ir import Graph
     from myia.grad import grad
 
     if isinstance(x, primops.Primitive):
-        return implementations[x]
+        return augmented_graphs[x]
     elif isinstance(x, Graph):
         return grad(x)
     elif isinstance(x, FunctionType):

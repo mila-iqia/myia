@@ -1,7 +1,7 @@
 """Generate the gradient graph (augmented graph)."""
 
 
-from typing import Set, Dict, Tuple
+from typing import Set, Dict, Tuple, List
 from collections import defaultdict
 from functools import reduce
 from myia.anf_ir import Apply, Constant, Graph, ANFNode
@@ -20,7 +20,7 @@ cons = Constant(primops.cons_tuple)
 
 def grad(graph):
     """Return the augmented graph. This is the same as the J primitive."""
-    if hasattr(graph, 'grad'):
+    if graph.grad:
         return graph.grad
     gr = Grad(graph)
     return gr.tagged_graphs[graph]
@@ -40,7 +40,7 @@ class Grad:
         self.nest = NestingAnalyzer(root)
         assert not self.nest.parents()[root]
 
-        self.fv_order = defaultdict(list)
+        self.fv_order: Dict[Graph, List[ANFNode]] = defaultdict(list)
         for g, fvs in self.nest.free_variables_total().items():
             self.fv_order[g] = list(fvs)
 
@@ -106,9 +106,9 @@ class Grad:
                                self._make_cons(graph, *rest))
 
     def _apply(self, graph, *inputs):
-        inputs = [i if isinstance(i, ANFNode) else Constant(i)
-                  for i in inputs]
-        return Apply(inputs, graph)
+        wrapped_inputs = [i if isinstance(i, ANFNode) else Constant(i)
+                          for i in inputs]
+        return Apply(wrapped_inputs, graph)
 
     def _process_graph_forward(self, graph):
         """Create the forward graph."""
@@ -191,15 +191,13 @@ class Grad:
 
         bg = node.graph and self.backpropagator_graphs[node.graph]
         bprop = self.backpropagator_nodes[node]
-        if bprop:
-            rval = self._apply(bg, bprop, self.rho(node, node.graph))
-            self.step_nodes[node] = rval
-            if not rval.debug.about:
-                rval.debug.about = About(node.debug, 'grad_bprop_step') \
-                    # pragma: no cover
-            return rval
-        else:
-            return None
+        assert bprop
+        rval = self._apply(bg, bprop, self.rho(node, node.graph))
+        self.step_nodes[node] = rval
+        if not rval.debug.about:
+            rval.debug.about = About(node.debug, 'grad_bprop_step') \
+                # pragma: no cover
+        return rval
 
     def rho(self, node, graph):
         """Compute expression for gradient wrt node and graph."""
@@ -229,7 +227,7 @@ class Grad:
             else:
                 # Uses in different graphs are ignored here. We take them
                 # into account below.
-                pass
+                pass  # pragma: no cover
 
         # We list all graphs that are immediately nested in this one and have
         # this node as a free variable. These graphs may not technically
