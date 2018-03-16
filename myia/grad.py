@@ -20,8 +20,8 @@ cons = Constant(primops.cons_tuple)
 
 def grad(graph):
     """Return the augmented graph. This is the same as the J primitive."""
-    if graph.grad:
-        return graph.grad
+    if graph.transforms.get('grad', None):
+        return graph.transforms['grad']
     gr = Grad(graph)
     return gr.tagged_graphs[graph]
 
@@ -78,8 +78,8 @@ class Grad:
         # Forward graph
         with About(graph.debug, 'grad_fw'):
             tgraph = Graph()
-        graph.grad = tgraph
-        tgraph.primal = graph
+        graph.transforms['grad'] = tgraph
+        tgraph.transforms['primal'] = graph
         self.tagged_graphs[graph] = tgraph
         # Same parameters as the original, but tagged
         for p in graph.parameters:

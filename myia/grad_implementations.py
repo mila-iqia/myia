@@ -34,7 +34,7 @@ def bprop_to_augm(prim: Primitive, fn: FunctionType) -> Graph:
 
     with About(info, 'grad_fw'):
         outer = Graph()
-        outer.primal = prim
+        outer.transforms['primal'] = prim
 
     def app(prim, *args):
         return Apply([Constant(prim), *args], outer)

@@ -222,8 +222,9 @@ def Jinv(x):
     elif isinstance(x, tuple):
         return smap(Jinv, x)
     elif isinstance(x, Graph):
-        assert x.primal
-        return x.primal
+        primal = x.transforms.get('primal', None)
+        assert primal
+        return primal
     elif isinstance(x, VMFrame.Closure):
         return VMFrame.Closure(Jinv(x.graph), x.frame)
     elif x is ZERO:

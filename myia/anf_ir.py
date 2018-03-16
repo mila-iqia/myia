@@ -10,7 +10,7 @@ returning a nested function creates a closure.
 
 """
 from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
-                    overload, Iterable, Union)
+                    overload, Iterable, Union, Dict)
 
 from myia.ir import Node
 from myia.utils import Named, repr_, list_str
@@ -35,6 +35,10 @@ class Graph:
             has no output node (because it won't be known e.g. until the
             function has completed parsing), but it must be set afterwards for
             the graph instance to be valid.
+        debug: A NamedDebugInfo object containing debugging information about
+            this graph.
+        transforms: A dictionary of available transforms for this graph, e.g.
+            'grad' or 'primal'.
 
     """
 
@@ -43,8 +47,7 @@ class Graph:
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
         self.debug = NamedDebugInfo(self)
-        self.grad: Graph = None
-        self.primal: Union[Graph, Primitive] = None
+        self.transforms: Dict[str, Union[Graph, Primitive]] = {}
 
     @property
     def output(self) -> 'ANFNode':
