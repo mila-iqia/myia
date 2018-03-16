@@ -221,16 +221,50 @@ def test_pow10(x):
     return v
 
 
+def _grad1(f):
+    J, tail
+
+    def grad(x):
+        jf = J(f)
+        tup = jf(x)
+        bprop = tup[1]
+        all_res = bprop(1)
+        res = tail(all_res)
+        return res
+    return grad
+
+
+def _grad2(f):
+    J, tail
+
+    def grad(x, y):
+        jf = J(f)
+        tup = jf(x, y)
+        bprop = tup[1]
+        all_res = bprop(1)
+        res = tail(all_res)
+        return res
+    return grad
+
+
+def _grad3(f):
+    J, tail
+
+    def grad(x, y, z):
+        jf = J(f)
+        tup = jf(x, y, z)
+        bprop = tup[1]
+        all_res = bprop(1)
+        res = tail(all_res)
+        return res
+    return grad
+
+
 @grad_test(3)
 def test_grad2_simple(x):
     def f(x):
         return x * x * x * x
-    jf = J(f)
-    tup = jf(x)
-    bprop = tup[1]
-    all_res = bprop(1)
-    res = tail(all_res)
-    return res
+    return _grad1(f)(x)
 
 
 @grad_test((4, 5, 2), (-7, 3, 1))
@@ -240,12 +274,7 @@ def test_grad2_if(x, y, z):
             return y * z
         else:
             return y + z
-    jf = J(f)
-    tup = jf(x, y, z)
-    bprop = tup[1]
-    all_res = bprop(1)
-    res = tail(all_res)
-    return res
+    return _grad3(f)(x, y, z)
 
 
 @grad_test((4, 5, 2), (7, 3, 1))
@@ -257,12 +286,7 @@ def test_grad2_while(x, y, z):
             rval += y
             x -= z
         return rval
-    jf = J(f)
-    tup = jf(x, y, z)
-    bprop = tup[1]
-    all_res = bprop(1)
-    res = tail(all_res)
-    return res
+    return _grad3(f)(x, y, z)
 
 
 @grad_test(3)
@@ -277,12 +301,7 @@ def test_grad2_pow(x):
                 i = i + 1
             j = j + 1
         return v
-    jf = J(f)
-    tup = jf(x)
-    bprop = tup[1]
-    all_res = bprop(1)
-    res = tail(all_res)
-    return res
+    return _grad1(f)(x)
 
 
 def test_zero():
