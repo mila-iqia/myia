@@ -12,10 +12,10 @@ class L(list):
 
 class TUnification(Unification):
     def visit(self, fn, v):
-        if isinstance(v, tuple):
+        if type(v) ==  tuple:
             return tuple(expandlist(fn(e) for e in v))
 
-        elif isinstance(v, L):
+        elif type(v) == L:
             return L(noseq(fn, e) for e in v)
 
         else:
@@ -34,8 +34,9 @@ def test_Var():
     assert v1.matches(v2)
     assert v1.matches(object())
     assert str(v1) == v1.tag
-    rv2 = repr(v2)
-    assert rv2 == f'Var({v2.tag})'
+    v3 = Var('name')
+    assert repr(v3) == 'Var(name)'
+    repr(v2)
     assert v1.tag != v2.tag
 
 
@@ -388,6 +389,7 @@ def test_reify():
     v2 = var()
     v3 = var()
     v4 = var()
+    sv = svar()
 
     d = {v1: 2.0, v2: None, v3: 3, v4: (v1, v3)}
     t = TU.reify(v4, d)
@@ -396,3 +398,7 @@ def test_reify():
     d = {v1: 3.0}
     t = TU.reify(L([v1]), d)
     assert t == L([3.0])
+
+    d = {sv: Seq((3, 4))}
+    t = TU.reify((1, 2, sv), d)
+    assert t == (1, 2, 3, 4);

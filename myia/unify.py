@@ -31,6 +31,11 @@ class Var(Generic[U]):
 
     __slots__ = ('tag',)
 
+    def __init__(self, tag: str = None):
+        """Optionally set a tag."""
+        if tag is not None:
+            self.tag = tag
+
     def matches(self, value: Value[U]) -> bool:
         """Return True if the variable matches the value given.
 
