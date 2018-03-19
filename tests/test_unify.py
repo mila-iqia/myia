@@ -12,7 +12,7 @@ class L(list):
 
 class TUnification(Unification):
     def visit(self, fn, v):
-        if type(v) ==  tuple:
+        if type(v) == tuple:
             return tuple(expandlist(fn(e) for e in v))
 
         elif type(v) == L:
@@ -401,4 +401,4 @@ def test_reify():
 
     d = {sv: Seq((3, 4))}
     t = TU.reify((1, 2, sv), d)
-    assert t == (1, 2, 3, 4);
+    assert t == (1, 2, 3, 4)

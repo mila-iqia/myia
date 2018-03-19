@@ -31,7 +31,7 @@ class Var(Generic[U]):
 
     __slots__ = ('tag',)
 
-    def __init__(self, tag: str = None):
+    def __init__(self, tag: str = None) -> None:
         """Optionally set a tag."""
         if tag is not None:
             self.tag = tag
