@@ -18,6 +18,7 @@ from myia.info import NamedDebugInfo
 from myia.prim import ops as primops
 
 PARAMETER = Named('PARAMETER')
+SPECIAL = Named('SPECIAL')
 APPLY = Named('APPLY')
 
 LITERALS = (bool, int, str, float)
@@ -326,3 +327,16 @@ class Constant(ANFNode):
 
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, value=self.value)
+
+
+class Special(ANFNode):
+
+    def __init__(self, special: Any, graph: Graph) -> None:
+        super().__init__([], SPECIAL, graph)
+        self.special = special
+
+    def __str__(self) -> str:
+        return str(self.special)
+
+    def __repr__(self) -> str:
+        return repr_(self, name=self.debug.debug_name, special=self.special)
