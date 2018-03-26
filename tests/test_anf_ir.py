@@ -138,6 +138,23 @@ def test_graph():
     g.parameters.append(x)
 
 
+def test_graph_helpers():
+    """Test the helper methods on graphs."""
+    g = Graph()
+    x = g.add_parameter()
+    y = g.add_parameter()
+    assert g.parameters == [x, y]
+    one = g.constant(1)
+    add = g.constant('add')
+    temp = g.apply('mul', one, 2)
+    assert temp.graph is g
+    assert all(isinstance(x, Constant) for x in temp.inputs)
+    assert list(x.value for x in temp.inputs) == ['mul', 1, 2]
+    g.output = g.apply(add, temp, x)
+    assert g.output.graph is g
+    assert list(g.output.inputs) == [add, temp, x]
+
+
 def test_graph_output():
     g = Graph()
     with pytest.raises(Exception):
