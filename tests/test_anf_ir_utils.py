@@ -1,11 +1,12 @@
-from myia.anf_ir import Constant, Apply, Graph
+from myia.anf_ir import Constant, Apply, Parameter, Graph
 from myia.graph_utils import dfs as _dfs
 from myia.anf_ir_utils import \
     dfs, toposort, accessible_graphs, destroy_disconnected_nodes, \
-    is_constant_graph, \
-    succ_incoming, succ_deep, succ_bidirectional
+    is_apply, is_constant, is_parameter, is_constant_graph, \
+    succ_incoming, succ_deep, succ_deeper, succ_bidirectional, \
+    exclude_from_set, freevars_boundary
 
-from myia.api import ENV
+from myia.api import ENV, parse
 from myia.parser import Parser
 
 from .test_graph_utils import _check_toposort
@@ -67,6 +68,41 @@ def _name_nodes(nodes):
     return set(map(name, nodes))
 
 
+def test_dfs_variants():
+    def f(x):
+        z = x * x
+
+        def g(y):
+            return y + z
+        w = z + 3
+        q = g(w)
+        return q
+
+    graph = parse(f)
+    inner_graph_ct, = [x for x in dfs(graph.return_) if is_constant_graph(x)]
+    inner_graph = inner_graph_ct.value
+
+    inner_ret = inner_graph.return_
+
+    deep = _name_nodes(_dfs(inner_ret, succ_deep))
+    assert deep == set('. return add y z mul x'.split())
+
+    deeper = _name_nodes(_dfs(inner_ret, succ_deeper))
+    assert deeper == set('. return add y z mul x w 3 q g'.split())
+
+    _bound_fv = freevars_boundary(inner_graph, True)
+    bound_fv = _name_nodes(_dfs(inner_ret, succ_deeper, _bound_fv))
+    assert bound_fv == set('. return add y z'.split())
+
+    _no_fv = freevars_boundary(inner_graph, False)
+    no_fv = _name_nodes(_dfs(inner_ret, succ_deeper, _no_fv))
+    assert no_fv == set('. return add y'.split())
+
+    _excl_root = exclude_from_set([inner_ret])
+    excl_root = _name_nodes(_dfs(inner_ret, succ_deeper, _excl_root))
+    assert excl_root == set()
+
+
 def test_disconnect():
     def f(x):
         a = x * x
@@ -93,3 +129,19 @@ def test_disconnect():
 
     total2 = _name_nodes(_dfs(g.return_, succ_bidirectional(cov)))
     assert total2 == live
+
+
+def test_helpers():
+    g = Graph()
+    cg = Constant(g)
+    assert is_constant_graph(cg)
+
+    one = Constant(1)
+    assert not is_constant_graph(one)
+    assert is_constant(one)
+
+    a = Apply([cg, one], g)
+    assert is_apply(a)
+
+    p = Parameter(g)
+    assert is_parameter(p)

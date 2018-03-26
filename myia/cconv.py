@@ -9,7 +9,8 @@ from typing import Dict, Iterable, Optional, Set
 from collections import defaultdict
 
 from myia.anf_ir import ANFNode, Constant, Graph
-from myia.anf_ir_utils import is_constant_graph, succ_deep, succ_stop_at_fv
+from myia.anf_ir_utils import \
+    is_constant_graph, succ_deeper, succ_incoming, freevars_boundary
 from myia.graph_utils import dfs
 from myia.utils import memoize_method
 
@@ -33,9 +34,9 @@ class NestingAnalyzer:
     def coverage(self) -> Iterable[Graph]:
         """Return a collection of graphs accessible from the root."""
         root: ANFNode = Constant(self.root)
-        nodes = dfs(root, succ_deep)
-        return [node.value for node in nodes
-                if is_constant_graph(node)]
+        nodes = dfs(root, succ_deeper)
+        return set(node.value if is_constant_graph(node) else node.graph
+                   for node in nodes) - {None}
 
     @memoize_method
     def free_variables_direct(self) -> Dict[Graph, Iterable[ANFNode]]:
@@ -47,7 +48,8 @@ class NestingAnalyzer:
         """
         coverage = self.coverage()
         return {g: [node for node in dfs(g.return_,
-                                         succ_stop_at_fv(g))
+                                         succ_incoming,
+                                         freevars_boundary(g))
                     if node.graph and node.graph is not g]
                 for g in coverage}
 
@@ -71,7 +73,8 @@ class NestingAnalyzer:
         """
         coverage = self.coverage()
         return {g: {node.value for node in dfs(g.return_,
-                                               succ_stop_at_fv(g))
+                                               succ_incoming,
+                                               freevars_boundary(g))
                     if is_constant_graph(node)}
                 for g in coverage}
 
@@ -159,7 +162,7 @@ class NestingAnalyzer:
         parents = self.parents()
         fvs: Dict[Graph, Set[ANFNode]] = defaultdict(set)
 
-        for node in dfs(self.root.return_, succ_deep):
+        for node in dfs(self.root.return_, succ_deeper):
             for inp in node.inputs:
                 if is_constant_graph(inp):
                     owner = parents[inp.value]
