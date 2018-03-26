@@ -77,7 +77,7 @@ node.const_output {
 node.freevar {
     background-color: blueviolet;
 }
-node.special-Var {
+node.special-Var, node.special-SVar {
     background-color: white;
     color: black;
     border-style: dashed;

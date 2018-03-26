@@ -313,6 +313,11 @@ class Unification(Generic[T]):
             equiv[diff] = UnionVar(set(okv[diff] for okv in ok_values))
             return equiv
 
+    def _extract_var(self, v):
+        if hasattr(v, '__var__'):
+            return v.__var__()
+        return v
+
     def unify_raw(self, w: Value[T], v: Value[T],
                   equiv: EquivT[T]) -> EquivT[T]:
         """'raw' interface for unification.
@@ -338,6 +343,11 @@ class Unification(Generic[T]):
             described by `equiv` or this function might never return.
 
         """
+        if hasattr(w, '__var__'):
+            w = self._extract_var(w)
+        if hasattr(v, '__var__'):
+            v = self._extract_var(v)
+
         while w in equiv:
             w = equiv[cast(Var[T], w)]
         while v in equiv:
@@ -370,10 +380,16 @@ class Unification(Generic[T]):
             values_w = list(w)
         else:
             try:
+                def appender(values):
+                    def append(u):
+                        values.append(self._extract_var(u))
+                        return u
+                    return append
+
                 values_v = []
-                self.visit(lambda u: values_v.append(u), v)
+                self.visit(appender(values_v), v)
                 values_w = []
-                self.visit(lambda u: values_w.append(u), w)
+                self.visit(appender(values_w), w)
             except self.VisitError:
                 raise UnificationError("Cannot visit elements")
 
