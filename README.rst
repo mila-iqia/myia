@@ -51,11 +51,11 @@ In development
 
 * **Type system**: Implementation in progress (`#27`_, `#41`_, `#50`_)
 * **Value propagation**: Under development.
-* **Inlining**: Requires graph cloning code awaiting review in #46
+* **Inlining**: Requires graph cloning code awaiting review in `#46`_
 * **Optimization**: in ``breuleux:opt``, requires cleanup, no PR yet.
 
   * **Pattern optimizer**: Works.
-  * **Inlining**: Works, using the algorithm in #46.
+  * **Inlining**: Works, using the algorithm in `#46`_.
   * **Constant propagation**: Works.
 
 Next steps
@@ -84,6 +84,8 @@ After Beta
 * **Support other languages**: Which ones depend on demand. A new language is also a possibility.
 
 .. _#22: https://github.com/mila-udem/myia/pull/22
+.. _#27: https://github.com/mila-udem/myia/pull/27
 .. _#41: https://github.com/mila-udem/myia/pull/41
 .. _#43: https://github.com/mila-udem/myia/pull/43
+.. _#46: https://github.com/mila-udem/myia/pull/46
 .. _#50: https://github.com/mila-udem/myia/pull/50
