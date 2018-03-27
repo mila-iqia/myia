@@ -40,19 +40,20 @@ Roadmap
 Current
 ~~~~~~~
 
-* **Parser**: Supports `def`, `if`, `while`, operators, function calls.
+* **Parser**: Supports ``def``, ``if``, ``while``, operators, function calls.
 * **Intermediate representation**: Implemented, with an array of utilities.
 * **Debug VM**: Faithfully runs the IR.
 * **Primitives**: Only scalar primitives currently work.
-* **Automatic differentiation**: Works, tested up to second order, PR #22 (awaiting review).
+* **Automatic differentiation**: Works, tested up to second order, PR `#22`_ (awaiting review).
 
 In development
 ~~~~~~~~~~~~~~
 
-* **Type system**: Implementation in progress (#27, #41, #50)
+* **Type system**: Implementation in progress (`#27`_, `#41`_, `#50`_)
 * **Value propagation**: Under development.
 * **Inlining**: Requires graph cloning code awaiting review in #46
-* **Optimization**: in `breuleux:opt`, requires cleanup, no PR yet.
+* **Optimization**: in ``breuleux:opt``, requires cleanup, no PR yet.
+
   * **Pattern optimizer**: Works.
   * **Inlining**: Works, using the algorithm in #46.
   * **Constant propagation**: Works.
@@ -60,8 +61,8 @@ In development
 Next steps
 ~~~~~~~~~~
 
-* **Broadcasting**: We are trying to figure out the best primitives to support this feature. Discussion in #43.
-* **Array primitives**: Need to implement `map` and `reduce` as well as their backpropagators.
+* **Broadcasting**: We are trying to figure out the best primitives to support this feature. Discussion in `#43`_.
+* **Array primitives**: Need to implement ``map`` and ``reduce`` as well as their backpropagators.
 * **GPU support**: We currently plan to integrate NNVM as a backend to compile subgraphs of array primitives.
 
 Near future
@@ -69,13 +70,20 @@ Near future
 
 * **Low level VM**: We need a VM that is more efficient and portable than the debug VM.
 * **Debugger**: Intent is to have a step debugger for Myia. There used to be a working one for a previous version of the IR, so this should not pose a problem.
-* **More Python syntax**: `for`, `lambda`, `and`/`or`, `break/continue`.
+* **More Python syntax**: ``for``, ``lambda``, ``and``/``or``, ``break/continue``.
 
 After Beta
 ~~~~~~~~~~
 
 * **Even more Python syntax**: Support for these features is not certain.
-  * `class` (under restrictions)
+
+  * ``class`` (under restrictions)
   * Augmented assignment (under restrictions)
-  * `yield` and `await`
+  * ``yield`` and ``await``
+
 * **Support other languages**: Which ones depend on demand. A new language is also a possibility.
+
+.. _#22: https://github.com/mila-udem/myia/pull/22
+.. _#41: https://github.com/mila-udem/myia/pull/41
+.. _#43: https://github.com/mila-udem/myia/pull/43
+.. _#50: https://github.com/mila-udem/myia/pull/50
