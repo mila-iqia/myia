@@ -1,314 +1,112 @@
 
-from typing import NamedTuple
-from functools import reduce
-from collections import defaultdict
-import operator
-from .anf_ir import ANFNode, Constant, Graph
-from . import primops as P
-from .unify import var, Unification, Var
-from .graph_utils import dfs
-from .anf_ir_utils import \
-    succ_deep, exclude_from_set, is_constant, is_constant_graph
+from myia.unify import Var, SVar, Unification, expandlist
+from myia.utils import Named
+from myia.graph_utils import toposort
+from myia.anf_ir import ANFNode, Graph, Apply, Constant, Parameter, Special
+from myia.anf_ir_utils import \
+    succ_incoming, freevars_boundary, replace, \
+    is_apply, is_constant, is_parameter, is_special
 
 
-_unification = Unification()
-unify = _unification.unify
+class VarNode(Special):
+    def __var__(self):
+        return self.special
 
 
-def isvar(x):
-    return isinstance(x, Var)
-
-
-def valuevar():
-    return var(filter=is_constant)
-
-
-def fnvar():
-    return var(filter=is_constant_graph)
-
-
-X = var()
-Y = var()
-Z = var()
-X1 = var()
-Y1 = var()
-Z1 = var()
-X2 = var()
-Y2 = var()
-Z2 = var()
-V = valuevar()
-V1 = valuevar()
-V2 = valuevar()
-L = fnvar()
-
-
-class PatternOpt:
-    def __init__(self, pattern, handler):
-        self.pattern = pattern
-        self.handler = handler
-
-    def _match(self, node, pattern, U):
-        if isinstance(node, ANFNode):
-            touches = {node}
+def sexp_to_node(sexp, graph, multigraph=False):
+    if isinstance(sexp, tuple):
+        if multigraph and isinstance(graph, Var):
+            return Apply([sexp_to_node(x, Var('G'), True)
+                          for x in sexp], graph)
         else:
-            touches = set()
-        if isinstance(pattern, tuple):
-            sexp = list(node.inputs)
-            if sexp:
-                if ... in pattern:
-                    idx = pattern.index(...)
-                    ntail = len(pattern) - idx - 1
-                    pattern = pattern[:idx] + pattern[idx + 1:]
-                    idx_last = len(sexp) - ntail
-                    mid = list(sexp[idx - 1:idx_last])
-                    sexp = sexp[:idx - 1] + [mid] + sexp[idx_last:]
-                if len(sexp) != len(pattern):
-                    return touches, False
-                for p, e in zip(pattern, sexp):
-                    t2, U = self._match(e, p, U)
-                    touches |= t2
-                    if U is None:
-                        return touches, False
-                return touches, U
+            return Apply([sexp_to_node(x, graph, multigraph)
+                          for x in sexp], graph)
+    elif isinstance(sexp, Var):
+        return VarNode(sexp, graph)
+    elif isinstance(sexp, ANFNode):
+        return sexp
+    else:
+        return Constant(sexp)
+
+
+def sexp_to_graph(sexp):
+    g = Graph()
+    g.output = sexp_to_node(sexp, g)
+    return g
+
+
+class GraphUnification(Unification):
+    def visit(self, fn, node):
+        if is_apply(node):
+            return Apply(expandlist(map(fn, node.inputs)), fn(node.graph))
+        elif is_parameter(node):
+            g = fn(node.graph)
+            if isinstance(g, Graph):
+                return node
             else:
-                return touches, False
-        elif isinstance(node, list):
-            if isvar(pattern):
-                for x in node:
-                    if not unify(pattern, x, U):
-                        return touches, False
-                return touches, {**U, var(pattern.token): node}
-            else:
-                return touches, False
-        elif isvar(pattern):
-            return touches, unify(pattern, node, U)
+                return Parameter(g)
         elif is_constant(node):
-            return touches, unify(pattern, node.value, U)
+            return Constant(fn(node.value))
+        elif isinstance(node, VarNode):
+            return fn(node.special)
+        elif is_special(node):
+            return Special(fn(node.special), fn(node.graph))
         else:
-            return touches, unify(pattern, node, U)
-
-    def match(self, node):
-        return self._match(node, self.pattern, {})
-
-    def __call__(self, mutator, univ, node):
-        touches, m = self.match(node)
-        if m is not False:
-            # kwargs = {k.token: v for k, v in m.items()}
-            repl = self.handler(node, m)
-            if repl is None or repl is node:
-                pass
-            elif isinstance(repl, ANFNode):
-                mutator.replace(node, repl)
-                return set()
-            else:
-                raise TypeError('Wrong return value for pattern.')
-        return touches
+            raise self.VisitError
 
 
-def pattern_opt(*pattern):
-    if len(pattern) == 2 and pattern[0] == 'just':
-        pattern = pattern[1]
+class PatternSubstitutionOptimization:
+    def __init__(self, pattern, replacement, *, name=None):
+        g = Var('RootG')
+        self.pattern = sexp_to_node(pattern, g, True)
+        self.replacement = sexp_to_node(replacement, g)
+        self.unif = GraphUnification()
+        self.name = name
 
-    def wrap(handler):
-        return PatternOpt(pattern, handler)
-    return wrap
-
-
-def simple_sub(pattern, replacement):
-    def handler(node, equiv):
-        g = node.graph
-
-        def make_node(spec):
-            if spec in equiv:
-                return equiv[spec]
-            elif isvar(spec):
-                raise Exception(f'Unresolved variable: {spec}')
-            elif spec == ():
-                return Constant(())
-            elif isinstance(spec, tuple):
-                return g.apply(*map(make_node, spec))
-            else:
-                return Constant(spec)
-
-        return make_node(replacement)
-
-    return PatternOpt(pattern, handler)
-
-
-class RelinkOperation(NamedTuple):
-    node: ANFNode
-    key: int
-    old: ANFNode
-    new: ANFNode
-
-    def inverse(self):
-        return Relink(self.node, self.key, self.new, self.old)
-
-
-class GraphMutator:
-    def __init__(self):
-        self.listeners = set()
-
-    def commit(self, operations):
-        try:
-            for i, op in enumerate(operations):
-                self._commit_operation(op)
-        except Exception as e:
-            for op in reversed(operations[:i]):
-                self._commit_operation(op.inverse())
-            raise
-        self.broadcast(operations)
-
-    def commit_operation(self, op):
-        self._commit_operation(op)
-        self.broadcast([op])
-
-    def _commit_operation(self, op):
-        if isinstance(op, RelinkOperation):
-            op.node.inputs[op.key] = op.new
+    def __call__(self, node):
+        equiv = self.unif.unify(node, self.pattern)
+        if equiv:
+            return self.unif.reify(self.replacement, equiv)
         else:
-            raise TypeError(f'Expected RelinkOperation.')
-
-    def destroy(self, node):
-        node.inputs.clear()
-
-    def broadcast(self, messages):
-        for listener in self.listeners:
-            listener(messages)
-
-    def relink_operations(self, node, key, new):
-        return [RelinkOperation(node, key, node.inputs[key], new)]
-
-    def replace_operations(self, node, new):
-        ops = [self.relink_operations(use, key, new)
-               for use, key in node.uses]
-        return reduce(operator.add, ops, [])
-
-    def relink(self, node, key, new):
-        self.commit(self.relink_operations(node, key, new))
-
-    def replace(self, node, new):
-        self.commit(self.replace_operations(node, new))
-
-    def transaction(self, *listeners):
-        return Transaction(self, listeners)
+            return None
 
 
-class Transaction:
-    def __init__(self, mutator, listeners=set()):
-        self.entered = False
-        self.mutator = mutator
-        self.listeners = set(listeners) - mutator.listeners
-        self.log = []
+class PatternOptimizerSinglePass:
+    def __init__(self, patterns):
+        self.patterns = patterns
 
-    def relink(self, node, key, new):
-        self.log += self.mutator.relink_operations(node, key, new)
+    def iterate(self, graph):
+        incl = freevars_boundary(graph, False)
+        topo = list(toposort(graph.output, succ_incoming, incl))
+        return topo
 
-    def replace(self, node, new):
-        self.log += self.mutator.replace_operations(node, new)
+    def replace(self, old, new):
+        return replace(old, new)
 
-    def __enter__(self):
-        assert not self.entered
-        self.entered = True
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        if exc_type is None:
-            self.mutator.listeners |= self.listeners
-            try:
-                self.mutator.commit(self.log)
-            finally:
-                self.mutator.listeners -= self.listeners
-        else:
-            # On exception, throw away all changes
-            pass
+    def __call__(self, graph):
+        changes = False
+        for node in self.iterate(graph):
+            for pattern in self.patterns:
+                new = pattern(node)
+                if new and new is not node:
+                    self.replace(node, new)
+                    changes = True
+                    continue
+        return changes
 
 
-class EquilibriumTransformer:
-    def __init__(self,
-                 universe,
-                 graphs,
-                 transformers):
-        self.universe = universe
-        self.mutator = GraphMutator()
-        self.graphs = set(graphs)
-        self.roots = [g.output for g in graphs]
-        self.transformers = transformers
-        self.repools = defaultdict(set)
+class PatternOptimizerEquilibrium:
+    def __init__(self, single_pass):
+        self.single_pass = single_pass
 
-    def mark_change(self, node):
-        for n in self.repools[node]:
-            self.pool.add(n)
-        self.repools[node] = set()
+    def __call__(self, *graphs):
+        any_changes = False
 
-    def check_eliminate(self, node):
-        if not node.uses:
-            inputs = list(node.inputs)
-            self.mutator.destroy(node)
-            for inp in inputs:
-                self.check_eliminate(inp)
-            if node in self.watched:
-                self.watched.remove(node)
+        changes = True
+        while changes:
+            changes = False
+            for graph in graphs:
+                changes |= self.single_pass(graph)
+                any_changes |= changes
 
-    def _listen_mark_changes(self, ops):
-        for op in ops:
-            if isinstance(op, RelinkOperation):
-                self.mark_change(op.node)
-            else:
-                raise ValueError(f'Expected RelinkOperation.')
-
-    def _listen_eliminate(self, ops):
-        check = {op.old for op in ops}
-        for node in check:
-            self.check_eliminate(node)
-
-    def _watch(self, node):
-        node_list = set(dfs(node, succ_deep, exclude_from_set(self.watched)))
-        for node2 in node_list:
-            if node2 not in self.watched:
-                self.watched.add(node2)
-                self.pool.add(node2)
-        self.pool.add(node)
-
-    def _listen_new_nodes(self, ops):
-        for op in ops:
-            if isinstance(op, RelinkOperation):
-                self._watch(op.new)
-            else:
-                raise ValueError(f'Expected RelinkOperation.')
-
-    def process(self, node):
-        # Whenever a node changes in the touches set, patterns that
-        # failed to run on the current node might now succeed.
-        touches = set()
-        for transformer in self.transformers:
-            # Transformer returns the nodes it has touched, and a
-            # list of operations.
-
-            with self.mutator.transaction(self._listen_mark_changes,
-                                          self._listen_eliminate,
-                                          self._listen_new_nodes) as mut:
-                try:
-                    ts = transformer(mut, self.universe, node)
-                except Exception as e:
-                    ts = set()
-                    # node.debug.errors.add(e)
-                    raise
-
-            if mut.log:
-                # Done with this node
-                break
-
-            touches |= ts
-        else:
-            for n in touches:
-                self.repools[n].add(node)
-
-    def run(self):
-        self.pool = set()
-        for root in self.roots:
-            self.pool |= set(dfs(root, succ_deep))
-        self.watched = set(self.pool)
-        while self.pool:
-            node = self.pool.pop()
-            self.process(node)
+        return any_changes
