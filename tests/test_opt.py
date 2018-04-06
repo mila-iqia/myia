@@ -1,8 +1,9 @@
 
 from myia.api import parse
-from myia.anf_ir import Graph
+from myia.anf_ir import Graph, Constant
 from myia.anf_ir_utils import is_constant, is_apply, is_parameter
 from myia.opt import \
+    sexp_to_graph, \
     PatternSubstitutionOptimization as psub, \
     PatternOptimizerSinglePass, \
     PatternOptimizerEquilibrium
@@ -72,7 +73,7 @@ add_zero_r = psub(
 )
 
 
-def _check_same(g1, g2, _equiv=None):
+def _same_graphs(g1, g2, _equiv=None):
     equiv = dict(zip(g1.parameters, g2.parameters))
     if _equiv:
         equiv.update(_equiv)
@@ -93,7 +94,7 @@ def _check_same(g1, g2, _equiv=None):
                 equiv[n1] = n2
             return success
         elif isinstance(n1, Graph):
-            return _check_same(n1, n2, equiv)
+            return _same_graphs(n1, n2, equiv)
         else:
             return n1 == n2
 
@@ -120,7 +121,18 @@ def _check_opt(before, after):
     for g in NestingAnalyzer(gbefore).coverage():
         eq(g)
 
-    assert _check_same(gbefore, gafter)
+    assert _same_graphs(gbefore, gafter)
+
+
+def test_sexp_conversion():
+    def f():
+        return 10 * (5 + 4)
+
+    sexp = (prim.mul, 10, (prim.add, 5, Constant(4)))
+
+    g = sexp_to_graph(sexp)
+
+    assert _same_graphs(g, parse(f))
 
 
 def test_elim():
@@ -216,14 +228,16 @@ def test_multi_function():
 
 def test_closure():
     def before(x):
-        Q
+        Q  # See issue #47
         y = P(x)
+
         def sub():
             return Q(y)
         return sub()
 
     def after(x):
-        Q
+        Q  # See issue #47
+
         def sub():
             return Q(x)
         return sub()

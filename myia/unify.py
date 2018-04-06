@@ -343,10 +343,8 @@ class Unification(Generic[T]):
             described by `equiv` or this function might never return.
 
         """
-        if hasattr(w, '__var__'):
-            w = self._extract_var(w)
-        if hasattr(v, '__var__'):
-            v = self._extract_var(v)
+        w = self._extract_var(w)
+        v = self._extract_var(v)
 
         while w in equiv:
             w = equiv[cast(Var[T], w)]

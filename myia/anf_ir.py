@@ -330,13 +330,25 @@ class Constant(ANFNode):
 
 
 class Special(ANFNode):
+    """A special node.
+
+    This is generally not a legal node in a graph, but may be needed by special
+    purpose algorithms, e.g. to hold a Var when performing unification on
+    graphs.
+
+    Attributes:
+        special: Some object that this node is wrapping.
+
+    """
 
     def __init__(self, special: Any, graph: Graph) -> None:
+        """Initialize a special node."""
         super().__init__([], SPECIAL, graph)
         self.special = special
 
     def __str__(self) -> str:
-        return str(self.special)
+        return str(self.special)  # pragma: no cover
 
     def __repr__(self) -> str:
-        return repr_(self, name=self.debug.debug_name, special=self.special)
+        return repr_(self, name=self.debug.debug_name, special=self.special) \
+            # pragma: no cover
