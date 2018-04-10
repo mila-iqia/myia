@@ -1,7 +1,7 @@
 import pytest
 
 from myia.dtype import (TypeMeta, Type, Bool, Number, Float, UInt, Int,
-                        List, Struct, Tuple, Callable)
+                        List, Struct, Tuple, Function)
 
 
 def test_TypeMeta():
@@ -63,12 +63,13 @@ def test_Tuple():
     assert t1 is t2
     t3 = Tuple(Bool(), Int(8))
     assert t1 is t3
+    assert Tuple(Float(16)) is Tuple((Float(16),))
 
 
-def test_Callable():
-    c = Callable((), Float(32))
+def test_Function():
+    c = Function((), Float(32))
     assert c.retval is Float(32)
-    c2 = Callable([], Float(32))
+    c2 = Function([], Float(32))
     assert c is c2
 
 

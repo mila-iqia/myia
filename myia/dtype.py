@@ -72,7 +72,31 @@ class TypeMeta(type):
 
 
 class Type(metaclass=TypeMeta):
-    """Base class for all Types."""
+    """Base class for all Types.
+
+    This class brings a number of unusual behaviour for its subclasses
+    compared to normal python classes.
+
+      * Arguments handled to the constructor will be passed to a
+       `_parse_args` class method if it exists and the value this
+       returns is what will be used for `__init__`.
+
+      * Instance are unique based on the parsed version of the
+        constructor arguments.  This means that `is` and `==` mean the
+        same thing.
+
+      * If the `__new__` method is not defined, one will be generated
+        which takes one parameter for each declared class attributes
+        that does not start with an underscore (`_`) and strores them
+        in a read-only container that can be referred to by attribute
+        access.
+
+    Notes
+    -----
+        In the current implementation, Type is a subtype of tuple via
+        metaclass magic, but this may change in the future.
+
+    """
 
     _root = True
     _fields: DictT[str, Any]
@@ -105,38 +129,61 @@ class Number(Type):
 
     @classmethod
     def _parse_args(cls, args, kwargs):
-        assert cls is not Number
+        if cls is Number:
+            raise RuntimeError("Can't instantiate Number directly")
         assert len(kwargs) == 0
-        assert args[0] in cls._valid_bits
+        assert len(args) == 1
+        if args[0] not in cls._valid_bits:
+            raise ValueError(f"Unsupported number of bits: {args[0]}")
         return args
 
 
 class Float(Number):
-    """Represents float values."""
+    """Represents float values.
+
+    Instantiate with `Float(nbits)`.  Unsupported values will raise a
+    ValueError.
+    """
 
     _valid_bits = (16, 32, 64)
 
 
 class Int(Number):
-    """Represents signed integer values."""
+    """Represents signed integer values.
+
+    Instantiate with `Int(nbits)`.  Unsupported values will raise a
+    ValueError.
+    """
 
     _valid_bits = (8, 16, 32, 64)
 
 
 class UInt(Number):
-    """Represents unsigned integer values."""
+    """Represents unsigned integer values.
+
+    Instantiate with `UInt(nbits)`.  Unsupported values will raise a
+    ValueError.
+    """
 
     _valid_bits = (8, 16, 32, 64)
 
 
 class List(Type):
-    """Represents a set of ordered values with the same type."""
+    """Represents a set of ordered values with the same type.
+
+    Instanciate with `List(element_type)`.
+    """
 
     element_type: Type
 
 
 class Struct(Type):
-    """Represents a set of named fields with their own types."""
+    """Represents a set of named fields with their own types.
+
+    Instantiate with `Struct(Mapping[str, Type])`.  A sequence of
+    key-value pairs is also acceptable, but duplicate keys will will
+    get lost.
+    """
 
     elements: DictT[str, Type]
 
@@ -162,21 +209,29 @@ class Struct(Type):
 
 
 class Tuple(Type):
-    """Represents a set of ordered values with independant types."""
+    """Represents a set of ordered values with independent types.
+
+    Instantiate with `Tuple(type1, type2, ... typeN)`.  A single
+    sequence of types is also acceptable as the sole argument.
+    """
 
     elements: TupleT[Type, ...]
 
     @classmethod
     def _parse_args(cls, args, kwargs):
         assert len(kwargs) == 0
-        if len(args) == 1 and isinstance(args[0], collections.Iterable):
+        if (len(args) == 1 and isinstance(args[0], collections.Iterable) and
+                not isinstance(args[0], Type)):
             return (tuple(args[0]),)
         else:
             return (args,)
 
 
-class Callable(Type):
-    """Represents a type that can be called."""
+class Function(Type):
+    """Represents a type that can be called.
+
+    Instantiate with `Function((type1, type2, ..., typeN), ret_type)`.
+    """
 
     arguments: TupleT[Type, ...]
     retval: Type
@@ -185,4 +240,5 @@ class Callable(Type):
     def _parse_args(cls, args, kwargs):
         assert len(args) == 2
         assert len(kwargs) == 0
+        assert not isinstance(args[0], Type)
         return (tuple(args[0]), args[1])
