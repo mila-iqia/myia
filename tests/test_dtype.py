@@ -32,6 +32,10 @@ def test_cache():
 def test_Number():
     assert isinstance(Int(32), Number)
     assert not isinstance(Bool(), Number)
+    with pytest.raises(RuntimeError):
+        Number()
+    with pytest.raises(ValueError):
+        Float(33)
 
 
 def test_List():
