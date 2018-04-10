@@ -75,19 +75,20 @@ class Type(metaclass=TypeMeta):
     """Base class for all Types.
 
     This class brings a number of unusual behaviour for its subclasses
-    compared to normal python classes.
+    compared to normal Python classes.
 
-      * Arguments handled to the constructor will be passed to a
-       `_parse_args` class method if it exists and the value this
-       returns is what will be used for `__init__`.
+      * Arguments passed to the constructor will be passed to the
+       `_parse_args(cls, args, kwargs)` class method if it exists.
+       That method must return a tuple of values, one for each
+       declared class attribute.
 
-      * Instance are unique based on the parsed version of the
-        constructor arguments.  This means that `is` and `==` mean the
+      * Instances are unique based on the parsed version of the
+        constructor arguments. This means that `is` and `==` mean the
         same thing.
 
       * If the `__new__` method is not defined, one will be generated
-        which takes one parameter for each declared class attributes
-        that does not start with an underscore (`_`) and strores them
+        which takes one parameter for each declared class attribute
+        that does not start with an underscore (`_`) and stores them
         in a read-only container that can be referred to by attribute
         access.
 
