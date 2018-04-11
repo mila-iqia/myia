@@ -8,8 +8,7 @@ from myia.opt import \
     PatternOptimizerSinglePass, \
     PatternOptimizerEquilibrium
 from myia.unify import Var
-from myia import primops as prim
-from myia.primops import Primitive
+from myia.prim import ops as prim, Primitive
 from myia.cconv import NestingAnalyzer
 
 
