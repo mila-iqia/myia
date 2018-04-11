@@ -38,7 +38,7 @@ def typeof(value) -> Type:
         return Tuple(etts)
     if tt is Primitive:
         return SIGNATURES[value]
-    raise TypeError("Cannot assign type to: {}".format(value))
+    raise TypeError(f"Cannot assign type to: {value}")
 
 
 class TypePlugin(Plugin):
@@ -83,10 +83,10 @@ class TypePlugin(Plugin):
     def infer_type(self, graph: Graph, *args: Type):
         """Get the return type of a call of `graph`.
 
-        args here should be a the type of the arguments passed-in.
+        args should be the types of the arguments passed in.
         """
         if graph not in self.analyzer.graphs:
-            raise ValueError("Unknow graph")
+            raise ValueError("Unknown graph")
 
         equiv = dict(self.analyzer.equiv)
         fn_t = self.analyzer.graphs[graph][self.NAME]
@@ -139,7 +139,7 @@ class TypePlugin(Plugin):
             raise AssertionError("Unknown node type")
 
     def unify_apply(self, node: Apply, equiv):
-        """Unifiy an Apply with its function type."""
+        """Unify an Apply with its function type."""
         DU = self.analyzer.DU
         fn = node.inputs[0]
         args = node.inputs[1:]

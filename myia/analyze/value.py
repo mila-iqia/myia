@@ -4,31 +4,15 @@ from .graph import Plugin
 
 from myia import primops as P
 from myia.primops import Primitive
-from myia.utils import Named
+from myia.utils import Named, Registry
 from myia.anf_ir import Constant, Apply, Parameter, Graph
 from myia.py_implementations import implementations as py_implementations
 
-ESTIMATORS: Dict[Primitive, Callable] = dict()
+ESTIMATORS: Registry[Primitive, Callable] = Registry()
+register_estimator = ESTIMATORS.register
 
 
 NO_VALUE = Named('NO_VALUE')
-NOT_CONSTANT = Named('NOT_CONSTANT')
-
-
-def register_estimator(prim: Primitive):
-    """Register an estimator for a primitive.
-
-    This serves to estimate the value of a primitive in the present of
-    incomplete information (not all arguments are constants).  In some
-    cases we can know the value (like mul(0, x) -> 0).  If you
-    can't do anything unless you know all the arguments don't
-    implement this.
-    """
-    def deco(e: Callable):
-        assert prim not in ESTIMATORS
-        ESTIMATORS[prim] = e
-        return e
-    return deco
 
 
 # SCCP
@@ -80,7 +64,7 @@ class ValuePlugin(Plugin):
             fn = args[0]
             args = args[1:]
 
-            if fn in (NO_VALUE, NOT_CONSTANT):
+            if fn is NO_VALUE:
                 return fn
 
             if isinstance(fn, Primitive):
@@ -94,7 +78,7 @@ class ValuePlugin(Plugin):
 
     def eval_primitive(self, fn: Primitive, args):
         """Compute the value for a primitive call."""
-        if all(a not in (NO_VALUE, NOT_CONSTANT) for a in args):
+        if all(a is not NO_VALUE for a in args):
             if fn == P.if_:
                 if args[0]:
                     return self.eval_graph(args[1], ())

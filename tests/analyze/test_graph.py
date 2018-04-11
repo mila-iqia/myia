@@ -23,7 +23,7 @@ def test_Plugin():
     p.on_attach()
 
 
-def test_PLuginManager():
+def test_PluginManager():
     pp = PluginManager()
     assert len(pp) == 0
 
@@ -35,14 +35,6 @@ def test_PLuginManager():
 
     T = TPlugin()
 
-    with pytest.raises(AssertionError):
-        pp.add(T)
-
-    T.NAME = "on_node"
-    with pytest.raises(AssertionError):
-        pp.add(T)
-
-    T.NAME = "_bad"
     with pytest.raises(AssertionError):
         pp.add(T)
 

@@ -30,6 +30,9 @@ class Plugin:
     NAME: str
     analyzer: 'GraphAnalyzer'
 
+    def __eq__(self, other):
+        return type(self) == type(other)
+
     def register(self, analyzer: 'GraphAnalyzer') -> None:
         """Attach the plugin to an analyzer."""
         assert not hasattr(self, 'analyzer')
@@ -79,37 +82,32 @@ def event(collect: bool) -> Callable[..., Callable]:
 class PluginManager:
     """Helper class to manage a collection of plugins."""
 
-    BAD_NAMES = ('on_preprocess', 'on_node', 'on_graph', 'on_postprocess',
-                 'add', 'values', 'items')
-
     def __init__(self) -> None:
         """Create a collection of plugins."""
         self._plugins: Dict[str, Plugin] = dict()
 
-    @event(False)
+    @event(collect=False)
     def on_preprocess(self) -> None:
         """Called when initiating an analysis."""
         pass  # pragma: no cover
 
-    @event(True)
+    @event(collect=True)
     def on_node(self, node: ANFNode) -> Any:
         """Called for each new node."""
         pass  # pragma: no cover
 
-    @event(True)
+    @event(collect=True)
     def on_graph(self, graph: Graph) -> Any:
         """Called for each new graph."""
         pass  # pragma: no cover
 
-    @event(False)
+    @event(collect=False)
     def on_postprocess(self) -> None:
         """Called when finishing an analysis."""
         pass  # pragma: no cover
 
     def add(self, plugin: Plugin) -> None:
         """Add a plugin to the collection."""
-        assert plugin.NAME not in self.BAD_NAMES
-        assert not plugin.NAME.startswith('_')
         assert plugin.NAME not in self._plugins
         self._plugins[plugin.NAME] = plugin
 
@@ -143,10 +141,10 @@ class GraphAnalyzer:
         """Register a plugin.
 
         Note that this method cannot be called once analysis has begun
-        since it would lead to bad interal state.
+        since it would lead to bad internal state.
         """
         if plugin.NAME in self.plugins:
-            assert type(self.plugins[plugin.NAME]) == type(plugin)
+            assert self.plugins[plugin.NAME] == plugin
             return
 
         assert len(self._info_map) == 0
@@ -182,8 +180,8 @@ class GraphAnalyzer:
     def analyze(self, graph: Graph) -> None:
         """Analyze a graph.
 
-        This may be a graph that was previously anaylyzed in which
-        case only the new nodes will be analyzed.  If a graph has been
+        This may be a graph that was previously analyzed in which case
+        only the new nodes will be analyzed.  If a graph has been
         entirely analyzed before, this is a no-op.
         """
         self.plugins.on_preprocess()

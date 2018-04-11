@@ -11,7 +11,7 @@ SIGNATURES: DictT[Primitive, Function] = dict()
 
 
 def register_signature(prim: Primitive, s: Function):
-    """Register the signature for a primive.
+    """Register the signature for a primitive.
 
     Does not accept duplicates.
     """
