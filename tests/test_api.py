@@ -1,6 +1,6 @@
 
 from myia.api import compile
-from myia.py_implementations import getitem
+from myia.prim.py_implementations import getitem
 
 
 def test_function_arg():

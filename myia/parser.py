@@ -50,7 +50,7 @@ from weakref import finalize
 from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
 from myia.anf_ir_utils import destroy_disconnected_nodes
 from myia.info import DebugInherit, About
-from myia import primops
+from myia.prim import ops as primops
 
 
 class Location(NamedTuple):

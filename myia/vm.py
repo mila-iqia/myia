@@ -10,8 +10,7 @@ from types import FunctionType
 from myia.anf_ir import Graph, ANFNode, Constant, Parameter, Apply
 from myia.anf_ir_utils import dfs
 from myia.utils import smap
-from myia.primops import Primitive
-from myia import primops
+from myia.prim import Primitive, ops as primops
 
 
 class CallableClosure:

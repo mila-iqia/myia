@@ -1,13 +1,13 @@
 from types import SimpleNamespace
 
-from myia.py_implementations import (
+from myia.prim.py_implementations import (
     head, tail,
     setitem as myia_setitem,
     setattr as myia_setattr
 )
 
 
-from .test_lang import parse_compare
+from ..test_lang import parse_compare
 
 
 @parse_compare((2, 7), (4, -6))

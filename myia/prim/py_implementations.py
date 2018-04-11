@@ -3,7 +3,7 @@
 
 from typing import Callable
 from copy import copy
-from myia import primops
+from . import ops as primops
 from myia.utils import Registry
 
 
