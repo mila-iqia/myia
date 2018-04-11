@@ -8,7 +8,7 @@ from myia.anf_ir import Graph, ANFNode, Apply, Constant
 from myia.anf_ir_utils import \
     is_apply, is_constant, is_constant_graph
 from myia.parser import Location
-from myia import primops
+from myia.prim import ops as primops
 from myia.cconv import NestingAnalyzer, ParentProxy
 from myia.debug.label import NodeLabeler, short_relation_symbols, short_labeler
 

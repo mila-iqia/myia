@@ -6,7 +6,7 @@ from myia.info import DebugInfo
 from myia.anf_ir import Graph
 from myia.anf_ir_utils import \
     succ_deeper, is_constant, is_constant_graph, is_parameter
-from myia.primops import Primitive
+from myia.prim import Primitive
 from myia.graph_utils import dfs, always_include
 
 
