@@ -5,9 +5,8 @@ from typing import Any, Callable, Dict, List
 
 from myia import parser
 from myia.anf_ir import Graph, Constant, ANFNode
-from myia import primops as P
 from myia.vm import VM as VM_
-from myia.py_implementations import implementations
+from myia.prim import implementations, ops as P
 
 
 def default_object_map() -> Dict[Any, ANFNode]:

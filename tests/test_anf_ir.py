@@ -3,7 +3,7 @@ import copy
 import pytest
 
 from myia.anf_ir import Graph, Apply, Parameter, Constant, PARAMETER
-from myia import primops
+from myia.prim import ops as primops
 
 
 def test_init_inputs():
