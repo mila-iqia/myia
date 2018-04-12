@@ -57,13 +57,19 @@ def dfs(root: T,
                 # pragma: no cover
 
 
-def toposort(root: T, succ: Callable[[T], Iterable[T]]) -> Iterable[T]:
+def toposort(root: T,
+             succ: Callable[[T], Iterable[T]],
+             include: Callable[[T], str] = always_include) -> Iterable[T]:
     """Yield the nodes in the tree starting at root in topological order.
 
     Arguments:
         root: The node to start from.
         succ: A function that returns a node's successors.
-
+        include: A function that returns whether to include a node
+                 in the search.
+            * Return 'follow' to include the node and follow its edges.
+            * Return 'nofollow' to include the node but not follow its edges.
+            * Return 'exclude' to not include the node, nor follow its edges.
     """
     done: Set[T] = set()
     todo: List[T] = [root]
@@ -74,10 +80,24 @@ def toposort(root: T, succ: Callable[[T], Iterable[T]]) -> Iterable[T]:
             todo.pop()
             continue
         cont = False
-        for i in succ(node):
-            if i not in done:
-                todo.append(i)
-                cont = True
+
+        incl = include(node)
+        if incl == FOLLOW:
+            for i in succ(node):
+                if i not in done:
+                    todo.append(i)
+                    cont = True
+        elif incl == NOFOLLOW:
+            pass
+        elif incl == EXCLUDE:
+            done.add(node)
+            todo.pop()
+            continue
+        else:
+            raise ValueError('include(node) must return one of: '
+                             '"follow", "nofollow", "exclude"') \
+                # pragma: no cover
+
         if cont:
             continue
         done.add(node)
