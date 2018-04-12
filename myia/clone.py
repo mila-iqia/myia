@@ -47,7 +47,13 @@ class GraphCloner:
                  relation: str = 'copy') -> None:
         """Initialize a GraphCloner."""
         self.todo: Set[Graph] = set()
-        self.graph_mappings: Dict[Graph, Union[Graph, bool]] = {}
+        # graph_clones maps a graph to either:
+        # * The clone of this graph
+        # * The string 'inline', if the graph was inlined
+        self.graph_clones: Dict[Graph, Union[Graph, str]] = {}
+        # repl maps:
+        # * A node to its clone
+        # * A graph to either its clone or the graph in which to inline it
         self.repl: Dict[Union[Graph, ANFNode],
                         Union[Graph, ANFNode]] = {None: None}
         self.total = total
@@ -89,9 +95,9 @@ class GraphCloner:
 
         self.repl[graph] = target_graph
         if set_output:
-            self.graph_mappings[graph] = target_graph
+            self.graph_clones[graph] = target_graph
         else:
-            self.graph_mappings[graph] = True
+            self.graph_clones[graph] = 'inline'
         self.todo.add(graph)
 
         return target_graph
@@ -112,10 +118,13 @@ class GraphCloner:
                 nested in the original graph will be automatically cloned.
             target_graph: The graph in which to place clones of the nodes
                 in the original graph. If target_graph is None or not given,
-                a fresh Graph will be created automatically.
+                a fresh Graph will be created automatically. If it is a
+                Graph, the original graph will be essentially inlined
+                in the target_graph.
             new_params: A list of nodes to serve as the new parameters of
                 the cloned graph, if the goal is inlining.
-            set_output: Whether the output of the target_graph should
+            set_output: (Advanced option) Whether the output of the
+                target_graph should
                 be set to the clone of the output of the original
                 graph. If set_output is None or not given, then it
                 is true if target_graph is None (and thus must be
@@ -135,8 +144,11 @@ class GraphCloner:
             for p, new_p in zip(graph.parameters, new_params):
                 self.repl[p] = new_p
 
-    def _get_graph(self, g: Graph) -> Graph:
-        if self.total and g not in self.repl:
+    def _is_inline(self, g: Graph) -> bool:
+        return self.graph_clones.get(g, None) == 'inline'
+
+    def _get_graph_replacement(self, g: Graph) -> Graph:
+        if self.total and g and g not in self.graph_clones:
             # When the total option is given, we clone any new graph
             # we encounter.
             self._add_clone(g)
@@ -159,7 +171,7 @@ class GraphCloner:
 
         for node in to_clone:
             assert node not in self.repl
-            g = self._get_graph(node.graph)
+            g = self._get_graph_replacement(node.graph)
             if g and g is node.graph:
                 self.repl[node] = node
                 continue
@@ -171,7 +183,11 @@ class GraphCloner:
                 elif is_constant(node):
                     def convert(x):
                         if isinstance(x, Graph):
-                            if self.graph_mappings.get(x, x) is True:
+                            # We must change the constant to point to the clone
+                            # of the graph x, if x was cloned.
+                            if self._is_inline(x):
+                                # We can either clone a graph or inline it, but
+                                # we can't do both.
                                 if self.total:
                                     raise Exception(
                                         '`total` option is not compatible'
@@ -179,7 +195,7 @@ class GraphCloner:
                                     )
                                 else:
                                     return x
-                            return self._get_graph(x)
+                            return self._get_graph_replacement(x)
                         else:
                             return x
                     # This will also properly handle e.g. tuples of graphs
@@ -208,20 +224,22 @@ class GraphCloner:
         """
         while self.todo:
             graph = self.todo.pop()
-            new_graph = self.graph_mappings[graph]
+            new_graph = self.graph_clones[graph]
             root = graph.output
             new_root = self._clone_subgraph(root)
-            if isinstance(new_graph, Graph):
+            if new_graph is not 'inline':
+                assert isinstance(new_graph, Graph)
                 new_graph.output = new_root
                 assert all(is_parameter(p) for p in graph.parameters)
                 new_graph.parameters = [cast(Parameter, self.repl[p])
                                         for p in graph.parameters]
 
     def __getitem__(self, x: Any) -> Any:
-        """Get the clone of the given graph."""
+        """Get the clone of the given graph or node."""
         self.run()
-        if isinstance(x, Graph) \
-                and self.graph_mappings.get(x, x) is True:
+        if self._is_inline(x):
+            # Inlined graphs don't have their own clones, since they are
+            # inserted in other graphs.
             return x
         else:
             return self.repl.get(x, x)
