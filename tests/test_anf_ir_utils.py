@@ -134,11 +134,14 @@ def test_disconnect():
 def test_helpers():
     g = Graph()
     cg = Constant(g)
+    assert is_constant(cg, Graph)
     assert is_constant_graph(cg)
 
     one = Constant(1)
-    assert not is_constant_graph(one)
     assert is_constant(one)
+    assert is_constant(one, int)
+    assert not is_constant(one, str)
+    assert not is_constant_graph(one)
 
     a = Apply([cg, one], g)
     assert is_apply(a)

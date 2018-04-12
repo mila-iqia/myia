@@ -1,5 +1,5 @@
 """Utilities for manipulating and inspecting the IR."""
-from typing import Iterable, Callable, Set
+from typing import Any, Iterable, Callable, Set
 
 from myia.anf_ir import ANFNode, Apply, Constant, Graph, Parameter
 from myia.graph_utils import dfs as _dfs, toposort as _toposort, \
@@ -151,11 +151,11 @@ def is_parameter(x: ANFNode) -> bool:
     return isinstance(x, Parameter)
 
 
-def is_constant(x: ANFNode) -> bool:
-    """Return whether x is a Constant."""
-    return isinstance(x, Constant)
+def is_constant(x: ANFNode, cls: Any = object) -> bool:
+    """Return whether x is a Constant, with value of given cls."""
+    return isinstance(x, Constant) and isinstance(x.value, cls)
 
 
 def is_constant_graph(x: ANFNode) -> bool:
     """Return whether x is a Constant with a Graph value."""
-    return isinstance(x, Constant) and isinstance(x.value, Graph)
+    return is_constant(x, Graph)
