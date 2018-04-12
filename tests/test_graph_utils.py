@@ -35,7 +35,7 @@ def test_dfs_dups():
 
 def _check_toposort(order, root, succ=_succ, incl=_incl):
     nodes = set(dfs(root, succ, incl))
-    assert len(order) == len(nodes)
+    assert set(order) == nodes
     for node in nodes:
         for i in succ(node):
             if i in order:
