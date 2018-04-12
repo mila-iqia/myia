@@ -141,6 +141,13 @@ def destroy_disconnected_nodes(root: Graph) -> None:
 ##################
 
 
+def replace(old_node: ANFNode, new_node: ANFNode) -> None:
+    """Replace a node by another."""
+    uses = set(old_node.uses)
+    for node, key in uses:
+        node.inputs[key] = new_node
+
+
 def is_apply(x: ANFNode) -> bool:
     """Return whether x is an Apply."""
     return isinstance(x, Apply)

@@ -4,10 +4,10 @@ from myia.anf_ir_utils import \
     dfs, toposort, accessible_graphs, destroy_disconnected_nodes, \
     is_apply, is_constant, is_parameter, is_constant_graph, \
     succ_incoming, succ_deep, succ_deeper, succ_bidirectional, \
-    exclude_from_set, freevars_boundary
-
+    exclude_from_set, freevars_boundary, replace
 from myia.api import ENV, parse
 from myia.parser import Parser
+from myia.debug.utils import GraphIndex, isomorphic
 
 from .test_graph_utils import _check_toposort
 
@@ -148,3 +148,35 @@ def test_helpers():
 
     p = Parameter(g)
     assert is_parameter(p)
+
+
+def test_replace():
+    @parse
+    def f1(x, y):
+        a = x * y
+        b = x + y
+        c = a / (b * b)
+        return c
+
+    @parse
+    def f2(x, y):
+        a = x * y
+        c = a / (10 * 10)
+        return c
+
+    @parse
+    def f3(x, y):
+        return 66
+
+    idx = GraphIndex(f1)
+
+    # Replacing inner node
+    assert not isomorphic(f1, f2)
+    replace(idx['b'], Constant(10))
+    assert isomorphic(f1, f2)
+
+    # Replacing output
+    assert not isomorphic(f1, f3)
+    replace(idx['c'], Constant(66))
+    assert not isomorphic(f1, f2)
+    assert isomorphic(f1, f3)
