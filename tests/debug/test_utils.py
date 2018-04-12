@@ -6,6 +6,12 @@ from myia.api import parse
 from myia.debug.utils import isomorphic, GraphIndex
 
 
+def _check_isomorphic(g1, g2, expected=True):
+    # Check that it works both ways
+    assert isomorphic(g1, g2) == expected
+    assert isomorphic(g2, g1) == expected
+
+
 def test_isomorphic():
     @parse
     def f1(x, y):
@@ -20,12 +26,13 @@ def test_isomorphic():
         return a + b
 
     @parse
-    def f4(a, b, c):
-        return a + b
+    def f4(x, y, z):
+        return x * y
 
-    assert isomorphic(f1, f2)
-    assert not isomorphic(f1, f3)
-    assert not isomorphic(f1, f4)
+    _check_isomorphic(f1, f2, True)
+    _check_isomorphic(f1, f3, False)
+    _check_isomorphic(f1, f4, False)
+    _check_isomorphic(f4, f1, False)
 
 
 def test_isomorphic_closures():
@@ -47,8 +54,8 @@ def test_isomorphic_closures():
             return a + b
         return inner3(10)
 
-    assert isomorphic(f1, f2)
-    assert not isomorphic(f1, f3)
+    _check_isomorphic(f1, f2, True)
+    _check_isomorphic(f1, f3, False)
 
 
 def test_isomorphic_globals():
@@ -77,9 +84,9 @@ def test_isomorphic_globals():
     def f4(a):
         return helper2(a) * helper3(4)
 
-    assert isomorphic(f1, f2)
-    assert isomorphic(f1, f3)
-    assert not isomorphic(f1, f4)
+    _check_isomorphic(f1, f2, True)
+    _check_isomorphic(f1, f3, True)
+    _check_isomorphic(f1, f4, False)
 
 
 def test_GraphIndex():
