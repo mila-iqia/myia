@@ -1,14 +1,13 @@
 """Primitives signatures for the type inference."""
-from typing import Dict as DictT
-
 from myia.dtype import Function, Number, Bool, Tuple
 from myia.unify import var, svar, Var, SVar
+from myia.utils import Registry
 
 from . import ops as P
 from .ops import Primitive
 
 
-SIGNATURES: DictT[Primitive, Function] = dict()
+SIGNATURES: Registry[Primitive, Function] = Registry()
 
 
 def register_signature(prim: Primitive, s: Function):
@@ -16,8 +15,7 @@ def register_signature(prim: Primitive, s: Function):
 
     Does not accept duplicates.
     """
-    assert prim not in SIGNATURES
-    SIGNATURES[prim] = s
+    SIGNATURES.register(prim)(s)
 
 
 def isnum(v) -> bool:
