@@ -4,10 +4,10 @@ from myia.anf_ir_utils import \
     dfs, toposort, accessible_graphs, destroy_disconnected_nodes, \
     is_apply, is_constant, is_parameter, is_constant_graph, \
     succ_incoming, succ_deep, succ_deeper, succ_bidirectional, \
-    exclude_from_set, freevars_boundary, replace
+    exclude_from_set, freevars_boundary, replace, isomorphic
 from myia.api import ENV, parse
 from myia.parser import Parser
-from myia.debug.utils import GraphIndex, isomorphic
+from myia.debug.utils import GraphIndex
 
 from .test_graph_utils import _check_toposort
 
@@ -129,6 +129,97 @@ def test_disconnect():
 
     total2 = _name_nodes(_dfs(g.return_, succ_bidirectional(cov)))
     assert total2 == live
+
+
+def _check_isomorphic(g1, g2, expected=True):
+    # Check that it works both ways
+    assert isomorphic(g1, g2) == expected
+    assert isomorphic(g2, g1) == expected
+
+
+def test_isomorphic():
+    @parse
+    def f1(x, y):
+        return x * y
+
+    @parse
+    def f2(a, b):
+        return a * b
+
+    @parse
+    def f3(a, b):
+        return a + b
+
+    @parse
+    def f4(x, y, z):
+        return x * y
+
+    _check_isomorphic(f1, f2, True)
+    _check_isomorphic(f1, f3, False)
+    _check_isomorphic(f1, f4, False)
+    _check_isomorphic(f4, f1, False)
+
+
+def test_isomorphic_closures():
+    @parse
+    def f1(x):
+        def inner1(y):
+            return x * y
+        return inner1(10)
+
+    @parse
+    def f2(a):
+        def inner2(b):
+            return a * b
+        return inner2(10)
+
+    @parse
+    def f3(a):
+        def inner3(b):
+            return a + b
+        return inner3(10)
+
+    _check_isomorphic(f1, f2, True)
+    _check_isomorphic(f1, f3, False)
+
+    idx1 = GraphIndex(f1)
+    idx2 = GraphIndex(f2)
+
+    # inner1 and inner2 are not considered isomorphic because their free
+    # variables are not matched together. They are matched together when we
+    # check from f1 and f2, but not when we start from the closures directly.
+    _check_isomorphic(idx1['inner1'], idx2['inner2'], False)
+
+
+def test_isomorphic_globals():
+    def helper1(x):
+        return x * x
+
+    def helper2(a):
+        return a * a
+
+    def helper3(a):
+        return a
+
+    @parse
+    def f1(x):
+        return helper1(x) * helper1(4)
+
+    @parse
+    def f2(a):
+        return helper1(a) * helper1(4)
+
+    @parse
+    def f3(a):
+        return helper2(a) * helper1(4)
+
+    @parse
+    def f4(a):
+        return helper2(a) * helper3(4)
+
+    _check_isomorphic(f1, f2, True)
+    _check_isomorphic(f1, f3, True)
+    _check_isomorphic(f1, f4, False)
 
 
 def test_helpers():
