@@ -5,7 +5,7 @@ the notion of successor.
 """
 
 
-from typing import Any, Callable, Iterable, Set, TypeVar, List
+from typing import Any, Callable, Iterable, Set, TypeVar, List, Dict
 
 
 FOLLOW = 'follow'
@@ -73,12 +73,16 @@ def toposort(root: T,
     """
     done: Set[T] = set()
     todo: List[T] = [root]
+    rank: Dict[T, int] = {}
 
     while todo:
         node = todo[-1]
         if node in done:
             todo.pop()
             continue
+        if node in rank and rank[node] != len(todo):
+            raise ValueError('cycle')
+        rank[node] = len(todo)
         cont = False
 
         incl = include(node)
