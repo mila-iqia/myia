@@ -1,5 +1,6 @@
 """Test generic graph utilities."""
 
+import pytest
 from myia.graph_utils import dfs, toposort, FOLLOW, NOFOLLOW, EXCLUDE
 
 
@@ -83,3 +84,19 @@ def test_toposort_incl():
 
     order2 = list(toposort(c, _succ, _incl_x))
     _check_toposort(order2, c, _succ, _incl_x)
+
+
+def test_toposort_cycle():
+    class Q:
+        def __init__(self, x, y):
+            self.x = x
+            self.y = y
+
+    def qsucc(q):
+        return [q.x, q.y]
+
+    q = Q(1, 2)
+    q.y = q
+
+    with pytest.raises(ValueError):
+        list(toposort(q, qsucc, _incl))
