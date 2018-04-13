@@ -1,8 +1,7 @@
 """Primitives signatures for the type inference."""
 from typing import Dict as DictT
 
-from myia import primops as P
-from myia.primops import Primitive
+from myia.prim import Primitive, ops as P
 from myia.dtype import Function, Number, Bool, Tuple
 from myia.unify import var, svar, Var, SVar
 

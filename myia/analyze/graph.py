@@ -5,7 +5,7 @@ from functools import wraps
 from myia.anf_ir import Graph, Apply, Constant, ANFNode
 from myia.anf_ir_utils import is_constant_graph
 from myia.graph_utils import toposort
-from myia.primops import return_
+from myia.prim.ops import return_
 from myia.unify import DomainUnification, Var
 
 

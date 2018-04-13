@@ -1,12 +1,12 @@
 """Value inference."""
 from typing import Dict, Callable
-from .graph import Plugin
 
-from myia import primops as P
-from myia.primops import Primitive
+from myia.prim import (Primitive, ops as P,
+                       implementations as py_implementations)
 from myia.utils import Named, Registry
 from myia.anf_ir import Constant, Apply, Parameter, Graph
-from myia.py_implementations import implementations as py_implementations
+
+from .graph import Plugin
 
 ESTIMATORS: Registry[Primitive, Callable] = Registry()
 register_estimator = ESTIMATORS.register
