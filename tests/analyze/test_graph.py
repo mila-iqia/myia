@@ -87,9 +87,6 @@ def test_GraphAnaylzer():
             assert self.active
             self.active = False
 
-        def visit(self, fn, value):
-            raise self.analyzer.DU.VisitError
-
     ga = GraphAnalyzer([TPlugin()])
     ga.add_plugin(DepPlugin())
     assert len(ga.plugins) == 2

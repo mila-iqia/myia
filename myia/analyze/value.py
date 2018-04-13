@@ -37,10 +37,6 @@ class ValuePlugin(Plugin):
             estimators = ESTIMATORS
         self._estimators = estimators
 
-    def visit(self, fn: Callable, value):
-        """Nothing to visit."""
-        raise self.analyzer.DU.VisitError  # pragma: no cover
-
     def on_attach(self):
         """Add shortcuts."""
         # Don't explicitely depend on TypePlugin since that will create a cycle

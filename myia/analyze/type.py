@@ -1,12 +1,12 @@
 """Type inference."""
 
-from typing import Any, Callable as CallableT, Dict as DictT, Set as SetT
+from typing import Any, Dict as DictT, Set as SetT
 
 from myia.anf_ir import Constant, Parameter, Apply, Graph, ANFNode
 from myia.anf_ir_utils import is_constant_graph
 from myia.prim import Primitive, SIGNATURES
-from myia.dtype import Type, Bool, Float, Int, List, Struct, Tuple, Function
-from myia.unify import var, noseq, expandlist, UnificationError
+from myia.dtype import Type, Bool, Float, Int, Tuple, Function
+from myia.unify import var, UnificationError
 
 
 from .graph import Plugin, is_return
@@ -49,27 +49,6 @@ class TypePlugin(Plugin):
         """Create a TypePlugin."""
         self._clones: DictT[Graph, SetT] = dict()
 
-    def visit(self, fn: CallableT, v: Any) -> Any:
-        """Visit types."""
-        if isinstance(v, List):
-            return List(noseq(fn, v.element_type))
-
-        elif isinstance(v, Struct):
-            for k in sorted(list(v.elements.keys())):
-                fn(k)  # type: ignore # This is a hack anyway
-            return Struct((k, noseq(fn, u))  # type: ignore
-                          for k, u in v.elements.items())
-
-        elif isinstance(v, Tuple):
-            return Tuple(expandlist(fn(e) for e in v.elements))
-
-        elif isinstance(v, Function):
-            return Function(expandlist(fn(a) for a in v.arguments),
-                            noseq(fn, v.retval))
-
-        else:
-            raise self.analyzer.DU.VisitError
-
     def on_attach(self):
         """Attach shortcuts."""
         analyzer = self.analyzer
@@ -89,15 +68,13 @@ class TypePlugin(Plugin):
 
         equiv = dict(self.analyzer.equiv)
         fn_t = self.analyzer.graphs[graph][self.NAME]
-        DU = self.analyzer.DU
-        with DU.domain(self.NAME):
-            equiv = DU.unify(Tuple(fn_t.arguments), Tuple(args), equiv)
+        U = self.analyzer.U
+        equiv = U.unify(Tuple(fn_t.arguments), Tuple(args), equiv)
 
         if equiv is None:
             raise TypeInferenceError("Incompatible apply")
 
-        with DU.domain(self.NAME):
-            return DU.reify(fn_t.retval, equiv)
+        return U.reify(fn_t.retval, equiv)
 
     def infer_args(self, graph: Graph, *args: Any):
         """Get the return type of a call of `graph`.
@@ -139,7 +116,7 @@ class TypePlugin(Plugin):
 
     def unify_apply(self, node: Apply, equiv):
         """Unify an Apply with its function type."""
-        DU = self.analyzer.DU
+        U = self.analyzer.U
         fn = node.inputs[0]
         args = node.inputs[1:]
         fn_t = self.get_type(fn)
@@ -147,33 +124,29 @@ class TypePlugin(Plugin):
         if not isinstance(fn_t, Function):
             c_fn_t = Function((var() for a in args), var())
             try:
-                with DU.domain(self.NAME):
-                    DU.unify_raw(fn_t, c_fn_t, equiv)
+                U.unify_raw(fn_t, c_fn_t, equiv)
             except UnificationError:
                 raise TypeInferenceError("Apply with non-callable")
             fn_t = c_fn_t
 
         if not isinstance(fn, Parameter):
-            with DU.domain(self.NAME):
-                fn_t = DU.clone(fn_t)
+            fn_t = U.clone(fn_t)
             assert isinstance(fn_t, Function)
             if is_constant_graph(fn):
                 self._clones.setdefault(fn.value, set()).add(fn_t)
 
         args_t = Tuple(self.get_type(a) for a in args)
-        with DU.domain(self.NAME):
-            equiv = DU.unify(Tuple(fn_t.arguments), args_t, equiv)
+        equiv = U.unify(Tuple(fn_t.arguments), args_t, equiv)
         if equiv is None:
             raise TypeInferenceError("Apply with incompatible types")
 
-        with DU.domain(self.NAME):
-            return DU.reify(fn_t.retval, equiv)
+        return U.reify(fn_t.retval, equiv)
 
     def on_postprocess(self):
         """Refine the graph types until equilibrium."""
         graphs_bak: DictT[Graph, Function] = dict()
         loops = 0
-        DU = self.analyzer.DU
+        U = self.analyzer.U
 
         # Make a copy of the graph type information.
         graphs = dict((k, v[self.NAME])
@@ -186,14 +159,11 @@ class TypePlugin(Plugin):
                 raise Exception("Possible bug in graph type stabilization")
 
             for g in list(graphs.keys()):
-                with DU.domain(self.NAME):
-                    graphs[g] = DU.reify(graphs[g], self.analyzer.equiv)
+                graphs[g] = U.reify(graphs[g], self.analyzer.equiv)
 
             for g in self._clones.keys():
                 for c in self._clones[g]:
-                    with DU.domain(self.NAME):
-                        res = DU.unify(DU.clone(graphs[g]), c,
-                                       self.analyzer.equiv)
+                    res = U.unify(U.clone(graphs[g]), c, self.analyzer.equiv)
                     if res is None:
                         raise TypeInferenceError("Imcompatible applies")
 
@@ -206,7 +176,6 @@ class TypePlugin(Plugin):
                 self.analyzer._info_map[n][self.NAME] = \
                         self.analyzer.graphs[n.value][self.NAME]
             else:
-                with DU.domain(self.NAME):
-                    self.analyzer._info_map[n][self.NAME] = DU.reify(
-                        self.analyzer._info_map[n][self.NAME],
-                        self.analyzer.equiv)
+                self.analyzer._info_map[n][self.NAME] = U.reify(
+                    self.analyzer._info_map[n][self.NAME],
+                    self.analyzer.equiv)

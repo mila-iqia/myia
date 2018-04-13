@@ -6,7 +6,7 @@ from myia.anf_ir import Graph, Apply, Constant, ANFNode
 from myia.anf_ir_utils import is_constant_graph
 from myia.graph_utils import toposort
 from myia.prim.ops import return_
-from myia.unify import DomainUnification, Var
+from myia.unify import Unification, Var
 
 
 T = TypeVar('T')
@@ -130,7 +130,7 @@ class GraphAnalyzer:
         self._info_map: Dict[ANFNode, Dict[str, Any]] = dict()
         self._shortcuts: Dict[str, Any] = dict()
         self.equiv: Dict[Var, Any] = dict()
-        self.DU = DomainUnification(dict())
+        self.U = Unification()
 
         self.plugins = PluginManager()
 
@@ -152,9 +152,6 @@ class GraphAnalyzer:
         plugin.register(self)
 
         self.plugins.add(plugin)
-
-        if hasattr(plugin, 'visit'):
-            self.DU.add_domain(plugin.NAME, plugin.visit)  # type: ignore
 
     def add_shortcut(self, name: str, value: Any):
         """Add an extra "shortcut" attribute to the graph."""

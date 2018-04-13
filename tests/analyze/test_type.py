@@ -29,37 +29,36 @@ def test_bad_node():
 
 def test_visit():
     ga = GraphAnalyzer([TypePlugin()])
-    DU = ga.DU
-    with DU.domain('type'):
-        v1 = var()
-        v2 = var()
+    U = ga.U
+    v1 = var()
+    v2 = var()
 
-        l1 = List(v1)
-        l2 = DU.clone(l1)
-        assert l1 is not l2
-        assert DU.unify(l1, l2)[v1] is l2.element_type
+    l1 = List(v1)
+    l2 = U.clone(l1)
+    assert l1 is not l2
+    assert U.unify(l1, l2)[v1] is l2.element_type
 
-        s1 = Struct(a=v1, b=v2)
-        s2 = DU.clone(s1)
-        assert s1 is not s2
-        assert set(s2.elements.keys()) == {'a', 'b'}
+    s1 = Struct(a=v1, b=v2)
+    s2 = U.clone(s1)
+    assert s1 is not s2
+    assert set(s2.elements.keys()) == {'a', 'b'}
 
-        t1 = Tuple(v1, v1, v2)
-        t2 = DU.clone(t1)
-        assert t1 is not t2
-        assert t2.elements[0] is t2.elements[1]
-        assert t2.elements[0] is not t2.elements[2]
-        assert len(t2.elements) == 3
+    t1 = Tuple(v1, v1, v2)
+    t2 = U.clone(t1)
+    assert t1 is not t2
+    assert t2.elements[0] is t2.elements[1]
+    assert t2.elements[0] is not t2.elements[2]
+    assert len(t2.elements) == 3
 
-        c1 = Function((v1, v2), v2)
-        c2 = DU.clone(c1)
-        assert c1 is not c2
-        assert c2.arguments[1] is c2.retval
-        assert c2.arguments[0] is not c2.arguments[1]
-        assert len(c2.arguments) == 2
+    c1 = Function((v1, v2), v2)
+    c2 = U.clone(c1)
+    assert c1 is not c2
+    assert c2.arguments[1] is c2.retval
+    assert c2.arguments[0] is not c2.arguments[1]
+    assert len(c2.arguments) == 2
 
-        b = DU.clone(Bool())
-        assert b is Bool()
+    b = U.clone(Bool())
+    assert b is Bool()
 
 
 def test_infer_args():
