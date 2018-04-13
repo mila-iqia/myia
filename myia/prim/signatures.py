@@ -1,9 +1,11 @@
 """Primitives signatures for the type inference."""
 from typing import Dict as DictT
 
-from myia.prim import Primitive, ops as P
 from myia.dtype import Function, Number, Bool, Tuple
 from myia.unify import var, svar, Var, SVar
+
+from . import ops as P
+from .ops import Primitive
 
 
 SIGNATURES: DictT[Primitive, Function] = dict()

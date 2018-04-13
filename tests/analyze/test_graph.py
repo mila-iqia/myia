@@ -1,7 +1,7 @@
 import pytest
 
 from myia.anf_ir import ANFNode, Apply, Constant, Graph
-from myia import primops as P
+from myia.prim import ops as P
 from myia.api import parse
 
 from myia.analyze.graph import GraphAnalyzer, Plugin, is_return, PluginManager

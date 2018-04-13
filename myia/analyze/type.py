@@ -4,13 +4,12 @@ from typing import Any, Callable as CallableT, Dict as DictT, Set as SetT
 
 from myia.anf_ir import Constant, Parameter, Apply, Graph, ANFNode
 from myia.anf_ir_utils import is_constant_graph
-from myia.prim import Primitive
+from myia.prim import Primitive, SIGNATURES
 from myia.dtype import Type, Bool, Float, Int, List, Struct, Tuple, Function
 from myia.unify import var, noseq, expandlist, UnificationError
 
 
 from .graph import Plugin, is_return
-from .prims import SIGNATURES
 from .value import ValuePlugin
 
 

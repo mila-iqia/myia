@@ -1,10 +1,10 @@
 import pytest
 
-from myia import primops as P
 from myia.anf_ir import Graph
 from myia.api import parse
-from myia.py_implementations import cons_tuple
 from myia.dtype import Function, Bool, Int, Float, Tuple, Struct, List
+from myia.prim import ops as P
+from myia.prim.py_implementations import cons_tuple
 from myia.unify import var
 
 from myia.analyze.graph import GraphAnalyzer
