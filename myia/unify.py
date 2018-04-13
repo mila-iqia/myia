@@ -171,7 +171,8 @@ def var(filter: FilterT = None)-> Var:
 def svar(subtype: Var = None) -> SVar:
     """Create an SVar (can match 0 or more items).
 
-    Items must match the subtype."""
+    Items must match the subtype.
+    """
     return SVar(subtype)
 
 
@@ -207,6 +208,7 @@ class Unification:
     """Unification engine."""
 
     def __init__(self):
+        """Create a unification engine."""
         self.visitors: Registry[Type, Callable] = Registry()
 
     def register_visitor(self, type):
