@@ -327,6 +327,11 @@ class Unification:
             equiv[diff] = UnionVar(set(okv[diff] for okv in ok_values))
             return equiv
 
+    def _getvar(self, v):
+        if hasattr(v, '__var__'):
+            return v.__var__()
+        return v
+
     def unify_raw(self, w, v, equiv: EquivT) -> EquivT:
         """'raw' interface for unification.
 
@@ -351,6 +356,9 @@ class Unification:
             described by `equiv` or this function might never return.
 
         """
+        w = self._getvar(w)
+        v = self._getvar(v)
+
         while w in equiv:
             w = equiv[w]
         while v in equiv:
@@ -382,11 +390,16 @@ class Unification:
             values_v = list(v)
             values_w = list(w)
         else:
+            def appender(l):
+                def fn(u):
+                    l.append(self._getvar(u))
+                    return u
+                return fn
             try:
                 values_v = []
-                self.visit(lambda u: values_v.append(u), v)
+                self.visit(appender(values_v), v)
                 values_w = []
-                self.visit(lambda u: values_w.append(u), w)
+                self.visit(appender(values_w), w)
             except VisitError:
                 raise UnificationError("Cannot visit elements")
 
@@ -486,10 +499,11 @@ class Unification:
             have to take care of this.
 
         """
+        v = self._getvar(v)
         if v in equiv:
             v = equiv[v]
 
         try:
-            return self.visit(lambda v: self.reify(v, equiv), v)
+            return self.visit(lambda u: self.reify(self._getvar(u), equiv), v)
         except VisitError:
             return v

@@ -6,11 +6,27 @@ from myia.anf_ir import Constant, Parameter, Apply, Graph, ANFNode
 from myia.anf_ir_utils import is_constant_graph
 from myia.prim import Primitive, SIGNATURES
 from myia.dtype import Type, Bool, Float, Int, Tuple, Function
-from myia.unify import var, UnificationError
-
+from myia.unify import var as _var, UnificationError, Var
 
 from .graph import Plugin, is_return
 from .value import ValuePlugin
+
+
+class TypeVar(Type):
+    """Hide a variable as a type."""
+
+    var: Var
+
+    def __var__(self):
+        return self.var
+
+    def __visit__(self, fn):
+        return TypeVar(fn(self.var))
+
+
+def var(*args, **kwargs) -> TypeVar:
+    """Proxy to wrap in TypeVar."""
+    return TypeVar(_var(*args, **kwargs))
 
 
 TYPE_MAP: DictT[type, Type] = {
@@ -90,7 +106,8 @@ class TypePlugin(Plugin):
 
     def on_graph(self, graph: Graph):
         """Return the type of the graph."""
-        return Function((self.get_type(p) for p in graph.parameters), var())
+        return Function((self.get_type(p) for p in graph.parameters),
+                        TypeVar(var()))
 
     def on_node(self, node: ANFNode):
         """Compute the type of the node."""
