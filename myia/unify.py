@@ -328,9 +328,7 @@ class Unification:
             return equiv
 
     def _getvar(self, v):
-        if hasattr(v, '__var__'):
-            return v.__var__()
-        return v
+        return getattr(v, '__var__', v)
 
     def unify_raw(self, w, v, equiv: EquivT) -> EquivT:
         """'raw' interface for unification.

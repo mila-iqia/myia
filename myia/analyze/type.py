@@ -17,11 +17,12 @@ class TypeVar(Type):
 
     var: Var
 
+    @property
     def __var__(self):
         return self.var
 
     def __visit__(self, fn):
-        return TypeVar(fn(self.var))
+        return TypeVar(fn(self.__var__))
 
 
 def var(*args, **kwargs) -> TypeVar:
