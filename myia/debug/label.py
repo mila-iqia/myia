@@ -1,13 +1,10 @@
 """Utilities to generate or map labels for nodes and graphs."""
 
 
-from collections import defaultdict
 from myia.info import DebugInfo
 from myia.anf_ir import Graph
-from myia.anf_ir_utils import \
-    succ_deeper, is_constant, is_constant_graph, is_parameter
+from myia.anf_ir_utils import is_constant, is_constant_graph, is_parameter
 from myia.prim import Primitive
-from myia.graph_utils import dfs, always_include
 
 
 short_relation_symbols = {
@@ -108,40 +105,3 @@ class NodeLabeler:
 short_labeler = NodeLabeler(
     relation_symbols=short_relation_symbols
 )
-
-
-class Index:
-    """Utility to map names to nodes and graphs.
-
-    A depth first search is initiated on the given graph, and the name of each
-    encountered node is mapped to the node.
-    """
-
-    def __init__(self,
-                 g,
-                 labeler=short_labeler,
-                 succ=succ_deeper,
-                 include=always_include):
-        """Create an Index."""
-        self.labeler = labeler
-        self._index = defaultdict(set)
-
-        self._acquire(g)
-
-        for node in dfs(g.return_, succ, include):
-            self._acquire(node)
-            if node.graph:
-                self._acquire(node.graph)
-
-    def _acquire(self, obj):
-        name = self.labeler.name(obj)
-        if name:
-            self._index[name].add(obj)
-
-    def get_all(self, key):
-        """Get all nodes/graphs corresponding to the given key."""
-        return self._index[key]
-
-    def __getitem__(self, key):
-        v, = self._index[key]
-        return v

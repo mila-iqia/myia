@@ -1,0 +1,58 @@
+"""Miscellaneous utilities for debugging."""
+
+from collections import defaultdict
+from myia.debug.label import short_labeler
+from myia.anf_ir_utils import succ_deeper
+from myia.graph_utils import dfs, always_include
+
+
+class _Empty:
+    """Bogus class, used internally by mixin."""
+
+
+def mixin(target):
+    """Class decorator to add methods to the target class."""
+    def apply(cls):
+        methods = set(dir(cls))
+        methods.difference_update(set(dir(_Empty)))
+        for mthd in methods:
+            setattr(target, mthd, getattr(cls, mthd))
+        return target
+    return apply
+
+
+class GraphIndex:
+    """Utility to map names to nodes and graphs.
+
+    A depth first search is initiated on the given graph, and the name of each
+    encountered node is mapped to the node.
+    """
+
+    def __init__(self,
+                 g,
+                 labeler=short_labeler,
+                 succ=succ_deeper,
+                 include=always_include):
+        """Create a GraphIndex."""
+        self.labeler = labeler
+        self._index = defaultdict(set)
+
+        self._acquire(g)
+
+        for node in dfs(g.return_, succ, include):
+            self._acquire(node)
+            if node.graph:
+                self._acquire(node.graph)
+
+    def _acquire(self, obj):
+        name = self.labeler.name(obj)
+        if name:
+            self._index[name].add(obj)
+
+    def get_all(self, key):
+        """Get all nodes/graphs corresponding to the given key."""
+        return self._index[key]
+
+    def __getitem__(self, key):
+        v, = self._index[key]
+        return v

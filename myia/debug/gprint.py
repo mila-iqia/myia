@@ -11,6 +11,7 @@ from myia.parser import Location
 from myia.prim import ops as primops
 from myia.cconv import NestingAnalyzer, ParentProxy
 from myia.debug.label import NodeLabeler, short_relation_symbols, short_labeler
+from myia.debug.utils import mixin
 
 
 gcss_path = f'{os.path.dirname(__file__)}/graph.css'
@@ -345,23 +346,6 @@ class MyiaGraphPrinter(GraphPrinter):
         """Add this node's graph if follow_references is True."""
         if is_constant_graph(node) and self.follow_references:
             self.graphs.add(node.value)
-
-
-class Empty:
-    """Bogus class."""
-
-    pass
-
-
-def mixin(target):
-    """Class decorator to add methods to the target class."""
-    def apply(cls):
-        methods = set(dir(cls))
-        methods.difference_update(set(dir(Empty)))
-        for mthd in methods:
-            setattr(target, mthd, getattr(cls, mthd))
-        return target
-    return apply
 
 
 @mixin(Graph)
