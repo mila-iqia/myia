@@ -5,7 +5,7 @@ from myia.graph_utils import dfs
 from myia.anf_ir import Graph, Constant
 from myia.anf_ir_utils import succ_deeper, succ_incoming, is_constant
 from myia.clone import GraphCloner
-from myia.debug.label import Index
+from myia.debug.utils import GraphIndex
 from myia.prim import ops as primops
 
 
@@ -51,11 +51,11 @@ def test_clone_closure():
         return c
 
     parsed_f = parse(f)
-    idx = Index(parsed_f)
+    idx = GraphIndex(parsed_f)
     g = idx['j']
 
     cl = GraphCloner(g, clone_constants=True)
-    idx2 = Index(cl[g], succ=succ_incoming)
+    idx2 = GraphIndex(cl[g], succ=succ_incoming)
 
     for name in 'xy':
         assert idx[name] is idx2[name]
@@ -84,8 +84,8 @@ def test_clone_scoping():
 
     g2 = cl[g]
 
-    idx1 = Index(g)
-    idx2 = Index(g2)
+    idx1 = GraphIndex(g)
+    idx2 = GraphIndex(g2)
 
     for name in 'fgi':
         assert idx1[name] is not idx2[name]
@@ -101,15 +101,15 @@ def test_clone_total():
         return f1(y) + 3
 
     g = parse(f2)
-    idx0 = Index(g)
+    idx0 = GraphIndex(g)
 
     cl1 = GraphCloner(g, clone_constants=True, total=True)
-    idx1 = Index(cl1[g])
+    idx1 = GraphIndex(cl1[g])
     assert idx1['f2'] is not idx0['f2']
     assert idx1['f1'] is not idx0['f1']
 
     cl2 = GraphCloner(g, clone_constants=True, total=False)
-    idx2 = Index(cl2[g])
+    idx2 = GraphIndex(cl2[g])
     assert idx2['f2'] is not idx0['f2']
     assert idx2['f1'] is idx0['f1']
 
