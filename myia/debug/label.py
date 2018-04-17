@@ -4,7 +4,7 @@
 from myia.info import DebugInfo
 from myia.anf_ir import Graph
 from myia.anf_ir_utils import \
-    succ_deeper, is_constant, is_constant_graph, is_parameter, is_special
+    is_constant, is_constant_graph, is_parameter, is_special
 from myia.prim import Primitive
 
 
