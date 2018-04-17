@@ -152,6 +152,21 @@ class NestingAnalyzer:
         return children
 
     @memoize_method
+    def scopes(self) -> Dict[Graph, Set[Graph]]:
+        """Map each graph to the complete set of graphs nested in it.
+
+        The set associated to a graph includes the graph.
+        """
+        parents = self.parents()
+        scopes: Dict[Graph, Set[Graph]] = defaultdict(set)
+        for g in self.coverage():
+            p = g
+            while p:
+                scopes[p].add(g)
+                p = parents[p]
+        return scopes
+
+    @memoize_method
     def free_variables_total(self) -> Dict[Graph, Set[ANFNode]]:
         """Map each graph to its free variables.
 
