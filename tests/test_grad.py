@@ -195,8 +195,8 @@ def test_while(x, y, z):
     rval = 0
     # Cannot compare to 0 or finite diff is unstable
     while x > -0.1:
-        rval += y
-        x -= z
+        rval = rval + y
+        x = x - z
     return rval
 
 
@@ -283,8 +283,8 @@ def test_grad2_while(x, y, z):
         rval = 0
         # Cannot compare to 0 or finite diff is unstable
         while x > -0.1:
-            rval += y
-            x -= z
+            rval = rval + y
+            x = x - z
         return rval
     return _grad3(f)(x, y, z)
 
