@@ -8,12 +8,13 @@ from myia.opt import \
     PatternOptimizerSinglePass, \
     PatternOptimizerEquilibrium, \
     pattern_replacer
-from myia.unify import Var
+from myia.unify import Var, var
 from myia.prim import ops as prim, Primitive
 from myia.cconv import NestingAnalyzer
 
 
 X = Var('X')
+V = var(is_constant)
 
 
 # We will optimize patterns of these fake primitives
@@ -263,3 +264,20 @@ def test_fn_replacement():
 
     _check_opt(before, after,
                elim_QPs)
+
+
+def test_constant_variable():
+    def before(x):
+        return Q(15) + Q(x)
+
+    def after(x):
+        return P(15) + Q(x)
+
+    Qct_to_P = psub(
+        (Q, V),
+        (P, V),
+        name='Qct_to_P'
+    )
+
+    _check_opt(before, after,
+               Qct_to_P)
