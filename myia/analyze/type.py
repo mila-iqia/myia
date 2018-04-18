@@ -25,6 +25,11 @@ class TypeVar(Type):
         return TypeVar(fn(self.__var__))
 
 
+class MetaVar:
+    def infer(self, args, equiv):
+        raise NotImplementedError("infer")
+
+
 def var(*args, **kwargs) -> TypeVar:
     """Proxy to wrap in TypeVar."""
     return TypeVar(_var(*args, **kwargs))
@@ -138,6 +143,9 @@ class TypePlugin(Plugin):
         fn = node.inputs[0]
         args = node.inputs[1:]
         fn_t = self.get_type(fn)
+
+        if isinstance(fn_t, MetaVar):
+            return fn_t.infer(args, equiv)
 
         if not isinstance(fn_t, Function):
             c_fn_t = Function((var() for a in args), var())
