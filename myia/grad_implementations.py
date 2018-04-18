@@ -10,10 +10,10 @@ from myia.utils import Registry
 from myia.api import parse
 from myia.info import NamedDebugInfo, About
 from myia.anf_ir import Graph
-from myia import primops
-from myia.primops import Primitive
+from myia.prim import ops as primops
+from myia.prim import Primitive
 from myia.anf_ir_utils import replace
-from myia.py_implementations import \
+from myia.prim.py_implementations import \
     Jinv, J, zeros_like, cons_tuple, head, tail, setitem
 
 

@@ -6,7 +6,7 @@ import numpy
 import itertools
 
 from myia.utils import smap
-from myia.py_implementations import zeros_like
+from myia.prim.py_implementations import zeros_like
 
 
 class NoTestGrad:

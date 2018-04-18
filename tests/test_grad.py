@@ -5,7 +5,7 @@ from copy import copy
 from myia.api import parse, compile
 from myia.grad import grad
 from myia.debug.finite_diff import GradTester
-from myia.py_implementations import J, tail, ZERO
+from myia.prim.py_implementations import J, tail, ZERO
 
 
 def grad_test(*tests):

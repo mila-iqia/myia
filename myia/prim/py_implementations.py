@@ -5,9 +5,7 @@ from typing import Callable
 from types import FunctionType
 from copy import copy
 from . import ops as primops
-from myia.anf_ir import Graph
 from myia.utils import Registry, smap
-from myia.vm import VMFrame
 
 
 implementations: Registry[primops.Primitive, Callable] = Registry()
@@ -190,6 +188,7 @@ def J(x):
     from myia.grad_implementations import augmented_graphs
     from myia.anf_ir import Graph
     from myia.grad import grad
+    from myia.vm import VMFrame
 
     if isinstance(x, primops.Primitive):
         return augmented_graphs[x]
@@ -217,6 +216,8 @@ def Jinv(x):
 
     This is the inverse of `J`: `Jinv(J(x)) == x`.
     """
+    from myia.vm import VMFrame
+    from myia.anf_ir import Graph
     if isinstance(x, (int, float)):
         return x
     elif isinstance(x, tuple):
@@ -267,6 +268,9 @@ ZERO = Zero()
 @register(primops.zeros_like)
 def zeros_like(x):
     """Implement `zeros_like`."""
+    from myia.vm import VMFrame
+    from myia.anf_ir import Graph
+
     def zero(x):
         if isinstance(x, VMFrame.Closure) or x is ZERO:
             return ZERO
