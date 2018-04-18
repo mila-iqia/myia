@@ -1,16 +1,14 @@
 """Unification module."""
-from typing import (Dict, List, Iterable, Union, Callable, cast, TypeVar,
-                    Generic, Any)
+from typing import Dict, List, Iterable, Union, Callable, TypeVar, Type, Any
 from functools import reduce
 
+from myia.utils import Registry
 
 T = TypeVar('T')
-U = TypeVar('U')
 
-Value = Union['Var[U]', U]
-FnFiltT = Callable[[Value[U]], bool]
-FilterT = Union[Iterable[Value[U]], FnFiltT[U]]
-EquivT = Dict['Var[U]', Value[U]]
+EquivT = Dict['Var', Any]
+FnFiltT = Callable[[Any], bool]
+FilterT = Union[Iterable, FnFiltT]
 
 
 class UnificationError(Exception):
@@ -26,7 +24,7 @@ def _get_next_tag():
     return f"_{_ID}"
 
 
-class Var(Generic[U]):
+class Var:
     """Basic universal variable type."""
 
     __slots__ = ('tag',)
@@ -36,7 +34,7 @@ class Var(Generic[U]):
         if tag is not None:
             self.tag = tag
 
-    def matches(self, value: Value[U]) -> bool:
+    def matches(self, value) -> bool:
         """Return True if the variable matches the value given.
 
         Note that this relation is transitive, but not associative.
@@ -64,18 +62,18 @@ class Seq(tuple):
         return "Seq" + super().__repr__()
 
 
-class SVar(Var[U]):
+class SVar(Var):
     """Variable to represent a variable length of values."""
 
     __slots__ = ('subtype',)
 
-    def __init__(self, subtype: Var[U] = None) -> None:
+    def __init__(self, subtype: Var = None) -> None:
         """Create an SVar."""
         if subtype is None:
             subtype = Var()
         self.subtype = subtype
 
-    def matches(self, value: Value[U]) -> bool:
+    def matches(self, value) -> bool:
         """Check if the provided value matches the SVar."""
         if isinstance(value, SVar):
             return self.subtype.matches(value.subtype)
@@ -93,12 +91,12 @@ class SVar(Var[U]):
         return f"SVar({self.tag})"
 
 
-class UnionVar(Var[U]):
+class UnionVar(Var):
     """Variable for a possible set of values."""
 
     __slots__ = ('values',)
 
-    def __init__(self, values: Iterable[Value[U]]) -> None:
+    def __init__(self, values: Iterable) -> None:
         """Create a UnionVar."""
         self.values = set(values)
 
@@ -111,16 +109,16 @@ class UnionVar(Var[U]):
         return f"UnionVar({self.tag}, {self.values})"
 
 
-class RestrictedVar(Var[U]):
+class RestrictedVar(Var):
     """Variable restricted to a set of values."""
 
     __slots__ = ('legal_values',)
 
-    def __init__(self, legal_values: Iterable[Value[U]]) -> None:
+    def __init__(self, legal_values: Iterable) -> None:
         """Create a RestrictedVar."""
         self.legal_values = tuple(legal_values)
 
-    def matches(self, value: Value[U]) -> bool:
+    def matches(self, value) -> bool:
         """Return True if the variable matches the value."""
         if isinstance(value, RestrictedVar):
             return all(v in self.legal_values for v in value.legal_values)
@@ -131,16 +129,16 @@ class RestrictedVar(Var[U]):
         return f"RestrictedVar({self.tag}, {self.legal_values})"
 
 
-class FilterVar(Var[U]):
+class FilterVar(Var):
     """Variable restricted to values that pass a filter function."""
 
     __slots__ = ('filter',)
 
-    def __init__(self, filter: FnFiltT[U]) -> None:
+    def __init__(self, filter: FnFiltT) -> None:
         """Create a FilterVar."""
         self.filter = filter
 
-    def matches(self, value: Value[U]) -> bool:
+    def matches(self, value) -> bool:
         """Return True if the variable matches the value."""
         if isinstance(value, RestrictedVar):
             return all(self.filter(v) for v in value.legal_values)
@@ -153,7 +151,7 @@ class FilterVar(Var[U]):
         return f"FilterVar({self.tag}, {self.filter})"
 
 
-def var(filter: FilterT[U] = None)-> Var[U]:
+def var(filter: FilterT = None)-> Var:
     """Create a variable for unification purposes.
 
     Arguments:
@@ -170,17 +168,20 @@ def var(filter: FilterT[U] = None)-> Var[U]:
         return Var()
 
 
-def svar() -> SVar[U]:
-    """Create an SVar (can match 0 or more items)."""
-    return SVar()
+def svar(subtype: Var = None) -> SVar:
+    """Create an SVar (can match 0 or more items).
+
+    Items must match the subtype.
+    """
+    return SVar(subtype)
 
 
-def uvar(values: Iterable[Value[U]]) -> UnionVar[U]:
+def uvar(values: Iterable) -> UnionVar:
     """Create a UnionVar (represents multiple possibilities)."""
     return UnionVar(values)
 
 
-def expandlist(lst: Iterable[Value[U]]) -> List[Value[U]]:
+def expandlist(lst: Iterable[T]) -> List[T]:
     """Flatten the Seq instances in a sequence."""
     lst = list(lst)
     off = 0
@@ -191,7 +192,7 @@ def expandlist(lst: Iterable[Value[U]]) -> List[Value[U]]:
     return lst
 
 
-def noseq(fn: Callable[[Value[U]], Value[U]], u: Value[U]) -> Value[U]:
+def noseq(fn: Callable[[T], T], u: T) -> T:
     """Make sure that there are no Seq in the value."""
     um = fn(u)
     if isinstance(um, Seq):
@@ -199,18 +200,32 @@ def noseq(fn: Callable[[Value[U]], Value[U]], u: Value[U]) -> Value[U]:
     return um
 
 
-class Unification(Generic[T]):
+class VisitError(Exception):
+    """Report unvisitable object."""
+
+
+class Unification:
     """Unification engine."""
 
-    class VisitError(Exception):
-        """Report unvisitable object."""
+    def __init__(self):
+        """Create a unification engine."""
+        self.visitors: Registry[Type, Callable] = Registry()
 
-    def visit(self, fn: Callable[[Value[T]], Value[T]],
-              value: Value[T]) -> Value[T]:
+    def register_visitor(self, type):
+        """Decorator to register additional visitors."""
+        return self.visitors.register(type)
+
+    def visit(self, fn: Callable[[T], T], value: T) -> T:
         """Apply `fn` to each element of `value` and return the result."""
-        raise self.VisitError
+        visit = self.visitors.get(type(value), None)
+        if visit:
+            return visit(fn, value)
+        visit = getattr(value, '__visit__', None)
+        if visit:
+            return visit(fn)
+        raise VisitError
 
-    def clone(self, v: Value[T], copy_map: Dict[Any, Any] = None) -> Value[T]:
+    def clone(self, v: T, copy_map: Dict = None) -> T:
         """Return a copy of a templated type structure.
 
         Type are passed through without modification, variables are
@@ -229,7 +244,7 @@ class Unification(Generic[T]):
             copy_map = {}
         return self._clone(v, copy_map)
 
-    def _clone(self, v: Value[T], copy_map: Dict[Any, Any]) -> Value[T]:
+    def _clone(self, v: T, copy_map: Dict) -> T:
         if v in copy_map:
             return copy_map[v]
 
@@ -252,19 +267,18 @@ class Unification(Generic[T]):
         else:
             try:
                 copy_map[v] = self.visit(lambda v: self._clone(v, copy_map), v)
-            except self.VisitError:
+            except VisitError:
                 return v
 
         return copy_map[v]
 
-    def unify_union(self, w: UnionVar[T], v: Value[T],
-                    equiv: EquivT[T]) -> EquivT[T]:
+    def unify_union(self, w: UnionVar, v, equiv: EquivT) -> EquivT:
         """Perform UnionVar unification.
 
         This is called as required from `unify_raw`, but can also be
         called directly.
         """
-        ok: Dict[Value[T], EquivT[T]] = dict()
+        ok: Dict[Any, EquivT] = dict()
         for vw in w.values:
             equiv_copy = dict(equiv)
             # try each of the possible alternatives
@@ -313,13 +327,10 @@ class Unification(Generic[T]):
             equiv[diff] = UnionVar(set(okv[diff] for okv in ok_values))
             return equiv
 
-    def _extract_var(self, v):
-        if hasattr(v, '__var__'):
-            return v.__var__()
-        return v
+    def _getvar(self, v):
+        return getattr(v, '__var__', v)
 
-    def unify_raw(self, w: Value[T], v: Value[T],
-                  equiv: EquivT[T]) -> EquivT[T]:
+    def unify_raw(self, w, v, equiv: EquivT) -> EquivT:
         """'raw' interface for unification.
 
         The `equiv` argument is modified in-place.
@@ -343,13 +354,13 @@ class Unification(Generic[T]):
             described by `equiv` or this function might never return.
 
         """
-        w = self._extract_var(w)
-        v = self._extract_var(v)
+        w = self._getvar(w)
+        v = self._getvar(v)
 
         while w in equiv:
-            w = equiv[cast(Var[T], w)]
+            w = equiv[w]
         while v in equiv:
-            v = equiv[cast(Var[T], v)]
+            v = equiv[v]
 
         if w == v:
             return equiv
@@ -377,18 +388,17 @@ class Unification(Generic[T]):
             values_v = list(v)
             values_w = list(w)
         else:
+            def appender(l):
+                def fn(u):
+                    l.append(self._getvar(u))
+                    return u
+                return fn
             try:
-                def appender(values):
-                    def append(u):
-                        values.append(self._extract_var(u))
-                        return u
-                    return append
-
                 values_v = []
                 self.visit(appender(values_v), v)
                 values_w = []
                 self.visit(appender(values_w), w)
-            except self.VisitError:
+            except VisitError:
                 raise UnificationError("Cannot visit elements")
 
         sv = -1
@@ -436,8 +446,7 @@ class Unification(Generic[T]):
 
         return equiv
 
-    def unify(self, w: Value[T], v: Value[T],
-              equiv: EquivT[T] = None) -> EquivT[T]:
+    def unify(self, w, v, equiv: EquivT = None) -> EquivT:
         """Unify two expressions.
 
         After a match is found, this will post-process the dictionary to
@@ -469,12 +478,12 @@ class Unification(Generic[T]):
         for k in ks:
             init_k = k
             while k in equiv:
-                k = cast(Var[T], equiv[k])
+                k = equiv[k]
                 equiv[init_k] = k
 
         return equiv
 
-    def reify(self, v: Value[T], equiv: EquivT[T]) -> Value[T]:
+    def reify(self, v, equiv: EquivT) -> Any:
         """Fill in a expression according to the equivalences given.
 
         Arguments:
@@ -488,10 +497,11 @@ class Unification(Generic[T]):
             have to take care of this.
 
         """
+        v = self._getvar(v)
         if v in equiv:
-            v = equiv[cast(Var[T], v)]
+            v = equiv[v]
 
         try:
-            return self.visit(lambda v: self.reify(v, equiv), v)
-        except self.VisitError:
+            return self.visit(lambda u: self.reify(self._getvar(u), equiv), v)
+        except VisitError:
             return v

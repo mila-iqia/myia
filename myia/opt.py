@@ -1,7 +1,7 @@
 """Graph optimization routines."""
 
 
-from myia.unify import Var, Unification, expandlist
+from myia.unify import Var, Unification, VisitError, expandlist
 from myia.graph_utils import toposort
 from myia.anf_ir import ANFNode, Graph, Apply, Constant, Special
 from myia.anf_ir_utils import \
@@ -12,6 +12,7 @@ from myia.anf_ir_utils import \
 class VarNode(Special):
     """Graph node that represents a variable."""
 
+    @property
     def __var__(self):
         return self.special
 
@@ -79,10 +80,8 @@ class GraphUnification(Unification):
             return node
         elif is_constant(node):
             return Constant(fn(node.value))
-        elif isinstance(node, VarNode):
-            return fn(node.special)
         else:
-            raise self.VisitError
+            raise VisitError
 
 
 class PatternSubstitutionOptimization:
