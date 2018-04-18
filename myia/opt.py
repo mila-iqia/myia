@@ -92,9 +92,13 @@ class PatternSubstitutionOptimization:
         pattern: An s-expression, represented as a nested tuple, that
             represents an expression to match. Terms in the s-expression
             may be Var instances or constants.
-        replacement: An s-expression, represented as a nested tuple, to
-            instantiate to replace the pattern. Vars in the pattern can
-            be reused in the replacement.
+        replacement:
+            * An s-expression, represented as a nested tuple, to
+              instantiate to replace the pattern. Vars in the pattern can
+              be reused in the replacement.
+            * OR a function which will be called when the pattern is
+              matched, with the node and the equivalence dictionary as
+              arguments.
         name: The name of the optimization.
         multigraph: Whether the pattern can span multiple graphs or not.
             A pattern can span multiple graphs if, for example, the root
@@ -117,7 +121,10 @@ class PatternSubstitutionOptimization:
         """Initialize va PatternSubstitutionOptimization."""
         g: Var = Var('RootG')
         self.pattern = sexp_to_node(pattern, g, multigraph)
-        self.replacement = sexp_to_node(replacement, g)
+        if callable(replacement):
+            self.replacement = replacement
+        else:
+            self.replacement = sexp_to_node(replacement, g)
         self.unif = GraphUnification()
         self.name = name
 
@@ -136,9 +143,19 @@ class PatternSubstitutionOptimization:
         """
         equiv = self.unif.unify(node, self.pattern)
         if equiv:
-            return self.unif.reify(self.replacement, equiv)
+            if callable(self.replacement):
+                return self.replacement(node, equiv)
+            else:
+                return self.unif.reify(self.replacement, equiv)
         else:
             return None
+
+
+def pattern_replacer(*pattern):
+    """Create a PatternSubstitutionOptimization using this function."""
+    def deco(f):
+        return PatternSubstitutionOptimization(pattern, f, name=f.__name__)
+    return deco
 
 
 class PatternOptimizerSinglePass:

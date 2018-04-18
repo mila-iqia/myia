@@ -6,7 +6,8 @@ from myia.opt import \
     sexp_to_graph, \
     PatternSubstitutionOptimization as psub, \
     PatternOptimizerSinglePass, \
-    PatternOptimizerEquilibrium
+    PatternOptimizerEquilibrium, \
+    pattern_replacer
 from myia.unify import Var
 from myia.prim import ops as prim, Primitive
 from myia.cconv import NestingAnalyzer
@@ -243,3 +244,22 @@ def test_closure():
 
     _check_opt(before, after,
                QP_to_QR, elim_R)
+
+
+def test_fn_replacement():
+    def before(x):
+        return Q(P(P(P(P(x)))))
+
+    def after(x):
+        return x
+
+    @pattern_replacer(Q, X)
+    def elim_QPs(node, equiv):
+        # Q(P(...P(x))) => x
+        arg = equiv[X]
+        while arg.inputs and arg.inputs[0].value == P:
+            arg = arg.inputs[1]
+        return arg
+
+    _check_opt(before, after,
+               elim_QPs)
