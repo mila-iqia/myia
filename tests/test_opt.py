@@ -100,20 +100,11 @@ def _same_graphs(g1, g2, _equiv=None):
     return same(g1.return_, g2.return_)
 
 
-def _check_opt(before, after):
+def _check_opt(before, after, *opts):
     gbefore = parse(before)
     gafter = parse(after)
 
-    pass_ = PatternOptimizerSinglePass([
-        idempotent_P,
-        elim_R,
-        Q0_to_R,
-        QP_to_QR,
-        multiply_by_zero_l,
-        multiply_by_zero_r,
-        add_zero_l,
-        add_zero_r,
-    ])
+    pass_ = PatternOptimizerSinglePass(opts)
 
     eq = PatternOptimizerEquilibrium(pass_)
 
@@ -141,7 +132,8 @@ def test_elim():
     def after(x):
         return x
 
-    _check_opt(before, after)
+    _check_opt(before, after,
+               elim_R)
 
 
 def _idempotent_after(x):
@@ -152,21 +144,24 @@ def test_idempotent():
     def before(x):
         return P(P(x))
 
-    _check_opt(before, _idempotent_after)
+    _check_opt(before, _idempotent_after,
+               idempotent_P)
 
 
 def test_idempotent_multi():
     def before(x):
         return P(P(P(P(x))))
 
-    _check_opt(before, _idempotent_after)
+    _check_opt(before, _idempotent_after,
+               idempotent_P)
 
 
 def test_idempotent_and_elim():
     def before(x):
         return P(R(P(R(R(P(x))))))
 
-    _check_opt(before, _idempotent_after)
+    _check_opt(before, _idempotent_after,
+               idempotent_P, elim_R)
 
 
 def test_multiply_zero():
@@ -176,7 +171,8 @@ def test_multiply_zero():
     def after(x):
         return 0
 
-    _check_opt(before, after)
+    _check_opt(before, after,
+               multiply_by_zero_l, multiply_by_zero_r)
 
 
 def test_multiply_add_elim_zero():
@@ -186,7 +182,8 @@ def test_multiply_add_elim_zero():
     def after(x):
         return x
 
-    _check_opt(before, after)
+    _check_opt(before, after,
+               elim_R, multiply_by_zero_r, add_zero_r)
 
 
 def test_replace_twice():
@@ -196,7 +193,8 @@ def test_replace_twice():
     def after(x):
         return 0
 
-    _check_opt(before, after)
+    _check_opt(before, after,
+               Q0_to_R, elim_R)
 
 
 def test_revisit():
@@ -206,7 +204,8 @@ def test_revisit():
     def after(x):
         return Q(x)
 
-    _check_opt(before, after)
+    _check_opt(before, after,
+               QP_to_QR, elim_R)
 
 
 def test_multi_function():
@@ -222,7 +221,8 @@ def test_multi_function():
     def after(x):
         return after_helper(x, 3)
 
-    _check_opt(before, after)
+    _check_opt(before, after,
+               elim_R)
 
 
 def test_closure():
@@ -241,4 +241,5 @@ def test_closure():
             return Q(x)
         return sub()
 
-    _check_opt(before, after)
+    _check_opt(before, after,
+               QP_to_QR, elim_R)
