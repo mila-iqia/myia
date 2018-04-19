@@ -38,6 +38,7 @@ Block
    33(4), pp.17-20.
 
 """
+
 import ast
 import inspect
 import textwrap
@@ -47,10 +48,11 @@ from typing import \
     overload, Any, Dict, List, Optional, Tuple, NamedTuple, Iterable
 from weakref import finalize
 
-from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
-from myia.anf_ir_utils import destroy_disconnected_nodes
-from myia.info import DebugInherit, About
-from myia.prim import ops as primops
+from .info import DebugInherit, About
+from .ir import \
+    ANFNode, Parameter, Apply, Graph, Constant, \
+    destroy_disconnected_nodes
+from .prim import ops as primops
 
 
 class Location(NamedTuple):

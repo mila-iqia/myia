@@ -1,15 +1,15 @@
-from myia.anf_ir import Constant, Apply, Parameter, Graph, Special
-from myia.graph_utils import dfs as _dfs
-from myia.anf_ir_utils import \
+from myia.ir import \
+    Constant, Apply, Parameter, Graph, Special, \
     dfs, toposort, accessible_graphs, destroy_disconnected_nodes, \
     is_apply, is_constant, is_parameter, is_constant_graph, is_special, \
     succ_incoming, succ_deep, succ_deeper, succ_bidirectional, \
     exclude_from_set, freevars_boundary, replace, isomorphic
+from myia.graph_utils import dfs as _dfs
 from myia.api import ENV, parse
 from myia.parser import Parser
 from myia.debug.utils import GraphIndex
 
-from .test_graph_utils import _check_toposort
+from tests.test_graph_utils import _check_toposort
 
 
 def test_dfs():

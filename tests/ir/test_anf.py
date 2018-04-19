@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from myia.anf_ir import Graph, Apply, Parameter, Constant, PARAMETER
+from myia.ir.anf import Graph, Apply, Parameter, Constant, PARAMETER
 from myia.prim import ops as primops
 
 

@@ -1,4 +1,5 @@
 """Type representation."""
+
 from typing import Tuple as TupleT, Dict as DictT, Iterable, Any
 from operator import itemgetter
 import collections

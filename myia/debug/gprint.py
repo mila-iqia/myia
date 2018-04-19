@@ -4,14 +4,15 @@ from hrepr import hrepr
 import os
 import json
 
-from myia.anf_ir import Graph, ANFNode, Apply, Constant
-from myia.anf_ir_utils import \
+from ..ir import \
+    Graph, ANFNode, Apply, Constant, \
     is_apply, is_constant, is_constant_graph, is_special
-from myia.parser import Location
-from myia.prim import ops as primops
-from myia.cconv import NestingAnalyzer, ParentProxy
-from myia.debug.label import NodeLabeler, short_relation_symbols, short_labeler
-from myia.debug.utils import mixin
+from ..parser import Location
+from ..prim import ops as primops
+from ..cconv import NestingAnalyzer, ParentProxy
+
+from .label import NodeLabeler, short_relation_symbols, short_labeler
+from .utils import mixin
 
 
 gcss_path = f'{os.path.dirname(__file__)}/graph.css'

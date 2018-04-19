@@ -4,7 +4,6 @@ The utilities in this file should be abstract with respect to node types or
 the notion of successor.
 """
 
-
 from typing import Any, Callable, Iterable, Set, TypeVar, List, Dict
 
 

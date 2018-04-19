@@ -7,10 +7,9 @@ implementation.
 from typing import List, Dict, Any, Union, Set, Callable
 from types import FunctionType
 
-from myia.anf_ir import Graph, ANFNode, Constant, Parameter, Apply
-from myia.anf_ir_utils import dfs
-from myia.utils import smap
-from myia.prim import Primitive, ops as primops
+from .ir import Graph, ANFNode, Constant, Parameter, Apply, dfs
+from .prim import Primitive, ops as primops
+from .utils import smap
 
 
 class CallableClosure:

@@ -9,13 +9,16 @@ implicitly creates a nested function. Functions are first-class objects, so
 returning a nested function creates a closure.
 
 """
+
 from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
                     overload, Iterable)
 
-from myia.ir import Node
-from myia.utils import Named, repr_, list_str
-from myia.info import NamedDebugInfo
-from myia.prim import ops as primops
+from ..utils import Named, repr_, list_str
+from ..info import NamedDebugInfo
+from ..prim import ops as primops
+
+from .abstract import Node
+
 
 PARAMETER = Named('PARAMETER')
 SPECIAL = Named('SPECIAL')

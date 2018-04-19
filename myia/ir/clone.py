@@ -1,15 +1,16 @@
 """Graph cloning facility."""
 
-
 from typing import Any, Iterable, Dict, Union, Set, cast
-from myia.cconv import NestingAnalyzer
-from myia.info import About
-from myia.anf_ir import ANFNode, Apply, Parameter, Constant, Graph
-from myia.graph_utils import dfs
-from myia.anf_ir_utils import \
+
+from ..cconv import NestingAnalyzer
+from ..info import About
+from ..graph_utils import dfs
+from ..utils import smap
+
+from .anf import ANFNode, Apply, Parameter, Constant, Graph
+from .utils import \
     succ_incoming, exclude_from_set, \
     is_parameter, is_constant
-from myia.utils import smap
 
 
 #################

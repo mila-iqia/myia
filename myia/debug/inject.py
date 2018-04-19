@@ -2,7 +2,7 @@
 
 import sys
 import pdb
-from myia.debug.buche import buche
+from .buche import buche
 from buche.debug import BucheDb
 from buche import reader
 

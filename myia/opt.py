@@ -1,12 +1,12 @@
 """Graph optimization routines."""
 
 
-from myia.unify import Var, Unification, VisitError, expandlist
-from myia.graph_utils import toposort
-from myia.anf_ir import ANFNode, Graph, Apply, Constant, Special
-from myia.anf_ir_utils import \
+from .ir import \
+    ANFNode, Graph, Apply, Constant, Special, \
     succ_incoming, freevars_boundary, replace, \
     is_apply, is_constant, is_parameter
+from .graph_utils import toposort
+from .unify import Var, Unification, VisitError, expandlist
 
 
 class VarNode(Special):

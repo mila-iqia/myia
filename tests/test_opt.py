@@ -1,7 +1,6 @@
 
 from myia.api import parse
-from myia.anf_ir import Constant
-from myia.anf_ir_utils import is_constant, isomorphic
+from myia.ir import Constant, is_constant, isomorphic
 from myia.opt import \
     sexp_to_graph, \
     PatternSubstitutionOptimization as psub, \
