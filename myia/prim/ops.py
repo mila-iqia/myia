@@ -7,7 +7,7 @@ subclass.
 """
 
 
-from myia.utils import Named
+from ..utils import Named
 
 
 class Primitive(Named):

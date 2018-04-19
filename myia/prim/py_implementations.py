@@ -3,8 +3,10 @@
 
 from typing import Callable
 from copy import copy
+
+from ..utils import Registry
+
 from . import ops as primops
-from myia.utils import Registry
 
 
 implementations: Registry[primops.Primitive, Callable] = Registry()

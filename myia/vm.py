@@ -39,7 +39,7 @@ class VM:
     def convert_value(self, value):
         """Translate the value to a format that the VM understands."""
         if isinstance(value, FunctionType):
-            from myia.api import parse
+            from .api import parse
             return parse(value)
         elif isinstance(value, CallableClosure):
             return value.closure
