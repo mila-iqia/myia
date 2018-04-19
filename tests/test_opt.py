@@ -1,7 +1,7 @@
 
 from myia.api import parse
-from myia.anf_ir import Graph, Constant
-from myia.anf_ir_utils import is_constant, is_apply, is_parameter
+from myia.anf_ir import Constant
+from myia.anf_ir_utils import is_constant, isomorphic
 from myia.opt import \
     sexp_to_graph, \
     PatternSubstitutionOptimization as psub, \
@@ -74,34 +74,6 @@ add_zero_r = psub(
 )
 
 
-def _same_graphs(g1, g2, _equiv=None):
-    equiv = dict(zip(g1.parameters, g2.parameters))
-    if _equiv:
-        equiv.update(_equiv)
-
-    def same(n1, n2):
-        if n1 in equiv:
-            return equiv[n1] is n2
-        if type(n1) is not type(n2):
-            return False
-        if is_constant(n1):
-            return same(n1.value, n2.value)
-            # return n1.value == n2.value
-        elif is_parameter(n1):
-            return False
-        elif is_apply(n1):
-            success = all(same(i1, i2) for i1, i2 in zip(n1.inputs, n2.inputs))
-            if success:
-                equiv[n1] = n2
-            return success
-        elif isinstance(n1, Graph):
-            return _same_graphs(n1, n2, equiv)
-        else:
-            return n1 == n2
-
-    return same(g1.return_, g2.return_)
-
-
 def _check_opt(before, after, *opts):
     gbefore = parse(before)
     gafter = parse(after)
@@ -113,7 +85,7 @@ def _check_opt(before, after, *opts):
     for g in NestingAnalyzer(gbefore).coverage():
         eq(g)
 
-    assert _same_graphs(gbefore, gafter)
+    assert isomorphic(gbefore, gafter)
 
 
 def test_sexp_conversion():
@@ -124,7 +96,7 @@ def test_sexp_conversion():
 
     g = sexp_to_graph(sexp)
 
-    assert _same_graphs(g, parse(f))
+    assert isomorphic(g, parse(f))
 
 
 def test_elim():
@@ -181,7 +153,7 @@ def test_multiply_add_elim_zero():
     def before(x, y):
         return x + y * R(0)
 
-    def after(x):
+    def after(x, y):
         return x
 
     _check_opt(before, after,
