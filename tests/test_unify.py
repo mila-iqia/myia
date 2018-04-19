@@ -2,27 +2,23 @@ import pytest
 
 from myia.unify import (Unification, UnificationError, Var, FilterVar, Seq,
                         RestrictedVar, SVar, UnionVar, expandlist, noseq,
-                        var, svar, uvar)
+                        var, svar, uvar, VisitError)
 
 
 class L(list):
     def __hash__(self):
         return hash(tuple(self))
 
-
-class TUnification(Unification):
-    def visit(self, fn, v):
-        if type(v) == tuple:
-            return tuple(expandlist(fn(e) for e in v))
-
-        elif type(v) == L:
-            return L(noseq(fn, e) for e in v)
-
-        else:
-            raise self.VisitError
+    def __visit__(self, fn):
+        return L(noseq(fn, e) for e in self)
 
 
-TU = TUnification()
+TU = Unification()
+
+
+@TU.register_visitor(tuple)
+def visit_tuple(fn, value):
+    return tuple(expandlist(fn(e) for e in value))
 
 
 def test_Var():
@@ -164,7 +160,7 @@ def test_visit():
     def f(x):
         return f
 
-    with pytest.raises(U.VisitError):
+    with pytest.raises(VisitError):
         U.visit(f, None)
 
 

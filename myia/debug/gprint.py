@@ -6,7 +6,7 @@ import json
 
 from myia.anf_ir import Graph, ANFNode, Apply, Constant
 from myia.anf_ir_utils import \
-    is_apply, is_constant, is_constant_graph
+    is_apply, is_constant, is_constant_graph, is_special
 from myia.parser import Location
 from myia.prim import ops as primops
 from myia.cconv import NestingAnalyzer, ParentProxy
@@ -257,6 +257,8 @@ class MyiaGraphPrinter(GraphPrinter):
             cl = 'input'
         elif is_constant(node):
             cl = 'constant'
+        elif is_special(node):
+            cl = f'special-{type(node.special).__name__}'
         else:
             cl = 'intermediate'
         if self._class_gen:

@@ -1,8 +1,8 @@
-from myia.anf_ir import Constant, Apply, Parameter, Graph
+from myia.anf_ir import Constant, Apply, Parameter, Graph, Special
 from myia.graph_utils import dfs as _dfs
 from myia.anf_ir_utils import \
     dfs, toposort, accessible_graphs, destroy_disconnected_nodes, \
-    is_apply, is_constant, is_parameter, is_constant_graph, \
+    is_apply, is_constant, is_parameter, is_constant_graph, is_special, \
     succ_incoming, succ_deep, succ_deeper, succ_bidirectional, \
     exclude_from_set, freevars_boundary, replace, isomorphic
 from myia.api import ENV, parse
@@ -239,6 +239,11 @@ def test_helpers():
 
     p = Parameter(g)
     assert is_parameter(p)
+
+    s = Special(1234, g)
+    assert is_special(s)
+    assert is_special(s, int)
+    assert not is_special(s, str)
 
 
 def test_replace():
