@@ -1,11 +1,7 @@
 from types import SimpleNamespace
 
-from myia.prim.py_implementations import (
-    head, tail,
-    setitem as myia_setitem,
-    setattr as myia_setattr
-)
-
+from myia.prim.py_implementations import head, setattr as myia_setattr, \
+    setitem as myia_setitem, tail
 
 from ..test_lang import parse_compare
 

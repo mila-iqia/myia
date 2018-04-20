@@ -1,13 +1,12 @@
 """Implementations for the debug VM."""
 
 
-from typing import Callable
 from copy import copy
+from typing import Callable
 
 from ..utils import Registry
 
 from . import ops as primops
-
 
 implementations: Registry[primops.Primitive, Callable] = Registry()
 register = implementations.register

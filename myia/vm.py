@@ -4,10 +4,10 @@ This VM will directly execute a graph so it should be suitable for
 testing or debugging.  Don't expect stellar performance from this
 implementation.
 """
-from typing import List, Dict, Any, Union, Set, Callable
 from types import FunctionType
+from typing import Any, Callable, Dict, List, Set, Union
 
-from .ir import Graph, ANFNode, Constant, Parameter, Apply, dfs
+from .ir import ANFNode, Apply, Constant, Graph, Parameter, dfs
 from .prim import Primitive, ops as primops
 from .utils import smap
 

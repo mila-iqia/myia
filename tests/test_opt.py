@@ -1,16 +1,11 @@
 
 from myia.api import parse
-from myia.ir import Constant, is_constant, isomorphic
-from myia.opt import \
-    sexp_to_graph, \
-    PatternSubstitutionOptimization as psub, \
-    PatternOptimizerSinglePass, \
-    PatternOptimizerEquilibrium, \
-    pattern_replacer
-from myia.unify import Var, var
-from myia.prim import ops as prim, Primitive
 from myia.cconv import NestingAnalyzer
-
+from myia.ir import Constant, is_constant, isomorphic
+from myia.opt import PatternOptimizerEquilibrium, PatternOptimizerSinglePass, \
+    PatternSubstitutionOptimization as psub, pattern_replacer, sexp_to_graph
+from myia.prim import Primitive, ops as prim
+from myia.unify import Var, var
 
 X = Var('X')
 V = var(is_constant)

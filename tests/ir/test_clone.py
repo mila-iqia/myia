@@ -1,10 +1,11 @@
 
 import pytest
+
 from myia.api import parse
-from myia.graph_utils import dfs
-from myia.ir import Graph, Constant, succ_deeper, succ_incoming, is_constant
-from myia.ir.clone import GraphCloner
 from myia.debug.utils import GraphIndex
+from myia.graph_utils import dfs
+from myia.ir import Constant, Graph, is_constant, succ_deeper, succ_incoming
+from myia.ir.clone import GraphCloner
 from myia.prim import ops as primops
 
 

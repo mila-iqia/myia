@@ -1,7 +1,7 @@
 import pytest
 
-from myia.dtype import (TypeMeta, Type, Bool, Number, Float, UInt, Int,
-                        List, Struct, Tuple, Function)
+from myia.dtype import Bool, Float, Function, Int, List, Number, Struct, \
+    Tuple, Type, TypeMeta, UInt
 
 
 def test_TypeMeta():

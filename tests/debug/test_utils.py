@@ -2,6 +2,7 @@
 
 
 import pytest
+
 from myia.api import parse
 from myia.debug.utils import GraphIndex
 

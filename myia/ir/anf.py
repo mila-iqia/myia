@@ -10,15 +10,14 @@ returning a nested function creates a closure.
 
 """
 
-from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
-                    overload, Iterable)
+from typing import Any, Iterable, List, MutableSequence, Sequence, Set, \
+    Tuple, overload
 
-from ..utils import Named, repr_, list_str
 from ..info import NamedDebugInfo
 from ..prim import ops as primops
+from ..utils import Named, list_str, repr_
 
 from .abstract import Node
-
 
 PARAMETER = Named('PARAMETER')
 SPECIAL = Named('SPECIAL')

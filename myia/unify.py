@@ -1,7 +1,7 @@
 """Unification module."""
 
-from typing import Dict, List, Iterable, Union, Callable, TypeVar, Type, Any
 from functools import reduce
+from typing import Any, Callable, Dict, Iterable, List, Type, TypeVar, Union
 
 from .utils import Registry
 

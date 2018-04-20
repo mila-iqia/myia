@@ -2,8 +2,8 @@
 
 from collections import defaultdict
 
+from ..graph_utils import always_include, dfs
 from ..ir.utils import succ_deeper
-from ..graph_utils import dfs, always_include
 
 from .label import short_labeler
 

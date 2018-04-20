@@ -5,13 +5,13 @@ I.e. retrieving nesting structure and listing free variables.
 """
 
 
-from typing import Dict, Iterable, Optional, Set
 from collections import defaultdict
+from typing import Dict, Iterable, Optional, Set
 
-from .ir.anf import ANFNode, Constant, Graph
-from .ir.utils import \
-    is_constant_graph, succ_deeper, succ_incoming, freevars_boundary
 from .graph_utils import dfs
+from .ir.anf import ANFNode, Constant, Graph
+from .ir.utils import freevars_boundary, is_constant_graph, succ_deeper, \
+    succ_incoming
 from .utils import memoize_method
 
 

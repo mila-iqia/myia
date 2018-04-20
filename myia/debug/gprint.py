@@ -1,19 +1,18 @@
 """Utilities to generate a graphical representation for a graph."""
 
-from hrepr import hrepr
-import os
 import json
+import os
 
-from ..ir import \
-    Graph, ANFNode, Apply, Constant, \
-    is_apply, is_constant, is_constant_graph, is_special
+from hrepr import hrepr
+
+from ..cconv import NestingAnalyzer, ParentProxy
+from ..ir import ANFNode, Apply, Constant, Graph, is_apply, is_constant, \
+    is_constant_graph, is_special
 from ..parser import Location
 from ..prim import ops as primops
-from ..cconv import NestingAnalyzer, ParentProxy
 
-from .label import NodeLabeler, short_relation_symbols, short_labeler
+from .label import NodeLabeler, short_labeler, short_relation_symbols
 from .utils import mixin
-
 
 gcss_path = f'{os.path.dirname(__file__)}/graph.css'
 gcss = open(gcss_path).read()

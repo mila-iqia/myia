@@ -1,12 +1,10 @@
 """Graph optimization routines."""
 
 
-from .ir import \
-    ANFNode, Graph, Apply, Constant, Special, \
-    succ_incoming, freevars_boundary, replace, \
-    is_apply, is_constant, is_parameter
 from .graph_utils import toposort
-from .unify import Var, Unification, VisitError, expandlist
+from .ir import ANFNode, Apply, Constant, Graph, Special, freevars_boundary, \
+    is_apply, is_constant, is_parameter, replace, succ_incoming
+from .unify import Unification, Var, VisitError, expandlist
 
 
 class VarNode(Special):

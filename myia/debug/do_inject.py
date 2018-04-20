@@ -3,5 +3,4 @@
 
 from .inject import inject_suite
 
-
 inject_suite()

@@ -41,16 +41,15 @@ Block
 
 import ast
 import inspect
-import textwrap
 import operator
+import textwrap
 from types import FunctionType
-from typing import \
-    overload, Any, Dict, List, Optional, Tuple, NamedTuple, Iterable
+from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Tuple, \
+    overload
 from weakref import finalize
 
-from .info import DebugInherit, About
-from .ir import \
-    ANFNode, Parameter, Apply, Graph, Constant, \
+from .info import About, DebugInherit
+from .ir import ANFNode, Apply, Constant, Graph, Parameter, \
     destroy_disconnected_nodes
 from .prim import ops as primops
 

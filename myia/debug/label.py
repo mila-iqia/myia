@@ -3,10 +3,8 @@
 
 from ..info import DebugInfo
 from ..ir.anf import Graph
-from ..ir.utils import \
-    is_constant, is_constant_graph, is_parameter, is_special
+from ..ir.utils import is_constant, is_constant_graph, is_parameter, is_special
 from ..prim import Primitive
-
 
 short_relation_symbols = {
     'copy': '',

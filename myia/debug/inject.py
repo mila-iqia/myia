@@ -1,10 +1,12 @@
 """Utility injecting functionality, only use for debugging."""
 
-import sys
 import pdb
-from .buche import buche
-from buche.debug import BucheDb
+import sys
+
 from buche import reader
+from buche.debug import BucheDb
+
+from .buche import buche
 
 
 def bubrk():

@@ -4,9 +4,9 @@ from types import FunctionType
 from typing import Any, Callable, Dict, List
 
 from . import parser
-from .ir import Graph, Constant, ANFNode
-from .vm import VM as VM_
+from .ir import ANFNode, Constant, Graph
 from .prim import implementations, ops as P
+from .vm import VM as VM_
 
 
 def default_object_map() -> Dict[Any, ANFNode]:

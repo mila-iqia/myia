@@ -1,8 +1,8 @@
 """Type representation."""
 
-from typing import Tuple as TupleT, Dict as DictT, Iterable, Any
-from operator import itemgetter
 import collections
+from operator import itemgetter
+from typing import Any, Dict as DictT, Iterable, Tuple as TupleT
 
 KeysT = Iterable[TupleT[str, 'Type']]
 
