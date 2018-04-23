@@ -113,7 +113,7 @@ class TypePlugin(Plugin):
     def on_graph(self, graph: Graph):
         """Return the type of the graph."""
         return Function((self.get_type(p) for p in graph.parameters),
-                        TypeVar(var()))
+                        var())
 
     def on_node(self, node: ANFNode):
         """Compute the type of the node."""
@@ -129,8 +129,12 @@ class TypePlugin(Plugin):
             node_t = self.unify_apply(node, self.analyzer.equiv)
 
             if is_return(node):
+                def w(v):
+                    if isinstance(v, Var):
+                        return TypeVar(v)
+                    return v
                 graph_t = Function((self.get_type(p)
-                                    for p in node.graph.parameters), node_t)
+                                    for p in node.graph.parameters), w(node_t))
                 self.analyzer.graphs[node.graph][self.NAME] = graph_t
             return node_t
 
