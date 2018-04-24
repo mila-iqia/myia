@@ -202,3 +202,18 @@ def test_clone_recursive():
     with pytest.raises(Exception):
         cl2.add_clone(g, target, new_params, False)
         cl2[g.output]
+
+
+def test_clone_unused_parameters():
+    @parse
+    def f(x, y):
+        return y
+
+    cl = GraphCloner(f)
+    f2 = cl[f]
+
+    assert len(f2.parameters) == 2
+    for p1, p2 in zip(f.parameters, f2.parameters):
+        assert p1.graph is f
+        assert p2.graph is f2
+        assert cl[p1] is p2
