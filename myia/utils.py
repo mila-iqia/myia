@@ -161,3 +161,17 @@ class StructuralMap:
 def smap(fn, *args):
     """Map a function recursively over all scalars in a structure."""
     return StructuralMap(fn)(*args)
+
+
+class HierDict(dict):
+    def __init__(self, parent, init_vals=()):
+        self.parent = parent
+        self.update(init_vals)
+
+    def __missing__(self, key):
+        parent = self.parent
+        while parent is not None:
+            if key in parent:
+                return parent[key]
+            parent = getattr(parent, 'parent', None)
+        raise KeyError(key)
