@@ -2,7 +2,7 @@ import pytest
 
 from myia.unify import FilterVar, RestrictedVar, Seq, SVar, Unification, \
     UnificationError, UnionVar, Var, VisitError, expandlist, noseq, svar, \
-    uvar, var
+    uvar, var, PredicateSet
 
 
 class L(list):
@@ -48,13 +48,31 @@ def test_RestrictedVar():
     assert v3.matches(2)
     assert not v1.matches(v3)
     assert v3.matches(v1)
+    v4 = var((3, 4))
+    v1_4 = v1.intersection(v4)
+    assert not v1_4.matches(2)
+    assert v1_4.matches(3)
+    assert not v1_4.matches(4)
     assert str(v1) == v1.tag
+    v5 = var((1, 2))
+    assert v1.intersection(v2) is v1
+    assert v3.intersection(v2) is v2
+    assert v4.intersection(v5) is False
+    assert v5.intersection(Var()) is NotImplemented
     assert repr(v1) == f'RestrictedVar({v1.tag}, (2, 3))'
 
 
 def test_FilterVar():
+
     def floats(v):
         return isinstance(v, float)
+
+    def neg(v):
+        return v < 0
+
+    def large(v):
+        return abs(v) > 1000
+
     v1 = var(floats)
     assert isinstance(v1, Var)
     assert isinstance(v1, FilterVar)
@@ -71,8 +89,21 @@ def test_FilterVar():
     assert not v3.matches(r1)
     assert v3.matches(None)
     assert not v3.matches(3.0)
+    v4 = var(neg)
+    v1_4 = v4.intersection(v1)
+    assert v4.matches(-1)
+    assert not v1_4.matches(-1)
+    assert v1_4.matches(-1.0)
+    assert not v1_4.matches(1.0)
+    v5 = var(large)
+    v1_4_5 = v5.intersection(v4).intersection(v1)
+    assert v1_4_5.matches(-1111.1)
+    assert not v1_4_5.matches(-1111)
+    assert not v1_4_5.matches(1.0)
+    assert v4.intersection(v4) is v4
+    assert v4.intersection(Var()) is NotImplemented
     assert str(v1) == v1.tag
-    assert repr(v1) == f'FilterVar({v1.tag}, {floats!r})'
+    assert repr(v1) == f'FilterVar({v1.tag}, {floats.__name__})'
 
 
 def test_Seq():
@@ -378,6 +409,32 @@ def test_unify():
     assert d[v3] is None
 
     assert TU.unify(None, 0) is None
+
+
+def test_unify_filtervars():
+
+    def floats(v):
+        return isinstance(v, float)
+
+    def neg(v):
+        return v < 0
+
+    vf = var(filter=floats)
+    vn = var(filter=neg)
+
+    d = TU.unify((vf, vn), (vn, vn))
+    assert d
+
+    vfn = d[vf]
+    assert vfn is not vf
+    assert vfn is not vn
+    assert vfn is d[vn]
+    assert isinstance(vfn, FilterVar)
+    assert vfn.filter == PredicateSet(floats, neg)
+
+    assert TU.unify((vf, vn), (vn, -1.0))
+    assert not TU.unify((vf, vn), (vn, -1))
+    assert not TU.unify((vf, vn), (vn, 1))
 
 
 def test_reify():

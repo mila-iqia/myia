@@ -1,7 +1,8 @@
 """Unification module."""
 
 from functools import reduce
-from typing import Any, Callable, Dict, Iterable, List, Type, TypeVar, Union
+from typing import \
+    Any, Callable, Dict, Iterable, List, Set, Type, TypeVar, Union
 
 from .utils import Registry
 
@@ -41,6 +42,20 @@ class Var:
         Note that this relation is transitive, but not associative.
         """
         return True
+
+    def intersection(self, v):
+        """Return the intersection with the given variable.
+
+        Returns:
+            * A variable that matches only the values both self and
+              v match.
+            * `False` if it can be proven that self and v are mutually
+              exclusive.
+            * NotImplemented, in which case one may try
+              `v.intersection(self)`.
+
+        """
+        return NotImplemented
 
     def ensure_tag(self) -> None:
         """Make sure that tag is set."""
@@ -125,9 +140,64 @@ class RestrictedVar(Var):
             return all(v in self.legal_values for v in value.legal_values)
         return value in self.legal_values
 
+    def intersection(self, v):
+        """Return the intersection of two RestrictedVars.
+
+        The resulting variable's legal values are the intersection
+        of self and v's legal values.
+        """
+        if isinstance(v, RestrictedVar):
+            lv = set(self.legal_values)
+            lv2 = set(v.legal_values)
+            common = lv & lv2
+            if common == lv:
+                return self
+            elif common == lv2:
+                return v
+            elif common:
+                return RestrictedVar(common)
+            else:
+                return False
+        else:
+            return NotImplemented
+
     def __repr__(self) -> str:
         self.ensure_tag()
         return f"RestrictedVar({self.tag}, {self.legal_values})"
+
+
+class PredicateSet:
+    """Set of predicates.
+
+    Attributes:
+        predicates: A set of callable predicates.
+
+    """
+
+    def __init__(self, *predicates):
+        """Initialize a PredicateSet."""
+        self.predicates: Set = set()
+        for p in predicates:
+            if isinstance(p, PredicateSet):
+                self.predicates |= p.predicates
+            else:
+                self.predicates.add(p)
+
+    def __eq__(self, v):
+        return isinstance(v, PredicateSet) \
+            and self.predicates == v.predicates
+
+    def __call__(self, x):
+        """Returns the conjunction of all predicates."""
+        return all(p(x) for p in self.predicates)
+
+    def __str__(self):
+        def _str(x):
+            if hasattr(x, '__name__'):
+                return x.__name__
+            else:
+                return str(x)  # pragma: no cover
+        return '&'.join(map(_str, self.predicates))
 
 
 class FilterVar(Var):
@@ -147,9 +217,22 @@ class FilterVar(Var):
             return self.filter == value.filter
         return self.filter(value)
 
+    def intersection(self, v):
+        """Return the intersection of two FilterVars.
+
+        The resulting variable tests that both self and v's filters
+        return true.
+        """
+        if isinstance(v, FilterVar):
+            if self.filter == v.filter:
+                return self
+            return FilterVar(PredicateSet(self.filter, v.filter))
+        else:
+            return NotImplemented
+
     def __repr__(self) -> str:
         self.ensure_tag()
-        return f"FilterVar({self.tag}, {self.filter})"
+        return f"FilterVar({self.tag}, {PredicateSet(self.filter)})"
 
 
 def var(filter: FilterT = None)-> Var:
@@ -371,6 +454,18 @@ class Unification:
 
         if isinstance(v, UnionVar):
             return self.unify_union(v, w, equiv)
+
+        if isinstance(v, Var) and isinstance(w, Var):
+            u = v.intersection(w)
+            if u is NotImplemented:
+                u = w.intersection(v)
+            if u is not NotImplemented:
+                assert isinstance(u, Var)
+                if u is not v:
+                    equiv[v] = u
+                if u is not w:
+                    equiv[w] = u
+                return equiv
 
         if isinstance(w, Var):
             if w.matches(v):
