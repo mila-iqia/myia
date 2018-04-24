@@ -6,6 +6,7 @@ import os
 from hrepr import hrepr
 
 from ..cconv import NestingAnalyzer, ParentProxy
+from ..dtype import Type, Bool, Int, Float, Tuple, List, Function
 from ..info import DebugInfo, About
 from ..ir import ANFNode, Apply, Constant, Graph, is_apply, is_constant, \
     is_constant_graph, is_parameter, is_special, GraphCloner
@@ -15,7 +16,7 @@ from ..opt import \
     PatternOptimizerSinglePass, \
     PatternOptimizerEquilibrium, \
     pattern_replacer
-from ..unify import Var, var
+from ..unify import Var, var, FilterVar
 from ..utils import Registry
 
 from .label import NodeLabeler, short_labeler, short_relation_symbols, \
@@ -499,6 +500,11 @@ class _Graph:
         return gpr.__hrepr__(H, hrepr)
 
 
+#################
+# Node printers #
+#################
+
+
 @mixin(ANFNode)
 class _ANFNode:
     @classmethod
@@ -524,6 +530,11 @@ class _Apply:
                 return hrepr(self.inputs[1])['node-return']
         else:
             return super(Apply, self).__hrepr__(H, hrepr)
+
+
+########
+# Misc #
+########
 
 
 @mixin(Location)
@@ -614,3 +625,92 @@ class _NestingAnalyzer:
                 pr.cynode(dep, lbl(dep), 'intermediate')
                 pr.cyedge(g, dep, '')
         return pr.__hrepr__(H, hrepr)
+
+
+#################
+# Type printers #
+#################
+
+
+@mixin(Type)
+class _Type:
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        return H.style(mcss)
+
+
+@mixin(Bool)
+class _Bool:
+    def __hrepr__(self, H, hrepr):
+        return H.div['myia-type-bool']('b')
+
+
+@mixin(Int)
+class _Int:
+    def __hrepr__(self, H, hrepr):
+        return H.div['myia-type-int'](
+            H.sub(self.bits)
+        )
+
+
+@mixin(Float)
+class _Float:
+    def __hrepr__(self, H, hrepr):
+        return H.div['myia-type-float'](
+            H.sub(self.bits)
+        )
+
+
+@mixin(Tuple)
+class _Tuple:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            self.elements,
+            cls='myia-type-tuple',
+            before='(',
+            after=')'
+        )
+
+
+@mixin(List)
+class _List:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            [self.element_type],
+            cls='myia-type-list',
+            before='[',
+            after=']'
+        )
+
+
+@mixin(Function)
+class _Function:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            list(self.arguments) + [H.span('→'), self.retval],
+            cls='myia-type-function'
+        )
+
+
+################
+# Var printers #
+################
+
+
+@mixin(Var)
+class _Var:
+    def __hrepr__(self, H, hrepr):
+        self.ensure_tag()
+        return H.div['myia-var'](f'{self.tag}')
+
+
+@mixin(FilterVar)
+class _FilterVar:
+    def __hrepr__(self, H, hrepr):
+        if hrepr.config.short_vars:
+            return Var.__hrepr__(self, H, hrepr)
+        else:
+            self.ensure_tag()
+            return H.div['myia-var', 'myia-filter-var'](
+                f'{self.tag}: {self.filter}'
+            )
