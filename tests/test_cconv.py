@@ -1,5 +1,6 @@
 from myia.api import parse
 from myia.cconv import NestingAnalyzer
+from myia.ir.anf import Constant, Graph
 
 
 def _parse_fvspec(fvspec):
@@ -31,7 +32,6 @@ def check_nest(rels, fv_direct, fv_total):
             gfn = parse(fn)
 
             def name(g):
-                from myia.anf_ir import Constant, Graph
                 if isinstance(g, Constant) and isinstance(g.value, Graph):
                     g = g.value
                 gname = g.debug.name

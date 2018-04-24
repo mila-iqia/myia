@@ -1,10 +1,10 @@
 """Utilities for manipulating and inspecting the IR."""
-from typing import Any, Iterable, Callable, Set
 
-from myia.anf_ir import ANFNode, Apply, Constant, Graph, Parameter, Special
-from myia.graph_utils import dfs as _dfs, toposort as _toposort, \
-    FOLLOW, NOFOLLOW, EXCLUDE
+from typing import Any, Callable, Iterable, Set
 
+from ..graph_utils import EXCLUDE, FOLLOW, NOFOLLOW, dfs as _dfs, \
+    toposort as _toposort
+from .anf import ANFNode, Apply, Constant, Graph, Parameter, Special
 
 #######################
 # Successor functions #

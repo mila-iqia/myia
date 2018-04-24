@@ -3,10 +3,10 @@ import operator
 from types import FunctionType
 from typing import Any, Callable, Dict, List
 
-from myia import parser
-from myia.anf_ir import Graph, Constant, ANFNode
-from myia.vm import VM as VM_
-from myia.prim import implementations, ops as P
+from . import parser
+from .ir import ANFNode, Constant, Graph
+from .prim import implementations, ops as P
+from .vm import VM as VM_
 
 
 def default_object_map() -> Dict[Any, ANFNode]:

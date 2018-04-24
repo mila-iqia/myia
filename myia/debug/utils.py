@@ -1,9 +1,11 @@
 """Miscellaneous utilities for debugging."""
 
 from collections import defaultdict
-from myia.debug.label import short_labeler
-from myia.anf_ir_utils import succ_deeper
-from myia.graph_utils import dfs, always_include
+
+from ..graph_utils import always_include, dfs
+from ..ir.utils import succ_deeper
+
+from .label import short_labeler
 
 
 class _Empty:

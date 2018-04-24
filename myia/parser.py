@@ -38,19 +38,20 @@ Block
    33(4), pp.17-20.
 
 """
+
 import ast
 import inspect
-import textwrap
 import operator
+import textwrap
 from types import FunctionType
-from typing import \
-    overload, Any, Dict, List, Optional, Tuple, NamedTuple, Iterable
+from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Tuple, \
+    overload
 from weakref import finalize
 
-from myia.anf_ir import ANFNode, Parameter, Apply, Graph, Constant
-from myia.anf_ir_utils import destroy_disconnected_nodes
-from myia.info import DebugInherit, About
-from myia.prim import ops as primops
+from .info import About, DebugInherit
+from .ir import ANFNode, Apply, Constant, Graph, Parameter, \
+    destroy_disconnected_nodes
+from .prim import ops as primops
 
 
 class Location(NamedTuple):

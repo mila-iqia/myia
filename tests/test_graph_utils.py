@@ -1,7 +1,8 @@
 """Test generic graph utilities."""
 
 import pytest
-from myia.graph_utils import dfs, toposort, FOLLOW, NOFOLLOW, EXCLUDE
+
+from myia.graph_utils import EXCLUDE, FOLLOW, NOFOLLOW, dfs, toposort
 
 
 def _succ(x):

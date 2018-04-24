@@ -1,8 +1,10 @@
 
-from pytest import mark
-from types import SimpleNamespace
-from myia.api import parse, run
 from copy import copy
+from types import SimpleNamespace
+
+from pytest import mark
+
+from myia.api import parse, run
 
 
 def parse_compare(*tests):
