@@ -459,6 +459,8 @@ class Unification:
             u = v.intersection(w)
             if u is NotImplemented:
                 u = w.intersection(v)
+            if u is False:
+                raise UnificationError("Incompatible variables")
             if u is not NotImplemented:
                 assert isinstance(u, Var)
                 if u is not v:

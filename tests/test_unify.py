@@ -411,6 +411,23 @@ def test_unify():
     assert TU.unify(None, 0) is None
 
 
+def test_unify_restrictedvars():
+    v1 = RestrictedVar((1, 2))
+    v2 = RestrictedVar((2, 3))
+    v3 = RestrictedVar((3, 4))
+
+    d = TU.unify((v1, v2), (v2, v1))
+    assert d
+
+    vx = d[v1]
+    assert vx is not v1
+    assert vx is not v2
+    assert vx is d[v2]
+    assert vx.legal_values == (2,)
+
+    assert not TU.unify(v1, v3)
+
+
 def test_unify_filtervars():
 
     def floats(v):
