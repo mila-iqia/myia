@@ -1,10 +1,10 @@
 """Graph optimization routines."""
 
 
-from ..graph_utils import toposort
+from ..graph_utils import dfs, toposort
 from ..ir import ANFNode, Apply, Constant, Graph, Special, \
-    freevars_boundary, is_apply, is_constant, is_parameter, replace, \
-    succ_incoming
+    freevars_boundary, succ_incoming, \
+    is_constant_graph, is_apply, is_constant, is_parameter, replace
 from ..unify import Unification, Var, VisitError, expandlist
 
 
@@ -199,22 +199,33 @@ class PatternOptimizerEquilibrium:
 
     Args:
         single_pass: An optimization pass on a graph.
+        auto_acquire: Whether to process any new graph encountered
+            when processing a graph.
 
     """
 
-    def __init__(self, single_pass):
+    def __init__(self, single_pass, *, auto_acquire=True):
         """Initialize a PatternOptimizerEquilibrium."""
         self.single_pass = single_pass
+        self.auto_acquire = auto_acquire
 
     def __call__(self, *graphs):
         """Apply the pass on all graphs repeatedly until equilibrium."""
+        graphs = set(graphs)  # type: ignore
         any_changes = 0
 
         changes = 1
         while changes:
+            new_graphs = set()
             changes = 0
             for graph in graphs:
-                changes |= self.single_pass(graph)
+                chg = self.single_pass(graph)
+                if chg and self.auto_acquire:
+                    for node in dfs(graph.output, succ_incoming):
+                        if is_constant_graph(node):
+                            new_graphs.add(node.value)
+                changes |= chg
                 any_changes |= changes
+            graphs |= new_graphs  # type: ignore
 
         return any_changes
