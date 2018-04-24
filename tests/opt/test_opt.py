@@ -1,7 +1,8 @@
 
+import pytest
 from myia.api import parse
 from myia.cconv import NestingAnalyzer
-from myia.ir import Constant, is_constant, isomorphic
+from myia.ir import Constant, is_constant, isomorphic, GraphCloner
 from myia.opt import PatternOptimizerEquilibrium, PatternOptimizerSinglePass, \
     PatternSubstitutionOptimization as psub, pattern_replacer, sexp_to_graph
 from myia.prim import Primitive, ops as prim
@@ -70,6 +71,7 @@ add_zero_r = psub(
 
 def _check_opt(before, after, *opts):
     gbefore = parse(before)
+    gbefore = GraphCloner(gbefore, total=True)[gbefore]
     gafter = parse(after)
 
     pass_ = PatternOptimizerSinglePass(opts)
@@ -80,6 +82,21 @@ def _check_opt(before, after, *opts):
         eq(g)
 
     assert isomorphic(gbefore, gafter)
+
+
+def test_checkopt_is_cloning():
+    # checkopt should optimize a copy of the before graph, which means
+    # _check_opt(before, before) can only succeed if no optimizations are
+    # applied.
+
+    def before(x):
+        return R(x)
+
+    _check_opt(before, before)
+
+    with pytest.raises(AssertionError):
+        _check_opt(before, before,
+                   elim_R)
 
 
 def test_sexp_conversion():
