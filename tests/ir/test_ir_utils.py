@@ -102,6 +102,12 @@ def test_dfs_variants():
 
 
 def test_disconnect():
+    def exclude_ct_uses(x):
+        if is_constant_graph(x) or x.graph is not None:
+            return 'follow'
+        else:
+            return 'nofollow'
+
     def f(x):
         a = x * x
         _b = a + x  # Not connected to any output # noqa
@@ -120,12 +126,16 @@ def test_disconnect():
     live = _name_nodes(_dfs(g.return_, succ_deep))
     assert live == set('x a mul c return . g d y'.split())
 
-    total = _name_nodes(_dfs(g.return_, succ_bidirectional(cov)))
+    total = _name_nodes(_dfs(g.return_,
+                             succ_bidirectional(cov),
+                             exclude_ct_uses))
     assert total == set('x a mul c return . g d y _b add'.split())
 
     destroy_disconnected_nodes(g)
 
-    total2 = _name_nodes(_dfs(g.return_, succ_bidirectional(cov)))
+    total2 = _name_nodes(_dfs(g.return_,
+                              succ_bidirectional(cov),
+                              exclude_ct_uses))
     assert total2 == live
 
 
