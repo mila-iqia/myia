@@ -9,15 +9,18 @@ implicitly creates a nested function. Functions are first-class objects, so
 returning a nested function creates a closure.
 
 """
-from typing import (List, Set, Tuple, Any, Sequence, MutableSequence,
-                    overload, Iterable, Union, Dict)
 
-from myia.ir import Node
-from myia.utils import Named, repr_, list_str
-from myia.info import NamedDebugInfo
-from myia.prim import Primitive, ops as primops
+from typing import Any, Iterable, List, MutableSequence, Sequence, Set, \
+    Tuple, overload, Union, Dict
+
+from ..info import NamedDebugInfo
+from ..prim import ops as primops, Primitive
+from ..utils import Named, list_str, repr_
+
+from .abstract import Node
 
 PARAMETER = Named('PARAMETER')
+SPECIAL = Named('SPECIAL')
 APPLY = Named('APPLY')
 
 LITERALS = (bool, int, str, float)
@@ -331,3 +334,28 @@ class Constant(ANFNode):
 
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, value=self.value)
+
+
+class Special(ANFNode):
+    """A special node.
+
+    This is generally not a legal node in a graph, but may be needed by special
+    purpose algorithms, e.g. to hold a Var when performing unification on
+    graphs.
+
+    Attributes:
+        special: Some object that this node is wrapping.
+
+    """
+
+    def __init__(self, special: Any, graph: Graph) -> None:
+        """Initialize a special node."""
+        super().__init__([], SPECIAL, graph)
+        self.special = special
+
+    def __str__(self) -> str:
+        return str(self.special)  # pragma: no cover
+
+    def __repr__(self) -> str:
+        return repr_(self, name=self.debug.debug_name, special=self.special) \
+            # pragma: no cover

@@ -1,11 +1,10 @@
 """Utilities to generate or map labels for nodes and graphs."""
 
 
-from myia.info import DebugInfo
-from myia.anf_ir import Graph
-from myia.anf_ir_utils import is_constant, is_constant_graph, is_parameter
-from myia.prim import Primitive
-
+from ..info import DebugInfo
+from ..ir.anf import Graph
+from ..ir.utils import is_constant, is_constant_graph, is_parameter, is_special
+from ..prim import Primitive
 
 short_relation_symbols = {
     'copy': '',
@@ -83,6 +82,8 @@ class NodeLabeler:
             else:
                 class_name = v.__class__.__name__
                 return f'{self.label(node.debug, True)}:{class_name}'
+        elif is_special(node):
+            return f'{node.special}'
         elif is_parameter(node):
             return self.label(node.debug, True)
         else:

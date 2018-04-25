@@ -1,10 +1,10 @@
 """Utilities for manipulating and inspecting the IR."""
-from typing import Any, Iterable, Callable, Set
 
-from myia.anf_ir import ANFNode, Apply, Constant, Graph, Parameter
-from myia.graph_utils import dfs as _dfs, toposort as _toposort, \
-    FOLLOW, NOFOLLOW, EXCLUDE
+from typing import Any, Callable, Iterable, Set
 
+from ..graph_utils import EXCLUDE, FOLLOW, NOFOLLOW, dfs as _dfs, \
+    toposort as _toposort
+from .anf import ANFNode, Apply, Constant, Graph, Parameter, Special
 
 #######################
 # Successor functions #
@@ -258,3 +258,8 @@ def is_constant(x: ANFNode, cls: Any = object) -> bool:
 def is_constant_graph(x: ANFNode) -> bool:
     """Return whether x is a Constant with a Graph value."""
     return is_constant(x, Graph)
+
+
+def is_special(x: ANFNode, cls: Any = object) -> bool:
+    """Return whether x is a Special, with value of given cls."""
+    return isinstance(x, Special) and isinstance(x.special, cls)

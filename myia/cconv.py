@@ -5,14 +5,14 @@ I.e. retrieving nesting structure and listing free variables.
 """
 
 
-from typing import Dict, Iterable, Optional, Set
 from collections import defaultdict
+from typing import Dict, Iterable, Optional, Set
 
-from myia.anf_ir import ANFNode, Constant, Graph
-from myia.anf_ir_utils import \
-    is_constant_graph, succ_deeper, succ_incoming, freevars_boundary
-from myia.graph_utils import dfs
-from myia.utils import memoize_method
+from .graph_utils import dfs
+from .ir.anf import ANFNode, Constant, Graph
+from .ir.utils import freevars_boundary, is_constant_graph, succ_deeper, \
+    succ_incoming
+from .utils import memoize_method
 
 
 class ParentProxy:

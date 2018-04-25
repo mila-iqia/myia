@@ -1,11 +1,10 @@
 """Objects and routines to track debug information."""
 
-from typing import Any, NamedTuple
-import types
 import threading
 import traceback
+import types
 import weakref
-
+from typing import Any, NamedTuple
 
 # We use per-thread storage for the about stack.
 _about = threading.local()

@@ -1,12 +1,13 @@
 """Implementations for the debug VM."""
 
 
-from typing import Callable
-from types import FunctionType
 from copy import copy
-from . import ops as primops
-from myia.utils import Registry, smap
+from types import FunctionType
+from typing import Callable
 
+from ..utils import Registry, smap
+
+from . import ops as primops
 
 implementations: Registry[primops.Primitive, Callable] = Registry()
 register = implementations.register
@@ -185,17 +186,17 @@ def J(x):
     output and a backpropagator. On structured data, this applies `J`
     recursively on each element. On scalars, this is a no-op.
     """
-    from myia.grad_implementations import augmented_graphs
-    from myia.anf_ir import Graph
-    from myia.grad import grad
-    from myia.vm import VMFrame
+    from ..grad_implementations import augmented_graphs
+    from ..ir.anf import Graph
+    from ..grad import grad
+    from ..vm import VMFrame
 
     if isinstance(x, primops.Primitive):
         return augmented_graphs[x]
     elif isinstance(x, Graph):
         return grad(x)
     elif isinstance(x, FunctionType):
-        from myia.api import parse, compile
+        from ..api import parse, compile
         g = parse(x)
         return compile(grad(g))
     elif isinstance(x, VMFrame.Closure):
@@ -216,8 +217,8 @@ def Jinv(x):
 
     This is the inverse of `J`: `Jinv(J(x)) == x`.
     """
-    from myia.vm import VMFrame
-    from myia.anf_ir import Graph
+    from ..ir.anf import Graph
+    from ..vm import VMFrame
     if isinstance(x, (int, float)):
         return x
     elif isinstance(x, tuple):
@@ -268,8 +269,8 @@ ZERO = Zero()
 @register(primops.zeros_like)
 def zeros_like(x):
     """Implement `zeros_like`."""
-    from myia.vm import VMFrame
-    from myia.anf_ir import Graph
+    from ..ir.anf import Graph
+    from ..vm import VMFrame
 
     def zero(x):
         if isinstance(x, VMFrame.Closure) or x is ZERO:

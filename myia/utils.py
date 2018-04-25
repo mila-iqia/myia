@@ -1,8 +1,7 @@
 """General utilities and design patterns."""
 
-from typing import Any, List, Dict, TypeVar
 from collections import defaultdict
-
+from typing import Any, Dict, List, TypeVar
 
 T1 = TypeVar('T1')
 T2 = TypeVar('T2')

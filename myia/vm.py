@@ -4,13 +4,12 @@ This VM will directly execute a graph so it should be suitable for
 testing or debugging.  Don't expect stellar performance from this
 implementation.
 """
-from typing import List, Dict, Any, Union, Set, Callable
 from types import FunctionType
+from typing import Any, Callable, Dict, List, Set, Union
 
-from myia.anf_ir import Graph, ANFNode, Constant, Parameter, Apply
-from myia.anf_ir_utils import dfs
-from myia.utils import smap
-from myia.prim import Primitive, ops as primops
+from .ir import ANFNode, Apply, Constant, Graph, Parameter, dfs
+from .prim import Primitive, ops as primops
+from .utils import smap
 
 
 class CallableClosure:
@@ -40,7 +39,7 @@ class VM:
     def convert_value(self, value):
         """Translate the value to a format that the VM understands."""
         if isinstance(value, FunctionType):
-            from myia.api import parse
+            from .api import parse
             return parse(value)
         elif isinstance(value, CallableClosure):
             return value.closure

@@ -1,15 +1,15 @@
 """Generate the gradient graph (augmented graph)."""
 
 
-from typing import Set, Dict, Tuple, List
 from collections import defaultdict
 from functools import reduce
-from myia.anf_ir import Apply, Constant, Graph, ANFNode
-from myia.info import About
-from myia.prim import ops as primops
-from myia.anf_ir_utils import \
+from typing import Set, Dict, Tuple, List
+
+from .cconv import NestingAnalyzer
+from .info import About
+from .ir import Apply, Constant, Graph, ANFNode, \
     is_apply, is_constant, is_constant_graph
-from myia.cconv import NestingAnalyzer
+from .prim import ops as primops
 
 
 add = Constant(primops.add)
