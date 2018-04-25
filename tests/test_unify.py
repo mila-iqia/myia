@@ -58,7 +58,7 @@ def test_RestrictedVar():
     assert v1.intersection(v2) is v1
     assert v3.intersection(v2) is v2
     assert v4.intersection(v5) is False
-    assert v5.intersection(Var()) is NotImplemented
+    assert v5.intersection(var()) is NotImplemented
     assert repr(v1) == f'RestrictedVar({v1.tag}, (2, 3))'
 
 
@@ -101,7 +101,7 @@ def test_FilterVar():
     assert not v1_4_5.matches(-1111)
     assert not v1_4_5.matches(1.0)
     assert v4.intersection(v4) is v4
-    assert v4.intersection(Var()) is NotImplemented
+    assert v4.intersection(var()) is NotImplemented
     assert str(v1) == v1.tag
     assert repr(v1) == f'FilterVar({v1.tag}, {floats.__name__})'
 
