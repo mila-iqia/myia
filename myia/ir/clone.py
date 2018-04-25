@@ -2,7 +2,6 @@
 
 from typing import Any, Dict, Iterable, Set, Union, cast
 
-from ..cconv import NestingAnalyzer
 from ..graph_utils import dfs
 from ..info import About
 from ..utils import smap
@@ -130,6 +129,7 @@ class GraphCloner:
                 likely inlining into target_graph, and you don't want
                 to set the output in this case).
         """
+        from ..cconv import NestingAnalyzer
         nest = NestingAnalyzer(graph)
         nested_graphs = nest.scopes()[graph]
         for g in nested_graphs:

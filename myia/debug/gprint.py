@@ -6,19 +6,39 @@ import os
 from hrepr import hrepr
 
 from ..cconv import NestingAnalyzer, ParentProxy
+from ..dtype import Type, Bool, Int, Float, Tuple, List, Function
+from ..info import DebugInfo, About
 from ..ir import ANFNode, Apply, Constant, Graph, is_apply, is_constant, \
-    is_constant_graph, is_special
+    is_constant_graph, is_parameter, is_special, GraphCloner
 from ..parser import Location
 from ..prim import ops as primops
+from ..opt import \
+    PatternOptimizerSinglePass, \
+    PatternOptimizerEquilibrium, \
+    pattern_replacer
+from ..unify import Var, var, FilterVar
+from ..utils import Registry
 
-from .label import NodeLabeler, short_labeler, short_relation_symbols
+from .label import NodeLabeler, short_labeler, short_relation_symbols, \
+    CosmeticPrimitive
 from .utils import mixin
+
 
 gcss_path = f'{os.path.dirname(__file__)}/graph.css'
 gcss = open(gcss_path).read()
 
 mcss_path = f'{os.path.dirname(__file__)}/myia.css'
 mcss = open(mcss_path).read()
+
+
+def _has_error(dbg):
+    # Whether an error occurred somewhere in a DebugInfo
+    if dbg.errors:
+        return True
+    elif dbg.about:
+        return _has_error(dbg.about.debug)
+    else:
+        return False
 
 
 class GraphPrinter:
@@ -133,7 +153,8 @@ class MyiaGraphPrinter(GraphPrinter):
                  follow_references=False,
                  tooltip_gen=None,
                  class_gen=None,
-                 extra_style=None):
+                 extra_style=None,
+                 beautify=True):
         """Initialize a MyiaGraphPrinter."""
         super().__init__(
             {
@@ -146,7 +167,16 @@ class MyiaGraphPrinter(GraphPrinter):
             extra_style=extra_style
         )
         # Graphs left to process
-        self.graphs = set(entry_points)
+        if beautify:
+            self.graphs = set()
+            self.focus = set()
+            for g in entry_points:
+                self._import_graph(g)
+        else:
+            self.graphs = set(entry_points)
+            self.focus = set(self.graphs)
+
+        self.beautify = beautify
         self.duplicate_constants = duplicate_constants
         self.duplicate_free_variables = duplicate_free_variables
         self.function_in_node = function_in_node
@@ -164,12 +194,20 @@ class MyiaGraphPrinter(GraphPrinter):
         self.returns = set()
         # IDs for duplicated constants
         self.currid = 0
-        # Custom rules for nodes that represent certain calls
-        self.custom_rules = {
-            'return': self.process_node_return,
-            'getitem': self.process_node_getitem,
-            'make_tuple': self.process_node_make_tuple
-        }
+
+    def _import_graph(self, graph):
+        nest = NestingAnalyzer(graph)
+        graphs = set()
+        parents = nest.parents()
+        g = graph
+        clone = GraphCloner(total=True)
+        while g:
+            clone.add_clone(g)
+            graphs.add(g)
+            g = parents[g]
+
+        self.graphs |= {clone[g] for g in graphs}
+        self.focus.add(clone[graph])
 
     def name(self, x):
         """Return the name of a node."""
@@ -192,40 +230,14 @@ class MyiaGraphPrinter(GraphPrinter):
         """Create a node for a graph."""
         if g in self.processed:
             return
+        if self.beautify:
+            g = cosmetic_transformer(g)
         name = self.name(g)
         argnames = [self.name(p) for p in g.parameters]
         lbl = f'{name}({", ".join(argnames)})'
-        self.cynode(id=g, label=lbl, classes='function')
+        classes = ['function', 'focus' if g in self.focus else '']
+        self.cynode(id=g, label=lbl, classes=' '.join(classes))
         self.processed.add(g)
-
-    def process_node_return(self, node, g, cl):
-        """Create node and edges for `return ...`."""
-        self.cynode(id=node, label='', parent=g, classes='const_output')
-        ret = node.inputs[1]
-        self.process_edges([(node, '', ret)])
-
-    def process_node_getitem(self, node, g, cl):
-        """Create node and edges for `x[ct]`."""
-        idx = node.inputs[2]
-        if self.function_in_node and is_constant(idx):
-            lbl = self.label(node, '')
-            self.cynode(id=node, label=lbl, parent=g, classes=cl)
-            self.process_edges([(node,
-                                 (f'[{idx.value}]', 'fn-edge'),
-                                 node.inputs[1])])
-        else:
-            self.process_node_generic(node, g, cl)
-
-    def process_node_make_tuple(self, node, g, cl):
-        """Create node and edges for `(a, b, c, ...)`."""
-        if self.function_in_node:
-            lbl = self.label(node, f'(...)')
-            self.cynode(id=node, label=lbl, parent=g, classes=cl)
-            edges = [(node, i + 1, inp)
-                     for i, inp in enumerate(node.inputs[1:]) or []]
-            self.process_edges(edges)
-        else:
-            return self.process_node_generic(node, g, cl)
 
     def process_node_generic(self, node, g, cl):
         """Create node and edges for a node."""
@@ -253,14 +265,18 @@ class MyiaGraphPrinter(GraphPrinter):
             pass
         elif node in self.returns:
             cl = 'output'
-        elif g and node in g.parameters:
+        elif is_parameter(node):
             cl = 'input'
+            if node not in g.parameters:
+                cl += ' unlisted'
         elif is_constant(node):
             cl = 'constant'
         elif is_special(node):
             cl = f'special-{type(node.special).__name__}'
         else:
             cl = 'intermediate'
+        if _has_error(node.debug):
+            cl += ' error'
         if self._class_gen:
             return self._class_gen(node, cl)
         else:
@@ -274,11 +290,15 @@ class MyiaGraphPrinter(GraphPrinter):
         g = node.graph
         self.follow(node)
         cl = self.class_gen(node)
+        if g and g not in self.processed:
+            self.add_graph(g)
 
-        ctfn = self.const_fn(node)
-        if ctfn:
-            if ctfn in self.custom_rules:
-                self.custom_rules[ctfn](node, g, cl)
+        if node.inputs and is_constant(node.inputs[0]):
+            fn = node.inputs[0].value
+            if fn in cosmetics:
+                cosmetics[fn](self, node, g, cl)
+            elif hasattr(fn, 'graph_display'):
+                fn.graph_display(self, node, g, cl)
             else:
                 self.process_node_generic(node, g, cl)
         else:
@@ -306,7 +326,7 @@ class MyiaGraphPrinter(GraphPrinter):
                 cid = self.fresh_id()
                 self.cynode(id=cid,
                             parent=src.graph,
-                            label=self.name(dest),
+                            label=self.labeler.label(dest, force=True),
                             classes=self.class_gen(dest, 'freevar'),
                             node=dest)
                 self.cyedge(src_id=src, dest_id=cid, label=lbl)
@@ -350,6 +370,102 @@ class MyiaGraphPrinter(GraphPrinter):
             self.graphs.add(node.value)
 
 
+cosmetics = Registry()
+
+
+@cosmetics.register(primops.return_)
+def _cosmetic_node_return(self, node, g, cl):
+    """Create node and edges for `return ...`."""
+    self.cynode(id=node, label='', parent=g, classes='const_output')
+    ret = node.inputs[1]
+    self.process_edges([(node, '', ret)])
+
+
+class GraphCosmeticPrimitive(CosmeticPrimitive):
+    """Cosmetic primitive that prints pretty in graphs.
+
+    Attributes:
+        on_edge: Whether to display the label on the edge.
+
+    """
+
+    def __init__(self, label, on_edge=False):
+        """Initialize a GraphCosmeticPrimitive."""
+        super().__init__(label)
+        self.on_edge = on_edge
+
+    def graph_display(self, gprint, node, g, cl):
+        """Display a node in cytoscape graph."""
+        if gprint.function_in_node and self.on_edge:
+            lbl = gprint.label(node, '')
+            gprint.cynode(id=node, label=lbl, parent=g, classes=cl)
+            gprint.process_edges([(node,
+                                   (self.label, 'fn-edge'),
+                                   node.inputs[1])])
+        else:
+            gprint.process_node_generic(node, g, cl)
+
+
+make_tuple = GraphCosmeticPrimitive('(...)')
+
+
+X = Var('X')
+Y = Var('Y')
+V = var(is_constant)
+L = var(is_constant_graph)
+
+
+@pattern_replacer(primops.cons_tuple, X, Y)
+def _opt_accum_cons(node, equiv):
+    x = equiv[X]
+    y = equiv[Y]
+    args = [Constant(make_tuple), x]
+    while isinstance(y, Apply):
+        if y.inputs[0].value is primops.cons_tuple:
+            args.append(y.inputs[1])
+            y = y.inputs[2]
+        elif y.inputs[0].value is make_tuple:
+            args += y.inputs[1:]
+            y = Constant(())
+            break
+        else:
+            break
+
+    if is_constant(y) and isinstance(y.value, tuple):
+        args += [Constant(xx) for xx in y.value]
+        with About(node.debug, 'cosmetic'):
+            return Apply(args, node.graph)
+    else:
+        return node
+
+
+@pattern_replacer(primops.getitem, X, V)
+def _opt_fancy_getitem(node, equiv):
+    x = equiv[X]
+    v = equiv[V]
+    ct = Constant(GraphCosmeticPrimitive(f'[{int(v.value)}]', on_edge=True))
+    with About(node.debug, 'cosmetic'):
+        return Apply([ct, x], node.graph)
+
+
+def cosmetic_transformer(g):
+    """Transform a graph so that it looks nicer.
+
+    The resulting graph is not a valid one to run, because it may contain nodes
+    with fake functions that only serve a cosmetic purpose.
+    """
+    opts = [
+        _opt_accum_cons,
+        _opt_fancy_getitem,
+    ]
+
+    pass_ = PatternOptimizerSinglePass(opts)
+    opt = PatternOptimizerEquilibrium(pass_)
+    opt(g)
+
+    return g
+
+
 @mixin(Graph)
 class _Graph:
     @classmethod
@@ -368,6 +484,7 @@ class _Graph:
         tgen = hrepr.config.node_tooltip
         cgen = hrepr.config.node_class
         xsty = hrepr.config.graph_style
+        beau = hrepr.config.graph_beautify
         gpr = MyiaGraphPrinter(
             {self},
             duplicate_constants=True if dc is None else dc,
@@ -376,10 +493,16 @@ class _Graph:
             follow_references=True if fr is None else fr,
             tooltip_gen=tgen,
             class_gen=cgen,
-            extra_style=xsty
+            extra_style=xsty,
+            beautify=True if beau is None else beau
         )
         gpr.process()
         return gpr.__hrepr__(H, hrepr)
+
+
+#################
+# Node printers #
+#################
 
 
 @mixin(ANFNode)
@@ -401,9 +524,17 @@ class _Apply:
         if len(self.inputs) == 2 and \
                 isinstance(self.inputs[0], Constant) and \
                 self.inputs[0].value is primops.return_:
-            return hrepr.hrepr_nowrap(self.inputs[1])['node-return']
+            if hasattr(hrepr, 'hrepr_nowrap'):
+                return hrepr.hrepr_nowrap(self.inputs[1])['node-return']
+            else:
+                return hrepr(self.inputs[1])['node-return']
         else:
             return super(Apply, self).__hrepr__(H, hrepr)
+
+
+########
+# Misc #
+########
 
 
 @mixin(Location)
@@ -412,13 +543,43 @@ class _Location:
         return H.div(
             H.style('.hljs, .hljs-linenos { font-size: 10px !IMPORTANT; }'),
             H.codeSnippet(
-                src=self.url,
+                src=self.filename,
                 language="python",
                 line=self.line,
                 column=self.column + 1,
                 context=hrepr.config.snippet_context or 4
             )
         )
+
+
+@mixin(DebugInfo)
+class _DebugInfo:
+    def __hrepr__(self, H, hrepr):
+        exclude = {'save_trace', 'about'}
+
+        def mkdict(info):
+            d = {k: v for k, v in info.__dict__.items()
+                 if not k.startswith('_') and k not in exclude}
+            tr = d.get('trace', None)
+            if tr:
+                fr = tr[-3]
+                d['trace'] = Location(fr.filename, fr.lineno, 0)
+            d['name'] = short_labeler.label(info)
+            return d
+
+        tabs = []
+        info = self
+        while getattr(info, 'about', None):
+            tabs.append((info, info.about.relation))
+            info = info.about.debug
+        tabs.append((info, 'initial'))
+
+        rval = H.tabbedView()
+        for info, rel in tabs:
+            pane = hrepr(mkdict(info))
+            rval = rval(H.view(H.tab(rel), H.pane(pane)))
+
+        return rval
 
 
 @mixin(NestingAnalyzer)
@@ -464,3 +625,92 @@ class _NestingAnalyzer:
                 pr.cynode(dep, lbl(dep), 'intermediate')
                 pr.cyedge(g, dep, '')
         return pr.__hrepr__(H, hrepr)
+
+
+#################
+# Type printers #
+#################
+
+
+@mixin(Type)
+class _Type:
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        return H.style(mcss)
+
+
+@mixin(Bool)
+class _Bool:
+    def __hrepr__(self, H, hrepr):
+        return H.div['myia-type-bool']('b')
+
+
+@mixin(Int)
+class _Int:
+    def __hrepr__(self, H, hrepr):
+        return H.div['myia-type-int'](
+            H.sub(self.bits)
+        )
+
+
+@mixin(Float)
+class _Float:
+    def __hrepr__(self, H, hrepr):
+        return H.div['myia-type-float'](
+            H.sub(self.bits)
+        )
+
+
+@mixin(Tuple)
+class _Tuple:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            self.elements,
+            cls='myia-type-tuple',
+            before='(',
+            after=')'
+        )
+
+
+@mixin(List)
+class _List:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            [self.element_type],
+            cls='myia-type-list',
+            before='[',
+            after=']'
+        )
+
+
+@mixin(Function)
+class _Function:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            list(self.arguments) + [H.span('→'), self.retval],
+            cls='myia-type-function'
+        )
+
+
+################
+# Var printers #
+################
+
+
+@mixin(Var)
+class _Var:
+    def __hrepr__(self, H, hrepr):
+        self.ensure_tag()
+        return H.div['myia-var'](f'{self.tag}')
+
+
+@mixin(FilterVar)
+class _FilterVar:
+    def __hrepr__(self, H, hrepr):
+        if hrepr.config.short_vars:
+            return Var.__hrepr__(self, H, hrepr)
+        else:
+            self.ensure_tag()
+            return H.div['myia-var', 'myia-filter-var'](
+                f'{self.tag}: {self.filter}'
+            )
