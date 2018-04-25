@@ -15,6 +15,7 @@ from typing import Any, Iterable, List, MutableSequence, Sequence, Set, \
 
 from ..info import NamedDebugInfo
 from ..prim import ops as primops
+from ..unify import expandlist, noseq
 from ..utils import Named, list_str, repr_
 
 from .abstract import Node
@@ -282,6 +283,11 @@ class Apply(ANFNode):
         """Construct an application."""
         super().__init__(inputs, APPLY, graph)
 
+    def __visit__(self, fn):
+        new_inputs = expandlist(map(fn, self.inputs))
+        g = noseq(fn, self.graph)
+        return Apply(new_inputs, g)  # type: ignore
+
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, inputs=self.inputs,
                      graph=self.graph)
@@ -299,6 +305,17 @@ class Parameter(ANFNode):
     def __init__(self, graph: Graph) -> None:
         """Construct the parameter."""
         super().__init__([], PARAMETER, graph)
+
+    def __visit__(self, fn):
+        g = noseq(fn, self.graph)
+        if not isinstance(g, Graph) or g is not self.graph:
+            # Note: this condition will be triggered if e.g. there is a
+            # Parameter in a pattern to reify. It's not clear what that's
+            # supposed to mean unless the Parameter already exists in a
+            # concrete graph, so we raise an Exception just in case.
+            raise Exception('Unification cannot create new Parameters.') \
+                # pragma: no cover
+        return self
 
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, graph=self.graph)
@@ -321,6 +338,9 @@ class Constant(ANFNode):
     def __init__(self, value: Any) -> None:
         """Construct a literal."""
         super().__init__([], value, None)
+
+    def __visit__(self, fn):
+        return Constant(noseq(fn, self.value))
 
     def __str__(self) -> str:
         if isinstance(self.value, LITERALS):
