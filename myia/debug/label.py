@@ -15,7 +15,8 @@ short_relation_symbols = {
     'if_after': '↓',
     'while_header': '⤾',
     'while_body': '⥁',
-    'while_after': '↓'
+    'while_after': '↓',
+    'specialized': '+'
 }
 
 

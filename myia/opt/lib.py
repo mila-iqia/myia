@@ -1,6 +1,6 @@
 """Library of optimizations."""
 
-from ..ir import \
+from ..ir import replace, \
     Graph, Constant, is_constant, is_constant_graph, GraphCloner
 from ..unify import Var, var, SVar
 from ..prim import ops as P, Primitive
@@ -33,6 +33,7 @@ G = var(is_constant_graph)
 NIL = var(lambda x: is_constant(x) and x.value == ())
 
 Xs = SVar(Var())
+Ys = SVar(Var())
 Cs = SVar(var(is_constant))
 
 
@@ -225,3 +226,40 @@ def make_inliner(inline_criterion, check_recursive):
 
 
 inline = make_inliner(inline_criterion=None, check_recursive=True)
+
+
+##################
+# Specialization #
+##################
+
+def make_specializer(specialize_criterion):
+    """Create an specializer.
+
+    Args:
+        specialize_criterion: A function that takes a node and returns
+            whether to specialize on it or not.
+    """
+    @pattern_replacer(G, Xs)
+    def specialize(node, equiv):
+        g = equiv[G].value
+        xs = equiv[Xs]
+
+        specialize = [specialize_criterion(x) for x in xs]
+        if not any(specialize):
+            return node
+
+        g2 = GraphCloner(g, relation='specialized')[g]
+        for x, p, s in zip(xs, g2.parameters, specialize):
+            if s:
+                replace(p, x)
+
+        g2.parameters = [p for s, p in zip(specialize, g2.parameters)
+                         if not s]
+        new_xs = [x for s, x in zip(specialize, xs) if not s]
+
+        return sexp_to_node((g2, *new_xs), node.graph)
+
+    return specialize
+
+
+specialize = make_specializer(specialize_criterion=is_constant)
