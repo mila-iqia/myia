@@ -3,7 +3,7 @@ import pytest
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim import ops
-from myia.prim.py_implementations import head, tail, setitem
+from myia.prim.py_implementations import head, tail, setitem, add, mul
 
 
 #######################
@@ -415,3 +415,47 @@ def test_inline_criterion():
 
     _check_opt(before, after,
                inline_binary)
+
+
+##################
+# Specialization #
+##################
+
+
+def test_specialize():
+
+    def before_helper(x, y):
+        return x * y
+
+    def before(x, y):
+        return before_helper(x, 3) + before_helper(7, y)
+
+    def after_helper_1(x):
+        return x * 3
+
+    def after_helper_2(y):
+        return 7 * y
+
+    def after(x, y):
+        return after_helper_1(x) + after_helper_2(y)
+
+    _check_opt(before, after,
+               lib.specialize)
+
+
+def test_specialize_2():
+
+    def before_helper(f, x, y):
+        return f(x, y) + f(y, x)
+
+    def before(x, y):
+        return before_helper(mul, x, y)
+
+    def after_helper(x, y):
+        return (x * y) + (y * x)
+
+    def after(x, y):
+        return after_helper(x, y)
+
+    _check_opt(before, after,
+               lib.specialize)
