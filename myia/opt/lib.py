@@ -263,3 +263,49 @@ def make_specializer(specialize_criterion):
 
 
 specialize = make_specializer(specialize_criterion=is_constant)
+
+
+##########################
+# Drop calls into graphs #
+##########################
+
+
+@pattern_replacer((G, Xs), Ys)
+def drop_into_call(node, equiv):
+    """Drop a call into the graph that returns the function.
+
+    g(x)(y) => g2(x, y)
+
+    Where g2 is a modified copy of g that incorporates the call on y.
+    """
+    g = equiv[G].value
+    g2 = GraphCloner(g)[g]
+
+    xs = equiv[Xs]
+    ys = equiv[Ys]
+
+    new_output = (g2.output, *ys)
+
+    replace(g2.output, Constant('DUMMY'))
+    replace(g2.output, sexp_to_node(new_output, g2))
+
+    return sexp_to_node((g2, *xs), node.graph)
+
+
+@pattern_replacer((P.if_, X, Y, Z), Xs)
+def drop_into_if(node, equiv):
+    """Drop a call on the result of if into both branches.
+
+    f(if(x, y, z)) => if(x, () -> f(y()), () -> f(z()))
+    """
+    y = equiv[Y]
+    z = equiv[Z]
+
+    y2 = Graph()
+    y2.output = sexp_to_node(((y,), *equiv[Xs]), y2)
+
+    z2 = Graph()
+    z2.output = sexp_to_node(((z,), *equiv[Xs]), z2)
+
+    new = (P.if_, equiv[X], y2, z2)
+    return sexp_to_node(new, node.graph)
