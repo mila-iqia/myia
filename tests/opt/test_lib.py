@@ -459,3 +459,58 @@ def test_specialize_2():
 
     _check_opt(before, after,
                lib.specialize)
+
+
+##################
+# Drop call into #
+##################
+
+
+def test_drop_into():
+    def b_help(q):
+        def subf(z):
+            return q * z
+        return subf
+
+    def before(x, y):
+        return b_help(x)(y)
+
+    def after(x, y):
+        def a_help(q):
+            def subf(z):
+                return q * z
+            return subf(y)
+        return a_help(x)
+
+    _check_opt(before, after,
+               lib.drop_into_call)
+
+
+def test_drop_into_if():
+
+    def before_helper(x):
+        if x < 0:
+            return mul
+        else:
+            return add
+
+    def before(x, y, z):
+        return before_helper(x)(y, z)
+
+    def after(x, y, z):
+        def after_helper(x):
+            def tb():
+                return y * z
+
+            def fb():
+                return y + z
+
+            if x < 0:
+                return tb()
+            else:
+                return fb()
+
+        return after_helper(x)
+
+    _check_opt(before, after,
+               lib.drop_into_call, lib.drop_into_if)
