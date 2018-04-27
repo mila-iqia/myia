@@ -2,12 +2,11 @@
 
 from typing import Any, Dict, Iterable, Set, Union, cast
 
-from ..cconv import NestingAnalyzer
 from ..graph_utils import dfs
 from ..info import About
 from ..utils import smap
 
-from .anf import ANFNode, Apply, Constant, Graph, Parameter
+from .anf import ANFNode, Apply, Constant, Graph
 from .utils import exclude_from_set, is_constant, is_parameter, succ_incoming
 
 #################
@@ -91,6 +90,10 @@ class GraphCloner:
             with About(graph.debug, self.relation):
                 target_graph = Graph()
 
+            for p in graph.parameters:
+                with About(p.debug, self.relation):
+                    self.repl[p] = target_graph.add_parameter()
+
         self.repl[graph] = target_graph
         if set_output:
             self.graph_clones[graph] = target_graph
@@ -130,13 +133,14 @@ class GraphCloner:
                 likely inlining into target_graph, and you don't want
                 to set the output in this case).
         """
+        from ..cconv import NestingAnalyzer
         nest = NestingAnalyzer(graph)
         nested_graphs = nest.scopes()[graph]
         for g in nested_graphs:
             if g is not graph:
                 self._add_clone(g)
 
-        self._add_clone(graph, target_graph, set_output)
+        target_graph = self._add_clone(graph, target_graph, set_output)
 
         if new_params:
             for p, new_p in zip(graph.parameters, new_params):
@@ -176,9 +180,10 @@ class GraphCloner:
 
             new: ANFNode
             with About(node.debug, self.relation):
-                if is_parameter(node):
-                    new = Parameter(g)
-                elif is_constant(node):
+                # Parameters are copied upfront and should already be in the
+                # cache.
+                assert not is_parameter(node)
+                if is_constant(node):
                     def convert(x):
                         if isinstance(x, Graph):
                             # We must change the constant to point to the clone
@@ -228,9 +233,6 @@ class GraphCloner:
             if new_graph is not 'inline':
                 assert isinstance(new_graph, Graph)
                 new_graph.output = new_root
-                assert all(is_parameter(p) for p in graph.parameters)
-                new_graph.parameters = [cast(Parameter, self.repl[p])
-                                        for p in graph.parameters]
 
     def __getitem__(self, x: Any) -> Any:
         """Get the clone of the given graph or node."""

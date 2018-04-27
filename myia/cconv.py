@@ -79,6 +79,28 @@ class NestingAnalyzer:
                 for g in coverage}
 
     @memoize_method
+    def graphs_accessible(self) -> Dict[Graph, Set[Graph]]:
+        """Map each graph to the set of graphs that may be called from there.
+
+        For each graph, this is the set of graphs that it refers to
+        directly *plus* the set of graphs it refers to indirectly.
+        """
+        used = self.graphs_used()
+        rval = {g: set(gs) for g, gs in used.items()}
+        changes = True
+        while changes:
+            changes = False
+            for g, gs in rval.items():
+                prev = len(gs)
+                accum: Set = set()
+                for g2 in gs:
+                    accum |= rval[g2]
+                gs |= accum
+                if len(gs) > prev:
+                    changes = True
+        return rval
+
+    @memoize_method
     def graph_dependencies_total(self) -> Dict[Graph, Set[Graph]]:
         """Map each graph to the set of graphs it depends on.
 

@@ -1,10 +1,10 @@
 """Graph optimization routines."""
 
 
-from .graph_utils import toposort
-from .ir import ANFNode, Apply, Constant, Graph, Special, freevars_boundary, \
-    is_apply, is_constant, is_parameter, replace, succ_incoming
-from .unify import Unification, Var, VisitError, expandlist
+from ..graph_utils import dfs, toposort
+from ..ir import ANFNode, Apply, Constant, Graph, Special, \
+    freevars_boundary, succ_incoming, is_constant_graph, replace
+from ..unify import Unification, Var
 
 
 class VarNode(Special):
@@ -57,31 +57,6 @@ def sexp_to_graph(sexp):
     return g
 
 
-class GraphUnification(Unification):
-    """Unification subclass that can unify subgraphs."""
-
-    def visit(self, fn, node):
-        """Visit a node and apply fn to all children."""
-        if is_apply(node):
-            new_inputs = expandlist(map(fn, node.inputs))
-            g = fn(node.graph)
-            return Apply(new_inputs, g)  # type: ignore
-        elif is_parameter(node):
-            g = fn(node.graph)
-            if not isinstance(g, Graph) or g is not node.graph:
-                # Note: this condition will be triggered if e.g. there is a
-                # Parameter in a pattern to reify. It's not clear what that's
-                # supposed to mean unless the Parameter already exists in a
-                # concrete graph, so we raise an Exception just in case.
-                raise Exception('Unification cannot create new Parameters.') \
-                    # pragma: no cover
-            return node
-        elif is_constant(node):
-            return Constant(fn(node.value))
-        else:
-            raise VisitError
-
-
 class PatternSubstitutionOptimization:
     """An optimization that replaces one pattern by another.
 
@@ -122,7 +97,7 @@ class PatternSubstitutionOptimization:
             self.replacement = replacement
         else:
             self.replacement = sexp_to_node(replacement, g)
-        self.unif = GraphUnification()
+        self.unif = Unification()
         self.name = name
 
     def __call__(self, node):
@@ -198,22 +173,33 @@ class PatternOptimizerEquilibrium:
 
     Args:
         single_pass: An optimization pass on a graph.
+        auto_acquire: Whether to process any new graph encountered
+            when processing a graph.
 
     """
 
-    def __init__(self, single_pass):
+    def __init__(self, single_pass, *, auto_acquire=True):
         """Initialize a PatternOptimizerEquilibrium."""
         self.single_pass = single_pass
+        self.auto_acquire = auto_acquire
 
     def __call__(self, *graphs):
         """Apply the pass on all graphs repeatedly until equilibrium."""
+        graphs = set(graphs)  # type: ignore
         any_changes = 0
 
         changes = 1
         while changes:
+            new_graphs = set()
             changes = 0
             for graph in graphs:
-                changes |= self.single_pass(graph)
+                chg = self.single_pass(graph)
+                if chg and self.auto_acquire:
+                    for node in dfs(graph.output, succ_incoming):
+                        if is_constant_graph(node):
+                            new_graphs.add(node.value)
+                changes |= chg
                 any_changes |= changes
+            graphs |= new_graphs  # type: ignore
 
         return any_changes

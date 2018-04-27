@@ -48,7 +48,7 @@ from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Tuple, \
     overload
 from weakref import finalize
 
-from .info import About, DebugInherit
+from .info import About, DebugInherit, NamedDebugInfo
 from .ir import ANFNode, Apply, Constant, Graph, Parameter, \
     destroy_disconnected_nodes
 from .prim import ops as primops
@@ -594,7 +594,7 @@ class Block:
             elif not self.preds:
                 return self.parser.read(varnum)
         # TODO: point to the original definition
-        with About(DebugInherit(name=varnum), 'phi'):
+        with About(NamedDebugInfo(name=varnum), 'phi'):
             phi = Parameter(self.graph)
         self.graph.parameters.append(phi)
         self.phi_nodes[phi] = varnum

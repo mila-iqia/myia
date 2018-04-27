@@ -4,7 +4,7 @@ import threading
 import traceback
 import types
 import weakref
-from typing import Any, NamedTuple
+from typing import Any, Set
 
 # We use per-thread storage for the about stack.
 _about = threading.local()
@@ -84,7 +84,8 @@ class NamedDebugInfo(DebugInfo):
         """Construct a NamedDebugInfo object."""
         self._id: int = None
         self.name: str = None
-        self.about: About = None
+        self.about = None
+        self.errors: Set = set()
         self.save_trace: bool = False
         self.trace: Any = None
         self._obj = weakref.ref(obj) if obj else None
@@ -121,7 +122,7 @@ class NamedDebugInfo(DebugInfo):
         return self.name
 
 
-class About(NamedTuple):
+class About:
     """Represent a relationship to an object.
 
     It can be used as a context manager, in which case any `DebugInfo`
@@ -138,8 +139,13 @@ class About(NamedTuple):
 
     """
 
-    debug: DebugInfo
-    relation: str
+    def __init__(self, debug: DebugInfo, relation: str) -> None:
+        """Initialize an About."""
+        if not isinstance(debug, DebugInfo):
+            raise TypeError('debug argument to About must be a DebugInfo.') \
+                # pragma: no cover
+        self.debug = debug
+        self.relation = relation
 
     def __enter__(self):
         """Enter the context of this `About`."""

@@ -230,6 +230,34 @@ def test_isomorphic_globals():
     _check_isomorphic(f1, f4, False)
 
 
+def test_isomorphic_recursion():
+
+    def f1(x):
+        if x < 0:
+            return x
+        else:
+            return f1(x - 1)
+
+    def f2(x):
+        if x < 0:
+            return x
+        else:
+            return f2(x - 1)
+
+    def f3(x):
+        if x > 0:
+            return x
+        else:
+            return f3(x - 1)
+
+    f1 = parse(f1)
+    f2 = parse(f2)
+    f3 = parse(f3)
+
+    _check_isomorphic(f1, f2, True)
+    _check_isomorphic(f1, f3, False)
+
+
 def test_helpers():
     g = Graph()
     cg = Constant(g)

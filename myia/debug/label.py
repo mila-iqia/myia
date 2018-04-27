@@ -8,14 +8,24 @@ from ..prim import Primitive
 
 short_relation_symbols = {
     'copy': '',
+    'cosmetic': '',
     'phi': 'Φ',
     'if_true': '✓',
     'if_false': '✗',
     'if_after': '↓',
     'while_header': '⤾',
     'while_body': '⥁',
-    'while_after': '↓'
+    'while_after': '↓',
+    'specialized': '+'
 }
+
+
+class CosmeticPrimitive:
+    """Primitive with no other utility than printing pretty."""
+
+    def __init__(self, label):
+        """Initialize a CosmeticPrimitive."""
+        self.label = label
 
 
 class NodeLabeler:
@@ -31,11 +41,15 @@ class NodeLabeler:
     def combine_relation(self, name, relation):
         """Combine a name and a relation in a single string."""
         rel = self.relation_symbols.get(relation, f'{relation}:')
-        return f'{rel}{name}'
+        if rel is None:
+            return None
+        if rel:
+            return f'{rel}{name or ""}'
+        else:
+            return name
 
     def const_fn(self, node):
-        """
-        Return name of function, if constant.
+        """Return name of function, if constant.
 
         Given an `Apply` node of a constant function, return the
         name of that function, otherwise return None.
@@ -53,7 +67,7 @@ class NodeLabeler:
                 return node.name
             elif node.about:
                 return self.combine_relation(
-                    self.name(node.about.debug),
+                    self.name(node.about.debug, force),
                     node.about.relation
                 )
             elif force:
@@ -75,10 +89,12 @@ class NodeLabeler:
                              True if force is None else force)
         elif is_constant(node):
             v = node.value
-            if isinstance(v, (int, float, str)):
+            if isinstance(v, (int, float, str)) or v == ():
                 return repr(v)
             elif isinstance(v, Primitive):
                 return v.name
+            elif isinstance(v, CosmeticPrimitive):
+                return v.label
             else:
                 class_name = v.__class__.__name__
                 return f'{self.label(node.debug, True)}:{class_name}'

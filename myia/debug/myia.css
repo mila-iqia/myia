@@ -27,3 +27,28 @@
     margin-right: 2px;
     background: orange;
 }
+
+.myia-type-function {
+    /* padding: 2px; */
+    margin: 2px;
+    border: 2px solid orangered;
+}
+
+.myia-type-bool {
+    font-weight: bold;
+}
+
+.myia-type-int:before {
+    content: "i";
+    font-weight: bold;
+}
+
+.myia-type-float:before {
+    content: "f";
+    font-weight: bold;
+}
+
+.myia-var {
+    padding: 2px;
+    border: 1px dashed blue;
+}
