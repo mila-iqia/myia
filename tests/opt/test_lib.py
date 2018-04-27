@@ -1,9 +1,9 @@
 
-import pytest
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim import ops
-from myia.prim.py_implementations import head, tail, setitem, add, mul
+from myia.prim.py_implementations import \
+    implementations as pyimpl, head, tail, setitem, add, mul
 
 
 #######################
@@ -218,7 +218,6 @@ def test_ctprop2():
                lib.constant_prop)
 
 
-@pytest.mark.xfail(reason="Should evaluate helper.")
 def test_ctprop_helper():
 
     def helper(x):
@@ -232,6 +231,9 @@ def test_ctprop_helper():
 
     _check_opt(before, after,
                lib.constant_prop)
+
+    _check_opt(before, before,
+               lib.make_constant_prop(pyimpl, None))
 
 
 def test_ctprop_closure():
