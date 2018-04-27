@@ -21,7 +21,7 @@ def bprop_to_augm(prim: Primitive, fn: FunctionType) -> Graph:
 
     bprop = parse(fn)
     bprop.debug.name = None
-    bprop.debug.about = About(info, 'grad_bprop')
+    bprop.debug.about = About(info, 'grad_bprop')  # type: ignore
     bprop.output = bprop.apply(primops.cons_tuple, (), bprop.output)
 
     *args, dout = bprop.parameters

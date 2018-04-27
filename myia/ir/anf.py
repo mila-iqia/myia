@@ -14,7 +14,7 @@ from typing import Any, Iterable, List, MutableSequence, Sequence, Set, \
     Tuple, overload, Union, Dict
 
 from ..info import NamedDebugInfo
-from ..prim import ops as primops
+from ..prim import ops as primops, Primitive
 from ..unify import expandlist, noseq
 from ..utils import Named, list_str, repr_
 
