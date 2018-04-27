@@ -230,6 +230,23 @@ def test_closure():
                QP_to_QR, elim_R)
 
 
+def test_closure_2():
+    def before(x):
+        # Note that y is only accessible through the closure
+        y = R(x)
+        def sub():
+            return y
+        return sub()
+
+    def after(x):
+        def sub():
+            return x
+        return sub()
+
+    _check_opt(before, after,
+               elim_R)
+
+
 def test_fn_replacement():
     def before(x):
         return Q(P(P(P(P(x)))))
