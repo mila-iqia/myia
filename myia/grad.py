@@ -23,7 +23,7 @@ def grad(graph):
     if graph.transforms.get('grad', None):
         return graph.transforms['grad']
     gr = Grad(graph)
-    return gr.tagged_graphs[graph]
+    return gr.forward_graphs[graph]
 
 
 class Grad:
@@ -44,18 +44,18 @@ class Grad:
         for g, fvs in self.nest.free_variables_total().items():
             self.fv_order[g] = list(fvs)
 
-        # g -> ↑g
-        self.tagged_graphs: Dict[Graph, Graph] = {}
-        # g -> ♢g
+        # g -> ▶g
+        self.forward_graphs: Dict[Graph, Graph] = {}
+        # g -> ◀g
         self.backpropagator_graphs: Dict[Graph, Graph] = {}
 
-        # x -> ↑x
-        self.tagged_nodes: Dict[ANFNode, ANFNode] = {}
-        # x -> ♢x
+        # x -> ▶x
+        self.forward_nodes: Dict[ANFNode, ANFNode] = {}
+        # x -> ◀x
         self.backpropagator_nodes: Dict[ANFNode, ANFNode] = {}
         # (x, g) -> ∇x (in the context of that graph)
         self.sensitivity_nodes: Dict[Tuple[ANFNode, Graph], ANFNode] = {}
-        # x -> ♢x(∇x) (for x an Apply node)
+        # x -> ◀x(∇x) (for x an Apply node)
         self.step_nodes: Dict[Apply, Apply] = {}
 
         # To get the uses of a graph, we need to know which Constant(s)
@@ -65,7 +65,7 @@ class Grad:
         graphs = self.nest.scopes()[root]
 
         for g in graphs:
-            self._make_tagged_graph(g)
+            self._make_forward_graph(g)
             self._make_backpropagator_graph(g)
 
         for g in graphs:
@@ -74,17 +74,17 @@ class Grad:
         for g in graphs:
             self._process_graph_backward(g)
 
-    def _make_tagged_graph(self, graph: Graph) -> None:
+    def _make_forward_graph(self, graph: Graph) -> None:
         # Forward graph
-        with About(graph.debug, 'grad_fw'):
-            tgraph = Graph()
-        graph.transforms['grad'] = tgraph
-        tgraph.transforms['primal'] = graph
-        self.tagged_graphs[graph] = tgraph
-        # Same parameters as the original, but tagged
+        with About(graph.debug, 'grad_fprop'):
+            fgraph = Graph()
+        graph.transforms['grad'] = fgraph
+        fgraph.transforms['primal'] = graph
+        self.forward_graphs[graph] = fgraph
+        # Same parameters as the original, but tagged as forward
         for p in graph.parameters:
-            with About(p.debug, 'grad_fw'):
-                self.tagged_nodes[p] = tgraph.add_parameter()
+            with About(p.debug, 'grad_fprop'):
+                self.forward_nodes[p] = fgraph.add_parameter()
 
     def _make_backpropagator_graph(self, graph: Graph) -> None:
         # Backpropagator graph
@@ -92,7 +92,7 @@ class Grad:
             bgraph = Graph()
         self.backpropagator_graphs[graph] = bgraph
         # Takes output sensitivity as sole parameter
-        with About(graph.debug, 'grad_bw'):
+        with About(graph.debug, 'grad_sens'):
             bparam = bgraph.add_parameter()
             self.sensitivity_nodes[(graph.output, graph)] = bparam
 
@@ -112,58 +112,58 @@ class Grad:
 
     def _process_graph_forward(self, graph):
         """Create the forward graph."""
-        tgraph = self.tagged_graphs[graph]
+        fgraph = self.forward_graphs[graph]
         bgraph = self.backpropagator_graphs[graph]
 
-        # Return (↑graph.output, ♢graph). The first element is given
+        # Return (▶graph.output, ◀graph). The first element is given
         # by the `phi` method.
 
-        tgraph.output = self._make_cons(
-            tgraph,
+        fgraph.output = self._make_cons(
+            fgraph,
             self.phi(graph.output),
             bgraph
         )
 
     def phi(self, node):
         """Compute equivalent node in forward graph."""
-        if node in self.tagged_nodes:
-            return self.tagged_nodes[node]
+        if node in self.forward_nodes:
+            return self.forward_nodes[node]
 
-        tg = node.graph and self.tagged_graphs[node.graph]
+        fg = node.graph and self.forward_graphs[node.graph]
 
-        if is_constant_graph(node) and node.value in self.tagged_graphs:
+        if is_constant_graph(node) and node.value in self.forward_graphs:
             # We will have to process this graph too.
-            tagged = self.tagged_graphs[node.value]
+            fwd = self.forward_graphs[node.value]
             bprop = self.backpropagator_graphs[node.value]
             self.graph_to_ct[node.value].add(node)
         elif is_constant(node):
             # Note that this application will have its graph set to None, which
             # makes sense since it's basically a constant expression.
-            tagged, bprop = self._apply(tg, J, node), None
-        elif is_apply(node) and node.graph not in self.tagged_graphs:
-            tagged, bprop = self._apply(tg, J, node), None
+            fwd, bprop = self._apply(fg, J, node), None
+        elif is_apply(node) and node.graph not in self.forward_graphs:
+            fwd, bprop = self._apply(fg, J, node), None
         elif is_apply(node):
-            # a = f(x, y) -> ↑a, ♢a = ↑f(↑x, ↑y)
-            tagged_args = [self.phi(n) for n in node.inputs]
-            app = self._apply(tg, *tagged_args)
-            # ↑a (the first element)
-            tagged = self._apply(tg, index, app, 0)
-            # ♢a (the second element)
-            # Note that ♢a is not part of the forward graph, however,
+            # a = f(x, y) -> ▶a, ◀a = ▶f(▶x, ▶y)
+            fwd_args = [self.phi(n) for n in node.inputs]
+            app = self._apply(fg, *fwd_args)
+            # ▶a (the first element)
+            fwd = self._apply(fg, index, app, 0)
+            # ◀a (the second element)
+            # Note that ◀a is not part of the forward graph, however,
             # it will be a free variable of the backpropagator graph.
-            bprop = self._apply(tg, index, app, 1)
+            bprop = self._apply(fg, index, app, 1)
         else:
-            # Note: Parameters were all added to tagged_nodes in
+            # Note: Parameters were all added to forward_nodes in
             # scaffold_graph, so they won't trigger this branch.
             raise Exception('This should be unreachable.')  # pragma: no cover
 
-        self.tagged_nodes[node] = tagged
+        self.forward_nodes[node] = fwd
         self.backpropagator_nodes[node] = bprop
-        if not tagged.debug.about:
-            tagged.debug.about = About(node.debug, 'grad_fw')
+        if not fwd.debug.about:
+            fwd.debug.about = About(node.debug, 'grad_fprop')
         if bprop and not bprop.debug.about:
             bprop.debug.about = About(node.debug, 'grad_bprop')
-        return tagged
+        return fwd
 
     def _process_graph_backward(self, graph):
         """Create the backward graph."""
@@ -183,7 +183,7 @@ class Grad:
     def bprop_step(self, node):
         """Compute backpropagator expression for this node.
 
-        If node is a = f(x, y), this returns ♢a(∇a). That expression returns
+        If node is a = f(x, y), this returns ◀a(∇a). That expression returns
         gradient contributions to ∇f, ∇x and ∇y.
         """
         if node in self.step_nodes:
@@ -219,7 +219,7 @@ class Grad:
                 # A use in the same graph: we get the backpropagator expression
                 # and we use the argument index to extract the right
                 # contribution.
-                with About(node.debug, 'grad_bw'):
+                with About(node.debug, 'grad_sens'):
                     contrib = self._apply(bg,
                                           index,
                                           self.bprop_step(user), idx)
@@ -261,7 +261,7 @@ class Grad:
 
         if len(contribs) == 0:
             # No contributions means a gradient of zero, naturally.
-            sens = self._apply(bg, primops.zeros_like, self.tagged_nodes[node])
+            sens = self._apply(bg, primops.zeros_like, self.forward_nodes[node])
         else:
             # Contributions must be added together.
             def mkadd(x, y):
@@ -269,6 +269,6 @@ class Grad:
             sens = reduce(mkadd, contribs)
 
         if not sens.debug.about:
-            sens.debug.about = About(node.debug, 'grad_bw')
+            sens.debug.about = About(node.debug, 'grad_sens')
         self.sensitivity_nodes[node] = sens
         return sens
