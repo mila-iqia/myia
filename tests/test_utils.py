@@ -1,6 +1,6 @@
 import pytest
 
-from myia.utils import Named, smap
+from myia.utils import Named, smap, HierDict
 
 
 def test_named():
@@ -31,3 +31,19 @@ def test_smap_failures():
     for a, b in pairs:
         with pytest.raises(TypeError):
             smap(_sum, a, b)
+
+
+def test_HierDict():
+    hd = HierDict(None)
+    hd2 = HierDict(hd)
+
+    hd['1'] = 1
+
+    assert '1' not in hd2
+    assert hd2['1'] == 1
+
+    with pytest.raises(KeyError):
+        hd['2']
+
+    with pytest.raises(KeyError):
+        hd2['2']

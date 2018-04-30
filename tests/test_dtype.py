@@ -3,6 +3,8 @@ import pytest
 from myia.dtype import Bool, Float, Function, Int, List, Number, Struct, \
     Tuple, Type, TypeMeta, UInt
 
+from myia.unify import Unification, var
+
 
 def test_TypeMeta():
     with pytest.raises(TypeError):
@@ -27,6 +29,39 @@ def test_cache():
     assert f32 is Float(32)
     assert f32 is not Float(16)
     assert f32 is not Float(64)
+
+
+def test_visit():
+    U = Unification()
+    v1 = var()
+    v2 = var()
+
+    l1 = List(v1)
+    l2 = U.clone(l1)
+    assert l1 is not l2
+    assert U.unify(l1, l2)[v1] is l2.element_type
+
+    s1 = Struct(a=v1, b=v2)
+    s2 = U.clone(s1)
+    assert s1 is not s2
+    assert set(s2.elements.keys()) == {'a', 'b'}
+
+    t1 = Tuple(v1, v1, v2)
+    t2 = U.clone(t1)
+    assert t1 is not t2
+    assert t2.elements[0] is t2.elements[1]
+    assert t2.elements[0] is not t2.elements[2]
+    assert len(t2.elements) == 3
+
+    c1 = Function((v1, v2), v2)
+    c2 = U.clone(c1)
+    assert c1 is not c2
+    assert c2.arguments[1] is c2.retval
+    assert c2.arguments[0] is not c2.arguments[1]
+    assert len(c2.arguments) == 2
+
+    b = U.clone(Bool())
+    assert b is Bool()
 
 
 def test_Number():

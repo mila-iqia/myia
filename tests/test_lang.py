@@ -342,6 +342,16 @@ def test_fn5():
     return g(2)
 
 
+@parse_compare(())
+def test_circular():
+    x = 2
+
+    def g():
+        return x + 1
+    x = g()
+    return x
+
+
 #############
 # Recursion #
 #############
