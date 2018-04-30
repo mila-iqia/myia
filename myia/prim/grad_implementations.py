@@ -6,13 +6,15 @@ the (augmented) original primitive's output and a backpropagator function.
 
 from types import FunctionType
 
-from .api import parse
-from .info import NamedDebugInfo, About
-from .ir import Graph, replace
-from .prim import ops as primops, Primitive
-from .prim.py_implementations import \
+from ..api import parse
+from ..info import NamedDebugInfo, About
+from ..ir import Graph, replace
+from ..utils import Registry
+
+from . import ops as primops
+from .ops import Primitive
+from .py_implementations import \
     Jinv, J, zeros_like, cons_tuple, head, tail, setitem
-from .utils import Registry
 
 
 def bprop_to_augm(prim: Primitive, fn: FunctionType) -> Graph:

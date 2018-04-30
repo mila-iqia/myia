@@ -186,10 +186,11 @@ def J(x):
     output and a backpropagator. On structured data, this applies `J`
     recursively on each element. On scalars, this is a no-op.
     """
-    from ..grad_implementations import augmented_graphs
     from ..ir.anf import Graph
     from ..grad import grad
     from ..vm import VMFrame
+
+    from .grad_implementations import augmented_graphs
 
     if isinstance(x, primops.Primitive):
         return augmented_graphs[x]
