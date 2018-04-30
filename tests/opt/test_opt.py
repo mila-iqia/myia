@@ -234,6 +234,7 @@ def test_closure_2():
     def before(x):
         # Note that y is only accessible through the closure
         y = R(x)
+
         def sub():
             return y
         return sub()

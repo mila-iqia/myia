@@ -261,7 +261,8 @@ class Grad:
 
         if len(contribs) == 0:
             # No contributions means a gradient of zero, naturally.
-            sens = self._apply(bg, primops.zeros_like, self.forward_nodes[node])
+            sens = self._apply(bg, primops.zeros_like,
+                               self.forward_nodes[node])
         else:
             # Contributions must be added together.
             def mkadd(x, y):
