@@ -59,6 +59,12 @@ class Call:
         self.values = values
 
 
+class Closure:
+    def __init__(self, graph, frame):
+        self.graph = graph
+        self.frame = frame
+
+
 class GraphAnalyzer:
     """Perform abstract interpretation of a graph deriving types and values."""
 
@@ -89,7 +95,7 @@ class GraphAnalyzer:
 
     def _handle_node(self, node: ANFNode, frame):
         if isinstance(node, Constant):
-            self._handle_constant(node)
+            self._handle_constant(node, frame)
 
         elif isinstance(node, Parameter):
             pass
@@ -100,11 +106,14 @@ class GraphAnalyzer:
         else:
             raise AssertionError("Unknown node type")
 
-    def _handle_constant(self, node):
+    def _handle_constant(self, node, frame):
         if is_constant_graph(node):
-            self.types[node] = self.signatures[node.value]
-            # TODO: handle closures
-            self.values[node] = node.value
+            g = node.value
+            self.types[node] = self.signatures[g]
+            if len(self._vars[g]) != 0:
+                frame.values[node] = Closure(g, frame)
+            else:
+                self.values[node] = g
         else:
             self.types[node] = typeof(node.value)
             self.values[node] = node.value
@@ -119,7 +128,10 @@ class GraphAnalyzer:
                 self._handle_apply_primitive(node, frame)
 
         elif isinstance(fn, Graph):
-            return self._handle_apply_graph(node, frame)
+            return self._handle_apply_graph(node, fn, frame, frame)
+
+        elif isinstance(fn, Closure):
+            return self._handle_apply_graph(node, fn.graph, frame, fn.frame)
 
         else:
             return self._handle_apply_generic(node, frame)
@@ -229,17 +241,15 @@ class GraphAnalyzer:
             else:
                 frame.values[node] = NO_VALUE
 
-    def _handle_apply_graph(self, node, frame):
-        fn = node.inputs[0]
-        graph = frame.values[fn]
+    def _handle_apply_graph(self, node, graph, frame, fenv):
         args = node.inputs[1:]
         args_t = tuple(frame.types[a] for a in args)
         args_v = tuple(frame.values[a] for a in args)
         fn_t = self.signatures[graph]
         cache = self.eval_cache[graph]
         cpath = frame.path + (node,)
-        cache_k = (args_v, frozenset((v, frame.values[v])
-                                     for v in self._vars[graph]))
+        vals = dict((k, fenv.values[k]) for k in self._vars[graph])
+        cache_k = (args_v, frozenset(vals.items()))
 
         if frame.cur_node is not node and cpath not in self.paths:
             need_call = False
@@ -259,9 +269,10 @@ class GraphAnalyzer:
             assert len(params) == len(args_t)
 
             if frame.depth < self.max_depth and need_call:
-                p_types = zip(params, args_t)
-                p_vals = zip(params, args_v)
-                return Call(graph.return_, types=p_types, values=p_vals)
+                types = dict((k, fenv.types[k]) for k in self._vars[graph])
+                types.update(zip(params, args_t))
+                vals.update(zip(params, args_v))
+                return Call(graph.return_, types=types, values=vals)
             else:
                 return None  # We'll just guess NO_VALUE here.
 

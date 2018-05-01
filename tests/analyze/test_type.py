@@ -299,6 +299,22 @@ def test_func_arg5():
     assert f_t.arguments[0].arguments[0] is Int(64)
 
 
+def test_closure():
+    def f():
+        def g(x):
+            def h():
+                return x
+            return h
+        return g(2)()
+
+    gf = parse(f)
+    ga = GraphAnalyzer()
+    ga.analyze(gf)
+
+    f_t = ga.signatures[gf]
+    assert f_t is Function((), Int(64))
+
+
 def test_cons_tuple():
     def g(e, t):
         return cons_tuple(e, t)
