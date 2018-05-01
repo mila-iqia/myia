@@ -165,7 +165,28 @@ def smap(fn, *args):
 
 
 class HierDict(dict):
+    """Hierachical dictionary that will lookup missing keys in the parent.
+
+    Note that the lookup only applies for `__getitem__` (aka `x[i]`).
+    If you try to check if it contains a key with `in` it will return
+    false if the key is not present in the top level.
+
+    Also writes to the top-level only affect the current dictionary
+    and will leave equal keys in the parents unaffected.
+
+    """
+
     def __init__(self, parent, init_vals=()):
+        """Create a HierDict.
+
+        Arguments
+        ---------
+            parent: Parent dictionary.  It has to be a mapping type
+                    (but not necessarily a HierDict).  It can also be
+                    None to indicate no parent.
+            init_vals: dict-like iterable of initial keys and values
+                       for the dictionary
+        """
         self.parent = parent
         self.update(init_vals)
 

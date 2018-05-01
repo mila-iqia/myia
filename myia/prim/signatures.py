@@ -12,7 +12,10 @@ SIGNATURES: Registry[Primitive, Function] = Registry()
 
 
 class MetaVar:
+    """Class to indicate that we need special handling."""
+
     def infer(self, args, frame, ga):
+        """Override to implement the special handling."""
         raise NotImplementedError("infer")
 
 
@@ -67,7 +70,10 @@ intv = var(filter=(Int(8), Int(16), Int(32), Int(64),
 
 
 class GetitemVar(MetaVar):
+    """Special handling for `getitem`."""
+
     def infer(self, args, frame, equiv):
+        """."""
         from myia.analyze.value import NO_VALUE
 
         assert len(args) == 2
@@ -96,7 +102,7 @@ class GetitemVar(MetaVar):
         return U.reify(r_t, equiv)
 
 
-register_signature(P.getitem, GetitemVar())
+register_signature(P.getitem, GetitemVar())  # type: ignore
 
 register_signature(P.if_, Function((Bool(), Function((), b),
                                     Function((), b)), b))

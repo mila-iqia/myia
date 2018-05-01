@@ -18,9 +18,23 @@ from .value import ESTIMATORS, NO_VALUE
 
 
 class Frame:
+    """Represents a "frame" in abstract evaluation."""
+
     def __init__(self, parent: 'Frame', nodes: Iterable[ANFNode], *,
                  types: Mapping[ANFNode, Type] = None,
                  values: Mapping[ANFNode, Any] = None) -> None:
+        """Initialize a frame.
+
+        Arguments
+        ---------
+            parent: Parent frame, may be None
+            nodes: Iterable of AFNNode. This must return all inputs
+                   before the node. Inputs include variables that a
+                   graph closes over.
+            types: types for the parameters and closed vars
+            values: values for the parameters and closed vars
+
+        """
         if types is None:
             types = {}
         if values is None:
@@ -44,6 +58,11 @@ class Frame:
 
     @property
     def path(self):
+        """Return the frame path.
+
+        The frame path is the list of calls that have been made to get
+        to this frame.
+        """
         f = self.parent
         p = []
         while f:
@@ -53,14 +72,27 @@ class Frame:
 
 
 class Call:
-    def __init__(self, node, *, types=None, values=None):
+    """Representation of a call."""
+
+    def __init__(self, node: ANFNode, *, types=None, values=None) -> None:
+        """Used internally.
+
+        Arguments
+        ---------
+            node: Inital node to visit (usually the return node of a graph).
+            types: Intial types for the frame
+            values: Intial values for the frame
+        """
         self.node = node
         self.types = types
         self.values = values
 
 
 class Closure:
-    def __init__(self, graph, frame):
+    """Bundle a graph with its closed frame."""
+
+    def __init__(self, graph: Graph, frame: Frame) -> None:
+        """Used internally."""
         self.graph = graph
         self.frame = frame
 
@@ -301,6 +333,10 @@ class GraphAnalyzer:
         frame.values[node] = NO_VALUE
 
     def infer_type(self, graph: Graph, types: Iterable[Type]) -> Type:
+        """Get the return type of a call of `graph`.
+
+        args should be the types of the arguments passed in.
+        """
         if graph not in self.signatures:
             raise ValueError("Unknown graph")
         equiv = dict(self._equiv)
@@ -313,6 +349,10 @@ class GraphAnalyzer:
             raise TypeError("Incompatible apply")
 
     def infer_args(self, graph: Graph, args: Iterable[Any]) -> Type:
+        """Get the return type of a call of `graph`.
+
+        args here should be a constant value for each argument.
+        """
         return self.infer_type(graph, (typeof(a) for a in args))
 
     def analyze(self, graph: Graph) -> None:
