@@ -59,6 +59,14 @@ getattr = Primitive('getattr')
 setattr = Primitive('setattr')
 
 
+################
+# Type helpers #
+################
+
+
+typeof = Primitive('typeof')
+
+
 ##############
 # Statements #
 ##############

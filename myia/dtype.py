@@ -4,6 +4,8 @@ import collections
 from operator import itemgetter
 from typing import Any, Dict as DictT, Iterable, Tuple as TupleT
 
+from myia.unify import noseq, expandlist
+
 KeysT = Iterable[TupleT[str, 'Type']]
 
 
@@ -178,6 +180,9 @@ class List(Type):
 
     element_type: Type
 
+    def __visit__(self, fn):
+        return List(noseq(fn, self.element_type))
+
 
 class Struct(Type):
     """Represents a set of named fields with their own types.
@@ -188,6 +193,12 @@ class Struct(Type):
     """
 
     elements: DictT[str, Type]
+
+    def __visit__(self, fn):
+        for k in sorted(list(self.elements.keys())):
+            fn(k)  # type: ignore # This is a hack anyway
+        return Struct((k, noseq(fn, u))  # type: ignore
+                      for k, u in self.elements.items())
 
     @classmethod
     def _parse_args(cls, args, kwargs):
@@ -219,6 +230,9 @@ class Tuple(Type):
 
     elements: TupleT[Type, ...]
 
+    def __visit__(self, fn):
+        return Tuple(expandlist(fn(e) for e in self.elements))
+
     @classmethod
     def _parse_args(cls, args, kwargs):
         assert len(kwargs) == 0
@@ -237,6 +251,10 @@ class Function(Type):
 
     arguments: TupleT[Type, ...]
     retval: Type
+
+    def __visit__(self, fn):
+        return Function(expandlist(fn(a) for a in self.arguments),
+                        noseq(fn, self.retval))
 
     @classmethod
     def _parse_args(cls, args, kwargs):

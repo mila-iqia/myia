@@ -1,7 +1,12 @@
+import pytest
+
 from types import SimpleNamespace
 
+from myia.prim.ops import add
 from myia.prim.py_implementations import head, setattr as myia_setattr, \
-    setitem as myia_setitem, tail
+    setitem as myia_setitem, tail, typeof
+
+from myia.dtype import Int, Bool, Tuple, Function
 
 from ..test_lang import parse_compare
 
@@ -112,3 +117,12 @@ def test_prim_setattr():
     ns2 = SimpleNamespace(a=1, b=22)
     assert myia_setattr(ns, 'b', 22) == ns2
     assert ns != ns2  # test that this is not inplace
+
+
+def test_typeof():
+    assert Int(64) is typeof(1)
+    assert Bool() is typeof(True)
+    assert Tuple(Bool(), Int(64)) is typeof((False, 22))
+    assert isinstance(typeof(add), Function)
+    with pytest.raises(TypeError):
+        typeof(object())

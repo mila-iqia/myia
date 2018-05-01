@@ -1,5 +1,4 @@
 """Unification module."""
-
 from functools import reduce
 from typing import \
     Any, Callable, Dict, Iterable, List, Set, Type, TypeVar, Union
