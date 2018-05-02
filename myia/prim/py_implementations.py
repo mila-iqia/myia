@@ -1,8 +1,8 @@
 """Implementations for the debug VM."""
 
-
 from copy import copy
 from typing import Callable
+import numpy as np
 
 from .. import dtype as types
 from ..utils import Registry
@@ -208,6 +208,55 @@ def setattr(data, attr, value):
     data2 = copy(data)
     py_setattr(data2, attr, value)
     return data2
+
+
+@register(primops.shape)
+def shape(array):
+    return array.shape
+
+
+@register(primops.map_array)
+def map_array(fn, array, axis):
+    def f(ary):
+        it = np.nditer([ary, None])
+        for x, y in it:
+            y[...] = fn(x)
+        return it.operands[1]
+    return np.apply_along_axis(f, axis, array)
+
+
+@register(primops.scan_array)
+def scan_array(fn, init, array, axis):
+    # This is inclusive scan because it's easier to implement
+    # We will have to discuss what semantics we want later
+    def f(ary):
+        val = init
+        it = np.nditer([ary, None])
+        for x, y in it:
+            y[...] = fn(val, x)
+        return it.operands[1]
+    return np.apply_along_axis(f, axis, array)
+
+
+@register(primops.reduce_array)
+def reduce_array(fn, init, array, axis):
+    def f(ary):
+        val = init
+        it = np.nditer([ary])
+        for x in it:
+            val = fn(val, x)
+        return val
+    return np.apply_along_axis(f, axis, array)
+
+
+@register(primops.distribute)
+def distribute(v, shape):
+    return np.broadcast_to(v, shape)
+
+
+@register(primops.dot)
+def dot(a, b):
+    return np.dot(a, b)
 
 
 @register(primops.return_)

@@ -200,3 +200,12 @@ async def infer_value_typeof(engine, x):
     # Instead of defaulting to 1
     max_depth = 1
     return limited(await x['type'], max_depth)
+
+
+@value_inferrer(P.shape, nargs=1)
+async def infer_value_shape(engine, ary):
+    """Infer the return value of shape."""
+    shp = await ary['shape']
+    if any(s is None for s in shp):
+        return ANYTHING
+    return shp

@@ -3,7 +3,7 @@
 
 from functools import partial
 
-from ..dtype import Int, Bool, Float, Tuple, List, Type
+from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number
 from ..infer import ANYTHING, Inferrer, GraphInferrer, \
     MyiaTypeError, register_inferrer, Track, VirtualReference
 from ..ir import Graph
@@ -196,6 +196,58 @@ async def infer_type_arith_bin(engine, x, y):
     t = await engine.assert_same('type', x, y)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
+    return t
+
+
+@type_inferrer(P.shape, nargs=1)
+async def infer_type_shape(engine, ary):
+    """Infer the return type of shape."""
+    shp = await engine.get('shape', ary)
+    return Tuple([Int(64)]*len(shp))
+
+
+@type_inferrer(P.map_array, nargs=3)
+async def infer_type_map_array(engine, fn, ary, ax):
+    """Infer the return type of map_array."""
+    fn_t = await engine.get('type', fn)
+    ary_t = await engine.get('type', ary)
+    if not isinstance(ary_t, Array):
+        raise MyiaTypeError('Expected array')
+    xref = engine.vref(type=ary_t.elements)
+    return Array(fn_t(xref))
+
+
+@type_inferrer(P.scan_array, P.map_array, nargs=4)
+async def infer_type_across_array(engine, fn, init, ary, ax):
+    """Infer the return type of map_array."""
+    fn_t = await engine.get('type', fn)
+    ary_t = await engine.get('type', ary)
+    init_t = await engine.get('type', init)
+    if not isinstance(ary_t, Array):
+        raise MyiaTypeError('Expected array')
+    if not ary_t.elements == init_t:
+        raise MyiaTypeError("Initial value must have the same type "
+                            "as array elements")
+    xref = engine.vref(type=ary_t.elements)
+    xref2 = engine.vref(type=ary_t.elements)
+    return Array(fn_t(xref, xref2))
+
+
+@type_inferrer(P.distribute, nargs=2)
+async def infer_type_distribute(engine, v, shp):
+    v_t = await engine.get('type', v)
+    if not isinstance(v_t, (Number, Bool)):
+        raise MyiaTypeError("Array elements must be numbers or bool")
+    shp_t = await engine.get('type', shp)
+    if (not isinstance(shp_t, Tuple) or
+            not all(e == UInt(64) for e in shp_t.elements)):
+        raise MyiaTypeError("Shape must be (i64, ...)")
+    return Array(v_t)
+
+
+@type_inferrer(P.dot, nargs=2)
+async def infer_type_dot(engine, a, b):
+    t = await engine.assert_same('type', a, b)
     return t
 
 

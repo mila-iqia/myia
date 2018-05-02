@@ -248,3 +248,33 @@ class Dead(Type):
 
 class Unknown(Type):
     """Represents an unknown type (prior to type inference)."""
+
+
+DTYPE_MAP = dict(
+    int8=Int(8),
+    int16=Int(16),
+    int32=Int(32),
+    int64=Int(64),
+    uint8=UInt(8),
+    uint16=UInt(16),
+    uint32=UInt(32),
+    uint64=UInt(64),
+    float16=Float(16),
+    float32=Float(32),
+    float64=Float(64),
+    bool=Bool())
+
+
+def np_dtype_to_type(dtype):
+    if dtype not in DTYPE_MAP:
+        raise TypeError(f"Unsupported dtype {dtype}")
+    return DTYPE_MAP[dtype]
+
+
+TYPE_MAP = dict((v, k) for k, v in DTYPE_MAP.items())
+
+
+def type_to_np_dtype(type):
+    if type not in TYPE_MAP:
+        raise TypeError(f"Con't convert to NumPy dtype {type}")
+    return TYPE_MAP[type]

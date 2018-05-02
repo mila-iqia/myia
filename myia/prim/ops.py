@@ -68,6 +68,19 @@ getattr = Primitive('getattr')
 setattr = Primitive('setattr')
 
 
+##########
+# Arrays #
+##########
+
+
+shape = Primitive('shape')
+map_array = Primitive('map_array')
+scan_array = Primitive('scan_array')
+reduce_array = Primitive('reduce_array')
+distribute = Primitive('distribute')
+dot = Primitive('dot')
+
+
 ##############
 # Statements #
 ##############
