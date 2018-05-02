@@ -1,3 +1,4 @@
+import pytest
 
 from myia.api import compile
 from myia.prim.py_implementations import getitem
@@ -83,3 +84,43 @@ def test_return_primitive():
 
     g = f()
     assert g((1, 2, 3), 0) == 1
+
+
+def test_return_graph():
+    @compile
+    def f():
+        def g():
+            return 42
+        return g
+
+    g = f()
+    assert g() == 42
+
+
+def test_bad_call1():
+    @compile
+    def f():
+        return 42
+
+    with pytest.raises(RuntimeError):
+        f(1)
+
+
+def test_bad_call2():
+    @compile
+    def f():
+        def g():
+            return 42
+        return g(0)
+
+    with pytest.raises(RuntimeError):
+        f()
+
+
+def test_tail_call():
+    @compile
+    def f():
+        x = 1000
+        while x > 0:
+            x = x - 1
+        return x
