@@ -43,7 +43,7 @@ infer_type_constant = TypeTrack(type_inferrer_constructors)
 def type_inferrer(prim):
     def deco(fn):
         def constructor(engine):
-            return PrimitiveInferrer(engine, 'type', fn)
+            return PrimitiveInferrer(engine, 'type', prim, fn)
         type_inferrer_constructors[prim] = constructor
         return fn
     return deco
@@ -137,7 +137,7 @@ async def infer_type_arith_bin(engine, x, y):
 
 def _register_inferrer(prim, fn):
     def construct(engine):
-        return PrimitiveInferrer(engine, 'type', fn)
+        return PrimitiveInferrer(engine, 'type', prim, fn)
     type_inferrer_constructors[prim] = construct
 
 

@@ -10,8 +10,8 @@ from .py_implementations import implementations as pyimpl
 
 
 class PrimitiveValueInferrer(Inferrer):
-    def __init__(self, engine, impl):
-        super().__init__(engine)
+    def __init__(self, engine, prim, impl):
+        super().__init__(engine, prim)
         self.impl = impl
 
     async def infer(self, *refs):
@@ -35,7 +35,9 @@ class ValueTrack:
             if v in self.constructors:
                 return self.constructors[v](engine)
             else:
-                return PrimitiveValueInferrer(engine, self.implementations[v])
+                return PrimitiveValueInferrer(
+                    engine, v, self.implementations[v]
+                )
         elif isinstance(v, Graph):
             return GraphInferrer(engine, 'value', v, ct.context)
         else:
@@ -49,7 +51,7 @@ infer_value_constant = ValueTrack(pyimpl, value_inferrer_constructors)
 def value_inferrer(prim):
     def deco(fn):
         def constructor(engine):
-            return PrimitiveInferrer(engine, 'value', fn)
+            return PrimitiveInferrer(engine, 'value', prim, fn)
         value_inferrer_constructors[prim] = constructor
         return fn
     return deco

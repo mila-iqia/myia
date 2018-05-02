@@ -20,8 +20,9 @@ class MyiaTypeError(Exception):
 
 
 class Inferrer:
-    def __init__(self, engine):
+    def __init__(self, engine, identifier):
         self.engine = engine
+        self.identifier = identifier
         self.cache = {}
 
     async def __call__(self, *args):
@@ -31,8 +32,8 @@ class Inferrer:
 
 
 class PrimitiveInferrer(Inferrer):
-    def __init__(self, engine, track, inferrer_fn):
-        super().__init__(engine)
+    def __init__(self, engine, track, prim, inferrer_fn):
+        super().__init__(engine, prim)
         self.track = track
         self.inferrer_fn = inferrer_fn
 
@@ -47,7 +48,7 @@ class PrimitiveInferrer(Inferrer):
 
 class GraphInferrer(Inferrer):
     def __init__(self, engine, track, graph, context):
-        super().__init__(engine)
+        super().__init__(engine, graph)
         self.track = track
         self.graph = graph
         self.context = context.filter(graph)
@@ -149,17 +150,17 @@ class InferrerEquivalenceClass:
 
     def __init__(self, engine, members):
         self.engine = engine
+        self.all_members = members
         self.checked_members = set()
         self.pending_members = members
         self.results = {}
 
     def update(self, other):
-        self.pending_members.update(other.checked_members)
-        self.pending_members.update(other.pending_members)
-        self.pending_members -= self.checked_members
+        self.all_members.update(other.all_members)
+        self.pending_members = self.all_members - self.checked_members
 
     def __iter__(self):
-        return iter(self.checked_members | self.pending_members)
+        return iter(self.all_members)
 
     async def check(self):
         maybe_changes = False
@@ -168,7 +169,9 @@ class InferrerEquivalenceClass:
             maybe_changes = True
             for args, expected in self.results.items():
                 v = await inf(*args)
-                self.engine.equiv.declare_equivalent(expected, v)
+                self.engine.equiv.declare_equivalent(
+                    expected, v, self.all_members
+                )
         self.checked_members.update(self.pending_members)
         self.pending_members = set()
 
@@ -185,7 +188,9 @@ class InferrerEquivalenceClass:
             self.results[args] = res1
             for inf2 in others:
                 res2 = inf2(*args)
-                self.engine.equiv.declare_equivalent(res1, res2)
+                self.engine.equiv.declare_equivalent(
+                    res1, res2, self.all_members
+                )
 
         return maybe_changes
 
@@ -198,11 +203,11 @@ class EquivalencePool:
         self.pending = []
         self.checked = {}
 
-    def declare_equivalent(self, x, y):
-        self.pending.append((x, y))
+    def declare_equivalent(self, x, y, refs):
+        self.pending.append((x, y, refs))
         self.engine.schedule_function(self.check)
 
-    async def _process_equivalence(self, x, y):
+    async def _process_equivalence(self, x, y, refs):
         vx = await x
         vy = await y
 
@@ -224,15 +229,15 @@ class EquivalencePool:
             pass
 
         else:
-            self.engine.errors.add(
-                MyiaTypeError(f'Type mismatch: {vx} != {vy}')
+            self.engine.add_error(
+                refs, MyiaTypeError(f'Type mismatch: {vx} != {vy}')
             )
 
     async def check(self):
         maybe_changes = False
         pending, self.pending = self.pending, []
-        for x, y in pending:
-            await self._process_equivalence(x, y)
+        for x, y, refs in pending:
+            await self._process_equivalence(x, y, refs)
             maybe_changes = True
 
         for eq in set(self.eqclasses.values()):
@@ -240,20 +245,6 @@ class EquivalencePool:
 
         if maybe_changes:
             self.engine.schedule_function(self.check)
-
-
-class EqEquivalence:
-    def __init__(self, engine):
-        self.engine = engine
-
-    def declare_equivalent(self, x, y):
-        self.engine.schedule(self.assert_equivalent(x, y))
-
-    async def assert_equivalent(self, x, y):
-        vx = await x
-        vy = await y
-        if not (vx == vy):
-            self.engine.errors.add(TypeError(f'Type mismatch: {vx} != {vy}'))
 
 
 class InferenceEngine:
@@ -264,7 +255,7 @@ class InferenceEngine:
         self.constant_inferrers = constant_inferrers
         self.cache = {track: {} for track in self.tracks}
         self.todo = set()
-        self.errors = set()
+        self.errors = []
         self.equiv = eq_class(self)
 
     async def compute_ref(self, track, ref):
@@ -281,7 +272,11 @@ class InferenceEngine:
                 return ANYTHING
             assert isinstance(inf, Inferrer)
             argrefs = [Reference(node, ctx) for node in n_args]
-            return await inf(*argrefs)
+            try:
+                return await inf(*argrefs)
+            except MyiaTypeError as e:
+                self.add_error([ref], e)
+                raise
         else:
             raise Exception(f'Cannot process: {node}')
 
@@ -295,6 +290,9 @@ class InferenceEngine:
         fut = asyncio.Future()
         fut.set_result(value)
         self.cache[track][ref] = fut
+
+    def add_error(self, refs, err):
+        self.errors.append({'refs': refs, 'error': err})
 
     def schedule(self, coro):
         self.todo.add(lambda: coro)
@@ -328,7 +326,7 @@ class InferenceEngine:
             await asyncio.gather(*todo, loop=self.loop)
 
         if self.errors:
-            raise self.errors.pop()
+            raise self.errors[0]['error']
         else:
             return {track: self.cache[track][oref].result()
                     for track in self.tracks}
@@ -347,5 +345,5 @@ class InferenceEngine:
         )
         main = done.pop()
         for fut in done | pending:
-            self.equiv.declare_equivalent(fut, main)
+            self.equiv.declare_equivalent(fut, main, refs)
         return main.result()
