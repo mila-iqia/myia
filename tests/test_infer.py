@@ -3,7 +3,8 @@ from pytest import mark
 
 from myia.api import parse
 from myia.infer import \
-    InferenceEngine, typeof, ANYTHING, all_inferrers, MyiaTypeError
+    InferenceEngine, typeof, ANYTHING, all_inferrers, MyiaTypeError, \
+    infer_value_constant, infer_type_constant
 
 from myia.dtype import Bool, Int, Float, Tuple as T, List as L
 from myia.prim.py_implementations import add, mul, lt
@@ -65,7 +66,10 @@ def infer(**tests_spec):
         def run_test(spec):
             *args, expected_out = spec
             g = parse(fn)
-            inferrer = InferenceEngine(all_inferrers)
+            inferrer = InferenceEngine({
+                'value': infer_value_constant,
+                'type': infer_type_constant,
+            })
             try:
                 out = inferrer.run_sync(g, args)
             except MyiaTypeError as e:

@@ -47,10 +47,9 @@ class Inferrer:
 
 
 class PrimitiveInferrer(Inferrer):
-    def __init__(self, engine, track, prim, inferrer_fn):
+    def __init__(self, engine, track, inferrer_fn):
         super().__init__(engine)
         self.track = track
-        self.prim = prim
         self.inferrer_fn = inferrer_fn
 
     def infer(self, *args):
@@ -100,22 +99,24 @@ class GraphInferrer(Inferrer):
 
 def primitive_inferrer(track, prim):
     def wrap(fn):
-        p = lambda engine: PrimitiveInferrer(engine, track, prim, fn)
+        p = lambda engine: PrimitiveInferrer(engine, track, fn)
         all_inferrers[track].register(prim)(p)
         return p
     return wrap
 
 
-def value_inferrer(prim):
-    async def infer(engine, *refs):
-        coros = [engine.get('value', ref) for ref in refs]
-        args = await asyncio.gather(*coros, loop=engine.loop)
+class PrimitiveValueInferrer(Inferrer):
+    def __init__(self, engine, impl):
+        super().__init__(engine)
+        self.impl = impl
+
+    async def infer(self, *refs):
+        coros = [self.engine.get('value', ref) for ref in refs]
+        args = await asyncio.gather(*coros, loop=self.engine.loop)
         if any(arg is ANYTHING for arg in args):
             return ANYTHING
         else:
-            return pyimpl[prim](*args)
-
-    return primitive_inferrer('value', prim)(infer)
+            return self.impl(*args)
 
 
 #############
@@ -129,7 +130,6 @@ all_inferrers = {
 }
 
 
-@primitive_inferrer('value', Constant)
 async def infer_value_constant(engine, ct):
     v = ct.node.value
     if isinstance(v, Primitive):
@@ -137,7 +137,7 @@ async def infer_value_constant(engine, ct):
         if v in vinfs:
             return vinfs[v](engine)
         else:
-            return value_inferrer(v)(engine)
+            return PrimitiveValueInferrer(engine, pyimpl[v])
     elif isinstance(v, Graph):
         return GraphInferrer(engine, 'value', v, ct.context)
     else:
@@ -157,7 +157,6 @@ async def infer_value_if(engine, cond, tb, fb):
     return await fn()
 
 
-@primitive_inferrer('type', Constant)
 async def infer_type_constant(engine, ct):
     v = ct.node.value
     if isinstance(v, Primitive):
@@ -224,14 +223,14 @@ async def infer_type_arith_bin(engine, x, y):
 for op in [P.add, P.sub, P.mul]:
     all_inferrers['type'].register(op)(
         lambda engine: PrimitiveInferrer(
-            engine, 'type', op, infer_type_arith_bin
+            engine, 'type', infer_type_arith_bin
         )
     )
 
 for op in [P.lt, P.gt, P.eq, P.le, P.ge]:
     all_inferrers['type'].register(op)(
         lambda engine: PrimitiveInferrer(
-            engine, 'type', op, infer_type_compare_bin
+            engine, 'type', infer_type_compare_bin
         )
     )
 
@@ -413,10 +412,10 @@ class EqEquivalence:
 
 class InferenceEngine:
 
-    def __init__(self, inferrers, eq_class=EquivalencePool):
+    def __init__(self, constant_inferrers, eq_class=EquivalencePool):
         self.loop = asyncio.get_event_loop()
-        self.tracks = tuple(inferrers.keys())
-        self.inferrers = inferrers
+        self.tracks = tuple(constant_inferrers.keys())
+        self.constant_inferrers = constant_inferrers
         self.cache = {track: {} for track in self.tracks}
         self.todo = set()
         self.errors = set()
@@ -427,9 +426,8 @@ class InferenceEngine:
             return ref.values[track]
         node = ref.node
         ctx = ref.context
-        infs = self.inferrers[track]
         if is_constant(node):
-            return await infs[Constant](self)(ref)
+            return await self.constant_inferrers[track](self, ref)
         elif is_apply(node):
             n_fn, *n_args = node.inputs
             inf = await self.get(track, Reference(n_fn, ctx))
