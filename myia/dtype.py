@@ -211,6 +211,15 @@ class Tuple(Type):
             return (args,)
 
 
+class Array(Type):
+    """Represents an array of values.
+
+    Instantiate with Array(subtype).
+    """
+
+    elements: Type
+
+
 class Function(Type):
     """Represents a type that can be called.
 
