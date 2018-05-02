@@ -3,11 +3,12 @@ from pytest import mark
 
 from myia.api import parse
 from myia.infer import \
-    InferenceEngine, typeof, ANYTHING, all_inferrers, MyiaTypeError, \
-    infer_value_constant, infer_type_constant
+    InferenceEngine, ANYTHING, MyiaTypeError
 
 from myia.dtype import Bool, Int, Float, Tuple as T, List as L
-from myia.prim.py_implementations import add, mul, lt
+from myia.prim.py_implementations import add, mul, lt, head, tail
+from myia.prim.value_inferrers import infer_value_constant
+from myia.prim.type_inferrers import infer_type_constant, typeof
 
 
 B = Bool()
@@ -124,8 +125,33 @@ def test_tup(x, y):
 
 
 @infer(type=[(i64, f64, i64), (f64, i64, f64)])
-def test_getitem(x, y):
+def test_head_tuple(x, y):
+    tup = (x, y)
+    return head(tup)
+
+
+@infer(type=[(i64, f64, T(f64)), (f64, i64, T(i64))])
+def test_tail_tuple(x, y):
+    tup = (x, y)
+    return tail(tup)
+
+
+@infer(type=[(i64, f64, i64), (f64, i64, f64)])
+def test_getitem_tuple(x, y):
     return (x, y)[0]
+
+
+@infer(
+    type=[
+        (li64, i64, i64),
+        (lf64, i64, f64),
+        (lf64, f64, TypeError),
+        (f64, i64, TypeError),
+        (T(i64, f64), i64, TypeError)
+    ]
+)
+def test_getitem_list(xs, i):
+    return xs[i]
 
 
 @infer(type=(i64, f64, T(i64, f64)))
@@ -357,12 +383,12 @@ def test_hof_3(x, y):
     ]
 )
 def test_func_arg(x, y):
-     def g(func, x, y):
-         return func(x, y)
+    def g(func, x, y):
+        return func(x, y)
 
-     def h(x, y):
-         return x + y
-     return g(h, x, y)
+    def h(x, y):
+        return x + y
+    return g(h, x, y)
 
 
 @infer(

@@ -1,6 +1,6 @@
 
 from ..dtype import Int, Bool, Float, Tuple, List
-from ..infer import ANYTHING, PrimitiveInferrer, GraphInferrer, \
+from ..infer import ANYTHING, Inferrer, PrimitiveInferrer, GraphInferrer, \
     MyiaTypeError
 from ..ir import Graph
 
@@ -18,7 +18,7 @@ def typeof(v):
     elif isinstance(v, tuple):
         return Tuple(map(typeof, v))
     else:
-        raise TypeError(f'Untypable value: {v}')
+        raise TypeError(f'Untypable value: {v}')  # pragma: no cover
 
 
 class TypeTrack:
@@ -51,24 +51,49 @@ def type_inferrer(prim):
 
 @type_inferrer(P.if_)
 async def infer_type_if(engine, cond, tb, fb):
-    assert await engine.get('type', cond) == Bool()
+    cond_t = await engine.get('type', cond)
+    if cond_t != Bool():
+        raise MyiaTypeError('Condition for if must be a boolean')
     v = await engine.get('value', cond)
-    tb_res = (await engine.get('type', tb))()
-    fb_res = (await engine.get('type', fb))()
+    tb_inf = await engine.get('type', tb)
+    fb_inf = await engine.get('type', fb)
+    if not isinstance(tb_inf, Inferrer) or not isinstance(fb_inf, Inferrer):
+        raise MyiaTypeError('Both branches of if primitive must be thunks')
     if v is True:
-        return await tb_res
+        return await tb_inf()
     elif v is False:
-        return await fb_res
+        return await fb_inf()
     elif v is ANYTHING:
-        return await engine.force_same('type', tb_res, fb_res)
+        return await engine.force_same('type', tb_inf(), fb_inf())
 
 
 @type_inferrer(P.cons_tuple)
 async def infer_type_cons_tuple(engine, x, y):
     x_t = await engine.get('type', x)
     y_t = await engine.get('type', y)
-    assert isinstance(y_t, Tuple)
+    if not isinstance(y_t, Tuple):
+        raise MyiaTypeError('cons_tuple on non-tuple')
     return Tuple([x_t, *y_t.elements])
+
+
+@type_inferrer(P.head)
+async def infer_type_head(engine, tup):
+    tup_t = await engine.get('type', tup)
+    if not isinstance(tup_t, Tuple):
+        raise MyiaTypeError('head of non-tuple')
+    if not len(tup_t.elements) >= 1:
+        raise MyiaTypeError('head on empty tuple')
+    return tup_t.elements[0]
+
+
+@type_inferrer(P.tail)
+async def infer_type_tail(engine, tup):
+    tup_t = await engine.get('type', tup)
+    if not isinstance(tup_t, Tuple):
+        raise MyiaTypeError('tail of non-tuple')
+    if not len(tup_t.elements) >= 1:
+        raise MyiaTypeError('tail on empty tuple')
+    return Tuple(tup_t.elements[1:])
 
 
 @type_inferrer(P.getitem)
@@ -80,7 +105,8 @@ async def infer_type_getitem(engine, seq, idx):
 
     if isinstance(seq_t, Tuple):
         idx_v = await engine.get('value', idx)
-        assert idx_v is not ANYTHING
+        if idx_v is ANYTHING:
+            raise MyiaTypeError('Tuples must be indexed with a constant')
         return seq_t.elements[idx_v]
     elif isinstance(seq_t, List):
         return seq_t.element_type
@@ -88,11 +114,18 @@ async def infer_type_getitem(engine, seq, idx):
         raise MyiaTypeError('Wrong seq type for getitem')
 
 
-async def infer_type_compare_bin(engine, x, y):
+async def infer_type_compare(engine, x, y):
     t = await engine.force_same('type', x, y)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
     return Bool()
+
+
+async def infer_type_arith_unary(engine, x):
+    t = await engine.get('type', x)
+    if not isinstance(t, (Int, Float)):
+        raise MyiaTypeError('Expected number')
+    return t
 
 
 async def infer_type_arith_bin(engine, x, y):
@@ -102,14 +135,19 @@ async def infer_type_arith_bin(engine, x, y):
     return t
 
 
-for op in [P.add, P.sub, P.mul]:
-    type_inferrer_constructors[op] = \
-        lambda engine: PrimitiveInferrer(
-            engine, 'type', infer_type_arith_bin
-        )
+def _register_inferrer(prim, fn):
+    def construct(engine):
+        return PrimitiveInferrer(engine, 'type', fn)
+    type_inferrer_constructors[prim] = construct
 
-for op in [P.lt, P.gt, P.eq, P.le, P.ge]:
-    type_inferrer_constructors[op] = \
-        lambda engine: PrimitiveInferrer(
-            engine, 'type', infer_type_compare_bin
-        )
+
+for op in [P.add, P.sub, P.mul, P.div, P.mod, P.pow]:
+    _register_inferrer(op, infer_type_arith_bin)
+
+
+for op in [P.uadd, P.usub]:
+    _register_inferrer(op, infer_type_arith_unary)
+
+
+for op in [P.eq, P.lt, P.gt, P.ne, P.le, P.ge]:
+    _register_inferrer(op, infer_type_compare)
