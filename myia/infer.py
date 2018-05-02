@@ -1,13 +1,10 @@
 
 import asyncio
 
-from .dtype import Int, Bool, Float, Tuple, List
-from .prim import ops as P, Primitive
-from .ir import Graph, Constant, \
-    is_constant, is_constant_graph, is_apply, is_parameter
-from .utils import Named, Registry
+from .ir import \
+    is_constant, is_constant_graph, is_apply
+from .utils import Named
 from .cconv import NestingAnalyzer
-from .prim.py_implementations import implementations as pyimpl
 
 
 ANYTHING = Named('ANYTHING')
@@ -15,19 +12,6 @@ ANYTHING = Named('ANYTHING')
 
 class MyiaTypeError(Exception):
     pass
-
-
-def typeof(v):
-    if isinstance(v, bool):
-        return Bool()
-    elif isinstance(v, int):
-        return Int(64)
-    elif isinstance(v, float):
-        return Float(64)
-    elif isinstance(v, tuple):
-        return Tuple(map(typeof, v))
-    else:
-        raise TypeError(f'Untypable value: {v}')
 
 
 ####################
@@ -95,144 +79,6 @@ class GraphInferrer(Inferrer):
             and other.track == self.track \
             and other.graph == self.graph \
             and other.context == self.context
-
-
-def primitive_inferrer(track, prim):
-    def wrap(fn):
-        p = lambda engine: PrimitiveInferrer(engine, track, fn)
-        all_inferrers[track].register(prim)(p)
-        return p
-    return wrap
-
-
-class PrimitiveValueInferrer(Inferrer):
-    def __init__(self, engine, impl):
-        super().__init__(engine)
-        self.impl = impl
-
-    async def infer(self, *refs):
-        coros = [self.engine.get('value', ref) for ref in refs]
-        args = await asyncio.gather(*coros, loop=self.engine.loop)
-        if any(arg is ANYTHING for arg in args):
-            return ANYTHING
-        else:
-            return self.impl(*args)
-
-
-#############
-# Inferrers #
-#############
-
-
-all_inferrers = {
-    'value': Registry(),
-    'type': Registry()
-}
-
-
-async def infer_value_constant(engine, ct):
-    v = ct.node.value
-    if isinstance(v, Primitive):
-        vinfs = all_inferrers['value']
-        if v in vinfs:
-            return vinfs[v](engine)
-        else:
-            return PrimitiveValueInferrer(engine, pyimpl[v])
-    elif isinstance(v, Graph):
-        return GraphInferrer(engine, 'value', v, ct.context)
-    else:
-        return v
-
-
-@primitive_inferrer('value', P.if_)
-async def infer_value_if(engine, cond, tb, fb):
-    v = await engine.get('value', cond)
-    if v is True:
-        fn = await engine.get('value', tb)
-    elif v is False:
-        fn = await engine.get('value', fb)
-    elif v is ANYTHING:
-        return ANYTHING
-
-    return await fn()
-
-
-async def infer_type_constant(engine, ct):
-    v = ct.node.value
-    if isinstance(v, Primitive):
-        return all_inferrers['type'][v](engine)
-    elif isinstance(v, Graph):
-        return GraphInferrer(engine, 'type', v, ct.context)
-    else:
-        return typeof(ct.node.value)
-
-
-@primitive_inferrer('type', P.if_)
-async def infer_type_if(engine, cond, tb, fb):
-    assert await engine.get('type', cond) == Bool()
-    v = await engine.get('value', cond)
-    tb_res = (await engine.get('type', tb))()
-    fb_res = (await engine.get('type', fb))()
-    if v is True:
-        return await tb_res
-    elif v is False:
-        return await fb_res
-    elif v is ANYTHING:
-        return await engine.force_same('type', tb_res, fb_res)
-
-
-@primitive_inferrer('type', P.cons_tuple)
-async def infer_type_cons_tuple(engine, x, y):
-    x_t = await engine.get('type', x)
-    y_t = await engine.get('type', y)
-    assert isinstance(y_t, Tuple)
-    return Tuple([x_t, *y_t.elements])
-
-
-@primitive_inferrer('type', P.getitem)
-async def infer_type_getitem(engine, seq, idx):
-    seq_t = await engine.get('type', seq)
-    idx_t = await engine.get('type', idx)
-    if not isinstance(idx_t, Int):
-        raise MyiaTypeError('Expected Int for index')
-
-    if isinstance(seq_t, Tuple):
-        idx_v = await engine.get('value', idx)
-        assert idx_v is not ANYTHING
-        return seq_t.elements[idx_v]
-    elif isinstance(seq_t, List):
-        return seq_t.element_type
-    else:
-        raise MyiaTypeError('Wrong seq type for getitem')
-
-
-async def infer_type_compare_bin(engine, x, y):
-    t = await engine.force_same('type', x, y)
-    if not isinstance(t, (Int, Float)):
-        raise MyiaTypeError('Expected number')
-    return Bool()
-
-
-async def infer_type_arith_bin(engine, x, y):
-    t = await engine.force_same('type', x, y)
-    if not isinstance(t, (Int, Float)):
-        raise MyiaTypeError('Expected number')
-    return t
-
-
-for op in [P.add, P.sub, P.mul]:
-    all_inferrers['type'].register(op)(
-        lambda engine: PrimitiveInferrer(
-            engine, 'type', infer_type_arith_bin
-        )
-    )
-
-for op in [P.lt, P.gt, P.eq, P.le, P.ge]:
-    all_inferrers['type'].register(op)(
-        lambda engine: PrimitiveInferrer(
-            engine, 'type', infer_type_compare_bin
-        )
-    )
 
 
 ##############
@@ -500,6 +346,6 @@ class InferenceEngine:
             return_when=asyncio.FIRST_COMPLETED
         )
         main = done.pop()
-        for fut in done|pending:
+        for fut in done | pending:
             self.equiv.declare_equivalent(fut, main)
         return main.result()
