@@ -41,3 +41,16 @@ def test_expression_statements():
         print(x)
         return x
     parse(f)
+
+
+def _global_f():
+    return 42
+
+
+def test_global_nested():
+    def g():
+        def h():
+            return _global_f()
+        return h()
+
+    parse(g)
