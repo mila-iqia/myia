@@ -3,12 +3,18 @@ from pytest import mark
 
 from myia.api import parse
 from myia.infer import \
-    InferenceEngine, ANYTHING, MyiaTypeError
+    InferenceEngine, ANYTHING, MyiaTypeError, PrimitiveInferrer, \
+    VirtualReference
 
 from myia.dtype import Bool, Int, Float, Tuple as T, List as L
-from myia.prim.py_implementations import add, mul, lt, head, tail
-from myia.prim.value_inferrers import infer_value_constant
-from myia.prim.type_inferrers import infer_type_constant, typeof
+from myia.prim import Primitive
+from myia.prim.py_implementations import \
+    implementations as pyimpl, \
+    add, mul, lt, head, tail
+from myia.prim.value_inferrers import \
+    ValueTrack, value_inferrer_constructors
+from myia.prim.type_inferrers import \
+    TypeTrack, type_inferrer_constructors, typeof
 
 
 B = Bool()
@@ -42,6 +48,52 @@ def fill_in(test, tracks):
             elif track == 'value':
                 entry[track] = ANYTHING
     return test
+
+
+########################
+# Temporary primitives #
+########################
+
+
+pyimpl_test = {**pyimpl}
+value_inferrer_cons_test = {**value_inferrer_constructors}
+type_inferrer_cons_test = {**type_inferrer_constructors}
+
+infer_value_constant = ValueTrack(pyimpl_test, value_inferrer_cons_test)
+infer_type_constant = TypeTrack(type_inferrer_cons_test)
+
+
+def primitive_inferrer(track, op, into):
+    def deco(fn):
+        def construct(engine):
+            return PrimitiveInferrer(engine, track, op, fn)
+        into[op] = construct
+        return construct
+
+    return deco
+
+
+# Map
+
+_map = Primitive('map')
+
+
+def impl_map(f, xs):
+    return list(map(f, xs))
+
+
+pyimpl_test[_map] = impl_map
+
+
+@primitive_inferrer('type', _map, into=type_inferrer_cons_test)
+async def infer_type_map(engine, f, xs):
+    f_t = await engine.get('type', f)
+    xs_t = await engine.get('type', xs)
+    if not isinstance(xs_t, L):
+        raise MyiaTypeError('Expect list for map')
+    xref = VirtualReference(value=ANYTHING, type=xs_t.element_type)
+    ret_t = await f_t(xref)
+    return L(ret_t)
 
 
 def infer(**tests_spec):
@@ -460,6 +512,19 @@ def test_closure_passing(x, y):
     a2 = adder(2)
 
     return a1(x) + a2(y)
+
+
+@infer(
+    type=[
+        (li64, lf64, T(li64, lf64)),
+        (li64, f64, TypeError),
+    ]
+)
+def test_map(xs, ys):
+    def square(x):
+        return x * x
+
+    return _map(square, xs), _map(square, ys)
 
 
 @infer(type=[(i64, TypeError)])
