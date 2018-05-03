@@ -133,7 +133,7 @@ def destroy_disconnected_nodes(root: Graph) -> None:
     total = _dfs(root.return_, succ_bidirectional(cov))
     dead = set(total) - set(live)
     for node in dead:
-        node.inputs.clear()  # type: ignore
+        node.inputs.clear()
 
 
 ###############
