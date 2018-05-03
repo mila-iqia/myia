@@ -103,9 +103,6 @@ class Context:
              if g in deps or g is graph)
         )
 
-    def __iter__(self):
-        return iter(self.parts)
-
     def __hash__(self):
         return hash((self.engine, self.parts))
 
@@ -131,9 +128,6 @@ class Reference:
 
     def __hash__(self):
         return hash((self.node, self.context))
-
-    def __hrepr__(self, H, hrepr):
-        return hrepr({'node': self.node, 'context': self.context})
 
 
 class VirtualReference:
@@ -229,7 +223,7 @@ class EquivalencePool:
             pass
 
         else:
-            self.engine.add_error(
+            self.engine.log_error(
                 refs, MyiaTypeError(f'Type mismatch: {vx} != {vy}')
             )
 
@@ -279,20 +273,19 @@ class InferenceEngine:
             try:
                 return await inf(*argrefs)
             except MyiaTypeError as e:
-                self.add_error([ref], e)
+                self.log_error([ref], e)
                 raise
             except RuntimeError as e:
                 message = e.args[0]
                 if message.startswith('Task cannot await on itself'):
-                    e2 = MyiaTypeError(
-                        'There seems to be an infinite recursion', e
+                    e2 = self.log_error(
+                        [ref], 'There seems to be an infinite recursion'
                     )
-                    self.add_error([ref], e2)
                     raise e2
                 else:
-                    raise
+                    raise  # pragma: no cover
         else:
-            raise Exception(f'Cannot process: {node}')
+            raise Exception(f'Cannot process: {node}')  # pragma: no cover
 
     def get(self, track, ref):
         futs = self.cache[track]
@@ -305,8 +298,15 @@ class InferenceEngine:
         fut.set_result(value)
         self.cache[track][ref] = fut
 
-    def add_error(self, refs, err):
+    def log_error(self, refs, err):
+        if isinstance(err, str):
+            err = MyiaTypeError(err)
+        elif isinstance(err, asyncio.Future):
+            err = err.exception()
+            if err is None:
+                return
         self.errors.append({'refs': refs, 'error': err})
+        return err
 
     def schedule(self, coro):
         self.todo.add(lambda: coro)
@@ -341,7 +341,7 @@ class InferenceEngine:
                 todo, loop=self.loop, timeout=self.timeout
             )
             if not done:
-                self.add_error(
+                self.log_error(
                     [], MyiaTypeError(
                         f'Exceeded timeout ({self.timeout}s) in type inferrer.'
                         ' There might be an infinite loop in the program,'
@@ -350,9 +350,8 @@ class InferenceEngine:
                     )
                 )
                 break
-            excs = [d.exception() for d in done if d.exception()]
-            if excs:
-                raise excs[0]
+            for d in done:
+                self.log_error([], d)
             self.todo.update(pending)
 
         if self.errors:
@@ -379,6 +378,8 @@ class InferenceEngine:
             loop=self.loop,
             return_when=asyncio.FIRST_COMPLETED
         )
+        for fut in done:
+            self.log_error(refs, fut)
         main = done.pop()
         for fut in done | pending:
             self.equiv.declare_equivalent(fut, main, refs)

@@ -142,8 +142,14 @@ def infer(**tests_spec):
 type_signature_arith_bin = [
     (i64, i64, i64),
     (f64, f64, f64),
-    (i64, f64, TypeError)
+    (i64, f64, TypeError),
+    (B, B, TypeError),
 ]
+
+
+@infer(type=[({'value': 12.0, 'type': f64},)], value=[(12.0,)])
+def test_constants():
+    return 1.5 * 8.0
 
 
 @infer(type=type_signature_arith_bin)
@@ -151,8 +157,29 @@ def test_prim_mul(x, y):
     return x * y
 
 
+@infer(type=[(i64, i64), (f64, f64), (B, TypeError)])
+def test_prim_usub(x):
+    return -x
+
+
+@infer(
+    type=[
+        (B, f64, f64, f64),
+        (B, f64, i64, TypeError),
+        ({'value': True}, f64, i64, f64),
+        ({'value': False}, f64, i64, i64),
+        (i64, f64, f64, TypeError),
+    ]
+)
+def test_if(c, x, y):
+    if c:
+        return x * x
+    else:
+        return y * y
+
+
 @infer(type=type_signature_arith_bin)
-def test_if(x, y):
+def test_if2(x, y):
     if x > y:
         return x
     else:
@@ -179,15 +206,19 @@ def test_tup(x, y):
     return (x, y)
 
 
-@infer(type=[(i64, f64, i64), (f64, i64, f64)])
-def test_head_tuple(x, y):
-    tup = (x, y)
+@infer(type=[(T(i64, f64), i64),
+             (T(f64, i64), f64),
+             (T(), TypeError),
+             (f64, TypeError)])
+def test_head_tuple(tup):
     return head(tup)
 
 
-@infer(type=[(i64, f64, T(f64)), (f64, i64, T(i64))])
-def test_tail_tuple(x, y):
-    tup = (x, y)
+@infer(type=[(T(i64, f64), T(f64)),
+             (T(f64, i64), T(i64)),
+             (T(), TypeError),
+             (f64, TypeError)])
+def test_tail_tuple(tup):
     return tail(tup)
 
 

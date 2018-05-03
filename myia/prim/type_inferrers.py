@@ -58,7 +58,8 @@ async def infer_type_if(engine, cond, tb, fb):
     tb_inf = await engine.get('type', tb)
     fb_inf = await engine.get('type', fb)
     if not isinstance(tb_inf, Inferrer) or not isinstance(fb_inf, Inferrer):
-        raise MyiaTypeError('Both branches of if primitive must be thunks')
+        raise MyiaTypeError('Both branches of if primitive must be thunks') \
+            # pragma: no cover
     if v is True:
         return await tb_inf()
     elif v is False:
@@ -72,7 +73,7 @@ async def infer_type_cons_tuple(engine, x, y):
     x_t = await engine.get('type', x)
     y_t = await engine.get('type', y)
     if not isinstance(y_t, Tuple):
-        raise MyiaTypeError('cons_tuple on non-tuple')
+        raise MyiaTypeError('cons_tuple on non-tuple')  # pragma: no cover
     return Tuple([x_t, *y_t.elements])
 
 
