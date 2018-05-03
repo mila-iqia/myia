@@ -67,10 +67,13 @@ def infer(**tests_spec):
         def run_test(spec):
             *args, expected_out = spec
             g = parse(fn)
-            inferrer = InferenceEngine({
-                'value': infer_value_constant,
-                'type': infer_type_constant,
-            })
+            inferrer = InferenceEngine(
+                {
+                    'value': infer_value_constant,
+                    'type': infer_type_constant,
+                },
+                timeout=0.1
+            )
             try:
                 out = inferrer.run_sync(g, args)
             except MyiaTypeError as e:
@@ -457,3 +460,35 @@ def test_closure_passing(x, y):
     a2 = adder(2)
 
     return a1(x) + a2(y)
+
+
+@infer(type=[(i64, TypeError)])
+def test_infinite_recursion(x):
+    def ouroboros(x):
+        return ouroboros(x - 1)
+
+    return ouroboros(x)
+
+
+@infer(type=[(i64, TypeError)])
+def test_indirect_infinite_recursion(x):
+    def ouroboros(x):
+        if x < 0:
+            return ouroboros(x - 1)
+        else:
+            return ouroboros(x + 1)
+
+    return ouroboros(x)
+
+
+def ping():
+    return pong()
+
+
+def pong():
+    return ping()
+
+
+@infer(type=[(i64, TypeError)])
+def test_infinite_mutual_recursion(x):
+    return ping()

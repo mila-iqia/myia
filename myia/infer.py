@@ -249,10 +249,14 @@ class EquivalencePool:
 
 class InferenceEngine:
 
-    def __init__(self, constant_inferrers, eq_class=EquivalencePool):
-        self.loop = asyncio.get_event_loop()
+    def __init__(self,
+                 constant_inferrers,
+                 eq_class=EquivalencePool,
+                 timeout=1.0):
+        self.loop = asyncio.new_event_loop()
         self.tracks = tuple(constant_inferrers.keys())
         self.constant_inferrers = constant_inferrers
+        self.timeout = timeout
         self.cache = {track: {} for track in self.tracks}
         self.todo = set()
         self.errors = []
@@ -277,6 +281,16 @@ class InferenceEngine:
             except MyiaTypeError as e:
                 self.add_error([ref], e)
                 raise
+            except RuntimeError as e:
+                message = e.args[0]
+                if message.startswith('Task cannot await on itself'):
+                    e2 = MyiaTypeError(
+                        'There seems to be an infinite recursion', e
+                    )
+                    self.add_error([ref], e2)
+                    raise e2
+                else:
+                    raise
         else:
             raise Exception(f'Cannot process: {node}')
 
@@ -322,8 +336,24 @@ class InferenceEngine:
         while self.todo:
             todo = list(self.todo)
             self.todo = set()
-            todo = [t() for t in todo]
-            await asyncio.gather(*todo, loop=self.loop)
+            todo = [t() if callable(t) else t for t in todo]
+            done, pending = await asyncio.wait(
+                todo, loop=self.loop, timeout=self.timeout
+            )
+            if not done:
+                self.add_error(
+                    [], MyiaTypeError(
+                        f'Exceeded timeout ({self.timeout}s) in type inferrer.'
+                        ' There might be an infinite loop in the program,'
+                        ' or the program is too large and you should'
+                        ' increase the timeout.'
+                    )
+                )
+                break
+            excs = [d.exception() for d in done if d.exception()]
+            if excs:
+                raise excs[0]
+            self.todo.update(pending)
 
         if self.errors:
             raise self.errors[0]['error']
@@ -333,7 +363,13 @@ class InferenceEngine:
 
     def run_sync(self, graph, args):
         self.deps = NestingAnalyzer(graph).graph_dependencies_total()
-        return self.loop.run_until_complete(self.run(graph, args))
+        try:
+            res = self.loop.run_until_complete(self.run(graph, args))
+        finally:
+            for task in asyncio.Task.all_tasks(self.loop):
+                task._log_destroy_pending = False
+            self.loop.close()
+        return res
 
     async def force_same(self, track, *refs):
         futs = [self.get(track, ref) if isinstance(ref, Reference) else ref
