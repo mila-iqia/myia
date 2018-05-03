@@ -1,3 +1,5 @@
+import pytest
+
 from myia.api import parse
 from myia.cconv import NestingAnalyzer
 from myia.ir.anf import Constant, Graph
@@ -201,3 +203,14 @@ def test_deep2(x):
             return h
         return g(x)
     return f(x + 1)
+
+
+@pytest.mark.xfail(reason="Need to fix free_variables_total")
+@check_nest('', '', '')
+def test_if_while(x):
+    while x > 0:
+        if x == 5:
+            return x
+        else:
+            x = x - 1
+    return -1
