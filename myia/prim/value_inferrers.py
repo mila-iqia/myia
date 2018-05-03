@@ -51,7 +51,7 @@ infer_value_constant = ValueTrack(pyimpl, value_inferrer_constructors)
 def value_inferrer(prim):
     def deco(fn):
         def constructor(engine):
-            return PrimitiveInferrer(engine, 'value', prim, fn)
+            return PrimitiveInferrer(engine, prim, fn)
         value_inferrer_constructors[prim] = constructor
         return fn
     return deco

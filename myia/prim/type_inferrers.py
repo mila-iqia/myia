@@ -43,7 +43,7 @@ infer_type_constant = TypeTrack(type_inferrer_constructors)
 def type_inferrer(prim):
     def deco(fn):
         def constructor(engine):
-            return PrimitiveInferrer(engine, 'type', prim, fn)
+            return PrimitiveInferrer(engine, prim, fn)
         type_inferrer_constructors[prim] = constructor
         return fn
     return deco
@@ -65,7 +65,7 @@ async def infer_type_if(engine, cond, tb, fb):
     elif v is False:
         return await fb_inf()
     elif v is ANYTHING:
-        return await engine.force_same('type', tb_inf(), fb_inf())
+        return await engine.assert_same('type', tb_inf(), fb_inf())
 
 
 @type_inferrer(P.cons_tuple)
@@ -116,7 +116,7 @@ async def infer_type_getitem(engine, seq, idx):
 
 
 async def infer_type_compare(engine, x, y):
-    t = await engine.force_same('type', x, y)
+    t = await engine.assert_same('type', x, y)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
     return Bool()
@@ -130,7 +130,7 @@ async def infer_type_arith_unary(engine, x):
 
 
 async def infer_type_arith_bin(engine, x, y):
-    t = await engine.force_same('type', x, y)
+    t = await engine.assert_same('type', x, y)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
     return t
@@ -138,7 +138,7 @@ async def infer_type_arith_bin(engine, x, y):
 
 def _register_inferrer(prim, fn):
     def construct(engine):
-        return PrimitiveInferrer(engine, 'type', prim, fn)
+        return PrimitiveInferrer(engine, prim, fn)
     type_inferrer_constructors[prim] = construct
 
 

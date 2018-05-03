@@ -63,10 +63,10 @@ infer_value_constant = ValueTrack(pyimpl_test, value_inferrer_cons_test)
 infer_type_constant = TypeTrack(type_inferrer_cons_test)
 
 
-def primitive_inferrer(track, op, into):
+def primitive_inferrer(op, into):
     def deco(fn):
         def construct(engine):
-            return PrimitiveInferrer(engine, track, op, fn)
+            return PrimitiveInferrer(engine, op, fn)
         into[op] = construct
         return construct
 
@@ -85,7 +85,7 @@ def impl_map(f, xs):
 pyimpl_test[_map] = impl_map
 
 
-@primitive_inferrer('type', _map, into=type_inferrer_cons_test)
+@primitive_inferrer(_map, into=type_inferrer_cons_test)
 async def infer_type_map(engine, f, xs):
     f_t = await engine.get('type', f)
     xs_t = await engine.get('type', xs)
@@ -108,9 +108,9 @@ def impl_tern(x, y, z):
 pyimpl_test[_tern] = impl_tern
 
 
-@primitive_inferrer('type', _tern, into=type_inferrer_cons_test)
+@primitive_inferrer(_tern, into=type_inferrer_cons_test)
 async def infer_type_tern(engine, x, y, z):
-    ret_t = await engine.force_same('type', x, y, z)
+    ret_t = await engine.assert_same('type', x, y, z)
     assert isinstance(ret_t, (Int, Float))
     return ret_t
 
@@ -127,7 +127,7 @@ def impl_to_i64(x, y, z):
 pyimpl_test[_to_i64] = impl_to_i64
 
 
-@primitive_inferrer('type', _to_i64, into=type_inferrer_cons_test)
+@primitive_inferrer(_to_i64, into=type_inferrer_cons_test)
 async def infer_type_to_i64(engine, x):
     return Int(64)
 
@@ -163,7 +163,7 @@ def infer(**tests_spec):
                 timeout=0.1
             )
             try:
-                out = inferrer.run_sync(g, args)
+                out = inferrer.run(g, args)
             except MyiaTypeError as e:
                 out = TypeError
             assert out == expected_out
