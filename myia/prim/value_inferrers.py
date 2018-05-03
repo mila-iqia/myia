@@ -48,16 +48,16 @@ value_inferrer_constructors = {}
 infer_value_constant = ValueTrack(pyimpl, value_inferrer_constructors)
 
 
-def value_inferrer(prim):
+def value_inferrer(prim, nargs):
     def deco(fn):
         def constructor(engine):
-            return PrimitiveInferrer(engine, prim, fn)
+            return PrimitiveInferrer(engine, prim, nargs, fn)
         value_inferrer_constructors[prim] = constructor
         return fn
     return deco
 
 
-@value_inferrer(P.if_)
+@value_inferrer(P.if_, 3)
 async def infer_value_if(engine, cond, tb, fb):
     v = await engine.get('value', cond)
     if v is True:

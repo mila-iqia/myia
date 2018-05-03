@@ -19,6 +19,13 @@ class MyiaTypeError(Exception):
     pass
 
 
+def type_error_nargs(ident, expected, got):
+    return MyiaTypeError(
+        f'Wrong number of arguments for {ident}:'
+        f' expected {expected}, got {got}.'
+    )
+
+
 ####################
 # Inferrer classes #
 ####################
@@ -72,13 +79,16 @@ class PrimitiveInferrer(Inferrer):
 
     """
 
-    def __init__(self, engine, prim, inferrer_fn):
+    def __init__(self, engine, prim, nargs, inferrer_fn):
         """Initialize the PrimitiveInferrer."""
         super().__init__(engine, prim)
         self.inferrer_fn = inferrer_fn
+        self.nargs = nargs
 
     def infer(self, *args):
         """Infer a property of the operation on the given arguments."""
+        if self.nargs is not None and len(args) != self.nargs:
+            raise type_error_nargs(self.identifier, self.nargs, len(args))
         return self.inferrer_fn(self.engine, *args)
 
     def provably_equivalent(self, other):
@@ -106,10 +116,14 @@ class GraphInferrer(Inferrer):
         super().__init__(engine, graph)
         self.track = track
         self.graph = graph
+        self.nargs = len(self.graph.parameters)
         self.context = context.filter(graph)
 
     async def infer(self, *args):
         """Infer a property of the operation on the given arguments."""
+        if len(args) != self.nargs:
+            raise type_error_nargs(self.identifier, self.nargs, len(args))
+
         engine = self.engine
 
         # We fetch all relevant properties of all arguments in order to build a
@@ -517,23 +531,18 @@ class InferenceEngine:
         self.todo.add(fn)
 
     async def _run(self, graph, args):
-        assert len(graph.parameters) == len(args)
 
         ctx = Context(
             self,
             ((graph, track, tuple(arg[track] for arg in args))
              for track in self.tracks)
         )
-
-        for p, arg in zip(graph.parameters, args):
-            for track, value in arg.items():
-                ref = Reference(p, ctx)
-                self.cache_value(track, ref, value)
-
+        refs = [VirtualReference(**arg) for arg in args]
         oref = Reference(graph.output, ctx)
 
         for track in self.tracks:
-            self.schedule(self.get(track, oref))
+            inf = GraphInferrer(self, track, graph, ctx)
+            self.schedule(inf(*refs))
 
         while self.todo:
             todo = list(self.todo)

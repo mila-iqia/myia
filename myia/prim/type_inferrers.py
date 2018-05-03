@@ -40,16 +40,16 @@ type_inferrer_constructors = {}
 infer_type_constant = TypeTrack(type_inferrer_constructors)
 
 
-def type_inferrer(prim):
+def type_inferrer(prim, nargs):
     def deco(fn):
         def constructor(engine):
-            return PrimitiveInferrer(engine, prim, fn)
+            return PrimitiveInferrer(engine, prim, nargs, fn)
         type_inferrer_constructors[prim] = constructor
         return fn
     return deco
 
 
-@type_inferrer(P.if_)
+@type_inferrer(P.if_, 3)
 async def infer_type_if(engine, cond, tb, fb):
     cond_t = await engine.get('type', cond)
     if cond_t != Bool():
@@ -68,7 +68,7 @@ async def infer_type_if(engine, cond, tb, fb):
         return await engine.assert_same('type', tb_inf(), fb_inf())
 
 
-@type_inferrer(P.cons_tuple)
+@type_inferrer(P.cons_tuple, 2)
 async def infer_type_cons_tuple(engine, x, y):
     x_t = await engine.get('type', x)
     y_t = await engine.get('type', y)
@@ -77,7 +77,7 @@ async def infer_type_cons_tuple(engine, x, y):
     return Tuple([x_t, *y_t.elements])
 
 
-@type_inferrer(P.head)
+@type_inferrer(P.head, 1)
 async def infer_type_head(engine, tup):
     tup_t = await engine.get('type', tup)
     if not isinstance(tup_t, Tuple):
@@ -87,7 +87,7 @@ async def infer_type_head(engine, tup):
     return tup_t.elements[0]
 
 
-@type_inferrer(P.tail)
+@type_inferrer(P.tail, 1)
 async def infer_type_tail(engine, tup):
     tup_t = await engine.get('type', tup)
     if not isinstance(tup_t, Tuple):
@@ -97,7 +97,7 @@ async def infer_type_tail(engine, tup):
     return Tuple(tup_t.elements[1:])
 
 
-@type_inferrer(P.getitem)
+@type_inferrer(P.getitem, 2)
 async def infer_type_getitem(engine, seq, idx):
     seq_t = await engine.get('type', seq)
     idx_t = await engine.get('type', idx)
@@ -136,19 +136,19 @@ async def infer_type_arith_bin(engine, x, y):
     return t
 
 
-def _register_inferrer(prim, fn):
+def _register_inferrer(prim, nargs, fn):
     def construct(engine):
-        return PrimitiveInferrer(engine, prim, fn)
+        return PrimitiveInferrer(engine, prim, nargs, fn)
     type_inferrer_constructors[prim] = construct
 
 
 for op in [P.add, P.sub, P.mul, P.div, P.mod, P.pow]:
-    _register_inferrer(op, infer_type_arith_bin)
+    _register_inferrer(op, 2, infer_type_arith_bin)
 
 
 for op in [P.uadd, P.usub]:
-    _register_inferrer(op, infer_type_arith_unary)
+    _register_inferrer(op, 1, infer_type_arith_unary)
 
 
 for op in [P.eq, P.lt, P.gt, P.ne, P.le, P.ge]:
-    _register_inferrer(op, infer_type_compare)
+    _register_inferrer(op, 2, infer_type_compare)

@@ -63,10 +63,10 @@ infer_value_constant = ValueTrack(pyimpl_test, value_inferrer_cons_test)
 infer_type_constant = TypeTrack(type_inferrer_cons_test)
 
 
-def primitive_inferrer(op, into):
+def primitive_inferrer(op, nargs, into):
     def deco(fn):
         def construct(engine):
-            return PrimitiveInferrer(engine, op, fn)
+            return PrimitiveInferrer(engine, op, nargs, fn)
         into[op] = construct
         return construct
 
@@ -85,7 +85,7 @@ def impl_map(f, xs):
 pyimpl_test[_map] = impl_map
 
 
-@primitive_inferrer(_map, into=type_inferrer_cons_test)
+@primitive_inferrer(_map, 2, into=type_inferrer_cons_test)
 async def infer_type_map(engine, f, xs):
     f_t = await engine.get('type', f)
     xs_t = await engine.get('type', xs)
@@ -108,7 +108,7 @@ def impl_tern(x, y, z):
 pyimpl_test[_tern] = impl_tern
 
 
-@primitive_inferrer(_tern, into=type_inferrer_cons_test)
+@primitive_inferrer(_tern, 3, into=type_inferrer_cons_test)
 async def infer_type_tern(engine, x, y, z):
     ret_t = await engine.assert_same('type', x, y, z)
     assert isinstance(ret_t, (Int, Float))
@@ -127,7 +127,7 @@ def impl_to_i64(x, y, z):
 pyimpl_test[_to_i64] = impl_to_i64
 
 
-@primitive_inferrer(_to_i64, into=type_inferrer_cons_test)
+@primitive_inferrer(_to_i64, 1, into=type_inferrer_cons_test)
 async def infer_type_to_i64(engine, x):
     return Int(64)
 
@@ -196,9 +196,13 @@ def test_prim_mul(x, y):
 @infer(type=[
     (i64, i64, i64, i64),
     (f64, f64, f64, f64),
+    # Three different inconsistent patterns below
     (f64, f64, i64, TypeError),
     (i64, f64, f64, TypeError),
     (f64, f64, i64, TypeError),
+    # Test too few/too many arguments below
+    (i64, TypeError),
+    (i64, i64, i64, i64, TypeError),
 ])
 def test_prim_tern(x, y, z):
     return _tern(x, y, z)
@@ -246,6 +250,30 @@ def test_while(x, y):
         rval = rval * y
         x = x - 1
     return rval
+
+
+@infer(type=[(i64, TypeError)])
+def test_not_enough_args_prim(x):
+    return mul(x)
+
+
+@infer(type=[(i64, i64, i64, TypeError)])
+def test_too_many_args_prim(x, y, z):
+    return mul(x, y, z)
+
+
+@infer(type=[(i64, TypeError)])
+def test_not_enough_args(x):
+    def g(x, y):
+        return x * y
+    return g(x)
+
+
+@infer(type=[(i64, i64, TypeError)])
+def test_too_many_args(x, y):
+    def g(x):
+        return x * x
+    return g(x, y)
 
 
 @infer(type=(i64, f64, T(i64, f64)))
