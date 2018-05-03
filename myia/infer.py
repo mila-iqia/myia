@@ -161,11 +161,17 @@ class InferrerEquivalenceClass:
 
         for inf in self.pending_members:
             maybe_changes = True
-            for args, expected in self.results.items():
-                v = await inf(*args)
-                self.engine.equiv.declare_equivalent(
-                    expected, v, self.all_members
-                )
+            # The assert will be triggered if we add new equivalences
+            # after the first ones are resolved. I'm not certain in what
+            # case exactly that'd happen. If it does, try to uncomment
+            # the block after the assert and see if it works.
+            assert not self.results, \
+                "Congrats, you found out how to trigger this code."
+            # for args, expected in self.results.items():
+            #     v = inf(*args)
+            #     self.engine.equiv.declare_equivalent(
+            #         expected, v, self.all_members
+            #     )
         self.checked_members.update(self.pending_members)
         self.pending_members = set()
 
@@ -178,7 +184,7 @@ class InferrerEquivalenceClass:
         for args in to_check:
             maybe_changes = True
             inf1, *others = self.checked_members
-            res1 = inf1(*args)
+            res1 = await inf1(*args)
             self.results[args] = res1
             for inf2 in others:
                 res2 = inf2(*args)
@@ -202,29 +208,31 @@ class EquivalencePool:
         self.engine.schedule_function(self.check)
 
     async def _process_equivalence(self, x, y, refs):
-        vx = await x
-        vy = await y
+        if hasattr(x, '__await__'):
+            x = await x
+        if hasattr(y, '__await__'):
+            y = await y
 
-        if isinstance(vx, Inferrer) and isinstance(vy, Inferrer):
-            if vx.provably_equivalent(vy):
+        if isinstance(x, Inferrer) and isinstance(y, Inferrer):
+            if x.provably_equivalent(y):
                 return
 
             eqx = self.eqclasses.get(
-                vx, InferrerEquivalenceClass(self.engine, {vx})
+                x, InferrerEquivalenceClass(self.engine, {x})
             )
             eqy = self.eqclasses.get(
-                vy, InferrerEquivalenceClass(self.engine, {vy})
+                y, InferrerEquivalenceClass(self.engine, {y})
             )
             eqx.update(eqy)
             for z in eqx:
                 self.eqclasses[z] = eqx
 
-        elif vx == vy:
+        elif x == y:
             pass
 
         else:
             self.engine.log_error(
-                refs, MyiaTypeError(f'Type mismatch: {vx} != {vy}')
+                refs, MyiaTypeError(f'Type mismatch: {x} != {y}')
             )
 
     async def check(self):

@@ -96,6 +96,42 @@ async def infer_type_map(engine, f, xs):
     return L(ret_t)
 
 
+# Ternary arithmetic op
+
+_tern = Primitive('tern')
+
+
+def impl_tern(x, y, z):
+    return x + y + z
+
+
+pyimpl_test[_tern] = impl_tern
+
+
+@primitive_inferrer('type', _tern, into=type_inferrer_cons_test)
+async def infer_type_tern(engine, x, y, z):
+    ret_t = await engine.force_same('type', x, y, z)
+    assert isinstance(ret_t, (Int, Float))
+    return ret_t
+
+
+# Coercion
+
+_to_i64 = Primitive('to_i64')
+
+
+def impl_to_i64(x, y, z):
+    return x + y + z
+
+
+pyimpl_test[_to_i64] = impl_to_i64
+
+
+@primitive_inferrer('type', _to_i64, into=type_inferrer_cons_test)
+async def infer_type_to_i64(engine, x):
+    return Int(64)
+
+
 def infer(**tests_spec):
 
     tests = []
@@ -155,6 +191,17 @@ def test_constants():
 @infer(type=type_signature_arith_bin)
 def test_prim_mul(x, y):
     return x * y
+
+
+@infer(type=[
+    (i64, i64, i64, i64),
+    (f64, f64, f64, f64),
+    (f64, f64, i64, TypeError),
+    (i64, f64, f64, TypeError),
+    (f64, f64, i64, TypeError),
+])
+def test_prim_tern(x, y, z):
+    return _tern(x, y, z)
 
 
 @infer(type=[(i64, i64), (f64, f64), (B, TypeError)])
@@ -418,10 +465,45 @@ def test_hof(x):
 
 @infer(
     type=[
+        (i64, i64, i64, i64),
+        (i64, f64, i64, TypeError)
+    ]
+)
+def test_hof_2(c, x, y):
+    _to_i64
+
+    def identity(x):
+        return x
+
+    def double(x):
+        return x + x
+
+    def square(x):
+        return x * x
+
+    def pick(c):
+        if c < 0:
+            return square
+        elif c == 0:
+            return _to_i64
+        else:
+            return double
+
+    def pick2(c, f):
+        if c < 0:
+            return f
+        else:
+            return identity
+
+    return pick2(c, pick(c))(x + x)
+
+
+@infer(
+    type=[
         (i64, T(T(i64, i64), T(B, B)))
     ]
 )
-def test_hof_2(x):
+def test_hof_3(x):
 
     def double(x):
         return x + x
@@ -442,7 +524,7 @@ def test_hof_2(x):
         ({'value': 1}, i64, T(i64, i64)),
     ]
 )
-def test_hof_3(x, y):
+def test_hof_4(x, y):
 
     def double(x):
         return x + x
