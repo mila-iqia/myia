@@ -234,6 +234,8 @@ class Parser:
         assert isinstance(self.function, FunctionType)
         if varnum in self.globals_:
             return self.environment.map(self.globals_[varnum])
+        elif varnum in self.function.__globals__:
+            return self.environment.map(self.function.__globals__[varnum])
         raise ValueError(varnum)
 
     def process_FunctionDef(self, block: 'Block',
