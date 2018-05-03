@@ -25,6 +25,6 @@ setup(
     install_requires=[],
     extras_require={
         'test': ['flake8', 'pytest', 'codecov',
-                 'pytest-cov', 'mypy', 'pydocstyle'],
+                 'pytest-cov', 'pydocstyle'],
     }
 )
