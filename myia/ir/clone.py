@@ -1,6 +1,6 @@
 """Graph cloning facility."""
 
-from typing import Any, Dict, Iterable, Set, Union, cast
+from typing import Any, Dict, Iterable, Set, Union
 
 from ..graph_utils import dfs
 from ..info import About
@@ -157,7 +157,7 @@ class GraphCloner:
         # When the total option is not given, we do not clone graphs
         # unless specified explicitly.
         g2 = self.repl.get(g, g)
-        return cast(Graph, g2)
+        return g2
 
     def _clone_subgraph(self, root: ANFNode) -> ANFNode:
         """Helper function to clone starting from root.
@@ -212,12 +212,12 @@ class GraphCloner:
             self.repl[node] = new
 
         for _node in to_clone:
-            node = cast(ANFNode, _node)
+            node = _node
             new_inputs = [self.repl[orig_node] for orig_node in node.inputs]
-            repl = cast(ANFNode, self.repl[node])
+            repl = self.repl[node]
             repl.inputs = new_inputs
 
-        return cast(ANFNode, self.repl[root])
+        return self.repl[root]
 
     def run(self) -> None:
         """Clone everything still to be cloned.
