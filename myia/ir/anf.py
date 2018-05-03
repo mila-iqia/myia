@@ -134,7 +134,7 @@ class ANFNode(Node):
     @inputs.setter
     def inputs(self, value: Iterable['ANFNode']) -> None:
         """Set the list of inputs."""
-        self._inputs.clear()  # type: ignore
+        self._inputs.clear()
         self._inputs = Inputs(self, value)
 
     @property
@@ -155,7 +155,7 @@ class ANFNode(Node):
 
         """
         cls = self.__class__
-        obj = cls.__new__(cls)  # type: ignore
+        obj = cls.__new__(cls)
         ANFNode.__init__(obj, self.inputs, self.value, self.graph)
         return obj
 
@@ -286,7 +286,7 @@ class Apply(ANFNode):
     def __visit__(self, fn):
         new_inputs = expandlist(map(fn, self.inputs))
         g = noseq(fn, self.graph)
-        return Apply(new_inputs, g)  # type: ignore
+        return Apply(new_inputs, g)
 
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, inputs=self.inputs,

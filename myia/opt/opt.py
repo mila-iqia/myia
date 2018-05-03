@@ -33,8 +33,8 @@ def sexp_to_node(sexp, graph, multigraph=False):
     """
     if isinstance(sexp, tuple):
         if multigraph and isinstance(graph, Var):
-            return Apply([sexp_to_node(x, Var('G'), True)  # type: ignore
-                          for x in sexp], graph)  # type: ignore
+            return Apply([sexp_to_node(x, Var('G'), True)
+                          for x in sexp], graph)
         else:
             return Apply([sexp_to_node(x, graph, multigraph)
                           for x in sexp], graph)
@@ -185,7 +185,7 @@ class PatternOptimizerEquilibrium:
 
     def __call__(self, *graphs):
         """Apply the pass on all graphs repeatedly until equilibrium."""
-        graphs = set(graphs)  # type: ignore
+        graphs = set(graphs)
         any_changes = 0
 
         changes = 1
@@ -200,6 +200,6 @@ class PatternOptimizerEquilibrium:
                             new_graphs.add(node.value)
                 changes |= chg
                 any_changes |= changes
-            graphs |= new_graphs  # type: ignore
+            graphs |= new_graphs
 
         return any_changes

@@ -215,7 +215,7 @@ class GraphCloner:
             node = cast(ANFNode, _node)
             new_inputs = [self.repl[orig_node] for orig_node in node.inputs]
             repl = cast(ANFNode, self.repl[node])
-            repl.inputs = new_inputs  # type: ignore
+            repl.inputs = new_inputs
 
         return cast(ANFNode, self.repl[root])
 

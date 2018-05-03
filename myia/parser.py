@@ -193,7 +193,7 @@ class Parser:
         self.filename: str = inspect.getfile(function)
         self.block_map: Dict[Block, Constant] = {}
         if globals_ is None:
-            free_vars = inspect.getclosurevars(function)  # type: ignore
+            free_vars = inspect.getclosurevars(function)
             assert isinstance(free_vars.builtins, Dict)
             globals_ = free_vars.builtins
             globals_.update(free_vars.globals)
@@ -204,8 +204,8 @@ class Parser:
         """Create a Location from an AST node."""
         if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
             return Location(self.filename,
-                            node.lineno + self.line_offset - 1,  # type: ignore
-                            node.col_offset)  # type: ignore
+                            node.lineno + self.line_offset - 1,
+                            node.col_offset)
         else:
             # Some nodes like Index carry no location information, but
             # we basically just pass through them.

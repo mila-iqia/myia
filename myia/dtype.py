@@ -29,7 +29,7 @@ def get_types(bases):
         return {}
     elif isinstance(bases[0], TypeMeta):
         # We need to make a copy here
-        return dict(bases[0]._fields)  # type: ignore
+        return dict(bases[0]._fields)
     return {}
 
 
@@ -202,7 +202,7 @@ class Struct(Type):
 
     def __new__(cls, elements: KeysT) -> None:
         """Convert input to a dict."""
-        return tuple.__new__(cls, (dict(elements),))  # type: ignore
+        return tuple.__new__(cls, (dict(elements),))
 
     def __getattr__(self, attr):
         if attr in self.elements:
