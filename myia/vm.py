@@ -227,7 +227,11 @@ class VMFrame:
                 frame = self
                 while frame and frame.graph not in targets:
                     frame = frame.parent
-                    assert frame is not None
+                if frame is None:
+                    frame = self.closure
+                while frame and frame.graph not in targets:
+                    frame = frame.parent
+                assert frame is not None
                 return self.Closure(value, frame)
         return value
 
