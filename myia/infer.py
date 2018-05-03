@@ -20,6 +20,7 @@ class MyiaTypeError(Exception):
 
 
 def type_error_nargs(ident, expected, got):
+    """Return a MyiaTypeError for number of arguments mismatch."""
     return MyiaTypeError(
         f'Wrong number of arguments for {ident}:'
         f' expected {expected}, got {got}.'

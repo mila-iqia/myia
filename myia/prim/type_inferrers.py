@@ -1,3 +1,5 @@
+"""Definitions of type inference for primitives."""
+
 
 from ..dtype import Int, Bool, Float, Tuple, List
 from ..infer import ANYTHING, Inferrer, PrimitiveInferrer, GraphInferrer, \
@@ -9,6 +11,7 @@ from .ops import Primitive
 
 
 def typeof(v):
+    """Return the type of v."""
     if isinstance(v, bool):
         return Bool()
     elif isinstance(v, int):
@@ -22,11 +25,23 @@ def typeof(v):
 
 
 class TypeTrack:
+    """Infer the type of a constant.
+
+    Note: the type of a Primitive or of a Graph is an Inferrer.
+
+    Attributes:
+        constructors: A map of Inferrer constructors. Each constructor
+            takes an engine as argument and returns an Inferrer. These
+            will be used to infer types for primitives.
+
+    """
 
     def __init__(self, constructors):
+        """Initialize a TypeTrack."""
         self.constructors = constructors
 
     async def __call__(self, engine, ct):
+        """Infer the type of a constant."""
         v = ct.node.value
         if isinstance(v, Primitive):
             return self.constructors[v](engine)
@@ -36,11 +51,13 @@ class TypeTrack:
             return typeof(ct.node.value)
 
 
+# Default constructors
 type_inferrer_constructors = {}
 infer_type_constant = TypeTrack(type_inferrer_constructors)
 
 
 def type_inferrer(prim, nargs):
+    """Define a type inferrer for prim with nargs arguments."""
     def deco(fn):
         def constructor(engine):
             return PrimitiveInferrer(engine, prim, nargs, fn)
@@ -51,25 +68,31 @@ def type_inferrer(prim, nargs):
 
 @type_inferrer(P.if_, 3)
 async def infer_type_if(engine, cond, tb, fb):
+    """Infer the return type of if."""
     cond_t = await engine.get('type', cond)
     if cond_t != Bool():
         raise MyiaTypeError('Condition for if must be a boolean')
-    v = await engine.get('value', cond)
     tb_inf = await engine.get('type', tb)
     fb_inf = await engine.get('type', fb)
     if not isinstance(tb_inf, Inferrer) or not isinstance(fb_inf, Inferrer):
         raise MyiaTypeError('Both branches of if primitive must be thunks') \
             # pragma: no cover
+    v = await engine.get('value', cond)
     if v is True:
+        # We only visit the first branch if the condition is provably true
         return await tb_inf()
     elif v is False:
+        # We only visit the second branch if the condition is provably false
         return await fb_inf()
     elif v is ANYTHING:
+        # The first branch to finish will return immediately. When the other
+        # branch finishes, its result will be checked against the other.
         return await engine.assert_same('type', tb_inf(), fb_inf())
 
 
 @type_inferrer(P.cons_tuple, 2)
 async def infer_type_cons_tuple(engine, x, y):
+    """Infer the return type of cons_tuple."""
     x_t = await engine.get('type', x)
     y_t = await engine.get('type', y)
     if not isinstance(y_t, Tuple):
@@ -79,6 +102,7 @@ async def infer_type_cons_tuple(engine, x, y):
 
 @type_inferrer(P.head, 1)
 async def infer_type_head(engine, tup):
+    """Infer the return type of head."""
     tup_t = await engine.get('type', tup)
     if not isinstance(tup_t, Tuple):
         raise MyiaTypeError('head of non-tuple')
@@ -89,6 +113,7 @@ async def infer_type_head(engine, tup):
 
 @type_inferrer(P.tail, 1)
 async def infer_type_tail(engine, tup):
+    """Infer the return type of tail."""
     tup_t = await engine.get('type', tup)
     if not isinstance(tup_t, Tuple):
         raise MyiaTypeError('tail of non-tuple')
@@ -99,6 +124,7 @@ async def infer_type_tail(engine, tup):
 
 @type_inferrer(P.getitem, 2)
 async def infer_type_getitem(engine, seq, idx):
+    """Infer the return type of getitem."""
     seq_t = await engine.get('type', seq)
     idx_t = await engine.get('type', idx)
     if not isinstance(idx_t, Int):
@@ -116,6 +142,7 @@ async def infer_type_getitem(engine, seq, idx):
 
 
 async def infer_type_compare(engine, x, y):
+    """Infer the return type of a comparison operator."""
     t = await engine.assert_same('type', x, y)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
@@ -123,6 +150,7 @@ async def infer_type_compare(engine, x, y):
 
 
 async def infer_type_arith_unary(engine, x):
+    """Infer the return type of a unary arithmetic operator."""
     t = await engine.get('type', x)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
@@ -130,6 +158,7 @@ async def infer_type_arith_unary(engine, x):
 
 
 async def infer_type_arith_bin(engine, x, y):
+    """Infer the return type of a binary arithmetic operator."""
     t = await engine.assert_same('type', x, y)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
