@@ -27,7 +27,7 @@ class PrimitiveValueInferrer(Inferrer):
 
     async def infer(self, *refs):
         """Infer the return value of a function using its implementation."""
-        coros = [self.engine.get('value', ref) for ref in refs]
+        coros = [ref['value'] for ref in refs]
         args = await asyncio.gather(*coros, loop=self.engine.loop)
         if any(arg is ANYTHING for arg in args):
             return ANYTHING
@@ -84,11 +84,11 @@ async def infer_value_if(engine, cond, tb, fb):
     regardless of whether the value of either or both branches can
     be inferred.
     """
-    v = await engine.get('value', cond)
+    v = await cond['value']
     if v is True:
-        fn = await engine.get('value', tb)
+        fn = await tb['value']
     elif v is False:
-        fn = await engine.get('value', fb)
+        fn = await fb['value']
     elif v is ANYTHING:
         # Note: we do not infer the values for the branches at all.
         # If we did, we may encounter recursion and deadlock.

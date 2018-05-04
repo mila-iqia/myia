@@ -242,6 +242,9 @@ class Reference:
         g = node.value if is_constant_graph(node) else node.graph
         self.context = context.filter(g)
 
+    def __getitem__(self, track):
+        return self.context.engine.get(track, self)
+
     def __eq__(self, other):
         return isinstance(other, Reference) \
             and self.node is other.node \
@@ -265,6 +268,9 @@ class VirtualReference:
     def __init__(self, **values):
         """Initialize the VirtualReference."""
         self.values = values
+
+    def __getitem__(self, track):
+        return self.values[track]
 
 
 ########
@@ -476,7 +482,7 @@ class InferenceEngine:
         """Compute the value of the Reference on the given track."""
         if isinstance(ref, VirtualReference):
             # A VirtualReference already contains the values we need.
-            return ref.values[track]
+            return ref[track]
 
         node = ref.node
         ctx = ref.context

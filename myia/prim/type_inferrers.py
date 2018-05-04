@@ -63,15 +63,15 @@ type_inferrer = partial(register_inferrer,
 @type_inferrer(P.if_, nargs=3)
 async def infer_type_if(engine, cond, tb, fb):
     """Infer the return type of if."""
-    cond_t = await engine.get('type', cond)
+    cond_t = await cond['type']
     if cond_t != Bool():
         raise MyiaTypeError('Condition for if must be a boolean')
-    tb_inf = await engine.get('type', tb)
-    fb_inf = await engine.get('type', fb)
+    tb_inf = await tb['type']
+    fb_inf = await fb['type']
     if not isinstance(tb_inf, Inferrer) or not isinstance(fb_inf, Inferrer):
         raise MyiaTypeError('Both branches of if primitive must be thunks') \
             # pragma: no cover
-    v = await engine.get('value', cond)
+    v = await cond['value']
     if v is True:
         # We only visit the first branch if the condition is provably true
         return await tb_inf()
@@ -87,8 +87,8 @@ async def infer_type_if(engine, cond, tb, fb):
 @type_inferrer(P.cons_tuple, nargs=2)
 async def infer_type_cons_tuple(engine, x, y):
     """Infer the return type of cons_tuple."""
-    x_t = await engine.get('type', x)
-    y_t = await engine.get('type', y)
+    x_t = await x['type']
+    y_t = await y['type']
     if not isinstance(y_t, Tuple):
         raise MyiaTypeError('cons_tuple on non-tuple')  # pragma: no cover
     return Tuple([x_t, *y_t.elements])
@@ -97,7 +97,7 @@ async def infer_type_cons_tuple(engine, x, y):
 @type_inferrer(P.head, nargs=1)
 async def infer_type_head(engine, tup):
     """Infer the return type of head."""
-    tup_t = await engine.get('type', tup)
+    tup_t = await tup['type']
     if not isinstance(tup_t, Tuple):
         raise MyiaTypeError('head of non-tuple')
     if not len(tup_t.elements) >= 1:
@@ -108,7 +108,7 @@ async def infer_type_head(engine, tup):
 @type_inferrer(P.tail, nargs=1)
 async def infer_type_tail(engine, tup):
     """Infer the return type of tail."""
-    tup_t = await engine.get('type', tup)
+    tup_t = await tup['type']
     if not isinstance(tup_t, Tuple):
         raise MyiaTypeError('tail of non-tuple')
     if not len(tup_t.elements) >= 1:
@@ -119,13 +119,13 @@ async def infer_type_tail(engine, tup):
 @type_inferrer(P.getitem, nargs=2)
 async def infer_type_getitem(engine, seq, idx):
     """Infer the return type of getitem."""
-    seq_t = await engine.get('type', seq)
-    idx_t = await engine.get('type', idx)
+    seq_t = await seq['type']
+    idx_t = await idx['type']
     if not isinstance(idx_t, Int):
         raise MyiaTypeError('Expected Int for index')
 
     if isinstance(seq_t, Tuple):
-        idx_v = await engine.get('value', idx)
+        idx_v = await idx['value']
         if idx_v is ANYTHING:
             raise MyiaTypeError('Tuples must be indexed with a constant')
         return seq_t.elements[idx_v]
@@ -138,7 +138,7 @@ async def infer_type_getitem(engine, seq, idx):
 @type_inferrer(P.not_, nargs=1)
 async def infer_type_not(engine, x):
     """Infer the return type of not."""
-    x_t = await engine.get('type', x)
+    x_t = await x['type']
     if x_t != Bool():
         raise MyiaTypeError('Expected Bool for not.')
     return Bool()
@@ -163,7 +163,7 @@ async def infer_type_arith_compare(engine, x, y):
 @type_inferrer(P.uadd, P.usub, nargs=1)
 async def infer_type_arith_unary(engine, x):
     """Infer the return type of a unary arithmetic operator."""
-    t = await engine.get('type', x)
+    t = await x['type']
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
     return t
