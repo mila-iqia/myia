@@ -150,7 +150,12 @@ def infer(**tests_spec):
     def decorate(fn):
         def run_test(spec):
             *args, expected_out = spec
+
             g = parse(fn)
+
+            print('Args:')
+            print(args)
+
             inferrer = InferenceEngine(
                 g, args,
                 constant_inferrers={
@@ -159,12 +164,28 @@ def infer(**tests_spec):
                 },
                 timeout=0.1
             )
-            try:
-                out = {track: inferrer.output_info(track)
-                       for track in all_tracks}
-            except MyiaTypeError as e:
-                out = TypeError
-            assert out == expected_out
+
+            def out():
+                rval = {track: inferrer.output_info(track)
+                        for track in all_tracks}
+                print('Output of inferrer:')
+                print(rval)
+                return rval
+
+            print('Expected:')
+            print(expected_out)
+
+            if expected_out is TypeError:
+                try:
+                    out()
+                except MyiaTypeError as e:
+                    pass
+                else:
+                    raise Exception(
+                        'Expected a TypeError, got: (see stdout).'
+                    )
+            else:
+                assert out() == expected_out
 
         m = mark.parametrize('spec', list(tests))(run_test)
         m.__orig__ = fn
