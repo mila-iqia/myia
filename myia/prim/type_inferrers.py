@@ -1,9 +1,11 @@
 """Definitions of type inference for primitives."""
 
 
+from functools import partial
+
 from ..dtype import Int, Bool, Float, Tuple, List
-from ..infer import ANYTHING, Inferrer, PrimitiveInferrer, GraphInferrer, \
-    MyiaTypeError
+from ..infer import ANYTHING, Inferrer, GraphInferrer, \
+    MyiaTypeError, register_inferrer
 from ..ir import Graph
 
 from . import ops as P
@@ -54,19 +56,11 @@ class TypeTrack:
 # Default constructors
 type_inferrer_constructors = {}
 infer_type_constant = TypeTrack(type_inferrer_constructors)
+type_inferrer = partial(register_inferrer,
+                        constructors=type_inferrer_constructors)
 
 
-def type_inferrer(prim, nargs):
-    """Define a type inferrer for prim with nargs arguments."""
-    def deco(fn):
-        def constructor(engine):
-            return PrimitiveInferrer(engine, prim, nargs, fn)
-        type_inferrer_constructors[prim] = constructor
-        return fn
-    return deco
-
-
-@type_inferrer(P.if_, 3)
+@type_inferrer(P.if_, nargs=3)
 async def infer_type_if(engine, cond, tb, fb):
     """Infer the return type of if."""
     cond_t = await engine.get('type', cond)
@@ -90,7 +84,7 @@ async def infer_type_if(engine, cond, tb, fb):
         return await engine.assert_same('type', tb_inf(), fb_inf())
 
 
-@type_inferrer(P.cons_tuple, 2)
+@type_inferrer(P.cons_tuple, nargs=2)
 async def infer_type_cons_tuple(engine, x, y):
     """Infer the return type of cons_tuple."""
     x_t = await engine.get('type', x)
@@ -100,7 +94,7 @@ async def infer_type_cons_tuple(engine, x, y):
     return Tuple([x_t, *y_t.elements])
 
 
-@type_inferrer(P.head, 1)
+@type_inferrer(P.head, nargs=1)
 async def infer_type_head(engine, tup):
     """Infer the return type of head."""
     tup_t = await engine.get('type', tup)
@@ -111,7 +105,7 @@ async def infer_type_head(engine, tup):
     return tup_t.elements[0]
 
 
-@type_inferrer(P.tail, 1)
+@type_inferrer(P.tail, nargs=1)
 async def infer_type_tail(engine, tup):
     """Infer the return type of tail."""
     tup_t = await engine.get('type', tup)
@@ -122,7 +116,7 @@ async def infer_type_tail(engine, tup):
     return Tuple(tup_t.elements[1:])
 
 
-@type_inferrer(P.getitem, 2)
+@type_inferrer(P.getitem, nargs=2)
 async def infer_type_getitem(engine, seq, idx):
     """Infer the return type of getitem."""
     seq_t = await engine.get('type', seq)
@@ -141,14 +135,32 @@ async def infer_type_getitem(engine, seq, idx):
         raise MyiaTypeError('Wrong seq type for getitem')
 
 
-async def infer_type_compare(engine, x, y):
-    """Infer the return type of a comparison operator."""
+@type_inferrer(P.not_, nargs=1)
+async def infer_type_not(engine, x):
+    """Infer the return type of not."""
+    x_t = await engine.get('type', x)
+    if x_t != Bool():
+        raise MyiaTypeError('Expected Bool for not.')
+    return Bool()
+
+
+@type_inferrer(P.eq, P.ne, nargs=2)
+async def infer_type_generic_compare(engine, x, y):
+    """Infer the return type of a generic comparison operator."""
+    await engine.assert_same('type', x, y)
+    return Bool()
+
+
+@type_inferrer(P.lt, P.gt, P.le, P.ge, nargs=2)
+async def infer_type_arith_compare(engine, x, y):
+    """Infer the return type of an arithmetic comparison operator."""
     t = await engine.assert_same('type', x, y)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
     return Bool()
 
 
+@type_inferrer(P.uadd, P.usub, nargs=1)
 async def infer_type_arith_unary(engine, x):
     """Infer the return type of a unary arithmetic operator."""
     t = await engine.get('type', x)
@@ -157,27 +169,10 @@ async def infer_type_arith_unary(engine, x):
     return t
 
 
+@type_inferrer(P.add, P.sub, P.mul, P.div, P.mod, P.pow, nargs=2)
 async def infer_type_arith_bin(engine, x, y):
     """Infer the return type of a binary arithmetic operator."""
     t = await engine.assert_same('type', x, y)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
     return t
-
-
-def _register_inferrer(prim, nargs, fn):
-    def construct(engine):
-        return PrimitiveInferrer(engine, prim, nargs, fn)
-    type_inferrer_constructors[prim] = construct
-
-
-for op in [P.add, P.sub, P.mul, P.div, P.mod, P.pow]:
-    _register_inferrer(op, 2, infer_type_arith_bin)
-
-
-for op in [P.uadd, P.usub]:
-    _register_inferrer(op, 1, infer_type_arith_unary)
-
-
-for op in [P.eq, P.lt, P.gt, P.ne, P.le, P.ge]:
-    _register_inferrer(op, 2, infer_type_compare)

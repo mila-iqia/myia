@@ -3,7 +3,9 @@
 
 import asyncio
 
-from ..infer import ANYTHING, Inferrer, PrimitiveInferrer, GraphInferrer
+from functools import partial
+
+from ..infer import ANYTHING, Inferrer, GraphInferrer, register_inferrer
 from ..ir import Graph
 
 from . import ops as P
@@ -70,19 +72,11 @@ class ValueTrack:
 # Default constructors
 value_inferrer_constructors = {}
 infer_value_constant = ValueTrack(pyimpl, value_inferrer_constructors)
+value_inferrer = partial(register_inferrer,
+                         constructors=value_inferrer_constructors)
 
 
-def value_inferrer(prim, nargs):
-    """Define a value inferrer for prim with nargs arguments."""
-    def deco(fn):
-        def constructor(engine):
-            return PrimitiveInferrer(engine, prim, nargs, fn)
-        value_inferrer_constructors[prim] = constructor
-        return fn
-    return deco
-
-
-@value_inferrer(P.if_, 3)
+@value_inferrer(P.if_, nargs=3)
 async def infer_value_if(engine, cond, tb, fb):
     """Infer the return value of if.
 

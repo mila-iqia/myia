@@ -1,10 +1,11 @@
 
+from functools import partial
 from pytest import mark
 
 from myia.api import parse
 from myia.infer import \
-    InferenceEngine, ANYTHING, MyiaTypeError, PrimitiveInferrer, \
-    VirtualReference
+    InferenceEngine, ANYTHING, MyiaTypeError, \
+    VirtualReference, register_inferrer
 
 from myia.dtype import Bool, Int, Float, Tuple as T, List as L
 from myia.prim import Primitive
@@ -59,18 +60,13 @@ pyimpl_test = {**pyimpl}
 value_inferrer_cons_test = {**value_inferrer_constructors}
 type_inferrer_cons_test = {**type_inferrer_constructors}
 
+type_inferrer_test = partial(register_inferrer,
+                             constructors=type_inferrer_cons_test)
+value_inferrer_test = partial(register_inferrer,
+                              constructors=value_inferrer_cons_test)
+
 infer_value_constant = ValueTrack(pyimpl_test, value_inferrer_cons_test)
 infer_type_constant = TypeTrack(type_inferrer_cons_test)
-
-
-def primitive_inferrer(op, nargs, into):
-    def deco(fn):
-        def construct(engine):
-            return PrimitiveInferrer(engine, op, nargs, fn)
-        into[op] = construct
-        return construct
-
-    return deco
 
 
 # Map
@@ -85,7 +81,7 @@ def impl_map(f, xs):
 pyimpl_test[_map] = impl_map
 
 
-@primitive_inferrer(_map, 2, into=type_inferrer_cons_test)
+@type_inferrer_test(_map, nargs=2)
 async def infer_type_map(engine, f, xs):
     f_t = await engine.get('type', f)
     xs_t = await engine.get('type', xs)
@@ -108,7 +104,7 @@ def impl_tern(x, y, z):
 pyimpl_test[_tern] = impl_tern
 
 
-@primitive_inferrer(_tern, 3, into=type_inferrer_cons_test)
+@type_inferrer_test(_tern, nargs=3)
 async def infer_type_tern(engine, x, y, z):
     ret_t = await engine.assert_same('type', x, y, z)
     assert isinstance(ret_t, (Int, Float))
@@ -127,7 +123,7 @@ def impl_to_i64(x, y, z):
 pyimpl_test[_to_i64] = impl_to_i64
 
 
-@primitive_inferrer(_to_i64, 1, into=type_inferrer_cons_test)
+@type_inferrer_test(_to_i64, nargs=1)
 async def infer_type_to_i64(engine, x):
     return Int(64)
 
@@ -655,6 +651,11 @@ def test_closure_passing(x, y):
     return a1(x) + a2(y)
 
 
+@infer(type=[(B, B), (i64, TypeError)])
+def test_not(x):
+    return not x
+
+
 @infer(
     type=[
         (li64, lf64, T(li64, lf64)),
@@ -662,10 +663,27 @@ def test_closure_passing(x, y):
     ]
 )
 def test_map(xs, ys):
+
     def square(x):
         return x * x
 
     return _map(square, xs), _map(square, ys)
+
+
+@infer(
+    type=[
+        (li64, i64, li64),
+        (lf64, i64, TypeError),
+    ]
+)
+def test_map_2(xs, z):
+
+    def adder(x):
+        def f(y):
+            return x + y
+        return f
+
+    return _map(adder(z), xs)
 
 
 @infer(type=[(i64, TypeError)])

@@ -165,6 +165,23 @@ class GraphInferrer(Inferrer):
             and other.context == self.context
 
 
+def register_inferrer(*prims, nargs, constructors):
+    """Define a PrimitiveInferrer for prims with nargs arguments.
+
+    For each primitive, this registers a constructor for a PrimitiveInferrer
+    that takes an engine argument, in the constructors dictionary.
+    """
+    def deco(fn):
+        def make_constructor(prim):
+            def constructor(engine):
+                return PrimitiveInferrer(engine, prim, nargs, fn)
+            return constructor
+        for prim in prims:
+            constructors[prim] = make_constructor(prim)
+        return fn
+    return deco
+
+
 ##############
 # References #
 ##############
