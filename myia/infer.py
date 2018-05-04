@@ -99,6 +99,7 @@ class PrimitiveInferrer(Inferrer):
         inferrer function.
         """
         return isinstance(other, PrimitiveInferrer) \
+            and other.nargs == self.nargs \
             and other.inferrer_fn == self.inferrer_fn
 
 
@@ -222,6 +223,7 @@ class Context:
             and self.parts == other.parts
 
     def __or__(self, other):
+        assert isinstance(other, set)
         return Context(self.engine, self.parts | other)
 
 
