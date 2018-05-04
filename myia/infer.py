@@ -1,10 +1,8 @@
 """Inference engine (types, values, etc.)."""
 
 import asyncio
-from typing import Set, Tuple, Any
 
-from .ir import \
-    Graph, is_constant, is_constant_graph, is_apply
+from .ir import is_constant, is_constant_graph, is_apply
 from .utils import Named
 from .cconv import NestingAnalyzer
 
@@ -131,27 +129,23 @@ class GraphInferrer(Inferrer):
         # We fetch all relevant properties of all arguments in order to build a
         # context (this cannot be done lazily, like with primitives, because we
         # need a concrete context.).
-        argvals = {
-            track: await asyncio.gather(
-                *[engine.get(track, arg) for arg in args],
-                loop=engine.loop
-            )
-            for track in engine.tracks
-        }
+        argvals = []
+        for arg in args:
+            argval = {track: (await engine.get(track, arg))
+                      for track in engine.tracks}
+            argvals.append(argval)
 
         # Update current context using the fetched properties.
-        gsigs = {(self.graph, track, tuple(argvals[track]))
-                 for track in engine.tracks}
-        context = self.context | gsigs
+        context = self.context.add(self.graph, argvals)
 
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
-        for track, vals in argvals.items():
-            for p, v in zip(self.graph.parameters, vals):
-                ref = Reference(p, context)
-                engine.cache_value(track, ref, v)
+        for p, arg in zip(self.graph.parameters, argvals):
+            for track in engine.tracks:
+                ref = engine.ref(p, context)
+                engine.cache_value(track, ref, arg[track])
 
-        out = Reference(self.graph.output, context)
+        out = engine.ref(self.graph.output, context)
         return await engine.get(self.track, out)
 
     def provably_equivalent(self, other):
@@ -195,55 +189,66 @@ class Context:
     parameter of each graph in which a node is nested.
     """
 
-    def __init__(self, engine, parts):
+    def __init__(self, parent, g, argvals, *, parents_map):
         """Initialize the Context."""
-        self.engine = engine
-        # parts = set of (graph, track/property_name, (*args))
-        self.parts: Set[Tuple[Graph, str, Tuple[Any, ...]]] = \
-            frozenset(parts)
+        self.parents_map = parents_map
+        self.parent = parent
+        self.graph = g
+        self.argkey = tuple(tuple(sorted(argv.items()))
+                            for argv in argvals)
+        self.parent_cache = dict(parent.parent_cache) if parent else {}
+        self.parent_cache[g] = self
+
+    def empty(self):
+        """Create an empty context."""
+        return Context(None, None, (), parents_map=self.parents_map)
 
     def filter(self, graph):
         """Return a context restricted to a graph's dependencies."""
-        if graph is None:
-            return Context(self.engine, ())
-        deps = self.engine.deps[graph]
-        return Context(
-            self.engine,
-            ((g, track, argsig)
-             for (g, track, argsig) in self.parts
-             if g in deps or g is graph)
-        )
+        rval = self.parent_cache.get(graph, None)
+        if rval is None:
+            parent_graph = self.parents_map.get(graph, None)
+            rval = self.parent_cache.get(parent_graph, None)
+        if rval is None:
+            rval = self.empty()
+        return rval
+
+    def add(self, graph, argvals):
+        """Extend this context with values for another graph."""
+        parent_graph = self.parents_map[graph]
+        parent = self.parent_cache.get(parent_graph, None)
+        return Context(parent, graph, argvals,
+                       parents_map=self.parents_map)
 
     def __hash__(self):
-        return hash((self.engine, self.parts))
+        return hash((self.parent, self.graph, self.argkey))
 
     def __eq__(self, other):
         return type(other) is Context \
-            and self.engine == other.engine \
-            and self.parts == other.parts
-
-    def __or__(self, other):
-        assert isinstance(other, set)
-        return Context(self.engine, self.parts | other)
+            and self.parent == other.parent \
+            and self.graph == other.graph \
+            and self.argkey == other.argkey
 
 
 class Reference:
     """Reference to a certain node in a certain context.
 
     Attributes:
+        engine: The InferenceEngine in which this Reference lives.
         node: The ANFNode being referred to.
         context: The Context for the node.
 
     """
 
-    def __init__(self, node, context):
+    def __init__(self, engine, node, context):
         """Initialize the Reference."""
         self.node = node
+        self.engine = engine
         g = node.value if is_constant_graph(node) else node.graph
         self.context = context.filter(g)
 
     def __getitem__(self, track):
-        return self.context.engine.get(track, self)
+        return self.engine.get(track, self)
 
     def __eq__(self, other):
         return isinstance(other, Reference) \
@@ -451,14 +456,14 @@ class InferenceEngine:
 
     def __init__(self,
                  graph,
-                 args,
+                 argvals,
                  *,
                  constant_inferrers,
                  eq_class=EquivalencePool,
                  timeout=1.0):
         """Initialize the InferenceEngine."""
         self.graph = graph
-        self.args = args
+        self.argvals = argvals
         self.loop = asyncio.new_event_loop()
         self.tracks = tuple(constant_inferrers.keys())
         self.constant_inferrers = constant_inferrers
@@ -468,15 +473,16 @@ class InferenceEngine:
         self.errors = []
         self.equiv = eq_class(self)
 
-        self.deps = NestingAnalyzer(graph).graph_dependencies_total()
-        self.root_context = Context(
-            self,
-            ((graph, track, tuple(arg[track] for arg in args))
-             for track in self.tracks)
-        )
-        self.arg_refs = [VirtualReference(**arg) for arg in args]
+        self.parents = NestingAnalyzer(graph).parents()
+        self.root_context = Context(None, graph, argvals,
+                                    parents_map=self.parents)
+        self.argrefs = [VirtualReference(**arg) for arg in argvals]
 
         self._run_sync()
+
+    def ref(self, node, context):
+        """Return a Reference to the node in the given context."""
+        return Reference(self, node, context)
 
     async def compute_ref(self, track, ref):
         """Compute the value of the Reference on the given track."""
@@ -493,11 +499,11 @@ class InferenceEngine:
         elif is_apply(node):
             n_fn, *n_args = node.inputs
             # We await on the function node to get the inferrer
-            inf = await self.get(track, Reference(n_fn, ctx))
+            inf = await self.get(track, self.ref(n_fn, ctx))
             if inf is ANYTHING:
                 return ANYTHING
             assert isinstance(inf, Inferrer)
-            argrefs = [Reference(node, ctx) for node in n_args]
+            argrefs = [self.ref(node, ctx) for node in n_args]
             try:
                 return await inf(*argrefs)
             except MyiaTypeError as e:
@@ -541,10 +547,8 @@ class InferenceEngine:
         if self.errors:
             raise self.errors[0]['error']
         else:
-            oref = Reference(self.graph.output, self.root_context)
+            oref = self.ref(self.graph.output, self.root_context)
             return self.get_info(track, oref)
-            # return {track: self.get_info(track, oref)
-            #         for track in self.tracks}
 
     def cache_value(self, track, ref, value):
         """Set the value of the Reference on the given track."""
@@ -595,7 +599,7 @@ class InferenceEngine:
         for track in self.tracks:
             inf = GraphInferrer(self, track,
                                 self.graph, self.root_context)
-            self.schedule(inf(*self.arg_refs))
+            self.schedule(inf(*self.argrefs))
 
         while self.todo:
             todo = list(self.todo)
