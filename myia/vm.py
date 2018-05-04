@@ -230,7 +230,7 @@ class VMFrame:
                 if frame is None:
                     frame = self.closure
                 while frame and frame.graph not in targets:
-                    frame = frame.parent
+                    frame = frame.parent  # pragma: no cover
                 assert frame is not None
                 return self.Closure(value, frame)
         return value
