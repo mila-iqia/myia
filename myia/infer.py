@@ -426,7 +426,10 @@ class EquivalencePool:
 class InferenceEngine:
     """Infer various properties about nodes in graphs.
 
-    Attributes:
+    Arguments:
+        graph: The graph to analyze.
+        args: The arguments. Must be a tuple of dictionaries where
+            each dictionary maps track name to value.
         constant_inferrers: Map each track (property name) to an
             async function that can infer that property on a
             Constant. Applying a constant_inferrer on a Constant
@@ -441,10 +444,15 @@ class InferenceEngine:
     """
 
     def __init__(self,
+                 graph,
+                 args,
+                 *,
                  constant_inferrers,
                  eq_class=EquivalencePool,
                  timeout=1.0):
         """Initialize the InferenceEngine."""
+        self.graph = graph
+        self.args = args
         self.loop = asyncio.new_event_loop()
         self.tracks = tuple(constant_inferrers.keys())
         self.constant_inferrers = constant_inferrers
@@ -453,6 +461,16 @@ class InferenceEngine:
         self.todo = set()
         self.errors = []
         self.equiv = eq_class(self)
+
+        self.deps = NestingAnalyzer(graph).graph_dependencies_total()
+        self.root_context = Context(
+            self,
+            ((graph, track, tuple(arg[track] for arg in args))
+             for track in self.tracks)
+        )
+        self.arg_refs = [VirtualReference(**arg) for arg in args]
+
+        self._run_sync()
 
     async def compute_ref(self, track, ref):
         """Compute the value of the Reference on the given track."""
@@ -496,7 +514,7 @@ class InferenceEngine:
             raise Exception(f'Cannot process: {node}')  # pragma: no cover
 
     def get(self, track, ref):
-        """Get the value of the Reference on the given track.
+        """Get a Future for the value of the Reference on the given track.
 
         Results are cached.
         """
@@ -504,6 +522,23 @@ class InferenceEngine:
         if ref not in futs:
             futs[ref] = self.loop.create_task(self.compute_ref(track, ref))
         return futs[ref]
+
+    def get_info(self, track, ref):
+        """Get information on the given track for the given reference.
+
+        Inferrers should use the get method instead.
+        """
+        return self.get(track, ref).result()
+
+    def output_info(self, track):
+        """Return information about the output of the analyzed graph."""
+        if self.errors:
+            raise self.errors[0]['error']
+        else:
+            oref = Reference(self.graph.output, self.root_context)
+            return self.get_info(track, oref)
+            # return {track: self.get_info(track, oref)
+            #         for track in self.tracks}
 
     def cache_value(self, track, ref, value):
         """Set the value of the Reference on the given track."""
@@ -550,19 +585,11 @@ class InferenceEngine:
         """
         self.todo.add(fn)
 
-    async def _run(self, graph, args):
-
-        ctx = Context(
-            self,
-            ((graph, track, tuple(arg[track] for arg in args))
-             for track in self.tracks)
-        )
-        refs = [VirtualReference(**arg) for arg in args]
-        oref = Reference(graph.output, ctx)
-
+    async def _run(self):
         for track in self.tracks:
-            inf = GraphInferrer(self, track, graph, ctx)
-            self.schedule(inf(*refs))
+            inf = GraphInferrer(self, track,
+                                self.graph, self.root_context)
+            self.schedule(inf(*self.arg_refs))
 
         while self.todo:
             todo = list(self.todo)
@@ -585,23 +612,9 @@ class InferenceEngine:
                 self.log_error([], d)
             self.todo.update(pending)
 
-        if self.errors:
-            raise self.errors[0]['error']
-        else:
-            return {track: self.cache[track][oref].result()
-                    for track in self.tracks}
-
-    def run(self, graph, args):
-        """Run inference on the given graph and arguments.
-
-        Arguments:
-            graph: The graph to process.
-            args: The arguments. Must be a tuple of dictionaries where
-                each dictionary maps track name to value.
-        """
-        self.deps = NestingAnalyzer(graph).graph_dependencies_total()
+    def _run_sync(self):
         try:
-            res = self.loop.run_until_complete(self._run(graph, args))
+            res = self.loop.run_until_complete(self._run())
         finally:
             for task in asyncio.Task.all_tasks(self.loop):
                 task._log_destroy_pending = False

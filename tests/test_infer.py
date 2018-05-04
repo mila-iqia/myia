@@ -152,14 +152,16 @@ def infer(**tests_spec):
             *args, expected_out = spec
             g = parse(fn)
             inferrer = InferenceEngine(
-                {
+                g, args,
+                constant_inferrers={
                     'value': infer_value_constant,
                     'type': infer_type_constant,
                 },
                 timeout=0.1
             )
             try:
-                out = inferrer.run(g, args)
+                out = {track: inferrer.output_info(track)
+                       for track in all_tracks}
             except MyiaTypeError as e:
                 out = TypeError
             assert out == expected_out
