@@ -15,7 +15,7 @@ from myia.prim.py_implementations import \
 from myia.prim.value_inferrers import \
     ValueTrack, value_inferrer_constructors
 from myia.prim.type_inferrers import \
-    TypeTrack, type_inferrer_constructors, typeof
+    TypeTrack, type_inferrer_constructors
 
 
 B = Bool()
@@ -37,20 +37,6 @@ lf32 = L(Float(32))
 lf64 = L(Float(64))
 
 
-def fill_in(test, tracks):
-    for entry in test:
-        if entry is TypeError:
-            continue
-        for track in tracks:
-            if track in entry:
-                continue
-            elif track == 'type':
-                entry[track] = typeof(entry['value'])
-            elif track == 'value':
-                entry[track] = ANYTHING
-    return test
-
-
 ########################
 # Temporary primitives #
 ########################
@@ -65,8 +51,15 @@ type_inferrer_test = partial(register_inferrer,
 value_inferrer_test = partial(register_inferrer,
                               constructors=value_inferrer_cons_test)
 
-infer_value_constant = ValueTrack(pyimpl_test, value_inferrer_cons_test)
-infer_type_constant = TypeTrack(type_inferrer_cons_test)
+value_track = partial(
+    ValueTrack,
+    implementations=pyimpl_test,
+    constructors=value_inferrer_cons_test
+)
+type_track = partial(
+    TypeTrack,
+    constructors=type_inferrer_cons_test
+)
 
 
 # Map
@@ -131,7 +124,6 @@ async def infer_type_to_i64(engine, x):
 def infer(**tests_spec):
 
     tests = []
-    all_tracks = ['type', 'value']
 
     for main_track, ts in tests_spec.items():
         if not isinstance(ts, list):
@@ -145,29 +137,32 @@ def infer(**tests_spec):
                     test.append(entry)
                 else:
                     test.append({main_track: entry})
-            tests.append(fill_in(test, all_tracks))
+            tests.append((main_track, test))
 
     def decorate(fn):
         def run_test(spec):
-            *args, expected_out = spec
+            main_track, (*args, expected_out) = spec
 
             g = parse(fn)
 
             print('Args:')
             print(args)
 
+            required_tracks = [main_track]
+
             inferrer = InferenceEngine(
                 g, args,
-                constant_inferrers={
-                    'value': infer_value_constant,
-                    'type': infer_type_constant,
+                tracks={
+                    'value': partial(value_track, max_depth=10),
+                    'type': partial(type_track)
                 },
+                required_tracks=required_tracks,
                 timeout=0.1
             )
 
             def out():
                 rval = {track: inferrer.output_info(track)
-                        for track in all_tracks}
+                        for track in required_tracks}
                 print('Output of inferrer:')
                 print(rval)
                 return rval
@@ -202,7 +197,7 @@ type_signature_arith_bin = [
 ]
 
 
-@infer(type=[({'value': 12.0, 'type': f64},)], value=[(12.0,)])
+@infer(type=[(f64,)], value=[(12.0,)])
 def test_constants():
     return 1.5 * 8.0
 
@@ -239,6 +234,11 @@ def test_prim_usub(x):
         ({'value': True}, f64, i64, f64),
         ({'value': False}, f64, i64, i64),
         (i64, f64, f64, TypeError),
+    ],
+    value=[
+        (True, 7, 4, 49),
+        (False, 7, 4, 16),
+        ({'type': B, 'value': ANYTHING}, 7, 4, ANYTHING),
     ]
 )
 def test_if(c, x, y):
@@ -260,7 +260,12 @@ def test_if2(x, y):
     type=[
         (i64, i64, i64),
         (i64, f64, f64),
-        (f64, f64, TypeError)
+        (f64, f64, TypeError),
+        ({'value': 1_000_000}, i64, i64)
+    ],
+    value=[
+        (2, 3, 27),
+        (1_000_000, 3, ANYTHING)
     ]
 )
 def test_while(x, y):
@@ -512,11 +517,16 @@ def test_hof(x):
 
 @infer(
     type=[
-        (i64, i64, i64, i64),
-        (i64, f64, i64, TypeError)
+        (i64, i64, i64),
+        (i64, f64, TypeError)
+    ],
+    value=[
+        (-1, 3, 36),
+        (1, 3, 6),
+        ({'type': i64, 'value': ANYTHING}, 3, ANYTHING)
     ]
 )
-def test_hof_2(c, x, y):
+def test_hof_2(c, x):
     _to_i64
 
     def identity(x):
@@ -641,11 +651,7 @@ def test_func_arg4(x):
     return g(t, x)
 
 
-@infer(
-    type=[
-        ({'value': 4},),
-    ]
-)
+@infer(type=(i64,), value=(4,))
 def test_closure_deep():
     def g(x):
         def h():
@@ -677,6 +683,15 @@ def test_closure_passing(x, y):
 @infer(type=[(B, B), (i64, TypeError)])
 def test_not(x):
     return not x
+
+
+@infer(value=[(2, 2, 8), (2, 3, 13)])
+def test_cover_limitedvalue_eq(x, y):
+
+    def square(x):
+        return x * x
+
+    return square(x) + square(y)
 
 
 @infer(

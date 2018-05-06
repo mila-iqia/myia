@@ -5,7 +5,7 @@ from functools import partial
 
 from ..dtype import Int, Bool, Float, Tuple, List
 from ..infer import ANYTHING, Inferrer, GraphInferrer, \
-    MyiaTypeError, register_inferrer
+    MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
 
 from . import ops as P
@@ -26,7 +26,10 @@ def typeof(v):
         raise TypeError(f'Untypable value: {v}')  # pragma: no cover
 
 
-class TypeTrack:
+type_inferrer_constructors = {}
+
+
+class TypeTrack(Track):
     """Infer the type of a constant.
 
     Note: the type of a Primitive or of a Graph is an Inferrer.
@@ -38,24 +41,38 @@ class TypeTrack:
 
     """
 
-    def __init__(self, constructors):
-        """Initialize a TypeTrack."""
+    def __init__(self,
+                 engine,
+                 name,
+                 *,
+                 constructors=type_inferrer_constructors):
+        """Initialize a TypeTrack.
+
+        If a TypeTrack is present, it is always required.
+        """
+        super().__init__(engine, name)
         self.constructors = constructors
 
-    async def __call__(self, engine, ct):
+    def from_value(self, v, context):
         """Infer the type of a constant."""
-        v = ct.node.value
         if isinstance(v, Primitive):
-            return self.constructors[v](engine)
+            return self.constructors[v](self.engine)
         elif isinstance(v, Graph):
-            return GraphInferrer(engine, 'type', v, ct.context)
+            return GraphInferrer(self.engine, 'type', v, context)
         else:
-            return typeof(ct.node.value)
+            return typeof(v)
+
+    def default(self):
+        """Return a default type; this method raises an exception."""
+        raise Exception('There is no default value for the type track.') \
+            # pragma: no cover
 
 
-# Default constructors
-type_inferrer_constructors = {}
-infer_type_constant = TypeTrack(type_inferrer_constructors)
+########################
+# Default constructors #
+########################
+
+
 type_inferrer = partial(register_inferrer,
                         constructors=type_inferrer_constructors)
 

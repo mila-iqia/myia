@@ -25,6 +25,47 @@ def type_error_nargs(ident, expected, got):
     )
 
 
+#########
+# Track #
+#########
+
+
+class Track:
+    """Represents a property to infer."""
+
+    def __init__(self, engine, name):
+        """Initialize a Track."""
+        self.engine = engine
+        self.name = name
+
+    def infer_constant(self, ctref):
+        """Get the property for a constant Reference."""
+        return self.from_value(ctref.node.value, ctref.context)
+
+    def from_value(self, v, context=None):
+        """Get the property from a value in the context."""
+        raise NotImplementedError()  # pragma: no cover
+
+    def broaden(self, v):
+        """Broaden the value for use in a graph's signature."""
+        return v
+
+    def default(self):
+        """Default value for this track, if nothing is known."""
+        raise NotImplementedError()  # pragma: no cover
+
+    def fill_in(self, values, context=None):
+        """Fill in a value for this property, given others."""
+        if self.name in values:
+            pass
+        elif 'value' in values:
+            v = self.engine.unwrap(values['value'])
+            v = getattr(v, '__uninfer__', v)
+            values[self.name] = self.from_value(v, context)
+        else:
+            values[self.name] = self.default()  # pragma: no cover
+
+
 ####################
 # Inferrer classes #
 ####################
@@ -131,8 +172,8 @@ class GraphInferrer(Inferrer):
         # need a concrete context.).
         argvals = []
         for arg in args:
-            argval = {track: (await engine.get(track, arg))
-                      for track in engine.tracks}
+            argval = {track: (await engine.get_raw(track, arg))
+                      for track in engine.all_track_names}
             argvals.append(argval)
 
         # Update current context using the fetched properties.
@@ -141,12 +182,13 @@ class GraphInferrer(Inferrer):
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
         for p, arg in zip(self.graph.parameters, argvals):
-            for track in engine.tracks:
+            for track in engine.all_track_names:
                 ref = engine.ref(p, context)
-                engine.cache_value(track, ref, arg[track])
+                v = engine.tracks[track].broaden(arg[track])
+                engine.cache_value(track, ref, v)
 
         out = engine.ref(self.graph.output, context)
-        return await engine.get(self.track, out)
+        return await engine.get_raw(self.track, out)
 
     def provably_equivalent(self, other):
         """Whether this inferrer is provably equivalent to the other.
@@ -439,13 +481,12 @@ class InferenceEngine:
 
     Arguments:
         graph: The graph to analyze.
-        args: The arguments. Must be a tuple of dictionaries where
+        argvals: The arguments. Must be a tuple of dictionaries where
             each dictionary maps track name to value.
-        constant_inferrers: Map each track (property name) to an
-            async function that can infer that property on a
-            Constant. Applying a constant_inferrer on a Constant
-            that contains a Primitive or a Graph should return
-            an Inferrer instance.
+        tracks: Map each track (property name) to a Track object.
+        required_tracks: A list of tracks that will be inferred for
+            the output. Other tracks may be used if requested in
+            the evaluation of a required track.
         eq_class: The class to use to check equivalence between
             values.
         timeout: Timeout applied when awaiting in the main loop,
@@ -458,17 +499,27 @@ class InferenceEngine:
                  graph,
                  argvals,
                  *,
-                 constant_inferrers,
+                 tracks,
+                 required_tracks=None,
                  eq_class=EquivalencePool,
                  timeout=1.0):
         """Initialize the InferenceEngine."""
         self.graph = graph
+
+        self.all_track_names = tuple(tracks.keys())
+        self.tracks = {
+            name: t(self, name)
+            for name, t in tracks.items()
+        }
+        self.required_tracks = required_tracks or self.all_track_names
+
         self.argvals = argvals
-        self.loop = asyncio.new_event_loop()
-        self.tracks = tuple(constant_inferrers.keys())
-        self.constant_inferrers = constant_inferrers
+        for arg in self.argvals:
+            for track_obj in self.tracks.values():
+                track_obj.fill_in(arg)
+
         self.timeout = timeout
-        self.cache = {track: {} for track in self.tracks}
+        self.cache = {track: {} for track in self.all_track_names}
         self.todo = set()
         self.errors = []
         self.equiv = eq_class(self)
@@ -494,7 +545,7 @@ class InferenceEngine:
         ctx = ref.context
 
         if is_constant(node):
-            return await self.constant_inferrers[track](self, ref)
+            return self.tracks[track].infer_constant(ref)
 
         elif is_apply(node):
             n_fn, *n_args = node.inputs
@@ -525,22 +576,38 @@ class InferenceEngine:
             # Values for Parameters are cached when we enter a Graph.
             raise Exception(f'Cannot process: {node}')  # pragma: no cover
 
-    def get(self, track, ref):
+    def get_raw(self, track, ref):
         """Get a Future for the value of the Reference on the given track.
 
-        Results are cached.
+        Results are cached. This method may return a wrapper around the
+        desired value, depending on the track.
         """
         futs = self.cache[track]
         if ref not in futs:
             futs[ref] = self.loop.create_task(self.compute_ref(track, ref))
         return futs[ref]
 
+    def unwrap(self, v):
+        """Unwrap a cached value."""
+        return getattr(v, '__unwrapped__', v)
+
+    async def get(self, track, ref):
+        """Get a Future for the value of the Reference on the given track.
+
+        Results are cached.
+        """
+        v = await self.get_raw(track, ref)
+        return self.unwrap(v)
+
     def get_info(self, track, ref):
         """Get information on the given track for the given reference.
 
-        Inferrers should use the get method instead.
+        This assumes that the Future associated to the information has
+        already been resolved. Asynchronous Inferrers should use the get
+        method instead.
         """
-        return self.get(track, ref).result()
+        v = self.get_raw(track, ref).result()
+        return self.unwrap(v)
 
     def output_info(self, track):
         """Return information about the output of the analyzed graph."""
@@ -596,7 +663,7 @@ class InferenceEngine:
         self.todo.add(fn)
 
     async def _run(self):
-        for track in self.tracks:
+        for track in self.required_tracks:
             inf = GraphInferrer(self, track,
                                 self.graph, self.root_context)
             self.schedule(inf(*self.argrefs))
@@ -623,6 +690,7 @@ class InferenceEngine:
             self.todo.update(pending)
 
     def _run_sync(self):
+        self.loop = asyncio.new_event_loop()
         try:
             res = self.loop.run_until_complete(self._run())
         finally:
