@@ -11,7 +11,13 @@ from .cconv import NestingAnalyzer
 ANYTHING = Named('ANYTHING')
 
 
-class MyiaTypeError(Exception):
+class InferenceError(Exception):
+    """Inference error in a Myia program."""
+
+    pass
+
+
+class MyiaTypeError(InferenceError):
     """Type error in a Myia program."""
 
     pass
@@ -557,7 +563,7 @@ class InferenceEngine:
             argrefs = [self.ref(node, ctx) for node in n_args]
             try:
                 return await inf(*argrefs)
-            except MyiaTypeError as e:
+            except InferenceError as e:
                 self.log_error([ref], e)
                 raise
             except RuntimeError as e:
@@ -633,13 +639,13 @@ class InferenceEngine:
                 e.g. References.
             err: Can be one of:
                 * An exception.
-                * A string to wrap as a MyiaTypeError.
+                * A string to wrap as an InferenceError.
                 * A future. If the future failed due to an exception,
                   the exception is logged, otherwise the method returns
                   without doing anything.
         """
         if isinstance(err, str):
-            err = MyiaTypeError(err)
+            err = InferenceError(err)
         elif isinstance(err, asyncio.Future):
             err = err.exception()
             if err is None:
@@ -677,7 +683,7 @@ class InferenceEngine:
             )
             if not done:
                 self.log_error(
-                    [], MyiaTypeError(
+                    [], InferenceError(
                         f'Exceeded timeout ({self.timeout}s) in type inferrer.'
                         ' There might be an infinite loop in the program,'
                         ' or the program is too large and you should'

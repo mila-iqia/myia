@@ -4,7 +4,7 @@ from pytest import mark
 
 from myia.api import parse
 from myia.infer import \
-    InferenceEngine, ANYTHING, MyiaTypeError, \
+    InferenceEngine, ANYTHING, MyiaTypeError, InferenceError, \
     VirtualReference, register_inferrer
 
 from myia.dtype import Bool, Int, Float, Tuple as T, List as L
@@ -109,8 +109,8 @@ async def infer_type_tern(engine, x, y, z):
 _to_i64 = Primitive('to_i64')
 
 
-def impl_to_i64(x, y, z):
-    return x + y + z
+def impl_to_i64(x):
+    return int(x)
 
 
 pyimpl_test[_to_i64] = impl_to_i64
@@ -131,9 +131,7 @@ def infer(**tests_spec):
         for t in ts:
             test = []
             for entry in t:
-                if entry is TypeError:
-                    test.append(TypeError)
-                elif isinstance(entry, dict):
+                if isinstance(entry, dict) or entry is InferenceError:
                     test.append(entry)
                 else:
                     test.append({main_track: entry})
@@ -170,14 +168,15 @@ def infer(**tests_spec):
             print('Expected:')
             print(expected_out)
 
-            if expected_out is TypeError:
+            if isinstance(expected_out, type) \
+                    and issubclass(expected_out, Exception):
                 try:
                     out()
-                except MyiaTypeError as e:
+                except InferenceError as e:
                     pass
                 else:
                     raise Exception(
-                        'Expected a TypeError, got: (see stdout).'
+                        f'Expected {expected_out}, got: (see stdout).'
                     )
             else:
                 assert out() == expected_out
@@ -192,8 +191,8 @@ def infer(**tests_spec):
 type_signature_arith_bin = [
     (i64, i64, i64),
     (f64, f64, f64),
-    (i64, f64, TypeError),
-    (B, B, TypeError),
+    (i64, f64, InferenceError),
+    (B, B, InferenceError),
 ]
 
 
@@ -211,18 +210,18 @@ def test_prim_mul(x, y):
     (i64, i64, i64, i64),
     (f64, f64, f64, f64),
     # Three different inconsistent patterns below
-    (f64, f64, i64, TypeError),
-    (i64, f64, f64, TypeError),
-    (f64, f64, i64, TypeError),
+    (f64, f64, i64, InferenceError),
+    (i64, f64, f64, InferenceError),
+    (f64, f64, i64, InferenceError),
     # Test too few/too many arguments below
-    (i64, TypeError),
-    (i64, i64, i64, i64, TypeError),
+    (i64, InferenceError),
+    (i64, i64, i64, i64, InferenceError),
 ])
 def test_prim_tern(x, y, z):
     return _tern(x, y, z)
 
 
-@infer(type=[(i64, i64), (f64, f64), (B, TypeError)])
+@infer(type=[(i64, i64), (f64, f64), (B, InferenceError)])
 def test_prim_usub(x):
     return -x
 
@@ -230,10 +229,10 @@ def test_prim_usub(x):
 @infer(
     type=[
         (B, f64, f64, f64),
-        (B, f64, i64, TypeError),
+        (B, f64, i64, InferenceError),
         ({'value': True}, f64, i64, f64),
         ({'value': False}, f64, i64, i64),
-        (i64, f64, f64, TypeError),
+        (i64, f64, f64, InferenceError),
     ],
     value=[
         (True, 7, 4, 49),
@@ -260,7 +259,7 @@ def test_if2(x, y):
     type=[
         (i64, i64, i64),
         (i64, f64, f64),
-        (f64, f64, TypeError),
+        (f64, f64, InferenceError),
         ({'value': 1_000_000}, i64, i64)
     ],
     value=[
@@ -276,24 +275,24 @@ def test_while(x, y):
     return rval
 
 
-@infer(type=[(i64, TypeError)])
+@infer(type=[(i64, InferenceError)])
 def test_not_enough_args_prim(x):
     return mul(x)
 
 
-@infer(type=[(i64, i64, i64, TypeError)])
+@infer(type=[(i64, i64, i64, InferenceError)])
 def test_too_many_args_prim(x, y, z):
     return mul(x, y, z)
 
 
-@infer(type=[(i64, TypeError)])
+@infer(type=[(i64, InferenceError)])
 def test_not_enough_args(x):
     def g(x, y):
         return x * y
     return g(x)
 
 
-@infer(type=[(i64, i64, TypeError)])
+@infer(type=[(i64, i64, InferenceError)])
 def test_too_many_args(x, y):
     def g(x):
         return x * x
@@ -307,16 +306,16 @@ def test_tup(x, y):
 
 @infer(type=[(T(i64, f64), i64),
              (T(f64, i64), f64),
-             (T(), TypeError),
-             (f64, TypeError)])
+             (T(), InferenceError),
+             (f64, InferenceError)])
 def test_head_tuple(tup):
     return head(tup)
 
 
 @infer(type=[(T(i64, f64), T(f64)),
              (T(f64, i64), T(i64)),
-             (T(), TypeError),
-             (f64, TypeError)])
+             (T(), InferenceError),
+             (f64, InferenceError)])
 def test_tail_tuple(tup):
     return tail(tup)
 
@@ -330,9 +329,9 @@ def test_getitem_tuple(x, y):
     type=[
         (li64, i64, i64),
         (lf64, i64, f64),
-        (lf64, f64, TypeError),
-        (f64, i64, TypeError),
-        (T(i64, f64), i64, TypeError)
+        (lf64, f64, InferenceError),
+        (f64, i64, InferenceError),
+        (T(i64, f64), i64, InferenceError)
     ]
 )
 def test_getitem_list(xs, i):
@@ -358,8 +357,8 @@ def test_closure(x, y):
         (i64, i64, i64, i64, T(i64, i64)),
         (f64, f64, f64, f64, T(f64, f64)),
         (i64, i64, f64, f64, T(i64, f64)),
-        (i64, f64, f64, f64, TypeError),
-        (i64, i64, i64, f64, TypeError),
+        (i64, f64, f64, f64, InferenceError),
+        (i64, i64, i64, f64, InferenceError),
     ]
 )
 def test_return_closure(w, x, y, z):
@@ -370,7 +369,7 @@ def test_return_closure(w, x, y, z):
     return (mul(w)(x), mul(y)(z))
 
 
-@infer(type=[(i64, i64), (f64, TypeError)])
+@infer(type=[(i64, i64), (f64, InferenceError)])
 def test_fact(n):
     def fact(n):
         if n <= 1:
@@ -394,7 +393,7 @@ def odd(n):
         return even(n - 1)
 
 
-@infer(type=[(i64, B), (f64, TypeError)])
+@infer(type=[(i64, B), (f64, InferenceError)])
 def test_even_odd(n):
     return even(n)
 
@@ -432,7 +431,7 @@ def test_choose_prim(i, x, y):
 
 @infer(
     type=[
-        (i64, i64, i64, TypeError),
+        (i64, i64, i64, InferenceError),
         ({'value': 0}, i64, i64, i64),
         ({'value': 1}, i64, i64, B),
     ]
@@ -451,7 +450,7 @@ def test_choose_prim_incompatible(i, x, y):
 
 @infer(
     type=[
-        (i64, i64, i64, TypeError),
+        (i64, i64, i64, InferenceError),
         ({'value': 0}, i64, i64, i64),
         ({'value': 1}, i64, i64, B),
     ]
@@ -518,7 +517,7 @@ def test_hof(x):
 @infer(
     type=[
         (i64, i64, i64),
-        (i64, f64, TypeError)
+        (i64, f64, InferenceError)
     ],
     value=[
         (-1, 3, 36),
@@ -576,7 +575,7 @@ def test_hof_3(x):
 
 @infer(
     type=[
-        (i64, i64, TypeError),
+        (i64, i64, InferenceError),
         ({'value': -1}, i64, i64),
         ({'value': 1}, i64, T(i64, i64)),
     ]
@@ -618,7 +617,7 @@ def test_func_arg(x, y):
 
 @infer(
     type=[
-        (i64, TypeError)
+        (i64, InferenceError)
     ]
 )
 def test_func_arg3(x):
@@ -680,7 +679,7 @@ def test_closure_passing(x, y):
     return a1(x) + a2(y)
 
 
-@infer(type=[(B, B), (i64, TypeError)])
+@infer(type=[(B, B), (i64, InferenceError)])
 def test_not(x):
     return not x
 
@@ -697,7 +696,7 @@ def test_cover_limitedvalue_eq(x, y):
 @infer(
     type=[
         (li64, lf64, T(li64, lf64)),
-        (li64, f64, TypeError),
+        (li64, f64, InferenceError),
     ]
 )
 def test_map(xs, ys):
@@ -711,7 +710,7 @@ def test_map(xs, ys):
 @infer(
     type=[
         (li64, i64, li64),
-        (lf64, i64, TypeError),
+        (lf64, i64, InferenceError),
     ]
 )
 def test_map_2(xs, z):
@@ -724,7 +723,7 @@ def test_map_2(xs, z):
     return _map(adder(z), xs)
 
 
-@infer(type=[(i64, TypeError)])
+@infer(type=[(i64, InferenceError)])
 def test_infinite_recursion(x):
     def ouroboros(x):
         return ouroboros(x - 1)
@@ -732,7 +731,7 @@ def test_infinite_recursion(x):
     return ouroboros(x)
 
 
-@infer(type=[(i64, TypeError)])
+@infer(type=[(i64, InferenceError)])
 def test_indirect_infinite_recursion(x):
     def ouroboros(x):
         if x < 0:
@@ -751,6 +750,6 @@ def pong():
     return ping()
 
 
-@infer(type=[(i64, TypeError)])
+@infer(type=[(i64, InferenceError)])
 def test_infinite_mutual_recursion(x):
     return ping()
