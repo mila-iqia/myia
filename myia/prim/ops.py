@@ -43,6 +43,8 @@ ne = Primitive('ne')
 le = Primitive('le')
 ge = Primitive('ge')
 not_ = Primitive('not')
+typeof = Primitive('typeof')
+hastype = Primitive('hastype')
 
 
 ###################

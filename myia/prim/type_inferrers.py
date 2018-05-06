@@ -3,27 +3,14 @@
 
 from functools import partial
 
-from ..dtype import Int, Bool, Float, Tuple, List
+from ..dtype import Int, Bool, Float, Tuple, List, Type
 from ..infer import ANYTHING, Inferrer, GraphInferrer, \
     MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
 
 from . import ops as P
 from .ops import Primitive
-
-
-def typeof(v):
-    """Return the type of v."""
-    if isinstance(v, bool):
-        return Bool()
-    elif isinstance(v, int):
-        return Int(64)
-    elif isinstance(v, float):
-        return Float(64)
-    elif isinstance(v, tuple):
-        return Tuple(map(typeof, v))
-    else:
-        raise TypeError(f'Untypable value: {v}')  # pragma: no cover
+from .py_implementations import typeof
 
 
 type_inferrer_constructors = {}
@@ -150,6 +137,17 @@ async def infer_type_getitem(engine, seq, idx):
         return seq_t.element_type
     else:
         raise MyiaTypeError('Wrong seq type for getitem')
+
+
+@type_inferrer(P.hastype, nargs=2)
+async def infer_type_hastype(engine, x, t):
+    """Infer the return type of hastype."""
+    t_t = await t['type']
+    if t_t is not Type:
+        raise MyiaTypeError(
+            f'Second argument to hastype must be a Type, got {t_t}'
+        )
+    return Bool()
 
 
 @type_inferrer(P.not_, nargs=1)

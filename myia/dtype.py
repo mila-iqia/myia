@@ -110,6 +110,9 @@ class Type(metaclass=TypeMeta):
     def __eq__(self, other):
         return self is other
 
+    def __ne__(self, other):
+        return self is not other
+
     def __hash__(self):
         return id(self)
 

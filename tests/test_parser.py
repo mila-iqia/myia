@@ -3,15 +3,6 @@ import pytest
 from myia.api import parse
 
 
-def test_unsupported_object():
-    c = object()
-
-    def f():  # pragma: no cover
-        return c
-    with pytest.raises(ValueError):
-        parse(f)
-
-
 def test_undefined():
     def f():  # pragma: no cover
         return c  # noqa

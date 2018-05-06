@@ -1,7 +1,10 @@
+import pytest
+
 from types import SimpleNamespace
 
+from myia.dtype import Int, Float, List, Tuple
 from myia.prim.py_implementations import head, setattr as myia_setattr, \
-    setitem as myia_setitem, tail
+    setitem as myia_setitem, tail, hastype, typeof
 
 from ..test_lang import parse_compare
 
@@ -112,3 +115,32 @@ def test_prim_setattr():
     ns2 = SimpleNamespace(a=1, b=22)
     assert myia_setattr(ns, 'b', 22) == ns2
     assert ns != ns2  # test that this is not inplace
+
+
+def test_prim_typeof():
+    i64 = Int(64)
+    f64 = Float(64)
+    assert typeof(1) == i64
+    assert typeof(1.2) == f64
+    assert typeof((1, 2.0, (3, 4))) == Tuple(i64, f64, Tuple(i64, i64))
+    assert typeof([1, 2]) == List(i64)
+    with pytest.raises(TypeError):
+        typeof([1, 2, 3.4])
+    with pytest.raises(TypeError):
+        typeof(object())
+
+
+def test_prim_istype():
+    i64 = Int(64)
+    f64 = Float(64)
+    assert hastype(123, i64)
+    assert not hastype(123.4, i64)
+    assert hastype(123.4, f64)
+    assert hastype([1, 2, 3], List)
+    assert hastype([1, 2, 3], List(i64))
+    assert hastype((1, 2.0, (3, 4)), Tuple)
+    assert hastype((1, 2.0, (3, 4)), Tuple(i64, f64, Tuple(i64, i64)))
+    with pytest.raises(TypeError):
+        hastype([1, 2, 3.4], List)
+    with pytest.raises(TypeError):
+        hastype(object(), i64)
