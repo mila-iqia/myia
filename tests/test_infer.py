@@ -418,7 +418,6 @@ def test_pow10(x):
     ]
 )
 def test_choose_prim(i, x, y):
-    add, mul
 
     def choose(i):
         if i == 0:
@@ -437,7 +436,6 @@ def test_choose_prim(i, x, y):
     ]
 )
 def test_choose_prim_incompatible(i, x, y):
-    add, lt
 
     def choose(i):
         if i == 0:
@@ -526,7 +524,6 @@ def test_hof(x):
     ]
 )
 def test_hof_2(c, x):
-    _to_i64
 
     def identity(x):
         return x
