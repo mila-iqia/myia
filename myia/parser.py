@@ -396,6 +396,7 @@ class Parser:
         inputs = [Constant(primops.return_),
                   self.process_node(block, node.value)]
         return_ = Apply(inputs, block.graph)
+        assert block.graph.return_ is None
         block.graph.return_ = return_
         return block
 
@@ -492,7 +493,8 @@ class Parser:
         body_block.mature()
         header_block.cond(cond, body_block, after_block)
         after_body = self.process_statements(body_block, node.body)
-        after_body.jump(header_block)
+        if not after_body.graph.return_:
+            after_body.jump(header_block)
         header_block.mature()
         after_block.mature()
         return after_block
@@ -635,6 +637,7 @@ class Block:
         target.preds.append(self)
         inputs = [Constant(primops.return_), jump]
         return_ = Apply(inputs, self.graph)
+        assert self.graph.return_ is None
         self.graph.return_ = return_
         return return_
 
@@ -657,5 +660,6 @@ class Block:
         if_ = Apply(inputs, self.graph)
         inputs = [Constant(primops.return_), if_]
         return_ = Apply(inputs, self.graph)
+        assert self.graph.return_ is None
         self.graph.return_ = return_
         return return_
