@@ -11,10 +11,10 @@ returning a nested function creates a closure.
 """
 
 from typing import Any, Iterable, List, MutableSequence, Sequence, Set, \
-    Tuple, overload
+    Tuple, overload, Union, Dict
 
 from ..info import NamedDebugInfo
-from ..prim import ops as primops
+from ..prim import ops as primops, Primitive
 from ..unify import expandlist, noseq
 from ..utils import Named, list_str, repr_
 
@@ -39,6 +39,10 @@ class Graph:
             has no output node (because it won't be known e.g. until the
             function has completed parsing), but it must be set afterwards for
             the graph instance to be valid.
+        debug: A NamedDebugInfo object containing debugging information about
+            this graph.
+        transforms: A dictionary of available transforms for this graph, e.g.
+            'grad' or 'primal'.
 
     """
 
@@ -47,6 +51,7 @@ class Graph:
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
         self.debug = NamedDebugInfo(self)
+        self.transforms: Dict[str, Union[Graph, Primitive]] = {}
 
     @property
     def output(self) -> 'ANFNode':

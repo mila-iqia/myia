@@ -12,7 +12,7 @@ from ..info import DebugInfo, About
 from ..ir import ANFNode, Apply, Constant, Graph, is_apply, is_constant, \
     is_constant_graph, is_parameter, is_special, GraphCloner
 from ..parser import Location
-from ..prim import ops as primops
+from ..prim import ops as primops, Primitive
 from ..opt import \
     PatternOptimizerSinglePass, \
     PatternOptimizerEquilibrium, \
@@ -449,6 +449,18 @@ def _opt_fancy_getitem(node, equiv):
         return Apply([ct, x], node.graph)
 
 
+@pattern_replacer(primops.J, V)
+def _opt_embed_J(node, equiv):
+    v = equiv[V].value
+    if isinstance(v, (Primitive, GraphCosmeticPrimitive, Graph)):
+        label = short_labeler.label(equiv[V], True)
+        with About(node.debug, 'cosmetic'):
+            ct = Constant(GraphCosmeticPrimitive(f'J({label})'))
+        return ct
+    else:
+        return node
+
+
 def cosmetic_transformer(g):
     """Transform a graph so that it looks nicer.
 
@@ -458,6 +470,7 @@ def cosmetic_transformer(g):
     opts = [
         _opt_accum_cons,
         _opt_fancy_getitem,
+        _opt_embed_J
     ]
 
     pass_ = PatternOptimizerSinglePass(opts)
