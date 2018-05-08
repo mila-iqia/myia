@@ -3,7 +3,7 @@
 
 from ..graph_utils import dfs, toposort
 from ..ir import ANFNode, Apply, Constant, Graph, Special, \
-    freevars_boundary, succ_incoming, is_constant_graph, replace
+    succ_incoming, is_constant_graph, replace
 from ..unify import Unification, Var
 
 
@@ -147,9 +147,7 @@ class PatternOptimizerSinglePass:
 
         The iterator proceeds in topological order.
         """
-        incl = freevars_boundary(graph, False)
-        topo = toposort(graph.output, succ_incoming, incl)
-        return topo
+        return toposort(graph.output, succ_incoming)
 
     def replace(self, old, new):
         """Replace a node by another."""

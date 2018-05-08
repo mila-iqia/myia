@@ -212,7 +212,6 @@ def test_multi_function():
 
 def test_closure():
     def before(x):
-        Q  # See issue #47
         y = P(x)
 
         def sub():
@@ -220,7 +219,6 @@ def test_closure():
         return sub()
 
     def after(x):
-        Q  # See issue #47
 
         def sub():
             return Q(x)
@@ -228,6 +226,24 @@ def test_closure():
 
     _check_opt(before, after,
                QP_to_QR, elim_R)
+
+
+def test_closure_2():
+    def before(x):
+        # Note that y is only accessible through the closure
+        y = R(x)
+
+        def sub():
+            return y
+        return sub()
+
+    def after(x):
+        def sub():
+            return x
+        return sub()
+
+    _check_opt(before, after,
+               elim_R)
 
 
 def test_fn_replacement():
