@@ -1,7 +1,7 @@
 """User-friendly interfaces to Myia machinery."""
 import operator
 from types import FunctionType
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Union
 
 from . import parser
 from .ir import ANFNode, Constant, Graph
@@ -52,7 +52,8 @@ def run(g: Graph, args: List[Any]) -> Any:
     return VM.evaluate(g, args)
 
 
-def compile(func: FunctionType) -> Callable:
+def compile(func: Union[Graph, FunctionType]) -> Callable:
     """Return a version of the function that runs using Myia's VM."""
-    g = parse(func)
-    return VM.make_callable(g)
+    if not isinstance(func, Graph):
+        func = parse(func)
+    return VM.make_callable(func)
