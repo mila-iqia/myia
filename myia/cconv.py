@@ -10,8 +10,7 @@ from typing import Dict, Iterable, Optional, Set
 
 from .graph_utils import dfs
 from .ir.anf import ANFNode, Constant, Graph
-from .ir.utils import freevars_boundary, is_constant_graph, succ_deeper, \
-    succ_incoming
+from .ir.utils import is_constant_graph, succ_deeper
 from .utils import memoize_method
 
 
@@ -29,14 +28,17 @@ class NestingAnalyzer:
     def __init__(self, root):
         """Initialize a NestingAnalyzer."""
         self.root = root
+        _root: ANFNode = Constant(self.root)
+        self.all_nodes = dict()
+        for node in dfs(_root, succ_deeper):
+            if node.graph:
+                self.all_nodes.setdefault(node.graph, set()).add(node)
+                self.all_nodes[node.graph].update(node.inputs)
 
     @memoize_method
     def coverage(self) -> Iterable[Graph]:
         """Return a collection of graphs accessible from the root."""
-        root: ANFNode = Constant(self.root)
-        nodes = dfs(root, succ_deeper)
-        return set(node.value if is_constant_graph(node) else node.graph
-                   for node in nodes) - {None}
+        return self.all_nodes.keys()
 
     @memoize_method
     def free_variables_direct(self) -> Dict[Graph, Iterable[ANFNode]]:
@@ -47,9 +49,7 @@ class NestingAnalyzer:
         they are in `free_variables_total`.
         """
         coverage = self.coverage()
-        return {g: [node for node in dfs(g.return_,
-                                         succ_incoming,
-                                         freevars_boundary(g))
+        return {g: [node for node in self.all_nodes[g]
                     if node.graph and node.graph is not g]
                 for g in coverage}
 
@@ -72,9 +72,7 @@ class NestingAnalyzer:
         directly.
         """
         coverage = self.coverage()
-        return {g: {node.value for node in dfs(g.return_,
-                                               succ_incoming,
-                                               freevars_boundary(g))
+        return {g: {node.value for node in self.all_nodes[g]
                     if is_constant_graph(node)}
                 for g in coverage}
 
