@@ -1,24 +1,9 @@
 """Type representation."""
 
 import collections
-from operator import itemgetter
 from typing import Any, Dict as DictT, Iterable, Tuple as TupleT
 
 KeysT = Iterable[TupleT[str, 'Type']]
-
-
-def make_new(types):
-    """Create a __new__ method with the specified arguments."""
-    args = ', '.join(f'{name}' for name in types.keys())
-
-    ns: DictT[str, Any] = dict()
-    tmpl = f"""def __new__(cls, {args}):
-    return tuple.__new__(cls, ({args}{',' if len(args) != 0 else ''}))
-    """
-    exec(tmpl, ns)
-    new = ns['__new__']
-    new.__annotations__ = types
-    return new
 
 
 def get_types(bases):
@@ -30,7 +15,7 @@ def get_types(bases):
     elif isinstance(bases[0], TypeMeta):
         # We need to make a copy here
         return dict(bases[0]._fields)
-    return {}
+    return {}  # pragma: no cover
 
 
 class TypeMeta(type):
@@ -42,21 +27,23 @@ class TypeMeta(type):
     def __new__(cls, typename, bases, ns):
         """Create a new Type."""
         if ns.get('_root', False):
-            bases = (tuple,) + bases
             ns['_instances'] = dict()
         if '__slots__' in ns:
             raise TypeError("Don't define __slots__")
-        ns['__slots__'] = ()
 
         types = get_types(bases)
         types.update(filter(lambda v: not v[0].startswith('_'),
                             ns.get('__annotations__', {}).items()))
         ns['_fields'] = types
+        ns['__slots__'] = list(types.keys())
 
-        if '__new__' not in ns:
-            ns['__new__'] = make_new(types)
-        for i, k in enumerate(types.keys()):
-            ns[k] = property(itemgetter(i))
+        if '__init__' not in ns:
+            def init(self, *args):
+                for k, arg in zip(types.keys(), args):
+                    setattr(self, k, arg)
+
+            ns['__init__'] = init
+
         return type.__new__(cls, typename, bases, ns)
 
     def __call__(self, *args, **kwargs):
@@ -103,18 +90,9 @@ class Type(metaclass=TypeMeta):
     _root = True
     _fields: DictT[str, Any]
 
-    def __new__(self, *args):
+    def __init__(self, *args):
         """Disable instantiation of the base type."""
         raise RuntimeError("Can't instantiate Type")
-
-    def __eq__(self, other):
-        return self is other
-
-    def __ne__(self, other):
-        return self is not other
-
-    def __hash__(self):
-        return id(self)
 
     def __repr__(self) -> str:
         name = type(self).__name__
@@ -203,9 +181,9 @@ class Struct(Type):
         items = ((k, elems[k]) for k in sorted(elems.keys()))
         return (tuple(items),)
 
-    def __new__(cls, elements: KeysT) -> None:
+    def __init__(self, elements: KeysT) -> None:
         """Convert input to a dict."""
-        return tuple.__new__(cls, (dict(elements),))
+        self.elements = dict(elements)
 
     def __getattr__(self, attr):
         if attr in self.elements:
