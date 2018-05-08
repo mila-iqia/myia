@@ -7,6 +7,7 @@ from hrepr import hrepr
 
 from ..cconv import NestingAnalyzer, ParentProxy
 from ..dtype import Type, Bool, Int, Float, Tuple, List, Function
+from ..infer import Reference
 from ..info import DebugInfo, About
 from ..ir import ANFNode, Apply, Constant, Graph, is_apply, is_constant, \
     is_constant_graph, is_parameter, is_special, GraphCloner
@@ -535,6 +536,12 @@ class _Apply:
 ########
 # Misc #
 ########
+
+
+@mixin(Reference)
+class _Reference:
+    def __hrepr__(self, H, hrepr):
+        return hrepr({'node': self.node, 'context': self.context})
 
 
 @mixin(Location)
