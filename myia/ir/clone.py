@@ -34,6 +34,9 @@ class GraphCloner:
         relation: The relation the cloned nodes present with respect
             to the originals, for debugging purposes. Default is
             'copy'.
+        graph_relation: The relation the cloned graphs present with
+            respect to the originals, for debugging purposes. Default
+            is the value of the `relation` argument.
 
     """
 
@@ -41,7 +44,8 @@ class GraphCloner:
                  *graphs: Graph,
                  total: bool = False,
                  clone_constants: bool = False,
-                 relation: str = 'copy') -> None:
+                 relation: str = 'copy',
+                 graph_relation: str = None) -> None:
         """Initialize a GraphCloner."""
         self.todo: Set[Graph] = set()
         # graph_clones maps a graph to either:
@@ -56,6 +60,7 @@ class GraphCloner:
         self.total = total
         self.clone_constants = clone_constants
         self.relation = relation
+        self.graph_relation = graph_relation or relation
         for graph in graphs:
             self.add_clone(graph)
 
@@ -87,7 +92,7 @@ class GraphCloner:
             set_output = target_graph is None
 
         if target_graph is None:
-            with About(graph.debug, self.relation):
+            with About(graph.debug, self.graph_relation):
                 target_graph = Graph()
 
             for p in graph.parameters:
