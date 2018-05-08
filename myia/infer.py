@@ -590,6 +590,9 @@ class InferenceEngine:
         """
         futs = self.cache[track]
         if ref not in futs:
+            if self.loop.is_closed():
+                raise Exception('Requested an unprocessed reference.') \
+                    # pragma: no cover
             futs[ref] = self.loop.create_task(self.compute_ref(track, ref))
         return futs[ref]
 
