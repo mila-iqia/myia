@@ -97,7 +97,9 @@ class GraphCloner:
 
             for p in graph.parameters:
                 with About(p.debug, self.relation):
-                    self.repl[p] = target_graph.add_parameter()
+                    p2 = target_graph.add_parameter()
+                    p2.type = p.type
+                    self.repl[p] = p2
 
         self.repl[graph] = target_graph
         if set_output:
@@ -214,6 +216,7 @@ class GraphCloner:
                         new = Constant(new_value)
                 else:
                     new = Apply([], g)
+            new.type = node.type
             self.repl[node] = new
 
         for _node in to_clone:

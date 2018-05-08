@@ -2,6 +2,7 @@ import copy
 
 import pytest
 
+from myia.dtype import Int, Float, Function
 from myia.ir.anf import PARAMETER, Apply, Constant, Graph, Parameter
 from myia.prim import ops as primops
 
@@ -153,6 +154,17 @@ def test_graph_helpers():
     g.output = g.apply(add, temp, x)
     assert g.output.graph is g
     assert list(g.output.inputs) == [add, temp, x]
+
+
+def test_graph_type():
+    g = Graph()
+    x = g.add_parameter()
+    y = g.add_parameter()
+    x.type = Int(16)
+    y.type = Float(32)
+    g.output = g.apply('mul', x, y)
+    g.output.type = Float(64)
+    assert g.type == Function((Int(16), Float(32)), Float(64))
 
 
 def test_graph_output():

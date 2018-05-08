@@ -13,6 +13,7 @@ returning a nested function creates a closure.
 from typing import Any, Iterable, List, MutableSequence, Sequence, Set, \
     Tuple, overload
 
+from ..dtype import Function
 from ..info import NamedDebugInfo
 from ..prim import ops as primops
 from ..unify import expandlist, noseq
@@ -47,6 +48,12 @@ class Graph:
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
         self.debug = NamedDebugInfo(self)
+
+    @property
+    def type(self):
+        """Return the graph's type based on parameter/output types."""
+        return Function(tuple(p.type for p in self.parameters),
+                        self.output.type)
 
     @property
     def output(self) -> 'ANFNode':
@@ -125,6 +132,7 @@ class ANFNode(Node):
         self.graph = graph
         self.uses: Set[Tuple[ANFNode, int]] = set()
         self.debug = NamedDebugInfo(self)
+        self.type = None
 
     @property
     def inputs(self) -> 'Inputs':
