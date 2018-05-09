@@ -188,3 +188,9 @@ async def infer_value_hastype(engine, x, t):
     if t_v is ANYTHING:
         raise InferenceError('Second argument to hastype must be constant.')
     return hastype_helper(x_t, t_v)
+
+
+@value_inferrer(P.typeof, nargs=1)
+async def infer_value_typeof(engine, x):
+    """Infer the return value of typeof."""
+    return await x['type']

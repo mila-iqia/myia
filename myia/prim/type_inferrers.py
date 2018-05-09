@@ -139,6 +139,12 @@ async def infer_type_getitem(engine, seq, idx):
         raise MyiaTypeError('Wrong seq type for getitem')
 
 
+@type_inferrer(P.typeof, nargs=1)
+async def infer_type_typeof(engine, _):
+    """Infer the return type of typeof."""
+    return Type
+
+
 @type_inferrer(P.hastype, nargs=2)
 async def infer_type_hastype(engine, x, t):
     """Infer the return type of hastype."""

@@ -39,6 +39,7 @@ class TypeMeta(type):
 
         if '__init__' not in ns:
             def init(self, *args):
+                assert len(args) == len(types)
                 for k, arg in zip(types.keys(), args):
                     setattr(self, k, arg)
 

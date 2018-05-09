@@ -11,7 +11,7 @@ from myia.dtype import Bool, Int, Float, Tuple as T, List as L, Type
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
     implementations as pyimpl, \
-    add, mul, lt, head, tail, hastype
+    add, mul, lt, head, tail, hastype, typeof
 from myia.prim.value_inferrers import \
     ValueTrack, value_inferrer_constructors
 from myia.prim.type_inferrers import \
@@ -721,6 +721,15 @@ def test_hastype(x):
 )
 def test_bad_hastype(x, y):
     return hastype(x, y)
+
+
+@infer(
+    type=[(i64, Type)],
+    value=[({'type': i64}, i64),
+           ({'type': f64}, f64)]
+)
+def test_typeof(x):
+    return typeof(x)
 
 
 @infer(
