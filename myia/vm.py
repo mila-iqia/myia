@@ -7,7 +7,7 @@ implementation.
 from types import FunctionType
 from typing import Iterable, Mapping, Any, Callable, List
 
-from myia.ir.anf import Graph, Apply, Constant, Parameter, ANFNode
+from myia.ir import Graph, Apply, Constant, Parameter, ANFNode
 from myia.ir.utils import is_constant_graph
 from myia.prim import Primitive
 from myia.prim.ops import if_, return_
@@ -26,8 +26,7 @@ class VMFrame:
     You can index a frame with a node to get its value in the context
     of this frame (if it has already been evaluated).
 
-    Attributes
-    ----------
+    Attributes:
         values: Mapping of node to their values in this application
         todo: list of nodes remaining to execute
         closure: values for the closure if the current application is a closure
