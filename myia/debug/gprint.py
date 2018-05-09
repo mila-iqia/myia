@@ -13,6 +13,7 @@ from ..ir import ANFNode, Apply, Constant, Graph, is_apply, is_constant, \
     is_constant_graph, is_parameter, is_special, GraphCloner
 from ..parser import Location
 from ..prim import ops as primops
+from ..prim.value_inferrers import LimitedValue
 from ..opt import \
     PatternOptimizerSinglePass, \
     PatternOptimizerEquilibrium, \
@@ -542,6 +543,12 @@ class _Apply:
 ########
 # Misc #
 ########
+
+
+@mixin(LimitedValue)
+class _LimitedValue:
+    def __hrepr__(self, H, hrepr):
+        return hrepr(self.value)
 
 
 @mixin(Reference)

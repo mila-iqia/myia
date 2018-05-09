@@ -197,3 +197,9 @@ async def infer_type_arith_bin(engine, x, y):
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
     return t
+
+
+@type_inferrer(P.return_, nargs=1)
+async def infer_type_return_(engine, x):
+    """Infer the return type of return_."""
+    return await x['type']

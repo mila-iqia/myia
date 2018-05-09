@@ -166,35 +166,41 @@ class GraphInferrer(Inferrer):
         self.nargs = len(self.graph.parameters)
         self.context = context.filter(graph)
 
+    async def make_context(self, args):
+        """Create a Context object for this graph with these arguments.
+
+        We await on all relevant properties of all arguments in order to
+        build a context (this cannot be done lazily, like with primitives,
+        because we need a concrete context).
+        """
+        argvals = []
+        for arg in args:
+            argval = {}
+            for track in self.engine.all_track_names:
+                tr = self.engine.tracks[track]
+                result = await self.engine.get_raw(track, arg)
+                argval[track] = tr.broaden(result)
+            argvals.append(argval)
+
+        # Update current context using the fetched properties.
+        return self.context.add(self.graph, argvals)
+
     async def infer(self, *args):
         """Infer a property of the operation on the given arguments."""
         if len(args) != self.nargs:
             raise type_error_nargs(self.identifier, self.nargs, len(args))
 
-        engine = self.engine
-
-        # We fetch all relevant properties of all arguments in order to build a
-        # context (this cannot be done lazily, like with primitives, because we
-        # need a concrete context.).
-        argvals = []
-        for arg in args:
-            argval = {track: (await engine.get_raw(track, arg))
-                      for track in engine.all_track_names}
-            argvals.append(argval)
-
-        # Update current context using the fetched properties.
-        context = self.context.add(self.graph, argvals)
+        context = await self.make_context(args)
 
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
-        for p, arg in zip(self.graph.parameters, argvals):
-            for track in engine.all_track_names:
-                ref = engine.ref(p, context)
-                v = engine.tracks[track].broaden(arg[track])
-                engine.cache_value(track, ref, v)
+        for p, arg in zip(self.graph.parameters, context.argkey):
+            for track, v in arg:
+                ref = self.engine.ref(p, context)
+                self.engine.cache_value(track, ref, v)
 
-        out = engine.ref(self.graph.output, context)
-        return await engine.get_raw(self.track, out)
+        out = self.engine.ref(self.graph.return_, context)
+        return await self.engine.get_raw(self.track, out)
 
     def provably_equivalent(self, other):
         """Whether this inferrer is provably equivalent to the other.
@@ -237,6 +243,11 @@ class Context:
     parameter of each graph in which a node is nested.
     """
 
+    @classmethod
+    def empty(cls, parents_map):
+        """Create an empty context."""
+        return Context(None, None, (), parents_map=parents_map)
+
     def __init__(self, parent, g, argvals, *, parents_map):
         """Initialize the Context."""
         self.parents_map = parents_map
@@ -247,18 +258,12 @@ class Context:
         self.parent_cache = dict(parent.parent_cache) if parent else {}
         self.parent_cache[g] = self
 
-    def empty(self):
-        """Create an empty context."""
-        return Context(None, None, (), parents_map=self.parents_map)
-
     def filter(self, graph):
         """Return a context restricted to a graph's dependencies."""
         rval = self.parent_cache.get(graph, None)
         if rval is None:
             parent_graph = self.parents_map.get(graph, None)
             rval = self.parent_cache.get(parent_graph, None)
-        if rval is None:
-            rval = self.empty()
         return rval
 
     def add(self, graph, argvals):
@@ -295,6 +300,11 @@ class Reference:
         g = node.value if is_constant_graph(node) else node.graph
         self.context = context.filter(g)
 
+    async def get_all(self):
+        """Return all properties associated to this reference."""
+        return {track: await self[track]
+                for track in self.engine.all_track_names}
+
     def __getitem__(self, track):
         return self.engine.get(track, self)
 
@@ -322,8 +332,12 @@ class VirtualReference:
         """Initialize the VirtualReference."""
         self.values = values
 
-    def __getitem__(self, track):
+    async def __getitem__(self, track):
         return self.values[track]
+
+    async def get_all(self):
+        """Return all properties associated to this reference."""
+        return self.values
 
 
 ########
@@ -519,10 +533,8 @@ class InferenceEngine:
         }
         self.required_tracks = required_tracks or self.all_track_names
 
-        self.argvals = argvals
-        for arg in self.argvals:
-            for track_obj in self.tracks.values():
-                track_obj.fill_in(arg)
+        self.argrefs = [self.vref(arg) for arg in argvals]
+        self.argvals = [ref.values for ref in self.argrefs]
 
         self.timeout = timeout
         self.cache = {track: {} for track in self.all_track_names}
@@ -531,21 +543,27 @@ class InferenceEngine:
         self.equiv = eq_class(self)
 
         self.parents = NestingAnalyzer(graph).parents()
-        self.root_context = Context(None, graph, argvals,
-                                    parents_map=self.parents)
-        self.argrefs = [VirtualReference(**arg) for arg in argvals]
+        empty_context = Context.empty(self.parents)
+        self.root_context = empty_context.add(graph, argvals)
 
-        self._run_sync()
+        self.loop = asyncio.new_event_loop()
+        self.run_coroutine(self._run())
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
         return Reference(self, node, context)
 
+    def vref(self, values):
+        """Return a VirtualReference using the given property values."""
+        for track_obj in self.tracks.values():
+            track_obj.fill_in(values)
+        return VirtualReference(**values)
+
     async def compute_ref(self, track, ref):
         """Compute the value of the Reference on the given track."""
         if isinstance(ref, VirtualReference):
             # A VirtualReference already contains the values we need.
-            return ref[track]
+            return await ref[track]
 
         node = ref.node
         ctx = ref.context
@@ -567,16 +585,10 @@ class InferenceEngine:
                 self.log_error([ref], e)
                 raise
             except RuntimeError as e:
-                # This happens sometimes, e.g. in
-                # def f(x): return f(x - 1)
-                message = e.args[0]
-                if message.startswith('Task cannot await on itself'):
-                    e2 = self.log_error(
-                        [ref], 'There seems to be an infinite recursion.'
-                    )
-                    raise e2
-                else:
-                    raise  # pragma: no cover
+                # At some point, some invalid recursive graphs raised this
+                # error. You can just add a log_error if this happens again
+                # e.g. because of changes in the inference engine.
+                raise  # pragma: no cover
 
         else:
             # Values for Parameters are cached when we enter a Graph.
@@ -623,7 +635,7 @@ class InferenceEngine:
         if self.errors:
             raise self.errors[0]['error']
         else:
-            oref = self.ref(self.graph.output, self.root_context)
+            oref = self.ref(self.graph.return_, self.root_context)
             return self.get_info(track, oref)
 
     def cache_value(self, track, ref, value):
@@ -647,9 +659,7 @@ class InferenceEngine:
                   the exception is logged, otherwise the method returns
                   without doing anything.
         """
-        if isinstance(err, str):
-            err = InferenceError(err)
-        elif isinstance(err, asyncio.Future):
+        if isinstance(err, asyncio.Future):
             err = err.exception()
             if err is None:
                 return
@@ -698,16 +708,6 @@ class InferenceEngine:
                 self.log_error([], d)
             self.todo.update(pending)
 
-    def _run_sync(self):
-        self.loop = asyncio.new_event_loop()
-        try:
-            res = self.loop.run_until_complete(self._run())
-        finally:
-            for task in asyncio.Task.all_tasks(self.loop):
-                task._log_destroy_pending = False
-            self.loop.close()
-        return res
-
     async def assert_same(self, track, *refs):
         """Assert that all refs have the same value on the given track."""
         # Make a future for the value of each reference
@@ -735,3 +735,16 @@ class InferenceEngine:
 
         # We return the first result immediately
         return main.result()
+
+    def run_coroutine(self, coro):
+        """Run an async function using this inferrer's loop."""
+        try:
+            res = self.loop.run_until_complete(coro)
+        finally:
+            for task in asyncio.Task.all_tasks(self.loop):
+                task._log_destroy_pending = False
+        return res
+
+    def close(self):
+        """Close this inferrer's loop."""
+        self.loop.close()
