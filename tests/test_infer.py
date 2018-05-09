@@ -170,18 +170,21 @@ def infer(**tests_spec):
             print('Expected:')
             print(expected_out)
 
-            if isinstance(expected_out, type) \
-                    and issubclass(expected_out, Exception):
-                try:
-                    out()
-                except InferenceError as e:
-                    pass
+            try:
+                if isinstance(expected_out, type) \
+                        and issubclass(expected_out, Exception):
+                    try:
+                        out()
+                    except InferenceError as e:
+                        pass
+                    else:
+                        raise Exception(
+                            f'Expected {expected_out}, got: (see stdout).'
+                        )
                 else:
-                    raise Exception(
-                        f'Expected {expected_out}, got: (see stdout).'
-                    )
-            else:
-                assert out() == expected_out
+                    assert out() == expected_out
+            finally:
+                inferrer.close()
 
         m = mark.parametrize('spec', list(tests))(run_test)
         m.__orig__ = fn

@@ -193,3 +193,9 @@ def setattr(data, attr, value):
     data2 = copy(data)
     py_setattr(data2, attr, value)
     return data2
+
+
+@register(primops.return_)
+def return_(x):
+    """Implement `return_`."""
+    return x

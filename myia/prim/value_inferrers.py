@@ -187,10 +187,16 @@ async def infer_value_hastype(engine, x, t):
     t_v = await t['value']
     if t_v is ANYTHING:
         raise InferenceError('Second argument to hastype must be constant.')
-    return hastype_helper(x_t, t_v)
+    # TODO: Find a good way to carry ValueTrack.max_depth to here
+    # Instead of defaulting to 1
+    max_depth = 1
+    return limited(hastype_helper(x_t, t_v), max_depth)
 
 
 @value_inferrer(P.typeof, nargs=1)
 async def infer_value_typeof(engine, x):
     """Infer the return value of typeof."""
-    return await x['type']
+    # TODO: Find a good way to carry ValueTrack.max_depth to here
+    # Instead of defaulting to 1
+    max_depth = 1
+    return limited(await x['type'], max_depth)
