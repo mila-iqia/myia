@@ -142,17 +142,15 @@ class Environment:
         """
         if id(obj) in self._object_map:
             return self._object_map[id(obj)]
-        elif isinstance(obj, (bool, float, int, str, primops.Primitive)):
-            node = Constant(obj)
-            self._object_map[id(obj)] = node
-            return node
         elif isinstance(obj, FunctionType):
             parser = Parser(self, obj)
             # This will insert object into the map
             parser.parse()
             return self._object_map[id(obj)]
         else:
-            raise ValueError(obj)
+            node = Constant(obj)
+            self._object_map[id(obj)] = node
+            return node
 
     def _remove(self, id: int) -> None:
         if id in self._object_map:

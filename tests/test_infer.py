@@ -7,11 +7,11 @@ from myia.infer import \
     InferenceEngine, ANYTHING, MyiaTypeError, InferenceError, \
     VirtualReference, register_inferrer
 
-from myia.dtype import Bool, Int, Float, Tuple as T, List as L
+from myia.dtype import Bool, Int, Float, Tuple as T, List as L, Type
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
     implementations as pyimpl, \
-    add, mul, lt, head, tail
+    add, mul, lt, head, tail, hastype, typeof
 from myia.prim.value_inferrers import \
     ValueTrack, value_inferrer_constructors
 from myia.prim.type_inferrers import \
@@ -35,6 +35,8 @@ li64 = L(Int(64))
 lf16 = L(Float(16))
 lf32 = L(Float(32))
 lf64 = L(Float(64))
+
+Nil = T()
 
 
 ########################
@@ -702,6 +704,67 @@ def test_map(xs, ys):
         return x * x
 
     return _map(square, xs), _map(square, ys)
+
+
+@infer(
+    type=[(i64, B)],
+    value=[({'type': i64}, True),
+           ({'type': f64}, False)]
+)
+def test_hastype(x):
+    return hastype(x, i64)
+
+
+@infer(
+    type=(i64, i64, InferenceError),
+    value=(i64, {'type': Type, 'value': ANYTHING}, InferenceError),
+)
+def test_bad_hastype(x, y):
+    return hastype(x, y)
+
+
+@infer(
+    type=[(i64, Type)],
+    value=[({'type': i64}, i64),
+           ({'type': f64}, f64)]
+)
+def test_typeof(x):
+    return typeof(x)
+
+
+@infer(
+    type=[
+        (i64, i64),
+        (f64, i64),
+        (T(i64, i64), i64),
+        (T(i64, T(f64, i64)), i64),
+        (li64, f64),
+        (T(i64, li64), InferenceError),
+    ],
+    value=[
+        (5, 5),
+        (6.0, 6),
+        ((5, 7, (3.2, 1.8)), 16)
+    ]
+)
+def test_hastype_2(x):
+    i64, f64, T, Nil, L, _to_i64, hastype, head, tail
+
+    def f(x):
+        if hastype(x, i64):
+            return x
+        elif hastype(x, f64):
+            return f(_to_i64(x))
+        elif hastype(x, Nil):
+            return 0
+        elif hastype(x, T):
+            return f(head(x)) + f(tail(x))
+        elif hastype(x, L):
+            return 1.0
+        else:
+            return 0
+
+    return f(x)
 
 
 @infer(

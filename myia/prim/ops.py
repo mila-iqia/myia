@@ -45,6 +45,15 @@ ge = Primitive('ge')
 not_ = Primitive('not')
 
 
+######################
+# Type introspection #
+######################
+
+
+typeof = Primitive('typeof')
+hastype = Primitive('hastype')
+
+
 ###################
 # Data structures #
 ###################

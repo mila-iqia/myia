@@ -5,13 +5,14 @@ import asyncio
 
 from functools import partial
 
-from ..infer import \
+from ..infer import InferenceError, \
     ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track
 from ..ir import Graph
 
 from . import ops as P
 from .ops import Primitive
-from .py_implementations import implementations as pyimpl
+from .py_implementations import \
+    implementations as pyimpl, hastype_helper
 
 
 class LimitedValue:
@@ -177,3 +178,19 @@ async def infer_value_if(engine, cond, tb, fb):
         return ANYTHING
 
     return await fn()
+
+
+@value_inferrer(P.hastype, nargs=2)
+async def infer_value_hastype(engine, x, t):
+    """Infer the return value of hastype."""
+    x_t = await x['type']
+    t_v = await t['value']
+    if t_v is ANYTHING:
+        raise InferenceError('Second argument to hastype must be constant.')
+    return hastype_helper(x_t, t_v)
+
+
+@value_inferrer(P.typeof, nargs=1)
+async def infer_value_typeof(engine, x):
+    """Infer the return value of typeof."""
+    return await x['type']

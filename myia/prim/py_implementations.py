@@ -4,6 +4,7 @@
 from copy import copy
 from typing import Callable
 
+from .. import dtype as types
 from ..utils import Registry
 
 from . import ops as primops
@@ -100,6 +101,44 @@ def ge(x, y):
 def not_(x):
     """Implement `not_`."""
     return not x
+
+
+@register(primops.typeof)
+def typeof(x):
+    """Implement typeof."""
+    if isinstance(x, types.Type) or isinstance(x, type):
+        return types.Type
+    elif isinstance(x, bool):
+        return types.Bool()
+    elif isinstance(x, int):
+        return types.Int(64)
+    elif isinstance(x, float):
+        return types.Float(64)
+    elif isinstance(x, tuple):
+        return types.Tuple(map(typeof, x))
+    elif isinstance(x, list) and len(x) > 0:
+        type0, *rest = map(typeof, x)
+        if any(t != type0 for t in rest):
+            raise TypeError(f'All list elements should have same type')
+        return types.List(type0)
+    else:
+        raise TypeError(f'Untypable value: {x}')
+
+
+def hastype_helper(t, model):
+    """Check that type t is represented by model."""
+    if t == model:
+        return True
+    elif isinstance(model, type) and issubclass(model, types.Type):
+        return isinstance(t, model)
+    else:
+        return False
+
+
+@register(primops.hastype)
+def hastype(x, t):
+    """Implement `hastype`."""
+    return hastype_helper(typeof(x), t)
 
 
 @register(primops.cons_tuple)
