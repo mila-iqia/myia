@@ -7,13 +7,13 @@ implementation.
 from types import FunctionType
 from typing import Iterable, Mapping, Any, Callable, List
 
-from myia.ir import Graph, Apply, Constant, Parameter, ANFNode
-from myia.ir.utils import is_constant_graph
-from myia.prim import Primitive
-from myia.prim.ops import if_, return_
-from myia.utils import smap
-from myia.graph_utils import toposort
-from myia.cconv import NestingAnalyzer
+from .ir import Graph, Apply, Constant, Parameter, ANFNode
+from .ir.utils import is_constant_graph
+from .prim import Primitive
+from .prim.ops import if_, return_
+from .utils import smap
+from .graph_utils import toposort
+from .cconv import NestingAnalyzer
 
 
 class VMFrame:
