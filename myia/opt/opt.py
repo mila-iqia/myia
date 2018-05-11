@@ -160,6 +160,7 @@ class PatternOptimizerSinglePass:
             for pattern in self.patterns:
                 new = pattern(node)
                 if new and new is not node:
+                    new.type = node.type
                     self.replace(node, new)
                     changes = True
                     continue
