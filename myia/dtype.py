@@ -226,3 +226,12 @@ class Function(Type):
         assert len(kwargs) == 0
         assert not isinstance(args[0], Type)
         return (tuple(args[0]), args[1])
+
+
+class Dead(Type):
+    """This is the type of a dead computation.
+
+    The type specializer may produce a dummy constant with this type when a
+    polymorphic function is given as a parameter to a function that fails to
+    use it.
+    """

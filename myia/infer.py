@@ -542,7 +542,8 @@ class InferenceEngine:
         self.errors = []
         self.equiv = eq_class(self)
 
-        self.parents = NestingAnalyzer(graph).parents()
+        self.nest = NestingAnalyzer(graph)
+        self.parents = self.nest.parents()
         empty_context = Context.empty(self.parents)
         self.root_context = empty_context.add(graph, argvals)
 
