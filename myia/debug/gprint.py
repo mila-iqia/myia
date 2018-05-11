@@ -71,6 +71,12 @@ class GraphPrinter:
         self.currid += 1
         return f'Y{self.currid}'
 
+    def _strip_cosmetic(self, node):
+        while node and node.debug.about \
+                and node.debug.about.relation == 'cosmetic':
+            node = node.debug.about.debug.obj
+        return node
+
     def cynode(self, id, label, classes, parent=None, node=None):
         """Build data structure for a node in cytoscape."""
         if not isinstance(id, str):
@@ -79,7 +85,7 @@ class GraphPrinter:
             id = self.id(id)
         data = {'id': id, 'label': str(label)}
         if self.tooltip_gen and node:
-            ttip = self.tooltip_gen(node)
+            ttip = self.tooltip_gen(self._strip_cosmetic(node))
             if ttip is not None:
                 if not isinstance(ttip, str):
                     ttip = str(hrepr(ttip))
@@ -201,7 +207,7 @@ class MyiaGraphPrinter(GraphPrinter):
         graphs = set()
         parents = nest.parents()
         g = graph
-        clone = GraphCloner(total=True)
+        clone = GraphCloner(total=True, relation='cosmetic')
         while g:
             clone.add_clone(g)
             graphs.add(g)
@@ -279,7 +285,7 @@ class MyiaGraphPrinter(GraphPrinter):
         if _has_error(node.debug):
             cl += ' error'
         if self._class_gen:
-            return self._class_gen(node, cl)
+            return self._class_gen(self._strip_cosmetic(node), cl)
         else:
             return cl
 
