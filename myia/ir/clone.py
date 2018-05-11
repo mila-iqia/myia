@@ -241,6 +241,7 @@ class GraphCloner:
             if new_graph is not 'inline':
                 assert isinstance(new_graph, Graph)
                 new_graph.output = new_root
+                self.repl[graph.return_] = new_graph.return_
 
     def __getitem__(self, x: Any) -> Any:
         """Get the clone of the given graph or node."""
