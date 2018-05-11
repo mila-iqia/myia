@@ -5,7 +5,7 @@ from functools import partial
 
 from ..dtype import Int, Bool, Float, Tuple, List, Type
 from ..infer import ANYTHING, Inferrer, GraphInferrer, \
-    MyiaTypeError, register_inferrer, Track
+    MyiaTypeError, register_inferrer, Track, VirtualReference
 from ..ir import Graph
 
 from . import ops as P
@@ -203,3 +203,15 @@ async def infer_type_arith_bin(engine, x, y):
 async def infer_type_return_(engine, x):
     """Infer the return type of return_."""
     return await x['type']
+
+
+@type_inferrer(P.maplist, nargs=2)
+async def infer_type_maplist(engine, f, xs):
+    """Infer the return type of maplist."""
+    f_t = await engine.get('type', f)
+    xs_t = await engine.get('type', xs)
+    if not isinstance(xs_t, List):
+        raise MyiaTypeError('Expect list for maplist')
+    xref = VirtualReference(value=ANYTHING, type=xs_t.element_type)
+    ret_t = await f_t(xref)
+    return List(ret_t)

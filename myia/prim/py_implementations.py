@@ -199,3 +199,13 @@ def setattr(data, attr, value):
 def return_(x):
     """Implement `return_`."""
     return x
+
+
+@register(primops.maplist)
+def maplist(f, xs):
+    """Implement `maplist`."""
+    from ..api import compile
+    from ..ir import Graph
+    if isinstance(f, Graph):
+        f = compile(f)
+    return list(map(f, xs))
