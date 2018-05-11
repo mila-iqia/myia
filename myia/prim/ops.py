@@ -75,3 +75,10 @@ setattr = Primitive('setattr')
 
 if_ = Primitive('if')
 return_ = Primitive('return')
+
+
+#################
+# Miscellaneous #
+#################
+
+maplist = Primitive('maplist')

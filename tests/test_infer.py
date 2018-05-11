@@ -4,14 +4,13 @@ from pytest import mark
 
 from myia.api import parse
 from myia.infer import \
-    InferenceEngine, ANYTHING, MyiaTypeError, InferenceError, \
-    VirtualReference, register_inferrer
+    InferenceEngine, ANYTHING, InferenceError, register_inferrer
 
 from myia.dtype import Bool, Int, Float, Tuple as T, List as L, Type
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
     implementations as pyimpl, \
-    add, mul, lt, head, tail, hastype, typeof
+    add, mul, lt, head, tail, maplist, hastype, typeof
 from myia.prim.value_inferrers import \
     ValueTrack, value_inferrer_constructors
 from myia.prim.type_inferrers import \
@@ -62,29 +61,6 @@ type_track = partial(
     TypeTrack,
     constructors=type_inferrer_cons_test
 )
-
-
-# Map
-
-_map = Primitive('map')
-
-
-def impl_map(f, xs):
-    return list(map(f, xs))
-
-
-pyimpl_test[_map] = impl_map
-
-
-@type_inferrer_test(_map, nargs=2)
-async def infer_type_map(engine, f, xs):
-    f_t = await engine.get('type', f)
-    xs_t = await engine.get('type', xs)
-    if not isinstance(xs_t, L):
-        raise MyiaTypeError('Expect list for map')
-    xref = VirtualReference(value=ANYTHING, type=xs_t.element_type)
-    ret_t = await f_t(xref)
-    return L(ret_t)
 
 
 # Ternary arithmetic op
@@ -701,12 +677,12 @@ def test_cover_limitedvalue_eq(x, y):
         (li64, f64, InferenceError),
     ]
 )
-def test_map(xs, ys):
+def test_maplist(xs, ys):
 
     def square(x):
         return x * x
 
-    return _map(square, xs), _map(square, ys)
+    return maplist(square, xs), maplist(square, ys)
 
 
 @infer(
@@ -783,7 +759,7 @@ def test_map_2(xs, z):
             return x + y
         return f
 
-    return _map(adder(z), xs)
+    return maplist(adder(z), xs)
 
 
 @infer(type=[(i64, InferenceError)])
