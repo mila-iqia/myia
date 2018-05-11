@@ -79,6 +79,8 @@ class Graph:
             self.return_.inputs[1] = value
         else:
             self.return_ = Apply([Constant(primops.return_), value], self)
+        self.return_.type = value.type
+        self.return_.inputs[0].type = Function((value.type,), value.type)
 
     def add_parameter(self) -> 'Parameter':
         """Add a new parameter to this graph (appended to the end)."""
