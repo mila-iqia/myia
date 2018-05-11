@@ -161,6 +161,25 @@ add_zero_r = psub(
 )
 
 
+######################
+# Branch elimination #
+######################
+
+
+simplify_always_true = psub(
+    pattern=(P.if_, True, X, Y),
+    replacement=(X,),
+    name='simplify_always_true'
+)
+
+
+simplify_always_false = psub(
+    pattern=(P.if_, False, X, Y),
+    replacement=(Y,),
+    name='simplify_always_false'
+)
+
+
 ########################
 # Constant propagation #
 ########################
@@ -241,6 +260,7 @@ inline = make_inliner(inline_criterion=None, check_recursive=True)
 ##################
 # Specialization #
 ##################
+
 
 def make_specializer(specialize_criterion):
     """Create an specializer.

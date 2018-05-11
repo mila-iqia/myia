@@ -189,6 +189,43 @@ def test_add_zero():
                lib.add_zero_r)
 
 
+######################
+# Branch elimination #
+######################
+
+
+def test_true_branch():
+
+    def before(x, y):
+        if True:
+            return x
+        else:
+            return y
+
+    def after(x, y):
+        return x
+
+    _check_opt(before, after,
+               lib.simplify_always_true,
+               lib.inline)
+
+
+def test_false_branch():
+
+    def before(x, y):
+        if False:
+            return x
+        else:
+            return y
+
+    def after(x, y):
+        return y
+
+    _check_opt(before, after,
+               lib.simplify_always_false,
+               lib.inline)
+
+
 ########################
 # Constant propagation #
 ########################
