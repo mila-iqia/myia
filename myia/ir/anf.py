@@ -299,7 +299,9 @@ class Apply(ANFNode):
     def __visit__(self, fn):
         new_inputs = expandlist(map(fn, self.inputs))
         g = noseq(fn, self.graph)
-        return Apply(new_inputs, g)
+        app = Apply(new_inputs, g)
+        app.type = self.type
+        return app
 
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, inputs=self.inputs,
@@ -353,7 +355,9 @@ class Constant(ANFNode):
         super().__init__([], value, None)
 
     def __visit__(self, fn):
-        return Constant(noseq(fn, self.value))
+        ct = Constant(noseq(fn, self.value))
+        ct.type = self.type
+        return ct
 
     def __str__(self) -> str:
         if isinstance(self.value, LITERALS):
