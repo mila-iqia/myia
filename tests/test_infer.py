@@ -10,7 +10,7 @@ from myia.dtype import Bool, Int, Float, Tuple as T, List as L, Type
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
     implementations as pyimpl, \
-    add, mul, lt, head, tail, maplist, hastype, typeof
+    add, mul, lt, head, tail, maplist, hastype, typeof, usub
 from myia.prim.value_inferrers import \
     ValueTrack, value_inferrer_constructors
 from myia.prim.type_inferrers import \
@@ -99,7 +99,7 @@ async def infer_type_to_i64(engine, x):
     return Int(64)
 
 
-def infer(**tests_spec):
+def parse_test_spec(tests_spec):
 
     tests = []
 
@@ -114,6 +114,13 @@ def infer(**tests_spec):
                 else:
                     test.append({main_track: entry})
             tests.append((main_track, test))
+
+    return tests
+
+
+def infer(**tests_spec):
+
+    tests = parse_test_spec(tests_spec)
 
     def decorate(fn):
         def run_test(spec):
@@ -254,6 +261,25 @@ def test_while(x, y):
         rval = rval * y
         x = x - 1
     return rval
+
+
+@infer(type=(i64, f64, T(i64, f64)))
+def test_nullary_closure(x, y):
+    def make(z):
+        def inner():
+            return z
+        return inner
+    a = make(x)
+    b = make(y)
+    return a(), b()
+
+
+@infer(type=(i64, f64, T(i64, f64)))
+def test_merge_point(x, y):
+    def mul2():
+        return mul
+    m = mul2()
+    return m(x, x), m(y, y)
 
 
 @infer(type=[(i64, InferenceError)])
@@ -577,6 +603,42 @@ def test_hof_4(x, y):
 
     f = pick(x)
     return f(double, (y + 3, y + 4))
+
+
+@infer(
+    type=[
+        (B, B, i64, i64, i64),
+        (B, B, f64, f64, InferenceError),
+        ({'value': True}, B, Nil, i64, i64),
+        (B, {'value': True}, f64, f64, f64),
+        (B, {'value': True}, i64, f64, InferenceError),
+    ]
+)
+def test_hof_5(c1, c2, x, y):
+
+    def pick_hof(c):
+        def hof_1(f):
+            def wrap(x, y):
+                return f(y)
+            return wrap
+
+        def hof_2(f):
+            def wrap(x, y):
+                return f(x)
+            return wrap
+
+        if c:
+            return hof_1
+        else:
+            return hof_2
+
+    def pick_f(c):
+        if c:
+            return usub
+        else:
+            return _to_i64
+
+    return pick_hof(c1)(pick_f(c2))(x, y)
 
 
 @infer(
