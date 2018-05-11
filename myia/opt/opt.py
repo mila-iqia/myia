@@ -1,6 +1,7 @@
 """Graph optimization routines."""
 
 
+from ..cconv import NestingAnalyzer
 from ..graph_utils import dfs, toposort
 from ..ir import ANFNode, Apply, Constant, Graph, Special, \
     succ_incoming, is_constant_graph, replace
@@ -167,7 +168,7 @@ class PatternOptimizerSinglePass:
         return changes
 
 
-class PatternOptimizerEquilibrium:
+class EquilibriumOptimizer:
     """Run an optimization pass until equilibrium.
 
     Args:
@@ -178,13 +179,16 @@ class PatternOptimizerEquilibrium:
     """
 
     def __init__(self, single_pass, *, auto_acquire=True):
-        """Initialize a PatternOptimizerEquilibrium."""
+        """Initialize a EquilibriumOptimizer."""
         self.single_pass = single_pass
         self.auto_acquire = auto_acquire
 
-    def __call__(self, *graphs):
-        """Apply the pass on all graphs repeatedly until equilibrium."""
-        graphs = set(graphs)
+    def __call__(self, graph):
+        """Apply the pass on the graph repeatedly until equilibrium."""
+        if self.auto_acquire:
+            graphs = set(NestingAnalyzer(graph).coverage())
+        else:
+            graphs = {graph}  # pragma: no cover
         any_changes = 0
 
         changes = 1
@@ -202,3 +206,8 @@ class PatternOptimizerEquilibrium:
             graphs |= new_graphs
 
         return any_changes
+
+
+def pattern_equilibrium_optimizer(*patterns):
+    """Create an EquilibriumOptimizers that applies the given patterns."""
+    return EquilibriumOptimizer(PatternOptimizerSinglePass(patterns))

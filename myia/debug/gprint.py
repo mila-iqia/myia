@@ -14,10 +14,7 @@ from ..ir import ANFNode, Apply, Constant, Graph, is_apply, is_constant, \
 from ..parser import Location
 from ..prim import ops as primops
 from ..prim.value_inferrers import LimitedValue
-from ..opt import \
-    PatternOptimizerSinglePass, \
-    PatternOptimizerEquilibrium, \
-    pattern_replacer
+from ..opt import pattern_equilibrium_optimizer, pattern_replacer
 from ..unify import Var, var, FilterVar
 from ..utils import Registry
 
@@ -462,15 +459,11 @@ def cosmetic_transformer(g):
     The resulting graph is not a valid one to run, because it may contain nodes
     with fake functions that only serve a cosmetic purpose.
     """
-    opts = [
+    opt = pattern_equilibrium_optimizer(
         _opt_accum_cons,
         _opt_fancy_getitem,
-    ]
-
-    pass_ = PatternOptimizerSinglePass(opts)
-    opt = PatternOptimizerEquilibrium(pass_)
+    )
     opt(g)
-
     return g
 
 
