@@ -1,10 +1,12 @@
 """Graph optimization routines."""
 
+from collections import defaultdict
 
 from ..cconv import NestingAnalyzer
 from ..graph_utils import dfs, toposort
 from ..ir import ANFNode, Apply, Constant, Graph, Special, \
-    succ_incoming, is_constant_graph, replace
+    succ_incoming, succ_deeper, is_constant_graph, replace, is_apply, \
+    GraphCloner
 from ..unify import Unification, Var
 
 
@@ -211,3 +213,35 @@ class EquilibriumOptimizer:
 def pattern_equilibrium_optimizer(*patterns):
     """Create an EquilibriumOptimizers that applies the given patterns."""
     return EquilibriumOptimizer(PatternOptimizerSinglePass(patterns))
+
+
+def inline_unique_uses(graph):
+    """Inline every graph that is only used once."""
+    graph_uses = defaultdict(set)
+    for node in dfs(graph.return_, succ_deeper):
+        if is_apply(node):
+            for i, inp in enumerate(node.inputs):
+                if is_constant_graph(inp):
+                    graph_uses[inp.value].add((node, i))
+
+    cloneseq = []
+
+    def lookup(x):
+        for c in cloneseq:
+            x = c[x]
+        return x
+
+    for g, uses in graph_uses.items():
+        if len(uses) != 1:
+            continue
+        (node, i), = uses
+        if i != 0:
+            continue
+
+        g = lookup(g)
+        node = lookup(node)
+
+        clone = GraphCloner(total=False)
+        clone.add_clone(g, node.graph, node.inputs[1:])
+        cloneseq.append(clone)
+        replace(node, clone[g.output])

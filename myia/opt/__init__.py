@@ -5,5 +5,6 @@ from .opt import (  # noqa
     PatternSubstitutionOptimization,
     pattern_replacer,
     PatternOptimizerSinglePass, EquilibriumOptimizer,
-    pattern_equilibrium_optimizer
+    pattern_equilibrium_optimizer,
+    inline_unique_uses
 )

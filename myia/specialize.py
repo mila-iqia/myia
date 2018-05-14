@@ -13,7 +13,8 @@ from .ir import GraphCloner, is_apply, is_constant, Constant, \
 from .prim import Primitive
 from .graph_utils import dfs
 from .utils import Named
-from .opt import pattern_equilibrium_optimizer, lib as optlib
+from .opt import pattern_equilibrium_optimizer, inline_unique_uses, \
+    lib as optlib
 
 
 UNKNOWN = Named('UNKNOWN')
@@ -49,6 +50,7 @@ def type_specialize(graph, argprops, optimize=True):
             optlib.simplify_always_false,
         )
         eq(g2)
+        inline_unique_uses(g2)
     return g2
 
 
@@ -157,7 +159,6 @@ class _GraphSpecializer:
             return t, None
 
         if argrefs is None:
-
             # The cache works using References, but if two references have
             # the same inferred type/value/etc., we can merge their entries.
             cache = {}
