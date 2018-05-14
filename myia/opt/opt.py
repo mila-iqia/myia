@@ -175,22 +175,16 @@ class EquilibriumOptimizer:
 
     Args:
         single_pass: An optimization pass on a graph.
-        auto_acquire: Whether to process any new graph encountered
-            when processing a graph.
 
     """
 
-    def __init__(self, single_pass, *, auto_acquire=True):
+    def __init__(self, single_pass):
         """Initialize a EquilibriumOptimizer."""
         self.single_pass = single_pass
-        self.auto_acquire = auto_acquire
 
     def __call__(self, graph):
         """Apply the pass on the graph repeatedly until equilibrium."""
-        if self.auto_acquire:
-            graphs = set(NestingAnalyzer(graph).coverage())
-        else:
-            graphs = {graph}  # pragma: no cover
+        graphs = set(NestingAnalyzer(graph).coverage())
         any_changes = 0
 
         changes = 1
@@ -199,7 +193,7 @@ class EquilibriumOptimizer:
             changes = 0
             for graph in graphs:
                 chg = self.single_pass(graph)
-                if chg and self.auto_acquire:
+                if chg:
                     for node in dfs(graph.output, succ_incoming):
                         if is_constant_graph(node):
                             new_graphs.add(node.value)
