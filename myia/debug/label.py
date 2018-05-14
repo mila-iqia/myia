@@ -12,6 +12,7 @@ short_relation_symbols = {
     'copy': '',
     'cosmetic': '',
     'phi': 'Φ',
+    'fv': '⤋',
     'if_true': '✓',
     'if_false': '✗',
     'if_after': '↓',

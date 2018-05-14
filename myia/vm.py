@@ -11,7 +11,7 @@ from typing import Iterable, Mapping, Any, Callable, List
 from .ir import Graph, Apply, Constant, Parameter, ANFNode, manage
 from .ir.utils import is_constant_graph, is_constant
 from .prim import Primitive
-from .prim.ops import if_, return_
+from .prim.ops import if_, return_, partial
 from .graph_utils import toposort
 from .utils import TypeMap
 
@@ -65,6 +65,20 @@ class Closure:
     def __call__(self, *args):
         """Evaluates the closure."""
         return self.vm.evaluate(self.graph, args, closure=self.values)
+
+
+class Partial:
+    """Representation of a partial application."""
+
+    def __init__(self, graph, args, vm):
+        """Build a partial."""
+        self.graph = graph
+        self.args = tuple(args)
+        self.vm = vm
+
+    def __call__(self, *args):
+        """Evaluates the partial."""
+        return self.vm.evaluate(self.graph, self.args + args)
 
 
 class VM:
@@ -210,6 +224,9 @@ class VM:
         if isinstance(graph, Closure):
             clos = graph.values
             graph = graph.graph
+        elif isinstance(graph, Partial):
+            args = graph.args + tuple(args)
+            graph = graph.graph
 
         if len(args) != len(graph.parameters):
             raise RuntimeError("Call with wrong number of arguments")
@@ -250,6 +267,11 @@ class VM:
                         self._call(args[2], [])
                 elif fn == return_:
                     raise self._Return(args[0])
+                elif fn == partial:
+                    partial_fn, *partial_args = args
+                    assert isinstance(partial_fn, Graph)
+                    res = Partial(partial_fn, partial_args, self)
+                    frame.values[node] = res
                 else:
                     frame.values[node] = self.implementations[fn](self, *args)
             else:
