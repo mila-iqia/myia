@@ -1,6 +1,7 @@
 import pytest
 
-from myia.api import compile
+from myia.api import parse, compile
+from myia.cconv import closure_convert
 from myia.prim.py_implementations import getitem
 
 
@@ -40,6 +41,20 @@ def test_return_closure():
         def g():
             return x + y
         return g
+
+    assert f(4, 5)() == 9
+
+
+def test_return_closure_partial():
+    """Return a closure (after closure conversion)."""
+    @parse
+    def f(x, y):
+        def g():
+            return x + y
+        return g
+
+    f = closure_convert(f)
+    f = compile(f)
 
     assert f(4, 5)() == 9
 

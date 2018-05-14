@@ -97,3 +97,4 @@ return_ = Primitive('return')
 
 maplist = Primitive('maplist')
 resolve = Primitive('resolve')
+partial = Primitive('partial')
