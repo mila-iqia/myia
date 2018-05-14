@@ -1,7 +1,9 @@
 """Library of optimizations."""
 
-from ..ir import replace, \
-    Graph, Constant, is_constant, is_constant_graph, GraphCloner
+from ..graph_utils import dfs
+from ..ir import replace, succ_incoming, freevars_boundary, \
+    Graph, Constant, is_constant, is_constant_graph, is_apply, \
+    GraphCloner
 from ..unify import Var, var, SVar
 from ..prim import ops as P, Primitive
 from ..prim.py_implementations import implementations as pyimpl
@@ -253,6 +255,30 @@ def make_inliner(inline_criterion, check_recursive):
 
     return inline
 
+
+def is_trivial_graph(g, node, args):
+    """Inline trivial graphs.
+
+    A trivial graph is a graph that contains at most one function
+    application.
+    """
+    nodes = [node
+             for node in dfs(g.output,
+                             succ_incoming,
+                             freevars_boundary(g, False))
+             if is_apply(node)]
+
+    if len(nodes) == 0:
+        return True
+    elif len(nodes) == 1:
+        app, = nodes
+        return all(not is_constant_graph(inp) for inp in app.inputs[1:])
+    else:
+        return False
+
+
+inline_trivial = make_inliner(inline_criterion=is_trivial_graph,
+                              check_recursive=False)
 
 inline = make_inliner(inline_criterion=None, check_recursive=True)
 

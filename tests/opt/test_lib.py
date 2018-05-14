@@ -1,4 +1,6 @@
 
+from pytest import mark
+
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim import ops
@@ -454,6 +456,57 @@ def test_inline_criterion():
 
     _check_opt(before, after,
                inline_binary)
+
+
+def test_inline_trivial():
+
+    def trivial(x):
+        return x * x
+
+    def nontrivial(x):
+        return x * x * x
+
+    def before(x):
+        return trivial(x), nontrivial(x)
+
+    def after(x):
+        return x * x, nontrivial(x)
+
+    _check_opt(before, after,
+               lib.inline_trivial)
+
+
+@mark.xfail(reason="inline_trivial does not look into closures properly")
+def test_inline_nontrivial_through_fv():
+
+    def nontrivial(x):
+        z = (x * x) * (x * x)
+
+        def g():
+            return z
+        return g
+
+    def before(x, y):
+        return nontrivial(x), nontrivial(y)
+
+    def after_all_inline(x, y):
+        z1 = (x * x) * (x * x)
+        z2 = (y * y) * (y * y)
+
+        def g1():
+            return z1
+
+        def g2():
+            return z2
+        return g1, g2
+
+    # Inlining everything bloats the graph
+    _check_opt(before, after_all_inline,
+               lib.inline)
+
+    # inline_trivial should avoid this
+    _check_opt(before, before,
+               lib.inline_trivial)
 
 
 ##################
