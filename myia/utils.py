@@ -57,7 +57,7 @@ def memoize_method(fn):
         if not hasattr(self, '_cache'):
             self._cache = defaultdict(dict)
         cache = self._cache[fn]
-        if args not in self._cache:
+        if args not in cache:
             cache[args] = fn(self, *args)
         return cache[args]
 
