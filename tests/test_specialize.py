@@ -128,7 +128,6 @@ def test_maplist(xs):
     return maplist(square, xs)
 
 
-@mark.xfail(reason='The multiple uses of a polymorphic graph are not split.')
 @specialize(([fp1, fp2], [int1, int2]))
 def test_maplist_polymorphic(xs, ys):
     def square(x):
