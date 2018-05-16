@@ -13,7 +13,7 @@ returning a nested function creates a closure.
 from typing import Any, Iterable, List, MutableSequence, Sequence, Set, \
     Tuple, overload, Union, Dict
 
-from ..dtype import Function
+from ..dtype import Function, Unknown
 from ..info import NamedDebugInfo
 from ..prim import ops as primops, Primitive
 from ..unify import expandlist, noseq
@@ -139,7 +139,7 @@ class ANFNode(Node):
         self.graph = graph
         self.uses: Set[Tuple[ANFNode, int]] = set()
         self.debug = NamedDebugInfo(self)
-        self.type = None
+        self.type = Unknown()
 
     @property
     def inputs(self) -> 'Inputs':
