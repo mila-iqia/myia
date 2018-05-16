@@ -50,7 +50,7 @@ from weakref import finalize
 
 from .info import About, DebugInherit, NamedDebugInfo
 from .ir import ANFNode, Apply, Constant, Graph, Parameter, \
-    destroy_disconnected_nodes
+    destroy_disconnected_nodes, is_constant
 from .prim import ops as primops
 
 
@@ -100,6 +100,14 @@ ast_map = {
 }
 
 
+def _fresh(node):
+    """If node is a constant, return a copy of it."""
+    if is_constant(node):
+        return Constant(node.value)
+    else:
+        return node
+
+
 class Environment:
     """Environment to parse a function in.
 
@@ -141,7 +149,7 @@ class Environment:
 
         """
         if id(obj) in self._object_map:
-            return self._object_map[id(obj)]
+            return _fresh(self._object_map[id(obj)])
         elif isinstance(obj, FunctionType):
             parser = Parser(self, obj)
             # This will insert object into the map
@@ -222,7 +230,7 @@ class Parser:
     def get_block_function(self, block: 'Block') -> Constant:
         """Return node representing the function corresponding to a block."""
         if block in self.block_map:
-            return self.block_map[block]
+            return _fresh(self.block_map[block])
         node = Constant(block.graph)
         self.block_map[block] = node
         return node
@@ -589,7 +597,7 @@ class Block:
 
         """
         if varnum in self.variables:
-            return self.variables[varnum]
+            return _fresh(self.variables[varnum])
         if self.matured:
             if len(self.preds) == 1:
                 return self.preds[0].read(varnum)
