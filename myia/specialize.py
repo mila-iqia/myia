@@ -3,7 +3,7 @@
 from collections import defaultdict, Counter
 from functools import partial
 
-from .dtype import Type, Function, Dead
+from .dtype import Type, Function, Dead, Unknown
 from .infer import InferenceEngine, Context, GraphInferrer, \
     ANYTHING, Inferrer
 from .prim.type_inferrers import TypeTrack
@@ -237,7 +237,7 @@ def validate(g):  # pragma: no cover
     """
     errors = defaultdict(set)
     for node in dfs(g.return_, succ_deeper):
-        if node.type is None:
+        if node.type is None or node.type == Unknown():
             errors[node].add('notype')
         elif isinstance(node.type, Inferrer):
             errors[node].add('inferrer')

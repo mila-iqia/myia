@@ -235,3 +235,7 @@ class Dead(Type):
     polymorphic function is given as a parameter to a function that fails to
     use it.
     """
+
+
+class Unknown(Type):
+    """Represents an unknown type (prior to type inference)."""
