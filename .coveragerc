@@ -2,13 +2,14 @@
 omit =
     setup.py
     tests/*
-    myia/debug/*
 
 [report]
 exclude_lines =
     @overload
     @abstractmethod
     @compile
+    @register_bprop
+    @register_augm
     pragma: no cover
     AssertionError
     NotImplementedError

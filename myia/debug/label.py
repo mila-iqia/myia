@@ -19,7 +19,10 @@ short_relation_symbols = {
     'while_header': '⤾',
     'while_body': '⥁',
     'while_after': '↓',
-    'specialized': '+'
+    'specialized': '+',
+    'grad_fprop': '▶',
+    'grad_bprop': '◀',
+    'grad_sens': '∇',
 }
 
 

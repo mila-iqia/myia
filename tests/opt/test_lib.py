@@ -4,7 +4,7 @@ from pytest import mark
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    head, tail, setitem, add, mul
+    head, tail, setitem, add, mul, J, Jinv
 
 
 #######################
@@ -110,6 +110,19 @@ def test_setitem_tuple_noopt():
 
     _check_opt(before, before,
                lib.setitem_tuple)
+
+
+def test_op_tuple_unary():
+
+    def before(x, y, z):
+        return J((x, y, z))
+
+    def after(x, y, z):
+        return (J(x), J(y), J(z))
+
+    _check_opt(before, after,
+               lib.bubble_op_cons,
+               lib.bubble_op_nil)
 
 
 def test_op_tuple_binary():
@@ -539,3 +552,28 @@ def test_drop_into_if():
 
     _check_opt(before, after,
                lib.drop_into_call, lib.drop_into_if)
+
+
+###########
+# Cancels #
+###########
+
+
+def test_cancel():
+
+    def before1(x):
+        return J(Jinv(x))
+
+    def before2(x):
+        return Jinv(J(x))
+
+    def after(x):
+        return x
+
+    _check_opt(before1, after,
+               lib.J_Jinv_cancel,
+               lib.Jinv_J_cancel)
+
+    _check_opt(before2, after,
+               lib.J_Jinv_cancel,
+               lib.Jinv_J_cancel)

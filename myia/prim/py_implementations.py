@@ -1,11 +1,12 @@
 """Implementations for the debug VM."""
 
 from copy import copy
+from types import FunctionType
 from typing import Callable
 import numpy as np
 
 from .. import dtype as types
-from ..utils import Registry
+from ..utils import Registry, smap
 
 from . import ops as primops
 
@@ -31,7 +32,18 @@ def register(prim):
 @register(primops.add)
 def add(x, y):
     """Implement `add`."""
-    return x + y
+    if x is ZERO:
+        return y
+    elif y is ZERO:
+        return x
+    elif isinstance(x, tuple):
+        # assert len(x) == len(y)
+        maxl = max(len(x), len(y))
+        x = Zero.pad(x, maxl)
+        y = Zero.pad(y, maxl)
+        return tuple(add(x2, y2) for x2, y2 in zip(x, y))
+    else:
+        return x + y
 
 
 @register(primops.sub)
@@ -186,6 +198,10 @@ def setitem(data, item, value):
     if isinstance(data, tuple):
         return tuple(value if i == item else x
                      for i, x in enumerate(data))
+    elif data is ZERO:
+        zeros = [ZERO for i in range(item + 1)]
+        zeros[item] = value
+        return tuple(zeros)
     else:
         data2 = copy(data)
         data2[item] = value
@@ -327,3 +343,112 @@ def partial(f, *args):
     def res(*others):
         return f(*(args + others))
     return res
+
+
+@register(primops.J)
+def J(x):
+    """Implement `J`.
+
+    On a function, this returns an augmented function that returns the original
+    output and a backpropagator. On structured data, this applies `J`
+    recursively on each element. On scalars, this is a no-op.
+    """
+    from ..ir.anf import Graph
+    from ..grad import grad
+    from ..vm import VMFrame
+
+    from .grad_implementations import augmented_graphs
+
+    if isinstance(x, primops.Primitive):
+        return augmented_graphs[x]
+    elif isinstance(x, Graph):
+        return grad(x)
+    elif isinstance(x, FunctionType):
+        from ..api import parse, compile
+        g = parse(x)
+        return compile(grad(g))
+    elif isinstance(x, VMFrame.Closure):
+        return VMFrame.Closure(J(x.graph), x.frame)
+    elif isinstance(x, (int, float)):
+        return x
+    elif isinstance(x, tuple):
+        return smap(J, x)
+    elif x is ZERO:
+        return ZERO
+    else:
+        raise TypeError(f'J is not defined on {type(x)}')  # pragma: no cover
+
+
+@register(primops.Jinv)
+def Jinv(x):
+    """Implement `Jinv`.
+
+    This is the inverse of `J`: `Jinv(J(x)) == x`.
+    """
+    from ..ir.anf import Graph
+    from ..vm import VMFrame
+    if isinstance(x, (int, float)):
+        return x
+    elif isinstance(x, tuple):
+        return smap(Jinv, x)
+    elif isinstance(x, Graph):
+        primal = x.transforms.get('primal', None)
+        if not primal:
+            buche(id(x))
+            buche(x)
+        assert primal
+        return primal
+    elif isinstance(x, VMFrame.Closure):
+        return VMFrame.Closure(Jinv(x.graph), x.frame)
+    elif x is ZERO:
+        return ZERO
+    else:
+        raise TypeError(f'Jinv is not defined on {type(x)}') \
+            # pragma: no cover
+
+
+class Zero:
+    """Null object for addition.
+
+    * ZERO + x is x
+    * x + ZERO is x
+    * ZERO[i] is ZERO
+    """
+
+    def __add__(self, z):
+        return z
+
+    def __radd__(self, z):
+        return z
+
+    def __getitem__(self, item):
+        return self
+
+    @staticmethod
+    def pad(arr, n):
+        """Pad the given array with `ZERO` up to length `n`."""
+        m = len(arr)
+        if m < n:
+            return arr + type(arr)(ZERO for _ in range(n - m))
+        else:
+            return arr
+
+
+ZERO = Zero()
+
+
+@register(primops.zeros_like)
+def zeros_like(x):
+    """Implement `zeros_like`."""
+    from ..ir.anf import Graph
+    from ..vm import VMFrame
+
+    def zero(x):
+        if isinstance(x, VMFrame.Closure) or x is ZERO:
+            return ZERO
+        elif isinstance(x, (Graph, primops.Primitive)):
+            return ()
+        else:
+            return type(x)(0)
+
+    return smap(zero, x)

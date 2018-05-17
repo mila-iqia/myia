@@ -99,6 +99,24 @@ tail_tuple = psub(
 )
 
 
+# f((a, b, ...)) => (f(a), f(b), ...)
+# For f in the following list:
+_Bubble = primset_var(P.J, P.Jinv, P.zeros_like)
+
+bubble_op_cons = psub(
+    pattern=(_Bubble, (P.cons_tuple, X, Y)),
+    replacement=(P.cons_tuple, (_Bubble, X), (_Bubble, Y)),
+    name='bubble_op_cons'
+)
+
+# f(()) => () -- this is a kind of constant prop
+bubble_op_nil = psub(
+    pattern=(_Bubble, NIL),
+    replacement=NIL,
+    name='bubble_op_nil'
+)
+
+
 # f((a, b, ...), (p, q, ...)) => (f(a, p), f(b, q), ...)
 # For f in the following list:
 _BubbleBinary = primset_var(P.add)
@@ -309,3 +327,21 @@ def drop_into_if(optimizer, node, equiv):
 
     new = (P.if_, equiv[X], y2, z2)
     return sexp_to_node(new, node.graph)
+
+
+##################################
+# Gradient-specific optimization #
+##################################
+
+
+J_Jinv_cancel = psub(
+    pattern=(P.J, (P.Jinv, X)),
+    replacement=X,
+    name='J_Jinv_cancel'
+)
+
+Jinv_J_cancel = psub(
+    pattern=(P.Jinv, (P.J, X)),
+    replacement=X,
+    name='Jinv_J_cancel'
+)

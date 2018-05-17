@@ -98,3 +98,12 @@ return_ = Primitive('return')
 maplist = Primitive('maplist')
 resolve = Primitive('resolve')
 partial = Primitive('partial')
+
+
+##############################
+# Gradient-related operations #
+##############################
+
+J = Primitive('J')
+Jinv = Primitive('Jinv')
+zeros_like = Primitive('zeros_like')
