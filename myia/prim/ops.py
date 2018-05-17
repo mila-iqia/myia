@@ -78,6 +78,7 @@ map_array = Primitive('map_array')
 scan_array = Primitive('scan_array')
 reduce_array = Primitive('reduce_array')
 distribute = Primitive('distribute')
+reshape = Primitive('reshape')
 dot = Primitive('dot')
 
 

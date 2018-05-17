@@ -1,6 +1,7 @@
 """Definition of shape inference for primitives."""
 
-from functools import partial
+import operator
+from functools import partial, reduce
 
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     Track, MyiaShapeError
@@ -9,6 +10,10 @@ from ..ir import Graph
 from . import ops as P
 from .ops import Primitive
 from .py_implementations import shape
+
+
+def prod(iterable):
+    return reduce(operator.mul, iterable, 1)
 
 
 shape_inferrer_constructors = {}
@@ -65,6 +70,29 @@ async def infer_shape_distribute(engine, v, shape):
     if shp == ANYTHING:
         shp_t = await engine.get('type', shape)
         shp = (None,) * len(shp_t.elements)
+    v_t = await engine.get('type', v)
+    if isinstance(v_t, Array):
+        v_shp = await engine.get('shape', v)
+        if len(shp) < len(v_shp):
+            raise MyiaShapeError("Cannot distribute to smaller shape")
+        for vs, s in zip(v_shp, shp):
+            if vs != s and vs not in (1, None) and s not in (1, None):
+                raise MyiaShapeError("Cannot change shape when distributing")
+    return shp
+
+
+@shape_inferrer(P.reshape, nargs=2)
+async def infer_shape_reshape(engine, v, shape):
+    shp = await engine.get('value', shape)
+    if shp == ANYTHING:
+        shp_t = await engine.get('type', shape)
+        shp = (None,) * len(shp_t.elements)
+    v_shp = await engine.get('shape', v)
+    if (all(s is not None for s in shp) and
+        all(s is not None for s in v_shp) and
+            prod(shp) != prod(v_shp)):
+        raise MyiaShapeError("Cannot change the total number of elements "
+                             "in reshape")
     return shp
 
 

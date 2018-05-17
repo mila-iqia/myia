@@ -236,13 +236,24 @@ async def infer_type_across_array(engine, fn, init, ary, ax):
 @type_inferrer(P.distribute, nargs=2)
 async def infer_type_distribute(engine, v, shp):
     v_t = await engine.get('type', v)
-    if not isinstance(v_t, (Number, Bool)):
+    if isinstance(v_t, Array):
+        v_t = v_t.elements
+    elif not isinstance(v_t, (Number, Bool)):
         raise MyiaTypeError("Array elements must be numbers or bool")
     shp_t = await engine.get('type', shp)
     if (not isinstance(shp_t, Tuple) or
             not all(e == UInt(64) for e in shp_t.elements)):
         raise MyiaTypeError("Shape must be (i64, ...)")
     return Array(v_t)
+
+
+@type_inferrer(P.reshape, nargs=2)
+async def infer_type(engine, v, shape):
+    shp_t = await engine.get('type', shape)
+    if (not isinstance(shp_t, Tuple) or
+            not all(e == UInt(64) for e in shp_t.elements)):
+        raise MyiaTypeError("Shape must be (i64, ...)")
+    return await engine.get('type', v)
 
 
 @type_inferrer(P.dot, nargs=2)

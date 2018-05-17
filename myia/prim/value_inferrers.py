@@ -208,4 +208,5 @@ async def infer_value_shape(engine, ary):
     shp = await ary['shape']
     if any(s is None for s in shp):
         return ANYTHING
-    return shp
+    # TODO: Should propagate ValueTrack.max_depth here
+    return limited(shp, 1)
