@@ -76,6 +76,12 @@ def pow(x, y):
     return x ** y
 
 
+@register(primops.log)
+def log(x):
+    """Implement `log`."""
+    return math.log(x)
+
+
 @register(primops.uadd)
 def uadd(x):
     """Implement `iadd`."""

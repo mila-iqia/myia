@@ -1,5 +1,6 @@
 """User-friendly interfaces to Myia machinery."""
 
+import math
 import operator
 from types import FunctionType
 
@@ -38,6 +39,7 @@ default_object_map = {
     operator.setitem: P.setitem,
     getattr: P.getattr,
     setattr: P.setattr,
+    math.log: P.log,
 }
 
 

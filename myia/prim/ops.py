@@ -27,6 +27,7 @@ mul = Primitive('mul')
 div = Primitive('div')
 mod = Primitive('mod')
 pow = Primitive('pow')
+log = Primitive('log')
 uadd = Primitive('uadd')
 usub = Primitive('usub')
 
