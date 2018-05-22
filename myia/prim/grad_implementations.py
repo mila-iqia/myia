@@ -4,6 +4,7 @@ Each primitive is associated to an augmented function, which returns a pair of
 the (augmented) original primitive's output and a backpropagator function.
 """
 
+from math import log
 from types import FunctionType
 
 from ..api import parse
@@ -97,6 +98,13 @@ def bprop_mul(x, y, dz):
 def bprop_div(x, y, dz):
     """Backpropagator for primitive `div`."""
     return (dz / y, -dz * x / (y * y))
+
+
+@register_bprop(primops.pow)
+def bprop_pow(x, y, dz):
+    """Backpropagator for primitive `pow`."""
+    return (dz * (y * x ** (y - 1)),
+            dz * log(x) * x ** y)
 
 
 @register_bprop(primops.uadd)
