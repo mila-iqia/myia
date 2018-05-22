@@ -216,13 +216,13 @@ def shape(array):
 
 
 @register(primops.map_array)
-def map_array(fn, array, axis):
+def map_array(fn, array):
     def f(ary):
         it = np.nditer([ary, None])
         for x, y in it:
             y[...] = fn(x)
         return it.operands[1]
-    return np.apply_along_axis(f, axis, array)
+    return np.apply_along_axis(f, 0, array)
 
 
 @register(primops.scan_array)
@@ -233,7 +233,8 @@ def scan_array(fn, init, array, axis):
         val = init
         it = np.nditer([ary, None])
         for x, y in it:
-            y[...] = fn(val, x)
+            val = fn(val, x)
+            y[...] = val
         return it.operands[1]
     return np.apply_along_axis(f, axis, array)
 
@@ -252,6 +253,11 @@ def reduce_array(fn, init, array, axis):
 @register(primops.distribute)
 def distribute(v, shape):
     return np.broadcast_to(v, shape)
+
+
+@register(primops.reshape)
+def reshape(v, shape):
+    return np.reshape(v, shape)
 
 
 @register(primops.dot)

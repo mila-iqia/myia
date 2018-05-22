@@ -6,15 +6,16 @@ from myia.api import parse
 from myia.infer import \
     InferenceEngine, ANYTHING, InferenceError, register_inferrer
 
-from myia.dtype import Bool, Int, Float, Tuple as T, List as L, Type
+from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
+    Type, UInt
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
     py_implementations as pyimpl, \
-    add, mul, lt, head, tail, maplist, hastype, typeof, usub
-from myia.prim.value_inferrers import \
-    ValueTrack, value_inferrer_constructors
-from myia.prim.type_inferrers import \
-    TypeTrack, type_inferrer_constructors
+    add, mul, lt, head, tail, maplist, hastype, typeof, usub, \
+    dot, distribute, shape, map_array, scan_array, reduce_array, reshape
+from myia.prim.value_inferrers import ValueTrack, value_inferrer_constructors
+from myia.prim.type_inferrers import TypeTrack, type_inferrer_constructors
+from myia.prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
 
 
 B = Bool()
@@ -22,6 +23,8 @@ B = Bool()
 i16 = Int(16)
 i32 = Int(32)
 i64 = Int(64)
+
+u64 = UInt(64)
 
 f16 = Float(16)
 f32 = Float(32)
@@ -34,6 +37,14 @@ li64 = L(Int(64))
 lf16 = L(Float(16))
 lf32 = L(Float(32))
 lf64 = L(Float(64))
+
+ai16 = A(i16)
+ai32 = A(i32)
+ai64 = A(i64)
+
+af16 = A(f16)
+af32 = A(f32)
+af64 = A(f64)
 
 Nil = T()
 
@@ -60,6 +71,10 @@ value_track = partial(
 type_track = partial(
     TypeTrack,
     constructors=type_inferrer_cons_test
+)
+shape_track = partial(
+    ShapeTrack,
+    constructors=shape_inferrer_constructors
 )
 
 
@@ -137,7 +152,8 @@ def infer(**tests_spec):
                 g, args,
                 tracks={
                     'value': partial(value_track, max_depth=10),
-                    'type': partial(type_track)
+                    'type': partial(type_track),
+                    'shape': partial(shape_track)
                 },
                 required_tracks=required_tracks,
                 timeout=0.1
@@ -481,6 +497,9 @@ def test_choose_incompatible(i, x, y):
     type=[
         (i64, i64, i64),
         (i64, f64, f64)
+    ],
+    shape=[
+        ({'type': i64, 'shape': ()}, {'type': i64, 'shape': ()}, ())
     ]
 )
 def test_choose_indirect(i, x):
@@ -854,3 +873,82 @@ def pong():
 @infer(type=[(i64, InferenceError)])
 def test_infinite_mutual_recursion(x):
     return ping()
+
+
+@infer(type=[({'shape': (2, 3), 'type': ai16}, T(i64, i64))],
+       value=[({'shape': (2, 3), 'type': ai16}, (2, 3)),
+              ({'shape': (2, None), 'type': ai16}, ANYTHING)])
+def test_shape(ary):
+    return shape(ary)
+
+
+@infer(shape=[({'type': af64, 'shape': (2, 3)},
+               {'type': af64, 'shape': (3, 4)}, (2, 4)),
+              ({'type': af64, 'shape': (2,)},
+               {'type': af64, 'shape': (3, 4)}, InferenceError),
+              ({'type': af64, 'shape': (2, 2)},
+               {'type': af64, 'shape': (3, 4)}, InferenceError)],
+       type=[({'type': af64, 'shape': (2, 3)},
+              {'type': af64, 'shape': (3, 4)}, af64)])
+def test_dot(a, b):
+    return dot(a, b)
+
+
+@infer(shape=[({'type': i32}, {'value': (4, 2)}, (4, 2)),
+              ({'type': i32}, {'type': T(u64, u64)}, (None, None)),
+              ({'type': ai32, 'shape': (4,)}, {'value': (4, 2)}, (4, 2)),
+              ({'type': ai32, 'shape': (4,)}, {'value': (5, 2)},
+               InferenceError),
+              ({'type': ai32, 'shape': (4, 2)}, {'value': (4,)},
+               InferenceError)],
+       type=[
+           ({'type': i32}, {'value': (4,), 'type': T(u64)}, ai32),
+           ({'type': ai32, 'shape': (1,)}, {'value': (4,), 'type': T(u64)},
+            ai32),
+           ({'type': li32}, {'value': (4,), 'type': T(u64)}, InferenceError),
+           ({'type': i32}, {'value': (4,)}, InferenceError)
+       ])
+def test_distribute(v, shp):
+    return distribute(v, shp)
+
+
+@infer(shape=[({'type': af16, 'shape': (1, 2, 3)}, {'value': (6,)}, (6,)),
+              ({'type': af16, 'shape': (1, 2, 3)}, {'type': T(u64)}, (None,)),
+              ({'type': af16, 'shape': (2, 3)}, {'value': (7,)},
+               InferenceError)],
+       type=[({'type': af16, 'shape': (2, 3)}, {'type': T(u64)}, af16),
+             ({'type': af16, 'shape': (2, 3)}, {'type': T(i64)},
+              InferenceError)])
+def test_reshape(v, shp):
+    return reshape(v, shp)
+
+
+@infer(shape=[({'type': af32, 'shape': (3, 4)}, (3, 4))],
+       type=[({'type': ai64, 'shape': (3, 4)}, ai64),
+             ({'type': i64}, InferenceError)])
+def test_map_array(ary):
+    def f(v):
+        return v + 1
+    return map_array(f, ary)
+
+
+@infer(shape=[({'type': ai64, 'shape': (3, 4)}, {'value': 1}, (3, 4))],
+       type=[
+           ({'type': ai64, 'shape': (3, 4)}, {'value': 1, 'type': u64}, ai64),
+           ({'type': i64}, {'value': 1, 'type': u64}, InferenceError),
+           ({'type': af32, 'shape': (3, 4)}, {'value': 1, 'type': u64},
+            InferenceError),
+           ({'type': ai64, 'shape': (3, 4)}, {'value': 1}, InferenceError)
+       ])
+def test_scan_array(ary, ax):
+    def f(a, b):
+        return a + b
+    return scan_array(f, 0, ary, ax)
+
+
+@infer(shape=[({'type': ai64, 'shape': (3, 4)}, {'value': 1}, (3,)),
+              ({'type': ai64, 'shape': (3, 4)}, {'type': u64}, (None,))])
+def test_reduce_array(ary, ax):
+    def f(a, b):
+        return a + b
+    return reduce_array(f, 0, ary, ax)

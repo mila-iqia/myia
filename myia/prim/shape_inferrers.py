@@ -4,12 +4,12 @@ import operator
 from functools import partial, reduce
 
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
-    Track, MyiaShapeError
+    Track, MyiaShapeError, Inferrer
 from ..ir import Graph
+from ..dtype import Array
 
 from . import ops as P
 from .ops import Primitive
-from .py_implementations import shape
 
 
 def prod(iterable):
@@ -17,6 +17,17 @@ def prod(iterable):
 
 
 shape_inferrer_constructors = {}
+
+
+class DefaultShapeInferrer(Inferrer):
+    def __init__(self, engine):
+        super().__init__(engine, 'default_shape_inferrer')
+
+    async def __call__(self, *args):
+        return ()
+
+    def provably_equivalent(self, other):
+        return type(self) == type(other)
 
 
 class ShapeTrack(Track):
@@ -31,19 +42,45 @@ class ShapeTrack(Track):
     def from_value(self, v, context):
         """Infer the shape of a constant."""
         if isinstance(v, Primitive):
-            return self.constructors[v](self.engine)
+            if v in self.constructors:
+                return self.constructors[v](self.engine)
+            else:
+                return DefaultShapeInferrer(self.engine)
         elif isinstance(v, Graph):
             return GraphInferrer(self.engine, 'shape', v, context)
         else:
-            return shape(v)
+            return getattr(v, 'shape', ())
 
 
 shape_inferrer = partial(register_inferrer,
                          constructors=shape_inferrer_constructors)
 
 
-@shape_inferrer(P.map_array, nargs=3)
-async def infer_shape_map_array(engine, fn, ary, ax):
+@shape_inferrer(P.return_, nargs=1)
+async def infer_shape_return(engine, v):
+    return await engine.get('shape', v)
+
+
+@shape_inferrer(P.if_, nargs=3)
+async def infer_type_if(engine, cond, tb, fb):
+    """Infer the return type of if."""
+    tb_inf = await engine.get('shape', tb)
+    fb_inf = await engine.get('shape', fb)
+    v = await engine.get('value', cond)
+    if v is True:
+        # We only visit the first branch if the condition is provably true
+        return await tb_inf()
+    elif v is False:
+        # We only visit the second branch if the condition is provably false
+        return await fb_inf()
+    elif v is ANYTHING:
+        # The first branch to finish will return immediately. When the other
+        # branch finishes, its result will be checked against the other.
+        return await engine.assert_same('shape', tb_inf(), fb_inf())
+
+
+@shape_inferrer(P.map_array, nargs=2)
+async def infer_shape_map_array(engine, fn, ary):
     return await engine.get('shape', ary)
 
 
@@ -60,7 +97,7 @@ async def infer_shape_reduce_array(engine, fn, init, ary, ax):
         return (None,) * (len(shp) - 1)
     else:
         lshp = list(shp)
-        del lshp[ax]
+        del lshp[ax_v]
         return tuple(lshp)
 
 
@@ -102,6 +139,6 @@ async def infer_shape_dot(engine, a, b):
     b_shp = await engine.get('shape', b)
     if len(a_shp) != 2 or len(b_shp) != 2:
         raise MyiaShapeError("dot needs matrix inputs")
-    if a[1] != b[0] and a[1] is not None and b[0] is not None:
+    if a_shp[1] != b_shp[0] and a_shp[1] is not None and b_shp[0] is not None:
         raise MyiaShapeError("Incompatible shapes in dot")
-    return (a[0], b[1])
+    return (a_shp[0], b_shp[1])
