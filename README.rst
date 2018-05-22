@@ -13,7 +13,7 @@ Myia is a new differentiable programming language. It aims to support large scal
 Status
 ------
 
-Myia is currently under development and is not yet ready for use. As of 2018/03/26 we anticipate we may be able to offer a beta for 2018/07/01. We will update that estimate regularly.
+Myia is currently under development and is not yet ready for use. As of 2018/05/22 we anticipate we may be able to offer a beta for 2018/08/01. We will update that estimate regularly.
 
 See `Roadmap`_.
 
@@ -44,19 +44,16 @@ Current
 * **Intermediate representation**: Implemented, with an array of utilities.
 * **Debug VM**: Faithfully runs the IR.
 * **Primitives**: Only scalar primitives currently work.
+* **Type system**: Types are inferred without the need for annotations.
+* **Optimization**: Pattern-based optimizations, inlining, constant propagation.
 * **Automatic differentiation**: Works, tested up to second order, PR `#22`_ (awaiting review).
 
 In development
 ~~~~~~~~~~~~~~
 
-* **Type system**: Implementation in progress (`#27`_, `#41`_, `#50`_)
-* **Value propagation**: Under development.
-* **Inlining**: Requires graph cloning code awaiting review in `#46`_
-* **Optimization**: in ``breuleux:opt``, requires cleanup, no PR yet.
-
-  * **Pattern optimizer**: Works.
-  * **Inlining**: Works, using the algorithm in `#46`_.
-  * **Constant propagation**: Works.
+* **Intermediate representation**: Closure conversion (`#72`_).
+* **Type system**: Shape inference.
+* **Optimization**: Common subexpression elimination.
 
 Next steps
 ~~~~~~~~~~
@@ -84,8 +81,4 @@ After Beta
 * **Support other languages**: Which ones depend on demand. A new language is also a possibility.
 
 .. _#22: https://github.com/mila-udem/myia/pull/22
-.. _#27: https://github.com/mila-udem/myia/pull/27
-.. _#41: https://github.com/mila-udem/myia/pull/41
-.. _#43: https://github.com/mila-udem/myia/pull/43
-.. _#46: https://github.com/mila-udem/myia/pull/46
-.. _#50: https://github.com/mila-udem/myia/pull/50
+.. _#72: https://github.com/mila-udem/myia/pull/72
