@@ -20,12 +20,12 @@ def prod(iterable):
 shape_inferrer_constructors = {}
 
 
-class DefaultShapeInferrer(Inferrer):
+class ScalarShapeInferrer(Inferrer):
     """Shape inferrer for all primitves that don't take arrays."""
 
     def __init__(self, engine):
-        """Initialize the DefaultShapeInferrer."""
-        super().__init__(engine, 'default_shape_inferrer')
+        """Initialize the ScalarShapeInferrer."""
+        super().__init__(engine, 'scalar_shape_inferrer')
 
     async def __call__(self, *args):
         """Since no arrays are involved, the shape is always ()."""
@@ -51,7 +51,7 @@ class ShapeTrack(Track):
             if v in self.constructors:
                 return self.constructors[v](self.engine)
             else:
-                return DefaultShapeInferrer(self.engine)
+                return ScalarShapeInferrer(self.engine)
         elif isinstance(v, Graph):
             return GraphInferrer(self.engine, 'shape', v, context)
         else:

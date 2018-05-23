@@ -219,7 +219,7 @@ async def infer_type_map_array(engine, fn, ary):
 
 @type_inferrer(P.scan_array, P.reduce_array, nargs=4)
 async def infer_type_across_array(engine, fn, init, ary, ax):
-    """Infer the return type of map_array."""
+    """Infer the return type of scan/reduce_array."""
     fn_t = await engine.get('type', fn)
     ary_t = await engine.get('type', ary)
     init_t = await engine.get('type', init)
@@ -247,7 +247,7 @@ async def infer_type_distribute(engine, v, shp):
     shp_t = await engine.get('type', shp)
     if (not isinstance(shp_t, Tuple) or
             not all(e == UInt(64) for e in shp_t.elements)):
-        raise MyiaTypeError("Shape must be (i64, ...)")
+        raise MyiaTypeError("Shape must be (u64, ...)")
     return Array(v_t)
 
 
@@ -257,7 +257,7 @@ async def infer_type_reshape(engine, v, shape):
     shp_t = await engine.get('type', shape)
     if (not isinstance(shp_t, Tuple) or
             not all(e == UInt(64) for e in shp_t.elements)):
-        raise MyiaTypeError("Shape must be (i64, ...)")
+        raise MyiaTypeError("Shape must be (u64, ...)")
     return await engine.get('type', v)
 
 
