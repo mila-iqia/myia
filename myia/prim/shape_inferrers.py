@@ -84,6 +84,8 @@ async def infer_shape_if(engine, cond, tb, fb):
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
         return await engine.assert_same('shape', tb_inf(), fb_inf())
+    else:
+        raise AssertionError("Invalid condition value for if.")
 
 
 @shape_inferrer(P.map_array, nargs=2)

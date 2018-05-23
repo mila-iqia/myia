@@ -86,6 +86,8 @@ async def infer_type_if(engine, cond, tb, fb):
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
         return await engine.assert_same('type', tb_inf(), fb_inf())
+    else:
+        raise AssertionError("Invalid condition value for if")
 
 
 @type_inferrer(P.cons_tuple, nargs=2)
