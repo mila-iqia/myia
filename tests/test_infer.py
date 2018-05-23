@@ -9,7 +9,7 @@ from myia.infer import \
 from myia.dtype import Bool, Int, Float, Tuple as T, List as L, Type
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
-    implementations as pyimpl, \
+    py_implementations as pyimpl, \
     add, mul, lt, head, tail, maplist, hastype, typeof, usub
 from myia.prim.value_inferrers import \
     ValueTrack, value_inferrer_constructors

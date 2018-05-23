@@ -5,7 +5,9 @@ from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim import ops
 from myia.prim.py_implementations import \
-    implementations as pyimpl, head, tail, setitem, add, mul
+    py_implementations as pyimpl, \
+    vm_implementations as vmimpl, \
+    head, tail, setitem, add, mul
 
 
 #######################
@@ -272,7 +274,7 @@ def test_ctprop_helper():
                lib.constant_prop)
 
     _check_opt(before, before,
-               lib.make_constant_prop(pyimpl, None))
+               lib.make_constant_prop(vmimpl, pyimpl, None))
 
 
 def test_ctprop_closure():
@@ -287,7 +289,7 @@ def test_ctprop_closure():
 
 
 def test_ctprop_subset():
-    prop = lib.make_constant_prop({
+    prop = lib.make_constant_prop(None, {
         ops.mul: lambda x, y: x * y
     })
 

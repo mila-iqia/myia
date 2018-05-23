@@ -12,7 +12,7 @@ from ..ir import Graph
 from . import ops as P
 from .ops import Primitive
 from .py_implementations import \
-    implementations as pyimpl, hastype_helper
+    py_implementations as pyimpl, hastype_helper
 
 
 class LimitedValue:

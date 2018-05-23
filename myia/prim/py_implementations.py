@@ -9,8 +9,23 @@ from ..utils import Registry
 
 from . import ops as primops
 
-implementations: Registry[primops.Primitive, Callable] = Registry()
-register = implementations.register
+
+py_implementations: Registry[primops.Primitive, Callable] = Registry()
+vm_implementations: Registry[primops.Primitive, Callable] = Registry()
+py_register = py_implementations.register
+vm_register = vm_implementations.register
+
+
+def register(prim):
+    """Register an implementation for this primitive.
+
+    The same implementation will be used for both the VM and for the pure
+    Python version.
+    """
+    def deco(fn):
+        vm_register(prim)(lambda vm, *args: fn(*args))
+        return py_register(prim)(fn)
+    return deco
 
 
 @register(primops.add)
@@ -201,9 +216,15 @@ def return_(x):
     return x
 
 
-@register(primops.maplist)
+@py_register(primops.maplist)
 def maplist(f, xs):
-    """Implement `maplist`."""
+    """Implement `maplist` in pure Python."""
+    return list(map(f, xs))
+
+
+@vm_register(primops.maplist)
+def _maplist_vm(vm, f, xs):
+    """Implement `maplist` for Myia's VM."""
     from ..api import compile
     from ..ir import Graph
     if isinstance(f, Graph):

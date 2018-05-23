@@ -6,7 +6,9 @@ from ..ir import replace, succ_incoming, freevars_boundary, \
     GraphCloner
 from ..unify import Var, var, SVar
 from ..prim import ops as P, Primitive
-from ..prim.py_implementations import implementations as pyimpl
+from ..prim.py_implementations import \
+    py_implementations as pyimpl, \
+    vm_implementations as vmimpl
 from ..cconv import NestingAnalyzer
 from ..vm import VM
 
@@ -187,17 +189,17 @@ simplify_always_false = psub(
 ########################
 
 
-def make_constant_prop(impl, vm_class=None):
+def make_constant_prop(vmimpl, pyimpl, vm_class=None):
     """Create a constant propagator that uses the given implementations."""
-    vm = vm_class and vm_class(impl)
+    vm = vm_class and vm_class(vmimpl, pyimpl)
 
     @pattern_replacer(C, Cs)
     def constant_prop(node, equiv):
         fn = equiv[C].value
         args = [ct.value for ct in equiv[Cs]]
         if isinstance(fn, Primitive):
-            if fn in impl:
-                return Constant(impl[fn](*args))
+            if fn in pyimpl:
+                return Constant(pyimpl[fn](*args))
             else:
                 return node
 
@@ -218,7 +220,7 @@ def make_constant_prop(impl, vm_class=None):
     return constant_prop
 
 
-constant_prop = make_constant_prop(pyimpl, VM)
+constant_prop = make_constant_prop(vmimpl, pyimpl, VM)
 
 
 ############
