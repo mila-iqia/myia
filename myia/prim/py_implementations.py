@@ -212,11 +212,13 @@ def setattr(data, attr, value):
 
 @register(primops.shape)
 def shape(array):
+    """Implement `shape`."""
     return array.shape
 
 
 @register(primops.map_array)
 def map_array(fn, array):
+    """Implement `map_array`."""
     def f(ary):
         it = np.nditer([ary, None])
         for x, y in it:
@@ -227,6 +229,7 @@ def map_array(fn, array):
 
 @register(primops.scan_array)
 def scan_array(fn, init, array, axis):
+    """Implement `scan_array`."""
     # This is inclusive scan because it's easier to implement
     # We will have to discuss what semantics we want later
     def f(ary):
@@ -241,6 +244,7 @@ def scan_array(fn, init, array, axis):
 
 @register(primops.reduce_array)
 def reduce_array(fn, init, array, axis):
+    """Implement `reduce_array`."""
     def f(ary):
         val = init
         it = np.nditer([ary])
@@ -252,16 +256,19 @@ def reduce_array(fn, init, array, axis):
 
 @register(primops.distribute)
 def distribute(v, shape):
+    """Implement `distribute`."""
     return np.broadcast_to(v, shape)
 
 
 @register(primops.reshape)
 def reshape(v, shape):
+    """Implement `reshape`."""
     return np.reshape(v, shape)
 
 
 @register(primops.dot)
 def dot(a, b):
+    """Implement `dot`."""
     return np.dot(a, b)
 
 

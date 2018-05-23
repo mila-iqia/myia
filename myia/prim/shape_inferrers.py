@@ -13,6 +13,7 @@ from .ops import Primitive
 
 
 def prod(iterable):
+    """Return the product of the elements of the iterator."""
     return reduce(operator.mul, iterable, 1)
 
 
@@ -20,13 +21,18 @@ shape_inferrer_constructors = {}
 
 
 class DefaultShapeInferrer(Inferrer):
+    """Shape inferrer for all primitves that don't take arrays."""
+
     def __init__(self, engine):
+        """Initialize the DefaultShapeInferrer."""
         super().__init__(engine, 'default_shape_inferrer')
 
     async def __call__(self, *args):
+        """Since no arrays are involved, the shape is always ()."""
         return ()
 
     def provably_equivalent(self, other):
+        """This is always equal to itself."""
         return type(self) == type(other)
 
 
@@ -58,12 +64,13 @@ shape_inferrer = partial(register_inferrer,
 
 @shape_inferrer(P.return_, nargs=1)
 async def infer_shape_return(engine, v):
+    """Infer the shape of return."""
     return await engine.get('shape', v)
 
 
 @shape_inferrer(P.if_, nargs=3)
-async def infer_type_if(engine, cond, tb, fb):
-    """Infer the return type of if."""
+async def infer_shape_if(engine, cond, tb, fb):
+    """Infer the shape of if."""
     tb_inf = await engine.get('shape', tb)
     fb_inf = await engine.get('shape', fb)
     v = await engine.get('value', cond)
@@ -81,16 +88,19 @@ async def infer_type_if(engine, cond, tb, fb):
 
 @shape_inferrer(P.map_array, nargs=2)
 async def infer_shape_map_array(engine, fn, ary):
+    """Infer the shape of map_array."""
     return await engine.get('shape', ary)
 
 
 @shape_inferrer(P.scan_array, nargs=4)
 async def infer_shape_scan_array(engine, fn, init, ary, ax):
+    """Infer the shape of scan_array."""
     return await engine.get('shape', ary)
 
 
 @shape_inferrer(P.reduce_array, nargs=4)
 async def infer_shape_reduce_array(engine, fn, init, ary, ax):
+    """Infer the shape of reduce_array."""
     shp = await engine.get('shape', ary)
     ax_v = await engine.get('value', ax)
     if ax_v == ANYTHING:
@@ -103,6 +113,7 @@ async def infer_shape_reduce_array(engine, fn, init, ary, ax):
 
 @shape_inferrer(P.distribute, nargs=2)
 async def infer_shape_distribute(engine, v, shape):
+    """Infer the shape of distribute."""
     shp = await engine.get('value', shape)
     if shp == ANYTHING:
         shp_t = await engine.get('type', shape)
@@ -120,6 +131,7 @@ async def infer_shape_distribute(engine, v, shape):
 
 @shape_inferrer(P.reshape, nargs=2)
 async def infer_shape_reshape(engine, v, shape):
+    """Infer the shape of reshape."""
     shp = await engine.get('value', shape)
     if shp == ANYTHING:
         shp_t = await engine.get('type', shape)
@@ -135,6 +147,7 @@ async def infer_shape_reshape(engine, v, shape):
 
 @shape_inferrer(P.dot, nargs=2)
 async def infer_shape_dot(engine, a, b):
+    """Infer the shape of dot."""
     a_shp = await engine.get('shape', a)
     b_shp = await engine.get('shape', b)
     if len(a_shp) != 2 or len(b_shp) != 2:

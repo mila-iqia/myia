@@ -266,6 +266,7 @@ DTYPE_MAP = dict(
 
 
 def np_dtype_to_type(dtype):
+    """Map a numpy type string to a myia type."""
     if dtype not in DTYPE_MAP:
         raise TypeError(f"Unsupported dtype {dtype}")
     return DTYPE_MAP[dtype]
@@ -275,6 +276,7 @@ TYPE_MAP = dict((v, k) for k, v in DTYPE_MAP.items())
 
 
 def type_to_np_dtype(type):
+    """Map a myia type to a numpy type string."""
     if type not in TYPE_MAP:
         raise TypeError(f"Con't convert to NumPy dtype {type}")
     return TYPE_MAP[type]

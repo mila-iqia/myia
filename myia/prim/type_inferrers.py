@@ -238,6 +238,7 @@ async def infer_type_across_array(engine, fn, init, ary, ax):
 
 @type_inferrer(P.distribute, nargs=2)
 async def infer_type_distribute(engine, v, shp):
+    """Infer the return type of distribute."""
     v_t = await engine.get('type', v)
     if isinstance(v_t, Array):
         v_t = v_t.elements
@@ -252,6 +253,7 @@ async def infer_type_distribute(engine, v, shp):
 
 @type_inferrer(P.reshape, nargs=2)
 async def infer_type_reshape(engine, v, shape):
+    """Infer the return type of reshape."""
     shp_t = await engine.get('type', shape)
     if (not isinstance(shp_t, Tuple) or
             not all(e == UInt(64) for e in shp_t.elements)):
@@ -261,6 +263,7 @@ async def infer_type_reshape(engine, v, shape):
 
 @type_inferrer(P.dot, nargs=2)
 async def infer_type_dot(engine, a, b):
+    """Infer the return type of dot."""
     t = await engine.assert_same('type', a, b)
     return t
 
