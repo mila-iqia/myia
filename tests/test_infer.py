@@ -875,9 +875,9 @@ def test_infinite_mutual_recursion(x):
     return ping()
 
 
-@infer(type=[({'shape': (2, 3), 'type': ai16}, T(i64, i64))],
+@infer(type=[({'shape': (2, 3), 'type': ai16}, T(u64, u64))],
        value=[({'shape': (2, 3), 'type': ai16}, (2, 3)),
-              ({'shape': (2, None), 'type': ai16}, ANYTHING)])
+              ({'shape': (2, ANYTHING), 'type': ai16}, ANYTHING)])
 def test_shape(ary):
     return shape(ary)
 
@@ -895,7 +895,7 @@ def test_dot(a, b):
 
 
 @infer(shape=[({'type': i32}, {'value': (4, 2)}, (4, 2)),
-              ({'type': i32}, {'type': T(u64, u64)}, (None, None)),
+              ({'type': i32}, {'type': T(u64, u64)}, (ANYTHING, ANYTHING)),
               ({'type': ai32, 'shape': (4,)}, {'value': (4, 2)}, (4, 2)),
               ({'type': ai32, 'shape': (4,)}, {'value': (5, 2)},
                InferenceError),
@@ -913,7 +913,8 @@ def test_distribute(v, shp):
 
 
 @infer(shape=[({'type': af16, 'shape': (1, 2, 3)}, {'value': (6,)}, (6,)),
-              ({'type': af16, 'shape': (1, 2, 3)}, {'type': T(u64)}, (None,)),
+              ({'type': af16, 'shape': (1, 2, 3)}, {'type': T(u64)},
+               (ANYTHING,)),
               ({'type': af16, 'shape': (2, 3)}, {'value': (7,)},
                InferenceError)],
        type=[({'type': af16, 'shape': (2, 3)}, {'type': T(u64)}, af16),
@@ -947,7 +948,7 @@ def test_scan_array(ary, ax):
 
 
 @infer(shape=[({'type': ai64, 'shape': (3, 4)}, {'value': 1}, (3,)),
-              ({'type': ai64, 'shape': (3, 4)}, {'type': u64}, (None,))])
+              ({'type': ai64, 'shape': (3, 4)}, {'type': u64}, (ANYTHING,))])
 def test_reduce_array(ary, ax):
     def f(a, b):
         return a + b
