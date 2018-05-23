@@ -202,15 +202,15 @@ async def infer_type_arith_bin(engine, x, y):
 @type_inferrer(P.shape, nargs=1)
 async def infer_type_shape(engine, ary):
     """Infer the return type of shape."""
-    shp = await engine.get('shape', ary)
+    shp = await ary['shape']
     return Tuple([UInt(64)]*len(shp))
 
 
 @type_inferrer(P.map_array, nargs=2)
 async def infer_type_map_array(engine, fn, ary):
     """Infer the return type of map_array."""
-    fn_t = await engine.get('type', fn)
-    ary_t = await engine.get('type', ary)
+    fn_t = await fn['type']
+    ary_t = await ary['type']
     if not isinstance(ary_t, Array):
         raise MyiaTypeError('Expected array')
     xref = engine.vref({'type': ary_t.elements})
@@ -220,10 +220,10 @@ async def infer_type_map_array(engine, fn, ary):
 @type_inferrer(P.scan_array, P.reduce_array, nargs=4)
 async def infer_type_across_array(engine, fn, init, ary, ax):
     """Infer the return type of scan/reduce_array."""
-    fn_t = await engine.get('type', fn)
-    ary_t = await engine.get('type', ary)
-    init_t = await engine.get('type', init)
-    ax_t = await engine.get('type', ax)
+    fn_t = await fn['type']
+    ary_t = await ary['type']
+    init_t = await init['type']
+    ax_t = await ax['type']
     if not isinstance(ary_t, Array):
         raise MyiaTypeError('Expected array')
     if not ary_t.elements == init_t:
@@ -239,12 +239,12 @@ async def infer_type_across_array(engine, fn, init, ary, ax):
 @type_inferrer(P.distribute, nargs=2)
 async def infer_type_distribute(engine, v, shp):
     """Infer the return type of distribute."""
-    v_t = await engine.get('type', v)
+    v_t = await v['type']
     if isinstance(v_t, Array):
         v_t = v_t.elements
     elif not isinstance(v_t, (Number, Bool)):
         raise MyiaTypeError("Array elements must be numbers or bool")
-    shp_t = await engine.get('type', shp)
+    shp_t = await shp['type']
     if (not isinstance(shp_t, Tuple) or
             not all(e == UInt(64) for e in shp_t.elements)):
         raise MyiaTypeError("Shape must be (u64, ...)")
@@ -254,11 +254,11 @@ async def infer_type_distribute(engine, v, shp):
 @type_inferrer(P.reshape, nargs=2)
 async def infer_type_reshape(engine, v, shape):
     """Infer the return type of reshape."""
-    shp_t = await engine.get('type', shape)
+    shp_t = await shape['type']
     if (not isinstance(shp_t, Tuple) or
             not all(e == UInt(64) for e in shp_t.elements)):
         raise MyiaTypeError("Shape must be (u64, ...)")
-    return await engine.get('type', v)
+    return await v['type']
 
 
 @type_inferrer(P.dot, nargs=2)
@@ -277,8 +277,8 @@ async def infer_type_return_(engine, x):
 @type_inferrer(P.maplist, nargs=2)
 async def infer_type_maplist(engine, f, xs):
     """Infer the return type of maplist."""
-    f_t = await engine.get('type', f)
-    xs_t = await engine.get('type', xs)
+    f_t = await f['type']
+    xs_t = await xs['type']
     if not isinstance(xs_t, List):
         raise MyiaTypeError('Expect list for maplist')
     xref = engine.vref(dict(type=xs_t.element_type))
