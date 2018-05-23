@@ -104,7 +104,7 @@ async def infer_shape_reduce_array(engine, fn, init, ary, ax):
     shp = await engine.get('shape', ary)
     ax_v = await engine.get('value', ax)
     if ax_v == ANYTHING:
-        return (None,) * (len(shp) - 1)
+        return (ANYTHING,) * (len(shp) - 1)
     else:
         lshp = list(shp)
         del lshp[ax_v]
@@ -117,14 +117,14 @@ async def infer_shape_distribute(engine, v, shape):
     shp = await engine.get('value', shape)
     if shp == ANYTHING:
         shp_t = await engine.get('type', shape)
-        shp = (None,) * len(shp_t.elements)
+        shp = (ANYTHING,) * len(shp_t.elements)
     v_t = await engine.get('type', v)
     if isinstance(v_t, Array):
         v_shp = await engine.get('shape', v)
         if len(shp) < len(v_shp):
             raise MyiaShapeError("Cannot distribute to smaller shape")
         for vs, s in zip(v_shp, shp):
-            if vs != s and vs not in (1, None) and s not in (1, None):
+            if vs != s and vs not in (1, ANYTHING) and s not in (1, ANYTHING):
                 raise MyiaShapeError("Cannot change shape when distributing")
     return shp
 
@@ -135,10 +135,10 @@ async def infer_shape_reshape(engine, v, shape):
     shp = await engine.get('value', shape)
     if shp == ANYTHING:
         shp_t = await engine.get('type', shape)
-        shp = (None,) * len(shp_t.elements)
+        shp = (ANYTHING,) * len(shp_t.elements)
     v_shp = await engine.get('shape', v)
-    if (all(s is not None for s in shp) and
-        all(s is not None for s in v_shp) and
+    if (all(s is not ANYTHING for s in shp) and
+        all(s is not ANYTHING for s in v_shp) and
             prod(shp) != prod(v_shp)):
         raise MyiaShapeError("Cannot change the total number of elements "
                              "in reshape")
@@ -152,6 +152,8 @@ async def infer_shape_dot(engine, a, b):
     b_shp = await engine.get('shape', b)
     if len(a_shp) != 2 or len(b_shp) != 2:
         raise MyiaShapeError("dot needs matrix inputs")
-    if a_shp[1] != b_shp[0] and a_shp[1] is not None and b_shp[0] is not None:
+    if (a_shp[1] != b_shp[0] and
+        a_shp[1] is not ANYTHING and
+            b_shp[0] is not ANYTHING):
         raise MyiaShapeError("Incompatible shapes in dot")
     return (a_shp[0], b_shp[1])

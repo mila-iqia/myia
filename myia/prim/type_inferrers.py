@@ -203,7 +203,7 @@ async def infer_type_arith_bin(engine, x, y):
 async def infer_type_shape(engine, ary):
     """Infer the return type of shape."""
     shp = await engine.get('shape', ary)
-    return Tuple([Int(64)]*len(shp))
+    return Tuple([UInt(64)]*len(shp))
 
 
 @type_inferrer(P.map_array, nargs=2)

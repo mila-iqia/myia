@@ -206,7 +206,7 @@ async def infer_value_typeof(engine, x):
 async def infer_value_shape(engine, ary):
     """Infer the return value of shape."""
     shp = await ary['shape']
-    if any(s is None for s in shp):
+    if any(s is ANYTHING for s in shp):
         return ANYTHING
     # TODO: Should propagate ValueTrack.max_depth here
     return limited(shp, 1)
