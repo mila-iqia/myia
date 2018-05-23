@@ -82,10 +82,13 @@ class VM:
         def __init__(self, value):
             self.value = value
 
-    def __init__(self, implementations: Mapping[Primitive, Callable]) \
+    def __init__(self,
+                 implementations: Mapping[Primitive, Callable],
+                 py_implementations: Mapping[Primitive, Callable]) \
             -> None:
         """Initialize the VM."""
         self.implementations = implementations
+        self.py_implementations = py_implementations
 
     def convert_value(self, value):
         """Translate the value to a format that the VM understands."""
@@ -98,7 +101,7 @@ class VM:
     def unconvert_value(self, value):
         """Translate a VM-produced value to a user-faced format."""
         if isinstance(value, Primitive):
-            return self.implementations[value]
+            return self.py_implementations[value]
         elif isinstance(value, Closure):
             value.vm = self
             return value
@@ -208,7 +211,7 @@ class VM:
                 elif fn == return_:
                     raise self._Return(args[0])
                 else:
-                    frame.values[node] = self.implementations[fn](*args)
+                    frame.values[node] = self.implementations[fn](self, *args)
             else:
                 self._call(fn, args)
 

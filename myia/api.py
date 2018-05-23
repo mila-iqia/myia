@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Union
 
 from . import parser
 from .ir import ANFNode, Constant, Graph
-from .prim import implementations, ops as P
+from .prim import py_implementations, vm_implementations, ops as P
 from .vm import VM as VM_
 
 
@@ -32,14 +32,14 @@ def default_object_map() -> Dict[Any, ANFNode]:
         getattr: Constant(P.getattr),
         setattr: Constant(P.setattr)
     }
-    for prim, impl in implementations.items():
+    for prim, impl in py_implementations.items():
         mapping[impl] = Constant(prim)
 
     return mapping
 
 
 ENV = parser.Environment(default_object_map().items())
-VM = VM_(implementations)
+VM = VM_(vm_implementations, py_implementations)
 
 
 def parse(func: FunctionType) -> Graph:
