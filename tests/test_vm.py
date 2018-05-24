@@ -19,10 +19,8 @@ def test_vm_icall_prim(l):
 @parse_compare(([1, 2, 3],))
 def test_vm_icall_clos(l):
     y = 1 + 1
-    
+
     def add2(v):
         return v + y
 
     return maplist(add2, l)
-
-

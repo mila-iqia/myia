@@ -166,6 +166,11 @@ class VM:
             yield from self._vars[node.value]
 
     def call(self, fn, args):
+        """Call the `fn` object.
+
+        `fn` can be anthing that would be valid as the first element
+        of an apply.
+        """
         if isinstance(fn, Primitive):
             return self.implementations[fn](self, *args)
 
