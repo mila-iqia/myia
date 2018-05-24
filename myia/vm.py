@@ -165,6 +165,24 @@ class VM:
         if is_constant_graph(node):
             yield from self._vars[node.value]
 
+    def call(self, fn, args):
+        """Call the `fn` object.
+
+        `fn` can be anything that would be valid as the first element
+        of an apply.
+        """
+        if isinstance(fn, Primitive):
+            return self.implementations[fn](self, *args)
+
+        elif isinstance(fn, Graph):
+            return self.evaluate(fn, args)
+
+        elif isinstance(fn, Closure):
+            return self.evaluate(fn.graph, args, closure=fn.values)
+
+        else:
+            raise AssertionError(f"Can't call {fn}")
+
     def _call(self, graph: Graph, args: List[Any]):
         clos = None
         if isinstance(graph, Closure):
