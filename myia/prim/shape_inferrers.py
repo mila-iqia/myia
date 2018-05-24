@@ -21,7 +21,7 @@ shape_inferrer_constructors = {}
 
 
 class ScalarShapeInferrer(Inferrer):
-    """Shape inferrer for all primitves that don't take arrays."""
+    """Shape inferrer for all primitives that don't take arrays."""
 
     def __init__(self, engine):
         """Initialize the ScalarShapeInferrer."""
@@ -41,7 +41,7 @@ class ShapeTrack(Track):
 
     def __init__(self, engine, name, *,
                  constructors=shape_inferrer_constructors):
-        """Intialize a ShapeTrack."""
+        """Initialize a ShapeTrack."""
         super().__init__(engine, name)
         self.constructors = constructors
 
