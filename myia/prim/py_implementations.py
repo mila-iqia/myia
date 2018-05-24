@@ -225,8 +225,6 @@ def maplist(f, xs):
 @vm_register(primops.maplist)
 def _maplist_vm(vm, f, xs):
     """Implement `maplist` for Myia's VM."""
-    from ..api import compile
-    from ..ir import Graph
-    if isinstance(f, Graph):
-        f = compile(f)
-    return list(map(f, xs))
+    def f_(*args):
+        return vm.call(f, args)
+    return list(map(f_, xs))
