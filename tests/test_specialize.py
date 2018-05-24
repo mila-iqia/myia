@@ -136,6 +136,23 @@ def test_maplist_polymorphic(xs, ys):
     return maplist(square, xs), maplist(square, ys)
 
 
+@mark.xfail(reason="Cannot specialize f")
+@specialize((True, [fp1, fp2], [int1, int2]))
+def test_maplist_polymorphic_2(c, xs, ys):
+    def square(x):
+        return x * x
+
+    def double(x):
+        return x + x
+
+    if c:
+        f = square
+    else:
+        f = double
+
+    return maplist(f, xs), maplist(f, ys)
+
+
 @specialize((int1, int2))
 def test_unused_parameter(x, y):
     return x * x
