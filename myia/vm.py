@@ -168,7 +168,7 @@ class VM:
     def call(self, fn, args):
         """Call the `fn` object.
 
-        `fn` can be anthing that would be valid as the first element
+        `fn` can be anything that would be valid as the first element
         of an apply.
         """
         if isinstance(fn, Primitive):
