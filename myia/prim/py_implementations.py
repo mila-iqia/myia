@@ -216,7 +216,7 @@ def shape(array):
     return array.shape
 
 
-@register(primops.map_array)
+@py_register(primops.map_array)
 def map_array(fn, array):
     """Implement `map_array`."""
     def f(ary):
@@ -227,7 +227,14 @@ def map_array(fn, array):
     return np.apply_along_axis(f, 0, array)
 
 
-@register(primops.scan_array)
+@vm_register(primops.map_array)
+def _map_array_vm(vm, fn, array):
+    def fn_(x):
+        return vm.call(fn, x)
+    return map_array(fn_, array)
+
+
+@py_register(primops.scan_array)
 def scan_array(fn, init, array, axis):
     """Implement `scan_array`."""
     # This is inclusive scan because it's easier to implement
@@ -242,7 +249,14 @@ def scan_array(fn, init, array, axis):
     return np.apply_along_axis(f, axis, array)
 
 
-@register(primops.reduce_array)
+@vm_register(primops.scan_array)
+def _scan_array_vm(vm, fn, init, array, axis):
+    def fn_(a, b):
+        return vm.call(fn, [a, b])
+    return scan_array(fn_, init, array, axis)
+
+
+@py_register(primops.reduce_array)
 def reduce_array(fn, init, array, axis):
     """Implement `reduce_array`."""
     def f(ary):
@@ -252,6 +266,13 @@ def reduce_array(fn, init, array, axis):
             val = fn(val, x)
         return val
     return np.apply_along_axis(f, axis, array)
+
+
+@vm_register(primops.reduce_array)
+def _reduce_array_vm(vm, fn, init, array, axis):
+    def fn_(a, b):
+        return vm.call(fn, [a, b])
+    return reduce_array(fn_, init, array, axis)
 
 
 @register(primops.distribute)
