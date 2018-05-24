@@ -100,6 +100,37 @@ ast_map = {
 }
 
 
+ast_map_2 = {
+    ast.Add: ('operator', 'add'),
+    ast.Sub: ('operator', 'sub'),
+    ast.Mult: ('operator', 'mul'),
+    ast.Div: ('operator', 'truediv'),
+    ast.FloorDiv: ('operator', 'floordiv'),
+    ast.Mod: ('operator', 'mod'),
+    ast.Pow: ('operator', 'pow'),
+    ast.MatMult: ('operator', 'matmul'),
+    ast.LShift: ('operator', 'lshift'),
+    ast.RShift: ('operator', 'rshift'),
+    ast.BitAnd: ('operator', 'and_'),
+    ast.BitOr: ('operator', 'or_'),
+    ast.BitXor: ('operator', 'xor'),
+    ast.UAdd: ('operator', 'pos'),
+    ast.USub: ('operator', 'neg'),
+    ast.Invert: ('operator', 'invert'),
+    ast.Not: ('operator', 'not_'),
+    ast.Eq: ('operator', 'eq'),
+    ast.NotEq: ('operator', 'ne'),
+    ast.Lt: ('operator', 'lt'),
+    ast.Gt: ('operator', 'gt'),
+    ast.LtE: ('operator', 'le'),
+    ast.GtE: ('operator', 'ge'),
+    ast.Is: ('operator', 'is_'),
+    ast.IsNot: ('operator', 'is_not'),
+    ast.In: ('operator', 'contains'),
+    # ast.NotIn: operator.???,  # Not in operator module
+}
+
+
 def _fresh(node):
     """If node is a constant, return a copy of it."""
     if is_constant(node):
@@ -151,7 +182,7 @@ class Environment:
         if id(obj) in self._object_map:
             return _fresh(self._object_map[id(obj)])
         elif isinstance(obj, FunctionType):
-            parser = Parser(self, obj)
+            parser = Parser(self, obj, resolve_globals=True)
             # This will insert object into the map
             parser.parse()
             return self._object_map[id(obj)]
@@ -191,14 +222,16 @@ class Parser:
 
     def __init__(self, environment: Environment,
                  function: FunctionType,
-                 globals_: Dict[str, Any] = None) -> None:
+                 globals_: Dict[str, Any] = None,
+                 resolve_globals=True) -> None:
         """Construct a parser."""
         self.environment = environment
         self.function = function
         _, self.line_offset = inspect.getsourcelines(function)
         self.filename: str = inspect.getfile(function)
         self.block_map: Dict[Block, Constant] = {}
-        if globals_ is None:
+        self.resolve_globals = resolve_globals
+        if resolve_globals and globals_ is None:
             free_vars = inspect.getclosurevars(function)
             assert isinstance(free_vars.builtins, Dict)
             globals_ = free_vars.builtins
@@ -238,11 +271,15 @@ class Parser:
     def read(self, varnum: str) -> ANFNode:
         """Read a variable from the function's global namespace."""
         assert isinstance(self.function, FunctionType)
-        if varnum in self.globals_:
-            return self.environment.map(self.globals_[varnum])
-        elif varnum in self.function.__globals__:
-            return self.environment.map(self.function.__globals__[varnum])
-        raise ValueError(varnum)
+        if self.resolve_globals:
+            if varnum in self.globals_:
+                return self.environment.map(self.globals_[varnum])
+            elif varnum in self.function.__globals__:
+                return self.environment.map(self.function.__globals__[varnum])
+            else:
+                raise ValueError(varnum)
+        else:
+            raise ValueError(varnum)
 
     def process_FunctionDef(self, block: 'Block',
                             node: ast.FunctionDef) -> 'Block':
@@ -266,8 +303,10 @@ class Parser:
             function_block.preds.append(block)
         else:
             # Add mapping for the top level so that recursive calls can resolve
-            self.environment.insert(self.function,
-                                    self.get_block_function(function_block))
+            g_ct = self.get_block_function(function_block)
+            self.graph = g_ct.value
+            if self.resolve_globals:
+                self.environment.insert(self.function, g_ct)
 
         function_block.mature()
         function_block.graph.debug.name = node.name
@@ -306,25 +345,28 @@ class Parser:
 
     # Expression implementations
 
-    def _resolve_ast_type(self, op):
-        return self.environment.map(ast_map[type(op)])
+    def _resolve_ast_type(self, op, block):
+        if self.resolve_globals:
+            return self.environment.map(ast_map[type(op)])
+        else:
+            return block.make_getmodule(*ast_map_2[type(op)])
 
     def process_BinOp(self, block: 'Block', node: ast.BinOp) -> ANFNode:
         """Process binary operators: `a + b`, `a | b`, etc."""
-        func = self._resolve_ast_type(node.op)
+        func = self._resolve_ast_type(node.op, block)
         left = self.process_node(block, node.left)
         right = self.process_node(block, node.right)
         return Apply([func, left, right], block.graph)
 
     def process_UnaryOp(self, block: 'Block', node: ast.UnaryOp) -> ANFNode:
         """Process unary operators: `+a`, `-a`, etc."""
-        func = self._resolve_ast_type(node.op)
+        func = self._resolve_ast_type(node.op, block)
         operand = self.process_node(block, node.operand)
         return Apply([func, operand], block.graph)
 
     def process_Compare(self, block: 'Block', node: ast.Compare) -> ANFNode:
         """Process comparison operators: `a == b`, `a > b`, etc."""
-        ops = [self._resolve_ast_type(op) for op in node.ops]
+        ops = [self._resolve_ast_type(op, block) for op in node.ops]
         assert len(ops) == 1
         left = self.process_node(block, node.left)
         right = self.process_node(block, node.comparators[0])
@@ -336,7 +378,7 @@ class Parser:
 
     def process_Num(self, block: 'Block', node: ast.Num) -> ANFNode:
         """Process numbers: `1`, `2.5`, etc."""
-        return self.environment.map(node.n)
+        return Constant(node.n)
 
     def process_Call(self, block: 'Block', node: ast.Call) -> ANFNode:
         """Process function calls: `f(x)`, etc."""
@@ -347,7 +389,7 @@ class Parser:
     def process_NameConstant(self, block: 'Block',
                              node: ast.NameConstant) -> ANFNode:
         """Process special constants: `True`, `False`, `None`, etc."""
-        return self.environment.map(node.value)
+        return Constant(node.value)
 
     def process_Tuple(self, block: 'Block', node: ast.Tuple) -> ANFNode:
         """Process tuple literals."""
@@ -365,7 +407,10 @@ class Parser:
     def process_Subscript(self, block: 'Block',
                           node: ast.Subscript) -> ANFNode:
         """Process subscripts: `x[y]`."""
-        op = self.environment.map(operator.getitem)
+        if self.resolve_globals:
+            op = self.environment.map(operator.getitem)
+        else:
+            op = block.make_getmodule('operator', 'getitem')
         value = self.process_node(block, node.value)
         slice = self.process_node(block, node.slice)
         return Apply([op, value, slice], block.graph)
@@ -377,7 +422,10 @@ class Parser:
     def process_Attribute(self, block: 'Block',
                           node: ast.Attribute) -> ANFNode:
         """Process attributes: `x.y`."""
-        op = self.environment.map(getattr)
+        if self.resolve_globals:
+            op = self.environment.map(getattr)
+        else:
+            op = block.make_getmodule('builtins', 'getattr')
         value = self.process_node(block, node.value)
         return Apply([op, value, Constant(node.attr)], block.graph)
 
@@ -420,7 +468,10 @@ class Parser:
             elif isinstance(targ, ast.Tuple):
                 # CASE: x, y = value
                 for i, elt in enumerate(targ.elts):
-                    op = self.environment.map(operator.getitem)
+                    if self.resolve_globals:
+                        op = self.environment.map(operator.getitem)
+                    else:
+                        op = block.make_getmodule('operator', 'getitem')
                     new_node = Apply([op, anf_node, Constant(i)], block.graph)
                     write(elt, new_node)
 
@@ -581,6 +632,14 @@ class Block:
                 self.set_phi_arguments(phi)
         self.matured = True
 
+    def make_getmodule(self, module_name, symbol_name):
+        """Return a subtree that resolves a name in a module."""
+        return self.graph.apply(
+            primops.getattr,
+            self.graph.apply(primops.getmodule, module_name),
+            symbol_name
+        )
+
     def read(self, varnum: str) -> ANFNode:
         """Read a variable.
 
@@ -602,7 +661,11 @@ class Block:
             if len(self.preds) == 1:
                 return self.preds[0].read(varnum)
             elif not self.preds:
-                return self.parser.read(varnum)
+                if self.parser.resolve_globals:
+                    return self.parser.read(varnum)
+                else:
+                    md = self.parser.function.__module__
+                    return self.make_getmodule(md, varnum)
         # TODO: point to the original definition
         with About(NamedDebugInfo(name=varnum), 'phi'):
             phi = Parameter(self.graph)

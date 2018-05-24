@@ -82,3 +82,4 @@ return_ = Primitive('return')
 #################
 
 maplist = Primitive('maplist')
+getmodule = Primitive('getmodule')

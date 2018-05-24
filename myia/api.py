@@ -42,9 +42,14 @@ ENV = parser.Environment(default_object_map().items())
 VM = VM_(vm_implementations, py_implementations)
 
 
-def parse(func: FunctionType) -> Graph:
+def parse(func: FunctionType, resolve_globals=True) -> Graph:
     """Parse a function into ANF."""
-    return ENV.map(func).value
+    if resolve_globals:
+        return ENV.map(func).value
+    else:
+        p = parser.Parser(None, func, resolve_globals=False)
+        p.parse()
+        return p.graph
 
 
 def run(g: Graph, args: List[Any]) -> Any:
