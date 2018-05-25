@@ -250,14 +250,12 @@ class Parser:
             # we basically just pass through them.
             return None  # pragma: no cover
 
-    def parse(self, clean=True) -> Graph:
+    def parse(self) -> Graph:
         """Parse the function into a Myia graph."""
         tree = ast.parse(textwrap.dedent(inspect.getsource(self.function)))
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
         graph = self._process_function(None, function_def)[1].graph
-        if clean:
-            destroy_disconnected_nodes(graph)
         return graph
 
     def get_block_function(self, block: 'Block') -> Constant:
