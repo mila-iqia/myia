@@ -6,11 +6,7 @@ from ..ir import replace, succ_incoming, freevars_boundary, \
     GraphCloner
 from ..unify import Var, var, SVar
 from ..prim import ops as P, Primitive
-from ..prim.py_implementations import \
-    py_implementations as pyimpl, \
-    vm_implementations as vmimpl
 from ..cconv import NestingAnalyzer
-from ..vm import VM
 
 from .opt import \
     sexp_to_node, \
@@ -182,45 +178,6 @@ simplify_always_false = psub(
     replacement=(Y,),
     name='simplify_always_false'
 )
-
-
-########################
-# Constant propagation #
-########################
-
-
-def make_constant_prop(vmimpl, pyimpl, vm_class=None):
-    """Create a constant propagator that uses the given implementations."""
-    vm = vm_class and vm_class(vmimpl, pyimpl)
-
-    @pattern_replacer(C, Cs)
-    def constant_prop(node, equiv):
-        fn = equiv[C].value
-        args = [ct.value for ct in equiv[Cs]]
-        if isinstance(fn, Primitive):
-            if fn in pyimpl:
-                return Constant(pyimpl[fn](*args))
-            else:
-                return node
-
-        elif isinstance(fn, Graph):
-            if vm:
-                parent = NestingAnalyzer(fn).parents()[fn]
-                if parent:
-                    # Can't evaluate a closure
-                    return node
-                else:
-                    return Constant(vm.evaluate(fn, args))
-            else:
-                return node
-
-        else:
-            raise TypeError(f'Cannot execute {fn}.')  # pragma: no cover
-
-    return constant_prop
-
-
-constant_prop = make_constant_prop(vmimpl, pyimpl, VM)
 
 
 ############
