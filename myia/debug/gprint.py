@@ -624,9 +624,9 @@ class _NestingAnalyzer:
 
         def lbl(x):
             if isinstance(x, ParentProxy):
-                return f"{x.graph.debug.debug_name}'"
+                return f"{short_labeler.label(x.graph)}'"
             else:
-                return x.debug.debug_name
+                return short_labeler.label(x)
 
         if mode == 'parents':
             graph = {g: set() if parent is None else {parent}

@@ -214,3 +214,52 @@ def test_nested_double_reference(_x):
             return h()
         return g()
     return f(_x)
+
+
+@check_nest('X,f->X,g->f,h->f', 'f:a; g:a,b; h:b', 'f:a; g:a,b; h:b')
+def test_previously_mishandled(x):
+    # This covers a case that the old NestingAnalyzer was mishandling
+    a = x * x
+
+    def f():
+        b = a * a
+
+        def g():
+            c = a * b
+            return c
+
+        def h():
+            d = b * b
+            return d
+        return g() + h() + b
+
+    return f()
+
+
+@check_nest('X,f1->X,f2->f1,f3->f2,f4->f3,f5->f4',
+            'f1:a; f2:a,b; f3:a,b,c; f4:a,b,c,d; f5:d,e',
+            'f1:a; f2:a,b; f3:a,b,c; f4:a,b,c,d; f5:d,e')
+def test_deepest(x):
+    a = x * x
+
+    def f1():
+        b = a * a
+
+        def f2():
+            c = a * b
+
+            def f3():
+                d = a * b * c
+
+                def f4():
+                    e = a * b * c * d
+
+                    def f5():
+                        f = d * e
+                        return f
+
+                    return f5()
+                return f4()
+            return f3()
+        return f2()
+    return f1()

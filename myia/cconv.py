@@ -139,23 +139,29 @@ class NestingAnalyzer:
         dictionary.
         """
         all_deps = self.graph_dependencies_total()
-        all_deps = {g: set(deps) for g, deps in all_deps.items()}
+        todo = list(all_deps.items())
+        todo.sort(key=lambda xy: len(xy[1]))
 
-        buckets: Dict[int, Set[Graph]] = defaultdict(set)
-        for g, deps in all_deps.items():
-            buckets[len(deps)].add(g)
+        parents = {}
 
-        rm: Set[Graph] = set()
-        next_rm: Set[Graph] = set()
-        for n, graphs in sorted(buckets.items()):
-            for g in graphs:
-                all_deps[g] -= rm
-                assert len(all_deps[g]) <= 1
-                next_rm |= all_deps[g]
-            rm |= next_rm
-
-        parents = {g: None if len(gs) == 0 else list(gs)[0]
-                   for g, gs in all_deps.items()}
+        while todo:
+            next_todo = []
+            for g, deps in todo:
+                if len(deps) > 1:
+                    rm = set()
+                    for dep in deps:
+                        parent = parents.get(dep, None)
+                        while parent:
+                            rm.add(parent)
+                            parent = parents.get(parent, None)
+                    deps -= rm
+                if len(deps) == 0:
+                    parents[g] = None
+                elif len(deps) == 1:
+                    parents[g] = deps.pop()
+                else:
+                    next_todo.append((g, deps))
+            todo = next_todo
 
         return parents
 
