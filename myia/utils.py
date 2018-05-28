@@ -161,3 +161,66 @@ class StructuralMap:
 def smap(fn, *args):
     """Map a function recursively over all scalars in a structure."""
     return StructuralMap(fn)(*args)
+
+
+class Namespace:
+    """Namespace in which to resolve variables."""
+
+    def __init__(self, label, ns):
+        """Initialize a namespace.
+
+        Args:
+            label: The namespace's name.
+            ns: A dictionary containing the namespace's data.
+        """
+        self.label = label
+        self.ns = ns
+
+    def __contains__(self, name):
+        return name in self.ns
+
+    def __getitem__(self, name):
+        try:
+            return self.ns[name]
+        except KeyError as e:
+            raise NameError(name)
+
+    def __repr__(self):
+        return f':{self.label}'  # pragma: no cover
+
+
+class ModuleNamespace(Namespace):
+    """Namespace that represents a Python module."""
+
+    def __init__(self, name):
+        """Initialize a ModuleNamespace.
+
+        Args:
+            name: Qualified name for the module. Must be possible
+                to `__import__` it.
+        """
+        mod = vars(__import__(name, fromlist=['_']))
+        super().__init__(name, mod)
+
+
+class ClosureNamespace(Namespace):
+    """Namespace that represents a function's closure."""
+
+    def __init__(self, fn):
+        """Initialize a ClosureNamespace.
+
+        Args:
+            fn: The function.
+
+        """
+        lbl = f'{fn.__module__}..<{fn.__name__}>'
+        names = fn.__code__.co_freevars
+        cells = fn.__closure__
+        ns = dict(zip(names, cells or ()))
+        super().__init__(lbl, ns)
+
+    def __getitem__(self, name):
+        try:
+            return self.ns[name].cell_contents
+        except ValueError as e:
+            raise UnboundLocalError(name)

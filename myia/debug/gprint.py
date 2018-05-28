@@ -450,9 +450,19 @@ def _opt_accum_cons(node, equiv):
 def _opt_fancy_getitem(node, equiv):
     x = equiv[X]
     v = equiv[V]
-    ct = Constant(GraphCosmeticPrimitive(f'[{int(v.value)}]', on_edge=True))
+    ct = Constant(GraphCosmeticPrimitive(f'[{v.value}]', on_edge=True))
     with About(node.debug, 'cosmetic'):
         return Apply([ct, x], node.graph)
+
+
+@pattern_replacer(primops.resolve, V1, V2)
+def _opt_fancy_resolve(node, equiv):
+    ns = equiv[V1]
+    name = equiv[V2]
+    with About(node.debug, 'cosmetic'):
+        lbl = f'{ns.value.label}.{name.value}'
+        ct = Constant(GraphCosmeticPrimitive(lbl))
+        return ct
 
 
 @pattern_replacer(primops.getattr, X, V)
@@ -464,15 +474,6 @@ def _opt_fancy_getattr(node, equiv):
         return Apply([ct, x], node.graph)
 
 
-@pattern_replacer(primops.getattr, (primops.getmodule, V1), V2)
-def _opt_fancy_getmodule(node, equiv):
-    v1 = equiv[V1]
-    v2 = equiv[V2]
-    ct = Constant(GraphCosmeticPrimitive(f'{v1.value}.{v2.value}'))
-    with About(node.debug, 'cosmetic'):
-        return ct
-
-
 def cosmetic_transformer(g):
     """Transform a graph so that it looks nicer.
 
@@ -482,7 +483,7 @@ def cosmetic_transformer(g):
     opt = pattern_equilibrium_optimizer(
         _opt_accum_cons,
         _opt_fancy_getitem,
-        _opt_fancy_getmodule,
+        _opt_fancy_resolve,
         _opt_fancy_getattr,
     )
     opt(g)

@@ -5,8 +5,9 @@ from ..ir import replace, succ_incoming, freevars_boundary, \
     Graph, Constant, is_constant, is_constant_graph, is_apply, \
     GraphCloner
 from ..unify import Var, var, SVar
-from ..prim import ops as P, Primitive
+from ..prim import ops as P
 from ..cconv import NestingAnalyzer
+from ..utils import Namespace
 
 from .opt import \
     sexp_to_node, \
@@ -30,6 +31,7 @@ Y2 = Var('Y2')
 C = var(is_constant)
 C1 = var(is_constant)
 C2 = var(is_constant)
+CNS = var(lambda x: is_constant(x, Namespace))
 G = var(is_constant_graph)
 NIL = var(lambda x: is_constant(x) and x.value == ())
 
@@ -178,6 +180,26 @@ simplify_always_false = psub(
     replacement=(Y,),
     name='simplify_always_false'
 )
+
+
+###################
+# Resolve globals #
+###################
+
+
+def make_resolver(vm):
+    """Create an optimization to resolve globals.
+
+    Args:
+        vm: The VM to use for conversion.
+    """
+    @pattern_replacer(P.resolve, CNS, C)
+    def resolve_globals(node, equiv):
+        ns = equiv[CNS]
+        x = equiv[C]
+        return Constant(vm.convert(ns.value[x.value]))
+
+    return resolve_globals
 
 
 ############

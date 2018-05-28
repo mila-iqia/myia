@@ -3,10 +3,7 @@ from pytest import mark
 
 from .test_opt import _check_opt
 from myia.opt import lib
-from myia.prim import ops
 from myia.prim.py_implementations import \
-    py_implementations as pyimpl, \
-    vm_implementations as vmimpl, \
     head, tail, setitem, add, mul
 
 

@@ -1,4 +1,4 @@
-from myia.api import ENV, parse
+from myia.api import parse
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs as _dfs
 from myia.ir import Apply, Constant, Graph, Parameter, Special, \
@@ -6,7 +6,6 @@ from myia.ir import Apply, Constant, Graph, Parameter, Special, \
     freevars_boundary, is_apply, is_constant, is_constant_graph, \
     is_parameter, is_special, isomorphic, replace, \
     succ_deep, succ_deeper, succ_incoming, toposort
-from myia.parser import Parser
 from tests.test_graph_utils import _check_toposort
 
 

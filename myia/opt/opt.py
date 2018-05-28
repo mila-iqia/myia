@@ -196,7 +196,8 @@ class EquilibriumOptimizer:
                 if chg:
                     for node in dfs(graph.output, succ_incoming):
                         if is_constant_graph(node):
-                            new_graphs.add(node.value)
+                            for g in NestingAnalyzer(node.value).coverage():
+                                new_graphs.add(g)
                 changes |= chg
                 any_changes |= changes
             graphs |= new_graphs
