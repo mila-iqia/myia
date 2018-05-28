@@ -49,8 +49,7 @@ resolver_opt = pattern_equilibrium_optimizer(optlib.make_resolver(default_vm))
 
 def parse(func: FunctionType, resolve_globals=True) -> Graph:
     """Parse a function into ANF."""
-    p = parser.Parser(func)
-    g = p.parse()
+    g = parser.parse(func)
     if resolve_globals:
         resolver_opt(g)
     return g

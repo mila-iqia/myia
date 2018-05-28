@@ -11,7 +11,7 @@ from typing import Iterable, Mapping, Any, Callable, List
 
 from .ir import Graph, Apply, Constant, Parameter, ANFNode
 from .ir.utils import is_constant_graph, is_constant
-from .parser import Parser
+from .parser import parse
 from .prim import Primitive
 from .prim.ops import if_, return_
 from .utils import smap
@@ -110,8 +110,7 @@ class VM:
             pass
 
         if isinstance(value, FunctionType):
-            p = Parser(value)
-            g = p.parse()
+            g = parse(value)
             self.object_map[value] = g
             self._acquire_graph(g)
             return g

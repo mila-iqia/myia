@@ -42,6 +42,9 @@ from .prim import ops as primops
 from .utils import ModuleNamespace, ClosureNamespace
 
 
+_parse_cache = {}
+
+
 class Location(NamedTuple):
     """A location in source code.
 
@@ -98,6 +101,21 @@ def _fresh(node):
         return Constant(node.value)
     else:
         return node
+
+
+def parse(func):
+    """Parse a function into a Myia graph.
+
+    The result of the parsing is cached: multiple calls to parse on the same
+    function will return the same graph. It should therefore be cloned prior
+    to manipulation.
+    """
+    if func in _parse_cache:
+        return _parse_cache[func]
+    parser = Parser(func)
+    graph = parser.parse()
+    _parse_cache[func] = graph
+    return graph
 
 
 class Parser:
