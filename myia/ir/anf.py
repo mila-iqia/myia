@@ -53,6 +53,7 @@ class Graph:
         self.return_: Apply = None
         self.debug = NamedDebugInfo(self)
         self.transforms: Dict[str, Union[Graph, Primitive]] = {}
+        self._manager = None
 
     @property
     def type(self):
@@ -97,6 +98,66 @@ class Graph:
         wrapped_inputs = [i if isinstance(i, ANFNode) else self.constant(i)
                           for i in inputs]
         return Apply(wrapped_inputs, self)
+
+    ######################
+    # Managed properties #
+    ######################
+
+    @property
+    def manager(self):
+        """Return the GraphManager for this Graph."""
+        if self._manager is None:
+            raise Exception(f'Graph {self} has no manager.')
+        return self._manager
+
+    @property
+    def nodes(self):
+        """Return all nodes that belong to this graph."""
+        return self._manager.nodes[self]
+
+    @property
+    def free_variables_direct(self):
+        """Return all free variables directly pointed to in this graph."""
+        return self._manager.free_variables_direct[self]
+
+    @property
+    def free_variables_total(self):
+        """Return all free variables required by this graph's scope."""
+        return self._manager.free_variables_total[self]
+
+    @property
+    def graphs_used(self):
+        """Return all graphs used by this graph directly."""
+        return self._manager.graphs_used[self]
+
+    @property
+    def graph_dependencies_direct(self):
+        """Return the set of graphs free_variables_direct belong to."""
+        return self._manager.graph_dependencies_direct[self]
+
+    @property
+    def graph_dependencies_total(self):
+        """Return the set of graphs free_variables_total belong to."""
+        return self._manager.graph_dependencies_total[self]
+
+    @property
+    def parent(self):
+        """Return the parent of this graph."""
+        return self._manager.parents.get(self, None)
+
+    @property
+    def children(self):
+        """Return all graphs that have this graph as parent."""
+        return self._manager.children[self]
+
+    @property
+    def scope(self):
+        """Return this graph and all nested graphs."""
+        return self._manager.scopes[self]
+
+    #################
+    # Miscellaneous #
+    #################
 
     def __str__(self) -> str:
         return self.debug.debug_name
