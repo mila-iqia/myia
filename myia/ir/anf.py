@@ -113,47 +113,52 @@ class Graph:
     @property
     def nodes(self):
         """Return all nodes that belong to this graph."""
-        return self._manager.nodes[self]
+        return self.manager.nodes[self]
+
+    @property
+    def constants(self):
+        """Return all constants used by this graph."""
+        return self.manager.constants[self]
 
     @property
     def free_variables_direct(self):
         """Return all free variables directly pointed to in this graph."""
-        return self._manager.free_variables_direct[self]
+        return self.manager.free_variables_direct[self]
 
     @property
     def free_variables_total(self):
         """Return all free variables required by this graph's scope."""
-        return self._manager.free_variables_total[self]
+        return self.manager.free_variables_total[self]
 
     @property
     def graphs_used(self):
         """Return all graphs used by this graph directly."""
-        return self._manager.graphs_used[self]
+        return self.manager.graphs_used[self]
 
     @property
     def graph_dependencies_direct(self):
         """Return the set of graphs free_variables_direct belong to."""
-        return self._manager.graph_dependencies_direct[self]
+        return self.manager.graph_dependencies_direct[self]
 
     @property
     def graph_dependencies_total(self):
         """Return the set of graphs free_variables_total belong to."""
-        return self._manager.graph_dependencies_total[self]
+        return self.manager.graph_dependencies_total[self]
 
     @property
     def parent(self):
         """Return the parent of this graph."""
-        return self._manager.parents.get(self, None)
+        return self.manager.parents.get(self, None)
 
     @property
     def children(self):
         """Return all graphs that have this graph as parent."""
-        return self._manager.children[self]
+        return self.manager.children[self]
 
     @property
     def scope(self):
         """Return this graph and all nested graphs."""
-        return self._manager.scopes[self]
+        return self.manager.scopes[self]
 
     #################
     # Miscellaneous #

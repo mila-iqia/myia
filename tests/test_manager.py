@@ -596,3 +596,34 @@ def test_manager_exclusivity():
 
     with pytest.raises(Exception):
         GraphManager(f)
+
+
+def test_graph_properties():
+
+    @parse
+    def test(x):
+        def f(y):
+            def g(z):
+                def h():
+                    return y + z
+                return h
+            return g(x)
+        return f(x + 1)
+
+    with pytest.raises(Exception):
+        test.manager
+
+    mng = GraphManager(test)
+
+    for g in mng.graphs:
+        assert g.manager is mng
+        assert g.nodes is mng.nodes[g]
+        assert g.constants is mng.constants[g]
+        assert g.free_variables_direct is mng.free_variables_direct[g]
+        assert g.free_variables_total is mng.free_variables_total[g]
+        assert g.graphs_used is mng.graphs_used[g]
+        assert g.graph_dependencies_direct is mng.graph_dependencies_direct[g]
+        assert g.graph_dependencies_total is mng.graph_dependencies_total[g]
+        assert g.parent is mng.parents[g]
+        assert g.children is mng.children[g]
+        assert g.scope is mng.scopes[g]
