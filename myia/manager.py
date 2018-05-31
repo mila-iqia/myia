@@ -480,6 +480,7 @@ class GraphManager:
         self.events.add_graph(graph)
         if root:
             self.roots.add(graph)
+        self._acquire_nodes(graph.parameters)
         self._acquire_nodes({graph.return_})
 
     def _ensure_graph(self, graph):

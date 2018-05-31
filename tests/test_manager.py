@@ -358,6 +358,11 @@ def test_deepest(x):
     return f1()
 
 
+@check_manager(nodes='X:x,y')
+def test_unused_parameter(x, y):
+    return x * x
+
+
 ############################
 # Tests involving mutation #
 ############################

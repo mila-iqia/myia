@@ -87,6 +87,8 @@ class Graph:
         """Add a new parameter to this graph (appended to the end)."""
         p = Parameter(self)
         self.parameters.append(p)
+        # TODO: tell the manager about what we have just done
+        assert self._manager is None
         return p
 
     def constant(self, obj: Any) -> 'Constant':
