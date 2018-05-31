@@ -94,6 +94,16 @@ def clone(g):
     return GraphCloner(g, total=True)[g]
 
 
+def _check_uses(manager):
+    for node in manager.all_nodes:
+        for i, inp in enumerate(node.inputs):
+            assert inp in manager.all_nodes
+            assert (node, i) in manager.uses[inp]
+        for node2, key in manager.uses[node]:
+            assert node2 in manager.all_nodes
+            assert node2.inputs[key] is node
+
+
 def check_manager(*stages, **specs):
     if specs and stages:
         raise Exception('Bad call to check_manager')
@@ -134,6 +144,7 @@ def check_manager(*stages, **specs):
                 for uses, new_node in operations:
                     _replace(uses, new_node)
                 mng.commit()
+                _check_uses(mng)
                 stage.check(mng)
 
         return test
