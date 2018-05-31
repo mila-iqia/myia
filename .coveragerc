@@ -11,3 +11,6 @@ exclude_lines =
     @compile
     pragma: no cover
     AssertionError
+    NotImplementedError
+    __str__
+    __repr__
