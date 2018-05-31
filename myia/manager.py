@@ -490,6 +490,18 @@ class GraphManager:
         graph._manager = self
         self.graphs.add(graph)
 
+    def _maybe_drop_graph(self, graph):
+        if graph in self.roots:
+            return
+
+        users = self.graph_users[graph]
+        if users:
+            return
+
+        self._maybe_drop_nodes({graph.return_})
+        self.events.drop_graph(graph)
+        self.graphs.remove(graph)
+
     def _process_edge(self, node, key, inp, direction):
         """Add/remove an edge between two nodes.
 
@@ -550,11 +562,12 @@ class GraphManager:
             node = nodes.pop()
             assert node in self.all_nodes
             uses = self.uses[node]
-            if uses or (node.graph
-                        and node.graph in self.graphs
-                        and node is node.graph.return_):
+            if uses:
                 # This node is still live
-                continue  # pragma: no cover
+                continue
+
+            if is_constant_graph(node):
+                self._maybe_drop_graph(node.value)
 
             self.all_nodes.remove(node)
             self.events.drop_node(node)

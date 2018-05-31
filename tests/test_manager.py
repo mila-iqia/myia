@@ -479,6 +479,26 @@ def test_mut_closure(x, y):
 
 
 @check_manager(
+    Stage(scopes='X:X; c:c; f1:f1; f2:f2'),
+    Stage(scopes='X:X; c:c; g:g')
+)
+def test_remove_unused_graphs(x, y):
+    def c(p):
+        return p
+
+    def f1(q):
+        return c(q)
+
+    def f2(r):
+        return f1(r * r)
+
+    def g(z):
+        return c(z)
+
+    return swap(f2, g)(3)
+
+
+@check_manager(
     Stage(parents='f->X', fvs_direct='f:x',   fvs_total='f:x'),
     Stage(parents='f->X', fvs_direct='f:x,y', fvs_total='f:x,y'),
     Stage(parents='f->X', fvs_direct='f:y',   fvs_total='f:y'),
