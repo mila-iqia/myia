@@ -163,6 +163,87 @@ def smap(fn, *args):
     return StructuralMap(fn)(*args)
 
 
+class Event(list):
+    """Simple Event class.
+
+    >>> e = Event('tickle')
+    >>> e.register(lambda event, n: print("hi" * n))
+    <function>
+    >>> e(5)
+    hihihihihi
+
+    Attributes:
+        name: The name of the event.
+        owner: The object defining this event (defaults to None).
+        history: A function that returns a list of previous events, or
+            None if no history exists.
+
+    """
+
+    def __init__(self, name, owner=None, history=None):
+        """Initialize an Event."""
+        self.name = name
+        self.owner = owner
+        self.history = history
+
+    def register(self, handler, run_history=False):
+        """Register a handler for this event.
+
+        This returns the handler so that register can be used as a decorator.
+
+        Arguments:
+            handler: A function. The handler's first parameter will always
+                be the event.
+            run_history: Whether to call the handler for all previous events
+                or not.
+        """
+        self.append(handler)
+        if run_history and self.history:
+            for entry in self.history():
+                if isinstance(entry, tuple):
+                    handler(self, *entry)
+                else:
+                    handler(self, entry)
+        return handler
+
+    def register_with_history(self, handler):
+        """Register a handler for this event and run it on the history."""
+        return self.register(handler, True)
+
+    def __call__(self, *args, **kwargs):
+        """Fire an event with the given arguments and keyword arguments."""
+        for f in self:
+            f(self, *args, **kwargs)
+
+    def __str__(self):
+        return f'Event({self.name})'
+
+    def __repr__(self):
+        return str(self)
+
+
+class Events:
+    """A group of named events.
+
+    >>> events = Events('tickle', 'yawn')
+    >>> events.tickle.register(lambda event, n: print("hi" * n))
+    <function>
+    >>> events.yawn.register(lambda event, n: print("a" * n))
+    <function>
+    >>> events.tickle(5)
+    hihihihihi
+    >>> events.yawn(20)
+    aaaaaaaaaaaaaaaaaaaa
+    """
+
+    def __init__(self, owner=None, **events):
+        """Initialize Events."""
+        self.owner = owner
+        for event_name, history in events.items():
+            ev = Event(event_name, owner=owner, history=history)
+            setattr(self, event_name, ev)
+
+
 class Namespace:
     """Namespace in which to resolve variables."""
 
