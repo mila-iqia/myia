@@ -5,8 +5,8 @@ from myia.api import parse
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs
 from myia.ir import Constant, Graph, is_constant, succ_deeper, succ_incoming
-from myia.ir.clone import GraphCloner
-from myia.prim import ops as primops
+from myia.manager import GraphCloner
+from myia.prim import ops as P
 
 
 def test_clone_simple():
@@ -38,7 +38,7 @@ def test_clone_simple():
 
     common = d1 & d2
     assert all(is_constant(x) for x in common)
-    assert {x.value for x in common} == {primops.add, primops.mul}
+    assert {x.value for x in common} == {P.add, P.mul, P.return_}
 
 
 def test_clone_closure():
@@ -160,7 +160,10 @@ def test_clone_inline():
     cl = GraphCloner(clone_constants=False)
     target = _graph_for_inline()
     new_params = [ONE, TWO]
-    cl.add_clone(g, target, new_params, False)
+    cl.add_clone(g, target, new_params)
+
+    # We ask twice to test that this doesn't cause problems
+    cl.add_clone(g, target, new_params)
 
     _successful_inlining(cl, g, new_params, target)
 
@@ -187,7 +190,7 @@ def test_clone_recursive():
     cl2 = GraphCloner(clone_constants=True)
     target = _graph_for_inline()
     new_params = [ONE, TWO]
-    cl2.add_clone(g, target, new_params, False)
+    cl2.add_clone(g, target, new_params)
 
     _successful_inlining(cl2, g, new_params, target)
 
@@ -200,7 +203,7 @@ def test_clone_recursive():
     target = _graph_for_inline()
     new_params = [ONE, TWO]
     with pytest.raises(Exception):
-        cl2.add_clone(g, target, new_params, False)
+        cl2.add_clone(g, target, new_params)
         cl2[g.output]
 
 
