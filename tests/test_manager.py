@@ -60,9 +60,12 @@ class NestingSpecs:
             return
         clean_results = {}
         for k, v in results.items():
+            if k is None:
+                continue
             k = self.name(k)
-            if isinstance(v, (Counter, set)):
+            if isinstance(v, (Counter, set, dict)):
                 v = {self.name(x) for x in v}
+                v = {x for x in v if x}
             elif v:
                 v = self.name(v)
             if v:
@@ -88,7 +91,7 @@ class Stage:
 
 
 def clone(g):
-    return GraphCloner(g)[g]
+    return GraphCloner(g, total=True)[g]
 
 
 def check_manager(*stages, **specs):
@@ -143,13 +146,13 @@ def check_manager(*stages, **specs):
 ################################
 
 
-@check_manager(parents='', fvs_direct='')
+@check_manager(nodes='X:x', parents='', fvs_direct='')
 def test_flat(x):
     """Sanity check."""
     return x
 
 
-@check_manager(parents='g->X', fvs_direct='g:x')
+@check_manager(nodes='X:x', parents='g->X', fvs_direct='g:x')
 def test_nested(x):
     """g is nested in X."""
     def g():
@@ -289,6 +292,7 @@ def test_deep2(x):
 
 
 @check_manager(parents='g->f; h->g',
+               nodes='X:_x; f:x; g:y',
                fvs_direct='h:y; g:x',
                fvs_total='h:y; g:x')
 def test_nested_double_reference(_x):

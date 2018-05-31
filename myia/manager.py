@@ -5,6 +5,24 @@ from collections import defaultdict, Counter
 
 from .ir import succ_deeper, is_constant_graph
 from .graph_utils import dfs, FOLLOW, EXCLUDE
+from .utils import Events
+
+
+def manage(*graphs):
+    """Ensure that all given graphs have a manager and return it.
+
+    * If one or more graphs has a manager, that manager will be used.
+    * If two graphs have different managers, an error will be raised.
+    * If no graph has a manager, one will be created.
+    """
+    manager = None
+    for graph in graphs:
+        manager = graph._manager
+    if manager is None:
+        manager = GraphManager()
+    for graph in graphs:
+        manager.add_graph(graph, root=True)
+    return manager
 
 
 class ParentProxy:
@@ -19,6 +37,347 @@ class ParentProxy:
 
     def __eq__(self, other):
         return isinstance(other, ParentProxy) and other.graph is self.graph
+
+
+class PerGraphStatistic(dict):
+    """Represents a statistic that maps each graph to some information."""
+
+    constructor = dict
+    include_graph_none = False
+
+    def __init__(self, manager):
+        """Initialize a PerGraphStatistic."""
+        super().__init__()
+        self.manager = manager
+        evts = self.manager.events
+        evts.add_node.register(self._on_add_node)
+        evts.drop_node.register(self._on_drop_node)
+        evts.add_graph.register(self._on_add_graph)
+        evts.drop_graph.register(self._on_drop_graph)
+        evts.add_edge.register(self._on_add_edge)
+        evts.drop_edge.register(self._on_drop_edge)
+        if self.include_graph_none:
+            self[None] = self.constructor()
+
+    def reset(self):
+        """Reset this graph's information."""
+        return self.clear()
+
+    def _on_add_graph(self, event, graph):
+        self[graph] = self.constructor()
+
+    def _on_drop_graph(self, event, graph):
+        del self[graph]
+
+    def _on_add_node(self, event, node):
+        pass
+
+    def _on_drop_node(self, event, node):
+        pass
+
+    def _on_add_edge(self, event, node, key, value):
+        pass
+
+    def _on_drop_edge(self, event, node, key, value):
+        pass
+
+
+class NodesStatistic(PerGraphStatistic):
+    """Implements `GraphManager.nodes`."""
+
+    constructor = set
+    include_graph_none = True
+
+    def _on_add_node(self, event, node):
+        self[node.graph].add(node)
+
+    def _on_drop_node(self, event, node):
+        self[node.graph].remove(node)
+
+
+class CounterStatistic(PerGraphStatistic):
+    """Represents a statistic that maps each graph to a set of counters."""
+
+    constructor = dict
+
+    def inc(self, graph, key, qty=1):
+        """Increment the count for self[graph][key] by qty."""
+        d = self[graph]
+        if key not in d:
+            d[key] = qty
+            return True
+        else:
+            d[key] += qty
+            return False
+
+    def dec(self, graph, key, qty=1):
+        """Decrement the count for self[graph][key] by qty.
+
+        The key is deleted if the count falls to zero.
+        """
+        d = self[graph]
+        if d[key] == qty:
+            del d[key]
+            return True
+        else:
+            d[key] -= qty
+            return False
+
+    def mod(self, graph, key, qty):
+        """Change the count for self[graph][key] by qty."""
+        if qty > 0:
+            return self.inc(graph, key, qty)
+        elif qty < 0:
+            return self.dec(graph, key, -qty)
+        else:
+            raise ValueError('qty cannot be 0')  # pragma: no cover
+
+    def _on_add_edge(self, event, node, key, inp):
+        self._on_mod_edge(event, node, key, inp, 1)
+
+    def _on_drop_edge(self, event, node, key, inp):
+        self._on_mod_edge(event, node, key, inp, -1)
+
+
+class ConstantsStatistic(CounterStatistic):
+    """Implements `GraphManager.constants`."""
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        if is_constant(inp):
+            self.mod(node.graph, inp, direction)
+
+
+class GraphConstantsStatistic(CounterStatistic):
+    """Implements `GraphManager.graph_constants`."""
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        if is_constant_graph(inp):
+            self.mod(inp.value, inp, direction)
+
+
+class FVDirectStatistic(CounterStatistic):
+    """Implements `GraphManager.free_variables_direct`."""
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        g1 = node.graph
+        g2 = inp.graph
+        if g1 and g2 and g1 is not g2:
+            self.mod(g1, inp, direction)
+
+
+class GDepDirectStatistic(CounterStatistic):
+    """Implements `GraphManager.graph_dependencies_direct`."""
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        g1 = node.graph
+        g2 = inp.graph
+        if g1 and g2 and g1 is not g2:
+            self.mod(g1, g2, direction)
+
+
+class GDepProxStatistic(CounterStatistic):
+    """Implements `GraphManager.graph_dependencies_prox`."""
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        g1 = node.graph
+
+        if is_constant_graph(inp):
+            ig = inp.value
+            if self.mod(g1, ParentProxy(ig), direction):
+                self.manager.events.invalidate_nesting()
+
+        g2 = inp.graph
+        if g1 and g2 and g1 is not g2:
+            if self.mod(g1, g2, direction):
+                self.manager.events.invalidate_nesting()
+
+
+class GraphsUsedStatistic(CounterStatistic):
+    """Implements `GraphManager.graphs_used`."""
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        if is_constant_graph(inp):
+            self.mod(node.graph, inp.value, direction)
+
+
+class GraphUsersStatistic(CounterStatistic):
+    """Implements `GraphManager.graph_users`."""
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        if is_constant_graph(inp):
+            self.mod(inp.value, node.graph, direction)
+
+
+class NestingStatistic(PerGraphStatistic):
+    """Represents a statistic about nesting.
+
+    These statistics become invalid when the `invalidate_nesting` event
+    is fired.
+    """
+
+    def __init__(self, manager):
+        """Initialize a NestingStatistic."""
+        super().__init__(manager)
+        evts = self.manager.events
+        evts.invalidate_nesting.register(self._on_invalidate_nesting)
+        self.valid = False
+
+    def reset(self):
+        """Reset this graph's information.
+
+        This makes the statistic invalid, so it must be recomputed.
+        """
+        super().reset()
+        self.valid = False
+
+    def _on_invalidate_nesting(self, event):
+        self.reset()
+
+    def _on_add_graph(self, event, graph):
+        self.reset()
+
+    def _on_drop_graph(self, event, graph):
+        self.reset()
+
+    def recompute(self):
+        """Recompute the information from scratch."""
+        self._recompute()
+        self.valid = True
+
+    def _recompute(self):
+        raise NotImplementedError()
+
+
+class GDepTotalStatistic(NestingStatistic):
+    """Implements `GraphManager.graph_dependencies_total`."""
+
+    def _recompute(self):
+        all_deps = self.manager.graph_dependencies_prox
+
+        def seek_parents(g, path=None):
+            if path is None:
+                path = set()
+            if g in path:
+                return set()
+            deps = all_deps[g]
+            parents = set()
+            for dep in deps:
+                if isinstance(dep, ParentProxy):
+                    parents |= seek_parents(dep.graph, path | {g})
+                else:
+                    parents.add(dep)
+            return parents - {g}
+
+        for g in list(all_deps.keys()):
+            self[g] = seek_parents(g)
+
+
+class ParentStatistic(NestingStatistic):
+    """Implements `GraphManager.parents`."""
+
+    def _recompute(self):
+        for g in self.manager.graphs:
+            self[g] = None
+
+        all_deps = self.manager.graph_dependencies_total
+        todo = [(g, set(deps)) for g, deps in all_deps.items()]
+        todo.sort(key=lambda xy: len(xy[1]))
+
+        while todo:
+            next_todo = []
+            for g, deps in todo:
+                if len(deps) > 1:
+                    rm = set()
+                    for dep in deps:
+                        parent = self[dep]
+                        while parent:
+                            rm.add(parent)
+                            parent = self[parent]
+                    deps -= rm
+                if len(deps) == 0:
+                    self[g] = None
+                elif len(deps) == 1:
+                    self[g] = deps.pop()
+                else:
+                    next_todo.append((g, deps))
+            todo = next_todo
+
+
+class ChildrenStatistic(NestingStatistic):
+    """Implements `GraphManager.children`."""
+
+    def _recompute(self):
+        parents = self.manager.parents
+        for g in self.manager.graphs:
+            self[g] = set()
+        for g, parent in parents.items():
+            if parent is not None:
+                self[parent].add(g)
+
+
+class ScopeStatistic(NestingStatistic):
+    """Implements `GraphManager.scopes`."""
+
+    def _recompute(self):
+        parents = self.manager.parents
+        for g in self.manager.graphs:
+            self[g] = set()
+        for g in self.manager.graphs:
+            p = g
+            while p:
+                self[p].add(g)
+                p = parents[p]
+
+
+class FVTotalStatistic(NestingStatistic, CounterStatistic):
+    """Implements `GraphManager.free_variables_total`."""
+
+    def _recompute(self):
+        mng = self.manager
+
+        for g in mng.graphs:
+            self[g] = {}
+
+        for g in mng.graphs:
+            for node, count in mng.free_variables_direct[g].items():
+                curr = g
+                while curr:
+                    self.mod(curr, node, count)
+                    curr = mng.parents[curr]
+                    if node in mng.nodes[curr]:
+                        break
+
+            for g2, count in mng.graphs_used[g].items():
+                p = mng.parents[g2]
+                if p is None:
+                    continue
+                curr = g
+                while curr is not p:
+                    self.mod(curr, g2, count)
+                    curr = mng.parents[curr]
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        if not self.valid:
+            return
+
+        g1 = node.graph
+
+        def _update(stop_graph, fv):
+            curr = g1
+            while curr and curr is not stop_graph:
+                self.mod(curr, fv, direction)
+                curr = self.manager.parents[curr]
+
+        if is_constant_graph(inp):
+            ig = inp.value
+            if self.manager._parents.valid:
+                p = self.manager._parents[ig]
+                if p:
+                    _update(p, ig)
+
+        g2 = inp.graph
+        if g1 and g2 and g1 is not g2:
+            _update(g2, inp)
 
 
 class GraphManager:
@@ -47,6 +406,14 @@ class GraphManager:
             to directly. Nested graphs are not taken into account, but
             they are in `free_variables_total`.
 
+        graphs_used:
+            Map each graph to the set of graphs it uses. For each graph,
+            this is the set of graphs that it refers to directly.
+
+        graph_users:
+            Map each graph to the set of graphs that use it. For each graph,
+            this is the set of graphs that refer to it directly.
+
         graph_dependencies_direct:
             Map each graph to the graphs it gets free variables from.
 
@@ -70,66 +437,45 @@ class GraphManager:
 
         Recompute everything from the roots.
         """
+        self.events = Events(
+            add_node=None,
+            drop_node=None,
+            add_graph=None,
+            drop_graph=None,
+            add_edge=None,
+            drop_edge=None,
+            invalidate_nesting=None,
+        )
         roots = set(self.roots) if self.roots else set()
         self.roots = set()
         self.graphs = set()
         self.all_nodes = set()
-        self.nodes = defaultdict(set)
         self.uses = defaultdict(set)
-        self.free_variables_direct = defaultdict(Counter)
-        self.graph_constants = defaultdict(Counter)
-        self._usegraph = UseGraph()
-        self.graph_dependencies_direct = defaultdict(Counter)
-        self.graph_dependencies_prox = defaultdict(Counter)
-        self.invalidate_nesting()
+
+        self.nodes = NodesStatistic(self)
+        self.constants = ConstantsStatistic(self)
+        self.free_variables_direct = FVDirectStatistic(self)
+        self.graph_constants = GraphConstantsStatistic(self)
+        self.graphs_used = GraphsUsedStatistic(self)
+        self.graph_users = GraphUsersStatistic(self)
+        self.graph_dependencies_direct = GDepDirectStatistic(self)
+        self.graph_dependencies_prox = GDepProxStatistic(self)
+
+        self._graph_dependencies_total = GDepTotalStatistic(self)
+        self._parents = ParentStatistic(self)
+        self._children = ChildrenStatistic(self)
+        self._scopes = ScopeStatistic(self)
+        self._free_variables_total = FVTotalStatistic(self)
+
         for root in roots:
             self.add_graph(root, root=True)
 
-    def invalidate_nesting(self):
-        """Invalidate current nesting information.
-
-        The following properties are invalidated and will be recomputed the
-        next time they are requested:
-
-        * free_variables_total
-        * graph_dependencies_total
-        * parents
-        * children
-        * scopes
-        """
-        self._graph_dependencies_total = None
-        self._parents = None
-        self._children = None
-        self._scopes = None
-        self._free_variables_total = None
-
-    def clean(self):
-        """Clean up properties that rely on counters.
-
-        Some properties exported by GraphManager map graphs to a map of nodes
-        to counters. This removes all mappings that map to a count of zero so
-        that every node in the set of keys is guaranteed to have a positive
-        count.
-
-        This is already called automatically after commit, so there should
-        normally be no need to call this method.
-        """
-        to_clean = [
-            self.free_variables_direct,
-            self._usegraph.uses,
-            self._usegraph.users,
-            self.graph_constants,
-            self.graph_dependencies_direct,
-            self.graph_dependencies_prox,
-            self._free_variables_total
-        ]
-        for d in to_clean:
-            for v in (d or {}).values():
-                v._keep_positive()
-
     def add_graph(self, graph, root=False):
         """Add a graph to this manager, optionally as a root graph."""
+        if graph in self.graphs:
+            return
         self._ensure_graph(graph)
+        self.events.add_graph(graph)
         if root:
             self.roots.add(graph)
         self._acquire_nodes({graph.return_})
@@ -141,16 +487,6 @@ class GraphManager:
         graph._manager = self
         self.graphs.add(graph)
 
-    def _update_counter(self, counters, key, direction):
-        """Update a counter in the given direction (1 or -1).
-
-        If the counter changes from or to zero, nesting data is invalidated.
-        """
-        count = counters[key]
-        counters[key] += direction
-        if (count == 0) != (counters[key] == 0):
-            self.invalidate_nesting()
-
     def _process_edge(self, node, key, inp, direction):
         """Add/remove an edge between two nodes.
 
@@ -159,46 +495,17 @@ class GraphManager:
                 * 1 if the edge is added.
                 * -1 if the edge is removed.
         """
-        g = node.graph
+        if inp.graph is not None:
+            self.add_graph(inp.graph)
+        if is_constant_graph(inp):
+            self.add_graph(inp.value)
 
         if direction == -1:
             self.uses[inp].remove((node, key))
+            self.events.drop_edge(node, key, inp)
         else:
             self.uses[inp].add((node, key))
-
-        def _update_fvtotal(stop_graph, fv):
-            tot = self._free_variables_total
-            if tot is not None:
-                curr = g
-                while curr and curr is not stop_graph:
-                    tot[curr][fv] += direction
-                    curr = self.parents.get(curr, None)
-
-        if is_constant_graph(inp):
-            ig = inp.value
-            self._ensure_graph(ig)
-            self.graph_constants[ig][inp] += direction
-            self._usegraph.update(g, ig, direction)
-            self._update_counter(
-                self.graph_dependencies_prox[g],
-                ParentProxy(ig),
-                direction
-            )
-            if self._parents is not None:
-                p = self._parents.get(ig, None)
-                if p:
-                    _update_fvtotal(p, ig)
-
-        elif inp.graph and inp.graph is not g:
-            self._ensure_graph(inp.graph)
-            self.free_variables_direct[g][inp] += direction
-            self.graph_dependencies_direct[g][inp.graph] += direction
-            self._update_counter(
-                self.graph_dependencies_prox[g],
-                inp.graph,
-                direction
-            )
-            _update_fvtotal(inp.graph, inp)
+            self.events.add_edge(node, key, inp)
 
     def _process_inputs(self, node, direction):
         """Process the inputs of a newly [dis]connected node.
@@ -227,7 +534,9 @@ class GraphManager:
 
         for node in acq:
             g = node.graph
-            self.nodes[g].add(node)
+            if g is not None:
+                self.add_graph(g)
+            self.events.add_node(node)
             self._process_inputs(node, 1)
 
     def _maybe_drop_nodes(self, nodes):
@@ -236,33 +545,23 @@ class GraphManager:
 
         while nodes:
             node = nodes.pop()
-            g = node.graph
             assert node in self.all_nodes
             uses = self.uses[node]
-            if uses or (node.graph and node is node.graph.return_):
+            if uses or (node.graph
+                        and node.graph in self.graphs
+                        and node is node.graph.return_):
                 # This node is still live
                 continue  # pragma: no cover
 
             self.all_nodes.remove(node)
-            self.nodes[g].remove(node)
+            self.events.drop_node(node)
             self._process_inputs(node, -1)
             nodes.update(node.inputs)
 
-    @property
-    def graphs_used(self):
-        """Map each graph to the set of graphs it uses.
-
-        For each graph, this is the set of graphs that it refers to directly.
-        """
-        return self._usegraph.uses
-
-    @property
-    def graph_users(self):
-        """Map each graph to the set of graphs that use it.
-
-        For each graph, this is the set of graphs that refer to it directly.
-        """
-        return self._usegraph.users
+    def _ensure_statistic(self, stat):
+        if not stat.valid:
+            stat.recompute()
+        return stat
 
     @property
     def graph_dependencies_total(self):
@@ -272,31 +571,7 @@ class GraphManager:
         includes the graphs from which nested graphs need free
         variables.
         """
-        if self._graph_dependencies_total is not None:
-            return self._graph_dependencies_total
-
-        all_deps = self.graph_dependencies_prox
-
-        def seek_parents(g, path=None):
-            if path is None:
-                path = set()
-            if g in path:
-                return set()
-            deps = all_deps[g]
-            parents = set()
-            for dep in deps:
-                if isinstance(dep, ParentProxy):
-                    parents |= seek_parents(dep.graph, path | {g})
-                else:
-                    parents.add(dep)
-            return parents - {g}
-
-        new_deps = defaultdict(set)
-        for g in list(all_deps.keys()):
-            new_deps[g] = seek_parents(g)
-
-        self._graph_dependencies_total = new_deps
-        return new_deps
+        return self._ensure_statistic(self._graph_dependencies_total)
 
     @property
     def parents(self):
@@ -305,36 +580,7 @@ class GraphManager:
         Top-level graphs are associated to `None` in the returned
         dictionary.
         """
-        if self._parents is not None:
-            return self._parents
-
-        all_deps = self.graph_dependencies_total
-        todo = [(g, set(deps)) for g, deps in all_deps.items()]
-        todo.sort(key=lambda xy: len(xy[1]))
-
-        parents = {}
-
-        while todo:
-            next_todo = []
-            for g, deps in todo:
-                if len(deps) > 1:
-                    rm = set()
-                    for dep in deps:
-                        parent = parents.get(dep, None)
-                        while parent:
-                            rm.add(parent)
-                            parent = parents.get(parent, None)
-                    deps -= rm
-                if len(deps) == 0:
-                    parents[g] = None
-                elif len(deps) == 1:
-                    parents[g] = deps.pop()
-                else:
-                    next_todo.append((g, deps))
-            todo = next_todo
-
-        self._parents = parents
-        return parents
+        return self._ensure_statistic(self._parents)
 
     @property
     def children(self):
@@ -342,16 +588,7 @@ class GraphManager:
 
         This is the inverse map of `parents`.
         """
-        if self._children is not None:
-            return self._children
-
-        children = defaultdict(set)
-        for g, parent in self.parents.items():
-            if parent:
-                children[parent].add(g)
-
-        self._children = children
-        return children
+        return self._ensure_statistic(self._children)
 
     @property
     def scopes(self):
@@ -359,18 +596,7 @@ class GraphManager:
 
         The set associated to a graph includes the graph.
         """
-        if self._scopes is not None:
-            return self._scopes
-
-        scopes = defaultdict(set)
-        for g in self.graphs:
-            p = g
-            while p:
-                scopes[p].add(g)
-                p = self.parents.get(p, None)
-
-        self._scopes = scopes
-        return scopes
+        return self._ensure_statistic(self._scopes)
 
     @property
     def free_variables_total(self):
@@ -380,30 +606,7 @@ class GraphManager:
         variables needed by children graphs. Furthermore, graph Constants may
         figure as free variables.
         """
-        if self._free_variables_total is not None:
-            return self._free_variables_total
-
-        total = defaultdict(Counter)
-        for g in self.graphs:
-            for node, count in self.free_variables_direct[g].items():
-                curr = g
-                while curr:
-                    total[curr][node] += count
-                    curr = self.parents[curr]
-                    if node in self.nodes[curr]:
-                        break
-
-            for g2, count in self.graphs_used[g].items():
-                p = self.parents.get(g2, None)
-                if p is None:
-                    continue
-                curr = g
-                while curr is not p:
-                    total[curr][g2] += count
-                    curr = self.parents[curr]
-
-        self._free_variables_total = total
-        return total
+        return self._ensure_statistic(self._free_variables_total)
 
     def push_replace(self, old_node, new_node):
         """Declare replacement of old_node by new_node.
@@ -456,24 +659,3 @@ class GraphManager:
             self._process_edge(root_node, key, old_node, -1)
 
         self._maybe_drop_nodes(rms - adds)
-        self.clean()
-
-
-class UseGraph:
-    """Hold graph uses and users."""
-
-    def __init__(self):
-        """Initialize UseGraph."""
-        self.uses = defaultdict(Counter)
-        self.users = defaultdict(Counter)
-
-    def update(self, user, usee, direction):
-        """Update relationship between user and uses.
-
-        Args:
-            direction:
-                * 1: Add an occurrence of user using usee
-                * -1: Remove an occurrence of user using usee
-        """
-        self.uses[user][usee] += direction
-        self.users[usee][user] += direction
