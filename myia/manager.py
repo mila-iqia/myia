@@ -490,17 +490,27 @@ class GraphManager:
         graph._manager = self
         self.graphs.add(graph)
 
-    def _maybe_drop_graph(self, graph):
-        if graph in self.roots:
-            return
+    def _maybe_drop_graphs(self, graphs):
+        todo = set(graphs)
+        dropped = set()
 
-        users = self.graph_users[graph]
-        if users:
-            return
+        while todo:
+            graph = todo.pop()
 
-        self._maybe_drop_nodes({graph.return_})
-        self.events.drop_graph(graph)
-        self.graphs.remove(graph)
+            if graph in self.roots:
+                continue
+
+            users = self.graph_users[graph]
+            if users:
+                continue
+
+            dropped.add(graph)
+
+            todo |= self._maybe_drop_nodes({graph.return_})
+
+        for g in dropped:
+            self.events.drop_graph(g)
+            self.graphs.remove(g)
 
     def _process_edge(self, node, key, inp, direction):
         """Add/remove an edge between two nodes.
@@ -510,15 +520,19 @@ class GraphManager:
                 * 1 if the edge is added.
                 * -1 if the edge is removed.
         """
-        if inp.graph is not None:
-            self.add_graph(inp.graph)
-        if is_constant_graph(inp):
-            self.add_graph(inp.value)
 
         if direction == -1:
+            if (node, key) not in self.uses[inp]:
+                # It's possible that we already got here when we
+                # dropped a graph.
+                return
             self.uses[inp].remove((node, key))
             self.events.drop_edge(node, key, inp)
         else:
+            if inp.graph is not None:
+                self.add_graph(inp.graph)
+            if is_constant_graph(inp):
+                self.add_graph(inp.value)
             self.uses[inp].add((node, key))
             self.events.add_edge(node, key, inp)
 
@@ -558,21 +572,28 @@ class GraphManager:
         """Check if the nodes are connected to a graph, drop them if not."""
         nodes = set(nodes)
 
+        # Set of graphs to check if we want to drop them or not
+        graphs_to_check = set()
+
         while nodes:
             node = nodes.pop()
-            assert node in self.all_nodes
+            if node not in self.all_nodes:
+                # Already dropped
+                continue
             uses = self.uses[node]
             if uses:
                 # This node is still live
                 continue
 
             if is_constant_graph(node):
-                self._maybe_drop_graph(node.value)
+                graphs_to_check.add(node.value)
 
+            self._process_inputs(node, -1)
             self.all_nodes.remove(node)
             self.events.drop_node(node)
-            self._process_inputs(node, -1)
             nodes.update(node.inputs)
+
+        return graphs_to_check
 
     def _ensure_statistic(self, stat):
         if not stat.valid:
@@ -674,7 +695,9 @@ class GraphManager:
         for root_node, key, old_node in rmedges - addedges:
             self._process_edge(root_node, key, old_node, -1)
 
-        self._maybe_drop_nodes(rms - adds)
+        maybe_drop_graphs = self._maybe_drop_nodes(rms - adds)
+
+        self._maybe_drop_graphs(maybe_drop_graphs)
 
 
 class GraphCloner:
