@@ -88,3 +88,11 @@ node.error {
     border-width: 2px;
     border-color: red;
 }
+
+node.special-VarNode, node.special-SVar {
+    background-color: white;
+    color: black;
+    border-style: dashed;
+    border-width: 1px;
+    border-color: blue;
+}

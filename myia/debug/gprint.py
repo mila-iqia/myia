@@ -6,6 +6,7 @@ import os
 from hrepr import hrepr
 
 from ..cconv import NestingAnalyzer, ParentProxy
+from ..manager import ParentProxy as PProx
 from ..dtype import Type, Bool, Int, Float, Tuple, List, Function
 from ..infer import Reference, Context
 from ..info import DebugInfo, About
@@ -554,6 +555,19 @@ class _Apply:
                 return hrepr(self.inputs[1])['node-return']
         else:
             return super(Apply, self).__hrepr__(H, hrepr)
+
+
+@mixin(PProx)
+class _ParentProxy:
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        """Require the cytoscape plugin for buche."""
+        return H.style(mcss)
+
+    def __hrepr__(self, H, hrepr):
+        class_name = 'constant'
+        label = 'Prox:' + short_labeler.label(self.graph, True)
+        return H.span['node', f'node-{class_name}'](label)
 
 
 ########
