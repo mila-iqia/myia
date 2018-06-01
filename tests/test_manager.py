@@ -641,13 +641,26 @@ def test_weak_manager():
     def f(x, y):
         return x * y
 
-    GraphManager(f, manage=False)
-    GraphManager(f, manage=False)
+    mng1 = GraphManager(f, manage=False)
     assert f._manager is None
-    mng1 = GraphManager(f, manage=True)
-    assert f._manager is mng1
-    mng2 = GraphManager(f, manage=False)
-    assert f._manager is mng1
+    with pytest.raises(Exception):
+        mng1.commit()
+    mng2 = GraphManager(f, manage=True)
+    assert f._manager is mng2
+    GraphManager(f, manage=False)
+    assert f._manager is mng2
+
+
+def test_drop_root():
+
+    @parse
+    def f(x, y):
+        return x * y
+
+    mng = GraphManager(f)
+    assert f in mng.nodes
+    mng._maybe_drop_graphs({f})
+    assert f in mng.nodes
 
 
 def test_graph_properties():

@@ -227,6 +227,6 @@ def test_clone_without_forcing_manager():
     def f(x, y):
         return x * y
 
-    f1 = clone(f)
-    f2 = clone(f)
+    clone(f)
+    clone(f)
     GraphManager(f)

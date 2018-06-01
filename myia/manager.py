@@ -527,7 +527,6 @@ class GraphManager:
                 * 1 if the edge is added.
                 * -1 if the edge is removed.
         """
-
         if direction == -1:
             if (node, key) not in self.uses[inp]:
                 # It's possible that we already got here when we
@@ -584,9 +583,9 @@ class GraphManager:
 
         while nodes:
             node = nodes.pop()
-            if node not in self.all_nodes:
-                # Already dropped
-                continue
+            # NOTE: If this assertion fails, just replace this with a test
+            # with a continue
+            assert node in self.all_nodes
             uses = self.uses[node]
             if uses:
                 # This node is still live
