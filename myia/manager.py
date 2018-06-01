@@ -857,3 +857,12 @@ class GraphCloner:
         """Get the clone of the given graph or node."""
         self.run()
         return self.repl.get(x, x)
+
+
+def clone(g,
+          total=False,
+          relation='copy',
+          clone_constants=False,
+          graph_relation=None):
+    """Return a clone of g."""
+    return GraphCloner(g)[g]
