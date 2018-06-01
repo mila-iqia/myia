@@ -10,18 +10,23 @@ from .graph_utils import dfs, FOLLOW, EXCLUDE
 from .utils import Events
 
 
-def manage(*graphs):
+def manage(*graphs, weak=False):
     """Ensure that all given graphs have a manager and return it.
 
     * If one or more graphs has a manager, that manager will be used.
     * If two graphs have different managers, an error will be raised.
     * If no graph has a manager, one will be created.
+
+    Args:
+        graphs: The graphs to manage.
+        weak: If True, when creating a new manager, graphs will not
+            be forcefully associated with it. (Defaults to False.)
     """
     manager = None
     for graph in graphs:
         manager = graph._manager
     if manager is None:
-        manager = GraphManager()
+        manager = GraphManager(manage=not weak)
     for graph in graphs:
         manager.add_graph(graph, root=True)
     return manager
@@ -428,10 +433,11 @@ class GraphManager:
 
     """
 
-    def __init__(self, *roots):
+    def __init__(self, *roots, manage=True):
         """Initialize the GraphManager."""
         self._changes = []
         self.roots = roots
+        self.manage = manage
         self.reset()
 
     def reset(self):
@@ -485,9 +491,10 @@ class GraphManager:
 
     def _ensure_graph(self, graph):
         """Ensure that the graph is managed by this manager."""
-        if graph._manager and graph._manager is not self:
-            raise Exception('A graph can only have one manager.')
-        graph._manager = self
+        if self.manage:
+            if graph._manager and graph._manager is not self:
+                raise Exception('A graph can only have one manager.')
+            graph._manager = self
         self.graphs.add(graph)
 
     def _maybe_drop_graphs(self, graphs):
@@ -671,6 +678,9 @@ class GraphManager:
 
         This modifies the graph and update attributes and properties.
         """
+        if not self.manage:
+            raise Exception('Cannot modify graph through this manager')
+
         changes, self._changes = self._changes, []
 
         addedges = Counter()
@@ -766,6 +776,8 @@ class GraphCloner:
         self.todo.append((graph, target_graph, new_params))
 
     def _process_graph(self, graph, target_graph, new_params):
+        mng = self.manager
+
         inline = target_graph is not None
 
         status = self.status.get(graph, None)
@@ -791,7 +803,7 @@ class GraphCloner:
                     self.repl[p] = p2
             self.repl[graph] = target_graph
 
-        for node in graph.nodes:
+        for node in mng.nodes[graph]:
             if node in self.repl:
                 continue
             with About(node.debug, self.relation):
@@ -801,20 +813,23 @@ class GraphCloner:
 
         if not inline:
             target_graph.return_ = self.repl[graph.return_]
-            for ct in graph.manager.graph_constants[graph]:
+            for ct in mng.graph_constants[graph]:
                 with About(ct.debug, self.relation):
                     self.repl[ct] = Constant(target_graph)
 
         if self.clone_constants:
-            for ct in graph.constants:
+            for ct in mng.constants[graph]:
                 if ct not in self.repl:
                     self.repl[ct] = Constant(ct.value)
 
         self.status[graph] = inline
 
-        self.todo += [(g, None, None) for g in graph.scope if g is not graph]
+        self.todo += [(g, None, None)
+                      for g in mng.scopes[graph]
+                      if g is not graph]
         if self.total:
-            self.todo += [(g, None, None) for g in graph.graphs_used]
+            self.todo += [(g, None, None)
+                          for g in mng.graphs_used[graph]]
 
     def run(self):
         """Clone everything still to be cloned.
@@ -827,7 +842,7 @@ class GraphCloner:
         if not todo:
             return
 
-        manage(*[g for g, _, _ in todo])
+        self.manager = manage(*[g for g, _, _ in todo], weak=True)
 
         while todo:
             item = todo.pop()

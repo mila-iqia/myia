@@ -5,7 +5,7 @@ from myia.api import parse
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs
 from myia.ir import Constant, Graph, is_constant, succ_deeper, succ_incoming
-from myia.manager import GraphCloner
+from myia.manager import GraphManager, GraphCloner
 from myia.prim import ops as P
 
 
@@ -220,3 +220,13 @@ def test_clone_unused_parameters():
         assert p1.graph is f
         assert p2.graph is f2
         assert cl[p1] is p2
+
+
+def test_clone_without_forcing_manager():
+    @parse
+    def f(x, y):
+        return x * y
+
+    f1 = GraphCloner(f)[f]
+    f2 = GraphCloner(f)[f]
+    GraphManager(f)

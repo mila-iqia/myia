@@ -5,8 +5,8 @@ from collections import Counter
 
 from myia.api import parse
 from myia.debug.label import short_labeler
-from myia.ir import is_constant, GraphCloner
-from myia.manager import GraphManager
+from myia.ir import is_constant
+from myia.manager import GraphManager, GraphCloner
 from myia.prim import Primitive
 
 
@@ -628,10 +628,26 @@ def test_manager_exclusivity():
     def f(x):
         return x * x
 
-    GraphManager(f)
+    mng = GraphManager(f)
+    assert f._manager is mng
 
     with pytest.raises(Exception):
         GraphManager(f)
+
+
+def test_weak_manager():
+
+    @parse
+    def f(x, y):
+        return x * y
+
+    GraphManager(f, manage=False)
+    GraphManager(f, manage=False)
+    assert f._manager is None
+    mng1 = GraphManager(f, manage=True)
+    assert f._manager is mng1
+    mng2 = GraphManager(f, manage=False)
+    assert f._manager is mng1
 
 
 def test_graph_properties():
