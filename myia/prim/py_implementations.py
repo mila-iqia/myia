@@ -230,7 +230,7 @@ def map_array(fn, array):
 @vm_register(primops.map_array)
 def _map_array_vm(vm, fn, array):
     def fn_(x):
-        return vm.call(fn, x)
+        return vm.call(fn, (x,))
     return map_array(fn_, array)
 
 
