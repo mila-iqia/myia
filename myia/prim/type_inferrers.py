@@ -3,9 +3,9 @@
 
 from functools import partial
 
-from ..dtype import Int, Bool, Float, Tuple, List, Type
+from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number
 from ..infer import ANYTHING, Inferrer, GraphInferrer, \
-    MyiaTypeError, register_inferrer, Track, VirtualReference
+    MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
 
 from . import ops as P
@@ -86,6 +86,8 @@ async def infer_type_if(engine, cond, tb, fb):
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
         return await engine.assert_same('type', tb_inf(), fb_inf())
+    else:
+        raise AssertionError("Invalid condition value for if")
 
 
 @type_inferrer(P.cons_tuple, nargs=2)
@@ -199,6 +201,75 @@ async def infer_type_arith_bin(engine, x, y):
     return t
 
 
+@type_inferrer(P.shape, nargs=1)
+async def infer_type_shape(engine, ary):
+    """Infer the return type of shape."""
+    shp = await ary['shape']
+    return Tuple([UInt(64)]*len(shp))
+
+
+@type_inferrer(P.map_array, nargs=2)
+async def infer_type_map_array(engine, fn, ary):
+    """Infer the return type of map_array."""
+    fn_t = await fn['type']
+    ary_t = await ary['type']
+    if not isinstance(ary_t, Array):
+        raise MyiaTypeError('Expected array')
+    xref = engine.vref({'type': ary_t.elements})
+    return Array(await fn_t(xref))
+
+
+@type_inferrer(P.scan_array, P.reduce_array, nargs=4)
+async def infer_type_across_array(engine, fn, init, ary, ax):
+    """Infer the return type of scan/reduce_array."""
+    fn_t = await fn['type']
+    ary_t = await ary['type']
+    init_t = await init['type']
+    ax_t = await ax['type']
+    if not isinstance(ary_t, Array):
+        raise MyiaTypeError('Expected array')
+    if not ary_t.elements == init_t:
+        raise MyiaTypeError("Initial value must have the same type "
+                            "as array elements")
+    if not ax_t == UInt(64):
+        raise MyiaTypeError("Axis must be u64")
+    xref = engine.vref({'type': ary_t.elements})
+    xref2 = engine.vref({'type': ary_t.elements})
+    return Array(await fn_t(xref, xref2))
+
+
+@type_inferrer(P.distribute, nargs=2)
+async def infer_type_distribute(engine, v, shp):
+    """Infer the return type of distribute."""
+    v_t = await v['type']
+    if isinstance(v_t, Array):
+        v_t = v_t.elements
+    elif not isinstance(v_t, (Number, Bool)):
+        raise MyiaTypeError("Array elements must be numbers or bool")
+    shp_t = await shp['type']
+    if (not isinstance(shp_t, Tuple) or
+            not all(e == UInt(64) for e in shp_t.elements)):
+        raise MyiaTypeError("Shape must be (u64, ...)")
+    return Array(v_t)
+
+
+@type_inferrer(P.reshape, nargs=2)
+async def infer_type_reshape(engine, v, shape):
+    """Infer the return type of reshape."""
+    shp_t = await shape['type']
+    if (not isinstance(shp_t, Tuple) or
+            not all(e == UInt(64) for e in shp_t.elements)):
+        raise MyiaTypeError("Shape must be (u64, ...)")
+    return await v['type']
+
+
+@type_inferrer(P.dot, nargs=2)
+async def infer_type_dot(engine, a, b):
+    """Infer the return type of dot."""
+    t = await engine.assert_same('type', a, b)
+    return t
+
+
 @type_inferrer(P.return_, nargs=1)
 async def infer_type_return_(engine, x):
     """Infer the return type of return_."""
@@ -208,10 +279,10 @@ async def infer_type_return_(engine, x):
 @type_inferrer(P.maplist, nargs=2)
 async def infer_type_maplist(engine, f, xs):
     """Infer the return type of maplist."""
-    f_t = await engine.get('type', f)
-    xs_t = await engine.get('type', xs)
+    f_t = await f['type']
+    xs_t = await xs['type']
     if not isinstance(xs_t, List):
         raise MyiaTypeError('Expect list for maplist')
-    xref = VirtualReference(value=ANYTHING, type=xs_t.element_type)
+    xref = engine.vref(dict(type=xs_t.element_type))
     ret_t = await f_t(xref)
     return List(ret_t)

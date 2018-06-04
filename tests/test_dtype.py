@@ -1,7 +1,7 @@
 import pytest
 
 from myia.dtype import Bool, Float, Function, Int, List, Number, Struct, \
-    Tuple, Type, TypeMeta, UInt
+    Tuple, Type, TypeMeta, UInt, np_dtype_to_type, type_to_np_dtype
 
 
 def test_TypeMeta():
@@ -80,3 +80,15 @@ def test_Function():
 def test_repr():
     t = UInt(16)
     assert repr(t) == 'UInt(16)'
+
+
+def test_type_conversions():
+    assert np_dtype_to_type('float32') is Float(32)
+
+    with pytest.raises(TypeError):
+        np_dtype_to_type('float80')
+
+    assert type_to_np_dtype(Float(16)) == 'float16'
+
+    with pytest.raises(TypeError):
+        type_to_np_dtype(List(Int(64)))

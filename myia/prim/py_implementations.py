@@ -1,8 +1,8 @@
 """Implementations for the debug VM."""
 
-
 from copy import copy
 from typing import Callable
+import numpy as np
 
 from .. import dtype as types
 from ..utils import Registry
@@ -208,6 +208,89 @@ def setattr(data, attr, value):
     data2 = copy(data)
     py_setattr(data2, attr, value)
     return data2
+
+
+@register(primops.shape)
+def shape(array):
+    """Implement `shape`."""
+    return array.shape
+
+
+@py_register(primops.map_array)
+def map_array(fn, array):
+    """Implement `map_array`."""
+    def f(ary):
+        it = np.nditer([ary, None])
+        for x, y in it:
+            y[...] = fn(x)
+        return it.operands[1]
+    return np.apply_along_axis(f, 0, array)
+
+
+@vm_register(primops.map_array)
+def _map_array_vm(vm, fn, array):
+    def fn_(x):
+        return vm.call(fn, (x,))
+    return map_array(fn_, array)
+
+
+@py_register(primops.scan_array)
+def scan_array(fn, init, array, axis):
+    """Implement `scan_array`."""
+    # This is inclusive scan because it's easier to implement
+    # We will have to discuss what semantics we want later
+    def f(ary):
+        val = init
+        it = np.nditer([ary, None])
+        for x, y in it:
+            val = fn(val, x)
+            y[...] = val
+        return it.operands[1]
+    return np.apply_along_axis(f, axis, array)
+
+
+@vm_register(primops.scan_array)
+def _scan_array_vm(vm, fn, init, array, axis):
+    def fn_(a, b):
+        return vm.call(fn, [a, b])
+    return scan_array(fn_, init, array, axis)
+
+
+@py_register(primops.reduce_array)
+def reduce_array(fn, init, array, axis):
+    """Implement `reduce_array`."""
+    def f(ary):
+        val = init
+        it = np.nditer([ary])
+        for x in it:
+            val = fn(val, x)
+        return val
+    return np.apply_along_axis(f, axis, array)
+
+
+@vm_register(primops.reduce_array)
+def _reduce_array_vm(vm, fn, init, array, axis):
+    def fn_(a, b):
+        return vm.call(fn, [a, b])
+    return reduce_array(fn_, init, array, axis)
+
+
+@register(primops.distribute)
+def distribute(v, shape):
+    """Implement `distribute`."""
+    return np.broadcast_to(v, shape)
+
+
+@register(primops.reshape)
+def reshape(v, shape):
+    """Implement `reshape`."""
+    return np.reshape(v, shape)
+
+
+@register(primops.dot)
+def dot(a, b):
+    """Implement `dot`."""
+    return np.dot(a, b)
 
 
 @register(primops.return_)

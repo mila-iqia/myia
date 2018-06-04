@@ -1,10 +1,12 @@
 import pytest
 
 from types import SimpleNamespace
+import numpy as np
 
 from myia.dtype import Int, Float, List, Tuple
 from myia.prim.py_implementations import head, setattr as myia_setattr, \
-    setitem as myia_setitem, tail, hastype, typeof
+    setitem as myia_setitem, tail, hastype, typeof, \
+    shape, reshape, map_array, scan_array, reduce_array, distribute, dot
 
 from ..test_lang import parse_compare
 
@@ -144,3 +146,64 @@ def test_prim_istype():
         hastype([1, 2, 3.4], List)
     with pytest.raises(TypeError):
         hastype(object(), i64)
+
+
+def test_prim_shape():
+    v = np.empty((2, 3))
+    assert shape(v) == (2, 3)
+
+
+def test_prim_map_array():
+    v = np.zeros((2, 3))
+
+    def f(a):
+        return a + 1
+
+    v2 = map_array(f, v)
+
+    assert (v == 0).all()
+    assert (v2 == 1).all()
+
+
+def test_prim_scan_array():
+    v = np.ones((2, 3))
+
+    def f(a, b):
+        return a + b
+
+    vref = np.cumsum(v, axis=1)
+    v2 = scan_array(f, 0, v, 1)
+
+    assert (v == 1).all()
+    assert (v2 == vref).all()
+
+
+def test_prim_reduce_array():
+    v = np.ones((2, 3))
+
+    def f(a, b):
+        return a + b
+
+    vref = np.add.reduce(v, axis=1)
+    v2 = reduce_array(f, 0, v, 1)
+
+    assert (v == 1).all()
+    assert (v2 == vref).all()
+
+
+def test_prim_distribute():
+    assert (distribute(1, (2, 3)) == np.ones((2, 3))).all()
+
+
+def test_prim_reshape():
+    assert reshape(np.empty((2, 3)), (6,)).shape == (6,)
+
+
+def test_prim_dot():
+    a = np.ones((2, 3))
+    b = np.ones((3, 4))
+
+    ref = np.dot(a, b)
+    res = dot(a, b)
+
+    assert (res == ref).all()

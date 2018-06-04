@@ -23,6 +23,10 @@ class MyiaTypeError(InferenceError):
     pass
 
 
+class MyiaShapeError(InferenceError):
+    """Shape error in a Myia program."""
+
+
 def type_error_nargs(ident, expected, got):
     """Return a MyiaTypeError for number of arguments mismatch."""
     return MyiaTypeError(
