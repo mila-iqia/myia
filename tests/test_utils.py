@@ -1,6 +1,6 @@
 import pytest
 
-from myia.utils import Named, smap, Event, Events
+from myia.utils import Named, TypeMap, smap, Event, Events
 
 
 def test_named():
@@ -10,6 +10,23 @@ def test_named():
 
 def _sum(*args):
     return sum(args)
+
+
+def test_typemap():
+    tmap = TypeMap()
+    tmap.register(int, 'int')
+    tmap.register(object, 'obj')
+    assert tmap[int] == 'int'
+    assert tmap[str] == 'obj'
+
+
+def test_typemap_discover():
+    def discover(cls):
+        return cls.__name__
+    tmap = TypeMap({object: '???'}, discover=discover)
+    assert tmap[int] == 'int'
+    assert tmap[str] == 'str'
+    assert tmap[object] == '???'
 
 
 def test_smap():

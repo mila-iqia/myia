@@ -93,6 +93,72 @@ def list_str(lst: List):
     return f'[{elements}]'
 
 
+class TypeMap(dict):
+    """Map types to handlers or values.
+
+    Mapping a type to a value also (lazily) maps all of its subclasses to the
+    same value, unless they have a mapping of their own.
+
+    TypeMap should ideally not be updated after it is used, because updates may
+    make some cached associations invalid.
+
+    Attributes:
+        discover: A function that takes a class and generates/returns a handler
+            for it, if none is found.
+    """
+    def __init__(self, *args, discover=None):
+        """Initialize a TypeMap."""
+        super().__init__(*args)
+        self.discover = discover
+
+    def register(self, obj_t, handler=None):
+        """Register a handler to the given type.
+
+        This method may be used as a decorator.
+        """
+        if handler is None:
+            def deco(fn):
+                self[obj_t] = fn
+                return fn
+            return deco
+        else:
+            self[obj_t] = handler
+
+    def __getitem__(self, obj_t):
+        """Get the handler for the given type."""
+        handler = self.get(obj_t, None)
+
+        if handler is None:
+            if issubclass(obj_t, type):
+                mro = [type]
+            else:
+                mro = obj_t.mro()
+
+            to_set = []
+
+            for cls in mro:
+                handler = self.get(cls, None)
+                if handler is None and self.discover:
+                    handler = self.discover(cls)
+                if handler:
+                    for cls2 in to_set:
+                        self[cls2] = handler
+                    break
+                to_set.append(cls)
+            else:
+                for cls2 in to_set:
+                    self[cls2] = False
+
+        if handler:
+            return handler
+        else:
+            raise KeyError(obj_t)
+
+
+def _object_map(smap, *args):
+    return smap.fn(*args)
+
+
 def _sequence_map(smap, *seqs):
     """Structural map on a sequence (list, tuple, etc.)."""
     s0 = seqs[0]
@@ -102,10 +168,12 @@ def _sequence_map(smap, *seqs):
     return t(smap(*[s[i] for s in seqs]) for i in range(len(s0)))
 
 
-default_smap_dispatch = {
+default_smap_dispatch = TypeMap({
     tuple: _sequence_map,
-    list: _sequence_map
-}
+    list: _sequence_map,
+    object: _object_map,
+    type: _object_map,
+})
 
 
 class StructuralMap:
@@ -150,12 +218,7 @@ class StructuralMap:
         """
         d0 = data[0]
         t = type(d0)
-        if t in self.dispatch:
-            return self.dispatch[t](self, *data)
-        # elif hasattr(d0, '__smap__'):
-        #     return d0.__smap__(self, *data[1:])
-        else:
-            return self.fn(*data)
+        return self.dispatch[t](self, *data)
 
 
 def smap(fn, *args):

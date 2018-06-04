@@ -2,9 +2,9 @@
 
 from functools import reduce
 from typing import \
-    Any, Callable, Dict, Iterable, List, Set, Type, TypeVar, Union
+    Any, Callable, Dict, Iterable, List, Set, TypeVar, Union
 
-from .utils import Registry
+from .utils import TypeMap
 
 T = TypeVar('T')
 
@@ -73,6 +73,9 @@ class Var:
 
 class Seq(tuple):
     """Class to mark sequence of values matched by an SVar."""
+
+    def __visit__(self, _):
+        raise VisitError
 
     def __repr__(self) -> str:
         return "Seq" + super().__repr__()
@@ -293,7 +296,9 @@ class Unification:
 
     def __init__(self):
         """Create a unification engine."""
-        self.visitors: Registry[Type, Callable] = Registry()
+        def discover(cls):
+            return getattr(cls, '__visit__', None)
+        self.visitors = TypeMap(discover=discover)
 
     def register_visitor(self, type):
         """Decorator to register additional visitors."""
@@ -301,13 +306,11 @@ class Unification:
 
     def visit(self, fn: Callable[[T], T], value: T) -> T:
         """Apply `fn` to each element of `value` and return the result."""
-        visit = self.visitors.get(type(value), None)
-        if visit:
-            return visit(fn, value)
-        visit = getattr(value, '__visit__', None)
-        if visit:
-            return visit(fn)
-        raise VisitError
+        try:
+            visit = self.visitors[type(value)]
+        except KeyError as e:
+            raise VisitError
+        return visit(value, fn)
 
     def clone(self, v: T, copy_map: Dict = None) -> T:
         """Return a copy of a templated type structure.
