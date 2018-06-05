@@ -1,4 +1,5 @@
 from myia.api import parse
+from myia.debug.label import short_labeler
 from myia.cconv import NestingAnalyzer
 from myia.ir.anf import Constant, Graph
 
@@ -34,7 +35,7 @@ def check_nest(rels, fv_direct, fv_total):
             def name(g):
                 if isinstance(g, Constant) and isinstance(g.value, Graph):
                     g = g.value
-                gname = g.debug.name
+                gname = short_labeler.name(g)
                 if gname == fn.__name__:
                     gname = 'X'
                 return gname
@@ -49,6 +50,14 @@ def check_nest(rels, fv_direct, fv_total):
                 for child in children:
                     assert analysis.nested_in(child, g1)
                     assert not analysis.nested_in(g1, child)
+
+            nonlocal expected_deps
+            expected_deps = {x: y for x, y in expected_deps.items() if y}
+            parents = {}
+            for g, parent in analysis.parents().items():
+                if parent:
+                    parents[name(g)] = {name(parent)}
+            assert parents == expected_deps
 
             fvs = {}
             for g, vs in analysis.free_variables_total().items():
