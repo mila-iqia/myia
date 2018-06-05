@@ -1,6 +1,5 @@
 """General utilities and design patterns."""
 
-from collections import defaultdict
 from typing import Any, Dict, List, TypeVar
 
 T1 = TypeVar('T1')
@@ -43,25 +42,6 @@ class Registry(Dict[T1, T2]):
             self[prim] = fn
             return fn
         return deco
-
-
-def memoize_method(fn):
-    """Memoize the result of a method.
-
-    The function's first argument must be `self` (in other words, it must be a
-    method).
-
-    The cache is stored per-instance, in ``self._cache[fn]``.
-    """
-    def deco(self, *args):
-        if not hasattr(self, '_cache'):
-            self._cache = defaultdict(dict)
-        cache = self._cache[fn]
-        if args not in cache:
-            cache[args] = fn(self, *args)
-        return cache[args]
-
-    return deco
 
 
 def repr_(obj: Any, **kwargs: Any):
