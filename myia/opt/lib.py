@@ -258,8 +258,16 @@ def is_trivial_graph(g, node, args):
         return False
 
 
+def is_unique_use(g, node, args):
+    users = g.graph_users
+    return len(users) == 1 and sum(users.values()) == 1
+
+
 inline_trivial = make_inliner(inline_criterion=is_trivial_graph,
                               check_recursive=False)
+
+inline_unique_uses = make_inliner(inline_criterion=is_unique_use,
+                                  check_recursive=True)
 
 inline = make_inliner(inline_criterion=None, check_recursive=True)
 

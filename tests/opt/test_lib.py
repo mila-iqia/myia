@@ -435,6 +435,57 @@ def test_inline_nontrivial_through_fv():
                lib.inline_trivial)
 
 
+def test_inline_unique_uses():
+
+    def one(x):
+        return x * x
+
+    def two(x):
+        return x + x
+
+    def before(x):
+        return one(x), two(x), two(x)
+
+    def after(x):
+        return x * x, two(x), two(x)
+
+    _check_opt(before, after,
+               lib.inline_unique_uses)
+
+
+def test_inline_unique_uses_2():
+
+    def f(x):
+        return x * x
+
+    def g(x):
+        return f(x)
+
+    def h(x):
+        return f(x)
+
+    def before(x):
+        return g(x) + h(x)
+
+    def after(x):
+        return f(x) + f(x)
+
+    _check_opt(before, after,
+               lib.inline_unique_uses)
+
+
+def test_inline_unique_uses_recursive():
+
+    def helper(x):
+        return before(x)
+
+    def before(x):
+        return helper(x)
+
+    _check_opt(before, before,
+               lib.inline_unique_uses)
+
+
 ##################
 # Specialization #
 ##################

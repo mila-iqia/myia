@@ -109,6 +109,7 @@ class GraphCloner:
                 continue
             with About(node.debug, self.relation):
                 new = Apply([], target_graph)
+                new.type = node.type
                 self.repl[node] = new
                 self.nodes.append((node, new))
 

@@ -13,7 +13,7 @@ from .ir import GraphCloner, is_apply, is_constant, Constant, \
 from .prim import Primitive
 from .graph_utils import dfs
 from .utils import Named
-from .opt import inline_unique_uses, lib as optlib, PatternEquilibriumOptimizer
+from .opt import lib as optlib, PatternEquilibriumOptimizer
 
 
 UNKNOWN = Named('UNKNOWN')
@@ -47,9 +47,9 @@ def type_specialize(graph, argprops, optimize=True):
         eq = PatternEquilibriumOptimizer(
             optlib.simplify_always_true,
             optlib.simplify_always_false,
+            optlib.inline_unique_uses,
         )
         eq(g2)
-        inline_unique_uses(g2)
     return g2
 
 
