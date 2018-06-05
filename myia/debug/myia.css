@@ -19,6 +19,10 @@
     background: orchid;
 }
 
+.node-Graph {
+    background: mediumvioletred;
+}
+
 .node-return:before {
     content: "return";
     display: inline-block;
