@@ -60,10 +60,10 @@ class TypeSpecializer:
         """Initialize a TypeSpecializer."""
         self.engine = engine
 
-        self.nest = self.engine.nest
-        self.node_map = {g: {n for n in nodes if n.graph is g}
-                         for g, nodes in self.nest.all_nodes.items()}
-        self.parents_map = self.nest.parents()
+        self.mng = self.engine.mng
+        self.node_map = self.mng.nodes
+        self.parents_map = self.mng.parents
+
         self.originals = {}
         self.specializations = {}
         self.counts = Counter()

@@ -2,9 +2,8 @@
 
 import asyncio
 
-from .ir import is_constant, is_constant_graph, is_apply
+from .ir import is_constant, is_constant_graph, is_apply, manage
 from .utils import Named
-from .cconv import NestingAnalyzer
 
 
 # Represents an unknown value
@@ -546,8 +545,8 @@ class InferenceEngine:
         self.errors = []
         self.equiv = eq_class(self)
 
-        self.nest = NestingAnalyzer(graph)
-        self.parents = self.nest.parents()
+        self.mng = manage(graph)
+        self.parents = self.mng.parents
         empty_context = Context.empty(self.parents)
         self.root_context = empty_context.add(graph, argvals)
 

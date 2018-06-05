@@ -6,7 +6,6 @@ from ..ir import replace, succ_incoming, freevars_boundary, \
     GraphCloner
 from ..unify import Var, var, SVar
 from ..prim import ops as P
-from ..cconv import NestingAnalyzer
 from ..utils import Namespace
 
 from .opt import \
@@ -227,8 +226,7 @@ def make_inliner(inline_criterion, check_recursive):
                 return node
 
         if check_recursive:
-            nest = NestingAnalyzer(g)
-            if g in nest.graphs_accessible()[g]:
+            if g.recursive:
                 return node
 
         clone = GraphCloner(total=False)

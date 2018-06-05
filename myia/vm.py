@@ -8,12 +8,11 @@ implementation.
 from collections import defaultdict
 from typing import Iterable, Mapping, Any, Callable, List
 
-from .ir import Graph, Apply, Constant, Parameter, ANFNode
+from .ir import Graph, Apply, Constant, Parameter, ANFNode, manage
 from .ir.utils import is_constant_graph, is_constant
 from .prim import Primitive
 from .prim.ops import if_, return_
 from .graph_utils import toposort
-from .cconv import NestingAnalyzer
 from .utils import TypeMap
 
 
@@ -101,11 +100,21 @@ class VM:
         self.py_implementations = py_implementations
         self._vars = defaultdict(set)
 
+    def _compute_fvs(self, graph):
+        rval = set()
+        for fv in graph.free_variables_total:
+            if isinstance(fv, Graph):
+                rval.update(ct for ct in graph.constants if ct.value is fv)
+            else:
+                rval.add(fv)
+        return rval
+
     def _acquire_graph(self, graph):
         if graph in self._vars:
             return
-        N = NestingAnalyzer(graph)
-        self._vars.update(N.free_variables_total())
+        manage(graph)
+        for g in graph.manager.graphs:
+            self._vars[g] = self._compute_fvs(g)
 
     def _export_sequence(self, seq):
         return type(seq)(self.export(x) for x in seq)
