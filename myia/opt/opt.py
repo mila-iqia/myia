@@ -2,11 +2,10 @@
 
 from collections import defaultdict
 
-from ..cconv import NestingAnalyzer
-from ..graph_utils import dfs, toposort
+from ..graph_utils import dfs
 from ..ir import ANFNode, Apply, Constant, Graph, Special, \
-    succ_incoming, succ_deeper, is_constant_graph, replace, is_apply, \
-    GraphCloner
+    succ_deeper, is_constant_graph, replace, is_apply, \
+    GraphCloner, manage
 from ..unify import Unification, Var
 
 
@@ -133,81 +132,32 @@ def pattern_replacer(*pattern):
     return deco
 
 
-class PatternOptimizerSinglePass:
-    """Single optimization pass using the given patterns.
+class PatternEquilibriumOptimizer:
+    """Apply a set of local pattern optimizations until equilibrium."""
 
-    Args:
-        patterns: A set of patterns to apply to each node in a graph.
+    def __init__(self, *node_transformers):
+        """Initialize a PatternEquilibriumOptimizer."""
+        self.node_transformers = node_transformers
 
-    """
+    def __call__(self, *graphs):
+        """Apply optimizations until equilibrium on given graphs."""
+        mng = manage(*graphs)
+        while True:
+            changes = False
 
-    def __init__(self, patterns):
-        """Initialize the PatternOptimizerSinglePass."""
-        self.patterns = patterns
+            for node in mng.all_nodes:
+                for transformer in self.node_transformers:
+                    new = transformer(node)
+                    if new and new is not node:
+                        new.type = node.type
+                        mng.push_replace(node, new)
+                        changes = True
+                        break
 
-    def iterate(self, graph):
-        """Iterate through the nodes of the graph.
+            mng.commit()
 
-        The iterator proceeds in topological order.
-        """
-        return toposort(graph.output, succ_incoming)
-
-    def replace(self, old, new):
-        """Replace a node by another."""
-        return replace(old, new)
-
-    def __call__(self, graph):
-        """Apply all patterns to all nodes of the given graph."""
-        changes = False
-        for node in self.iterate(graph):
-            for pattern in self.patterns:
-                new = pattern(node)
-                if new and new is not node:
-                    new.type = node.type
-                    self.replace(node, new)
-                    changes = True
-                    continue
-        return changes
-
-
-class EquilibriumOptimizer:
-    """Run an optimization pass until equilibrium.
-
-    Args:
-        single_pass: An optimization pass on a graph.
-
-    """
-
-    def __init__(self, single_pass):
-        """Initialize a EquilibriumOptimizer."""
-        self.single_pass = single_pass
-
-    def __call__(self, graph):
-        """Apply the pass on the graph repeatedly until equilibrium."""
-        graphs = set(NestingAnalyzer(graph).coverage())
-        any_changes = 0
-
-        changes = 1
-        while changes:
-            new_graphs = set()
-            changes = 0
-            for graph in graphs:
-                chg = self.single_pass(graph)
-                if chg:
-                    for node in dfs(graph.output, succ_incoming):
-                        if is_constant_graph(node):
-                            for g in NestingAnalyzer(node.value).coverage():
-                                new_graphs.add(g)
-                changes |= chg
-                any_changes |= changes
-            graphs |= new_graphs
-
-        return any_changes
-
-
-def pattern_equilibrium_optimizer(*patterns):
-    """Create an EquilibriumOptimizers that applies the given patterns."""
-    return EquilibriumOptimizer(PatternOptimizerSinglePass(patterns))
+            if not changes:
+                break
 
 
 def inline_unique_uses(graph):

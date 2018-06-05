@@ -2,8 +2,8 @@
 import pytest
 from myia.api import parse
 from myia.ir import Constant, is_constant, isomorphic, GraphCloner
-from myia.opt import pattern_equilibrium_optimizer, \
-    PatternSubstitutionOptimization as psub, pattern_replacer, sexp_to_graph
+from myia.opt import PatternSubstitutionOptimization as psub, \
+    PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph
 from myia.prim import Primitive, ops as prim
 from myia.unify import Var, var
 
@@ -73,7 +73,7 @@ def _check_opt(before, after, *opts):
     gbefore = GraphCloner(gbefore, total=True)[gbefore]
     gafter = parse(after)
 
-    eq = pattern_equilibrium_optimizer(*opts)
+    eq = PatternEquilibriumOptimizer(*opts)
     eq(gbefore)
 
     assert isomorphic(gbefore, gafter)
