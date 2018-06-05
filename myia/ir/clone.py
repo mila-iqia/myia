@@ -1,8 +1,7 @@
 """Graph cloning facility."""
 
-from typing import Any, Dict, Iterable, Set, Union
 
-from .anf import ANFNode, Apply, Constant, Graph
+from .anf import Apply, Constant, Graph
 from ..info import About
 from .manager import manage
 

@@ -3,11 +3,9 @@
 
 from collections import defaultdict, Counter
 
-from ..info import About
 from ..graph_utils import dfs, FOLLOW, EXCLUDE
 from ..utils import Events
 
-from .anf import Apply, Constant, Graph
 from .utils import succ_deeper, is_constant, is_constant_graph
 
 
