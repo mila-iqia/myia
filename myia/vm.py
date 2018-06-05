@@ -6,17 +6,15 @@ implementation.
 """
 
 from collections import defaultdict
-from types import FunctionType
 from typing import Iterable, Mapping, Any, Callable, List
 
 from .ir import Graph, Apply, Constant, Parameter, ANFNode
 from .ir.utils import is_constant_graph, is_constant
-from .parser import parse
 from .prim import Primitive
 from .prim.ops import if_, return_
-from .utils import smap
 from .graph_utils import toposort
 from .cconv import NestingAnalyzer
+from .utils import TypeMap
 
 
 class VMFrame:
@@ -88,11 +86,17 @@ class VM:
     def __init__(self,
                  implementations: Mapping[Primitive, Callable],
                  py_implementations: Mapping[Primitive, Callable],
-                 object_map,
-                 accepted_types) -> None:
+                 convert) -> None:
         """Initialize the VM."""
-        self.object_map = object_map
-        self.accepted_types = accepted_types
+        self.convert = convert
+        self._exporters = TypeMap({
+            tuple: self._export_sequence,
+            list: self._export_sequence,
+            Closure: self._export_Closure,
+            Graph: self._export_Graph,
+            Primitive: self._export_Primitive,
+            object: self._export_object,
+        })
         self.implementations = implementations
         self.py_implementations = py_implementations
         self._vars = defaultdict(set)
@@ -103,49 +107,28 @@ class VM:
         N = NestingAnalyzer(graph)
         self._vars.update(N.free_variables_total())
 
-    def _convert_scalar(self, value):
-        try:
-            return self.object_map[value]
-        except (TypeError, KeyError):
-            pass
+    def _export_sequence(self, seq):
+        return type(seq)(self.export(x) for x in seq)
 
-        if isinstance(value, FunctionType):
-            g = parse(value)
-            self.object_map[value] = g
-            self._acquire_graph(g)
-            return g
+    def _export_Primitive(self, prim):
+        return self.py_implementations[prim]
 
-        elif isinstance(value, self.accepted_types):
-            return value
+    def _export_Closure(self, clos):
+        clos.vm = self
+        return clos
 
-        else:
-            raise ValueError(f'Cannot convert: {value!r}')  # pragma: no cover
-
-    def convert(self, value):
-        """Convert a Python value into a value understood by the VM."""
-        return smap(self._convert_scalar, value)
-
-    def _unconvert_scalar(self, value):
-        """Translate a VM-produced value to a user-facing format."""
-        if isinstance(value, Primitive):
-            return self.py_implementations[value]
-        elif isinstance(value, Closure):
-            value.vm = self
-            return value
-        elif isinstance(value, Graph):
-            return self.make_callable(value)
-        else:
-            return value
-
-    def unconvert(self, value):
-        """Convert a value from the VM into a corresponding Python object."""
-        return smap(self._unconvert_scalar, value)
-
-    def make_callable(self, g):
+    def _export_Graph(self, g):
         """Return an object that executes `g` when called on arguments."""
         c = Closure(g, None)
         c.vm = self
         return c
+
+    def _export_object(self, obj):
+        return obj
+
+    def export(self, value):
+        """Convert a value from the VM into a corresponding Python object."""
+        return self._exporters[type(value)](value)
 
     def evaluate(self, graph: Graph, _args: Iterable[Any], *,
                  closure: Mapping[ANFNode, Any] = None) -> Any:
@@ -185,7 +168,7 @@ class VM:
                     frames[-1].values[frames[-1].todo[-1]] = r.value
                     frames[-1].todo.pop()
                 else:
-                    return self.unconvert(r.value)
+                    return self.export(r.value)
 
     def _succ_vm(self, node: ANFNode) -> Iterable[ANFNode]:
         """Follow node.incoming and free variables."""

@@ -105,7 +105,9 @@ class TypeMap(dict):
     Attributes:
         discover: A function that takes a class and generates/returns a handler
             for it, if none is found.
+
     """
+
     def __init__(self, *args, discover=None):
         """Initialize a TypeMap."""
         super().__init__(*args)

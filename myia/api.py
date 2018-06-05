@@ -1,12 +1,14 @@
 """User-friendly interfaces to Myia machinery."""
+
 import operator
 from types import FunctionType
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Dict, List
 
 from . import parser
-from .ir import ANFNode, Graph
-from .opt import pattern_equilibrium_optimizer, lib as optlib
-from .prim import py_implementations, vm_implementations, ops as P, Primitive
+from .ir import ANFNode, Graph, clone
+from .opt import PatternEquilibriumOptimizer, lib as optlib
+from .prim import py_implementations, vm_implementations, ops as P
+from .utils import TypeMap
 from .vm import VM
 
 
@@ -38,20 +40,67 @@ def default_object_map() -> Dict[Any, ANFNode]:
     return mapping
 
 
-restricted_types = (int, float, bool, str, Primitive)
-all_types = (object,)
+class Converter:
+    """Convert a Python object into an object that can be in a Myia graph."""
+
+    def __init__(self, object_map, converters):
+        """Initialize a Converter."""
+        self.object_map = object_map
+        self.converters = converters
+
+    def __call__(self, value):
+        """Convert a value."""
+        try:
+            return self.object_map[value]
+        except (TypeError, KeyError):
+            pass
+
+        return self.converters[type(value)](self, value)
+
+
+def _convert_identity(env, x):
+    return x
+
+
+def _convert_sequence(env, seq):
+    return type(seq)(env(x) for x in seq)
+
+
+def _convert_function(env, fn):
+    g = clone(parser.parse(fn))
+    env.object_map[fn] = g
+    return g
+
+
+def lax_converter():
+    """Return a "lax" converter that allows arbitrary objects."""
+    return Converter(
+        default_object_map(),
+        TypeMap({
+            FunctionType: _convert_function,
+            tuple: _convert_sequence,
+            list: _convert_sequence,
+            object: _convert_identity,
+            type: _convert_identity,
+        })
+    )
+
+
 default_vm = VM(vm_implementations,
                 py_implementations,
-                default_object_map(),
-                all_types)
-resolver_opt = pattern_equilibrium_optimizer(optlib.make_resolver(default_vm))
+                lax_converter())
 
 
 def parse(func: FunctionType, resolve_globals=True) -> Graph:
     """Parse a function into ANF."""
-    g = parser.parse(func)
+    converter = lax_converter()
+    resolver_opt = PatternEquilibriumOptimizer(
+        optlib.make_resolver(converter)
+    )
+    g = converter(func)
     if resolve_globals:
         resolver_opt(g)
+        g = clone(g)
     return g
 
 
@@ -60,8 +109,7 @@ def run(g: Graph, args: List[Any]) -> Any:
     return default_vm.evaluate(g, args)
 
 
-def compile(func: Union[Graph, FunctionType]) -> Callable:
+def compile(obj):
     """Return a version of the function that runs using Myia's VM."""
-    if not isinstance(func, Graph):
-        func = parse(func)
-    return default_vm.make_callable(func)
+    myia_obj = default_vm.convert(obj)
+    return default_vm.export(myia_obj)

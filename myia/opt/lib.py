@@ -187,17 +187,18 @@ simplify_always_false = psub(
 ###################
 
 
-def make_resolver(vm):
+def make_resolver(convert):
     """Create an optimization to resolve globals.
 
     Args:
-        vm: The VM to use for conversion.
+        convert: The function to use for conversion.
     """
     @pattern_replacer(P.resolve, CNS, C)
     def resolve_globals(node, equiv):
         ns = equiv[CNS]
         x = equiv[C]
-        return Constant(vm.convert(ns.value[x.value]))
+        g = convert(ns.value[x.value])
+        return Constant(g)
 
     return resolve_globals
 
@@ -259,6 +260,7 @@ def is_trivial_graph(g, node, args):
 
 
 def is_unique_use(g, node, args):
+    """Inline graphs that are only used once."""
     users = g.graph_users
     return len(users) == 1 and sum(users.values()) == 1
 
