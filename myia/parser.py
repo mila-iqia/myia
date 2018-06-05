@@ -11,20 +11,11 @@ predecessor blocks.
 Note that variable names in this module closely follow the ones used in [1]_ in
 order to make it easy to compare the two algorithms.
 
-The parsing of Python functions is handled on 3 separate levels, mimicking the
-way that Python resolves variable names (local/enclosed scope, globals,
-builtins):
-
-Global environment
-  There is usually one environment per Python process, although multiple can be
-  instantiated. Within a single environment, the same Python objects will
-  correspond to the same Myia object e.g. if two functions use the same
-  subroutine and are parsed, this subroutine will only be parsed once.
+The parsing of Python functions is handled as follows:
 
 Parser
   There is one parser per user-defined function. A parser is responsible for
-  e.g. resolving variable names using the function's global scope and managing
-  the parsing process.
+  managing the parsing process.
 
 Block
   A single basic block exists for each block of code in a user-defined
@@ -41,17 +32,17 @@ Block
 
 import ast
 import inspect
-import operator
 import textwrap
 from types import FunctionType
-from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Tuple, \
-    overload
-from weakref import finalize
+from typing import Dict, List, NamedTuple, Optional, Tuple, overload
 
 from .info import About, DebugInherit, NamedDebugInfo
-from .ir import ANFNode, Apply, Constant, Graph, Parameter, \
-    destroy_disconnected_nodes, is_constant
+from .ir import ANFNode, Apply, Constant, Graph, Parameter, is_constant
 from .prim import ops as primops
+from .utils import ModuleNamespace, ClosureNamespace
+
+
+_parse_cache = {}
 
 
 class Location(NamedTuple):
@@ -69,33 +60,37 @@ class Location(NamedTuple):
     column: int
 
 
+operator_ns = ModuleNamespace('operator')
+builtins_ns = ModuleNamespace('builtins')
+
+
 ast_map = {
-    ast.Add: operator.add,
-    ast.Sub: operator.sub,
-    ast.Mult: operator.mul,
-    ast.Div: operator.truediv,
-    ast.FloorDiv: operator.floordiv,
-    ast.Mod: operator.mod,
-    ast.Pow: operator.pow,
-    ast.MatMult: operator.matmul,
-    ast.LShift: operator.lshift,
-    ast.RShift: operator.rshift,
-    ast.BitAnd: operator.and_,
-    ast.BitOr: operator.or_,
-    ast.BitXor: operator.xor,
-    ast.UAdd: operator.pos,
-    ast.USub: operator.neg,
-    ast.Invert: operator.invert,
-    ast.Not: operator.not_,
-    ast.Eq: operator.eq,
-    ast.NotEq: operator.ne,
-    ast.Lt: operator.lt,
-    ast.Gt: operator.gt,
-    ast.LtE: operator.le,
-    ast.GtE: operator.ge,
-    ast.Is: operator.is_,
-    ast.IsNot: operator.is_not,
-    ast.In: operator.contains,
+    ast.Add: (operator_ns, 'add'),
+    ast.Sub: (operator_ns, 'sub'),
+    ast.Mult: (operator_ns, 'mul'),
+    ast.Div: (operator_ns, 'truediv'),
+    ast.FloorDiv: (operator_ns, 'floordiv'),
+    ast.Mod: (operator_ns, 'mod'),
+    ast.Pow: (operator_ns, 'pow'),
+    ast.MatMult: (operator_ns, 'matmul'),
+    ast.LShift: (operator_ns, 'lshift'),
+    ast.RShift: (operator_ns, 'rshift'),
+    ast.BitAnd: (operator_ns, 'and_'),
+    ast.BitOr: (operator_ns, 'or_'),
+    ast.BitXor: (operator_ns, 'xor'),
+    ast.UAdd: (operator_ns, 'pos'),
+    ast.USub: (operator_ns, 'neg'),
+    ast.Invert: (operator_ns, 'invert'),
+    ast.Not: (operator_ns, 'not_'),
+    ast.Eq: (operator_ns, 'eq'),
+    ast.NotEq: (operator_ns, 'ne'),
+    ast.Lt: (operator_ns, 'lt'),
+    ast.Gt: (operator_ns, 'gt'),
+    ast.LtE: (operator_ns, 'le'),
+    ast.GtE: (operator_ns, 'ge'),
+    ast.Is: (operator_ns, 'is_'),
+    ast.IsNot: (operator_ns, 'is_not'),
+    ast.In: (operator_ns, 'contains'),
     # ast.NotIn: operator.???,  # Not in operator module
 }
 
@@ -108,103 +103,54 @@ def _fresh(node):
         return node
 
 
-class Environment:
-    """Environment to parse a function in.
+def parse(func):
+    """Parse a function into a Myia graph.
 
-    An environment consists of a mapping from Python objects to nodes. If a
-    Python object is missing from this mapping, the environment will try to
-    convert it into a Myia object e.g. create a Myia constant or parse a Python
-    function into a Myia function.
-
-    Note that the parser uses the mapping for ``operator.<op>`` to determine
-    which primitive to use for operation ``<op>``.
-
-    The environment is also in charge of resolving variable names that could
-    not be resolved in the function's local and global namespace i.e. for
-    built-ins and for undefined variable names.
-
-    Functions parsed in different environments will have no nodes in common.
-    Functions parsed in the same environment will use the same Myia objects for
-    the same Python objects.
-
+    The result of the parsing is cached: multiple calls to parse on the same
+    function will return the same graph. It should therefore be cloned prior
+    to manipulation.
     """
-
-    def __init__(self, object_map: Iterable[Tuple[Any, ANFNode]]) -> None:
-        """Construct an environment.
-
-        Args:
-            object_map: The object map maps Python objects to their
-                corresponding Myia nodes.
-
-        """
-        self._object_map: Dict[int, ANFNode] = dict()
-        for o, n in object_map:
-            self.insert(o, n)
-
-    def map(self, obj: Any) -> ANFNode:
-        """Map a Python object to an ANF node.
-
-        If the object was already converted, the existing Myia node will be
-        returned.
-
-        """
-        if id(obj) in self._object_map:
-            return _fresh(self._object_map[id(obj)])
-        elif isinstance(obj, FunctionType):
-            parser = Parser(self, obj)
-            # This will insert object into the map
-            parser.parse()
-            return self._object_map[id(obj)]
-        else:
-            node = Constant(obj)
-            self._object_map[id(obj)] = node
-            return node
-
-    def _remove(self, id: int) -> None:
-        if id in self._object_map:
-            del self._object_map[id]
-
-    def insert(self, obj: Any, node: ANFNode) -> None:
-        """Add a mapping in the environement, rejecting duplicates."""
-        assert id(obj) not in self._object_map
-        self._object_map[id(obj)] = node
-        finalize(obj, self._remove, id(obj))
+    if func in _parse_cache:
+        return _parse_cache[func]
+    parser = Parser(func)
+    graph = parser.parse()
+    _parse_cache[func] = graph
+    return graph
 
 
 class Parser:
     """Parser for a function.
 
-    This class handles the parsing of a single user-defined function. It is
-    responsible for handling e.g. globals.
+    This class handles the parsing of a single user-defined function.
 
-    Todo:
-        This parser resolves globals in the current Python namespace. This
-        causes two problems: Forward declarations are not support, and changes
-        to Python's mutable namespace are not reflected if the function is not
-        reparsed.
+    References to global variables, or nonlocal variables, are converted to
+    calls to the `resolve` primitive (`resolve(ns, name)`).
 
-        In the future we will have an implementation that resolves globals
-        just-in-time (to support forward declarations) and acts accordingly
-        when the Python namespace changes.
+    Attributes:
+        function: The function to transform.
+        filename: The name of the file in which the function is defined.
+        global_namespace: The Namespace in which to resolve the function's
+            global variables. It will be embedded in the graph for every
+            global variable to resolve.
+        closure_namespace: The Namespace in which to resolve the function's
+            nonlocal variables. It will be embedded in the graph for every
+            nonlocal variable to resolve.
+        graph: The graph of the function being parsed.
 
     """
 
-    def __init__(self, environment: Environment,
-                 function: FunctionType,
-                 globals_: Dict[str, Any] = None) -> None:
+    def __init__(self, function: FunctionType) -> None:
         """Construct a parser."""
-        self.environment = environment
         self.function = function
         _, self.line_offset = inspect.getsourcelines(function)
         self.filename: str = inspect.getfile(function)
         self.block_map: Dict[Block, Constant] = {}
-        if globals_ is None:
-            free_vars = inspect.getclosurevars(function)
-            assert isinstance(free_vars.builtins, Dict)
-            globals_ = free_vars.builtins
-            globals_.update(free_vars.globals)
-            globals_.update(free_vars.nonlocals)
-        self.globals_ = globals_
+        # This is used to resolve the function's globals.
+        self.global_namespace = ModuleNamespace(function.__module__)
+        # This is used to resolve the function's nonlocals.
+        self.closure_namespace = ClosureNamespace(self.function)
+        # Will be set later
+        self.graph = None
 
     def make_location(self, node: ast.AST) -> Location:
         """Create a Location from an AST node."""
@@ -217,14 +163,12 @@ class Parser:
             # we basically just pass through them.
             return None  # pragma: no cover
 
-    def parse(self, clean=True) -> Graph:
+    def parse(self) -> Graph:
         """Parse the function into a Myia graph."""
         tree = ast.parse(textwrap.dedent(inspect.getsource(self.function)))
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
         graph = self._process_function(None, function_def)[1].graph
-        if clean:
-            destroy_disconnected_nodes(graph)
         return graph
 
     def get_block_function(self, block: 'Block') -> Constant:
@@ -234,15 +178,6 @@ class Parser:
         node = Constant(block.graph)
         self.block_map[block] = node
         return node
-
-    def read(self, varnum: str) -> ANFNode:
-        """Read a variable from the function's global namespace."""
-        assert isinstance(self.function, FunctionType)
-        if varnum in self.globals_:
-            return self.environment.map(self.globals_[varnum])
-        elif varnum in self.function.__globals__:
-            return self.environment.map(self.function.__globals__[varnum])
-        raise ValueError(varnum)
 
     def process_FunctionDef(self, block: 'Block',
                             node: ast.FunctionDef) -> 'Block':
@@ -265,9 +200,9 @@ class Parser:
         if block:
             function_block.preds.append(block)
         else:
-            # Add mapping for the top level so that recursive calls can resolve
-            self.environment.insert(self.function,
-                                    self.get_block_function(function_block))
+            # This is the top-level function, so we set self.graph
+            g_ct = self.get_block_function(function_block)
+            self.graph = g_ct.value
 
         function_block.mature()
         function_block.graph.debug.name = node.name
@@ -306,25 +241,22 @@ class Parser:
 
     # Expression implementations
 
-    def _resolve_ast_type(self, op):
-        return self.environment.map(ast_map[type(op)])
-
     def process_BinOp(self, block: 'Block', node: ast.BinOp) -> ANFNode:
         """Process binary operators: `a + b`, `a | b`, etc."""
-        func = self._resolve_ast_type(node.op)
+        func = block._resolve_ast_type(node.op)
         left = self.process_node(block, node.left)
         right = self.process_node(block, node.right)
         return Apply([func, left, right], block.graph)
 
     def process_UnaryOp(self, block: 'Block', node: ast.UnaryOp) -> ANFNode:
         """Process unary operators: `+a`, `-a`, etc."""
-        func = self._resolve_ast_type(node.op)
+        func = block._resolve_ast_type(node.op)
         operand = self.process_node(block, node.operand)
         return Apply([func, operand], block.graph)
 
     def process_Compare(self, block: 'Block', node: ast.Compare) -> ANFNode:
         """Process comparison operators: `a == b`, `a > b`, etc."""
-        ops = [self._resolve_ast_type(op) for op in node.ops]
+        ops = [block._resolve_ast_type(op) for op in node.ops]
         assert len(ops) == 1
         left = self.process_node(block, node.left)
         right = self.process_node(block, node.comparators[0])
@@ -336,7 +268,7 @@ class Parser:
 
     def process_Num(self, block: 'Block', node: ast.Num) -> ANFNode:
         """Process numbers: `1`, `2.5`, etc."""
-        return self.environment.map(node.n)
+        return Constant(node.n)
 
     def process_Call(self, block: 'Block', node: ast.Call) -> ANFNode:
         """Process function calls: `f(x)`, etc."""
@@ -347,7 +279,7 @@ class Parser:
     def process_NameConstant(self, block: 'Block',
                              node: ast.NameConstant) -> ANFNode:
         """Process special constants: `True`, `False`, `None`, etc."""
-        return self.environment.map(node.value)
+        return Constant(node.value)
 
     def process_Tuple(self, block: 'Block', node: ast.Tuple) -> ANFNode:
         """Process tuple literals."""
@@ -365,7 +297,7 @@ class Parser:
     def process_Subscript(self, block: 'Block',
                           node: ast.Subscript) -> ANFNode:
         """Process subscripts: `x[y]`."""
-        op = self.environment.map(operator.getitem)
+        op = block.make_resolve(operator_ns, 'getitem')
         value = self.process_node(block, node.value)
         slice = self.process_node(block, node.slice)
         return Apply([op, value, slice], block.graph)
@@ -377,7 +309,7 @@ class Parser:
     def process_Attribute(self, block: 'Block',
                           node: ast.Attribute) -> ANFNode:
         """Process attributes: `x.y`."""
-        op = self.environment.map(getattr)
+        op = block.make_resolve(builtins_ns, 'getattr')
         value = self.process_node(block, node.value)
         return Apply([op, value, Constant(node.attr)], block.graph)
 
@@ -420,7 +352,7 @@ class Parser:
             elif isinstance(targ, ast.Tuple):
                 # CASE: x, y = value
                 for i, elt in enumerate(targ.elts):
-                    op = self.environment.map(operator.getitem)
+                    op = block.make_resolve(operator_ns, 'getitem')
                     new_node = Apply([op, anf_node, Constant(i)], block.graph)
                     write(elt, new_node)
 
@@ -581,6 +513,17 @@ class Block:
                 self.set_phi_arguments(phi)
         self.matured = True
 
+    def _resolve_ast_type(self, op):
+        return self.make_resolve(*ast_map[type(op)])
+
+    def make_resolve(self, module_name, symbol_name):
+        """Return a subtree that resolves a name in a module."""
+        return self.graph.apply(
+            primops.resolve,
+            Constant(module_name),
+            Constant(symbol_name)
+        )
+
     def read(self, varnum: str) -> ANFNode:
         """Read a variable.
 
@@ -602,7 +545,12 @@ class Block:
             if len(self.preds) == 1:
                 return self.preds[0].read(varnum)
             elif not self.preds:
-                return self.parser.read(varnum)
+                cn = self.parser.closure_namespace
+                if varnum in cn:
+                    return self.make_resolve(cn, varnum)
+                else:
+                    ns = self.parser.global_namespace
+                    return self.make_resolve(ns, varnum)
         # TODO: point to the original definition
         with About(NamedDebugInfo(name=varnum), 'phi'):
             phi = Parameter(self.graph)

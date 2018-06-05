@@ -1,12 +1,11 @@
-from myia.api import ENV, parse
+from myia.api import parse
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs as _dfs
 from myia.ir import Apply, Constant, Graph, Parameter, Special, \
-    accessible_graphs, destroy_disconnected_nodes, dfs, exclude_from_set, \
+    dfs, exclude_from_set, \
     freevars_boundary, is_apply, is_constant, is_constant_graph, \
-    is_parameter, is_special, isomorphic, replace, succ_bidirectional, \
+    is_parameter, is_special, isomorphic, replace, \
     succ_deep, succ_deeper, succ_incoming, toposort
-from myia.parser import Parser
 from tests.test_graph_utils import _check_toposort
 
 
@@ -99,44 +98,6 @@ def test_dfs_variants():
     _excl_root = exclude_from_set([inner_ret])
     excl_root = _name_nodes(_dfs(inner_ret, succ_deeper, _excl_root))
     assert excl_root == set()
-
-
-def test_disconnect():
-    def exclude_ct_uses(x):
-        if is_constant_graph(x) or x.graph is not None:
-            return 'follow'
-        else:
-            return 'nofollow'
-
-    def f(x):
-        a = x * x
-        _b = a + x  # Not connected to any output # noqa
-        c = a * a
-        d = c * c   # Connected to g's output
-
-        def g(y):
-            return d * y
-        return g(c)
-
-    g = Parser(ENV, f).parse(False)
-
-    # Include {None} to get Constants (makes it easier to compare to live)
-    cov = {None} | accessible_graphs(g)
-
-    live = _name_nodes(_dfs(g.return_, succ_deep))
-    assert live == set('x a mul c return . g d y'.split())
-
-    total = _name_nodes(_dfs(g.return_,
-                             succ_bidirectional(cov),
-                             exclude_ct_uses))
-    assert total == set('x a mul c return . g d y _b add'.split())
-
-    destroy_disconnected_nodes(g)
-
-    total2 = _name_nodes(_dfs(g.return_,
-                              succ_bidirectional(cov),
-                              exclude_ct_uses))
-    assert total2 == live
 
 
 def _check_isomorphic(g1, g2, expected=True):

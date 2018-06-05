@@ -4,11 +4,14 @@ This VM will directly execute a graph so it should be suitable for
 testing or debugging.  Don't expect stellar performance from this
 implementation.
 """
+
+from collections import defaultdict
 from types import FunctionType
 from typing import Iterable, Mapping, Any, Callable, List
 
 from .ir import Graph, Apply, Constant, Parameter, ANFNode
-from .ir.utils import is_constant_graph
+from .ir.utils import is_constant_graph, is_constant
+from .parser import parse
 from .prim import Primitive
 from .prim.ops import if_, return_
 from .utils import smap
@@ -46,9 +49,11 @@ class VMFrame:
             return self.values[node]
         elif self.closure is not None and node in self.closure:
             return self.closure[node]
-        else:
+        elif is_constant(node):
             # Should be a constant
             return node.value
+        else:
+            raise ValueError(node)  # pragma: no cover
 
 
 class Closure:
@@ -60,11 +65,9 @@ class Closure:
         self.values = values
         self.vm: 'VM' = None
 
-    def __call__(self, *args, vm: 'VM' = None):
+    def __call__(self, *args):
         """Evaluates the closure."""
-        if vm is None:
-            vm = self.vm
-        return vm.evaluate(self.graph, args, closure=self.values)
+        return self.vm.evaluate(self.graph, args, closure=self.values)
 
 
 class VM:
@@ -84,22 +87,46 @@ class VM:
 
     def __init__(self,
                  implementations: Mapping[Primitive, Callable],
-                 py_implementations: Mapping[Primitive, Callable]) \
-            -> None:
+                 py_implementations: Mapping[Primitive, Callable],
+                 object_map,
+                 accepted_types) -> None:
         """Initialize the VM."""
+        self.object_map = object_map
+        self.accepted_types = accepted_types
         self.implementations = implementations
         self.py_implementations = py_implementations
+        self._vars = defaultdict(set)
 
-    def convert_value(self, value):
-        """Translate the value to a format that the VM understands."""
+    def _acquire_graph(self, graph):
+        if graph in self._vars:
+            return
+        N = NestingAnalyzer(graph)
+        self._vars.update(N.free_variables_total())
+
+    def _convert_scalar(self, value):
+        try:
+            return self.object_map[value]
+        except (TypeError, KeyError):
+            pass
+
         if isinstance(value, FunctionType):
-            from .api import parse
-            return parse(value)
-        else:
+            g = parse(value)
+            self.object_map[value] = g
+            self._acquire_graph(g)
+            return g
+
+        elif isinstance(value, self.accepted_types):
             return value
 
-    def unconvert_value(self, value):
-        """Translate a VM-produced value to a user-faced format."""
+        else:
+            raise ValueError(f'Cannot convert: {value!r}')  # pragma: no cover
+
+    def convert(self, value):
+        """Convert a Python value into a value understood by the VM."""
+        return smap(self._convert_scalar, value)
+
+    def _unconvert_scalar(self, value):
+        """Translate a VM-produced value to a user-facing format."""
         if isinstance(value, Primitive):
             return self.py_implementations[value]
         elif isinstance(value, Closure):
@@ -109,6 +136,10 @@ class VM:
             return self.make_callable(value)
         else:
             return value
+
+    def unconvert(self, value):
+        """Convert a value from the VM into a corresponding Python object."""
+        return smap(self._unconvert_scalar, value)
 
     def make_callable(self, g):
         """Return an object that executes `g` when called on arguments."""
@@ -123,10 +154,9 @@ class VM:
         This will evaluate the passed-in graph and return the
         resulting value.
         """
-        args = smap(self.convert_value, tuple(_args))
+        args = self.convert(tuple(_args))
 
-        N = NestingAnalyzer(graph)
-        self._vars = N.free_variables_total()
+        self._acquire_graph(graph)
 
         if len(args) != len(graph.parameters):
             raise RuntimeError("Call with wrong number of arguments")
@@ -155,7 +185,7 @@ class VM:
                     frames[-1].values[frames[-1].todo[-1]] = r.value
                     frames[-1].todo.pop()
                 else:
-                    return smap(self.unconvert_value, r.value)
+                    return self.unconvert(r.value)
 
     def _succ_vm(self, node: ANFNode) -> Iterable[ANFNode]:
         """Follow node.incoming and free variables."""

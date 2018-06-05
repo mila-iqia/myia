@@ -3,10 +3,7 @@ from pytest import mark
 
 from .test_opt import _check_opt
 from myia.opt import lib
-from myia.prim import ops
 from myia.prim.py_implementations import \
-    py_implementations as pyimpl, \
-    vm_implementations as vmimpl, \
     head, tail, setitem, add, mul
 
 
@@ -228,79 +225,6 @@ def test_false_branch():
     _check_opt(before, after,
                lib.simplify_always_false,
                lib.inline)
-
-
-########################
-# Constant propagation #
-########################
-
-
-def test_ctprop():
-
-    def before(x):
-        return 10 + 5 * 8
-
-    def after(x):
-        return 50
-
-    _check_opt(before, after,
-               lib.constant_prop)
-
-
-def test_ctprop2():
-
-    def before(x):
-        return (6 - 3) + x * (8 * 2)
-
-    def after(x):
-        return 3 + x * 16
-
-    _check_opt(before, after,
-               lib.constant_prop)
-
-
-def test_ctprop_helper():
-
-    def helper(x):
-        return x * x
-
-    def before(x):
-        return helper(3) + x
-
-    def after(x):
-        return 9 + x
-
-    _check_opt(before, after,
-               lib.constant_prop)
-
-    _check_opt(before, before,
-               lib.make_constant_prop(vmimpl, pyimpl, None))
-
-
-def test_ctprop_closure():
-
-    def before(x):
-        def helper(y):
-            return x * y
-        return helper(3) + x
-
-    _check_opt(before, before,
-               lib.constant_prop)
-
-
-def test_ctprop_subset():
-    prop = lib.make_constant_prop(None, {
-        ops.mul: lambda x, y: x * y
-    })
-
-    def before():
-        return (5 * 8) + 3
-
-    def after():
-        return 40 + 3
-
-    _check_opt(before, after,
-               prop)
 
 
 ############

@@ -5,12 +5,9 @@ from ..ir import replace, succ_incoming, freevars_boundary, \
     Graph, Constant, is_constant, is_constant_graph, is_apply, \
     GraphCloner
 from ..unify import Var, var, SVar
-from ..prim import ops as P, Primitive
-from ..prim.py_implementations import \
-    py_implementations as pyimpl, \
-    vm_implementations as vmimpl
+from ..prim import ops as P
 from ..cconv import NestingAnalyzer
-from ..vm import VM
+from ..utils import Namespace
 
 from .opt import \
     sexp_to_node, \
@@ -34,6 +31,7 @@ Y2 = Var('Y2')
 C = var(is_constant)
 C1 = var(is_constant)
 C2 = var(is_constant)
+CNS = var(lambda x: is_constant(x, Namespace))
 G = var(is_constant_graph)
 NIL = var(lambda x: is_constant(x) and x.value == ())
 
@@ -184,43 +182,24 @@ simplify_always_false = psub(
 )
 
 
-########################
-# Constant propagation #
-########################
+###################
+# Resolve globals #
+###################
 
 
-def make_constant_prop(vmimpl, pyimpl, vm_class=None):
-    """Create a constant propagator that uses the given implementations."""
-    vm = vm_class and vm_class(vmimpl, pyimpl)
+def make_resolver(vm):
+    """Create an optimization to resolve globals.
 
-    @pattern_replacer(C, Cs)
-    def constant_prop(node, equiv):
-        fn = equiv[C].value
-        args = [ct.value for ct in equiv[Cs]]
-        if isinstance(fn, Primitive):
-            if fn in pyimpl:
-                return Constant(pyimpl[fn](*args))
-            else:
-                return node
+    Args:
+        vm: The VM to use for conversion.
+    """
+    @pattern_replacer(P.resolve, CNS, C)
+    def resolve_globals(node, equiv):
+        ns = equiv[CNS]
+        x = equiv[C]
+        return Constant(vm.convert(ns.value[x.value]))
 
-        elif isinstance(fn, Graph):
-            if vm:
-                parent = NestingAnalyzer(fn).parents()[fn]
-                if parent:
-                    # Can't evaluate a closure
-                    return node
-                else:
-                    return Constant(vm.evaluate(fn, args))
-            else:
-                return node
-
-        else:
-            raise TypeError(f'Cannot execute {fn}.')  # pragma: no cover
-
-    return constant_prop
-
-
-constant_prop = make_constant_prop(vmimpl, pyimpl, VM)
+    return resolve_globals
 
 
 ############

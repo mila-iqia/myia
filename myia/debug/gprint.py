@@ -417,6 +417,8 @@ make_tuple = GraphCosmeticPrimitive('(...)')
 X = Var('X')
 Y = Var('Y')
 V = var(is_constant)
+V1 = var(is_constant)
+V2 = var(is_constant)
 L = var(is_constant_graph)
 
 
@@ -448,7 +450,26 @@ def _opt_accum_cons(node, equiv):
 def _opt_fancy_getitem(node, equiv):
     x = equiv[X]
     v = equiv[V]
-    ct = Constant(GraphCosmeticPrimitive(f'[{int(v.value)}]', on_edge=True))
+    ct = Constant(GraphCosmeticPrimitive(f'[{v.value}]', on_edge=True))
+    with About(node.debug, 'cosmetic'):
+        return Apply([ct, x], node.graph)
+
+
+@pattern_replacer(primops.resolve, V1, V2)
+def _opt_fancy_resolve(node, equiv):
+    ns = equiv[V1]
+    name = equiv[V2]
+    with About(node.debug, 'cosmetic'):
+        lbl = f'{ns.value.label}.{name.value}'
+        ct = Constant(GraphCosmeticPrimitive(lbl))
+        return ct
+
+
+@pattern_replacer(primops.getattr, X, V)
+def _opt_fancy_getattr(node, equiv):
+    x = equiv[X]
+    v = equiv[V]
+    ct = Constant(GraphCosmeticPrimitive(f'{v.value}', on_edge=True))
     with About(node.debug, 'cosmetic'):
         return Apply([ct, x], node.graph)
 
@@ -462,6 +483,8 @@ def cosmetic_transformer(g):
     opt = pattern_equilibrium_optimizer(
         _opt_accum_cons,
         _opt_fancy_getitem,
+        _opt_fancy_resolve,
+        _opt_fancy_getattr,
     )
     opt(g)
     return g

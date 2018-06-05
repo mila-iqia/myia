@@ -6,17 +6,26 @@ from myia.api import parse
 def test_undefined():
     def f():  # pragma: no cover
         return c  # noqa
-    with pytest.raises(ValueError):
+    with pytest.raises(NameError):
         parse(f)
 
 
-@pytest.mark.xfail(reason='x is possibly undefined')
+def test_defined_later():
+    def f():  # pragma: no cover
+        return c  # noqa
+    with pytest.raises(UnboundLocalError):
+        parse(f)
+    c = 3
+
+
 def test_maybe():
     def f():  # pragma: no cover
         while True:
             x = 2
         return x
-    parse(f)
+    with pytest.raises(Exception):
+        # This shouldn't resolve
+        parse(f)
 
 
 def test_unsupported():
@@ -45,3 +54,13 @@ def test_global_nested():
         return h()
 
     parse(g)
+
+
+def test_forward_reference():
+    def g():
+        return h()
+
+    parse(g, resolve_globals=False)
+
+    def h():
+        return 2 + 2

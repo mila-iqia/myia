@@ -4,56 +4,64 @@ from types import FunctionType
 from typing import Any, Callable, Dict, List, Union
 
 from . import parser
-from .ir import ANFNode, Constant, Graph
-from .prim import py_implementations, vm_implementations, ops as P
-from .vm import VM as VM_
+from .ir import ANFNode, Graph
+from .opt import pattern_equilibrium_optimizer, lib as optlib
+from .prim import py_implementations, vm_implementations, ops as P, Primitive
+from .vm import VM
 
 
 def default_object_map() -> Dict[Any, ANFNode]:
     """Get a mapping from Python objects to nodes."""
-    mapping: Dict[Any, ANFNode] = {
-        operator.add: Constant(P.add),
-        operator.sub: Constant(P.sub),
-        operator.mul: Constant(P.mul),
-        operator.truediv: Constant(P.div),
-        operator.mod: Constant(P.mod),
-        operator.pow: Constant(P.pow),
-        operator.eq: Constant(P.eq),
-        operator.ne: Constant(P.ne),
-        operator.lt: Constant(P.lt),
-        operator.gt: Constant(P.gt),
-        operator.le: Constant(P.le),
-        operator.ge: Constant(P.ge),
-        operator.pos: Constant(P.uadd),
-        operator.neg: Constant(P.usub),
-        operator.not_: Constant(P.not_),
-        operator.getitem: Constant(P.getitem),
-        operator.setitem: Constant(P.setitem),
-        getattr: Constant(P.getattr),
-        setattr: Constant(P.setattr)
+    mapping = {
+        operator.add: P.add,
+        operator.sub: P.sub,
+        operator.mul: P.mul,
+        operator.truediv: P.div,
+        operator.mod: P.mod,
+        operator.pow: P.pow,
+        operator.eq: P.eq,
+        operator.ne: P.ne,
+        operator.lt: P.lt,
+        operator.gt: P.gt,
+        operator.le: P.le,
+        operator.ge: P.ge,
+        operator.pos: P.uadd,
+        operator.neg: P.usub,
+        operator.not_: P.not_,
+        operator.getitem: P.getitem,
+        operator.setitem: P.setitem,
+        getattr: P.getattr,
+        setattr: P.setattr,
     }
     for prim, impl in py_implementations.items():
-        mapping[impl] = Constant(prim)
-
+        mapping[impl] = prim
     return mapping
 
 
-ENV = parser.Environment(default_object_map().items())
-VM = VM_(vm_implementations, py_implementations)
+restricted_types = (int, float, bool, str, Primitive)
+all_types = (object,)
+default_vm = VM(vm_implementations,
+                py_implementations,
+                default_object_map(),
+                all_types)
+resolver_opt = pattern_equilibrium_optimizer(optlib.make_resolver(default_vm))
 
 
-def parse(func: FunctionType) -> Graph:
+def parse(func: FunctionType, resolve_globals=True) -> Graph:
     """Parse a function into ANF."""
-    return ENV.map(func).value
+    g = parser.parse(func)
+    if resolve_globals:
+        resolver_opt(g)
+    return g
 
 
 def run(g: Graph, args: List[Any]) -> Any:
     """Evaluate a graph on a set of arguments."""
-    return VM.evaluate(g, args)
+    return default_vm.evaluate(g, args)
 
 
 def compile(func: Union[Graph, FunctionType]) -> Callable:
     """Return a version of the function that runs using Myia's VM."""
     if not isinstance(func, Graph):
         func = parse(func)
-    return VM.make_callable(func)
+    return default_vm.make_callable(func)

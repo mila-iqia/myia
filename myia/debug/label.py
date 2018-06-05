@@ -5,7 +5,7 @@ from ..info import DebugInfo
 from ..ir.anf import Graph
 from ..ir.utils import is_constant, is_constant_graph, is_parameter, is_special
 from ..prim import Primitive
-from ..utils import Named
+from ..utils import Named, Namespace
 
 
 short_relation_symbols = {
@@ -91,7 +91,7 @@ class NodeLabeler:
                              True if force is None else force)
         elif is_constant(node):
             v = node.value
-            if isinstance(v, (int, float, str, Named)) or v == ():
+            if isinstance(v, (int, float, str, Named, Namespace)) or v == ():
                 return repr(v)
             elif isinstance(v, Primitive):
                 return v.name

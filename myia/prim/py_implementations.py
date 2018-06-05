@@ -311,3 +311,11 @@ def _maplist_vm(vm, f, xs):
     def f_(*args):
         return vm.call(f, args)
     return list(map(f_, xs))
+
+
+@vm_register(primops.resolve)
+def _resolve_vm(vm, data, item):
+    """Implement `resolve` for the VM."""
+    # There is no Python implementation for this one.
+    value = data[item]
+    return vm.convert(value)
