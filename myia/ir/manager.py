@@ -518,6 +518,7 @@ class GraphManager:
         for g in dropped:
             self.events.drop_graph(g)
             self.graphs.remove(g)
+            g._manager = None
 
     def _process_edge(self, node, key, inp, direction):
         """Add/remove an edge between two nodes.
@@ -859,9 +860,13 @@ class GraphCloner:
 
 
 def clone(g,
-          total=False,
+          total=True,
           relation='copy',
           clone_constants=False,
           graph_relation=None):
     """Return a clone of g."""
-    return GraphCloner(g)[g]
+    return GraphCloner(g,
+                       total=total,
+                       relation=relation,
+                       clone_constants=clone_constants,
+                       graph_relation=graph_relation)[g]

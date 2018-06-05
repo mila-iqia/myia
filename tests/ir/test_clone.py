@@ -4,8 +4,8 @@ import pytest
 from myia.api import parse
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs
-from myia.ir import Constant, Graph, is_constant, succ_deeper, succ_incoming
-from myia.manager import GraphManager, GraphCloner, clone
+from myia.ir import Constant, Graph, is_constant, succ_deeper, succ_incoming, \
+    GraphManager, GraphCloner, clone
 from myia.prim import ops as P
 
 

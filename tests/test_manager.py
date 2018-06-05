@@ -5,8 +5,7 @@ from collections import Counter
 
 from myia.api import parse
 from myia.debug.label import short_labeler
-from myia.ir import is_constant
-from myia.manager import GraphManager, GraphCloner
+from myia.ir import is_constant, GraphManager, GraphCloner
 from myia.prim import Primitive
 
 
