@@ -44,10 +44,12 @@ class NestingSpecs:
                 if values:
                     expected[key] = values
             else:
-                pass
+                expected[spec] = True
         return expected
 
     def name(self, node):
+        if isinstance(node, bool):
+            return node
         name = short_labeler.name(node)
         if name in self.stage.subs:
             return self.stage.subs[name]
@@ -178,7 +180,12 @@ def test_fake_nested(x):
     return g
 
 
-@check_manager(parents='g->X', fvs_direct='g:x', fvs_total='g:x,g')
+@check_manager(parents='g->X',
+               fvs_direct='g:x',
+               fvs_total='g:x,g',
+               graphs_used='X:g; g:g',
+               graphs_reachable='X:g; g:g',
+               recursive='g')
 def test_recurse(x):
     """Test that recursion doesn't break the algorithm."""
     def g():
@@ -371,6 +378,28 @@ def test_deepest(x):
 @check_manager(nodes='X:x,y')
 def test_unused_parameter(x, y):
     return x * x
+
+
+@check_manager(graphs_used='X:j; g:f; h:g; j:h,i',
+               graphs_reachable='X:f,g,h,i,j; g:f; h:f,g; j:f,g,h,i',
+               recursive='')
+def test_reachable(x, y):
+    def f(x):
+        return x * x
+
+    def g(x):
+        return f(x) + f(y)
+
+    def h():
+        return g(13)
+
+    def i():
+        return 6
+
+    def j(x, y):
+        return i() + h(x)
+
+    return j(x, y)
 
 
 ############################
@@ -686,8 +715,11 @@ def test_graph_properties():
         assert g.free_variables_direct is mng.free_variables_direct[g]
         assert g.free_variables_total is mng.free_variables_total[g]
         assert g.graphs_used is mng.graphs_used[g]
+        assert g.graph_users is mng.graph_users[g]
+        assert g.graphs_reachable is mng.graphs_reachable[g]
         assert g.graph_dependencies_direct is mng.graph_dependencies_direct[g]
         assert g.graph_dependencies_total is mng.graph_dependencies_total[g]
         assert g.parent is mng.parents[g]
         assert g.children is mng.children[g]
         assert g.scope is mng.scopes[g]
+        assert g.recursive is mng.recursive[g]

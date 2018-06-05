@@ -388,6 +388,35 @@ class FVTotalStatistic(NestingStatistic, CounterStatistic):
             _update(g2, inp)
 
 
+class GraphsReachableStatistic(NestingStatistic):
+    """Implements `GraphManager.graphs_reachable`."""
+
+    def _recompute(self):
+        used = self.manager.graphs_used
+        for g, gs in used.items():
+            self[g] = set(gs)
+        changes = True
+        while changes:
+            changes = False
+            for g, gs in self.items():
+                prev = len(gs)
+                accum = set()
+                for g2 in gs:
+                    accum |= self[g2]
+                gs |= accum
+                if len(gs) > prev:
+                    changes = True
+
+
+class RecursiveStatistic(NestingStatistic):
+    """Implements `GraphManager.recursive`."""
+
+    def _recompute(self):
+        reach = self.manager.graphs_reachable
+        for g, gs in reach.items():
+            self[g] = g in gs
+
+
 class GraphManager:
     """Structure to hold information about graphs and modify them.
 
@@ -475,6 +504,8 @@ class GraphManager:
         self._children = ChildrenStatistic(self)
         self._scopes = ScopeStatistic(self)
         self._free_variables_total = FVTotalStatistic(self)
+        self._graphs_reachable = GraphsReachableStatistic(self)
+        self._recursive = RecursiveStatistic(self)
 
         for root in roots:
             self.add_graph(root, root=True)
@@ -652,6 +683,23 @@ class GraphManager:
         figure as free variables.
         """
         return self._ensure_statistic(self._free_variables_total)
+
+    @property
+    def graphs_reachable(self):
+        """Map each graph to the set of graphs that may be called from there.
+
+        For each graph, this is the set of graphs that it refers to
+        directly *plus* the set of graphs it refers to indirectly.
+        """
+        return self._ensure_statistic(self._graphs_reachable)
+
+    @property
+    def recursive(self):
+        """Map each graph to whether it is recursive or not.
+
+        A graph is considered recursive if it is reachable from itself.
+        """
+        return self._ensure_statistic(self._recursive)
 
     def push_replace(self, old_node, new_node):
         """Declare replacement of old_node by new_node.

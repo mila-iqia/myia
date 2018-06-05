@@ -138,6 +138,11 @@ class Graph:
         return self.manager.graphs_used[self]
 
     @property
+    def graph_users(self):
+        """Return all graphs that use this graph."""
+        return self.manager.graph_users[self]
+
+    @property
     def graph_dependencies_direct(self):
         """Return the set of graphs free_variables_direct belong to."""
         return self.manager.graph_dependencies_direct[self]
@@ -161,6 +166,16 @@ class Graph:
     def scope(self):
         """Return this graph and all nested graphs."""
         return self.manager.scopes[self]
+
+    @property
+    def graphs_reachable(self):
+        """Return all graphs that may figure this one's call tree."""
+        return self.manager.graphs_reachable[self]
+
+    @property
+    def recursive(self):
+        """Return whether this graph is recursive."""
+        return self.manager.recursive[self]
 
     #################
     # Miscellaneous #
