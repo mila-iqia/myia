@@ -76,7 +76,10 @@ class Graph:
     def output(self, value: 'ANFNode') -> None:
         """Set the graph's output."""
         if self.return_:
-            self.return_.inputs[1] = value
+            if self._manager:
+                self._manager.set_edge(self.return_, 1, value)
+            else:
+                self.return_.inputs[1] = value
         else:
             self.return_ = Apply([Constant(primops.return_), value], self)
         self.return_.type = value.type
@@ -85,9 +88,11 @@ class Graph:
     def add_parameter(self) -> 'Parameter':
         """Add a new parameter to this graph (appended to the end)."""
         p = Parameter(self)
-        self.parameters.append(p)
-        # TODO: tell the manager about what we have just done
-        assert self._manager is None
+        new_parameters = self.parameters + [p]
+        if self._manager is None:
+            self.parameters = new_parameters
+        else:
+            self._manager.set_parameters(self, new_parameters)
         return p
 
     def constant(self, obj: Any) -> 'Constant':

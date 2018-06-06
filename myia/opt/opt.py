@@ -140,16 +140,15 @@ class PatternEquilibriumOptimizer:
         while True:
             changes = False
 
-            for node in mng.all_nodes:
-                for transformer in self.node_transformers:
-                    new = transformer(node)
-                    if new and new is not node:
-                        new.type = node.type
-                        mng.push_replace(node, new)
-                        changes = True
-                        break
-
-            mng.commit()
+            with mng.transact() as tr:
+                for node in mng.all_nodes:
+                    for transformer in self.node_transformers:
+                        new = transformer(node)
+                        if new and new is not node:
+                            new.type = node.type
+                            tr.replace(node, new)
+                            changes = True
+                            break
 
             if not changes:
                 break

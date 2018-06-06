@@ -6,7 +6,13 @@ from collections import defaultdict, Counter
 from ..graph_utils import dfs, FOLLOW, EXCLUDE
 from ..utils import Events
 
-from .utils import succ_deeper, is_constant, is_constant_graph
+from .utils import succ_deeper, is_constant, is_constant_graph, is_parameter
+
+
+class ManagerError(Exception):
+    """Class for errors raised by GraphManager."""
+
+    pass
 
 
 def manage(*graphs, weak=False):
@@ -465,7 +471,6 @@ class GraphManager:
 
     def __init__(self, *roots, manage=True):
         """Initialize the GraphManager."""
-        self._changes = []
         self.roots = roots
         self.manage = manage
         self.reset()
@@ -525,7 +530,7 @@ class GraphManager:
         """Ensure that the graph is managed by this manager."""
         if self.manage:
             if graph._manager and graph._manager is not self:
-                raise Exception('A graph can only have one manager.')
+                raise ManagerError('A graph can only have one manager.')
             graph._manager = self
         self.graphs.add(graph)
 
@@ -620,7 +625,7 @@ class GraphManager:
             # with a continue
             assert node in self.all_nodes
             uses = self.uses[node]
-            if uses:
+            if uses or is_parameter(node):
                 # This node is still live
                 continue
 
@@ -701,50 +706,58 @@ class GraphManager:
         """
         return self._ensure_statistic(self._recursive)
 
-    def push_replace(self, old_node, new_node):
-        """Declare replacement of old_node by new_node.
+    def set_parameters(self, graph, parameters):
+        """Replace a graph's parameters."""
+        with self.transact() as tr:
+            tr.set_parameters(graph, parameters)
 
-        This does not modify the graph. The change will occur in the next call
-        to commit().
+    def replace(self, old_node, new_node):
+        """Replace old_node by new_node."""
+        with self.transact() as tr:
+            tr.replace(old_node, new_node)
+
+    def set_edge(self, node, key, value):
+        """Set node.inputs[key] to value."""
+        with self.transact() as tr:
+            tr.set_edge(node, key, value)
+
+    def transact(self):
+        """Begin a transaction.
+
+        >>> with mng.transact() as tr:
+        ...     tr.replace(node1, node2)
+        ...     ...
         """
-        g = old_node.graph
-        if g and g.return_ is old_node:
-            raise Exception('Cannot replace the return node of a graph.')
-        uses = self.uses[old_node]
-        for node, key in uses:
-            self.push_set_edge(node, key, new_node)
+        return GraphTransaction(self)
 
-    def push_set_edge(self, node, key, value):
-        """Declare setting node.inputs[key] to value.
-
-        This does not modify the graph. The change will occur in the next call
-        to commit().
-        """
-        self._changes.append((node, key, value))
-
-    def commit(self):
+    def commit_changes(self, changes):
         """Commit changes.
 
         This modifies the graph and update attributes and properties.
         """
-        if not self.manage:
-            raise Exception('Cannot modify graph through this manager')
-
-        changes, self._changes = self._changes, []
-
         addedges = Counter()
         rmedges = Counter()
 
         adds = Counter()
         rms = Counter()
 
-        for root_node, key, new_node in changes:
-            old_node = root_node.inputs[key]
-            rmedges[(root_node, key, old_node)] += 1
-            addedges[(root_node, key, new_node)] += 1
-            rms[old_node] += 1
-            adds[new_node] += 1
-            root_node.inputs[key] = new_node
+        for operation, *args in changes:
+            if operation == 'set_edge':
+                root_node, key, new_node = args
+                old_node = root_node.inputs[key]
+                rmedges[(root_node, key, old_node)] += 1
+                addedges[(root_node, key, new_node)] += 1
+                rms[old_node] += 1
+                adds[new_node] += 1
+                root_node.inputs[key] = new_node
+            elif operation == 'set_parameters':
+                graph, new_parameters = args
+                old_parameters = graph.parameters
+                for p in new_parameters:
+                    adds[p] += 1
+                for p in old_parameters:
+                    rms[p] += 1
+                graph.parameters = new_parameters
 
         for root_node, key, new_node in addedges - rmedges:
             self._process_edge(root_node, key, new_node, 1)
@@ -757,3 +770,59 @@ class GraphManager:
         maybe_drop_graphs = self._maybe_drop_nodes(rms - adds)
 
         self._maybe_drop_graphs(maybe_drop_graphs)
+
+
+class GraphTransaction:
+    """Group changes to a graph into a transaction.
+
+    GraphTransaction supports replacing nodes, setting edges and replacing a
+    graph's parameters list. No changes actually happen until the commit()
+    method is called. commit() can only be called once, for multiple
+    transactions create multiple GraphTransaction objects.
+
+    When used as a context manager, commit() is called automatically at the end
+    of the with block.
+    """
+
+    def __init__(self, manager):
+        """Initialize a GraphTransaction."""
+        if not manager.manage:
+            raise ManagerError('Cannot modify graph through this manager')
+        self.manager = manager
+        self.changes = []
+
+    def set_parameters(self, graph, parameters):
+        """Declare replacement of a graph's parameters."""
+        self.changes.append(('set_parameters', graph, parameters))
+
+    def replace(self, old_node, new_node):
+        """Declare replacement of old_node by new_node.
+
+        This does not modify the graph. The change will occur in the next call
+        to commit().
+        """
+        g = old_node.graph
+        if g and g.return_ is old_node:
+            raise ManagerError('Cannot replace the return node of a graph.')
+        uses = self.manager.uses[old_node]
+        for node, key in uses:
+            self.set_edge(node, key, new_node)
+
+    def set_edge(self, node, key, value):
+        """Declare setting node.inputs[key] to value.
+
+        This does not modify the graph. The change will occur in the next call
+        to commit().
+        """
+        self.changes.append(('set_edge', node, key, value))
+
+    def commit(self):
+        """Commit the changes."""
+        changes, self.changes = self.changes, None
+        self.manager.commit_changes(changes)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, tb):
+        self.commit()

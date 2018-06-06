@@ -5,7 +5,7 @@ from collections import Counter
 
 from myia.api import parse
 from myia.debug.label import short_labeler
-from myia.ir import is_constant, GraphManager, GraphCloner
+from myia.ir import is_constant, GraphManager, GraphCloner, ManagerError
 from myia.prim import Primitive
 
 
@@ -118,9 +118,9 @@ def check_manager(*stages, **specs):
             stage.subs = subs
 
         def test():
-            def _replace(uses, value):
+            def _replace(tr, uses, value):
                 for node, key in uses:
-                    mng.push_set_edge(node, key, value)
+                    tr.set_edge(node, key, value)
 
             gfn = clone(parse(fn))
 
@@ -128,23 +128,23 @@ def check_manager(*stages, **specs):
 
             mng = GraphManager(gfn)
 
-            for node in mng.all_nodes:
-                if is_constant(node) and node.value in swaps:
-                    j = swaps.index(node.value)
-                    for swap_node, i in mng.uses[node]:
-                        assert i == 0
-                        uses = set(mng.uses[swap_node])
-                        _, first, second = swap_node.inputs
-                        todo[j + 1].append((uses, second))
-                        mng.push_replace(swap_node, first)
+            with mng.transact() as tr:
+                for node in mng.all_nodes:
+                    if is_constant(node) and node.value in swaps:
+                        j = swaps.index(node.value)
+                        for swap_node, i in mng.uses[node]:
+                            assert i == 0
+                            uses = set(mng.uses[swap_node])
+                            _, first, second = swap_node.inputs
+                            todo[j + 1].append((uses, second))
+                            tr.replace(swap_node, first)
 
-            mng.commit()
             mng.reset()
 
             for stage, operations in zip(stages, todo):
-                for uses, new_node in operations:
-                    _replace(uses, new_node)
-                mng.commit()
+                with mng.transact() as tr:
+                    for uses, new_node in operations:
+                        _replace(tr, uses, new_node)
                 _check_uses(mng)
                 stage.check(mng)
 
@@ -647,8 +647,8 @@ def test_cannot_replace_return():
 
     mng = GraphManager(f)
 
-    with pytest.raises(Exception):
-        mng.push_replace(f.return_, f.parameters[0])
+    with pytest.raises(ManagerError):
+        mng.replace(f.return_, f.parameters[0])
 
 
 def test_manager_exclusivity():
@@ -659,7 +659,7 @@ def test_manager_exclusivity():
     mng = GraphManager(f)
     assert f._manager is mng
 
-    with pytest.raises(Exception):
+    with pytest.raises(ManagerError):
         GraphManager(f)
 
 
@@ -671,8 +671,15 @@ def test_weak_manager():
 
     mng1 = GraphManager(f, manage=False)
     assert f._manager is None
-    with pytest.raises(Exception):
-        mng1.commit()
+    with pytest.raises(ManagerError):
+        with mng1.transact():
+            pass
+    with pytest.raises(ManagerError):
+        mng1.set_parameters(f, f.parameters)
+    with pytest.raises(ManagerError):
+        mng1.replace(f.output, f.output)
+    with pytest.raises(ManagerError):
+        mng1.set_edge(f.return_, 1, f.output)
     mng2 = GraphManager(f, manage=True)
     assert f._manager is mng2
     GraphManager(f, manage=False)
@@ -689,6 +696,33 @@ def test_drop_root():
     assert f in mng.nodes
     mng._maybe_drop_graphs({f})
     assert f in mng.nodes
+
+
+def test_add_parameter():
+
+    @parse
+    def f(x, y):
+        return x * y
+
+    mng = GraphManager(f)
+    assert len(f.parameters) == 2
+    assert set(f.parameters).issubset(mng.nodes[f])
+    f.add_parameter()
+    assert len(f.parameters) == 3
+    assert set(f.parameters).issubset(mng.nodes[f])
+
+
+def test_set_output():
+
+    @parse
+    def f(x, y):
+        return x * y
+
+    mng = GraphManager(f)
+    assert f.manager is mng
+    assert len(f.nodes) == 4
+    f.output = f.parameters[0]
+    assert len(f.nodes) == 3
 
 
 def test_graph_properties():
