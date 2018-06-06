@@ -62,13 +62,12 @@ class TypeSpecializer:
 
         self.mng = self.engine.mng
         self.node_map = self.mng.nodes
-        self.parents_map = self.mng.parents
 
         self.originals = {}
         self.specializations = {}
         self.counts = Counter()
 
-        empty_ctx = Context(None, None, (), parents_map=self.parents_map)
+        empty_ctx = Context.empty()
         ginf = GraphInferrer(self.engine, 'type', engine.graph, empty_ctx)
         argrefs = self.engine.argrefs
 
@@ -99,7 +98,6 @@ class _GraphSpecializer:
     def __init__(self, parent, specializer, ginf, argrefs, context):
         self.parent = parent
         self.specializer = specializer
-        self.parents_map = specializer.parents_map
         self.engine = specializer.engine
         self.graph = ginf.graph
         self.ginf = ginf
@@ -135,7 +133,7 @@ class _GraphSpecializer:
             v = await ref['value']
             if isinstance(v, GraphInferrer):
                 g = v.graph
-                if self.parents_map[g] is None:
+                if g.parent is None:
                     return g
                 else:
                     return UNKNOWN

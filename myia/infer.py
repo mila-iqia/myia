@@ -247,13 +247,12 @@ class Context:
     """
 
     @classmethod
-    def empty(cls, parents_map):
+    def empty(cls):
         """Create an empty context."""
-        return Context(None, None, (), parents_map=parents_map)
+        return Context(None, None, ())
 
-    def __init__(self, parent, g, argvals, *, parents_map):
+    def __init__(self, parent, g, argvals):
         """Initialize the Context."""
-        self.parents_map = parents_map
         self.parent = parent
         self.graph = g
         self.argkey = tuple(tuple(sorted(argv.items()))
@@ -265,16 +264,13 @@ class Context:
         """Return a context restricted to a graph's dependencies."""
         rval = self.parent_cache.get(graph, None)
         if rval is None:
-            parent_graph = self.parents_map.get(graph, None)
-            rval = self.parent_cache.get(parent_graph, None)
+            rval = self.parent_cache.get(graph.parent, None)
         return rval
 
     def add(self, graph, argvals):
         """Extend this context with values for another graph."""
-        parent_graph = self.parents_map[graph]
-        parent = self.parent_cache.get(parent_graph, None)
-        return Context(parent, graph, argvals,
-                       parents_map=self.parents_map)
+        parent = self.parent_cache.get(graph.parent, None)
+        return Context(parent, graph, argvals)
 
     def __hash__(self):
         return hash((self.parent, self.graph, self.argkey))
@@ -546,8 +542,7 @@ class InferenceEngine:
         self.equiv = eq_class(self)
 
         self.mng = manage(graph)
-        self.parents = self.mng.parents
-        empty_context = Context.empty(self.parents)
+        empty_context = Context.empty()
         self.root_context = empty_context.add(graph, argvals)
 
         self.loop = asyncio.new_event_loop()
