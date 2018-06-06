@@ -10,8 +10,7 @@ returning a nested function creates a closure.
 
 """
 
-from typing import Any, Iterable, List, MutableSequence, Sequence, Set, \
-    Tuple, overload, Union, Dict
+from typing import Any, Iterable, List, Union, Dict
 
 from ..dtype import Function, Unknown
 from ..info import NamedDebugInfo
@@ -217,157 +216,19 @@ class ANFNode(Node):
     def __init__(self, inputs: Iterable['ANFNode'], value: Any,
                  graph: Graph) -> None:
         """Construct a node."""
-        self._inputs = Inputs(self, inputs)
+        self.inputs = list(inputs)
         self.value = value
         self.graph = graph
-        self.uses: Set[Tuple[ANFNode, int]] = set()
         self.debug = NamedDebugInfo(self)
         self.type = Unknown()
-
-    @property
-    def inputs(self) -> 'Inputs':
-        """Return the list of inputs."""
-        return self._inputs
-
-    @inputs.setter
-    def inputs(self, value: Iterable['ANFNode']) -> None:
-        """Set the list of inputs."""
-        self._inputs.clear()
-        self._inputs = Inputs(self, value)
 
     @property
     def incoming(self) -> Iterable['ANFNode']:
         """Return incoming nodes in order."""
         return iter(self.inputs)
 
-    @property
-    def outgoing(self) -> Iterable['ANFNode']:
-        """Return uses of this node in random order."""
-        return (node for node, index in self.uses)
-
-    def __copy__(self) -> 'ANFNode':
-        """Copy this node.
-
-        This method is used by the `copy` module. It ensures that copied nodes
-        will have correct `uses` information. Debug information is not copied.
-
-        """
-        cls = self.__class__
-        obj = cls.__new__(cls)
-        ANFNode.__init__(obj, self.inputs, self.value, self.graph)
-        return obj
-
     def __str__(self) -> str:
         return self.debug.debug_name
-
-
-class Inputs(MutableSequence[ANFNode]):
-    """Container data structure for node inputs.
-
-    This mutable sequence data structure can be used to keep track of a node's
-    inputs. Any insertion or deletion of edges will be reflected in the inputs'
-    `uses` attributes.
-
-    """
-
-    def __init__(self, node: ANFNode,
-                 initlist: Iterable[ANFNode] = None) -> None:
-        """Construct the inputs container for a node.
-
-        Args:
-            node: The node of which the inputs are stored.
-            initlist: A sequence of nodes to initialize the container with.
-
-        """
-        self.node = node
-        self.data: List[ANFNode] = []
-        if initlist is not None:
-            self.extend(initlist)
-
-    @overload
-    def __getitem__(self, index: int) -> ANFNode:
-        pass
-
-    @overload  # noqa: F811
-    def __getitem__(self, index: slice) -> Sequence[ANFNode]:
-        pass
-
-    def __getitem__(self, index):  # noqa: F811
-        """Get an input by its index."""
-        return self.data[index]
-
-    @overload
-    def __setitem__(self, index: int, value: ANFNode) -> None:
-        pass
-
-    @overload  # noqa: F811
-    def __setitem__(self, index: slice, value: Iterable[ANFNode]) -> None:
-        pass
-
-    def __setitem__(self, index, value):  # noqa: F811
-        """Replace an input with another."""
-        if isinstance(index, slice):
-            raise ValueError("slice assignment not supported")
-        if index < 0:
-            index += len(self)
-        old_value = self.data[index]
-        old_value.uses.remove((self.node, index))
-        value.uses.add((self.node, index))
-        self.data[index] = value
-
-    @overload
-    def __delitem__(self, index: int) -> None:
-        pass
-
-    @overload  # noqa: F811
-    def __delitem__(self, index: slice) -> None:
-        pass
-
-    def __delitem__(self, index):  # noqa: F811
-        """Delete an input."""
-        if isinstance(index, slice):
-            raise ValueError("slice deletion not supported")
-        if index < 0:
-            index += len(self)
-        value = self.data[index]
-        value.uses.remove((self.node, index))
-        for i, next_value in enumerate(self.data[index + 1:]):
-            next_value.uses.remove((self.node, i + index + 1))
-            next_value.uses.add((self.node, i + index))
-        del self.data[index]
-
-    def __len__(self) -> int:
-        """Get the number of inputs."""
-        return len(self.data)
-
-    def insert(self, index: int, value: ANFNode) -> None:
-        """Insert an input at a given location."""
-        if index < 0:
-            index += len(self)
-        for i, next_value in enumerate(reversed(self.data[index:])):
-            next_value.uses.remove((self.node, len(self) - i - 1))
-            next_value.uses.add((self.node, len(self) - i))
-        value.uses.add((self.node, index))
-        self.data.insert(index, value)
-
-    def __str__(self) -> str:
-        return list_str(self.data)
-
-    def __repr__(self) -> str:
-        return f"Inputs({self.node}, {list_str(self.data)})"
-
-    def __eq__(self, other) -> bool:
-        """Test whether a list of inputs is equal to another list.
-
-        Note:
-            The goal of `Inputs` is to behave exactly like a list, but track
-            insertions and deletions to keep the bidirectional graph structure
-            up to date. As such, which node an `Inputs` object is attached to
-            is irrelevant to the equality test. Instead, a simple element by
-            element test is performed.
-
-        """
-        return all(x == y for x, y in zip(self, other))
 
 
 class Apply(ANFNode):

@@ -24,6 +24,8 @@ def manage(*graphs, weak=False):
     manager = None
     for graph in graphs:
         manager = graph._manager
+        if manager:
+            break
     if manager is None:
         manager = GraphManager(manage=not weak)
     for graph in graphs:
@@ -562,7 +564,7 @@ class GraphManager:
             if (node, key) not in self.uses[inp]:
                 # It's possible that we already got here when we
                 # dropped a graph.
-                return
+                return  # pragma: no cover
             self.uses[inp].remove((node, key))
             self.events.drop_edge(node, key, inp)
         else:

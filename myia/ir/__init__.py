@@ -11,6 +11,5 @@ from .utils import (  # noqa
     exclude_from_set, freevars_boundary,
     dfs, toposort,
     isomorphic,
-    replace,
     is_apply, is_parameter, is_constant, is_constant_graph, is_special
 )

@@ -1,7 +1,7 @@
 """Library of optimizations."""
 
 from ..graph_utils import dfs
-from ..ir import replace, succ_incoming, freevars_boundary, \
+from ..ir import succ_incoming, freevars_boundary, \
     Graph, Constant, is_constant, is_constant_graph, is_apply, \
     GraphCloner
 from ..unify import Var, var, SVar
@@ -272,44 +272,6 @@ inline_unique_uses = make_inliner(inline_criterion=is_unique_use,
 inline = make_inliner(inline_criterion=None, check_recursive=True)
 
 
-##################
-# Specialization #
-##################
-
-
-def make_specializer(specialize_criterion):
-    """Create an specializer.
-
-    Args:
-        specialize_criterion: A function that takes a node and returns
-            whether to specialize on it or not.
-    """
-    @pattern_replacer(G, Xs)
-    def specialize(node, equiv):
-        g = equiv[G].value
-        xs = equiv[Xs]
-
-        specialize = [specialize_criterion(x) for x in xs]
-        if not any(specialize):
-            return node
-
-        g2 = GraphCloner(g, relation='specialized')[g]
-        for x, p, s in zip(xs, g2.parameters, specialize):
-            if s:
-                replace(p, x)
-
-        g2.parameters = [p for s, p in zip(specialize, g2.parameters)
-                         if not s]
-        new_xs = [x for s, x in zip(specialize, xs) if not s]
-
-        return sexp_to_node((g2, *new_xs), node.graph)
-
-    return specialize
-
-
-specialize = make_specializer(specialize_criterion=is_constant)
-
-
 ##########################
 # Drop calls into graphs #
 ##########################
@@ -331,8 +293,8 @@ def drop_into_call(node, equiv):
 
     new_output = (g2.output, *ys)
 
-    replace(g2.output, Constant('DUMMY'))
-    replace(g2.output, sexp_to_node(new_output, g2))
+    g2.output = Constant('DUMMY')
+    g2.output = sexp_to_node(new_output, g2)
 
     return sexp_to_node((g2, *xs), node.graph)
 

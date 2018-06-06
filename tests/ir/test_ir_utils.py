@@ -5,7 +5,7 @@ from myia.graph_utils import dfs as _dfs
 from myia.ir import Apply, Constant, Graph, Parameter, Special, \
     dfs, exclude_from_set, \
     freevars_boundary, is_apply, is_constant, is_constant_graph, \
-    is_parameter, is_special, isomorphic, replace, \
+    is_parameter, is_special, isomorphic, \
     succ_deep, succ_deeper, succ_incoming, toposort
 from tests.test_graph_utils import _check_toposort
 
@@ -237,35 +237,3 @@ def test_helpers():
     assert is_special(s)
     assert is_special(s, int)
     assert not is_special(s, str)
-
-
-def test_replace():
-    @parse
-    def f1(x, y):
-        a = x * y
-        b = x + y
-        c = a / (b * b)
-        return c
-
-    @parse
-    def f2(x, y):
-        a = x * y
-        c = a / (10 * 10)
-        return c
-
-    @parse
-    def f3(x, y):
-        return 66
-
-    idx = GraphIndex(f1)
-
-    # Replacing inner node
-    assert not isomorphic(f1, f2)
-    replace(idx['b'], Constant(10))
-    assert isomorphic(f1, f2)
-
-    # Replacing output
-    assert not isomorphic(f1, f3)
-    replace(idx['c'], Constant(66))
-    assert not isomorphic(f1, f2)
-    assert isomorphic(f1, f3)

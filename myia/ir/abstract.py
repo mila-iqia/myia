@@ -12,7 +12,6 @@ class Node(ABC):
 
     Attributes:
         incoming: A collection of nodes which are inputs to this node.
-        outgoing: A collection of nodes that use this node as an input.
 
     """
 
@@ -20,10 +19,4 @@ class Node(ABC):
     @abstractmethod
     def incoming(self) -> Iterable['Node']:
         """Return nodes used as inputs."""
-        pass
-
-    @property
-    @abstractmethod
-    def outgoing(self) -> Iterable['Node']:
-        """Return nodes which use this node as an input."""
         pass
