@@ -517,14 +517,32 @@ class GraphManager:
 
     def add_graph(self, graph, root=False):
         """Add a graph to this manager, optionally as a root graph."""
+        if root:
+            self.roots.add(graph)
         if graph in self.graphs:
             return
         self._ensure_graph(graph)
         self.events.add_graph(graph)
-        if root:
-            self.roots.add(graph)
         self._acquire_nodes(graph.parameters)
         self._acquire_nodes({graph.return_})
+
+    def keep_roots(self, *roots):
+        """Keep only the graphs reachable from the given roots.
+
+        All other graphs will be removed from this manager.
+
+        If no roots are given, existing roots will be used.
+        """
+        if roots:
+            self.roots = set()
+            for root in roots:
+                self.add_graph(root, True)
+        else:
+            roots = self.roots
+        keep = set()
+        for root in roots:
+            keep.update(self.graphs_reachable[root])
+        self._maybe_drop_graphs(self.graphs - keep, ignore_users=True)
 
     def _ensure_graph(self, graph):
         """Ensure that the graph is managed by this manager."""
@@ -534,7 +552,7 @@ class GraphManager:
             graph._manager = self
         self.graphs.add(graph)
 
-    def _maybe_drop_graphs(self, graphs):
+    def _maybe_drop_graphs(self, graphs, ignore_users=False):
         todo = set(graphs)
         dropped = set()
 
@@ -545,7 +563,7 @@ class GraphManager:
                 continue
 
             users = self.graph_users[graph]
-            if users:
+            if users and not ignore_users:
                 continue
 
             dropped.add(graph)
@@ -621,9 +639,8 @@ class GraphManager:
 
         while nodes:
             node = nodes.pop()
-            # NOTE: If this assertion fails, just replace this with a test
-            # with a continue
-            assert node in self.all_nodes
+            if node not in self.all_nodes:
+                continue
             uses = self.uses[node]
             if uses or is_parameter(node):
                 # This node is still live

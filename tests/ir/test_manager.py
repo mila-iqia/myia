@@ -698,6 +698,57 @@ def test_drop_root():
     assert f in mng.nodes
 
 
+def test_keep_roots():
+
+    @parse
+    def f(x, y):
+        return x * y
+
+    @parse
+    def g(x, y):
+        return x + y
+
+    mng = GraphManager(f)
+    assert mng.graphs == {f}
+
+    mng.add_graph(g)
+    assert mng.graphs == {f, g}
+
+    mng.keep_roots()
+    assert mng.graphs == {f}
+
+    mng.keep_roots(g)
+    assert mng.graphs == {g}
+
+
+def test_keep_roots_recursion():
+
+    def nonrec():
+        return 123
+
+    def rec1():
+        return rec2()
+
+    def rec2():
+        return rec1()
+
+    @parse
+    def f(x, y):
+        return rec1() + nonrec()
+
+    mng = GraphManager(f)
+    assert len(mng.graphs) == 4
+
+    mng.replace(f.output, f.parameters[0])
+    # This reclaimed nonrec, but failed to reclaim rec1 and rec2 because of a
+    # cycle in references
+    assert len(mng.graphs) == 3
+
+    # This acts like a GC, so the recursive graphs will be cut
+    mng.keep_roots()
+    assert len(mng.graphs) == 1
+
+
 def test_add_parameter():
 
     @parse
