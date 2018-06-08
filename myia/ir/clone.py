@@ -86,9 +86,10 @@ class GraphCloner:
             if status == inline:
                 return
             else:
-                raise Exception(
-                    '`total` option is not compatible with inlining.'
-                )
+                msg = 'Trying to clone and inline a graph at the same time.'
+                if self.total:
+                    msg += ' Try setting the `total` option to False.'
+                raise Exception(msg)
 
         if inline:
             for p, new_p in zip(graph.parameters, new_params):
@@ -117,12 +118,16 @@ class GraphCloner:
             target_graph.return_ = self.repl[graph.return_]
             for ct in mng.graph_constants[graph]:
                 with About(ct.debug, self.relation):
-                    self.repl[ct] = Constant(target_graph)
+                    new = Constant(target_graph)
+                    new.type = ct.type
+                    self.repl[ct] = new
 
         if self.clone_constants:
             for ct in mng.constants[graph]:
                 if ct not in self.repl:
-                    self.repl[ct] = Constant(ct.value)
+                    new = Constant(ct.value)
+                    new.type = ct.type
+                    self.repl[ct] = new
 
         self.status[graph] = inline
 

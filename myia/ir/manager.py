@@ -12,8 +12,6 @@ from .utils import succ_deeper, is_constant, is_constant_graph, is_parameter
 class ManagerError(Exception):
     """Class for errors raised by GraphManager."""
 
-    pass
-
 
 def manage(*graphs, weak=False):
     """Ensure that all given graphs have a manager and return it.
@@ -112,8 +110,6 @@ class NodesStatistic(PerGraphStatistic):
 class CounterStatistic(PerGraphStatistic):
     """Represents a statistic that maps each graph to a set of counters."""
 
-    constructor = dict
-
     def inc(self, graph, key, qty=1):
         """Increment the count for self[graph][key] by qty."""
         d = self[graph]
@@ -135,6 +131,7 @@ class CounterStatistic(PerGraphStatistic):
             return True
         else:
             d[key] -= qty
+            assert d[key] > 0
             return False
 
     def mod(self, graph, key, qty):
@@ -144,7 +141,12 @@ class CounterStatistic(PerGraphStatistic):
         elif qty < 0:
             return self.dec(graph, key, -qty)
         else:
+            # If this happens, there's probably a bug elsewhere,
+            # or a new features, in which case this can be a no-op
             raise ValueError('qty cannot be 0')  # pragma: no cover
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        raise NotImplementedError()
 
     def _on_add_edge(self, event, node, key, inp):
         self._on_mod_edge(event, node, key, inp, 1)
@@ -573,7 +575,8 @@ class GraphManager:
         for g in dropped:
             self.events.drop_graph(g)
             self.graphs.remove(g)
-            g._manager = None
+            if g._manager is self:
+                g._manager = None
 
     def _process_edge(self, node, key, inp, direction):
         """Add/remove an edge between two nodes.
@@ -747,7 +750,7 @@ class GraphManager:
         """
         return GraphTransaction(self)
 
-    def commit_changes(self, changes):
+    def _commit_changes(self, changes):
         """Commit changes.
 
         This modifies the graph and update attributes and properties.
@@ -836,7 +839,7 @@ class GraphTransaction:
     def commit(self):
         """Commit the changes."""
         changes, self.changes = self.changes, None
-        self.manager.commit_changes(changes)
+        self.manager._commit_changes(changes)
 
     def __enter__(self):
         return self

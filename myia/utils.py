@@ -261,16 +261,16 @@ class Event(list):
             f(self, *args, **kwargs)
 
     def __str__(self):
-        return f'Event({self.name})'
+        return repr(self)
 
     def __repr__(self):
-        return str(self)
+        return f'Event({self.name})'
 
 
 class Events:
     """A group of named events.
 
-    >>> events = Events('tickle', 'yawn')
+    >>> events = Events(tickle=None, yawn=None)
     >>> events.tickle.register(lambda event, n: print("hi" * n))
     <function>
     >>> events.yawn.register(lambda event, n: print("a" * n))
@@ -279,6 +279,12 @@ class Events:
     hihihihihi
     >>> events.yawn(20)
     aaaaaaaaaaaaaaaaaaaa
+
+    Args:
+        owner: The object that owns all the events. It will be passed
+            as the first argument on each event.
+        events: Keyword arguments mapping an event name to a history,
+            or None if there is no history.
     """
 
     def __init__(self, owner=None, **events):
