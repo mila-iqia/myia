@@ -1,10 +1,11 @@
 from myia.api import parse
+from myia.debug.label import short_labeler
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs as _dfs
 from myia.ir import Apply, Constant, Graph, Parameter, Special, \
     dfs, exclude_from_set, \
     freevars_boundary, is_apply, is_constant, is_constant_graph, \
-    is_parameter, is_special, isomorphic, replace, \
+    is_parameter, is_special, isomorphic, \
     succ_deep, succ_deeper, succ_incoming, toposort
 from tests.test_graph_utils import _check_toposort
 
@@ -55,14 +56,9 @@ def test_toposort2():
 
 def _name_nodes(nodes):
     def name(node):
-        if is_constant_graph(node):
-            return node.value.debug.name or '.'
-        elif isinstance(node, Constant):
-            return str(node.value)
-        else:
-            return node.debug.name or '.'
+        return short_labeler.label(node, fn_label=False)
 
-    return set(map(name, nodes))
+    return set(map(name, nodes)) - {'·'}
 
 
 def test_dfs_variants():
@@ -82,18 +78,18 @@ def test_dfs_variants():
     inner_ret = inner_graph.return_
 
     deep = _name_nodes(_dfs(inner_ret, succ_deep))
-    assert deep == set('. return add y z mul x'.split())
+    assert deep == set('return add y z mul x'.split())
 
     deeper = _name_nodes(_dfs(inner_ret, succ_deeper))
-    assert deeper == set('. return add y z mul x w 3 q g'.split())
+    assert deeper == set('return add y z mul x w 3 q g'.split())
 
     _bound_fv = freevars_boundary(inner_graph, True)
     bound_fv = _name_nodes(_dfs(inner_ret, succ_deeper, _bound_fv))
-    assert bound_fv == set('. return add y z'.split())
+    assert bound_fv == set('return add y z'.split())
 
     _no_fv = freevars_boundary(inner_graph, False)
     no_fv = _name_nodes(_dfs(inner_ret, succ_deeper, _no_fv))
-    assert no_fv == set('. return add y'.split())
+    assert no_fv == set('return add y'.split())
 
     _excl_root = exclude_from_set([inner_ret])
     excl_root = _name_nodes(_dfs(inner_ret, succ_deeper, _excl_root))
@@ -241,35 +237,3 @@ def test_helpers():
     assert is_special(s)
     assert is_special(s, int)
     assert not is_special(s, str)
-
-
-def test_replace():
-    @parse
-    def f1(x, y):
-        a = x * y
-        b = x + y
-        c = a / (b * b)
-        return c
-
-    @parse
-    def f2(x, y):
-        a = x * y
-        c = a / (10 * 10)
-        return c
-
-    @parse
-    def f3(x, y):
-        return 66
-
-    idx = GraphIndex(f1)
-
-    # Replacing inner node
-    assert not isomorphic(f1, f2)
-    replace(idx['b'], Constant(10))
-    assert isomorphic(f1, f2)
-
-    # Replacing output
-    assert not isomorphic(f1, f3)
-    replace(idx['c'], Constant(66))
-    assert not isomorphic(f1, f2)
-    assert isomorphic(f1, f3)

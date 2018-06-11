@@ -13,8 +13,7 @@ from .ir import GraphCloner, is_apply, is_constant, Constant, \
 from .prim import Primitive
 from .graph_utils import dfs
 from .utils import Named
-from .opt import pattern_equilibrium_optimizer, inline_unique_uses, \
-    lib as optlib
+from .opt import lib as optlib, PatternEquilibriumOptimizer
 
 
 UNKNOWN = Named('UNKNOWN')
@@ -45,12 +44,12 @@ def type_specialize(graph, argprops, optimize=True):
     s = TypeSpecializer(engine)
     g2 = s.result
     if optimize:
-        eq = pattern_equilibrium_optimizer(
+        eq = PatternEquilibriumOptimizer(
             optlib.simplify_always_true,
             optlib.simplify_always_false,
+            optlib.inline_unique_uses,
         )
         eq(g2)
-        inline_unique_uses(g2)
     return g2
 
 
@@ -61,15 +60,14 @@ class TypeSpecializer:
         """Initialize a TypeSpecializer."""
         self.engine = engine
 
-        self.nest = self.engine.nest
-        self.node_map = {g: {n for n in nodes if n.graph is g}
-                         for g, nodes in self.nest.all_nodes.items()}
-        self.parents_map = self.nest.parents()
+        self.mng = self.engine.mng
+        self.node_map = self.mng.nodes
+
         self.originals = {}
         self.specializations = {}
         self.counts = Counter()
 
-        empty_ctx = Context(None, None, (), parents_map=self.parents_map)
+        empty_ctx = Context.empty()
         ginf = GraphInferrer(self.engine, 'type', engine.graph, empty_ctx)
         argrefs = self.engine.argrefs
 
@@ -100,7 +98,6 @@ class _GraphSpecializer:
     def __init__(self, parent, specializer, ginf, argrefs, context):
         self.parent = parent
         self.specializer = specializer
-        self.parents_map = specializer.parents_map
         self.engine = specializer.engine
         self.graph = ginf.graph
         self.ginf = ginf
@@ -136,7 +133,7 @@ class _GraphSpecializer:
             v = await ref['value']
             if isinstance(v, GraphInferrer):
                 g = v.graph
-                if self.parents_map[g] is None:
+                if g.parent is None:
                     return g
                 else:
                     return UNKNOWN

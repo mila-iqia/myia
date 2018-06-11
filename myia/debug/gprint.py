@@ -5,16 +5,16 @@ import os
 
 from hrepr import hrepr
 
-from ..cconv import NestingAnalyzer, ParentProxy
 from ..dtype import Type, Bool, Int, Float, Tuple, List, Function
 from ..infer import Reference, Context
 from ..info import DebugInfo, About
 from ..ir import ANFNode, Apply, Constant, Graph, is_apply, is_constant, \
-    is_constant_graph, is_parameter, is_special, GraphCloner
+    is_constant_graph, is_parameter, is_special, GraphCloner, \
+    ParentProxy, GraphManager, manage
 from ..parser import Location
 from ..prim import ops as primops
 from ..prim.value_inferrers import LimitedValue
-from ..opt import pattern_equilibrium_optimizer, pattern_replacer
+from ..opt import PatternEquilibriumOptimizer, pattern_replacer
 from ..unify import Var, var, FilterVar
 from ..utils import Registry
 
@@ -201,9 +201,9 @@ class MyiaGraphPrinter(GraphPrinter):
         self.currid = 0
 
     def _import_graph(self, graph):
-        nest = NestingAnalyzer(graph)
+        mng = manage(graph, weak=True)
         graphs = set()
-        parents = nest.parents()
+        parents = mng.parents
         g = graph
         clone = GraphCloner(total=True, relation='cosmetic')
         while g:
@@ -480,7 +480,7 @@ def cosmetic_transformer(g):
     The resulting graph is not a valid one to run, because it may contain nodes
     with fake functions that only serve a cosmetic purpose.
     """
-    opt = pattern_equilibrium_optimizer(
+    opt = PatternEquilibriumOptimizer(
         _opt_accum_cons,
         _opt_fancy_getitem,
         _opt_fancy_resolve,
@@ -500,7 +500,8 @@ class _Graph:
     def __hrepr__(self, H, hrepr):
         """Return HTML representation (uses buche-cytoscape)."""
         if hrepr.config.depth > 1 and not hrepr.config.graph_expand_all:
-            return hrepr(Constant(self))
+            label = short_labeler.label(self, True)
+            return H.span['node', f'node-Graph'](label)
         dc = hrepr.config.duplicate_constants
         dfv = hrepr.config.duplicate_free_variables
         fin = hrepr.config.function_in_node
@@ -554,6 +555,19 @@ class _Apply:
                 return hrepr(self.inputs[1])['node-return']
         else:
             return super(Apply, self).__hrepr__(H, hrepr)
+
+
+@mixin(ParentProxy)
+class _ParentProxy:
+    @classmethod
+    def __hrepr_resources__(cls, H):
+        """Require the cytoscape plugin for buche."""
+        return H.style(mcss)
+
+    def __hrepr__(self, H, hrepr):
+        class_name = 'constant'
+        label = 'Prox:' + short_labeler.label(self.graph, True)
+        return H.span['node', f'node-{class_name}'](label)
 
 
 ########
@@ -629,8 +643,8 @@ class _DebugInfo:
         return rval
 
 
-@mixin(NestingAnalyzer)
-class _NestingAnalyzer:
+@mixin(GraphManager)
+class _GraphManager:
     @classmethod
     def __hrepr_resources__(cls, H):
         return GraphPrinter.__hrepr_resources__(H)
@@ -643,7 +657,7 @@ class _NestingAnalyzer:
             }
         })
 
-        mode = hrepr.config.nesting_analyzer_mode or 'parents'
+        mode = hrepr.config.manager_mode or 'parents'
 
         def lbl(x):
             if isinstance(x, ParentProxy):
@@ -653,16 +667,16 @@ class _NestingAnalyzer:
 
         if mode == 'parents':
             graph = {g: set() if parent is None else {parent}
-                     for g, parent in self.parents().items()}
+                     for g, parent in self.parents.items()}
         elif mode == 'children':
-            graph = self.children()
+            graph = self.children
         elif mode == 'graph_dependencies_direct':
-            graph = self.graph_dependencies_direct()
+            graph = self.graph_dependencies_direct
         elif mode == 'graph_dependencies_total':
-            graph = self.graph_dependencies_total()
+            graph = self.graph_dependencies_total
         else:
             raise Exception(
-                f'Unknown display mode for NestingAnalyzer: "{mode}"'
+                f'Unknown display mode for GraphManager: "{mode}"'
             )
 
         for g, deps in graph.items():

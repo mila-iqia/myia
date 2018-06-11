@@ -17,7 +17,7 @@ TU = Unification()
 
 
 @TU.register_visitor(tuple)
-def visit_tuple(fn, value):
+def visit_tuple(value, fn):
     return tuple(expandlist(fn(e) for e in value))
 
 

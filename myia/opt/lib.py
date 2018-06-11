@@ -1,12 +1,11 @@
 """Library of optimizations."""
 
 from ..graph_utils import dfs
-from ..ir import replace, succ_incoming, freevars_boundary, \
+from ..ir import succ_incoming, freevars_boundary, \
     Graph, Constant, is_constant, is_constant_graph, is_apply, \
     GraphCloner
 from ..unify import Var, var, SVar
 from ..prim import ops as P
-from ..cconv import NestingAnalyzer
 from ..utils import Namespace
 
 from .opt import \
@@ -187,17 +186,18 @@ simplify_always_false = psub(
 ###################
 
 
-def make_resolver(vm):
+def make_resolver(convert):
     """Create an optimization to resolve globals.
 
     Args:
-        vm: The VM to use for conversion.
+        convert: The function to use for conversion.
     """
     @pattern_replacer(P.resolve, CNS, C)
     def resolve_globals(node, equiv):
         ns = equiv[CNS]
         x = equiv[C]
-        return Constant(vm.convert(ns.value[x.value]))
+        g = convert(ns.value[x.value])
+        return Constant(g)
 
     return resolve_globals
 
@@ -226,8 +226,7 @@ def make_inliner(inline_criterion, check_recursive):
                 return node
 
         if check_recursive:
-            nest = NestingAnalyzer(g)
-            if g in nest.graphs_accessible()[g]:
+            if g.recursive:
                 return node
 
         clone = GraphCloner(total=False)
@@ -258,48 +257,19 @@ def is_trivial_graph(g, node, args):
         return False
 
 
+def is_unique_use(g, node, args):
+    """Inline graphs that are only used once."""
+    users = g.graph_users
+    return len(users) == 1 and sum(users.values()) == 1
+
+
 inline_trivial = make_inliner(inline_criterion=is_trivial_graph,
                               check_recursive=False)
 
+inline_unique_uses = make_inliner(inline_criterion=is_unique_use,
+                                  check_recursive=True)
+
 inline = make_inliner(inline_criterion=None, check_recursive=True)
-
-
-##################
-# Specialization #
-##################
-
-
-def make_specializer(specialize_criterion):
-    """Create an specializer.
-
-    Args:
-        specialize_criterion: A function that takes a node and returns
-            whether to specialize on it or not.
-    """
-    @pattern_replacer(G, Xs)
-    def specialize(node, equiv):
-        g = equiv[G].value
-        xs = equiv[Xs]
-
-        specialize = [specialize_criterion(x) for x in xs]
-        if not any(specialize):
-            return node
-
-        g2 = GraphCloner(g, relation='specialized')[g]
-        for x, p, s in zip(xs, g2.parameters, specialize):
-            if s:
-                replace(p, x)
-
-        g2.parameters = [p for s, p in zip(specialize, g2.parameters)
-                         if not s]
-        new_xs = [x for s, x in zip(specialize, xs) if not s]
-
-        return sexp_to_node((g2, *new_xs), node.graph)
-
-    return specialize
-
-
-specialize = make_specializer(specialize_criterion=is_constant)
 
 
 ##########################
@@ -323,8 +293,8 @@ def drop_into_call(node, equiv):
 
     new_output = (g2.output, *ys)
 
-    replace(g2.output, Constant('DUMMY'))
-    replace(g2.output, sexp_to_node(new_output, g2))
+    g2.output = Constant('DUMMY')
+    g2.output = sexp_to_node(new_output, g2)
 
     return sexp_to_node((g2, *xs), node.graph)
 

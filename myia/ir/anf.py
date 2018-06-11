@@ -10,8 +10,7 @@ returning a nested function creates a closure.
 
 """
 
-from typing import Any, Iterable, List, MutableSequence, Sequence, Set, \
-    Tuple, overload, Union, Dict
+from typing import Any, Iterable, List, Union, Dict
 
 from ..dtype import Function, Unknown
 from ..info import NamedDebugInfo
@@ -53,6 +52,7 @@ class Graph:
         self.return_: Apply = None
         self.debug = NamedDebugInfo(self)
         self.transforms: Dict[str, Union[Graph, Primitive]] = {}
+        self._manager = None
 
     @property
     def type(self):
@@ -76,7 +76,10 @@ class Graph:
     def output(self, value: 'ANFNode') -> None:
         """Set the graph's output."""
         if self.return_:
-            self.return_.inputs[1] = value
+            if self._manager:
+                self._manager.set_edge(self.return_, 1, value)
+            else:
+                self.return_.inputs[1] = value
         else:
             self.return_ = Apply([Constant(primops.return_), value], self)
         self.return_.type = value.type
@@ -85,7 +88,11 @@ class Graph:
     def add_parameter(self) -> 'Parameter':
         """Add a new parameter to this graph (appended to the end)."""
         p = Parameter(self)
-        self.parameters.append(p)
+        new_parameters = self.parameters + [p]
+        if self._manager is None:
+            self.parameters = new_parameters
+        else:
+            self._manager.set_parameters(self, new_parameters)
         return p
 
     def constant(self, obj: Any) -> 'Constant':
@@ -97,6 +104,86 @@ class Graph:
         wrapped_inputs = [i if isinstance(i, ANFNode) else self.constant(i)
                           for i in inputs]
         return Apply(wrapped_inputs, self)
+
+    ######################
+    # Managed properties #
+    ######################
+
+    @property
+    def manager(self):
+        """Return the GraphManager for this Graph."""
+        if self._manager is None:
+            raise Exception(f'Graph {self} has no manager.')
+        return self._manager
+
+    @property
+    def nodes(self):
+        """Return all nodes that belong to this graph."""
+        return self.manager.nodes[self]
+
+    @property
+    def constants(self):
+        """Return all constants used by this graph."""
+        return self.manager.constants[self]
+
+    @property
+    def free_variables_direct(self):
+        """Return all free variables directly pointed to in this graph."""
+        return self.manager.free_variables_direct[self]
+
+    @property
+    def free_variables_total(self):
+        """Return all free variables required by this graph's scope."""
+        return self.manager.free_variables_total[self]
+
+    @property
+    def graphs_used(self):
+        """Return all graphs used by this graph directly."""
+        return self.manager.graphs_used[self]
+
+    @property
+    def graph_users(self):
+        """Return all graphs that use this graph."""
+        return self.manager.graph_users[self]
+
+    @property
+    def graph_dependencies_direct(self):
+        """Return the set of graphs free_variables_direct belong to."""
+        return self.manager.graph_dependencies_direct[self]
+
+    @property
+    def graph_dependencies_total(self):
+        """Return the set of graphs free_variables_total belong to."""
+        return self.manager.graph_dependencies_total[self]
+
+    @property
+    def parent(self):
+        """Return the parent of this graph."""
+        return self.manager.parents.get(self, None)
+
+    @property
+    def children(self):
+        """Return all graphs that have this graph as parent."""
+        return self.manager.children[self]
+
+    @property
+    def scope(self):
+        """Return this graph and all nested graphs."""
+        return self.manager.scopes[self]
+
+    @property
+    def graphs_reachable(self):
+        """Return all graphs that may figure this one's call tree."""
+        return self.manager.graphs_reachable[self]
+
+    @property
+    def recursive(self):
+        """Return whether this graph is recursive."""
+        return self.manager.recursive[self]
+
+    #################
+    # Miscellaneous #
+    #################
 
     def __str__(self) -> str:
         return self.debug.debug_name
@@ -134,157 +221,19 @@ class ANFNode(Node):
     def __init__(self, inputs: Iterable['ANFNode'], value: Any,
                  graph: Graph) -> None:
         """Construct a node."""
-        self._inputs = Inputs(self, inputs)
+        self.inputs = list(inputs)
         self.value = value
         self.graph = graph
-        self.uses: Set[Tuple[ANFNode, int]] = set()
         self.debug = NamedDebugInfo(self)
         self.type = Unknown()
-
-    @property
-    def inputs(self) -> 'Inputs':
-        """Return the list of inputs."""
-        return self._inputs
-
-    @inputs.setter
-    def inputs(self, value: Iterable['ANFNode']) -> None:
-        """Set the list of inputs."""
-        self._inputs.clear()
-        self._inputs = Inputs(self, value)
 
     @property
     def incoming(self) -> Iterable['ANFNode']:
         """Return incoming nodes in order."""
         return iter(self.inputs)
 
-    @property
-    def outgoing(self) -> Iterable['ANFNode']:
-        """Return uses of this node in random order."""
-        return (node for node, index in self.uses)
-
-    def __copy__(self) -> 'ANFNode':
-        """Copy this node.
-
-        This method is used by the `copy` module. It ensures that copied nodes
-        will have correct `uses` information. Debug information is not copied.
-
-        """
-        cls = self.__class__
-        obj = cls.__new__(cls)
-        ANFNode.__init__(obj, self.inputs, self.value, self.graph)
-        return obj
-
     def __str__(self) -> str:
         return self.debug.debug_name
-
-
-class Inputs(MutableSequence[ANFNode]):
-    """Container data structure for node inputs.
-
-    This mutable sequence data structure can be used to keep track of a node's
-    inputs. Any insertion or deletion of edges will be reflected in the inputs'
-    `uses` attributes.
-
-    """
-
-    def __init__(self, node: ANFNode,
-                 initlist: Iterable[ANFNode] = None) -> None:
-        """Construct the inputs container for a node.
-
-        Args:
-            node: The node of which the inputs are stored.
-            initlist: A sequence of nodes to initialize the container with.
-
-        """
-        self.node = node
-        self.data: List[ANFNode] = []
-        if initlist is not None:
-            self.extend(initlist)
-
-    @overload
-    def __getitem__(self, index: int) -> ANFNode:
-        pass
-
-    @overload  # noqa: F811
-    def __getitem__(self, index: slice) -> Sequence[ANFNode]:
-        pass
-
-    def __getitem__(self, index):  # noqa: F811
-        """Get an input by its index."""
-        return self.data[index]
-
-    @overload
-    def __setitem__(self, index: int, value: ANFNode) -> None:
-        pass
-
-    @overload  # noqa: F811
-    def __setitem__(self, index: slice, value: Iterable[ANFNode]) -> None:
-        pass
-
-    def __setitem__(self, index, value):  # noqa: F811
-        """Replace an input with another."""
-        if isinstance(index, slice):
-            raise ValueError("slice assignment not supported")
-        if index < 0:
-            index += len(self)
-        old_value = self.data[index]
-        old_value.uses.remove((self.node, index))
-        value.uses.add((self.node, index))
-        self.data[index] = value
-
-    @overload
-    def __delitem__(self, index: int) -> None:
-        pass
-
-    @overload  # noqa: F811
-    def __delitem__(self, index: slice) -> None:
-        pass
-
-    def __delitem__(self, index):  # noqa: F811
-        """Delete an input."""
-        if isinstance(index, slice):
-            raise ValueError("slice deletion not supported")
-        if index < 0:
-            index += len(self)
-        value = self.data[index]
-        value.uses.remove((self.node, index))
-        for i, next_value in enumerate(self.data[index + 1:]):
-            next_value.uses.remove((self.node, i + index + 1))
-            next_value.uses.add((self.node, i + index))
-        del self.data[index]
-
-    def __len__(self) -> int:
-        """Get the number of inputs."""
-        return len(self.data)
-
-    def insert(self, index: int, value: ANFNode) -> None:
-        """Insert an input at a given location."""
-        if index < 0:
-            index += len(self)
-        for i, next_value in enumerate(reversed(self.data[index:])):
-            next_value.uses.remove((self.node, len(self) - i - 1))
-            next_value.uses.add((self.node, len(self) - i))
-        value.uses.add((self.node, index))
-        self.data.insert(index, value)
-
-    def __str__(self) -> str:
-        return list_str(self.data)
-
-    def __repr__(self) -> str:
-        return f"Inputs({self.node}, {list_str(self.data)})"
-
-    def __eq__(self, other) -> bool:
-        """Test whether a list of inputs is equal to another list.
-
-        Note:
-            The goal of `Inputs` is to behave exactly like a list, but track
-            insertions and deletions to keep the bidirectional graph structure
-            up to date. As such, which node an `Inputs` object is attached to
-            is irrelevant to the equality test. Instead, a simple element by
-            element test is performed.
-
-        """
-        return all(x == y for x, y in zip(self, other))
 
 
 class Apply(ANFNode):

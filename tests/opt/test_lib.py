@@ -435,48 +435,55 @@ def test_inline_nontrivial_through_fv():
                lib.inline_trivial)
 
 
-##################
-# Specialization #
-##################
+def test_inline_unique_uses():
 
+    def one(x):
+        return x * x
 
-def test_specialize():
+    def two(x):
+        return x + x
 
-    def before_helper(x, y):
-        return x * y
+    def before(x):
+        return one(x), two(x), two(x)
 
-    def before(x, y):
-        return before_helper(x, 3) + before_helper(7, y)
-
-    def after_helper_1(x):
-        return x * 3
-
-    def after_helper_2(y):
-        return 7 * y
-
-    def after(x, y):
-        return after_helper_1(x) + after_helper_2(y)
+    def after(x):
+        return x * x, two(x), two(x)
 
     _check_opt(before, after,
-               lib.specialize)
+               lib.inline_unique_uses)
 
 
-def test_specialize_2():
+def test_inline_unique_uses_2():
 
-    def before_helper(f, x, y):
-        return f(x, y) + f(y, x)
+    def f(x):
+        return x * x
 
-    def before(x, y):
-        return before_helper(mul, x, y)
+    def g(x):
+        return f(x)
 
-    def after_helper(x, y):
-        return (x * y) + (y * x)
+    def h(x):
+        return f(x)
 
-    def after(x, y):
-        return after_helper(x, y)
+    def before(x):
+        return g(x) + h(x)
+
+    def after(x):
+        return f(x) + f(x)
 
     _check_opt(before, after,
-               lib.specialize)
+               lib.inline_unique_uses)
+
+
+def test_inline_unique_uses_recursive():
+
+    def helper(x):
+        return before(x)
+
+    def before(x):
+        return helper(x)
+
+    _check_opt(before, before,
+               lib.inline_unique_uses)
 
 
 ##################

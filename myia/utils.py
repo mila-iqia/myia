@@ -1,6 +1,5 @@
 """General utilities and design patterns."""
 
-from collections import defaultdict
 from typing import Any, Dict, List, TypeVar
 
 T1 = TypeVar('T1')
@@ -45,25 +44,6 @@ class Registry(Dict[T1, T2]):
         return deco
 
 
-def memoize_method(fn):
-    """Memoize the result of a method.
-
-    The function's first argument must be `self` (in other words, it must be a
-    method).
-
-    The cache is stored per-instance, in ``self._cache[fn]``.
-    """
-    def deco(self, *args):
-        if not hasattr(self, '_cache'):
-            self._cache = defaultdict(dict)
-        cache = self._cache[fn]
-        if args not in cache:
-            cache[args] = fn(self, *args)
-        return cache[args]
-
-    return deco
-
-
 def repr_(obj: Any, **kwargs: Any):
     """Return unique string representation of object with additional info.
 
@@ -93,6 +73,70 @@ def list_str(lst: List):
     return f'[{elements}]'
 
 
+class TypeMap(dict):
+    """Map types to handlers or values.
+
+    Mapping a type to a value also (lazily) maps all of its subclasses to the
+    same value, unless they have a mapping of their own.
+
+    TypeMap should ideally not be updated after it is used, because updates may
+    make some cached associations invalid.
+
+    Attributes:
+        discover: A function that takes a class and generates/returns a handler
+            for it, if none is found.
+
+    """
+
+    def __init__(self, *args, discover=None):
+        """Initialize a TypeMap."""
+        super().__init__(*args)
+        self.discover = discover
+
+    def register(self, obj_t, handler=None):
+        """Register a handler to the given type.
+
+        This method may be used as a decorator.
+        """
+        if handler is None:
+            def deco(fn):
+                self[obj_t] = fn
+                return fn
+            return deco
+        else:
+            self[obj_t] = handler
+
+    def __missing__(self, obj_t):
+        """Get the handler for the given type."""
+        handler = None
+
+        if issubclass(obj_t, type):
+            mro = [type]
+        else:
+            mro = obj_t.mro()
+
+        to_set = []
+
+        for cls in mro:
+            handler = super().get(cls, None)
+            if handler is None and self.discover:
+                handler = self.discover(cls)
+            if handler:
+                for cls2 in to_set:
+                    self[cls2] = handler
+                break
+            to_set.append(cls)
+
+        if handler:
+            return handler
+        else:
+            raise KeyError(obj_t)
+
+
+def _object_map(smap, *args):
+    return smap.fn(*args)
+
+
 def _sequence_map(smap, *seqs):
     """Structural map on a sequence (list, tuple, etc.)."""
     s0 = seqs[0]
@@ -102,10 +146,12 @@ def _sequence_map(smap, *seqs):
     return t(smap(*[s[i] for s in seqs]) for i in range(len(s0)))
 
 
-default_smap_dispatch = {
+default_smap_dispatch = TypeMap({
     tuple: _sequence_map,
-    list: _sequence_map
-}
+    list: _sequence_map,
+    object: _object_map,
+    type: _object_map,
+})
 
 
 class StructuralMap:
@@ -150,17 +196,108 @@ class StructuralMap:
         """
         d0 = data[0]
         t = type(d0)
-        if t in self.dispatch:
-            return self.dispatch[t](self, *data)
-        # elif hasattr(d0, '__smap__'):
-        #     return d0.__smap__(self, *data[1:])
-        else:
-            return self.fn(*data)
+        return self.dispatch[t](self, *data)
 
 
 def smap(fn, *args):
     """Map a function recursively over all scalars in a structure."""
     return StructuralMap(fn)(*args)
+
+
+class Event:
+    """Simple Event class.
+
+    >>> e = Event('tickle')
+    >>> e.register(lambda event, n: print("hi" * n))
+    <function>
+    >>> e(5)
+    hihihihihi
+
+    Attributes:
+        name: The name of the event.
+        owner: The object defining this event (defaults to None).
+        history: A function that returns a list of previous events, or
+            None if no history exists.
+
+    """
+
+    def __init__(self, name, owner=None, history=None):
+        """Initialize an Event."""
+        self._handlers = []
+        self.name = name
+        self.owner = owner
+        self.history = history
+
+    def register(self, handler, run_history=False):
+        """Register a handler for this event.
+
+        This returns the handler so that register can be used as a decorator.
+
+        Arguments:
+            handler: A function. The handler's first parameter will always
+                be the event.
+            run_history: Whether to call the handler for all previous events
+                or not.
+        """
+        self._handlers.append(handler)
+        if run_history and self.history:
+            for entry in self.history():
+                if isinstance(entry, tuple):
+                    handler(self, *entry)
+                else:
+                    handler(self, entry)
+        return handler
+
+    def register_with_history(self, handler):
+        """Register a handler for this event and run it on the history."""
+        return self.register(handler, True)
+
+    def remove(self, handler):
+        """Remove this handler."""
+        self._handlers.remove(handler)
+
+    def __iter__(self):
+        """Iterate over all handlers in the order they were added."""
+        return iter(self._handlers)
+
+    def __call__(self, *args, **kwargs):
+        """Fire an event with the given arguments and keyword arguments."""
+        for f in self:
+            f(self, *args, **kwargs)
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return f'Event({self.name})'
+
+
+class Events:
+    """A group of named events.
+
+    >>> events = Events(tickle=None, yawn=None)
+    >>> events.tickle.register(lambda event, n: print("hi" * n))
+    <function>
+    >>> events.yawn.register(lambda event, n: print("a" * n))
+    <function>
+    >>> events.tickle(5)
+    hihihihihi
+    >>> events.yawn(20)
+    aaaaaaaaaaaaaaaaaaaa
+
+    Args:
+        owner: The object that owns all the events. It will be passed
+            as the first argument on each event.
+        events: Keyword arguments mapping an event name to a history,
+            or None if there is no history.
+    """
+
+    def __init__(self, owner=None, **events):
+        """Initialize Events."""
+        self.owner = owner
+        for event_name, history in events.items():
+            ev = Event(event_name, owner=owner, history=history)
+            setattr(self, event_name, ev)
 
 
 class Namespace:
