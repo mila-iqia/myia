@@ -1,4 +1,4 @@
-"""Generate the gradient graph (augmented graph)."""
+"""Generate the gradient graphs"""
 
 
 from collections import defaultdict
@@ -19,7 +19,9 @@ cons = Constant(primops.cons_tuple)
 
 
 def grad(graph):
-    """Return the augmented graph. This is the same as the J primitive."""
+    """Return the forward graph, which embeds its backprop in a closure.
+
+    This is the same as the J primitive, when the argument is a graph."""
     if graph.transforms.get('grad', None):
         return graph.transforms['grad']
     gr = Grad(graph)
@@ -37,10 +39,13 @@ def grad(graph):
 
 
 class Grad:
-    """Class to generate the gradient graph (augmented graph).
+    """Class to generate the gradient graph.
+
+    This returns the forward graph, which returns a pair of the original value
+    coupled with a closure that performs backpropagation.
 
     Arguments:
-        root: The root graph for which we want an augmented graph.
+        root: The root graph for which we want the gradient graph.
             We will operate on every graph in its scope, plus every
             graph called in its scope.
     """
