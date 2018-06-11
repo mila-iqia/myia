@@ -7,8 +7,8 @@ from myia.utils import TypeMap
 
 class OpStep(PipelineStep):
 
-    def __init__(self, op, param=0):
-        super().__init__()
+    def __init__(self, pipeline_init, op, param=0):
+        super().__init__(pipeline_init)
         self.op = op
         self.param = param
 
@@ -18,8 +18,8 @@ class OpStep(PipelineStep):
 
 class OpResourceStep(PipelineStep):
 
-    def __init__(self, op):
-        super().__init__()
+    def __init__(self, pipeline_init, op):
+        super().__init__(pipeline_init)
         self.op = op
 
     def step(self, value):
@@ -240,8 +240,9 @@ def test_Pipeline_configure(op_pipeline):
 
     pdef2 = pdef.configure_resources(quack=[1, 2])
     assert pdef2.make().resources.quack == [1, 2]
-    assert pdef2.configure(quack=[3]).make().resources.quack == [1, 2, 3]
-    assert pdef2.configure(quack=Reset([3])).make().resources.quack == [3]
+    assert pdef2.configure(quack=Merge([3])).make().resources.quack \
+        == [1, 2, 3]
+    assert pdef2.configure(quack=[3]).make().resources.quack == [3]
 
 
 def test_Pipeline_insert(op_pipeline):
@@ -266,3 +267,16 @@ def test_Pipeline_insert(op_pipeline):
 
     pip = pdef.insert_after('square', half=half).make()
     assert pip(value=3) == {'value': 32}
+
+
+def test_Pipeline_select(op_pipeline):
+    pdef = op_pipeline
+
+    pip = pdef.select('addp', 'neg').make()
+    assert pip(value=3) == {'value': -4}
+
+    pip = pdef.select('mulp', 'square').make()
+    assert pip(value=3) == {'value': 36}
+
+    pip = pdef.select('square', 'mulp').make()
+    assert pip(value=3) == {'value': 18}

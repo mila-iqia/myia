@@ -2,8 +2,7 @@
 
 
 import inspect
-from myia.utils import TypeMap
-from myia.utils import Named
+from .utils import TypeMap, Named
 
 
 # Use in a merge to indicate that a key should be deleted
@@ -169,6 +168,18 @@ def merge(a, b, mode=MergeMode.mode):
     return _merge_map[type(a)](a, b, mode)
 
 
+def _filter_keywords(f, kw):
+    spec = inspect.getfullargspec(f)
+    if spec.varkw:
+        return kw, {}
+    valid = spec.args + spec.kwonlyargs
+
+    good = {k: v for k, v in kw.items() if k in valid}
+    bad = {k: v for k, v in kw.items() if k not in valid}
+
+    return good, bad
+
+
 class NS:
     """Namespace for pipeline stages.
 
@@ -205,11 +216,8 @@ class Partial:
       constructor.
     """
 
-    def __init__(self, func, *,
-                 _wrap=False,
-                 **keywords):
+    def __init__(self, func, **keywords):
         """Initialize a Partial."""
-        self.wrap = _wrap
         self.func = func
         self.keywords = keywords
         self._validate()
@@ -220,19 +228,18 @@ class Partial:
             f = getattr(self.func, '__init__', self.func)
         else:
             f = self.func
-        spec = inspect.getfullargspec(f)
-        if spec.varkw:
-            return
-        valid = spec.args + spec.kwonlyargs
-        for k, v in self.keywords.items():
-            if k not in valid:
-                raise TypeError(f"{f} has no argument named '{k}'")
+        _, invalid = _filter_keywords(f, self.keywords)
+        if invalid:
+            keys = ", ".join(f"'{k}'" for k in invalid.keys())
+            raise TypeError(f"{f} has no argument(s) named {keys}")
+
+    def partial(self, **keywords):
+        """Refine this Partial with additional keywords."""
+        return merge(self, keywords)
 
     def __call__(self, **kwargs):
         """Run the pipeline on the given arguments, from start to finish."""
         value = self.func(**self.keywords, **kwargs)
-        if self.wrap:
-            value = self.wrap(value)
         return value
 
     def __merge__(self, partial, mode):
@@ -248,15 +255,9 @@ class Partial:
         else:
             raise ValueError('Incompatible func')
 
-        if mode == 'reset':
-            kwargs = partial.keywords
-        elif mode == 'override':
-            kwargs = {**self.keywords, **partial.keywords}
-        else:
-            kwargs = merge(self.keywords, partial.keywords)
+        kwargs = merge(self.keywords, partial.keywords, mode)
 
-        wrap = partial.wrap or self.wrap
-        return Partial(func, _wrap=wrap, **kwargs)
+        return Partial(func, **kwargs)
 
     def __repr__(self):
         args = [f'{k}={v}' for k, v in self.keywords.items()]
@@ -293,7 +294,7 @@ class PipelineDefinition:
     def __init__(self, *, resources=None, steps):
         """Initialize a PipelineDefinition."""
         self.resources = resources or {}
-        self.steps = list(steps.items())
+        self.steps = steps
         self.step_names = list(steps.keys())
 
     def index(self, step, upper_bound=False):
@@ -345,7 +346,7 @@ class PipelineDefinition:
 
         This returns a new PipelineDefinition.
         """
-        steps = list(self.steps)
+        steps = list(self.steps.items())
         index = self.index(step) or 0
         steps[index:index] = new_steps.items()
         return PipelineDefinition(
@@ -360,7 +361,7 @@ class PipelineDefinition:
 
         This returns a new PipelineDefinition.
         """
-        steps = list(self.steps)
+        steps = list(self.steps.items())
         if step is None:
             steps.extend(new_steps.items())
         else:
@@ -377,8 +378,8 @@ class PipelineDefinition:
         This returns a new PipelineDefinition.
         """
         return PipelineDefinition(
-            resources=merge(self.resources, resources),
-            steps=dict(self.steps)
+            resources=merge(self.resources, resources, mode='override'),
+            steps=self.steps
         )
 
     def configure(self, changes={}, **kwchanges):
@@ -400,23 +401,29 @@ class PipelineDefinition:
         update will be appended to the previous, but you can use
         `Override([a, b, c])` to replace the old list.
         """
-        def activator(active):
-            def wrap(x):
-                x.active = active
-                return x
-            return wrap
-        new_data = {**dict(self.steps), **self.resources}
+        new_data = {**self.steps, **self.resources}
         changes = {**changes, **kwchanges}
         for path, delta in changes.items():
             if isinstance(delta, bool) and path in self.step_names:
-                delta = dict(_wrap=activator(delta))
+                delta = Merge(pipeline_init={'active': delta})
             top, *parts = path.split('.')
             for part in reversed(parts):
                 delta = {part: delta}
-            new_data[top] = merge(new_data[top], delta)
+            new_data[top] = merge(new_data[top], delta, mode='override')
         return PipelineDefinition(
             resources={k: new_data[k] for k in self.resources},
             steps={k: new_data[k] for k in self.step_names}
+        )
+
+    def select(self, *names):
+        """Define a pipeline with the listed steps.
+
+        The names don't have to be in the same order as the original
+        definition, so pipeline steps can be reordered this way.
+        """
+        return PipelineDefinition(
+            resources=self.resources,
+            steps={name: self.steps[name] for name in names}
         )
 
     def make(self):
@@ -425,9 +432,10 @@ class PipelineDefinition:
 
     def __getitem__(self, item):
         """Return a pipeline that only contains a subset of the steps."""
+        steps = list(self.steps.items())
         return PipelineDefinition(
             resources=self.resources,
-            steps=dict(self.steps[self.getslice(item)])
+            steps=dict(steps[self.getslice(item)])
         )
 
 
@@ -442,9 +450,8 @@ class Pipeline:
         """Initialize a Pipeline from a PipelineDefinition."""
         def convert(x, name):
             if isinstance(x, Partial):
+                x = x.partial(pipeline_init={'pipeline': self, 'name': name})
                 x = x()
-            if hasattr(x, 'set_pipeline'):
-                x.set_pipeline(pipeline=self, name=name)
             return x
 
         self.defn = defn
@@ -453,7 +460,7 @@ class Pipeline:
         self._seq = []
         for k, v in defn.resources.items():
             self.resources[k] = convert(v, None)
-        for k, v in defn.steps:
+        for k, v in defn.steps.items():
             v = convert(v, k)
             self.steps[k] = v
             self._seq.append(v)
@@ -481,23 +488,21 @@ class _PipelineSlice:
     def __call__(self, **args):
         for step in self.pipeline._seq[self.slice]:
             if step.active:
-                args = step.step(**args)
+                valid_args, rest = _filter_keywords(step.step, args)
+                args = {**args, **step.step(**valid_args)}
         return args
 
 
 class PipelineStep(Partializable):
     """Step in a Pipeline."""
 
-    def __init__(self):
+    def __init__(self, pipeline_init):
         """Initialize a PipelineStep."""
-        self.active = True
-
-    def set_pipeline(self, pipeline, name):
-        """Set the pipeline field to this step's parent pipeline."""
-        self.pipeline = pipeline
-        self.name = name
-        self.steps = pipeline.steps
-        self.resources = pipeline.resources
+        self.active = pipeline_init.get('active', True)
+        self.name = pipeline_init['name']
+        self.pipeline = pipeline_init['pipeline']
+        self.steps = self.pipeline.steps
+        self.resources = self.pipeline.resources
 
     def step(self, **kwargs):
         """Execute this step only.
