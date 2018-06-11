@@ -12,5 +12,3 @@ exclude_lines =
     pragma: no cover
     AssertionError
     NotImplementedError
-    __str__
-    __repr__

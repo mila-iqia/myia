@@ -118,3 +118,9 @@ def test_events():
 
     events.brownie()
     assert accum == [1, 2, 2, 2]
+
+
+def test_events_str_repr():
+    ev = Event('event')
+    str(ev)
+    repr(ev)

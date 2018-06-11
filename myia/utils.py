@@ -106,30 +106,26 @@ class TypeMap(dict):
         else:
             self[obj_t] = handler
 
-    def __getitem__(self, obj_t):
+    def __missing__(self, obj_t):
         """Get the handler for the given type."""
-        handler = self.get(obj_t, None)
+        handler = None
 
-        if handler is None:
-            if issubclass(obj_t, type):
-                mro = [type]
-            else:
-                mro = obj_t.mro()
+        if issubclass(obj_t, type):
+            mro = [type]
+        else:
+            mro = obj_t.mro()
 
-            to_set = []
+        to_set = []
 
-            for cls in mro:
-                handler = self.get(cls, None)
-                if handler is None and self.discover:
-                    handler = self.discover(cls)
-                if handler:
-                    for cls2 in to_set:
-                        self[cls2] = handler
-                    break
-                to_set.append(cls)
-            else:
+        for cls in mro:
+            handler = super().get(cls, None)
+            if handler is None and self.discover:
+                handler = self.discover(cls)
+            if handler:
                 for cls2 in to_set:
-                    self[cls2] = False
+                    self[cls2] = handler
+                break
+            to_set.append(cls)
 
         if handler:
             return handler
@@ -208,7 +204,7 @@ def smap(fn, *args):
     return StructuralMap(fn)(*args)
 
 
-class Event(list):
+class Event:
     """Simple Event class.
 
     >>> e = Event('tickle')
@@ -227,6 +223,7 @@ class Event(list):
 
     def __init__(self, name, owner=None, history=None):
         """Initialize an Event."""
+        self._handlers = []
         self.name = name
         self.owner = owner
         self.history = history
@@ -242,7 +239,7 @@ class Event(list):
             run_history: Whether to call the handler for all previous events
                 or not.
         """
-        self.append(handler)
+        self._handlers.append(handler)
         if run_history and self.history:
             for entry in self.history():
                 if isinstance(entry, tuple):
@@ -254,6 +251,14 @@ class Event(list):
     def register_with_history(self, handler):
         """Register a handler for this event and run it on the history."""
         return self.register(handler, True)
+
+    def remove(self, handler):
+        """Remove this handler."""
+        self._handlers.remove(handler)
+
+    def __iter__(self):
+        """Iterate over all handlers in the order they were added."""
+        return iter(self._handlers)
 
     def __call__(self, *args, **kwargs):
         """Fire an event with the given arguments and keyword arguments."""
