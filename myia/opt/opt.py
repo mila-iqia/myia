@@ -97,7 +97,7 @@ class PatternSubstitutionOptimization:
         self.unif = Unification()
         self.name = name
 
-    def __call__(self, node):
+    def __call__(self, optimizer, node):
         """Return a replacement for the node, if the pattern matches.
 
         The replacement will be instantiated in the graph of the root of the
@@ -113,7 +113,7 @@ class PatternSubstitutionOptimization:
         equiv = self.unif.unify(node, self.pattern)
         if equiv:
             if callable(self.replacement):
-                return self.replacement(node, equiv)
+                return self.replacement(optimizer, node, equiv)
             else:
                 return self.unif.reify(self.replacement, equiv)
         else:
@@ -130,9 +130,10 @@ def pattern_replacer(*pattern):
 class PatternEquilibriumOptimizer:
     """Apply a set of local pattern optimizations until equilibrium."""
 
-    def __init__(self, *node_transformers):
+    def __init__(self, *node_transformers, optimizer=None):
         """Initialize a PatternEquilibriumOptimizer."""
         self.node_transformers = node_transformers
+        self.optimizer = optimizer
 
     def __call__(self, *graphs):
         """Apply optimizations until equilibrium on given graphs."""
@@ -143,7 +144,7 @@ class PatternEquilibriumOptimizer:
             with mng.transact() as tr:
                 for node in mng.all_nodes:
                     for transformer in self.node_transformers:
-                        new = transformer(node)
+                        new = transformer(self.optimizer, node)
                         if new and new is not node:
                             new.type = node.type
                             tr.replace(node, new)

@@ -50,7 +50,7 @@ def primset_var(*prims):
 
 
 @pattern_replacer(P.getitem, (P.cons_tuple, X, Y), C)
-def getitem_tuple(node, equiv):
+def getitem_tuple(optimizer, node, equiv):
     """Match a constant index in an explicit tuple.
 
     (a, b, c, ...)[0] => a
@@ -66,7 +66,7 @@ def getitem_tuple(node, equiv):
 
 
 @pattern_replacer(P.setitem, (P.cons_tuple, X, Y), C, Z)
-def setitem_tuple(node, equiv):
+def setitem_tuple(optimizer, node, equiv):
     """Match a constant setitem in an explicit tuple.
 
     setitem((a, b, c, ...), 0, z) => (z, b, c, ...)
@@ -193,7 +193,7 @@ def make_resolver(convert):
         convert: The function to use for conversion.
     """
     @pattern_replacer(P.resolve, CNS, C)
-    def resolve_globals(node, equiv):
+    def resolve_globals(optimizer, node, equiv):
         ns = equiv[CNS]
         x = equiv[C]
         g = convert(ns.value[x.value])
@@ -217,7 +217,7 @@ def make_inliner(inline_criterion, check_recursive):
             before inlining it. If it is, don't inline.
     """
     @pattern_replacer(G, Xs)
-    def inline(node, equiv):
+    def inline(optimizer, node, equiv):
         g = equiv[G].value
         args = equiv[Xs]
 
@@ -278,7 +278,7 @@ inline = make_inliner(inline_criterion=None, check_recursive=True)
 
 
 @pattern_replacer((G, Xs), Ys)
-def drop_into_call(node, equiv):
+def drop_into_call(optimizer, node, equiv):
     """Drop a call into the graph that returns the function.
 
     g(x)(y) => g2(x, y)
@@ -300,7 +300,7 @@ def drop_into_call(node, equiv):
 
 
 @pattern_replacer((P.if_, X, Y, Z), Xs)
-def drop_into_if(node, equiv):
+def drop_into_if(optimizer, node, equiv):
     """Drop a call on the result of if into both branches.
 
     f(if(x, y, z)) => if(x, () -> f(y()), () -> f(z()))
