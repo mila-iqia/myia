@@ -1,6 +1,6 @@
 
 import pytest
-from myia.pipeline import merge, Partial, PipelineStep, \
+from myia.pipeline import merge, NS, Partial, PipelineStep, \
     PipelineDefinition, Merge, Reset, Override, DELETE, cleanup
 from myia.utils import TypeMap
 
@@ -108,6 +108,23 @@ def test_cleanup_subclass():
     assert ca == TypeMap({int: "int"})
 
 
+def test_NS():
+    ns = NS(x=1, y=2)
+
+    assert ns.x == 1
+    assert ns.y == 2
+
+    ns.a = 3
+    assert ns.a == 3
+    assert ns['a'] == 3
+
+    ns['b'] = 4
+    assert ns['b'] == 4
+    assert ns.b == 4
+
+    assert repr(ns) == 'NS(x=1, y=2, a=3, b=4)'
+
+
 def test_Partial():
 
     def f(x, y):
@@ -152,6 +169,8 @@ def test_Partial():
 
     p9 = Partial(h, x=10)
     assert p9(y=20, z=30) == dict(x=10, y=20, z=30)
+
+    str(p9), repr(p9)
 
 
 def test_Partial_class():

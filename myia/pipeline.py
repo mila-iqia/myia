@@ -191,8 +191,8 @@ class NS:
         """Initialize NS."""
         self.__dict__.update(kwargs)
 
-    # def __getitem__(self, item):
-    #     return self.__dict__[item]
+    def __getitem__(self, item):
+        return self.__dict__[item]
 
     def __setitem__(self, item, value):
         self.__dict__[item] = value
