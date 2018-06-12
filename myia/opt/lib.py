@@ -186,20 +186,13 @@ simplify_always_false = psub(
 ###################
 
 
-def make_resolver(convert):
-    """Create an optimization to resolve globals.
-
-    Args:
-        convert: The function to use for conversion.
-    """
-    @pattern_replacer(P.resolve, CNS, C)
-    def resolve_globals(optimizer, node, equiv):
-        ns = equiv[CNS]
-        x = equiv[C]
-        g = convert(ns.value[x.value])
-        return Constant(g)
-
-    return resolve_globals
+@pattern_replacer(P.resolve, CNS, C)
+def resolve_globals(optimizer, node, equiv):
+    """Resolve global variables."""
+    ns = equiv[CNS]
+    x = equiv[C]
+    res = optimizer.resources.convert(ns.value[x.value])
+    return Constant(res)
 
 
 ############

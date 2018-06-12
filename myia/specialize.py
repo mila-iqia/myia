@@ -1,19 +1,14 @@
 """Specialize graphs according to the types of their arguments."""
 
 from collections import defaultdict, Counter
-from functools import partial
 
 from .dtype import Type, Function, Dead, Unknown
-from .infer import InferenceEngine, Context, GraphInferrer, \
-    ANYTHING, Inferrer
-from .prim.type_inferrers import TypeTrack
-from .prim.value_inferrers import ValueTrack
+from .infer import Context, GraphInferrer, ANYTHING, Inferrer
 from .ir import GraphCloner, is_apply, is_constant, Constant, \
     succ_deeper, Graph
 from .prim import Primitive
 from .graph_utils import dfs
 from .utils import Named
-from .opt import lib as optlib, PatternEquilibriumOptimizer
 
 
 UNKNOWN = Named('UNKNOWN')
@@ -24,33 +19,6 @@ def _const(v, t):
     ct = Constant(v)
     ct.type = t
     return ct
-
-
-def type_specialize(graph, argprops, optimize=True):
-    """Specialize a graph given argument types or values."""
-    engine = InferenceEngine(
-        graph, argprops,
-        tracks={
-            'value': partial(ValueTrack, max_depth=1),
-            'type': partial(TypeTrack)
-        },
-        required_tracks=['type'],
-        timeout=1.0
-    )
-
-    if engine.errors:
-        raise engine.errors[0]['error']  # pragma: no cover
-
-    s = TypeSpecializer(engine)
-    g2 = s.result
-    if optimize:
-        eq = PatternEquilibriumOptimizer(
-            optlib.simplify_always_true,
-            optlib.simplify_always_false,
-            optlib.inline_unique_uses,
-        )
-        eq(g2)
-    return g2
 
 
 class TypeSpecializer:

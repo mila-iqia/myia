@@ -5,7 +5,8 @@ from collections import Counter
 
 from myia.api import parse
 from myia.debug.label import short_labeler
-from myia.ir import is_constant, GraphManager, GraphCloner, ManagerError
+from myia.ir import is_constant, manage, GraphManager, GraphCloner, \
+    ManagerError
 from myia.prim import Primitive
 
 
@@ -645,7 +646,7 @@ def test_cannot_replace_return():
     def f(x):
         return x * x
 
-    mng = GraphManager(f)
+    mng = manage(f)
 
     with pytest.raises(ManagerError):
         mng.replace(f.return_, f.parameters[0])
@@ -656,7 +657,7 @@ def test_manager_exclusivity():
     def f(x):
         return x * x
 
-    mng = GraphManager(f)
+    mng = manage(f)
     assert f._manager is mng
 
     with pytest.raises(ManagerError):
@@ -665,6 +666,7 @@ def test_manager_exclusivity():
 
 def test_weak_manager():
 
+    @clone
     @parse
     def f(x, y):
         return x * y
@@ -692,7 +694,7 @@ def test_drop_root():
     def f(x, y):
         return x * y
 
-    mng = GraphManager(f)
+    mng = manage(f)
     assert f in mng.nodes
     mng._maybe_drop_graphs({f})
     assert f in mng.nodes
@@ -700,15 +702,17 @@ def test_drop_root():
 
 def test_keep_roots():
 
+    @clone
     @parse
     def f(x, y):
         return x * y
 
+    @clone
     @parse
     def g(x, y):
         return x + y
 
-    mng = GraphManager(f)
+    mng = manage(f)
     assert mng.graphs == {f}
 
     mng.add_graph(g)
@@ -736,7 +740,7 @@ def test_keep_roots_recursion():
     def f(x, y):
         return rec1() + nonrec()
 
-    mng = GraphManager(f)
+    mng = manage(f)
     assert len(mng.graphs) == 4
 
     mng.replace(f.output, f.parameters[0])
@@ -755,7 +759,7 @@ def test_add_parameter():
     def f(x, y):
         return x * y
 
-    mng = GraphManager(f)
+    mng = manage(f)
     assert len(f.parameters) == 2
     assert set(f.parameters).issubset(mng.nodes[f])
     f.add_parameter()
@@ -769,7 +773,7 @@ def test_set_output():
     def f(x, y):
         return x * y
 
-    mng = GraphManager(f)
+    mng = manage(f)
     assert f.manager is mng
     assert len(f.nodes) == 4
     f.output = f.parameters[0]
@@ -778,6 +782,7 @@ def test_set_output():
 
 def test_graph_properties():
 
+    @clone
     @parse
     def test(x):
         def f(y):

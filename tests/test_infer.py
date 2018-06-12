@@ -2,20 +2,15 @@
 from functools import partial
 from pytest import mark
 
-from myia.api import parse
+from myia.api import standard_pipeline
 from myia.infer import \
-    InferenceEngine, ANYTHING, InferenceError, register_inferrer
-
+    ANYTHING, InferenceError, register_inferrer
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
     Type, UInt
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
-    py_implementations as pyimpl, \
     add, mul, lt, head, tail, maplist, hastype, typeof, usub, \
     dot, distribute, shape, map_array, scan_array, reduce_array, reshape
-from myia.prim.value_inferrers import ValueTrack, value_inferrer_constructors
-from myia.prim.type_inferrers import TypeTrack, type_inferrer_constructors
-from myia.prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
 
 
 B = Bool()
@@ -54,28 +49,14 @@ Nil = T()
 ########################
 
 
-pyimpl_test = {**pyimpl}
-value_inferrer_cons_test = {**value_inferrer_constructors}
-type_inferrer_cons_test = {**type_inferrer_constructors}
+pyimpl_test = {}
+value_inferrer_cons_test = {}
+type_inferrer_cons_test = {}
 
 type_inferrer_test = partial(register_inferrer,
                              constructors=type_inferrer_cons_test)
 value_inferrer_test = partial(register_inferrer,
                               constructors=value_inferrer_cons_test)
-
-value_track = partial(
-    ValueTrack,
-    implementations=pyimpl_test,
-    constructors=value_inferrer_cons_test
-)
-type_track = partial(
-    TypeTrack,
-    constructors=type_inferrer_cons_test
-)
-shape_track = partial(
-    ShapeTrack,
-    constructors=shape_inferrer_constructors
-)
 
 
 # Ternary arithmetic op
@@ -114,6 +95,17 @@ async def infer_type_to_i64(engine, x):
     return Int(64)
 
 
+infer_pipeline = standard_pipeline.select(
+    'parse', 'resolve', 'infer'
+).configure({
+    'py_implementations': pyimpl_test,
+    'infer.tracks.value.max_depth': 10,
+    'infer.tracks.value.constructors': value_inferrer_cons_test,
+    'infer.tracks.type.constructors': type_inferrer_cons_test,
+    'infer.timeout': 0.1
+})
+
+
 def parse_test_spec(tests_spec):
 
     tests = []
@@ -141,27 +133,19 @@ def infer(**tests_spec):
         def run_test(spec):
             main_track, (*args, expected_out) = spec
 
-            g = parse(fn)
-
             print('Args:')
             print(args)
 
             required_tracks = [main_track]
 
-            inferrer = InferenceEngine(
-                g, args,
-                tracks={
-                    'value': partial(value_track, max_depth=10),
-                    'type': partial(type_track),
-                    'shape': partial(shape_track)
-                },
-                required_tracks=required_tracks,
-                timeout=0.1
-            )
-
             def out():
-                rval = {track: inferrer.output_info(track)
-                        for track in required_tracks}
+                pip = infer_pipeline.configure({
+                    'infer.required_tracks': required_tracks
+                })
+
+                res = pip.make()(input=fn, argspec=args)
+                rval = res['inference_results']
+
                 print('Output of inferrer:')
                 print(rval)
                 return rval
@@ -169,21 +153,18 @@ def infer(**tests_spec):
             print('Expected:')
             print(expected_out)
 
-            try:
-                if isinstance(expected_out, type) \
-                        and issubclass(expected_out, Exception):
-                    try:
-                        out()
-                    except InferenceError as e:
-                        pass
-                    else:
-                        raise Exception(
-                            f'Expected {expected_out}, got: (see stdout).'
-                        )
+            if isinstance(expected_out, type) \
+                    and issubclass(expected_out, Exception):
+                try:
+                    out()
+                except InferenceError as e:
+                    pass
                 else:
-                    assert out() == expected_out
-            finally:
-                inferrer.close()
+                    raise Exception(
+                        f'Expected {expected_out}, got: (see stdout).'
+                    )
+            else:
+                assert out() == expected_out
 
         m = mark.parametrize('spec', list(tests))(run_test)
         m.__orig__ = fn

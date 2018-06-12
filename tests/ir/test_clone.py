@@ -223,6 +223,7 @@ def test_clone_unused_parameters():
 
 
 def test_clone_without_forcing_manager():
+    @clone
     @parse
     def f(x, y):
         return x * y
