@@ -1,5 +1,6 @@
-from ..prim.ops import if_, return_, add
-from ..ir import Apply, toposort, is_parameter, is_apply, is_constant_graph, is_constant, Parameter, manage
+from ..prim.ops import if_, return_, partial
+from ..ir import Apply, toposort, is_parameter, is_apply, is_constant_graph, \
+    is_constant, manage
 from ..prim import Primitive
 from .nnvm import nnvm_convert
 
@@ -9,7 +10,7 @@ def cut(node):
         fn = node.inputs[0]
         if not is_constant(fn, Primitive):
             return True
-        elif fn.value in (if_, return_):
+        elif fn.value in (if_, return_, partial):
             return True
     return False
 
@@ -69,13 +70,11 @@ def convert_graph(graph):
         nonlocal height
         height -= nargs
 
-    for p in graph.parameters:
+    for p in reversed(graph.parameters):
         push(p)
 
     param_height = height
-    # The pc
-    height += 1
-    max_height = max(height, max_height)
+    push(None)  # The pc
     print(f"(init) height = {height}, {max_height}")
 
     for split in splits:
@@ -89,36 +88,42 @@ def convert_graph(graph):
         else:
             assert isinstance(split, Apply)
             fn = split.inputs[0]
-            
+
             if is_constant(fn, Primitive):
+                # pre-push arguments on the stack if needed
+                for i in split.inputs[1:]:
+                    ref(i)
                 if fn.value == if_:
                     instrs.append(('if', ref(split.inputs[1]),
-                                   split.inputs[2], split.inputs[3]))
+                                   ref(split.inputs[2]), ref(split.inputs[3])))
                 elif fn.value == return_:
                     print(f"(ret ) height = {height}, {max_height}")
                     instrs.append(('return', ref(split.inputs[1]),
                                    height - param_height - 1, param_height))
                     # To avoid pushing the split
                     continue
+                elif fn.value == partial:
+                    instrs.append(('partial', ref(split.inputs[1])) + \
+                                  tuple(ref(inp) for inp in split.inputs[2:]))
                 else:
                     raise AssertionError("should not happen")
-            elif is_constant_graph(fn):
-                for i in split.inputs[1:]:
-                    dup(i)
-                instrs.append(('call_graph', fn))
-                push(None) # The pc
-                ret(len(split.inputs))
             else:
-                for i in split.inputs[1:]:
+                for i in reversed(split.inputs[1:]):
                     dup(i)
-                instrs.append(('call_ind', ref(fn)))
-                push(None) # The pc
+                instrs.append(('call', ref(fn)))
+                push(None)  # The pc
                 ret(len(split.inputs))
 
             push(split)
 
     print(f"(end ) height = {height}, {max_height}")
-    instrs.insert(0, ('pad_stack', max_height - (param_height + 1)))
+    need_stack = max_height - (param_height + 1)
+    if need_stack != 0:
+        instrs.insert(0, ('pad_stack', max_height - (param_height + 1)))
+    return instrs
+
+
+def optimize(instrs):
     return instrs
 
 
@@ -130,29 +135,25 @@ def convert_and_link(graph):
 
     # compile (aka convert)
     mapping[graph] = len(instrs)
-    instrs.extend(convert_graph(graph))
+    instrs.extend(optimize(convert_graph(graph)))
 
     for g in (graphs - set([graph])):
         mapping[g] = len(instrs)
-        instrs.extend(convert_graph(g))
+        instrs.extend(optimize(convert_graph(g)))
 
     # link
     for i in range(len(instrs)):
         instr = instrs[i]
-        if instr[0] == 'call_graph':
-            if is_constant_graph(instr[1]):
-                instrs[i] = ('call', mapping[instr[1].value])
-        elif instr[0] == 'push_graph':
+        if instr[0] == 'push_graph':
             instrs[i] = ('push', mapping[instr[1]])
-        elif instr[0] == 'if':
-            instrs[i] = ('if', instr[1], mapping[instr[2].value],
-                         mapping[instr[3].value])
 
     return instrs
 
 
-def stack_optimize(instrs):
-    pass
+class struct_partial:
+    def __init__(self, fn, args):
+        self.fn = fn
+        self.args = args
 
 
 class FinalVM:
@@ -177,11 +178,11 @@ class FinalVM:
 
     def eval(self, args):
         self.stack = [None] * (len(args) + 1)
-        self.pc = -1
+        self.pc = 0
         self.sp = 0
-        for a in args:
+        for a in reversed(args):
             self._push(a)
-        self.inst_call(0)
+        self._push(-1)
 
         self.running = True
         print("==== Start ====")
@@ -201,18 +202,19 @@ class FinalVM:
             self.pc += 1
             impl(*instr[1:])
 
-        assert self.sp == 1
+        assert self.sp == 1, self.sp
         return self.stack[0]
 
     def inst_call(self, jmp):
         print(f"running call({jmp})")
+        jmp = self._ref(jmp)
+        while isinstance(jmp, struct_partial):
+            self.inst_pad_stack(len(jmp.args))
+            for a in reversed(jmp.args):
+                self._push(a)
+            jmp = jmp.fn
         self._push(self.pc)
         self.pc = jmp
-
-    def inst_call_ind(self, cpos):
-        print(f"running call_ind({cpos})")
-        jmp = self._ref(cpos)
-        self.inst_call(jmp)
 
     def inst_return(self, rpos, height, nargs):
         print(f"running return({rpos}, {height}, {nargs})")
@@ -221,6 +223,11 @@ class FinalVM:
         self.pc = self._pop()
         self._pop(nargs)
         self._push(rv)
+
+    def inst_partial(self, fn_, *args_):
+        fn = self._ref(fn_)
+        args = tuple(self._ref(a) for a in args_)
+        self._push(struct_partial(fn, args))
 
     def inst_if(self, cond, ftrue, ffalse):
         print(f"running if({cond}, {ftrue}, {ffalse})")
