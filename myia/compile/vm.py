@@ -80,9 +80,10 @@ def convert_graph(graph):
     for split in splits:
         print(split)
         if isinstance(split, list):
-            g, inputs, constants, outs = nnvm_convert(split)
+            print(f"(lin_call) height = {height}, {max_height}")
+            mod, inputs, outs = nnvm_convert(split)
             args = [ref(i) for i in inputs]
-            instrs.append(('nnvm_call', g, args, constants))
+            instrs.append(('nnvm_call', mod, args))
             for o in outs:
                 push(o)
         else:
@@ -251,3 +252,9 @@ class FinalVM:
     def inst_pad_stack(self, sz):
         print(f"running pad_stack({sz})")
         self.stack.extend([None] * sz)
+
+    def inst_nnvm_call(self, mod, args):
+        print(f"running nnvm_call({mod}, {args})")
+        outs = mod(*(self._ref(a) for a in args))
+        assert len(outs) == 1
+        self._push(outs[0])
