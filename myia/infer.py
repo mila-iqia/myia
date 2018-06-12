@@ -217,6 +217,21 @@ class GraphInferrer(Inferrer):
             and other.context == self.context
 
 
+class PartialInferrer(Inferrer):
+    def __init__(self, engine, fn, args):
+        super().__init__(engine, 'partial')
+        self.fn = fn
+        self.args = tuple(args)
+
+    def infer(self, *args):
+        return self.fn(*(self.args + args))
+
+    def provably_equivalent(self, other):
+        return (isinstance(other, PartialInferrer) and
+                self.args == other.args and
+                self.fn.provably_equivalent(other.fn))
+
+
 def register_inferrer(*prims, nargs, constructors):
     """Define a PrimitiveInferrer for prims with nargs arguments.
 

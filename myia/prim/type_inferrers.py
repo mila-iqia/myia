@@ -3,8 +3,9 @@
 
 from functools import partial
 
-from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number
-from ..infer import ANYTHING, Inferrer, GraphInferrer, \
+from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number, \
+    Function
+from ..infer import ANYTHING, Inferrer, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
 
@@ -88,6 +89,13 @@ async def infer_type_if(engine, cond, tb, fb):
         return await engine.assert_same('type', tb_inf(), fb_inf())
     else:
         raise AssertionError("Invalid condition value for if")
+
+
+@type_inferrer(P.partial, nargs=None)
+async def infer_type_partial(engine, fn, *args):
+    """Infer the return type of partial."""
+    fn_t = await fn['type']
+    return PartialInferrer(engine, fn_t, args)
 
 
 @type_inferrer(P.cons_tuple, nargs=2)

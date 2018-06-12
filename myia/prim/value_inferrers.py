@@ -5,7 +5,7 @@ import asyncio
 
 from functools import partial
 
-from ..infer import InferenceError, \
+from ..infer import InferenceError, PartialInferrer, \
     ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track
 from ..ir import Graph
 
@@ -176,6 +176,13 @@ async def infer_value_if(engine, cond, tb, fb):
         return ANYTHING
 
     return await fn()
+
+
+@value_inferrer(P.partial, nargs=None)
+async def infer_value_partial(engine, fn, *args):
+    """Infer the return type of partial."""
+    fn_t = await fn['value']
+    return PartialInferrer(engine, fn_t, args)
 
 
 @value_inferrer(P.hastype, nargs=2)
