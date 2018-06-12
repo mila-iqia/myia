@@ -5,6 +5,7 @@ from types import FunctionType
 from typing import Any, List
 
 from . import parser
+from .cconv import closure_convert
 from .infer import InferenceEngine
 from .ir import Graph, clone
 from .opt import PatternEquilibriumOptimizer, lib as optlib
@@ -207,6 +208,26 @@ class Specializer(PipelineStep):
         return {'graph': result}
 
 
+class ClosureConverter(PipelineStep):
+    """Pipeline step to closure convert a graph.
+
+    Inputs:
+        graph: The graph to closure convert.
+
+    Outputs:
+        graph: The closure converted graph.
+    """
+
+    def __init__(self, pipeline_init):
+        """Initialize a ClosureConverter."""
+        super().__init__(pipeline_init)
+
+    def step(self, graph):
+        """Closure convert the graph."""
+        closure_convert(graph)
+        return {'graph': graph}
+
+
 class Exporter(PipelineStep):
     """Pipeline step to export a callable.
 
@@ -263,6 +284,7 @@ standard_pipeline = PipelineDefinition(
                 optlib.inline_unique_uses,
             ]
         ),
+        cconv=ClosureConverter.partial(),
         export=Exporter.partial(
             implementations=vm_implementations
         )

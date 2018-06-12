@@ -1,33 +1,37 @@
 
 from pytest import mark
 
-from myia.api import parse, compile
-from myia.cconv import closure_convert
-from myia.ir import clone, manage
+from myia.api import standard_pipeline
+from myia.ir import manage
+
+
+cconv_pipeline = standard_pipeline.select(
+    'parse', 'resolve', 'cconv', 'export'
+)
 
 
 def check_no_free_variables(root):
     mng = manage(root)
     for g, nodes in mng.nodes.items():
+        if not g:
+            continue
+        if g.parent is not None:
+            raise Exception(f'Nested graph detected: {g}')
         for node in nodes:
-            if node.graph is g:
-                continue
-            else:
-                raise Exception(f'Free variable detected: {node}')
+            assert node.graph is g
+            for inp in node.inputs:
+                if inp.graph is not None and inp.graph is not g:
+                    raise Exception(f'Free variable detected: {node}')
 
 
 def cconv(*arglists):
 
     def decorate(fn):
         def run_test(args):
-            g = parse(fn)
             result_py = fn(*args)
-            result_orig = compile(g)(*args)
-            assert result_py == result_orig
-            g2 = clone(g, total=True)
-            g2 = closure_convert(g2)
-            check_no_free_variables(g2)
-            result_final = compile(g2)(*args)
+            res = cconv_pipeline.make()(input=fn)
+            check_no_free_variables(res['graph'])
+            result_final = res['output'](*args)
             assert result_py == result_final
 
         m = mark.parametrize('args', arglists)(run_test)
