@@ -197,10 +197,6 @@ class Specializer(PipelineStep):
         graph: The specialized graph.
     """
 
-    def __init__(self, pipeline_init):
-        """Initialize a Specializer."""
-        super().__init__(pipeline_init)
-
     def step(self, graph, inferrer):
         """Specialize the graph according to argument types."""
         spc = TypeSpecializer(inferrer)
@@ -217,10 +213,6 @@ class ClosureConverter(PipelineStep):
     Outputs:
         graph: The closure converted graph.
     """
-
-    def __init__(self, pipeline_init):
-        """Initialize a ClosureConverter."""
-        super().__init__(pipeline_init)
 
     def step(self, graph):
         """Closure convert the graph."""
