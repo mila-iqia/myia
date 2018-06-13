@@ -240,6 +240,51 @@ class Exporter(PipelineStep):
         return {'output': self.vm.export(graph)}
 
 
+step_parse = Parser.partial()
+
+
+step_resolve = Optimizer.partial(
+    opts=[optlib.resolve_globals]
+)
+
+
+step_infer = Inferrer.partial(
+    tracks=dict(
+        value=ValueTrack.partial(
+            constructors=value_inferrer_constructors
+        ),
+        type=TypeTrack.partial(
+            constructors=type_inferrer_constructors
+        ),
+        shape=ShapeTrack.partial(
+            constructors=shape_inferrer_constructors
+        )
+    ),
+    required_tracks=['type'],
+    timeout=1
+)
+
+
+step_specialize = Specializer.partial()
+
+
+step_opt = Optimizer.partial(
+    opts=[
+        optlib.simplify_always_true,
+        optlib.simplify_always_false,
+        optlib.inline_unique_uses,
+    ]
+)
+
+
+step_cconv = ClosureConverter.partial()
+
+
+step_export = Exporter.partial(
+    implementations=vm_implementations
+)
+
+
 standard_pipeline = PipelineDefinition(
     resources=dict(
         py_implementations=py_implementations,
@@ -249,36 +294,12 @@ standard_pipeline = PipelineDefinition(
         )
     ),
     steps=dict(
-        parse=Parser.partial(),
-        resolve=Optimizer.partial(
-            opts=[optlib.resolve_globals]
-        ),
-        infer=Inferrer.partial(
-            tracks=dict(
-                value=ValueTrack.partial(
-                    constructors=value_inferrer_constructors
-                ),
-                type=TypeTrack.partial(
-                    constructors=type_inferrer_constructors
-                ),
-                shape=ShapeTrack.partial(
-                    constructors=shape_inferrer_constructors
-                )
-            ),
-            required_tracks=['type'],
-            timeout=1
-        ),
-        specialize=Specializer.partial(),
-        opt=Optimizer.partial(
-            opts=[
-                optlib.simplify_always_true,
-                optlib.simplify_always_false,
-                optlib.inline_unique_uses,
-            ]
-        ),
-        cconv=ClosureConverter.partial(),
-        export=Exporter.partial(
-            implementations=vm_implementations
-        )
+        parse=step_parse,
+        resolve=step_resolve,
+        infer=step_infer,
+        specialize=step_specialize,
+        opt=step_opt,
+        cconv=step_cconv,
+        export=step_export,
     )
 )
