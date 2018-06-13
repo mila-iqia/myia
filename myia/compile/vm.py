@@ -93,30 +93,47 @@ def convert_graph(graph):
                 for i in split.inputs[1:]:
                     ref(i)
                 if fn.value == if_:
-                    instrs.append(('if', ref(split.inputs[1]),
-                                   ref(split.inputs[2]), ref(split.inputs[3])))
+                    if split is graph.output:
+                        instrs.append(('tailif', ref(split.inputs[1]),
+                                       ref(split.inputs[2]),
+                                       ref(split.inputs[3]),
+                                       height))
+                        # execution stops here
+                        break
+                    else:
+                        instrs.append(('if', ref(split.inputs[1]),
+                                       ref(split.inputs[2]),
+                                       ref(split.inputs[3])))
                 elif fn.value == return_:
                     print(f"(ret ) height = {height}, {max_height}")
                     instrs.append(('return', ref(split.inputs[1]), height))
-                    # To avoid pushing the split
-                    continue
+                    # execution stops here
+                    break
                 elif fn.value == partial:
                     instrs.append(('partial', ref(split.inputs[1])) + \
                                   tuple(ref(inp) for inp in split.inputs[2:]))
                 else:
                     raise AssertionError("should not happen")
             else:
+                # pre-push the function on the stack
+                ref(fn)
                 for i in reversed(split.inputs[1:]):
                     dup(i)
-                instrs.append(('call', ref(fn)))
-                ret(len(split.inputs))
+                if split is graph.output:
+                    instrs.append(('tailcall', ref(fn), height,
+                                   len(split.inputs[1:])))
+                    # execution stops here
+                    break
+                else:
+                    instrs.append(('call', ref(fn)))
+                    ret(len(split.inputs))
 
             push(split)
 
     print(f"(end ) height = {height}, {max_height}")
-    need_stack = max_height - (param_height + 1)
+    need_stack = max_height - (param_height)
     if need_stack != 0:
-        instrs.insert(0, ('pad_stack', max_height - (param_height + 1)))
+        instrs.insert(0, ('pad_stack', need_stack))
     return instrs
 
 
@@ -171,8 +188,15 @@ class FinalVM:
 
     def _pop(self, n=1):
         v = self.stack[self.sp - 1]
+        for p in range(n):
+            self.stack[self.sp - p - 1] = None
         self.sp -= n
         return v
+
+    def _move_stack(self, nitems, height):
+        self.stack[self.sp - height:self.sp - (height - nitems)] = \
+            self.stack[self.sp - nitems:self.sp]
+        self._pop(height - nitems)
 
     def _ref(self, i):
         return self.stack[self.sp + i]
@@ -183,8 +207,20 @@ class FinalVM:
     def _popp(self):
         self.pc = self.retp.pop()
 
+    def _do_jmp(self, jmp):
+        print(f"jumping to {jmp}")
+        print(f"stack = {self.stack} {self.sp}")
+        while isinstance(jmp, struct_partial):
+            print(f"is partial to {jmp.fn}, appending args")
+            self.inst_pad_stack(len(jmp.args))
+            for a in reversed(jmp.args):
+                self._push(a)
+            print(f"stack = {self.stack} {self.sp}")
+            jmp = jmp.fn
+        self.pc = jmp
+
     def eval(self, args):
-        self.stack = [None] * (len(args) + 1)
+        self.stack = [None] * len(args)
         self.retp = [-1]
         self.pc = 0
         self.sp = 0
@@ -216,17 +252,13 @@ class FinalVM:
     def inst_call(self, jmp):
         print(f"running call({jmp})")
         self._pushp()
-        self.inst_tailcall(jmp)
+        self._do_jmp(self._ref(jmp))
 
-    def inst_tailcall(self, jmp):
-        #print(f"running tailcall({jmp})")
+    def inst_tailcall(self, jmp, height, nargs):
+        print(f"running tailcall({jmp}, {height}, {nargs})")
         jmp = self._ref(jmp)
-        while isinstance(jmp, struct_partial):
-            self.inst_pad_stack(len(jmp.args))
-            for a in reversed(jmp.args):
-                self._push(a)
-            jmp = jmp.fn
-        self.pc = jmp
+        self._move_stack(nargs, height)
+        self._do_jmp(jmp)
 
     def inst_return(self, rpos, height):
         print(f"running return({rpos}, {height})")
@@ -247,6 +279,13 @@ class FinalVM:
         else:
             self.inst_call(ffalse)
 
+    def inst_tailif(self, cond, ftrue, ffalse, height):
+        print(f"running tailif({cond}, {ftrue}, {ffalse}, {height})")
+        if self._ref(cond):
+            self.inst_tailcall(ftrue, height, 0)
+        else:
+            self.inst_tailcall(ffalse, height, 0)
+
     def inst_push(self, v):
         print(f"running push({v})")
         self._push(v)
@@ -261,7 +300,9 @@ class FinalVM:
 
     def inst_pad_stack(self, sz):
         print(f"running pad_stack({sz})")
-        self.stack.extend([None] * sz)
+        need = sz - (len(self.stack) - self.sp)
+        if need > 0:
+            self.stack.extend([None] * need)
 
     def inst_nnvm_call(self, mod, args):
         print(f"running nnvm_call({mod}, {args})")
