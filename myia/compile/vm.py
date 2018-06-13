@@ -41,9 +41,8 @@ def convert_graph(graph):
 
     def push(n):
         nonlocal height, max_height
-        if n is not None:
-            assert n not in slots
-            slots[n] = height
+        assert n not in slots
+        slots[n] = height
         height += 1
         max_height = max(height, max_height)
         print(f"push height up {n}")
@@ -74,7 +73,6 @@ def convert_graph(graph):
         push(p)
 
     param_height = height
-    push(None)  # The pc
     print(f"(init) height = {height}, {max_height}")
 
     for split in splits:
@@ -99,8 +97,7 @@ def convert_graph(graph):
                                    ref(split.inputs[2]), ref(split.inputs[3])))
                 elif fn.value == return_:
                     print(f"(ret ) height = {height}, {max_height}")
-                    instrs.append(('return', ref(split.inputs[1]),
-                                   height - param_height - 1, param_height))
+                    instrs.append(('return', ref(split.inputs[1]), height))
                     # To avoid pushing the split
                     continue
                 elif fn.value == partial:
@@ -112,7 +109,6 @@ def convert_graph(graph):
                 for i in reversed(split.inputs[1:]):
                     dup(i)
                 instrs.append(('call', ref(fn)))
-                push(None)  # The pc
                 ret(len(split.inputs))
 
             push(split)
@@ -156,11 +152,15 @@ class struct_partial:
         self.fn = fn
         self.args = args
 
+    def __repr__(self):
+        return f"partial({self.fn}, {self.args})"
+
 
 class FinalVM:
     def __init__(self, code):
         self.stack = []
-        self.pc = -1
+        self.retp = [-1]
+        self.pc = 0
         self.sp = 0
         self.code = tuple(code)
         self.running = False
@@ -177,13 +177,19 @@ class FinalVM:
     def _ref(self, i):
         return self.stack[self.sp + i]
 
+    def _pushp(self):
+        self.retp.append(self.pc)
+
+    def _popp(self):
+        self.pc = self.retp.pop()
+
     def eval(self, args):
         self.stack = [None] * (len(args) + 1)
+        self.retp = [-1]
         self.pc = 0
         self.sp = 0
         for a in reversed(args):
             self._push(a)
-        self._push(-1)
 
         self.running = True
         print("==== Start ====")
@@ -195,6 +201,7 @@ class FinalVM:
         while self.pc >= 0:
             print(f"pc at {self.pc}")
             print(self.stack, self.sp)
+            print(self.retp)
             instr = self.code[self.pc]
             print(f"instr = {instr[0]}")
             impl = getattr(self, f'inst_{instr[0]}', None)
@@ -208,21 +215,24 @@ class FinalVM:
 
     def inst_call(self, jmp):
         print(f"running call({jmp})")
+        self._pushp()
+        self.inst_tailcall(jmp)
+
+    def inst_tailcall(self, jmp):
+        #print(f"running tailcall({jmp})")
         jmp = self._ref(jmp)
         while isinstance(jmp, struct_partial):
             self.inst_pad_stack(len(jmp.args))
             for a in reversed(jmp.args):
                 self._push(a)
             jmp = jmp.fn
-        self._push(self.pc)
         self.pc = jmp
 
-    def inst_return(self, rpos, height, nargs):
-        print(f"running return({rpos}, {height}, {nargs})")
+    def inst_return(self, rpos, height):
+        print(f"running return({rpos}, {height})")
         rv = self._ref(rpos)
         self._pop(height)
-        self.pc = self._pop()
-        self._pop(nargs)
+        self._popp()
         self._push(rv)
 
     def inst_partial(self, fn_, *args_):
