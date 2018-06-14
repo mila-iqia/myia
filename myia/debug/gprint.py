@@ -15,8 +15,8 @@ from ..parser import Location
 from ..prim import ops as primops
 from ..prim.value_inferrers import LimitedValue
 from ..opt import PatternEquilibriumOptimizer, pattern_replacer
-from ..unify import Var, var, FilterVar
 from ..utils import Registry
+from ..utils.unify import Var, var, FilterVar
 
 from .label import NodeLabeler, short_labeler, short_relation_symbols, \
     CosmeticPrimitive

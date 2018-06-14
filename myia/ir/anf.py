@@ -15,8 +15,8 @@ from typing import Any, Iterable, List, Union, Dict
 from ..dtype import Function, Unknown
 from ..info import NamedDebugInfo
 from ..prim import ops as primops, Primitive
-from ..unify import expandlist, noseq
 from ..utils import Named, list_str, repr_
+from ..utils.unify import expandlist, noseq
 
 from .abstract import Node
 

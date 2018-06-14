@@ -5,7 +5,7 @@ from myia.ir import Constant, is_constant, isomorphic, GraphCloner
 from myia.opt import PatternSubstitutionOptimization as psub, \
     PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph
 from myia.prim import Primitive, ops as prim
-from myia.unify import Var, var
+from myia.utils.unify import Var, var
 
 X = Var('X')
 V = var(is_constant)
