@@ -237,7 +237,7 @@ def test_Pipeline(op_pipeline):
     assert pip['!square'](value=3) == {'value': -8}
     assert pip['mulp':'!neg'](value=3) == {'value': 6}
 
-    assert pdef['mulp':'neg'].make()(value=3) == {'value': -6}
+    assert pdef['mulp':'neg'].run(value=3) == {'value': -6}
 
 
 def test_Pipeline_configure(op_pipeline):

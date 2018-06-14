@@ -429,6 +429,10 @@ class PipelineDefinition:
         """Create a Pipeline from this definition."""
         return Pipeline(self)
 
+    def run(self, **args):
+        """Run a Pipeline made from this definition."""
+        return self.make()(**args)
+
     def __getitem__(self, item):
         """Return a pipeline that only contains a subset of the steps."""
         steps = list(self.steps.items())
