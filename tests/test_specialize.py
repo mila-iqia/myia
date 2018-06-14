@@ -1,11 +1,18 @@
 
 from pytest import mark
 
-from myia.api import parse, compile
+from myia.api import standard_pipeline
 from myia.prim.py_implementations import typeof, hastype, maplist, add
-from myia.specialize import type_specialize, validate
+from myia.specialize import validate
 
 from .test_infer import i64, f64
+
+
+specialize_pipeline = standard_pipeline.select(
+    'parse', 'resolve', 'infer', 'specialize', 'export'
+).configure(
+    {'infer.tracks.value.max_depth': 1}
+)
 
 
 def specialize(*arglists):
@@ -14,11 +21,11 @@ def specialize(*arglists):
         def run_test(args):
             arg_types = [{'type': typeof(arg)} for arg in args]
 
-            g = parse(fn)
             result_py = fn(*args)
-            result_orig = compile(g)(*args)
-            assert result_py == result_orig
-            g2 = type_specialize(g, arg_types)
+
+            res = specialize_pipeline.make()(input=fn, argspec=arg_types)
+            g2 = res['graph']
+
             errs = validate(g2)
             if errs:
                 print('Collected the following errors:')
@@ -26,7 +33,7 @@ def specialize(*arglists):
                     print(f'   {node}')
                     print(f'      {" ".join(e)}')
                 raise Exception('There are errors in the specialized graph.')
-            result_final = compile(g2)(*args)
+            result_final = res['output'](*args)
             assert result_py == result_final
 
         m = mark.parametrize('args', arglists)(run_test)

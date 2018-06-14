@@ -6,9 +6,9 @@ implementation.
 """
 
 from collections import defaultdict
-from typing import Iterable, Mapping, Any, Callable, List
+from typing import Iterable, Mapping, Any, List
 
-from .ir import Graph, Apply, Constant, Parameter, ANFNode, manage
+from .ir import Graph, Apply, Constant, Parameter, ANFNode
 from .ir.utils import is_constant_graph, is_constant
 from .prim import Primitive
 from .prim.ops import if_, return_, partial
@@ -96,12 +96,10 @@ class VM:
         def __init__(self, value):
             self.value = value
 
-    def __init__(self,
-                 implementations: Mapping[Primitive, Callable],
-                 py_implementations: Mapping[Primitive, Callable],
-                 convert) -> None:
+    def __init__(self, pipeline, implementations):
         """Initialize the VM."""
-        self.convert = convert
+        self.convert = pipeline.resources.convert
+        self.manager = pipeline.resources.manager
         self._exporters = TypeMap({
             tuple: self._export_sequence,
             list: self._export_sequence,
@@ -111,7 +109,7 @@ class VM:
             object: self._export_object,
         })
         self.implementations = implementations
-        self.py_implementations = py_implementations
+        self.py_implementations = pipeline.resources.py_implementations
         self._vars = defaultdict(set)
 
     def _compute_fvs(self, graph):
@@ -126,7 +124,7 @@ class VM:
     def _acquire_graph(self, graph):
         if graph in self._vars:
             return
-        manage(graph)
+        self.manager.add_graph(graph)
         for g in graph.manager.graphs:
             self._vars[g] = self._compute_fvs(g)
 

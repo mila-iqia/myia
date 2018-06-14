@@ -2,7 +2,8 @@
 
 import asyncio
 
-from .ir import is_constant, is_constant_graph, is_apply, manage
+from .ir import is_constant, is_constant_graph, is_apply
+from .pipeline import Partializable
 from .utils import Named
 
 
@@ -39,7 +40,7 @@ def type_error_nargs(ident, expected, got):
 #########
 
 
-class Track:
+class Track(Partializable):
     """Represents a property to infer."""
 
     def __init__(self, engine, name):
@@ -515,6 +516,7 @@ class InferenceEngine:
     """
 
     def __init__(self,
+                 pipeline,
                  graph,
                  argvals,
                  *,
@@ -523,11 +525,13 @@ class InferenceEngine:
                  eq_class=EquivalencePool,
                  timeout=1.0):
         """Initialize the InferenceEngine."""
+        self.pipeline = pipeline
+
         self.graph = graph
 
         self.all_track_names = tuple(tracks.keys())
         self.tracks = {
-            name: t(self, name)
+            name: t(engine=self, name=name)
             for name, t in tracks.items()
         }
         self.required_tracks = required_tracks or self.all_track_names
@@ -541,7 +545,8 @@ class InferenceEngine:
         self.errors = []
         self.equiv = eq_class(self)
 
-        self.mng = manage(graph)
+        self.mng = self.pipeline.resources.manager
+        self.mng.add_graph(graph)
         empty_context = Context.empty()
         self.root_context = empty_context.add(graph, argvals)
 
@@ -629,13 +634,14 @@ class InferenceEngine:
         v = self.get_raw(track, ref).result()
         return self.unwrap(v)
 
-    def output_info(self, track):
+    def output_info(self):
         """Return information about the output of the analyzed graph."""
         if self.errors:
             raise self.errors[0]['error']
         else:
             oref = self.ref(self.graph.return_, self.root_context)
-            return self.get_info(track, oref)
+            return {track: self.get_info(track, oref)
+                    for track in self.required_tracks}
 
     def cache_value(self, track, ref, value):
         """Set the value of the Reference on the given track."""
@@ -743,7 +749,3 @@ class InferenceEngine:
             for task in asyncio.Task.all_tasks(self.loop):
                 task._log_destroy_pending = False
         return res
-
-    def close(self):
-        """Close this inferrer's loop."""
-        self.loop.close()

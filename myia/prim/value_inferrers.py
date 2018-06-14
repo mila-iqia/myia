@@ -11,8 +11,7 @@ from ..ir import Graph
 
 from . import ops as P
 from .ops import Primitive
-from .py_implementations import \
-    py_implementations as pyimpl, hastype_helper
+from .py_implementations import hastype_helper
 
 
 class LimitedValue:
@@ -103,11 +102,10 @@ class ValueTrack(Track):
                  engine,
                  name,
                  max_depth=10,
-                 implementations=pyimpl,
                  constructors=value_inferrer_constructors):
         """Initialize a ValueTrack."""
         super().__init__(engine, name)
-        self.implementations = implementations
+        self.implementations = engine.pipeline.resources.py_implementations
         self.constructors = constructors
         self.max_depth = max_depth
 

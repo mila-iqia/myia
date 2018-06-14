@@ -249,7 +249,7 @@ def test_fn_replacement():
         return x
 
     @pattern_replacer(Q, X)
-    def elim_QPs(node, equiv):
+    def elim_QPs(optimizer, node, equiv):
         # Q(P(...P(x))) => x
         arg = equiv[X]
         while arg.inputs and arg.inputs[0].value == P:
