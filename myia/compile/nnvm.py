@@ -7,7 +7,7 @@ import nnvm.compiler
 from nnvm.compiler import graph_attr
 import nnvm.symbol as sym
 import tvm
-from tvm.contrib import graph_runtime, util
+from tvm.contrib import graph_runtime
 import numpy as np
 
 PRIMITIVE_MAP = {
@@ -65,7 +65,6 @@ class NNVMRunner:
         nnvm_args = dict(zip(self.input_names, args))
         self.mod.set_input(**nnvm_args)
         self.mod.run()
-        outs = []
         for i, out in enumerate(self._outs):
             out = self.mod.get_output(i, out)
         return [o.asnumpy() for o in self._outs]

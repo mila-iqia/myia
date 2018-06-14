@@ -3,8 +3,7 @@
 
 from functools import partial
 
-from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number, \
-    Function
+from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number
 from ..infer import ANYTHING, Inferrer, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
