@@ -194,6 +194,25 @@ def test_Partial_class():
         Partial(C, z=10)
 
 
+def test_PipelineDefinition_index(op_pipeline):
+    pdef = op_pipeline
+
+    assert pdef.index('addp') == 0
+    assert pdef.index('addp', True) == 1
+    assert pdef.index('!addp', True) == 0
+    assert pdef.index('mulp') == 1
+    assert pdef.index('neg') == 2
+    assert pdef.index('square') == 3
+
+    assert pdef.index(1) == 1
+
+    with pytest.raises(ValueError):
+        pdef.index('unknown')
+
+    with pytest.raises(TypeError):
+        pdef.index(object())
+
+
 def test_Pipeline(op_pipeline):
     pdef = op_pipeline
 

@@ -238,9 +238,8 @@ class Partial:
         return merge(self, keywords)
 
     def __call__(self, **kwargs):
-        """Run the pipeline on the given arguments, from start to finish."""
-        value = self.func(**self.keywords, **kwargs)
-        return value
+        """Merge stored arguments with kwargs and call the function."""
+        return self.func(**self.keywords, **kwargs)
 
     def __merge__(self, partial, mode):
         """Combine arguments from two partials."""
@@ -318,7 +317,7 @@ class PipelineDefinition:
                 return self.step_names.index(step) + plus
         elif isinstance(step, int) or step is None:
             return step
-        else:  # pragma: no cover
+        else:
             raise TypeError('index should be a string or int')
 
     def getslice(self, item):
@@ -493,8 +492,8 @@ class _PipelineSlice:
         return args
 
 
-class PipelineStep(Partializable):
-    """Step in a Pipeline."""
+class PipelineResource(Partializable):
+    """Resource in a Pipeline."""
 
     def __init__(self, pipeline_init):
         """Initialize a PipelineStep."""
@@ -503,6 +502,10 @@ class PipelineStep(Partializable):
         self.pipeline = pipeline_init['pipeline']
         self.steps = self.pipeline.steps
         self.resources = self.pipeline.resources
+
+
+class PipelineStep(PipelineResource):
+    """Step in a Pipeline."""
 
     def step(self, **kwargs):
         """Execute this step only.

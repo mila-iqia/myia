@@ -9,7 +9,7 @@ from .cconv import closure_convert
 from .infer import InferenceEngine
 from .ir import Graph, clone
 from .opt import PatternEquilibriumOptimizer, lib as optlib
-from .pipeline import PipelineStep, PipelineDefinition
+from .pipeline import PipelineStep, PipelineResource, PipelineDefinition
 from .prim import py_implementations, vm_implementations, ops as P
 from .prim.value_inferrers import ValueTrack, value_inferrer_constructors
 from .prim.type_inferrers import TypeTrack, type_inferrer_constructors
@@ -93,7 +93,7 @@ def compile(obj):
 ############
 
 
-class Converter(PipelineStep):
+class Converter(PipelineResource):
     """Convert a Python object into an object that can be in a Myia graph."""
 
     def __init__(self, pipeline_init, object_map, converters):
@@ -220,7 +220,7 @@ class ClosureConverter(PipelineStep):
         return {'graph': graph}
 
 
-class Exporter(PipelineStep):
+class DebugVMExporter(PipelineStep):
     """Pipeline step to export a callable.
 
     Inputs:
@@ -231,7 +231,7 @@ class Exporter(PipelineStep):
     """
 
     def __init__(self, pipeline_init, implementations):
-        """Initialize an Exporter."""
+        """Initialize an DebugVMExporter."""
         super().__init__(pipeline_init)
         self.vm = VM(self.pipeline, implementations)
 
@@ -280,7 +280,7 @@ step_opt = Optimizer.partial(
 step_cconv = ClosureConverter.partial()
 
 
-step_export = Exporter.partial(
+step_export = DebugVMExporter.partial(
     implementations=vm_implementations
 )
 
