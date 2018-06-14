@@ -2,7 +2,7 @@
 
 import asyncio
 
-from .ir import is_constant, is_constant_graph, is_apply, manage
+from .ir import is_constant, is_constant_graph, is_apply
 from .pipeline import Partializable
 from .utils import Named
 
@@ -545,7 +545,8 @@ class InferenceEngine:
         self.errors = []
         self.equiv = eq_class(self)
 
-        self.mng = manage(graph)
+        self.mng = self.pipeline.resources.manager
+        self.mng.add_graph(graph)
         empty_context = Context.empty()
         self.root_context = empty_context.add(graph, argvals)
 

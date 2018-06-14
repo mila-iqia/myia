@@ -4,7 +4,10 @@ from types import SimpleNamespace
 
 from pytest import mark
 
-from myia.api import parse, run
+from myia.api import standard_pipeline
+
+
+lang_pipeline = standard_pipeline.select('parse', 'resolve', 'export')
 
 
 def parse_compare(*tests):
@@ -24,10 +27,9 @@ def parse_compare(*tests):
         def test(args):
             if not isinstance(args, tuple):
                 args = (args,)
-            # TODO: avoid re-parsing every time
-            fn2 = parse(fn)
             py_result = fn(*map(copy, args))
-            myia_result = run(fn2, tuple(map(copy, args)))
+            myia_fn = lang_pipeline.run(input=fn)['output']
+            myia_result = myia_fn(*map(copy, args))
             assert py_result == myia_result
 
         m = mark.parametrize('args', list(tests))(test)
@@ -300,9 +302,9 @@ def test_closure_recur():
         else:
             return f(x, g(y))
 
-    fn2 = parse(fn)
     py_result = fn(1, 2)
-    myia_result = run(fn2, (1, 2))
+    myia_fn = lang_pipeline.run(input=fn)['output']
+    myia_result = myia_fn(1, 2)
     assert py_result == myia_result
 
 

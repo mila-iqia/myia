@@ -137,12 +137,18 @@ class PatternEquilibriumOptimizer:
 
     def __call__(self, *graphs):
         """Apply optimizations until equilibrium on given graphs."""
-        mng = manage(*graphs)
+        if self.optimizer is not None:
+            mng = self.optimizer.resources.manager
+            for g in graphs:
+                mng.add_graph(g)
+        else:
+            mng = manage(*graphs)
+
         while True:
             changes = False
 
             with mng.transact() as tr:
-                for node in mng.all_nodes:
+                for node in list(mng.all_nodes):
                     for transformer in self.node_transformers:
                         new = transformer(self.optimizer, node)
                         if new and new is not node:

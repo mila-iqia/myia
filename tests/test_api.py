@@ -2,6 +2,7 @@ import pytest
 
 from myia.api import parse, compile
 from myia.cconv import closure_convert
+from myia.ir import clone
 from myia.prim.py_implementations import getitem
 
 
@@ -53,10 +54,11 @@ def test_return_closure_partial():
             return x + y
         return g
 
-    f = closure_convert(f)
+    f = clone(closure_convert(f))
     f = compile(f)
 
-    assert f(4, 5)() == 9
+    g = f(4, 5)
+    assert g() == 9
 
 
 def test_return_closure_tuple():

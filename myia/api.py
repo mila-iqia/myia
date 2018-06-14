@@ -2,12 +2,11 @@
 
 import operator
 from types import FunctionType
-from typing import Any, List
 
 from . import parser
 from .cconv import closure_convert
 from .infer import InferenceEngine
-from .ir import Graph, clone
+from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib
 from .pipeline import PipelineStep, PipelineResource, PipelineDefinition
 from .prim import py_implementations, vm_implementations, ops as P
@@ -52,6 +51,7 @@ def _convert_sequence(env, seq):
 
 def _convert_function(env, fn):
     g = clone(parser.parse(fn))
+    env.resources.manager.add_graph(g)
     env.object_map[fn] = g
     return g
 
@@ -71,13 +71,6 @@ def parse(func: FunctionType, resolve_globals=True) -> Graph:
     pdef = pdef.configure(resolve=resolve_globals)
     g = pdef.make()(input=func)['graph']
     return g
-
-
-def run(g: Graph, args: List[Any]) -> Any:
-    """Evaluate a graph on a set of arguments."""
-    pdef = standard_pipeline.select('export')
-    f = pdef.make()(graph=g)['output']
-    return f(*args)
 
 
 def compile(obj):
@@ -150,6 +143,7 @@ class Optimizer(PipelineStep):
         """Optimize the graph using the given patterns."""
         eq = PatternEquilibriumOptimizer(*self.opts, optimizer=self)
         eq(graph)
+        self.resources.manager.keep_roots(graph)
         return {'graph': graph}
 
 
@@ -201,6 +195,7 @@ class Specializer(PipelineStep):
         """Specialize the graph according to argument types."""
         spc = TypeSpecializer(inferrer)
         result = spc.result
+        self.resources.manager.keep_roots(result)
         return {'graph': result}
 
 
@@ -287,6 +282,7 @@ step_export = DebugVMExporter.partial(
 
 standard_pipeline = PipelineDefinition(
     resources=dict(
+        manager=GraphManager.partial(),
         py_implementations=py_implementations,
         convert=Converter.partial(
             object_map=default_object_map,

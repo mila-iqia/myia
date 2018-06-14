@@ -453,7 +453,12 @@ class Pipeline:
         """Initialize a Pipeline from a PipelineDefinition."""
         def convert(x, name):
             if isinstance(x, Partial):
-                x = x.partial(pipeline_init={'pipeline': self, 'name': name})
+                try:
+                    x = x.partial(
+                        pipeline_init={'pipeline': self, 'name': name}
+                    )
+                except TypeError:
+                    pass
                 x = x()
             return x
 
