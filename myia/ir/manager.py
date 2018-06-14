@@ -4,8 +4,7 @@
 from collections import defaultdict, Counter
 
 from ..graph_utils import dfs, FOLLOW, EXCLUDE
-from ..pipeline import Partializable
-from ..utils import Events
+from ..utils import Events, Partializable
 
 from .utils import succ_deeper, is_constant, is_constant_graph, is_parameter
 
