@@ -1,5 +1,11 @@
+"""Implementation of a prototype optimized VM in python."""
+
+
 class struct_partial:
+    """Representation for the result of a partial()."""
+
     def __init__(self, fn, args):
+        """Initialize struct_partial."""
         self.fn = fn
         self.args = args
 
@@ -8,19 +14,26 @@ class struct_partial:
 
 
 class FinalVM:
+    """Run a sequence of instructions.
+
+    These instructions can represent multiple graphs with arbitrary
+    recursion between them.
+    """
+
     def __init__(self, code):
-        self.stack = []
-        self.retp = [-1]
-        self.pc = 0
-        self.sp = 0
+        """Create a VM with the specified instructions."""
         self.code = tuple(code)
-        self.running = False
 
     def _push(self, v):
+        """Push a value to the stack."""
         self.stack[self.sp] = v
         self.sp += 1
 
     def _pop(self, n=1):
+        """Pop a number of values off the stack returning the top.
+
+        This also clears values that were popped off the stack.
+        """
         v = self.stack[self.sp - 1]
         for p in range(n):
             self.stack[self.sp - p - 1] = None
@@ -28,121 +41,227 @@ class FinalVM:
         return v
 
     def _move_stack(self, nitems, height):
+        """Move a range of values down the stack, clearing the excess.
+
+        This is used to implement tailcalls.
+        """
         self.stack[self.sp - height:self.sp - (height - nitems)] = \
             self.stack[self.sp - nitems:self.sp]
         self._pop(height - nitems)
 
     def _ref(self, i):
+        """Fetch a value from the stack."""
         return self.stack[self.sp + i]
 
     def _pushp(self):
+        """Push the pc on the call stack (call)."""
         self.retp.append(self.pc)
 
     def _popp(self):
+        """Restore the pc from the call stack (return)."""
         self.pc = self.retp.pop()
 
     def _do_jmp(self, jmp):
-        print(f"jumping to {jmp}")
-        print(f"stack = {self.stack} {self.sp}")
+        """Jump to the specified position.
+
+        This also handles jumping to a partial.
+        """
         while isinstance(jmp, struct_partial):
-            print(f"is partial to {jmp.fn}, appending args")
             self.inst_pad_stack(len(jmp.args))
             for a in reversed(jmp.args):
                 self._push(a)
-            print(f"stack = {self.stack} {self.sp}")
             jmp = jmp.fn
         self.pc = jmp
 
     def __call__(self, *args):
+        """Shortcut to eval()."""
         return self.eval(args)
 
     def eval(self, args):
-        self.stack = [None] * len(args)
-        self.retp = [-1]
-        self.pc = 0
-        self.sp = 0
+        """Evalute the code for this vm with the passed-in arguments."""
+        # reset the runtime to initial values
+        self.stack = [None] * len(args)  # The value stack
+        self.retp = [-1]  # The call stack
+        self.pc = 0  # program counter (next instruction)
+        self.sp = 0  # stack pointer (for the value stack)
+
+        # Calling convention is to push arguments from last to first
+        # because it makes partial application easier.
         for a in reversed(args):
             self._push(a)
 
-        self.running = True
-        print("==== Start ====")
-        print("Stack:")
-        print(self.stack)
-        print(f"pc = {self.pc}")
-        print(self.code)
-        print("=== Runtime ===")
+        # Main runtime loop
         while self.pc >= 0:
-            print(f"pc at {self.pc}")
-            print(self.stack, self.sp)
-            print(self.retp)
             instr = self.code[self.pc]
-            print(f"instr = {instr[0]}")
             impl = getattr(self, f'inst_{instr[0]}', None)
             if impl is None:
                 raise AssertionError(f'Unknown instruction {instr[0]}')
             self.pc += 1
             impl(*instr[1:])
 
+        # When we reach here there should be a single value on the
+        # value stack and it is the return value for the evaluation.
         assert self.sp == 1, self.sp
         return self.stack[0]
 
     def inst_call(self, jmp):
-        print(f"running call({jmp})")
+        """Call.
+
+        Will push the current pc on the call stack and jump to the
+        given referrence.  Arguments are assumed to already be on the stack.
+
+        Arguments:
+            jmp: stack reference to a callable (code position or partial).
+
+        """
         self._pushp()
         self._do_jmp(self._ref(jmp))
 
     def inst_tailcall(self, jmp, height, nargs):
-        print(f"running tailcall({jmp}, {height}, {nargs})")
+        """Tail call.
+
+        Will clear `height` values off the stack moving the last
+        `nargs` ones down to serve as arguments for the calls, then
+        jumps to the given reference.  This does not push the pc on
+        the call stack.
+
+        Arguments:
+            jmp: stack reference to a callable (code position or partial).
+            height: height of the stack relative to the previous
+                    function (includes arguments)
+            nargs: number of arguments passed to the called reference.
+
+        """
         jmp = self._ref(jmp)
         self._move_stack(nargs, height)
         self._do_jmp(jmp)
 
     def inst_return(self, rpos, height):
-        print(f"running return({rpos}, {height})")
+        """Return.
+
+        Clears the stack while ensuring that the specified value ends
+        up at the top of the remaing stack.  Then jumps to the pc at
+        the top of the call stack.
+
+        Arguments:
+            rpos: reference to the return value
+            height: stack height to clear (includes arguments)
+
+        """
         rv = self._ref(rpos)
         self._pop(height)
-        self._popp()
         self._push(rv)
+        self._popp()
 
     def inst_partial(self, fn_, *args_):
+        """Create a partial application.
+
+        Bundles together the callable and the arguments and pushes
+        that onto the stack.  The resulting value is callable and will
+        transparently add the specified arguemnts at the beginning of
+        any other arguments received.
+
+        Arguments:
+            fn_: callable reference
+            args_: arguments references
+
+        """
         fn = self._ref(fn_)
         args = tuple(self._ref(a) for a in args_)
         self._push(struct_partial(fn, args))
 
     def inst_if(self, cond, ftrue, ffalse):
-        print(f"running if({cond}, {ftrue}, {ffalse})")
+        """If.
+
+        This will fetch the conditional and call either ftrue or
+        ffalse with no arguments depending on the value.
+
+        Arguments:
+            cond: boolean value
+            ftrue: callable reference
+            ffalse: callable reference
+
+        Note:
+            This instruction might change to instead return the chosen
+            callable in the future.
+
+        """
         if self._ref(cond):
             self.inst_call(ftrue)
         else:
             self.inst_call(ffalse)
 
     def inst_tailif(self, cond, ftrue, ffalse, height):
-        print(f"running tailif({cond}, {ftrue}, {ffalse}, {height})")
+        """Tail If.
+
+        This will fetch the conditional and tail call either ftrue or
+        ffalse with no arguments depending on the value.
+
+        Arguments:
+            cond: boolean value
+            ftrue: callable reference
+            ffalse: callable reference
+            height: stack height to clear
+
+        Note:
+            This instruction might disappear in the future.
+
+        """
         if self._ref(cond):
             self.inst_tailcall(ftrue, height, 0)
         else:
             self.inst_tailcall(ffalse, height, 0)
 
     def inst_push(self, v):
-        print(f"running push({v})")
+        """Push a value on the stack.
+
+        Used to push constant values
+
+        Arguments:
+            v: value to push
+
+        """
         self._push(v)
 
     def inst_dup(self, rpos):
-        print(f"running dup({rpos})")
+        """Duplicate a value already on the stack.
+
+        Arguments:
+            rpos: stack reference
+
+        """
         self._push(self._ref(rpos))
 
     def inst_pop(self):
-        print("running pop")
+        """Pop the top value off the stack."""
         self._pop()
 
     def inst_pad_stack(self, sz):
-        print(f"running pad_stack({sz})")
+        """Pad stack.
+
+        This should be the first instruction in any function.  It
+        allows the vm to ensure that the function will have the stack
+        space it needs.
+
+        Arguments:
+            sz: stack space
+
+        """
         need = sz - (len(self.stack) - self.sp)
         if need > 0:
             self.stack.extend([None] * need)
 
     def inst_lin_apply(self, mod, args):
-        print(f"running lin_apply({mod}, {args})")
+        """Linear apply.
+
+        This will call the provided function with the specified values
+        and push any outputs that function has (may be more than one).
+
+        Arguments:
+           mod: Callable function that implements a linear section of the code.
+           args: sequence of stack references
+
+        """
         outs = mod(*(self._ref(a) for a in args))
         assert len(outs) == 1
         self._push(outs[0])

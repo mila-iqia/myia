@@ -1,3 +1,5 @@
+"""Transforms a graph into lower-level code."""
+
 from ..ir import (Apply, is_apply, is_constant, is_constant_graph,
                   is_parameter, toposort)
 from ..pipeline import PipelineDefinition, PipelineStep
@@ -8,14 +10,23 @@ from .vm import FinalVM
 
 
 class SplitGraph(PipelineStep):
-    """Pipeline stop to cut the graph into linear portions and control flow."""
+    """Pipeline step to cut the graph into linear portions and control flow.
+
+    Inputs:
+        graph: A graph
+
+    Outputs:
+        splits: list of graph portions
+
+    """
 
     def step(self, graph):
+        """Split the graph into portions."""
         splits = []
         split = []
 
         for node in toposort(graph.return_):
-            if self._cut(node):
+            if self.is_cut(node):
                 if len(split) != 0:
                     splits.append(split)
                 splits.append(node)
@@ -25,7 +36,13 @@ class SplitGraph(PipelineStep):
 
         return {'splits': splits}
 
-    def _cut(self, node):
+    def is_cut(self, node):
+        """Returns whether there should be a cut for this node.
+
+        Cuts are done for all "non-linear" nodes: function calls,
+        branches, ...
+
+        """
         if is_apply(node):
             fn = node.inputs[0]
             if not is_constant(fn, Primitive):
@@ -36,13 +53,29 @@ class SplitGraph(PipelineStep):
 
 
 class CompileGraph(PipelineStep):
-    """Step to convert splits into linear instruction flow."""
+    """Step to convert splits into linear instruction flow.
+
+    Inputs:
+        graph: A graph
+        splits: list of graph portions
+
+    Outputs:
+        uinstrs: list of instructions for the graph (unlinked)
+
+    """
 
     def __init__(self, pipeline_init, lin_convert):
+        """Initialize a the CompileGraph step.
+
+        Arguments:
+            lin_convert: function to convert linear portions to a callable.
+
+        """
         super().__init__(pipeline_init)
         self.lin_convert = lin_convert
 
     def _reset(self):
+        """Set/clear shared values."""
         self._height = 0
         self.max_height = 0
         self.slots = {}
@@ -50,6 +83,7 @@ class CompileGraph(PipelineStep):
 
     @property
     def height(self):
+        """The current stack height."""
         return self._height
 
     @height.setter
@@ -58,14 +92,27 @@ class CompileGraph(PipelineStep):
         self.max_height = max(self.max_height, self._height)
 
     def add_instr(self, instr, *args):
+        """Append instruction to the list."""
         self.instrs.append((instr,) + args)
 
     def push(self, node):
+        """Simulate pushing the value for node on the stack.
+
+        This records the postion so that other nodes can refer to this
+        value later.
+
+        """
         assert node not in self.slots
         self.slots[node] = self.height
         self.height += 1
 
     def ref(self, node):
+        """Get the stack reference for the value of a node.
+
+        This can actually cause a push if the node is a constant that
+        wasn't referreded to before.
+
+        """
         if node not in self.slots and is_constant(node):
             if is_constant_graph(node):
                 self.add_instr('push_graph', node.value)
@@ -75,6 +122,7 @@ class CompileGraph(PipelineStep):
         return self.slots[node] - self.height
 
     def dup(self, node):
+        """Ensures that the value for node is at the top of the stack."""
         if node not in self.slots:
             return self.ref(node)
         self.add_instr('dup', self.ref(node))
@@ -82,9 +130,11 @@ class CompileGraph(PipelineStep):
         return -1
 
     def ret(self, nargs):
+        """Simulate the effect of a return from a call on the stack."""
         self.height -= nargs
 
     def step(self, graph, splits):
+        """Convert the graph into a list of instructions."""
         self._reset()
 
         for p in reversed(graph.parameters):
@@ -153,14 +203,24 @@ class CompileGraph(PipelineStep):
         if need_stack > 0:
             self.instrs.insert(0, ('pad_stack', need_stack))
 
-        res = {'instrs': self.instrs}
+        res = {'uinstrs': self.instrs}
         self._reset()
         return res
 
 
 class OptimizeInstrs(PipelineStep):
-    def step(self, instrs):
-        return {'instrs': instrs}
+    """Run peephole optimizations.
+
+    Inputs:
+        uinstrs: List of unlinked instructions
+
+    Outputs:
+        uinstrs: List of unlinked instructions
+    """
+
+    def step(self, uinstrs):
+        """Apply optimizations (currently none)."""
+        return {'uinstrs': uinstrs}
 
 
 graph_transform = PipelineDefinition(
@@ -173,19 +233,40 @@ graph_transform = PipelineDefinition(
 
 
 class CompileGraphs(PipelineStep):
+    """Convert a graph cluster into instruction lists.
+
+    Inputs:
+        graph: A graph
+
+    Outputs:
+        mapping: map each graph to its starting position in the code list.
+        uinstrs: list of unlinked instructions for all the graphs in
+                 the cluster, starting with the passed-in graph.
+
+    """
+
     def __init__(self, pipeline_init, transform):
+        """Initialize a CompileGraphs.
+
+        Arguments:
+            transform: Pipeline to convert a single graph to unlinked
+                       instructions.
+        """
         super().__init__(pipeline_init)
         self.transform = transform
 
     def reset(self):
+        """Clear/set local variables."""
         self.mapping = {}
         self.instrs = []
 
     def compile(self, graph):
+        """Convert a single graph to unlinked instructions and map it."""
         self.mapping[graph] = len(self.instrs)
-        self.instrs.extend(self.transform(graph=graph)['instrs'])
+        self.instrs.extend(self.transform(graph=graph)['uinstrs'])
 
     def step(self, graph):
+        """Convert all graphs to unlinked instructions and map them."""
         self.reset()
 
         self.compile(graph)
@@ -194,23 +275,45 @@ class CompileGraphs(PipelineStep):
         for g in (graphs - set([graph])):
             self.compile(g)
 
-        res = {'mapping': self.mapping, 'instrs': self.instrs}
+        res = {'mapping': self.mapping, 'uinstrs': self.instrs}
         self.reset()
         return res
 
 
 class LinkInstrs(PipelineStep):
-    def step(self, mapping, instrs):
-        for i in range(len(instrs)):
-            instr = instrs[i]
-            if instr[0] == 'push_graph':
-                instrs[i] = ('push', mapping[instr[1]])
+    """Link unlinked instructions.
 
-        return {'instrs': instrs}
+    Inputs:
+        mapping: graph map
+        uinstrs: unlinked instructions
+
+    Outputs:
+        instrs: linked instructions
+
+    """
+
+    def step(self, mapping, uinstrs):
+        """Link instructions."""
+        for i in range(len(uinstrs)):
+            instr = uinstrs[i]
+            if instr[0] == 'push_graph':
+                uinstrs[i] = ('push', mapping[instr[1]])
+
+        return {'instrs': uinstrs}
 
 
 class VMExporter(PipelineStep):
+    """Make a callable out of instructions.
+
+    Inputs:
+        instrs: instruction list
+
+    Outputs:
+        output: callable
+    """
+
     def step(self, instrs):
+        """Make a callable."""
         return {'output': FinalVM(instrs)}
 
 

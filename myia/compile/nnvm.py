@@ -1,3 +1,5 @@
+"""Linear implementation using NNVM."""
+
 import numpy as np
 
 import nnvm.compiler
@@ -10,6 +12,7 @@ from ..dtype import type_to_np_dtype
 from ..ir import is_apply, is_constant
 from ..prim import Primitive
 from ..prim import ops as P
+
 
 PRIMITIVE_MAP = {
     P.add: sym.elemwise_add,
@@ -40,6 +43,7 @@ PRIMITIVE_MAP = {
 
 
 def counter():
+    """Returns a function that returns increasing numbers with each call."""
     val = -1
 
     def next():
@@ -49,12 +53,19 @@ def counter():
     return next
 
 
-def map_type(typ):
-    return type_to_np_dtype(typ)
-
-
 class NNVMRunner:
+    """Adpater to run an NNVM module."""
+
     def __init__(self, mod, input_names, output_specs):
+        """Intialize the runner.
+
+        Arguments:
+            mod: NNVM compiled module
+            input_names: list of the names of inputs (in order)
+            output_specs: list of shape and dtype for outputs
+                          [(shp0, dtype0), ...]
+
+        """
         self.mod = mod
         self.input_names = input_names
         self.output_specs = output_specs
@@ -62,6 +73,7 @@ class NNVMRunner:
                       for spec in self.output_specs]
 
     def __call__(self, *args):
+        """Run the module on the arguments."""
         assert len(args) == len(self.input_names)
         nnvm_args = dict(zip(self.input_names, args))
         self.mod.set_input(**nnvm_args)
@@ -72,7 +84,24 @@ class NNVMRunner:
 
 
 def nnvm_convert(lst):
-    """Returns graph, inputs, output, constants"""
+    """Converts the list of nodes to a runnable form.
+
+    All the nodes in the list must represent linear flow (no calls,
+    branches, ...)
+
+    Returns:
+       (fn, inputs, outputs):
+
+       - fn: A callable function
+       - inputs: the list of inputs nodes whose values should be
+                  provided to the function
+       - outputs: the list of output nodes corresponding to the
+                  outputs of the function
+
+    Notes:
+        This implementation converts the nodes to NNVM and compiles it.
+
+    """
     eqv = {}
     inputs = []
     input_names = []
@@ -84,16 +113,17 @@ def nnvm_convert(lst):
     def ref(n):
         if is_constant(n):
             name = f"cst{c()}"
-            constants[name] = np.asarray(n.value, dtype=map_type(n.type))
+            constants[name] = np.asarray(n.value,
+                                         dtype=type_to_np_dtype(n.type))
             eqv[n] = sym.Variable(name)
-            types[name] = map_type(n.type)
+            types[name] = type_to_np_dtype(n.type)
             shapes[name] = (1,)
         elif n not in eqv:
             name = f"i{c()}"
             inputs.append(n)
             input_names.append(name)
             eqv[n] = sym.Variable(name)
-            types[name] = map_type(n.type)
+            types[name] = type_to_np_dtype(n.type)
             shapes[name] = (1,)
         return eqv[n]
 
