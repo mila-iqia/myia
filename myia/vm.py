@@ -96,10 +96,10 @@ class VM:
         def __init__(self, value):
             self.value = value
 
-    def __init__(self, pipeline, implementations):
+    def __init__(self, convert, manager, py_implementations, implementations):
         """Initialize the VM."""
-        self.convert = pipeline.resources.convert
-        self.manager = pipeline.resources.manager
+        self.convert = convert
+        self.manager = manager
         self._exporters = TypeMap({
             tuple: self._export_sequence,
             list: self._export_sequence,
@@ -109,7 +109,7 @@ class VM:
             object: self._export_object,
         })
         self.implementations = implementations
-        self.py_implementations = pipeline.resources.py_implementations
+        self.py_implementations = py_implementations
         self._vars = defaultdict(set)
 
     def _compute_fvs(self, graph):

@@ -3,7 +3,9 @@ from ..ir import Apply, toposort, is_parameter, is_apply, is_constant_graph, \
     is_constant
 from ..prim import Primitive
 from .nnvm import nnvm_convert
+from .debug_lin import debug_convert
 from ..pipeline import PipelineStep, PipelineDefinition
+from .vm import FinalVM
 
 
 class SplitGraph(PipelineStep):
@@ -84,7 +86,7 @@ class CompileGraph(PipelineStep):
         self.height -= nargs
 
     def step(self, graph, splits):
-        self.reset()
+        self._reset()
 
         for p in reversed(graph.parameters):
             self.push(p)
@@ -138,8 +140,8 @@ class CompileGraph(PipelineStep):
                     for i in reversed(split.inputs[1:]):
                         self.dup(i)
                     if split is graph.output:
-                        self.add_instrs('tailcall', self.ref(fn), self.height,
-                                        len(split.inputs[1:]))
+                        self.add_instr('tailcall', self.ref(fn), self.height,
+                                       len(split.inputs[1:]))
                         # execution stops here
                         break
                     else:
@@ -150,10 +152,10 @@ class CompileGraph(PipelineStep):
 
         need_stack = self.max_height - param_height
         if need_stack > 0:
-            self.instrs.inssert(0, ('pad_stack', need_stack))
+            self.instrs.insert(0, ('pad_stack', need_stack))
 
         res = {'instrs': self.instrs}
-        self.reset()
+        self._reset()
         return res
 
 
@@ -165,7 +167,7 @@ class OptimizeInstrs(PipelineStep):
 graph_transform = PipelineDefinition(
     steps=dict(
         split=SplitGraph.partial(),
-        compile=CompileGraph.partial(lin_convert=nnvm_convert),
+        compile=CompileGraph.partial(lin_convert=debug_convert),
         optimize=OptimizeInstrs.partial(),
     )
 )
@@ -182,7 +184,7 @@ class CompileGraphs(PipelineStep):
 
     def compile(self, graph):
         self.mapping[graph] = len(self.instrs)
-        self.instrs.extend(self.tranform(graph=graph)['instrs'])
+        self.instrs.extend(self.transform(graph=graph)['instrs'])
 
     def step(self, graph):
         self.reset()
@@ -208,9 +210,11 @@ class LinkInstrs(PipelineStep):
         return {'instrs': instrs}
 
 
-compile_graphs = PipelineDefinition(
-    steps=dict(
-        compile=CompileGraphs.partial(transform=graph_transform.make()),
-        link=LinkInstrs.partial(),
-    )
-)
+class VMExporter(PipelineStep):
+    def step(self, instrs):
+        return {'output': FinalVM(instrs)}
+
+
+step_compile = CompileGraphs.partial(transform=graph_transform.make())
+step_link = LinkInstrs.partial()
+step_export = VMExporter.partial()

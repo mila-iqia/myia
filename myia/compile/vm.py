@@ -53,6 +53,9 @@ class FinalVM:
             jmp = jmp.fn
         self.pc = jmp
 
+    def __call__(self, *args):
+        return self.eval(args)
+
     def eval(self, args):
         self.stack = [None] * len(args)
         self.retp = [-1]
@@ -138,8 +141,8 @@ class FinalVM:
         if need > 0:
             self.stack.extend([None] * need)
 
-    def inst_nnvm_call(self, mod, args):
-        print(f"running nnvm_call({mod}, {args})")
+    def inst_lin_apply(self, mod, args):
+        print(f"running lin_apply({mod}, {args})")
         outs = mod(*(self._ref(a) for a in args))
         assert len(outs) == 1
         self._push(outs[0])
