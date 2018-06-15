@@ -3,8 +3,7 @@
 import asyncio
 
 from .ir import is_constant, is_constant_graph, is_apply
-from .pipeline import Partializable
-from .utils import Named
+from .utils import Named, Partializable
 
 
 # Represents an unknown value

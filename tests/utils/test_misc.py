@@ -1,6 +1,6 @@
 import pytest
 
-from myia.utils import Named, TypeMap, smap, Event, Events
+from myia.utils import Named, TypeMap, smap, Event, Events, NS
 
 
 def test_named():
@@ -124,3 +124,20 @@ def test_events_str_repr():
     ev = Event('event')
     str(ev)
     repr(ev)
+
+
+def test_NS():
+    ns = NS(x=1, y=2)
+
+    assert ns.x == 1
+    assert ns.y == 2
+
+    ns.a = 3
+    assert ns.a == 3
+    assert ns['a'] == 3
+
+    ns['b'] = 4
+    assert ns['b'] == 4
+    assert ns.b == 4
+
+    assert repr(ns) == 'NS(x=1, y=2, a=3, b=4)'

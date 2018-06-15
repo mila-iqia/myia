@@ -4,7 +4,7 @@ from functools import reduce
 from typing import \
     Any, Callable, Dict, Iterable, List, Set, TypeVar, Union
 
-from .utils import TypeMap
+from . import TypeMap
 
 T = TypeVar('T')
 

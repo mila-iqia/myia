@@ -4,9 +4,9 @@ from ..graph_utils import dfs
 from ..ir import succ_incoming, freevars_boundary, \
     Graph, Constant, is_constant, is_constant_graph, is_apply, \
     GraphCloner
-from ..unify import Var, var, SVar
 from ..prim import ops as P
 from ..utils import Namespace
+from ..utils.unify import Var, var, SVar
 
 from .opt import \
     sexp_to_node, \

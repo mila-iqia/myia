@@ -1,7 +1,7 @@
 """Graph optimization routines."""
 
 from ..ir import ANFNode, Apply, Constant, Graph, Special, manage
-from ..unify import Unification, Var
+from ..utils.unify import Unification, Var
 
 
 class VarNode(Special):

@@ -1,6 +1,7 @@
-"""General utilities and design patterns."""
+"""Miscellaneous utilities."""
 
 from typing import Any, Dict, List, TypeVar
+
 
 T1 = TypeVar('T1')
 T2 = TypeVar('T2')
@@ -298,6 +299,30 @@ class Events:
         for event_name, history in events.items():
             ev = Event(event_name, owner=owner, history=history)
             setattr(self, event_name, ev)
+
+
+class NS:
+    """Simple namespace, acts a bit like a dict with dot access on keys.
+
+    This is different from Namespace below.
+
+    This namespace preserves key order in the representation, unlike
+    types.SimpleNamespace.
+    """
+
+    def __init__(self, **kwargs):
+        """Initialize NS."""
+        self.__dict__.update(kwargs)
+
+    def __getitem__(self, item):
+        return self.__dict__[item]
+
+    def __setitem__(self, item, value):
+        self.__dict__[item] = value
+
+    def __repr__(self):
+        args = [f'{k}={v}' for k, v in self.__dict__.items()]
+        return f'NS({", ".join(args)})'
 
 
 class Namespace:
