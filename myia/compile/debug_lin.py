@@ -1,8 +1,6 @@
-from ..ir import is_apply, is_constant, Graph, manage
+from ..ir import Graph, is_apply, is_constant, manage
 from ..prim import Primitive, vm_implementations
 from ..vm import VM
-
-from myia.debug.buche import buche
 
 
 def debug_convert(lst):
@@ -37,6 +35,7 @@ def debug_convert(lst):
             implementations=vm_implementations)
 
     fn = vm.export(g)
+
     def wrap(*args):
         return [fn(*args)]
 

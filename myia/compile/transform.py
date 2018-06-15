@@ -1,10 +1,9 @@
-from ..prim.ops import if_, return_, partial
-from ..ir import Apply, toposort, is_parameter, is_apply, is_constant_graph, \
-    is_constant
+from ..ir import (Apply, is_apply, is_constant, is_constant_graph,
+                  is_parameter, toposort)
+from ..pipeline import PipelineDefinition, PipelineStep
 from ..prim import Primitive
-from .nnvm import nnvm_convert
+from ..prim.ops import if_, partial, return_
 from .debug_lin import debug_convert
-from ..pipeline import PipelineStep, PipelineDefinition
 from .vm import FinalVM
 
 

@@ -1,14 +1,15 @@
-from ..prim import ops as P
-from ..ir import is_apply, is_constant
-from ..prim import Primitive
-from ..dtype import type_to_np_dtype
+import numpy as np
 
 import nnvm.compiler
-from nnvm.compiler import graph_attr
 import nnvm.symbol as sym
 import tvm
+from nnvm.compiler import graph_attr
 from tvm.contrib import graph_runtime
-import numpy as np
+
+from ..dtype import type_to_np_dtype
+from ..ir import is_apply, is_constant
+from ..prim import Primitive
+from ..prim import ops as P
 
 PRIMITIVE_MAP = {
     P.add: sym.elemwise_add,
