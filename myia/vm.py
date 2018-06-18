@@ -197,6 +197,7 @@ class VM:
             if i.graph == node.graph or is_constant_graph(i):
                 yield i
         if is_constant_graph(node):
+            self._acquire_graph(node.value)
             yield from self._vars[node.value]
 
     def call(self, fn, args):

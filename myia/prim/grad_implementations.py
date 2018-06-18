@@ -9,7 +9,7 @@ from types import FunctionType
 
 from ..api import parse
 from ..info import NamedDebugInfo, About
-from ..ir import Graph, replace
+from ..ir import Constant, Graph, manage, clone
 from ..utils import Registry
 
 from . import ops as primops
@@ -32,17 +32,20 @@ def bprop_to_augm(prim: Primitive, fn: FunctionType) -> Graph:
     with About(info, 'grad_fprop'):
         outer = Graph()
         outer.transforms['primal'] = prim
+        outer.output = Constant(None)
+
+    mng = manage(bprop, outer)
 
     transf_args = []
     for p in args:
         with About(p.debug, 'grad_fprop'):
             outer_p = outer.add_parameter()
-        replace(p, outer_p)
+        mng.replace(p, outer_p)
         transf_args.append(outer.apply(primops.Jinv, outer_p))
 
-    with About(dout.debug, 'grad_bprop'):
+    with About(dout.debug, 'grad_sens'):
         new_dout = bprop.add_parameter()
-        replace(dout, new_dout)
+        mng.replace(dout, new_dout)
         # We remove all parameters except new_dout
         bprop.parameters = [new_dout]
 
@@ -52,7 +55,7 @@ def bprop_to_augm(prim: Primitive, fn: FunctionType) -> Graph:
         result,
         outer.apply(primops.cons_tuple, bprop, ())
     )
-    return outer
+    return clone(outer)
 
 
 augmented_graphs: Registry[primops.Primitive, Graph] = Registry()
@@ -69,8 +72,13 @@ def register_bprop(prim):
 
 def register_augm(prim):
     """Register an augmented function for prim."""
+    from ..debug.label import short_labeler, short_relation_symbols as syms
     def deco(fn):
         fn2 = parse(fn)
+        for g in manage(fn2, weak=True).graphs:
+            name = short_labeler.name(g)
+            name = name.replace('__fprop__', syms['grad_fprop'])
+            g.debug.name = name.replace('__bprop__', syms['grad_bprop'])
         fn2.transforms['primal'] = prim
         return register(prim)(fn2)
     return deco
@@ -186,19 +194,21 @@ def bprop_zeros_like(x, dz):
 
 
 @register_augm(primops.if_)
-def bprop_if_(c, tb, fb):
+def __fprop__if_(c, tb, fb):
     """Backpropagator for primitive `if`."""
-    zeros_like  # Currently required for parser to see it in bprop()
-
     if Jinv(c):
-        rval, branch_bprop = tb()
+        res = tb()
     else:
-        rval, branch_bprop = fb()
+        res = fb()
 
-    def bprop(dout):
+    rval, branch_bprop = res
+
+    def __bprop__if_(dout):
+        zc = zeros_like(c)
+        value = branch_bprop(dout)[0]
         if Jinv(c):
-            return (), zeros_like(c), branch_bprop(dout)[0], zeros_like(fb)
+            return (), zc, value, zeros_like(fb)
         else:
-            return (), zeros_like(c), zeros_like(tb), branch_bprop(dout)[0]
+            return (), zc, zeros_like(tb), value
 
-    return rval, bprop
+    return rval, __bprop__if_

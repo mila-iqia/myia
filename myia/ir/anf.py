@@ -137,6 +137,16 @@ class Graph:
         return self.manager.free_variables_total[self]
 
     @property
+    def free_variables_indirect(self):
+        return {fv for fv in self.free_variables_total
+                if isinstance(fv, ANFNode)}
+
+    @property
+    def free_variables_graphs(self):
+        return {fv for fv in self.free_variables_total
+                if isinstance(fv, Graph)}
+
+    @property
     def graphs_used(self):
         """Return all graphs used by this graph directly."""
         return self.manager.graphs_used[self]
