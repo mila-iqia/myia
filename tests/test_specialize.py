@@ -195,3 +195,20 @@ def test_indirect_graph(x):
         return f
 
     return f2()(x)
+
+
+@specialize((True, int1, int1))
+def test_poly_with_constants(c, x, y):
+    def f1(x, y):
+        return x + y
+
+    def f2(x, y):
+        return y + x
+
+    def choose(c):
+        if c:
+            return f1
+        else:
+            return f2
+
+    return choose(c)(x, 2), choose(not c)(2, y)

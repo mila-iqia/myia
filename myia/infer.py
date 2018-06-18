@@ -299,11 +299,6 @@ class Reference:
         g = node.value if is_constant_graph(node) else node.graph
         self.context = context.filter(g)
 
-    async def get_all(self):
-        """Return all properties associated to this reference."""
-        return {track: await self[track]
-                for track in self.engine.all_track_names}
-
     def __getitem__(self, track):
         return self.engine.get(track, self)
 
@@ -333,10 +328,6 @@ class VirtualReference:
 
     async def __getitem__(self, track):
         return self.values[track]
-
-    async def get_all(self):
-        """Return all properties associated to this reference."""
-        return self.values
 
 
 ########

@@ -128,8 +128,7 @@ class _GraphSpecializer:
             # the same inferred type/value/etc., we can merge their entries.
             cache = {}
             for x, y in t.cache.items():
-                key = tuple([tuple(sorted((await arg.get_all()).items()))
-                             for arg in x])
+                key = tuple([await arg['type'] for arg in x])
                 if key in cache:
                     assert cache[key] == y
                 cache[key] = y
