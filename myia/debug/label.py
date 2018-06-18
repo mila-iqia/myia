@@ -20,6 +20,9 @@ short_relation_symbols = {
     'while_body': '⥁',
     'while_after': '↓',
     'specialized': '+',
+    'grad_fprop_app': '',
+    # 'grad_bprop_app': lambda lbl: '·',
+    'grad_bprop_app': '▼',
     'grad_fprop': '▶',
     'grad_bprop': '◀',
     'grad_sens': '∇',
@@ -50,7 +53,10 @@ class NodeLabeler:
         if rel is None:
             return None
         if rel:
-            return f'{rel}{name or ""}'
+            if isinstance(rel, str):
+                return f'{rel}{name or ""}'
+            else:
+                return rel(name or "")
         else:
             return name
 
