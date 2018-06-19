@@ -8,18 +8,9 @@ from ..prim.ops import if_, partial, return_
 from .debug_lin import debug_convert
 from .vm import FinalVM
 
-try:
-    from .nnvm import nnvm_convert
-except ImportError:  # pragma: no cover
-    nnvm_convert = None
-
-
 LIN_IMPLS = dict(
     debug=debug_convert,
 )
-
-if nnvm_convert is not None:
-    LIN_IMPLS['nnvm'] = nnvm_convert
 
 
 class SplitGraph(PipelineStep):
@@ -233,7 +224,7 @@ class OptimizeInstrs(PipelineStep):
 
 graph_transform = PipelineDefinition(
     resources=dict(
-        lin_convert=nnvm_convert,
+        lin_convert=debug_convert,
     ),
     steps=dict(
         split=SplitGraph.partial(),

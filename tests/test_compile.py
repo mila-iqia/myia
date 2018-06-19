@@ -4,15 +4,10 @@ from copy import copy
 from myia.api import standard_pipeline
 from myia.prim.py_implementations import typeof
 
-from myia.compile.transform import LIN_IMPLS
-
-nnvm_enabled = 'nnvm' in LIN_IMPLS
-
 compile_pipeline = standard_pipeline
-nnvm_pipeline = compile_pipeline.configure({'compile.linear_impl': 'nnvm'})
 
 
-def parse_compare(*tests, nnvm=False):
+def parse_compare(*tests):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -31,12 +26,8 @@ def parse_compare(*tests, nnvm=False):
                 args = (args,)
             py_result = fn(*map(copy, args))
             argspec = tuple({'type': typeof(a)} for a in args)
-            if nnvm:
-                myia_fn = nnvm_pipeline.run(input=fn,
-                                            argspec=argspec)['output']
-            else:
-                myia_fn = compile_pipeline.run(input=fn,
-                                               argspec=argspec)['output']
+            myia_fn = compile_pipeline.run(input=fn,
+                                           argspec=argspec)['output']
             myia_result = myia_fn(*map(copy, args))
             assert py_result == myia_result
 
@@ -44,16 +35,6 @@ def parse_compare(*tests, nnvm=False):
         m.__orig__ = fn
         return m
     return decorate
-
-
-if nnvm_enabled:
-    @parse_compare((2, 3), nnvm=True)
-    def test_simple_nnvm(x, y):
-        return x + y
-
-    @parse_compare((2,), nnvm=True)
-    def test_simple2_nnvm(x):
-        return 44 - x
 
 
 @parse_compare((2, 3))
