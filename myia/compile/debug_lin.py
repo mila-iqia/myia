@@ -9,6 +9,7 @@ from ..vm import VM
 
 
 def make_tuple(vals, g):
+    """Make a graph that builds a tuple from the specified values."""
     tup = g.constant(())
     for v in reversed(list(vals)):
         tup = g.apply(cons_tuple, v, tup)
