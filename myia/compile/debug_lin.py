@@ -1,8 +1,18 @@
 """Linear implementation using the debug VM."""
 
+from .utils import get_outputs
+
 from ..ir import Graph, is_apply, is_constant, manage
 from ..prim import Primitive, vm_implementations
+from ..prim.ops import cons_tuple
 from ..vm import VM
+
+
+def make_tuple(vals, g):
+    tup = g.constant(())
+    for v in reversed(list(vals)):
+        tup = g.apply(cons_tuple, v, tup)
+    return tup
 
 
 def debug_convert(lst):
@@ -27,12 +37,13 @@ def debug_convert(lst):
     """
     eqv = {}
     inputs = []
+    outputs = []
 
     g = Graph()
 
     def ref(n):
         if is_constant(n):
-            pass
+            eqv[n] = n
         elif n not in eqv:
             inputs.append(n)
             eqv[n] = g.add_parameter()
@@ -45,9 +56,8 @@ def debug_convert(lst):
         args = [ref(a) for a in n.inputs[1:]]
         eqv[n] = g.apply(fn, *args)
 
-    # TODO: figure out multiple outputs
-    out = lst[-1]
-    g.output = eqv[out]
+    outputs = get_outputs(lst, lst[0].graph.manager.uses, set(eqv.keys()))
+    g.output = make_tuple((eqv[o] for o in outputs), g)
 
     mng = manage(g)
 
@@ -56,7 +66,4 @@ def debug_convert(lst):
 
     fn = vm.export(g)
 
-    def wrap(*args):
-        return [fn(*args)]
-
-    return wrap, inputs, [out]
+    return fn, inputs, outputs

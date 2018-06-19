@@ -251,17 +251,17 @@ class FinalVM:
         if need > 0:
             self.stack.extend([None] * need)
 
-    def inst_lin_apply(self, mod, args):
-        """Linear apply.
+    def inst_external(self, fn, args):
+        """Call external function.
 
         This will call the provided function with the specified values
         and push any outputs that function has (may be more than one).
 
         Arguments:
-           mod: Callable function that implements a linear section of the code.
-           args: sequence of stack references
+           fn: Callable external function.
+           args: sequence of stack references.
 
         """
-        outs = mod(*(self._ref(a) for a in args))
-        assert len(outs) == 1
-        self._push(outs[0])
+        outs = fn(*(self._ref(a) for a in args))
+        for o in outs:
+            self._push(o)

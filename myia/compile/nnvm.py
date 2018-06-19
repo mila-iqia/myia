@@ -8,6 +8,8 @@ import tvm
 from nnvm.compiler import graph_attr
 from tvm.contrib import graph_runtime
 
+from .utils import get_outputs
+
 from ..dtype import type_to_np_dtype
 from ..ir import is_apply, is_constant
 from ..prim import Primitive
@@ -138,10 +140,8 @@ def nnvm_convert(lst):
         else:
             raise NotImplementedError(fn)
 
-    # TODO: figure out multiple outputs
-    out = lst[-1]
-
-    g = nnvm.graph.create(eqv[out])
+    outputs = get_outputs(lst, lst[0].graph.manager.uses, set(eqv.keys()))
+    g = nnvm.graph.create(sym.Group(list(eqv[o] for o in outputs)))
     dg, lib, params = nnvm.compiler.build(
         g, target="llvm", shape=shapes, dtype=types, params=constants)
 
@@ -153,11 +153,11 @@ def nnvm_convert(lst):
         return (shape[entry_id], graph_attr.TCODE_TO_DTYPE[types[entry_id]])
 
     output_specs = [spec(index.entry_id(x)) for x in index.output_entries]
+    assert len(output_specs) == len(outputs)
 
     module = graph_runtime.create(dg, lib, tvm.cpu())
 
     for n, p in params.items():
         module.set_input(n, p)
 
-    print('nnvm_graph = ', dg.ir())
-    return NNVMRunner(module, input_names, output_specs), inputs, [out]
+    return NNVMRunner(module, input_names, output_specs), inputs, outputs

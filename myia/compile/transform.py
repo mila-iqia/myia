@@ -8,6 +8,19 @@ from ..prim.ops import if_, partial, return_
 from .debug_lin import debug_convert
 from .vm import FinalVM
 
+try:
+    from .nnvm import nnvm_convert
+except ImportError:
+    nnvm_convert = None
+
+
+LIN_IMPLS = dict(
+    debug=debug_convert,
+)
+
+if nnvm_convert is not None:
+    LIN_IMPLS['nnvm'] = nnvm_convert
+
 
 class SplitGraph(PipelineStep):
     """Pipeline step to cut the graph into linear portions and control flow.
@@ -64,15 +77,9 @@ class CompileGraph(PipelineStep):
 
     """
 
-    def __init__(self, pipeline_init, lin_convert):
-        """Initialize a the CompileGraph step.
-
-        Arguments:
-            lin_convert: function to convert linear portions to a callable.
-
-        """
+    def __init__(self, pipeline_init):
+        """Initialize a the CompileGraph step."""
         super().__init__(pipeline_init)
-        self.lin_convert = lin_convert
 
     def _reset(self):
         """Set/clear shared values."""
@@ -144,9 +151,10 @@ class CompileGraph(PipelineStep):
 
         for split in splits:
             if isinstance(split, list):
-                run, inputs, outputs = self.lin_convert(split)
+                run, inputs, outputs = \
+                    self.pipeline.resources.lin_convert(split)
                 args = [self.ref(i) for i in inputs]
-                self.add_instr('lin_apply', run, args)
+                self.add_instr('external', run, args)
                 for o in outputs:
                     self.push(o)
 
@@ -195,7 +203,7 @@ class CompileGraph(PipelineStep):
                         break
                     else:
                         self.add_instr('call', self.ref(fn))
-                        self.ret(len(split.inputs))
+                        self.ret(len(split.inputs) - 1)
 
                 self.push(split)
 
@@ -224,9 +232,12 @@ class OptimizeInstrs(PipelineStep):
 
 
 graph_transform = PipelineDefinition(
+    resources=dict(
+        lin_convert=nnvm_convert,
+    ),
     steps=dict(
         split=SplitGraph.partial(),
-        compile=CompileGraph.partial(lin_convert=debug_convert),
+        compile=CompileGraph.partial(),
         optimize=OptimizeInstrs.partial(),
     )
 )
@@ -245,15 +256,16 @@ class CompileGraphs(PipelineStep):
 
     """
 
-    def __init__(self, pipeline_init, transform):
+    def __init__(self, pipeline_init, linear_impl):
         """Initialize a CompileGraphs.
 
         Arguments:
-            transform: Pipeline to convert a single graph to unlinked
-                       instructions.
+            linear_impl: the implementation to use for linear parts.
+
         """
         super().__init__(pipeline_init)
-        self.transform = transform
+        self.transform = graph_transform.configure(
+            lin_convert=LIN_IMPLS[linear_impl]).make()
 
     def reset(self):
         """Clear/set local variables."""
@@ -317,6 +329,6 @@ class VMExporter(PipelineStep):
         return {'output': FinalVM(instrs)}
 
 
-step_compile = CompileGraphs.partial(transform=graph_transform.make())
+step_compile = CompileGraphs.partial(linear_impl='debug')
 step_link = LinkInstrs.partial()
 step_export = VMExporter.partial()
