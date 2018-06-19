@@ -249,7 +249,8 @@ step_resolve = Optimizer.partial(
 step_infer = Inferrer.partial(
     tracks=dict(
         value=ValueTrack.partial(
-            constructors=value_inferrer_constructors
+            constructors=value_inferrer_constructors,
+            max_depth=1
         ),
         type=TypeTrack.partial(
             constructors=type_inferrer_constructors
@@ -299,7 +300,6 @@ standard_pipeline = PipelineDefinition(
         specialize=step_specialize,
         opt=step_opt,
         cconv=step_cconv,
-        infer2=step_infer,
         compile=step_compile,
         link=step_link,
         export=step_export,
