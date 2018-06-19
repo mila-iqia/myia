@@ -105,8 +105,8 @@ class CompileGraph(PipelineStep):
     def push(self, node):
         """Simulate pushing the value for node on the stack.
 
-        This records the postion so that other nodes can refer to this
-        value later.
+        This records the position so that other nodes can refer to
+        this value later.
 
         """
         assert node not in self.slots
@@ -117,7 +117,7 @@ class CompileGraph(PipelineStep):
         """Get the stack reference for the value of a node.
 
         This can actually cause a push if the node is a constant that
-        wasn't referreded to before.
+        wasn't referred to before.
 
         """
         if node not in self.slots and is_constant(node):

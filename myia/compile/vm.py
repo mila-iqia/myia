@@ -23,6 +23,10 @@ class FinalVM:
     def __init__(self, code):
         """Create a VM with the specified instructions."""
         self.code = tuple(code)
+        self.stack = [None]  # The value stack
+        self.retp = [-1]  # The call stack
+        self.pc = 0  # program counter (next instruction)
+        self.sp = 0  # stack pointer (for the value stack)
 
     def _push(self, v):
         """Push a value to the stack."""
@@ -66,7 +70,7 @@ class FinalVM:
 
         This also handles jumping to a partial.
         """
-        while isinstance(jmp, struct_partial):
+        if isinstance(jmp, struct_partial):
             self.inst_pad_stack(len(jmp.args))
             for a in reversed(jmp.args):
                 self._push(a)
@@ -167,6 +171,9 @@ class FinalVM:
 
         """
         fn = self._ref(fn_)
+        assert not isinstance(fn, struct_partial), \
+            ("You found a nested partial case, please report it "
+             "so we can add it to the tests")
         args = tuple(self._ref(a) for a in args_)
         self._push(struct_partial(fn, args))
 
