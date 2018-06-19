@@ -9,7 +9,7 @@ class struct_partial:
         self.fn = fn
         self.args = args
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         return f"partial({self.fn}, {self.args})"
 
 
@@ -231,10 +231,6 @@ class FinalVM:
 
         """
         self._push(self._ref(rpos))
-
-    def inst_pop(self):
-        """Pop the top value off the stack."""
-        self._pop()
 
     def inst_pad_stack(self, sz):
         """Pad stack.

@@ -10,7 +10,7 @@ from .vm import FinalVM
 
 try:
     from .nnvm import nnvm_convert
-except ImportError:
+except ImportError:  # pragma: no cover
     nnvm_convert = None
 
 
