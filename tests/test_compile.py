@@ -48,11 +48,11 @@ def parse_compare(*tests, nnvm=False):
 
 if nnvm_enabled:
     @parse_compare((2, 3), nnvm=True)
-    def test_simple(x, y):
+    def test_simple_nnvm(x, y):
         return x + y
 
     @parse_compare((2,), nnvm=True)
-    def test_simple2(x):
+    def test_simple2_nnvm(x):
         return 44 - x
 
 
@@ -127,4 +127,3 @@ def test_call_hof(c, x, y):
             return f2
 
     return choose(c)(x, 2) + choose(not c)(2, y)
-    

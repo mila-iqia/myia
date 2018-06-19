@@ -16,14 +16,13 @@ lang_pipeline = standard_pipeline.select(
 def parse_compare(*tests):
     """Decorate a function to parse and run it against pure Python.
 
-    Returns a unit test that will parse the function, and then for each
-    `inputs`.
-
-    tuple in `tests` it will check that the pure Python, undecorated function
-    returns that same output.
+    Returns a unit test that will parse the function, and then for
+    each `inputs` tuple in `tests` it will check that the pure Python,
+    undecorated function returns that same output.
 
     Arguments:
         tests: One or more inputs tuple.
+
     """
 
     def decorate(fn):
