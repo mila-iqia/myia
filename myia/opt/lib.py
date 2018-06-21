@@ -340,8 +340,28 @@ J_Jinv_cancel = psub(
     name='J_Jinv_cancel'
 )
 
+
 Jinv_J_cancel = psub(
     pattern=(P.Jinv, (P.J, X)),
     replacement=X,
     name='Jinv_J_cancel'
 )
+
+
+@pattern_replacer(P.J, C)
+def expand_J(optimizer, node, equiv):
+    from ..prim.py_implementations import J_internal
+    ct = equiv[C].value
+    # if not isinstance(ct, Graph):
+    #     return node
+    return Constant(J_internal(optimizer.resources, ct))
+
+
+@pattern_replacer(P.Jinv, C)
+def expand_Jinv(optimizer, node, equiv):
+    from ..prim.py_implementations import Jinv_internal
+    ct = equiv[C].value
+    if isinstance(ct, (int, float)) or ct == ():
+        return Constant(Jinv_internal(optimizer.resources, ct))
+    else:
+        return node

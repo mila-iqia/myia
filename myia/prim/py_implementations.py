@@ -4,6 +4,7 @@ from copy import copy
 from types import FunctionType
 from typing import Callable
 import numpy as np
+import math
 
 from .. import dtype as types
 from ..utils import Registry, smap
@@ -351,66 +352,83 @@ def partial(f, *args):
     return res
 
 
-@register(primops.J)
-def J(x):
-    """Implement `J`.
+def J_internal(resources, x):
+    from functools import partial
 
-    On a function, this returns an augmented function that returns the original
-    output and a backpropagator. On structured data, this applies `J`
-    recursively on each element. On scalars, this is a no-op.
-    """
     from ..ir.anf import Graph
     from ..grad import grad
-    from ..vm import VMFrame
+    from ..vm import Closure
 
     from .grad_implementations import augmented_graphs
 
+    manager = resources.manager if resources else None
+    cloner = resources.cloner if resources else None
+
     if isinstance(x, primops.Primitive):
-        return augmented_graphs[x]
+        return cloner.clone(augmented_graphs[x])
     elif isinstance(x, Graph):
-        return grad(x)
+        return cloner.clone(grad(x, mng=manager))
     elif isinstance(x, FunctionType):
         from ..api import parse, compile
         g = parse(x)
         return compile(grad(g))
-    elif isinstance(x, VMFrame.Closure):
-        return VMFrame.Closure(J(x.graph), x.frame)
+    elif isinstance(x, Closure):
+        return Closure(J_internal(resources, x.graph), x.values)
     elif isinstance(x, (int, float)):
         return x
     elif isinstance(x, tuple):
-        return smap(J, x)
+        return smap(partial(J_internal, resources), x)
     elif x is ZERO:
         return ZERO
     else:
         raise TypeError(f'J is not defined on {type(x)}')  # pragma: no cover
 
 
-@register(primops.Jinv)
-def Jinv(x):
-    """Implement `Jinv`.
+def Jinv_internal(resources, x):
+    from functools import partial
 
-    This is the inverse of `J`: `Jinv(J(x)) == x`.
-    """
     from ..ir.anf import Graph
-    from ..vm import VMFrame
+    from ..vm import Closure
+
+    cloner = resources.cloner if resources else None
+
     if isinstance(x, (int, float)):
         return x
     elif isinstance(x, tuple):
-        return smap(Jinv, x)
+        return smap(partial(Jinv_internal, resources), x)
     elif isinstance(x, Graph):
         primal = x.transforms.get('primal', None)
-        if not primal:
-            buche(id(x))
-            buche(x)
         assert primal
+        if isinstance(primal, Graph):
+            primal = cloner.clone(primal)
         return primal
-    elif isinstance(x, VMFrame.Closure):
-        return VMFrame.Closure(Jinv(x.graph), x.frame)
+    elif isinstance(x, Closure):
+        return Closure(Jinv_internal(resources, x.graph), x.values)
     elif x is ZERO:
         return ZERO
     else:
         raise TypeError(f'Jinv is not defined on {type(x)}') \
             # pragma: no cover
+
+
+@py_register(primops.J)
+def J(x):
+    return J_internal(None, x)
+
+
+@vm_register(primops.J)
+def J_vm(vm, x):
+    return J_internal(vm.pipeline.resources, x)
+
+
+@py_register(primops.Jinv)
+def Jinv(x):
+    return Jinv_internal(None, x)
+
+
+@vm_register(primops.Jinv)
+def Jinv_vm(vm, x):
+    return Jinv_internal(vm.resources, x)
 
 
 class Zero:
@@ -447,10 +465,10 @@ ZERO = Zero()
 def zeros_like(x):
     """Implement `zeros_like`."""
     from ..ir.anf import Graph
-    from ..vm import VMFrame
+    from ..vm import Closure
 
     def zero(x):
-        if isinstance(x, VMFrame.Closure) or x is ZERO:
+        if isinstance(x, Closure) or x is ZERO:
             return ZERO
         elif isinstance(x, (Graph, primops.Primitive)):
             return ()
@@ -458,3 +476,8 @@ def zeros_like(x):
             return type(x)(0)
 
     return smap(zero, x)
+
+
+@register(primops.identity)
+def identity(x):
+    return x

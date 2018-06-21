@@ -331,8 +331,10 @@ def test_closure3(x):
 @parse_compare(7)
 def test_closure4(x):
     a = x * x
+
     def g():
         return a
+
     def f():
         return g()
     return f()

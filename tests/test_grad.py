@@ -5,6 +5,7 @@ from copy import copy
 from myia.api import parse, compile
 from myia.grad import grad
 from myia.debug.finite_diff import GradTester
+from myia.debug.label import short_labeler as lbl
 from myia.prim.py_implementations import J, tail, ZERO
 
 
@@ -38,7 +39,7 @@ def grad_test(*tests):
             myia_result, bprop_fn = gfn(*map(copy, args))
             assert py_result == myia_result
 
-            argnames = [p.debug.name for p in graph.parameters]
+            argnames = [lbl.name(p) for p in graph.parameters]
 
             test = GradTester(fn=fn,
                               gfn=bprop_fn,
@@ -190,8 +191,16 @@ def test_if(a, b):
         return b + a
 
 
+@grad_test((4,))
+def test_while(x):
+    rval = x
+    while rval < 100:
+        rval = rval * rval
+    return rval
+
+
 @grad_test((4, 5, 2), (7, 3, 1))
-def test_while(x, y, z):
+def test_while_2(x, y, z):
     rval = 0
     # Cannot compare to 0 or finite diff is unstable
     while x > -0.1:
@@ -221,87 +230,81 @@ def test_pow10(x):
     return v
 
 
-def _grad1(f):
-    J, tail
-
-    def grad(x):
-        jf = J(f)
-        tup = jf(x)
-        bprop = tup[1]
-        all_res = bprop(1)
-        res = tail(all_res)
-        return res
-    return grad
+# def _grad1(f):
+#     def grad(x):
+#         jf = J(f)
+#         tup = jf(x)
+#         bprop = tup[1]
+#         all_res = bprop(1)
+#         res = tail(all_res)
+#         return res
+#     return grad
 
 
-def _grad2(f):
-    J, tail
-
-    def grad(x, y):
-        jf = J(f)
-        tup = jf(x, y)
-        bprop = tup[1]
-        all_res = bprop(1)
-        res = tail(all_res)
-        return res
-    return grad
+# def _grad2(f):
+#     def grad(x, y):
+#         jf = J(f)
+#         tup = jf(x, y)
+#         bprop = tup[1]
+#         all_res = bprop(1)
+#         res = tail(all_res)
+#         return res
+#     return grad
 
 
-def _grad3(f):
-    J, tail
-
-    def grad(x, y, z):
-        jf = J(f)
-        tup = jf(x, y, z)
-        bprop = tup[1]
-        all_res = bprop(1)
-        res = tail(all_res)
-        return res
-    return grad
+# def _grad3(f):
+#     def grad(x, y, z):
+#         jf = J(f)
+#         tup = jf(x, y, z)
+#         bprop = tup[1]
+#         all_res = bprop(1)
+#         res = tail(all_res)
+#         return res
+#     return grad
 
 
-@grad_test(3)
-def test_grad2_simple(x):
-    def f(x):
-        return x * x * x * x
-    return _grad1(f)(x)
+# @grad_test(3)
+# def test_grad2_simple(x):
+#     def f(x):
+#         return x * x * x * x
+#     return _grad1(f)(x)
 
 
-@grad_test((4, 5, 2), (-7, 3, 1))
-def test_grad2_if(x, y, z):
-    def f(x, y, z):
-        if x < 0:
-            return y * z
-        else:
-            return y + z
-    return _grad3(f)(x, y, z)
+# @grad_test((4, 5, 2), (-7, 3, 1))
+# def test_grad2_if(x, y, z):
+#     def f(x, y, z):
+#         if x < 0:
+#             return y * z
+#         else:
+#             return y + z
+#     return _grad3(f)(x, y, z)
 
 
-@grad_test((4, 5, 2), (7, 3, 1))
-def test_grad2_while(x, y, z):
-    def f(x, y, z):
-        rval = 0
-        # Cannot compare to 0 or finite diff is unstable
-        while x > -0.1:
-            rval = rval + y
-            x = x - z
-        return rval
-    return _grad3(f)(x, y, z)
+# @grad_test((4, 5, 2), (7, 3, 1))
+# def test_grad2_while(x, y, z):
+#     def f(x, y, z):
+#         rval = 0
+#         # Cannot compare to 0 or finite diff is unstable
+#         while x > -0.1:
+#             rval = rval + y
+#             x = x - z
+#         return rval
+#     return _grad3(f)(x, y, z)
 
 
-@grad_test(3)
-def test_grad2_pow(x):
-    def f(x):
-        v = x
-        j = 0
-        while j < 3:
-            i = 0
-            while i < 3:
-                v = v * x
-                i = i + 1
-            j = j + 1
-        return v
-    return _grad1(f)(x)
+# @grad_test(3)
+# def test_grad2_pow(x):
+#     def f(x):
+#         v = x
+#         j = 0
+#         while j < 3:
+#             i = 0
+#             while i < 3:
+#                 v = v * x
+#                 i = i + 1
+#             j = j + 1
+#         return v
+#     return _grad1(f)(x)
 
 
 def test_zero():

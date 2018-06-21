@@ -73,6 +73,7 @@ def register_bprop(prim):
 def register_augm(prim):
     """Register an augmented function for prim."""
     from ..debug.label import short_labeler, short_relation_symbols as syms
+
     def deco(fn):
         fn2 = parse(fn)
         for g in manage(fn2, weak=True).graphs:
