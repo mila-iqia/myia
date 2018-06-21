@@ -196,10 +196,11 @@ class Graph:
     #################
 
     def __str__(self) -> str:
-        return self.debug.debug_name
+        from ..debug.label import short_labeler as lbl
+        return lbl.name(self, force=True)
 
     def __repr__(self) -> str:
-        return repr_(self, name=self.debug.debug_name,
+        return repr_(self, name=str(self),
                      parameters=list_str(self.parameters),
                      return_=self.return_)
 
@@ -243,7 +244,8 @@ class ANFNode(Node):
         return iter(self.inputs)
 
     def __str__(self) -> str:
-        return self.debug.debug_name
+        from ..debug.label import short_labeler as lbl
+        return lbl.name(self, force=True)
 
 
 class Apply(ANFNode):
@@ -265,7 +267,7 @@ class Apply(ANFNode):
         return app
 
     def __repr__(self) -> str:
-        return repr_(self, name=self.debug.debug_name, inputs=self.inputs,
+        return repr_(self, name=str(self), inputs=self.inputs,
                      graph=self.graph)
 
 
