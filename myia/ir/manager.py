@@ -13,7 +13,7 @@ class ManagerError(Exception):
     """Class for errors raised by GraphManager."""
 
 
-def manage(*graphs, weak=False):
+def manage(*graphs, weak=False, roots=False):
     """Ensure that all given graphs have a manager and return it.
 
     * If one or more graphs has a manager, that manager will be used.
@@ -33,7 +33,7 @@ def manage(*graphs, weak=False):
     if manager is None:
         manager = GraphManager(manage=not weak)
     for graph in graphs:
-        manager.add_graph(graph, root=True)
+        manager.add_graph(graph, root=roots)
     return manager
 
 

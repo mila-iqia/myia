@@ -712,7 +712,7 @@ def test_keep_roots():
     def g(x, y):
         return x + y
 
-    mng = manage(f)
+    mng = manage(f, roots=True)
     assert mng.graphs == {f}
 
     mng.add_graph(g)
@@ -740,7 +740,7 @@ def test_keep_roots_recursion():
     def f(x, y):
         return rec1() + nonrec()
 
-    mng = manage(f)
+    mng = manage(f, roots=True)
     assert len(mng.graphs) == 4
 
     mng.replace(f.output, f.parameters[0])
