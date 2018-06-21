@@ -1,8 +1,10 @@
 """Graph cloning facility."""
 
 
-from .anf import Apply, Constant, Graph
 from ..info import About
+from ..utils import Partializable
+
+from .anf import Apply, Constant, Graph
 from .manager import manage
 
 
@@ -11,7 +13,7 @@ from .manager import manage
 #################
 
 
-class GraphCloner:
+class GraphCloner(Partializable):
     """Facility to clone graphs.
 
     Graphs to clone can be passed in the constructor or they can be
@@ -50,6 +52,7 @@ class GraphCloner:
         self.clone_constants = clone_constants
         # repl maps a node or a graph to its clone
         self.repl = {None: None}
+        self.mine = set()
         self.total = total
         self.relation = relation
         self.graph_relation = graph_relation or relation
@@ -77,6 +80,9 @@ class GraphCloner:
         self.todo.append((graph, target_graph, new_params))
 
     def _process_graph(self, graph, target_graph, new_params):
+        if graph in self.mine:
+            return
+
         mng = self.manager
 
         inline = target_graph is not None
@@ -106,6 +112,7 @@ class GraphCloner:
                     p2.type = p.type
                     self.repl[p] = p2
             self.repl[graph] = target_graph
+            self.mine.add(target_graph)
 
         for node in mng.nodes[graph]:
             if node in self.repl:
@@ -147,6 +154,7 @@ class GraphCloner:
         it automatically.
         """
         todo = self.todo
+        self.nodes = []
 
         if not todo:
             return
@@ -161,6 +169,11 @@ class GraphCloner:
             for inp in old_node.inputs:
                 repl = self.repl.get(inp, inp)
                 new_node.inputs.append(repl)
+
+    def clone(self, g):
+        """Return a clone of g."""
+        self.add_clone(g)
+        return self[g]
 
     def __getitem__(self, x):
         """Get the clone of the given graph or node."""
