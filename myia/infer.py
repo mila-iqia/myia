@@ -79,6 +79,10 @@ class Track(Partializable):
         else:
             values[self.name] = self.default()  # pragma: no cover
 
+    def assert_same(self, *refs):
+        """Assert that all refs have the same value on this track."""
+        return self.engine.assert_same(self.name, *refs)
+
 
 ####################
 # Inferrer classes #
@@ -97,9 +101,10 @@ class Inferrer:
 
     """
 
-    def __init__(self, engine, identifier):
+    def __init__(self, track, identifier):
         """Initialize the Inferrer."""
-        self.engine = engine
+        self.track = track
+        self.engine = track.engine
         self.identifier = identifier
         self.cache = {}
 
@@ -133,9 +138,9 @@ class PrimitiveInferrer(Inferrer):
 
     """
 
-    def __init__(self, engine, prim, nargs, inferrer_fn):
+    def __init__(self, track, prim, nargs, inferrer_fn):
         """Initialize the PrimitiveInferrer."""
-        super().__init__(engine, prim)
+        super().__init__(track, prim)
         self.inferrer_fn = inferrer_fn
         self.nargs = nargs
 
@@ -143,7 +148,7 @@ class PrimitiveInferrer(Inferrer):
         """Infer a property of the operation on the given arguments."""
         if self.nargs is not None and len(args) != self.nargs:
             raise type_error_nargs(self.identifier, self.nargs, len(args))
-        return self.inferrer_fn(self.engine, *args)
+        return self.inferrer_fn(self.track, *args)
 
     def provably_equivalent(self, other):
         """Whether this inferrer is provably equivalent to the other.
@@ -166,9 +171,9 @@ class GraphInferrer(Inferrer):
 
     """
 
-    def __init__(self, engine, track, graph, context):
+    def __init__(self, track, graph, context):
         """Initialize the GraphInferrer."""
-        super().__init__(engine, graph)
+        super().__init__(track, graph)
         self.track = track
         self.graph = graph
         self.nargs = len(self.graph.parameters)
@@ -208,7 +213,7 @@ class GraphInferrer(Inferrer):
                 self.engine.cache_value(track, ref, v)
 
         out = self.engine.ref(self.graph.return_, context)
-        return await self.engine.get_raw(self.track, out)
+        return await self.engine.get_raw(self.track.name, out)
 
     def provably_equivalent(self, other):
         """Whether this inferrer is provably equivalent to the other.
@@ -254,12 +259,12 @@ def register_inferrer(*prims, nargs, constructors):
     """Define a PrimitiveInferrer for prims with nargs arguments.
 
     For each primitive, this registers a constructor for a PrimitiveInferrer
-    that takes an engine argument, in the constructors dictionary.
+    that takes a track argument, in the constructors dictionary.
     """
     def deco(fn):
         def make_constructor(prim):
-            def constructor(engine):
-                return PrimitiveInferrer(engine, prim, nargs, fn)
+            def constructor(track):
+                return PrimitiveInferrer(track, prim, nargs, fn)
             return constructor
         for prim in prims:
             constructors[prim] = make_constructor(prim)
@@ -761,7 +766,7 @@ class InferenceEngine:
 
     async def _run(self):
         for track in self.required_tracks:
-            inf = GraphInferrer(self, track,
+            inf = GraphInferrer(self.tracks[track],
                                 self.graph, self.root_context)
             self.schedule(inf(*self.argrefs))
 

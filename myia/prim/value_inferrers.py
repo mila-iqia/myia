@@ -62,9 +62,9 @@ class PrimitiveValueInferrer(Inferrer):
     The implementation will not be called.
     """
 
-    def __init__(self, engine, prim, impl):
+    def __init__(self, track, prim, impl):
         """Initialize a PrimitiveValueInferrer."""
-        super().__init__(engine, prim)
+        super().__init__(track, prim)
         self.impl = impl
 
     async def infer(self, *refs):
@@ -118,13 +118,13 @@ class ValueTrack(Track):
         engine = self.engine
         if isinstance(v, Primitive):
             if v in self.constructors:
-                inf = self.constructors[v](engine)
+                inf = self.constructors[v](self)
             else:
                 inf = PrimitiveValueInferrer(
-                    engine, v, self.implementations[v]
+                    self, v, self.implementations[v]
                 )
         elif isinstance(v, Graph):
-            inf = GraphInferrer(engine, 'value', v, context)
+            inf = GraphInferrer(self, v, context)
         else:
             return self.wrap(v)
 

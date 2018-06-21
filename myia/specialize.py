@@ -36,7 +36,9 @@ class TypeSpecializer:
         self.counts = Counter()
 
         empty_ctx = Context.empty()
-        ginf = GraphInferrer(self.engine, 'type', engine.graph, empty_ctx)
+        ginf = GraphInferrer(self.engine.tracks['type'],
+                             engine.graph,
+                             empty_ctx)
         argrefs = self.engine.argrefs
 
         self.result = self.engine.run_coroutine(

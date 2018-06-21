@@ -73,8 +73,8 @@ pyimpl_test[_tern] = impl_tern
 
 
 @type_inferrer_test(_tern, nargs=3)
-async def infer_type_tern(engine, x, y, z):
-    ret_t = await engine.assert_same('type', x, y, z)
+async def infer_type_tern(track, x, y, z):
+    ret_t = await track.assert_same(x, y, z)
     assert isinstance(ret_t, (Int, Float))
     return ret_t
 
@@ -92,7 +92,7 @@ pyimpl_test[_to_i64] = impl_to_i64
 
 
 @type_inferrer_test(_to_i64, nargs=1)
-async def infer_type_to_i64(engine, x):
+async def infer_type_to_i64(track, x):
     return Int(64)
 
 
