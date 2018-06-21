@@ -9,11 +9,11 @@ from collections import defaultdict
 from typing import Iterable, Mapping, Any, List
 
 from .ir import Graph, Apply, Constant, Parameter, ANFNode
-from .ir.utils import is_constant_graph, is_constant
+from .ir.utils import is_constant_graph, is_constant, freevars_boundary as fvb
 from .prim import Primitive
 from .prim.ops import if_, return_, partial
 from .graph_utils import toposort
-from .utils import TypeMap
+from .utils import TypeMap, Event
 
 
 class VMFrame:
@@ -33,10 +33,10 @@ class VMFrame:
 
     """
 
-    def __init__(self, nodes: Iterable[ANFNode], values: Mapping[ANFNode, Any],
+    def __init__(self, nodes: Iterable[ANFNode],
                  *, closure: Mapping[ANFNode, Any] = None) -> None:
         """Initialize a frame."""
-        self.values = dict(values)
+        self.values = {}
         self.todo = list(nodes)
         self.todo.reverse()
         self.closure = closure
@@ -100,6 +100,7 @@ class VM:
         """Initialize the VM."""
         self.convert = convert
         self.manager = manager
+        self.on_node_value = Event('on_node_value')
         self._exporters = TypeMap({
             tuple: self._export_sequence,
             list: self._export_sequence,
@@ -151,6 +152,10 @@ class VM:
         """Convert a value from the VM into a corresponding Python object."""
         return self._exporters[type(value)](value)
 
+    def _set_node_value(self, frame, node, value):
+        frame.values[node] = value
+        self.on_node_value(frame, node, value)
+
     def evaluate(self, graph: Graph, _args: Iterable[Any], *,
                  closure: Mapping[ANFNode, Any] = None) -> Any:
         """Run a graph.
@@ -165,9 +170,13 @@ class VM:
         if len(args) != len(graph.parameters):
             raise RuntimeError("Call with wrong number of arguments")
 
-        top_frame = VMFrame(toposort(graph.return_, self._succ_vm),
-                            dict(zip(graph.parameters, args)),
+        top_frame = VMFrame(toposort(graph.return_,
+                                     self._succ_vm,
+                                     fvb(graph, False)),
                             closure=closure)
+        for p, arg in zip(graph.parameters, args):
+            self._set_node_value(top_frame, p, arg)
+
         frames = [top_frame]
 
         while frames:
@@ -186,7 +195,8 @@ class VM:
             except self._Return as r:
                 frames.pop()
                 if frames:
-                    frames[-1].values[frames[-1].todo[-1]] = r.value
+                    last_fr = frames[-1]
+                    self._set_node_value(last_fr, last_fr.todo[-1], r.value)
                     frames[-1].todo.pop()
                 else:
                     return self.export(r.value)
@@ -230,9 +240,14 @@ class VM:
         if len(args) != len(graph.parameters):
             raise RuntimeError("Call with wrong number of arguments")
 
-        raise self._Call(VMFrame(toposort(graph.return_, self._succ_vm),
-                                 dict(zip(graph.parameters, args)),
-                                 closure=clos))
+        frame = VMFrame(toposort(graph.return_,
+                                 self._succ_vm,
+                                 fvb(graph, False)),
+                        closure=clos)
+        for p, arg in zip(graph.parameters, args):
+            self._set_node_value(frame, p, arg)
+
+        raise self._Call(frame)
 
     def _make_closure(self, graph: Graph, frame: VMFrame) -> Closure:
         clos = dict()
@@ -249,7 +264,7 @@ class VM:
             assert is_constant_graph(node)
             g = node.value
             if len(self._vars[g]) != 0:
-                frame.values[node] = self._make_closure(g, frame)
+                self._set_node_value(frame, node, self._make_closure(g, frame))
             # We don't need to do anything special for non-closures
 
         elif isinstance(node, Parameter):
@@ -265,14 +280,16 @@ class VM:
                     else:
                         self._call(args[2], [])
                 elif fn == return_:
+                    self.on_node_value(frame, node, args[0])
                     raise self._Return(args[0])
                 elif fn == partial:
                     partial_fn, *partial_args = args
                     assert isinstance(partial_fn, Graph)
                     res = Partial(partial_fn, partial_args, self)
-                    frame.values[node] = res
+                    self._set_node_value(frame, node, res)
                 else:
-                    frame.values[node] = self.implementations[fn](self, *args)
+                    res = self.implementations[fn](self, *args)
+                    self._set_node_value(frame, node, res)
             else:
                 self._call(fn, args)
 

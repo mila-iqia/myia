@@ -7,7 +7,7 @@ from types import FunctionType
 from . import parser
 from .cconv import closure_convert
 from .infer import InferenceEngine
-from .ir import Graph, clone, GraphManager
+from .ir import Graph, clone, GraphCloner, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib
 from .pipeline import PipelineStep, PipelineResource, PipelineDefinition
 from .prim import py_implementations, vm_implementations, ops as P
@@ -227,13 +227,15 @@ class DebugVMExporter(PipelineStep):
         output: The callable.
     """
 
-    def __init__(self, pipeline_init, implementations):
+    def __init__(self, pipeline_init, implementations, callback=None):
         """Initialize an DebugVMExporter."""
         super().__init__(pipeline_init)
         self.vm = VM(self.pipeline.resources.convert,
                      self.pipeline.resources.manager,
                      self.pipeline.resources.py_implementations,
                      implementations)
+        if callback:
+            self.vm.on_node_value.register(callback)
 
     def step(self, graph):
         """Make a Python callable out of the graph."""
@@ -289,6 +291,7 @@ step_debug_export = DebugVMExporter.partial(
 standard_pipeline = PipelineDefinition(
     resources=dict(
         manager=GraphManager.partial(),
+        cloner=GraphCloner.partial(total=True),
         py_implementations=py_implementations,
         convert=Converter.partial(
             object_map=default_object_map,
