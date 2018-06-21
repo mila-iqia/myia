@@ -250,6 +250,12 @@ class Unknown(Type):
     """Represents an unknown type (prior to type inference)."""
 
 
+class External(Type):
+    """Represents a type external to Myia (essentially invalid)."""
+
+    t: Any
+
+
 DTYPE_MAP = dict(
     int8=Int(8),
     int16=Int(16),

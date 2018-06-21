@@ -137,7 +137,7 @@ def typeof(x):
             raise TypeError(f'All list elements should have same type')
         return types.List(type0)
     else:
-        raise TypeError(f'Untypable value: {x}')
+        return types.External(type(x))
 
 
 def hastype_helper(t, model):
