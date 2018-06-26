@@ -4,16 +4,8 @@ from .utils import get_outputs
 
 from ..ir import Graph, is_apply, is_constant, manage
 from ..prim import Primitive, vm_implementations
-from ..prim.ops import cons_tuple
 from ..vm import VM
-
-
-def make_tuple(vals, g):
-    """Make a graph that builds a tuple from the specified values."""
-    tup = g.constant(())
-    for v in reversed(list(vals)):
-        tup = g.apply(cons_tuple, v, tup)
-    return tup
+from ..graph_utils import make_tuple
 
 
 def debug_convert(lst):
