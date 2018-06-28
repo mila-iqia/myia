@@ -16,7 +16,7 @@ from .prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
 from .specialize import TypeSpecializer
 from .utils import TypeMap
 from .vm import VM
-
+from .compile import step_compile, step_link, step_export
 
 default_object_map = {
     operator.add: P.add,
@@ -76,8 +76,8 @@ def parse(func: FunctionType, resolve_globals=True) -> Graph:
 def compile(obj):
     """Return a version of the function that runs using Myia's VM."""
     pdef = standard_pipeline.select(
-        'parse', 'resolve', 'export'
-    )
+        'parse', 'resolve',
+    ).insert_after(debug_export=step_debug_export)
     return pdef.make()(input=obj)['output']
 
 
@@ -228,7 +228,10 @@ class DebugVMExporter(PipelineStep):
     def __init__(self, pipeline_init, implementations):
         """Initialize an DebugVMExporter."""
         super().__init__(pipeline_init)
-        self.vm = VM(self.pipeline, implementations)
+        self.vm = VM(self.pipeline.resources.convert,
+                     self.pipeline.resources.manager,
+                     self.pipeline.resources.py_implementations,
+                     implementations)
 
     def step(self, graph):
         """Make a Python callable out of the graph."""
@@ -246,7 +249,8 @@ step_resolve = Optimizer.partial(
 step_infer = Inferrer.partial(
     tracks=dict(
         value=ValueTrack.partial(
-            constructors=value_inferrer_constructors
+            constructors=value_inferrer_constructors,
+            max_depth=1
         ),
         type=TypeTrack.partial(
             constructors=type_inferrer_constructors
@@ -275,7 +279,7 @@ step_opt = Optimizer.partial(
 step_cconv = ClosureConverter.partial()
 
 
-step_export = DebugVMExporter.partial(
+step_debug_export = DebugVMExporter.partial(
     implementations=vm_implementations
 )
 
@@ -296,6 +300,8 @@ standard_pipeline = PipelineDefinition(
         specialize=step_specialize,
         opt=step_opt,
         cconv=step_cconv,
+        compile=step_compile,
+        link=step_link,
         export=step_export,
     )
 )

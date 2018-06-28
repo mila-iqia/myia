@@ -319,3 +319,11 @@ def _resolve_vm(vm, data, item):
     # There is no Python implementation for this one.
     value = data[item]
     return vm.convert(value)
+
+
+@py_register(primops.partial)
+def partial(f, *args):
+    """Implement `partial`."""
+    def res(*others):
+        return f(*(args + others))
+    return res

@@ -1,7 +1,7 @@
 
 from pytest import mark
 
-from myia.api import standard_pipeline
+from myia.api import standard_pipeline, step_debug_export
 from myia.prim.py_implementations import typeof, hastype, maplist, add
 from myia.specialize import validate
 
@@ -9,7 +9,9 @@ from .test_infer import i64, f64
 
 
 specialize_pipeline = standard_pipeline.select(
-    'parse', 'resolve', 'infer', 'specialize', 'export'
+    'parse', 'resolve', 'infer', 'specialize'
+).insert_after(
+    debug_export=step_debug_export
 ).configure(
     {'infer.tracks.value.max_depth': 1}
 )

@@ -217,6 +217,34 @@ class GraphInferrer(Inferrer):
             and other.context == self.context
 
 
+class PartialInferrer(Inferrer):
+    """Infer a property on a partial.
+
+    This wraps another inferrer and defers all the work to it,
+    prepending some arguments to all calls.
+    """
+
+    def __init__(self, engine, fn, args):
+        """Initialize the PartialInferrer."""
+        super().__init__(engine, 'partial')
+        self.fn = fn
+        self.args = tuple(args)
+
+    def infer(self, *args):
+        """Add the partial arguments and defer to the wrapped inferrer."""
+        return self.fn(*(self.args + args))
+
+    def provably_equivalent(self, other):
+        """Wether this inferrer is equivalent to another.
+
+        Two PartialInferrers are equivalent if the wrap the same
+        inferrer and add the same arguments.
+        """
+        return (isinstance(other, PartialInferrer) and
+                self.args == other.args and
+                self.fn.provably_equivalent(other.fn))
+
+
 def register_inferrer(*prims, nargs, constructors):
     """Define a PrimitiveInferrer for prims with nargs arguments.
 

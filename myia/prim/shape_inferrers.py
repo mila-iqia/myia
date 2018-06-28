@@ -4,7 +4,7 @@ import operator
 from functools import partial, reduce
 
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
-    Track, MyiaShapeError, Inferrer
+    PartialInferrer, Track, MyiaShapeError, Inferrer
 from ..ir import Graph
 from ..dtype import Array
 
@@ -86,6 +86,13 @@ async def infer_shape_if(engine, cond, tb, fb):
         return await engine.assert_same('shape', tb_inf(), fb_inf())
     else:
         raise AssertionError("Invalid condition value for if.")
+
+
+@shape_inferrer(P.partial, nargs=None)
+async def infer_shape_partial(engine, fn, *args):
+    """Infer the return type of partial."""
+    fn_t = await fn['shape']
+    return PartialInferrer(engine, fn_t, args)
 
 
 @shape_inferrer(P.map_array, nargs=2)

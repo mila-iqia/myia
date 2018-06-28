@@ -10,7 +10,8 @@ from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
     add, mul, lt, head, tail, maplist, hastype, typeof, usub, \
-    dot, distribute, shape, map_array, scan_array, reduce_array, reshape
+    dot, distribute, shape, map_array, scan_array, reduce_array, reshape, \
+    partial as myia_partial
 
 
 B = Bool()
@@ -934,3 +935,28 @@ def test_reduce_array(ary, ax):
     def f(a, b):
         return a + b
     return reduce_array(f, 0, ary, ax)
+
+
+@infer(type=[(i64, i64)],
+       value=[(40, 42)],
+       shape=[({'type': i64, 'shape': ()}, ())])
+def test_partial_1(x):
+    def f(a, b):
+        return a + b
+    f2 = myia_partial(f, 2)
+    return f2(x)
+
+
+@infer(type=[(i64, i64)])
+def test_partial_2(x):
+    def f(a, b):
+        return a + b
+
+    def g(c):
+        f2 = myia_partial(f, 2)
+        f3 = myia_partial(f, -2)
+        if c:
+            return f2
+        else:
+            return f3
+    return g(x < 42)(x)

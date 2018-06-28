@@ -4,23 +4,25 @@ from types import SimpleNamespace
 
 from pytest import mark
 
-from myia.api import standard_pipeline
+from myia.api import standard_pipeline, step_debug_export
 
 
-lang_pipeline = standard_pipeline.select('parse', 'resolve', 'export')
+lang_pipeline = standard_pipeline.select(
+    'parse', 'resolve'
+).insert_after(
+    debug_export=step_debug_export)
 
 
 def parse_compare(*tests):
     """Decorate a function to parse and run it against pure Python.
 
-    Returns a unit test that will parse the function, and then for each
-    `inputs`.
-
-    tuple in `tests` it will check that the pure Python, undecorated function
-    returns that same output.
+    Returns a unit test that will parse the function, and then for
+    each `inputs` tuple in `tests` it will check that the pure Python,
+    undecorated function returns that same output.
 
     Arguments:
         tests: One or more inputs tuple.
+
     """
 
     def decorate(fn):

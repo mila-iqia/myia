@@ -6,7 +6,8 @@ import numpy as np
 from myia.dtype import Int, Float, List, Tuple
 from myia.prim.py_implementations import head, setattr as myia_setattr, \
     setitem as myia_setitem, tail, hastype, typeof, \
-    shape, reshape, map_array, scan_array, reduce_array, distribute, dot
+    shape, reshape, map_array, scan_array, reduce_array, distribute, dot, \
+    partial as myia_partial
 
 from ..test_lang import parse_compare
 
@@ -207,3 +208,12 @@ def test_prim_dot():
     res = dot(a, b)
 
     assert (res == ref).all()
+
+
+@parse_compare((40,),)
+def test_prim_partial(x):
+    def f(a, b):
+        return a + b
+
+    g = myia_partial(f, 2)
+    return g(x)
