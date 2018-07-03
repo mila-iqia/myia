@@ -418,7 +418,7 @@ def J(x):
 
 @vm_register(primops.J)
 def J_vm(vm, x):
-    return J_internal(vm.pipeline.resources, x)
+    return J_internal(vm.resources, x)
 
 
 @py_register(primops.Jinv)

@@ -96,8 +96,14 @@ class VM:
         def __init__(self, value):
             self.value = value
 
-    def __init__(self, convert, manager, py_implementations, implementations):
+    def __init__(self,
+                 convert,
+                 manager,
+                 py_implementations,
+                 implementations,
+                 resources=None):
         """Initialize the VM."""
+        self.resources = resources
         self.convert = convert
         self.manager = manager
         self.on_node_value = Event('on_node_value')

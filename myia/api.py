@@ -233,7 +233,8 @@ class DebugVMExporter(PipelineStep):
         self.vm = VM(self.pipeline.resources.convert,
                      self.pipeline.resources.manager,
                      self.pipeline.resources.py_implementations,
-                     implementations)
+                     implementations,
+                     resources=self.pipeline.resources)
         if callback:
             self.vm.on_node_value.register(callback)
 
