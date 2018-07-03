@@ -10,6 +10,7 @@ from ..dtype import Array
 
 from . import ops as P
 from .ops import Primitive
+from .value_inferrers import _static_getter
 
 
 def prod(iterable):
@@ -166,3 +167,15 @@ async def infer_shape_dot(track, a, b):
             b_shp[0] is not ANYTHING):
         raise MyiaShapeError("Incompatible shapes in dot")
     return (a_shp[0], b_shp[1])
+
+
+@shape_inferrer(P.resolve, nargs=2)
+async def infer_shape_resolve(track, data, item):
+    """Infer the shape of resolve."""
+    return await _static_getter(track, data, item, lambda x, y: x[y])
+
+
+@shape_inferrer(P.getattr, nargs=2)
+async def infer_shape_getattr(track, data, item):
+    """Infer the shape of getattr."""
+    return await _static_getter(track, data, item, getattr)

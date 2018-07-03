@@ -7,10 +7,12 @@ from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number
 from ..infer import ANYTHING, Inferrer, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
+from ..utils import Namespace
 
 from . import ops as P
 from .ops import Primitive
 from .py_implementations import typeof
+from .value_inferrers import _static_getter
 
 
 type_inferrer_constructors = {}
@@ -293,3 +295,23 @@ async def infer_type_maplist(track, f, xs):
     xref = track.engine.vref(dict(type=xs_t.element_type))
     ret_t = await f_t(xref)
     return List(ret_t)
+
+
+@type_inferrer(P.resolve, nargs=2)
+async def infer_type_resolve(track, data, item):
+    """Infer the return type of resolve."""
+    def chk(data_v, item_v):
+        if not isinstance(data_v, Namespace):  # pragma: no cover
+            raise MyiaTypeError('data argument to resolve must be Namespace.')
+        if not isinstance(item_v, str):  # pragma: no cover
+            raise MyiaTypeError('item argument to resolve must be string.')
+    return await _static_getter(track, data, item, (lambda x, y: x[y]), chk)
+
+
+@type_inferrer(P.getattr, nargs=2)
+async def infer_type_getattr(track, data, item):
+    """Infer the return type of getattr."""
+    def chk(data_v, item_v):
+        if not isinstance(item_v, str):
+            raise MyiaTypeError('item argument to getattr must be string.')
+    return await _static_getter(track, data, item, getattr, chk)

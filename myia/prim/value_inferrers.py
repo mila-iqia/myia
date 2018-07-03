@@ -6,7 +6,7 @@ import asyncio
 from functools import partial
 
 from ..infer import InferenceError, PartialInferrer, \
-    ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track
+    ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track, Context
 from ..ir import Graph
 
 from . import ops as P
@@ -115,7 +115,6 @@ class ValueTrack(Track):
 
     def from_value(self, v, context):
         """Infer the value of a constant."""
-        engine = self.engine
         if isinstance(v, Primitive):
             if v in self.constructors:
                 inf = self.constructors[v](self)
@@ -186,7 +185,7 @@ async def infer_value_partial(engine, fn, *args):
 
 
 @value_inferrer(P.hastype, nargs=2)
-async def infer_value_hastype(engine, x, t):
+async def infer_value_hastype(track, x, t):
     """Infer the return value of hastype."""
     x_t = await x['type']
     t_v = await t['value']
@@ -199,7 +198,7 @@ async def infer_value_hastype(engine, x, t):
 
 
 @value_inferrer(P.typeof, nargs=1)
-async def infer_value_typeof(engine, x):
+async def infer_value_typeof(track, x):
     """Infer the return value of typeof."""
     # TODO: Find a good way to carry ValueTrack.max_depth to here
     # Instead of defaulting to 1
@@ -208,10 +207,38 @@ async def infer_value_typeof(engine, x):
 
 
 @value_inferrer(P.shape, nargs=1)
-async def infer_value_shape(engine, ary):
+async def infer_value_shape(track, ary):
     """Infer the return value of shape."""
     shp = await ary['shape']
     if any(s is ANYTHING for s in shp):
         return ANYTHING
     # TODO: Should propagate ValueTrack.max_depth here
     return limited(shp, 1)
+
+
+async def _static_getter(track, data, item, fetch, chk=None):
+    engine = track.engine
+    data_v = await data['value']
+    item_v = await item['value']
+    if data_v is ANYTHING or item_v is ANYTHING:
+        raise InferenceError('Both arguments must be known.')
+    if chk:
+        chk(data_v, item_v)
+    try:
+        raw = fetch(data_v, item_v)
+    except Exception as e:
+        raise InferenceError('Getter error', e)
+    value = engine.pipeline.resources.convert(raw)
+    return track.from_value(value, Context.empty())
+
+
+@value_inferrer(P.resolve, nargs=2)
+async def infer_value_resolve(track, data, item):
+    """Infer the return value of resolve."""
+    return await _static_getter(track, data, item, lambda x, y: x[y])
+
+
+@value_inferrer(P.getattr, nargs=2)
+async def infer_value_getattr(track, data, item):
+    """Infer the return value of getattr."""
+    return await _static_getter(track, data, item, getattr)

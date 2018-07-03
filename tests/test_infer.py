@@ -1,12 +1,16 @@
 
+import operator
+import numpy as np
+
 from functools import partial
 from pytest import mark
+from types import SimpleNamespace
 
 from myia.api import standard_pipeline
 from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
-    Type, UInt
+    Type, UInt, External
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
     add, mul, lt, head, tail, maplist, hastype, typeof, usub, \
@@ -97,7 +101,7 @@ async def infer_type_to_i64(track, x):
 
 
 infer_pipeline = standard_pipeline.select(
-    'parse', 'resolve', 'infer'
+    'parse', 'infer'
 ).configure({
     'py_implementations': pyimpl_test,
     'infer.tracks.value.max_depth': 10,
@@ -822,6 +826,74 @@ def test_map_2(xs, z):
         return f
 
     return maplist(adder(z), xs)
+
+
+def _square(x):
+    return x * x
+
+
+helpers = SimpleNamespace(
+    add=operator.add,
+    mul=operator.mul,
+    square=_square
+)
+
+
+data = SimpleNamespace(
+    a25=np.ones((2, 5))
+)
+
+
+@infer(
+    type=[
+        (i64, i64, T(i64, i64)),
+        (i64, f64, InferenceError),
+    ],
+    value=[
+        (2, 3, (5, 36))
+    ]
+)
+def test_getattr(x, y):
+    a = helpers.add(x, y)
+    b = helpers.mul(x, y)
+    c = helpers.square(b)
+    return a, c
+
+
+@infer(
+    type=[
+        (i64, i64, T(i64, i64)),
+        (i64, f64, T(i64, f64)),
+    ]
+)
+def test_getattr_multitype(x, y):
+    a = helpers.add(x, x)
+    b = helpers.add(y, y)
+    return a, b
+
+
+@infer(
+    shape=[
+        ((2, 5),),
+    ]
+)
+def test_getattr_shape():
+    return data.a25
+
+
+_getattr = getattr
+
+
+@infer(
+    type=[
+        ({'value': 'add'}, i64, i64),
+        ({'value': 'bad'}, i64, InferenceError),
+        ({'value': 1234}, i64, InferenceError),
+        (External(str), i64, InferenceError),
+    ]
+)
+def test_getattr_flex(name, x):
+    return _getattr(helpers, name)(x, x)
 
 
 @infer(type=[(i64, InferenceError)])

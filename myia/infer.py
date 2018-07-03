@@ -693,7 +693,8 @@ class InferenceEngine:
             inf = await self.get(track, self.ref(n_fn, ctx))
             if inf is ANYTHING:
                 return ANYTHING
-            assert isinstance(inf, Inferrer)
+            if not isinstance(inf, Inferrer):
+                raise AssertionError(f'Not an inferrer: {inf}')
             argrefs = [self.ref(node, ctx) for node in n_args]
             try:
                 return await inf(*argrefs)
