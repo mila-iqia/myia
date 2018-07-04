@@ -3,7 +3,7 @@
 import operator
 from types import FunctionType
 
-from . import parser
+from . import dtype, parser
 from .cconv import closure_convert
 from .infer import InferenceEngine
 from .ir import Graph, clone, GraphManager
@@ -38,6 +38,29 @@ default_object_map = {
     operator.setitem: P.setitem,
     getattr: P.getattr,
     setattr: P.setattr,
+}
+
+
+_number_map = {
+    '__add__': P.add,
+    '__sub__': P.sub,
+    '__mul__': P.mul,
+    '__div__': P.div,
+}
+
+
+default_method_map = {
+    dtype.Int(8): _number_map,
+    dtype.Int(16): _number_map,
+    dtype.Int(32): _number_map,
+    dtype.Int(64): _number_map,
+    dtype.UInt(8): _number_map,
+    dtype.UInt(16): _number_map,
+    dtype.UInt(32): _number_map,
+    dtype.UInt(64): _number_map,
+    dtype.Float(16): _number_map,
+    dtype.Float(32): _number_map,
+    dtype.Float(64): _number_map,
 }
 
 
@@ -288,7 +311,8 @@ standard_pipeline = PipelineDefinition(
         convert=Converter.partial(
             object_map=default_object_map,
             converters=lax_type_map
-        )
+        ),
+        method_map=default_method_map
     ),
     steps=dict(
         parse=step_parse,

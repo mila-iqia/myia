@@ -217,19 +217,45 @@ async def infer_value_shape(track, ary):
 
 
 async def _static_getter(track, data, item, fetch, chk=None):
-    engine = track.engine
-    data_v = await data['value']
+    resources = track.engine.pipeline.resources
+    mmap = resources.method_map
+
+    data_t = await data['type']
     item_v = await item['value']
-    if data_v is ANYTHING or item_v is ANYTHING:
-        raise InferenceError('Both arguments must be known.')
-    if chk:
-        chk(data_v, item_v)
-    try:
-        raw = fetch(data_v, item_v)
-    except Exception as e:
-        raise InferenceError('Getter error', e)
-    value = engine.pipeline.resources.convert(raw)
-    return track.from_value(value, Context.empty())
+    if item_v is ANYTHING:
+        raise InferenceError('Item or attribute must be known.')
+
+    if data_t in mmap:
+        # Method call
+        if chk:
+            chk(None, item_v)
+        if item_v in mmap[data_t]:
+            method = mmap[data_t][item_v]
+            inferrer = track.from_value(method, Context.empty())
+            if isinstance(inferrer, LimitedValue):
+                inferrer = inferrer.value
+            return PartialInferrer(
+                track,
+                inferrer,
+                [data]
+            )
+        else:
+            msg = f'Method {item_v} of {data_t} does not exist.'
+            raise InferenceError(msg)
+
+    else:
+        # Module or static namespace
+        data_v = await data['value']
+        if data_v is ANYTHING:
+            raise InferenceError('Data must be known.')
+        if chk:
+            chk(data_v, item_v)
+        try:
+            raw = fetch(data_v, item_v)
+        except Exception as e:
+            raise InferenceError('Getter error', e)
+        value = resources.convert(raw)
+        return track.from_value(value, Context.empty())
 
 
 @value_inferrer(P.resolve, nargs=2)

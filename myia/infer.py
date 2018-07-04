@@ -234,9 +234,9 @@ class PartialInferrer(Inferrer):
     prepending some arguments to all calls.
     """
 
-    def __init__(self, engine, fn, args):
+    def __init__(self, track, fn, args):
         """Initialize the PartialInferrer."""
-        super().__init__(engine, 'partial')
+        super().__init__(track, 'partial')
         self.fn = fn
         self.args = tuple(args)
 

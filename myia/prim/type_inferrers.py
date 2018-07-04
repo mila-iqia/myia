@@ -5,9 +5,9 @@ from functools import partial
 
 from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number
 from ..infer import ANYTHING, Inferrer, GraphInferrer, PartialInferrer, \
-    MyiaTypeError, register_inferrer, Track
+    MyiaTypeError, register_inferrer, Track, Context
 from ..ir import Graph
-from ..utils import Namespace
+from ..utils import Namespace, NS
 
 from . import ops as P
 from .ops import Primitive
@@ -93,10 +93,10 @@ async def infer_type_if(track, cond, tb, fb):
 
 
 @type_inferrer(P.partial, nargs=None)
-async def infer_type_partial(engine, fn, *args):
+async def infer_type_partial(track, fn, *args):
     """Infer the return type of partial."""
     fn_t = await fn['type']
-    return PartialInferrer(engine, fn_t, args)
+    return PartialInferrer(track, fn_t, args)
 
 
 @type_inferrer(P.cons_tuple, nargs=2)
