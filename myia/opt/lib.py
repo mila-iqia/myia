@@ -101,7 +101,7 @@ tail_tuple = psub(
 
 # f((a, b, ...), (p, q, ...)) => (f(a, p), f(b, q), ...)
 # For f in the following list:
-_BubbleBinary = primset_var(P.add)
+_BubbleBinary = primset_var(P.scalar_add)
 
 bubble_op_cons_binary = psub(
     pattern=(_BubbleBinary, (P.cons_tuple, X1, Y1), (P.cons_tuple, X2, Y2)),
@@ -126,37 +126,37 @@ bubble_op_nil_binary = psub(
 
 
 multiply_by_zero_l = psub(
-    pattern=(P.mul, 0, X),
+    pattern=(P.scalar_mul, 0, X),
     replacement=0,
     name='multiply_by_zero_l'
 )
 
 multiply_by_zero_r = psub(
-    pattern=(P.mul, X, 0),
+    pattern=(P.scalar_mul, X, 0),
     replacement=0,
     name='multiply_by_zero_r'
 )
 
 multiply_by_one_l = psub(
-    pattern=(P.mul, 1, X),
+    pattern=(P.scalar_mul, 1, X),
     replacement=X,
     name='multiply_by_one_l'
 )
 
 multiply_by_one_r = psub(
-    pattern=(P.mul, X, 1),
+    pattern=(P.scalar_mul, X, 1),
     replacement=X,
     name='multiply_by_one_r'
 )
 
 add_zero_l = psub(
-    pattern=(P.add, 0, X),
+    pattern=(P.scalar_add, 0, X),
     replacement=X,
     name='add_zero_l'
 )
 
 add_zero_r = psub(
-    pattern=(P.add, X, 0),
+    pattern=(P.scalar_add, X, 0),
     replacement=X,
     name='add_zero_r'
 )

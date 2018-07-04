@@ -2,7 +2,7 @@ import numpy as np
 
 from myia.api import compile
 from myia.prim.py_implementations import (map_array, maplist, reduce_array,
-                                          scan_array, usub)
+                                          scan_array, scalar_usub)
 
 from .test_lang import parse_compare
 
@@ -17,7 +17,7 @@ def test_vm_icall_fn(l):
 
 @parse_compare(([1, 2, 3],))
 def test_vm_icall_prim(l):
-    return maplist(usub, l)
+    return maplist(scalar_usub, l)
 
 
 @parse_compare(([1, 2, 3],))

@@ -167,7 +167,7 @@ async def infer_type_hastype(track, x, t):
     return Bool()
 
 
-@type_inferrer(P.not_, nargs=1)
+@type_inferrer(P.bool_not, nargs=1)
 async def infer_type_not(track, x):
     """Infer the return type of not."""
     x_t = await x['type']
@@ -176,14 +176,14 @@ async def infer_type_not(track, x):
     return Bool()
 
 
-@type_inferrer(P.eq, P.ne, nargs=2)
+@type_inferrer(P.scalar_eq, P.scalar_ne, nargs=2)
 async def infer_type_generic_compare(track, x, y):
     """Infer the return type of a generic comparison operator."""
     await track.assert_same(x, y)
     return Bool()
 
 
-@type_inferrer(P.lt, P.gt, P.le, P.ge, nargs=2)
+@type_inferrer(P.scalar_lt, P.scalar_gt, P.scalar_le, P.scalar_ge, nargs=2)
 async def infer_type_arith_compare(track, x, y):
     """Infer the return type of an arithmetic comparison operator."""
     t = await track.assert_same(x, y)
@@ -192,7 +192,7 @@ async def infer_type_arith_compare(track, x, y):
     return Bool()
 
 
-@type_inferrer(P.uadd, P.usub, nargs=1)
+@type_inferrer(P.scalar_uadd, P.scalar_usub, nargs=1)
 async def infer_type_arith_unary(track, x):
     """Infer the return type of a unary arithmetic operator."""
     t = await x['type']
@@ -201,7 +201,8 @@ async def infer_type_arith_unary(track, x):
     return t
 
 
-@type_inferrer(P.add, P.sub, P.mul, P.div, P.mod, P.pow, nargs=2)
+@type_inferrer(P.scalar_add, P.scalar_sub, P.scalar_mul, P.scalar_div,
+               P.scalar_mod, P.scalar_pow, nargs=2)
 async def infer_type_arith_bin(track, x, y):
     """Infer the return type of a binary arithmetic operator."""
     t = await track.assert_same(x, y)

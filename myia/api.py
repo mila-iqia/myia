@@ -18,22 +18,23 @@ from .utils import TypeMap
 from .vm import VM
 from .compile import step_compile, step_link, step_export
 
+
 default_object_map = {
-    operator.add: P.add,
-    operator.sub: P.sub,
-    operator.mul: P.mul,
-    operator.truediv: P.div,
-    operator.mod: P.mod,
-    operator.pow: P.pow,
-    operator.eq: P.eq,
-    operator.ne: P.ne,
-    operator.lt: P.lt,
-    operator.gt: P.gt,
-    operator.le: P.le,
-    operator.ge: P.ge,
-    operator.pos: P.uadd,
-    operator.neg: P.usub,
-    operator.not_: P.not_,
+    operator.add: P.scalar_add,
+    operator.sub: P.scalar_sub,
+    operator.mul: P.scalar_mul,
+    operator.truediv: P.scalar_div,
+    operator.mod: P.scalar_mod,
+    operator.pow: P.scalar_pow,
+    operator.eq: P.scalar_eq,
+    operator.ne: P.scalar_ne,
+    operator.lt: P.scalar_lt,
+    operator.gt: P.scalar_gt,
+    operator.le: P.scalar_le,
+    operator.ge: P.scalar_ge,
+    operator.pos: P.scalar_uadd,
+    operator.neg: P.scalar_usub,
+    operator.not_: P.bool_not,
     operator.getitem: P.getitem,
     operator.setitem: P.setitem,
     getattr: P.getattr,
@@ -42,10 +43,10 @@ default_object_map = {
 
 
 _number_map = {
-    '__add__': P.add,
-    '__sub__': P.sub,
-    '__mul__': P.mul,
-    '__div__': P.div,
+    '__add__': P.scalar_add,
+    '__sub__': P.scalar_sub,
+    '__mul__': P.scalar_mul,
+    '__div__': P.scalar_div,
 }
 
 

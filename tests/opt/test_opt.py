@@ -44,25 +44,25 @@ QP_to_QR = psub(
 )
 
 multiply_by_zero_l = psub(
-    (prim.mul, 0, X),
+    (prim.scalar_mul, 0, X),
     0,
     name='multiply_by_zero_l'
 )
 
 multiply_by_zero_r = psub(
-    (prim.mul, X, 0),
+    (prim.scalar_mul, X, 0),
     0,
     name='multiply_by_zero_r'
 )
 
 add_zero_l = psub(
-    (prim.add, 0, X),
+    (prim.scalar_add, 0, X),
     X,
     name='add_zero_l'
 )
 
 add_zero_r = psub(
-    (prim.add, X, 0),
+    (prim.scalar_add, X, 0),
     X,
     name='add_zero_r'
 )
@@ -98,7 +98,7 @@ def test_sexp_conversion():
     def f():
         return 10 * (5 + 4)
 
-    sexp = (prim.mul, 10, (prim.add, 5, Constant(4)))
+    sexp = (prim.scalar_mul, 10, (prim.scalar_add, 5, Constant(4)))
 
     g = sexp_to_graph(sexp)
 

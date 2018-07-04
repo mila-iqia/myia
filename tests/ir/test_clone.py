@@ -38,7 +38,7 @@ def test_clone_simple():
 
     common = d1 & d2
     assert all(is_constant(x) for x in common)
-    assert {x.value for x in common} == {P.add, P.mul, P.return_}
+    assert {x.value for x in common} == {P.scalar_add, P.scalar_mul, P.return_}
 
 
 def test_clone_closure():

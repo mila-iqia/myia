@@ -8,7 +8,7 @@ from myia.graph_utils import dfs
 from myia.infer import Inferrer
 from myia.ir import succ_deeper, is_apply, is_constant
 from myia.prim import ops as P, Primitive
-from myia.prim.py_implementations import typeof, hastype, maplist, add
+from myia.prim.py_implementations import typeof, hastype, maplist, scalar_add
 from myia.specialize import DEAD
 
 from .test_infer import i64, f64
@@ -27,8 +27,8 @@ specialize_pipeline = standard_pipeline.select(
 # to eliminate at this stage.
 op_whitelist = [
     P.return_, P.if_, P.partial,
-    P.add, P.mul, P.sub,
-    P.gt, P.lt,
+    P.scalar_add, P.scalar_mul, P.scalar_sub,
+    P.scalar_gt, P.scalar_lt,
     P.cons_tuple, P.hastype, P.maplist
 ]
 
@@ -234,7 +234,7 @@ def test_unused_function_parameter(x):
 @specialize((int1,))
 def test_indirect_primitive(x):
     def add2():
-        return add
+        return scalar_add
 
     return add2()(x, x)
 

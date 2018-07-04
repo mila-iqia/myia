@@ -28,93 +28,121 @@ def register(prim):
     return deco
 
 
-@register(primops.add)
-def add(x, y):
-    """Implement `add`."""
+def _assert_scalar(*args):
+    # TODO: These checks should be stricter, e.g. require that all args
+    # have exactly the same type, but right now there is some mixing between
+    # numpy types and int/float.
+    for x in args:
+        if isinstance(x, np.ndarray):
+            if x.shape != ():
+                msg = f'Expected scalar, not array with shape {x.shape}'
+                raise TypeError(msg)
+        elif not isinstance(x, (int, float)):
+            raise TypeError(f'Expected scalar, not {type(x)}')
+
+
+@register(primops.scalar_add)
+def scalar_add(x, y):
+    """Implement `scalar_add`."""
+    _assert_scalar(x, y)
     return x + y
 
 
-@register(primops.sub)
-def sub(x, y):
-    """Implement `sub`."""
+@register(primops.scalar_sub)
+def scalar_sub(x, y):
+    """Implement `scalar_sub`."""
+    _assert_scalar(x, y)
     return x - y
 
 
-@register(primops.mul)
-def mul(x, y):
-    """Implement `mul`."""
+@register(primops.scalar_mul)
+def scalar_mul(x, y):
+    """Implement `scalar_mul`."""
+    _assert_scalar(x, y)
     return x * y
 
 
-@register(primops.div)
-def div(x, y):
-    """Implement `div`."""
+@register(primops.scalar_div)
+def scalar_div(x, y):
+    """Implement `scalar_div`."""
+    _assert_scalar(x, y)
     return x / y
 
 
-@register(primops.mod)
-def mod(x, y):
-    """Implement `mod`."""
+@register(primops.scalar_mod)
+def scalar_mod(x, y):
+    """Implement `scalar_mod`."""
+    _assert_scalar(x, y)
     return x % y
 
 
-@register(primops.pow)
-def pow(x, y):
-    """Implement `pow`."""
+@register(primops.scalar_pow)
+def scalar_pow(x, y):
+    """Implement `scalar_pow`."""
+    _assert_scalar(x, y)
     return x ** y
 
 
-@register(primops.uadd)
-def uadd(x):
-    """Implement `iadd`."""
+@register(primops.scalar_uadd)
+def scalar_uadd(x):
+    """Implement `scalar_uadd`."""
+    _assert_scalar(x)
     return x
 
 
-@register(primops.usub)
-def usub(x):
-    """Implement `isub`."""
+@register(primops.scalar_usub)
+def scalar_usub(x):
+    """Implement `scalar_usub`."""
+    _assert_scalar(x)
     return -x
 
 
-@register(primops.eq)
-def eq(x, y):
-    """Implement `eq`."""
+@register(primops.scalar_eq)
+def scalar_eq(x, y):
+    """Implement `scalar_eq`."""
+    _assert_scalar(x, y)
     return x == y
 
 
-@register(primops.lt)
-def lt(x, y):
-    """Implement `lt`."""
+@register(primops.scalar_lt)
+def scalar_lt(x, y):
+    """Implement `scalar_lt`."""
+    _assert_scalar(x, y)
     return x < y
 
 
-@register(primops.gt)
-def gt(x, y):
-    """Implement `gt`."""
+@register(primops.scalar_gt)
+def scalar_gt(x, y):
+    """Implement `scalar_gt`."""
+    _assert_scalar(x, y)
     return x > y
 
 
-@register(primops.ne)
-def ne(x, y):
-    """Implement `ne`."""
+@register(primops.scalar_ne)
+def scalar_ne(x, y):
+    """Implement `scalar_ne`."""
+    _assert_scalar(x, y)
     return x != y
 
 
-@register(primops.le)
-def le(x, y):
-    """Implement `le`."""
+@register(primops.scalar_le)
+def scalar_le(x, y):
+    """Implement `scalar_le`."""
+    _assert_scalar(x, y)
     return x <= y
 
 
-@register(primops.ge)
-def ge(x, y):
-    """Implement `ge`."""
+@register(primops.scalar_ge)
+def scalar_ge(x, y):
+    """Implement `scalar_ge`."""
+    _assert_scalar(x, y)
     return x >= y
 
 
-@register(primops.not_)
-def not_(x):
-    """Implement `not_`."""
+@register(primops.bool_not)
+def bool_not(x):
+    """Implement `bool_not`."""
+    assert x is True or x is False
     return not x
 
 
