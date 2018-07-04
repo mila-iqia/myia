@@ -186,7 +186,7 @@ async def infer_type_arith_compare(engine, x, y):
     """Infer the return type of an arithmetic comparison operator."""
     t = await engine.assert_same('type', x, y)
     if not isinstance(t, (Int, Float)):
-        raise MyiaTypeError('Expected number')
+        raise MyiaTypeError(f'Expected number, not {t}')
     return Bool()
 
 
@@ -195,7 +195,7 @@ async def infer_type_arith_unary(engine, x):
     """Infer the return type of a unary arithmetic operator."""
     t = await x['type']
     if not isinstance(t, (Int, Float)):
-        raise MyiaTypeError('Expected number')
+        raise MyiaTypeError(f'Expected number, not {t}')
     return t
 
 
@@ -204,7 +204,7 @@ async def infer_type_arith_bin(engine, x, y):
     """Infer the return type of a binary arithmetic operator."""
     t = await engine.assert_same('type', x, y)
     if not isinstance(t, (Int, Float)):
-        raise MyiaTypeError('Expected number')
+        raise MyiaTypeError(f'Expected number, not {t}')
     return t
 
 

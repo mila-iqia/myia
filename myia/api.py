@@ -274,9 +274,9 @@ step_specialize = Specializer.partial()
 
 step_opt = Optimizer.partial(
     opts=[
-        optlib.simplify_always_true,
-        optlib.simplify_always_false,
-        optlib.inline_unique_uses,
+        # optlib.simplify_always_true,
+        # optlib.simplify_always_false,
+        # optlib.inline_unique_uses,
     ]
 )
 

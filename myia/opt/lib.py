@@ -4,7 +4,7 @@ from ..graph_utils import dfs
 from ..ir import succ_incoming, freevars_boundary, \
     Graph, Constant, is_constant, is_constant_graph, is_apply, \
     GraphCloner
-from ..prim import ops as P
+from ..prim import ops as P, Primitive
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
 
@@ -352,8 +352,8 @@ Jinv_J_cancel = psub(
 def expand_J(optimizer, node, equiv):
     from ..prim.py_implementations import J_internal
     ct = equiv[C].value
-    # if not isinstance(ct, Graph):
-    #     return node
+    if not isinstance(ct, (Graph, Primitive)):
+        return node
     return Constant(J_internal(optimizer.resources, ct))
 
 
