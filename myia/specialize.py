@@ -8,7 +8,7 @@ from .ir import GraphCloner, is_apply, is_constant, Constant, \
     succ_deeper, Graph
 from .prim import Primitive
 from .graph_utils import dfs
-from .utils import Named
+from .utils import Named, TypeMap
 
 
 UNKNOWN = Named('UNKNOWN')
@@ -60,6 +60,59 @@ class TypeSpecializer:
         return g2
 
 
+_concretize_map = TypeMap()
+
+
+class _NotConcrete(Exception):
+    pass
+
+
+@_concretize_map.register(tuple)
+def _concretize_tuple(xs):
+    return tuple(map(_concretize, xs))
+
+
+@_concretize_map.register(list)
+def _concretize_list(xs):
+    return list(map(_concretize, xs))
+
+
+@_concretize_map.register(Named)
+def _concretize_Named(x):
+    if x is ANYTHING:
+        raise _NotConcrete()
+    else:
+        raise ValueError(f'Invalid value: {x}')
+
+
+@_concretize_map.register(object)
+def _concretize_object(x):
+    return x
+
+
+@_concretize_map.register(GraphInferrer)
+def _concretize_GraphInferrer(v):
+    g = v.graph
+    if g.parent is None:
+        return g
+    else:
+        raise _NotConcrete()
+
+
+@_concretize_map.register(Inferrer)
+def _concretize_Inferrer(v):
+    v = v.identifier
+    if isinstance(v, Primitive):
+        return v
+    else:
+        # This can't happen at the moment
+        raise _NotConcrete()  # pragma: no cover
+
+
+def _concretize(x):
+    return _concretize_map[type(x)](x)
+
+
 class _GraphSpecializer:
     """Helper class for TypeSpecializer."""
 
@@ -99,23 +152,10 @@ class _GraphSpecializer:
             return node.value
         else:
             v = await ref['value']
-            if isinstance(v, GraphInferrer):
-                g = v.graph
-                if g.parent is None:
-                    return g
-                else:
-                    return UNKNOWN
-            elif isinstance(v, Inferrer):
-                v = v.identifier
-                if isinstance(v, Primitive):
-                    return v
-                else:
-                    # This can't happen at the moment
-                    return UNKNOWN  # pragma: no cover
-            elif v is ANYTHING:
+            try:
+                return _concretize(v)
+            except _NotConcrete:
                 return UNKNOWN
-            else:
-                return v
 
     async def extract_type_and_argrefs(self, ref, argrefs=None, appref=None):
         t = await ref['type']
