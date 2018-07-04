@@ -215,3 +215,21 @@ async def infer_value_shape(engine, ary):
         return ANYTHING
     # TODO: Should propagate ValueTrack.max_depth here
     return limited(shp, 1)
+
+
+@value_inferrer(P.cons_tuple, nargs=2)
+async def infer_value_cons_tuple(engine, x, y):
+    x_v = await x['value']
+    y_v = await y['value']
+    v = (x_v, *y_v)
+    return limited(v, 1)
+
+
+@value_inferrer(P.J, nargs=1)
+async def infer_value_J(engine, x):
+    return ANYTHING
+
+
+@value_inferrer(P.Jinv, nargs=1)
+async def infer_value_Jinv(engine, x):
+    return ANYTHING

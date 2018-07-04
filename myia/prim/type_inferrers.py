@@ -3,9 +3,10 @@
 
 from functools import partial
 
-from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number
+from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number, \
+    GradTagged
 from ..infer import ANYTHING, Inferrer, GraphInferrer, PartialInferrer, \
-    MyiaTypeError, register_inferrer, Track
+    PrimitiveInferrer, MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
 
 from . import ops as P
@@ -293,3 +294,89 @@ async def infer_type_maplist(engine, f, xs):
     xref = engine.vref(dict(type=xs_t.element_type))
     ret_t = await f_t(xref)
     return List(ret_t)
+
+
+
+from ..utils import TypeMap
+
+
+_jcvt_map = TypeMap()
+
+
+@_jcvt_map.register(Tuple)
+def _jcvt_Tuple(engine, tup, tup_t):
+    return Tuple(_jcvt(engine, value, t)
+                 for value, t in zip(tup, tup_t.elements))
+
+
+@_jcvt_map.register(Number)
+def _jcvt_Number(engine, _, n):
+    return GradTagged(n)
+
+
+@_jcvt_map.register(GradTagged)
+def _jcvt_GradTagged(engine, _, n):
+    return GradTagged(n)
+
+
+@_jcvt_map.register(GraphInferrer)
+def _jcvt_GraphInferrer(engine, g, g_t):
+    if g is ANYTHING:
+        raise InferenceError('Must know identity of graph for J.')
+    else:
+        from ..grad import grad
+        from ..infer import Context
+        mng = engine.pipeline.resources.manager
+        gg = grad(g_t.graph, mng)
+        mng.add_graph(gg)
+        return GraphInferrer(engine, 'type', gg, Context.empty())
+
+
+@_jcvt_map.register(PrimitiveInferrer)
+def _jcvt_PrimitiveInferrer(engine, p, p_t):
+    if p is ANYTHING:
+        raise InferenceError('Must know identity of primitive for J.')
+    else:
+        from ..grad import grad
+        from ..infer import Context
+        from ..prim.grad_implementations import augmented_graphs
+        mng = engine.pipeline.resources.manager
+        cloner = engine.pipeline.resources.cloner
+        gg = cloner.clone(augmented_graphs[p_t.identifier])
+        mng.add_graph(gg)
+        return GraphInferrer(engine, 'type', gg, Context.empty())
+
+
+def _jcvt(engine, x, x_t):
+    return _jcvt_map[type(x_t)](engine, x, x_t)
+
+
+@type_inferrer(P.J, nargs=1)
+async def infer_type_J(engine, x):
+    x_v = await x['value']
+    x_t = await x['type']
+    return _jcvt(engine, x_v, x_t)
+
+
+_jinvcvt_map = TypeMap()
+
+
+@_jinvcvt_map.register(Tuple)
+def _jinvcvt_Tuple(tup, tup_t):
+    return Tuple(_jinvcvt(value, t) for value, t in zip(tup, tup_t.elements))
+
+
+@_jinvcvt_map.register(GradTagged)
+def _jinvcvt_GradTagged(_, x):
+    return x.subtype
+
+
+def _jinvcvt(x, x_t):
+    return _jinvcvt_map[type(x_t)](x, x_t)
+
+
+@type_inferrer(P.Jinv, nargs=1)
+async def infer_type_Jinv(engine, x):
+    x_v = await x['value']
+    x_t = await x['type']
+    return _jinvcvt(x_v, x_t)

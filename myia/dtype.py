@@ -250,6 +250,11 @@ class Unknown(Type):
     """Represents an unknown type (prior to type inference)."""
 
 
+
+class GradTagged(Type):
+    subtype: Type
+
+
 DTYPE_MAP = dict(
     int8=Int(8),
     int16=Int(16),
