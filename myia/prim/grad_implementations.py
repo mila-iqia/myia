@@ -40,8 +40,10 @@ def bprop_to_augm(prim: Primitive, fn: FunctionType) -> Graph:
     for p in args:
         with About(p.debug, 'grad_fprop'):
             outer_p = outer.add_parameter()
-        mng.replace(p, outer_p)
-        transf_args.append(outer.apply(primops.Jinv, outer_p))
+        with About(p.debug, 'equiv'):
+            transf_p = outer.apply(primops.Jinv, outer_p)
+        mng.replace(p, transf_p)
+        transf_args.append(transf_p)
 
     with About(dout.debug, 'grad_sens'):
         new_dout = bprop.add_parameter()
@@ -208,8 +210,8 @@ def __fprop__if_(c, tb, fb):
         zc = zeros_like(c)
         value = branch_bprop(dout)[0]
         if Jinv(c):
-            return (), zc, value, zeros_like(fb)
+            return (), zc, value, zeros_like(Jinv(fb))
         else:
-            return (), zc, zeros_like(tb), value
+            return (), zc, zeros_like(Jinv(tb)), value
 
     return rval, __bprop__if_

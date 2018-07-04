@@ -11,6 +11,7 @@ from ..utils import Named, Namespace
 short_relation_symbols = {
     'copy': '',
     'cosmetic': '',
+    'equiv': '',
     'phi': 'Φ',
     'fv': '⤋',
     'if_true': '✓',
