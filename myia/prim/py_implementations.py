@@ -33,18 +33,7 @@ def register(prim):
 @register(primops.add)
 def add(x, y):
     """Implement `add`."""
-    if x is ZERO:
-        return y
-    elif y is ZERO:
-        return x
-    elif isinstance(x, tuple):
-        # assert len(x) == len(y)
-        maxl = max(len(x), len(y))
-        x = Zero.pad(x, maxl)
-        y = Zero.pad(y, maxl)
-        return tuple(add(x2, y2) for x2, y2 in zip(x, y))
-    else:
-        return x + y
+    return x + y
 
 
 @register(primops.sub)
@@ -476,6 +465,23 @@ def zeros_like(x):
             return type(x)(0)
 
     return smap(zero, x)
+
+
+@register(primops.mapadd)
+def mapadd(x, y):
+    """Implement `mapadd`."""
+    if x is ZERO:
+        return y
+    elif y is ZERO:
+        return x
+    elif isinstance(x, tuple):
+        # assert len(x) == len(y)
+        maxl = max(len(x), len(y))
+        x = Zero.pad(x, maxl)
+        y = Zero.pad(y, maxl)
+        return tuple(mapadd(x2, y2) for x2, y2 in zip(x, y))
+    else:
+        return x + y
 
 
 @register(primops.identity)

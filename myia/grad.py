@@ -14,7 +14,7 @@ from .prim import ops as primops
 from .utils import Partializable
 
 
-add = Constant(primops.add)
+mapadd = Constant(primops.mapadd)
 J = Constant(primops.J)
 index = Constant(primops.getitem)
 cons = Constant(primops.cons_tuple)
@@ -298,7 +298,7 @@ class SensRemapper(GraphRemapper):
                      self.remappers['grad_fprop'].get(g, node)))
         else:
             def mkadd(x, y):
-                return (primops.add, x, y)
+                return (primops.mapadd, x, y)
             sexp = reduce(mkadd, contribs)
 
         new_node.inputs = sexp_to_node(sexp, ng).inputs
@@ -631,7 +631,7 @@ class OldGrad:
         else:
             # Contributions must be added together.
             def mkadd(x, y):
-                return self._apply(bg, add, x, y)
+                return self._apply(bg, mapadd, x, y)
             sens = reduce(mkadd, contribs)
 
         if not sens.debug.about:
