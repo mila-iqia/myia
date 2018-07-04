@@ -8,7 +8,7 @@ from .ir import GraphCloner, is_apply, is_constant, Constant, \
     succ_deeper, Graph
 from .prim import Primitive
 from .graph_utils import dfs
-from .utils import Named
+from .utils import Named, TypeMap
 
 
 UNKNOWN = Named('UNKNOWN')
@@ -42,10 +42,10 @@ class TypeSpecializer:
         argrefs = self.engine.argrefs
 
         self.result = self.engine.run_coroutine(
-            self._specialize(None, ginf, argrefs, None)
+            self._specialize(None, ginf, argrefs)
         )
 
-    async def _specialize(self, parent, ginf, argrefs, parent_ctx):
+    async def _specialize(self, parent, ginf, argrefs):
         g = ginf.graph
 
         ctx = await ginf.make_context(argrefs)
@@ -54,7 +54,7 @@ class TypeSpecializer:
             return self.specializations[ctx]
 
         self.counts[g] += 1
-        gspec = _GraphSpecializer(parent, self, ginf, argrefs, ctx)
+        gspec = _GraphSpecializer(parent, self, ginf.graph, ctx)
         g2 = gspec.new_graph
         self.originals[g2] = g
         self.specializations[ctx] = g2
@@ -62,16 +62,67 @@ class TypeSpecializer:
         return g2
 
 
+_concretize_map = TypeMap()
+
+
+class _NotConcrete(Exception):
+    pass
+
+
+@_concretize_map.register(tuple)
+def _concretize_tuple(xs):
+    return tuple(map(_concretize, xs))
+
+
+@_concretize_map.register(list)
+def _concretize_list(xs):
+    return list(map(_concretize, xs))
+
+
+@_concretize_map.register(Named)
+def _concretize_Named(x):
+    if x is ANYTHING:
+        raise _NotConcrete()
+    else:
+        raise ValueError(f'Invalid value: {x}')
+
+
+@_concretize_map.register(object)
+def _concretize_object(x):
+    return x
+
+
+@_concretize_map.register(GraphInferrer)
+def _concretize_GraphInferrer(v):
+    g = v.graph
+    if g.parent is None:
+        return g
+    else:
+        raise _NotConcrete()
+
+
+@_concretize_map.register(Inferrer)
+def _concretize_Inferrer(v):
+    v = v.identifier
+    if isinstance(v, Primitive):
+        return v
+    else:
+        # This can't happen at the moment
+        raise _NotConcrete()  # pragma: no cover
+
+
+def _concretize(x):
+    return _concretize_map[type(x)](x)
+
+
 class _GraphSpecializer:
     """Helper class for TypeSpecializer."""
 
-    def __init__(self, parent, specializer, ginf, argrefs, context):
+    def __init__(self, parent, specializer, graph, context):
         self.parent = parent
         self.specializer = specializer
         self.engine = specializer.engine
-        self.graph = ginf.graph
-        self.ginf = ginf
-        self.argrefs = argrefs
+        self.graph = graph
         self.context = context
         self.nodes = specializer.node_map[self.graph]
 
@@ -101,26 +152,16 @@ class _GraphSpecializer:
             return node.value
         else:
             v = await ref['value']
-            if isinstance(v, GraphInferrer):
-                g = v.graph
-                if g.parent is None:
-                    return g
-                else:
-                    return UNKNOWN
-            elif isinstance(v, Inferrer):
-                v = v.identifier
-                if isinstance(v, Primitive):
-                    return v
-                else:
-                    # This can't happen at the moment
-                    return UNKNOWN  # pragma: no cover
-            elif v is ANYTHING:
+            try:
+                return _concretize(v)
+            except _NotConcrete:
                 return UNKNOWN
-            else:
-                return v
 
-    async def extract_type_and_argrefs(self, ref, argrefs=None, appref=None):
-        t = await ref['type']
+    async def extract_type_and_argrefs(self, ref, argrefs=None):
+        if isinstance(ref, (Type, Inferrer)):
+            t = ref
+        else:
+            t = await ref['type']
 
         if not isinstance(t, Inferrer):
             return t, None
@@ -130,7 +171,7 @@ class _GraphSpecializer:
             # the same inferred type/value/etc., we can merge their entries.
             cache = {}
             for x, y in t.cache.items():
-                key = tuple([await arg['type'] for arg in x])
+                key = tuple([await self.extract_type(arg) for arg in x])
                 if key in cache:
                     assert cache[key] == y
                 cache[key] = y
@@ -141,19 +182,21 @@ class _GraphSpecializer:
                 (argrefs, res), *_ = t.cache.items()
             else:
                 return POLY, None
+
         else:
-            res = await self.extract_type(appref)
+            res = t.cache[tuple(argrefs)]
 
         ftype = Function([await self.extract_type(argref)
-                          for argref in argrefs], res)
+                          for argref in argrefs],
+                         await self.extract_type(res))
 
         return ftype, argrefs
 
-    async def extract_type(self, ref, argrefs=None, appref=None):
-        t, _ = await self.extract_type_and_argrefs(ref, argrefs, appref)
+    async def extract_type(self, ref, argrefs=None):
+        t, _ = await self.extract_type_and_argrefs(ref, argrefs)
         return t
 
-    async def make_constant(self, appref, ref, argrefs=None):
+    async def make_constant(self, ref, argrefs=None):
         v = await self.value_of(ref)
         t = await ref['type']
 
@@ -163,14 +206,14 @@ class _GraphSpecializer:
         elif isinstance(v, (Graph, Primitive)):
 
             ftype, argrefs = \
-                await self.extract_type_and_argrefs(ref, argrefs, appref)
+                await self.extract_type_and_argrefs(ref, argrefs)
 
             if argrefs is None:
                 return _const(ftype, ftype)
 
             if isinstance(v, Graph):
                 v = await self.specializer._specialize(
-                    self, t, argrefs, self.context
+                    self, t, argrefs
                 )
 
             return _const(v, ftype)
@@ -188,9 +231,9 @@ class _GraphSpecializer:
             irefs = list(map(self.ref, node.inputs))
             for i, iref in enumerate(irefs):
                 if i == 0:
-                    ct = await self.make_constant(ref, iref, irefs[1:])
+                    ct = await self.make_constant(iref, irefs[1:])
                 else:
-                    ct = await self.make_constant(ref, iref)
+                    ct = await self.make_constant(iref)
                 if ct:
                     self.get(node).inputs[i] = ct
 
