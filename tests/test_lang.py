@@ -282,6 +282,19 @@ def test_if_return_in_while(x):
     return -1
 
 
+#################
+# for statement #
+#################
+
+
+@parse_compare(([1, 2, 3, 4],))
+def test_for(xs):
+    result = 0
+    for x in xs:
+        result = result + x
+    return result
+
+
 ############
 # closures #
 ############

@@ -165,7 +165,6 @@ class Parser:
 
     def make_condition_blocks(self, block):
         """Make two blocks for an if statement or expression."""
-
         with About(block.graph.debug, 'if_true'):
             true_block = Block(self)
         true_block.preds.append(block)
@@ -310,7 +309,6 @@ class Parser:
 
     def process_IfExp(self, block: 'Block', node: ast.IfExp) -> ANFNode:
         """Process if expression: `a if b else c`."""
-
         cond = self.process_node(block, node.test)
 
         true_block, false_block = self.make_condition_blocks(block)
@@ -328,7 +326,6 @@ class Parser:
 
     def process_Lambda(self, block: 'Block', node: ast.Lambda) -> ANFNode:
         """Process lambda: `lambda x, y: x + y`."""
-
         function_block = Block(self)
         function_block.preds.append(block)
         function_block.mature()
@@ -515,6 +512,72 @@ class Parser:
         after_block.mature()
         return after_block
 
+    def process_For(self, block: 'Block', node: ast.For) -> 'Block':
+        """Process a for loop.
+
+        ```
+        for x in xs:
+            body
+        ```
+
+        Is essentially compiled as:
+
+        ```
+        it = iter(xs)
+        while hasnext(it):
+            x, it = next(it)
+            body
+        ```
+
+        A for loop will generate 3 functions: The test, the body, and the
+        continuation.
+        """
+        # Initialization of the iterator, only done once
+        init = block.graph.apply(primops.iter,
+                                 self.process_node(block, node.iter))
+
+        # Checks hasnext on the iterator.
+        with About(block.graph.debug, 'for_header'):
+            header_block = Block(self)
+        # We explicitly add the iterator as the first argument
+        it = header_block.graph.add_parameter()
+        cond = header_block.graph.apply(primops.hasnext, it)
+
+        # Body of the iterator.
+        with About(block.graph.debug, 'for_body'):
+            body_block = Block(self)
+        body_block.preds.append(header_block)
+        # app = next(it); target = app[0]; it = app[1]
+        app = body_block.graph.apply(primops.next, it)
+        target = body_block.graph.apply(primops.getitem, app, 0)
+        target.debug.name = node.target.id
+        it2 = body_block.graph.apply(primops.getitem, app, 1)
+        # We link the variable name to the target
+        body_block.write(node.target.id, target)
+        # We set some debug data on all iterator variables
+        it_debug_data = About(target.debug, 'iterator')
+        it.debug.about = it_debug_data
+        it2.debug.about = it_debug_data
+        init.debug.about = it_debug_data
+
+        # This is the block after for
+        with About(block.graph.debug, 'for_after'):
+            after_block = Block(self)
+        after_block.preds.append(header_block)
+
+        block.jump(header_block, init)
+
+        body_block.mature()
+        header_block.cond(cond, body_block, after_block)
+
+        after_body_block = self.process_statements(body_block, node.body)
+        if not after_body_block.graph.return_:
+            after_body_block.jump(header_block, it2)
+
+        header_block.mature()
+        after_block.mature()
+        return after_block
+
 
 class Block:
     """A basic block.
@@ -652,7 +715,7 @@ class Block:
         """
         self.variables[varnum] = node
 
-    def jump(self, target: 'Block') -> Apply:
+    def jump(self, target: 'Block', *args) -> Apply:
         """Jumping from one block to the next becomes a tail call.
 
         This method will generate the tail call by calling the graph
@@ -664,14 +727,11 @@ class Block:
             target: The block to jump to from this statement.
 
         """
-        jump = Apply([self.parser.get_block_function(target)], self.graph)
+        assert self.graph.return_ is None
+        jump = self.graph.apply(target.graph, *args)
         self.jumps[target] = jump
         target.preds.append(self)
-        inputs = [Constant(primops.return_), jump]
-        return_ = Apply(inputs, self.graph)
-        assert self.graph.return_ is None
-        self.graph.return_ = return_
-        return return_
+        self.graph.output = jump
 
     def cond(self, cond: ANFNode, true: 'Block', false: 'Block') -> Apply:
         """Perform a conditional jump.
@@ -686,12 +746,10 @@ class Block:
             false: The block to jump to if the condition is false.
 
         """
-        inputs = [Constant(primops.if_), cond,
-                  self.parser.get_block_function(true),
-                  self.parser.get_block_function(false)]
-        if_ = Apply(inputs, self.graph)
-        inputs = [Constant(primops.return_), if_]
-        return_ = Apply(inputs, self.graph)
         assert self.graph.return_ is None
-        self.graph.return_ = return_
-        return return_
+        self.graph.output = self.graph.apply(
+            primops.if_,
+            cond,
+            self.parser.get_block_function(true),
+            self.parser.get_block_function(false)
+        )

@@ -68,6 +68,16 @@ getattr = Primitive('getattr')
 setattr = Primitive('setattr')
 
 
+#############
+# Iteration #
+#############
+
+
+iter = Primitive('iter')
+hasnext = Primitive('hasnext')
+next = Primitive('next')
+
+
 ##########
 # Arrays #
 ##########
