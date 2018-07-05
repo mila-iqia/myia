@@ -163,6 +163,21 @@ class Parser:
             # we basically just pass through them.
             return None  # pragma: no cover
 
+    def make_condition_blocks(self, block):
+        """Make two blocks for an if statement or expression."""
+
+        with About(block.graph.debug, 'if_true'):
+            true_block = Block(self)
+        true_block.preds.append(block)
+        true_block.mature()
+
+        with About(block.graph.debug, 'if_false'):
+            false_block = Block(self)
+        false_block.preds.append(block)
+        false_block.mature()
+
+        return true_block, false_block
+
     def parse(self) -> Graph:
         """Parse the function into a Myia graph."""
         tree = ast.parse(textwrap.dedent(inspect.getsource(self.function)))
@@ -262,6 +277,73 @@ class Parser:
         right = self.process_node(block, node.comparators[0])
         return Apply([ops[0], left, right], block.graph)
 
+    def process_BoolOp(self, block: 'Block', node: ast.BinOp) -> ANFNode:
+        """Process boolean operators: `a and b`, `a or b`."""
+        def fold(block, values, mode='and'):
+            first, *rest = values
+            test = self.process_node(block, first)
+            if rest:
+                true_block, false_block = self.make_condition_blocks(block)
+
+                if mode == 'and':
+                    b1, b2 = true_block, false_block
+                else:
+                    b1, b2 = false_block, true_block
+
+                b1.graph.output = fold(b1, rest, mode)
+                b2.graph.output = test
+
+                return block.graph.apply(primops.if_,
+                                         test,
+                                         true_block.graph,
+                                         false_block.graph)
+            else:
+                return test
+
+        init, *rest = node.values
+        if isinstance(node.op, ast.And):
+            return fold(block, node.values, 'and')
+        elif isinstance(node.op, ast.Or):
+            return fold(block, node.values, 'or')
+        else:
+            raise AssertionError(f'Unknown BoolOp: {node.op}')
+
+    def process_IfExp(self, block: 'Block', node: ast.IfExp) -> ANFNode:
+        """Process if expression: `a if b else c`."""
+
+        cond = self.process_node(block, node.test)
+
+        true_block, false_block = self.make_condition_blocks(block)
+
+        tb = self.process_node(true_block, node.body)
+        fb = self.process_node(false_block, node.orelse)
+
+        tg = true_block.graph
+        fg = false_block.graph
+
+        tg.output = tb
+        fg.output = fb
+
+        return block.graph.apply(primops.if_, cond, tg, fg)
+
+    def process_Lambda(self, block: 'Block', node: ast.Lambda) -> ANFNode:
+        """Process lambda: `lambda x, y: x + y`."""
+
+        function_block = Block(self)
+        function_block.preds.append(block)
+        function_block.mature()
+
+        for arg in node.args.args:
+            with DebugInherit(ast=arg, location=self.make_location(arg)):
+                anf_node = Parameter(function_block.graph)
+            anf_node.debug.name = arg.arg
+            function_block.graph.parameters.append(anf_node)
+            function_block.write(arg.arg, anf_node)
+
+        function_block.graph.output = \
+            self.process_node(function_block, node.body)
+        return Constant(function_block.graph)
+
     def process_Name(self, block: 'Block', node: ast.Name) -> ANFNode:
         """Process variables: `variable_name`."""
         return block.read(node.id)
@@ -347,6 +429,9 @@ class Parser:
             if isinstance(targ, ast.Name):
                 # CASE: x = value
                 anf_node.debug.name = targ.id
+                if is_constant(anf_node, Graph):
+                    if anf_node.value.debug.name is None:
+                        anf_node.value.debug.name = targ.id
                 block.write(targ.id, anf_node)
 
             elif isinstance(targ, ast.Tuple):
@@ -381,14 +466,7 @@ class Parser:
         cond = self.process_node(block, node.test)
 
         # Create two branches
-        with About(block.graph.debug, 'if_true'):
-            true_block = Block(self)
-        with About(block.graph.debug, 'if_false'):
-            false_block = Block(self)
-        true_block.preds.append(block)
-        false_block.preds.append(block)
-        true_block.mature()
-        false_block.mature()
+        true_block, false_block = self.make_condition_blocks(block)
 
         # Create the continuation
         with About(block.graph.debug, 'if_after'):
