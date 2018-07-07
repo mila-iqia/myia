@@ -144,7 +144,6 @@ class Parser:
         self.function = function
         _, self.line_offset = inspect.getsourcelines(function)
         self.filename: str = inspect.getfile(function)
-        self.block_map: Dict[Block, Constant] = {}
         # This is used to resolve the function's globals.
         self.global_namespace = ModuleNamespace(function.__module__)
         # This is used to resolve the function's nonlocals.
@@ -185,14 +184,6 @@ class Parser:
         graph = self._process_function(None, function_def)[1].graph
         return graph
 
-    def get_block_function(self, block: 'Block') -> Constant:
-        """Return node representing the function corresponding to a block."""
-        if block in self.block_map:
-            return _fresh(self.block_map[block])
-        node = Constant(block.graph)
-        self.block_map[block] = node
-        return node
-
     def process_FunctionDef(self, block: 'Block',
                             node: ast.FunctionDef) -> 'Block':
         """Process a function definition.
@@ -204,7 +195,7 @@ class Parser:
 
         """
         _, function_block = self._process_function(block, node)
-        block.write(node.name, self.get_block_function(function_block))
+        block.write(node.name, Constant(function_block.graph))
         return block
 
     def _process_function(self, block: Optional['Block'],
@@ -215,8 +206,7 @@ class Parser:
             function_block.preds.append(block)
         else:
             # This is the top-level function, so we set self.graph
-            g_ct = self.get_block_function(function_block)
-            self.graph = g_ct.value
+            self.graph = function_block.graph
 
         function_block.mature()
         function_block.graph.debug.name = node.name
@@ -226,8 +216,7 @@ class Parser:
             anf_node.debug.name = arg.arg
             function_block.graph.parameters.append(anf_node)
             function_block.write(arg.arg, anf_node)
-        function_block.write(node.name,
-                             self.get_block_function(function_block))
+        function_block.write(node.name, Constant(function_block.graph))
         final_block = self.process_statements(function_block, node.body)
         return final_block, function_block
 
@@ -750,6 +739,6 @@ class Block:
         self.graph.output = self.graph.apply(
             primops.if_,
             cond,
-            self.parser.get_block_function(true),
-            self.parser.get_block_function(false)
+            true.graph,
+            false.graph
         )
