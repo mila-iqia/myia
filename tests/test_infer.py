@@ -896,6 +896,25 @@ def test_getattr_flex(name, x):
     return _getattr(helpers, name)(x, x)
 
 
+@infer(type=[
+    (External(SimpleNamespace),
+     {'type': External(str), 'value': 'surprise'},
+     InferenceError)
+])
+def test_unknown_data(data, field):
+    return _getattr(data, field)
+
+
+@infer(type=[(i64, i64, i64), (f64, f64, f64)])
+def test_method(x, y):
+    return x.__add__(y)
+
+
+@infer(type=[(i64, i64, InferenceError)])
+def test_unknown_method(x, y):
+    return x.unknown(y)
+
+
 @infer(type=[(i64, InferenceError)])
 def test_infinite_recursion(x):
     def ouroboros(x):

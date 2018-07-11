@@ -1,18 +1,25 @@
 """Specialize graphs according to the types of their arguments."""
 
-from collections import defaultdict, Counter
+from collections import Counter
 
-from .dtype import Type, Function, Dead, Unknown
-from .infer import Context, GraphInferrer, ANYTHING, Inferrer
-from .ir import GraphCloner, is_apply, is_constant, Constant, \
-    succ_deeper, Graph
-from .prim import Primitive
-from .graph_utils import dfs
+from .dtype import Type, Function, Number, Bool, Problem
+from .infer import ANYTHING, Context, GraphInferrer, PartialInferrer, Inferrer
+from .ir import GraphCloner, is_apply, is_constant_graph, Constant
+from .prim import ops as P, Primitive
 from .utils import Named, TypeMap
 
 
 UNKNOWN = Named('UNKNOWN')
+DEAD = Named('DEAD')
 POLY = Named('POLY')
+INACCESSIBLE = Named('INACCESSIBLE')
+
+
+class _Unspecializable(Exception):
+    def __init__(self, problem):
+        problem = Problem(problem)
+        super().__init__(problem)
+        self.problem = problem
 
 
 def _const(v, t):
@@ -62,57 +69,42 @@ class TypeSpecializer:
         return g2
 
 
-_concretize_map = TypeMap()
+async def _find_argrefs(inf):
+    # The cache works using References, but if two references have
+    # the same inferred type/value/etc., we can merge their entries.
+    cache = {}
+    for x, y in inf.cache.items():
+        key = tuple([await arg[track] for arg in x
+                     for track in inf.engine.tracks])
+        if key in cache:
+            assert cache[key] == y
+        cache[key] = y
 
-
-class _NotConcrete(Exception):
-    pass
-
-
-@_concretize_map.register(tuple)
-def _concretize_tuple(xs):
-    return tuple(map(_concretize, xs))
-
-
-@_concretize_map.register(list)
-def _concretize_list(xs):
-    return list(map(_concretize, xs))
-
-
-@_concretize_map.register(Named)
-def _concretize_Named(x):
-    if x is ANYTHING:
-        raise _NotConcrete()
+    if len(cache) == 0:
+        raise _Unspecializable(DEAD)
+    elif len(cache) == 1:
+        (argrefs, res), *_ = inf.cache.items()
+        return argrefs
     else:
-        raise ValueError(f'Invalid value: {x}')
+        raise _Unspecializable(POLY)
 
 
-@_concretize_map.register(object)
-def _concretize_object(x):
-    return x
-
-
-@_concretize_map.register(GraphInferrer)
-def _concretize_GraphInferrer(v):
-    g = v.graph
-    if g.parent is None:
-        return g
+async def _concretize_type(t, argrefs=None):
+    if isinstance(t, Inferrer):
+        if argrefs is None:
+            try:
+                argrefs = await _find_argrefs(t)
+            except _Unspecializable as e:
+                return e.args[0]
+        return Function([await _extract_type(argref)
+                         for argref in argrefs],
+                        await _concretize_type(t.cache[tuple(argrefs)]))
     else:
-        raise _NotConcrete()
+        return t
 
 
-@_concretize_map.register(Inferrer)
-def _concretize_Inferrer(v):
-    v = v.identifier
-    if isinstance(v, Primitive):
-        return v
-    else:
-        # This can't happen at the moment
-        raise _NotConcrete()  # pragma: no cover
-
-
-def _concretize(x):
-    return _concretize_map[type(x)](x)
+async def _extract_type(ref, argrefs=None):
+    return await _concretize_type(await ref['type'], argrefs)
 
 
 class _GraphSpecializer:
@@ -126,7 +118,6 @@ class _GraphSpecializer:
         self.context = context
         self.nodes = specializer.node_map[self.graph]
 
-        # rel = 'copy'
         rel = f'{self.specializer.counts[self.graph]}'
         g = self.graph
         if self.parent:
@@ -146,115 +137,93 @@ class _GraphSpecializer:
     def ref(self, node):
         return self.engine.ref(node, self.context)
 
-    async def value_of(self, ref):
-        node = ref.node
-        if is_constant(node):
-            return node.value
-        else:
-            v = await ref['value']
-            try:
-                return _concretize(v)
-            except _NotConcrete:
-                return UNKNOWN
+    #########
+    # Build #
+    #########
 
-    async def extract_type_and_argrefs(self, ref, argrefs=None):
-        if isinstance(ref, (Type, Inferrer)):
-            t = ref
-        else:
+    build_map = TypeMap()
+
+    async def build(self, ref, argrefs=None, t=None):
+        if t is None:
             t = await ref['type']
+        handler = self.build_map[type(t)]
+        return await handler(self, ref, argrefs, t)
 
-        if not isinstance(t, Inferrer):
-            return t, None
-
-        if argrefs is None:
-            # The cache works using References, but if two references have
-            # the same inferred type/value/etc., we can merge their entries.
-            cache = {}
-            for x, y in t.cache.items():
-                key = tuple([await self.extract_type(arg) for arg in x])
-                if key in cache:
-                    assert cache[key] == y
-                cache[key] = y
-
-            if len(cache) == 0:
-                return Dead(), None
-            elif len(cache) == 1:
-                (argrefs, res), *_ = t.cache.items()
-            else:
-                return POLY, None
-
-        else:
-            res = t.cache[tuple(argrefs)]
-
-        ftype = Function([await self.extract_type(argref)
-                          for argref in argrefs],
-                         await self.extract_type(res))
-
-        return ftype, argrefs
-
-    async def extract_type(self, ref, argrefs=None):
-        t, _ = await self.extract_type_and_argrefs(ref, argrefs)
-        return t
-
-    async def make_constant(self, ref, argrefs=None):
-        v = await self.value_of(ref)
-        t = await ref['type']
-
-        if v is UNKNOWN:
-            return None
-
-        elif isinstance(v, (Graph, Primitive)):
-
-            ftype, argrefs = \
-                await self.extract_type_and_argrefs(ref, argrefs)
-
+    @build_map.register(GraphInferrer)
+    async def build_GraphInferrer(self, ref, argrefs, inf):
+        g = inf.graph
+        if g.parent is None or ref and is_constant_graph(ref.node):
             if argrefs is None:
-                return _const(ftype, ftype)
-
-            if isinstance(v, Graph):
-                v = await self.specializer._specialize(
-                    self, t, argrefs
-                )
-
-            return _const(v, ftype)
-
+                argrefs = await _find_argrefs(inf)
+            v = await self.specializer._specialize(
+                self, inf, argrefs
+            )
+            return _const(v, await _concretize_type(inf, argrefs))
         else:
-            assert not isinstance(v, (Graph, Primitive))
+            raise _Unspecializable(INACCESSIBLE)
+
+    @build_map.register(PartialInferrer)
+    async def build_PartialInferrer(self, ref, argrefs, inf):
+        sub_build = await self.build(None, [*inf.args, *argrefs], inf.fn)
+        ptl_args = [await self.build(ref) for ref in inf.args]
+        res_t = await _concretize_type(inf, argrefs)
+        ptl = _const(P.partial, Function(
+            [sub_build.type, *[a.type for a in ptl_args]],
+            res_t
+        ))
+        res = self.new_graph.apply(
+            ptl,
+            sub_build,
+            *ptl_args
+        )
+        res.type = res_t
+        return res
+
+    @build_map.register(Inferrer)
+    async def build_Inferrer(self, ref, argrefs, inf):
+        v = inf.identifier
+        assert isinstance(v, Primitive)
+        return _const(v, await _concretize_type(inf, argrefs))
+
+    @build_map.register(Number)
+    @build_map.register(Bool)
+    @build_map.register(type)
+    async def build_atom(self, ref, argrefs, t):
+        v = await ref['value']
+        if v is ANYTHING:
+            return await self.build_Type(ref, argrefs, t)
+        else:
             return _const(v, t)
 
-    async def process_node(self, node):
-        ref = self.ref(node)
+    @build_map.register(Type)
+    async def build_Type(self, ref, argrefs, t):
+        new_node = self.get(ref.node)
+        new_node.type = t
+        return new_node
 
-        self.get(node).type = await self.extract_type(ref)
+    ###########
+    # Process #
+    ###########
+
+    async def process_node(self, node):
+        t = await _extract_type(self.ref(node))
+        self.get(node).type = t
 
         if is_apply(node):
+            new_node = self.get(node)
+            new_inputs = new_node.inputs
             irefs = list(map(self.ref, node.inputs))
             for i, iref in enumerate(irefs):
-                if i == 0:
-                    ct = await self.make_constant(iref, irefs[1:])
-                else:
-                    ct = await self.make_constant(iref)
-                if ct:
-                    self.get(node).inputs[i] = ct
-
-
-def validate(g):  # pragma: no cover
-    """Verify that g is properly type-specialized.
-
-    Every node of each graph must have a concrete type in its type attribute,
-    and every application must be compatible with its argument types.
-    """
-    errors = defaultdict(set)
-    for node in dfs(g.return_, succ_deeper):
-        if node.type is None or node.type == Unknown():
-            errors[node].add('notype')
-        elif isinstance(node.type, Inferrer):
-            errors[node].add('inferrer')
-        elif not isinstance(node.type, Type):
-            errors[node].add(f'{node.type}')
-        elif is_apply(node):
-            expected = Function([i.type for i in node.inputs[1:]], node.type)
-            if node.inputs[0].type != expected:
-                errors[node].add('mismatch')
-
-    return errors
+                argrefs = irefs[1:] if i == 0 else None
+                try:
+                    repl = await self.build(ref=iref,
+                                            argrefs=argrefs)
+                    new_inputs[i] = repl
+                except _Unspecializable as e:
+                    if is_constant_graph(new_inputs[i]):
+                        # Graphs that cannot be specialized are replaced
+                        # by a constant with the associated Problem type.
+                        # We can't keep references to unspecialized graphs.
+                        new_inputs[i] = _const(e.problem.kind, e.problem)
+                    else:
+                        new_inputs[i].type = await _extract_type(iref)

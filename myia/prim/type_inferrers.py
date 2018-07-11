@@ -5,9 +5,9 @@ from functools import partial
 
 from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number
 from ..infer import ANYTHING, Inferrer, GraphInferrer, PartialInferrer, \
-    MyiaTypeError, register_inferrer, Track, Context
+    MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
-from ..utils import Namespace, NS
+from ..utils import Namespace
 
 from . import ops as P
 from .ops import Primitive

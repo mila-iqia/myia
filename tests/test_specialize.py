@@ -1,20 +1,71 @@
 
 from pytest import mark
+from collections import defaultdict
 
 from myia.api import standard_pipeline, step_debug_export
+from myia.dtype import Function, Unknown, Type, Problem, External
+from myia.graph_utils import dfs
+from myia.infer import Inferrer
+from myia.ir import succ_deeper, is_apply, is_constant
+from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import typeof, hastype, maplist, add
-from myia.specialize import validate
+from myia.specialize import DEAD
 
 from .test_infer import i64, f64
 
 
 specialize_pipeline = standard_pipeline.select(
-    'parse', 'resolve', 'infer', 'specialize'
+    'parse', 'infer', 'specialize'
 ).insert_after(
     debug_export=step_debug_export
 ).configure(
     {'infer.tracks.value.max_depth': 1}
 )
+
+
+# Add ops as needed, but don't add getattr, resolve and other ops that we want
+# to eliminate at this stage.
+op_whitelist = [
+    P.return_, P.if_, P.partial,
+    P.add, P.mul, P.sub,
+    P.gt, P.lt,
+    P.cons_tuple, P.hastype, P.maplist
+]
+
+
+def validate(g):
+    """Verify that g is properly type-specialized.
+
+    Every node of each graph must have a concrete type in its type attribute,
+    every application must be compatible with its argument types, and every
+    primitive must belong to the whitelist.
+    """
+    errors = defaultdict(set)
+    for node in dfs(g.return_, succ_deeper):
+        if node.type is None or node.type == Unknown():
+            errors[node].add('No type')
+        elif isinstance(node.type, Inferrer):
+            errors[node].add('Uneliminated inferrer')
+        elif isinstance(node.type, Problem):
+            if node.type.kind is DEAD:
+                # This one is okay if it happens, because we don't really need
+                # to infer types for dead code.
+                pass
+            else:
+                errors[node].add(f'Problem type: {node.type}')
+        elif isinstance(node.type, External):
+            errors[node].add(f'External type: {node.type}')
+        elif not isinstance(node.type, Type):
+            errors[node].add(f'Unknown type: {node.type}')
+        elif is_apply(node):
+            expected = Function([i.type for i in node.inputs[1:]], node.type)
+            if node.inputs[0].type != expected:
+                errors[node].add('Function/argument inconsistency')
+            fn = node.inputs[0]
+            if is_constant(fn, Primitive) and fn.value not in op_whitelist:
+                errors[node].add(f'Forbidden primitive: {fn.value}')
+
+    return errors
 
 
 def specialize(*arglists):
@@ -169,7 +220,7 @@ def test_unused_parameter(x, y):
 
 @specialize((int1,))
 def test_unused_function_parameter(x):
-    # The type of square will be Dead(), but that's not really an issue
+    # The type of square will be Problem(DEAD), but that's not really an issue
     # because it is indeed not used, and we can simply replace the reference
     # by a dummy.
     def square(x):
@@ -214,3 +265,13 @@ def test_poly_with_constants(c, x, y):
             return f2
 
     return choose(c)(x, 2), choose(not c)(2, y)
+
+
+@specialize((int1, int2), (fp1, fp2))
+def test_method(x, y):
+    return x.__add__(y)
+
+
+@specialize((int1, fp1))
+def test_method_polymorphic(x, y):
+    return x.__add__(x), y.__add__(y)
