@@ -159,12 +159,11 @@ class Inferrer(PipelineStep):
         inferrer: The inference engine.
     """
 
-    def __init__(self, pipeline_init, tracks, required_tracks, timeout):
+    def __init__(self, pipeline_init, tracks, required_tracks):
         """Initialize an Inferrer."""
         super().__init__(pipeline_init)
         self.tracks = tracks
         self.required_tracks = required_tracks
-        self.timeout = timeout
 
     def step(self, graph, argspec):
         """Infer types, shapes, values, etc. for the graph."""
@@ -174,7 +173,6 @@ class Inferrer(PipelineStep):
             graph, argprops,
             tracks=self.tracks,
             required_tracks=self.required_tracks,
-            timeout=self.timeout
         )
         return {'inference_results': engine.output_info(),
                 'inferrer': engine}
@@ -260,7 +258,6 @@ step_infer = Inferrer.partial(
         )
     ),
     required_tracks=['type'],
-    timeout=1
 )
 
 

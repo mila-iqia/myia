@@ -103,7 +103,6 @@ infer_pipeline = standard_pipeline.select(
     'infer.tracks.value.max_depth': 10,
     'infer.tracks.value.constructors': value_inferrer_cons_test,
     'infer.tracks.type.constructors': type_inferrer_cons_test,
-    'infer.timeout': 0.1
 })
 
 

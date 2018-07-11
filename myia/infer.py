@@ -363,6 +363,117 @@ class VirtualReference:
 ########
 
 
+class _AbortedLoopError(Exception):
+    pass
+
+
+class _InferenceLoop(asyncio.AbstractEventLoop):
+    """EventLoop implementation for use with the inferrer.
+
+    This event loop doesn't allow scheduling tasks and callbacks with
+    `call_later` or `call_at`, which means the `timeout` argument to methods
+    like `wait` will not work. `run_forever` will stop when it has exhausted
+    all work there is to be done. This means `run_until_complete` may finish
+    before it can evaluate the future, which suggests an infinite loop.
+    """
+
+    def __init__(self, debug=False):
+        self._running = False
+        self._todo = set()
+        self._debug = debug
+
+    def get_debug(self):
+        return self._debug
+
+    def run_forever(self):
+        self._running = True
+        while self._todo and self._running:
+            h = self._todo.pop()
+            if not h._cancelled:
+                h._run()
+
+    def run_until_complete(self, future):  # pragma: no cover
+        """Run until the Future is done.
+
+        I essentially copied the implementation in BaseEventLoop:
+
+        github.com/python/cpython/blob/master/Lib/asyncio/base_events.py
+        """
+        # This function isn't covered since it comes from somewhere else
+        # and is probably already well-tested for what it does.
+        def _run_until_complete_cb(fut):
+            if not fut.cancelled():
+                exc = fut.exception()
+                if isinstance(exc, BaseException) \
+                        and not isinstance(exc, Exception):
+                    # Issue #22429: run_forever() already finished, no need to
+                    # stop it.
+                    return
+            self.stop()
+
+        assert not self._running
+
+        new_task = not asyncio.isfuture(future)
+        future = asyncio.ensure_future(future, loop=self)
+        if new_task:
+            # An exception is raised if the future didn't complete, so there
+            # is no need to log the "destroy pending task" message
+            future._log_destroy_pending = False
+
+        future.add_done_callback(_run_until_complete_cb)
+        try:
+            self.run_forever()
+        except:  # noqa
+            if new_task and future.done() and not future.cancelled():
+                # The coroutine raised a BaseException. Consume the exception
+                # to not log a warning, the caller doesn't have access to the
+                # local task.
+                future.exception()
+            raise
+        finally:
+            future.remove_done_callback(_run_until_complete_cb)
+
+        if not future.done():
+            raise _AbortedLoopError(
+                'Event loop stopped before Future completed.'
+            )
+
+        return future.result()
+
+    def is_running(self):
+        return self._running
+
+    def is_closed(self):
+        return not self.is_running()
+
+    def stop(self):
+        self.close()
+
+    def close(self):
+        self._running = False
+
+    def call_soon(self, callback, *args):
+        h = asyncio.Handle(callback, args, self)
+        self._todo.add(h)
+        return h
+
+    def call_later(self, delay, callback, *args):
+        raise NotImplementedError(
+            '_InferenceLoop does not allow timeouts or time-based scheduling.'
+        )
+
+    def call_at(self, when, callback, *args):
+        raise NotImplementedError(
+            '_InferenceLoop does not allow time-based scheduling.'
+        )
+
+    def create_task(self, coro):
+        return asyncio.Task(coro, loop=self)
+
+    def create_future(self):
+        return asyncio.Future(loop=self)
+
+
 class InferrerEquivalenceClass:
     """An equivalence class between a set of Inferrers.
 
@@ -527,9 +638,6 @@ class InferenceEngine:
             the evaluation of a required track.
         eq_class: The class to use to check equivalence between
             values.
-        timeout: Timeout applied when awaiting in the main loop,
-            to check for possible deadlocks. This is not a hard
-            limit on how long the inference might take.
 
     """
 
@@ -540,8 +648,7 @@ class InferenceEngine:
                  *,
                  tracks,
                  required_tracks=None,
-                 eq_class=EquivalencePool,
-                 timeout=1.0):
+                 eq_class=EquivalencePool):
         """Initialize the InferenceEngine."""
         self.pipeline = pipeline
 
@@ -557,7 +664,6 @@ class InferenceEngine:
         self.argrefs = [self.vref(arg) for arg in argvals]
         self.argvals = [ref.values for ref in self.argrefs]
 
-        self.timeout = timeout
         self.cache = {track: {} for track in self.all_track_names}
         self.todo = set()
         self.errors = []
@@ -568,7 +674,7 @@ class InferenceEngine:
         empty_context = Context.empty()
         self.root_context = empty_context.add(graph, argvals)
 
-        self.loop = asyncio.new_event_loop()
+        self.loop = _InferenceLoop()
         self.run_coroutine(self._run())
 
     def ref(self, node, context):
@@ -665,7 +771,7 @@ class InferenceEngine:
         """Set the value of the Reference on the given track."""
         # We create a future and resolve it immediately, because all entries
         # in the cache must be futures.
-        fut = asyncio.Future()
+        fut = asyncio.Future(loop=self.loop)
         fut.set_result(value)
         self.cache[track][ref] = fut
 
@@ -715,18 +821,8 @@ class InferenceEngine:
             self.todo = set()
             todo = [t() if callable(t) else t for t in todo]
             done, pending = await asyncio.wait(
-                todo, loop=self.loop, timeout=self.timeout
+                todo, loop=self.loop
             )
-            if not done:
-                self.log_error(
-                    [], InferenceError(
-                        f'Exceeded timeout ({self.timeout}s) in type inferrer.'
-                        ' There might be an infinite loop in the program,'
-                        ' or the program is too large and you should'
-                        ' increase the timeout.'
-                    )
-                )
-                break
             for d in done:
                 self.log_error([], d)
             self.todo.update(pending)
@@ -763,6 +859,15 @@ class InferenceEngine:
         """Run an async function using this inferrer's loop."""
         try:
             res = self.loop.run_until_complete(coro)
+        except _AbortedLoopError:
+            self.log_error(
+                [], InferenceError(
+                    f'Could not run inference to completion.'
+                    ' There might be an infinite loop in the program'
+                    ' which prevents type inference from working.'
+                )
+            )
+            raise self.errors[0]['error']
         finally:
             for task in asyncio.Task.all_tasks(self.loop):
                 task._log_destroy_pending = False
