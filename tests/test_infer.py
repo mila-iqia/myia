@@ -14,8 +14,8 @@ from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
-    typeof, scalar_usub, dot, distribute, shape, array_map, array_scan, \
-    array_reduce, reshape, partial as myia_partial, identity, \
+    typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
+    array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch
 
 
@@ -1018,6 +1018,24 @@ def test_array_map(ary):
     def f(v):
         return v + 1
     return array_map(f, ary)
+
+
+@infer(shape=[({'type': af32, 'shape': (3, 4)},
+               {'type': af32, 'shape': (3, 4)},
+               (3, 4)),
+              ({'type': af32, 'shape': (3, 4)},
+               {'type': af32, 'shape': (3, 7)},
+               InferenceError),
+              ({'type': af32, 'shape': (3, 4, 5)},
+               {'type': af32, 'shape': (3, 4)},
+               InferenceError)],
+       type=[({'type': ai64}, {'type': ai64}, ai64),
+             ({'type': ai64}, {'type': i64}, InferenceError),
+             ({'type': i64}, {'type': ai64}, InferenceError)])
+def test_array_map2(ary1, ary2):
+    def f(v1, v2):
+        return v1 + v2
+    return array_map2(f, ary1, ary2)
 
 
 @infer(shape=[({'type': ai64, 'shape': (3, 4)}, {'value': 1}, (3, 4))],

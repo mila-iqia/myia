@@ -1,8 +1,8 @@
 import numpy as np
 
 from myia.api import compile
-from myia.prim.py_implementations import (array_map, list_map, array_reduce,
-                                          array_scan, scalar_usub)
+from myia.prim.py_implementations import \
+    array_map, array_map2, list_map, array_reduce, array_scan, scalar_usub
 
 from .test_lang import parse_compare
 
@@ -41,6 +41,20 @@ def test_vm_array_map():
     a = np.zeros((2, 3))
     res = f(a)
     assert (res == np.ones((2, 3))).all()
+
+
+def test_vm_array_map2():
+    @compile
+    def f(xs, ys):
+        def add(x, y):
+            return x + y
+
+        return array_map2(add, xs, ys)
+
+    a = np.ones((2, 3))
+    b = np.ones((2, 3))
+    res = f(a, b)
+    assert (res == 2 * np.ones((2, 3))).all()
 
 
 def test_vm_array_scan():

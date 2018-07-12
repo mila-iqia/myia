@@ -120,6 +120,19 @@ async def infer_shape_array_map(track, fn, ary):
     return await ary['shape']
 
 
+@shape_inferrer(P.array_map2, nargs=3)
+async def infer_shape_array_map2(track, fn, ary1, ary2):
+    """Infer the shape of array_map2."""
+    shp1 = await ary1['shape']
+    shp2 = await ary2['shape']
+    if len(shp1) != len(shp2):
+        raise MyiaShapeError("Expect same shapes for array_map2")
+    for a, b in zip(shp1, shp2):
+        if a != b and a is not ANYTHING and b is not ANYTHING:
+            raise MyiaShapeError("Expect same shapes for array_map2")
+    return shp1
+
+
 @shape_inferrer(P.array_scan, nargs=4)
 async def infer_shape_array_scan(track, fn, init, ary, ax):
     """Infer the shape of array_scan."""

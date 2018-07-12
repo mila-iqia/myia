@@ -270,6 +270,21 @@ async def infer_type_array_map(track, fn, ary):
     return Array(await fn_t(xref))
 
 
+@type_inferrer(P.array_map2, nargs=3)
+async def infer_type_array_map2(track, fn, ary1, ary2):
+    """Infer the return type of array_map2."""
+    fn_t = await fn['type']
+    ary1_t = await ary1['type']
+    if not isinstance(ary1_t, Array):
+        raise MyiaTypeError('Expected array')
+    ary2_t = await ary2['type']
+    if not isinstance(ary2_t, Array):
+        raise MyiaTypeError('Expected array')
+    xref = track.engine.vref({'type': ary1_t.elements})
+    yref = track.engine.vref({'type': ary2_t.elements})
+    return Array(await fn_t(xref, yref))
+
+
 @type_inferrer(P.array_scan, P.array_reduce, nargs=4)
 async def infer_type_across_array(track, fn, init, ary, ax):
     """Infer the return type of scan/array_reduce."""

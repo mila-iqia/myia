@@ -6,8 +6,9 @@ import numpy as np
 from myia.dtype import Int, Float, List, Tuple, External
 from myia.prim.py_implementations import head, setattr as myia_setattr, \
     setitem as myia_setitem, tail, hastype, typeof, \
-    shape, reshape, array_map, array_scan, array_reduce, distribute, dot, \
-    partial as myia_partial, identity, _assert_scalar, switch
+    shape, reshape, array_map, array_map2, array_scan, array_reduce, \
+    distribute, dot, partial as myia_partial, identity, _assert_scalar, \
+    switch
 
 from ..test_lang import parse_compare
 
@@ -162,6 +163,20 @@ def test_prim_array_map():
 
     assert (v == 0).all()
     assert (v2 == 1).all()
+
+
+def test_prim_array_map2():
+    v1 = np.ones((2, 3))
+    v2 = np.ones((2, 3))
+
+    def f(a, b):
+        return a + b
+
+    vres = array_map2(f, v1, v2)
+
+    assert (v1 == 1).all()
+    assert (v2 == 1).all()
+    assert (vres == 2).all()
 
 
 def test_prim_array_scan():

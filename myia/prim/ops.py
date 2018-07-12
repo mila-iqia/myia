@@ -87,6 +87,7 @@ next = Primitive('next')
 
 shape = Primitive('shape')
 array_map = Primitive('array_map')
+array_map2 = Primitive('array_map2')
 array_scan = Primitive('array_scan')
 array_reduce = Primitive('array_reduce')
 distribute = Primitive('distribute')
