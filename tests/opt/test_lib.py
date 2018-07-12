@@ -4,7 +4,7 @@ from pytest import mark
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    head, tail, setitem, scalar_add, scalar_mul, identity
+    head, tail, setitem, scalar_add, scalar_mul, identity, partial
 
 
 #######################
@@ -236,6 +236,26 @@ def test_false_branch():
     _check_opt(before, after,
                lib.simplify_always_false,
                lib.inline)
+
+
+############
+# Partials #
+############
+
+
+def test_partials():
+
+    def f(x, y):
+        return x + y
+
+    def before(x, y):
+        return partial(f, x)(y)
+
+    def after(x, y):
+        return f(x, y)
+
+    _check_opt(before, after,
+               lib.simplify_partial)
 
 
 ############

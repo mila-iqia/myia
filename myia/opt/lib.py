@@ -187,6 +187,18 @@ simplify_always_false = psub(
 )
 
 
+#####################
+# Simplify partials #
+#####################
+
+
+simplify_partial = psub(
+    pattern=((P.partial, X, Xs), Ys),
+    replacement=(X, Xs, Ys),
+    name='simplify_partial'
+)
+
+
 ###################
 # Resolve globals #
 ###################
