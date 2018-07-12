@@ -1,6 +1,7 @@
 """Inference engine (types, values, etc.)."""
 
 import asyncio
+from heapq import heappush, heappop
 
 from .ir import is_constant, is_constant_graph, is_apply
 from .utils import Named, Partializable
@@ -13,7 +14,11 @@ ANYTHING = Named('ANYTHING')
 class InferenceError(Exception):
     """Inference error in a Myia program."""
 
-    pass
+    def __init__(self, message, refs=[]):
+        """Initialize an InferenceError."""
+        super().__init__(message, refs)
+        self.message = message
+        self.refs = refs
 
 
 class MyiaTypeError(InferenceError):
@@ -363,8 +368,13 @@ class VirtualReference:
 ########
 
 
-class _AbortedLoopError(Exception):
-    pass
+class _TodoEntry:
+    def __init__(self, order, handler):
+        self.order = order
+        self.handler = handler
+
+    def __lt__(self, other):
+        return self.order < other.order
 
 
 class _InferenceLoop(asyncio.AbstractEventLoop):
@@ -379,8 +389,10 @@ class _InferenceLoop(asyncio.AbstractEventLoop):
 
     def __init__(self, debug=False):
         self._running = False
-        self._todo = set()
+        self._todo = []
         self._debug = debug
+        self._futures = []
+        self._errors = []
 
     def get_debug(self):
         return self._debug
@@ -388,57 +400,13 @@ class _InferenceLoop(asyncio.AbstractEventLoop):
     def run_forever(self):
         self._running = True
         while self._todo and self._running:
-            h = self._todo.pop()
-            if not h._cancelled:
+            todo = heappop(self._todo)
+            h = todo.handler
+            if isinstance(h, asyncio.Handle):
                 h._run()
-
-    def run_until_complete(self, future):  # pragma: no cover
-        """Run until the Future is done.
-
-        I essentially copied the implementation in BaseEventLoop:
-
-        github.com/python/cpython/blob/master/Lib/asyncio/base_events.py
-        """
-        # This function isn't covered since it comes from somewhere else
-        # and is probably already well-tested for what it does.
-        def _run_until_complete_cb(fut):
-            if not fut.cancelled():
-                exc = fut.exception()
-                if isinstance(exc, BaseException) \
-                        and not isinstance(exc, Exception):
-                    # Issue #22429: run_forever() already finished, no need to
-                    # stop it.
-                    return
-            self.stop()
-
-        assert not self._running
-
-        new_task = not asyncio.isfuture(future)
-        future = asyncio.ensure_future(future, loop=self)
-        if new_task:
-            # An exception is raised if the future didn't complete, so there
-            # is no need to log the "destroy pending task" message
-            future._log_destroy_pending = False
-
-        future.add_done_callback(_run_until_complete_cb)
-        try:
-            self.run_forever()
-        except:  # noqa
-            if new_task and future.done() and not future.cancelled():
-                # The coroutine raised a BaseException. Consume the exception
-                # to not log a warning, the caller doesn't have access to the
-                # local task.
-                future.exception()
-            raise
-        finally:
-            future.remove_done_callback(_run_until_complete_cb)
-
-        if not future.done():
-            raise _AbortedLoopError(
-                'Event loop stopped before Future completed.'
-            )
-
-        return future.result()
+            else:
+                fut = asyncio.ensure_future(h, loop=self)
+                self._futures.append(fut)
 
     def is_running(self):
         return self._running
@@ -446,15 +414,29 @@ class _InferenceLoop(asyncio.AbstractEventLoop):
     def is_closed(self):
         return not self.is_running()
 
-    def stop(self):
-        self.close()
+    def schedule(self, x, order=0):
+        heappush(self._todo, _TodoEntry(order, x))
 
-    def close(self):
-        self._running = False
+    def collect_errors(self):
+        futs, self._futures = self._futures, []
+        errors, self._errors = self._errors, []
+        for fut in futs:
+            if fut.done():
+                exc = fut.exception()
+            else:
+                exc = InferenceError(
+                    f'Could not run inference to completion.'
+                    ' There might be an infinite loop in the program'
+                    ' which prevents type inference from working.',
+                    refs=[]
+                )
+            if exc is not None:
+                errors.append(exc)
+        return errors
 
     def call_soon(self, callback, *args):
         h = asyncio.Handle(callback, args, self)
-        self._todo.add(h)
+        heappush(self._todo, _TodoEntry(0, h))
         return h
 
     def call_later(self, delay, callback, *args):
@@ -570,7 +552,7 @@ class EquivalencePool:
         # We only put x and y in a pending list for now.
         self.pending.append((x, y, refs))
         # Later, we will call check.
-        self.engine.schedule_function(self.check)
+        self.engine.schedule(self.check())
 
     async def _process_equivalence(self, x, y, refs):
         if hasattr(x, '__await__'):
@@ -597,8 +579,10 @@ class EquivalencePool:
             pass
 
         else:
-            self.engine.log_error(
-                refs, MyiaTypeError(f'Type mismatch: {x} != {y}')
+            # We log the error directly instead of raising an exception so that
+            # it doesn't prevent other (independent) checks.
+            self.engine.errors.append(
+                MyiaTypeError(f'Type mismatch: {x} != {y}', refs=refs)
             )
 
     async def check(self):
@@ -622,7 +606,7 @@ class EquivalencePool:
 
         if maybe_changes:
             # Reschedule, in case there is new data.
-            self.engine.schedule_function(self.check)
+            self.engine.schedule(self.check(), order=1000)
 
 
 class InferenceEngine:
@@ -665,7 +649,6 @@ class InferenceEngine:
         self.argvals = [ref.values for ref in self.argrefs]
 
         self.cache = {track: {} for track in self.all_track_names}
-        self.todo = set()
         self.errors = []
         self.equiv = eq_class(self)
 
@@ -709,9 +692,6 @@ class InferenceEngine:
             argrefs = [self.ref(node, ctx) for node in n_args]
             try:
                 return await inf(*argrefs)
-            except InferenceError as e:
-                self.log_error([ref], e)
-                raise
             except RuntimeError as e:
                 # At some point, some invalid recursive graphs raised this
                 # error. You can just add a log_error if this happens again
@@ -761,7 +741,7 @@ class InferenceEngine:
     def output_info(self):
         """Return information about the output of the analyzed graph."""
         if self.errors:
-            raise self.errors[0]['error']
+            raise self.errors[0]  # pragma: no cover
         else:
             oref = self.ref(self.graph.return_, self.root_context)
             return {track: self.get_info(track, oref)
@@ -775,57 +755,15 @@ class InferenceEngine:
         fut.set_result(value)
         self.cache[track][ref] = fut
 
-    def log_error(self, refs, err):
-        """Log an error, with a context given by the given refs.
-
-        Arguments:
-            refs: A list of objects that give a context to the error,
-                e.g. References.
-            err: Can be one of:
-                * An exception.
-                * A string to wrap as an InferenceError.
-                * A future. If the future failed due to an exception,
-                  the exception is logged, otherwise the method returns
-                  without doing anything.
-        """
-        if isinstance(err, asyncio.Future):
-            err = err.exception()
-            if err is None:
-                return
-        self.errors.append({'refs': refs, 'error': err})
-        return err
-
-    def schedule(self, coro):
+    def schedule(self, coro, order=0):
         """Schedule the given coroutine to run."""
-        self.todo.add(lambda: coro)
-
-    def schedule_function(self, fn):
-        """Schedule a function that returns a coroutine to run.
-
-        Scheduling the same function multiple times before it runs will
-        only cause it to run once. It can be rescheduled after a run.
-
-        Arguments:
-            fn: A nullary function that returns a coroutine to run.
-        """
-        self.todo.add(fn)
+        self.loop.schedule(coro, order)
 
     async def _run(self):
         for track in self.required_tracks:
             inf = GraphInferrer(self, track,
                                 self.graph, self.root_context)
             self.schedule(inf(*self.argrefs))
-
-        while self.todo:
-            todo = list(self.todo)
-            self.todo = set()
-            todo = [t() if callable(t) else t for t in todo]
-            done, pending = await asyncio.wait(
-                todo, loop=self.loop
-            )
-            for d in done:
-                self.log_error([], d)
-            self.todo.update(pending)
 
     async def assert_same(self, track, *refs):
         """Assert that all refs have the same value on the given track."""
@@ -839,10 +777,6 @@ class InferenceEngine:
             loop=self.loop,
             return_when=asyncio.FIRST_COMPLETED
         )
-
-        # Log any errors in the futures that finished
-        for fut in done:
-            self.log_error(refs, fut)
 
         # We must now tell equiv that all remaining futures must return the
         # same thing as the first one. This will essentially schedule a
@@ -858,17 +792,12 @@ class InferenceEngine:
     def run_coroutine(self, coro):
         """Run an async function using this inferrer's loop."""
         try:
-            res = self.loop.run_until_complete(coro)
-        except _AbortedLoopError:
-            self.log_error(
-                [], InferenceError(
-                    f'Could not run inference to completion.'
-                    ' There might be an infinite loop in the program'
-                    ' which prevents type inference from working.'
-                )
-            )
-            raise self.errors[0]['error']
+            fut = asyncio.ensure_future(coro, loop=self.loop)
+            self.loop.run_forever()
+            self.errors.extend(self.loop.collect_errors())
+            if self.errors:
+                raise self.errors[0]
+            return fut.result()
         finally:
             for task in asyncio.Task.all_tasks(self.loop):
                 task._log_destroy_pending = False
-        return res
