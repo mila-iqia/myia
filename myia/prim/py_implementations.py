@@ -245,7 +245,22 @@ def setitem(data, item, value):
 @vm_register(primops.getattr)
 def _vm_getattr(vm, data, attr):
     """Implement `getattr`."""
-    return vm.convert(getattr(data, attr))
+    from types import MethodType
+    from ..vm import Partial
+    # I don't know how else to get a reference to this type
+    method_wrapper_type = type((0).__add__)
+    x = getattr(data, attr)
+    if isinstance(x, method_wrapper_type):
+        # This is returned by <int>.__add__ and the like.
+        # Don't know how else to retrieve the unwrapped method
+        unwrapped = getattr(x.__objclass__, x.__name__)
+        return Partial(vm.convert(unwrapped), [x.__self__], vm)
+    elif isinstance(x, MethodType):  # pragma: no cover
+        # This is a method made from a user function
+        # TODO: Should test this when we have custom types
+        return Partial(vm.convert(x.__func__), [x.__self__], vm)
+    else:
+        return vm.convert(x)
 
 
 py_setattr = setattr
