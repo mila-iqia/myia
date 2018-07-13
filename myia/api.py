@@ -1,6 +1,7 @@
 """User-friendly interfaces to Myia machinery."""
 
 import operator
+import numpy as np
 from types import FunctionType
 
 from . import dtype, parser
@@ -44,27 +45,47 @@ default_object_map = {
 }
 
 
-_number_map = {
-    '__add__': P.scalar_add,
-    '__sub__': P.scalar_sub,
-    '__mul__': P.scalar_mul,
-    '__div__': P.scalar_div,
-}
-
-
-default_method_map = {
-    dtype.Int(8): _number_map,
-    dtype.Int(16): _number_map,
-    dtype.Int(32): _number_map,
-    dtype.Int(64): _number_map,
-    dtype.UInt(8): _number_map,
-    dtype.UInt(16): _number_map,
-    dtype.UInt(32): _number_map,
-    dtype.UInt(64): _number_map,
-    dtype.Float(16): _number_map,
-    dtype.Float(32): _number_map,
-    dtype.Float(64): _number_map,
-}
+default_method_map = TypeMap({
+    dtype.Bool: {
+        '__and__': P.bool_and,
+        '__or__': P.bool_or,
+    },
+    dtype.Int: {
+        '__add__': P.scalar_add,
+        '__sub__': P.scalar_sub,
+        '__mul__': P.scalar_mul,
+        '__truediv__': P.scalar_div,
+        '__mod__': P.scalar_mod,
+        '__pow__': P.scalar_pow,
+        '__pos__': P.scalar_uadd,
+        '__neg__': P.scalar_usub,
+        '__eq__': P.scalar_eq,
+        '__ne__': P.scalar_ne,
+        '__lt__': P.scalar_lt,
+        '__gt__': P.scalar_gt,
+        '__le__': P.scalar_le,
+        '__ge__': P.scalar_ge,
+    },
+    dtype.Float: {
+        '__add__': P.scalar_add,
+        '__sub__': P.scalar_sub,
+        '__mul__': P.scalar_mul,
+        '__truediv__': P.scalar_div,
+        '__mod__': P.scalar_mod,
+        '__pow__': P.scalar_pow,
+        '__pos__': P.scalar_uadd,
+        '__neg__': P.scalar_usub,
+        '__eq__': P.scalar_eq,
+        '__ne__': P.scalar_ne,
+        '__lt__': P.scalar_lt,
+        '__gt__': P.scalar_gt,
+        '__le__': P.scalar_le,
+        '__ge__': P.scalar_ge,
+    },
+    dtype.Array: {
+        # TODO
+    }
+})
 
 
 def _convert_identity(env, x):
@@ -112,21 +133,52 @@ def compile(obj):
 ############
 
 
+class _Unconverted:
+    # This is just used by Converter to delay conversion of graphs associated
+    # to operators or methods until they are actually needed.
+    def __init__(self, value):
+        self.value = value
+
+
 class Converter(PipelineResource):
     """Convert a Python object into an object that can be in a Myia graph."""
 
     def __init__(self, pipeline_init, object_map, converters):
         """Initialize a Converter."""
         super().__init__(pipeline_init)
-        self.object_map = dict(object_map)
+        self.converters = converters
+        self.object_map = {}
+        for k, v in object_map.items():
+            self.object_map[k] = _Unconverted(v)
         for prim, impl in self.resources.py_implementations.items():
             self.object_map[impl] = prim
-        self.converters = converters
+        type_map = {
+            bool: dtype.Bool,
+            int: dtype.Int,
+            float: dtype.Float,
+            np.ndarray: dtype.Array,
+            np.int8: dtype.Int,
+            np.int16: dtype.Int,
+            np.int32: dtype.Int,
+            np.int64: dtype.Int,
+            np.float16: dtype.Float,
+            np.float32: dtype.Float,
+            np.float64: dtype.Float,
+        }
+        mmap = self.resources.method_map
+        for t1, t2 in type_map.items():
+            for name, prim in mmap[t2].items():
+                self.object_map[getattr(t1, name)] = _Unconverted(prim)
 
     def __call__(self, value):
         """Convert a value."""
         try:
-            return self.object_map[value]
+            v = self.object_map[value]
+            if isinstance(v, _Unconverted):
+                v = v.value
+                v = self.converters[type(v)](self, v)
+                self.object_map[value] = v
+            return v
         except (TypeError, KeyError):
             pass
 
@@ -311,11 +363,11 @@ standard_pipeline = PipelineDefinition(
     resources=dict(
         manager=GraphManager.partial(),
         py_implementations=py_implementations,
+        method_map=default_method_map,
         convert=Converter.partial(
             object_map=default_object_map,
             converters=lax_type_map
         ),
-        method_map=default_method_map
     ),
     steps=dict(
         parse=step_parse,

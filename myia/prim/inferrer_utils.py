@@ -23,12 +23,18 @@ async def static_getter(track, data, item, fetch, chk=None):
     if item_v is ANYTHING:
         raise InferenceError('Item or attribute must be known.')
 
-    if data_t in mmap:
+    try:
+        mmap_t = mmap[type(data_t)]
+    except KeyError:
+        mmap_t = None
+
+    if mmap_t is not None:
         # Method call
         if chk:
             chk(None, item_v)
-        if item_v in mmap[data_t]:
-            method = mmap[data_t][item_v]
+        if item_v in mmap_t:
+            method = mmap_t[item_v]
+            method = track.engine.pipeline.resources.convert(method)
             inferrer = track.from_value(method, Context.empty())
             inferrer = getattr(inferrer, '__unwrapped__', inferrer)
             return PartialInferrer(

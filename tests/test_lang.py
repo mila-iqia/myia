@@ -146,6 +146,11 @@ def test_getattr(pt):
     return pt.x
 
 
+@parse_compare((2, 3))
+def test_method(x, y):
+    return x.__add__(y)
+
+
 ################
 # if statement #
 ################
