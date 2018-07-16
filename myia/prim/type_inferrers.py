@@ -7,8 +7,10 @@ from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number
 from ..infer import ANYTHING, Inferrer, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
+from ..utils import Namespace
 
 from . import ops as P
+from .inferrer_utils import static_getter
 from .ops import Primitive
 from .py_implementations import typeof
 
@@ -43,9 +45,9 @@ class TypeTrack(Track):
     def from_value(self, v, context):
         """Infer the type of a constant."""
         if isinstance(v, Primitive):
-            return self.constructors[v](self.engine)
+            return self.constructors[v](self)
         elif isinstance(v, Graph):
-            return GraphInferrer(self.engine, 'type', v, context)
+            return GraphInferrer(self, v, context)
         else:
             return typeof(v)
 
@@ -65,7 +67,7 @@ type_inferrer = partial(register_inferrer,
 
 
 @type_inferrer(P.if_, nargs=3)
-async def infer_type_if(engine, cond, tb, fb):
+async def infer_type_if(track, cond, tb, fb):
     """Infer the return type of if."""
     cond_t = await cond['type']
     if cond_t != Bool():
@@ -85,20 +87,20 @@ async def infer_type_if(engine, cond, tb, fb):
     elif v is ANYTHING:
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
-        return await engine.assert_same('type', tb_inf(), fb_inf())
+        return await track.assert_same(tb_inf(), fb_inf())
     else:
         raise AssertionError("Invalid condition value for if")
 
 
 @type_inferrer(P.partial, nargs=None)
-async def infer_type_partial(engine, fn, *args):
+async def infer_type_partial(track, fn, *args):
     """Infer the return type of partial."""
     fn_t = await fn['type']
-    return PartialInferrer(engine, fn_t, args)
+    return PartialInferrer(track, fn_t, args)
 
 
 @type_inferrer(P.cons_tuple, nargs=2)
-async def infer_type_cons_tuple(engine, x, y):
+async def infer_type_cons_tuple(track, x, y):
     """Infer the return type of cons_tuple."""
     x_t = await x['type']
     y_t = await y['type']
@@ -108,7 +110,7 @@ async def infer_type_cons_tuple(engine, x, y):
 
 
 @type_inferrer(P.head, nargs=1)
-async def infer_type_head(engine, tup):
+async def infer_type_head(track, tup):
     """Infer the return type of head."""
     tup_t = await tup['type']
     if not isinstance(tup_t, Tuple):
@@ -119,7 +121,7 @@ async def infer_type_head(engine, tup):
 
 
 @type_inferrer(P.tail, nargs=1)
-async def infer_type_tail(engine, tup):
+async def infer_type_tail(track, tup):
     """Infer the return type of tail."""
     tup_t = await tup['type']
     if not isinstance(tup_t, Tuple):
@@ -130,7 +132,7 @@ async def infer_type_tail(engine, tup):
 
 
 @type_inferrer(P.getitem, nargs=2)
-async def infer_type_getitem(engine, seq, idx):
+async def infer_type_getitem(track, seq, idx):
     """Infer the return type of getitem."""
     seq_t = await seq['type']
     idx_t = await idx['type']
@@ -149,13 +151,13 @@ async def infer_type_getitem(engine, seq, idx):
 
 
 @type_inferrer(P.typeof, nargs=1)
-async def infer_type_typeof(engine, _):
+async def infer_type_typeof(track, _):
     """Infer the return type of typeof."""
     return Type
 
 
 @type_inferrer(P.hastype, nargs=2)
-async def infer_type_hastype(engine, x, t):
+async def infer_type_hastype(track, x, t):
     """Infer the return type of hastype."""
     t_t = await t['type']
     if t_t is not Type:
@@ -166,7 +168,7 @@ async def infer_type_hastype(engine, x, t):
 
 
 @type_inferrer(P.not_, nargs=1)
-async def infer_type_not(engine, x):
+async def infer_type_not(track, x):
     """Infer the return type of not."""
     x_t = await x['type']
     if x_t != Bool():
@@ -175,23 +177,23 @@ async def infer_type_not(engine, x):
 
 
 @type_inferrer(P.eq, P.ne, nargs=2)
-async def infer_type_generic_compare(engine, x, y):
+async def infer_type_generic_compare(track, x, y):
     """Infer the return type of a generic comparison operator."""
-    await engine.assert_same('type', x, y)
+    await track.assert_same(x, y)
     return Bool()
 
 
 @type_inferrer(P.lt, P.gt, P.le, P.ge, nargs=2)
-async def infer_type_arith_compare(engine, x, y):
+async def infer_type_arith_compare(track, x, y):
     """Infer the return type of an arithmetic comparison operator."""
-    t = await engine.assert_same('type', x, y)
+    t = await track.assert_same(x, y)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
     return Bool()
 
 
 @type_inferrer(P.uadd, P.usub, nargs=1)
-async def infer_type_arith_unary(engine, x):
+async def infer_type_arith_unary(track, x):
     """Infer the return type of a unary arithmetic operator."""
     t = await x['type']
     if not isinstance(t, (Int, Float)):
@@ -200,34 +202,34 @@ async def infer_type_arith_unary(engine, x):
 
 
 @type_inferrer(P.add, P.sub, P.mul, P.div, P.mod, P.pow, nargs=2)
-async def infer_type_arith_bin(engine, x, y):
+async def infer_type_arith_bin(track, x, y):
     """Infer the return type of a binary arithmetic operator."""
-    t = await engine.assert_same('type', x, y)
+    t = await track.assert_same(x, y)
     if not isinstance(t, (Int, Float)):
         raise MyiaTypeError('Expected number')
     return t
 
 
 @type_inferrer(P.shape, nargs=1)
-async def infer_type_shape(engine, ary):
+async def infer_type_shape(track, ary):
     """Infer the return type of shape."""
     shp = await ary['shape']
     return Tuple([UInt(64)]*len(shp))
 
 
 @type_inferrer(P.map_array, nargs=2)
-async def infer_type_map_array(engine, fn, ary):
+async def infer_type_map_array(track, fn, ary):
     """Infer the return type of map_array."""
     fn_t = await fn['type']
     ary_t = await ary['type']
     if not isinstance(ary_t, Array):
         raise MyiaTypeError('Expected array')
-    xref = engine.vref({'type': ary_t.elements})
+    xref = track.engine.vref({'type': ary_t.elements})
     return Array(await fn_t(xref))
 
 
 @type_inferrer(P.scan_array, P.reduce_array, nargs=4)
-async def infer_type_across_array(engine, fn, init, ary, ax):
+async def infer_type_across_array(track, fn, init, ary, ax):
     """Infer the return type of scan/reduce_array."""
     fn_t = await fn['type']
     ary_t = await ary['type']
@@ -240,13 +242,13 @@ async def infer_type_across_array(engine, fn, init, ary, ax):
                             "as array elements")
     if not ax_t == UInt(64):
         raise MyiaTypeError("Axis must be u64")
-    xref = engine.vref({'type': ary_t.elements})
-    xref2 = engine.vref({'type': ary_t.elements})
+    xref = track.engine.vref({'type': ary_t.elements})
+    xref2 = track.engine.vref({'type': ary_t.elements})
     return Array(await fn_t(xref, xref2))
 
 
 @type_inferrer(P.distribute, nargs=2)
-async def infer_type_distribute(engine, v, shp):
+async def infer_type_distribute(track, v, shp):
     """Infer the return type of distribute."""
     v_t = await v['type']
     if isinstance(v_t, Array):
@@ -261,7 +263,7 @@ async def infer_type_distribute(engine, v, shp):
 
 
 @type_inferrer(P.reshape, nargs=2)
-async def infer_type_reshape(engine, v, shape):
+async def infer_type_reshape(track, v, shape):
     """Infer the return type of reshape."""
     shp_t = await shape['type']
     if (not isinstance(shp_t, Tuple) or
@@ -271,25 +273,45 @@ async def infer_type_reshape(engine, v, shape):
 
 
 @type_inferrer(P.dot, nargs=2)
-async def infer_type_dot(engine, a, b):
+async def infer_type_dot(track, a, b):
     """Infer the return type of dot."""
-    t = await engine.assert_same('type', a, b)
+    t = await track.assert_same(a, b)
     return t
 
 
 @type_inferrer(P.return_, nargs=1)
-async def infer_type_return_(engine, x):
+async def infer_type_return_(track, x):
     """Infer the return type of return_."""
     return await x['type']
 
 
 @type_inferrer(P.maplist, nargs=2)
-async def infer_type_maplist(engine, f, xs):
+async def infer_type_maplist(track, f, xs):
     """Infer the return type of maplist."""
     f_t = await f['type']
     xs_t = await xs['type']
     if not isinstance(xs_t, List):
         raise MyiaTypeError('Expect list for maplist')
-    xref = engine.vref(dict(type=xs_t.element_type))
+    xref = track.engine.vref(dict(type=xs_t.element_type))
     ret_t = await f_t(xref)
     return List(ret_t)
+
+
+@type_inferrer(P.resolve, nargs=2)
+async def infer_type_resolve(track, data, item):
+    """Infer the return type of resolve."""
+    def chk(data_v, item_v):
+        if not isinstance(data_v, Namespace):  # pragma: no cover
+            raise MyiaTypeError('data argument to resolve must be Namespace.')
+        if not isinstance(item_v, str):  # pragma: no cover
+            raise MyiaTypeError('item argument to resolve must be string.')
+    return await static_getter(track, data, item, (lambda x, y: x[y]), chk)
+
+
+@type_inferrer(P.getattr, nargs=2)
+async def infer_type_getattr(track, data, item):
+    """Infer the return type of getattr."""
+    def chk(data_v, item_v):
+        if not isinstance(item_v, str):
+            raise MyiaTypeError('item argument to getattr must be string.')
+    return await static_getter(track, data, item, getattr, chk)

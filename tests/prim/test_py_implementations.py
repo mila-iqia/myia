@@ -3,7 +3,7 @@ import pytest
 from types import SimpleNamespace
 import numpy as np
 
-from myia.dtype import Int, Float, List, Tuple
+from myia.dtype import Int, Float, List, Tuple, External
 from myia.prim.py_implementations import head, setattr as myia_setattr, \
     setitem as myia_setitem, tail, hastype, typeof, \
     shape, reshape, map_array, scan_array, reduce_array, distribute, dot, \
@@ -129,8 +129,7 @@ def test_prim_typeof():
     assert typeof([1, 2]) == List(i64)
     with pytest.raises(TypeError):
         typeof([1, 2, 3.4])
-    with pytest.raises(TypeError):
-        typeof(object())
+    assert typeof(object()) == External(object)
 
 
 def test_prim_istype():
@@ -145,8 +144,7 @@ def test_prim_istype():
     assert hastype((1, 2.0, (3, 4)), Tuple(i64, f64, Tuple(i64, i64)))
     with pytest.raises(TypeError):
         hastype([1, 2, 3.4], List)
-    with pytest.raises(TypeError):
-        hastype(object(), i64)
+    assert hastype(object(), External(object))
 
 
 def test_prim_shape():

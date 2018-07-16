@@ -237,17 +237,28 @@ class Function(Type):
         return (tuple(args[0]), args[1])
 
 
-class Dead(Type):
-    """This is the type of a dead computation.
+class Problem(Type):
+    """This represents some kind of problematic type.
 
-    The type specializer may produce a dummy constant with this type when a
-    polymorphic function is given as a parameter to a function that fails to
-    use it.
+    For example, when the specializer tries to specialize a graph that is not
+    called anywhere, it won't have the information it needs to do that, so it
+    may produce the type Problem(DEAD). A Problem type may not end up being
+    a real problem: dead code won't be called anyway, so it doesn't matter if
+    we can't type it. Others may be real problems, e.g. Problem(POLY) which
+    happens when there are multiple ways to type a graph in a given context.
     """
+
+    kind: Any
 
 
 class Unknown(Type):
     """Represents an unknown type (prior to type inference)."""
+
+
+class External(Type):
+    """Represents a type external to Myia (essentially invalid)."""
+
+    t: Any
 
 
 DTYPE_MAP = dict(

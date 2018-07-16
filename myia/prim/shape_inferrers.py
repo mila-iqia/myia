@@ -9,6 +9,7 @@ from ..ir import Graph
 from ..dtype import Array
 
 from . import ops as P
+from .inferrer_utils import static_getter
 from .ops import Primitive
 
 
@@ -23,9 +24,9 @@ shape_inferrer_constructors = {}
 class ScalarShapeInferrer(Inferrer):
     """Shape inferrer for all primitives that don't take arrays."""
 
-    def __init__(self, engine):
+    def __init__(self, track):
         """Initialize the ScalarShapeInferrer."""
-        super().__init__(engine, 'scalar_shape_inferrer')
+        super().__init__(track, 'scalar_shape_inferrer')
 
     async def __call__(self, *args):
         """Since no arrays are involved, the shape is always ()."""
@@ -49,11 +50,11 @@ class ShapeTrack(Track):
         """Infer the shape of a constant."""
         if isinstance(v, Primitive):
             if v in self.constructors:
-                return self.constructors[v](self.engine)
+                return self.constructors[v](self)
             else:
-                return ScalarShapeInferrer(self.engine)
+                return ScalarShapeInferrer(self)
         elif isinstance(v, Graph):
-            return GraphInferrer(self.engine, 'shape', v, context)
+            return GraphInferrer(self, v, context)
         else:
             return getattr(v, 'shape', ())
 
@@ -63,13 +64,13 @@ shape_inferrer = partial(register_inferrer,
 
 
 @shape_inferrer(P.return_, nargs=1)
-async def infer_shape_return(engine, v):
+async def infer_shape_return(track, v):
     """Infer the shape of return."""
     return await v['shape']
 
 
 @shape_inferrer(P.if_, nargs=3)
-async def infer_shape_if(engine, cond, tb, fb):
+async def infer_shape_if(track, cond, tb, fb):
     """Infer the shape of if."""
     tb_inf = await tb['shape']
     fb_inf = await fb['shape']
@@ -83,7 +84,7 @@ async def infer_shape_if(engine, cond, tb, fb):
     elif v is ANYTHING:
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
-        return await engine.assert_same('shape', tb_inf(), fb_inf())
+        return await track.assert_same(tb_inf(), fb_inf())
     else:
         raise AssertionError("Invalid condition value for if.")
 
@@ -96,19 +97,19 @@ async def infer_shape_partial(engine, fn, *args):
 
 
 @shape_inferrer(P.map_array, nargs=2)
-async def infer_shape_map_array(engine, fn, ary):
+async def infer_shape_map_array(track, fn, ary):
     """Infer the shape of map_array."""
     return await ary['shape']
 
 
 @shape_inferrer(P.scan_array, nargs=4)
-async def infer_shape_scan_array(engine, fn, init, ary, ax):
+async def infer_shape_scan_array(track, fn, init, ary, ax):
     """Infer the shape of scan_array."""
     return await ary['shape']
 
 
 @shape_inferrer(P.reduce_array, nargs=4)
-async def infer_shape_reduce_array(engine, fn, init, ary, ax):
+async def infer_shape_reduce_array(track, fn, init, ary, ax):
     """Infer the shape of reduce_array."""
     shp = await ary['shape']
     ax_v = await ax['value']
@@ -121,7 +122,7 @@ async def infer_shape_reduce_array(engine, fn, init, ary, ax):
 
 
 @shape_inferrer(P.distribute, nargs=2)
-async def infer_shape_distribute(engine, v, shape):
+async def infer_shape_distribute(track, v, shape):
     """Infer the shape of distribute."""
     shp = await shape['value']
     if shp == ANYTHING:
@@ -139,7 +140,7 @@ async def infer_shape_distribute(engine, v, shape):
 
 
 @shape_inferrer(P.reshape, nargs=2)
-async def infer_shape_reshape(engine, v, shape):
+async def infer_shape_reshape(track, v, shape):
     """Infer the shape of reshape."""
     shp = await shape['value']
     if shp == ANYTHING:
@@ -155,7 +156,7 @@ async def infer_shape_reshape(engine, v, shape):
 
 
 @shape_inferrer(P.dot, nargs=2)
-async def infer_shape_dot(engine, a, b):
+async def infer_shape_dot(track, a, b):
     """Infer the shape of dot."""
     a_shp = await a['shape']
     b_shp = await b['shape']
@@ -166,3 +167,15 @@ async def infer_shape_dot(engine, a, b):
             b_shp[0] is not ANYTHING):
         raise MyiaShapeError("Incompatible shapes in dot")
     return (a_shp[0], b_shp[1])
+
+
+@shape_inferrer(P.resolve, nargs=2)
+async def infer_shape_resolve(track, data, item):
+    """Infer the shape of resolve."""
+    return await static_getter(track, data, item, lambda x, y: x[y])
+
+
+@shape_inferrer(P.getattr, nargs=2)
+async def infer_shape_getattr(track, data, item):
+    """Infer the shape of getattr."""
+    return await static_getter(track, data, item, getattr)

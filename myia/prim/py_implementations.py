@@ -137,7 +137,7 @@ def typeof(x):
             raise TypeError(f'All list elements should have same type')
         return types.List(type0)
     else:
-        raise TypeError(f'Untypable value: {x}')
+        return types.External(type(x))
 
 
 def hastype_helper(t, model):
@@ -174,10 +174,16 @@ def tail(tup):
     return tup[1:]
 
 
-@register(primops.getitem)
+@py_register(primops.getitem)
 def getitem(data, item):
     """Implement `getitem`."""
     return data[item]
+
+
+@vm_register(primops.getitem)
+def _vm_getitem(vm, data, item):
+    """Implement `getitem`."""
+    return vm.convert(data[item])
 
 
 @register(primops.setitem)
@@ -192,14 +198,13 @@ def setitem(data, item, value):
         return data2
 
 
-py_getattr = getattr
-py_setattr = setattr
-
-
-@register(primops.getattr)
-def getattr(data, attr):
+@vm_register(primops.getattr)
+def _vm_getattr(vm, data, attr):
     """Implement `getattr`."""
-    return py_getattr(data, attr)
+    return vm.convert(getattr(data, attr))
+
+
+py_setattr = setattr
 
 
 @register(primops.setattr)

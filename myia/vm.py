@@ -70,15 +70,15 @@ class Closure:
 class Partial:
     """Representation of a partial application."""
 
-    def __init__(self, graph, args, vm):
+    def __init__(self, fn, args, vm):
         """Build a partial."""
-        self.graph = graph
+        self.fn = fn
         self.args = tuple(args)
         self.vm = vm
 
     def __call__(self, *args):
         """Evaluates the partial."""
-        return self.vm.evaluate(self.graph, self.args + args)
+        return self.vm.call(self.fn, self.args + args)
 
 
 class VM:
@@ -222,9 +222,8 @@ class VM:
         if isinstance(graph, Closure):
             clos = graph.values
             graph = graph.graph
-        elif isinstance(graph, Partial):
-            args = graph.args + tuple(args)
-            graph = graph.graph
+
+        assert isinstance(graph, Graph)
 
         if len(args) != len(graph.parameters):
             raise RuntimeError("Call with wrong number of arguments")
@@ -238,6 +237,27 @@ class VM:
         for v in self._vars[graph]:
             clos[v] = frame[v]
         return Closure(graph, clos)
+
+    def _dispatch_call(self, node, frame, fn, args):
+        if isinstance(fn, Primitive):
+            if fn == if_:
+                cond, tb, fb = args
+                fn = tb if cond else fb
+                self._dispatch_call(node, frame, fn, [])
+            elif fn == return_:
+                raise self._Return(args[0])
+            elif fn == partial:
+                partial_fn, *partial_args = args
+                res = Partial(partial_fn, partial_args, self)
+                frame.values[node] = res
+            else:
+                frame.values[node] = self.implementations[fn](self, *args)
+        elif isinstance(fn, Partial):
+            self._dispatch_call(node, frame, fn.fn, fn.args + tuple(args))
+        elif isinstance(fn, (Graph, Closure)):
+            self._call(fn, args)
+        else:
+            raise AssertionError(f'Invalid fn to call: {fn}')
 
     def _handle_node(self, node: ANFNode, frame: VMFrame):
         if isinstance(node, Constant):
@@ -255,25 +275,8 @@ class VM:
             pass
 
         elif isinstance(node, Apply):
-            fn = frame[node.inputs[0]]
-            args = [frame[a] for a in node.inputs[1:]]
-            if isinstance(fn, Primitive):
-                if fn == if_:
-                    if args[0]:
-                        self._call(args[1], [])
-                    else:
-                        self._call(args[2], [])
-                elif fn == return_:
-                    raise self._Return(args[0])
-                elif fn == partial:
-                    partial_fn, *partial_args = args
-                    assert isinstance(partial_fn, Graph)
-                    res = Partial(partial_fn, partial_args, self)
-                    frame.values[node] = res
-                else:
-                    frame.values[node] = self.implementations[fn](self, *args)
-            else:
-                self._call(fn, args)
+            fn, *args = (frame[inp] for inp in node.inputs)
+            self._dispatch_call(node, frame, fn, args)
 
         else:
             raise AssertionError("Unknown node type")  # pragma: no cover

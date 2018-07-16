@@ -5,16 +5,17 @@ import asyncio
 
 from functools import partial
 
-from ..infer import InferenceError, PartialInferrer, \
+from ..infer import ValueWrapper, InferenceError, PartialInferrer, \
     ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track
 from ..ir import Graph
 
 from . import ops as P
+from .inferrer_utils import static_getter
 from .ops import Primitive
 from .py_implementations import hastype_helper
 
 
-class LimitedValue:
+class LimitedValue(ValueWrapper):
     """Value associated to a count.
 
     Attributes:
@@ -32,19 +33,8 @@ class LimitedValue:
 
     def __init__(self, value, count):
         """Initialize a LimitedValue."""
-        self.value = value
+        super().__init__(value)
         self.count = count
-
-    def __hash__(self):
-        return hash(self.value)
-
-    def __eq__(self, other):
-        return type(other) is LimitedValue \
-            and self.value == other.value
-
-    @property
-    def __unwrapped__(self):
-        return self.value
 
 
 def limited(v, count):
@@ -62,9 +52,9 @@ class PrimitiveValueInferrer(Inferrer):
     The implementation will not be called.
     """
 
-    def __init__(self, engine, prim, impl):
+    def __init__(self, track, prim, impl):
         """Initialize a PrimitiveValueInferrer."""
-        super().__init__(engine, prim)
+        super().__init__(track, prim)
         self.impl = impl
 
     async def infer(self, *refs):
@@ -115,16 +105,15 @@ class ValueTrack(Track):
 
     def from_value(self, v, context):
         """Infer the value of a constant."""
-        engine = self.engine
         if isinstance(v, Primitive):
             if v in self.constructors:
-                inf = self.constructors[v](engine)
+                inf = self.constructors[v](self)
             else:
                 inf = PrimitiveValueInferrer(
-                    engine, v, self.implementations[v]
+                    self, v, self.implementations[v]
                 )
         elif isinstance(v, Graph):
-            inf = GraphInferrer(engine, 'value', v, context)
+            inf = GraphInferrer(self, v, context)
         else:
             return self.wrap(v)
 
@@ -186,7 +175,7 @@ async def infer_value_partial(engine, fn, *args):
 
 
 @value_inferrer(P.hastype, nargs=2)
-async def infer_value_hastype(engine, x, t):
+async def infer_value_hastype(track, x, t):
     """Infer the return value of hastype."""
     x_t = await x['type']
     t_v = await t['value']
@@ -199,7 +188,7 @@ async def infer_value_hastype(engine, x, t):
 
 
 @value_inferrer(P.typeof, nargs=1)
-async def infer_value_typeof(engine, x):
+async def infer_value_typeof(track, x):
     """Infer the return value of typeof."""
     # TODO: Find a good way to carry ValueTrack.max_depth to here
     # Instead of defaulting to 1
@@ -208,10 +197,22 @@ async def infer_value_typeof(engine, x):
 
 
 @value_inferrer(P.shape, nargs=1)
-async def infer_value_shape(engine, ary):
+async def infer_value_shape(track, ary):
     """Infer the return value of shape."""
     shp = await ary['shape']
     if any(s is ANYTHING for s in shp):
         return ANYTHING
     # TODO: Should propagate ValueTrack.max_depth here
     return limited(shp, 1)
+
+
+@value_inferrer(P.resolve, nargs=2)
+async def infer_value_resolve(track, data, item):
+    """Infer the return value of resolve."""
+    return await static_getter(track, data, item, lambda x, y: x[y])
+
+
+@value_inferrer(P.getattr, nargs=2)
+async def infer_value_getattr(track, data, item):
+    """Infer the return value of getattr."""
+    return await static_getter(track, data, item, getattr)
