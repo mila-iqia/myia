@@ -9,8 +9,8 @@ from ..ir import Graph
 from ..dtype import Array
 
 from . import ops as P
+from .inferrer_utils import static_getter
 from .ops import Primitive
-from .value_inferrers import _static_getter
 
 
 def prod(iterable):
@@ -172,10 +172,10 @@ async def infer_shape_dot(track, a, b):
 @shape_inferrer(P.resolve, nargs=2)
 async def infer_shape_resolve(track, data, item):
     """Infer the shape of resolve."""
-    return await _static_getter(track, data, item, lambda x, y: x[y])
+    return await static_getter(track, data, item, lambda x, y: x[y])
 
 
 @shape_inferrer(P.getattr, nargs=2)
 async def infer_shape_getattr(track, data, item):
     """Infer the shape of getattr."""
-    return await _static_getter(track, data, item, getattr)
+    return await static_getter(track, data, item, getattr)

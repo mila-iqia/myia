@@ -10,9 +10,9 @@ from ..ir import Graph
 from ..utils import Namespace
 
 from . import ops as P
+from .inferrer_utils import static_getter
 from .ops import Primitive
 from .py_implementations import typeof
-from .value_inferrers import _static_getter
 
 
 type_inferrer_constructors = {}
@@ -305,7 +305,7 @@ async def infer_type_resolve(track, data, item):
             raise MyiaTypeError('data argument to resolve must be Namespace.')
         if not isinstance(item_v, str):  # pragma: no cover
             raise MyiaTypeError('item argument to resolve must be string.')
-    return await _static_getter(track, data, item, (lambda x, y: x[y]), chk)
+    return await static_getter(track, data, item, (lambda x, y: x[y]), chk)
 
 
 @type_inferrer(P.getattr, nargs=2)
@@ -314,4 +314,4 @@ async def infer_type_getattr(track, data, item):
     def chk(data_v, item_v):
         if not isinstance(item_v, str):
             raise MyiaTypeError('item argument to getattr must be string.')
-    return await _static_getter(track, data, item, getattr, chk)
+    return await static_getter(track, data, item, getattr, chk)

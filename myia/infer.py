@@ -39,6 +39,29 @@ def type_error_nargs(ident, expected, got):
     )
 
 
+class ValueWrapper:
+    """Wrapper for an inferred value.
+
+    Values may be wrapped using subclasses of ValueWrapper, associating them
+    with tracking data or metadata.
+    """
+
+    def __init__(self, value):
+        """Initialize a ValueWrapper."""
+        self.value = value
+
+    def __hash__(self):
+        return hash(self.value)
+
+    def __eq__(self, other):
+        return type(other) is type(self) \
+            and self.value == other.value
+
+    @property
+    def __unwrapped__(self):
+        return self.value
+
+
 #########
 # Track #
 #########

@@ -5,16 +5,17 @@ import asyncio
 
 from functools import partial
 
-from ..infer import InferenceError, PartialInferrer, \
-    ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track, Context
+from ..infer import ValueWrapper, InferenceError, PartialInferrer, \
+    ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track
 from ..ir import Graph
 
 from . import ops as P
+from .inferrer_utils import static_getter
 from .ops import Primitive
 from .py_implementations import hastype_helper
 
 
-class LimitedValue:
+class LimitedValue(ValueWrapper):
     """Value associated to a count.
 
     Attributes:
@@ -32,19 +33,8 @@ class LimitedValue:
 
     def __init__(self, value, count):
         """Initialize a LimitedValue."""
-        self.value = value
+        super().__init__(value)
         self.count = count
-
-    def __hash__(self):
-        return hash(self.value)
-
-    def __eq__(self, other):
-        return type(other) is LimitedValue \
-            and self.value == other.value
-
-    @property
-    def __unwrapped__(self):
-        return self.value
 
 
 def limited(v, count):
@@ -216,55 +206,13 @@ async def infer_value_shape(track, ary):
     return limited(shp, 1)
 
 
-async def _static_getter(track, data, item, fetch, chk=None):
-    resources = track.engine.pipeline.resources
-    mmap = resources.method_map
-
-    data_t = await data['type']
-    item_v = await item['value']
-    if item_v is ANYTHING:
-        raise InferenceError('Item or attribute must be known.')
-
-    if data_t in mmap:
-        # Method call
-        if chk:
-            chk(None, item_v)
-        if item_v in mmap[data_t]:
-            method = mmap[data_t][item_v]
-            inferrer = track.from_value(method, Context.empty())
-            if isinstance(inferrer, LimitedValue):
-                inferrer = inferrer.value
-            return PartialInferrer(
-                track,
-                inferrer,
-                [data]
-            )
-        else:
-            msg = f'Method {item_v} of {data_t} does not exist.'
-            raise InferenceError(msg)
-
-    else:
-        # Module or static namespace
-        data_v = await data['value']
-        if data_v is ANYTHING:
-            raise InferenceError('Data must be known.')
-        if chk:
-            chk(data_v, item_v)
-        try:
-            raw = fetch(data_v, item_v)
-        except Exception as e:
-            raise InferenceError('Getter error', e)
-        value = resources.convert(raw)
-        return track.from_value(value, Context.empty())
-
-
 @value_inferrer(P.resolve, nargs=2)
 async def infer_value_resolve(track, data, item):
     """Infer the return value of resolve."""
-    return await _static_getter(track, data, item, lambda x, y: x[y])
+    return await static_getter(track, data, item, lambda x, y: x[y])
 
 
 @value_inferrer(P.getattr, nargs=2)
 async def infer_value_getattr(track, data, item):
     """Infer the return value of getattr."""
-    return await _static_getter(track, data, item, getattr)
+    return await static_getter(track, data, item, getattr)
