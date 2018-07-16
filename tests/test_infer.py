@@ -264,6 +264,20 @@ def test_while(x, y):
     return rval
 
 
+@infer(
+    type=[
+        (li64, i64, i64),
+        (li64, f64, InferenceError),
+        (i64, i64, InferenceError),
+    ]
+)
+def test_for(xs, y):
+    rval = y
+    for x in xs:
+        rval = rval + x
+    return rval
+
+
 @infer(type=(i64, f64, T(i64, f64)))
 def test_nullary_closure(x, y):
     def make(z):

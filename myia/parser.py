@@ -267,7 +267,7 @@ class Parser:
 
     def process_BoolOp(self, block: 'Block', node: ast.BinOp) -> ANFNode:
         """Process boolean operators: `a and b`, `a or b`."""
-        def fold(block, values, mode='and'):
+        def fold(block, values, mode):
             first, *rest = values
             test = self.process_node(block, first)
             if rest:
