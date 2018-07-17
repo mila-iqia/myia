@@ -210,6 +210,26 @@ def test_max(x, y):
         return y
 
 
+@parse_compare((7, 3), (-1, 3))
+def test_ifexpr(x, y):
+    return x * x if x > 0 else y * y
+
+
+@parse_compare((7, 3), (1, 3))
+def test_max_expr(x, y):
+    return x if x > y else y
+
+
+@parse_compare((7, 3), (-1, 3), (-3, 1), (-1, -1))
+def test_and(x, y):
+    return x > 0 and y > 0
+
+
+@parse_compare((7, 3), (-1, 3), (-3, 1), (-1, -1))
+def test_or(x, y):
+    return x > 0 or y > 0
+
+
 ###################
 # while statement #
 ###################
@@ -260,6 +280,19 @@ def test_if_return_in_while(x):
         else:
             x = x - 1
     return -1
+
+
+#################
+# for statement #
+#################
+
+
+@parse_compare(([1, 2, 3, 4],))
+def test_for(xs):
+    result = 0
+    for x in xs:
+        result = result + x
+    return result
 
 
 ############
@@ -371,6 +404,23 @@ def test_fn5():
             return y + 1
         return f(x + 1)
     return g(2)
+
+
+###########
+# Lambda #
+###########
+
+
+@parse_compare((5,))
+def test_lambda(x):
+    f = lambda y: x + y  # noqa
+    return f(x)
+
+
+@parse_compare((5,))
+def test_lambda2(x):
+    f = lambda y, z: x + y * z  # noqa
+    return f(10, x)
 
 
 #############

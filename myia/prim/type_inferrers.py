@@ -315,3 +315,38 @@ async def infer_type_getattr(track, data, item):
         if not isinstance(item_v, str):
             raise MyiaTypeError('item argument to getattr must be string.')
     return await static_getter(track, data, item, getattr, chk)
+
+
+@type_inferrer(P.iter, nargs=1)
+async def infer_type_iter(engine, xs):
+    """Infer the return type of iter."""
+    xs_t = await xs['type']
+    if isinstance(xs_t, List):
+        return Tuple([Int(64), xs_t])
+    else:
+        raise MyiaTypeError('Unsupported type for iter')
+
+
+@type_inferrer(P.hasnext, nargs=1)
+async def infer_type_hasnext(engine, it):
+    """Infer the return type of hasnext."""
+    it_t = await(it['type'])
+    if isinstance(it_t, Tuple) \
+            and len(it_t.elements) == 2 \
+            and isinstance(it_t.elements[1], List):
+        return Bool()
+    else:  # pragma: no cover
+        raise MyiaTypeError('Unsupported iterator type for hasnext')
+
+
+@type_inferrer(P.next, nargs=1)
+async def infer_type_next(engine, it):
+    """Infer the return type of next."""
+    it_t = await(it['type'])
+    if isinstance(it_t, Tuple) \
+            and len(it_t.elements) == 2 \
+            and isinstance(it_t.elements[1], List):
+        x_t = it_t.elements[1].element_type
+        return Tuple([x_t, it_t])
+    else:  # pragma: no cover
+        raise MyiaTypeError('Unsupported iterator type for next')

@@ -12,6 +12,7 @@ short_relation_symbols = {
     'copy': '',
     'cosmetic': '',
     'phi': 'Φ',
+    'iterator': '*',
     'fv': '⤋',
     'if_true': '✓',
     'if_false': '✗',
@@ -19,6 +20,9 @@ short_relation_symbols = {
     'while_header': '⤾',
     'while_body': '⥁',
     'while_after': '↓',
+    'for_header': '⤾',
+    'for_body': '⥁',
+    'for_after': '↓',
     'specialized': '+'
 }
 

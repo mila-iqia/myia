@@ -332,3 +332,23 @@ def partial(f, *args):
     def res(*others):
         return f(*(args + others))
     return res
+
+
+@register(primops.iter)
+def _iter(xs):
+    """Implement `iter`."""
+    return (0, xs)
+
+
+@register(primops.hasnext)
+def _hasnext(it):
+    """Implement `hasnext`."""
+    n, data = it
+    return n < len(data)
+
+
+@register(primops.next)
+def _next(it):
+    """Implement `next`."""
+    n, data = it
+    return (data[n], (n + 1, data))
