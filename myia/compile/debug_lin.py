@@ -2,7 +2,7 @@
 
 from .utils import get_outputs
 
-from ..ir import Graph, is_apply, is_constant, manage
+from ..ir import Graph, is_apply, is_constant, manage, clone
 from ..prim import Primitive, vm_implementations
 from ..vm import VM
 from ..graph_utils import make_tuple
@@ -51,6 +51,9 @@ def debug_convert(lst):
 
     outputs = get_outputs(lst, lst[0].graph.manager.uses, set(eqv.keys()))
     g.output = make_tuple((eqv[o] for o in outputs), g)
+
+    # Clone in case g contains subgraphs that have a different manager
+    g = clone(g)
 
     mng = manage(g)
 

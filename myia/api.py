@@ -17,7 +17,7 @@ from .prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
 from .specialize import TypeSpecializer
 from .utils import TypeMap
 from .vm import VM
-from .compile import step_compile, step_link, step_export
+from .compile import step_wrap_primitives, step_compile, step_link, step_export
 
 
 scalar_object_map = {
@@ -375,11 +375,11 @@ _standard_pipeline = PipelineDefinition(
 
 standard_pipeline = _standard_pipeline \
     .insert_after(
+        wrap_primitives=step_wrap_primitives,
         compile=step_compile,
         link=step_link,
         export=step_export
     )
-
 
 standard_debug_pipeline = _standard_pipeline \
     .insert_after(export=step_debug_export)

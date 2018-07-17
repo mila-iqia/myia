@@ -1,10 +1,12 @@
 from pytest import mark
 from copy import copy
 
-from myia.api import scalar_pipeline
-from myia.prim.py_implementations import typeof
+from myia.api import standard_pipeline
+from myia.prim import ops as P
+from myia.prim.py_implementations import \
+    typeof, scalar_add, partial
 
-compile_pipeline = scalar_pipeline
+compile_pipeline = standard_pipeline
 
 
 def parse_compare(*tests):
@@ -99,7 +101,7 @@ def test_call_hof(c, x, y):
         return x + y
 
     def f2(x, y):
-        return y + x
+        return x * y
 
     def choose(c):
         if c:
@@ -107,4 +109,30 @@ def test_call_hof(c, x, y):
         else:
             return f2
 
-    return choose(c)(x, 2) + choose(not c)(2, y)
+    return choose(c)(x, y) + choose(not c)(x, y)
+
+
+@parse_compare((15, 17))
+def test_partial_prim(x, y):
+    return partial(scalar_add, x)(y)
+
+
+def test_if_nontail():
+    def fn(x, y):
+        def f1():
+            return x
+
+        def f2():
+            return y
+
+        a = P.if_(x > y, f1, f2)
+        return a * a
+
+    i64 = typeof(1)
+    argspec = ({'type': i64}, {'type': i64})
+    myia_fn = compile_pipeline.run(input=fn,
+                                   argspec=argspec)['output']
+
+    for test in [(6, 23, 23**2), (67, 23, 67**2)]:
+        *args, expected = test
+        assert myia_fn(*args) == expected

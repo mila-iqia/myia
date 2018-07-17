@@ -63,7 +63,9 @@ class FinalVM:
 
     def _popp(self):
         """Restore the pc from the call stack (return)."""
-        self.pc = self.retp.pop()
+        v = self.retp.pop()
+        assert isinstance(v, int)
+        self.pc = v
 
     def _do_jmp(self, jmp):
         """Jump to the specified position.
@@ -75,6 +77,7 @@ class FinalVM:
             for a in reversed(jmp.args):
                 self._push(a)
             jmp = jmp.fn
+        assert isinstance(jmp, int)
         self.pc = jmp
 
     def __call__(self, *args):
