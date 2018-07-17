@@ -4,7 +4,7 @@ from pytest import mark
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    head, tail, setitem, scalar_add, scalar_mul
+    head, tail, setitem, scalar_add, scalar_mul, identity
 
 
 #######################
@@ -188,6 +188,17 @@ def test_add_zero():
     _check_opt(before2, after,
                lib.add_zero_l,
                lib.add_zero_r)
+
+
+def test_elim_identity():
+
+    def before(x, y):
+        return identity(x) + identity(y)
+
+    def after(x, y):
+        return x + y
+
+    _check_opt(before, after, lib.elim_identity)
 
 
 ######################

@@ -298,6 +298,12 @@ async def infer_type_list_map(track, f, xs):
     return List(ret_t)
 
 
+@type_inferrer(P.identity, nargs=1)
+async def infer_type_identity(track, x):
+    """Infer the return type of identity."""
+    return await x['type']
+
+
 @type_inferrer(P.resolve, nargs=2)
 async def infer_type_resolve(track, data, item):
     """Infer the return type of resolve."""

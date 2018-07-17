@@ -161,6 +161,12 @@ add_zero_r = psub(
     name='add_zero_r'
 )
 
+elim_identity = psub(
+    pattern=(P.identity, X),
+    replacement=X,
+    name='elim_identity'
+)
+
 
 ######################
 # Branch elimination #

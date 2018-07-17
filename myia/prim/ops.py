@@ -106,5 +106,6 @@ return_ = Primitive('return')
 #################
 
 list_map = Primitive('list_map')
+identity = Primitive('identity')
 resolve = Primitive('resolve')
 partial = Primitive('partial')

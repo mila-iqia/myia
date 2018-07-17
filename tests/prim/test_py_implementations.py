@@ -7,7 +7,7 @@ from myia.dtype import Int, Float, List, Tuple, External
 from myia.prim.py_implementations import head, setattr as myia_setattr, \
     setitem as myia_setitem, tail, hastype, typeof, \
     shape, reshape, array_map, array_scan, array_reduce, distribute, dot, \
-    partial as myia_partial, _assert_scalar
+    partial as myia_partial, identity, _assert_scalar
 
 from ..test_lang import parse_compare
 
@@ -227,3 +227,8 @@ def test_assert_scalar():
         _assert_scalar(np.ones((2, 2)))
     with pytest.raises(TypeError):
         _assert_scalar((1, 2), (3, 4))
+
+
+def test_prim_identity():
+    for x in (1, 1.7, True, False, [1, 2, 3], (4, 5)):
+        assert identity(x) is x
