@@ -285,7 +285,24 @@ async def infer_type_array_map2(track, fn, ary1, ary2):
     return Array(await fn_t(xref, yref))
 
 
-@type_inferrer(P.array_scan, P.array_reduce, nargs=4)
+@type_inferrer(P.array_reduce, nargs=3)
+async def infer_type_reduce(track, fn, ary, shp):
+    """Infer the return type of array_reduce."""
+    fn_t = await fn['type']
+    ary_t = await ary['type']
+    shp_t = await shp['type']
+    if not isinstance(ary_t, Array):
+        raise MyiaTypeError('Expected array')
+    if not (isinstance(shp_t, Tuple)
+            and all(t == UInt(64) for t in shp_t.elements)):
+        raise MyiaTypeError("Target shape must be u64 tuple")
+    xref = track.engine.vref({'type': ary_t.elements})
+    xref2 = track.engine.vref({'type': ary_t.elements})
+    res_elem_t = await fn_t(xref, xref2)
+    return Array(res_elem_t)
+
+
+@type_inferrer(P.array_scan, nargs=4)
 async def infer_type_across_array(track, fn, init, ary, ax):
     """Infer the return type of scan/array_reduce."""
     fn_t = await fn['type']

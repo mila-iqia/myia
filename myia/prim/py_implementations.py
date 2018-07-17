@@ -319,22 +319,43 @@ def _array_scan_vm(vm, fn, init, array, axis):
 
 
 @py_register(primops.array_reduce)
-def array_reduce(fn, init, array, axis):
+def array_reduce(fn, array, shp):
     """Implement `array_reduce`."""
-    def f(ary):
-        val = init
-        it = np.nditer([ary])
-        for x in it:
-            val = fn(val, x)
-        return val
-    return np.apply_along_axis(f, axis, array)
+    ufn = np.frompyfunc(fn, 2, 1)
+    delta = len(array.shape) - len(shp)
+    if delta < 0:
+        raise ValueError('Shape to reduce to cannot be larger than original')
+
+    def is_reduction(ishp, tshp):
+        if tshp == 1 and ishp > 1:
+            return True
+        elif tshp != ishp:
+            raise ValueError('Dimension mismatch for reduce')
+        else:
+            return False
+
+    reduction = [(delta + idx if is_reduction(ishp, tshp) else None, True)
+                 for idx, (ishp, tshp)
+                 in enumerate(zip(array.shape[delta:], shp))]
+
+    reduction = [(i, False) for i in range(delta)] + reduction
+
+    for idx, keep in reversed(reduction):
+        if idx is not None:
+            array = ufn.reduce(array, axis=idx, keepdims=keep)
+
+    if not isinstance(array, np.ndarray):
+        # Force result to be ndarray, even if it's 0d
+        array = np.array(array)
+
+    return array
 
 
 @vm_register(primops.array_reduce)
-def _array_reduce_vm(vm, fn, init, array, axis):
+def _array_reduce_vm(vm, fn, array, shp):
     def fn_(a, b):
         return vm.call(fn, [a, b])
-    return array_reduce(fn_, init, array, axis)
+    return array_reduce(fn_, array, shp)
 
 
 @register(primops.distribute)

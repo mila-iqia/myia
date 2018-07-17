@@ -1052,12 +1052,42 @@ def test_array_scan(ary, ax):
     return array_scan(f, 0, ary, ax)
 
 
-@infer(shape=[({'type': ai64, 'shape': (3, 4)}, {'value': 1}, (3,)),
-              ({'type': ai64, 'shape': (3, 4)}, {'type': u64}, (ANYTHING,))])
-def test_array_reduce(ary, ax):
+@infer(
+    type=[
+        (ai64, T([u64, u64]), ai64),
+        (ai64, i64, InferenceError),
+        (i64, T([u64, u64]), InferenceError),
+    ],
+    shape=[
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': (3, 1)},
+         (3, 1)),
+
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': (3, ANYTHING)},
+         (3, ANYTHING)),
+
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': (3, 1, 1)},
+         InferenceError),
+
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': (4, 1)},
+         InferenceError),
+
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': (4,)},
+         (4,)),
+
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': ()},
+         ()),
+    ]
+)
+def test_array_reduce(ary, shp):
     def f(a, b):
         return a + b
-    return array_reduce(f, 0, ary, ax)
+    return array_reduce(f, ary, shp)
 
 
 @infer(type=[(i64, i64)],

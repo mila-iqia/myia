@@ -76,7 +76,7 @@ def test_vm_array_reduce():
         def add(x, y):
             return x + y
 
-        return array_reduce(add, 0, x, 0)
+        return array_reduce(add, x, (1, 3))
 
     a = np.ones((2, 3))
     res = f(a)

@@ -139,17 +139,25 @@ async def infer_shape_array_scan(track, fn, init, ary, ax):
     return await ary['shape']
 
 
-@shape_inferrer(P.array_reduce, nargs=4)
-async def infer_shape_array_reduce(track, fn, init, ary, ax):
+@shape_inferrer(P.array_reduce, nargs=3)
+async def infer_shape_array_reduce(track, fn, ary, shp):
     """Infer the shape of array_reduce."""
-    shp = await ary['shape']
-    ax_v = await ax['value']
-    if ax_v == ANYTHING:
-        return (ANYTHING,) * (len(shp) - 1)
+    shp_i = await ary['shape']
+    shp_v = await shp['value']
+    if shp_v == ANYTHING:
+        raise AssertionError(
+            'We currently require knowing the shape for reduce.'
+        )
+        # return (ANYTHING,) * (len(shp_i) - 1)
     else:
-        lshp = list(shp)
-        del lshp[ax_v]
-        return tuple(lshp)
+        delta = len(shp_i) - len(shp_v)
+        if delta < 0 \
+                or any(1 != s1 != ANYTHING and 1 != s2 != ANYTHING and s1 != s2
+                       for s1, s2 in zip(shp_i[delta:], shp_v)):
+            raise MyiaShapeError(
+                f'Incompatible dims for reduce: {shp_i}, {shp_v}'
+            )
+        return shp_v
 
 
 @shape_inferrer(P.distribute, nargs=2)

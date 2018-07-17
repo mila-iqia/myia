@@ -193,16 +193,31 @@ def test_prim_array_scan():
 
 
 def test_prim_array_reduce():
-    v = np.ones((2, 3))
-
-    def f(a, b):
+    def add(a, b):
         return a + b
 
-    vref = np.add.reduce(v, axis=1)
-    v2 = array_reduce(f, 0, v, 1)
+    tests = [
+        (add, (2, 3, 7), (1, 3, 1), 14),
+        (add, (2, 3, 7), (1, 3, 8), ValueError),
+        (add, (2, 3, 7), (1, 2, 3, 7), ValueError),
+        (add, (2, 3, 7), (3, 1), 14),
+        (add, (2, 3, 7), (1, 1, 1), 42),
+        (add, (2, 3, 7), (), 42),
+    ]
 
-    assert (v == 1).all()
-    assert (v2 == vref).all()
+    for f, inshp, outshp, value in tests:
+        v = np.ones(inshp)
+        try:
+            res = array_reduce(f, v, outshp)
+        except Exception as e:
+            if isinstance(value, type) and isinstance(e, value):
+                continue
+            else:
+                print(f'Expected {value}, but got {e}')
+                raise
+
+        assert res.shape == outshp
+        assert (res == value).all()
 
 
 def test_prim_distribute():
