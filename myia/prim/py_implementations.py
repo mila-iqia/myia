@@ -346,6 +346,12 @@ def _list_map_vm(vm, f, xs):
     return list(map(f_, xs))
 
 
+@register(primops.identity)
+def identity(x):
+    """Implement `identity`."""
+    return x
+
+
 @vm_register(primops.resolve)
 def _resolve_vm(vm, data, item):
     """Implement `resolve` for the VM."""

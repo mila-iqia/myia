@@ -179,3 +179,9 @@ async def infer_shape_resolve(track, data, item):
 async def infer_shape_getattr(track, data, item):
     """Infer the shape of getattr."""
     return await static_getter(track, data, item, getattr)
+
+
+@shape_inferrer(P.identity, nargs=1)
+async def infer_shape_identity(track, x):
+    """Infer the shape of identity."""
+    return await x['shape']

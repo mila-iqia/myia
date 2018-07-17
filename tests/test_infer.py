@@ -15,7 +15,7 @@ from myia.prim import Primitive
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
     typeof, scalar_usub, dot, distribute, shape, array_map, array_scan, \
-    array_reduce, reshape, partial as myia_partial
+    array_reduce, reshape, partial as myia_partial, identity
 
 
 B = Bool()
@@ -1064,3 +1064,9 @@ def test_partial_2(x):
         else:
             return f3
     return g(x < 42)(x)
+
+
+@infer(type=[(i64, i64)],
+       shape=[({'type': ai64, 'shape': (6, 13)}, (6, 13))])
+def test_identity(x):
+    return identity(x)
