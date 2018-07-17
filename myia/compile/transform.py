@@ -1,7 +1,7 @@
 """Transforms a graph into lower-level code."""
 
 from ..ir import (Apply, is_apply, is_constant, is_constant_graph,
-                  is_parameter, toposort)
+                  is_parameter, toposort, Graph, Constant)
 from ..pipeline import PipelineDefinition, PipelineStep
 from ..prim import Primitive
 from ..prim.ops import if_, partial, return_
@@ -11,6 +11,52 @@ from .vm import FinalVM
 LIN_IMPLS = dict(
     debug=debug_convert,
 )
+
+
+class WrapPrimitives(PipelineStep):
+    """Pipeline step to wrap primitives in non-call positions into graphs.
+
+    Inputs:
+        graph: A graph
+
+    Outputs:
+        graph: The transformed graph
+
+    """
+
+    def step(self, graph):
+        """Wrap primitives in non-call positions into graphs."""
+        mng = self.resources.manager
+        mng.add_graph(graph)
+
+        prim_graphs = {}
+
+        def get_prim_graph(prim, typ):
+            if (prim, typ) not in prim_graphs:
+                g = Graph()
+                args = []
+                for t in typ.arguments:
+                    p = g.add_parameter()
+                    p.type = t
+                    args.append(p)
+                primct = Constant(prim)
+                primct.type = typ
+                out = g.apply(primct, *args)
+                out.type = typ.retval
+                g.output = out
+                prim_graphs[(prim, typ)] = g
+            return prim_graphs[(prim, typ)]
+
+        with mng.transact() as tr:
+            cts = {ct for cts in mng.constants.values() for ct in cts}
+            for ct in cts:
+                if is_constant(ct, Primitive):
+                    for node, key in mng.uses[ct]:
+                        if key != 0:
+                            g = get_prim_graph(ct.value, ct.type)
+                            tr.set_edge(node, key, Constant(g))
+
+        return {'graph': graph}
 
 
 class SplitGraph(PipelineStep):
@@ -115,6 +161,7 @@ class CompileGraph(PipelineStep):
             if is_constant_graph(node):
                 self.add_instr('push_graph', node.value)
             else:
+                assert not isinstance(node.value, Primitive)
                 self.add_instr('push', node.value)
             self.push(node)
         return self.slots[node] - self.height
@@ -320,6 +367,7 @@ class VMExporter(PipelineStep):
         return {'output': FinalVM(instrs)}
 
 
+step_wrap_primitives = WrapPrimitives.partial()
 step_compile = CompileGraphs.partial(linear_impl='debug')
 step_link = LinkInstrs.partial()
 step_export = VMExporter.partial()
