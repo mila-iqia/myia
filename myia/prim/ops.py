@@ -85,6 +85,7 @@ next = Primitive('next')
 ##########
 
 
+scalar_to_array = Primitive('scalar_to_array')
 shape = Primitive('shape')
 array_map = Primitive('array_map')
 array_map2 = Primitive('array_map2')

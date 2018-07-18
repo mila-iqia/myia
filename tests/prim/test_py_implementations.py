@@ -8,7 +8,7 @@ from myia.prim.py_implementations import head, setattr as myia_setattr, \
     setitem as myia_setitem, tail, hastype, typeof, \
     shape, reshape, array_map, array_map2, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
-    switch
+    switch, scalar_to_array
 
 from ..test_lang import parse_compare
 
@@ -267,3 +267,12 @@ def test_prim_identity():
 def test_prim_switch():
     assert switch(True, 1, 2) == 1
     assert switch(False, 1, 2) == 2
+
+
+def test_scalar_to_array():
+    a = scalar_to_array(1)
+    assert isinstance(a, np.ndarray)
+    assert a.dtype == np.int64
+    b = scalar_to_array(1.5)
+    assert isinstance(b, np.ndarray)
+    assert b.dtype == np.float64

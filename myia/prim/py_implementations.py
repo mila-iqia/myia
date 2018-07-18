@@ -442,3 +442,9 @@ def _next(it):
 def switch(c, x, y):
     """Implement `switch`."""
     return x if c else y
+
+
+@register(primops.scalar_to_array)
+def scalar_to_array(x):
+    """Implement `scalar_to_array`."""
+    return np.array(x)

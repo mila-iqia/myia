@@ -398,7 +398,7 @@ async def infer_type_getattr(track, data, item):
 
 
 @type_inferrer(P.iter, nargs=1)
-async def infer_type_iter(engine, xs):
+async def infer_type_iter(track, xs):
     """Infer the return type of iter."""
     xs_t = await xs['type']
     if isinstance(xs_t, List):
@@ -408,7 +408,7 @@ async def infer_type_iter(engine, xs):
 
 
 @type_inferrer(P.hasnext, nargs=1)
-async def infer_type_hasnext(engine, it):
+async def infer_type_hasnext(track, it):
     """Infer the return type of hasnext."""
     it_t = await(it['type'])
     if isinstance(it_t, Tuple) \
@@ -420,7 +420,7 @@ async def infer_type_hasnext(engine, it):
 
 
 @type_inferrer(P.next, nargs=1)
-async def infer_type_next(engine, it):
+async def infer_type_next(track, it):
     """Infer the return type of next."""
     it_t = await(it['type'])
     if isinstance(it_t, Tuple) \
@@ -430,3 +430,12 @@ async def infer_type_next(engine, it):
         return Tuple([x_t, it_t])
     else:  # pragma: no cover
         raise MyiaTypeError('Unsupported iterator type for next')
+
+
+@type_inferrer(P.scalar_to_array, nargs=1)
+async def infer_type_scalar_to_array(track, x):
+    """Infer the return type of scalar_to_array."""
+    x_t = await x['type']
+    if not isinstance(x_t, (Int, Float)):
+        raise MyiaTypeError(f'Invalid type for scalar_to_array: {x_t}')
+    return Array(x_t)

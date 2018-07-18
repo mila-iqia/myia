@@ -227,3 +227,9 @@ async def infer_shape_getattr(track, data, item):
 async def infer_shape_identity(track, x):
     """Infer the shape of identity."""
     return await x['shape']
+
+
+@shape_inferrer(P.scalar_to_array, nargs=1)
+async def infer_shape_scalar_to_array(track, x):
+    """Infer the shape of scalar_to_array."""
+    return ()
