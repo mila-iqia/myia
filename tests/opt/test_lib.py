@@ -517,6 +517,54 @@ def test_inline_unique_uses_recursive():
                lib.inline_unique_uses)
 
 
+def test_replace_applicator():
+
+    def app1(x, y):
+        return x + y
+
+    def app2(x, y):
+        return app1(x, y)
+
+    def app3(x, y):
+        return y + x
+
+    def before1(x, y):
+        return app1(x, y)
+
+    def before2(x, y):
+        return app2(x, y)
+
+    def before3(x, y):
+        return app3(x, y)
+
+    def after(x, y):
+        return x + y
+
+    _check_opt(before1, after,
+               lib.replace_applicator)
+
+    _check_opt(before2, after,
+               lib.replace_applicator)
+
+    _check_opt(before3, before3,
+               lib.replace_applicator)
+
+
+def test_replace_applicator_2():
+
+    def before(x, y):
+        def app(x, y):
+            z = x * y
+
+            def inner(x, y):
+                return z
+            return inner(x, y)
+        return app(x + 1, y + 1)
+
+    _check_opt(before, before,
+               lib.replace_applicator)
+
+
 ##################
 # Drop call into #
 ##################

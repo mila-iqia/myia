@@ -4,7 +4,7 @@ from ..graph_utils import dfs
 from ..ir import succ_incoming, freevars_boundary, \
     Graph, Constant, is_constant, is_constant_graph, is_apply, \
     GraphCloner
-from ..prim import ops as P
+from ..prim import Primitive, ops as P
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
 
@@ -281,6 +281,29 @@ inline_unique_uses = make_inliner(inline_criterion=is_unique_use,
                                   check_recursive=True)
 
 inline = make_inliner(inline_criterion=None, check_recursive=True)
+
+
+@pattern_replacer('just', G)
+def replace_applicator(optimizer, node, equiv):
+    """Replace a function that applies another by the other function.
+
+    For example, `lambda x, y: f(x, y)` is replaced by f.
+
+    The inner function must be applied on all the outer function's parameters
+    in the exact same order, and it must be either a Primitive or a global
+    function.
+    """
+    g = equiv[G].value
+    out = g.output
+    if is_apply(out) and out.inputs[1:] == g.parameters:
+        inner = out.inputs[0]
+        # NOTE: it is likely correct to use `inner.value.parent is not g` as
+        # the condition instead of `is None`, the current code is just playing
+        # it safe.
+        if is_constant(inner, Primitive) \
+                or is_constant_graph(inner) and inner.value.parent is None:
+            return inner
+    return node
 
 
 ##########################

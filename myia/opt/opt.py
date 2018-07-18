@@ -122,6 +122,9 @@ class PatternSubstitutionOptimization:
 
 def pattern_replacer(*pattern):
     """Create a PatternSubstitutionOptimization using this function."""
+    if len(pattern) == 2 and pattern[0] == 'just':
+        pattern = pattern[1]
+
     def deco(f):
         return PatternSubstitutionOptimization(pattern, f, name=f.__name__)
     return deco
