@@ -16,7 +16,7 @@ from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
     typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
-    bool_and, bool_or, switch, scalar_to_array
+    bool_and, bool_or, switch, scalar_to_array, broadcast_shape
 
 
 B = Bool()
@@ -1181,3 +1181,15 @@ def test_switch(c, x, y):
        shape=[({'type': i64}, ())])
 def test_scalar_to_array(x):
     return scalar_to_array(x)
+
+
+@infer(type=[
+    (T([u64]), T([u64]), T([u64])),
+    (T([u64, u64]), T([u64]), T([u64, u64])),
+    (T([u64]), T([u64, u64]), T([u64, u64])),
+    (T([i64]), T([u64]), InferenceError),
+    (T([u64]), T([i64]), InferenceError),
+    (i64, i64, InferenceError),
+])
+def test_broadcast_shape(xs, ys):
+    return broadcast_shape(xs, ys)

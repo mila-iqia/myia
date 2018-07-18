@@ -448,3 +448,29 @@ def switch(c, x, y):
 def scalar_to_array(x):
     """Implement `scalar_to_array`."""
     return np.array(x)
+
+
+@register(primops.broadcast_shape)
+def broadcast_shape(shpx, shpy):
+    """Implement `broadcast_shape`."""
+    orig_shpx = shpx
+    orig_shpy = shpy
+    dlen = len(shpx) - len(shpy)
+    if dlen < 0:
+        shpx = (1,) * -dlen + shpx
+    elif dlen > 0:
+        shpy = (1,) * dlen + shpy
+    assert len(shpx) == len(shpy)
+    shp = []
+    for a, b in zip(shpx, shpy):
+        if a == 1:
+            shp.append(b)
+        elif b == 1:
+            shp.append(a)
+        elif a == b:
+            shp.append(a)
+        else:
+            raise ValueError(
+                f'Cannot broadcast shapes {orig_shpx} and {orig_shpy}.'
+            )
+    return tuple(shp)

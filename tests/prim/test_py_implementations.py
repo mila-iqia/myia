@@ -8,7 +8,7 @@ from myia.prim.py_implementations import head, setattr as myia_setattr, \
     setitem as myia_setitem, tail, hastype, typeof, \
     shape, reshape, array_map, array_map2, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
-    switch, scalar_to_array
+    switch, scalar_to_array, broadcast_shape
 
 from ..test_lang import parse_compare
 
@@ -276,3 +276,27 @@ def test_scalar_to_array():
     b = scalar_to_array(1.5)
     assert isinstance(b, np.ndarray)
     assert b.dtype == np.float64
+
+
+def test_broadcast_shape():
+    tests = [
+        ((2, 3), (2, 3), (2, 3)),
+        ((2, 1), (2, 3), (2, 3)),
+        ((2, 3), (2, 1), (2, 3)),
+        ((2, 1), (1, 3), (2, 3)),
+        ((2, 1), (7, 1, 3), (7, 2, 3)),
+        ((1, 2, 3), (2, 3), (1, 2, 3)),
+        ((2, 3), (2, 4), ValueError),
+        ((), (1, 2, 3, 4, 5), (1, 2, 3, 4, 5)),
+        ((1, 2, 3, 4, 5), (), (1, 2, 3, 4, 5)),
+    ]
+    for shpx, shpy, result in tests:
+        try:
+            shp = broadcast_shape(shpx, shpy)
+        except Exception as e:
+            if isinstance(result, type) and isinstance(e, result):
+                continue
+            else:
+                print(f'Expected {result}, got {e}')
+                raise
+        assert shp == result

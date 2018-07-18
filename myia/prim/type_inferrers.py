@@ -439,3 +439,19 @@ async def infer_type_scalar_to_array(track, x):
     if not isinstance(x_t, (Int, Float)):
         raise MyiaTypeError(f'Invalid type for scalar_to_array: {x_t}')
     return Array(x_t)
+
+
+@type_inferrer(P.broadcast_shape, nargs=2)
+async def infer_type_broadcast_shape(track, xs, ys):
+    """Infer the return type of broadcast_shape."""
+    xs_t = await xs['type']
+    ys_t = await ys['type']
+    if not isinstance(xs_t, Tuple) \
+            or not all(t == UInt(64) for t in xs_t.elements):
+        raise MyiaTypeError(f'Invalid type for broadcast_shape: {xs_t}')
+    if not isinstance(ys_t, Tuple) \
+            or not all(t == UInt(64) for t in ys_t.elements):
+        raise MyiaTypeError(f'Invalid type for broadcast_shape: {ys_t}')
+    shp_xs_n = len(xs_t.elements)
+    shp_ys_n = len(ys_t.elements)
+    return Tuple([UInt(64) for i in range(max(shp_xs_n, shp_ys_n))])
