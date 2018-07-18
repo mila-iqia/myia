@@ -114,6 +114,7 @@ def parse(func):
         return _parse_cache[func]
     parser = Parser(func)
     graph = parser.parse()
+    graph.flags.update(getattr(func, '_myia_flags', {}))
     _parse_cache[func] = graph
     return graph
 
