@@ -52,6 +52,7 @@ class Graph:
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
         self.debug = NamedDebugInfo(self)
+        self.flags = {}
         self.transforms: Dict[str, Union[Graph, Primitive]] = {}
         self._manager = None
 

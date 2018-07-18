@@ -99,6 +99,7 @@ class GraphCloner:
         else:
             with About(graph.debug, self.graph_relation):
                 target_graph = Graph()
+                target_graph.flags = copy(graph.flags)
             for p in graph.parameters:
                 with About(p.debug, self.relation):
                     p2 = target_graph.add_parameter()
