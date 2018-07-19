@@ -6,7 +6,7 @@ import numpy as np
 from myia.dtype import Int, Float, List, Tuple, External
 from myia.prim.py_implementations import head, setattr as myia_setattr, \
     setitem as myia_setitem, tail, hastype, typeof, \
-    shape, reshape, map_array, scan_array, reduce_array, distribute, dot, \
+    shape, reshape, array_map, array_scan, array_reduce, distribute, dot, \
     partial as myia_partial, _assert_scalar
 
 from ..test_lang import parse_compare
@@ -152,39 +152,39 @@ def test_prim_shape():
     assert shape(v) == (2, 3)
 
 
-def test_prim_map_array():
+def test_prim_array_map():
     v = np.zeros((2, 3))
 
     def f(a):
         return a + 1
 
-    v2 = map_array(f, v)
+    v2 = array_map(f, v)
 
     assert (v == 0).all()
     assert (v2 == 1).all()
 
 
-def test_prim_scan_array():
+def test_prim_array_scan():
     v = np.ones((2, 3))
 
     def f(a, b):
         return a + b
 
     vref = np.cumsum(v, axis=1)
-    v2 = scan_array(f, 0, v, 1)
+    v2 = array_scan(f, 0, v, 1)
 
     assert (v == 1).all()
     assert (v2 == vref).all()
 
 
-def test_prim_reduce_array():
+def test_prim_array_reduce():
     v = np.ones((2, 3))
 
     def f(a, b):
         return a + b
 
     vref = np.add.reduce(v, axis=1)
-    v2 = reduce_array(f, 0, v, 1)
+    v2 = array_reduce(f, 0, v, 1)
 
     assert (v == 1).all()
     assert (v2 == vref).all()

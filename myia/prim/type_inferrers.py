@@ -218,9 +218,9 @@ async def infer_type_shape(track, ary):
     return Tuple([UInt(64)]*len(shp))
 
 
-@type_inferrer(P.map_array, nargs=2)
-async def infer_type_map_array(track, fn, ary):
-    """Infer the return type of map_array."""
+@type_inferrer(P.array_map, nargs=2)
+async def infer_type_array_map(track, fn, ary):
+    """Infer the return type of array_map."""
     fn_t = await fn['type']
     ary_t = await ary['type']
     if not isinstance(ary_t, Array):
@@ -229,9 +229,9 @@ async def infer_type_map_array(track, fn, ary):
     return Array(await fn_t(xref))
 
 
-@type_inferrer(P.scan_array, P.reduce_array, nargs=4)
+@type_inferrer(P.array_scan, P.array_reduce, nargs=4)
 async def infer_type_across_array(track, fn, init, ary, ax):
-    """Infer the return type of scan/reduce_array."""
+    """Infer the return type of scan/array_reduce."""
     fn_t = await fn['type']
     ary_t = await ary['type']
     init_t = await init['type']
@@ -286,13 +286,13 @@ async def infer_type_return_(track, x):
     return await x['type']
 
 
-@type_inferrer(P.maplist, nargs=2)
-async def infer_type_maplist(track, f, xs):
-    """Infer the return type of maplist."""
+@type_inferrer(P.list_map, nargs=2)
+async def infer_type_list_map(track, f, xs):
+    """Infer the return type of list_map."""
     f_t = await f['type']
     xs_t = await xs['type']
     if not isinstance(xs_t, List):
-        raise MyiaTypeError('Expect list for maplist')
+        raise MyiaTypeError('Expect list for list_map')
     xref = track.engine.vref(dict(type=xs_t.element_type))
     ret_t = await f_t(xref)
     return List(ret_t)

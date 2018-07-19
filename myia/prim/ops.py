@@ -84,9 +84,9 @@ next = Primitive('next')
 
 
 shape = Primitive('shape')
-map_array = Primitive('map_array')
-scan_array = Primitive('scan_array')
-reduce_array = Primitive('reduce_array')
+array_map = Primitive('array_map')
+array_scan = Primitive('array_scan')
+array_reduce = Primitive('array_reduce')
 distribute = Primitive('distribute')
 reshape = Primitive('reshape')
 dot = Primitive('dot')
@@ -105,6 +105,6 @@ return_ = Primitive('return')
 # Miscellaneous #
 #################
 
-maplist = Primitive('maplist')
+list_map = Primitive('list_map')
 resolve = Primitive('resolve')
 partial = Primitive('partial')

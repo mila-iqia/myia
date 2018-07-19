@@ -249,9 +249,9 @@ def shape(array):
     return array.shape
 
 
-@py_register(primops.map_array)
-def map_array(fn, array):
-    """Implement `map_array`."""
+@py_register(primops.array_map)
+def array_map(fn, array):
+    """Implement `array_map`."""
     def f(ary):
         it = np.nditer([ary, None])
         for x, y in it:
@@ -260,16 +260,16 @@ def map_array(fn, array):
     return np.apply_along_axis(f, 0, array)
 
 
-@vm_register(primops.map_array)
-def _map_array_vm(vm, fn, array):
+@vm_register(primops.array_map)
+def _array_map_vm(vm, fn, array):
     def fn_(x):
         return vm.call(fn, (x,))
-    return map_array(fn_, array)
+    return array_map(fn_, array)
 
 
-@py_register(primops.scan_array)
-def scan_array(fn, init, array, axis):
-    """Implement `scan_array`."""
+@py_register(primops.array_scan)
+def array_scan(fn, init, array, axis):
+    """Implement `array_scan`."""
     # This is inclusive scan because it's easier to implement
     # We will have to discuss what semantics we want later
     def f(ary):
@@ -282,16 +282,16 @@ def scan_array(fn, init, array, axis):
     return np.apply_along_axis(f, axis, array)
 
 
-@vm_register(primops.scan_array)
-def _scan_array_vm(vm, fn, init, array, axis):
+@vm_register(primops.array_scan)
+def _array_scan_vm(vm, fn, init, array, axis):
     def fn_(a, b):
         return vm.call(fn, [a, b])
-    return scan_array(fn_, init, array, axis)
+    return array_scan(fn_, init, array, axis)
 
 
-@py_register(primops.reduce_array)
-def reduce_array(fn, init, array, axis):
-    """Implement `reduce_array`."""
+@py_register(primops.array_reduce)
+def array_reduce(fn, init, array, axis):
+    """Implement `array_reduce`."""
     def f(ary):
         val = init
         it = np.nditer([ary])
@@ -301,11 +301,11 @@ def reduce_array(fn, init, array, axis):
     return np.apply_along_axis(f, axis, array)
 
 
-@vm_register(primops.reduce_array)
-def _reduce_array_vm(vm, fn, init, array, axis):
+@vm_register(primops.array_reduce)
+def _array_reduce_vm(vm, fn, init, array, axis):
     def fn_(a, b):
         return vm.call(fn, [a, b])
-    return reduce_array(fn_, init, array, axis)
+    return array_reduce(fn_, init, array, axis)
 
 
 @register(primops.distribute)
@@ -332,15 +332,15 @@ def return_(x):
     return x
 
 
-@py_register(primops.maplist)
-def maplist(f, xs):
-    """Implement `maplist` in pure Python."""
+@py_register(primops.list_map)
+def list_map(f, xs):
+    """Implement `list_map` in pure Python."""
     return list(map(f, xs))
 
 
-@vm_register(primops.maplist)
-def _maplist_vm(vm, f, xs):
-    """Implement `maplist` for Myia's VM."""
+@vm_register(primops.list_map)
+def _list_map_vm(vm, f, xs):
+    """Implement `list_map` for Myia's VM."""
     def f_(*args):
         return vm.call(f, args)
     return list(map(f_, xs))

@@ -96,21 +96,21 @@ async def infer_shape_partial(engine, fn, *args):
     return PartialInferrer(engine, fn_t, args)
 
 
-@shape_inferrer(P.map_array, nargs=2)
-async def infer_shape_map_array(track, fn, ary):
-    """Infer the shape of map_array."""
+@shape_inferrer(P.array_map, nargs=2)
+async def infer_shape_array_map(track, fn, ary):
+    """Infer the shape of array_map."""
     return await ary['shape']
 
 
-@shape_inferrer(P.scan_array, nargs=4)
-async def infer_shape_scan_array(track, fn, init, ary, ax):
-    """Infer the shape of scan_array."""
+@shape_inferrer(P.array_scan, nargs=4)
+async def infer_shape_array_scan(track, fn, init, ary, ax):
+    """Infer the shape of array_scan."""
     return await ary['shape']
 
 
-@shape_inferrer(P.reduce_array, nargs=4)
-async def infer_shape_reduce_array(track, fn, init, ary, ax):
-    """Infer the shape of reduce_array."""
+@shape_inferrer(P.array_reduce, nargs=4)
+async def infer_shape_array_reduce(track, fn, init, ary, ax):
+    """Infer the shape of array_reduce."""
     shp = await ary['shape']
     ax_v = await ax['value']
     if ax_v == ANYTHING:

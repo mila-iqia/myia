@@ -8,7 +8,7 @@ from myia.graph_utils import dfs
 from myia.infer import Inferrer
 from myia.ir import succ_deeper, is_apply, is_constant
 from myia.prim import ops as P, Primitive
-from myia.prim.py_implementations import typeof, hastype, maplist, scalar_add
+from myia.prim.py_implementations import typeof, hastype, list_map, scalar_add
 from myia.specialize import DEAD
 
 from .test_infer import i64, f64
@@ -29,7 +29,7 @@ op_whitelist = [
     P.return_, P.if_, P.partial,
     P.scalar_add, P.scalar_mul, P.scalar_sub,
     P.scalar_gt, P.scalar_lt,
-    P.cons_tuple, P.hastype, P.maplist
+    P.cons_tuple, P.hastype, P.list_map
 ]
 
 
@@ -181,24 +181,24 @@ def test_hastype(x, y):
 
 
 @specialize(([fp1, fp2],))
-def test_maplist(xs):
+def test_list_map(xs):
     def square(x):
         return x * x
 
-    return maplist(square, xs)
+    return list_map(square, xs)
 
 
 @specialize(([fp1, fp2], [int1, int2]))
-def test_maplist_polymorphic(xs, ys):
+def test_list_map_polymorphic(xs, ys):
     def square(x):
         return x * x
 
-    return maplist(square, xs), maplist(square, ys)
+    return list_map(square, xs), list_map(square, ys)
 
 
 @mark.xfail(reason="Cannot specialize f")
 @specialize((True, [fp1, fp2], [int1, int2]))
-def test_maplist_polymorphic_2(c, xs, ys):
+def test_list_map_polymorphic_2(c, xs, ys):
     def square(x):
         return x * x
 
@@ -210,7 +210,7 @@ def test_maplist_polymorphic_2(c, xs, ys):
     else:
         f = double
 
-    return maplist(f, xs), maplist(f, ys)
+    return list_map(f, xs), list_map(f, ys)
 
 
 @specialize((int1, int2))
