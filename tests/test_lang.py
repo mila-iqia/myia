@@ -230,6 +230,16 @@ def test_or(x, y):
     return x > 0 or y > 0
 
 
+@parse_compare((7, 3), (-1, 3), (-3, 1), (-1, -1))
+def test_band(x, y):
+    return (x > 0) & (y > 0)
+
+
+@parse_compare((7, 3), (-1, 3), (-3, 1), (-1, -1))
+def test_bor(x, y):
+    return (x > 0) | (y > 0)
+
+
 ###################
 # while statement #
 ###################

@@ -43,6 +43,8 @@ scalar_ne = Primitive('scalar_ne')
 scalar_le = Primitive('scalar_le')
 scalar_ge = Primitive('scalar_ge')
 bool_not = Primitive('bool_not')
+bool_and = Primitive('bool_and')
+bool_or = Primitive('bool_or')
 
 
 ######################

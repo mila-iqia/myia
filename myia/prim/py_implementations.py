@@ -146,6 +146,22 @@ def bool_not(x):
     return not x
 
 
+@register(primops.bool_and)
+def bool_and(x, y):
+    """Implement `bool_and`."""
+    assert x is True or x is False
+    assert y is True or y is False
+    return x and y
+
+
+@register(primops.bool_or)
+def bool_or(x, y):
+    """Implement `bool_or`."""
+    assert x is True or x is False
+    assert y is True or y is False
+    return x or y
+
+
 @register(primops.typeof)
 def typeof(x):
     """Implement typeof."""

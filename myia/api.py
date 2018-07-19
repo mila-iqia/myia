@@ -35,6 +35,8 @@ default_object_map = {
     operator.pos: P.scalar_uadd,
     operator.neg: P.scalar_usub,
     operator.not_: P.bool_not,
+    operator.and_: P.bool_and,
+    operator.or_: P.bool_or,
     operator.getitem: P.getitem,
     operator.setitem: P.setitem,
     getattr: P.getattr,
