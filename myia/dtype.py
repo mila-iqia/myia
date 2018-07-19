@@ -59,6 +59,9 @@ class TypeMeta(type):
             self._instances[key] = obj
         return self._instances[key]
 
+    def __str__(self):  # pragma: no cover
+        return self.__name__
+
 
 class Type(metaclass=TypeMeta):
     """Base class for all Types.
