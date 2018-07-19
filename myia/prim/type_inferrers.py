@@ -92,6 +92,27 @@ async def infer_type_if(track, cond, tb, fb):
         raise AssertionError("Invalid condition value for if")
 
 
+@type_inferrer(P.switch, nargs=3)
+async def infer_type_switch(track, cond, tb, fb):
+    """Infer the return type of switch."""
+    cond_t = await cond['type']
+    if cond_t != Bool():
+        raise MyiaTypeError('Condition for switch must be a boolean')
+    v = await cond['value']
+    if v is True:
+        # We only visit the first branch if the condition is provably true
+        return await tb['type']
+    elif v is False:
+        # We only visit the second branch if the condition is provably false
+        return await fb['type']
+    elif v is ANYTHING:
+        # The first branch to finish will return immediately. When the other
+        # branch finishes, its result will be checked against the other.
+        return await track.assert_same(tb['type'], fb['type'])
+    else:
+        raise AssertionError("Invalid condition value for switch")
+
+
 @type_inferrer(P.partial, nargs=None)
 async def infer_type_partial(track, fn, *args):
     """Infer the return type of partial."""

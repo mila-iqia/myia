@@ -15,7 +15,8 @@ from myia.prim import Primitive
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
     typeof, scalar_usub, dot, distribute, shape, array_map, array_scan, \
-    array_reduce, reshape, partial as myia_partial, identity, bool_and, bool_or
+    array_reduce, reshape, partial as myia_partial, identity, \
+    bool_and, bool_or, switch
 
 
 B = Bool()
@@ -1084,3 +1085,42 @@ def test_bool_and(x, y):
              (B, i64, InferenceError)])
 def test_bool_or(x, y):
     return bool_or(x, y)
+
+
+@infer(
+    type=[
+        (B, i64, i64, i64),
+        (i64, i64, i64, InferenceError),
+        (B, i64, f64, InferenceError),
+        ({'value': True}, i64, f64, i64),
+        ({'value': False}, i64, f64, f64),
+    ],
+    value=[
+        (True, 1, 2, 1),
+        (False, 1, 2, 2),
+        (ANYTHING, 1, 2, ANYTHING),
+    ],
+    shape=[
+        ({'type': B},
+         {'type': ai64, 'shape': (6, 13)},
+         {'type': ai64, 'shape': (6, 13)},
+         (6, 13)),
+
+        ({'type': B},
+         {'type': ai64, 'shape': (6, 13)},
+         {'type': ai64, 'shape': (6, 14)},
+         InferenceError),
+
+        ({'type': B, 'value': True},
+         {'type': ai64, 'shape': (6, 13)},
+         {'type': ai64, 'shape': (6, 14)},
+         (6, 13)),
+
+        ({'type': B, 'value': False},
+         {'type': ai64, 'shape': (6, 13)},
+         {'type': ai64, 'shape': (6, 14)},
+         (6, 14)),
+    ]
+)
+def test_switch(c, x, y):
+    return switch(c, x, y)

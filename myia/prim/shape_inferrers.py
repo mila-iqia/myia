@@ -89,6 +89,24 @@ async def infer_shape_if(track, cond, tb, fb):
         raise AssertionError("Invalid condition value for if.")
 
 
+@shape_inferrer(P.switch, nargs=3)
+async def infer_shape_switch(track, cond, tb, fb):
+    """Infer the shape of switch."""
+    v = await cond['value']
+    if v is True:
+        # We only visit the first branch if the condition is provably true
+        return await tb['shape']
+    elif v is False:
+        # We only visit the second branch if the condition is provably false
+        return await fb['shape']
+    elif v is ANYTHING:
+        # The first branch to finish will return immediately. When the other
+        # branch finishes, its result will be checked against the other.
+        return await track.assert_same(tb['shape'], fb['shape'])
+    else:
+        raise AssertionError("Invalid condition value for switch.")
+
+
 @shape_inferrer(P.partial, nargs=None)
 async def infer_shape_partial(engine, fn, *args):
     """Infer the return type of partial."""
