@@ -363,6 +363,10 @@ class Reference:
     def __getitem__(self, track):
         return self.engine.get(track, self)
 
+    def get_raw(self, track):
+        """Get the raw value for the track, which might be wrapped."""
+        return self.engine.get_raw(track, self)
+
     def __eq__(self, other):
         return isinstance(other, Reference) \
             and self.node is other.node \

@@ -402,3 +402,9 @@ def _next(it):
     """Implement `next`."""
     n, data = it
     return (data[n], (n + 1, data))
+
+
+@register(primops.switch)
+def switch(c, x, y):
+    """Implement `switch`."""
+    return x if c else y
