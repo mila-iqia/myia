@@ -96,7 +96,9 @@ class NodeLabeler:
                              True if force is None else force)
         elif is_constant(node):
             v = node.value
-            if isinstance(v, (int, float, str, Named, Namespace)) or v == ():
+            if v is None or v == ():
+                return repr(v)
+            elif isinstance(v, (int, float, str, Named, Namespace)):
                 return repr(v)
             elif isinstance(v, Primitive):
                 return v.name
@@ -104,7 +106,10 @@ class NodeLabeler:
                 return v.label
             else:
                 class_name = v.__class__.__name__
-                return f'{self.label(node.debug, True)}:{class_name}'
+                s = str(v)
+                if len(s) > 10:
+                    s = f'{s[:10]}...'
+                return f'{s}::{class_name}'
         elif is_special(node):
             return f'{node.special}'
         elif is_parameter(node):
