@@ -99,3 +99,9 @@ venv.bak/
 
 # mkdocs documentation
 /site
+
+# Profiler output
+/prof
+
+# MyPy cache
+.mypy_cache
