@@ -168,11 +168,31 @@ async def infer_type_hastype(track, x, t):
 
 
 @type_inferrer(P.bool_not, nargs=1)
-async def infer_type_not(track, x):
+async def infer_type_bool_not(track, x):
     """Infer the return type of not."""
     x_t = await x['type']
     if x_t != Bool():
         raise MyiaTypeError('Expected Bool for not.')
+    return Bool()
+
+
+@type_inferrer(P.bool_and, nargs=2)
+async def infer_type_bool_and(track, x, y):
+    """Infer the return type of bool_and."""
+    x_t = await x['type']
+    y_t = await y['type']
+    if x_t != Bool() or y_t != Bool():
+        raise MyiaTypeError('Expected Bool for bool_and.')
+    return Bool()
+
+
+@type_inferrer(P.bool_or, nargs=2)
+async def infer_type_bool_or(track, x, y):
+    """Infer the return type of bool_or."""
+    x_t = await x['type']
+    y_t = await y['type']
+    if x_t != Bool() or y_t != Bool():
+        raise MyiaTypeError('Expected Bool for bool_or.')
     return Bool()
 
 

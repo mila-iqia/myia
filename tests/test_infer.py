@@ -15,7 +15,7 @@ from myia.prim import Primitive
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
     typeof, scalar_usub, dot, distribute, shape, array_map, array_scan, \
-    array_reduce, reshape, partial as myia_partial, identity
+    array_reduce, reshape, partial as myia_partial, identity, bool_and, bool_or
 
 
 B = Bool()
@@ -1070,3 +1070,17 @@ def test_partial_2(x):
        shape=[({'type': ai64, 'shape': (6, 13)}, (6, 13))])
 def test_identity(x):
     return identity(x)
+
+
+@infer(type=[(B, B, B),
+             (i64, B, InferenceError),
+             (B, i64, InferenceError)])
+def test_bool_and(x, y):
+    return bool_and(x, y)
+
+
+@infer(type=[(B, B, B),
+             (i64, B, InferenceError),
+             (B, i64, InferenceError)])
+def test_bool_or(x, y):
+    return bool_or(x, y)
