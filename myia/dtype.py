@@ -251,10 +251,6 @@ class Problem(Type):
     kind: Any
 
 
-class Unknown(Type):
-    """Represents an unknown type (prior to type inference)."""
-
-
 class External(Type):
     """Represents a type external to Myia (essentially invalid)."""
 

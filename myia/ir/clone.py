@@ -1,5 +1,6 @@
 """Graph cloning facility."""
 
+from copy import copy
 
 from .anf import Apply, Constant, Graph
 from ..info import About
@@ -101,7 +102,7 @@ class GraphCloner:
             for p in graph.parameters:
                 with About(p.debug, self.relation):
                     p2 = target_graph.add_parameter()
-                    p2.type = p.type
+                    p2.inferred = copy(p.inferred)
                     self.repl[p] = p2
             self.repl[graph] = target_graph
 
@@ -110,7 +111,7 @@ class GraphCloner:
                 continue
             with About(node.debug, self.relation):
                 new = Apply([], target_graph)
-                new.type = node.type
+                new.inferred = copy(node.inferred)
                 self.repl[node] = new
                 self.nodes.append((node, new))
 
@@ -119,14 +120,14 @@ class GraphCloner:
             for ct in mng.graph_constants[graph]:
                 with About(ct.debug, self.relation):
                     new = Constant(target_graph)
-                    new.type = ct.type
+                    new.inferred = copy(ct.inferred)
                     self.repl[ct] = new
 
         if self.clone_constants:
             for ct in mng.constants[graph]:
                 if ct not in self.repl:
                     new = Constant(ct.value)
-                    new.type = ct.type
+                    new.inferred = copy(ct.inferred)
                     self.repl[ct] = new
 
         self.status[graph] = inline

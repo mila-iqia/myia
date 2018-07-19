@@ -205,12 +205,26 @@ class _GraphSpecializer:
     # Process #
     ###########
 
+    async def fill_inferred(self, new_node, ref):
+        # Fill in inferred properties like shape, etc.
+        # Inference for 'type' and 'value' is ignored here because
+        # they are processed specifically by the rest of the code.
+        for name, track in self.engine.tracks.items():
+            if name not in ('type', 'value'):
+                res = await ref[name]
+                if not isinstance(ref, Inferrer):
+                    new_node.inferred[name] = res
+
     async def process_node(self, node):
-        t = await _extract_type(self.ref(node))
-        self.get(node).type = t
+        ref = self.ref(node)
+        new_node = self.get(node)
+
+        t = await _extract_type(ref)
+        new_node.type = t
+
+        await self.fill_inferred(new_node, ref)
 
         if is_apply(node):
-            new_node = self.get(node)
             new_inputs = new_node.inputs
             irefs = list(map(self.ref, node.inputs))
             for i, iref in enumerate(irefs):
@@ -218,6 +232,7 @@ class _GraphSpecializer:
                 try:
                     repl = await self.build(ref=iref,
                                             argrefs=argrefs)
+                    await self.fill_inferred(repl, iref)
                     new_inputs[i] = repl
                 except _Unspecializable as e:
                     if is_constant_graph(new_inputs[i]):
