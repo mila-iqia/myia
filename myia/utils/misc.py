@@ -29,6 +29,9 @@ class Named:
         return self.name
 
 
+UNKNOWN = Named('UNKNOWN')
+
+
 class Registry(Dict[T1, T2]):
     """Associates primitives to implementations."""
 

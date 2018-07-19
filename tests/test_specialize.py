@@ -3,13 +3,14 @@ from pytest import mark
 from collections import defaultdict
 
 from myia.api import standard_pipeline, step_debug_export
-from myia.dtype import Function, Unknown, Type, Problem, External
+from myia.dtype import Function, Type, Problem, External
 from myia.graph_utils import dfs
 from myia.infer import Inferrer
 from myia.ir import succ_deeper, is_apply, is_constant
 from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import typeof, hastype, list_map, scalar_add
 from myia.specialize import DEAD
+from myia.utils import UNKNOWN
 
 from .test_infer import i64, f64
 
@@ -42,8 +43,8 @@ def validate(g):
     """
     errors = defaultdict(set)
     for node in dfs(g.return_, succ_deeper):
-        if node.type is None or node.type == Unknown():
-            errors[node].add('No type')
+        if node.type is UNKNOWN:
+            errors[node].add('Type was not inferred')
         elif isinstance(node.type, Inferrer):
             errors[node].add('Uneliminated inferrer')
         elif isinstance(node.type, Problem):

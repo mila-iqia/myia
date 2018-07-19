@@ -10,12 +10,13 @@ returning a nested function creates a closure.
 
 """
 
+from collections import defaultdict
 from typing import Any, Iterable, List, Union, Dict
 
-from ..dtype import Function, Unknown
+from ..dtype import Function
 from ..info import NamedDebugInfo
 from ..prim import ops as primops, Primitive
-from ..utils import Named, list_str, repr_
+from ..utils import Named, list_str, repr_, UNKNOWN
 from ..utils.unify import expandlist, noseq
 
 from .abstract import Node
@@ -225,7 +226,17 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.debug = NamedDebugInfo(self)
-        self.type = Unknown()
+        self.inferred = defaultdict(lambda: UNKNOWN)
+
+    @property
+    def type(self):
+        """Return the node's type."""
+        return self.inferred['type']
+
+    @type.setter
+    def type(self, value):
+        """Set the node's type."""
+        self.inferred['type'] = value
 
     @property
     def incoming(self) -> Iterable['ANFNode']:
