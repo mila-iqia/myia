@@ -78,18 +78,18 @@ def test_dfs_variants():
     inner_ret = inner_graph.return_
 
     deep = _name_nodes(_dfs(inner_ret, succ_deep))
-    assert deep == set('return add y z mul x'.split())
+    assert deep == set('return scalar_add y z scalar_mul x'.split())
 
     deeper = _name_nodes(_dfs(inner_ret, succ_deeper))
-    assert deeper == set('return add y z mul x w 3 q g'.split())
+    assert deeper == set('return scalar_add y z scalar_mul x w 3 q g'.split())
 
     _bound_fv = freevars_boundary(inner_graph, True)
     bound_fv = _name_nodes(_dfs(inner_ret, succ_deeper, _bound_fv))
-    assert bound_fv == set('return add y z'.split())
+    assert bound_fv == set('return scalar_add y z'.split())
 
     _no_fv = freevars_boundary(inner_graph, False)
     no_fv = _name_nodes(_dfs(inner_ret, succ_deeper, _no_fv))
-    assert no_fv == set('return add y'.split())
+    assert no_fv == set('return scalar_add y'.split())
 
     _excl_root = exclude_from_set([inner_ret])
     excl_root = _name_nodes(_dfs(inner_ret, succ_deeper, _excl_root))

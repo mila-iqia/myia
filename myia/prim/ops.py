@@ -21,14 +21,14 @@ class Primitive(Named):
 ##############
 
 
-add = Primitive('add')
-sub = Primitive('sub')
-mul = Primitive('mul')
-div = Primitive('div')
-mod = Primitive('mod')
-pow = Primitive('pow')
-uadd = Primitive('uadd')
-usub = Primitive('usub')
+scalar_add = Primitive('scalar_add')
+scalar_sub = Primitive('scalar_sub')
+scalar_mul = Primitive('scalar_mul')
+scalar_div = Primitive('scalar_div')
+scalar_mod = Primitive('scalar_mod')
+scalar_pow = Primitive('scalar_pow')
+scalar_uadd = Primitive('scalar_uadd')
+scalar_usub = Primitive('scalar_usub')
 
 
 ###############
@@ -36,13 +36,13 @@ usub = Primitive('usub')
 ###############
 
 
-eq = Primitive('eq')
-lt = Primitive('lt')
-gt = Primitive('gt')
-ne = Primitive('ne')
-le = Primitive('le')
-ge = Primitive('ge')
-not_ = Primitive('not')
+scalar_eq = Primitive('scalar_eq')
+scalar_lt = Primitive('scalar_lt')
+scalar_gt = Primitive('scalar_gt')
+scalar_ne = Primitive('scalar_ne')
+scalar_le = Primitive('scalar_le')
+scalar_ge = Primitive('scalar_ge')
+bool_not = Primitive('bool_not')
 
 
 ######################
@@ -84,9 +84,9 @@ next = Primitive('next')
 
 
 shape = Primitive('shape')
-map_array = Primitive('map_array')
-scan_array = Primitive('scan_array')
-reduce_array = Primitive('reduce_array')
+array_map = Primitive('array_map')
+array_scan = Primitive('array_scan')
+array_reduce = Primitive('array_reduce')
 distribute = Primitive('distribute')
 reshape = Primitive('reshape')
 dot = Primitive('dot')
@@ -105,6 +105,6 @@ return_ = Primitive('return')
 # Miscellaneous #
 #################
 
-maplist = Primitive('maplist')
+list_map = Primitive('list_map')
 resolve = Primitive('resolve')
 partial = Primitive('partial')

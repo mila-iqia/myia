@@ -1,8 +1,8 @@
 import numpy as np
 
 from myia.api import compile
-from myia.prim.py_implementations import (map_array, maplist, reduce_array,
-                                          scan_array, usub)
+from myia.prim.py_implementations import (array_map, list_map, array_reduce,
+                                          array_scan, scalar_usub)
 
 from .test_lang import parse_compare
 
@@ -12,12 +12,12 @@ def test_vm_icall_fn(l):
     def square(x):
         return x * x
 
-    return maplist(square, l)
+    return list_map(square, l)
 
 
 @parse_compare(([1, 2, 3],))
 def test_vm_icall_prim(l):
-    return maplist(usub, l)
+    return list_map(scalar_usub, l)
 
 
 @parse_compare(([1, 2, 3],))
@@ -27,42 +27,42 @@ def test_vm_icall_clos(l):
     def add2(v):
         return v + y
 
-    return maplist(add2, l)
+    return list_map(add2, l)
 
 
-def test_vm_map_array():
+def test_vm_array_map():
     @compile
     def f(x):
         def add1(x):
             return x + 1
 
-        return map_array(add1, x)
+        return array_map(add1, x)
 
     a = np.zeros((2, 3))
     res = f(a)
     assert (res == np.ones((2, 3))).all()
 
 
-def test_vm_scan_array():
+def test_vm_array_scan():
     @compile
     def f(x):
         def add(x, y):
             return x + y
 
-        return scan_array(add, 0, x, 1)
+        return array_scan(add, 0, x, 1)
 
     a = np.ones((2, 3))
     res = f(a)
     assert (res == a.cumsum(axis=1)).all()
 
 
-def test_vm_reduce_array():
+def test_vm_array_reduce():
     @compile
     def f(x):
         def add(x, y):
             return x + y
 
-        return reduce_array(add, 0, x, 0)
+        return array_reduce(add, 0, x, 0)
 
     a = np.ones((2, 3))
     res = f(a)

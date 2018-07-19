@@ -4,7 +4,7 @@ from pytest import mark
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    head, tail, setitem, add, mul
+    head, tail, setitem, scalar_add, scalar_mul
 
 
 #######################
@@ -515,9 +515,9 @@ def test_drop_into_if():
 
     def before_helper(x):
         if x < 0:
-            return mul
+            return scalar_mul
         else:
-            return add
+            return scalar_add
 
     def before(x, y, z):
         return before_helper(x)(y, z)

@@ -13,9 +13,9 @@ from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
     Type, UInt, External
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
-    add, mul, lt, head, tail, maplist, hastype, typeof, usub, \
-    dot, distribute, shape, map_array, scan_array, reduce_array, reshape, \
-    partial as myia_partial
+    scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
+    typeof, scalar_usub, dot, distribute, shape, array_map, array_scan, \
+    array_reduce, reshape, partial as myia_partial
 
 
 B = Bool()
@@ -292,19 +292,19 @@ def test_nullary_closure(x, y):
 @infer(type=(i64, f64, T(i64, f64)))
 def test_merge_point(x, y):
     def mul2():
-        return mul
+        return scalar_mul
     m = mul2()
     return m(x, x), m(y, y)
 
 
 @infer(type=[(i64, InferenceError)])
 def test_not_enough_args_prim(x):
-    return mul(x)
+    return scalar_mul(x)
 
 
 @infer(type=[(i64, i64, i64, InferenceError)])
 def test_too_many_args_prim(x, y, z):
-    return mul(x, y, z)
+    return scalar_mul(x, y, z)
 
 
 @infer(type=[(i64, InferenceError)])
@@ -443,9 +443,9 @@ def test_choose_prim(i, x, y):
 
     def choose(i):
         if i == 0:
-            return add
+            return scalar_add
         else:
-            return mul
+            return scalar_mul
 
     return choose(i)(x, y)
 
@@ -461,9 +461,9 @@ def test_choose_prim_incompatible(i, x, y):
 
     def choose(i):
         if i == 0:
-            return add
+            return scalar_add
         else:
-            return lt
+            return scalar_lt
 
     return choose(i)(x, y)
 
@@ -652,7 +652,7 @@ def test_hof_5(c1, c2, x, y):
 
     def pick_f(c):
         if c:
-            return usub
+            return scalar_usub
         else:
             return _to_i64
 
@@ -757,12 +757,12 @@ def test_cover_limitedvalue_eq(x, y):
         (li64, f64, InferenceError),
     ]
 )
-def test_maplist(xs, ys):
+def test_list_map(xs, ys):
 
     def square(x):
         return x * x
 
-    return maplist(square, xs), maplist(square, ys)
+    return list_map(square, xs), list_map(square, ys)
 
 
 @infer(
@@ -839,7 +839,7 @@ def test_map_2(xs, z):
             return x + y
         return f
 
-    return maplist(adder(z), xs)
+    return list_map(adder(z), xs)
 
 
 def _square(x):
@@ -1013,10 +1013,10 @@ def test_reshape(v, shp):
 @infer(shape=[({'type': af32, 'shape': (3, 4)}, (3, 4))],
        type=[({'type': ai64, 'shape': (3, 4)}, ai64),
              ({'type': i64}, InferenceError)])
-def test_map_array(ary):
+def test_array_map(ary):
     def f(v):
         return v + 1
-    return map_array(f, ary)
+    return array_map(f, ary)
 
 
 @infer(shape=[({'type': ai64, 'shape': (3, 4)}, {'value': 1}, (3, 4))],
@@ -1027,18 +1027,18 @@ def test_map_array(ary):
             InferenceError),
            ({'type': ai64, 'shape': (3, 4)}, {'value': 1}, InferenceError)
        ])
-def test_scan_array(ary, ax):
+def test_array_scan(ary, ax):
     def f(a, b):
         return a + b
-    return scan_array(f, 0, ary, ax)
+    return array_scan(f, 0, ary, ax)
 
 
 @infer(shape=[({'type': ai64, 'shape': (3, 4)}, {'value': 1}, (3,)),
               ({'type': ai64, 'shape': (3, 4)}, {'type': u64}, (ANYTHING,))])
-def test_reduce_array(ary, ax):
+def test_array_reduce(ary, ax):
     def f(a, b):
         return a + b
-    return reduce_array(f, 0, ary, ax)
+    return array_reduce(f, 0, ary, ax)
 
 
 @infer(type=[(i64, i64)],

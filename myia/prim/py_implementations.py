@@ -28,93 +28,121 @@ def register(prim):
     return deco
 
 
-@register(primops.add)
-def add(x, y):
-    """Implement `add`."""
+def _assert_scalar(*args):
+    # TODO: These checks should be stricter, e.g. require that all args
+    # have exactly the same type, but right now there is some mixing between
+    # numpy types and int/float.
+    for x in args:
+        if isinstance(x, np.ndarray):
+            if x.shape != ():
+                msg = f'Expected scalar, not array with shape {x.shape}'
+                raise TypeError(msg)
+        elif not isinstance(x, (int, float)):
+            raise TypeError(f'Expected scalar, not {type(x)}')
+
+
+@register(primops.scalar_add)
+def scalar_add(x, y):
+    """Implement `scalar_add`."""
+    _assert_scalar(x, y)
     return x + y
 
 
-@register(primops.sub)
-def sub(x, y):
-    """Implement `sub`."""
+@register(primops.scalar_sub)
+def scalar_sub(x, y):
+    """Implement `scalar_sub`."""
+    _assert_scalar(x, y)
     return x - y
 
 
-@register(primops.mul)
-def mul(x, y):
-    """Implement `mul`."""
+@register(primops.scalar_mul)
+def scalar_mul(x, y):
+    """Implement `scalar_mul`."""
+    _assert_scalar(x, y)
     return x * y
 
 
-@register(primops.div)
-def div(x, y):
-    """Implement `div`."""
+@register(primops.scalar_div)
+def scalar_div(x, y):
+    """Implement `scalar_div`."""
+    _assert_scalar(x, y)
     return x / y
 
 
-@register(primops.mod)
-def mod(x, y):
-    """Implement `mod`."""
+@register(primops.scalar_mod)
+def scalar_mod(x, y):
+    """Implement `scalar_mod`."""
+    _assert_scalar(x, y)
     return x % y
 
 
-@register(primops.pow)
-def pow(x, y):
-    """Implement `pow`."""
+@register(primops.scalar_pow)
+def scalar_pow(x, y):
+    """Implement `scalar_pow`."""
+    _assert_scalar(x, y)
     return x ** y
 
 
-@register(primops.uadd)
-def uadd(x):
-    """Implement `iadd`."""
+@register(primops.scalar_uadd)
+def scalar_uadd(x):
+    """Implement `scalar_uadd`."""
+    _assert_scalar(x)
     return x
 
 
-@register(primops.usub)
-def usub(x):
-    """Implement `isub`."""
+@register(primops.scalar_usub)
+def scalar_usub(x):
+    """Implement `scalar_usub`."""
+    _assert_scalar(x)
     return -x
 
 
-@register(primops.eq)
-def eq(x, y):
-    """Implement `eq`."""
+@register(primops.scalar_eq)
+def scalar_eq(x, y):
+    """Implement `scalar_eq`."""
+    _assert_scalar(x, y)
     return x == y
 
 
-@register(primops.lt)
-def lt(x, y):
-    """Implement `lt`."""
+@register(primops.scalar_lt)
+def scalar_lt(x, y):
+    """Implement `scalar_lt`."""
+    _assert_scalar(x, y)
     return x < y
 
 
-@register(primops.gt)
-def gt(x, y):
-    """Implement `gt`."""
+@register(primops.scalar_gt)
+def scalar_gt(x, y):
+    """Implement `scalar_gt`."""
+    _assert_scalar(x, y)
     return x > y
 
 
-@register(primops.ne)
-def ne(x, y):
-    """Implement `ne`."""
+@register(primops.scalar_ne)
+def scalar_ne(x, y):
+    """Implement `scalar_ne`."""
+    _assert_scalar(x, y)
     return x != y
 
 
-@register(primops.le)
-def le(x, y):
-    """Implement `le`."""
+@register(primops.scalar_le)
+def scalar_le(x, y):
+    """Implement `scalar_le`."""
+    _assert_scalar(x, y)
     return x <= y
 
 
-@register(primops.ge)
-def ge(x, y):
-    """Implement `ge`."""
+@register(primops.scalar_ge)
+def scalar_ge(x, y):
+    """Implement `scalar_ge`."""
+    _assert_scalar(x, y)
     return x >= y
 
 
-@register(primops.not_)
-def not_(x):
-    """Implement `not_`."""
+@register(primops.bool_not)
+def bool_not(x):
+    """Implement `bool_not`."""
+    assert x is True or x is False
     return not x
 
 
@@ -221,9 +249,9 @@ def shape(array):
     return array.shape
 
 
-@py_register(primops.map_array)
-def map_array(fn, array):
-    """Implement `map_array`."""
+@py_register(primops.array_map)
+def array_map(fn, array):
+    """Implement `array_map`."""
     def f(ary):
         it = np.nditer([ary, None])
         for x, y in it:
@@ -232,16 +260,16 @@ def map_array(fn, array):
     return np.apply_along_axis(f, 0, array)
 
 
-@vm_register(primops.map_array)
-def _map_array_vm(vm, fn, array):
+@vm_register(primops.array_map)
+def _array_map_vm(vm, fn, array):
     def fn_(x):
         return vm.call(fn, (x,))
-    return map_array(fn_, array)
+    return array_map(fn_, array)
 
 
-@py_register(primops.scan_array)
-def scan_array(fn, init, array, axis):
-    """Implement `scan_array`."""
+@py_register(primops.array_scan)
+def array_scan(fn, init, array, axis):
+    """Implement `array_scan`."""
     # This is inclusive scan because it's easier to implement
     # We will have to discuss what semantics we want later
     def f(ary):
@@ -254,16 +282,16 @@ def scan_array(fn, init, array, axis):
     return np.apply_along_axis(f, axis, array)
 
 
-@vm_register(primops.scan_array)
-def _scan_array_vm(vm, fn, init, array, axis):
+@vm_register(primops.array_scan)
+def _array_scan_vm(vm, fn, init, array, axis):
     def fn_(a, b):
         return vm.call(fn, [a, b])
-    return scan_array(fn_, init, array, axis)
+    return array_scan(fn_, init, array, axis)
 
 
-@py_register(primops.reduce_array)
-def reduce_array(fn, init, array, axis):
-    """Implement `reduce_array`."""
+@py_register(primops.array_reduce)
+def array_reduce(fn, init, array, axis):
+    """Implement `array_reduce`."""
     def f(ary):
         val = init
         it = np.nditer([ary])
@@ -273,11 +301,11 @@ def reduce_array(fn, init, array, axis):
     return np.apply_along_axis(f, axis, array)
 
 
-@vm_register(primops.reduce_array)
-def _reduce_array_vm(vm, fn, init, array, axis):
+@vm_register(primops.array_reduce)
+def _array_reduce_vm(vm, fn, init, array, axis):
     def fn_(a, b):
         return vm.call(fn, [a, b])
-    return reduce_array(fn_, init, array, axis)
+    return array_reduce(fn_, init, array, axis)
 
 
 @register(primops.distribute)
@@ -304,15 +332,15 @@ def return_(x):
     return x
 
 
-@py_register(primops.maplist)
-def maplist(f, xs):
-    """Implement `maplist` in pure Python."""
+@py_register(primops.list_map)
+def list_map(f, xs):
+    """Implement `list_map` in pure Python."""
     return list(map(f, xs))
 
 
-@vm_register(primops.maplist)
-def _maplist_vm(vm, f, xs):
-    """Implement `maplist` for Myia's VM."""
+@vm_register(primops.list_map)
+def _list_map_vm(vm, f, xs):
+    """Implement `list_map` for Myia's VM."""
     def f_(*args):
         return vm.call(f, args)
     return list(map(f_, xs))

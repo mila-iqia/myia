@@ -167,7 +167,7 @@ async def infer_type_hastype(track, x, t):
     return Bool()
 
 
-@type_inferrer(P.not_, nargs=1)
+@type_inferrer(P.bool_not, nargs=1)
 async def infer_type_not(track, x):
     """Infer the return type of not."""
     x_t = await x['type']
@@ -176,14 +176,14 @@ async def infer_type_not(track, x):
     return Bool()
 
 
-@type_inferrer(P.eq, P.ne, nargs=2)
+@type_inferrer(P.scalar_eq, P.scalar_ne, nargs=2)
 async def infer_type_generic_compare(track, x, y):
     """Infer the return type of a generic comparison operator."""
     await track.assert_same(x, y)
     return Bool()
 
 
-@type_inferrer(P.lt, P.gt, P.le, P.ge, nargs=2)
+@type_inferrer(P.scalar_lt, P.scalar_gt, P.scalar_le, P.scalar_ge, nargs=2)
 async def infer_type_arith_compare(track, x, y):
     """Infer the return type of an arithmetic comparison operator."""
     t = await track.assert_same(x, y)
@@ -192,7 +192,7 @@ async def infer_type_arith_compare(track, x, y):
     return Bool()
 
 
-@type_inferrer(P.uadd, P.usub, nargs=1)
+@type_inferrer(P.scalar_uadd, P.scalar_usub, nargs=1)
 async def infer_type_arith_unary(track, x):
     """Infer the return type of a unary arithmetic operator."""
     t = await x['type']
@@ -201,7 +201,8 @@ async def infer_type_arith_unary(track, x):
     return t
 
 
-@type_inferrer(P.add, P.sub, P.mul, P.div, P.mod, P.pow, nargs=2)
+@type_inferrer(P.scalar_add, P.scalar_sub, P.scalar_mul, P.scalar_div,
+               P.scalar_mod, P.scalar_pow, nargs=2)
 async def infer_type_arith_bin(track, x, y):
     """Infer the return type of a binary arithmetic operator."""
     t = await track.assert_same(x, y)
@@ -217,9 +218,9 @@ async def infer_type_shape(track, ary):
     return Tuple([UInt(64)]*len(shp))
 
 
-@type_inferrer(P.map_array, nargs=2)
-async def infer_type_map_array(track, fn, ary):
-    """Infer the return type of map_array."""
+@type_inferrer(P.array_map, nargs=2)
+async def infer_type_array_map(track, fn, ary):
+    """Infer the return type of array_map."""
     fn_t = await fn['type']
     ary_t = await ary['type']
     if not isinstance(ary_t, Array):
@@ -228,9 +229,9 @@ async def infer_type_map_array(track, fn, ary):
     return Array(await fn_t(xref))
 
 
-@type_inferrer(P.scan_array, P.reduce_array, nargs=4)
+@type_inferrer(P.array_scan, P.array_reduce, nargs=4)
 async def infer_type_across_array(track, fn, init, ary, ax):
-    """Infer the return type of scan/reduce_array."""
+    """Infer the return type of scan/array_reduce."""
     fn_t = await fn['type']
     ary_t = await ary['type']
     init_t = await init['type']
@@ -285,13 +286,13 @@ async def infer_type_return_(track, x):
     return await x['type']
 
 
-@type_inferrer(P.maplist, nargs=2)
-async def infer_type_maplist(track, f, xs):
-    """Infer the return type of maplist."""
+@type_inferrer(P.list_map, nargs=2)
+async def infer_type_list_map(track, f, xs):
+    """Infer the return type of list_map."""
     f_t = await f['type']
     xs_t = await xs['type']
     if not isinstance(xs_t, List):
-        raise MyiaTypeError('Expect list for maplist')
+        raise MyiaTypeError('Expect list for list_map')
     xref = track.engine.vref(dict(type=xs_t.element_type))
     ret_t = await f_t(xref)
     return List(ret_t)
