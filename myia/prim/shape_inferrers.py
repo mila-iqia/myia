@@ -170,8 +170,11 @@ async def infer_shape_distribute(track, v, shape):
     v_t = await v['type']
     if isinstance(v_t, Array):
         v_shp = await v['shape']
-        if len(shp) < len(v_shp):
+        delta = len(shp) - len(v_shp)
+        if delta < 0:
             raise MyiaShapeError("Cannot distribute to smaller shape")
+        elif delta > 0:
+            v_shp = (1,) * delta + v_shp
         for vs, s in zip(v_shp, shp):
             if vs != s and vs not in (1, ANYTHING) and s not in (1, ANYTHING):
                 raise MyiaShapeError("Cannot change shape when distributing")
