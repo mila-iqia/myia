@@ -1,6 +1,6 @@
 import pytest
 
-from myia.api import parse
+from myia.api import scalar_parse as parse, scalar_pipeline
 
 
 def test_undefined():
@@ -60,7 +60,12 @@ def test_forward_reference():
     def g():
         return h()
 
-    parse(g, resolve_globals=False)
+    # No resolve
+    parse2 = scalar_pipeline \
+        .select('parse') \
+        .make_transformer('input', 'graph')
+
+    parse2(g)
 
     def h():
         return 2 + 2

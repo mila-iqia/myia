@@ -1,6 +1,6 @@
 import pytest
 
-from myia.api import parse, compile
+from myia.api import scalar_parse as parse, scalar_debug_compile as compile
 from myia.cconv import closure_convert
 from myia.ir import clone
 from myia.prim.py_implementations import getitem

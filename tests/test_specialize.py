@@ -2,7 +2,7 @@
 from pytest import mark
 from collections import defaultdict
 
-from myia.api import standard_pipeline, step_debug_export
+from myia.api import scalar_debug_pipeline
 from myia.dtype import Function, Type, Problem, External
 from myia.graph_utils import dfs
 from myia.infer import Inferrer
@@ -15,13 +15,11 @@ from myia.utils import UNKNOWN
 from .test_infer import i64, f64
 
 
-specialize_pipeline = standard_pipeline.select(
-    'parse', 'infer', 'specialize'
-).insert_after(
-    debug_export=step_debug_export
-).configure(
-    {'infer.tracks.value.max_depth': 1}
-)
+specialize_pipeline = scalar_debug_pipeline \
+    .select('parse', 'infer', 'specialize', 'export') \
+    .configure(
+        {'infer.tracks.value.max_depth': 1}
+    )
 
 
 # Add ops as needed, but don't add getattr, resolve and other ops that we want

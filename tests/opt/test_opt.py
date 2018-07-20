@@ -1,6 +1,7 @@
 
 import pytest
-from myia.api import parse
+
+from myia.api import scalar_parse as parse
 from myia.ir import Constant, is_constant, isomorphic, GraphCloner
 from myia.opt import PatternSubstitutionOptimization as psub, \
     PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph

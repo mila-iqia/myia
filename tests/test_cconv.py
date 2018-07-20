@@ -1,13 +1,12 @@
 
 from pytest import mark
 
-from myia.api import standard_pipeline, step_debug_export
+from myia.api import standard_debug_pipeline
 from myia.ir import manage
 
 
-cconv_pipeline = standard_pipeline.select(
-    'parse', 'resolve', 'cconv'
-).insert_after(debug_export=step_debug_export)
+cconv_pipeline = standard_debug_pipeline \
+    .select('parse', 'resolve', 'cconv', 'export')
 
 
 def check_no_free_variables(root):

@@ -6,7 +6,7 @@ from functools import partial
 from pytest import mark
 from types import SimpleNamespace
 
-from myia.api import standard_pipeline
+from myia.api import scalar_pipeline
 from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
@@ -101,7 +101,7 @@ async def infer_type_to_i64(track, x):
     return Int(64)
 
 
-infer_pipeline = standard_pipeline.select(
+infer_pipeline = scalar_pipeline.select(
     'parse', 'infer'
 ).configure({
     'py_implementations': pyimpl_test,

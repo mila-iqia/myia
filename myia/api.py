@@ -20,7 +20,7 @@ from .vm import VM
 from .compile import step_compile, step_link, step_export
 
 
-default_object_map = {
+scalar_object_map = {
     operator.add: P.scalar_add,
     operator.sub: P.scalar_sub,
     operator.mul: P.scalar_mul,
@@ -45,7 +45,11 @@ default_object_map = {
 }
 
 
-default_method_map = TypeMap({
+# Provisional
+standard_object_map = scalar_object_map
+
+
+standard_method_map = TypeMap({
     dtype.Bool: {
         '__and__': P.bool_and,
         '__or__': P.bool_or,
@@ -110,22 +114,6 @@ lax_type_map = TypeMap({
     object: _convert_identity,
     type: _convert_identity,
 })
-
-
-def parse(func: FunctionType, resolve_globals=True) -> Graph:
-    """Parse a function into ANF."""
-    pdef = standard_pipeline.select('parse', 'resolve')
-    pdef = pdef.configure(resolve=resolve_globals)
-    g = pdef.make()(input=func)['graph']
-    return g
-
-
-def compile(obj):
-    """Return a version of the function that runs using Myia's VM."""
-    pdef = standard_pipeline.select(
-        'parse', 'resolve',
-    ).insert_after(debug_export=step_debug_export)
-    return pdef.make()(input=obj)['output']
 
 
 ############
@@ -359,13 +347,13 @@ step_debug_export = DebugVMExporter.partial(
 )
 
 
-standard_pipeline = PipelineDefinition(
+_standard_pipeline = PipelineDefinition(
     resources=dict(
         manager=GraphManager.partial(),
         py_implementations=py_implementations,
-        method_map=default_method_map,
+        method_map=standard_method_map,
         convert=Converter.partial(
-            object_map=default_object_map,
+            object_map=standard_object_map,
             converters=lax_type_map
         ),
     ),
@@ -376,8 +364,47 @@ standard_pipeline = PipelineDefinition(
         specialize=step_specialize,
         opt=step_opt,
         cconv=step_cconv,
-        compile=step_compile,
-        link=step_link,
-        export=step_export,
     )
 )
+
+
+######################
+# Pre-made pipelines #
+######################
+
+
+standard_pipeline = _standard_pipeline \
+    .insert_after(
+        compile=step_compile,
+        link=step_link,
+        export=step_export
+    )
+
+
+standard_debug_pipeline = _standard_pipeline \
+    .insert_after(export=step_debug_export)
+
+
+scalar_pipeline = standard_pipeline.configure({
+    'convert.object_map': scalar_object_map
+})
+
+
+scalar_debug_pipeline = standard_debug_pipeline.configure({
+    'convert.object_map': scalar_object_map
+})
+
+
+######################
+# Pre-made utilities #
+######################
+
+
+scalar_parse = scalar_pipeline \
+    .select('parse', 'resolve') \
+    .make_transformer('input', 'graph')
+
+
+scalar_debug_compile = scalar_debug_pipeline \
+    .select('parse', 'resolve', 'export') \
+    .make_transformer('input', 'output')
