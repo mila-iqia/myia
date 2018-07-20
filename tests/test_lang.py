@@ -4,13 +4,11 @@ from types import SimpleNamespace
 
 from pytest import mark
 
-from myia.api import standard_pipeline, step_debug_export
+from myia.api import standard_debug_pipeline
 
 
-lang_pipeline = standard_pipeline.select(
-    'parse', 'resolve'
-).insert_after(
-    debug_export=step_debug_export)
+lang_pipeline = standard_debug_pipeline \
+    .select('parse', 'resolve', 'export')
 
 
 def parse_compare(*tests):

@@ -161,6 +161,18 @@ class PipelineDefinition:
         """Run a Pipeline made from this definition."""
         return self.make()(**args)
 
+    def make_transformer(self, in_key, out_key):
+        """Create a callable for specific input and output keys.
+
+        Arguments:
+            in_key: The name of the pipeline input to use for the
+                callable's argument.
+            out_key: The name of the pipeline output to return.
+        """
+        def run(arg):
+            return self.run(**{in_key: arg})[out_key]
+        return run
+
     def __getitem__(self, item):
         """Return a pipeline that only contains a subset of the steps."""
         steps = list(self.steps.items())

@@ -1,10 +1,10 @@
 from pytest import mark
 from copy import copy
 
-from myia.api import standard_pipeline
+from myia.api import scalar_pipeline
 from myia.prim.py_implementations import typeof
 
-compile_pipeline = standard_pipeline
+compile_pipeline = scalar_pipeline
 
 
 def parse_compare(*tests):

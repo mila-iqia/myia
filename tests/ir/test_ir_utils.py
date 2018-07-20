@@ -1,4 +1,5 @@
-from myia.api import parse
+
+from myia.api import scalar_parse as parse
 from myia.debug.label import short_labeler
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs as _dfs
