@@ -32,8 +32,11 @@ def manage(*graphs, weak=False):
             break
     if manager is None:
         manager = GraphManager(manage=not weak)
+        root = True
+    else:
+        root = False
     for graph in graphs:
-        manager.add_graph(graph, root=True)
+        manager.add_graph(graph, root=root)
     return manager
 
 
