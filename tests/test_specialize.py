@@ -8,7 +8,9 @@ from myia.graph_utils import dfs
 from myia.infer import Inferrer
 from myia.ir import succ_deeper, is_apply, is_constant
 from myia.prim import ops as P, Primitive
-from myia.prim.py_implementations import typeof, hastype, list_map, scalar_add
+from myia.prim.py_implementations import \
+    typeof, hastype, list_map, scalar_add, scalar_usub, scalar_uadd, \
+    switch
 from myia.specialize import DEAD
 from myia.utils import UNKNOWN
 
@@ -27,8 +29,9 @@ specialize_pipeline = scalar_debug_pipeline \
 op_whitelist = [
     P.return_, P.if_, P.partial,
     P.scalar_add, P.scalar_mul, P.scalar_sub,
-    P.scalar_gt, P.scalar_lt,
-    P.cons_tuple, P.hastype, P.list_map
+    P.scalar_uadd, P.scalar_usub,
+    P.bool_not, P.scalar_gt, P.scalar_lt,
+    P.cons_tuple, P.hastype, P.list_map, P.switch
 ]
 
 
@@ -249,13 +252,13 @@ def test_indirect_graph(x):
     return f2()(x)
 
 
-@specialize((True, int1, int1))
+@specialize((True, int1, int2))
 def test_poly_with_constants(c, x, y):
     def f1(x, y):
         return x + y
 
     def f2(x, y):
-        return y + x
+        return x * y
 
     def choose(c):
         if c:
@@ -263,7 +266,26 @@ def test_poly_with_constants(c, x, y):
         else:
             return f2
 
-    return choose(c)(x, 2), choose(not c)(2, y)
+    return choose(c)(x, y), choose(not c)(x, y)
+
+
+@mark.xfail(reason="Distinct contexts are created for 2 and 3, "
+                   "leading to Problem(POLY).")
+@specialize((True, int1, int2))
+def test_poly_with_constants2(c, x, y):
+    def f1(x, y):
+        return x + y
+
+    def f2(x, y):
+        return x * y
+
+    def choose(c):
+        if c:
+            return f1
+        else:
+            return f2
+
+    return choose(c)(x, 2), choose(not c)(y, 3)
 
 
 @specialize((int1, int2), (fp1, fp2))
@@ -274,3 +296,8 @@ def test_method(x, y):
 @specialize((int1, fp1))
 def test_method_polymorphic(x, y):
     return x.__add__(x), y.__add__(y)
+
+
+@specialize((True, int1), (False, int1))
+def test_switch(c, x):
+    return switch(c, scalar_usub, scalar_uadd)(x)
