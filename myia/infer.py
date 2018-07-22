@@ -215,7 +215,9 @@ class GraphInferrer(Inferrer):
             for track in self.engine.all_track_names:
                 tr = self.engine.tracks[track]
                 result = await self.engine.get_raw(track, arg)
-                argval[track] = tr.broaden(result)
+                if not self.graph.flags.get('flatten_inference'):
+                    result = tr.broaden(result)
+                argval[track] = result
             argvals.append(argval)
 
         # Update current context using the fetched properties.

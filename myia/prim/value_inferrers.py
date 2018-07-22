@@ -197,8 +197,7 @@ async def infer_value_hastype(track, x, t):
         raise InferenceError('Second argument to hastype must be constant.')
     # TODO: Find a good way to carry ValueTrack.max_depth to here
     # Instead of defaulting to 1
-    max_depth = 1
-    return limited(hastype_helper(x_t, t_v), max_depth)
+    return limited(hastype_helper(x_t, t_v), track.max_depth)
 
 
 @value_inferrer(P.typeof, nargs=1)
@@ -206,8 +205,7 @@ async def infer_value_typeof(track, x):
     """Infer the return value of typeof."""
     # TODO: Find a good way to carry ValueTrack.max_depth to here
     # Instead of defaulting to 1
-    max_depth = 1
-    return limited(await x['type'], max_depth)
+    return limited(await x['type'], track.max_depth)
 
 
 @value_inferrer(P.shape, nargs=1)
