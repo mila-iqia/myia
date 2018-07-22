@@ -341,6 +341,10 @@ class Parser:
         """Process numbers: `1`, `2.5`, etc."""
         return Constant(node.n)
 
+    def process_Str(self, block: 'Block', node: ast.Str) -> ANFNode:
+        """Process strings: `"a"`, `'hello world'`, etc."""
+        return Constant(node.s)
+
     def process_Call(self, block: 'Block', node: ast.Call) -> ANFNode:
         """Process function calls: `f(x)`, etc."""
         func = self.process_node(block, node.func)

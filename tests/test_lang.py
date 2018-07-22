@@ -144,6 +144,11 @@ def test_getattr(pt):
     return pt.x
 
 
+@parse_compare((SimpleNamespace(x=5, y=2)))
+def test_getattr_function(pt):
+    return getattr(pt, 'x')
+
+
 @parse_compare((2, 3))
 def test_method(x, y):
     return x.__add__(y)
