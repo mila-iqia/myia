@@ -146,6 +146,10 @@ class _GraphSpecializer:
     async def build(self, ref, argrefs=None, t=None):
         if t is None:
             t = await ref['type']
+        if ref is not None and isinstance(t, Inferrer):
+            if (await ref['value']) is ANYTHING:
+                t = await _concretize_type(t, argrefs)
+                return await self.build_generic(ref, argrefs, t)
         handler = self.build_map[type(t)]
         return await handler(self, ref, argrefs, t)
 
@@ -191,12 +195,12 @@ class _GraphSpecializer:
     async def build_atom(self, ref, argrefs, t):
         v = await ref['value']
         if v is ANYTHING:
-            return await self.build_Type(ref, argrefs, t)
+            return await self.build_generic(ref, argrefs, t)
         else:
             return _const(v, t)
 
     @build_map.register(Type)
-    async def build_Type(self, ref, argrefs, t):
+    async def build_generic(self, ref, argrefs, t):
         new_node = self.get(ref.node)
         new_node.type = t
         return new_node
