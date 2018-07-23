@@ -4,7 +4,7 @@ import operator
 import numpy as np
 from types import FunctionType
 
-from . import dtype, parser
+from . import dtype, parser, composite as C
 from .cconv import closure_convert
 from .infer import InferenceEngine
 from .ir import Graph, clone, GraphManager
@@ -46,14 +46,37 @@ scalar_object_map = {
 }
 
 
-# Provisional
-standard_object_map = scalar_object_map
+standard_object_map = {
+    operator.add: C.add,
+    operator.sub: C.sub,
+    operator.mul: C.mul,
+    operator.truediv: C.div,
+    operator.mod: C.mod,
+    operator.pow: C.pow,
+    operator.eq: C.eq,
+    operator.ne: C.ne,
+    operator.lt: C.lt,
+    operator.gt: C.gt,
+    operator.le: C.le,
+    operator.ge: C.ge,
+    operator.pos: C.uadd,
+    operator.neg: C.usub,
+    operator.not_: C.not_,
+    operator.and_: C.and_,
+    operator.or_: C.or_,
+    operator.getitem: P.getitem,
+    operator.setitem: P.setitem,
+    bool: C.bool,
+    getattr: P.getattr,
+    setattr: P.setattr,
+}
 
 
 standard_method_map = TypeMap({
     dtype.Bool: {
         '__and__': P.bool_and,
         '__or__': P.bool_or,
+        '__bool__': P.identity,
     },
     dtype.Int: {
         '__add__': P.scalar_add,
@@ -70,6 +93,8 @@ standard_method_map = TypeMap({
         '__gt__': P.scalar_gt,
         '__le__': P.scalar_le,
         '__ge__': P.scalar_ge,
+        '__bool__': C.int_bool,
+        '__myia_to_array__': P.scalar_to_array,
     },
     dtype.Float: {
         '__add__': P.scalar_add,
@@ -86,9 +111,24 @@ standard_method_map = TypeMap({
         '__gt__': P.scalar_gt,
         '__le__': P.scalar_le,
         '__ge__': P.scalar_ge,
+        '__bool__': C.float_bool,
+        '__myia_to_array__': P.scalar_to_array,
     },
     dtype.Array: {
-        # TODO
+        '__add__': C.array_add,
+        '__sub__': C.array_sub,
+        '__mul__': C.array_mul,
+        '__truediv__': C.array_div,
+        '__mod__': C.array_mod,
+        '__pow__': C.array_pow,
+        '__pos__': C.array_uadd,
+        '__neg__': C.array_usub,
+        '__eq__': C.array_eq,
+        '__ne__': C.array_ne,
+        '__lt__': C.array_lt,
+        '__gt__': C.array_gt,
+        '__le__': C.array_le,
+        '__ge__': C.array_ge,
     }
 })
 
@@ -157,7 +197,9 @@ class Converter(PipelineResource):
         mmap = self.resources.method_map
         for t1, t2 in type_map.items():
             for name, prim in mmap[t2].items():
-                self.object_map[getattr(t1, name)] = _Unconverted(prim)
+                method = getattr(t1, name, None)
+                if method is not None:
+                    self.object_map[method] = _Unconverted(prim)
 
     def __call__(self, value):
         """Convert a value."""
@@ -336,6 +378,9 @@ step_opt = Optimizer.partial(
         optlib.simplify_always_true,
         optlib.simplify_always_false,
         optlib.inline_unique_uses,
+        optlib.simplify_partial,
+        optlib.replace_applicator,
+        optlib.elim_identity,
     ]
 )
 
