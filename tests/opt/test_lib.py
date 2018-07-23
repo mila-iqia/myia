@@ -218,6 +218,7 @@ def test_true_branch():
         return x
 
     _check_opt(before, after,
+               lib.elim_identity,
                lib.simplify_always_true,
                lib.inline)
 
@@ -234,6 +235,7 @@ def test_false_branch():
         return y
 
     _check_opt(before, after,
+               lib.elim_identity,
                lib.simplify_always_false,
                lib.inline)
 

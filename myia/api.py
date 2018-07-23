@@ -40,6 +40,7 @@ scalar_object_map = {
     operator.or_: P.bool_or,
     operator.getitem: P.getitem,
     operator.setitem: P.setitem,
+    bool: P.identity,
     getattr: P.getattr,
     setattr: P.setattr,
 }
