@@ -1,6 +1,10 @@
 """Miscellaneous utilities."""
 
+import builtins
 from typing import Any, Dict, List, TypeVar
+
+
+builtins_d = vars(builtins)
 
 
 T1 = TypeVar('T1')
@@ -331,23 +335,29 @@ class NS:
 class Namespace:
     """Namespace in which to resolve variables."""
 
-    def __init__(self, label, ns):
+    def __init__(self, label, *dicts):
         """Initialize a namespace.
 
         Args:
             label: The namespace's name.
-            ns: A dictionary containing the namespace's data.
+            dicts: A list of dictionaries containing the namespace's data,
+                which are consulted sequentially.
         """
         self.label = label
-        self.ns = ns
+        self.dicts = dicts
 
     def __contains__(self, name):
-        return name in self.ns
+        for d in self.dicts:
+            if name in d:
+                return True
+        else:
+            return False
 
     def __getitem__(self, name):
-        try:
-            return self.ns[name]
-        except KeyError as e:
+        for d in self.dicts:
+            if name in d:
+                return d[name]
+        else:
             raise NameError(name)
 
     def __repr__(self):
@@ -365,7 +375,7 @@ class ModuleNamespace(Namespace):
                 to `__import__` it.
         """
         mod = vars(__import__(name, fromlist=['_']))
-        super().__init__(name, mod)
+        super().__init__(name, mod, builtins_d)
 
 
 class ClosureNamespace(Namespace):
@@ -385,7 +395,8 @@ class ClosureNamespace(Namespace):
         super().__init__(lbl, ns)
 
     def __getitem__(self, name):
+        d, = self.dicts
         try:
-            return self.ns[name].cell_contents
+            return d[name].cell_contents
         except ValueError as e:
             raise UnboundLocalError(name)
