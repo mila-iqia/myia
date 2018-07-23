@@ -285,7 +285,7 @@ class Parser:
                 b2.graph.output = test
 
                 return block.graph.apply(primops.if_,
-                                         test,
+                                         block.force_bool(test),
                                          true_block.graph,
                                          false_block.graph)
             else:
@@ -457,6 +457,7 @@ class Parser:
         """
         # Process the condition
         cond = self.process_node(block, node.test)
+        cond = block.force_bool(cond)
 
         # Create two branches
         true_block, false_block = self.make_condition_blocks(block)
@@ -660,6 +661,13 @@ class Block:
             primops.resolve,
             Constant(module_name),
             Constant(symbol_name)
+        )
+
+    def force_bool(self, cond):
+        """Wrap a condition in a call to bool()."""
+        return self.graph.apply(
+            self.make_resolve(builtins_ns, 'bool'),
+            cond
         )
 
     def read(self, varnum: str) -> ANFNode:

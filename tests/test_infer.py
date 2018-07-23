@@ -222,6 +222,9 @@ def test_prim_usub(x):
         (B, f64, i64, InferenceError),
         ({'value': True}, f64, i64, f64),
         ({'value': False}, f64, i64, i64),
+        # Note: scalar_pipeline will not convert i64 to bool,
+        # so the following is an InferenceError even though it
+        # will work with the standard_pipeline
         (i64, f64, f64, InferenceError),
     ],
     value=[
@@ -808,7 +811,6 @@ def test_typeof(x):
     ]
 )
 def test_hastype_2(x):
-    i64, f64, T, Nil, L, _to_i64, hastype, head, tail
 
     def f(x):
         if hastype(x, i64):
