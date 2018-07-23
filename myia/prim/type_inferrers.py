@@ -270,7 +270,39 @@ async def infer_type_array_map(track, fn, ary):
     return Array(await fn_t(xref))
 
 
-@type_inferrer(P.array_scan, P.array_reduce, nargs=4)
+@type_inferrer(P.array_map2, nargs=3)
+async def infer_type_array_map2(track, fn, ary1, ary2):
+    """Infer the return type of array_map2."""
+    fn_t = await fn['type']
+    ary1_t = await ary1['type']
+    if not isinstance(ary1_t, Array):
+        raise MyiaTypeError('Expected array')
+    ary2_t = await ary2['type']
+    if not isinstance(ary2_t, Array):
+        raise MyiaTypeError('Expected array')
+    xref = track.engine.vref({'type': ary1_t.elements})
+    yref = track.engine.vref({'type': ary2_t.elements})
+    return Array(await fn_t(xref, yref))
+
+
+@type_inferrer(P.array_reduce, nargs=3)
+async def infer_type_reduce(track, fn, ary, shp):
+    """Infer the return type of array_reduce."""
+    fn_t = await fn['type']
+    ary_t = await ary['type']
+    shp_t = await shp['type']
+    if not isinstance(ary_t, Array):
+        raise MyiaTypeError('Expected array')
+    if not (isinstance(shp_t, Tuple)
+            and all(t == UInt(64) for t in shp_t.elements)):
+        raise MyiaTypeError("Target shape must be u64 tuple")
+    xref = track.engine.vref({'type': ary_t.elements})
+    xref2 = track.engine.vref({'type': ary_t.elements})
+    res_elem_t = await fn_t(xref, xref2)
+    return Array(res_elem_t)
+
+
+@type_inferrer(P.array_scan, nargs=4)
 async def infer_type_across_array(track, fn, init, ary, ax):
     """Infer the return type of scan/array_reduce."""
     fn_t = await fn['type']
@@ -366,7 +398,7 @@ async def infer_type_getattr(track, data, item):
 
 
 @type_inferrer(P.iter, nargs=1)
-async def infer_type_iter(engine, xs):
+async def infer_type_iter(track, xs):
     """Infer the return type of iter."""
     xs_t = await xs['type']
     if isinstance(xs_t, List):
@@ -376,7 +408,7 @@ async def infer_type_iter(engine, xs):
 
 
 @type_inferrer(P.hasnext, nargs=1)
-async def infer_type_hasnext(engine, it):
+async def infer_type_hasnext(track, it):
     """Infer the return type of hasnext."""
     it_t = await(it['type'])
     if isinstance(it_t, Tuple) \
@@ -388,7 +420,7 @@ async def infer_type_hasnext(engine, it):
 
 
 @type_inferrer(P.next, nargs=1)
-async def infer_type_next(engine, it):
+async def infer_type_next(track, it):
     """Infer the return type of next."""
     it_t = await(it['type'])
     if isinstance(it_t, Tuple) \
@@ -398,3 +430,28 @@ async def infer_type_next(engine, it):
         return Tuple([x_t, it_t])
     else:  # pragma: no cover
         raise MyiaTypeError('Unsupported iterator type for next')
+
+
+@type_inferrer(P.scalar_to_array, nargs=1)
+async def infer_type_scalar_to_array(track, x):
+    """Infer the return type of scalar_to_array."""
+    x_t = await x['type']
+    if not isinstance(x_t, (Int, Float)):
+        raise MyiaTypeError(f'Invalid type for scalar_to_array: {x_t}')
+    return Array(x_t)
+
+
+@type_inferrer(P.broadcast_shape, nargs=2)
+async def infer_type_broadcast_shape(track, xs, ys):
+    """Infer the return type of broadcast_shape."""
+    xs_t = await xs['type']
+    ys_t = await ys['type']
+    if not isinstance(xs_t, Tuple) \
+            or not all(t == UInt(64) for t in xs_t.elements):
+        raise MyiaTypeError(f'Invalid type for broadcast_shape: {xs_t}')
+    if not isinstance(ys_t, Tuple) \
+            or not all(t == UInt(64) for t in ys_t.elements):
+        raise MyiaTypeError(f'Invalid type for broadcast_shape: {ys_t}')
+    shp_xs_n = len(xs_t.elements)
+    shp_ys_n = len(ys_t.elements)
+    return Tuple([UInt(64) for i in range(max(shp_xs_n, shp_ys_n))])

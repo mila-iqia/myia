@@ -14,9 +14,9 @@ from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
-    typeof, scalar_usub, dot, distribute, shape, array_map, array_scan, \
-    array_reduce, reshape, partial as myia_partial, identity, \
-    bool_and, bool_or, switch
+    typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
+    array_scan, array_reduce, reshape, partial as myia_partial, identity, \
+    bool_and, bool_or, switch, scalar_to_array, broadcast_shape
 
 
 B = Bool()
@@ -983,7 +983,7 @@ def test_dot(a, b):
 
 @infer(shape=[({'type': i32}, {'value': (4, 2)}, (4, 2)),
               ({'type': i32}, {'type': T(u64, u64)}, (ANYTHING, ANYTHING)),
-              ({'type': ai32, 'shape': (4,)}, {'value': (4, 2)}, (4, 2)),
+              ({'type': ai32, 'shape': (4,)}, {'value': (2, 4)}, (2, 4)),
               ({'type': ai32, 'shape': (4,)}, {'value': (5, 2)},
                InferenceError),
               ({'type': ai32, 'shape': (4, 2)}, {'value': (4,)},
@@ -1020,6 +1020,24 @@ def test_array_map(ary):
     return array_map(f, ary)
 
 
+@infer(shape=[({'type': af32, 'shape': (3, 4)},
+               {'type': af32, 'shape': (3, 4)},
+               (3, 4)),
+              ({'type': af32, 'shape': (3, 4)},
+               {'type': af32, 'shape': (3, 7)},
+               InferenceError),
+              ({'type': af32, 'shape': (3, 4, 5)},
+               {'type': af32, 'shape': (3, 4)},
+               InferenceError)],
+       type=[({'type': ai64}, {'type': ai64}, ai64),
+             ({'type': ai64}, {'type': i64}, InferenceError),
+             ({'type': i64}, {'type': ai64}, InferenceError)])
+def test_array_map2(ary1, ary2):
+    def f(v1, v2):
+        return v1 + v2
+    return array_map2(f, ary1, ary2)
+
+
 @infer(shape=[({'type': ai64, 'shape': (3, 4)}, {'value': 1}, (3, 4))],
        type=[
            ({'type': ai64, 'shape': (3, 4)}, {'value': 1, 'type': u64}, ai64),
@@ -1034,12 +1052,42 @@ def test_array_scan(ary, ax):
     return array_scan(f, 0, ary, ax)
 
 
-@infer(shape=[({'type': ai64, 'shape': (3, 4)}, {'value': 1}, (3,)),
-              ({'type': ai64, 'shape': (3, 4)}, {'type': u64}, (ANYTHING,))])
-def test_array_reduce(ary, ax):
+@infer(
+    type=[
+        (ai64, T([u64, u64]), ai64),
+        (ai64, i64, InferenceError),
+        (i64, T([u64, u64]), InferenceError),
+    ],
+    shape=[
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': (3, 1)},
+         (3, 1)),
+
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': (3, ANYTHING)},
+         (3, ANYTHING)),
+
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': (3, 1, 1)},
+         InferenceError),
+
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': (4, 1)},
+         InferenceError),
+
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': (4,)},
+         (4,)),
+
+        ({'type': ai64, 'shape': (3, 4)},
+         {'value': ()},
+         ()),
+    ]
+)
+def test_array_reduce(ary, shp):
     def f(a, b):
         return a + b
-    return array_reduce(f, 0, ary, ax)
+    return array_reduce(f, ary, shp)
 
 
 @infer(type=[(i64, i64)],
@@ -1124,3 +1172,24 @@ def test_bool_or(x, y):
 )
 def test_switch(c, x, y):
     return switch(c, x, y)
+
+
+@infer(type=[(i64, ai64),
+             (f64, af64),
+             (af64, InferenceError),
+             (T([i64]), InferenceError)],
+       shape=[({'type': i64}, ())])
+def test_scalar_to_array(x):
+    return scalar_to_array(x)
+
+
+@infer(type=[
+    (T([u64]), T([u64]), T([u64])),
+    (T([u64, u64]), T([u64]), T([u64, u64])),
+    (T([u64]), T([u64, u64]), T([u64, u64])),
+    (T([i64]), T([u64]), InferenceError),
+    (T([u64]), T([i64]), InferenceError),
+    (i64, i64, InferenceError),
+])
+def test_broadcast_shape(xs, ys):
+    return broadcast_shape(xs, ys)

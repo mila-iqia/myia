@@ -283,6 +283,19 @@ def _array_map_vm(vm, fn, array):
     return array_map(fn_, array)
 
 
+@py_register(primops.array_map2)
+def array_map2(fn, array1, array2):
+    """Implement `array_map2`."""
+    return np.vectorize(fn)(array1, array2)
+
+
+@vm_register(primops.array_map2)
+def _array_map2_vm(vm, fn, array1, array2):
+    def fn_(x, y):
+        return vm.call(fn, (x, y))
+    return array_map2(fn_, array1, array2)
+
+
 @py_register(primops.array_scan)
 def array_scan(fn, init, array, axis):
     """Implement `array_scan`."""
@@ -306,22 +319,43 @@ def _array_scan_vm(vm, fn, init, array, axis):
 
 
 @py_register(primops.array_reduce)
-def array_reduce(fn, init, array, axis):
+def array_reduce(fn, array, shp):
     """Implement `array_reduce`."""
-    def f(ary):
-        val = init
-        it = np.nditer([ary])
-        for x in it:
-            val = fn(val, x)
-        return val
-    return np.apply_along_axis(f, axis, array)
+    ufn = np.frompyfunc(fn, 2, 1)
+    delta = len(array.shape) - len(shp)
+    if delta < 0:
+        raise ValueError('Shape to reduce to cannot be larger than original')
+
+    def is_reduction(ishp, tshp):
+        if tshp == 1 and ishp > 1:
+            return True
+        elif tshp != ishp:
+            raise ValueError('Dimension mismatch for reduce')
+        else:
+            return False
+
+    reduction = [(delta + idx if is_reduction(ishp, tshp) else None, True)
+                 for idx, (ishp, tshp)
+                 in enumerate(zip(array.shape[delta:], shp))]
+
+    reduction = [(i, False) for i in range(delta)] + reduction
+
+    for idx, keep in reversed(reduction):
+        if idx is not None:
+            array = ufn.reduce(array, axis=idx, keepdims=keep)
+
+    if not isinstance(array, np.ndarray):
+        # Force result to be ndarray, even if it's 0d
+        array = np.array(array)
+
+    return array
 
 
 @vm_register(primops.array_reduce)
-def _array_reduce_vm(vm, fn, init, array, axis):
+def _array_reduce_vm(vm, fn, array, shp):
     def fn_(a, b):
         return vm.call(fn, [a, b])
-    return array_reduce(fn_, init, array, axis)
+    return array_reduce(fn_, array, shp)
 
 
 @register(primops.distribute)
@@ -408,3 +442,35 @@ def _next(it):
 def switch(c, x, y):
     """Implement `switch`."""
     return x if c else y
+
+
+@register(primops.scalar_to_array)
+def scalar_to_array(x):
+    """Implement `scalar_to_array`."""
+    return np.array(x)
+
+
+@register(primops.broadcast_shape)
+def broadcast_shape(shpx, shpy):
+    """Implement `broadcast_shape`."""
+    orig_shpx = shpx
+    orig_shpy = shpy
+    dlen = len(shpx) - len(shpy)
+    if dlen < 0:
+        shpx = (1,) * -dlen + shpx
+    elif dlen > 0:
+        shpy = (1,) * dlen + shpy
+    assert len(shpx) == len(shpy)
+    shp = []
+    for a, b in zip(shpx, shpy):
+        if a == 1:
+            shp.append(b)
+        elif b == 1:
+            shp.append(a)
+        elif a == b:
+            shp.append(a)
+        else:
+            raise ValueError(
+                f'Cannot broadcast shapes {orig_shpx} and {orig_shpy}.'
+            )
+    return tuple(shp)

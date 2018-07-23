@@ -6,8 +6,9 @@ import numpy as np
 from myia.dtype import Int, Float, List, Tuple, External
 from myia.prim.py_implementations import head, setattr as myia_setattr, \
     setitem as myia_setitem, tail, hastype, typeof, \
-    shape, reshape, array_map, array_scan, array_reduce, distribute, dot, \
-    partial as myia_partial, identity, _assert_scalar, switch
+    shape, reshape, array_map, array_map2, array_scan, array_reduce, \
+    distribute, dot, partial as myia_partial, identity, _assert_scalar, \
+    switch, scalar_to_array, broadcast_shape
 
 from ..test_lang import parse_compare
 
@@ -164,6 +165,20 @@ def test_prim_array_map():
     assert (v2 == 1).all()
 
 
+def test_prim_array_map2():
+    v1 = np.ones((2, 3))
+    v2 = np.ones((2, 3))
+
+    def f(a, b):
+        return a + b
+
+    vres = array_map2(f, v1, v2)
+
+    assert (v1 == 1).all()
+    assert (v2 == 1).all()
+    assert (vres == 2).all()
+
+
 def test_prim_array_scan():
     v = np.ones((2, 3))
 
@@ -178,16 +193,31 @@ def test_prim_array_scan():
 
 
 def test_prim_array_reduce():
-    v = np.ones((2, 3))
-
-    def f(a, b):
+    def add(a, b):
         return a + b
 
-    vref = np.add.reduce(v, axis=1)
-    v2 = array_reduce(f, 0, v, 1)
+    tests = [
+        (add, (2, 3, 7), (1, 3, 1), 14),
+        (add, (2, 3, 7), (1, 3, 8), ValueError),
+        (add, (2, 3, 7), (1, 2, 3, 7), ValueError),
+        (add, (2, 3, 7), (3, 1), 14),
+        (add, (2, 3, 7), (1, 1, 1), 42),
+        (add, (2, 3, 7), (), 42),
+    ]
 
-    assert (v == 1).all()
-    assert (v2 == vref).all()
+    for f, inshp, outshp, value in tests:
+        v = np.ones(inshp)
+        try:
+            res = array_reduce(f, v, outshp)
+        except Exception as e:
+            if isinstance(value, type) and isinstance(e, value):
+                continue
+            else:
+                print(f'Expected {value}, but got {e}')
+                raise
+
+        assert res.shape == outshp
+        assert (res == value).all()
 
 
 def test_prim_distribute():
@@ -237,3 +267,36 @@ def test_prim_identity():
 def test_prim_switch():
     assert switch(True, 1, 2) == 1
     assert switch(False, 1, 2) == 2
+
+
+def test_scalar_to_array():
+    a = scalar_to_array(1)
+    assert isinstance(a, np.ndarray)
+    assert a.dtype == np.int64
+    b = scalar_to_array(1.5)
+    assert isinstance(b, np.ndarray)
+    assert b.dtype == np.float64
+
+
+def test_broadcast_shape():
+    tests = [
+        ((2, 3), (2, 3), (2, 3)),
+        ((2, 1), (2, 3), (2, 3)),
+        ((2, 3), (2, 1), (2, 3)),
+        ((2, 1), (1, 3), (2, 3)),
+        ((2, 1), (7, 1, 3), (7, 2, 3)),
+        ((1, 2, 3), (2, 3), (1, 2, 3)),
+        ((2, 3), (2, 4), ValueError),
+        ((), (1, 2, 3, 4, 5), (1, 2, 3, 4, 5)),
+        ((1, 2, 3, 4, 5), (), (1, 2, 3, 4, 5)),
+    ]
+    for shpx, shpy, result in tests:
+        try:
+            shp = broadcast_shape(shpx, shpy)
+        except Exception as e:
+            if isinstance(result, type) and isinstance(e, result):
+                continue
+            else:
+                print(f'Expected {result}, got {e}')
+                raise
+        assert shp == result

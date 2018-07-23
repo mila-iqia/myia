@@ -120,23 +120,44 @@ async def infer_shape_array_map(track, fn, ary):
     return await ary['shape']
 
 
+@shape_inferrer(P.array_map2, nargs=3)
+async def infer_shape_array_map2(track, fn, ary1, ary2):
+    """Infer the shape of array_map2."""
+    shp1 = await ary1['shape']
+    shp2 = await ary2['shape']
+    if len(shp1) != len(shp2):
+        raise MyiaShapeError("Expect same shapes for array_map2")
+    for a, b in zip(shp1, shp2):
+        if a != b and a is not ANYTHING and b is not ANYTHING:
+            raise MyiaShapeError("Expect same shapes for array_map2")
+    return shp1
+
+
 @shape_inferrer(P.array_scan, nargs=4)
 async def infer_shape_array_scan(track, fn, init, ary, ax):
     """Infer the shape of array_scan."""
     return await ary['shape']
 
 
-@shape_inferrer(P.array_reduce, nargs=4)
-async def infer_shape_array_reduce(track, fn, init, ary, ax):
+@shape_inferrer(P.array_reduce, nargs=3)
+async def infer_shape_array_reduce(track, fn, ary, shp):
     """Infer the shape of array_reduce."""
-    shp = await ary['shape']
-    ax_v = await ax['value']
-    if ax_v == ANYTHING:
-        return (ANYTHING,) * (len(shp) - 1)
+    shp_i = await ary['shape']
+    shp_v = await shp['value']
+    if shp_v == ANYTHING:
+        raise AssertionError(
+            'We currently require knowing the shape for reduce.'
+        )
+        # return (ANYTHING,) * (len(shp_i) - 1)
     else:
-        lshp = list(shp)
-        del lshp[ax_v]
-        return tuple(lshp)
+        delta = len(shp_i) - len(shp_v)
+        if delta < 0 \
+                or any(1 != s1 != ANYTHING and 1 != s2 != ANYTHING and s1 != s2
+                       for s1, s2 in zip(shp_i[delta:], shp_v)):
+            raise MyiaShapeError(
+                f'Incompatible dims for reduce: {shp_i}, {shp_v}'
+            )
+        return shp_v
 
 
 @shape_inferrer(P.distribute, nargs=2)
@@ -149,8 +170,11 @@ async def infer_shape_distribute(track, v, shape):
     v_t = await v['type']
     if isinstance(v_t, Array):
         v_shp = await v['shape']
-        if len(shp) < len(v_shp):
+        delta = len(shp) - len(v_shp)
+        if delta < 0:
             raise MyiaShapeError("Cannot distribute to smaller shape")
+        elif delta > 0:
+            v_shp = (1,) * delta + v_shp
         for vs, s in zip(v_shp, shp):
             if vs != s and vs not in (1, ANYTHING) and s not in (1, ANYTHING):
                 raise MyiaShapeError("Cannot change shape when distributing")
@@ -203,3 +227,9 @@ async def infer_shape_getattr(track, data, item):
 async def infer_shape_identity(track, x):
     """Infer the shape of identity."""
     return await x['shape']
+
+
+@shape_inferrer(P.scalar_to_array, nargs=1)
+async def infer_shape_scalar_to_array(track, x):
+    """Infer the shape of scalar_to_array."""
+    return ()
