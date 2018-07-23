@@ -9,7 +9,7 @@ from myia.prim.py_implementations import \
 compile_pipeline = standard_pipeline
 
 
-def parse_compare(*tests):
+def parse_compare(*tests, optimize=True):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -22,14 +22,16 @@ def parse_compare(*tests):
         tests: One or more inputs tuple.
 
     """
+    pipeline = compile_pipeline if optimize else \
+        compile_pipeline.configure({'opt.opts': []})
+
     def decorate(fn):
         def test(args):
             if not isinstance(args, tuple):
                 args = (args,)
             py_result = fn(*map(copy, args))
             argspec = tuple({'type': typeof(a)} for a in args)
-            myia_fn = compile_pipeline.run(input=fn,
-                                           argspec=argspec)['output']
+            myia_fn = pipeline.run(input=fn, argspec=argspec)['output']
             myia_result = myia_fn(*map(copy, args))
             assert py_result == myia_result
 
@@ -112,7 +114,7 @@ def test_call_hof(c, x, y):
     return choose(c)(x, y) + choose(not c)(x, y)
 
 
-@parse_compare((15, 17))
+@parse_compare((15, 17), optimize=False)
 def test_partial_prim(x, y):
     return partial(scalar_add, x)(y)
 
