@@ -204,17 +204,18 @@ class CompileGraph(PipelineStep):
                     for i in split.inputs[1:]:
                         self.ref(i)
                     if fn.value == if_:
-                        if split is graph.output:
-                            self.add_instr('tailif', self.ref(split.inputs[1]),
-                                           self.ref(split.inputs[2]),
-                                           self.ref(split.inputs[3]),
-                                           self.height)
-                            # execution stops here
-                            break
-                        else:
-                            self.add_instr('if', self.ref(split.inputs[1]),
+                            self.add_instr('switch', self.ref(split.inputs[1]),
                                            self.ref(split.inputs[2]),
                                            self.ref(split.inputs[3]))
+                            # XXX remove this somehow
+                            self.height += 1
+                            if split is graph.output:
+                                self.add_instr('tailcall', -1, self.height, 0)
+                                # execution stops here
+                                break
+                            else:
+                                self.add_instr('call', -1)
+
                     elif fn.value == return_:
                         self.add_instr('return', self.ref(split.inputs[1]),
                                        self.height)
