@@ -468,17 +468,17 @@ class _InferenceLoop(asyncio.AbstractEventLoop):
                 errors.append(exc)
         return errors
 
-    def call_soon(self, callback, *args):
+    def call_soon(self, callback, *args, context=None):
         h = asyncio.Handle(callback, args, self)
         heappush(self._todo, _TodoEntry(0, h))
         return h
 
-    def call_later(self, delay, callback, *args):
+    def call_later(self, delay, callback, *args, context=None):
         raise NotImplementedError(
             '_InferenceLoop does not allow timeouts or time-based scheduling.'
         )
 
-    def call_at(self, when, callback, *args):
+    def call_at(self, when, callback, *args, context=None):
         raise NotImplementedError(
             '_InferenceLoop does not allow time-based scheduling.'
         )
