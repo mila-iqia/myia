@@ -65,7 +65,10 @@ class PrimitiveValueInferrer(Inferrer):
             return ANYTHING
         else:
             args_unwrapped = [self.engine.unwrap(arg) for arg in args]
-            v = self.impl(*args_unwrapped)
+            try:
+                v = self.impl(*args_unwrapped)
+            except Exception as e:
+                raise InferenceError(e, refs=refs)
             n = LimitedValue.min_count(args)
             return limited(v, n)
 

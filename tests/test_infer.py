@@ -6,7 +6,7 @@ from functools import partial
 from pytest import mark
 from types import SimpleNamespace
 
-from myia.api import scalar_pipeline
+from myia.api import scalar_pipeline, standard_pipeline
 from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
@@ -111,6 +111,16 @@ infer_pipeline = scalar_pipeline.select(
 })
 
 
+infer_pipeline_std = standard_pipeline.select(
+    'parse', 'infer'
+).configure({
+    'py_implementations': pyimpl_test,
+    'infer.tracks.value.max_depth': 10,
+    'infer.tracks.value.constructors': value_inferrer_cons_test,
+    'infer.tracks.type.constructors': type_inferrer_cons_test,
+})
+
+
 def parse_test_spec(tests_spec):
 
     tests = []
@@ -130,52 +140,59 @@ def parse_test_spec(tests_spec):
     return tests
 
 
-def infer(**tests_spec):
+def inferrer_decorator(pipeline):
+    def infer(**tests_spec):
 
-    tests = parse_test_spec(tests_spec)
+        tests = parse_test_spec(tests_spec)
 
-    def decorate(fn):
-        def run_test(spec):
-            main_track, (*args, expected_out) = spec
+        def decorate(fn):
+            def run_test(spec):
+                main_track, (*args, expected_out) = spec
 
-            print('Args:')
-            print(args)
+                print('Args:')
+                print(args)
 
-            required_tracks = [main_track]
+                required_tracks = [main_track]
 
-            def out():
-                pip = infer_pipeline.configure({
-                    'infer.required_tracks': required_tracks
-                })
+                def out():
+                    pip = pipeline.configure({
+                        'infer.required_tracks': required_tracks
+                    })
 
-                res = pip.make()(input=fn, argspec=args)
-                rval = res['inference_results']
+                    res = pip.make()(input=fn, argspec=args)
+                    rval = res['inference_results']
 
-                print('Output of inferrer:')
-                print(rval)
-                return rval
+                    print('Output of inferrer:')
+                    print(rval)
+                    return rval
 
-            print('Expected:')
-            print(expected_out)
+                print('Expected:')
+                print(expected_out)
 
-            if isinstance(expected_out, type) \
-                    and issubclass(expected_out, Exception):
-                try:
-                    out()
-                except InferenceError as e:
-                    pass
+                if isinstance(expected_out, type) \
+                        and issubclass(expected_out, Exception):
+                    try:
+                        out()
+                    except InferenceError as e:
+                        pass
+                    else:
+                        raise Exception(
+                            f'Expected {expected_out}, got: (see stdout).'
+                        )
                 else:
-                    raise Exception(
-                        f'Expected {expected_out}, got: (see stdout).'
-                    )
-            else:
-                assert out() == expected_out
+                    assert out() == expected_out
 
-        m = mark.parametrize('spec', list(tests))(run_test)
-        m.__orig__ = fn
-        return m
+            m = mark.parametrize('spec', list(tests))(run_test)
+            m.__orig__ = fn
+            return m
 
-    return decorate
+        return decorate
+
+    return infer
+
+
+infer = inferrer_decorator(infer_pipeline)
+infer_std = inferrer_decorator(infer_pipeline_std)
 
 
 type_signature_arith_bin = [
@@ -1195,3 +1212,44 @@ def test_scalar_to_array(x):
 ])
 def test_broadcast_shape(xs, ys):
     return broadcast_shape(xs, ys)
+
+
+###########################
+# Using standard_pipeline #
+###########################
+
+
+def ai64_of(*shp):
+    return {'type': ai64, 'shape': shp}
+
+
+@infer_std(
+    type=[
+        (i64, i64, i64),
+        (ai64, ai64, ai64),
+        (ai64, i64, ai64),
+        (i64, ai64, ai64),
+        (i64, f64, InferenceError),
+    ],
+    shape=[
+        (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
+        (ai64_of(2, 5), ai64_of(2, 1), (2, 5)),
+        (ai64_of(1, 5), ai64_of(2, 1), (2, 5)),
+        (ai64_of(5,), ai64_of(2, 1), (2, 5)),
+        (ai64_of(2, 3, 4), ai64_of(3, 4), (2, 3, 4)),
+        (ai64_of(5,), ai64_of(2,), InferenceError),
+        ({'type': i64}, ai64_of(2, 5), (2, 5)),
+        (ai64_of(2, 5), {'type': i64}, (2, 5)),
+    ]
+)
+def test_add_std(x, y):
+    return x + y
+
+
+@infer_std(type=[(i64, i64, i64),
+                 (ai64, i64, InferenceError)])
+def test_max_std(x, y):
+    if x > y:
+        return x
+    else:
+        return y
