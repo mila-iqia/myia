@@ -692,7 +692,7 @@ class InferenceEngine:
         self.root_context = empty_context.add(graph, argvals)
 
         self.loop = _InferenceLoop()
-        self.run_coroutine(self._run())
+        self.run_coroutine(self._run(), throw=False)
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
@@ -824,14 +824,18 @@ class InferenceEngine:
         # We return the first result immediately
         return main.result()
 
-    def run_coroutine(self, coro):
+    def run_coroutine(self, coro, throw=True):
         """Run an async function using this inferrer's loop."""
+        errs_before = len(self.errors)
         try:
             fut = asyncio.ensure_future(coro, loop=self.loop)
             self.loop.run_forever()
             self.errors.extend(self.loop.collect_errors())
-            if self.errors:
-                raise self.errors[0]
+            if errs_before < len(self.errors):
+                if throw:  # pragma: no cover
+                    raise self.errors[-1]
+                else:
+                    return None
             return fut.result()
         finally:
             for task in asyncio.Task.all_tasks(self.loop):

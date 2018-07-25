@@ -79,6 +79,8 @@ def specialize(*arglists):
             result_py = fn(*args)
 
             res = specialize_pipeline.make()(input=fn, argspec=arg_types)
+            if 'error' in res:
+                raise res['error']
             g2 = res['graph']
 
             errs = validate(g2)
