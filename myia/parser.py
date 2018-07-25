@@ -31,6 +31,7 @@ Block
 """
 
 import ast
+import asttokens
 import inspect
 import textwrap
 from types import FunctionType
@@ -56,8 +57,11 @@ class Location(NamedTuple):
     """
 
     filename: str
-    line: str
+    line: int
     column: int
+    line_end: int
+    column_end: int
+    node: ast.AST
 
 
 operator_ns = ModuleNamespace('operator')
@@ -155,9 +159,14 @@ class Parser:
     def make_location(self, node: ast.AST) -> Location:
         """Create a Location from an AST node."""
         if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
+            li1, col1 = node.first_token.start
+            li2, col2 = node.last_token.end
+            li1 += self.line_offset - 1
+            li2 += self.line_offset - 1
+            col1 += self.col_offset
+            col2 += self.col_offset
             return Location(self.filename,
-                            node.lineno + self.line_offset - 1,
-                            node.col_offset)
+                            li1, col1, li2, col2, node)
         else:
             # Some nodes like Index carry no location information, but
             # we basically just pass through them.
@@ -181,7 +190,11 @@ class Parser:
 
     def parse(self) -> Graph:
         """Parse the function into a Myia graph."""
-        tree = ast.parse(textwrap.dedent(inspect.getsource(self.function)))
+        src0 = inspect.getsource(self.function)
+        src = textwrap.dedent(src0)
+        # We need col_offset to compensate for the dedent
+        self.col_offset = len(src0.split('\n')[0]) - len(src.split('\n')[0])
+        tree = asttokens.ASTTokens(src, parse=True).tree
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
         graph = self._process_function(None, function_def)[1].graph
