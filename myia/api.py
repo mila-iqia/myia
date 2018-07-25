@@ -283,8 +283,16 @@ class Inferrer(PipelineStep):
             tracks=self.tracks,
             required_tracks=self.required_tracks,
         )
-        return {'inference_results': engine.output_info(),
-                'inferrer': engine}
+
+        try:
+            return {'inference_results': engine.output_info(),
+                    'inferrer': engine}
+        except Exception as exc:
+            # We still want to keep the inferrer around even
+            # if an error occurred.
+            return {'error': exc,
+                    'error_step': self,
+                    'inferrer': engine}
 
 
 class Specializer(PipelineStep):

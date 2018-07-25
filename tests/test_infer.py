@@ -160,6 +160,9 @@ def inferrer_decorator(pipeline):
                     })
 
                     res = pip.make()(input=fn, argspec=args)
+                    if 'error' in res:
+                        raise res['error']
+
                     rval = res['inference_results']
 
                     print('Output of inferrer:')

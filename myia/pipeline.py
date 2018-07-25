@@ -170,7 +170,11 @@ class PipelineDefinition:
             out_key: The name of the pipeline output to return.
         """
         def run(arg):
-            return self.run(**{in_key: arg})[out_key]
+            res = self.run(**{in_key: arg})
+            if 'error' in res:
+                raise res['error']
+            else:
+                return res[out_key]
         return run
 
     def __getitem__(self, item):
@@ -235,9 +239,15 @@ class _PipelineSlice:
 
     def __call__(self, **args):
         for step in self.pipeline._seq[self.slice]:
+            if 'error' in args:
+                break
             if step.active:
                 valid_args, rest = partition_keywords(step.step, args)
-                args = {**args, **step.step(**valid_args)}
+                try:
+                    args = {**args, **step.step(**valid_args)}
+                except Exception as e:
+                    args['error'] = e
+                    args['error_step'] = step
         return args
 
 

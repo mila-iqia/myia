@@ -31,7 +31,10 @@ def parse_compare(*tests, optimize=True):
                 args = (args,)
             py_result = fn(*map(copy, args))
             argspec = tuple({'type': typeof(a)} for a in args)
-            myia_fn = pipeline.run(input=fn, argspec=argspec)['output']
+            res = pipeline.run(input=fn, argspec=argspec)
+            if 'error' in res:
+                raise res['error']
+            myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))
             assert py_result == myia_result
 
