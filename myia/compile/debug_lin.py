@@ -34,7 +34,7 @@ def debug_convert(lst):
     g = Graph()
 
     def ref(n):
-        if n.is_constant():
+        if n.is_constant() and not n.is_constant_graph():
             eqv[n] = n
         elif n not in eqv:
             inputs.append(n)
