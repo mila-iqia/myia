@@ -3,7 +3,7 @@
 
 from functools import partial
 
-from ..dtype import Int, Bool, Float, Tuple, List, Type, Array, UInt, Number
+from ..dtype import Int, Bool, Tuple, List, Type, Array, UInt, Number
 from ..infer import ANYTHING, Inferrer, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
@@ -16,6 +16,12 @@ from .py_implementations import typeof
 
 
 type_inferrer_constructors = {}
+
+
+def _shape_type(t):  # noqa: D400
+    """Tuple(UInt(64) ...)"""
+    # The docstring is used in the error message.
+    return isinstance(t, Tuple) and all(x == UInt(64) for x in t.elements)
 
 
 class TypeTrack(Track):
@@ -69,14 +75,9 @@ type_inferrer = partial(register_inferrer,
 @type_inferrer(P.if_, nargs=3)
 async def infer_type_if(track, cond, tb, fb):
     """Infer the return type of if."""
-    cond_t = await cond['type']
-    if cond_t != Bool():
-        raise MyiaTypeError('Condition for if must be a boolean')
+    await track.expect(Bool(), cond)
     tb_inf = await tb['type']
     fb_inf = await fb['type']
-    if not isinstance(tb_inf, Inferrer) or not isinstance(fb_inf, Inferrer):
-        raise MyiaTypeError('Both branches of if primitive must be thunks') \
-            # pragma: no cover
     v = await cond['value']
     if v is True:
         # We only visit the first branch if the condition is provably true
@@ -95,9 +96,7 @@ async def infer_type_if(track, cond, tb, fb):
 @type_inferrer(P.switch, nargs=3)
 async def infer_type_switch(track, cond, tb, fb):
     """Infer the return type of switch."""
-    cond_t = await cond['type']
-    if cond_t != Bool():
-        raise MyiaTypeError('Condition for switch must be a boolean')
+    await track.expect(Bool(), cond)
     v = await cond['value']
     if v is True:
         # We only visit the first branch if the condition is provably true
@@ -108,7 +107,7 @@ async def infer_type_switch(track, cond, tb, fb):
     elif v is ANYTHING:
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
-        return await track.assert_same(tb['type'], fb['type'])
+        return await track.assert_same(tb, fb)
     else:
         raise AssertionError("Invalid condition value for switch")
 
@@ -124,41 +123,33 @@ async def infer_type_partial(track, fn, *args):
 async def infer_type_cons_tuple(track, x, y):
     """Infer the return type of cons_tuple."""
     x_t = await x['type']
-    y_t = await y['type']
-    if not isinstance(y_t, Tuple):
-        raise MyiaTypeError('cons_tuple on non-tuple')  # pragma: no cover
+    y_t = await track.expect(Tuple, y)
     return Tuple([x_t, *y_t.elements])
 
 
 @type_inferrer(P.head, nargs=1)
 async def infer_type_head(track, tup):
     """Infer the return type of head."""
-    tup_t = await tup['type']
-    if not isinstance(tup_t, Tuple):
-        raise MyiaTypeError('head of non-tuple')
+    tup_t = await track.expect(Tuple, tup)
     if not len(tup_t.elements) >= 1:
-        raise MyiaTypeError('head on empty tuple')
+        raise MyiaTypeError('head on empty tuple', refs=[tup])
     return tup_t.elements[0]
 
 
 @type_inferrer(P.tail, nargs=1)
 async def infer_type_tail(track, tup):
     """Infer the return type of tail."""
-    tup_t = await tup['type']
-    if not isinstance(tup_t, Tuple):
-        raise MyiaTypeError('tail of non-tuple')
+    tup_t = await track.expect(Tuple, tup)
     if not len(tup_t.elements) >= 1:
-        raise MyiaTypeError('tail on empty tuple')
+        raise MyiaTypeError('tail on empty tuple', refs=[tup])
     return Tuple(tup_t.elements[1:])
 
 
 @type_inferrer(P.getitem, nargs=2)
 async def infer_type_getitem(track, seq, idx):
     """Infer the return type of getitem."""
-    seq_t = await seq['type']
-    idx_t = await idx['type']
-    if not isinstance(idx_t, Int):
-        raise MyiaTypeError('Expected Int for index')
+    seq_t = await track.expect((Tuple, List), seq)
+    await track.expect(Int, idx)
 
     if isinstance(seq_t, Tuple):
         idx_v = await idx['value']
@@ -167,8 +158,6 @@ async def infer_type_getitem(track, seq, idx):
         return seq_t.elements[idx_v]
     elif isinstance(seq_t, List):
         return seq_t.element_type
-    else:
-        raise MyiaTypeError('Wrong seq type for getitem')
 
 
 @type_inferrer(P.typeof, nargs=1)
@@ -180,65 +169,53 @@ async def infer_type_typeof(track, _):
 @type_inferrer(P.hastype, nargs=2)
 async def infer_type_hastype(track, x, t):
     """Infer the return type of hastype."""
-    t_t = await t['type']
-    if t_t is not Type:
-        raise MyiaTypeError(
-            f'Second argument to hastype must be a Type, got {t_t}'
-        )
+    def istype(x):  # noqa: D400
+        """Type"""
+        return x is Type
+
+    await track.expect(istype, t)
     return Bool()
 
 
 @type_inferrer(P.bool_not, nargs=1)
 async def infer_type_bool_not(track, x):
     """Infer the return type of not."""
-    x_t = await x['type']
-    if x_t != Bool():
-        raise MyiaTypeError('Expected Bool for not.')
+    await track.expect(Bool, x)
     return Bool()
 
 
 @type_inferrer(P.bool_and, nargs=2)
 async def infer_type_bool_and(track, x, y):
     """Infer the return type of bool_and."""
-    x_t = await x['type']
-    y_t = await y['type']
-    if x_t != Bool() or y_t != Bool():
-        raise MyiaTypeError('Expected Bool for bool_and.')
+    await track.expect(Bool, x, y)
     return Bool()
 
 
 @type_inferrer(P.bool_or, nargs=2)
 async def infer_type_bool_or(track, x, y):
     """Infer the return type of bool_or."""
-    x_t = await x['type']
-    y_t = await y['type']
-    if x_t != Bool() or y_t != Bool():
-        raise MyiaTypeError('Expected Bool for bool_or.')
+    await track.expect(Bool, x, y)
     return Bool()
 
 
 @type_inferrer(P.scalar_eq, P.scalar_ne, nargs=2)
 async def infer_type_generic_compare(track, x, y):
     """Infer the return type of a generic comparison operator."""
-    await track.assert_same(x, y)
+    await track.expect(Number, x, y)
     return Bool()
 
 
 @type_inferrer(P.scalar_lt, P.scalar_gt, P.scalar_le, P.scalar_ge, nargs=2)
 async def infer_type_arith_compare(track, x, y):
     """Infer the return type of an arithmetic comparison operator."""
-    t = await track.assert_same(x, y)
-    if not isinstance(t, (Int, Float)):
-        raise MyiaTypeError('Expected number')
+    await track.expect(Number, x, y)
     return Bool()
 
 
 @type_inferrer(P.scalar_uadd, P.scalar_usub, nargs=1)
 async def infer_type_arith_unary(track, x):
     """Infer the return type of a unary arithmetic operator."""
-    t = await x['type']
-    if not isinstance(t, (Int, Float)):
-        raise MyiaTypeError('Expected number')
+    t = await track.expect(Number, x)
     return t
 
 
@@ -246,9 +223,7 @@ async def infer_type_arith_unary(track, x):
                P.scalar_mod, P.scalar_pow, nargs=2)
 async def infer_type_arith_bin(track, x, y):
     """Infer the return type of a binary arithmetic operator."""
-    t = await track.assert_same(x, y)
-    if not isinstance(t, (Int, Float)):
-        raise MyiaTypeError('Expected number')
+    t, _ = await track.expect(Number, x, y)
     return t
 
 
@@ -263,9 +238,7 @@ async def infer_type_shape(track, ary):
 async def infer_type_array_map(track, fn, ary):
     """Infer the return type of array_map."""
     fn_t = await fn['type']
-    ary_t = await ary['type']
-    if not isinstance(ary_t, Array):
-        raise MyiaTypeError('Expected array')
+    ary_t = await track.expect(Array, ary)
     xref = track.engine.vref({'type': ary_t.elements})
     return Array(await fn_t(xref))
 
@@ -274,12 +247,7 @@ async def infer_type_array_map(track, fn, ary):
 async def infer_type_array_map2(track, fn, ary1, ary2):
     """Infer the return type of array_map2."""
     fn_t = await fn['type']
-    ary1_t = await ary1['type']
-    if not isinstance(ary1_t, Array):
-        raise MyiaTypeError('Expected array')
-    ary2_t = await ary2['type']
-    if not isinstance(ary2_t, Array):
-        raise MyiaTypeError('Expected array')
+    ary1_t, ary2_t = await track.expect(Array, ary1, ary2, assert_same=False)
     xref = track.engine.vref({'type': ary1_t.elements})
     yref = track.engine.vref({'type': ary2_t.elements})
     return Array(await fn_t(xref, yref))
@@ -289,13 +257,8 @@ async def infer_type_array_map2(track, fn, ary1, ary2):
 async def infer_type_reduce(track, fn, ary, shp):
     """Infer the return type of array_reduce."""
     fn_t = await fn['type']
-    ary_t = await ary['type']
-    shp_t = await shp['type']
-    if not isinstance(ary_t, Array):
-        raise MyiaTypeError('Expected array')
-    if not (isinstance(shp_t, Tuple)
-            and all(t == UInt(64) for t in shp_t.elements)):
-        raise MyiaTypeError("Target shape must be u64 tuple")
+    await track.expect(_shape_type, shp)
+    ary_t = await track.expect(Array, ary)
     xref = track.engine.vref({'type': ary_t.elements})
     xref2 = track.engine.vref({'type': ary_t.elements})
     res_elem_t = await fn_t(xref, xref2)
@@ -306,11 +269,9 @@ async def infer_type_reduce(track, fn, ary, shp):
 async def infer_type_across_array(track, fn, init, ary, ax):
     """Infer the return type of scan/array_reduce."""
     fn_t = await fn['type']
-    ary_t = await ary['type']
     init_t = await init['type']
     ax_t = await ax['type']
-    if not isinstance(ary_t, Array):
-        raise MyiaTypeError('Expected array')
+    ary_t = await track.expect(Array, ary)
     if not ary_t.elements == init_t:
         raise MyiaTypeError("Initial value must have the same type "
                             "as array elements")
@@ -324,32 +285,23 @@ async def infer_type_across_array(track, fn, init, ary, ax):
 @type_inferrer(P.distribute, nargs=2)
 async def infer_type_distribute(track, v, shp):
     """Infer the return type of distribute."""
-    v_t = await v['type']
-    if isinstance(v_t, Array):
-        v_t = v_t.elements
-    elif not isinstance(v_t, (Number, Bool)):
-        raise MyiaTypeError("Array elements must be numbers or bool")
-    shp_t = await shp['type']
-    if (not isinstance(shp_t, Tuple) or
-            not all(e == UInt(64) for e in shp_t.elements)):
-        raise MyiaTypeError("Shape must be (u64, ...)")
-    return Array(v_t)
+    v_t = await track.expect(Array, v)
+    await track.expect(_shape_type, shp)
+    return v_t
 
 
 @type_inferrer(P.reshape, nargs=2)
 async def infer_type_reshape(track, v, shape):
     """Infer the return type of reshape."""
-    shp_t = await shape['type']
-    if (not isinstance(shp_t, Tuple) or
-            not all(e == UInt(64) for e in shp_t.elements)):
-        raise MyiaTypeError("Shape must be (u64, ...)")
-    return await v['type']
+    v_t = await track.expect(Array, v)
+    await track.expect(_shape_type, shape)
+    return v_t
 
 
 @type_inferrer(P.dot, nargs=2)
 async def infer_type_dot(track, a, b):
     """Infer the return type of dot."""
-    t = await track.assert_same(a, b)
+    t, _ = await track.expect(Array, a, b)
     return t
 
 
@@ -363,9 +315,7 @@ async def infer_type_return_(track, x):
 async def infer_type_list_map(track, f, xs):
     """Infer the return type of list_map."""
     f_t = await f['type']
-    xs_t = await xs['type']
-    if not isinstance(xs_t, List):
-        raise MyiaTypeError('Expect list for list_map')
+    xs_t = await track.expect(List, xs)
     xref = track.engine.vref(dict(type=xs_t.element_type))
     ret_t = await f_t(xref)
     return List(ret_t)
@@ -435,23 +385,14 @@ async def infer_type_next(track, it):
 @type_inferrer(P.scalar_to_array, nargs=1)
 async def infer_type_scalar_to_array(track, x):
     """Infer the return type of scalar_to_array."""
-    x_t = await x['type']
-    if not isinstance(x_t, (Int, Float)):
-        raise MyiaTypeError(f'Invalid type for scalar_to_array: {x_t}')
+    x_t = await track.expect(Number, x)
     return Array(x_t)
 
 
 @type_inferrer(P.broadcast_shape, nargs=2)
 async def infer_type_broadcast_shape(track, xs, ys):
     """Infer the return type of broadcast_shape."""
-    xs_t = await xs['type']
-    ys_t = await ys['type']
-    if not isinstance(xs_t, Tuple) \
-            or not all(t == UInt(64) for t in xs_t.elements):
-        raise MyiaTypeError(f'Invalid type for broadcast_shape: {xs_t}')
-    if not isinstance(ys_t, Tuple) \
-            or not all(t == UInt(64) for t in ys_t.elements):
-        raise MyiaTypeError(f'Invalid type for broadcast_shape: {ys_t}')
+    xs_t, ys_t = await track.expect(_shape_type, xs, ys, assert_same=False)
     shp_xs_n = len(xs_t.elements)
     shp_ys_n = len(ys_t.elements)
     return Tuple([UInt(64) for i in range(max(shp_xs_n, shp_ys_n))])

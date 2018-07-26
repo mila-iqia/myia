@@ -1003,15 +1003,13 @@ def test_dot(a, b):
     return dot(a, b)
 
 
-@infer(shape=[({'type': i32}, {'value': (4, 2)}, (4, 2)),
-              ({'type': i32}, {'type': T(u64, u64)}, (ANYTHING, ANYTHING)),
-              ({'type': ai32, 'shape': (4,)}, {'value': (2, 4)}, (2, 4)),
+@infer(shape=[({'type': ai32, 'shape': (4,)}, {'value': (2, 4)}, (2, 4)),
               ({'type': ai32, 'shape': (4,)}, {'value': (5, 2)},
                InferenceError),
               ({'type': ai32, 'shape': (4, 2)}, {'value': (4,)},
                InferenceError)],
        type=[
-           ({'type': i32}, {'value': (4,), 'type': T(u64)}, ai32),
+           ({'type': i32}, {'value': (4,), 'type': T(u64)}, InferenceError),
            ({'type': ai32, 'shape': (1,)}, {'value': (4,), 'type': T(u64)},
             ai32),
            ({'type': li32}, {'value': (4,), 'type': T(u64)}, InferenceError),

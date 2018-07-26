@@ -2,7 +2,9 @@
 
 import asyncio
 from heapq import heappush, heappop
+from types import FunctionType
 
+from .dtype import Type
 from .ir import is_constant, is_constant_graph, is_apply
 from .utils import Named, Partializable
 
@@ -12,7 +14,18 @@ ANYTHING = Named('ANYTHING')
 
 
 class InferenceError(Exception):
-    """Inference error in a Myia program."""
+    """Inference error in a Myia program.
+
+    Attributes:
+        message: The error message.
+        refs: A list of references which are involved in the error,
+            e.g. because they have the wrong type or don't match
+            each other.
+        traceback_refs: A map from a context to the first reference in
+            that context that fails to resolve because of this error.
+            This represents a traceback of sorts.
+
+    """
 
     def __init__(self, message, refs=[]):
         """Initialize an InferenceError."""
@@ -105,6 +118,99 @@ class Track(Partializable):
     def assert_same(self, *refs):
         """Assert that all refs have the same value on this track."""
         return self.engine.assert_same(self.name, *refs)
+
+    def apply_predicate(self, predicate, res):
+        """Apply a predicate on a value.
+
+        The predicate can be a type, a callable, or a tuple of these
+        things.
+        """
+        if isinstance(predicate, tuple):
+            return any(self.apply_predicate(p, res) for p in predicate)
+        elif isinstance(predicate, Type):
+            return res == predicate
+        elif isinstance(predicate, type) and issubclass(predicate, Type):
+            return isinstance(res, predicate)
+        elif callable(predicate):
+            return predicate(res)
+        else:
+            raise ValueError(predicate)  # pragma: no cover
+
+    def predicate_error(self, predicate, res, ref):
+        """Raise an error for the given predicate when a value doesn't match.
+
+        Arguments:
+            predicate: The predicate.
+            res: The value that did not match the predicate.
+            ref: The reference that produced the value.
+        """
+        def is_type(preds):
+            return any(isinstance(pred, Type)
+                       or isinstance(pred, type)
+                       and issubclass(pred, Type)
+                       for pred in preds)
+
+        if not isinstance(predicate, tuple):
+            predicate = (predicate,)
+
+        def _str(p):
+            if isinstance(p, FunctionType):
+                return p.__doc__
+            else:
+                return str(p)
+
+        descrs = [_str(p) for p in predicate]
+        if len(descrs) == 1:
+            expected, = descrs
+        else:
+            expected = ", ".join(descrs[:-1]) + ' or ' + descrs[-1]
+
+        if is_type(predicate):
+            err_cls = MyiaTypeError
+        else:
+            err_cls = InferenceError
+
+        return err_cls(
+            f'Expected: {expected}; Got: {res}',
+            [ref]
+        )
+
+    async def expect(self,
+                     predicate,
+                     *refs,
+                     assert_same=True):
+        """Assert that all refs match the given predicate.
+
+        Arguments:
+            predicate: A type that all refs must have, or a predicate
+                function, or a tuple of types/predicates.
+            refs: The references to compare.
+            assert_same: Whether all references should be identical
+                on that track, in addition to matching the predicate.
+        """
+        results = [(ref, await ref[self.name]) for ref in refs]
+
+        for ref, res in results:
+            if not self.apply_predicate(predicate, res):
+                raise self.predicate_error(
+                    predicate,
+                    res,
+                    ref
+                )
+
+        if assert_same:
+            (main_ref, main), *rest = results
+            for ref, res in rest:
+                if res != main:
+                    raise InferenceError(
+                        f"Mismatch: {main} != {res}",
+                        [main_ref, ref]
+                    )
+
+        rval = [res for _, res in results]
+        if len(rval) == 1:
+            rval, = rval
+        return rval
 
 
 ####################
