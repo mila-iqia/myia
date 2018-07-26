@@ -175,14 +175,12 @@ class Parser:
     def make_condition_blocks(self, block):
         """Make two blocks for an if statement or expression."""
         with About(block.graph.debug, 'if_true'):
-            true_block = Block(self)
-            true_block.graph.flags['flatten_inference'] = True
+            true_block = Block(self, auxiliary=True, flatten_inference=True)
         true_block.preds.append(block)
         true_block.mature()
 
         with About(block.graph.debug, 'if_false'):
-            false_block = Block(self)
-            false_block.graph.flags['flatten_inference'] = True
+            false_block = Block(self, auxiliary=True, flatten_inference=True)
         false_block.preds.append(block)
         false_block.mature()
 
@@ -477,8 +475,7 @@ class Parser:
 
         # Create the continuation
         with About(block.graph.debug, 'if_after'):
-            after_block = Block(self)
-            after_block.graph.flags['flatten_inference'] = True
+            after_block = Block(self, auxiliary=True, flatten_inference=True)
 
         # Process the first branch
         true_end = self.process_statements(true_block, node.body)
@@ -505,11 +502,11 @@ class Parser:
 
         """
         with About(block.graph.debug, 'while_header'):
-            header_block = Block(self)
+            header_block = Block(self, auxiliary=True)
         with About(block.graph.debug, 'while_body'):
-            body_block = Block(self)
+            body_block = Block(self, auxiliary=True)
         with About(block.graph.debug, 'while_after'):
-            after_block = Block(self)
+            after_block = Block(self, auxiliary=True)
         body_block.preds.append(header_block)
         after_block.preds.append(header_block)
         block.jump(header_block)
@@ -549,14 +546,14 @@ class Parser:
 
         # Checks hasnext on the iterator.
         with About(block.graph.debug, 'for_header'):
-            header_block = Block(self)
+            header_block = Block(self, auxiliary=True)
         # We explicitly add the iterator as the first argument
         it = header_block.graph.add_parameter()
         cond = header_block.graph.apply(primops.hasnext, it)
 
         # Body of the iterator.
         with About(block.graph.debug, 'for_body'):
-            body_block = Block(self)
+            body_block = Block(self, auxiliary=True)
         body_block.preds.append(header_block)
         # app = next(it); target = app[0]; it = app[1]
         app = body_block.graph.apply(primops.next, it)
@@ -573,7 +570,7 @@ class Parser:
 
         # This is the block after for
         with About(block.graph.debug, 'for_after'):
-            after_block = Block(self)
+            after_block = Block(self, auxiliary=True)
         after_block.preds.append(header_block)
 
         block.jump(header_block, init)
@@ -620,12 +617,15 @@ class Block:
 
     """
 
-    def __init__(self, parser: Parser) -> None:
+    def __init__(self, parser: Parser, **flags) -> None:
         """Construct a basic block.
 
         Constructing a basic block also constructs a corresponding function,
         and a constant that can be used to call this function.
 
+        Arguments:
+            parser: The Parser object.
+            flags: Flags to give to that Block's graph.
         """
         self.parser = parser
 
@@ -635,6 +635,7 @@ class Block:
         self.phi_nodes: Dict[Parameter, str] = {}
         self.jumps: Dict[Block, Apply] = {}
         self.graph: Graph = Graph()
+        self.graph.flags.update(flags)
 
     def set_phi_arguments(self, phi: Parameter) -> None:
         """Resolve the arguments to a phi node.
