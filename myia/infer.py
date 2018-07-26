@@ -32,6 +32,7 @@ class InferenceError(Exception):
         super().__init__(message, refs)
         self.message = message
         self.refs = refs
+        self.traceback_refs = {}
 
 
 class MyiaTypeError(InferenceError):
@@ -838,6 +839,13 @@ class InferenceEngine:
                 # error. You can just add a log_error if this happens again
                 # e.g. because of changes in the inference engine.
                 raise  # pragma: no cover
+            except InferenceError as infe:
+                # This builds a traceback of sorts in traceback_refs
+                # The first encounter with a ctx will be the caller,
+                # the others will be subsequence operations that depend
+                # on the result.
+                infe.traceback_refs.setdefault(ctx, ref)
+                raise
 
         else:
             # Values for Parameters are cached when we enter a Graph.
