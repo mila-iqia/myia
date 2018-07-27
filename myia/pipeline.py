@@ -244,7 +244,11 @@ class _PipelineSlice:
             if step.active:
                 valid_args, rest = partition_keywords(step.step, args)
                 try:
-                    args = {**args, **step.step(**valid_args)}
+                    results = step.step(**valid_args)
+                    if not isinstance(results, dict) and len(valid_args) == 1:
+                        field_name, = valid_args.keys()
+                        results = {field_name: results}
+                    args = {**args, **results}
                 except Exception as e:
                     args['error'] = e
                     args['error_step'] = step
@@ -276,3 +280,15 @@ class PipelineStep(PipelineResource):
     def __call__(self, **args):
         """Execute the pipeline all the way up to this step."""
         return self.pipeline[:self.name](**args)
+
+
+def pipeline_function(fn):
+    """Create a pipeline step from a function.
+
+    The provided function must receive `self` as its first argument, and
+    then the pipeline fields it needs (the variable names are inspected
+    by the pipeline to determine what values to give this step).
+    """
+    class PipelineStepFunction(PipelineStep):
+        step = fn
+    return PipelineStepFunction.partial()

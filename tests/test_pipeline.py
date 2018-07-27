@@ -1,6 +1,6 @@
 
 import pytest
-from myia.pipeline import PipelineStep, PipelineDefinition
+from myia.pipeline import PipelineStep, PipelineDefinition, pipeline_function
 from myia.utils import Merge, Reset
 
 
@@ -23,6 +23,11 @@ class OpResourceStep(PipelineStep):
 
     def step(self, value):
         return {'value': self.op(self.resources.param, value)}
+
+
+@pipeline_function
+def double_step(self, value):
+    return value * 2
 
 
 @pytest.fixture
@@ -133,6 +138,7 @@ def test_Pipeline_insert(op_pipeline):
     pdef = op_pipeline
 
     half = OpStep.partial(op=lambda p, x: x / p, param=2)
+    double = double_step
 
     pip = pdef.insert_before(half=half).make()
     assert pip(value=3) == {'value': 25}
@@ -151,6 +157,9 @@ def test_Pipeline_insert(op_pipeline):
 
     pip = pdef.insert_after('square', half=half).make()
     assert pip(value=3) == {'value': 32}
+
+    pip = pdef.insert_after('square', double=double).make()
+    assert pip(value=3) == {'value': 128}
 
 
 def test_Pipeline_select(op_pipeline):
