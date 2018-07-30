@@ -67,6 +67,12 @@ class PrimitiveValueInferrer(Inferrer):
             args_unwrapped = [self.engine.unwrap(arg) for arg in args]
             try:
                 v = self.impl(*args_unwrapped)
+                try:
+                    # Throw away non-hashable results
+                    # Use a whitelist of types instead?
+                    hash(v)
+                except TypeError:
+                    return ANYTHING
             except Exception as e:
                 raise InferenceError(e, refs=refs)
             n = LimitedValue.min_count(args)
