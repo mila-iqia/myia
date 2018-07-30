@@ -7,6 +7,7 @@ from pytest import mark
 from types import SimpleNamespace
 
 from myia.api import scalar_pipeline, standard_pipeline
+from myia.debug.traceback import print_inference_error
 from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
@@ -178,13 +179,17 @@ def inferrer_decorator(pipeline):
                     try:
                         out()
                     except InferenceError as e:
-                        pass
+                        print_inference_error(e)
                     else:
                         raise Exception(
                             f'Expected {expected_out}, got: (see stdout).'
                         )
                 else:
-                    assert out() == expected_out
+                    try:
+                        assert out() == expected_out
+                    except InferenceError as e:
+                        print_inference_error(e)
+                        raise
 
             m = mark.parametrize('spec', list(tests))(run_test)
             m.__orig__ = fn
