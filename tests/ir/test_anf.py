@@ -4,6 +4,7 @@ import pytest
 from myia.dtype import Int, Float, Function
 from myia.ir.anf import PARAMETER, Apply, Constant, Graph, Parameter
 from myia.prim import ops as primops
+from myia.utils import UNKNOWN
 
 
 def test_incoming():
@@ -52,6 +53,7 @@ def test_graph_type():
     g = Graph()
     x = g.add_parameter()
     y = g.add_parameter()
+    assert g.type is UNKNOWN
     x.type = Int(16)
     y.type = Float(32)
     g.output = g.apply('mul', x, y)
