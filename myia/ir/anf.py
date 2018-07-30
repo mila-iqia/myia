@@ -59,6 +59,8 @@ class Graph:
     @property
     def type(self):
         """Return the graph's type based on parameter/output types."""
+        if any(p.type is UNKNOWN for p in self.parameters):
+            return UNKNOWN
         return Function(tuple(p.type for p in self.parameters),
                         self.output.type)
 
@@ -85,7 +87,8 @@ class Graph:
         else:
             self.return_ = Apply([Constant(primops.return_), value], self)
         self.return_.type = value.type
-        self.return_.inputs[0].type = Function((value.type,), value.type)
+        if value.type is not UNKNOWN:
+            self.return_.inputs[0].type = Function((value.type,), value.type)
 
     def add_parameter(self) -> 'Parameter':
         """Add a new parameter to this graph (appended to the end)."""

@@ -4,9 +4,9 @@ import asyncio
 from heapq import heappush, heappop
 from types import FunctionType
 
-from .dtype import Type
+from .dtype import Type, Function
 from .ir import is_constant, is_constant_graph, is_apply
-from .utils import Named, Partializable
+from .utils import Named, Partializable, UNKNOWN
 
 
 # Represents an unknown value
@@ -27,18 +27,18 @@ class InferenceError(Exception):
 
     """
 
-    def __init__(self, message, refs=[]):
+    def __init__(self, message, refs=[], app=None):
         """Initialize an InferenceError."""
         super().__init__(message, refs)
         self.message = message
         self.refs = refs
         self.traceback_refs = {}
+        if app is not None:
+            self.traceback_refs[app.context] = app
 
 
 class MyiaTypeError(InferenceError):
     """Type error in a Myia program."""
-
-    pass
 
 
 class MyiaShapeError(InferenceError):
@@ -820,18 +820,51 @@ class InferenceEngine:
         node = ref.node
         ctx = ref.context
 
-        if is_constant(node):
+        inferred = ref.node.inferred.get(track, UNKNOWN)
+
+        if inferred is not UNKNOWN:
+            return inferred
+
+        elif is_constant(node):
             return self.tracks[track].infer_constant(ref)
 
         elif is_apply(node):
             n_fn, *n_args = node.inputs
             # We await on the function node to get the inferrer
-            inf = await self.get(track, self.ref(n_fn, ctx))
+            fn_ref = self.ref(n_fn, ctx)
+            inf = await self.get(track, fn_ref)
             if inf is ANYTHING:
                 return ANYTHING
-            if not isinstance(inf, Inferrer):
-                raise AssertionError(f'Not an inferrer: {inf}')
+
             argrefs = [self.ref(node, ctx) for node in n_args]
+            if isinstance(inf, Function):
+                ngot = len(argrefs)
+                nexpect = len(inf.arguments)
+                if ngot != nexpect:
+                    raise MyiaTypeError(
+                        'Wrong number of arguments.'
+                        f' Expected {nexpect}, got {ngot}.',
+                        refs=[],
+                        app=ref
+                    )
+                for got, aref in zip(inf.arguments, argrefs):
+                    expect = await aref[track]
+                    if expect != got:
+                        raise MyiaTypeError(
+                            'Type mismatch.'
+                            f' Expected {expect}, got {got}.',
+                            refs=[aref],
+                            app=ref
+                        )
+                return inf.retval
+
+            if not isinstance(inf, Inferrer):
+                raise MyiaTypeError(
+                    f'Trying to call a non-callable type.',
+                    refs=[fn_ref],
+                    app=ref
+                )
+
             try:
                 return await inf(*argrefs)
             except RuntimeError as e:

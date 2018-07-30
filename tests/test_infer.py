@@ -10,7 +10,8 @@ from myia.api import scalar_pipeline, standard_pipeline
 from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
-    Type, UInt, External
+    Function as F, Type, UInt, External
+from myia.pipeline import pipeline_function
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
@@ -1213,6 +1214,97 @@ def test_scalar_to_array(x):
 ])
 def test_broadcast_shape(xs, ys):
     return broadcast_shape(xs, ys)
+
+
+@infer(type=[
+    (i64, i64, InferenceError),
+    (F([i64], f64), i64, f64),
+    (F([f64], f64), i64, InferenceError),
+])
+def test_call_argument(f, x):
+    return f(x)
+
+
+def test_forced_type():
+
+    @pipeline_function
+    def mod(self, graph):
+        # Force the inferred tyoe of the output to be f64
+        graph.output.inferred['type'] = f64
+        return graph
+
+    def fn(x, y):
+        return x + y
+
+    pip = infer_pipeline.insert_before('infer', mod=mod)
+
+    for argspec in [[{'type': i64}, {'type': i64}],
+                    [{'type': i64}, {'type': f64}]]:
+
+        results = pip.run(input=fn, argspec=argspec)
+
+        if 'error' in results:
+            raise results['error']
+
+        rval = results['inference_results']
+
+        assert rval['type'] == f64
+
+
+def test_forced_function_type():
+
+    @pipeline_function
+    def mod(self, graph):
+        # Force the inferred tyoe of scalar_add to be (i64,i64)->f64
+        scalar_add = graph.output.inputs[0]
+        scalar_add.inferred['type'] = F([i64, i64], f64)
+        return graph
+
+    def fn(x, y):
+        return x + y
+
+    pip = infer_pipeline.insert_before('infer', mod=mod)
+
+    # Test correct
+
+    results = pip.run(
+        input=fn,
+        argspec=[{'type': i64}, {'type': i64}]
+    )
+
+    if 'error' in results:
+        raise results['error']
+
+    rval = results['inference_results']
+
+    assert rval['type'] == f64
+
+    # Test mismatch
+
+    results = pip.run(
+        input=fn,
+        argspec=[{'type': i64}, {'type': f64}]
+    )
+
+    assert 'error' in results
+    err = results['error']
+    if not isinstance(err, InferenceError):
+        raise err
+
+    # Test narg mismatch
+
+    def fn2(x):
+        return fn(x)
+
+    results = pip.run(
+        input=fn2,
+        argspec=[{'type': i64}]
+    )
+
+    assert 'error' in results
+    err = results['error']
+    if not isinstance(err, InferenceError):
+        raise err
 
 
 ###########################
