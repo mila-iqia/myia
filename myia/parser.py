@@ -156,11 +156,19 @@ class Parser:
         # Will be set later
         self.graph = None
 
-    def make_location(self, node: ast.AST) -> Location:
+    def make_location(self, node) -> Location:
         """Create a Location from an AST node."""
-        if hasattr(node, 'lineno') and hasattr(node, 'col_offset'):
-            li1, col1 = node.first_token.start
-            li2, col2 = node.last_token.end
+        if isinstance(node, (list, tuple)):
+            if len(node) == 0:
+                return None
+            node0 = node[0]
+            node1 = node[-1]
+        else:
+            node0 = node
+            node1 = node
+        if hasattr(node0, 'lineno') and hasattr(node0, 'col_offset'):
+            li1, col1 = node0.first_token.start
+            li2, col2 = node1.last_token.end
             li1 += self.line_offset - 1
             li2 += self.line_offset - 1
             col1 += self.col_offset
@@ -315,6 +323,8 @@ class Parser:
         cond = self.process_node(block, node.test)
 
         true_block, false_block = self.make_condition_blocks(block)
+        true_block.graph.debug.location = self.make_location(node.body)
+        false_block.graph.debug.location = self.make_location(node.orelse)
 
         tb = self.process_node(true_block, node.body)
         fb = self.process_node(false_block, node.orelse)
@@ -472,6 +482,8 @@ class Parser:
 
         # Create two branches
         true_block, false_block = self.make_condition_blocks(block)
+        true_block.graph.debug.location = self.make_location(node.body)
+        false_block.graph.debug.location = self.make_location(node.orelse)
 
         # Create the continuation
         with About(block.graph.debug, 'if_after'):
