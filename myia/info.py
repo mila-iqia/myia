@@ -121,6 +121,15 @@ class NamedDebugInfo(DebugInfo):
         self.name = f'_{prefix}{self.id}'
         return self.name
 
+    def find(self, prop):
+        """Find a property in self or in self.about.debug."""
+        if hasattr(self, prop):
+            return getattr(self, prop)
+        elif self.about is not None:
+            return self.about.debug.find(prop)
+        else:
+            return None
+
 
 class About:
     """Represent a relationship to an object.

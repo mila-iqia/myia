@@ -980,6 +980,8 @@ class InferenceEngine:
             fut = asyncio.ensure_future(coro, loop=self.loop)
             self.loop.run_forever()
             self.errors.extend(self.loop.collect_errors())
+            for err in self.errors[errs_before:]:
+                err.engine = self
             if errs_before < len(self.errors):
                 if throw:  # pragma: no cover
                     raise self.errors[-1]

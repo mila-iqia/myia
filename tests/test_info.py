@@ -1,4 +1,4 @@
-from myia.info import DebugInfo, DebugInherit, NamedDebugInfo
+from myia.info import DebugInfo, DebugInherit, NamedDebugInfo, About
 
 
 def test_nested_info():
@@ -35,3 +35,17 @@ def test_info_obj():
     assert d.obj is o
     del o
     assert d.obj is None
+
+
+def test_info_find():
+    a = NamedDebugInfo()
+    a.field1 = 1
+    a.field2 = 2
+    with About(a, 'thing'):
+        b = NamedDebugInfo()
+        b.field2 = 3
+    assert a.find('field1') == 1
+    assert a.find('field2') == 2
+    assert b.find('field1') == 1
+    assert b.find('field2') == 3
+    assert b.find('field3') is None
