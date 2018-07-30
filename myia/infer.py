@@ -116,9 +116,9 @@ class Track(Partializable):
         else:
             values[self.name] = self.default()  # pragma: no cover
 
-    def assert_same(self, *refs):
-        """Assert that all refs have the same value on this track."""
-        return self.engine.assert_same(self.name, *refs)
+    def assert_same(self, *vals, refs=[]):
+        """Assert that all vals are the same on this track."""
+        return self.engine.assert_same(self.name, *vals, refs=refs)
 
     def apply_predicate(self, predicate, res):
         """Apply a predicate on a value.
@@ -604,10 +604,11 @@ class InferrerEquivalenceClass:
     arguments that they are given.
     """
 
-    def __init__(self, engine, members):
+    def __init__(self, engine, members, refs):
         """Initialize the InferrerEquivalenceClass."""
         self.engine = engine
         self.all_members = members
+        self.all_refs = refs
 
         # Members for which we are up to date
         self.checked_members = set()
@@ -621,6 +622,7 @@ class InferrerEquivalenceClass:
     def update(self, other):
         """Merge the other equivalence class into this one."""
         self.all_members.update(other.all_members)
+        self.all_refs.update(other.all_refs)
         self.pending_members = self.all_members - self.checked_members
 
     def __iter__(self):
@@ -666,7 +668,7 @@ class InferrerEquivalenceClass:
             for inf2 in others:
                 res2 = inf2(*args)
                 self.engine.equiv.declare_equivalent(
-                    res1, res2, self.all_members
+                    res1, res2, self.all_refs
                 )
 
         return maybe_changes
@@ -707,10 +709,10 @@ class EquivalencePool:
 
             # We merge the equivalence classes for x and y.
             eqx = self.eqclasses.get(
-                x, InferrerEquivalenceClass(self.engine, {x})
+                x, InferrerEquivalenceClass(self.engine, {x}, set(refs))
             )
             eqy = self.eqclasses.get(
-                y, InferrerEquivalenceClass(self.engine, {y})
+                y, InferrerEquivalenceClass(self.engine, {y}, set(refs))
             )
             eqx.update(eqy)
             for z in eqx:
@@ -947,11 +949,11 @@ class InferenceEngine:
                                 self.graph, self.root_context)
             self.schedule(inf(*self.argrefs))
 
-    async def assert_same(self, track, *refs):
+    async def assert_same(self, track, *vals, refs=[]):
         """Assert that all refs have the same value on the given track."""
         # Make a future for the value of each reference
         futs = [self.get(track, ref) if isinstance(ref, Reference) else ref
-                for ref in refs]
+                for ref in vals]
 
         # We wait only for the first future to complete
         done, pending = await asyncio.wait(

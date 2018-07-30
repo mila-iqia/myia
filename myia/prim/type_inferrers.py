@@ -4,7 +4,7 @@
 from functools import partial
 
 from ..dtype import Int, Bool, Tuple, List, Type, Array, UInt, Number
-from ..infer import ANYTHING, Inferrer, GraphInferrer, PartialInferrer, \
+from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
 from ..utils import Namespace
@@ -88,7 +88,7 @@ async def infer_type_if(track, cond, tb, fb):
     elif v is ANYTHING:
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
-        return await track.assert_same(tb_inf(), fb_inf())
+        return await track.assert_same(tb_inf(), fb_inf(), refs=[tb, fb])
     else:
         raise AssertionError("Invalid condition value for if")
 
@@ -107,7 +107,7 @@ async def infer_type_switch(track, cond, tb, fb):
     elif v is ANYTHING:
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
-        return await track.assert_same(tb, fb)
+        return await track.assert_same(tb, fb, refs=[tb, fb])
     else:
         raise AssertionError("Invalid condition value for switch")
 
