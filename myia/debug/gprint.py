@@ -423,7 +423,7 @@ L = var(is_constant_graph)
 
 
 @pattern_replacer(primops.cons_tuple, X, Y)
-def _opt_accum_cons(node, equiv):
+def _opt_accum_cons(optimizer, node, equiv):
     x = equiv[X]
     y = equiv[Y]
     args = [Constant(make_tuple), x]
@@ -447,7 +447,7 @@ def _opt_accum_cons(node, equiv):
 
 
 @pattern_replacer(primops.getitem, X, V)
-def _opt_fancy_getitem(node, equiv):
+def _opt_fancy_getitem(optimizer, node, equiv):
     x = equiv[X]
     v = equiv[V]
     ct = Constant(GraphCosmeticPrimitive(f'[{v.value}]', on_edge=True))
@@ -456,7 +456,7 @@ def _opt_fancy_getitem(node, equiv):
 
 
 @pattern_replacer(primops.resolve, V1, V2)
-def _opt_fancy_resolve(node, equiv):
+def _opt_fancy_resolve(optimizer, node, equiv):
     ns = equiv[V1]
     name = equiv[V2]
     with About(node.debug, 'cosmetic'):
@@ -466,7 +466,7 @@ def _opt_fancy_resolve(node, equiv):
 
 
 @pattern_replacer(primops.getattr, X, V)
-def _opt_fancy_getattr(node, equiv):
+def _opt_fancy_getattr(optimizer, node, equiv):
     x = equiv[X]
     v = equiv[V]
     ct = Constant(GraphCosmeticPrimitive(f'{v.value}', on_edge=True))
