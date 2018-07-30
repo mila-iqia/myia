@@ -84,7 +84,7 @@ async def infer_shape_if(track, cond, tb, fb):
     elif v is ANYTHING:
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
-        return await track.assert_same(tb_inf(), fb_inf())
+        return await track.assert_same(tb_inf(), fb_inf(), refs=[tb, fb])
     else:
         raise AssertionError("Invalid condition value for if.")
 
@@ -102,7 +102,7 @@ async def infer_shape_switch(track, cond, tb, fb):
     elif v is ANYTHING:
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
-        return await track.assert_same(tb['shape'], fb['shape'])
+        return await track.assert_same(tb, fb, refs=[tb, fb])
     else:
         raise AssertionError("Invalid condition value for switch.")
 
