@@ -1323,6 +1323,7 @@ def ai64_of(*shp):
         (ai64, i64, ai64),
         (i64, ai64, ai64),
         (i64, f64, InferenceError),
+        ({'type': i64, 'value': 3}, ai64, ai64)
     ],
     shape=[
         (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
