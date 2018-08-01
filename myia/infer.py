@@ -342,7 +342,7 @@ class GraphInferrer(Inferrer):
         for p, arg in zip(self.graph.parameters, context.argkey):
             for track, v in arg:
                 ref = self.engine.ref(p, context)
-                self.engine.cache_value(track, ref, v)
+                self.engine.cache.set_value((track, ref), v)
 
         out = self.engine.ref(self.graph.return_, context)
         return await self.engine.get_raw(self.track.name, out)
@@ -752,6 +752,42 @@ class EquivalencePool:
             self.engine.schedule(self.check(), order=1000)
 
 
+class EvaluationCache:
+    """Key/value store where keys are associated to Futures.
+
+    Attributes:
+        cache: The cache.
+        loop: The InferenceLoop for async evaluation.
+        keycalc: An async function that takes a key and returns
+            the value associated to that key.
+    """
+
+    def __init__(self, loop, keycalc):
+        """Initialize an EvaluationCache."""
+        self.cache = {}
+        self.loop = loop
+        self.keycalc = keycalc
+
+    def get(self, key):
+        """Get the future associated to the key."""
+        if key not in self.cache:
+            self.set(key, self.keycalc(key))
+        return self.cache[key]
+
+    def set(self, key, coro):
+        """Associate a key to a coroutine."""
+        self.cache[key] = self.loop.create_task(coro)
+
+    def set_value(self, key, value):
+        """Associate a key to a value.
+
+        This will wrap the value in a Future.
+        """
+        fut = asyncio.Future(loop=self.loop)
+        fut.set_result(value)
+        self.cache[key] = fut
+
+
 class InferenceEngine:
     """Infer various properties about nodes in graphs.
 
@@ -777,6 +813,7 @@ class InferenceEngine:
                  required_tracks=None,
                  eq_class=EquivalencePool):
         """Initialize the InferenceEngine."""
+        self.loop = _InferenceLoop()
         self.pipeline = pipeline
 
         self.graph = graph
@@ -791,7 +828,7 @@ class InferenceEngine:
         self.argrefs = [self.vref(arg) for arg in argvals]
         self.argvals = [ref.values for ref in self.argrefs]
 
-        self.cache = {track: {} for track in self.all_track_names}
+        self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
         self.equiv = eq_class(self)
 
@@ -800,7 +837,6 @@ class InferenceEngine:
         empty_context = Context.empty()
         self.root_context = empty_context.add(graph, argvals)
 
-        self.loop = _InferenceLoop()
         self.run_coroutine(self._run(), throw=False)
 
     def ref(self, node, context):
@@ -813,8 +849,10 @@ class InferenceEngine:
             track_obj.fill_in(values)
         return VirtualReference(**values)
 
-    async def compute_ref(self, track, ref):
+    async def compute_ref(self, key):
         """Compute the value of the Reference on the given track."""
+        track, ref = key
+
         if isinstance(ref, VirtualReference):
             # A VirtualReference already contains the values we need.
             return await ref[track]
@@ -887,18 +925,7 @@ class InferenceEngine:
             raise Exception(f'Cannot process: {node}')  # pragma: no cover
 
     def get_raw(self, track, ref):
-        """Get a Future for the value of the Reference on the given track.
-
-        Results are cached. This method may return a wrapper around the
-        desired value, depending on the track.
-        """
-        futs = self.cache[track]
-        if ref not in futs:
-            if self.loop.is_closed():
-                raise Exception('Requested an unprocessed reference.') \
-                    # pragma: no cover
-            futs[ref] = self.loop.create_task(self.compute_ref(track, ref))
-        return futs[ref]
+        return self.cache.get((track, ref))
 
     def unwrap(self, v):
         """Unwrap a cached value."""
@@ -930,14 +957,6 @@ class InferenceEngine:
             oref = self.ref(self.graph.return_, self.root_context)
             return {track: self.get_info(track, oref)
                     for track in self.required_tracks}
-
-    def cache_value(self, track, ref, value):
-        """Set the value of the Reference on the given track."""
-        # We create a future and resolve it immediately, because all entries
-        # in the cache must be futures.
-        fut = asyncio.Future(loop=self.loop)
-        fut.set_result(value)
-        self.cache[track][ref] = fut
 
     def schedule(self, coro, order=0):
         """Schedule the given coroutine to run."""
