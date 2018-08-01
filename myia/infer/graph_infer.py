@@ -7,8 +7,8 @@ from ..dtype import Type, Function
 from ..ir import is_constant, is_constant_graph, is_apply
 from ..utils import Partializable, UNKNOWN
 
-from .core import InferenceLoop, EvaluationCache
-from .utils import ANYTHING, InferenceError, MyiaTypeError
+from .core import InferenceLoop, EvaluationCache, EquivalenceChecker
+from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap
 
 
 def type_error_nargs(ident, expected, got):
@@ -162,7 +162,7 @@ class Track(Partializable):
 ####################
 
 
-class Inferrer:
+class Inferrer(DynamicMap):
     """Infer a property of the output of an operation.
 
     Attributes:
@@ -176,30 +176,10 @@ class Inferrer:
 
     def __init__(self, track, identifier):
         """Initialize the Inferrer."""
+        super().__init__()
         self.track = track
         self.engine = track.engine
         self.identifier = identifier
-        self.cache = {}
-
-    async def __call__(self, *args):
-        """Infer a property of the operation on the given arguments.
-
-        The results of this call are cached.
-        """
-        if args not in self.cache:
-            self.cache[args] = await self.infer(*args)
-        return self.cache[args]
-
-    def infer(self, *args):
-        """Infer a property of the operation on the given arguments.
-
-        This must be overriden in subclasses.
-        """
-        raise NotImplementedError()  # pragma: no cover
-
-    def provably_equivalent(self, other):
-        """Whether this inferrer is provably equivalent to the other."""
-        return self is other  # pragma: no cover
 
 
 class PrimitiveInferrer(Inferrer):
@@ -452,161 +432,6 @@ class VirtualReference:
 ########
 
 
-class InferrerEquivalenceClass:
-    """An equivalence class between a set of Inferrers.
-
-    Two inferrers are equivalent if they return the same value on each set of
-    arguments that they are given.
-    """
-
-    def __init__(self, engine, members, refs):
-        """Initialize the InferrerEquivalenceClass."""
-        self.engine = engine
-        self.all_members = members
-        self.all_refs = refs
-
-        # Members for which we are up to date
-        self.checked_members = set()
-
-        # Members left to process
-        self.pending_members = members
-
-        # Map argument tuples to results
-        self.results = {}
-
-    def update(self, other):
-        """Merge the other equivalence class into this one."""
-        self.all_members.update(other.all_members)
-        self.all_refs.update(other.all_refs)
-        self.pending_members = self.all_members - self.checked_members
-
-    def __iter__(self):
-        return iter(self.all_members)
-
-    async def check(self):
-        """Check that all inferrers in the class are equivalent.
-
-        Return True if any work was done (it might be necessary to run this
-        method more than once, if new work entails that some members may be run
-        on new arguments, or new members may be added to this equivalence
-        class).
-        """
-        maybe_changes = False
-
-        for inf in self.pending_members:
-            maybe_changes = True
-            # The assert will be triggered if we add new equivalences
-            # after the first ones are resolved. I'm not certain in what
-            # case exactly that'd happen. If it does, try to uncomment
-            # the block after the assert and see if it works.
-            assert not self.results, \
-                "Congrats, you found out how to trigger this code."
-            # for args, expected in self.results.items():
-            #     v = inf(*args)
-            #     self.engine.equiv.declare_equivalent(
-            #         expected, v, self.all_members
-            #     )
-        self.checked_members.update(self.pending_members)
-        self.pending_members = set()
-
-        all_keys = set()
-        for m in self.checked_members:
-            all_keys.update(m.cache.keys())
-
-        to_check = all_keys - set(self.results.keys())
-
-        for args in to_check:
-            maybe_changes = True
-            inf1, *others = self.checked_members
-            res1 = await inf1(*args)
-            self.results[args] = res1
-            for inf2 in others:
-                res2 = inf2(*args)
-                self.engine.equiv.declare_equivalent(
-                    res1, res2, self.all_refs
-                )
-
-        return maybe_changes
-
-
-class EquivalencePool:
-    """Handle equivalence between values.
-
-    Equivalence between inferrers are handled with InferrerEquivalenceClass.
-    """
-
-    def __init__(self, engine):
-        """Initialize the EquivalencePool."""
-        self.engine = engine
-        self.eqclasses = {}
-        self.pending = []
-        self.checked = {}
-
-    def declare_equivalent(self, x, y, refs):
-        """Declare that x and y should be equivalent.
-
-        If an error occurs, the refs argument is to be packaged with it.
-        """
-        # We only put x and y in a pending list for now.
-        self.pending.append((x, y, refs))
-        # Later, we will call check.
-        self.engine.schedule(self.check())
-
-    async def _process_equivalence(self, x, y, refs):
-        if hasattr(x, '__await__'):
-            x = await x
-        if hasattr(y, '__await__'):
-            y = await y
-
-        if isinstance(x, Inferrer) and isinstance(y, Inferrer):
-            if x.provably_equivalent(y):
-                return
-
-            # We merge the equivalence classes for x and y.
-            eqx = self.eqclasses.get(
-                x, InferrerEquivalenceClass(self.engine, {x}, set(refs))
-            )
-            eqy = self.eqclasses.get(
-                y, InferrerEquivalenceClass(self.engine, {y}, set(refs))
-            )
-            eqx.update(eqy)
-            for z in eqx:
-                self.eqclasses[z] = eqx
-
-        elif x == y:
-            pass
-
-        else:
-            # We log the error directly instead of raising an exception so that
-            # it doesn't prevent other (independent) checks.
-            self.engine.errors.append(
-                MyiaTypeError(f'Type mismatch: {x} != {y}', refs=refs)
-            )
-
-    async def check(self):
-        """Check whether the declared equivalences hold.
-
-        If new work was performed in order to perform the checks, `check`
-        reschedules itself on the engine, in case there are new equivalences,
-        or equivalences to rescind.
-        """
-        maybe_changes = False
-
-        # Process all pending tasks
-        pending, self.pending = self.pending, []
-        for x, y, refs in pending:
-            await self._process_equivalence(x, y, refs)
-            maybe_changes = True
-
-        # Process the inferrers using equivalence classes
-        for eq in set(self.eqclasses.values()):
-            maybe_changes |= await eq.check()
-
-        if maybe_changes:
-            # Reschedule, in case there is new data.
-            self.engine.schedule(self.check(), order=1000)
-
-
 class InferenceEngine:
     """Infer various properties about nodes in graphs.
 
@@ -630,7 +455,7 @@ class InferenceEngine:
                  *,
                  tracks,
                  required_tracks=None,
-                 eq_class=EquivalencePool):
+                 eq_class=EquivalenceChecker):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop()
         self.pipeline = pipeline
@@ -649,7 +474,10 @@ class InferenceEngine:
 
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
-        self.equiv = eq_class(self)
+        self.equiv = eq_class(
+            loop=self.loop,
+            error_callback=self.errors.append
+        )
 
         self.mng = self.pipeline.resources.manager
         self.mng.add_graph(graph)
@@ -803,7 +631,7 @@ class InferenceEngine:
         # We must now tell equiv that all remaining futures must return the
         # same thing as the first one. This will essentially schedule a
         # bunch of tasks to wait for the remaining futures and verify that
-        # they match. See EquivalencePool.
+        # they match. See EquivalenceChecker.
         main = done.pop()
         for fut in done | pending:
             self.equiv.declare_equivalent(fut, main, refs)
