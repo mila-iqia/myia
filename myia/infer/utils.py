@@ -1,14 +1,14 @@
 """Misc utilities for inference."""
 
 
-from ..utils import Named
+from ..utils import Named, Event, Partializable
 
 
 # Represents an unknown value
 ANYTHING = Named('ANYTHING')
 
 
-class InferenceError(Exception):
+class InferenceError(Exception, Partializable):
     """Inference error in a Myia program.
 
     Attributes:
@@ -61,3 +61,37 @@ class ValueWrapper:
     @property
     def __unwrapped__(self):
         return self.value
+
+
+class DynamicMap:
+    """Represents a sort of mapping that's constantly updated."""
+
+    def __init__(self):
+        """Initialize a DynamicMap."""
+        self.cache = {}
+        self.on_result = Event(
+            name='on_result',
+            history=self.cache.items
+        )
+
+    def provably_equivalent(self, other):
+        """Whether this map is provably equivalent to the other."""
+        return self is other  # pragma: no cover
+
+    async def __call__(self, *args):
+        """Infer a property of the operation on the given arguments.
+
+        The results of this call are cached.
+        """
+        if args not in self.cache:
+            res = await self.infer(*args)
+            self.cache[args] = res
+            self.on_result(args, res)
+        return self.cache[args]
+
+    def infer(self, *args):
+        """Infer a property of the operation on the given arguments.
+
+        This must be overriden in subclasses.
+        """
+        raise NotImplementedError()  # pragma: no cover

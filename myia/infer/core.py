@@ -3,7 +3,7 @@
 import asyncio
 from heapq import heappush, heappop
 
-from .utils import InferenceError
+from .utils import InferenceError, DynamicMap, MyiaTypeError
 
 
 class _TodoEntry:
@@ -62,6 +62,8 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
         A smaller value for `order` means higher priority.
         """
+        # TODO: order argument may not be relevant anymore, so we might want to
+        # remove it and simplify task sorting.
         heappush(self._todo, _TodoEntry(order, x))
 
     def collect_errors(self):
@@ -143,3 +145,46 @@ class EvaluationCache:
         fut = asyncio.Future(loop=self.loop)
         fut.set_result(value)
         self.cache[key] = fut
+
+
+class EquivalenceChecker:
+    """Handle equivalence between values."""
+
+    def __init__(self, loop, error_callback):
+        """Initialize the EquivalenceChecker."""
+        self.loop = loop
+        self.error_callback = error_callback
+
+    def declare_equivalent(self, x, y, refs):
+        """Declare that x and y should be equivalent.
+
+        If an error occurs, the refs argument is to be packaged with it.
+        """
+        self.loop.schedule(self._process_equivalence(x, y, refs))
+
+    def _tie_dmaps(self, src, dest, refs, hist=True):
+        def evt(_, refs, res_src):
+            res_dest = dest(*refs)
+            self.declare_equivalent(res_src, res_dest, refs)
+        src.on_result.register(evt, run_history=hist)
+
+    async def _process_equivalence(self, x, y, refs):
+        if hasattr(x, '__await__'):
+            x = await x
+        if hasattr(y, '__await__'):
+            y = await y
+
+        if isinstance(x, DynamicMap) and isinstance(y, DynamicMap):
+            if x.provably_equivalent(y):
+                return
+
+            self._tie_dmaps(x, y, refs,)
+            self._tie_dmaps(y, x, refs, hist=False)
+
+        elif x == y:
+            pass
+
+        else:
+            self.error_callback(
+                MyiaTypeError(f'Type mismatch: {x} != {y}', refs=refs)
+            )
