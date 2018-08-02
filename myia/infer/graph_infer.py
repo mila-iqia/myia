@@ -27,14 +27,65 @@ def type_error_nargs(ident, expected, got):
 class Track(Partializable):
     """Represents a property to infer."""
 
+    prereqs = []
+
     def __init__(self, engine, name):
         """Initialize a Track."""
         self.engine = engine
         self.name = name
 
-    def infer_constant(self, ctref):
-        """Get the property for a constant Reference."""
+    async def infer_constant(self, ctref):
+        """Get the property for a ref of a Constant node."""
         return self.from_value(ctref.node.value, ctref.context)
+
+    async def infer_apply(self, ref):
+        """Get the property for a ref of an Apply node."""
+        ctx = ref.context
+        n_fn, *n_args = ref.node.inputs
+        # We await on the function node to get the inferrer
+        fn_ref = self.engine.ref(n_fn, ctx)
+        inf = await self.engine.get(self.name, fn_ref)
+        if inf is ANYTHING:
+            return ANYTHING
+
+        argrefs = [self.engine.ref(node, ctx) for node in n_args]
+        if isinstance(inf, Function):
+            ngot = len(argrefs)
+            nexpect = len(inf.arguments)
+            if ngot != nexpect:
+                raise MyiaTypeError(
+                    'Wrong number of arguments.'
+                    f' Expected {nexpect}, got {ngot}.',
+                    refs=[],
+                    app=ref
+                )
+            for got, aref in zip(inf.arguments, argrefs):
+                expect = await aref[self.name]
+                if expect != got:
+                    raise MyiaTypeError(
+                        'Type mismatch.'
+                        f' Expected {expect}, got {got}.',
+                        refs=[aref],
+                        app=ref
+                    )
+            return inf.retval
+
+        if not isinstance(inf, Inferrer):
+            raise MyiaTypeError(
+                f'Trying to call a non-callable type.',
+                refs=[fn_ref],
+                app=ref
+            )
+
+        try:
+            return await inf(*argrefs)
+        except InferenceError as infe:
+            # This builds a traceback of sorts in traceback_refs
+            # The first encounter with a ctx will be the caller,
+            # the others will be subsequence operations that depend
+            # on the result.
+            infe.traceback_refs.setdefault(ctx, ref)
+            raise
 
     def from_value(self, v, context=None):
         """Get the property from a value in the context."""
@@ -61,7 +112,9 @@ class Track(Partializable):
 
     def assert_same(self, *vals, refs=[]):
         """Assert that all vals are the same on this track."""
-        return self.engine.assert_same(self.name, *vals, refs=refs)
+        futs = [ref[self.name] if isinstance(ref, Reference) else ref
+                for ref in vals]
+        return self.engine.assert_same(*futs, refs=refs)
 
     def apply_predicate(self, predicate, res):
         """Apply a predicate on a value.
@@ -392,8 +445,23 @@ class Reference:
         g = node.value if is_constant_graph(node) else node.graph
         self.context = context.filter(g)
 
-    def __getitem__(self, track):
-        return self.engine.get(track, self)
+    async def __getitem__(self, track):
+        """Get the value for the track (asynchronous).
+
+        If track is "*", return a dictionary with all tracks.
+        """
+        if track == '*':
+            return {track: await self[track]
+                    for track in self.engine.required_tracks}
+        else:
+            return await self.engine.get(track, self)
+
+    def get(self, track="*"):
+        """Get the value for the track (synchronous).
+
+        If track is "*", return a dictionary with all tracks.
+        """
+        return self.engine.run_coroutine(self[track], throw=True)
 
     def get_raw(self, track):
         """Get the raw value for the track, which might be wrapped."""
@@ -436,9 +504,6 @@ class InferenceEngine:
     """Infer various properties about nodes in graphs.
 
     Arguments:
-        graph: The graph to analyze.
-        argvals: The arguments. Must be a tuple of dictionaries where
-            each dictionary maps track name to value.
         tracks: Map each track (property name) to a Track object.
         required_tracks: A list of tracks that will be inferred for
             the output. Other tracks may be used if requested in
@@ -450,8 +515,6 @@ class InferenceEngine:
 
     def __init__(self,
                  pipeline,
-                 graph,
-                 argvals,
                  *,
                  tracks,
                  required_tracks=None,
@@ -459,19 +522,13 @@ class InferenceEngine:
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop()
         self.pipeline = pipeline
-
-        self.graph = graph
-
+        self.mng = self.pipeline.resources.manager
         self.all_track_names = tuple(tracks.keys())
         self.tracks = {
             name: t(engine=self, name=name)
             for name, t in tracks.items()
         }
         self.required_tracks = required_tracks or self.all_track_names
-
-        self.argrefs = [self.vref(arg) for arg in argvals]
-        self.argvals = [ref.values for ref in self.argrefs]
-
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
         self.equiv = eq_class(
@@ -479,12 +536,31 @@ class InferenceEngine:
             error_callback=self.errors.append
         )
 
-        self.mng = self.pipeline.resources.manager
+    def run(self, graph, argvals):
+        """Run the inferrer on a graph given initial values.
+
+        Arguments:
+            graph: The graph to analyze.
+            argvals: The arguments. Must be a tuple of dictionaries where
+                each dictionary maps track name to value.
+        """
+        argrefs = [self.vref(arg) for arg in argvals]
+        argvals = [{t: ref.values[t] for t in self.all_track_names}
+                        for ref in argrefs]
+
         self.mng.add_graph(graph)
         empty_context = Context.empty()
-        self.root_context = empty_context.add(graph, argvals)
+        root_context = empty_context.add(graph, argvals)
+        output_ref = self.ref(graph.return_, root_context)
 
-        self.run_coroutine(self._run(), throw=False)
+        async def _run():
+            for track in self.required_tracks:
+                inf = GraphInferrer(self.tracks[track],
+                                    graph, empty_context)
+                self.loop.schedule(inf(*argrefs))
+
+        self.run_coroutine(_run())
+        return output_ref.get(), root_context
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
@@ -498,78 +574,35 @@ class InferenceEngine:
 
     async def compute_ref(self, key):
         """Compute the value of the Reference on the given track."""
-        track, ref = key
+        track_name, ref = key
+        track = self.tracks[track_name]
+
+        for prereq in track.prereqs:
+            await self.compute_ref((prereq, ref))
 
         if isinstance(ref, VirtualReference):
             # A VirtualReference already contains the values we need.
-            return await ref[track]
+            return await ref[track_name]
 
         node = ref.node
         ctx = ref.context
 
-        inferred = ref.node.inferred.get(track, UNKNOWN)
+        inferred = ref.node.inferred.get(track_name, UNKNOWN)
 
         if inferred is not UNKNOWN:
             return inferred
 
         elif is_constant(node):
-            return self.tracks[track].infer_constant(ref)
+            return await track.infer_constant(ref)
 
         elif is_apply(node):
-            n_fn, *n_args = node.inputs
-            # We await on the function node to get the inferrer
-            fn_ref = self.ref(n_fn, ctx)
-            inf = await self.get(track, fn_ref)
-            if inf is ANYTHING:
-                return ANYTHING
-
-            argrefs = [self.ref(node, ctx) for node in n_args]
-            if isinstance(inf, Function):
-                ngot = len(argrefs)
-                nexpect = len(inf.arguments)
-                if ngot != nexpect:
-                    raise MyiaTypeError(
-                        'Wrong number of arguments.'
-                        f' Expected {nexpect}, got {ngot}.',
-                        refs=[],
-                        app=ref
-                    )
-                for got, aref in zip(inf.arguments, argrefs):
-                    expect = await aref[track]
-                    if expect != got:
-                        raise MyiaTypeError(
-                            'Type mismatch.'
-                            f' Expected {expect}, got {got}.',
-                            refs=[aref],
-                            app=ref
-                        )
-                return inf.retval
-
-            if not isinstance(inf, Inferrer):
-                raise MyiaTypeError(
-                    f'Trying to call a non-callable type.',
-                    refs=[fn_ref],
-                    app=ref
-                )
-
-            try:
-                return await inf(*argrefs)
-            except RuntimeError as e:
-                # At some point, some invalid recursive graphs raised this
-                # error. You can just add a log_error if this happens again
-                # e.g. because of changes in the inference engine.
-                raise  # pragma: no cover
-            except InferenceError as infe:
-                # This builds a traceback of sorts in traceback_refs
-                # The first encounter with a ctx will be the caller,
-                # the others will be subsequence operations that depend
-                # on the result.
-                infe.traceback_refs.setdefault(ctx, ref)
-                raise
+            return await track.infer_apply(ref)
 
         else:
             # Values for Parameters are cached when we enter a Graph.
-            raise Exception(f'Cannot process: {node}')  # pragma: no cover
+            raise AssertionError(
+                f'Cannot process: {node} in track "{track_name}"'
+            )
 
     def get_raw(self, track, ref):
         return self.cache.get((track, ref))
@@ -586,41 +619,8 @@ class InferenceEngine:
         v = await self.get_raw(track, ref)
         return self.unwrap(v)
 
-    def get_info(self, track, ref):
-        """Get information on the given track for the given reference.
-
-        This assumes that the Future associated to the information has
-        already been resolved. Asynchronous Inferrers should use the get
-        method instead.
-        """
-        v = self.get_raw(track, ref).result()
-        return self.unwrap(v)
-
-    def output_info(self):
-        """Return information about the output of the analyzed graph."""
-        if self.errors:
-            raise self.errors[0]  # pragma: no cover
-        else:
-            oref = self.ref(self.graph.return_, self.root_context)
-            return {track: self.get_info(track, oref)
-                    for track in self.required_tracks}
-
-    def schedule(self, coro, order=0):
-        """Schedule the given coroutine to run."""
-        self.loop.schedule(coro, order)
-
-    async def _run(self):
-        for track in self.required_tracks:
-            inf = GraphInferrer(self.tracks[track],
-                                self.graph, self.root_context)
-            self.schedule(inf(*self.argrefs))
-
-    async def assert_same(self, track, *vals, refs=[]):
+    async def assert_same(self, *futs, refs=[]):
         """Assert that all refs have the same value on the given track."""
-        # Make a future for the value of each reference
-        futs = [self.get(track, ref) if isinstance(ref, Reference) else ref
-                for ref in vals]
-
         # We wait only for the first future to complete
         done, pending = await asyncio.wait(
             futs,

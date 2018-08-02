@@ -34,21 +34,21 @@ class TypeSpecializer:
     def __init__(self, engine):
         """Initialize a TypeSpecializer."""
         self.engine = engine
-
         self.mng = self.engine.mng
         self.node_map = self.mng.nodes
-
         self.originals = {}
         self.specializations = {}
         self.counts = Counter()
 
-        empty_ctx = Context.empty()
+    def run(self, graph, context):
+        """Run the specializer on the given graph in the given context."""
         ginf = GraphInferrer(self.engine.tracks['type'],
-                             engine.graph,
-                             empty_ctx)
-        argrefs = self.engine.argrefs
+                             graph, Context.empty())
 
-        self.result = self.engine.run_coroutine(
+        argrefs = [self.engine.ref(p, context)
+                   for p in graph.parameters]
+
+        return self.engine.run_coroutine(
             self._specialize(None, ginf, argrefs)
         )
 

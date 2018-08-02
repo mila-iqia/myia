@@ -276,16 +276,16 @@ class Inferrer(PipelineStep):
 
     def step(self, graph, argspec):
         """Infer types, shapes, values, etc. for the graph."""
-        argprops = argspec
         engine = InferenceEngine(
             self.pipeline,
-            graph, argprops,
             tracks=self.tracks,
             required_tracks=self.required_tracks,
         )
 
         try:
-            return {'inference_results': engine.output_info(),
+            res, context = engine.run(graph, argspec)
+            return {'inference_results': res,
+                    'inference_context': context,
                     'inferrer': engine}
         except Exception as exc:
             # We still want to keep the inferrer around even
@@ -306,10 +306,10 @@ class Specializer(PipelineStep):
         graph: The specialized graph.
     """
 
-    def step(self, graph, inferrer):
+    def step(self, graph, inferrer, inference_context):
         """Specialize the graph according to argument types."""
         spc = TypeSpecializer(inferrer)
-        result = spc.result
+        result = spc.run(graph, inference_context)
         self.resources.manager.keep_roots(result)
         return {'graph': result}
 
