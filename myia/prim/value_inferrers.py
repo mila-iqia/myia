@@ -6,7 +6,8 @@ import asyncio
 from functools import partial
 
 from ..infer import ValueWrapper, InferenceError, PartialInferrer, \
-    ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track
+    ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track, \
+    unwrap
 from ..ir import Graph
 
 from . import ops as P
@@ -59,12 +60,12 @@ class PrimitiveValueInferrer(Inferrer):
 
     async def infer(self, *refs):
         """Infer the return value of a function using its implementation."""
-        coros = [self.engine.get_raw('value', ref) for ref in refs]
+        coros = [ref.get_raw('value') for ref in refs]
         args = await asyncio.gather(*coros, loop=self.engine.loop)
         if any(arg is ANYTHING for arg in args):
             return ANYTHING
         else:
-            args_unwrapped = [self.engine.unwrap(arg) for arg in args]
+            args_unwrapped = [unwrap(arg) for arg in args]
             try:
                 v = self.impl(*args_unwrapped)
                 try:
@@ -112,6 +113,10 @@ class ValueTrack(Track):
         """Produce a LimitedValue for v, with a maximal count."""
         return LimitedValue(v, self.max_depth)
 
+    def default(self, values):
+        """Default value for ValueTrack."""
+        return ANYTHING
+
     def from_value(self, v, context):
         """Infer the value of a constant."""
         if isinstance(v, Primitive):
@@ -123,20 +128,12 @@ class ValueTrack(Track):
                 )
         elif isinstance(v, Graph):
             inf = GraphInferrer(self, v, context)
+        elif v is ANYTHING:
+            return v
         else:
             return self.wrap(v)
 
-        inf.__uninfer__ = v
         return self.wrap(inf)
-
-    def fill_in(self, values, context=None):
-        """Fill in a value for this property, given others."""
-        if self.name in values:
-            v = values[self.name]
-            if v is not ANYTHING and not isinstance(v, LimitedValue):
-                values[self.name] = self.wrap(v)
-        else:
-            values[self.name] = ANYTHING
 
     def broaden(self, v):
         """Broaden the value if we reach a certain depth in the stack."""
