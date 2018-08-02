@@ -58,10 +58,6 @@ class ValueWrapper:
         return type(other) is type(self) \
             and self.value == other.value
 
-    @property
-    def __unwrapped__(self):
-        return self.value
-
 
 class DynamicMap:
     """Represents a sort of mapping that's constantly updated."""
@@ -95,3 +91,10 @@ class DynamicMap:
         This must be overriden in subclasses.
         """
         raise NotImplementedError()  # pragma: no cover
+
+
+def unwrap(x):
+    """Extract the value if x is a ValueWrapper, return x otherwise."""
+    if isinstance(x, ValueWrapper):
+        x = x.value
+    return x

@@ -282,6 +282,13 @@ class Inferrer(PipelineStep):
             required_tracks=self.required_tracks,
         )
 
+        for arg in argspec:
+            if 'value' in arg:
+                v = arg['value']
+                for track_name, track in engine.tracks.items():
+                    if track_name not in arg or track_name == 'value':
+                        arg[track_name] = track.from_value(v, None)
+
         try:
             res, context = engine.run(graph, argspec)
             return {'inference_results': res,

@@ -57,7 +57,7 @@ class TypeTrack(Track):
         else:
             return typeof(v)
 
-    def default(self):
+    def default(self, values):
         """Return a default type; this method raises an exception."""
         raise Exception('There is no default value for the type track.') \
             # pragma: no cover

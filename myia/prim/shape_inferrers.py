@@ -46,6 +46,10 @@ class ShapeTrack(Track):
         super().__init__(engine, name)
         self.constructors = constructors
 
+    def default(self, values):
+        """Default value for ShapeTrack."""
+        return ()
+
     def from_value(self, v, context):
         """Infer the shape of a constant."""
         if isinstance(v, Primitive):

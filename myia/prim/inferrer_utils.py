@@ -1,7 +1,7 @@
 """Utilities that may leveraged by several inferrers."""
 
 
-from ..infer import InferenceError, PartialInferrer, Context, ANYTHING
+from ..infer import InferenceError, PartialInferrer, Context, ANYTHING, unwrap
 
 
 async def static_getter(track, data, item, fetch, chk=None):
@@ -36,7 +36,7 @@ async def static_getter(track, data, item, fetch, chk=None):
             method = mmap_t[item_v]
             method = track.engine.pipeline.resources.convert(method)
             inferrer = track.from_value(method, Context.empty())
-            inferrer = getattr(inferrer, '__unwrapped__', inferrer)
+            inferrer = unwrap(inferrer)
             return PartialInferrer(
                 track,
                 inferrer,

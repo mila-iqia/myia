@@ -8,7 +8,7 @@ from ..ir import is_constant, is_constant_graph, is_apply
 from ..utils import Partializable, UNKNOWN
 
 from .core import InferenceLoop, EvaluationCache, EquivalenceChecker
-from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap
+from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, unwrap
 
 
 def type_error_nargs(ident, expected, got):
@@ -44,7 +44,7 @@ class Track(Partializable):
         n_fn, *n_args = ref.node.inputs
         # We await on the function node to get the inferrer
         fn_ref = self.engine.ref(n_fn, ctx)
-        inf = await self.engine.get(self.name, fn_ref)
+        inf = await fn_ref[self.name]
         if inf is ANYTHING:
             return ANYTHING
 
@@ -95,26 +95,15 @@ class Track(Partializable):
         """Broaden the value for use in a graph's signature."""
         return v
 
-    def default(self):
+    def default(self, values):
         """Default value for this track, if nothing is known."""
         raise NotImplementedError()  # pragma: no cover
-
-    def fill_in(self, values, context=None):
-        """Fill in a value for this property, given others."""
-        if self.name in values:
-            pass
-        elif 'value' in values:
-            v = self.engine.unwrap(values['value'])
-            v = getattr(v, '__uninfer__', v)
-            values[self.name] = self.from_value(v, context)
-        else:
-            values[self.name] = self.default()  # pragma: no cover
 
     def assert_same(self, *vals, refs=[]):
         """Assert that all vals are the same on this track."""
         futs = [ref[self.name] if isinstance(ref, Reference) else ref
                 for ref in vals]
-        return self.engine.assert_same(*futs, refs=refs)
+        return self.engine.equiv.assert_same(*futs, refs=refs)
 
     def apply_predicate(self, predicate, res):
         """Apply a predicate on a value.
@@ -295,12 +284,11 @@ class GraphInferrer(Inferrer):
         argvals = []
         for arg in args:
             argval = {}
-            for track in self.engine.all_track_names:
-                tr = self.engine.tracks[track]
-                result = await self.engine.get_raw(track, arg)
+            for track_name, track in self.engine.tracks.items():
+                result = await self.engine.get_inferred(track_name, arg)
                 if not self.graph.flags.get('flatten_inference'):
-                    result = tr.broaden(result)
-                argval[track] = result
+                    result = track.broaden(result)
+                argval[track_name] = result
             argvals.append(argval)
 
         # Update current context using the fetched properties.
@@ -321,7 +309,7 @@ class GraphInferrer(Inferrer):
                 self.engine.cache.set_value((track, ref), v)
 
         out = self.engine.ref(self.graph.return_, context)
-        return await self.engine.get_raw(self.track.name, out)
+        return await self.engine.get_inferred(self.track.name, out)
 
     def provably_equivalent(self, other):
         """Whether this inferrer is provably equivalent to the other.
@@ -454,7 +442,7 @@ class Reference:
             return {track: await self[track]
                     for track in self.engine.required_tracks}
         else:
-            return await self.engine.get(track, self)
+            return unwrap(await self.get_raw(track))
 
     def get(self, track="*"):
         """Get the value for the track (synchronous).
@@ -465,7 +453,7 @@ class Reference:
 
     def get_raw(self, track):
         """Get the raw value for the track, which might be wrapped."""
-        return self.engine.get_raw(track, self)
+        return self.engine.get_inferred(track, self)
 
     def __eq__(self, other):
         return isinstance(other, Reference) \
@@ -487,12 +475,15 @@ class VirtualReference:
 
     """
 
-    def __init__(self, **values):
+    def __init__(self, values):
         """Initialize the VirtualReference."""
         self.values = values
 
     async def __getitem__(self, track):
-        return self.values[track]
+        if track == '*':
+            return self.values
+        else:
+            return self.values[track]
 
 
 ########
@@ -546,7 +537,7 @@ class InferenceEngine:
         """
         argrefs = [self.vref(arg) for arg in argvals]
         argvals = [{t: ref.values[t] for t in self.all_track_names}
-                        for ref in argrefs]
+                    for ref in argrefs]
 
         self.mng.add_graph(graph)
         empty_context = Context.empty()
@@ -569,8 +560,9 @@ class InferenceEngine:
     def vref(self, values):
         """Return a VirtualReference using the given property values."""
         for track_obj in self.tracks.values():
-            track_obj.fill_in(values)
-        return VirtualReference(**values)
+            if track_obj.name not in values:
+                values[track_obj.name] = track_obj.default(values)
+        return VirtualReference(values)
 
     async def compute_ref(self, key):
         """Compute the value of the Reference on the given track."""
@@ -604,40 +596,12 @@ class InferenceEngine:
                 f'Cannot process: {node} in track "{track_name}"'
             )
 
-    def get_raw(self, track, ref):
-        return self.cache.get((track, ref))
-
-    def unwrap(self, v):
-        """Unwrap a cached value."""
-        return getattr(v, '__unwrapped__', v)
-
-    async def get(self, track, ref):
+    def get_inferred(self, track, ref):
         """Get a Future for the value of the Reference on the given track.
 
         Results are cached.
         """
-        v = await self.get_raw(track, ref)
-        return self.unwrap(v)
-
-    async def assert_same(self, *futs, refs=[]):
-        """Assert that all refs have the same value on the given track."""
-        # We wait only for the first future to complete
-        done, pending = await asyncio.wait(
-            futs,
-            loop=self.loop,
-            return_when=asyncio.FIRST_COMPLETED
-        )
-
-        # We must now tell equiv that all remaining futures must return the
-        # same thing as the first one. This will essentially schedule a
-        # bunch of tasks to wait for the remaining futures and verify that
-        # they match. See EquivalenceChecker.
-        main = done.pop()
-        for fut in done | pending:
-            self.equiv.declare_equivalent(fut, main, refs)
-
-        # We return the first result immediately
-        return main.result()
+        return self.cache.get((track, ref))
 
     def run_coroutine(self, coro, throw=True):
         """Run an async function using this inferrer's loop."""

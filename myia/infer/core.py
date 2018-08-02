@@ -119,6 +119,7 @@ class EvaluationCache:
         loop: The InferenceLoop for async evaluation.
         keycalc: An async function that takes a key and returns
             the value associated to that key.
+
     """
 
     def __init__(self, loop, keycalc):
@@ -188,3 +189,23 @@ class EquivalenceChecker:
             self.error_callback(
                 MyiaTypeError(f'Type mismatch: {x} != {y}', refs=refs)
             )
+
+    async def assert_same(self, *futs, refs=[]):
+        """Assert that all refs have the same value on the given track."""
+        # We wait only for the first future to complete
+        done, pending = await asyncio.wait(
+            futs,
+            loop=self.loop,
+            return_when=asyncio.FIRST_COMPLETED
+        )
+
+        # We must now tell equiv that all remaining futures must return the
+        # same thing as the first one. This will essentially schedule a
+        # bunch of tasks to wait for the remaining futures and verify that
+        # they match. See EquivalenceChecker.
+        main = done.pop()
+        for fut in done | pending:
+            self.declare_equivalent(fut, main, refs)
+
+        # We return the first result immediately
+        return main.result()

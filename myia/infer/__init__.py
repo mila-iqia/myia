@@ -23,4 +23,5 @@ from .utils import (  # noqa
     MyiaTypeError,
     MyiaShapeError,
     ValueWrapper,
+    unwrap,
 )
