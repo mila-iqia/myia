@@ -6,7 +6,8 @@ from functools import partial, reduce
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer
 from ..ir import Graph, MetaGraph
-from ..dtype import Array, ismyiatype
+
+from ..dtype import Array, Tuple, ismyiatype
 from ..utils import is_dataclass_type
 
 from . import ops as P
@@ -20,6 +21,10 @@ def prod(iterable):
 
 
 shape_inferrer_constructors = {}
+
+
+class TupleShape(tuple):
+    pass
 
 
 class ScalarShapeInferrer(Inferrer):
@@ -68,12 +73,45 @@ class ShapeTrack(Track):
             return MetaGraphInferrer(self, v)
         elif is_dataclass_type(v):
             raise NotImplementedError('Dataclasses are not supported yet')
+        elif isinstance(v, tuple):
+            return TupleShape(self.from_value(e) for e in v)
         else:
             return getattr(v, 'shape', ())
 
 
 shape_inferrer = partial(register_inferrer,
                          constructors=shape_inferrer_constructors)
+
+
+@shape_inferrer(P.cons_tuple, nargs=2)
+async def infer_shape_cons_tuple(track, head, tail):
+    sht = await tail['shape']
+    shh = await head['shape']
+    return TupleShape(shh,) + sht
+
+
+@shape_inferrer(P.head, nargs=1)
+async def infer_shape_head(track, tup):
+    return (await tup['shape'])[0]
+
+
+@shape_inferrer(P.tail, nargs=1)
+async def infer_shape_tail(track, tup):
+    return (await tup['shape'])[1:]
+
+
+@shape_inferrer(P.getitem, nargs=2)
+async def infer_shape_getitem(track, seq, idx):
+    seq_t = await seq['type']
+
+    if isinstance(seq_t, Tuple):
+        seq_sh = await seq['shape']
+        idx_v = await idx['value']
+        if idx_v is ANYTHING:
+            raise InferenceError("No idx")
+        return seq_sh[idx_v]
+    # For any other type
+    raise InferenceError("Unknown type")
 
 
 @shape_inferrer(P.return_, nargs=1)
