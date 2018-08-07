@@ -3,6 +3,9 @@
 from .core import (  # noqa
     InferenceLoop,
     EvaluationCache,
+    EquivalenceChecker,
+    InferenceVar,
+    reify,
 )
 
 from .graph_infer import (  # noqa

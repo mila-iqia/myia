@@ -3,7 +3,10 @@
 import asyncio
 from heapq import heappush, heappop
 
-from .utils import InferenceError, DynamicMap, MyiaTypeError
+from ..dtype import Array, List, Tuple, Function
+from ..utils import TypeMap, Unification, Var
+
+from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
 
 
 class _TodoEntry:
@@ -30,8 +33,9 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         self._running = False
         self._todo = []
         self._debug = debug
-        self._futures = []
+        self._tasks = []
         self._errors = []
+        self._vars = []
 
     def get_debug(self):
         """Not entirely sure what this does."""
@@ -47,7 +51,17 @@ class InferenceLoop(asyncio.AbstractEventLoop):
                 h._run()
             else:
                 fut = asyncio.ensure_future(h, loop=self)
-                self._futures.append(fut)
+                self._tasks.append(fut)
+        pending_vars = [fut for fut in self._vars if not fut.resolved()]
+        if pending_vars:
+            # If some literals weren't forced to a concrete type by some
+            # operation, we sort by priority (i.e. floats first) and we
+            # force the first one to take its default concrete type. Then
+            # we resume the loop.
+            pending_vars.sort(key=lambda x: -x.priority)
+            v1, *self._vars = pending_vars
+            v1.resolve_to_default()
+            self.run_forever()
 
     def is_running(self):
         """Return whether the loop is running."""
@@ -68,7 +82,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
     def collect_errors(self):
         """Return a collection of all exceptions from all futures."""
-        futs, self._futures = self._futures, []
+        futs, self._tasks = self._tasks, []
         errors, self._errors = self._errors, []
         for fut in futs:
             if fut.done():
@@ -109,6 +123,12 @@ class InferenceLoop(asyncio.AbstractEventLoop):
     def create_future(self):
         """Create a Future using this loop."""
         return asyncio.Future(loop=self)
+
+    def create_var(self, var, default, priority=0):
+        """Create an InferenceVar running on this loop."""
+        v = InferenceVar(var, default, priority, loop=self)
+        self._vars.append(v)
+        return v
 
 
 class EvaluationCache:
@@ -155,6 +175,8 @@ class EquivalenceChecker:
         """Initialize the EquivalenceChecker."""
         self.loop = loop
         self.error_callback = error_callback
+        self.unif = Unification()
+        self.equiv = {}
 
     def declare_equivalent(self, x, y, refs):
         """Declare that x and y should be equivalent.
@@ -182,13 +204,28 @@ class EquivalenceChecker:
             self._tie_dmaps(x, y, refs,)
             self._tie_dmaps(y, x, refs, hist=False)
 
-        elif x == y:
+        elif x == y or self.merge(x, y):
             pass
 
         else:
             self.error_callback(
                 MyiaTypeError(f'Type mismatch: {x} != {y}', refs=refs)
             )
+
+    def merge(self, x, y):
+        """Merge the two values/variables x and y."""
+        res = self.unif.unify(x, y, self.equiv)
+        if res is None:
+            return False
+        self.equiv = res
+        for var, value in self.equiv.items():
+            iv = var._infvar
+            if isinstance(value, Var) and not hasattr(value, '_infvar'):
+                # Unification may create additional variables
+                self.loop.create_var(value, iv.default, iv.priority)
+            if not iv.done():
+                iv.set_result(value)
+        return True
 
     async def assert_same(self, *futs, refs=[]):
         """Assert that all refs have the same value on the given track."""
@@ -209,3 +246,115 @@ class EquivalenceChecker:
 
         # We return the first result immediately
         return main.result()
+
+
+class InferenceVar(asyncio.Future):
+    """Hold a Var that stands in for an inference result.
+
+    This is a Future which can be awaited. Await on the `reify` function to
+    get the concrete inference value for this InferenceVar.
+
+    Arguments:
+        var: A Var instance that can be unified with other Vars and values.
+        default: The concrete value this InferenceVar will resolve to if
+            the unification process fails to force a value.
+        priority: When multiple InferenceVars have to be forced to their
+            default values, those with higher priority are processed first.
+        loop: The InferenceLoop this InferenceVar is attached to.
+    """
+
+    def __init__(self, var, default, priority, loop):
+        """Initialize an InferenceVar."""
+        super().__init__(loop=loop)
+        self.var = var
+        self.default = default
+        self.priority = priority
+        self.__var__ = var
+        var._infvar = self
+
+    def resolve_to_default(self):
+        """Resolve to the default value."""
+        if self.done():
+            self.result()._infvar.resolve_to(self.default)
+        else:
+            self.set_result(self.default)
+
+    def resolve_to(self, value):
+        """Resolve to the provided value."""
+        if self.done():
+            self.result()._infvar.resolve_to(value)
+        else:
+            self.set_result(value)
+
+    def resolved(self):
+        """Whether this was resolved to a concrete value."""
+        if not self.done():
+            return False
+        else:
+            res = self.result()
+            if isinstance(res, Var):
+                return res._infvar.resolved()
+            else:
+                return True
+
+    async def __reify__(self):
+        """Map this InferenceVar to a concrete value."""
+        return await reify(await self)
+
+
+_reify_map = TypeMap(discover=lambda cls: getattr(cls, '__reify__', None))
+
+
+@_reify_map.register(ValueWrapper)
+async def _reify_ValueWrapper(x):
+    return await reify(x.value)
+
+
+@_reify_map.register(Var)
+async def _reify_Var(v):
+    return await reify(await v._infvar)
+
+
+@_reify_map.register(Array)
+async def _reify_Array(t):
+    return Array(await reify(t.elements))
+
+
+@_reify_map.register(List)
+async def _reify_List(t):
+    return List(await reify(t.element_type))
+
+
+@_reify_map.register(Tuple)
+async def _reify_Tuple(t):
+    return Tuple(await reify(t.elements))
+
+
+@_reify_map.register(Function)
+async def _reify_Function(t):
+    return Function(await reify(t.arguments), await reify(t.retval))
+
+
+@_reify_map.register(tuple)
+async def _reify_tuple(v):
+    li = [await reify(x) for x in v]
+    return tuple(li)
+
+
+@_reify_map.register(int)
+async def _reify_int(v):
+    return v
+
+
+@_reify_map.register(type)
+@_reify_map.register(object)
+async def _reify_object(v):
+    return v
+
+
+async def reify(v):
+    """Build a concrete value from v.
+
+    All InferenceVars in v will be awaited on.
+    """
+    return await _reify_map[type(v)](v)
