@@ -61,46 +61,49 @@ pyimpl_test = {}
 value_inferrer_cons_test = {}
 type_inferrer_cons_test = {}
 
-type_inferrer_test = partial(register_inferrer,
-                             constructors=type_inferrer_cons_test)
-value_inferrer_test = partial(register_inferrer,
-                              constructors=value_inferrer_cons_test)
+
+def _test_op(cls):
+    import inspect
+    op = Primitive(cls.__name__)
+    nargs = len(inspect.getargspec(cls.impl).args)
+    pyimpl_test[op] = cls.impl
+    for method in dir(cls):
+        pfx = 'infer_'
+        if method.startswith(pfx):
+            track = method[len(pfx):]
+            if track == 'type':
+                cons = type_inferrer_cons_test
+            elif track == 'value':
+                cons = value_inferrer_cons_test
+            else:
+                raise Exception(f'Unknown track to infer: {track}')
+            inffn = getattr(cls, method)
+            register_inferrer(op, nargs=nargs, constructors=cons)(inffn)
+    return op
 
 
 # Ternary arithmetic op
 
-_tern = Primitive('tern')
 
+@_test_op
+class _tern:
+    def impl(x, y, z):
+        return x + y + z
 
-def impl_tern(x, y, z):
-    return x + y + z
-
-
-pyimpl_test[_tern] = impl_tern
-
-
-@type_inferrer_test(_tern, nargs=3)
-async def infer_type_tern(track, x, y, z):
-    ret_t = await track.assert_same(x, y, z)
-    assert isinstance(ret_t, (Int, Float))
-    return ret_t
+    async def infer_type(track, x, y, z):
+        return await track.standard_check((Int, Float), x, y, z)
 
 
 # Coercion
 
-_to_i64 = Primitive('to_i64')
 
+@_test_op
+class _to_i64:
+    def impl(x):
+        return int(x)
 
-def impl_to_i64(x):
-    return int(x)
-
-
-pyimpl_test[_to_i64] = impl_to_i64
-
-
-@type_inferrer_test(_to_i64, nargs=1)
-async def infer_type_to_i64(track, x):
-    return Int(64)
+    async def infer_type(track, x):
+        return Int(64)
 
 
 infer_pipeline = scalar_pipeline.select(
