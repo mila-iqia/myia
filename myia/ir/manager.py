@@ -319,6 +319,10 @@ class ParentStatistic(NestingStatistic):
                     self[g] = deps.pop()
                 else:
                     next_todo.append((g, deps))
+            if todo == next_todo:
+                # Likely a graph with two deps, neither of which have deps.
+                # It's not entirely clear as of yet what makes that happen.
+                raise AssertionError('Problematic graph dependencies')
             todo = next_todo
 
 
