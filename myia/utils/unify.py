@@ -29,8 +29,6 @@ def _get_next_tag():
 class Var:
     """Basic universal variable type."""
 
-    __slots__ = ('tag',)
-
     def __init__(self, tag: str = None) -> None:
         """Optionally set a tag."""
         if tag is not None:
@@ -205,8 +203,6 @@ class PredicateSet:
 
 class FilterVar(Var):
     """Variable restricted to values that pass a filter function."""
-
-    __slots__ = ('filter',)
 
     def __init__(self, filter: FnFiltT) -> None:
         """Create a FilterVar."""

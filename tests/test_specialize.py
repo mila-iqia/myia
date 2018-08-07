@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from myia.api import scalar_debug_pipeline
 from myia.dtype import Function, Type, Problem, External
+from myia.debug.label import short_labeler as lbl
 from myia.graph_utils import dfs
 from myia.infer import Inferrer
 from myia.ir import succ_deeper, is_apply, is_constant
@@ -87,7 +88,7 @@ def specialize(*arglists):
             if errs:
                 print('Collected the following errors:')
                 for node, e in errs.items():
-                    print(f'   {node}')
+                    print(f'   {lbl.label(node)}')
                     print(f'      {" ".join(e)}')
                 raise Exception('There are errors in the specialized graph.')
             result_final = res['output'](*args)

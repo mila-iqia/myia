@@ -7,8 +7,8 @@ from ..dtype import Type, Function
 from ..ir import is_constant, is_constant_graph, is_apply
 from ..utils import Partializable, UNKNOWN
 
-from .core import InferenceLoop, EvaluationCache, EquivalenceChecker
-from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, unwrap
+from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify
+from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap
 
 
 def type_error_nargs(ident, expected, got):
@@ -101,7 +101,7 @@ class Track(Partializable):
 
     def assert_same(self, *vals, refs=[]):
         """Assert that all vals are the same on this track."""
-        futs = [ref[self.name] if isinstance(ref, Reference) else ref
+        futs = [ref.get_raw(self.name) if isinstance(ref, Reference) else ref
                 for ref in vals]
         return self.engine.equiv.assert_same(*futs, refs=refs)
 
@@ -174,7 +174,9 @@ class Track(Partializable):
             assert_same: Whether all references should be identical
                 on that track, in addition to matching the predicate.
         """
-        results = [(ref, await ref[self.name]) for ref in refs]
+        coros = [ref[self.name] for ref in refs]
+        results = await asyncio.gather(*coros, loop=self.engine.loop)
+        results = list(zip(refs, results))
 
         for ref, res in results:
             if not self.apply_predicate(predicate, res):
@@ -197,6 +199,25 @@ class Track(Partializable):
         if len(rval) == 1:
             rval, = rval
         return rval
+
+    async def standard_check(self, predicate, *refs):
+        """Check that all refs match the predicate and each other.
+
+        Checks are asynchronous and the value for one of the refs is
+        returned (whichever is resolved first). That value may be
+        an InferenceVar.
+        """
+        async def chk(ref):
+            res = await ref[self.name]
+            if not self.apply_predicate(predicate, res):
+                raise self.predicate_error(
+                    predicate,
+                    res,
+                    ref
+                )
+        for ref in refs:
+            self.engine.loop.schedule(chk(ref))
+        return await self.assert_same(*refs)
 
 
 ####################
@@ -385,12 +406,15 @@ class Context:
         """Create an empty context."""
         return Context(None, None, ())
 
-    def __init__(self, parent, g, argvals):
+    def __init__(self, parent, g, argvals, raw_argvals=False):
         """Initialize the Context."""
         self.parent = parent
         self.graph = g
-        self.argkey = tuple(tuple(sorted(argv.items()))
-                            for argv in argvals)
+        if raw_argvals:
+            self.argkey = argvals
+        else:
+            self.argkey = tuple(tuple(sorted(argv.items()))
+                                for argv in argvals)
         self.parent_cache = dict(parent.parent_cache) if parent else {}
         self.parent_cache[g] = self
 
@@ -414,6 +438,15 @@ class Context:
             and self.parent == other.parent \
             and self.graph == other.graph \
             and self.argkey == other.argkey
+
+    async def __reify__(self):
+        """Reify this Context."""
+        return Context(
+            await reify(self.parent),
+            self.graph,
+            await reify(self.argkey),
+            True
+        )
 
 
 class Reference:
@@ -442,7 +475,7 @@ class Reference:
             return {track: await self[track]
                     for track in self.engine.required_tracks}
         else:
-            return unwrap(await self.get_raw(track))
+            return await reify(await self.get_raw(track))
 
     def get(self, track="*"):
         """Get the value for the track (synchronous).
@@ -537,7 +570,7 @@ class InferenceEngine:
         """
         argrefs = [self.vref(arg) for arg in argvals]
         argvals = [{t: ref.values[t] for t in self.all_track_names}
-                    for ref in argrefs]
+                   for ref in argrefs]
 
         self.mng.add_graph(graph)
         empty_context = Context.empty()
@@ -577,8 +610,6 @@ class InferenceEngine:
             return await ref[track_name]
 
         node = ref.node
-        ctx = ref.context
-
         inferred = ref.node.inferred.get(track_name, UNKNOWN)
 
         if inferred is not UNKNOWN:
@@ -616,7 +647,7 @@ class InferenceEngine:
                 if throw:  # pragma: no cover
                     raise self.errors[-1]
                 else:
-                    return None
+                    return None  # pragma: no cover
             return fut.result()
         finally:
             for task in asyncio.Task.all_tasks(self.loop):

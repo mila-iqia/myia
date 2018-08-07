@@ -212,9 +212,29 @@ type_signature_arith_bin = [
 ]
 
 
+@infer(type=[(i64, i64)], value=[(89, 89)])
+def test_identity(x):
+    return x
+
+
+@infer(type=[(i64,)], value=[(16,)])
+def test_constants_int():
+    return 2 * 8
+
+
 @infer(type=[(f64,)], value=[(12.0,)])
-def test_constants():
+def test_constants_float():
     return 1.5 * 8.0
+
+
+@infer(type=[(f64,)], value=[(12.0,)])
+def test_constants_intxfloat():
+    return 8 * 1.5
+
+
+@infer(type=[(f64,)], value=[(12.0,)])
+def test_constants_floatxint():
+    return 1.5 * 8
 
 
 @infer(type=type_signature_arith_bin)
@@ -278,7 +298,7 @@ def test_if2(x, y):
     type=[
         (i64, i64, i64),
         (i64, f64, f64),
-        (f64, f64, InferenceError),
+        (f64, f64, f64),
         ({'value': 1_000_000}, i64, i64)
     ],
     value=[
@@ -421,7 +441,7 @@ def test_return_closure(w, x, y, z):
     return (mul(w)(x), mul(y)(z))
 
 
-@infer(type=[(i64, i64), (f64, InferenceError)])
+@infer(type=[(i64, i64), (f64, f64)])
 def test_fact(n):
     def fact(n):
         if n <= 1:
@@ -445,7 +465,7 @@ def odd(n):
         return even(n - 1)
 
 
-@infer(type=[(i64, B), (f64, InferenceError)])
+@infer(type=[(i64, B), (f64, B)])
 def test_even_odd(n):
     return even(n)
 
@@ -828,7 +848,7 @@ def test_typeof(x):
         (T(i64, i64), i64),
         (T(i64, T(f64, i64)), i64),
         (li64, f64),
-        (T(i64, li64), InferenceError),
+        (T(i64, li64), i64),
     ],
     value=[
         (5, 5),
@@ -1146,7 +1166,7 @@ def test_partial_2(x):
 
 @infer(type=[(i64, i64)],
        shape=[({'type': ai64, 'shape': (6, 13)}, (6, 13))])
-def test_identity(x):
+def test_identity_function(x):
     return identity(x)
 
 

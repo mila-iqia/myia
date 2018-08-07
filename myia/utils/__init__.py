@@ -13,3 +13,8 @@ from .misc import (  # noqa
 from .partial import (  # noqa
     partition_keywords, Partial, Partializable
 )
+
+from .unify import (  # noqa
+    Unification, Var, Seq, SVar, UnionVar, RestrictedVar, PredicateSet,
+    FilterVar, var, svar, uvar, expandlist, noseq, VisitError
+)

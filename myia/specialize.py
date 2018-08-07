@@ -3,7 +3,8 @@
 from collections import Counter
 
 from .dtype import Type, Function, Number, Bool, Problem
-from .infer import ANYTHING, Context, GraphInferrer, PartialInferrer, Inferrer
+from .infer import ANYTHING, Context, reify, \
+    GraphInferrer, PartialInferrer, Inferrer
 from .ir import GraphCloner, is_apply, is_constant_graph, Constant
 from .prim import ops as P, Primitive
 from .utils import Named, TypeMap
@@ -57,14 +58,15 @@ class TypeSpecializer:
 
         ctx = await ginf.make_context(argrefs)
 
-        if ctx in self.specializations:
-            return self.specializations[ctx]
+        ctxkey = await reify(ctx)
+        if ctxkey in self.specializations:
+            return self.specializations[ctxkey]
 
         self.counts[g] += 1
         gspec = _GraphSpecializer(parent, self, ginf.graph, ctx)
         g2 = gspec.new_graph
         self.originals[g2] = g
-        self.specializations[ctx] = g2
+        self.specializations[ctxkey] = g2
         await gspec.run()
         return g2
 
@@ -74,6 +76,7 @@ async def _find_argrefs(inf):
     # the same inferred type/value/etc., we can merge their entries.
     cache = {}
     for x, y in inf.cache.items():
+        y = await reify(y)
         key = tuple([await arg[track] for arg in x
                      for track in inf.engine.tracks])
         if key in cache:
@@ -100,7 +103,7 @@ async def _concretize_type(t, argrefs=None):
                          for argref in argrefs],
                         await _concretize_type(t.cache[tuple(argrefs)]))
     else:
-        return t
+        return await reify(t)
 
 
 async def _extract_type(ref, argrefs=None):
@@ -238,6 +241,8 @@ class _GraphSpecializer:
                     repl = await self.build(ref=iref,
                                             argrefs=argrefs)
                     await self.fill_inferred(repl, iref)
+                    if repl.graph:
+                        assert repl.graph is new_inputs[i].graph
                     new_inputs[i] = repl
                 except _Unspecializable as e:
                     if is_constant_graph(new_inputs[i]):

@@ -3,11 +3,11 @@
 
 from functools import partial
 
-from ..dtype import Int, Bool, Tuple, List, Type, Array, UInt, Number
+from ..dtype import Int, Float, Bool, Tuple, List, Type, Array, UInt, Number
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track
 from ..ir import Graph
-from ..utils import Namespace
+from ..utils import Namespace, FilterVar
 
 from . import ops as P
 from .inferrer_utils import static_getter
@@ -16,6 +16,10 @@ from .py_implementations import typeof
 
 
 type_inferrer_constructors = {}
+
+
+def _is_number(t):
+    return isinstance(t, Number)
 
 
 def _shape_type(t):  # noqa: D400
@@ -47,6 +51,16 @@ class TypeTrack(Track):
         """
         super().__init__(engine, name)
         self.constructors = constructors
+
+    async def infer_constant(self, ctref):
+        """Get the property for a ref of a Constant node."""
+        t = self.from_value(ctref.node.value, ctref.context)
+        if isinstance(t, Number):
+            v = FilterVar(_is_number)
+            prio = 1 if isinstance(t, Float) else 0
+            return self.engine.loop.create_var(v, t, prio)
+        else:
+            return t
 
     def from_value(self, v, context):
         """Infer the type of a constant."""
@@ -180,51 +194,49 @@ async def infer_type_hastype(track, x, t):
 @type_inferrer(P.bool_not, nargs=1)
 async def infer_type_bool_not(track, x):
     """Infer the return type of not."""
-    await track.expect(Bool, x)
+    await track.standard_check(Bool, x)
     return Bool()
 
 
 @type_inferrer(P.bool_and, nargs=2)
 async def infer_type_bool_and(track, x, y):
     """Infer the return type of bool_and."""
-    await track.expect(Bool, x, y)
+    await track.standard_check(Bool, x, y)
     return Bool()
 
 
 @type_inferrer(P.bool_or, nargs=2)
 async def infer_type_bool_or(track, x, y):
     """Infer the return type of bool_or."""
-    await track.expect(Bool, x, y)
+    await track.standard_check(Bool, x, y)
     return Bool()
 
 
 @type_inferrer(P.scalar_eq, P.scalar_ne, nargs=2)
 async def infer_type_generic_compare(track, x, y):
     """Infer the return type of a generic comparison operator."""
-    await track.expect(Number, x, y)
+    await track.standard_check(Number, x, y)
     return Bool()
 
 
 @type_inferrer(P.scalar_lt, P.scalar_gt, P.scalar_le, P.scalar_ge, nargs=2)
 async def infer_type_arith_compare(track, x, y):
     """Infer the return type of an arithmetic comparison operator."""
-    await track.expect(Number, x, y)
+    await track.standard_check(Number, x, y)
     return Bool()
 
 
 @type_inferrer(P.scalar_uadd, P.scalar_usub, nargs=1)
 async def infer_type_arith_unary(track, x):
     """Infer the return type of a unary arithmetic operator."""
-    t = await track.expect(Number, x)
-    return t
+    return await track.standard_check(Number, x)
 
 
 @type_inferrer(P.scalar_add, P.scalar_sub, P.scalar_mul, P.scalar_div,
                P.scalar_mod, P.scalar_pow, nargs=2)
 async def infer_type_arith_bin(track, x, y):
     """Infer the return type of a binary arithmetic operator."""
-    t, _ = await track.expect(Number, x, y)
-    return t
+    return await track.standard_check(Number, x, y)
 
 
 @type_inferrer(P.shape, nargs=1)
@@ -308,7 +320,7 @@ async def infer_type_dot(track, a, b):
 @type_inferrer(P.return_, nargs=1)
 async def infer_type_return_(track, x):
     """Infer the return type of return_."""
-    return await x['type']
+    return await x.get_raw('type')
 
 
 @type_inferrer(P.list_map, nargs=2)
