@@ -27,8 +27,6 @@ def type_error_nargs(ident, expected, got):
 class Track(Partializable):
     """Represents a property to infer."""
 
-    prereqs = []
-
     def __init__(self, engine, name):
         """Initialize a Track."""
         self.engine = engine
@@ -161,24 +159,22 @@ class Track(Partializable):
             [ref]
         )
 
-    async def expect(self,
-                     predicate,
-                     *refs,
-                     assert_same=True):
-        """Assert that all refs match the given predicate.
+    async def check(self, predicate, *refs):
+        """Assert that all refs match predicate, return values.
+
+        This differs from will_check by resolving the values of each
+        ref immediately, and returning them all instead of whichever
+        resolves first.
 
         Arguments:
             predicate: A type that all refs must have, or a predicate
                 function, or a tuple of types/predicates.
             refs: The references to compare.
-            assert_same: Whether all references should be identical
-                on that track, in addition to matching the predicate.
         """
         coros = [ref[self.name] for ref in refs]
         results = await asyncio.gather(*coros, loop=self.engine.loop)
-        results = list(zip(refs, results))
 
-        for ref, res in results:
+        for ref, res in zip(refs, results):
             if not self.apply_predicate(predicate, res):
                 raise self.predicate_error(
                     predicate,
@@ -186,26 +182,17 @@ class Track(Partializable):
                     ref
                 )
 
-        if assert_same:
-            (main_ref, main), *rest = results
-            for ref, res in rest:
-                if res != main:
-                    raise InferenceError(
-                        f"Mismatch: {main} != {res}",
-                        [main_ref, ref]
-                    )
+        if len(results) == 1:
+            results, = results
+        return results
 
-        rval = [res for _, res in results]
-        if len(rval) == 1:
-            rval, = rval
-        return rval
-
-    async def standard_check(self, predicate, *refs):
+    async def will_check(self, predicate, *refs):
         """Check that all refs match the predicate and each other.
 
         Checks are asynchronous and the value for one of the refs is
         returned (whichever is resolved first). That value may be
-        an InferenceVar.
+        an InferenceVar, which is guaranteed to *eventually* resolve to
+        the same thing as all the other refs.
         """
         async def chk(ref):
             res = await ref[self.name]
@@ -514,7 +501,7 @@ class VirtualReference:
 
     async def __getitem__(self, track):
         if track == '*':
-            return self.values
+            raise NotImplementedError('vref["*"]')
         else:
             return self.values[track]
 
@@ -601,9 +588,6 @@ class InferenceEngine:
         """Compute the value of the Reference on the given track."""
         track_name, ref = key
         track = self.tracks[track_name]
-
-        for prereq in track.prereqs:
-            await self.compute_ref((prereq, ref))
 
         if isinstance(ref, VirtualReference):
             # A VirtualReference already contains the values we need.

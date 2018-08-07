@@ -2,7 +2,6 @@
 import operator
 import numpy as np
 
-from functools import partial
 from pytest import mark
 from types import SimpleNamespace
 
@@ -19,6 +18,7 @@ from myia.prim.py_implementations import \
     typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape
+from myia.utils import RestrictedVar
 
 
 B = Bool()
@@ -91,7 +91,7 @@ class _tern:
         return x + y + z
 
     async def infer_type(track, x, y, z):
-        return await track.standard_check((Int, Float), x, y, z)
+        return await track.will_check((Int, Float), x, y, z)
 
 
 # Coercion
@@ -104,6 +104,29 @@ class _to_i64:
 
     async def infer_type(track, x):
         return Int(64)
+
+
+# Unification tricks
+
+
+@_test_op
+class _unif1:
+    def impl(x):
+        return x
+
+    async def infer_type(track, x):
+        rv = RestrictedVar({i16, f32})
+        return track.engine.loop.create_var(rv, None, 0)
+
+
+@_test_op
+class _unif2:
+    def impl(x):
+        return x
+
+    async def infer_type(track, x):
+        rv = RestrictedVar({i16, f64})
+        return track.engine.loop.create_var(rv, None, 0)
 
 
 infer_pipeline = scalar_pipeline.select(
@@ -1254,6 +1277,29 @@ def test_broadcast_shape(xs, ys):
 ])
 def test_call_argument(f, x):
     return f(x)
+
+
+@infer(type=[
+    (i64, i16),
+])
+def test_unif_tricks(x):
+    # unif1 is i16 or f32
+    # unif2 is i16 or f64
+    # a + b requires same type for a and b
+    # Therefore unif1 and unif2 are i16
+    a = _unif1(x)
+    b = _unif2(x)
+    return a + b
+
+
+@infer(type=[
+    (i64, InferenceError),
+])
+def test_unif_tricks_2(x):
+    # unif1 is i16 or f32
+    # Both are possible, so we raise an error due to ambiguity
+    a = _unif1(x)
+    return a + a
 
 
 def test_forced_type():
