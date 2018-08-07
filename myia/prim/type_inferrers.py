@@ -89,7 +89,7 @@ type_inferrer = partial(register_inferrer,
 @type_inferrer(P.if_, nargs=3)
 async def infer_type_if(track, cond, tb, fb):
     """Infer the return type of if."""
-    await track.expect(Bool(), cond)
+    await track.check(Bool(), cond)
     tb_inf = await tb['type']
     fb_inf = await fb['type']
     v = await cond['value']
@@ -110,7 +110,7 @@ async def infer_type_if(track, cond, tb, fb):
 @type_inferrer(P.switch, nargs=3)
 async def infer_type_switch(track, cond, tb, fb):
     """Infer the return type of switch."""
-    await track.expect(Bool(), cond)
+    await track.check(Bool(), cond)
     v = await cond['value']
     if v is True:
         # We only visit the first branch if the condition is provably true
@@ -137,14 +137,14 @@ async def infer_type_partial(track, fn, *args):
 async def infer_type_cons_tuple(track, x, y):
     """Infer the return type of cons_tuple."""
     x_t = await x['type']
-    y_t = await track.expect(Tuple, y)
+    y_t = await track.check(Tuple, y)
     return Tuple([x_t, *y_t.elements])
 
 
 @type_inferrer(P.head, nargs=1)
 async def infer_type_head(track, tup):
     """Infer the return type of head."""
-    tup_t = await track.expect(Tuple, tup)
+    tup_t = await track.check(Tuple, tup)
     if not len(tup_t.elements) >= 1:
         raise MyiaTypeError('head on empty tuple', refs=[tup])
     return tup_t.elements[0]
@@ -153,7 +153,7 @@ async def infer_type_head(track, tup):
 @type_inferrer(P.tail, nargs=1)
 async def infer_type_tail(track, tup):
     """Infer the return type of tail."""
-    tup_t = await track.expect(Tuple, tup)
+    tup_t = await track.check(Tuple, tup)
     if not len(tup_t.elements) >= 1:
         raise MyiaTypeError('tail on empty tuple', refs=[tup])
     return Tuple(tup_t.elements[1:])
@@ -162,8 +162,8 @@ async def infer_type_tail(track, tup):
 @type_inferrer(P.getitem, nargs=2)
 async def infer_type_getitem(track, seq, idx):
     """Infer the return type of getitem."""
-    seq_t = await track.expect((Tuple, List), seq)
-    await track.expect(Int, idx)
+    seq_t = await track.check((Tuple, List), seq)
+    await track.check(Int, idx)
 
     if isinstance(seq_t, Tuple):
         idx_v = await idx['value']
@@ -187,56 +187,56 @@ async def infer_type_hastype(track, x, t):
         """Type"""
         return x is Type
 
-    await track.expect(istype, t)
+    await track.check(istype, t)
     return Bool()
 
 
 @type_inferrer(P.bool_not, nargs=1)
 async def infer_type_bool_not(track, x):
     """Infer the return type of not."""
-    await track.standard_check(Bool, x)
+    await track.will_check(Bool, x)
     return Bool()
 
 
 @type_inferrer(P.bool_and, nargs=2)
 async def infer_type_bool_and(track, x, y):
     """Infer the return type of bool_and."""
-    await track.standard_check(Bool, x, y)
+    await track.will_check(Bool, x, y)
     return Bool()
 
 
 @type_inferrer(P.bool_or, nargs=2)
 async def infer_type_bool_or(track, x, y):
     """Infer the return type of bool_or."""
-    await track.standard_check(Bool, x, y)
+    await track.will_check(Bool, x, y)
     return Bool()
 
 
 @type_inferrer(P.scalar_eq, P.scalar_ne, nargs=2)
 async def infer_type_generic_compare(track, x, y):
     """Infer the return type of a generic comparison operator."""
-    await track.standard_check(Number, x, y)
+    await track.will_check(Number, x, y)
     return Bool()
 
 
 @type_inferrer(P.scalar_lt, P.scalar_gt, P.scalar_le, P.scalar_ge, nargs=2)
 async def infer_type_arith_compare(track, x, y):
     """Infer the return type of an arithmetic comparison operator."""
-    await track.standard_check(Number, x, y)
+    await track.will_check(Number, x, y)
     return Bool()
 
 
 @type_inferrer(P.scalar_uadd, P.scalar_usub, nargs=1)
 async def infer_type_arith_unary(track, x):
     """Infer the return type of a unary arithmetic operator."""
-    return await track.standard_check(Number, x)
+    return await track.will_check(Number, x)
 
 
 @type_inferrer(P.scalar_add, P.scalar_sub, P.scalar_mul, P.scalar_div,
                P.scalar_mod, P.scalar_pow, nargs=2)
 async def infer_type_arith_bin(track, x, y):
     """Infer the return type of a binary arithmetic operator."""
-    return await track.standard_check(Number, x, y)
+    return await track.will_check(Number, x, y)
 
 
 @type_inferrer(P.shape, nargs=1)
@@ -250,7 +250,7 @@ async def infer_type_shape(track, ary):
 async def infer_type_array_map(track, fn, ary):
     """Infer the return type of array_map."""
     fn_t = await fn['type']
-    ary_t = await track.expect(Array, ary)
+    ary_t = await track.check(Array, ary)
     xref = track.engine.vref({'type': ary_t.elements})
     return Array(await fn_t(xref))
 
@@ -259,7 +259,7 @@ async def infer_type_array_map(track, fn, ary):
 async def infer_type_array_map2(track, fn, ary1, ary2):
     """Infer the return type of array_map2."""
     fn_t = await fn['type']
-    ary1_t, ary2_t = await track.expect(Array, ary1, ary2, assert_same=False)
+    ary1_t, ary2_t = await track.check(Array, ary1, ary2)
     xref = track.engine.vref({'type': ary1_t.elements})
     yref = track.engine.vref({'type': ary2_t.elements})
     return Array(await fn_t(xref, yref))
@@ -269,8 +269,8 @@ async def infer_type_array_map2(track, fn, ary1, ary2):
 async def infer_type_reduce(track, fn, ary, shp):
     """Infer the return type of array_reduce."""
     fn_t = await fn['type']
-    await track.expect(_shape_type, shp)
-    ary_t = await track.expect(Array, ary)
+    await track.check(_shape_type, shp)
+    ary_t = await track.check(Array, ary)
     xref = track.engine.vref({'type': ary_t.elements})
     xref2 = track.engine.vref({'type': ary_t.elements})
     res_elem_t = await fn_t(xref, xref2)
@@ -283,7 +283,7 @@ async def infer_type_across_array(track, fn, init, ary, ax):
     fn_t = await fn['type']
     init_t = await init['type']
     ax_t = await ax['type']
-    ary_t = await track.expect(Array, ary)
+    ary_t = await track.check(Array, ary)
     if not ary_t.elements == init_t:
         raise MyiaTypeError("Initial value must have the same type "
                             "as array elements")
@@ -297,24 +297,23 @@ async def infer_type_across_array(track, fn, init, ary, ax):
 @type_inferrer(P.distribute, nargs=2)
 async def infer_type_distribute(track, v, shp):
     """Infer the return type of distribute."""
-    v_t = await track.expect(Array, v)
-    await track.expect(_shape_type, shp)
+    v_t = await track.check(Array, v)
+    await track.check(_shape_type, shp)
     return v_t
 
 
 @type_inferrer(P.reshape, nargs=2)
 async def infer_type_reshape(track, v, shape):
     """Infer the return type of reshape."""
-    v_t = await track.expect(Array, v)
-    await track.expect(_shape_type, shape)
+    v_t = await track.check(Array, v)
+    await track.check(_shape_type, shape)
     return v_t
 
 
 @type_inferrer(P.dot, nargs=2)
 async def infer_type_dot(track, a, b):
     """Infer the return type of dot."""
-    t, _ = await track.expect(Array, a, b)
-    return t
+    return await track.will_check(Array, a, b)
 
 
 @type_inferrer(P.return_, nargs=1)
@@ -327,7 +326,7 @@ async def infer_type_return_(track, x):
 async def infer_type_list_map(track, f, xs):
     """Infer the return type of list_map."""
     f_t = await f['type']
-    xs_t = await track.expect(List, xs)
+    xs_t = await track.check(List, xs)
     xref = track.engine.vref(dict(type=xs_t.element_type))
     ret_t = await f_t(xref)
     return List(ret_t)
@@ -397,14 +396,14 @@ async def infer_type_next(track, it):
 @type_inferrer(P.scalar_to_array, nargs=1)
 async def infer_type_scalar_to_array(track, x):
     """Infer the return type of scalar_to_array."""
-    x_t = await track.expect(Number, x)
+    x_t = await track.check(Number, x)
     return Array(x_t)
 
 
 @type_inferrer(P.broadcast_shape, nargs=2)
 async def infer_type_broadcast_shape(track, xs, ys):
     """Infer the return type of broadcast_shape."""
-    xs_t, ys_t = await track.expect(_shape_type, xs, ys, assert_same=False)
+    xs_t, ys_t = await track.check(_shape_type, xs, ys)
     shp_xs_n = len(xs_t.elements)
     shp_ys_n = len(ys_t.elements)
     return Tuple([UInt(64) for i in range(max(shp_xs_n, shp_ys_n))])

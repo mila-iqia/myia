@@ -4,7 +4,7 @@ import asyncio
 from heapq import heappush, heappop
 
 from ..dtype import Array, List, Tuple, Function
-from ..utils import TypeMap, Unification, Var
+from ..utils import TypeMap, Unification, Var, RestrictedVar
 
 from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
 
@@ -60,16 +60,12 @@ class InferenceLoop(asyncio.AbstractEventLoop):
             # we resume the loop.
             pending_vars.sort(key=lambda x: -x.priority)
             v1, *self._vars = pending_vars
-            v1.resolve_to_default()
-            self.run_forever()
-
-    def is_running(self):
-        """Return whether the loop is running."""
-        return self._running
-
-    def is_closed(self):
-        """Return whether the loop is closed."""
-        return not self.is_running()
+            try:
+                v1.resolve_to_default()
+            except InferenceError as e:
+                self._errors.append(e)
+            else:
+                self.run_forever()
 
     def schedule(self, x, order=0):
         """Schedule a task with the given priority.
@@ -274,15 +270,28 @@ class InferenceVar(asyncio.Future):
 
     def resolve_to_default(self):
         """Resolve to the default value."""
-        if self.done():
-            self.result()._infvar.resolve_to(self.default)
+        default = self.default
+        if default is None:
+            if self.done():
+                self.result()._infvar.resolve_to_default()
+                return
+            elif isinstance(self.var, RestrictedVar) \
+                    and len(self.var.legal_values) == 1:
+                for val in self.var.legal_values:
+                    self.set_result(val)
+                    return
+            raise InferenceError('Could not resolve a variable type.', refs=[])
         else:
-            self.set_result(self.default)
+            if self.done():
+                self.result()._infvar.resolve_to(default)
+            else:
+                self.set_result(default)
 
     def resolve_to(self, value):
         """Resolve to the provided value."""
         if self.done():
-            self.result()._infvar.resolve_to(value)
+            # This used to happen, not sure how to trigger now.
+            self.result()._infvar.resolve_to(value)  # pragma: no cover
         else:
             self.set_result(value)
 
