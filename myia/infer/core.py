@@ -201,8 +201,8 @@ class EquivalenceChecker:
             if x.provably_equivalent(y):
                 return
 
-            self._tie_dmaps(x, y, refs,)
-            self._tie_dmaps(y, x, refs, hist=False)
+            self._tie_dmaps(x, y, refs)
+            self._tie_dmaps(y, x, refs)
 
         elif x == y or self.merge(x, y):
             pass
