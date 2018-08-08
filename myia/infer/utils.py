@@ -1,7 +1,13 @@
 """Misc utilities for inference."""
 
 
+from contextvars import ContextVar
+
 from ..utils import Named, Event, Partializable
+
+
+infer_trace = ContextVar('infer_trace')
+infer_trace.set({})
 
 
 # Represents an unknown value
@@ -27,7 +33,7 @@ class InferenceError(Exception, Partializable):
         super().__init__(message, refs)
         self.message = message
         self.refs = refs
-        self.traceback_refs = {}
+        self.traceback_refs = infer_trace.get()
         if app is not None:
             self.traceback_refs[app.context] = app
 

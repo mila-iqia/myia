@@ -8,7 +8,8 @@ from ..ir import is_constant, is_constant_graph, is_apply
 from ..utils import Partializable, UNKNOWN
 
 from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify
-from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap
+from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, \
+    infer_trace
 
 
 def type_error_nargs(ident, expected, got):
@@ -70,20 +71,17 @@ class Track(Partializable):
 
         if not isinstance(inf, Inferrer):
             raise MyiaTypeError(
-                f'Trying to call a non-callable type.',
+                f'Trying to call a non-callable type: {inf}',
                 refs=[fn_ref],
                 app=ref
             )
 
-        try:
-            return await inf(*argrefs)
-        except InferenceError as infe:
-            # This builds a traceback of sorts in traceback_refs
-            # The first encounter with a ctx will be the caller,
-            # the others will be subsequence operations that depend
-            # on the result.
-            infe.traceback_refs.setdefault(ctx, ref)
-            raise
+        return await self.engine.loop.schedule(
+            inf(*argrefs),
+            context_map={
+                infer_trace: {**infer_trace.get(), ctx: ref}
+            }
+        )
 
     def from_value(self, v, context=None):
         """Get the property from a value in the context."""
@@ -204,7 +202,7 @@ class Track(Partializable):
                 )
         for ref in refs:
             self.engine.loop.schedule(chk(ref))
-        return await self.assert_same(*refs)
+        return await self.assert_same(*refs, refs=refs)
 
 
 ####################
@@ -344,9 +342,9 @@ class PartialInferrer(Inferrer):
         self.fn = fn
         self.args = tuple(args)
 
-    def infer(self, *args):
+    async def infer(self, *args):
         """Add the partial arguments and defer to the wrapped inferrer."""
-        return self.fn(*(self.args + args))
+        return await self.fn(*(self.args + args))
 
     def provably_equivalent(self, other):
         """Wether this inferrer is equivalent to another.
@@ -622,7 +620,7 @@ class InferenceEngine:
         """Run an async function using this inferrer's loop."""
         errs_before = len(self.errors)
         try:
-            fut = asyncio.ensure_future(coro, loop=self.loop)
+            fut = self.loop.schedule(coro)
             self.loop.run_forever()
             self.errors.extend(self.loop.collect_errors())
             for err in self.errors[errs_before:]:
