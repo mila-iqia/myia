@@ -1,21 +1,13 @@
 """Core of the inference engine (not Myia-specific)."""
 
 import asyncio
-from heapq import heappush, heappop
+from contextvars import copy_context
+from collections import deque
 
 from ..dtype import Array, List, Tuple, Function
 from ..utils import TypeMap, Unification, Var, RestrictedVar
 
 from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
-
-
-class _TodoEntry:
-    def __init__(self, order, handler):
-        self.order = order
-        self.handler = handler
-
-    def __lt__(self, other):
-        return self.order < other.order
 
 
 class InferenceLoop(asyncio.AbstractEventLoop):
@@ -30,8 +22,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
     def __init__(self, debug=False):
         """Initialize an InferenceLoop."""
-        self._running = False
-        self._todo = []
+        self._todo = deque()
         self._debug = debug
         self._tasks = []
         self._errors = []
@@ -43,38 +34,36 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
     def run_forever(self):
         """Run this loop until there is no more work to do."""
-        self._running = True
-        while self._todo and self._running:
-            todo = heappop(self._todo)
-            h = todo.handler
-            if isinstance(h, asyncio.Handle):
+        while True:
+            while self._todo:
+                h = self._todo.popleft()
                 h._run()
-            else:
-                fut = asyncio.ensure_future(h, loop=self)
-                self._tasks.append(fut)
-        pending_vars = [fut for fut in self._vars if not fut.resolved()]
-        if pending_vars:
-            # If some literals weren't forced to a concrete type by some
-            # operation, we sort by priority (i.e. floats first) and we
-            # force the first one to take its default concrete type. Then
-            # we resume the loop.
-            pending_vars.sort(key=lambda x: -x.priority)
-            v1, *self._vars = pending_vars
-            try:
-                v1.resolve_to_default()
-            except InferenceError as e:
-                self._errors.append(e)
-            else:
-                self.run_forever()
+            pending_vars = [fut for fut in self._vars if not fut.resolved()]
+            if pending_vars:
+                # If some literals weren't forced to a concrete type by some
+                # operation, we sort by priority (i.e. floats first) and we
+                # force the first one to take its default concrete type. Then
+                # we resume the loop.
+                pending_vars.sort(key=lambda x: -x.priority)
+                v1, *self._vars = pending_vars
+                try:
+                    v1.resolve_to_default()
+                except InferenceError as e:
+                    self._errors.append(e)
+                else:
+                    continue  # pragma: no cover
+            break
 
-    def schedule(self, x, order=0):
-        """Schedule a task with the given priority.
-
-        A smaller value for `order` means higher priority.
-        """
-        # TODO: order argument may not be relevant anymore, so we might want to
-        # remove it and simplify task sorting.
-        heappush(self._todo, _TodoEntry(order, x))
+    def schedule(self, x, context_map=None):
+        """Schedule a task."""
+        if context_map:
+            ctx = copy_context()
+            ctx.run(lambda: [k.set(v) for k, v in context_map.items()])
+            fut = ctx.run(asyncio.ensure_future, x, loop=self)
+        else:
+            fut = asyncio.ensure_future(x, loop=self)
+        self._tasks.append(fut)
+        return fut
 
     def collect_errors(self):
         """Return a collection of all exceptions from all futures."""
@@ -96,8 +85,8 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
     def call_soon(self, callback, *args, context=None):
         """Call the given callback as soon as possible."""
-        h = asyncio.Handle(callback, args, self)
-        heappush(self._todo, _TodoEntry(0, h))
+        h = asyncio.Handle(callback, args, self, context=context)
+        self._todo.append(h)
         return h
 
     def call_later(self, delay, callback, *args, context=None):

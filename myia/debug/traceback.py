@@ -122,7 +122,6 @@ async def _myia_multirefs(engine, error, refs):
 
 async def _myia_traceback(engine, error):
     refs = [*error.traceback_refs.values()]
-    refs.reverse()
 
     if not refs:
         return await _myia_multirefs(engine, error, error.refs)
@@ -152,7 +151,11 @@ async def _myia_traceback(engine, error):
             ctx = ref.context
             irefs = [engine.ref(node, ctx) for node in ref.node.inputs]
             fn_ref, *_ = irefs
-            fn_type, *arg_types = [await iref['type'] for iref in irefs]
+            try:
+                fn_type, *arg_types = [await iref['type'] for iref in irefs]
+            except InferenceError:
+                eprint('<Error retrieving types for reference.>')
+                return
             fn_str = _best_label(fn_ref.node, fn_type) or '<function>'
             if isinstance(fn_type, (Function, Inferrer)):
                 types_str = ", ".join(map(str, arg_types))
