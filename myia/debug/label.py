@@ -2,7 +2,7 @@
 
 
 from ..info import DebugInfo
-from ..ir.anf import Graph
+from ..ir.anf import ANFNode, Graph
 from ..ir.utils import is_constant, is_constant_graph, is_parameter, is_special
 from ..prim import Primitive
 from ..utils import Named, Namespace
@@ -134,3 +134,13 @@ class NodeLabeler:
 short_labeler = NodeLabeler(
     relation_symbols=short_relation_symbols
 )
+
+
+def label(x):
+    """Return an informative textual label for a node."""
+    if isinstance(x, Primitive):
+        return x.name
+    elif isinstance(x, (ANFNode, Graph, DebugInfo)):
+        return short_labeler.name(x)
+    else:
+        return repr(x)

@@ -921,6 +921,11 @@ def _square(x):
     return x * x
 
 
+@infer(type=(InferenceError,))
+def test_nonexistent_variable():
+    return xxxx + yz
+
+
 helpers = SimpleNamespace(
     add=operator.add,
     mul=operator.mul,

@@ -4,6 +4,14 @@
 from ..infer import InferenceError, PartialInferrer, Context, ANYTHING, unwrap
 
 
+class MyiaNameError(InferenceError):
+    """Raised when a name is not found in scope."""
+
+
+class MyiaAttributeError(InferenceError):
+    """Raised when an attribute is not found in a type or module."""
+
+
 async def static_getter(track, data, item, fetch, chk=None):
     """Return an inferrer for resolve or getattr.
 
@@ -21,7 +29,9 @@ async def static_getter(track, data, item, fetch, chk=None):
     data_t = await data['type']
     item_v = await item['value']
     if item_v is ANYTHING:
-        raise InferenceError('Item or attribute must be known.')
+        raise InferenceError(
+            'The value of the attribute could not be inferred.'
+        )
 
     try:
         mmap_t = mmap[type(data_t)]
@@ -43,19 +53,26 @@ async def static_getter(track, data, item, fetch, chk=None):
                 [data]
             )
         else:
-            msg = f'Method {item_v} of {data_t} does not exist.'
-            raise InferenceError(msg)
+            msg = f"object of type {data_t} has no attribute '{item_v}'"
+            raise MyiaAttributeError(msg)
 
     else:
         # Module or static namespace
         data_v = await data['value']
         if data_v is ANYTHING:
-            raise InferenceError('Data must be known.')
+            raise InferenceError(
+                'Could not infer the type or the value of the object'
+                f" on which to resolve the attribute '{item_v}"
+            )
         if chk:
             chk(data_v, item_v)
         try:
             raw = fetch(data_v, item_v)
-        except Exception as e:
-            raise InferenceError('Getter error', e)
+        except NameError as e:
+            raise MyiaNameError(f"Cannot resolve name '{item_v}'")
+        except AttributeError as e:
+            raise MyiaAttributeError(str(e))
+        except Exception as e:  # pragma: no cover
+            raise InferenceError(f'Unexpected error in getter: {e!r}')
         value = resources.convert(raw)
         return track.from_value(value, Context.empty())

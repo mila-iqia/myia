@@ -3,7 +3,7 @@
 
 from contextvars import ContextVar
 
-from ..utils import Named, Event, Partializable
+from ..utils import Named, Event, Partializable, eprint
 
 
 infer_trace = ContextVar('infer_trace')
@@ -37,9 +37,24 @@ class InferenceError(Exception, Partializable):
         if app is not None:
             self.traceback_refs[app.context] = app
 
+    def print_tb_end(self, fn_ctx, args_ctx, is_prim):
+        """Print the error message at the end of a traceback."""
+        eprint(f'{type(self).__qualname__}: {self.message}')
+
 
 class MyiaTypeError(InferenceError):
     """Type error in a Myia program."""
+
+    def print_tb_end(self, fn_ctx, args_ctx, is_prim):
+        """Print the error message at the end of a traceback."""
+        if fn_ctx is None:
+            super().print_tb_end(fn_ctx, args_ctx, is_prim)
+            return
+        s = f'{type(self).__qualname__}: `{fn_ctx}` cannot be called with' \
+            f' argument types {args_ctx}.'
+        if is_prim:
+            s += f' Reason: {self.message}'
+        eprint(s)
 
 
 class MyiaShapeError(InferenceError):

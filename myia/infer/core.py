@@ -5,9 +5,33 @@ from contextvars import copy_context
 from collections import deque
 
 from ..dtype import Array, List, Tuple, Function
-from ..utils import TypeMap, Unification, Var, RestrictedVar
+from ..utils import TypeMap, Unification, Var, RestrictedVar, eprint
 
 from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
+
+
+class MyiaTypeMismatchError(MyiaTypeError):
+    """Error where two values should have the same type, but don't."""
+
+    def __init__(self, type1, type2, *, refs):
+        """Initialize a MyiaTypeMismatchError."""
+        msg = f'{type1} != {type2}'
+        super().__init__(msg, refs=refs)
+        self.type1 = type1
+        self.type2 = type2
+
+
+class MyiaFunctionMismatchError(MyiaTypeMismatchError):
+    """Error where two functions should have the same type, but don't."""
+
+    def __init__(self, type1, type2, *, refs):
+        """Initialize a MyiaFunctionMismatchError."""
+        super().__init__(type1, type2, refs=refs)
+
+    def print_tb_end(self, fn_ctx, args_ctx, is_prim):
+        """Print the error message at the end of a traceback."""
+        m = "Two functions with incompatible return types may be called here"
+        eprint(f'{type(self).__qualname__}: {m}: {self.message}')
 
 
 class InferenceLoop(asyncio.AbstractEventLoop):
@@ -163,20 +187,36 @@ class EquivalenceChecker:
         self.unif = Unification()
         self.equiv = {}
 
-    def declare_equivalent(self, x, y, refs):
+    def declare_equivalent(self, x, y, refs, error_callback=None):
         """Declare that x and y should be equivalent.
 
         If an error occurs, the refs argument is to be packaged with it.
         """
-        self.loop.schedule(self._process_equivalence(x, y, refs))
+        coro = self._process_equivalence(x, y, refs, error_callback)
+        self.loop.schedule(coro)
 
     def _tie_dmaps(self, src, dest, refs, hist=True):
-        def evt(_, refs, res_src):
-            res_dest = dest(*refs)
-            self.declare_equivalent(res_src, res_dest, refs)
+        def evt(_, argrefs, res_src):
+            async def acb(err):
+                # TODO: this should fetch the appropriate track, not
+                # necessarily 'type'
+                argt = [await ref['type'] for ref in argrefs]
+                t1 = Function(argt, err.type1)
+                t2 = Function(argt, err.type2)
+                err = MyiaFunctionMismatchError(t1, t2, refs=err.refs)
+                self.error_callback(err)
+
+            def cb(err):
+                self.loop.schedule(acb(err))
+
+            res_dest = dest(*argrefs)
+            self.declare_equivalent(res_src, res_dest, refs, cb)
         src.on_result.register(evt, run_history=hist)
 
-    async def _process_equivalence(self, x, y, refs):
+    async def _process_equivalence(self, x, y, refs, error_callback=None):
+        if error_callback is None:
+            error_callback = self.error_callback
+
         if hasattr(x, '__await__'):
             x = await x
         if hasattr(y, '__await__'):
@@ -193,9 +233,7 @@ class EquivalenceChecker:
             pass
 
         else:
-            self.error_callback(
-                MyiaTypeError(f'Type mismatch: {x} != {y}', refs=refs)
-            )
+            error_callback(MyiaTypeMismatchError(x, y, refs=refs))
 
     def merge(self, x, y):
         """Merge the two values/variables x and y."""
