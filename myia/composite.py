@@ -160,6 +160,12 @@ def or_(x, y):
     return x.__or__(y)
 
 
+@core
+def matmul(x, y):
+    """Implementation of `matmul` (`@`)."""
+    return x.__matmul__(y)
+
+
 ##################
 # Scalar methods #
 ##################

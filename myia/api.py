@@ -38,6 +38,7 @@ scalar_object_map = {
     operator.not_: P.bool_not,
     operator.and_: P.bool_and,
     operator.or_: P.bool_or,
+    operator.matmul: P.dot,
     operator.getitem: P.getitem,
     operator.setitem: P.setitem,
     bool: P.identity,
@@ -64,6 +65,7 @@ standard_object_map = {
     operator.not_: C.not_,
     operator.and_: C.and_,
     operator.or_: C.or_,
+    operator.matmul: C.matmul,
     operator.getitem: P.getitem,
     operator.setitem: P.setitem,
     bool: C.bool,
@@ -129,6 +131,7 @@ standard_method_map = TypeMap({
         '__gt__': C.array_gt,
         '__le__': C.array_le,
         '__ge__': C.array_ge,
+        '__matmul__': P.dot,
     }
 })
 
