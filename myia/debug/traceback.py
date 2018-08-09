@@ -3,17 +3,11 @@
 import ast
 import sys
 
-from ..dtype import Function
 from ..infer import Inferrer, InferenceError
-from ..prim import Primitive
 from ..ir import is_apply, is_constant_graph
+from ..utils import eprint
 
-from .label import short_labeler as shl
-
-
-def eprint(*things):
-    """Print to stderr."""
-    print(*things, file=sys.stderr)
+from .label import label
 
 
 def skip_node(node):
@@ -72,18 +66,16 @@ def _format_context(ctx):
     g = ctx.graph
     if g is None:
         return '<unknown>'
-    args = [f'{shl.name(p)}: {fromsig(t)}'
+    args = [f'{label(p)}: {fromsig(t)}'
             for (p, t) in zip(g.parameters, ctx.argkey)]
-    return f'{shl.name(g)}({", ".join(args)})'
+    return label(g), f'({", ".join(args)})'
 
 
-def _best_label(node, typ):
+def _label(node, typ):
     if isinstance(typ, Inferrer):
-        return _best_label(typ.identifier, None)
-    elif isinstance(node, Primitive):
-        return node.name
+        return _label(typ.identifier, None)
     else:
-        return shl.name(node)
+        return label(node)
 
 
 def _find_loc(ref):
@@ -97,35 +89,18 @@ def _find_loc(ref):
     return loc
 
 
-async def _myia_multirefs(engine, error, refs):
-    for i, ref in enumerate(refs):
-        loc = _find_loc(ref)
-        if loc is None:
-            continue
-        ctx = ref.context
+def _get_main(ref):
+    ctx = ref.context
+    g = ctx.graph
+    while g and g.flags.get('auxiliary') \
+            and ctx.parent and ctx.parent.graph:
+        ctx = ctx.parent
         g = ctx.graph
-        while g and g.flags.get('auxiliary') \
-                and ctx.parent and ctx.parent.graph:
-            ctx = ctx.parent
-            g = ctx.graph
-        ctx_str = 'in ' + _format_context(ctx)
-        if g and g.flags.get('core', False):
-            eprint(ctx_str)
-            eprint('  Invalid signature for core function.')
-            eprint()
-            break
-        _show_location(loc, ctx_str, str())
-        eprint()
-
-    eprint(f'{type(error).__qualname__}: {error.message}')
+    return g, ctx
 
 
 async def _myia_traceback(engine, error):
     refs = [*error.traceback_refs.values()]
-
-    if not refs:
-        return await _myia_multirefs(engine, error, error.refs)
-
     ref = None
     for i, ref in enumerate(refs):
         loc = _find_loc(ref)
@@ -133,39 +108,28 @@ async def _myia_traceback(engine, error):
             continue
         if skip_node(loc.node):
             continue
-        ctx = ref.context
-        g = ctx.graph
-        while g.flags.get('auxiliary') and ctx.parent and ctx.parent.graph:
-            ctx = ctx.parent
-            g = ctx.graph
-        ctx_str = 'in ' + _format_context(ctx)
+        g, ctx = _get_main(ref)
+        fstr, argstr = _format_context(ctx)
         if g.flags.get('core', False):
-            eprint(ctx_str)
-            eprint('  Invalid signature for core function.')
-            eprint()
+            error.print_tb_end(fstr, argstr, False)
             break
+        ctx_str = f'in {fstr}{argstr}'
         _show_location(loc, ctx_str, str())
         eprint()
     else:
+        fstr, argstr = None, None
         if ref is not None and is_apply(ref.node):
             ctx = ref.context
             irefs = [engine.ref(node, ctx) for node in ref.node.inputs]
             fn_ref, *_ = irefs
             try:
                 fn_type, *arg_types = [await iref['type'] for iref in irefs]
+                fstr = _label(fn_ref.node, fn_type) or '<function>'
+                argstr = "(" + ", ".join(map(str, arg_types)) + ")"
             except InferenceError:
-                eprint('<Error retrieving types for reference.>')
-                return
-            fn_str = _best_label(fn_ref.node, fn_type) or '<function>'
-            if isinstance(fn_type, (Function, Inferrer)):
-                types_str = ", ".join(map(str, arg_types))
-                eprint(f'in {fn_str}({types_str})')
-                eprint(f'  Invalid signature for core function.')
-            else:
-                eprint(f'Invalid function type:\n  {fn_str}: {fn_type}')
-            eprint()
-
-    eprint(f'{type(error).__qualname__}: {error.message}')
+                fstr = None
+                argstr = None
+        error.print_tb_end(fstr, argstr, True)
 
 
 _previous_excepthook = sys.excepthook

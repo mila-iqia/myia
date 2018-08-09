@@ -1,6 +1,7 @@
 """Miscellaneous utilities."""
 
 import builtins
+import sys
 from typing import Any, Dict, List, TypeVar
 
 
@@ -400,3 +401,8 @@ class ClosureNamespace(Namespace):
             return d[name].cell_contents
         except ValueError as e:
             raise UnboundLocalError(name)
+
+
+def eprint(*things):
+    """Print to stderr."""
+    print(*things, file=sys.stderr)

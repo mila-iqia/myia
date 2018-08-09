@@ -7,7 +7,7 @@ from .merge import (  # noqa
 
 from .misc import (  # noqa
     Named, UNKNOWN, Registry, repr_, list_str, TypeMap, StructuralMap, smap,
-    Event, Events, NS, Namespace, ModuleNamespace, ClosureNamespace
+    Event, Events, NS, Namespace, ModuleNamespace, ClosureNamespace, eprint
 )
 
 from .partial import (  # noqa

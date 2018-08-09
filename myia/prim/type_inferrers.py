@@ -343,9 +343,13 @@ async def infer_type_resolve(track, data, item):
     """Infer the return type of resolve."""
     def chk(data_v, item_v):
         if not isinstance(data_v, Namespace):  # pragma: no cover
-            raise MyiaTypeError('data argument to resolve must be Namespace.')
+            raise MyiaTypeError(
+                f'data argument to resolve must be Namespace, not {data_v}'
+            )
         if not isinstance(item_v, str):  # pragma: no cover
-            raise MyiaTypeError('item argument to resolve must be string.')
+            raise MyiaTypeError(
+                f'item argument to resolve must be a string, not {item_v}.'
+            )
     return await static_getter(track, data, item, (lambda x, y: x[y]), chk)
 
 
@@ -354,7 +358,9 @@ async def infer_type_getattr(track, data, item):
     """Infer the return type of getattr."""
     def chk(data_v, item_v):
         if not isinstance(item_v, str):
-            raise MyiaTypeError('item argument to getattr must be string.')
+            raise MyiaTypeError(
+                f'item argument to getattr must be string, not {item_v}.'
+            )
     return await static_getter(track, data, item, getattr, chk)
 
 

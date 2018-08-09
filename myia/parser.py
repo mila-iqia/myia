@@ -691,10 +691,12 @@ class Block:
 
     def force_bool(self, cond):
         """Wrap a condition in a call to bool()."""
-        return self.graph.apply(
+        rval = self.graph.apply(
             self.make_resolve(builtins_ns, 'bool'),
             cond
         )
+        rval.debug.location = cond.debug.location
+        return rval
 
     def read(self, varnum: str) -> ANFNode:
         """Read a variable.

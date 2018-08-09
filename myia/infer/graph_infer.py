@@ -4,6 +4,7 @@ import asyncio
 from types import FunctionType
 
 from ..dtype import Type, Function
+from ..debug.label import label
 from ..ir import is_constant, is_constant_graph, is_apply
 from ..utils import Partializable, UNKNOWN
 
@@ -15,8 +16,8 @@ from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, \
 def type_error_nargs(ident, expected, got):
     """Return a MyiaTypeError for number of arguments mismatch."""
     return MyiaTypeError(
-        f'Wrong number of arguments for {ident}:'
-        f' expected {expected}, got {got}.'
+        f"Wrong number of arguments for '{label(ident)}':"
+        f" expected {expected}, got {got}."
     )
 
 
