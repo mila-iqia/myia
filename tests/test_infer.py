@@ -923,7 +923,7 @@ def _square(x):
 
 @infer(type=(InferenceError,))
 def test_nonexistent_variable():
-    return xxxx + yz
+    return xxxx + yz  # noqa
 
 
 helpers = SimpleNamespace(
