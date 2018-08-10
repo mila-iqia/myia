@@ -5,8 +5,8 @@ from functools import partial
 
 from ..dtype import Int, Float, Bool, Tuple, List, Type, Array, UInt, Number
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
-    MyiaTypeError, register_inferrer, Track
-from ..ir import Graph
+    MyiaTypeError, register_inferrer, Track, MetaGraphInferrer
+from ..ir import Graph, MetaGraph
 from ..utils import Namespace, FilterVar
 
 from . import ops as P
@@ -68,6 +68,8 @@ class TypeTrack(Track):
             return self.constructors[v](self)
         elif isinstance(v, Graph):
             return GraphInferrer(self, v, context)
+        elif isinstance(v, MetaGraph):
+            return MetaGraphInferrer(self, v)
         else:
             return typeof(v)
 

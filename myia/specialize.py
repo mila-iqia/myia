@@ -4,7 +4,7 @@ from collections import Counter
 
 from .dtype import Type, Function, Number, Bool, Problem
 from .infer import ANYTHING, Context, reify, \
-    GraphInferrer, PartialInferrer, Inferrer
+    GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer
 from .ir import GraphCloner, is_apply, is_constant_graph, Constant
 from .prim import ops as P, Primitive
 from .utils import Named, TypeMap
@@ -54,8 +54,7 @@ class TypeSpecializer:
         )
 
     async def _specialize(self, parent, ginf, argrefs):
-        g = ginf.graph
-
+        g = await ginf.make_graph(argrefs)
         ctx = await ginf.make_context(argrefs)
 
         ctxkey = await reify(ctx)
@@ -63,7 +62,7 @@ class TypeSpecializer:
             return self.specializations[ctxkey]
 
         self.counts[g] += 1
-        gspec = _GraphSpecializer(parent, self, ginf.graph, ctx)
+        gspec = _GraphSpecializer(parent, self, g, ctx)
         g2 = gspec.new_graph
         self.originals[g2] = g
         self.specializations[ctxkey] = g2
@@ -158,8 +157,11 @@ class _GraphSpecializer:
 
     @build_map.register(GraphInferrer)
     async def build_GraphInferrer(self, ref, argrefs, inf):
-        g = inf.graph
-        if g.parent is None or ref and is_constant_graph(ref.node):
+        if isinstance(inf, MetaGraphInferrer):
+            g = None
+        else:
+            g = await inf.make_graph(None)
+        if not g or g.parent is None or ref and is_constant_graph(ref.node):
             if argrefs is None:
                 argrefs = await _find_argrefs(inf)
             v = await self.specializer._specialize(

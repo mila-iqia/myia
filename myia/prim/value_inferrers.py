@@ -7,8 +7,8 @@ from functools import partial
 
 from ..infer import ValueWrapper, InferenceError, PartialInferrer, \
     ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track, \
-    unwrap
-from ..ir import Graph
+    unwrap, MetaGraphInferrer
+from ..ir import Graph, MetaGraph
 
 from . import ops as P
 from .inferrer_utils import static_getter
@@ -128,6 +128,8 @@ class ValueTrack(Track):
                 )
         elif isinstance(v, Graph):
             inf = GraphInferrer(self, v, context)
+        elif isinstance(v, MetaGraph):
+            inf = MetaGraphInferrer(self, v)
         elif v is ANYTHING:
             return v
         else:

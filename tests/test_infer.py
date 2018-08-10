@@ -9,6 +9,7 @@ from myia.api import scalar_pipeline, standard_pipeline
 from myia.debug.traceback import print_inference_error
 from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
+from myia.ir import MultitypeGraph
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
     Function as F, Type, UInt, External
 from myia.pipeline import pipeline_function
@@ -1318,6 +1319,67 @@ def test_unif_tricks_2(x):
     # Both are possible, so we raise an error due to ambiguity
     a = _unif1(x)
     return a + a
+
+
+mysum = MultitypeGraph('mysum')
+
+
+@mysum.register(i64)
+def _mysum1(x):
+    return x
+
+
+@mysum.register(i64, i64)
+def _mysum2(x, y):
+    return x + y
+
+
+@mysum.register(i64, i64, i64)
+def _mysum3(x, y, z):
+    return x + y + z
+
+
+@infer(
+    value=[
+        (2, 3, 4, 90)
+    ],
+    type=[
+        (i64, i64, i64, i64),
+        (f64, f64, f64, InferenceError),
+    ]
+)
+def test_multitype(x, y, z):
+    return mysum(x) * mysum(x, y) * mysum(x, y, z)
+
+
+mystery = MultitypeGraph('mystery')
+
+
+@mystery.register(ai64, ai64)
+def _mystery1(x, y):
+    return x @ y
+
+
+@mystery.register(af64, af64)
+def _mystery2(x, y):
+    return array_map2(scalar_add, x, y)
+
+
+@infer(
+    type=[
+        (ai64_of(7, 9), ai64_of(9, 2), ai64),
+        (af64_of(7, 9), af64_of(7, 9), af64),
+        (f64, f64, InferenceError),
+    ],
+    shape=[
+        (ai64_of(2, 5), ai64_of(5, 3), (2, 3)),
+        (af64_of(2, 5), af64_of(5, 3), InferenceError),
+        (ai64_of(2, 5), ai64_of(2, 5), InferenceError),
+        (af64_of(2, 5), af64_of(2, 5), (2, 5)),
+    ]
+)
+def test_multitype_2(x, y):
+    return mystery(x, y)
 
 
 def test_forced_type():

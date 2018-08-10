@@ -4,8 +4,8 @@ import operator
 from functools import partial, reduce
 
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
-    PartialInferrer, Track, MyiaShapeError, Inferrer
-from ..ir import Graph
+    PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer
+from ..ir import Graph, MetaGraph
 from ..dtype import Array
 
 from . import ops as P
@@ -63,6 +63,8 @@ class ShapeTrack(Track):
                 return ScalarShapeInferrer(self)
         elif isinstance(v, Graph):
             return GraphInferrer(self, v, context)
+        elif isinstance(v, MetaGraph):
+            return MetaGraphInferrer(self, v)
         else:
             return getattr(v, 'shape', ())
 

@@ -5,8 +5,8 @@ from types import FunctionType
 
 from ..dtype import Type, Function
 from ..debug.label import label
-from ..ir import is_constant, is_constant_graph, is_apply
-from ..utils import Partializable, UNKNOWN
+from ..ir import is_constant, is_constant_graph, is_apply, GraphGenerationError
+from ..utils import Partializable, UNKNOWN, eprint
 
 from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify
 from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, \
@@ -19,6 +19,21 @@ def type_error_nargs(ident, expected, got):
         f"Wrong number of arguments for '{label(ident)}':"
         f" expected {expected}, got {got}."
     )
+
+
+class TypeDispatchError(MyiaTypeError):
+    """Represents an error in type dispatch for a MetaGraph."""
+
+    def __init__(self, metagraph, types, refs=[], app=None):
+        """Initialize a TypeDispatchError."""
+        message = f'`{metagraph}` is not defined for argument types {types}'
+        super().__init__(message, refs=refs, app=app)
+        self.metagraph = metagraph
+        self.types = types
+
+    def print_tb_end(self, fn_ctx, args_ctx, is_prim):
+        """Print the error message at the end of a traceback."""
+        eprint(f'{type(self).__qualname__}: {self.message}')
 
 
 #########
@@ -98,7 +113,8 @@ class Track(Partializable):
 
     def assert_same(self, *vals, refs=[]):
         """Assert that all vals are the same on this track."""
-        futs = [ref.get_raw(self.name) if isinstance(ref, Reference) else ref
+        futs = [ref.get_raw(self.name)
+                if isinstance(ref, AbstractReference) else ref
                 for ref in vals]
         return self.engine.equiv.assert_same(*futs, refs=refs)
 
@@ -264,22 +280,21 @@ class PrimitiveInferrer(Inferrer):
 
 
 class GraphInferrer(Inferrer):
-    """Infer a property of the result of calling a Graph.
-
-    Attributes:
-        track: Name of the property to infer.
-        graph: The Graph to infer on.
-        context: The context for the given graph.
-
-    """
+    """Infer a property of the result of calling a Graph."""
 
     def __init__(self, track, graph, context):
         """Initialize the GraphInferrer."""
         super().__init__(track, graph)
         self.track = track
-        self.graph = graph
-        self.nargs = len(self.graph.parameters)
-        self.context = context.filter(graph)
+        self._graph = graph
+        if context is None:
+            self.context = Context.empty()
+        else:
+            self.context = context.filter(graph)
+
+    async def make_graph(self, args):
+        """Return the graph to use for the given args."""
+        return self._graph
 
     async def make_context(self, args):
         """Create a Context object for this graph with these arguments.
@@ -288,34 +303,38 @@ class GraphInferrer(Inferrer):
         build a context (this cannot be done lazily, like with primitives,
         because we need a concrete context).
         """
+        g = await self.make_graph(args)
         argvals = []
         for arg in args:
             argval = {}
             for track_name, track in self.engine.tracks.items():
                 result = await self.engine.get_inferred(track_name, arg)
-                if not self.graph.flags.get('flatten_inference'):
+                if not g.flags.get('flatten_inference'):
                     result = track.broaden(result)
                 argval[track_name] = result
             argvals.append(argval)
 
         # Update current context using the fetched properties.
-        return self.context.add(self.graph, argvals)
+        return self.context.add(g, argvals)
 
     async def infer(self, *args):
         """Infer a property of the operation on the given arguments."""
-        if len(args) != self.nargs:
-            raise type_error_nargs(self.identifier, self.nargs, len(args))
+        g = await self.make_graph(args)
+        nargs = len(g.parameters)
+
+        if len(args) != nargs:
+            raise type_error_nargs(self.identifier, nargs, len(args))
 
         context = await self.make_context(args)
 
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
-        for p, arg in zip(self.graph.parameters, context.argkey):
+        for p, arg in zip(g.parameters, context.argkey):
             for track, v in arg:
                 ref = self.engine.ref(p, context)
                 self.engine.cache.set_value((track, ref), v)
 
-        out = self.engine.ref(self.graph.return_, context)
+        out = self.engine.ref(g.return_, context)
         return await self.engine.get_inferred(self.track.name, out)
 
     def provably_equivalent(self, other):
@@ -326,8 +345,26 @@ class GraphInferrer(Inferrer):
         """
         return isinstance(other, GraphInferrer) \
             and other.track == self.track \
-            and other.graph == self.graph \
+            and other._graph == self._graph \
             and other.context == self.context
+
+
+class MetaGraphInferrer(GraphInferrer):
+    """Infer a property of the result of calling a MetaGraph."""
+
+    def __init__(self, track, metagraph):
+        """Initialize the MetaGraphInferrer."""
+        super().__init__(track, metagraph, None)
+
+    async def make_graph(self, args):
+        """Return the graph to use for the given args."""
+        types = [await arg['type'] for arg in args]
+        try:
+            return self._graph.specialize(
+                self.engine.pipeline.resources, types
+            )
+        except GraphGenerationError as err:
+            raise TypeDispatchError(self._graph, types) from None
 
 
 class PartialInferrer(Inferrer):
@@ -435,7 +472,11 @@ class Context:
         )
 
 
-class Reference:
+class AbstractReference:
+    """Superclass for Reference and VirtualReference."""
+
+
+class Reference(AbstractReference):
     """Reference to a certain node in a certain context.
 
     Attributes:
@@ -483,7 +524,7 @@ class Reference:
         return hash((self.node, self.context))
 
 
-class VirtualReference:
+class VirtualReference(AbstractReference):
     """Synthetic reference that can be given to an inferrer.
 
     A VirtualReference contains the values it is supposed to take on
@@ -497,6 +538,10 @@ class VirtualReference:
     def __init__(self, values):
         """Initialize the VirtualReference."""
         self.values = values
+
+    async def get_raw(self, track):
+        """Get the raw value for the track, which might be wrapped."""
+        return self.values[track]
 
     async def __getitem__(self, track):
         if track == '*':
