@@ -5,6 +5,8 @@ from types import SimpleNamespace
 from pytest import mark
 
 from myia.api import standard_debug_pipeline
+from myia.dtype import Int
+from myia.ir import MultitypeGraph
 
 
 lang_pipeline = standard_debug_pipeline \
@@ -454,6 +456,35 @@ def test_rec1(x):
         else:
             return x
     return f(x)
+
+
+#############
+# MetaGraph #
+#############
+
+
+mysum = MultitypeGraph('mysum')
+i64 = Int(64)
+
+
+@mysum.register(i64)
+def _mysum1(x):
+    return x
+
+
+@mysum.register(i64, i64)
+def _mysum2(x, y):
+    return x + y
+
+
+@mysum.register(i64, i64, i64)
+def _mysum3(x, y, z):
+    return x + y + z
+
+
+@parse_compare((2, 3, 4))
+def test_multitype(x, y, z):
+    return mysum(x) * mysum(x, y) * mysum(x, y, z)
 
 
 ###############

@@ -15,6 +15,7 @@ from myia.prim.py_implementations import \
 from myia.specialize import DEAD
 from myia.utils import UNKNOWN
 
+from .test_lang import mysum
 from .test_infer import i64, f64, mysum
 
 

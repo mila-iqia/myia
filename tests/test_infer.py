@@ -21,6 +21,8 @@ from myia.prim.py_implementations import \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape
 from myia.utils import RestrictedVar
 
+from .test_lang import mysum
+
 
 B = Bool()
 
@@ -1319,24 +1321,6 @@ def test_unif_tricks_2(x):
     # Both are possible, so we raise an error due to ambiguity
     a = _unif1(x)
     return a + a
-
-
-mysum = MultitypeGraph('mysum')
-
-
-@mysum.register(i64)
-def _mysum1(x):
-    return x
-
-
-@mysum.register(i64, i64)
-def _mysum2(x, y):
-    return x + y
-
-
-@mysum.register(i64, i64, i64)
-def _mysum3(x, y, z):
-    return x + y + z
 
 
 @infer(
