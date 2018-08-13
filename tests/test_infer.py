@@ -11,7 +11,7 @@ from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
 from myia.ir import MultitypeGraph
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
-    Function as F, Type, UInt, External
+    Function as F, TypeType, UInt, External
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
@@ -875,14 +875,14 @@ def test_hastype(x):
 
 @infer(
     type=(i64, i64, InferenceError),
-    value=(i64, {'type': Type, 'value': ANYTHING}, InferenceError),
+    value=(i64, {'type': TypeType(), 'value': ANYTHING}, InferenceError),
 )
 def test_bad_hastype(x, y):
     return hastype(x, y)
 
 
 @infer(
-    type=[(i64, Type)],
+    type=[(i64, TypeType())],
     value=[({'type': i64}, i64),
            ({'type': f64}, f64)]
 )

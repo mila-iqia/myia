@@ -2,7 +2,7 @@
 
 from collections import Counter
 
-from .dtype import Type, Function, Number, Bool, Problem
+from .dtype import Type, Function, Number, Bool, Problem, TypeType
 from .infer import ANYTHING, Context, reify, \
     GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer
 from .ir import GraphCloner, is_apply, is_constant_graph, Constant
@@ -197,6 +197,7 @@ class _GraphSpecializer:
 
     @build_map.register(Number)
     @build_map.register(Bool)
+    @build_map.register(TypeType)
     @build_map.register(type)
     async def build_atom(self, ref, argrefs, t):
         v = await ref['value']

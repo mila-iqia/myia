@@ -166,7 +166,7 @@ def bool_or(x, y):
 def typeof(x):
     """Implement typeof."""
     if isinstance(x, types.Type) or isinstance(x, type):
-        return types.Type
+        return types.TypeType()
     elif isinstance(x, bool):
         return types.Bool()
     elif isinstance(x, int):

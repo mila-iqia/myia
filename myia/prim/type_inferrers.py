@@ -3,7 +3,8 @@
 
 from functools import partial
 
-from ..dtype import Int, Float, Bool, Tuple, List, Type, Array, UInt, Number
+from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
+    TypeType
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track, MetaGraphInferrer
 from ..ir import Graph, MetaGraph
@@ -179,7 +180,7 @@ async def infer_type_getitem(track, seq, idx):
 @type_inferrer(P.typeof, nargs=1)
 async def infer_type_typeof(track, _):
     """Infer the return type of typeof."""
-    return Type
+    return TypeType()
 
 
 @type_inferrer(P.hastype, nargs=2)
@@ -187,7 +188,7 @@ async def infer_type_hastype(track, x, t):
     """Infer the return type of hastype."""
     def istype(x):  # noqa: D400
         """Type"""
-        return x is Type
+        return x == TypeType()
 
     await track.check(istype, t)
     return Bool()

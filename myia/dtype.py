@@ -104,11 +104,21 @@ class Type(metaclass=TypeMeta):
         return f"{name}({args})"
 
 
-class Bool(Type):
+class Object(Type):
+    """Some object."""
+
+    @classmethod
+    def _parse_args(cls, args, kwargs):
+        if cls is Object:
+            raise RuntimeError("Can't instantiate Object directly")
+        return args
+
+
+class Bool(Object):
     """Boolean values."""
 
 
-class Number(Type):
+class Number(Object):
     """Numerical values."""
 
     bits: int
@@ -155,7 +165,7 @@ class UInt(Number):
     _valid_bits = (8, 16, 32, 64)
 
 
-class List(Type):
+class List(Object):
     """Represents a set of ordered values with the same type.
 
     Instanciate with `List(element_type)`.
@@ -164,7 +174,7 @@ class List(Type):
     element_type: Type
 
 
-class Struct(Type):
+class Struct(Object):
     """Represents a set of named fields with their own types.
 
     Instantiate with `Struct(Mapping[str, Type])`.  A sequence of
@@ -195,7 +205,7 @@ class Struct(Type):
         raise AttributeError
 
 
-class Tuple(Type):
+class Tuple(Object):
     """Represents a set of ordered values with independent types.
 
     Instantiate with `Tuple(type1, type2, ... typeN)`.  A single
@@ -214,7 +224,7 @@ class Tuple(Type):
             return (args,)
 
 
-class Array(Type):
+class Array(Object):
     """Represents an array of values.
 
     Instantiate with Array(subtype).
@@ -223,7 +233,7 @@ class Array(Type):
     elements: Type
 
 
-class Function(Type):
+class Function(Object):
     """Represents a type that can be called.
 
     Instantiate with `Function((type1, type2, ..., typeN), ret_type)`.
@@ -238,6 +248,10 @@ class Function(Type):
         assert len(kwargs) == 0
         assert not isinstance(args[0], Type)
         return (tuple(args[0]), args[1])
+
+
+class TypeType(Type):
+    """The type of a Type."""
 
 
 class Problem(Type):
