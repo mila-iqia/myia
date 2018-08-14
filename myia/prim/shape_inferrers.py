@@ -48,6 +48,10 @@ class ShapeTrack(Track):
 
     def default(self, values):
         """Default value for ShapeTrack."""
+        if isinstance(values['type'], Array):
+            raise Exception(
+                'There is no default value for Arrays on the shape track.'
+            )  # pragma: no cover
         return ()
 
     def from_value(self, v, context):
