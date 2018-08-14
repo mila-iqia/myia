@@ -168,7 +168,8 @@ class _GraphSpecializer:
 
     @build_map.register(PartialInferrer)
     async def build_PartialInferrer(self, ref, argrefs, inf):
-        sub_build = await self.build(None, [*inf.args, *argrefs], inf.fn)
+        all_argrefs = None if argrefs is None else [*inf.args, *argrefs]
+        sub_build = await self.build(None, all_argrefs, inf.fn)
         ptl_args = [await self.build(ref) for ref in inf.args]
         res_t = await _concretize_type(inf, argrefs)
         ptl = _const(P.partial, Function(

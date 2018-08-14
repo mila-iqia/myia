@@ -9,8 +9,8 @@ from myia.infer import Inferrer
 from myia.ir import succ_deeper, is_apply, is_constant
 from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import \
-    typeof, hastype, list_map, scalar_add, scalar_usub, scalar_uadd, \
-    switch
+    typeof, hastype, partial, list_map, scalar_add, scalar_sub, \
+    scalar_usub, scalar_uadd, switch
 from myia.specialize import DEAD
 from myia.utils import UNKNOWN
 
@@ -303,3 +303,13 @@ def test_method_polymorphic(x, y):
 @specialize((True, int1), (False, int1))
 def test_switch(c, x):
     return switch(c, scalar_usub, scalar_uadd)(x)
+
+
+@specialize((True, int1, int2), (False, int1, int2))
+def test_switch2(c, x, y):
+    fn = switch(
+        c,
+        partial(scalar_sub, x),
+        partial(scalar_add, x)
+    )
+    return fn(y)
