@@ -1,4 +1,5 @@
 asttokens
+colorama
 pytest
 pytest-cov
 codecov

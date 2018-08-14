@@ -3,6 +3,7 @@
 import builtins
 import sys
 from typing import Any, Dict, List, TypeVar
+from colorama import AnsiToWin32
 
 
 builtins_d = vars(builtins)
@@ -403,6 +404,9 @@ class ClosureNamespace(Namespace):
             raise UnboundLocalError(name)
 
 
+stderr = AnsiToWin32(sys.stderr).stream
+
+
 def eprint(*things):
     """Print to stderr."""
-    print(*things, file=sys.stderr)
+    print(*things, file=stderr)

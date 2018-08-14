@@ -2,6 +2,7 @@
 
 import ast
 import sys
+from colorama import init as colorama_init, Fore, Style
 
 from ..infer import Inferrer, InferenceError
 from ..ir import is_apply, is_constant_graph
@@ -39,7 +40,8 @@ def _print_lines(lines, l1, c1, l2, c2, label='', mode='^'):
             prefix = trimmed[:start]
             hl = trimmed[start:end]
             rest = trimmed[end:]
-            eprint(f'  {prefix}\033[1;31m{hl}\033[0m{rest}')
+            eprint(f'  {prefix}{Fore.RED}{Style.BRIGHT}'
+                   f'{hl}{Style.RESET_ALL}{rest}')
 
 
 def _show_location(loc, ctx, label):
