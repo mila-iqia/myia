@@ -2,7 +2,7 @@
 
 import ast
 import sys
-from colorama import init as colorama_init, Fore, Style
+from colorama import Fore, Style
 
 from ..infer import Inferrer, InferenceError
 from ..ir import is_apply, is_constant_graph
