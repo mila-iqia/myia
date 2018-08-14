@@ -52,6 +52,26 @@ af64 = A(f64)
 Nil = T()
 
 
+def ai64_of(*shp):
+    return {'type': ai64, 'shape': shp}
+
+
+def ai32_of(*shp):
+    return {'type': ai32, 'shape': shp}
+
+
+def af64_of(*shp):
+    return {'type': af64, 'shape': shp}
+
+
+def af32_of(*shp):
+    return {'type': af32, 'shape': shp}
+
+
+def af16_of(*shp):
+    return {'type': af16, 'shape': shp}
+
+
 ########################
 # Temporary primitives #
 ########################
@@ -1048,44 +1068,43 @@ def test_shape(ary):
     return shape(ary)
 
 
-@infer(shape=[({'type': af64, 'shape': (2, 3)},
-               {'type': af64, 'shape': (3, 4)}, (2, 4)),
-              ({'type': af64, 'shape': (2,)},
-               {'type': af64, 'shape': (3, 4)}, InferenceError),
-              ({'type': af64, 'shape': (2, 2)},
-               {'type': af64, 'shape': (3, 4)}, InferenceError)],
-       type=[({'type': af64, 'shape': (2, 3)},
-              {'type': af64, 'shape': (3, 4)}, af64)])
+@infer(shape=[(af64_of(2, 3),
+               af64_of(3, 4), (2, 4)),
+              (af64_of(2),
+               af64_of(3, 4), InferenceError),
+              (af64_of(2, 2),
+               af64_of(3, 4), InferenceError)],
+       type=[(af64_of(2, 3),
+              af64_of(3, 4), af64)])
 def test_dot(a, b):
     return dot(a, b)
 
 
-@infer(shape=[({'type': ai32, 'shape': (4,)}, {'value': (2, 4)}, (2, 4)),
-              ({'type': ai32, 'shape': (4,)},
+@infer(shape=[(ai32_of(4), {'value': (2, 4)}, (2, 4)),
+              (ai32_of(4),
                {'type': T(u64, u64)},
                (ANYTHING, ANYTHING)),
-              ({'type': ai32, 'shape': (4,)}, {'value': (5, 2)},
+              (ai32_of(4), {'value': (5, 2)},
                InferenceError),
               ({'type': ai32, 'shape': (4, 2)}, {'value': (4,)},
                InferenceError)],
        type=[
-           ({'type': i32}, {'value': (4,), 'type': T(u64)}, InferenceError),
-           ({'type': ai32, 'shape': (1,)}, {'value': (4,), 'type': T(u64)},
-            ai32),
-           ({'type': li32}, {'value': (4,), 'type': T(u64)}, InferenceError),
-           ({'type': i32}, {'value': (4,)}, InferenceError)
+           (i32, {'value': (4,), 'type': T(u64)}, InferenceError),
+           (ai32_of(1), {'value': (4,), 'type': T(u64)}, ai32),
+           (li32, {'value': (4,), 'type': T(u64)}, InferenceError),
+           (i32, {'value': (4,)}, InferenceError)
        ])
 def test_distribute(v, shp):
     return distribute(v, shp)
 
 
-@infer(shape=[({'type': af16, 'shape': (1, 2, 3)}, {'value': (6,)}, (6,)),
-              ({'type': af16, 'shape': (1, 2, 3)}, {'type': T(u64)},
+@infer(shape=[(af16_of(1, 2, 3), {'value': (6,)}, (6,)),
+              (af16_of(1, 2, 3), {'type': T(u64)},
                (ANYTHING,)),
-              ({'type': af16, 'shape': (2, 3)}, {'value': (7,)},
+              (af16_of(2, 3), {'value': (7,)},
                InferenceError)],
-       type=[({'type': af16, 'shape': (2, 3)}, {'type': T(u64)}, af16),
-             ({'type': af16, 'shape': (2, 3)}, {'type': T(i64)},
+       type=[(af16_of(2, 3), T(u64), af16),
+             (af16_of(2, 3), T(i64),
               InferenceError)])
 def test_reshape(v, shp):
     return reshape(v, shp)
@@ -1100,31 +1119,25 @@ def test_array_map(ary):
     return array_map(f, ary)
 
 
-@infer(shape=[({'type': af32, 'shape': (3, 4)},
-               {'type': af32, 'shape': (3, 4)},
-               (3, 4)),
-              ({'type': af32, 'shape': (3, 4)},
-               {'type': af32, 'shape': (3, 7)},
-               InferenceError),
-              ({'type': af32, 'shape': (3, 4, 5)},
-               {'type': af32, 'shape': (3, 4)},
-               InferenceError)],
-       type=[({'type': ai64}, {'type': ai64}, ai64),
-             ({'type': ai64}, {'type': i64}, InferenceError),
-             ({'type': i64}, {'type': ai64}, InferenceError)])
+@infer(shape=[(af32_of(3, 4), af32_of(3, 4), (3, 4)),
+              (af32_of(3, 4), af32_of(3, 7), InferenceError),
+              (af32_of(3, 4, 5), af32_of(3, 4), InferenceError)],
+       type=[(ai64_of(7, 9), ai64_of(7, 9), ai64),
+             (ai64_of(7, 9), i64, InferenceError),
+             (i64, ai64_of(7, 9), InferenceError)])
 def test_array_map2(ary1, ary2):
     def f(v1, v2):
         return v1 + v2
     return array_map2(f, ary1, ary2)
 
 
-@infer(shape=[({'type': ai64, 'shape': (3, 4)}, {'value': 1}, (3, 4))],
+@infer(shape=[(ai64_of(3, 4), {'value': 1}, (3, 4))],
        type=[
-           ({'type': ai64, 'shape': (3, 4)}, {'value': 1, 'type': u64}, ai64),
+           (ai64_of(3, 4), {'value': 1, 'type': u64}, ai64),
            ({'type': i64}, {'value': 1, 'type': u64}, InferenceError),
-           ({'type': af32, 'shape': (3, 4)}, {'value': 1, 'type': u64},
+           (af32_of(3, 4), {'value': 1, 'type': u64},
             InferenceError),
-           ({'type': ai64, 'shape': (3, 4)}, {'value': 1}, InferenceError)
+           (ai64_of(3, 4), {'value': 1}, InferenceError)
        ])
 def test_array_scan(ary, ax):
     def f(a, b):
@@ -1134,32 +1147,32 @@ def test_array_scan(ary, ax):
 
 @infer(
     type=[
-        (ai64, T([u64, u64]), ai64),
-        (ai64, i64, InferenceError),
+        (ai64_of(7, 9), T([u64, u64]), ai64),
+        (ai64_of(7, 9), i64, InferenceError),
         (i64, T([u64, u64]), InferenceError),
     ],
     shape=[
-        ({'type': ai64, 'shape': (3, 4)},
+        (ai64_of(3, 4),
          {'value': (3, 1)},
          (3, 1)),
 
-        ({'type': ai64, 'shape': (3, 4)},
+        (ai64_of(3, 4),
          {'value': (3, ANYTHING)},
          (3, ANYTHING)),
 
-        ({'type': ai64, 'shape': (3, 4)},
+        (ai64_of(3, 4),
          {'value': (3, 1, 1)},
          InferenceError),
 
-        ({'type': ai64, 'shape': (3, 4)},
+        (ai64_of(3, 4),
          {'value': (4, 1)},
          InferenceError),
 
-        ({'type': ai64, 'shape': (3, 4)},
+        (ai64_of(3, 4),
          {'value': (4,)},
          (4,)),
 
-        ({'type': ai64, 'shape': (3, 4)},
+        (ai64_of(3, 4),
          {'value': ()},
          ()),
     ]
@@ -1196,7 +1209,7 @@ def test_partial_2(x):
 
 
 @infer(type=[(i64, i64)],
-       shape=[({'type': ai64, 'shape': (6, 13)}, (6, 13))])
+       shape=[(ai64_of(6, 13), (6, 13))])
 def test_identity_function(x):
     return identity(x)
 
@@ -1230,23 +1243,23 @@ def test_bool_or(x, y):
     ],
     shape=[
         ({'type': B},
-         {'type': ai64, 'shape': (6, 13)},
-         {'type': ai64, 'shape': (6, 13)},
+         ai64_of(6, 13),
+         ai64_of(6, 13),
          (6, 13)),
 
         ({'type': B},
-         {'type': ai64, 'shape': (6, 13)},
-         {'type': ai64, 'shape': (6, 14)},
+         ai64_of(6, 13),
+         ai64_of(6, 14),
          InferenceError),
 
         ({'type': B, 'value': True},
-         {'type': ai64, 'shape': (6, 13)},
-         {'type': ai64, 'shape': (6, 14)},
+         ai64_of(6, 13),
+         ai64_of(6, 14),
          (6, 13)),
 
         ({'type': B, 'value': False},
-         {'type': ai64, 'shape': (6, 13)},
-         {'type': ai64, 'shape': (6, 14)},
+         ai64_of(6, 13),
+         ai64_of(6, 14),
          (6, 14)),
     ]
 )
@@ -1256,7 +1269,7 @@ def test_switch(c, x, y):
 
 @infer(type=[(i64, ai64),
              (f64, af64),
-             (af64, InferenceError),
+             (af64_of(9, 7), InferenceError),
              (T([i64]), InferenceError)],
        shape=[({'type': i64}, ())])
 def test_scalar_to_array(x):
@@ -1394,18 +1407,14 @@ def test_forced_function_type():
 ###########################
 
 
-def ai64_of(*shp):
-    return {'type': ai64, 'shape': shp}
-
-
 @infer_std(
     type=[
         (i64, i64, i64),
-        (ai64, ai64, ai64),
-        (ai64, i64, ai64),
-        (i64, ai64, ai64),
+        (ai64_of(7, 9), ai64_of(7, 9), ai64),
+        (ai64_of(7, 9), i64, ai64),
+        (i64, ai64_of(7, 9), ai64),
         (i64, f64, InferenceError),
-        ({'type': i64, 'value': 3}, ai64, ai64)
+        ({'type': i64, 'value': 3}, ai64_of(7, 9), ai64)
     ],
     shape=[
         (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
@@ -1423,7 +1432,7 @@ def test_add_std(x, y):
 
 
 @infer_std(type=[(i64, i64, i64),
-                 (ai64, i64, InferenceError)])
+                 (ai64_of(7, 9), i64, InferenceError)])
 def test_max_std(x, y):
     if x > y:
         return x
