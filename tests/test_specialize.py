@@ -16,7 +16,7 @@ from myia.specialize import DEAD
 from myia.utils import UNKNOWN
 
 from .test_lang import mysum
-from .test_infer import i64, f64, mysum
+from .test_infer import i64, f64
 
 
 specialize_pipeline = scalar_debug_pipeline \
