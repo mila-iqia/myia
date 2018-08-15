@@ -1,6 +1,7 @@
 
 from copy import copy
 from types import SimpleNamespace
+from dataclasses import dataclass
 
 from pytest import mark
 
@@ -522,3 +523,17 @@ def test_fact(x):
         else:
             return n * fact(n - 1)
     return fact(x)
+
+
+@dataclass(frozen=True)
+class Point:
+    x: Int(64)
+    y: Int(64)
+
+    def abs(self):
+        return (self.x ** 2 + self.y ** 2) ** 0.5
+
+
+@parse_compare(42)
+def test_record(x):
+    return Point(x, x)

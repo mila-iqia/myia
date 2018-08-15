@@ -4,6 +4,7 @@ import numpy as np
 
 from pytest import mark
 from types import SimpleNamespace
+from dataclasses import dataclass
 
 from myia.api import scalar_pipeline, standard_pipeline
 from myia.debug.traceback import print_inference_error
@@ -11,7 +12,7 @@ from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
 from myia.ir import MultitypeGraph
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
-    Function as F, TypeType, UInt, External
+    Function as F, TypeType, UInt, External, pytype_to_myiatype, Number
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive
 from myia.prim.py_implementations import \
@@ -21,7 +22,7 @@ from myia.prim.py_implementations import \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape
 from myia.utils import RestrictedVar
 
-from .test_lang import mysum
+from .test_lang import mysum, Point
 
 
 B = Bool()
@@ -53,6 +54,22 @@ af32 = A(f32)
 af64 = A(f64)
 
 Nil = T()
+
+
+Point_t = pytype_to_myiatype(Point)
+
+
+@dataclass(frozen=True)
+class Point3D:
+    x: Int(64)
+    y: Int(64)
+    z: Int(64)
+
+    def abs(self):
+        return (self.x ** 2 + self.y ** 2 + self.z ** 2) ** 0.5
+
+
+Point3D_t = pytype_to_myiatype(Point3D)
 
 
 def ai64_of(*shp):
@@ -869,15 +886,29 @@ def test_list_map(xs, ys):
     value=[({'type': i64}, True),
            ({'type': f64}, False)]
 )
-def test_hastype(x):
+def test_hastype_simple(x):
     return hastype(x, i64)
 
 
 @infer(
-    type=(i64, i64, InferenceError),
-    value=(i64, {'type': TypeType(), 'value': ANYTHING}, InferenceError),
+    type=[
+        (i64, i64, InferenceError),
+        (i64, {'type': TypeType(), 'value': Int(64)}, B),
+    ],
+    value=[
+        ({'type': i64, 'value': ANYTHING},
+         {'type': TypeType(), 'value': ANYTHING}, InferenceError),
+        ({'type': i64, 'value': ANYTHING},
+         {'type': TypeType(), 'value': i64}, {'value': True}),
+        ({'type': f64, 'value': ANYTHING},
+         {'type': TypeType(), 'value': i64}, {'value': False}),
+        ({'type': T(i64, i64), 'value': ANYTHING},
+         {'type': TypeType(), 'value': T(i64, i64)}, {'value': True}),
+        ({'type': T(i64, i64), 'value': ANYTHING},
+         {'type': TypeType(), 'value': T(Number, Number)}, {'value': True}),
+    ]
 )
-def test_bad_hastype(x, y):
+def test_hastype(x, y):
     return hastype(x, y)
 
 
@@ -898,11 +929,15 @@ def test_typeof(x):
         (T(i64, T(f64, i64)), i64),
         (li64, f64),
         (T(i64, li64), i64),
+        (Point_t, i64),
+        (Point3D_t, i64),
     ],
     value=[
         (5, 5),
         (6.0, 6),
-        ((5, 7, (3.2, 1.8)), 16)
+        ((5, 7, (3.2, 1.8)), 16),
+        (Point(5, 7), 35),
+        (Point3D(5, 7, 9), 0),
     ]
 )
 def test_hastype_2(x):
@@ -912,6 +947,8 @@ def test_hastype_2(x):
             return x
         elif hastype(x, f64):
             return f(_to_i64(x))
+        elif hastype(x, Point_t):
+            return f(x.x) * f(x.y)
         elif hastype(x, Nil):
             return 0
         elif hastype(x, T):
@@ -1484,3 +1521,48 @@ def test_max_std(x, y):
         return x
     else:
         return y
+
+
+@infer(
+    type=[
+        (Point_t, i64),
+    ],
+    value=[
+        (Point(3, 4), 7),
+        ({'type': Point_t, 'value': ANYTHING}, ANYTHING),
+    ]
+)
+def test_class(pt):
+    return pt.x + pt.y
+
+
+@infer(
+    type=[
+        (Point_t, i64),
+    ],
+    value=[
+        (Point(3, 4), 5),
+    ]
+)
+def test_dataclass_method(pt):
+    return pt.abs()
+
+
+@infer(
+    type=[
+        (i64, i64, i64, i64, Point_t),
+        (f64, f64, f64, f64, InferenceError),
+    ],
+    value=[
+        (1, 2, 3, 4, Point(4, 6)),
+    ]
+)
+def test_dataclass_inst(x1, y1, x2, y2):
+    pt1 = Point(x1, y1)
+    pt2 = Point(x2, y2)
+    return Point(pt1.x + pt2.x, pt1.y + pt2.y)
+
+
+@infer(type=[(Point_t, InferenceError)])
+def test_dataclass_wrong_field(pt):
+    return pt.z

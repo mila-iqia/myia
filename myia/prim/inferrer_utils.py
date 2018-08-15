@@ -1,6 +1,7 @@
 """Utilities that may leveraged by several inferrers."""
 
 
+from ..dtype import Class
 from ..infer import InferenceError, PartialInferrer, Context, ANYTHING, unwrap
 
 
@@ -33,6 +34,33 @@ async def static_getter(track, data, item, fetch, chk=None):
             'The value of the attribute could not be inferred.'
         )
 
+    if isinstance(data_t, Class):
+        # Get field from Class
+        if item_v in data_t.attributes:
+            if track.name == 'type':
+                return data_t.attributes[item_v]
+            else:
+                data_v = await data['value']
+                if data_v is ANYTHING:
+                    return track.default({'type': data_t})
+                else:
+                    return track.from_value(
+                        getattr(data_v, item_v), Context.empty()
+                    )
+        elif item_v in data_t.methods:
+            method = data_t.methods[item_v]
+            method = track.engine.pipeline.resources.convert(method)
+            inferrer = track.from_value(method, Context.empty())
+            inferrer = unwrap(inferrer)
+            return PartialInferrer(
+                track,
+                inferrer,
+                [data]
+            )
+        else:
+            raise InferenceError(f'Unknown field in {data_t}: {item_v}')
+
+    # Try method map
     try:
         mmap_t = mmap[type(data_t)]
     except KeyError:
