@@ -1,7 +1,10 @@
 """Type representation."""
 
 import collections
+import numpy
 from typing import Any, Dict as DictT, Iterable, Tuple as TupleT
+from types import FunctionType
+from .utils import Named, is_dataclass_type
 
 KeysT = Iterable[TupleT[str, 'Type']]
 
@@ -104,11 +107,21 @@ class Type(metaclass=TypeMeta):
         return f"{name}({args})"
 
 
-class Bool(Type):
+class Object(Type):
+    """Some object."""
+
+    @classmethod
+    def _parse_args(cls, args, kwargs):
+        if cls is Object:
+            raise RuntimeError("Can't instantiate Object directly")
+        return args
+
+
+class Bool(Object):
     """Boolean values."""
 
 
-class Number(Type):
+class Number(Object):
     """Numerical values."""
 
     bits: int
@@ -155,7 +168,7 @@ class UInt(Number):
     _valid_bits = (8, 16, 32, 64)
 
 
-class List(Type):
+class List(Object):
     """Represents a set of ordered values with the same type.
 
     Instanciate with `List(element_type)`.
@@ -164,38 +177,42 @@ class List(Type):
     element_type: Type
 
 
-class Struct(Type):
-    """Represents a set of named fields with their own types.
+class Class(Object):
+    """Represents a set of methods and named fields with their own types.
 
-    Instantiate with `Struct(Mapping[str, Type])`.  A sequence of
-    key-value pairs is also acceptable, but duplicate keys will will
-    get lost.
+    Instantiate with
+    `Class(Tag, Mapping[str, Type], Mapping[str, Primitive/[Meta]Graph])`.
+
+    Attributes:
+        tag: A unique Named identifier for this class.
+        attributes: Named fields, stored in each instance.
+        methods: Named methods available for this class.
+
     """
 
-    elements: DictT[str, Type]
+    tag: Named
+    attributes: DictT[str, Type]
+    methods: DictT[str, Any]
 
     @classmethod
     def _parse_args(cls, args, kwargs):
-        if len(kwargs) != 0:
-            assert len(args) == 0
-            elems = kwargs
-        else:
-            assert len(args) == 1
-            elems = dict(args[0])
-        items = ((k, elems[k]) for k in sorted(elems.keys()))
-        return (tuple(items),)
+        assert not kwargs
+        tag, attributes, methods = args
+        return tag, tuple(attributes.items()), tuple(methods.items())
 
-    def __init__(self, elements: KeysT) -> None:
-        """Convert input to a dict."""
-        self.elements = dict(elements)
+    def __init__(self, tag, attributes, methods):
+        """Initialize a Class."""
+        self.tag = tag
+        self.attributes = dict(attributes)
+        self.methods = dict(methods)
 
-    def __getattr__(self, attr):
-        if attr in self.elements:
-            return self.elements[attr]
-        raise AttributeError
+    def __repr__(self) -> str:
+        args = ', '.join(f'{name}: {repr(attr)}'
+                         for name, attr in self.attributes.items())
+        return f"{self.tag}({args})"
 
 
-class Tuple(Type):
+class Tuple(Object):
     """Represents a set of ordered values with independent types.
 
     Instantiate with `Tuple(type1, type2, ... typeN)`.  A single
@@ -214,7 +231,7 @@ class Tuple(Type):
             return (args,)
 
 
-class Array(Type):
+class Array(Object):
     """Represents an array of values.
 
     Instantiate with Array(subtype).
@@ -223,7 +240,7 @@ class Array(Type):
     elements: Type
 
 
-class Function(Type):
+class Function(Object):
     """Represents a type that can be called.
 
     Instantiate with `Function((type1, type2, ..., typeN), ret_type)`.
@@ -238,6 +255,10 @@ class Function(Type):
         assert len(kwargs) == 0
         assert not isinstance(args[0], Type)
         return (tuple(args[0]), args[1])
+
+
+class TypeType(Type):
+    """The type of a Type."""
 
 
 class Problem(Type):
@@ -290,3 +311,84 @@ def type_to_np_dtype(type):
     if type not in TYPE_MAP:
         raise TypeError(f"Con't convert to NumPy dtype {type}")
     return TYPE_MAP[type]
+
+
+dataclass_to_myiaclass = {}
+tag_to_dataclass = {}
+
+
+def pytype_to_myiatype(pytype, instance=None):
+    """Convert a Python type into a Myia type.
+
+    Arguments:
+        pytype: The Python type to convert.
+        instance: Optionally, an instance of the Python type to use
+            in order to get a more precise type.
+    """
+    if isinstance(pytype, Type) \
+            or isinstance(pytype, type) and issubclass(pytype, Type):
+        return pytype
+
+    elif pytype is bool:
+        return Bool()
+
+    elif pytype is int:
+        return Int(64)
+
+    elif pytype is float:
+        return Float(64)
+
+    elif pytype is tuple:
+        if instance is None:
+            return Tuple
+        else:
+            elems = [pytype_to_myiatype(type(x), x) for x in instance]
+            return Tuple(elems)
+
+    elif pytype is list:
+        if instance is None:
+            return List
+        else:
+            type0, *rest = [pytype_to_myiatype(type(x), x) for x in instance]
+            if any(t != type0 for t in rest):
+                raise TypeError(f'All list elements should have same type')
+            return List(type0)
+
+    elif pytype is numpy.ndarray:
+        if instance is None:
+            return Array
+        else:
+            return Array(DTYPE_MAP[instance.dtype.name])
+
+    elif is_dataclass_type(pytype):
+        if pytype in dataclass_to_myiaclass:
+            mcls = dataclass_to_myiaclass[pytype]
+            if instance is None:
+                return mcls
+            tag = mcls.tag
+        elif instance is None:
+            tag = Named(pytype.__name__)
+        else:
+            tag = pytype_to_myiatype(pytype).tag
+
+        fields = pytype.__dataclass_fields__
+        if instance is None:
+            attributes = {name: pytype_to_myiatype(field.type)
+                          for name, field in fields.items()}
+        else:
+            attributes = {}
+            for name, field in fields.items():
+                x = getattr(instance, field.name)
+                t = pytype_to_myiatype(type(x), x)
+                attributes[field.name] = t
+        methods = {name: getattr(pytype, name)
+                   for name in dir(pytype)
+                   if isinstance(getattr(pytype, name), (FunctionType,))}
+        rval = Class(tag, attributes, methods)
+        if pytype not in dataclass_to_myiaclass:
+            dataclass_to_myiaclass[pytype] = rval
+            tag_to_dataclass[tag] = pytype
+        return rval
+
+    else:
+        return External(pytype)

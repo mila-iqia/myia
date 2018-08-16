@@ -1,7 +1,19 @@
 import pytest
+import numpy
+from dataclasses import dataclass
 
-from myia.dtype import Bool, Float, Function, Int, List, Number, Struct, \
-    Tuple, Type, TypeMeta, UInt, np_dtype_to_type, type_to_np_dtype
+from myia.dtype import Bool, Float, Function, Int, List, Number, \
+    Tuple, Type, TypeMeta, UInt, np_dtype_to_type, type_to_np_dtype, Object, \
+    pytype_to_myiatype, Array, Class, External
+
+
+@dataclass(frozen=True)
+class Point:
+    x: Number
+    y: Number
+
+    def abs(self):
+        return (self.x ** 2 + self.y ** 2) ** 0.5
 
 
 def test_TypeMeta():
@@ -20,6 +32,11 @@ def test_TypeMeta():
 def test_Type():
     with pytest.raises(RuntimeError):
         Type()
+
+
+def test_Object():
+    with pytest.raises(RuntimeError):
+        Object()
 
 
 def test_cache():
@@ -41,21 +58,6 @@ def test_Number():
 def test_List():
     ll = List(Bool())
     assert ll.element_type is Bool()
-
-
-def test_Struct():
-    c64 = Struct((('r', Float(32)), ('i', Float(32))))
-    assert c64.r is Float(32)
-    assert c64.elements['i'] is Float(32)
-
-    with pytest.raises(AttributeError):
-        c64.foo
-
-    c64_2 = Struct(dict(r=Float(32), i=Float(32)))
-    assert c64 is c64_2
-
-    c64_3 = Struct(r=Float(32), i=Float(32))
-    assert c64 is c64_3
 
 
 def test_Tuple():
@@ -92,3 +94,42 @@ def test_type_conversions():
 
     with pytest.raises(TypeError):
         type_to_np_dtype(List(Int(64)))
+
+
+def test_pytype_to_myiatype():
+    ptm = pytype_to_myiatype
+
+    assert ptm(Int) is Int
+    assert ptm(Int(64)) is Int(64)
+
+    assert ptm(bool) is Bool()
+    assert ptm(int) is Int(64)
+    assert ptm(float) is Float(64)
+
+    assert ptm(tuple) is Tuple
+    assert ptm(tuple, (1, (2, 3))) is Tuple(Int(64), Tuple(Int(64), Int(64)))
+
+    assert ptm(list) is List
+    assert ptm(list, [1, 2, 3]) is List(Int(64))
+    with pytest.raises(TypeError):
+        ptm(list, [1, (2, 3)])
+
+    assert ptm(numpy.ndarray) is Array
+    assert ptm(numpy.ndarray, numpy.ones((2, 2))) is Array(Float(64))
+
+    # We run this before ptm(Point) to make sure it doesn't cache Float, Float
+    # for the type of x and y
+    ptm(Point, Point(1.1, 2.2))
+
+    pcls = ptm(Point)
+    assert isinstance(pcls, Class)
+    assert pcls.attributes == {'x': Number, 'y': Number}
+    assert 'abs' in pcls.methods
+    assert str(pcls.tag) == 'Point'
+
+    pcls2 = ptm(Point, Point(1, 2))
+    assert pcls2.tag is pcls.tag
+    assert pcls2.attributes == {'x': Int(64), 'y': Int(64)}
+
+    assert ptm(str) is External(str)
+    assert ptm(object) is External(object)

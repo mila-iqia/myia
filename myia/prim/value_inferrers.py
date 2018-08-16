@@ -5,10 +5,12 @@ import asyncio
 
 from functools import partial
 
+from ..dtype import pytype_to_myiatype, TypeType
 from ..infer import ValueWrapper, InferenceError, PartialInferrer, \
     ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track, \
     unwrap, MetaGraphInferrer
 from ..ir import Graph, MetaGraph
+from ..utils import is_dataclass_type
 
 from . import ops as P
 from .inferrer_utils import static_getter
@@ -130,6 +132,13 @@ class ValueTrack(Track):
             inf = GraphInferrer(self, v, context)
         elif isinstance(v, MetaGraph):
             inf = MetaGraphInferrer(self, v)
+        elif is_dataclass_type(v):
+            p = P.make_record
+            recinf = PrimitiveValueInferrer(self, p, self.implementations[p])
+            typ = pytype_to_myiatype(v)
+            vref = self.engine.vref({'value': limited(typ, self.max_depth),
+                                     'type': TypeType()})
+            return PartialInferrer(self, recinf, [vref])
         elif v is ANYTHING:
             return v
         else:

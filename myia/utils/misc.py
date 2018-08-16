@@ -410,3 +410,8 @@ stderr = AnsiToWin32(sys.stderr).stream
 def eprint(*things):
     """Print to stderr."""
     print(*things, file=stderr)
+
+
+def is_dataclass_type(cls):
+    """Returns whether cls is a dataclass."""
+    return isinstance(cls, type) and hasattr(cls, '__dataclass_fields__')

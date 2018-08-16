@@ -3,16 +3,17 @@
 
 from functools import partial
 
-from ..dtype import Int, Float, Bool, Tuple, List, Type, Array, UInt, Number
+from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
+    TypeType, Class, pytype_to_myiatype
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track, MetaGraphInferrer
 from ..ir import Graph, MetaGraph
-from ..utils import Namespace, FilterVar
+from ..utils import Namespace, FilterVar, is_dataclass_type
 
 from . import ops as P
 from .inferrer_utils import static_getter
 from .ops import Primitive
-from .py_implementations import typeof
+from .py_implementations import typeof, hastype_helper
 
 
 type_inferrer_constructors = {}
@@ -70,6 +71,11 @@ class TypeTrack(Track):
             return GraphInferrer(self, v, context)
         elif isinstance(v, MetaGraph):
             return MetaGraphInferrer(self, v)
+        elif is_dataclass_type(v):
+            rec = self.constructors[P.make_record](self)
+            typ = pytype_to_myiatype(v)
+            vref = self.engine.vref({'value': typ, 'type': TypeType()})
+            return PartialInferrer(self, rec, [vref])
         else:
             return typeof(v)
 
@@ -179,7 +185,7 @@ async def infer_type_getitem(track, seq, idx):
 @type_inferrer(P.typeof, nargs=1)
 async def infer_type_typeof(track, _):
     """Infer the return type of typeof."""
-    return Type
+    return TypeType()
 
 
 @type_inferrer(P.hastype, nargs=2)
@@ -187,7 +193,7 @@ async def infer_type_hastype(track, x, t):
     """Infer the return type of hastype."""
     def istype(x):  # noqa: D400
         """Type"""
-        return x is Type
+        return x is TypeType()
 
     await track.check(istype, t)
     return Bool()
@@ -415,3 +421,25 @@ async def infer_type_broadcast_shape(track, xs, ys):
     shp_xs_n = len(xs_t.elements)
     shp_ys_n = len(ys_t.elements)
     return Tuple([UInt(64) for i in range(max(shp_xs_n, shp_ys_n))])
+
+
+@type_inferrer(P.make_record, nargs=None)
+async def infer_type_make_record(track, cls, *elems):
+    """Infer the return type of make_record."""
+    elem_types = [await x['type'] for x in elems]
+    cls_v = await cls['value']
+
+    ret_t = Class(
+        cls_v.tag,
+        dict(zip(cls_v.attributes.keys(), elem_types)),
+        cls_v.methods
+    )
+
+    if not hastype_helper(ret_t, cls_v):
+        raise MyiaTypeError(
+            f'Constructor {cls_v} cannot be called'
+            f' with argument types {tuple(elem_types)}',
+            refs=elems,
+        )
+
+    return ret_t

@@ -13,8 +13,6 @@ from ..utils import Named
 class Primitive(Named):
     """Base class for primitives."""
 
-    pass
-
 
 ##############
 # Arithmetic #
@@ -115,3 +113,4 @@ list_map = Primitive('list_map')
 identity = Primitive('identity')
 resolve = Primitive('resolve')
 partial = Primitive('partial')
+make_record = Primitive('make_record')

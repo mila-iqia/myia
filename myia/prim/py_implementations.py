@@ -5,7 +5,7 @@ from typing import Callable
 import numpy as np
 
 from .. import dtype as types
-from ..utils import Registry
+from ..utils import Registry, TypeMap
 
 from . import ops as primops
 
@@ -166,22 +166,38 @@ def bool_or(x, y):
 def typeof(x):
     """Implement typeof."""
     if isinstance(x, types.Type) or isinstance(x, type):
-        return types.Type
-    elif isinstance(x, bool):
-        return types.Bool()
-    elif isinstance(x, int):
-        return types.Int(64)
-    elif isinstance(x, float):
-        return types.Float(64)
-    elif isinstance(x, tuple):
-        return types.Tuple(map(typeof, x))
-    elif isinstance(x, list) and len(x) > 0:
-        type0, *rest = map(typeof, x)
-        if any(t != type0 for t in rest):
-            raise TypeError(f'All list elements should have same type')
-        return types.List(type0)
+        return types.TypeType()
     else:
-        return types.External(type(x))
+        return types.pytype_to_myiatype(type(x), x)
+
+
+hastype_helper_map = TypeMap()
+
+
+@hastype_helper_map.register(types.Array)
+def _hh_Array(t, model):
+    return hastype_helper(t.elements, model.elements)
+
+
+@hastype_helper_map.register(types.Tuple)
+def _hh_Tuple(t, model):
+    if len(t.elements) != len(model.elements):
+        return False
+    return all(hastype_helper(t1, t2)
+               for t1, t2 in zip(t.elements, model.elements))
+
+
+@hastype_helper_map.register(types.Class)
+def _hh_Class(t, model):
+    if t.tag != model.tag:
+        return False
+    if tuple(t.attributes.keys()) != tuple(model.attributes.keys()):
+        raise AssertionError(
+            'Identical Class tags should imply identical attributes.'
+        )
+    return all(hastype_helper(t1, t2)
+               for t1, t2 in zip(t.attributes.values(),
+                                 model.attributes.values()))
 
 
 def hastype_helper(t, model):
@@ -190,6 +206,8 @@ def hastype_helper(t, model):
         return True
     elif isinstance(model, type) and issubclass(model, types.Type):
         return isinstance(t, model)
+    elif type(t) is type(model):
+        return hastype_helper_map[type(t)](t, model)
     else:
         return False
 
@@ -489,3 +507,10 @@ def broadcast_shape(shpx, shpy):
                 f'Cannot broadcast shapes {orig_shpx} and {orig_shpy}.'
             )
     return tuple(shp)
+
+
+@register(primops.make_record)
+def make_record(typ, *args):
+    """Implement `make_record`."""
+    dataclass = types.tag_to_dataclass[typ.tag]
+    return dataclass(*args)
