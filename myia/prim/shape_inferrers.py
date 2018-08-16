@@ -24,9 +24,12 @@ shape_inferrer_constructors = {}
 
 
 class TupleShape:
+    """Class to distinguish the shape of tuples from the shape of arrays."""
+
     __slots__ = ['tup']
 
     def __init__(self, tup):
+        """Create the shape."""
         self.tup = tuple(tup)
 
     def __repr__(self):
@@ -104,6 +107,7 @@ shape_inferrer = partial(register_inferrer,
 
 @shape_inferrer(P.cons_tuple, nargs=2)
 async def infer_shape_cons_tuple(track, head, tail):
+    """Infer the shape for cons_tuple."""
     sht = await tail['shape']
     shh = await head['shape']
     return TupleShape((shh,) + sht.tup)
@@ -111,16 +115,19 @@ async def infer_shape_cons_tuple(track, head, tail):
 
 @shape_inferrer(P.head, nargs=1)
 async def infer_shape_head(track, tup):
+    """Infer the shape for head."""
     return (await tup['shape']).tup[0]
 
 
 @shape_inferrer(P.tail, nargs=1)
 async def infer_shape_tail(track, tup):
+    """Infer the shape of tail."""
     return TupleShape((await tup['shape']).tup[1:])
 
 
 @shape_inferrer(P.getitem, nargs=2)
 async def infer_shape_getitem(track, seq, idx):
+    """Infer the shape of getitem."""
     seq_t = await seq['type']
 
     if isinstance(seq_t, Tuple):
@@ -134,12 +141,14 @@ async def infer_shape_getitem(track, seq, idx):
 
 @shape_inferrer(P.iter, nargs=1)
 async def infer_shape_iter(track, seq):
+    """Infer the shape of iter."""
     seq_sh = await seq['shape']
     return TupleShape(((), seq_sh))
 
 
 @shape_inferrer(P.next, nargs=1)
 async def infer_shape_next(track, it):
+    """Infer the shape of next."""
     it_sh = await it['shape']
     it_t = await it['type']
     # This is probably wrong but it works for now
