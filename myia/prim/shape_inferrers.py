@@ -4,7 +4,8 @@ import operator
 from functools import partial, reduce
 
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
-    PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer
+    PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer, \
+    InferenceError
 from ..ir import Graph, MetaGraph
 
 from ..dtype import Array, Tuple, ismyiatype
