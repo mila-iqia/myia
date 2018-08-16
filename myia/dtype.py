@@ -366,8 +366,10 @@ def pytype_to_myiatype(pytype, instance=None):
             if instance is None:
                 return mcls
             tag = mcls.tag
-        else:
+        elif instance is None:
             tag = Named(pytype.__name__)
+        else:
+            tag = pytype_to_myiatype(pytype).tag
 
         fields = pytype.__dataclass_fields__
         if instance is None:
@@ -383,8 +385,9 @@ def pytype_to_myiatype(pytype, instance=None):
                    for name in dir(pytype)
                    if isinstance(getattr(pytype, name), (FunctionType,))}
         rval = Class(tag, attributes, methods)
-        dataclass_to_myiaclass[pytype] = rval
-        tag_to_dataclass[tag] = pytype
+        if pytype not in dataclass_to_myiaclass:
+            dataclass_to_myiaclass[pytype] = rval
+            tag_to_dataclass[tag] = pytype
         return rval
 
     else:

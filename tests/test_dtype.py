@@ -117,6 +117,10 @@ def test_pytype_to_myiatype():
     assert ptm(numpy.ndarray) is Array
     assert ptm(numpy.ndarray, numpy.ones((2, 2))) is Array(Float(64))
 
+    # We run this before ptm(Point) to make sure it doesn't cache Float, Float
+    # for the type of x and y
+    ptm(Point, Point(1.1, 2.2))
+
     pcls = ptm(Point)
     assert isinstance(pcls, Class)
     assert pcls.attributes == {'x': Number, 'y': Number}
