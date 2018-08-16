@@ -15,6 +15,7 @@ from myia.prim.py_implementations import \
 from myia.specialize import DEAD
 from myia.utils import UNKNOWN
 
+from .test_lang import mysum
 from .test_infer import i64, f64
 
 
@@ -314,3 +315,8 @@ def test_switch2(c, x, y):
         partial(scalar_add, x)
     )
     return fn(y)
+
+
+@specialize((int1, int2, int2))
+def test_multitype(x, y, z):
+    return mysum(x) * mysum(x, y) * mysum(x, y, z)

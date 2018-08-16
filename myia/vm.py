@@ -8,12 +8,13 @@ implementation.
 from collections import defaultdict
 from typing import Iterable, Mapping, Any, List
 
-from .ir import Graph, Apply, Constant, Parameter, ANFNode
+from .ir import Graph, Apply, Constant, Parameter, ANFNode, MetaGraph
 from .ir.utils import is_constant_graph, is_constant
 from .prim import Primitive
+from .prim.py_implementations import typeof
 from .prim.ops import if_, return_, partial
 from .graph_utils import toposort
-from .utils import TypeMap
+from .utils import TypeMap, NS
 
 
 class VMFrame:
@@ -256,6 +257,11 @@ class VM:
             self._dispatch_call(node, frame, fn.fn, fn.args + tuple(args))
         elif isinstance(fn, (Graph, Closure)):
             self._call(fn, args)
+        elif isinstance(fn, MetaGraph):
+            types = [typeof(arg) for arg in args]
+            res = NS(convert=self.convert, manager=self.manager)
+            g = fn.specialize(res, types)
+            self._dispatch_call(node, frame, g, args)
         else:
             raise AssertionError(f'Invalid fn to call: {fn}')
 
