@@ -23,8 +23,24 @@ def prod(iterable):
 shape_inferrer_constructors = {}
 
 
-class TupleShape(tuple):
-    pass
+class TupleShape:
+    __slots__ = ['tup']
+
+    def __init__(self, tup):
+        self.tup = tuple(tup)
+
+    def __repr__(self):
+        return f"T{self.tup}"
+
+    def __len__(self):
+        return len(self.tup)
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.tup == other.tup)
+
+    def __hash__(self):
+        return hash((type(self), self.tup))
 
 
 class ScalarShapeInferrer(Inferrer):
@@ -58,6 +74,9 @@ class ShapeTrack(Track):
             raise Exception(
                 'There is no default value for Arrays on the shape track.'
             )  # pragma: no cover
+        if isinstance(values['type'], Tuple):
+            return TupleShape(self.default({'type': e})
+                              for e in values['type'].elements)
         return ()
 
     def from_value(self, v, context):
@@ -74,7 +93,7 @@ class ShapeTrack(Track):
         elif is_dataclass_type(v):
             raise NotImplementedError('Dataclasses are not supported yet')
         elif isinstance(v, tuple):
-            return TupleShape(self.from_value(e) for e in v)
+            return TupleShape(self.from_value(e, context) for e in v)
         else:
             return getattr(v, 'shape', ())
 
@@ -87,17 +106,17 @@ shape_inferrer = partial(register_inferrer,
 async def infer_shape_cons_tuple(track, head, tail):
     sht = await tail['shape']
     shh = await head['shape']
-    return TupleShape(shh,) + sht
+    return TupleShape((shh,) + sht.tup)
 
 
 @shape_inferrer(P.head, nargs=1)
 async def infer_shape_head(track, tup):
-    return (await tup['shape'])[0]
+    return (await tup['shape']).tup[0]
 
 
 @shape_inferrer(P.tail, nargs=1)
 async def infer_shape_tail(track, tup):
-    return (await tup['shape'])[1:]
+    return TupleShape((await tup['shape']).tup[1:])
 
 
 @shape_inferrer(P.getitem, nargs=2)
@@ -107,11 +126,25 @@ async def infer_shape_getitem(track, seq, idx):
     if isinstance(seq_t, Tuple):
         seq_sh = await seq['shape']
         idx_v = await idx['value']
-        if idx_v is ANYTHING:
-            raise InferenceError("No idx")
-        return seq_sh[idx_v]
+        assert idx_v is not ANYTHING
+        return seq_sh.tup[idx_v]
     # For any other type
-    raise InferenceError("Unknown type")
+    raise InferenceError("Unknown type")  # pragma: no cover
+
+
+@shape_inferrer(P.iter, nargs=1)
+async def infer_shape_iter(track, seq):
+    seq_sh = await seq['shape']
+    return TupleShape(((), seq_sh))
+
+
+@shape_inferrer(P.next, nargs=1)
+async def infer_shape_next(track, it):
+    it_sh = await it['shape']
+    it_t = await it['type']
+    # This is probably wrong but it works for now
+    data_sh = track.default({'type': it_t.elements[1]})
+    return TupleShape((data_sh, it_sh))
 
 
 @shape_inferrer(P.return_, nargs=1)
