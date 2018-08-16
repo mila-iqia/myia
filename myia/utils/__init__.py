@@ -8,7 +8,7 @@ from .merge import (  # noqa
 from .misc import (  # noqa
     Named, UNKNOWN, Registry, repr_, list_str, TypeMap, StructuralMap, smap,
     Event, Events, NS, Namespace, ModuleNamespace, ClosureNamespace, eprint,
-    is_dataclass
+    is_dataclass_type
 )
 
 from .partial import (  # noqa

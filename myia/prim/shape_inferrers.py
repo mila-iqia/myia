@@ -7,7 +7,7 @@ from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer
 from ..ir import Graph, MetaGraph
 from ..dtype import Array
-from ..utils import is_dataclass
+from ..utils import is_dataclass_type
 
 from . import ops as P
 from .inferrer_utils import static_getter
@@ -66,7 +66,7 @@ class ShapeTrack(Track):
             return GraphInferrer(self, v, context)
         elif isinstance(v, MetaGraph):
             return MetaGraphInferrer(self, v)
-        elif is_dataclass(v):
+        elif is_dataclass_type(v):
             raise NotImplementedError('Dataclasses are not supported yet')
         else:
             return getattr(v, 'shape', ())

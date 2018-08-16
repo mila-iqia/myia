@@ -8,7 +8,7 @@ from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track, MetaGraphInferrer
 from ..ir import Graph, MetaGraph
-from ..utils import Namespace, FilterVar, is_dataclass
+from ..utils import Namespace, FilterVar, is_dataclass_type
 
 from . import ops as P
 from .inferrer_utils import static_getter
@@ -71,7 +71,7 @@ class TypeTrack(Track):
             return GraphInferrer(self, v, context)
         elif isinstance(v, MetaGraph):
             return MetaGraphInferrer(self, v)
-        elif is_dataclass(v):
+        elif is_dataclass_type(v):
             rec = self.constructors[P.make_record](self)
             typ = pytype_to_myiatype(v)
             vref = self.engine.vref({'value': typ, 'type': TypeType()})
@@ -193,7 +193,7 @@ async def infer_type_hastype(track, x, t):
     """Infer the return type of hastype."""
     def istype(x):  # noqa: D400
         """Type"""
-        return x == TypeType()
+        return x is TypeType()
 
     await track.check(istype, t)
     return Bool()

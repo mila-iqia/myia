@@ -14,7 +14,7 @@ from .prim import Primitive
 from .prim.py_implementations import typeof
 from .prim.ops import if_, return_, partial
 from .graph_utils import toposort
-from .utils import TypeMap, NS, is_dataclass
+from .utils import TypeMap, NS, is_dataclass_type
 
 
 class VMFrame:
@@ -262,7 +262,7 @@ class VM:
             res = NS(convert=self.convert, manager=self.manager)
             g = fn.specialize(res, types)
             self._dispatch_call(node, frame, g, args)
-        elif is_dataclass(fn):
+        elif is_dataclass_type(fn):
             frame.values[node] = fn(*args)
         else:
             raise AssertionError(f'Invalid fn to call: {fn}')

@@ -4,7 +4,7 @@ import collections
 import numpy
 from typing import Any, Dict as DictT, Iterable, Tuple as TupleT
 from types import FunctionType
-from .utils import Named, is_dataclass
+from .utils import Named, is_dataclass_type
 
 KeysT = Iterable[TupleT[str, 'Type']]
 
@@ -360,7 +360,7 @@ def pytype_to_myiatype(pytype, instance=None):
         else:
             return Array(DTYPE_MAP[instance.dtype.name])
 
-    elif is_dataclass(pytype):
+    elif is_dataclass_type(pytype):
         if pytype in dataclass_to_myiaclass:
             mcls = dataclass_to_myiaclass[pytype]
             if instance is None:
