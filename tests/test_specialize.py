@@ -62,7 +62,7 @@ def validate(g):
         elif not ismyiatype(node.type, Type):
             errors[node].add(f'Unknown type: {node.type}')
         elif is_apply(node):
-            expected = Function([i.type for i in node.inputs[1:]], node.type)
+            expected = Function[[i.type for i in node.inputs[1:]], node.type]
             if node.inputs[0].type != expected:
                 errors[node].add('Function/argument inconsistency')
             fn = node.inputs[0]

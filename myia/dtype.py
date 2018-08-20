@@ -61,10 +61,6 @@ class TypeMeta(type):
                        if not k.startswith('_')]
         cls.generic = cls
 
-    def __call__(cls, *args):
-        """Parameterize this generic type."""
-        return cls.parameterize(*args)
-
     def is_generic(cls):
         """Return whether this type is a generic."""
         return cls.generic is cls
@@ -88,11 +84,7 @@ class TypeMeta(type):
         """
         fields = cls._fields
         if not fields:
-            if params:
-                raise TypeError(f'{cls} cannot be parameterized.')
-            else:
-                # TODO: don't do that
-                return cls
+            raise TypeError(f'{cls} cannot be parameterized.')
         elif cls._params is not None:
             raise TypeError('Already a generic')
         elif list(params.keys()) != fields:
@@ -127,6 +119,10 @@ class TypeMeta(type):
 
 class Type(metaclass=TypeMeta):
     """Base class for all Types."""
+
+    def __init__(self, *args, **kwargs):
+        """Type cannot be initialized."""
+        raise RuntimeError('Cannot instantiate Myia types.')
 
 
 class Object(Type):
@@ -222,7 +218,7 @@ class Class(Object):
 class Tuple(Object):
     """Represents a set of ordered values with independent types.
 
-    Instantiate with `Tuple(type1, type2, ... typeN)`.  A single
+    Instantiate with `Tuple[type1, type2, ... typeN]`.  A single
     sequence of types is also acceptable as the sole argument.
     """
 
@@ -247,7 +243,7 @@ class Tuple(Object):
 class Array(Object):
     """Represents an array of values.
 
-    Instantiate with Array(subtype).
+    Instantiate with Array[subtype].
     """
 
     elements: Type
@@ -256,7 +252,7 @@ class Array(Object):
 class Function(Object):
     """Represents a type that can be called.
 
-    Instantiate with `Function((type1, type2, ..., typeN), ret_type)`.
+    Instantiate with `Function[(type1, type2, ..., typeN), ret_type]`.
     """
 
     arguments: TupleT[Type, ...]
@@ -294,18 +290,18 @@ class External(Type):
 
 
 DTYPE_MAP = dict(
-    int8=Int(8),
-    int16=Int(16),
-    int32=Int(32),
-    int64=Int(64),
-    uint8=UInt(8),
-    uint16=UInt(16),
-    uint32=UInt(32),
-    uint64=UInt(64),
-    float16=Float(16),
-    float32=Float(32),
-    float64=Float(64),
-    bool=Bool())
+    int8=Int[8],
+    int16=Int[16],
+    int32=Int[32],
+    int64=Int[64],
+    uint8=UInt[8],
+    uint16=UInt[16],
+    uint32=UInt[32],
+    uint64=UInt[64],
+    float16=Float[16],
+    float32=Float[32],
+    float64=Float[64],
+    bool=Bool)
 
 
 def np_dtype_to_type(dtype):
@@ -342,20 +338,20 @@ def pytype_to_myiatype(pytype, instance=None):
         return pytype
 
     elif pytype is bool:
-        return Bool()
+        return Bool
 
     elif pytype is int:
-        return Int(64)
+        return Int[64]
 
     elif pytype is float:
-        return Float(64)
+        return Float[64]
 
     elif pytype is tuple:
         if instance is None:
             return Tuple
         else:
             elems = [pytype_to_myiatype(type(x), x) for x in instance]
-            return Tuple(elems)
+            return Tuple[elems]
 
     elif pytype is list:
         if instance is None:
@@ -364,13 +360,13 @@ def pytype_to_myiatype(pytype, instance=None):
             type0, *rest = [pytype_to_myiatype(type(x), x) for x in instance]
             if any(t != type0 for t in rest):
                 raise TypeError(f'All list elements should have same type')
-            return List(type0)
+            return List[type0]
 
     elif pytype is numpy.ndarray:
         if instance is None:
             return Array
         else:
-            return Array(DTYPE_MAP[instance.dtype.name])
+            return Array[DTYPE_MAP[instance.dtype.name]]
 
     elif is_dataclass_type(pytype):
         if pytype in dataclass_to_myiaclass:
@@ -396,11 +392,11 @@ def pytype_to_myiatype(pytype, instance=None):
         methods = {name: getattr(pytype, name)
                    for name in dir(pytype)
                    if isinstance(getattr(pytype, name), (FunctionType,))}
-        rval = Class(tag, attributes, methods)
+        rval = Class[tag, attributes, methods]
         if pytype not in dataclass_to_myiaclass:
             dataclass_to_myiaclass[pytype] = rval
             tag_to_dataclass[tag] = pytype
         return rval
 
     else:
-        return External(pytype)
+        return External[pytype]

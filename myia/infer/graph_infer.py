@@ -3,7 +3,7 @@
 import asyncio
 from types import FunctionType
 
-from ..dtype import ismyiatype, Type, Function
+from ..dtype import ismyiatype, Function
 from ..debug.label import label
 from ..ir import is_constant, is_constant_graph, is_apply, GraphGenerationError
 from ..utils import Partializable, UNKNOWN, eprint

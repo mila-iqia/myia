@@ -18,7 +18,7 @@ INACCESSIBLE = Named('INACCESSIBLE')
 
 class _Unspecializable(Exception):
     def __init__(self, problem):
-        problem = Problem(problem)
+        problem = Problem[problem]
         super().__init__(problem)
         self.problem = problem
 
@@ -98,9 +98,9 @@ async def _concretize_type(t, argrefs=None):
                 argrefs = await _find_argrefs(t)
             except _Unspecializable as e:
                 return e.args[0]
-        return Function([await _extract_type(argref)
+        return Function[[await _extract_type(argref)
                          for argref in argrefs],
-                        await _concretize_type(t.cache[tuple(argrefs)]))
+                        await _concretize_type(t.cache[tuple(argrefs)])]
     else:
         return await reify(t)
 
@@ -177,10 +177,10 @@ class _GraphSpecializer:
         sub_build = await self.build(None, all_argrefs, inf.fn)
         ptl_args = [await self.build(ref) for ref in inf.args]
         res_t = await _concretize_type(inf, argrefs)
-        ptl = _const(P.partial, Function(
+        ptl = _const(P.partial, Function[
             [sub_build.type, *[a.type for a in ptl_args]],
             res_t
-        ))
+        ])
         res = self.new_graph.apply(
             ptl,
             sub_build,
