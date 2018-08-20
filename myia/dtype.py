@@ -4,7 +4,7 @@
 import numpy
 from types import FunctionType
 from typing import Tuple as TupleT, Dict as DictT, Any
-from myia.utils import Named, is_dataclass_type
+from .utils import Named, is_dataclass_type, as_frozen
 
 
 _type_cache = {}
@@ -36,16 +36,6 @@ def get_generic(t1, t2):
         return t1.generic
     else:
         return None
-
-
-def _freeze(x):
-    """Return an immutable representation for x."""
-    if isinstance(x, dict):
-        return tuple((k, _freeze(v)) for k, v in x.items())
-    elif isinstance(x, list):
-        return tuple(x)
-    else:
-        return x
 
 
 class TypeMeta(type):
@@ -90,7 +80,7 @@ class TypeMeta(type):
         elif list(params.keys()) != fields:
             raise TypeError('Invalid type parameterization')
         else:
-            key = (cls, _freeze(params))
+            key = (cls, as_frozen(params))
             if key in _type_cache:
                 return _type_cache[key]
             rval = type(cls.__qualname__, (cls,), {'_params': params})
