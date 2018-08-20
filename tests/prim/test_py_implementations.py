@@ -133,7 +133,7 @@ def test_prim_typeof():
     assert typeof(object()) == External(object)
 
 
-def test_prim_istype():
+def test_prim_ismyiatype():
     i64 = Int(64)
     f64 = Float(64)
     assert hastype(123, i64)

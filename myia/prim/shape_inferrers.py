@@ -6,7 +6,7 @@ from functools import partial, reduce
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer
 from ..ir import Graph, MetaGraph
-from ..dtype import Array
+from ..dtype import Array, ismyiatype
 from ..utils import is_dataclass_type
 
 from . import ops as P
@@ -181,7 +181,7 @@ async def infer_shape_distribute(track, v, shape):
         shp_t = await shape['type']
         shp = (ANYTHING,) * len(shp_t.elements)
     v_t = await v['type']
-    if isinstance(v_t, Array):
+    if ismyiatype(v_t, Array):
         v_shp = await v['shape']
         delta = len(shp) - len(v_shp)
         if delta < 0:

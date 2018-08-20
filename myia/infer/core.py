@@ -4,7 +4,7 @@ import asyncio
 from contextvars import copy_context
 from collections import deque
 
-from ..dtype import Array, List, Tuple, Function
+from ..dtype import Array, List, Tuple, Function, TypeMeta
 from ..utils import TypeMap, Unification, Var, RestrictedVar, eprint
 
 from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
@@ -380,6 +380,14 @@ async def _reify_tuple(v):
 @_reify_map.register(int)
 async def _reify_int(v):
     return v
+
+
+@_reify_map.register(TypeMeta)
+async def _reify_tmeta(v):
+    if v.is_generic():
+        return v
+    else:
+        return await _reify_map[v](v)
 
 
 @_reify_map.register(type)

@@ -1,120 +1,136 @@
 """Type representation."""
 
-import collections
+
 import numpy
-from typing import Any, Dict as DictT, Iterable, Tuple as TupleT
 from types import FunctionType
-from .utils import Named, is_dataclass_type
+from typing import Tuple as TupleT, Dict as DictT, Any
+from myia.utils import Named, is_dataclass_type
 
-KeysT = Iterable[TupleT[str, 'Type']]
+
+_type_cache = {}
 
 
-def get_types(bases):
-    """Return the type of the class fields."""
-    if len(bases) > 1:
-        raise TypeError("Multiple inheritance not supported")
-    elif len(bases) == 0:
-        return {}
-    elif isinstance(bases[0], TypeMeta):
-        # We need to make a copy here
-        return dict(bases[0]._fields)
-    return {}  # pragma: no cover
+def ismyiatype(t, model=None, generic=None):
+    """Check that the argument is a Myia type.
+
+    Arguments:
+        t: The object to check.
+        model: If not None, check that t is the model, or a subtype
+            of it.
+        generic: If True, check that t is a generic. If False, check that
+            t is *not* a generic. If None (default), don't check.
+    """
+    if not isinstance(t, TypeMeta):
+        return False
+    if model is not None and not issubclass(t, model):
+        return False
+    if generic is None:
+        return True
+    return t.is_generic() == generic
+
+
+def get_generic(t1, t2):
+    """Check that t1 and t2 are subtypes of the same generic and return it."""
+    if ismyiatype(t1, generic=False) and ismyiatype(t2, generic=False) \
+            and t1.generic == t2.generic:
+        return t1.generic
+    else:
+        return None
+
+
+def _freeze(x):
+    """Return an immutable representation for x."""
+    if isinstance(x, dict):
+        return tuple((k, _freeze(v)) for k, v in x.items())
+    elif isinstance(x, list):
+        return tuple(x)
+    else:
+        return x
 
 
 class TypeMeta(type):
-    """Metaclass for types.
+    """Metaclass for types."""
 
-    Ensures that instances are unique.
-    """
+    def __init__(cls, name, bases, dict):
+        """Initialize a new Type."""
+        super().__init__(name, bases, dict)
+        if not hasattr(cls, '_params'):
+            cls._params = None
+        ann = getattr(cls, '__annotations__', {})
+        cls._fields = [k for k in ann.keys()
+                       if not k.startswith('_')]
+        cls.generic = cls
 
-    def __new__(cls, typename, bases, ns):
-        """Create a new Type."""
-        if ns.get('_root', False):
-            ns['_instances'] = dict()
-        if '__slots__' in ns:
-            raise TypeError("Don't define __slots__")
+    def __call__(cls, *args):
+        """Parameterize this generic type."""
+        return cls.parameterize(*args)
 
-        types = get_types(bases)
-        types.update(filter(lambda v: not v[0].startswith('_'),
-                            ns.get('__annotations__', {}).items()))
-        ns['_fields'] = types
-        ns['__slots__'] = list(types.keys())
+    def is_generic(cls):
+        """Return whether this type is a generic."""
+        return cls.generic is cls
 
-        if '__init__' not in ns:
-            def init(self, *args):
-                assert len(args) == len(types)
-                for k, arg in zip(types.keys(), args):
-                    setattr(self, k, arg)
+    def parameterize(cls, *args):
+        """Parameterize this generic to get a concrete type.
 
-            ns['__init__'] = init
+        This is called by __getitem__.
+        """
+        fields = cls._fields
+        if len(fields) != len(args):
+            raise TypeError('Invalid type parameterization')
+        kw = {name: arg for name, arg in zip(fields, args)}
+        return cls.make_subtype(**kw)
 
-        return type.__new__(cls, typename, bases, ns)
+    def make_subtype(cls, **params):
+        """Low-level parameterization function.
 
-    def __call__(self, *args, **kwargs):
-        """Overloaded to change the semantics of class instantiation."""
-        if hasattr(self, '_parse_args'):
-            args = self._parse_args(args, kwargs)
+        The named parameters correspond to the fields declared in the Type's
+        annotations.
+        """
+        fields = cls._fields
+        if not fields:
+            if params:
+                raise TypeError(f'{cls} cannot be parameterized.')
+            else:
+                # TODO: don't do that
+                return cls
+        elif cls._params is not None:
+            raise TypeError('Already a generic')
+        elif list(params.keys()) != fields:
+            raise TypeError('Invalid type parameterization')
         else:
-            assert len(kwargs) == 0
-        key = (self, args)
-        if key not in self._instances:
-            obj = super().__call__(*args)
-            self._instances[key] = obj
-        return self._instances[key]
+            key = (cls, _freeze(params))
+            if key in _type_cache:
+                return _type_cache[key]
+            rval = type(cls.__qualname__, (cls,), {'_params': params})
+            for k, v in params.items():
+                setattr(rval, k, v)
+            rval.generic = cls
+            _type_cache[key] = rval
+            return rval
 
-    def __str__(self):  # pragma: no cover
-        return self.__name__
+    def __getitem__(cls, args):
+        """Parameterize this generic type."""
+        if not isinstance(args, tuple):
+            args = args,
+        return cls.parameterize(*args)
+
+    def __repr__(cls):
+        if hasattr(cls, '__type_repr__'):
+            return cls.__type_repr__()
+        name = cls.__qualname__
+        if cls._params is None:
+            args = ''
+        else:
+            args = f'[{", ".join([repr(a) for a in cls._params.values()])}]'
+        return f'{name}{args}'
 
 
 class Type(metaclass=TypeMeta):
-    """Base class for all Types.
-
-    This class brings a number of unusual behaviour for its subclasses
-    compared to normal Python classes.
-
-      * Arguments passed to the constructor will be passed to the
-       `_parse_args(cls, args, kwargs)` class method if it exists.
-       That method must return a tuple of values, one for each
-       declared class attribute.
-
-      * Instances are unique based on the parsed version of the
-        constructor arguments. This means that `is` and `==` mean the
-        same thing.
-
-      * If the `__new__` method is not defined, one will be generated
-        which takes one parameter for each declared class attribute
-        that does not start with an underscore (`_`) and stores them
-        in a read-only container that can be referred to by attribute
-        access.
-
-    Notes
-    -----
-        In the current implementation, Type is a subtype of tuple via
-        metaclass magic, but this may change in the future.
-
-    """
-
-    _root = True
-    _fields: DictT[str, Any]
-
-    def __init__(self, *args):
-        """Disable instantiation of the base type."""
-        raise RuntimeError("Can't instantiate Type")
-
-    def __repr__(self) -> str:
-        name = type(self).__name__
-        args = ', '.join(repr(getattr(self, p)) for p in self._fields.keys())
-        return f"{name}({args})"
+    """Base class for all Types."""
 
 
 class Object(Type):
     """Some object."""
-
-    @classmethod
-    def _parse_args(cls, args, kwargs):
-        if cls is Object:
-            raise RuntimeError("Can't instantiate Object directly")
-        return args
 
 
 class Bool(Object):
@@ -122,26 +138,28 @@ class Bool(Object):
 
 
 class Number(Object):
-    """Numerical values."""
+    """Numerical values.
+
+    Cannot be parameterized directly.
+    """
 
     bits: int
     _valid_bits: TupleT[int, ...] = ()
 
     @classmethod
-    def _parse_args(cls, args, kwargs):
-        if cls is Number:
-            raise RuntimeError("Can't instantiate Number directly")
-        assert len(kwargs) == 0
-        assert len(args) == 1
-        if args[0] not in cls._valid_bits:
-            raise ValueError(f"Unsupported number of bits: {args[0]}")
-        return args
+    def parameterize(cls, bits):
+        """Parameterize using a number of bits."""
+        if not cls._valid_bits:
+            raise RuntimeError(f"Can't parameterize {cls.__name__} directly")
+        if bits not in cls._valid_bits:
+            raise ValueError(f"Unsupported number of bits: {bits}")
+        return cls.make_subtype(bits=bits)
 
 
 class Float(Number):
     """Represents float values.
 
-    Instantiate with `Float(nbits)`.  Unsupported values will raise a
+    Instantiate with `Float[nbits]`.  Unsupported values will raise a
     ValueError.
     """
 
@@ -151,7 +169,7 @@ class Float(Number):
 class Int(Number):
     """Represents signed integer values.
 
-    Instantiate with `Int(nbits)`.  Unsupported values will raise a
+    Instantiate with `Int[nbits]`.  Unsupported values will raise a
     ValueError.
     """
 
@@ -161,7 +179,7 @@ class Int(Number):
 class UInt(Number):
     """Represents unsigned integer values.
 
-    Instantiate with `UInt(nbits)`.  Unsupported values will raise a
+    Instantiate with `UInt[nbits]`.  Unsupported values will raise a
     ValueError.
     """
 
@@ -171,7 +189,7 @@ class UInt(Number):
 class List(Object):
     """Represents a set of ordered values with the same type.
 
-    Instanciate with `List(element_type)`.
+    Instanciate with `List[element_type]`.
     """
 
     element_type: Type
@@ -181,7 +199,7 @@ class Class(Object):
     """Represents a set of methods and named fields with their own types.
 
     Instantiate with
-    `Class(Tag, Mapping[str, Type], Mapping[str, Primitive/[Meta]Graph])`.
+    `Class[Tag, Mapping[str, Type], Mapping[str, Primitive/[Meta]Graph]]`.
 
     Attributes:
         tag: A unique Named identifier for this class.
@@ -195,21 +213,10 @@ class Class(Object):
     methods: DictT[str, Any]
 
     @classmethod
-    def _parse_args(cls, args, kwargs):
-        assert not kwargs
-        tag, attributes, methods = args
-        return tag, tuple(attributes.items()), tuple(methods.items())
-
-    def __init__(self, tag, attributes, methods):
-        """Initialize a Class."""
-        self.tag = tag
-        self.attributes = dict(attributes)
-        self.methods = dict(methods)
-
-    def __repr__(self) -> str:
+    def __type_repr__(cls):
         args = ', '.join(f'{name}: {repr(attr)}'
-                         for name, attr in self.attributes.items())
-        return f"{self.tag}({args})"
+                         for name, attr in cls.attributes.items())
+        return f"{cls.tag}[{args}]"
 
 
 class Tuple(Object):
@@ -222,13 +229,19 @@ class Tuple(Object):
     elements: TupleT[Type, ...]
 
     @classmethod
-    def _parse_args(cls, args, kwargs):
-        assert len(kwargs) == 0
-        if (len(args) == 1 and isinstance(args[0], collections.Iterable) and
-                not isinstance(args[0], Type)):
-            return (tuple(args[0]),)
+    def parameterize(cls, *elements):
+        """Parameterize using a list of elements."""
+        if len(elements) == 1 and isinstance(elements[0], (tuple, list)):
+            elements, = elements
+        return cls.make_subtype(elements=elements)
+
+    @classmethod
+    def __type_repr__(cls):
+        if hasattr(cls, 'elements'):
+            elems = ', '.join(map(repr, cls.elements))
         else:
-            return (args,)
+            elems = ''
+        return f'Tuple[{elems}]'
 
 
 class Array(Object):
@@ -250,11 +263,10 @@ class Function(Object):
     retval: Type
 
     @classmethod
-    def _parse_args(cls, args, kwargs):
-        assert len(args) == 2
-        assert len(kwargs) == 0
-        assert not isinstance(args[0], Type)
-        return (tuple(args[0]), args[1])
+    def parameterize(cls, arguments, retval):
+        """Parameterize using a sequence of arguments and a return type."""
+        assert isinstance(arguments, (list, tuple))
+        return cls.make_subtype(arguments=arguments, retval=retval)
 
 
 class TypeType(Type):

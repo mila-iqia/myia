@@ -10,6 +10,7 @@ from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
 from ..ir import Graph, MetaGraph
 from ..utils import Namespace, FilterVar, is_dataclass_type
 
+from ..dtype import ismyiatype
 from . import ops as P
 from .inferrer_utils import static_getter
 from .ops import Primitive
@@ -20,13 +21,13 @@ type_inferrer_constructors = {}
 
 
 def _is_number(t):
-    return isinstance(t, Number)
+    return ismyiatype(t, Number)
 
 
 def _shape_type(t):  # noqa: D400
     """Tuple(UInt(64) ...)"""
     # The docstring is used in the error message.
-    return isinstance(t, Tuple) and all(x == UInt(64) for x in t.elements)
+    return ismyiatype(t, Tuple) and all(x == UInt(64) for x in t.elements)
 
 
 class TypeTrack(Track):
@@ -56,9 +57,9 @@ class TypeTrack(Track):
     async def infer_constant(self, ctref):
         """Get the property for a ref of a Constant node."""
         t = self.from_value(ctref.node.value, ctref.context)
-        if isinstance(t, Number):
+        if ismyiatype(t, Number):
             v = FilterVar(_is_number)
-            prio = 1 if isinstance(t, Float) else 0
+            prio = 1 if ismyiatype(t, Float) else 0
             return self.engine.loop.create_var(v, t, prio)
         else:
             return t
@@ -173,12 +174,12 @@ async def infer_type_getitem(track, seq, idx):
     seq_t = await track.check((Tuple, List), seq)
     await track.check(Int, idx)
 
-    if isinstance(seq_t, Tuple):
+    if ismyiatype(seq_t, Tuple):
         idx_v = await idx['value']
         if idx_v is ANYTHING:
             raise MyiaTypeError('Tuples must be indexed with a constant')
         return seq_t.elements[idx_v]
-    elif isinstance(seq_t, List):
+    elif ismyiatype(seq_t, List):
         return seq_t.element_type
 
 
@@ -191,11 +192,11 @@ async def infer_type_typeof(track, _):
 @type_inferrer(P.hastype, nargs=2)
 async def infer_type_hastype(track, x, t):
     """Infer the return type of hastype."""
-    def istype(x):  # noqa: D400
+    def ismyiatype(x):  # noqa: D400
         """Type"""
         return x is TypeType()
 
-    await track.check(istype, t)
+    await track.check(ismyiatype, t)
     return Bool()
 
 
@@ -376,7 +377,7 @@ async def infer_type_getattr(track, data, item):
 async def infer_type_iter(track, xs):
     """Infer the return type of iter."""
     xs_t = await xs['type']
-    if isinstance(xs_t, List):
+    if ismyiatype(xs_t, List):
         return Tuple([Int(64), xs_t])
     else:
         raise MyiaTypeError('Unsupported type for iter')
@@ -386,9 +387,9 @@ async def infer_type_iter(track, xs):
 async def infer_type_hasnext(track, it):
     """Infer the return type of hasnext."""
     it_t = await(it['type'])
-    if isinstance(it_t, Tuple) \
+    if ismyiatype(it_t, Tuple, generic=False) \
             and len(it_t.elements) == 2 \
-            and isinstance(it_t.elements[1], List):
+            and ismyiatype(it_t.elements[1], List, generic=False):
         return Bool()
     else:  # pragma: no cover
         raise MyiaTypeError('Unsupported iterator type for hasnext')
@@ -398,9 +399,9 @@ async def infer_type_hasnext(track, it):
 async def infer_type_next(track, it):
     """Infer the return type of next."""
     it_t = await(it['type'])
-    if isinstance(it_t, Tuple) \
+    if ismyiatype(it_t, Tuple, generic=False) \
             and len(it_t.elements) == 2 \
-            and isinstance(it_t.elements[1], List):
+            and ismyiatype(it_t.elements[1], List, generic=False):
         x_t = it_t.elements[1].element_type
         return Tuple([x_t, it_t])
     else:  # pragma: no cover

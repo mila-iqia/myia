@@ -2,9 +2,9 @@ import pytest
 import numpy
 from dataclasses import dataclass
 
-from myia.dtype import Bool, Float, Function, Int, List, Number, \
-    Tuple, Type, TypeMeta, UInt, np_dtype_to_type, type_to_np_dtype, Object, \
-    pytype_to_myiatype, Array, Class, External
+from myia.dtype import ismyiatype, Bool, Float, Function, Int, List, Number, \
+    Tuple, UInt, np_dtype_to_type, type_to_np_dtype, Object, \
+    pytype_to_myiatype, Array, Class, External, get_generic
 
 
 @dataclass(frozen=True)
@@ -16,27 +16,9 @@ class Point:
         return (self.x ** 2 + self.y ** 2) ** 0.5
 
 
-def test_TypeMeta():
-    with pytest.raises(TypeError):
-        class A(tuple, int, metaclass=TypeMeta):
-            pass
-
-    class B(metaclass=TypeMeta):
-        pass
-
-    with pytest.raises(TypeError):
-        class C(metaclass=TypeMeta):
-            __slots__ = ('c',)
-
-
-def test_Type():
-    with pytest.raises(RuntimeError):
-        Type()
-
-
-def test_Object():
-    with pytest.raises(RuntimeError):
-        Object()
+# def test_instantiate():
+#     with pytest.raises(RuntimeError):
+#         Type()
 
 
 def test_cache():
@@ -47,9 +29,9 @@ def test_cache():
 
 
 def test_Number():
-    assert isinstance(Int(32), Number)
-    assert not isinstance(Bool(), Number)
-    with pytest.raises(RuntimeError):
+    assert issubclass(Int(32), Number)
+    assert not issubclass(Bool(), Number)
+    with pytest.raises(TypeError):
         Number()
     with pytest.raises(ValueError):
         Float(33)
@@ -79,9 +61,61 @@ def test_Function():
     assert c is c2
 
 
+def test_make_subtype():
+    with pytest.raises(TypeError):
+        Bool[64]
+    with pytest.raises(RuntimeError):
+        Number[64]
+    with pytest.raises(TypeError):
+        Int[64][64]
+    with pytest.raises(TypeError):
+        Bool.make_subtype(nbits=64)
+    with pytest.raises(TypeError):
+        Int.make_subtype(x=64)
+    with pytest.raises(TypeError):
+        Int.make_subtype()
+
+
+def test_generic():
+    assert Number.generic is Number
+    assert Int.generic is Int
+    assert Int[64].generic is Int
+
+
+def test_is_generic():
+    assert Number.is_generic()
+    assert Int.is_generic()
+    assert not Int[64].is_generic()
+
+
+def test_ismyiatype():
+    assert ismyiatype(Number)
+    assert ismyiatype(Number, Object)
+    assert ismyiatype(Int)
+    assert ismyiatype(Int, Number)
+    assert ismyiatype(Int[64])
+    assert ismyiatype(Int[64], Int)
+    assert ismyiatype(Int[64], Number)
+    assert ismyiatype(Int[64], Object)
+    assert not ismyiatype(Int[64], Float)
+    assert ismyiatype(Tuple[()], Tuple)
+    assert ismyiatype(Int, generic=True)
+    assert not ismyiatype(Int, generic=False)
+    assert not ismyiatype(Int[64], generic=True)
+    assert ismyiatype(Int[64], generic=False)
+    assert not ismyiatype(1234)
+    assert not ismyiatype(object)
+
+
+def test_get_generic():
+    assert get_generic(Int[64], Int[32]) is Int
+    assert get_generic(Tuple[Number, Number], Tuple[()]) is Tuple
+    assert get_generic(Int[64], Float[64]) is None
+
+
 def test_repr():
     t = UInt(16)
-    assert repr(t) == 'UInt(16)'
+    assert repr(t) == 'UInt[16]'
 
 
 def test_type_conversions():
@@ -122,7 +156,7 @@ def test_pytype_to_myiatype():
     ptm(Point, Point(1.1, 2.2))
 
     pcls = ptm(Point)
-    assert isinstance(pcls, Class)
+    assert issubclass(pcls, Class)
     assert pcls.attributes == {'x': Number, 'y': Number}
     assert 'abs' in pcls.methods
     assert str(pcls.tag) == 'Point'
