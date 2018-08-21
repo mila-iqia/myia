@@ -64,37 +64,37 @@ class Location(NamedTuple):
     node: ast.AST
 
 
-operator_ns = ModuleNamespace('operator')
+operations_ns = ModuleNamespace('myia.operations')
 builtins_ns = ModuleNamespace('builtins')
 
 
 ast_map = {
-    ast.Add: (operator_ns, 'add'),
-    ast.Sub: (operator_ns, 'sub'),
-    ast.Mult: (operator_ns, 'mul'),
-    ast.Div: (operator_ns, 'truediv'),
-    ast.FloorDiv: (operator_ns, 'floordiv'),
-    ast.Mod: (operator_ns, 'mod'),
-    ast.Pow: (operator_ns, 'pow'),
-    ast.MatMult: (operator_ns, 'matmul'),
-    ast.LShift: (operator_ns, 'lshift'),
-    ast.RShift: (operator_ns, 'rshift'),
-    ast.BitAnd: (operator_ns, 'and_'),
-    ast.BitOr: (operator_ns, 'or_'),
-    ast.BitXor: (operator_ns, 'xor'),
-    ast.UAdd: (operator_ns, 'pos'),
-    ast.USub: (operator_ns, 'neg'),
-    ast.Invert: (operator_ns, 'invert'),
-    ast.Not: (operator_ns, 'not_'),
-    ast.Eq: (operator_ns, 'eq'),
-    ast.NotEq: (operator_ns, 'ne'),
-    ast.Lt: (operator_ns, 'lt'),
-    ast.Gt: (operator_ns, 'gt'),
-    ast.LtE: (operator_ns, 'le'),
-    ast.GtE: (operator_ns, 'ge'),
-    ast.Is: (operator_ns, 'is_'),
-    ast.IsNot: (operator_ns, 'is_not'),
-    ast.In: (operator_ns, 'contains'),
+    ast.Add: (operations_ns, 'add'),
+    ast.Sub: (operations_ns, 'sub'),
+    ast.Mult: (operations_ns, 'mul'),
+    ast.Div: (operations_ns, 'truediv'),
+    ast.FloorDiv: (operations_ns, 'floordiv'),
+    ast.Mod: (operations_ns, 'mod'),
+    ast.Pow: (operations_ns, 'pow'),
+    ast.MatMult: (operations_ns, 'matmul'),
+    ast.LShift: (operations_ns, 'lshift'),
+    ast.RShift: (operations_ns, 'rshift'),
+    ast.BitAnd: (operations_ns, 'and_'),
+    ast.BitOr: (operations_ns, 'or_'),
+    ast.BitXor: (operations_ns, 'xor'),
+    ast.UAdd: (operations_ns, 'pos'),
+    ast.USub: (operations_ns, 'neg'),
+    ast.Invert: (operations_ns, 'invert'),
+    ast.Not: (operations_ns, 'not_'),
+    ast.Eq: (operations_ns, 'eq'),
+    ast.NotEq: (operations_ns, 'ne'),
+    ast.Lt: (operations_ns, 'lt'),
+    ast.Gt: (operations_ns, 'gt'),
+    ast.LtE: (operations_ns, 'le'),
+    ast.GtE: (operations_ns, 'ge'),
+    ast.Is: (operations_ns, 'is_'),
+    ast.IsNot: (operations_ns, 'is_not'),
+    ast.In: (operations_ns, 'contains'),
     # ast.NotIn: operator.???,  # Not in operator module
 }
 
@@ -303,7 +303,7 @@ class Parser:
                 b1.graph.output = fold(b1, rest, mode)
                 b2.graph.output = test
 
-                return block.graph.apply(primops.if_,
+                return block.graph.apply(block.operation('if_'),
                                          block.force_bool(test),
                                          true_block.graph,
                                          false_block.graph)
@@ -335,7 +335,7 @@ class Parser:
         tg.output = tb
         fg.output = fb
 
-        return block.graph.apply(primops.if_, cond, tg, fg)
+        return block.graph.apply(block.operation('if_'), cond, tg, fg)
 
     def process_Lambda(self, block: 'Block', node: ast.Lambda) -> ANFNode:
         """Process lambda: `lambda x, y: x + y`."""
@@ -379,7 +379,7 @@ class Parser:
 
     def process_Tuple(self, block: 'Block', node: ast.Tuple) -> ANFNode:
         """Process tuple literals."""
-        op = Constant(primops.cons_tuple)
+        op = block.operation('cons_tuple')
         elts = [self.process_node(block, e) for e in node.elts]
 
         def cons(elts):
@@ -393,7 +393,7 @@ class Parser:
     def process_Subscript(self, block: 'Block',
                           node: ast.Subscript) -> ANFNode:
         """Process subscripts: `x[y]`."""
-        op = block.make_resolve(operator_ns, 'getitem')
+        op = block.operation('getitem')
         value = self.process_node(block, node.value)
         slice = self.process_node(block, node.slice)
         return Apply([op, value, slice], block.graph)
@@ -405,7 +405,7 @@ class Parser:
     def process_Attribute(self, block: 'Block',
                           node: ast.Attribute) -> ANFNode:
         """Process attributes: `x.y`."""
-        op = block.make_resolve(builtins_ns, 'getattr')
+        op = block.operation('getattr')
         value = self.process_node(block, node.value)
         return Apply([op, value, Constant(node.attr)], block.graph)
 
@@ -451,7 +451,7 @@ class Parser:
             elif isinstance(targ, ast.Tuple):
                 # CASE: x, y = value
                 for i, elt in enumerate(targ.elts):
-                    op = block.make_resolve(operator_ns, 'getitem')
+                    op = block.operation('getitem')
                     new_node = Apply([op, anf_node, Constant(i)], block.graph)
                     write(elt, new_node)
 
@@ -552,8 +552,13 @@ class Parser:
         A for loop will generate 3 functions: The test, the body, and the
         continuation.
         """
+        op_iter = block.operation('iter')
+        op_next = block.operation('next')
+        op_getitem = block.operation('getitem')
+        op_hasnext = block.operation('hasnext')
+
         # Initialization of the iterator, only done once
-        init = block.graph.apply(primops.iter,
+        init = block.graph.apply(op_iter,
                                  self.process_node(block, node.iter))
 
         # Checks hasnext on the iterator.
@@ -561,17 +566,17 @@ class Parser:
             header_block = Block(self, auxiliary=True)
         # We explicitly add the iterator as the first argument
         it = header_block.graph.add_parameter()
-        cond = header_block.graph.apply(primops.hasnext, it)
+        cond = header_block.graph.apply(op_hasnext, it)
 
         # Body of the iterator.
         with About(block.graph.debug, 'for_body'):
             body_block = Block(self, auxiliary=True)
         body_block.preds.append(header_block)
         # app = next(it); target = app[0]; it = app[1]
-        app = body_block.graph.apply(primops.next, it)
-        target = body_block.graph.apply(primops.getitem, app, 0)
+        app = body_block.graph.apply(op_next, it)
+        target = body_block.graph.apply(op_getitem, app, 0)
         target.debug.name = node.target.id
-        it2 = body_block.graph.apply(primops.getitem, app, 1)
+        it2 = body_block.graph.apply(op_getitem, app, 1)
         # We link the variable name to the target
         body_block.write(node.target.id, target)
         # We set some debug data on all iterator variables
@@ -689,10 +694,14 @@ class Block:
             Constant(symbol_name)
         )
 
+    def operation(self, symbol_name):
+        """Return a subtree that resolves a name in the operations module."""
+        return self.make_resolve(operations_ns, symbol_name)
+
     def force_bool(self, cond):
         """Wrap a condition in a call to bool()."""
         rval = self.graph.apply(
-            self.make_resolve(builtins_ns, 'bool'),
+            self.operation('bool'),
             cond
         )
         rval.debug.location = cond.debug.location
@@ -781,7 +790,7 @@ class Block:
         """
         assert self.graph.return_ is None
         self.graph.output = self.graph.apply(
-            primops.if_,
+            self.operation('if_'),
             cond,
             true.graph,
             false.graph
