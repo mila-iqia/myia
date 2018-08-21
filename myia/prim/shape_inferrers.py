@@ -4,9 +4,11 @@ import operator
 from functools import partial, reduce
 
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
-    PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer
+    PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer, \
+    InferenceError
 from ..ir import Graph, MetaGraph
-from ..dtype import Array, ismyiatype
+
+from ..dtype import Array, Tuple, ismyiatype
 from ..utils import is_dataclass_type
 
 from . import ops as P
@@ -20,6 +22,29 @@ def prod(iterable):
 
 
 shape_inferrer_constructors = {}
+
+
+class TupleShape:
+    """Class to distinguish the shape of tuples from the shape of arrays."""
+
+    __slots__ = ['shape']
+
+    def __init__(self, shape):
+        """Create the shape."""
+        self.shape = tuple(shape)
+
+    def __repr__(self):
+        return f"T{self.shape}"
+
+    def __len__(self):
+        return len(self.shape)
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.shape == other.shape)
+
+    def __hash__(self):
+        return hash((type(self), self.shape))
 
 
 class ScalarShapeInferrer(Inferrer):
@@ -53,6 +78,9 @@ class ShapeTrack(Track):
             raise Exception(
                 'There is no default value for Arrays on the shape track.'
             )  # pragma: no cover
+        if ismyiatype(values['type'], Tuple):
+            return TupleShape(self.default({'type': e})
+                              for e in values['type'].elements)
         return ()
 
     def from_value(self, v, context):
@@ -68,12 +96,65 @@ class ShapeTrack(Track):
             return MetaGraphInferrer(self, v)
         elif is_dataclass_type(v):
             raise NotImplementedError('Dataclasses are not supported yet')
+        elif isinstance(v, tuple):
+            return TupleShape(self.from_value(e, context) for e in v)
         else:
             return getattr(v, 'shape', ())
 
 
 shape_inferrer = partial(register_inferrer,
                          constructors=shape_inferrer_constructors)
+
+
+@shape_inferrer(P.cons_tuple, nargs=2)
+async def infer_shape_cons_tuple(track, head, tail):
+    """Infer the shape for cons_tuple."""
+    sht = await tail['shape']
+    shh = await head['shape']
+    return TupleShape((shh,) + sht.shape)
+
+
+@shape_inferrer(P.head, nargs=1)
+async def infer_shape_head(track, tup):
+    """Infer the shape for head."""
+    return (await tup['shape']).shape[0]
+
+
+@shape_inferrer(P.tail, nargs=1)
+async def infer_shape_tail(track, tup):
+    """Infer the shape of tail."""
+    return TupleShape((await tup['shape']).shape[1:])
+
+
+@shape_inferrer(P.getitem, nargs=2)
+async def infer_shape_getitem(track, seq, idx):
+    """Infer the shape of getitem."""
+    seq_t = await seq['type']
+
+    if ismyiatype(seq_t, Tuple):
+        seq_sh = await seq['shape']
+        idx_v = await idx['value']
+        assert idx_v is not ANYTHING
+        return seq_sh.shape[idx_v]
+    # For any other type
+    raise InferenceError("Unknown type")  # pragma: no cover
+
+
+@shape_inferrer(P.iter, nargs=1)
+async def infer_shape_iter(track, seq):
+    """Infer the shape of iter."""
+    seq_sh = await seq['shape']
+    return TupleShape(((), seq_sh))
+
+
+@shape_inferrer(P.next, nargs=1)
+async def infer_shape_next(track, it):
+    """Infer the shape of next."""
+    it_sh = await it['shape']
+    it_t = await it['type']
+    # This is probably wrong but it works for now
+    data_sh = track.default({'type': it_t.elements[1]})
+    return TupleShape((data_sh, it_sh))
 
 
 @shape_inferrer(P.return_, nargs=1)

@@ -15,6 +15,7 @@ from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
     Function as F, TypeType, UInt, External, pytype_to_myiatype, Number
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive
+from myia.prim.shape_inferrers import TupleShape
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
     typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
@@ -437,7 +438,10 @@ def test_too_many_args(x, y):
     return g(x, y)
 
 
-@infer(type=(i64, f64, T[i64, f64]))
+@infer(type=(i64, f64, T[i64, f64]),
+       shape=[({'type': i64}, {'type': f64}, TupleShape(((), ()))),
+              ({'type': T[i64, i64]}, {'type': f64},
+               TupleShape((TupleShape(((), ())), ())))])
 def test_tup(x, y):
     return (x, y)
 
@@ -445,7 +449,9 @@ def test_tup(x, y):
 @infer(type=[(T[i64, f64], i64),
              (T[f64, i64], f64),
              (T[()], InferenceError),
-             (f64, InferenceError)])
+             (f64, InferenceError)],
+       shape=[({'type': T[i64, f64]}, ()),
+              ({'type': T[T[i64, f64], i64]}, TupleShape(((), ())))])
 def test_head_tuple(tup):
     return head(tup)
 
@@ -453,12 +459,16 @@ def test_head_tuple(tup):
 @infer(type=[(T[i64, f64], T[f64]),
              (T[f64, i64], T[i64]),
              (T[()], InferenceError),
-             (f64, InferenceError)])
+             (f64, InferenceError)],
+       shape=[({'type': T[f64, i64]}, TupleShape(((),))),
+              ({'type': T[i64, T[i64, f64]]},
+               TupleShape((TupleShape(((), ())),)))])
 def test_tail_tuple(tup):
     return tail(tup)
 
 
-@infer(type=[(i64, f64, i64), (f64, i64, f64)])
+@infer(type=[(i64, f64, i64), (f64, i64, f64)],
+       shape=({'type': i64}, {'type': f64}, ()))
 def test_getitem_tuple(x, y):
     return (x, y)[0]
 
