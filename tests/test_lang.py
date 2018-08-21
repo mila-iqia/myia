@@ -465,7 +465,7 @@ def test_rec1(x):
 
 
 mysum = MultitypeGraph('mysum')
-i64 = Int(64)
+i64 = Int[64]
 
 
 @mysum.register(i64)
@@ -527,8 +527,8 @@ def test_fact(x):
 
 @dataclass(frozen=True)
 class Point:
-    x: Int(64)
-    y: Int(64)
+    x: Int[64]
+    y: Int[64]
 
     def abs(self):
         return (self.x ** 2 + self.y ** 2) ** 0.5

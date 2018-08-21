@@ -3,7 +3,7 @@ from pytest import mark
 from collections import defaultdict
 
 from myia.api import scalar_debug_pipeline
-from myia.dtype import Function, Type, Problem, External
+from myia.dtype import Function, Type, Problem, External, ismyiatype
 from myia.debug.label import short_labeler as lbl
 from myia.graph_utils import dfs
 from myia.infer import Inferrer
@@ -50,19 +50,19 @@ def validate(g):
             errors[node].add('Type was not inferred')
         elif isinstance(node.type, Inferrer):
             errors[node].add('Uneliminated inferrer')
-        elif isinstance(node.type, Problem):
+        elif ismyiatype(node.type, Problem):
             if node.type.kind is DEAD:
                 # This one is okay if it happens, because we don't really need
                 # to infer types for dead code.
                 pass
             else:
                 errors[node].add(f'Problem type: {node.type}')
-        elif isinstance(node.type, External):
+        elif ismyiatype(node.type, External):
             errors[node].add(f'External type: {node.type}')
-        elif not isinstance(node.type, Type):
+        elif not ismyiatype(node.type, Type):
             errors[node].add(f'Unknown type: {node.type}')
         elif is_apply(node):
-            expected = Function([i.type for i in node.inputs[1:]], node.type)
+            expected = Function[[i.type for i in node.inputs[1:]], node.type]
             if node.inputs[0].type != expected:
                 errors[node].add('Function/argument inconsistency')
             fn = node.inputs[0]

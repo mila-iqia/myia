@@ -3,7 +3,7 @@
 import asyncio
 from types import FunctionType
 
-from ..dtype import Type, Function
+from ..dtype import ismyiatype, Function
 from ..debug.label import label
 from ..ir import is_constant, is_constant_graph, is_apply, GraphGenerationError
 from ..utils import Partializable, UNKNOWN, eprint
@@ -64,7 +64,8 @@ class Track(Partializable):
             return ANYTHING
 
         argrefs = [self.engine.ref(node, ctx) for node in n_args]
-        if isinstance(inf, Function):
+        # if isinstance(inf, Function):
+        if isinstance(inf, type) and issubclass(inf, Function):
             ngot = len(argrefs)
             nexpect = len(inf.arguments)
             if ngot != nexpect:
@@ -126,10 +127,8 @@ class Track(Partializable):
         """
         if isinstance(predicate, tuple):
             return any(self.apply_predicate(p, res) for p in predicate)
-        elif isinstance(predicate, Type):
-            return res == predicate
-        elif isinstance(predicate, type) and issubclass(predicate, Type):
-            return isinstance(res, predicate)
+        elif ismyiatype(predicate):
+            return ismyiatype(res, predicate)
         elif callable(predicate):
             return predicate(res)
         else:
@@ -144,10 +143,7 @@ class Track(Partializable):
             ref: The reference that produced the value.
         """
         def is_type(preds):
-            return any(isinstance(pred, Type)
-                       or isinstance(pred, type)
-                       and issubclass(pred, Type)
-                       for pred in preds)
+            return any(ismyiatype(pred) for pred in preds)
 
         if not isinstance(predicate, tuple):
             predicate = (predicate,)

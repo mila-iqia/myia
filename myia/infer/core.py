@@ -4,7 +4,7 @@ import asyncio
 from contextvars import copy_context
 from collections import deque
 
-from ..dtype import Array, List, Tuple, Function
+from ..dtype import Array, List, Tuple, Function, TypeMeta
 from ..utils import TypeMap, Unification, Var, RestrictedVar, eprint
 
 from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
@@ -201,8 +201,8 @@ class EquivalenceChecker:
                 # TODO: this should fetch the appropriate track, not
                 # necessarily 'type'
                 argt = [await ref['type'] for ref in argrefs]
-                t1 = Function(argt, err.type1)
-                t2 = Function(argt, err.type2)
+                t1 = Function[argt, err.type1]
+                t2 = Function[argt, err.type2]
                 err = MyiaFunctionMismatchError(t1, t2, refs=err.refs)
                 self.error_callback(err)
 
@@ -353,22 +353,22 @@ async def _reify_Var(v):
 
 @_reify_map.register(Array)
 async def _reify_Array(t):
-    return Array(await reify(t.elements))
+    return Array[await reify(t.elements)]
 
 
 @_reify_map.register(List)
 async def _reify_List(t):
-    return List(await reify(t.element_type))
+    return List[await reify(t.element_type)]
 
 
 @_reify_map.register(Tuple)
 async def _reify_Tuple(t):
-    return Tuple(await reify(t.elements))
+    return Tuple[await reify(t.elements)]
 
 
 @_reify_map.register(Function)
 async def _reify_Function(t):
-    return Function(await reify(t.arguments), await reify(t.retval))
+    return Function[await reify(t.arguments), await reify(t.retval)]
 
 
 @_reify_map.register(tuple)
@@ -380,6 +380,14 @@ async def _reify_tuple(v):
 @_reify_map.register(int)
 async def _reify_int(v):
     return v
+
+
+@_reify_map.register(TypeMeta)
+async def _reify_tmeta(v):
+    if v.is_generic():
+        return v
+    else:
+        return await _reify_map[v](v)
 
 
 @_reify_map.register(type)

@@ -166,7 +166,7 @@ def bool_or(x, y):
 def typeof(x):
     """Implement typeof."""
     if isinstance(x, types.Type) or isinstance(x, type):
-        return types.TypeType()
+        return types.TypeType
     else:
         return types.pytype_to_myiatype(type(x), x)
 
@@ -204,10 +204,10 @@ def hastype_helper(t, model):
     """Check that type t is represented by model."""
     if t == model:
         return True
-    elif isinstance(model, type) and issubclass(model, types.Type):
-        return isinstance(t, model)
-    elif type(t) is type(model):
-        return hastype_helper_map[type(t)](t, model)
+    elif types.ismyiatype(model, generic=True):
+        return types.ismyiatype(t, model)
+    elif types.get_generic(t, model):
+        return hastype_helper_map[t.generic](t, model)
     else:
         return False
 

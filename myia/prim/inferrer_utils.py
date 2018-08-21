@@ -1,7 +1,7 @@
 """Utilities that may leveraged by several inferrers."""
 
 
-from ..dtype import Class
+from ..dtype import Class, ismyiatype
 from ..infer import InferenceError, PartialInferrer, Context, ANYTHING, unwrap
 
 
@@ -34,7 +34,7 @@ async def static_getter(track, data, item, fetch, chk=None):
             'The value of the attribute could not be inferred.'
         )
 
-    if isinstance(data_t, Class):
+    if ismyiatype(data_t, Class):
         # Get field from Class
         if item_v in data_t.attributes:
             if track.name == 'type':
@@ -62,7 +62,7 @@ async def static_getter(track, data, item, fetch, chk=None):
 
     # Try method map
     try:
-        mmap_t = mmap[type(data_t)]
+        mmap_t = mmap[data_t]
     except KeyError:
         mmap_t = None
 

@@ -415,3 +415,13 @@ def eprint(*things):
 def is_dataclass_type(cls):
     """Returns whether cls is a dataclass."""
     return isinstance(cls, type) and hasattr(cls, '__dataclass_fields__')
+
+
+def as_frozen(x):
+    """Return an immutable representation for x."""
+    if isinstance(x, dict):
+        return tuple(sorted((k, as_frozen(v)) for k, v in x.items()))
+    elif isinstance(x, (list, tuple)):
+        return tuple(as_frozen(y) for y in x)
+    else:
+        return x

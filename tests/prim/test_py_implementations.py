@@ -122,30 +122,30 @@ def test_prim_setattr():
 
 
 def test_prim_typeof():
-    i64 = Int(64)
-    f64 = Float(64)
+    i64 = Int[64]
+    f64 = Float[64]
     assert typeof(1) == i64
     assert typeof(1.2) == f64
-    assert typeof((1, 2.0, (3, 4))) == Tuple(i64, f64, Tuple(i64, i64))
-    assert typeof([1, 2]) == List(i64)
+    assert typeof((1, 2.0, (3, 4))) == Tuple[i64, f64, Tuple[i64, i64]]
+    assert typeof([1, 2]) == List[i64]
     with pytest.raises(TypeError):
         typeof([1, 2, 3.4])
-    assert typeof(object()) == External(object)
+    assert typeof(object()) == External[object]
 
 
-def test_prim_istype():
-    i64 = Int(64)
-    f64 = Float(64)
+def test_prim_ismyiatype():
+    i64 = Int[64]
+    f64 = Float[64]
     assert hastype(123, i64)
     assert not hastype(123.4, i64)
     assert hastype(123.4, f64)
     assert hastype([1, 2, 3], List)
-    assert hastype([1, 2, 3], List(i64))
+    assert hastype([1, 2, 3], List[i64])
     assert hastype((1, 2.0, (3, 4)), Tuple)
-    assert hastype((1, 2.0, (3, 4)), Tuple(i64, f64, Tuple(i64, i64)))
+    assert hastype((1, 2.0, (3, 4)), Tuple[i64, f64, Tuple[i64, i64]])
     with pytest.raises(TypeError):
         hastype([1, 2, 3.4], List)
-    assert hastype(object(), External(object))
+    assert hastype(object(), External[object])
 
 
 def test_prim_shape():

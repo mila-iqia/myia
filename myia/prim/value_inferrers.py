@@ -137,7 +137,7 @@ class ValueTrack(Track):
             recinf = PrimitiveValueInferrer(self, p, self.implementations[p])
             typ = pytype_to_myiatype(v)
             vref = self.engine.vref({'value': limited(typ, self.max_depth),
-                                     'type': TypeType()})
+                                     'type': TypeType})
             return PartialInferrer(self, recinf, [vref])
         elif v is ANYTHING:
             return v
