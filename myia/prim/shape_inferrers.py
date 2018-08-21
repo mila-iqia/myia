@@ -27,24 +27,24 @@ shape_inferrer_constructors = {}
 class TupleShape:
     """Class to distinguish the shape of tuples from the shape of arrays."""
 
-    __slots__ = ['tup']
+    __slots__ = ['shape']
 
-    def __init__(self, tup):
+    def __init__(self, shape):
         """Create the shape."""
-        self.tup = tuple(tup)
+        self.shape = tuple(shape)
 
     def __repr__(self):
-        return f"T{self.tup}"
+        return f"T{self.shape}"
 
     def __len__(self):
-        return len(self.tup)
+        return len(self.shape)
 
     def __eq__(self, other):
         return (type(self) == type(other) and
-                self.tup == other.tup)
+                self.shape == other.shape)
 
     def __hash__(self):
-        return hash((type(self), self.tup))
+        return hash((type(self), self.shape))
 
 
 class ScalarShapeInferrer(Inferrer):
@@ -78,7 +78,7 @@ class ShapeTrack(Track):
             raise Exception(
                 'There is no default value for Arrays on the shape track.'
             )  # pragma: no cover
-        if isinstance(values['type'], Tuple):
+        if ismyiatype(values['type'], Tuple):
             return TupleShape(self.default({'type': e})
                               for e in values['type'].elements)
         return ()
@@ -111,19 +111,19 @@ async def infer_shape_cons_tuple(track, head, tail):
     """Infer the shape for cons_tuple."""
     sht = await tail['shape']
     shh = await head['shape']
-    return TupleShape((shh,) + sht.tup)
+    return TupleShape((shh,) + sht.shape)
 
 
 @shape_inferrer(P.head, nargs=1)
 async def infer_shape_head(track, tup):
     """Infer the shape for head."""
-    return (await tup['shape']).tup[0]
+    return (await tup['shape']).shape[0]
 
 
 @shape_inferrer(P.tail, nargs=1)
 async def infer_shape_tail(track, tup):
     """Infer the shape of tail."""
-    return TupleShape((await tup['shape']).tup[1:])
+    return TupleShape((await tup['shape']).shape[1:])
 
 
 @shape_inferrer(P.getitem, nargs=2)
@@ -131,11 +131,11 @@ async def infer_shape_getitem(track, seq, idx):
     """Infer the shape of getitem."""
     seq_t = await seq['type']
 
-    if isinstance(seq_t, Tuple):
+    if ismyiatype(seq_t, Tuple):
         seq_sh = await seq['shape']
         idx_v = await idx['value']
         assert idx_v is not ANYTHING
-        return seq_sh.tup[idx_v]
+        return seq_sh.shape[idx_v]
     # For any other type
     raise InferenceError("Unknown type")  # pragma: no cover
 
