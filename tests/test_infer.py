@@ -15,7 +15,7 @@ from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
     Function as F, TypeType, UInt, External, pytype_to_myiatype, Number
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive
-from myia.prim.shape_inferrers import TupleShape
+from myia.prim.shape_inferrers import TupleShape, NOSHAPE
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
     typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
@@ -439,9 +439,9 @@ def test_too_many_args(x, y):
 
 
 @infer(type=(i64, f64, T[i64, f64]),
-       shape=[({'type': i64}, {'type': f64}, TupleShape(((), ()))),
+       shape=[({'type': i64}, {'type': f64}, TupleShape((NOSHAPE, NOSHAPE))),
               ({'type': T[i64, i64]}, {'type': f64},
-               TupleShape((TupleShape(((), ())), ())))])
+               TupleShape((TupleShape((NOSHAPE, NOSHAPE)), NOSHAPE)))])
 def test_tup(x, y):
     return (x, y)
 
@@ -450,8 +450,8 @@ def test_tup(x, y):
              (T[f64, i64], f64),
              (T[()], InferenceError),
              (f64, InferenceError)],
-       shape=[({'type': T[i64, f64]}, ()),
-              ({'type': T[T[i64, f64], i64]}, TupleShape(((), ())))])
+       shape=[({'type': T[i64, f64]}, NOSHAPE),
+              ({'type': T[T[i64, f64], i64]}, TupleShape((NOSHAPE, NOSHAPE)))])
 def test_head_tuple(tup):
     return head(tup)
 
@@ -460,15 +460,15 @@ def test_head_tuple(tup):
              (T[f64, i64], T[i64]),
              (T[()], InferenceError),
              (f64, InferenceError)],
-       shape=[({'type': T[f64, i64]}, TupleShape(((),))),
+       shape=[({'type': T[f64, i64]}, TupleShape((NOSHAPE,))),
               ({'type': T[i64, T[i64, f64]]},
-               TupleShape((TupleShape(((), ())),)))])
+               TupleShape((TupleShape((NOSHAPE, NOSHAPE)),)))])
 def test_tail_tuple(tup):
     return tail(tup)
 
 
 @infer(type=[(i64, f64, i64), (f64, i64, f64)],
-       shape=({'type': i64}, {'type': f64}, ()))
+       shape=({'type': i64}, {'type': f64}, NOSHAPE))
 def test_getitem_tuple(x, y):
     return (x, y)[0]
 
@@ -624,7 +624,7 @@ def test_choose_incompatible(i, x, y):
         (i64, f64, f64)
     ],
     shape=[
-        ({'type': i64, 'shape': ()}, {'type': i64, 'shape': ()}, ())
+        ({'type': i64}, {'type': i64}, NOSHAPE)
     ]
 )
 def test_choose_indirect(i, x):
@@ -1235,7 +1235,7 @@ def test_array_reduce(ary, shp):
 
 @infer(type=[(i64, i64)],
        value=[(40, 42)],
-       shape=[({'type': i64, 'shape': ()}, ())])
+       shape=[({'type': i64}, NOSHAPE)])
 def test_partial_1(x):
     def f(a, b):
         return a + b
