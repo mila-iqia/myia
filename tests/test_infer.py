@@ -21,7 +21,8 @@ from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
     typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
-    bool_and, bool_or, switch, scalar_to_array, broadcast_shape
+    bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
+    tuple_setitem, list_setitem
 from myia.utils import RestrictedVar
 
 from .test_lang import mysum, Point
@@ -476,7 +477,7 @@ def test_tail_tuple(tup):
 
 @infer(type=[(i64, f64, i64), (f64, i64, f64)],
        shape=(t(i64), t(f64), NOSHAPE))
-def test_getitem_tuple(x, y):
+def test_tuple_getitem(x, y):
     return (x, y)[0]
 
 
@@ -489,8 +490,32 @@ def test_getitem_tuple(x, y):
         (T[i64, f64], i64, InferenceError)
     ]
 )
-def test_getitem_list(xs, i):
+def test_list_getitem(xs, i):
     return xs[i]
+
+
+@infer(
+    type=[
+        (T[i64, i64], {'value': 1}, f64, T[i64, f64]),
+        (T[i64, i64, f64], {'value': 1}, f64, T[i64, f64, f64]),
+        (T[i64], {'value': 1}, f64, InferenceError),
+        (T[i64], {'type': f64, 'value': 0}, f64, InferenceError),
+        (T[i64], i64, f64, InferenceError),
+    ]
+)
+def test_tuple_setitem(xs, idx, x):
+    return tuple_setitem(xs, idx, x)
+
+
+@infer(
+    type=[
+        (li64, i64, i64, li64),
+        (li64, f64, i64, InferenceError),
+        (li64, i64, f64, InferenceError),
+    ]
+)
+def test_list_setitem(xs, idx, x):
+    return list_setitem(xs, idx, x)
 
 
 @infer(type=(i64, f64, T[i64, f64]))

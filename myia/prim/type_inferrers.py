@@ -187,6 +187,33 @@ async def infer_type_list_getitem(track, seq, idx):
     return seq_t.element_type
 
 
+@type_inferrer(P.tuple_setitem, nargs=3)
+async def infer_type_tuple_setitem(track, seq, idx, value):
+    """Infer the return type of tuple_setitem."""
+    seq_t = await track.check(Tuple, seq)
+    await track.check(Int, idx)
+    idx_v = await idx['value']
+    if idx_v is ANYTHING:
+        raise MyiaTypeError('Tuples must be indexed with a constant')
+    value_t = await value['type']
+    elts = seq_t.elements
+    try:
+        elts[idx_v]
+    except IndexError:
+        raise MyiaTypeError('Index out of bounds')
+    new_elts = tuple([*elts[:idx_v], value_t, *seq_t.elements[idx_v + 1:]])
+    return Tuple[new_elts]
+
+
+@type_inferrer(P.list_setitem, nargs=3)
+async def infer_type_list_setitem(track, seq, idx, value):
+    """Infer the return type of list_setitem."""
+    seq_t = await track.check(List, seq)
+    await track.check(Int, idx)
+    await track.will_check(seq_t.element_type, value)
+    return seq_t
+
+
 @type_inferrer(P.typeof, nargs=1)
 async def infer_type_typeof(track, _):
     """Infer the return type of typeof."""
