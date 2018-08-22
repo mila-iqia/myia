@@ -278,15 +278,19 @@ class Optimizer(PipelineStep):
         graph: The optimized graph.
     """
 
-    def __init__(self, pipeline_init, opts):
+    def __init__(self, pipeline_init, pre, opts, post):
         """Initialize an Optimizer."""
         super().__init__(pipeline_init)
+        self.pre = [opt(optimizer=self) for opt in pre]
         self.opts = opts
+        self.post = [opt(optimizer=self) for opt in post]
 
     def step(self, graph):
         """Optimize the graph using the given patterns."""
         eq = PatternEquilibriumOptimizer(*self.opts, optimizer=self)
-        eq(graph)
+        seq = [*self.pre, eq, *self.post]
+        for opt in seq:
+            opt(graph)
         self.resources.manager.keep_roots(graph)
         return {'graph': graph}
 
@@ -406,7 +410,9 @@ step_parse = Parser.partial()
 
 
 step_resolve = Optimizer.partial(
-    opts=[optlib.resolve_globals]
+    pre=[],
+    opts=[optlib.resolve_globals],
+    post=[],
 )
 
 
@@ -431,6 +437,7 @@ step_specialize = Specializer.partial()
 
 
 step_opt = Optimizer.partial(
+    pre=[],
     opts=[
         optlib.simplify_always_true,
         optlib.simplify_always_false,
@@ -438,7 +445,8 @@ step_opt = Optimizer.partial(
         optlib.simplify_partial,
         optlib.replace_applicator,
         optlib.elim_identity,
-    ]
+    ],
+    post=[],
 )
 
 
