@@ -5,7 +5,7 @@ import numpy as np
 
 from myia.dtype import Int, Float, List, Tuple, External
 from myia.prim.py_implementations import head, setattr as myia_setattr, \
-    setitem as myia_setitem, tail, hastype, typeof, \
+    tuple_setitem, list_setitem, tail, hastype, typeof, \
     shape, reshape, array_map, array_map2, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
     switch, scalar_to_array, broadcast_shape
@@ -104,13 +104,15 @@ def test_prim_head_tail():
     assert tail(tup) == (2, 3, 4)
 
 
-def test_prim_setitem():
+def test_prim_tuple_setitem():
     tup = (1, 2, 3, 4)
-    assert myia_setitem(tup, 1, 22) == (1, 22, 3, 4)
+    assert tuple_setitem(tup, 1, 22) == (1, 22, 3, 4)
 
+
+def test_prim_list_setitem():
     L = [1, 2, 3, 4]
     L2 = [1, 22, 3, 4]
-    assert myia_setitem(L, 1, 22) == L2
+    assert list_setitem(L, 1, 22) == L2
     assert L != L2  # test that this is not inplace
 
 

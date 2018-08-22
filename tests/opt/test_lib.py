@@ -4,7 +4,7 @@ from pytest import mark
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    head, tail, setitem, scalar_add, scalar_mul, identity, partial
+    head, tail, tuple_setitem, scalar_add, scalar_mul, identity, partial
 
 
 #######################
@@ -78,7 +78,7 @@ def test_setitem_tuple_elem0():
 
     def before(x, y):
         tup = (x + 1, x + 2, x + 3, x + 4)
-        return setitem(tup, 0, y)
+        return tuple_setitem(tup, 0, y)
 
     def after(x, y):
         tup = (y, x + 2, x + 3, x + 4)
@@ -92,7 +92,7 @@ def test_setitem_tuple_elem3():
 
     def before(x, y):
         tup = (x + 1, x + 2, x + 3, x + 4)
-        return setitem(tup, 3, y)
+        return tuple_setitem(tup, 3, y)
 
     def after(x, y):
         tup = (x + 1, x + 2, x + 3, y)
@@ -106,7 +106,7 @@ def test_setitem_tuple_noopt():
 
     def before(x, y, z):
         tup = (x + 1, x + 2, x + 3, x + 4)
-        return setitem(tup, z, y)
+        return tuple_setitem(tup, z, y)
 
     _check_opt(before, before,
                lib.setitem_tuple)

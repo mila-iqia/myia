@@ -65,7 +65,7 @@ def getitem_tuple(optimizer, node, equiv):
         return sexp_to_node((P.tuple_getitem, equiv[Y], i - 1), node.graph)
 
 
-@pattern_replacer(P.setitem, (P.cons_tuple, X, Y), C, Z)
+@pattern_replacer(P.tuple_setitem, (P.cons_tuple, X, Y), C, Z)
 def setitem_tuple(optimizer, node, equiv):
     """Match a constant setitem in an explicit tuple.
 
@@ -79,7 +79,7 @@ def setitem_tuple(optimizer, node, equiv):
         return sexp_to_node((P.cons_tuple, equiv[Z], equiv[Y]), node.graph)
     else:
         return sexp_to_node((P.cons_tuple, equiv[X],
-                             (P.setitem, equiv[Y], i - 1, equiv[Z])),
+                             (P.tuple_setitem, equiv[Y], i - 1, equiv[Z])),
                             node.graph)
 
 

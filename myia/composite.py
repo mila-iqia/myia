@@ -197,6 +197,12 @@ def getitem(data, item):
 
 
 @core
+def setitem(data, item, value):
+    """Implementation of `setitem`."""
+    return data.__setitem__(item, value)
+
+
+@core
 def iter(xs):
     """Implementation of `iter`."""
     return xs.__myia_iter__()

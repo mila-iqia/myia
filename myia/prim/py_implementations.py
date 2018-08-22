@@ -252,16 +252,20 @@ def _vm_getitem(vm, data, item):
     return vm.convert(data[item])
 
 
-@register(primops.setitem)
-def setitem(data, item, value):
-    """Implement `setitem`."""
-    if isinstance(data, tuple):
-        return tuple(value if i == item else x
-                     for i, x in enumerate(data))
-    else:
-        data2 = copy(data)
-        data2[item] = value
-        return data2
+@register(primops.tuple_setitem)
+def tuple_setitem(data, item, value):
+    """Implement `tuple_setitem`."""
+    return tuple(value if i == item else x
+                 for i, x in enumerate(data))
+
+
+@register(primops.list_setitem)
+@register(primops.array_setitem)
+def list_setitem(data, item, value):
+    """Implement `list/array_setitem`."""
+    data2 = copy(data)
+    data2[item] = value
+    return data2
 
 
 @vm_register(primops.getattr)

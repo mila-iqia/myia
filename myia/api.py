@@ -39,7 +39,7 @@ scalar_object_map = {
     operations.or_: P.bool_or,
     operations.matmul: P.dot,
     operations.getitem: C.getitem,
-    operations.setitem: P.setitem,
+    operations.setitem: C.setitem,
     operations.bool: P.identity,
     operations.getattr: P.getattr,
     operations.setattr: P.setattr,
@@ -72,7 +72,7 @@ standard_object_map = {
     operations.or_: C.or_,
     operations.matmul: C.matmul,
     operations.getitem: C.getitem,
-    operations.setitem: P.setitem,
+    operations.setitem: C.setitem,
     operations.bool: C.bool,
     operations.getattr: P.getattr,
     operations.setattr: P.setattr,
@@ -129,12 +129,14 @@ standard_method_map = TypeMap({
     },
     dtype.Tuple: {
         '__getitem__': P.tuple_getitem,
+        '__setitem__': P.tuple_setitem,
         '__myia_iter__': P.identity,
         '__myia_next__': C.tuple_next,
         '__myia_hasnext__': C.tuple_hasnext,
     },
     dtype.List: {
         '__getitem__': P.list_getitem,
+        '__setitem__': P.list_setitem,
         '__myia_iter__': C.list_iter,
     },
     dtype.Array: {
@@ -154,6 +156,7 @@ standard_method_map = TypeMap({
         '__ge__': C.array_ge,
         '__matmul__': P.dot,
         '__getitem__': P.array_getitem,
+        '__setitem__': P.array_setitem,
         '__myia_iter__': C.array_iter,
     }
 })
