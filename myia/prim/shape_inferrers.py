@@ -224,6 +224,8 @@ async def infer_shape_getitem(track, seq, idx):
         idx_v = await idx['value']
         assert idx_v is not ANYTHING
         return seq_sh.shape[idx_v]
+    else:
+        return ()
     # For any other type
     raise InferenceError("Unknown type")  # pragma: no cover
 
@@ -234,23 +236,6 @@ async def infer_type_make_record(track, cls, *elems):
     elem_shapes = [await x['shape'] for x in elems]
     cls_v = await cls['value']
     return ClassShape(dict(zip(cls_v.attributes.keys(), elem_shapes)))
-
-
-@shape_inferrer(P.iter, nargs=1)
-async def infer_shape_iter(track, seq):
-    """Infer the shape of iter."""
-    seq_sh = await seq['shape']
-    return TupleShape(((), seq_sh))
-
-
-@shape_inferrer(P.next, nargs=1)
-async def infer_shape_next(track, it):
-    """Infer the shape of next."""
-    it_sh = await it['shape']
-    it_t = await it['type']
-    # This is probably wrong but it works for now
-    data_sh = track.default({'type': it_t.elements[1]})
-    return TupleShape((data_sh, it_sh))
 
 
 @shape_inferrer(P.return_, nargs=1)
@@ -439,4 +424,10 @@ async def infer_shape_identity(track, x):
 @shape_inferrer(P.scalar_to_array, nargs=1)
 async def infer_shape_scalar_to_array(track, x):
     """Infer the shape of scalar_to_array."""
+    return ()
+
+
+@shape_inferrer(P.len, nargs=1)
+async def infer_shape_len(track, xs):
+    """Infer the shape of len."""
     return ()

@@ -66,16 +66,7 @@ getitem = Primitive('getitem')
 setitem = Primitive('setitem')
 getattr = Primitive('getattr')
 setattr = Primitive('setattr')
-
-
-#############
-# Iteration #
-#############
-
-
-iter = Primitive('iter')
-hasnext = Primitive('hasnext')
-next = Primitive('next')
+len = Primitive('len')
 
 
 ##########

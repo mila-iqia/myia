@@ -267,7 +267,14 @@ def _vm_getattr(vm, data, attr):
     from ..vm import Partial
     # I don't know how else to get a reference to this type
     method_wrapper_type = type((0).__add__)
-    x = getattr(data, attr)
+    try:
+        x = getattr(data, attr)
+    except AttributeError:
+        mmap = vm.convert.resources.method_map[typeof(data)]
+        if attr in mmap:
+            x = MethodType(mmap[attr], data)
+        else:
+            raise  # pragma: no cover
     if isinstance(x, method_wrapper_type):
         # This is returned by <int>.__add__ and the like.
         # Don't know how else to retrieve the unwrapped method
@@ -451,26 +458,6 @@ def partial(f, *args):
     return res
 
 
-@register(primops.iter)
-def _iter(xs):
-    """Implement `iter`."""
-    return (0, xs)
-
-
-@register(primops.hasnext)
-def _hasnext(it):
-    """Implement `hasnext`."""
-    n, data = it
-    return n < len(data)
-
-
-@register(primops.next)
-def _next(it):
-    """Implement `next`."""
-    n, data = it
-    return (data[n], (n + 1, data))
-
-
 @register(primops.switch)
 def switch(c, x, y):
     """Implement `switch`."""
@@ -514,3 +501,9 @@ def make_record(typ, *args):
     """Implement `make_record`."""
     dataclass = types.tag_to_dataclass[typ.tag]
     return dataclass(*args)
+
+
+@register(primops.len)
+def _len(x):
+    """Implement `len`."""
+    return len(x)

@@ -373,41 +373,6 @@ async def infer_type_getattr(track, data, item):
     return await static_getter(track, data, item, getattr, chk)
 
 
-@type_inferrer(P.iter, nargs=1)
-async def infer_type_iter(track, xs):
-    """Infer the return type of iter."""
-    xs_t = await xs['type']
-    if ismyiatype(xs_t, List):
-        return Tuple[Int[64], xs_t]
-    else:
-        raise MyiaTypeError('Unsupported type for iter')
-
-
-@type_inferrer(P.hasnext, nargs=1)
-async def infer_type_hasnext(track, it):
-    """Infer the return type of hasnext."""
-    it_t = await(it['type'])
-    if ismyiatype(it_t, Tuple, generic=False) \
-            and len(it_t.elements) == 2 \
-            and ismyiatype(it_t.elements[1], List, generic=False):
-        return Bool
-    else:  # pragma: no cover
-        raise MyiaTypeError('Unsupported iterator type for hasnext')
-
-
-@type_inferrer(P.next, nargs=1)
-async def infer_type_next(track, it):
-    """Infer the return type of next."""
-    it_t = await(it['type'])
-    if ismyiatype(it_t, Tuple, generic=False) \
-            and len(it_t.elements) == 2 \
-            and ismyiatype(it_t.elements[1], List, generic=False):
-        x_t = it_t.elements[1].element_type
-        return Tuple[x_t, it_t]
-    else:  # pragma: no cover
-        raise MyiaTypeError('Unsupported iterator type for next')
-
-
 @type_inferrer(P.scalar_to_array, nargs=1)
 async def infer_type_scalar_to_array(track, x):
     """Infer the return type of scalar_to_array."""
@@ -444,3 +409,10 @@ async def infer_type_make_record(track, cls, *elems):
         )
 
     return ret_t
+
+
+@type_inferrer(P.len, nargs=1)
+async def infer_type_len(track, xs):
+    """Infer the return type of len."""
+    await track.will_check((List, Array, Tuple), xs)
+    return Int[64]

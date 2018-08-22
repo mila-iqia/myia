@@ -391,6 +391,8 @@ def test_while(x, y):
         (li64, i64, i64),
         (li64, f64, InferenceError),
         (i64, i64, InferenceError),
+        (T[i64, i64, i64], i64, i64),
+        (T[i64, f64, i64], i64, InferenceError),
     ]
 )
 def test_for(xs, y):

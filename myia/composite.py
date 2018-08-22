@@ -1,10 +1,12 @@
 """Implementations of primitives as graphs."""
 
 
-from .dtype import Array
+from dataclasses import dataclass
+
+from .dtype import Array, Object, Int
 from .prim.py_implementations import \
     array_map, array_map2, bool_not, hastype, distribute, \
-    shape, broadcast_shape, switch, identity, bool_and
+    shape, broadcast_shape, switch, identity, bool_and, head, tail
 
 
 def core(fn):
@@ -181,6 +183,71 @@ def int_bool(x):
 def float_bool(x):
     """Implementation of `float_bool`."""
     return x != 0.0
+
+
+#############
+# Iteration #
+#############
+
+
+@core
+def iter(xs):
+    """Implementation of `iter`."""
+    return xs.__myia_iter__()
+
+
+@core
+def next(it):
+    """Implementation of `next`."""
+    return it.__myia_next__()
+
+
+@core
+def hasnext(it):
+    """Implementation of `hasnext`."""
+    return it.__myia_hasnext__()
+
+
+@dataclass(frozen=True)
+class SequenceIterator:
+    """Iterator to use for sequences like List, Array."""
+
+    idx: Int
+    seq: Object
+
+    @core
+    def __myia_hasnext__(self):
+        """Whether the index is past the length of the sequence."""
+        return self.idx < len(self.seq)
+
+    @core
+    def __myia_next__(self):
+        """Return the next element and a new iterator."""
+        return self.seq[self.idx], SequenceIterator(self.idx + 1, self.seq)
+
+
+@core
+def list_iter(xs):
+    """Iterator for List."""
+    return SequenceIterator(0, xs)
+
+
+@core
+def array_iter(xs):
+    """Iterator for Array."""
+    return SequenceIterator(0, xs)
+
+
+@core
+def tuple_next(xs):
+    """Next tuple."""
+    return head(xs), tail(xs)
+
+
+@core
+def tuple_hasnext(xs):
+    """Whether the tuple is empty or not."""
+    return len(xs) > 0
 
 
 #################

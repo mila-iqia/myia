@@ -43,10 +43,11 @@ scalar_object_map = {
     operations.bool: P.identity,
     operations.getattr: P.getattr,
     operations.setattr: P.setattr,
+    operations.len: P.len,
     operations.cons_tuple: P.cons_tuple,
-    operations.iter: P.iter,
-    operations.hasnext: P.hasnext,
-    operations.next: P.next,
+    operations.iter: C.iter,
+    operations.hasnext: C.hasnext,
+    operations.next: C.next,
     operations.if_: P.if_,
 }
 
@@ -75,10 +76,11 @@ standard_object_map = {
     operations.bool: C.bool,
     operations.getattr: P.getattr,
     operations.setattr: P.setattr,
+    operations.len: P.len,
     operations.cons_tuple: P.cons_tuple,
-    operations.iter: P.iter,
-    operations.hasnext: P.hasnext,
-    operations.next: P.next,
+    operations.iter: C.iter,
+    operations.hasnext: C.hasnext,
+    operations.next: C.next,
     operations.if_: P.if_,
 }
 
@@ -125,6 +127,14 @@ standard_method_map = TypeMap({
         '__bool__': C.float_bool,
         '__myia_to_array__': P.scalar_to_array,
     },
+    dtype.Tuple: {
+        '__myia_iter__': P.identity,
+        '__myia_next__': C.tuple_next,
+        '__myia_hasnext__': C.tuple_hasnext,
+    },
+    dtype.List: {
+        '__myia_iter__': C.list_iter,
+    },
     dtype.Array: {
         '__add__': C.array_add,
         '__sub__': C.array_sub,
@@ -141,6 +151,7 @@ standard_method_map = TypeMap({
         '__le__': C.array_le,
         '__ge__': C.array_ge,
         '__matmul__': P.dot,
+        '__myia_iter__': C.array_iter,
     }
 })
 

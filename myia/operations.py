@@ -8,7 +8,7 @@ from operator import (  # noqa
 
 
 from builtins import (  # noqa
-    bool, getattr, setattr
+    bool, getattr, setattr, len
 )
 
 

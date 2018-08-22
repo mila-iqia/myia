@@ -5,7 +5,7 @@ import asyncio
 
 from functools import partial
 
-from ..dtype import pytype_to_myiatype, TypeType
+from ..dtype import pytype_to_myiatype, TypeType, ismyiatype, Tuple
 from ..infer import ValueWrapper, InferenceError, PartialInferrer, \
     ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track, \
     unwrap, MetaGraphInferrer
@@ -249,3 +249,17 @@ async def infer_value_resolve(track, data, item):
 async def infer_value_getattr(track, data, item):
     """Infer the return value of getattr."""
     return await static_getter(track, data, item, getattr)
+
+
+@value_inferrer(P.len, nargs=1)
+async def infer_value_len(track, xs):
+    """Infer the return value of len."""
+    xs_t = await xs['type']
+    if ismyiatype(xs_t, Tuple, generic=False):
+        return limited(len(xs_t.elements), track.max_depth)
+    else:
+        xs_v = await xs['value']
+        if xs_v is ANYTHING:
+            return ANYTHING
+        else:
+            return limited(len(xs_v), track.max_depth)
