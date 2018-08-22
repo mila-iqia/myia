@@ -1,6 +1,7 @@
 """Definition of shape inference for primitives."""
 
 import operator
+from dataclasses import is_dataclass
 from functools import partial, reduce
 
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
@@ -8,8 +9,9 @@ from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     InferenceError
 from ..ir import Graph, MetaGraph
 
-from ..dtype import Array, Tuple, ismyiatype
-from ..utils import is_dataclass_type
+from ..dtype import Array, Tuple, List, Class, TypeType, ismyiatype, \
+    pytype_to_myiatype
+from ..utils import Named
 
 from . import ops as P
 from .inferrer_utils import static_getter
@@ -24,8 +26,11 @@ def prod(iterable):
 shape_inferrer_constructors = {}
 
 
+NOSHAPE = Named('NOSHAPE')
+
+
 class TupleShape:
-    """Class to distinguish the shape of tuples from the shape of arrays."""
+    """Class to distinguish the shape of tuples items."""
 
     __slots__ = ['shape']
 
@@ -47,6 +52,46 @@ class TupleShape:
         return hash((type(self), self.shape))
 
 
+class ListShape:
+    """Class to represent the shape of list elements."""
+
+    __slots__ = ['shape']
+
+    def __init__(self, shape):
+        """Create the shape."""
+        self.shape = shape
+
+    def __repr__(self):
+        return f"L{self.shape}"
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.shape == other.shape)
+
+    def __hash__(self):
+        return hash((type(self), self.shape))
+
+
+class ClassShape:
+    """Class to represent the shape of dataclass fields."""
+
+    __slots__ = ['shape']
+
+    def __init__(self, shape):
+        """Create the shape."""
+        self.shape = shape
+
+    def __repr__(self):
+        return f"C{self.shape}"
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.shape == other.shape)
+
+    def __hash__(self):
+        return hash((type(self), tuple(sorted(self.shape.items()))))
+
+
 class ScalarShapeInferrer(Inferrer):
     """Shape inferrer for all primitives that don't take arrays."""
 
@@ -55,12 +100,35 @@ class ScalarShapeInferrer(Inferrer):
         super().__init__(track, 'scalar_shape_inferrer')
 
     async def __call__(self, *args):
-        """Since no arrays are involved, the shape is always ()."""
-        return ()
+        """Since no arrays are involved, there is no shape."""
+        return NOSHAPE
 
     def provably_equivalent(self, other):
         """This is always equal to itself."""
         return type(self) == type(other)
+
+
+def find_matching_shape(shps):
+    """Returns a shape that matches all shapes in `shps`."""
+    shp = shps[0]
+    shps = shps[1:]
+
+    if all(shp == s for s in shps):
+        return shp
+
+    if (not isinstance(shp, tuple) or
+            any(not isinstance(s, tuple) for s in shps)):
+        raise InferenceError("Mismatched element shapes in list")
+
+    if not all(len(shp) == len(s) for s in shps):
+        raise InferenceError("Arrays of differing ndim")
+
+    shp = list(shp)
+    for i, shp_i in enumerate(shp):
+        if any(s[i] != shp_i for s in shps):
+            shp[i] = ANYTHING
+
+    return tuple(shp)
 
 
 class ShapeTrack(Track):
@@ -74,14 +142,21 @@ class ShapeTrack(Track):
 
     def default(self, values):
         """Default value for ShapeTrack."""
-        if isinstance(values['type'], Array):
+        if ismyiatype(values['type'], Array):
             raise Exception(
                 'There is no default value for Arrays on the shape track.'
             )  # pragma: no cover
         if ismyiatype(values['type'], Tuple):
-            return TupleShape(self.default({'type': e})
-                              for e in values['type'].elements)
-        return ()
+            tup = values['type']
+            return TupleShape(self.default({'type': e}) for e in tup.elements)
+        elif ismyiatype(values['type'], List):
+            lst = values['type']
+            return ListShape(self.default({'type': lst.element_type}))
+        elif ismyiatype(values['type'], Class):
+            cls = values['type']
+            return ClassShape(dict((attr, self.default({'type': tp}))
+                                   for attr, tp in cls.attributes.items()))
+        return NOSHAPE
 
     def from_value(self, v, context):
         """Infer the shape of a constant."""
@@ -94,12 +169,25 @@ class ShapeTrack(Track):
             return GraphInferrer(self, v, context)
         elif isinstance(v, MetaGraph):
             return MetaGraphInferrer(self, v)
-        elif is_dataclass_type(v):
-            raise NotImplementedError('Dataclasses are not supported yet')
         elif isinstance(v, tuple):
             return TupleShape(self.from_value(e, context) for e in v)
+        elif isinstance(v, list):
+            shps = [self.from_value(e, context) for e in v]
+            if len(shps) == 0:
+                return ListShape(NOSHAPE)  # pragma: no cover
+            return ListShape(find_matching_shape(shps))
+        elif is_dataclass(v):
+            if isinstance(v, type):
+                rec = self.constructors[P.make_record](self)
+                typ = pytype_to_myiatype(v)
+                vref = self.engine.vref({'value': typ, 'type': TypeType})
+                return PartialInferrer(self, rec, [vref])
+            else:
+                return ClassShape(
+                    dict((n, self.from_value(getattr(v, n), context))
+                         for n in v.__dataclass_fields__.keys()))
         else:
-            return getattr(v, 'shape', ())
+            return getattr(v, 'shape', NOSHAPE)
 
 
 shape_inferrer = partial(register_inferrer,
@@ -138,6 +226,14 @@ async def infer_shape_getitem(track, seq, idx):
         return seq_sh.shape[idx_v]
     # For any other type
     raise InferenceError("Unknown type")  # pragma: no cover
+
+
+@shape_inferrer(P.make_record, nargs=None)
+async def infer_type_make_record(track, cls, *elems):
+    """Infer the shape of make_record."""
+    elem_shapes = [await x['shape'] for x in elems]
+    cls_v = await cls['value']
+    return ClassShape(dict(zip(cls_v.attributes.keys(), elem_shapes)))
 
 
 @shape_inferrer(P.iter, nargs=1)
@@ -227,6 +323,15 @@ async def infer_shape_array_map2(track, fn, ary1, ary2):
     return shp1
 
 
+@shape_inferrer(P.list_map, nargs=2)
+async def infer_shape_list_map(track, fn, lst):
+    """Infer the shape of list_map."""
+    shp = await lst['shape']
+    typ = await lst['type']
+    e = track.engine.vref({'type': typ.element_type, 'shape': shp.shape})
+    return ListShape(await (await fn['shape'])(e))
+
+
 @shape_inferrer(P.array_scan, nargs=4)
 async def infer_shape_array_scan(track, fn, init, ary, ax):
     """Infer the shape of array_scan."""
@@ -314,6 +419,14 @@ async def infer_shape_resolve(track, data, item):
 @shape_inferrer(P.getattr, nargs=2)
 async def infer_shape_getattr(track, data, item):
     """Infer the shape of getattr."""
+    data_typ = await data['type']
+    if ismyiatype(data_typ, Class):
+        item_v = await item['value']
+        if item_v is ANYTHING:
+            raise InferenceError(
+                "getattr with non-constant item")  # pragma: no cover
+        data_sh = await data['shape']
+        return data_sh.shape[item_v]
     return await static_getter(track, data, item, getattr)
 
 

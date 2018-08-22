@@ -15,7 +15,8 @@ from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
     Function as F, TypeType, UInt, External, pytype_to_myiatype, Number
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive
-from myia.prim.shape_inferrers import TupleShape
+from myia.prim.shape_inferrers import TupleShape, ListShape, ClassShape, \
+    NOSHAPE
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
     typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
@@ -55,6 +56,10 @@ af32 = A[f32]
 af64 = A[f64]
 
 Nil = T[()]
+
+
+def t(tt):
+    return {'type': tt}
 
 
 Point_t = pytype_to_myiatype(Point)
@@ -439,9 +444,9 @@ def test_too_many_args(x, y):
 
 
 @infer(type=(i64, f64, T[i64, f64]),
-       shape=[({'type': i64}, {'type': f64}, TupleShape(((), ()))),
-              ({'type': T[i64, i64]}, {'type': f64},
-               TupleShape((TupleShape(((), ())), ())))])
+       shape=[(t(i64), t(f64), TupleShape((NOSHAPE, NOSHAPE))),
+              (t(T[i64, i64]), t(f64),
+               TupleShape((TupleShape((NOSHAPE, NOSHAPE)), NOSHAPE)))])
 def test_tup(x, y):
     return (x, y)
 
@@ -450,8 +455,8 @@ def test_tup(x, y):
              (T[f64, i64], f64),
              (T[()], InferenceError),
              (f64, InferenceError)],
-       shape=[({'type': T[i64, f64]}, ()),
-              ({'type': T[T[i64, f64], i64]}, TupleShape(((), ())))])
+       shape=[(t(T[i64, f64]), NOSHAPE),
+              (t(T[T[i64, f64], i64]), TupleShape((NOSHAPE, NOSHAPE)))])
 def test_head_tuple(tup):
     return head(tup)
 
@@ -460,15 +465,15 @@ def test_head_tuple(tup):
              (T[f64, i64], T[i64]),
              (T[()], InferenceError),
              (f64, InferenceError)],
-       shape=[({'type': T[f64, i64]}, TupleShape(((),))),
-              ({'type': T[i64, T[i64, f64]]},
-               TupleShape((TupleShape(((), ())),)))])
+       shape=[(t(T[f64, i64]), TupleShape((NOSHAPE,))),
+              (t(T[i64, T[i64, f64]]),
+               TupleShape((TupleShape((NOSHAPE, NOSHAPE)),)))])
 def test_tail_tuple(tup):
     return tail(tup)
 
 
 @infer(type=[(i64, f64, i64), (f64, i64, f64)],
-       shape=({'type': i64}, {'type': f64}, ()))
+       shape=(t(i64), t(f64), NOSHAPE))
 def test_getitem_tuple(x, y):
     return (x, y)[0]
 
@@ -624,7 +629,7 @@ def test_choose_incompatible(i, x, y):
         (i64, f64, f64)
     ],
     shape=[
-        ({'type': i64, 'shape': ()}, {'type': i64, 'shape': ()}, ())
+        (t(i64), t(i64), NOSHAPE)
     ]
 )
 def test_choose_indirect(i, x):
@@ -893,8 +898,8 @@ def test_list_map(xs, ys):
 
 @infer(
     type=[(i64, B)],
-    value=[({'type': i64}, True),
-           ({'type': f64}, False)]
+    value=[(t(i64), True),
+           (t(f64), False)]
 )
 def test_hastype_simple(x):
     return hastype(x, i64)
@@ -924,8 +929,8 @@ def test_hastype(x, y):
 
 @infer(
     type=[(i64, TypeType)],
-    value=[({'type': i64}, i64),
-           ({'type': f64}, f64)]
+    value=[(t(i64), i64),
+           (t(f64), f64)]
 )
 def test_typeof(x):
     return typeof(x)
@@ -971,11 +976,14 @@ def test_hastype_2(x):
     return f(x)
 
 
-@infer(
+@infer_std(
     type=[
         (li64, i64, li64),
         (lf64, i64, InferenceError),
-    ]
+    ],
+    shape=[(t(li64), t(i64), ListShape(NOSHAPE)),
+           ({'type': L[ai64], 'shape': ListShape((2, 3))}, ai64_of(2, 3),
+            ListShape((2, 3)))]
 )
 def test_map_2(xs, z):
 
@@ -996,16 +1004,14 @@ def test_nonexistent_variable():
     return xxxx + yz  # noqa
 
 
-helpers = SimpleNamespace(
-    add=operator.add,
-    mul=operator.mul,
-    square=_square
-)
+class helpers:
+    add = operator.add
+    mul = operator.mul
+    square = _square
 
 
-data = SimpleNamespace(
-    a25=np.ones((2, 5))
-)
+class data:
+    a25 = np.ones((2, 5))
 
 
 @infer(
@@ -1116,6 +1122,15 @@ def test_infinite_mutual_recursion(x):
               ({'shape': (2, ANYTHING), 'type': ai16}, ANYTHING)])
 def test_shape(ary):
     return shape(ary)
+
+
+@infer(shape=[
+    ({'value': Point(2, 3)}, ClassShape({'x': NOSHAPE, 'y': NOSHAPE})),
+    ({'value': [np.ones((2, 3)), np.ones((2, 3))]}, ListShape((2, 3))),
+    ({'value': [np.ones((2, 2)), np.ones((2, 3))]}, ListShape((2, ANYTHING))),
+])
+def test_shape2(val):
+    return val
 
 
 @infer(shape=[(af64_of(2, 3),
@@ -1235,7 +1250,7 @@ def test_array_reduce(ary, shp):
 
 @infer(type=[(i64, i64)],
        value=[(40, 42)],
-       shape=[({'type': i64, 'shape': ()}, ())])
+       shape=[({'type': i64}, NOSHAPE)])
 def test_partial_1(x):
     def f(a, b):
         return a + b
@@ -1540,6 +1555,9 @@ def test_max_std(x, y):
     value=[
         (Point(3, 4), 7),
         ({'type': Point_t, 'value': ANYTHING}, ANYTHING),
+    ],
+    shape=[
+        (t(Point_t), NOSHAPE)
     ]
 )
 def test_class(pt):
@@ -1565,6 +1583,10 @@ def test_dataclass_method(pt):
     ],
     value=[
         (1, 2, 3, 4, Point(4, 6)),
+    ],
+    shape=[
+        (t(i64), t(i64), t(i64), t(i64),
+         ClassShape({'x': NOSHAPE, 'y': NOSHAPE}))
     ]
 )
 def test_dataclass_inst(x1, y1, x2, y2):
