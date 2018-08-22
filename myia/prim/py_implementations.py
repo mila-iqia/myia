@@ -236,13 +236,17 @@ def tail(tup):
     return tup[1:]
 
 
-@py_register(primops.getitem)
+@py_register(primops.tuple_getitem)
+@py_register(primops.list_getitem)
+@py_register(primops.array_getitem)
 def getitem(data, item):
     """Implement `getitem`."""
     return data[item]
 
 
-@vm_register(primops.getitem)
+@vm_register(primops.tuple_getitem)
+@vm_register(primops.list_getitem)
+@vm_register(primops.array_getitem)
 def _vm_getitem(vm, data, item):
     """Implement `getitem`."""
     return vm.convert(data[item])
@@ -263,7 +267,7 @@ def setitem(data, item, value):
 @vm_register(primops.getattr)
 def _vm_getattr(vm, data, attr):
     """Implement `getattr`."""
-    from types import MethodType
+    from types import MethodType, BuiltinMethodType
     from ..vm import Partial
     # I don't know how else to get a reference to this type
     method_wrapper_type = type((0).__add__)
@@ -280,6 +284,10 @@ def _vm_getattr(vm, data, attr):
         # Don't know how else to retrieve the unwrapped method
         unwrapped = getattr(x.__objclass__, x.__name__)
         return Partial(vm.convert(unwrapped), [x.__self__], vm)
+    elif isinstance(x, BuiltinMethodType):
+        # This is returned by <list>.__getitem__ and maybe others.
+        x = getattr(type(data), attr)
+        return Partial(vm.convert(x), [data], vm)
     elif isinstance(x, MethodType):  # pragma: no cover
         # This is a method made from a user function
         # TODO: Should test this when we have custom types

@@ -38,7 +38,7 @@ scalar_object_map = {
     operations.and_: P.bool_and,
     operations.or_: P.bool_or,
     operations.matmul: P.dot,
-    operations.getitem: P.getitem,
+    operations.getitem: C.getitem,
     operations.setitem: P.setitem,
     operations.bool: P.identity,
     operations.getattr: P.getattr,
@@ -71,7 +71,7 @@ standard_object_map = {
     operations.and_: C.and_,
     operations.or_: C.or_,
     operations.matmul: C.matmul,
-    operations.getitem: P.getitem,
+    operations.getitem: C.getitem,
     operations.setitem: P.setitem,
     operations.bool: C.bool,
     operations.getattr: P.getattr,
@@ -128,11 +128,13 @@ standard_method_map = TypeMap({
         '__myia_to_array__': P.scalar_to_array,
     },
     dtype.Tuple: {
+        '__getitem__': P.tuple_getitem,
         '__myia_iter__': P.identity,
         '__myia_next__': C.tuple_next,
         '__myia_hasnext__': C.tuple_hasnext,
     },
     dtype.List: {
+        '__getitem__': P.list_getitem,
         '__myia_iter__': C.list_iter,
     },
     dtype.Array: {
@@ -151,6 +153,7 @@ standard_method_map = TypeMap({
         '__le__': C.array_le,
         '__ge__': C.array_ge,
         '__matmul__': P.dot,
+        '__getitem__': P.array_getitem,
         '__myia_iter__': C.array_iter,
     }
 })
@@ -216,6 +219,8 @@ class Converter(PipelineResource):
             np.float16: dtype.Float,
             np.float32: dtype.Float,
             np.float64: dtype.Float,
+            tuple: dtype.Tuple,
+            list: dtype.List,
         }
         mmap = self.resources.method_map
         for t1, t2 in type_map.items():

@@ -446,8 +446,8 @@ def _opt_accum_cons(optimizer, node, equiv):
         return node
 
 
-@pattern_replacer(primops.getitem, X, V)
-def _opt_fancy_getitem(optimizer, node, equiv):
+@pattern_replacer(primops.tuple_getitem, X, V)
+def _opt_fancy_tuple_getitem(optimizer, node, equiv):
     x = equiv[X]
     v = equiv[V]
     ct = Constant(GraphCosmeticPrimitive(f'[{v.value}]', on_edge=True))
@@ -482,7 +482,7 @@ def cosmetic_transformer(g):
     """
     opt = PatternEquilibriumOptimizer(
         _opt_accum_cons,
-        _opt_fancy_getitem,
+        _opt_fancy_tuple_getitem,
         _opt_fancy_resolve,
         _opt_fancy_getattr,
     )

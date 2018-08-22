@@ -168,19 +168,23 @@ async def infer_type_tail(track, tup):
     return Tuple[tup_t.elements[1:]]
 
 
-@type_inferrer(P.getitem, nargs=2)
-async def infer_type_getitem(track, seq, idx):
-    """Infer the return type of getitem."""
-    seq_t = await track.check((Tuple, List), seq)
+@type_inferrer(P.tuple_getitem, nargs=2)
+async def infer_type_tuple_getitem(track, seq, idx):
+    """Infer the return type of tuple_getitem."""
+    seq_t = await track.check(Tuple, seq)
     await track.check(Int, idx)
+    idx_v = await idx['value']
+    if idx_v is ANYTHING:
+        raise MyiaTypeError('Tuples must be indexed with a constant')
+    return seq_t.elements[idx_v]
 
-    if ismyiatype(seq_t, Tuple):
-        idx_v = await idx['value']
-        if idx_v is ANYTHING:
-            raise MyiaTypeError('Tuples must be indexed with a constant')
-        return seq_t.elements[idx_v]
-    elif ismyiatype(seq_t, List):
-        return seq_t.element_type
+
+@type_inferrer(P.list_getitem, nargs=2)
+async def infer_type_list_getitem(track, seq, idx):
+    """Infer the return type of list_getitem."""
+    seq_t = await track.check(List, seq)
+    await track.check(Int, idx)
+    return seq_t.element_type
 
 
 @type_inferrer(P.typeof, nargs=1)

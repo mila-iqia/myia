@@ -49,7 +49,7 @@ def primset_var(*prims):
 ###############################
 
 
-@pattern_replacer(P.getitem, (P.cons_tuple, X, Y), C)
+@pattern_replacer(P.tuple_getitem, (P.cons_tuple, X, Y), C)
 def getitem_tuple(optimizer, node, equiv):
     """Match a constant index in an explicit tuple.
 
@@ -62,7 +62,7 @@ def getitem_tuple(optimizer, node, equiv):
     if i == 0:
         return equiv[X]
     else:
-        return sexp_to_node((P.getitem, equiv[Y], i - 1), node.graph)
+        return sexp_to_node((P.tuple_getitem, equiv[Y], i - 1), node.graph)
 
 
 @pattern_replacer(P.setitem, (P.cons_tuple, X, Y), C, Z)

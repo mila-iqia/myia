@@ -191,6 +191,12 @@ def float_bool(x):
 
 
 @core
+def getitem(data, item):
+    """Implementation of `getitem`."""
+    return data.__getitem__(item)
+
+
+@core
 def iter(xs):
     """Implementation of `iter`."""
     return xs.__myia_iter__()

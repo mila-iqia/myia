@@ -214,20 +214,15 @@ async def infer_shape_tail(track, tup):
     return TupleShape((await tup['shape']).shape[1:])
 
 
-@shape_inferrer(P.getitem, nargs=2)
-async def infer_shape_getitem(track, seq, idx):
-    """Infer the shape of getitem."""
+@shape_inferrer(P.tuple_getitem, nargs=2)
+async def infer_shape_tuple_getitem(track, seq, idx):
+    """Infer the shape of tuple_getitem."""
     seq_t = await seq['type']
-
-    if ismyiatype(seq_t, Tuple):
-        seq_sh = await seq['shape']
-        idx_v = await idx['value']
-        assert idx_v is not ANYTHING
-        return seq_sh.shape[idx_v]
-    else:
-        return ()
-    # For any other type
-    raise InferenceError("Unknown type")  # pragma: no cover
+    assert ismyiatype(seq_t, Tuple)
+    seq_sh = await seq['shape']
+    idx_v = await idx['value']
+    assert idx_v is not ANYTHING
+    return seq_sh.shape[idx_v]
 
 
 @shape_inferrer(P.make_record, nargs=None)
