@@ -6,3 +6,7 @@ from .opt import (  # noqa
     pattern_replacer,
     PatternEquilibriumOptimizer
 )
+
+from .cse import (  # noqa
+    cse, CSE
+)
