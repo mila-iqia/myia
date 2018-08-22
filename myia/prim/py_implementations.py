@@ -292,9 +292,8 @@ def _vm_getattr(vm, data, attr):
         # This is returned by <list>.__getitem__ and maybe others.
         x = getattr(type(data), attr)
         return Partial(vm.convert(x), [data], vm)
-    elif isinstance(x, MethodType):  # pragma: no cover
+    elif isinstance(x, MethodType):
         # This is a method made from a user function
-        # TODO: Should test this when we have custom types
         return Partial(vm.convert(x.__func__), [x.__self__], vm)
     else:
         return vm.convert(x)
