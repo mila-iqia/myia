@@ -8,7 +8,8 @@ from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
 from .infer import InferenceEngine, ANYTHING
 from .ir import Graph, clone, GraphManager
-from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE
+from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
+    EraseClass
 from .pipeline import PipelineStep, PipelineResource, PipelineDefinition
 from .prim import py_implementations, vm_implementations, ops as P
 from .prim.value_inferrers import ValueTrack, value_inferrer_constructors
@@ -446,7 +447,7 @@ step_opt = Optimizer.partial(
         optlib.replace_applicator,
         optlib.elim_identity,
     ],
-    post=[CSE],
+    post=[CSE, EraseClass],
 )
 
 

@@ -10,3 +10,7 @@ from .opt import (  # noqa
 from .cse import (  # noqa
     cse, CSE
 )
+
+from .clean import (  # noqa
+    EraseClass
+)
