@@ -70,7 +70,9 @@ list_setitem = Primitive('list_setitem')
 array_setitem = Primitive('array_setitem')
 getattr = Primitive('getattr')
 setattr = Primitive('setattr')
-len = Primitive('len')
+tuple_len = Primitive('tuple_len')
+list_len = Primitive('list_len')
+array_len = Primitive('array_len')
 
 
 ##########

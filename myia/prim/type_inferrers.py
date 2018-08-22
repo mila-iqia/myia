@@ -442,8 +442,22 @@ async def infer_type_make_record(track, cls, *elems):
     return ret_t
 
 
-@type_inferrer(P.len, nargs=1)
-async def infer_type_len(track, xs):
-    """Infer the return type of len."""
-    await track.will_check((List, Array, Tuple), xs)
+@type_inferrer(P.tuple_len, nargs=1)
+async def infer_type_tuple_len(track, xs):
+    """Infer the return type of tuple_len."""
+    await track.will_check(Tuple, xs)
+    return Int[64]
+
+
+@type_inferrer(P.list_len, nargs=1)
+async def infer_type_list_len(track, xs):
+    """Infer the return type of list_len."""
+    await track.will_check(List, xs)
+    return Int[64]
+
+
+@type_inferrer(P.array_len, nargs=1)
+async def infer_type_array_len(track, xs):
+    """Infer the return type of array_len."""
+    await track.will_check(Array, xs)
     return Int[64]

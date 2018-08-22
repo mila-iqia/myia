@@ -191,6 +191,12 @@ def float_bool(x):
 
 
 @core
+def _len(data):
+    """Implementation of `len`."""
+    return data.__len__()
+
+
+@core
 def getitem(data, item):
     """Implementation of `getitem`."""
     return data.__getitem__(item)

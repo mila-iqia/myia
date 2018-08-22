@@ -515,7 +515,9 @@ def make_record(typ, *args):
     return dataclass(*args)
 
 
-@register(primops.len)
+@register(primops.tuple_len)
+@register(primops.list_len)
+@register(primops.array_len)
 def _len(x):
     """Implement `len`."""
     return len(x)

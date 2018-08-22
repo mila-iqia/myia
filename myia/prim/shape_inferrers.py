@@ -420,9 +420,3 @@ async def infer_shape_identity(track, x):
 async def infer_shape_scalar_to_array(track, x):
     """Infer the shape of scalar_to_array."""
     return ()
-
-
-@shape_inferrer(P.len, nargs=1)
-async def infer_shape_len(track, xs):
-    """Infer the shape of len."""
-    return ()
