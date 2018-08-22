@@ -142,6 +142,10 @@ class ValueTrack(Track):
         elif v is ANYTHING:
             return v
         else:
+            try:
+                hash(v)
+            except TypeError:
+                return ANYTHING
             return self.wrap(v)
 
         return self.wrap(inf)

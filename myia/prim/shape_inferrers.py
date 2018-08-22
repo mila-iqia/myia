@@ -1,6 +1,7 @@
 """Definition of shape inference for primitives."""
 
 import operator
+from dataclasses import is_dataclass
 from functools import partial, reduce
 
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
@@ -82,9 +83,6 @@ class ClassShape:
 
     def __repr__(self):
         return f"C{self.shape}"
-
-    def __getitem__(self, name):
-        return self.shape[name]
 
     def __eq__(self, other):
         return (type(self) == type(other) and
@@ -176,13 +174,18 @@ class ShapeTrack(Track):
         elif isinstance(v, list):
             shps = [self.from_value(e, context) for e in v]
             if len(shps) == 0:
-                return ListShape(NOSHAPE)
+                return ListShape(NOSHAPE)  # pragma: no cover
             return ListShape(find_matching_shape(shps))
-        elif is_dataclass_type(v):
-            rec = self.constructors[P.make_record](self)
-            typ = pytype_to_myiatype(v)
-            vref = self.engine.vref({'value': typ, 'type': TypeType})
-            return PartialInferrer(self, rec, [vref])
+        elif is_dataclass(v):
+            if isinstance(v, type):
+                rec = self.constructors[P.make_record](self)
+                typ = pytype_to_myiatype(v)
+                vref = self.engine.vref({'value': typ, 'type': TypeType})
+                return PartialInferrer(self, rec, [vref])
+            else:
+                return ClassShape(
+                    dict((n, self.from_value(getattr(v, n), context))
+                         for n in v.__dataclass_fields__.keys()))
         else:
             return getattr(v, 'shape', NOSHAPE)
 
@@ -318,6 +321,15 @@ async def infer_shape_array_map2(track, fn, ary1, ary2):
         if a != b and a is not ANYTHING and b is not ANYTHING:
             raise MyiaShapeError("Expect same shapes for array_map2")
     return shp1
+
+
+@shape_inferrer(P.list_map, nargs=2)
+async def infer_shape_list_map(track, fn, lst):
+    """Infer the shape of list_map."""
+    shp = await lst['shape']
+    typ = await lst['type']
+    e = track.engine.vref({'type': typ.element_type, 'shape': shp.shape})
+    return ListShape(await (await fn['shape'])(e))
 
 
 @shape_inferrer(P.array_scan, nargs=4)
