@@ -1013,6 +1013,7 @@ class helpers:
 class data:
     a25 = np.ones((2, 5))
 
+
 @infer(
     type=[
         (i64, i64, T[i64, i64]),
@@ -1584,7 +1585,8 @@ def test_dataclass_method(pt):
         (1, 2, 3, 4, Point(4, 6)),
     ],
     shape=[
-        (t(i64), t(i64), t(i64), t(i64), ClassShape({'x': NOSHAPE, 'y': NOSHAPE}))
+        (t(i64), t(i64), t(i64), t(i64),
+         ClassShape({'x': NOSHAPE, 'y': NOSHAPE}))
     ]
 )
 def test_dataclass_inst(x1, y1, x2, y2):

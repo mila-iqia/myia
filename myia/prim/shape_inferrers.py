@@ -11,7 +11,7 @@ from ..ir import Graph, MetaGraph
 
 from ..dtype import Array, Tuple, List, Class, TypeType, ismyiatype, \
     pytype_to_myiatype
-from ..utils import is_dataclass_type, Named
+from ..utils import Named
 
 from . import ops as P
 from .inferrer_utils import static_getter
@@ -419,11 +419,13 @@ async def infer_shape_resolve(track, data, item):
 @shape_inferrer(P.getattr, nargs=2)
 async def infer_shape_getattr(track, data, item):
     """Infer the shape of getattr."""
-    if ismyiatype(data, Class):
+    data_typ = await data['type']
+    if ismyiatype(data_typ, Class):
         item_v = await item['value']
         if item_v is ANYTHING:
-            raise InferenceError("getattr with non-constant item")
-        data_sh = await item['shape']
+            raise InferenceError(
+                "getattr with non-constant item")  # pragma: no cover
+        data_sh = await data['shape']
         return data_sh.shape[item_v]
     return await static_getter(track, data, item, getattr)
 
