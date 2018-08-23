@@ -195,8 +195,11 @@ class ShapeTrack(Track):
         """Return the type of each element of shape sh."""
         if isinstance(sh, ListShape):
             return sh.shape
-        else:
+        elif isinstance(sh, tuple):
+            # Array
             return NOSHAPE
+        else:
+            raise AssertionError()
 
 
 shape_inferrer = partial(register_inferrer,

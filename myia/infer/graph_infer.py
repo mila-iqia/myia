@@ -103,7 +103,7 @@ class Track(Partializable):
         )
 
     def to_element(self, v):
-        """Simulates getitem on the inferred value v."""
+        """Returns the value on this track for each element of v."""
         raise NotImplementedError()  # pragma: no cover
 
     def from_value(self, v, context=None):
