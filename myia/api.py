@@ -438,7 +438,7 @@ step_specialize = Specializer.partial()
 
 
 step_opt = Optimizer.partial(
-    pre=[],
+    pre=[EraseClass],
     opts=[
         optlib.simplify_always_true,
         optlib.simplify_always_false,
@@ -447,7 +447,7 @@ step_opt = Optimizer.partial(
         optlib.replace_applicator,
         optlib.elim_identity,
     ],
-    post=[CSE, EraseClass],
+    post=[CSE]
 )
 
 
