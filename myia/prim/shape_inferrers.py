@@ -277,23 +277,26 @@ async def infer_shape_partial(engine, fn, *args):
     return PartialInferrer(engine, fn_t, args)
 
 
-@shape_inferrer(P.array_map, nargs=2)
-async def infer_shape_array_map(track, fn, ary):
+@shape_inferrer(P.array_map, nargs=None)
+async def infer_shape_array_map(track, fn, *arrays):
     """Infer the shape of array_map."""
-    return await ary['shape']
-
-
-@shape_inferrer(P.array_map2, nargs=3)
-async def infer_shape_array_map2(track, fn, ary1, ary2):
-    """Infer the shape of array_map2."""
-    shp1 = await ary1['shape']
-    shp2 = await ary2['shape']
-    if len(shp1) != len(shp2):
-        raise MyiaShapeError("Expect same shapes for array_map2")
-    for a, b in zip(shp1, shp2):
-        if a != b and a is not ANYTHING and b is not ANYTHING:
-            raise MyiaShapeError("Expect same shapes for array_map2")
-    return shp1
+    shapes = [await a['shape'] for a in arrays]
+    shape0, *rest = shapes
+    if any(len(s) != len(shape0) for s in rest):
+        raise MyiaShapeError("Expect same shapes for array_map")
+    rshape = []
+    for entries in zip(*shapes):
+        entries = set(entries)
+        entries.add(ANYTHING)
+        if len(entries) == 1:
+            rshape.append(ANYTHING)
+        elif len(entries) == 2:
+            entries.remove(ANYTHING)
+            entry, = entries
+            rshape.append(entry)
+        else:
+            raise MyiaShapeError("Expect same shapes for array_map")
+    return tuple(rshape)
 
 
 @shape_inferrer(P.list_map, nargs=2)

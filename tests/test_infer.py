@@ -19,7 +19,7 @@ from myia.prim.shape_inferrers import TupleShape, ListShape, ClassShape, \
     NOSHAPE
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, tail, list_map, hastype, \
-    typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
+    typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem
@@ -1244,6 +1244,9 @@ def test_array_map(ary):
 
 @infer(shape=[(af32_of(3, 4), af32_of(3, 4), (3, 4)),
               (af32_of(3, 4), af32_of(3, 7), InferenceError),
+              (af32_of(3, ANYTHING), af32_of(ANYTHING, 7), (3, 7)),
+              (af32_of(3, ANYTHING), af32_of(ANYTHING, ANYTHING),
+               (3, ANYTHING)),
               (af32_of(3, 4, 5), af32_of(3, 4), InferenceError)],
        type=[(ai64_of(7, 9), ai64_of(7, 9), ai64),
              (ai64_of(7, 9), i64, InferenceError),
@@ -1251,7 +1254,28 @@ def test_array_map(ary):
 def test_array_map2(ary1, ary2):
     def f(v1, v2):
         return v1 + v2
-    return array_map2(f, ary1, ary2)
+    return array_map(f, ary1, ary2)
+
+
+@infer(shape=[(af32_of(3, 4), af32_of(3, 4), af32_of(3, 4), (3, 4)),
+              (af32_of(3, 4), af32_of(3, 4), af32_of(3, 7), InferenceError),
+              (af32_of(3, ANYTHING, 5, 6),
+               af32_of(3, 4, 5, ANYTHING),
+               af32_of(ANYTHING, ANYTHING, ANYTHING, 6),
+               (3, 4, 5, 6)),
+              (af32_of(3, ANYTHING, 5, 6),
+               af32_of(3, 4, 5, ANYTHING),
+               af32_of(ANYTHING, ANYTHING, ANYTHING, 7),
+               InferenceError),
+              (af32_of(3, 4, 5), af32_of(3, 4), af32_of(3, 4),
+               InferenceError)],
+       type=[(ai64_of(7, 9), ai64_of(7, 9), ai64_of(7, 9), ai64),
+             (ai64_of(7, 9), ai64_of(7, 9), i64, InferenceError),
+             (i64, ai64_of(7, 9), ai64_of(7, 9), InferenceError)])
+def test_array_map3(ary1, ary2, ary3):
+    def f(v1, v2, v3):
+        return v1 + v2 + v3
+    return array_map(f, ary1, ary2, ary3)
 
 
 @infer(shape=[(ai64_of(3, 4), {'value': 1}, (3, 4))],
@@ -1466,7 +1490,7 @@ def _mystery1(x, y):
 
 @mystery.register(af64, af64)
 def _mystery2(x, y):
-    return array_map2(scalar_add, x, y)
+    return array_map(scalar_add, x, y)
 
 
 @infer(

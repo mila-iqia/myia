@@ -2,7 +2,7 @@ import numpy as np
 
 from myia.api import scalar_debug_compile as compile
 from myia.prim.py_implementations import \
-    array_map, array_map2, list_map, array_reduce, array_scan, scalar_usub
+    array_map, list_map, array_reduce, array_scan, scalar_usub
 
 from .test_lang import parse_compare
 
@@ -49,7 +49,7 @@ def test_vm_array_map2():
         def add(x, y):
             return x + y
 
-        return array_map2(add, xs, ys)
+        return array_map(add, xs, ys)
 
     a = np.ones((2, 3))
     b = np.ones((2, 3))

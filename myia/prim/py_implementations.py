@@ -311,34 +311,16 @@ def shape(array):
 
 
 @py_register(primops.array_map)
-def array_map(fn, array):
+def array_map(fn, *arrays):
     """Implement `array_map`."""
-    def f(ary):
-        it = np.nditer([ary, None])
-        for x, y in it:
-            y[...] = fn(x)
-        return it.operands[1]
-    return np.apply_along_axis(f, 0, array)
+    return np.vectorize(fn)(*arrays)
 
 
 @vm_register(primops.array_map)
-def _array_map_vm(vm, fn, array):
-    def fn_(x):
-        return vm.call(fn, (x,))
-    return array_map(fn_, array)
-
-
-@py_register(primops.array_map2)
-def array_map2(fn, array1, array2):
-    """Implement `array_map2`."""
-    return np.vectorize(fn)(array1, array2)
-
-
-@vm_register(primops.array_map2)
-def _array_map2_vm(vm, fn, array1, array2):
-    def fn_(x, y):
-        return vm.call(fn, (x, y))
-    return array_map2(fn_, array1, array2)
+def _array_map_vm(vm, fn, *arrays):
+    def fn_(*args):
+        return vm.call(fn, args)
+    return array_map(fn_, *arrays)
 
 
 @py_register(primops.array_scan)

@@ -276,23 +276,14 @@ async def infer_type_shape(track, ary):
     return Tuple[[UInt[64]]*len(shp)]
 
 
-@type_inferrer(P.array_map, nargs=2)
-async def infer_type_array_map(track, fn, ary):
+@type_inferrer(P.array_map, nargs=None)
+async def infer_type_array_map(track, fn, *arrays):
     """Infer the return type of array_map."""
     fn_t = await fn['type']
-    ary_t = await track.check(Array, ary)
-    xref = track.engine.vref({'type': ary_t.elements})
-    return Array[await fn_t(xref)]
-
-
-@type_inferrer(P.array_map2, nargs=3)
-async def infer_type_array_map2(track, fn, ary1, ary2):
-    """Infer the return type of array_map2."""
-    fn_t = await fn['type']
-    ary1_t, ary2_t = await track.check(Array, ary1, ary2)
-    xref = track.engine.vref({'type': ary1_t.elements})
-    yref = track.engine.vref({'type': ary2_t.elements})
-    return Array[await fn_t(xref, yref)]
+    array_ts = await track.check(Array, *arrays, return_tuple=True)
+    vrefs = [track.engine.vref({'type': a_t.elements})
+             for a_t in array_ts]
+    return Array[await fn_t(*vrefs)]
 
 
 @type_inferrer(P.array_reduce, nargs=3)

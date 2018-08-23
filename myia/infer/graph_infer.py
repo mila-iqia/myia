@@ -170,7 +170,7 @@ class Track(Partializable):
             [ref]
         )
 
-    async def check(self, predicate, *refs):
+    async def check(self, predicate, *refs, return_tuple=False):
         """Assert that all refs match predicate, return values.
 
         This differs from will_check by resolving the values of each
@@ -181,6 +181,7 @@ class Track(Partializable):
             predicate: A type that all refs must have, or a predicate
                 function, or a tuple of types/predicates.
             refs: The references to compare.
+            return_tuple: Whether to always return a tuple or not.
         """
         coros = [ref[self.name] for ref in refs]
         results = await asyncio.gather(*coros, loop=self.engine.loop)
@@ -193,7 +194,7 @@ class Track(Partializable):
                     ref
                 )
 
-        if len(results) == 1:
+        if len(results) == 1 and not return_tuple:
             results, = results
         return results
 

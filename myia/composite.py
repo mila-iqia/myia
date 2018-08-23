@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 from .dtype import Array, Object, Int
 from .prim.py_implementations import \
-    array_map, array_map2, bool_not, hastype, distribute, \
-    shape, broadcast_shape, switch, identity, bool_and, tail
+    array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
+    switch, identity, bool_and, tail
 
 
 def core(fn):
@@ -287,7 +287,7 @@ def broadcastable_binary(op, xs, ys):
     shp = broadcast_shape(shape(xs), shape(ys))
     xs = distribute(xs, shp)
     ys = distribute(ys, shp)
-    res = array_map2(op, xs, ys)
+    res = array_map(op, xs, ys)
     return res
 
 
