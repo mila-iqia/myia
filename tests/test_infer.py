@@ -14,7 +14,7 @@ from myia.ir import MultitypeGraph
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
     Function as F, TypeType, UInt, External, pytype_to_myiatype, Number
 from myia.pipeline import pipeline_function
-from myia.prim import Primitive
+from myia.prim import Primitive, ops as P
 from myia.prim.shape_inferrers import TupleShape, ListShape, ClassShape, \
     NOSHAPE
 from myia.prim.py_implementations import \
@@ -452,6 +452,47 @@ def test_too_many_args(x, y):
                TupleShape((TupleShape((NOSHAPE, NOSHAPE)), NOSHAPE)))])
 def test_tup(x, y):
     return (x, y)
+
+
+@infer(
+    type=[
+        (T[i64, f64], i64),
+        (lf64, InferenceError),
+        (af64_of(2, 5), InferenceError),
+        (i64, InferenceError),
+    ],
+    value=[
+        ((), 0),
+        ((1,), 1),
+        ((1, 2), 2),
+    ]
+)
+def test_tuple_len(xs):
+    return P.tuple_len(xs)
+
+
+@infer(
+    type=[
+        (T[i64, f64], InferenceError),
+        (lf64, i64),
+        (af64_of(2, 5), InferenceError),
+        (i64, InferenceError),
+    ],
+)
+def test_list_len(xs):
+    return P.list_len(xs)
+
+
+@infer(
+    type=[
+        (T[i64, f64], InferenceError),
+        (lf64, InferenceError),
+        (af64_of(2, 5), i64),
+        (i64, InferenceError),
+    ],
+)
+def test_array_len(xs):
+    return P.array_len(xs)
 
 
 @infer(type=[(T[i64, f64], i64),

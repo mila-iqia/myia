@@ -157,7 +157,7 @@ class Track(Partializable):
         descrs = [_str(p) for p in predicate]
         if len(descrs) == 1:
             expected, = descrs
-        else:
+        else:  # pragma: no cover
             expected = ", ".join(descrs[:-1]) + ' or ' + descrs[-1]
 
         if is_type(predicate):
