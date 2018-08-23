@@ -1,15 +1,25 @@
 
 import pytest
 
-from myia.api import scalar_parse as parse
+from myia import operations
+from myia.api import scalar_pipeline
 from myia.ir import Constant, is_constant, isomorphic, GraphCloner
 from myia.opt import PatternSubstitutionOptimization as psub, \
     PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph
 from myia.prim import Primitive, ops as prim
+from myia.utils import Merge
 from myia.utils.unify import Var, var
 
 X = Var('X')
 V = var(is_constant)
+
+
+parse = scalar_pipeline \
+    .configure({
+        'convert.object_map': Merge({operations.getitem: prim.tuple_getitem})
+    }) \
+    .select('parse', 'resolve') \
+    .make_transformer('input', 'graph')
 
 
 # We will optimize patterns of these fake primitives

@@ -1,5 +1,6 @@
 """Miscellaneous utilities for debugging."""
 
+import types
 from collections import defaultdict
 
 from ..graph_utils import always_include, dfs
@@ -17,8 +18,11 @@ def mixin(target):
     def apply(cls):
         methods = set(dir(cls))
         methods.difference_update(set(dir(_Empty)))
-        for mthd in methods:
-            setattr(target, mthd, getattr(cls, mthd))
+        for method_name in methods:
+            mthd = getattr(cls, method_name)
+            if isinstance(mthd, types.MethodType):
+                mthd = classmethod(mthd.__func__)
+            setattr(target, method_name, mthd)
         return target
     return apply
 

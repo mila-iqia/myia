@@ -44,6 +44,9 @@ class TypeDispatchError(MyiaTypeError):
 class Track(Partializable):
     """Represents a property to infer."""
 
+    # List of track names this track depends on.
+    dependencies = []
+
     def __init__(self, engine, name):
         """Initialize a Track."""
         self.engine = engine
@@ -64,8 +67,7 @@ class Track(Partializable):
             return ANYTHING
 
         argrefs = [self.engine.ref(node, ctx) for node in n_args]
-        # if isinstance(inf, Function):
-        if isinstance(inf, type) and issubclass(inf, Function):
+        if ismyiatype(inf, Function):
             ngot = len(argrefs)
             nexpect = len(inf.arguments)
             if ngot != nexpect:
@@ -99,6 +101,10 @@ class Track(Partializable):
                 infer_trace: {**infer_trace.get(), ctx: ref}
             }
         )
+
+    def to_element(self, v):
+        """Returns the value on this track for each element of v."""
+        raise NotImplementedError()  # pragma: no cover
 
     def from_value(self, v, context=None):
         """Get the property from a value in the context."""
@@ -157,7 +163,7 @@ class Track(Partializable):
         descrs = [_str(p) for p in predicate]
         if len(descrs) == 1:
             expected, = descrs
-        else:
+        else:  # pragma: no cover
             expected = ", ".join(descrs[:-1]) + ' or ' + descrs[-1]
 
         if is_type(predicate):
@@ -170,7 +176,7 @@ class Track(Partializable):
             [ref]
         )
 
-    async def check(self, predicate, *refs):
+    async def check(self, predicate, *refs, return_tuple=False):
         """Assert that all refs match predicate, return values.
 
         This differs from will_check by resolving the values of each
@@ -181,6 +187,7 @@ class Track(Partializable):
             predicate: A type that all refs must have, or a predicate
                 function, or a tuple of types/predicates.
             refs: The references to compare.
+            return_tuple: Whether to always return a tuple or not.
         """
         coros = [ref[self.name] for ref in refs]
         results = await asyncio.gather(*coros, loop=self.engine.loop)
@@ -193,7 +200,7 @@ class Track(Partializable):
                     ref
                 )
 
-        if len(results) == 1:
+        if len(results) == 1 and not return_tuple:
             results, = results
         return results
 
@@ -471,6 +478,10 @@ class Context:
 class AbstractReference:
     """Superclass for Reference and VirtualReference."""
 
+    def transform(self, fn):
+        """Create a reference transformed through the given function."""
+        return TransformedReference(self, fn)
+
 
 class Reference(AbstractReference):
     """Reference to a certain node in a certain context.
@@ -544,6 +555,34 @@ class VirtualReference(AbstractReference):
             raise NotImplementedError('vref["*"]')
         else:
             return self.values[track]
+
+
+class TransformedReference(AbstractReference):
+    """Synthetic reference that modifies another reference.
+
+    Attributes:
+        ref: The original reference.
+        fn: The function to call on (track, value) to modify the value
+            inferred for ref.
+
+    """
+
+    def __init__(self, ref, fn):
+        """Initialize the TransformedReference."""
+        self.ref = ref
+        self.fn = fn
+
+    async def get_raw(self, track_name):
+        """Get the raw value for the track."""
+        track = self.ref.engine.tracks[track_name]
+        v = await self.ref[track_name]
+        return self.fn(track, v)
+
+    async def __getitem__(self, track_name):
+        if track_name == '*':
+            raise NotImplementedError('tref["*"]')
+        else:
+            return await self.get_raw(track_name)
 
 
 ########
@@ -629,7 +668,10 @@ class InferenceEngine:
         track_name, ref = key
         track = self.tracks[track_name]
 
-        if isinstance(ref, VirtualReference):
+        for dep in track.dependencies:
+            await ref[dep]
+
+        if isinstance(ref, (VirtualReference, TransformedReference)):
             # A VirtualReference already contains the values we need.
             return await ref[track_name]
 

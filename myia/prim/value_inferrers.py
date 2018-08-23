@@ -100,6 +100,8 @@ class ValueTrack(Track):
 
     """
 
+    dependencies = ['type']
+
     def __init__(self,
                  engine,
                  name,
@@ -156,6 +158,10 @@ class ValueTrack(Track):
             return v
         else:
             return limited(v.value, v.count - 1)
+
+    def to_element(self, v):
+        """Value of each element of v."""
+        return ANYTHING
 
 
 ########################
@@ -249,3 +255,10 @@ async def infer_value_resolve(track, data, item):
 async def infer_value_getattr(track, data, item):
     """Infer the return value of getattr."""
     return await static_getter(track, data, item, getattr)
+
+
+@value_inferrer(P.tuple_len, nargs=1)
+async def infer_value_tuple_len(track, xs):
+    """Infer the return value of tuple_len."""
+    xs_t = await xs['type']
+    return limited(len(xs_t.elements), track.max_depth)

@@ -134,6 +134,8 @@ def find_matching_shape(shps):
 class ShapeTrack(Track):
     """Infer the shape of a constant."""
 
+    dependencies = ['type']
+
     def __init__(self, engine, name, *,
                  constructors=shape_inferrer_constructors):
         """Initialize a ShapeTrack."""
@@ -189,23 +191,26 @@ class ShapeTrack(Track):
         else:
             return getattr(v, 'shape', NOSHAPE)
 
+    def to_element(self, sh):
+        """Return the type of each element of shape sh."""
+        if isinstance(sh, ListShape):
+            return sh.shape
+        elif isinstance(sh, tuple):
+            # Array
+            return NOSHAPE
+        else:
+            raise AssertionError()
+
 
 shape_inferrer = partial(register_inferrer,
                          constructors=shape_inferrer_constructors)
 
 
-@shape_inferrer(P.cons_tuple, nargs=2)
-async def infer_shape_cons_tuple(track, head, tail):
-    """Infer the shape for cons_tuple."""
-    sht = await tail['shape']
-    shh = await head['shape']
-    return TupleShape((shh,) + sht.shape)
-
-
-@shape_inferrer(P.head, nargs=1)
-async def infer_shape_head(track, tup):
-    """Infer the shape for head."""
-    return (await tup['shape']).shape[0]
+@shape_inferrer(P.make_tuple, nargs=None)
+async def infer_shape_make_tuple(track, *args):
+    """Infer the shape for make_tuple."""
+    sh = [await x['shape'] for x in args]
+    return TupleShape(sh)
 
 
 @shape_inferrer(P.tail, nargs=1)
@@ -214,18 +219,12 @@ async def infer_shape_tail(track, tup):
     return TupleShape((await tup['shape']).shape[1:])
 
 
-@shape_inferrer(P.getitem, nargs=2)
-async def infer_shape_getitem(track, seq, idx):
-    """Infer the shape of getitem."""
-    seq_t = await seq['type']
-
-    if ismyiatype(seq_t, Tuple):
-        seq_sh = await seq['shape']
-        idx_v = await idx['value']
-        assert idx_v is not ANYTHING
-        return seq_sh.shape[idx_v]
-    # For any other type
-    raise InferenceError("Unknown type")  # pragma: no cover
+@shape_inferrer(P.tuple_getitem, nargs=2)
+async def infer_shape_tuple_getitem(track, seq, idx):
+    """Infer the shape of tuple_getitem."""
+    seq_sh = await seq['shape']
+    idx_v = await idx['value']
+    return seq_sh.shape[idx_v]
 
 
 @shape_inferrer(P.make_record, nargs=None)
@@ -234,23 +233,6 @@ async def infer_type_make_record(track, cls, *elems):
     elem_shapes = [await x['shape'] for x in elems]
     cls_v = await cls['value']
     return ClassShape(dict(zip(cls_v.attributes.keys(), elem_shapes)))
-
-
-@shape_inferrer(P.iter, nargs=1)
-async def infer_shape_iter(track, seq):
-    """Infer the shape of iter."""
-    seq_sh = await seq['shape']
-    return TupleShape(((), seq_sh))
-
-
-@shape_inferrer(P.next, nargs=1)
-async def infer_shape_next(track, it):
-    """Infer the shape of next."""
-    it_sh = await it['shape']
-    it_t = await it['type']
-    # This is probably wrong but it works for now
-    data_sh = track.default({'type': it_t.elements[1]})
-    return TupleShape((data_sh, it_sh))
 
 
 @shape_inferrer(P.return_, nargs=1)
@@ -304,31 +286,32 @@ async def infer_shape_partial(engine, fn, *args):
     return PartialInferrer(engine, fn_t, args)
 
 
-@shape_inferrer(P.array_map, nargs=2)
-async def infer_shape_array_map(track, fn, ary):
+@shape_inferrer(P.array_map, nargs=None)
+async def infer_shape_array_map(track, fn, *arrays):
     """Infer the shape of array_map."""
-    return await ary['shape']
-
-
-@shape_inferrer(P.array_map2, nargs=3)
-async def infer_shape_array_map2(track, fn, ary1, ary2):
-    """Infer the shape of array_map2."""
-    shp1 = await ary1['shape']
-    shp2 = await ary2['shape']
-    if len(shp1) != len(shp2):
-        raise MyiaShapeError("Expect same shapes for array_map2")
-    for a, b in zip(shp1, shp2):
-        if a != b and a is not ANYTHING and b is not ANYTHING:
-            raise MyiaShapeError("Expect same shapes for array_map2")
-    return shp1
+    shapes = [await a['shape'] for a in arrays]
+    shape0, *rest = shapes
+    if any(len(s) != len(shape0) for s in rest):
+        raise MyiaShapeError("Expect same shapes for array_map")
+    rshape = []
+    for entries in zip(*shapes):
+        entries = set(entries)
+        entries.add(ANYTHING)
+        if len(entries) == 1:
+            rshape.append(ANYTHING)
+        elif len(entries) == 2:
+            entries.remove(ANYTHING)
+            entry, = entries
+            rshape.append(entry)
+        else:
+            raise MyiaShapeError("Expect same shapes for array_map")
+    return tuple(rshape)
 
 
 @shape_inferrer(P.list_map, nargs=2)
 async def infer_shape_list_map(track, fn, lst):
     """Infer the shape of list_map."""
-    shp = await lst['shape']
-    typ = await lst['type']
-    e = track.engine.vref({'type': typ.element_type, 'shape': shp.shape})
+    e = lst.transform(lambda track, x: track.to_element(x))
     return ListShape(await (await fn['shape'])(e))
 
 
@@ -425,8 +408,9 @@ async def infer_shape_getattr(track, data, item):
         if item_v is ANYTHING:
             raise InferenceError(
                 "getattr with non-constant item")  # pragma: no cover
-        data_sh = await data['shape']
-        return data_sh.shape[item_v]
+        if item_v in data_typ.attributes:
+            data_sh = await data['shape']
+            return data_sh.shape[item_v]
     return await static_getter(track, data, item, getattr)
 
 

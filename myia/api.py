@@ -1,10 +1,9 @@
 """User-friendly interfaces to Myia machinery."""
 
-import operator
 import numpy as np
 from types import FunctionType
 
-from . import dtype, parser, composite as C
+from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
 from .infer import InferenceEngine
 from .ir import Graph, clone, GraphManager
@@ -21,56 +20,68 @@ from .compile import step_wrap_primitives, step_compile, step_link, step_export
 
 
 scalar_object_map = {
-    operator.add: P.scalar_add,
-    operator.sub: P.scalar_sub,
-    operator.mul: P.scalar_mul,
-    operator.truediv: P.scalar_div,
-    operator.mod: P.scalar_mod,
-    operator.pow: P.scalar_pow,
-    operator.eq: P.scalar_eq,
-    operator.ne: P.scalar_ne,
-    operator.lt: P.scalar_lt,
-    operator.gt: P.scalar_gt,
-    operator.le: P.scalar_le,
-    operator.ge: P.scalar_ge,
-    operator.pos: P.scalar_uadd,
-    operator.neg: P.scalar_usub,
-    operator.not_: P.bool_not,
-    operator.and_: P.bool_and,
-    operator.or_: P.bool_or,
-    operator.matmul: P.dot,
-    operator.getitem: P.getitem,
-    operator.setitem: P.setitem,
-    bool: P.identity,
-    getattr: P.getattr,
-    setattr: P.setattr,
+    operations.add: P.scalar_add,
+    operations.sub: P.scalar_sub,
+    operations.mul: P.scalar_mul,
+    operations.truediv: P.scalar_div,
+    operations.mod: P.scalar_mod,
+    operations.pow: P.scalar_pow,
+    operations.eq: P.scalar_eq,
+    operations.ne: P.scalar_ne,
+    operations.lt: P.scalar_lt,
+    operations.gt: P.scalar_gt,
+    operations.le: P.scalar_le,
+    operations.ge: P.scalar_ge,
+    operations.pos: P.scalar_uadd,
+    operations.neg: P.scalar_usub,
+    operations.not_: P.bool_not,
+    operations.and_: P.bool_and,
+    operations.or_: P.bool_or,
+    operations.matmul: P.dot,
+    operations.getitem: C.getitem,
+    operations.setitem: C.setitem,
+    operations.bool: P.identity,
+    operations.getattr: P.getattr,
+    operations.setattr: P.setattr,
+    operations.len: C._len,
+    operations.make_tuple: P.make_tuple,
+    operations.iter: C.iter,
+    operations.hasnext: C.hasnext,
+    operations.next: C.next,
+    operations.if_: P.if_,
 }
 
 
 standard_object_map = {
-    operator.add: C.add,
-    operator.sub: C.sub,
-    operator.mul: C.mul,
-    operator.truediv: C.div,
-    operator.mod: C.mod,
-    operator.pow: C.pow,
-    operator.eq: C.eq,
-    operator.ne: C.ne,
-    operator.lt: C.lt,
-    operator.gt: C.gt,
-    operator.le: C.le,
-    operator.ge: C.ge,
-    operator.pos: C.uadd,
-    operator.neg: C.usub,
-    operator.not_: C.not_,
-    operator.and_: C.and_,
-    operator.or_: C.or_,
-    operator.matmul: C.matmul,
-    operator.getitem: P.getitem,
-    operator.setitem: P.setitem,
-    bool: C.bool,
-    getattr: P.getattr,
-    setattr: P.setattr,
+    operations.add: C.add,
+    operations.sub: C.sub,
+    operations.mul: C.mul,
+    operations.truediv: C.div,
+    operations.mod: C.mod,
+    operations.pow: C.pow,
+    operations.eq: C.eq,
+    operations.ne: C.ne,
+    operations.lt: C.lt,
+    operations.gt: C.gt,
+    operations.le: C.le,
+    operations.ge: C.ge,
+    operations.pos: C.uadd,
+    operations.neg: C.usub,
+    operations.not_: C.not_,
+    operations.and_: C.and_,
+    operations.or_: C.or_,
+    operations.matmul: C.matmul,
+    operations.getitem: C.getitem,
+    operations.setitem: C.setitem,
+    operations.bool: C.bool,
+    operations.getattr: P.getattr,
+    operations.setattr: P.setattr,
+    operations.len: C._len,
+    operations.make_tuple: P.make_tuple,
+    operations.iter: C.iter,
+    operations.hasnext: C.hasnext,
+    operations.next: C.next,
+    operations.if_: P.if_,
 }
 
 
@@ -116,6 +127,20 @@ standard_method_map = TypeMap({
         '__bool__': C.float_bool,
         '__myia_to_array__': P.scalar_to_array,
     },
+    dtype.Tuple: {
+        '__len__': P.tuple_len,
+        '__getitem__': P.tuple_getitem,
+        '__setitem__': P.tuple_setitem,
+        '__myia_iter__': P.identity,
+        '__myia_next__': C.tuple_next,
+        '__myia_hasnext__': C.tuple_hasnext,
+    },
+    dtype.List: {
+        '__len__': P.list_len,
+        '__getitem__': P.list_getitem,
+        '__setitem__': P.list_setitem,
+        '__myia_iter__': C.list_iter,
+    },
     dtype.Array: {
         '__add__': C.array_add,
         '__sub__': C.array_sub,
@@ -132,6 +157,10 @@ standard_method_map = TypeMap({
         '__le__': C.array_le,
         '__ge__': C.array_ge,
         '__matmul__': P.dot,
+        '__len__': P.array_len,
+        '__getitem__': P.array_getitem,
+        '__setitem__': P.array_setitem,
+        '__myia_iter__': C.array_iter,
     }
 })
 
@@ -196,6 +225,8 @@ class Converter(PipelineResource):
             np.float16: dtype.Float,
             np.float32: dtype.Float,
             np.float64: dtype.Float,
+            tuple: dtype.Tuple,
+            list: dtype.List,
         }
         mmap = self.resources.method_map
         for t1, t2 in type_map.items():

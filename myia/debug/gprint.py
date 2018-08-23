@@ -422,32 +422,8 @@ V2 = var(is_constant)
 L = var(is_constant_graph)
 
 
-@pattern_replacer(primops.cons_tuple, X, Y)
-def _opt_accum_cons(optimizer, node, equiv):
-    x = equiv[X]
-    y = equiv[Y]
-    args = [Constant(make_tuple), x]
-    while isinstance(y, Apply):
-        if y.inputs[0].value is primops.cons_tuple:
-            args.append(y.inputs[1])
-            y = y.inputs[2]
-        elif y.inputs[0].value is make_tuple:
-            args += y.inputs[1:]
-            y = Constant(())
-            break
-        else:
-            break
-
-    if is_constant(y) and isinstance(y.value, tuple):
-        args += [Constant(xx) for xx in y.value]
-        with About(node.debug, 'cosmetic'):
-            return Apply(args, node.graph)
-    else:
-        return node
-
-
-@pattern_replacer(primops.getitem, X, V)
-def _opt_fancy_getitem(optimizer, node, equiv):
+@pattern_replacer(primops.tuple_getitem, X, V)
+def _opt_fancy_tuple_getitem(optimizer, node, equiv):
     x = equiv[X]
     v = equiv[V]
     ct = Constant(GraphCosmeticPrimitive(f'[{v.value}]', on_edge=True))
@@ -481,8 +457,7 @@ def cosmetic_transformer(g):
     with fake functions that only serve a cosmetic purpose.
     """
     opt = PatternEquilibriumOptimizer(
-        _opt_accum_cons,
-        _opt_fancy_getitem,
+        _opt_fancy_tuple_getitem,
         _opt_fancy_resolve,
         _opt_fancy_getattr,
     )

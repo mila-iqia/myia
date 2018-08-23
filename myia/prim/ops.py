@@ -59,23 +59,19 @@ hastype = Primitive('hastype')
 ###################
 
 
-cons_tuple = Primitive('cons_tuple')
-head = Primitive('head')
+make_tuple = Primitive('make_tuple')
 tail = Primitive('tail')
-getitem = Primitive('getitem')
-setitem = Primitive('setitem')
+tuple_getitem = Primitive('tuple_getitem')
+list_getitem = Primitive('list_getitem')
+array_getitem = Primitive('array_getitem')
+tuple_setitem = Primitive('tuple_setitem')
+list_setitem = Primitive('list_setitem')
+array_setitem = Primitive('array_setitem')
 getattr = Primitive('getattr')
 setattr = Primitive('setattr')
-
-
-#############
-# Iteration #
-#############
-
-
-iter = Primitive('iter')
-hasnext = Primitive('hasnext')
-next = Primitive('next')
+tuple_len = Primitive('tuple_len')
+list_len = Primitive('list_len')
+array_len = Primitive('array_len')
 
 
 ##########
@@ -87,7 +83,6 @@ scalar_to_array = Primitive('scalar_to_array')
 broadcast_shape = Primitive('broadcast_shape')
 shape = Primitive('shape')
 array_map = Primitive('array_map')
-array_map2 = Primitive('array_map2')
 array_scan = Primitive('array_scan')
 array_reduce = Primitive('array_reduce')
 distribute = Primitive('distribute')

@@ -14,14 +14,15 @@ from myia.ir import MultitypeGraph
 from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
     Function as F, TypeType, UInt, External, pytype_to_myiatype, Number
 from myia.pipeline import pipeline_function
-from myia.prim import Primitive
+from myia.prim import Primitive, ops as P
 from myia.prim.shape_inferrers import TupleShape, ListShape, ClassShape, \
     NOSHAPE
 from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
-    typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
+    scalar_add, scalar_mul, scalar_lt, tail, list_map, hastype, \
+    typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
-    bool_and, bool_or, switch, scalar_to_array, broadcast_shape
+    bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
+    tuple_setitem, list_setitem
 from myia.utils import RestrictedVar
 
 from .test_lang import mysum, Point
@@ -391,6 +392,8 @@ def test_while(x, y):
         (li64, i64, i64),
         (li64, f64, InferenceError),
         (i64, i64, InferenceError),
+        (T[i64, i64, i64], i64, i64),
+        (T[i64, f64, i64], i64, InferenceError),
     ]
 )
 def test_for(xs, y):
@@ -451,14 +454,45 @@ def test_tup(x, y):
     return (x, y)
 
 
-@infer(type=[(T[i64, f64], i64),
-             (T[f64, i64], f64),
-             (T[()], InferenceError),
-             (f64, InferenceError)],
-       shape=[(t(T[i64, f64]), NOSHAPE),
-              (t(T[T[i64, f64], i64]), TupleShape((NOSHAPE, NOSHAPE)))])
-def test_head_tuple(tup):
-    return head(tup)
+@infer(
+    type=[
+        (T[i64, f64], i64),
+        (lf64, InferenceError),
+        (af64_of(2, 5), InferenceError),
+        (i64, InferenceError),
+    ],
+    value=[
+        ((), 0),
+        ((1,), 1),
+        ((1, 2), 2),
+    ]
+)
+def test_tuple_len(xs):
+    return P.tuple_len(xs)
+
+
+@infer(
+    type=[
+        (T[i64, f64], InferenceError),
+        (lf64, i64),
+        (af64_of(2, 5), InferenceError),
+        (i64, InferenceError),
+    ],
+)
+def test_list_len(xs):
+    return P.list_len(xs)
+
+
+@infer(
+    type=[
+        (T[i64, f64], InferenceError),
+        (lf64, InferenceError),
+        (af64_of(2, 5), i64),
+        (i64, InferenceError),
+    ],
+)
+def test_array_len(xs):
+    return P.array_len(xs)
 
 
 @infer(type=[(T[i64, f64], T[f64]),
@@ -474,7 +508,7 @@ def test_tail_tuple(tup):
 
 @infer(type=[(i64, f64, i64), (f64, i64, f64)],
        shape=(t(i64), t(f64), NOSHAPE))
-def test_getitem_tuple(x, y):
+def test_tuple_getitem(x, y):
     return (x, y)[0]
 
 
@@ -487,8 +521,32 @@ def test_getitem_tuple(x, y):
         (T[i64, f64], i64, InferenceError)
     ]
 )
-def test_getitem_list(xs, i):
+def test_list_getitem(xs, i):
     return xs[i]
+
+
+@infer(
+    type=[
+        (T[i64, i64], {'value': 1}, f64, T[i64, f64]),
+        (T[i64, i64, f64], {'value': 1}, f64, T[i64, f64, f64]),
+        (T[i64], {'value': 1}, f64, InferenceError),
+        (T[i64], {'type': f64, 'value': 0}, f64, InferenceError),
+        (T[i64], i64, f64, InferenceError),
+    ]
+)
+def test_tuple_setitem(xs, idx, x):
+    return tuple_setitem(xs, idx, x)
+
+
+@infer(
+    type=[
+        (li64, i64, i64, li64),
+        (li64, f64, i64, InferenceError),
+        (li64, i64, f64, InferenceError),
+    ]
+)
+def test_list_setitem(xs, idx, x):
+    return list_setitem(xs, idx, x)
 
 
 @infer(type=(i64, f64, T[i64, f64]))
@@ -967,7 +1025,7 @@ def test_hastype_2(x):
         elif hastype(x, Nil):
             return 0
         elif hastype(x, T):
-            return f(head(x)) + f(tail(x))
+            return f(x[0]) + f(tail(x))
         elif hastype(x, L):
             return 1.0
         else:
@@ -980,6 +1038,7 @@ def test_hastype_2(x):
     type=[
         (li64, i64, li64),
         (lf64, i64, InferenceError),
+        ({'type': L[ai64], 'shape': ListShape((2, 3))}, i64, L[ai64]),
     ],
     shape=[(t(li64), t(i64), ListShape(NOSHAPE)),
            ({'type': L[ai64], 'shape': ListShape((2, 3))}, ai64_of(2, 3),
@@ -1145,13 +1204,15 @@ def test_dot(a, b):
     return dot(a, b)
 
 
-@infer(shape=[(ai32_of(4), {'value': (2, 4)}, (2, 4)),
+@infer(shape=[(ai32_of(4), {'type': T[u64, u64], 'value': (2, 4)}, (2, 4)),
               (ai32_of(4),
                {'type': T[u64, u64]},
                (ANYTHING, ANYTHING)),
-              (ai32_of(4), {'value': (5, 2)},
+              (ai32_of(4),
+               {'type': T[u64, u64], 'value': (5, 2)},
                InferenceError),
-              ({'type': ai32, 'shape': (4, 2)}, {'value': (4,)},
+              ({'type': ai32, 'shape': (4, 2)},
+               {'type': T[u64], 'value': (4,)},
                InferenceError)],
        type=[
            (i32, {'value': (4,), 'type': T[u64]}, InferenceError),
@@ -1163,10 +1224,10 @@ def test_distribute(v, shp):
     return distribute(v, shp)
 
 
-@infer(shape=[(af16_of(1, 2, 3), {'value': (6,)}, (6,)),
+@infer(shape=[(af16_of(1, 2, 3), {'type': T[u64], 'value': (6,)}, (6,)),
               (af16_of(1, 2, 3), {'type': T[u64]},
                (ANYTHING,)),
-              (af16_of(2, 3), {'value': (7,)},
+              (af16_of(2, 3), {'type': T[u64], 'value': (7,)},
                InferenceError)],
        type=[(af16_of(2, 3), T[u64], af16),
              (af16_of(2, 3), T[i64],
@@ -1186,6 +1247,9 @@ def test_array_map(ary):
 
 @infer(shape=[(af32_of(3, 4), af32_of(3, 4), (3, 4)),
               (af32_of(3, 4), af32_of(3, 7), InferenceError),
+              (af32_of(3, ANYTHING), af32_of(ANYTHING, 7), (3, 7)),
+              (af32_of(3, ANYTHING), af32_of(ANYTHING, ANYTHING),
+               (3, ANYTHING)),
               (af32_of(3, 4, 5), af32_of(3, 4), InferenceError)],
        type=[(ai64_of(7, 9), ai64_of(7, 9), ai64),
              (ai64_of(7, 9), i64, InferenceError),
@@ -1193,10 +1257,31 @@ def test_array_map(ary):
 def test_array_map2(ary1, ary2):
     def f(v1, v2):
         return v1 + v2
-    return array_map2(f, ary1, ary2)
+    return array_map(f, ary1, ary2)
 
 
-@infer(shape=[(ai64_of(3, 4), {'value': 1}, (3, 4))],
+@infer(shape=[(af32_of(3, 4), af32_of(3, 4), af32_of(3, 4), (3, 4)),
+              (af32_of(3, 4), af32_of(3, 4), af32_of(3, 7), InferenceError),
+              (af32_of(3, ANYTHING, 5, 6),
+               af32_of(3, 4, 5, ANYTHING),
+               af32_of(ANYTHING, ANYTHING, ANYTHING, 6),
+               (3, 4, 5, 6)),
+              (af32_of(3, ANYTHING, 5, 6),
+               af32_of(3, 4, 5, ANYTHING),
+               af32_of(ANYTHING, ANYTHING, ANYTHING, 7),
+               InferenceError),
+              (af32_of(3, 4, 5), af32_of(3, 4), af32_of(3, 4),
+               InferenceError)],
+       type=[(ai64_of(7, 9), ai64_of(7, 9), ai64_of(7, 9), ai64),
+             (ai64_of(7, 9), ai64_of(7, 9), i64, InferenceError),
+             (i64, ai64_of(7, 9), ai64_of(7, 9), InferenceError)])
+def test_array_map3(ary1, ary2, ary3):
+    def f(v1, v2, v3):
+        return v1 + v2 + v3
+    return array_map(f, ary1, ary2, ary3)
+
+
+@infer(shape=[(ai64_of(3, 4), {'value': 1, 'type': u64}, (3, 4))],
        type=[
            (ai64_of(3, 4), {'value': 1, 'type': u64}, ai64),
            ({'type': i64}, {'value': 1, 'type': u64}, InferenceError),
@@ -1218,23 +1303,23 @@ def test_array_scan(ary, ax):
     ],
     shape=[
         (ai64_of(3, 4),
-         {'value': (3, 1)},
+         {'type': T[u64, u64], 'value': (3, 1)},
          (3, 1)),
 
         (ai64_of(3, 4),
-         {'value': (3, ANYTHING)},
+         {'type': T[u64, u64], 'value': (3, ANYTHING)},
          (3, ANYTHING)),
 
         (ai64_of(3, 4),
-         {'value': (3, 1, 1)},
+         {'type': T[u64, u64, u64], 'value': (3, 1, 1)},
          InferenceError),
 
         (ai64_of(3, 4),
-         {'value': (4, 1)},
+         {'type': T[u64, u64], 'value': (4, 1)},
          InferenceError),
 
         (ai64_of(3, 4),
-         {'value': (4,)},
+         {'type': T[u64], 'value': (4,)},
          (4,)),
 
         (ai64_of(3, 4),
@@ -1304,7 +1389,7 @@ def test_bool_or(x, y):
     value=[
         (True, 1, 2, 1),
         (False, 1, 2, 2),
-        (ANYTHING, 1, 2, ANYTHING),
+        ({'type': B, 'value': ANYTHING}, 1, 2, ANYTHING),
     ],
     shape=[
         ({'type': B},
@@ -1408,7 +1493,7 @@ def _mystery1(x, y):
 
 @mystery.register(af64, af64)
 def _mystery2(x, y):
-    return array_map2(scalar_add, x, y)
+    return array_map(scalar_add, x, y)
 
 
 @infer(

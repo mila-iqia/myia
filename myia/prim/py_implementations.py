@@ -218,16 +218,10 @@ def hastype(x, t):
     return hastype_helper(typeof(x), t)
 
 
-@register(primops.cons_tuple)
-def cons_tuple(head, tail):
-    """Implement `cons_tuple`."""
-    return (head,) + tail
-
-
-@register(primops.head)
-def head(tup):
-    """Implement `head`."""
-    return tup[0]
+@register(primops.make_tuple)
+def make_tuple(*args):
+    """Implement `make_tuple`."""
+    return args
 
 
 @register(primops.tail)
@@ -236,46 +230,64 @@ def tail(tup):
     return tup[1:]
 
 
-@py_register(primops.getitem)
+@py_register(primops.tuple_getitem)
+@py_register(primops.list_getitem)
+@py_register(primops.array_getitem)
 def getitem(data, item):
     """Implement `getitem`."""
     return data[item]
 
 
-@vm_register(primops.getitem)
+@vm_register(primops.tuple_getitem)
+@vm_register(primops.list_getitem)
+@vm_register(primops.array_getitem)
 def _vm_getitem(vm, data, item):
     """Implement `getitem`."""
     return vm.convert(data[item])
 
 
-@register(primops.setitem)
-def setitem(data, item, value):
-    """Implement `setitem`."""
-    if isinstance(data, tuple):
-        return tuple(value if i == item else x
-                     for i, x in enumerate(data))
-    else:
-        data2 = copy(data)
-        data2[item] = value
-        return data2
+@register(primops.tuple_setitem)
+def tuple_setitem(data, item, value):
+    """Implement `tuple_setitem`."""
+    return tuple(value if i == item else x
+                 for i, x in enumerate(data))
+
+
+@register(primops.list_setitem)
+@register(primops.array_setitem)
+def list_setitem(data, item, value):
+    """Implement `list/array_setitem`."""
+    data2 = copy(data)
+    data2[item] = value
+    return data2
 
 
 @vm_register(primops.getattr)
 def _vm_getattr(vm, data, attr):
     """Implement `getattr`."""
-    from types import MethodType
+    from types import MethodType, BuiltinMethodType
     from ..vm import Partial
     # I don't know how else to get a reference to this type
     method_wrapper_type = type((0).__add__)
-    x = getattr(data, attr)
+    try:
+        x = getattr(data, attr)
+    except AttributeError:
+        mmap = vm.convert.resources.method_map[typeof(data)]
+        if attr in mmap:
+            x = MethodType(mmap[attr], data)
+        else:
+            raise  # pragma: no cover
     if isinstance(x, method_wrapper_type):
         # This is returned by <int>.__add__ and the like.
         # Don't know how else to retrieve the unwrapped method
         unwrapped = getattr(x.__objclass__, x.__name__)
         return Partial(vm.convert(unwrapped), [x.__self__], vm)
-    elif isinstance(x, MethodType):  # pragma: no cover
+    elif isinstance(x, BuiltinMethodType):
+        # This is returned by <list>.__getitem__ and maybe others.
+        x = getattr(type(data), attr)
+        return Partial(vm.convert(x), [data], vm)
+    elif isinstance(x, MethodType):
         # This is a method made from a user function
-        # TODO: Should test this when we have custom types
         return Partial(vm.convert(x.__func__), [x.__self__], vm)
     else:
         return vm.convert(x)
@@ -299,34 +311,16 @@ def shape(array):
 
 
 @py_register(primops.array_map)
-def array_map(fn, array):
+def array_map(fn, *arrays):
     """Implement `array_map`."""
-    def f(ary):
-        it = np.nditer([ary, None])
-        for x, y in it:
-            y[...] = fn(x)
-        return it.operands[1]
-    return np.apply_along_axis(f, 0, array)
+    return np.vectorize(fn)(*arrays)
 
 
 @vm_register(primops.array_map)
-def _array_map_vm(vm, fn, array):
-    def fn_(x):
-        return vm.call(fn, (x,))
-    return array_map(fn_, array)
-
-
-@py_register(primops.array_map2)
-def array_map2(fn, array1, array2):
-    """Implement `array_map2`."""
-    return np.vectorize(fn)(array1, array2)
-
-
-@vm_register(primops.array_map2)
-def _array_map2_vm(vm, fn, array1, array2):
-    def fn_(x, y):
-        return vm.call(fn, (x, y))
-    return array_map2(fn_, array1, array2)
+def _array_map_vm(vm, fn, *arrays):
+    def fn_(*args):
+        return vm.call(fn, args)
+    return array_map(fn_, *arrays)
 
 
 @py_register(primops.array_scan)
@@ -451,26 +445,6 @@ def partial(f, *args):
     return res
 
 
-@register(primops.iter)
-def _iter(xs):
-    """Implement `iter`."""
-    return (0, xs)
-
-
-@register(primops.hasnext)
-def _hasnext(it):
-    """Implement `hasnext`."""
-    n, data = it
-    return n < len(data)
-
-
-@register(primops.next)
-def _next(it):
-    """Implement `next`."""
-    n, data = it
-    return (data[n], (n + 1, data))
-
-
 @register(primops.switch)
 def switch(c, x, y):
     """Implement `switch`."""
@@ -514,3 +488,11 @@ def make_record(typ, *args):
     """Implement `make_record`."""
     dataclass = types.tag_to_dataclass[typ.tag]
     return dataclass(*args)
+
+
+@register(primops.tuple_len)
+@register(primops.list_len)
+@register(primops.array_len)
+def _len(x):
+    """Implement `len`."""
+    return len(x)

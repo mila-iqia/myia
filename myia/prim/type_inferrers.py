@@ -80,6 +80,15 @@ class TypeTrack(Track):
         else:
             return typeof(v)
 
+    def to_element(self, t):
+        """Return the type of each element of type t."""
+        if ismyiatype(t, List):
+            return t.element_type
+        elif ismyiatype(t, Array):
+            return t.elements
+        else:
+            raise AssertionError()
+
     def default(self, values):
         """Return a default type; this method raises an exception."""
         raise Exception('There is no default value for the type track.') \
@@ -142,21 +151,11 @@ async def infer_type_partial(track, fn, *args):
     return PartialInferrer(track, fn_t, args)
 
 
-@type_inferrer(P.cons_tuple, nargs=2)
-async def infer_type_cons_tuple(track, x, y):
-    """Infer the return type of cons_tuple."""
-    x_t = await x['type']
-    y_t = await track.check(Tuple, y)
-    return Tuple[[x_t, *y_t.elements]]
-
-
-@type_inferrer(P.head, nargs=1)
-async def infer_type_head(track, tup):
-    """Infer the return type of head."""
-    tup_t = await track.check(Tuple, tup)
-    if not len(tup_t.elements) >= 1:
-        raise MyiaTypeError('head on empty tuple', refs=[tup])
-    return tup_t.elements[0]
+@type_inferrer(P.make_tuple, nargs=None)
+async def infer_type_make_tuple(track, *args):
+    """Infer the return type of make_tuple."""
+    elts = [await x['type'] for x in args]
+    return Tuple[elts]
 
 
 @type_inferrer(P.tail, nargs=1)
@@ -168,19 +167,50 @@ async def infer_type_tail(track, tup):
     return Tuple[tup_t.elements[1:]]
 
 
-@type_inferrer(P.getitem, nargs=2)
-async def infer_type_getitem(track, seq, idx):
-    """Infer the return type of getitem."""
-    seq_t = await track.check((Tuple, List), seq)
+@type_inferrer(P.tuple_getitem, nargs=2)
+async def infer_type_tuple_getitem(track, seq, idx):
+    """Infer the return type of tuple_getitem."""
+    seq_t = await track.check(Tuple, seq)
     await track.check(Int, idx)
+    idx_v = await idx['value']
+    if idx_v is ANYTHING:
+        raise MyiaTypeError('Tuples must be indexed with a constant')
+    return seq_t.elements[idx_v]
 
-    if ismyiatype(seq_t, Tuple):
-        idx_v = await idx['value']
-        if idx_v is ANYTHING:
-            raise MyiaTypeError('Tuples must be indexed with a constant')
-        return seq_t.elements[idx_v]
-    elif ismyiatype(seq_t, List):
-        return seq_t.element_type
+
+@type_inferrer(P.list_getitem, nargs=2)
+async def infer_type_list_getitem(track, seq, idx):
+    """Infer the return type of list_getitem."""
+    seq_t = await track.check(List, seq)
+    await track.check(Int, idx)
+    return seq_t.element_type
+
+
+@type_inferrer(P.tuple_setitem, nargs=3)
+async def infer_type_tuple_setitem(track, seq, idx, value):
+    """Infer the return type of tuple_setitem."""
+    seq_t = await track.check(Tuple, seq)
+    await track.check(Int, idx)
+    idx_v = await idx['value']
+    if idx_v is ANYTHING:
+        raise MyiaTypeError('Tuples must be indexed with a constant')
+    value_t = await value['type']
+    elts = seq_t.elements
+    try:
+        elts[idx_v]
+    except IndexError:
+        raise MyiaTypeError('Index out of bounds')
+    new_elts = tuple([*elts[:idx_v], value_t, *seq_t.elements[idx_v + 1:]])
+    return Tuple[new_elts]
+
+
+@type_inferrer(P.list_setitem, nargs=3)
+async def infer_type_list_setitem(track, seq, idx, value):
+    """Infer the return type of list_setitem."""
+    seq_t = await track.check(List, seq)
+    await track.check(Int, idx)
+    await track.will_check(seq_t.element_type, value)
+    return seq_t
 
 
 @type_inferrer(P.typeof, nargs=1)
@@ -255,23 +285,14 @@ async def infer_type_shape(track, ary):
     return Tuple[[UInt[64]]*len(shp)]
 
 
-@type_inferrer(P.array_map, nargs=2)
-async def infer_type_array_map(track, fn, ary):
+@type_inferrer(P.array_map, nargs=None)
+async def infer_type_array_map(track, fn, *arrays):
     """Infer the return type of array_map."""
     fn_t = await fn['type']
-    ary_t = await track.check(Array, ary)
-    xref = track.engine.vref({'type': ary_t.elements})
-    return Array[await fn_t(xref)]
-
-
-@type_inferrer(P.array_map2, nargs=3)
-async def infer_type_array_map2(track, fn, ary1, ary2):
-    """Infer the return type of array_map2."""
-    fn_t = await fn['type']
-    ary1_t, ary2_t = await track.check(Array, ary1, ary2)
-    xref = track.engine.vref({'type': ary1_t.elements})
-    yref = track.engine.vref({'type': ary2_t.elements})
-    return Array[await fn_t(xref, yref)]
+    await track.check(Array, *arrays)
+    vrefs = [a.transform(lambda track, x: track.to_element(x))
+             for a in arrays]
+    return Array[await fn_t(*vrefs)]
 
 
 @type_inferrer(P.array_reduce, nargs=3)
@@ -279,9 +300,9 @@ async def infer_type_reduce(track, fn, ary, shp):
     """Infer the return type of array_reduce."""
     fn_t = await fn['type']
     await track.check(_shape_type, shp)
-    ary_t = await track.check(Array, ary)
-    xref = track.engine.vref({'type': ary_t.elements})
-    xref2 = track.engine.vref({'type': ary_t.elements})
+    await track.check(Array, ary)
+    xref = ary.transform(lambda track, x: track.to_element(x))
+    xref2 = ary.transform(lambda track, x: track.to_element(x))
     res_elem_t = await fn_t(xref, xref2)
     return Array[res_elem_t]
 
@@ -298,8 +319,8 @@ async def infer_type_across_array(track, fn, init, ary, ax):
                             "as array elements")
     if not ax_t == UInt[64]:
         raise MyiaTypeError("Axis must be u64")
-    xref = track.engine.vref({'type': ary_t.elements})
-    xref2 = track.engine.vref({'type': ary_t.elements})
+    xref = ary.transform(lambda track, x: track.to_element(x))
+    xref2 = ary.transform(lambda track, x: track.to_element(x))
     return Array[await fn_t(xref, xref2)]
 
 
@@ -335,8 +356,8 @@ async def infer_type_return_(track, x):
 async def infer_type_list_map(track, f, xs):
     """Infer the return type of list_map."""
     f_t = await f['type']
-    xs_t = await track.check(List, xs)
-    xref = track.engine.vref(dict(type=xs_t.element_type))
+    await track.check(List, xs)
+    xref = xs.transform(lambda track, x: track.to_element(x))
     ret_t = await f_t(xref)
     return List[ret_t]
 
@@ -371,41 +392,6 @@ async def infer_type_getattr(track, data, item):
                 f'item argument to getattr must be string, not {item_v}.'
             )
     return await static_getter(track, data, item, getattr, chk)
-
-
-@type_inferrer(P.iter, nargs=1)
-async def infer_type_iter(track, xs):
-    """Infer the return type of iter."""
-    xs_t = await xs['type']
-    if ismyiatype(xs_t, List):
-        return Tuple[Int[64], xs_t]
-    else:
-        raise MyiaTypeError('Unsupported type for iter')
-
-
-@type_inferrer(P.hasnext, nargs=1)
-async def infer_type_hasnext(track, it):
-    """Infer the return type of hasnext."""
-    it_t = await(it['type'])
-    if ismyiatype(it_t, Tuple, generic=False) \
-            and len(it_t.elements) == 2 \
-            and ismyiatype(it_t.elements[1], List, generic=False):
-        return Bool
-    else:  # pragma: no cover
-        raise MyiaTypeError('Unsupported iterator type for hasnext')
-
-
-@type_inferrer(P.next, nargs=1)
-async def infer_type_next(track, it):
-    """Infer the return type of next."""
-    it_t = await(it['type'])
-    if ismyiatype(it_t, Tuple, generic=False) \
-            and len(it_t.elements) == 2 \
-            and ismyiatype(it_t.elements[1], List, generic=False):
-        x_t = it_t.elements[1].element_type
-        return Tuple[x_t, it_t]
-    else:  # pragma: no cover
-        raise MyiaTypeError('Unsupported iterator type for next')
 
 
 @type_inferrer(P.scalar_to_array, nargs=1)
@@ -444,3 +430,24 @@ async def infer_type_make_record(track, cls, *elems):
         )
 
     return ret_t
+
+
+@type_inferrer(P.tuple_len, nargs=1)
+async def infer_type_tuple_len(track, xs):
+    """Infer the return type of tuple_len."""
+    await track.will_check(Tuple, xs)
+    return Int[64]
+
+
+@type_inferrer(P.list_len, nargs=1)
+async def infer_type_list_len(track, xs):
+    """Infer the return type of list_len."""
+    await track.will_check(List, xs)
+    return Int[64]
+
+
+@type_inferrer(P.array_len, nargs=1)
+async def infer_type_array_len(track, xs):
+    """Infer the return type of array_len."""
+    await track.will_check(Array, xs)
+    return Int[64]
