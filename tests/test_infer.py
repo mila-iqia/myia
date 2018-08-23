@@ -1038,6 +1038,7 @@ def test_hastype_2(x):
     type=[
         (li64, i64, li64),
         (lf64, i64, InferenceError),
+        ({'type': L[ai64], 'shape': ListShape((2, 3))}, i64, L[ai64]),
     ],
     shape=[(t(li64), t(i64), ListShape(NOSHAPE)),
            ({'type': L[ai64], 'shape': ListShape((2, 3))}, ai64_of(2, 3),
@@ -1203,13 +1204,15 @@ def test_dot(a, b):
     return dot(a, b)
 
 
-@infer(shape=[(ai32_of(4), {'value': (2, 4)}, (2, 4)),
+@infer(shape=[(ai32_of(4), {'type': T[u64, u64], 'value': (2, 4)}, (2, 4)),
               (ai32_of(4),
                {'type': T[u64, u64]},
                (ANYTHING, ANYTHING)),
-              (ai32_of(4), {'value': (5, 2)},
+              (ai32_of(4),
+               {'type': T[u64, u64], 'value': (5, 2)},
                InferenceError),
-              ({'type': ai32, 'shape': (4, 2)}, {'value': (4,)},
+              ({'type': ai32, 'shape': (4, 2)},
+               {'type': T[u64], 'value': (4,)},
                InferenceError)],
        type=[
            (i32, {'value': (4,), 'type': T[u64]}, InferenceError),
@@ -1221,10 +1224,10 @@ def test_distribute(v, shp):
     return distribute(v, shp)
 
 
-@infer(shape=[(af16_of(1, 2, 3), {'value': (6,)}, (6,)),
+@infer(shape=[(af16_of(1, 2, 3), {'type': T[u64], 'value': (6,)}, (6,)),
               (af16_of(1, 2, 3), {'type': T[u64]},
                (ANYTHING,)),
-              (af16_of(2, 3), {'value': (7,)},
+              (af16_of(2, 3), {'type': T[u64], 'value': (7,)},
                InferenceError)],
        type=[(af16_of(2, 3), T[u64], af16),
              (af16_of(2, 3), T[i64],
@@ -1278,7 +1281,7 @@ def test_array_map3(ary1, ary2, ary3):
     return array_map(f, ary1, ary2, ary3)
 
 
-@infer(shape=[(ai64_of(3, 4), {'value': 1}, (3, 4))],
+@infer(shape=[(ai64_of(3, 4), {'value': 1, 'type': u64}, (3, 4))],
        type=[
            (ai64_of(3, 4), {'value': 1, 'type': u64}, ai64),
            ({'type': i64}, {'value': 1, 'type': u64}, InferenceError),
@@ -1300,23 +1303,23 @@ def test_array_scan(ary, ax):
     ],
     shape=[
         (ai64_of(3, 4),
-         {'value': (3, 1)},
+         {'type': T[u64, u64], 'value': (3, 1)},
          (3, 1)),
 
         (ai64_of(3, 4),
-         {'value': (3, ANYTHING)},
+         {'type': T[u64, u64], 'value': (3, ANYTHING)},
          (3, ANYTHING)),
 
         (ai64_of(3, 4),
-         {'value': (3, 1, 1)},
+         {'type': T[u64, u64, u64], 'value': (3, 1, 1)},
          InferenceError),
 
         (ai64_of(3, 4),
-         {'value': (4, 1)},
+         {'type': T[u64, u64], 'value': (4, 1)},
          InferenceError),
 
         (ai64_of(3, 4),
-         {'value': (4,)},
+         {'type': T[u64], 'value': (4,)},
          (4,)),
 
         (ai64_of(3, 4),
@@ -1386,7 +1389,7 @@ def test_bool_or(x, y):
     value=[
         (True, 1, 2, 1),
         (False, 1, 2, 2),
-        (ANYTHING, 1, 2, ANYTHING),
+        ({'type': B, 'value': ANYTHING}, 1, 2, ANYTHING),
     ],
     shape=[
         ({'type': B},

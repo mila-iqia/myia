@@ -80,6 +80,15 @@ class TypeTrack(Track):
         else:
             return typeof(v)
 
+    def to_element(self, t):
+        """Return the type of each element of type t."""
+        if ismyiatype(t, List):
+            return t.element_type
+        elif ismyiatype(t, Array):
+            return t.elements
+        else:
+            raise AssertionError()
+
     def default(self, values):
         """Return a default type; this method raises an exception."""
         raise Exception('There is no default value for the type track.') \
@@ -280,9 +289,9 @@ async def infer_type_shape(track, ary):
 async def infer_type_array_map(track, fn, *arrays):
     """Infer the return type of array_map."""
     fn_t = await fn['type']
-    array_ts = await track.check(Array, *arrays, return_tuple=True)
-    vrefs = [track.engine.vref({'type': a_t.elements})
-             for a_t in array_ts]
+    await track.check(Array, *arrays)
+    vrefs = [a.transform(lambda track, x: track.to_element(x))
+             for a in arrays]
     return Array[await fn_t(*vrefs)]
 
 
@@ -291,9 +300,9 @@ async def infer_type_reduce(track, fn, ary, shp):
     """Infer the return type of array_reduce."""
     fn_t = await fn['type']
     await track.check(_shape_type, shp)
-    ary_t = await track.check(Array, ary)
-    xref = track.engine.vref({'type': ary_t.elements})
-    xref2 = track.engine.vref({'type': ary_t.elements})
+    await track.check(Array, ary)
+    xref = ary.transform(lambda track, x: track.to_element(x))
+    xref2 = ary.transform(lambda track, x: track.to_element(x))
     res_elem_t = await fn_t(xref, xref2)
     return Array[res_elem_t]
 
@@ -310,8 +319,8 @@ async def infer_type_across_array(track, fn, init, ary, ax):
                             "as array elements")
     if not ax_t == UInt[64]:
         raise MyiaTypeError("Axis must be u64")
-    xref = track.engine.vref({'type': ary_t.elements})
-    xref2 = track.engine.vref({'type': ary_t.elements})
+    xref = ary.transform(lambda track, x: track.to_element(x))
+    xref2 = ary.transform(lambda track, x: track.to_element(x))
     return Array[await fn_t(xref, xref2)]
 
 
@@ -347,8 +356,8 @@ async def infer_type_return_(track, x):
 async def infer_type_list_map(track, f, xs):
     """Infer the return type of list_map."""
     f_t = await f['type']
-    xs_t = await track.check(List, xs)
-    xref = track.engine.vref(dict(type=xs_t.element_type))
+    await track.check(List, xs)
+    xref = xs.transform(lambda track, x: track.to_element(x))
     ret_t = await f_t(xref)
     return List[ret_t]
 

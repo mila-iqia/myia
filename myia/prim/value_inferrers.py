@@ -100,6 +100,8 @@ class ValueTrack(Track):
 
     """
 
+    dependencies = ['type']
+
     def __init__(self,
                  engine,
                  name,
@@ -156,6 +158,10 @@ class ValueTrack(Track):
             return v
         else:
             return limited(v.value, v.count - 1)
+
+    def to_element(self, v):
+        """Value of each element of v."""
+        return ANYTHING
 
 
 ########################

@@ -134,6 +134,8 @@ def find_matching_shape(shps):
 class ShapeTrack(Track):
     """Infer the shape of a constant."""
 
+    dependencies = ['type']
+
     def __init__(self, engine, name, *,
                  constructors=shape_inferrer_constructors):
         """Initialize a ShapeTrack."""
@@ -189,6 +191,13 @@ class ShapeTrack(Track):
         else:
             return getattr(v, 'shape', NOSHAPE)
 
+    def to_element(self, sh):
+        """Return the type of each element of shape sh."""
+        if isinstance(sh, ListShape):
+            return sh.shape
+        else:
+            return NOSHAPE
+
 
 shape_inferrer = partial(register_inferrer,
                          constructors=shape_inferrer_constructors)
@@ -210,11 +219,8 @@ async def infer_shape_tail(track, tup):
 @shape_inferrer(P.tuple_getitem, nargs=2)
 async def infer_shape_tuple_getitem(track, seq, idx):
     """Infer the shape of tuple_getitem."""
-    seq_t = await seq['type']
-    assert ismyiatype(seq_t, Tuple)
     seq_sh = await seq['shape']
     idx_v = await idx['value']
-    assert idx_v is not ANYTHING
     return seq_sh.shape[idx_v]
 
 
@@ -302,9 +308,7 @@ async def infer_shape_array_map(track, fn, *arrays):
 @shape_inferrer(P.list_map, nargs=2)
 async def infer_shape_list_map(track, fn, lst):
     """Infer the shape of list_map."""
-    shp = await lst['shape']
-    typ = await lst['type']
-    e = track.engine.vref({'type': typ.element_type, 'shape': shp.shape})
+    e = lst.transform(lambda track, x: track.to_element(x))
     return ListShape(await (await fn['shape'])(e))
 
 
