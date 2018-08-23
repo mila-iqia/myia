@@ -18,7 +18,7 @@ from myia.prim import Primitive, ops as P
 from myia.prim.shape_inferrers import TupleShape, ListShape, ClassShape, \
     NOSHAPE
 from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, scalar_lt, head, tail, list_map, hastype, \
+    scalar_add, scalar_mul, scalar_lt, tail, list_map, hastype, \
     typeof, scalar_usub, dot, distribute, shape, array_map, array_map2, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
@@ -493,16 +493,6 @@ def test_list_len(xs):
 )
 def test_array_len(xs):
     return P.array_len(xs)
-
-
-@infer(type=[(T[i64, f64], i64),
-             (T[f64, i64], f64),
-             (T[()], InferenceError),
-             (f64, InferenceError)],
-       shape=[(t(T[i64, f64]), NOSHAPE),
-              (t(T[T[i64, f64], i64]), TupleShape((NOSHAPE, NOSHAPE)))])
-def test_head_tuple(tup):
-    return head(tup)
 
 
 @infer(type=[(T[i64, f64], T[f64]),
@@ -1035,7 +1025,7 @@ def test_hastype_2(x):
         elif hastype(x, Nil):
             return 0
         elif hastype(x, T):
-            return f(head(x)) + f(tail(x))
+            return f(x[0]) + f(tail(x))
         elif hastype(x, L):
             return 1.0
         else:

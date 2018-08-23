@@ -149,15 +149,6 @@ async def infer_type_make_tuple(track, *args):
     return Tuple[elts]
 
 
-@type_inferrer(P.head, nargs=1)
-async def infer_type_head(track, tup):
-    """Infer the return type of head."""
-    tup_t = await track.check(Tuple, tup)
-    if not len(tup_t.elements) >= 1:
-        raise MyiaTypeError('head on empty tuple', refs=[tup])
-    return tup_t.elements[0]
-
-
 @type_inferrer(P.tail, nargs=1)
 async def infer_type_tail(track, tup):
     """Infer the return type of tail."""

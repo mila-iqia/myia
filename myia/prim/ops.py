@@ -60,7 +60,6 @@ hastype = Primitive('hastype')
 
 
 make_tuple = Primitive('make_tuple')
-head = Primitive('head')
 tail = Primitive('tail')
 tuple_getitem = Primitive('tuple_getitem')
 list_getitem = Primitive('list_getitem')

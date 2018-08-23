@@ -77,14 +77,6 @@ def setitem_tuple(optimizer, node, equiv):
     return sexp_to_node((P.make_tuple, *elems), node.graph)
 
 
-# head((a, b, ...)) => a
-head_tuple = psub(
-    pattern=(P.head, (P.make_tuple, X, Xs)),
-    replacement=X,
-    name='head_tuple'
-)
-
-
 # tail((a, b, ...)) => (b, ...)
 tail_tuple = psub(
     pattern=(P.tail, (P.make_tuple, X, Xs)),

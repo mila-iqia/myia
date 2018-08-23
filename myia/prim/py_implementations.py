@@ -224,12 +224,6 @@ def make_tuple(*args):
     return args
 
 
-@register(primops.head)
-def head(tup):
-    """Implement `head`."""
-    return tup[0]
-
-
 @register(primops.tail)
 def tail(tup):
     """Implement `tail`."""

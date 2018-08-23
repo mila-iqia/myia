@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from myia.dtype import Int, Float, List, Tuple, External
-from myia.prim.py_implementations import head, setattr as myia_setattr, \
+from myia.prim.py_implementations import setattr as myia_setattr, \
     tuple_setitem, list_setitem, tail, hastype, typeof, \
     shape, reshape, array_map, array_map2, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
@@ -98,9 +98,8 @@ def test_prim_getitem(data, item):
     return data[item]
 
 
-def test_prim_head_tail():
+def test_prim_tail():
     tup = (1, 2, 3, 4)
-    assert head(tup) == 1
     assert tail(tup) == (2, 3, 4)
 
 

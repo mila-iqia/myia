@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from .dtype import Array, Object, Int
 from .prim.py_implementations import \
     array_map, array_map2, bool_not, hastype, distribute, \
-    shape, broadcast_shape, switch, identity, bool_and, head, tail
+    shape, broadcast_shape, switch, identity, bool_and, tail
 
 
 def core(fn):
@@ -259,7 +259,7 @@ def array_iter(xs):
 @core
 def tuple_next(xs):
     """Next tuple."""
-    return head(xs), tail(xs)
+    return xs[0], tail(xs)
 
 
 @core

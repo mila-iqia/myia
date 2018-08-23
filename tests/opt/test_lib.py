@@ -4,7 +4,7 @@ from pytest import mark
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    head, tail, tuple_setitem, scalar_add, scalar_mul, identity, partial
+    tail, tuple_setitem, scalar_add, scalar_mul, identity, partial
 
 
 #######################
@@ -14,22 +14,15 @@ from myia.prim.py_implementations import \
 
 def test_getitem_tuple_elem0():
 
-    def before1(x):
+    def before(x):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tup[0]
-
-    def before2(x):
-        tup = (x + 1, x + 2, x + 3, x + 4)
-        return head(tup)
 
     def after(x):
         return x + 1
 
-    _check_opt(before1, after,
+    _check_opt(before, after,
                lib.getitem_tuple)
-
-    _check_opt(before2, after,
-               lib.head_tuple)
 
 
 def test_getitem_tuple_elem3():
@@ -40,7 +33,7 @@ def test_getitem_tuple_elem3():
 
     def before2(x):
         tup = (x + 1, x + 2, x + 3, x + 4)
-        return head(tail(tail(tail(tup))))
+        return tail(tail(tail(tup)))[0]
 
     def after(x):
         return x + 4
@@ -49,7 +42,7 @@ def test_getitem_tuple_elem3():
                lib.getitem_tuple)
 
     _check_opt(before2, after,
-               lib.head_tuple, lib.tail_tuple)
+               lib.getitem_tuple, lib.tail_tuple)
 
 
 def test_getitem_tuple_noopt():
@@ -59,18 +52,12 @@ def test_getitem_tuple_noopt():
         return tup[y]
 
     def before2(x):
-        return head(x)
-
-    def before3(x):
         return tail(x)
 
     _check_opt(before1, before1,
                lib.getitem_tuple)
 
     _check_opt(before2, before2,
-               lib.head_tuple)
-
-    _check_opt(before3, before3,
                lib.tail_tuple)
 
 
