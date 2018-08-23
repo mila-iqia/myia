@@ -12,6 +12,11 @@ from builtins import (  # noqa
 )
 
 
+def make_tuple(*elts):  # pragma: no cover
+    """Tuple builder."""
+    raise RuntimeError('This operation is not meant to be called directly.')
+
+
 def cons_tuple(head, tail):  # pragma: no cover
     """Tuple builder."""
     raise RuntimeError('This operation is not meant to be called directly.')

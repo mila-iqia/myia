@@ -194,12 +194,11 @@ shape_inferrer = partial(register_inferrer,
                          constructors=shape_inferrer_constructors)
 
 
-@shape_inferrer(P.cons_tuple, nargs=2)
-async def infer_shape_cons_tuple(track, head, tail):
-    """Infer the shape for cons_tuple."""
-    sht = await tail['shape']
-    shh = await head['shape']
-    return TupleShape((shh,) + sht.shape)
+@shape_inferrer(P.make_tuple, nargs=None)
+async def infer_shape_make_tuple(track, *args):
+    """Infer the shape for make_tuple."""
+    sh = [await x['shape'] for x in args]
+    return TupleShape(sh)
 
 
 @shape_inferrer(P.head, nargs=1)
@@ -405,8 +404,9 @@ async def infer_shape_getattr(track, data, item):
         if item_v is ANYTHING:
             raise InferenceError(
                 "getattr with non-constant item")  # pragma: no cover
-        data_sh = await data['shape']
-        return data_sh.shape[item_v]
+        if item_v in data_typ.attributes:
+            data_sh = await data['shape']
+            return data_sh.shape[item_v]
     return await static_getter(track, data, item, getattr)
 
 

@@ -379,16 +379,12 @@ class Parser:
 
     def process_Tuple(self, block: 'Block', node: ast.Tuple) -> ANFNode:
         """Process tuple literals."""
-        op = block.operation('cons_tuple')
+        op = block.operation('make_tuple')
         elts = [self.process_node(block, e) for e in node.elts]
-
-        def cons(elts):
-            if len(elts) == 0:
-                return Constant(())
-            else:
-                x, *rest = elts
-                return Apply([op, x, cons(rest)], block.graph)
-        return cons(elts)
+        if len(elts) == 0:
+            return Constant(())
+        else:
+            return block.graph.apply(op, *elts)
 
     def process_Subscript(self, block: 'Block',
                           node: ast.Subscript) -> ANFNode:

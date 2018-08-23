@@ -142,12 +142,11 @@ async def infer_type_partial(track, fn, *args):
     return PartialInferrer(track, fn_t, args)
 
 
-@type_inferrer(P.cons_tuple, nargs=2)
-async def infer_type_cons_tuple(track, x, y):
-    """Infer the return type of cons_tuple."""
-    x_t = await x['type']
-    y_t = await track.check(Tuple, y)
-    return Tuple[[x_t, *y_t.elements]]
+@type_inferrer(P.make_tuple, nargs=None)
+async def infer_type_make_tuple(track, *args):
+    """Infer the return type of make_tuple."""
+    elts = [await x['type'] for x in args]
+    return Tuple[elts]
 
 
 @type_inferrer(P.head, nargs=1)

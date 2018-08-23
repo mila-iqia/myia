@@ -218,10 +218,10 @@ def hastype(x, t):
     return hastype_helper(typeof(x), t)
 
 
-@register(primops.cons_tuple)
-def cons_tuple(head, tail):
-    """Implement `cons_tuple`."""
-    return (head,) + tail
+@register(primops.make_tuple)
+def make_tuple(*args):
+    """Implement `make_tuple`."""
+    return args
 
 
 @register(primops.head)

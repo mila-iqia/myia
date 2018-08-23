@@ -3,9 +3,8 @@
 from .utils import get_outputs
 
 from ..ir import Graph, is_apply, is_constant, manage, clone
-from ..prim import Primitive, vm_implementations
+from ..prim import Primitive, vm_implementations, ops as P
 from ..vm import VM
-from ..graph_utils import make_tuple
 
 
 def debug_convert(lst):
@@ -50,7 +49,7 @@ def debug_convert(lst):
         eqv[n] = g.apply(fn, *args)
 
     outputs = get_outputs(lst, lst[0].graph.manager.uses, set(eqv.keys()))
-    g.output = make_tuple((eqv[o] for o in outputs), g)
+    g.output = g.apply(P.make_tuple, *[eqv[o] for o in outputs])
 
     # Clone in case g contains subgraphs that have a different manager
     g = clone(g)

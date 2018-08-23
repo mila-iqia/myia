@@ -33,7 +33,7 @@ op_whitelist = [
     P.scalar_add, P.scalar_mul, P.scalar_sub,
     P.scalar_uadd, P.scalar_usub,
     P.bool_not, P.scalar_gt, P.scalar_lt,
-    P.cons_tuple, P.hastype, P.list_map, P.identity, P.switch
+    P.make_tuple, P.hastype, P.list_map, P.identity, P.switch
 ]
 
 

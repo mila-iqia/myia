@@ -49,7 +49,7 @@ def primset_var(*prims):
 ###############################
 
 
-@pattern_replacer(P.tuple_getitem, (P.cons_tuple, X, Y), C)
+@pattern_replacer(P.tuple_getitem, (P.make_tuple, Xs), C)
 def getitem_tuple(optimizer, node, equiv):
     """Match a constant index in an explicit tuple.
 
@@ -59,13 +59,10 @@ def getitem_tuple(optimizer, node, equiv):
     """
     i = equiv[C].value
     assert isinstance(i, int)
-    if i == 0:
-        return equiv[X]
-    else:
-        return sexp_to_node((P.tuple_getitem, equiv[Y], i - 1), node.graph)
+    return equiv[Xs][i]
 
 
-@pattern_replacer(P.tuple_setitem, (P.cons_tuple, X, Y), C, Z)
+@pattern_replacer(P.tuple_setitem, (P.make_tuple, Xs), C, Z)
 def setitem_tuple(optimizer, node, equiv):
     """Match a constant setitem in an explicit tuple.
 
@@ -75,17 +72,14 @@ def setitem_tuple(optimizer, node, equiv):
     """
     i = equiv[C].value
     assert isinstance(i, int)
-    if i == 0:
-        return sexp_to_node((P.cons_tuple, equiv[Z], equiv[Y]), node.graph)
-    else:
-        return sexp_to_node((P.cons_tuple, equiv[X],
-                             (P.tuple_setitem, equiv[Y], i - 1, equiv[Z])),
-                            node.graph)
+    elems = list(equiv[Xs])
+    elems[i] = equiv[Z]
+    return sexp_to_node((P.make_tuple, *elems), node.graph)
 
 
 # head((a, b, ...)) => a
 head_tuple = psub(
-    pattern=(P.head, (P.cons_tuple, X, Y)),
+    pattern=(P.head, (P.make_tuple, X, Xs)),
     replacement=X,
     name='head_tuple'
 )
@@ -93,8 +87,8 @@ head_tuple = psub(
 
 # tail((a, b, ...)) => (b, ...)
 tail_tuple = psub(
-    pattern=(P.tail, (P.cons_tuple, X, Y)),
-    replacement=Y,
+    pattern=(P.tail, (P.make_tuple, X, Xs)),
+    replacement=(P.make_tuple, Xs),
     name='tail_tuple'
 )
 
@@ -103,21 +97,16 @@ tail_tuple = psub(
 # For f in the following list:
 _BubbleBinary = primset_var(P.scalar_add)
 
-bubble_op_cons_binary = psub(
-    pattern=(_BubbleBinary, (P.cons_tuple, X1, Y1), (P.cons_tuple, X2, Y2)),
-    replacement=(P.cons_tuple,
-                 (_BubbleBinary, X1, X2),
-                 (_BubbleBinary, Y1, Y2)),
-    name='bubble_op_cons_binary'
-)
 
-
-# f((), ()) => () -- this is a kind of constant prop
-bubble_op_nil_binary = psub(
-    pattern=(_BubbleBinary, NIL, NIL),
-    replacement=NIL,
-    name='bubble_op_nil_binary'
-)
+@pattern_replacer(_BubbleBinary, (P.make_tuple, Xs), (P.make_tuple, Ys))
+def bubble_op_tuple_binary(optimizer, node, equiv):
+    """Replace (x, y, ...) + (a, b, ...) => (x + a, y + b, ...)."""
+    xs = equiv[Xs]
+    ys = equiv[Ys]
+    op = equiv[_BubbleBinary]
+    assert len(xs) == len(ys)
+    elems = [(op, x, y) for x, y in zip(xs, ys)]
+    return sexp_to_node((P.make_tuple, *elems), node.graph)
 
 
 ##############################

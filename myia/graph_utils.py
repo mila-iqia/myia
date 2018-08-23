@@ -6,7 +6,6 @@ the notion of successor.
 
 from typing import Any, Callable, Dict, Iterable, List, Set, TypeVar
 
-from .prim.ops import cons_tuple
 
 FOLLOW = 'follow'
 NOFOLLOW = 'nofollow'
@@ -107,11 +106,3 @@ def toposort(root: T,
         done.add(node)
         yield node
         todo.pop()
-
-
-def make_tuple(vals, graph):
-    """Make a graph that builds a tuple from the specified values."""
-    tup = graph.constant(())
-    for v in reversed(list(vals)):
-        tup = graph.apply(cons_tuple, v, tup)
-    return tup

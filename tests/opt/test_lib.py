@@ -121,8 +121,7 @@ def test_op_tuple_binary():
         return (x + 1, y + 2, z + 3)
 
     _check_opt(before, after,
-               lib.bubble_op_cons_binary,
-               lib.bubble_op_nil_binary)
+               lib.bubble_op_tuple_binary)
 
 
 ##############################
