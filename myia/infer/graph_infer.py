@@ -285,11 +285,12 @@ class PrimitiveInferrer(Inferrer):
 class GraphInferrer(Inferrer):
     """Infer a property of the result of calling a Graph."""
 
-    def __init__(self, track, graph, context):
+    def __init__(self, track, graph, context, broaden=True):
         """Initialize the GraphInferrer."""
         super().__init__(track, graph)
         self.track = track
         self._graph = graph
+        self.broaden = broaden
         if context is None:
             self.context = Context.empty()
         else:
@@ -312,7 +313,7 @@ class GraphInferrer(Inferrer):
             argval = {}
             for track_name, track in self.engine.tracks.items():
                 result = await self.engine.get_inferred(track_name, arg)
-                if not g.flags.get('flatten_inference'):
+                if self.broaden and not g.flags.get('flatten_inference'):
                     result = track.broaden(result)
                 argval[track_name] = result
             argvals.append(argval)
@@ -646,7 +647,8 @@ class InferenceEngine:
         async def _run():
             for track in self.required_tracks:
                 inf = GraphInferrer(self.tracks[track],
-                                    graph, empty_context)
+                                    graph, empty_context,
+                                    broaden=False)
                 self.loop.schedule(inf(*argrefs))
 
         self.run_coroutine(_run())
