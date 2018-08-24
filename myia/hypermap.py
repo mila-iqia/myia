@@ -2,8 +2,8 @@
 
 
 from . import composite as C
-from .ir import MetaGraph, Graph, Constant
-from .dtype import Array, Tuple, Class, Type, tag_to_dataclass, \
+from .ir import MetaGraph, Graph
+from .dtype import Array, List, Tuple, Class, Type, tag_to_dataclass, \
     pytype_to_myiatype
 from .utils import TypeMap
 from .prim import ops as P
@@ -11,7 +11,7 @@ from .prim.py_implementations import hastype_helper
 
 
 class HyperMap(MetaGraph):
-    """Map over tuples, classes and arrays.
+    """Map over tuples, classes, lists and arrays.
 
     Arguments:
         fn_leaf: The function to apply on leaves. If it is None,
@@ -31,7 +31,7 @@ class HyperMap(MetaGraph):
                  fn_leaf=None,
                  fn_rec=None,
                  broadcast=True,
-                 nonleaf=(Array, Tuple, Class)):
+                 nonleaf=(Array, List, Tuple, Class)):
         """Initialize a HyperMap."""
         if fn_leaf is None:
             self.name = 'hyper_map'
@@ -47,6 +47,16 @@ class HyperMap(MetaGraph):
         self.cache = {}
 
     full_make_map = TypeMap()
+
+    @full_make_map.register(List)
+    def _make_List(self, resources, t, g, fnarg, argmap):
+        if fnarg is None:
+            fnarg = resources.convert(self.fn_leaf)
+
+        args = list(argmap.keys())
+        first, *rest = args
+
+        return g.apply(P.list_map, fnarg, *args)
 
     @full_make_map.register(Array)
     def _make_Array(self, resources, t, g, fnarg, argmap):

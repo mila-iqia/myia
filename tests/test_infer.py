@@ -1711,9 +1711,13 @@ hyper_add = HyperMap(fn_leaf=scalar_add)
     type=[
         (i64, i64, i64),
         (f64, f64, f64),
+        (lf64, lf64, lf64),
         (T[i64, f64], T[i64, f64], T[i64, f64]),
         (Point_t, Point_t, Point_t),
         (ai64_of(2, 5), ai64_of(2, 5), ai64),
+        (i64, f64, InferenceError),
+        (lf64, f64, InferenceError),
+        (ai64_of(2, 5), af64_of(2, 5), InferenceError),
     ],
     value=[
         (1, 2, 3),
@@ -1754,6 +1758,7 @@ def test_hyper_map_nobroadcast(x, y):
     type=[
         (i64, i64, i64),
         (f64, f64, f64),
+        (lf64, lf64, lf64),
         (T[i64, f64], T[i64, f64], T[i64, f64]),
         (Point_t, Point_t, Point_t),
         (ai64_of(2, 5), ai64_of(2, 5), ai64),
