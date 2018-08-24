@@ -21,6 +21,10 @@ def test_myia():
     assert fi is f.compile((100, 200))
 
     with pytest.raises(InferenceError):
+        f(10)
+    with pytest.raises(InferenceError):
+        f(10, 20, 30)
+    with pytest.raises(InferenceError):
         f((10, 20), (30, 40))
 
 
