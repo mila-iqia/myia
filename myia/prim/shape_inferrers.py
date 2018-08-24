@@ -308,11 +308,12 @@ async def infer_shape_array_map(track, fn, *arrays):
     return tuple(rshape)
 
 
-@shape_inferrer(P.list_map, nargs=2)
-async def infer_shape_list_map(track, fn, lst):
+@shape_inferrer(P.list_map, nargs=None)
+async def infer_shape_list_map(track, fn, *lsts):
     """Infer the shape of list_map."""
-    e = lst.transform(lambda track, x: track.to_element(x))
-    return ListShape(await (await fn['shape'])(e))
+    argrefs = [lst.transform(lambda track, x: track.to_element(x))
+               for lst in lsts]
+    return ListShape(await (await fn['shape'])(*argrefs))
 
 
 @shape_inferrer(P.array_scan, nargs=4)

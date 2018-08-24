@@ -957,6 +957,20 @@ def test_list_map(xs, ys):
 
 
 @infer(
+    type=[
+        (li64, li64, li64),
+        (li64, lf64, InferenceError),
+    ]
+)
+def test_list_map2(xs, ys):
+
+    def mulm(x, y):
+        return x * -y
+
+    return list_map(mulm, xs, ys)
+
+
+@infer(
     type=[(i64, B)],
     value=[(t(i64), True),
            (t(f64), False)]

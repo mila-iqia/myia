@@ -352,13 +352,14 @@ async def infer_type_return_(track, x):
     return await x.get_raw('type')
 
 
-@type_inferrer(P.list_map, nargs=2)
-async def infer_type_list_map(track, f, xs):
+@type_inferrer(P.list_map, nargs=None)
+async def infer_type_list_map(track, f, *lsts):
     """Infer the return type of list_map."""
     f_t = await f['type']
-    await track.check(List, xs)
-    xref = xs.transform(lambda track, x: track.to_element(x))
-    ret_t = await f_t(xref)
+    await track.check(List, *lsts)
+    argrefs = [xs.transform(lambda track, x: track.to_element(x))
+               for xs in lsts]
+    ret_t = await f_t(*argrefs)
     return List[ret_t]
 
 
