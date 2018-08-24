@@ -44,7 +44,8 @@ class TypeSpecializer:
     def run(self, graph, context):
         """Run the specializer on the given graph in the given context."""
         ginf = GraphInferrer(self.engine.tracks['type'],
-                             graph, Context.empty())
+                             graph, Context.empty(),
+                             broaden=False)
 
         argrefs = [self.engine.ref(p, context)
                    for p in graph.parameters]
