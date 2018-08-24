@@ -115,6 +115,8 @@ class ValueTrack(Track):
 
     def wrap(self, v):
         """Produce a LimitedValue for v, with a maximal count."""
+        if isinstance(v, LimitedValue):
+            return v
         return LimitedValue(v, self.max_depth)
 
     def default(self, values):

@@ -1,9 +1,43 @@
 import pytest
 
+from myia.api import myia
 from myia.api import scalar_parse as parse, scalar_debug_compile as compile
 from myia.cconv import closure_convert
+from myia.infer import InferenceError
 from myia.ir import clone
 from myia.prim.py_implementations import getitem
+
+
+def test_myia():
+    @myia
+    def f(x, y):
+        return x + y
+
+    assert f(10, 20) == 30
+
+    fi = f.compile((10, 20))
+    ff = f.compile((10.0, 20.0))
+    assert fi is not ff
+    assert fi is f.compile((100, 200))
+
+    with pytest.raises(InferenceError):
+        f((10, 20), (30, 40))
+
+
+def test_myia_specialize_values():
+    @myia(specialize_values=['c'])
+    def f(c, x, y):
+        if c:
+            return x + y
+        else:
+            return x * y
+
+    assert f(True, 10, 20) == 30
+    assert f(False, 10, 20) == 200
+
+    ft = f.compile((True, 10, 20))
+    ff = f.compile((False, 10, 20))
+    assert ft is not ff
 
 
 def test_function_arg():
