@@ -1,6 +1,6 @@
 """Clean up Class types."""
 
-from ..dtype import Tuple, List, Class, Function, Type, ismyiatype
+from ..dtype import Int, Tuple, List, Class, Function, Type, ismyiatype
 from ..ir import is_apply, is_constant, Constant
 from ..prim import ops as P
 from ..utils import TypeMap
@@ -34,15 +34,19 @@ def _retype_Type(t):
     return t
 
 
-@_retype_map.register(object)
-def _retype_object(t):
-    return t
-
-
 def _retype(t):
     if not ismyiatype(t):
-        t = type(t)
+        # This will be a validation error later on, and the validator
+        # will report it better than we could here.
+        return t  # pragma: no cover
     return _retype_map[t](t)
+
+
+def _mkr_to_mkt(mkr):
+    argtypes = mkr.type.arguments[1:]
+    mkt = Constant(P.make_tuple)
+    mkt.type = Function[argtypes, Tuple[argtypes]]
+    return mkt
 
 
 def erase_class(root, manager):
@@ -62,20 +66,29 @@ def erase_class(root, manager):
             dt = data.type
             assert ismyiatype(dt, Class)
             idx = list(dt.attributes.keys()).index(item.value)
-            new_node = node.graph.apply(P.tuple_getitem, data, idx)
+            idx = Constant(idx)
+            idx.type = Int[64]
+            gi = Constant(P.tuple_getitem)
+            gi.type = Function[[dt, Int[64]], node.type]
+            new_node = node.graph.apply(gi, data, idx)
 
         elif is_apply(node, P.make_record):
-            _, typ, *args = node.inputs
-            new_node = node.graph.apply(P.make_tuple, *args)
+            mkr, typ, *args = node.inputs
+            mkt = _mkr_to_mkt(mkr)
+            new_node = node.graph.apply(mkt, *args)
 
         elif is_apply(node, P.partial):
-            _, oper, *args = node.inputs
+            orig_ptl, oper, *args = node.inputs
             if is_constant(oper) and oper.value is P.make_record:
+                argtypes = [arg.type for arg in args[1:]]
+                mkt = _mkr_to_mkt(oper)
                 if len(args) == 1:
-                    new_node = Constant(P.make_tuple)
+                    new_node = mkt
                 elif len(args) > 1:
-                    new_node = node.graph.apply(P.partial,
-                                                P.make_tuple, *args[1:])
+                    ptl = Constant(P.partial)
+                    ret = orig_ptl.type.retval
+                    ptl.type = Function[[mkt.type, *argtypes], ret]
+                    new_node = node.graph.apply(ptl, mkt, *args[1:])
 
         if new_node is not None:
             new_node.type = node.type
