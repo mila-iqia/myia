@@ -7,12 +7,12 @@ from myia.prim.py_implementations import \
 from .test_lang import parse_compare
 
 
-@parse_compare(([1, 2, 3],))
-def test_vm_icall_fn(l):
-    def square(x):
-        return x * x
+@parse_compare(([1, 2, 3], [4, 5, 6]))
+def test_vm_icall_fn(l1, l2):
+    def mulm(x, y):
+        return x * -y
 
-    return list_map(square, l)
+    return list_map(mulm, l1, l2)
 
 
 @parse_compare(([1, 2, 3],))

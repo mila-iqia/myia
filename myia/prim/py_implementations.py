@@ -410,17 +410,23 @@ def return_(x):
 
 
 @py_register(primops.list_map)
-def list_map(f, xs):
+def list_map(f, *lsts):
     """Implement `list_map` in pure Python."""
-    return list(map(f, xs))
+    assert len(set(len(l) for l in lsts)) == 1
+
+    def f_(args):
+        return f(*args)
+    return list(map(f_, zip(*lsts)))
 
 
 @vm_register(primops.list_map)
-def _list_map_vm(vm, f, xs):
+def _list_map_vm(vm, f, *lsts):
     """Implement `list_map` for Myia's VM."""
-    def f_(*args):
+    assert len(set(len(l) for l in lsts)) == 1
+
+    def f_(args):
         return vm.call(f, args)
-    return list(map(f_, xs))
+    return list(map(f_, zip(*lsts)))
 
 
 @register(primops.identity)

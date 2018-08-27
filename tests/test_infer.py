@@ -8,11 +8,13 @@ from dataclasses import dataclass
 
 from myia.api import scalar_pipeline, standard_pipeline
 from myia.debug.traceback import print_inference_error
+from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
+    Function as F, TypeType, UInt, External, pytype_to_myiatype, Number, \
+    Class
+from myia.hypermap import HyperMap
 from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
 from myia.ir import MultitypeGraph
-from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
-    Function as F, TypeType, UInt, External, pytype_to_myiatype, Number
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive, ops as P
 from myia.prim.shape_inferrers import TupleShape, ListShape, ClassShape, \
@@ -955,6 +957,20 @@ def test_list_map(xs, ys):
 
 
 @infer(
+    type=[
+        (li64, li64, li64),
+        (li64, lf64, InferenceError),
+    ]
+)
+def test_list_map2(xs, ys):
+
+    def mulm(x, y):
+        return x * -y
+
+    return list_map(mulm, xs, ys)
+
+
+@infer(
     type=[(i64, B)],
     value=[(t(i64), True),
            (t(f64), False)]
@@ -1683,3 +1699,83 @@ def test_dataclass_inst(x1, y1, x2, y2):
 @infer(type=[(Point_t, InferenceError)])
 def test_dataclass_wrong_field(pt):
     return pt.z
+
+
+hyper_map = HyperMap()
+hyper_map_notuple = HyperMap(nonleaf=(A, Class))
+hyper_map_nobroadcast = HyperMap(broadcast=False)
+hyper_add = HyperMap(fn_leaf=scalar_add)
+
+
+@infer(
+    type=[
+        (i64, i64, i64),
+        (f64, f64, f64),
+        (lf64, lf64, lf64),
+        (L[lf64], L[lf64], L[lf64]),
+        (lf64, f64, InferenceError),
+        (L[f64], L[lf64], InferenceError),
+        (T[i64, f64], T[i64, f64], T[i64, f64]),
+        (Point_t, Point_t, Point_t),
+        (ai64_of(2, 5), ai64_of(2, 5), ai64),
+        (i64, f64, InferenceError),
+        (lf64, f64, InferenceError),
+        (ai64_of(2, 5), af64_of(2, 5), InferenceError),
+    ],
+    value=[
+        (1, 2, 3),
+        (4.5, 7.5, 12.0),
+        (Point(1, 2), Point(3, 4), Point(4, 6)),
+    ],
+    shape=[
+        (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
+        (ai64_of(2, 5), ai64_of(2, 1), (2, 5)),
+        (ai64_of(2, 5), {'type': i64}, (2, 5)),
+    ]
+)
+def test_hyper_map(x, y):
+    return hyper_map(scalar_add, x, y)
+
+
+@infer(
+    type=[
+        (T[i64, f64], T[i64, f64], InferenceError),
+    ],
+)
+def test_hyper_map_notuple(x, y):
+    return hyper_map_notuple(scalar_add, x, y)
+
+
+@infer(
+    shape=[
+        (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
+        (ai64_of(2, 5), ai64_of(2, 1), InferenceError),
+        (ai64_of(2, 5), {'type': i64}, InferenceError),
+    ]
+)
+def test_hyper_map_nobroadcast(x, y):
+    return hyper_map_nobroadcast(scalar_add, x, y)
+
+
+@infer(
+    type=[
+        (i64, i64, i64),
+        (f64, f64, f64),
+        (lf64, lf64, lf64),
+        (T[i64, f64], T[i64, f64], T[i64, f64]),
+        (Point_t, Point_t, Point_t),
+        (ai64_of(2, 5), ai64_of(2, 5), ai64),
+    ],
+    value=[
+        (1, 2, 3),
+        (4.5, 7.5, 12.0),
+        (Point(1, 2), Point(3, 4), Point(4, 6)),
+    ],
+    shape=[
+        (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
+        (ai64_of(2, 5), ai64_of(2, 1), (2, 5)),
+        (ai64_of(2, 5), {'type': i64}, (2, 5)),
+    ]
+)
+def test_hyper_add(x, y):
+    return hyper_add(x, y)
