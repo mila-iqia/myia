@@ -2,6 +2,7 @@
 
 
 from . import composite as C
+from .infer import InferenceError
 from .ir import MetaGraph, Graph
 from .dtype import Array, List, Tuple, Class, Type, tag_to_dataclass, \
     pytype_to_myiatype
@@ -44,19 +45,19 @@ class HyperMap(MetaGraph):
         self.make_map = TypeMap()
         for t in (*nonleaf, Type):
             self.make_map[t] = self.full_make_map[t]
+        self.nonleaf = nonleaf
         self.cache = {}
 
     full_make_map = TypeMap()
 
     @full_make_map.register(List)
     def _make_List(self, resources, t, g, fnarg, argmap):
-        if fnarg is None:
-            fnarg = resources.convert(self.fn_leaf)
-
         args = list(argmap.keys())
-        first, *rest = args
-
-        return g.apply(P.list_map, fnarg, *args)
+        if fnarg is None:
+            fn_rec = self.fn_rec
+        else:
+            fn_rec = g.apply(P.partial, self.fn_rec, fnarg)
+        return g.apply(P.list_map, fn_rec, *args)
 
     @full_make_map.register(Array)
     def _make_Array(self, resources, t, g, fnarg, argmap):
@@ -115,7 +116,17 @@ class HyperMap(MetaGraph):
 
     def _make(self, resources, g, fnarg, argmap):
         for t in argmap.values():
-            break
+            # If any of the arguments is a nonleaf generic, pick it.
+            if t.generic in self.nonleaf:
+                break
+        if t.generic in self.nonleaf:
+            # In a nonleaf situation, all arguments must have the same
+            # generic.
+            for t2 in argmap.values():
+                if t.generic is not t2.generic:
+                    raise InferenceError(
+                        f'HyperMap cannot match up types {t} and {t2}'
+                    )
         return self.make_map[t](self, resources, t, g, fnarg, argmap)
 
     def _harmonize(self, resources, g, args):
