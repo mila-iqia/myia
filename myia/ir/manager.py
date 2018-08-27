@@ -581,6 +581,7 @@ class GraphManager(Partializable):
 
         for g in dropped:
             self.events.drop_graph(g)
+            self.all_nodes -= set(g.parameters)
             self.graphs.remove(g)
             if g._manager is self:
                 g._manager = None
@@ -652,8 +653,8 @@ class GraphManager(Partializable):
             if node not in self.all_nodes:
                 continue
             uses = self.uses[node]
-            if uses or node.is_parameter():
-                # This node is still live
+
+            if uses or (is_parameter(node) and node in node.graph.parameters):
                 continue
 
             if node.is_constant_graph():
