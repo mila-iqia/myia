@@ -5,7 +5,6 @@ import sys
 from colorama import Fore, Style
 
 from ..infer import Inferrer, InferenceError
-from ..ir import is_apply, is_constant_graph
 from ..utils import eprint
 
 from .label import label
@@ -82,7 +81,7 @@ def _label(node, typ):
 
 def _find_loc(ref):
     node = ref.node
-    if is_constant_graph(node):
+    if node.is_constant_graph():
         node = node.value
     loc = node.debug.find('location')
     if loc is None:
@@ -120,7 +119,7 @@ async def _myia_traceback(engine, error):
         eprint()
     else:
         fstr, argstr = None, None
-        if ref is not None and is_apply(ref.node):
+        if ref is not None and ref.node.is_apply():
             ctx = ref.context
             irefs = [engine.ref(node, ctx) for node in ref.node.inputs]
             fn_ref, *_ = irefs

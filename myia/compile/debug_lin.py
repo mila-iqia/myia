@@ -2,7 +2,7 @@
 
 from .utils import get_outputs
 
-from ..ir import Graph, is_apply, is_constant, manage, clone
+from ..ir import Graph, manage, clone
 from ..prim import Primitive, vm_implementations, ops as P
 from ..vm import VM
 
@@ -34,7 +34,7 @@ def debug_convert(lst):
     g = Graph()
 
     def ref(n):
-        if is_constant(n):
+        if n.is_constant():
             eqv[n] = n
         elif n not in eqv:
             inputs.append(n)
@@ -42,8 +42,8 @@ def debug_convert(lst):
         return eqv[n]
 
     for n in lst:
-        assert is_apply(n)
-        assert is_constant(n.inputs[0], Primitive)
+        assert n.is_apply()
+        assert n.inputs[0].is_constant(Primitive)
         fn = n.inputs[0].value
         args = [ref(a) for a in n.inputs[1:]]
         eqv[n] = g.apply(fn, *args)

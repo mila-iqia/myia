@@ -9,7 +9,6 @@ from collections import defaultdict
 from typing import Iterable, Mapping, Any, List
 
 from .ir import Graph, Apply, Constant, Parameter, ANFNode, MetaGraph
-from .ir.utils import is_constant_graph, is_constant
 from .prim import Primitive
 from .prim.py_implementations import typeof
 from .prim.ops import if_, return_, partial
@@ -47,7 +46,7 @@ class VMFrame:
             return self.values[node]
         elif self.closure is not None and node in self.closure:
             return self.closure[node]
-        elif is_constant(node):
+        elif node.is_constant():
             # Should be a constant
             return node.value
         else:
@@ -195,9 +194,9 @@ class VM:
     def _succ_vm(self, node: ANFNode) -> Iterable[ANFNode]:
         """Follow node.incoming and free variables."""
         for i in node.inputs:
-            if i.graph == node.graph or is_constant_graph(i):
+            if i.graph == node.graph or i.is_constant_graph():
                 yield i
-        if is_constant_graph(node):
+        if node.is_constant_graph():
             yield from self._vars[node.value]
 
     def call(self, fn, args):
@@ -273,7 +272,7 @@ class VM:
                 return
 
             # We only visit constant graphs
-            assert is_constant_graph(node)
+            assert node.is_constant_graph()
             g = node.value
             if len(self._vars[g]) != 0:
                 frame.values[node] = self._make_closure(g, frame)

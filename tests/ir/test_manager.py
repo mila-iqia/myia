@@ -5,8 +5,7 @@ from collections import Counter
 
 from myia.api import scalar_parse as parse
 from myia.debug.label import short_labeler
-from myia.ir import is_constant, manage, GraphManager, GraphCloner, \
-    ManagerError
+from myia.ir import manage, GraphManager, GraphCloner, ManagerError
 from myia.prim import Primitive
 
 
@@ -131,7 +130,7 @@ def check_manager(*stages, **specs):
 
             with mng.transact() as tr:
                 for node in mng.all_nodes:
-                    if is_constant(node) and node.value in swaps:
+                    if node.is_constant() and node.value in swaps:
                         j = swaps.index(node.value)
                         for swap_node, i in mng.uses[node]:
                             assert i == 0

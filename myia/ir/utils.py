@@ -1,10 +1,10 @@
 """Utilities for manipulating and inspecting the IR."""
 
-from typing import Any, Iterable, Set
+from typing import Iterable, Set
 
 from ..graph_utils import EXCLUDE, FOLLOW, NOFOLLOW, dfs as _dfs, \
     toposort as _toposort
-from .anf import ANFNode, Apply, Constant, Graph, Parameter, Special
+from .anf import ANFNode
 
 #######################
 # Successor functions #
@@ -17,7 +17,7 @@ def succ_deep(node: ANFNode) -> Iterable[ANFNode]:
     A node's successors are its `incoming` set, or the return node of a graph
     when a graph Constant is encountered.
     """
-    if is_constant_graph(node):
+    if node.is_constant_graph():
         return [node.value.return_] if node.value.return_ else []
     else:
         return node.incoming
@@ -29,7 +29,7 @@ def succ_deeper(node: ANFNode) -> Iterable[ANFNode]:
     Unlike `succ_deep` this visits all encountered graphs thoroughly, including
     those found through free variables.
     """
-    if is_constant_graph(node):
+    if node.is_constant_graph():
         return [node.value.return_] if node.value.return_ else []
     elif node.graph:
         return list(node.incoming) + [node.graph.return_]
@@ -101,13 +101,13 @@ def _same_node_shallow(n1, n2, equiv):
     # Works for Constant, Parameter and nodes previously seen
     if n1 in equiv and equiv[n1] is n2:
         return True
-    elif is_constant_graph(n1) and is_constant_graph(n2):
+    elif n1.is_constant_graph() and n2.is_constant_graph():
         # Note: we provide current equiv so that nested graphs can properly
         # match their free variables, using the equiv of their parent graph.
         return isomorphic(n1.value, n2.value, equiv)
-    elif is_constant(n1):
+    elif n1.is_constant():
         return n1.value == n2.value
-    elif is_parameter(n1):
+    elif n1.is_parameter():
         # Parameters are matched together in equiv when we ask whether two
         # graphs are isomorphic. Therefore, we only end up here when trying to
         # match free variables.
@@ -118,7 +118,7 @@ def _same_node_shallow(n1, n2, equiv):
 
 def _same_node(n1, n2, equiv):
     # Works for Apply (when not seen previously) or other nodes
-    if is_apply(n1):
+    if n1.is_apply():
         return all(_same_node_shallow(i1, i2, equiv)
                    for i1, i2 in zip(n1.inputs, n2.inputs))
     else:
@@ -191,31 +191,31 @@ def isomorphic(g1, g2, equiv=None):
     return rval
 
 
-##################
-# Misc utilities #
-##################
+# ##################
+# # Misc utilities #
+# ##################
 
 
-def is_apply(x: ANFNode) -> bool:
-    """Return whether x is an Apply."""
-    return isinstance(x, Apply)
+# def is_apply(x: ANFNode) -> bool:
+#     """Return whether x is an Apply."""
+#     return isinstance(x, Apply)
 
 
-def is_parameter(x: ANFNode) -> bool:
-    """Return whether x is a Parameter."""
-    return isinstance(x, Parameter)
+# def is_parameter(x: ANFNode) -> bool:
+#     """Return whether x is a Parameter."""
+#     return isinstance(x, Parameter)
 
 
-def is_constant(x: ANFNode, cls: Any = object) -> bool:
-    """Return whether x is a Constant, with value of given cls."""
-    return isinstance(x, Constant) and isinstance(x.value, cls)
+# def is_constant(x: ANFNode, cls: Any = object) -> bool:
+#     """Return whether x is a Constant, with value of given cls."""
+#     return isinstance(x, Constant) and isinstance(x.value, cls)
 
 
-def is_constant_graph(x: ANFNode) -> bool:
-    """Return whether x is a Constant with a Graph value."""
-    return is_constant(x, Graph)
+# def is_constant_graph(x: ANFNode) -> bool:
+#     """Return whether x is a Constant with a Graph value."""
+#     return is_constant(x, Graph)
 
 
-def is_special(x: ANFNode, cls: Any = object) -> bool:
-    """Return whether x is a Special, with value of given cls."""
-    return isinstance(x, Special) and isinstance(x.special, cls)
+# def is_special(x: ANFNode, cls: Any = object) -> bool:
+#     """Return whether x is a Special, with value of given cls."""
+#     return isinstance(x, Special) and isinstance(x.special, cls)

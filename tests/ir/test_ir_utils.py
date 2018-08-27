@@ -4,9 +4,7 @@ from myia.debug.label import short_labeler
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs as _dfs
 from myia.ir import Apply, Constant, Graph, Parameter, Special, \
-    dfs, exclude_from_set, \
-    freevars_boundary, is_apply, is_constant, is_constant_graph, \
-    is_parameter, is_special, isomorphic, \
+    dfs, exclude_from_set, freevars_boundary, isomorphic, \
     succ_deep, succ_deeper, succ_incoming, toposort
 from tests.test_graph_utils import _check_toposort
 
@@ -73,7 +71,7 @@ def test_dfs_variants():
         return q
 
     graph = parse(f)
-    inner_graph_ct, = [x for x in dfs(graph.return_) if is_constant_graph(x)]
+    inner_graph_ct, = [x for x in dfs(graph.return_) if x.is_constant_graph()]
     inner_graph = inner_graph_ct.value
 
     inner_ret = inner_graph.return_
@@ -219,22 +217,22 @@ def test_isomorphic_recursion():
 def test_helpers():
     g = Graph()
     cg = Constant(g)
-    assert is_constant(cg, Graph)
-    assert is_constant_graph(cg)
+    assert cg.is_constant(Graph)
+    assert cg.is_constant_graph()
 
     one = Constant(1)
-    assert is_constant(one)
-    assert is_constant(one, int)
-    assert not is_constant(one, str)
-    assert not is_constant_graph(one)
+    assert one.is_constant()
+    assert one.is_constant(int)
+    assert not one.is_constant(str)
+    assert not one.is_constant_graph()
 
     a = Apply([cg, one], g)
-    assert is_apply(a)
+    assert a.is_apply()
 
     p = Parameter(g)
-    assert is_parameter(p)
+    assert p.is_parameter()
 
     s = Special(1234, g)
-    assert is_special(s)
-    assert is_special(s, int)
-    assert not is_special(s, str)
+    assert s.is_special()
+    assert s.is_special(int)
+    assert not s.is_special(str)

@@ -1,9 +1,8 @@
 """Library of optimizations."""
 
 from ..graph_utils import dfs
-from ..ir import succ_incoming, freevars_boundary, \
-    Graph, Constant, is_constant, is_constant_graph, is_apply, \
-    GraphCloner
+from ..ir import ANFNode, succ_incoming, freevars_boundary, \
+    Graph, Constant, GraphCloner
 from ..prim import Primitive, ops as P
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
@@ -27,21 +26,21 @@ Y1 = Var('Y1')
 X2 = Var('X2')
 Y2 = Var('Y2')
 
-C = var(is_constant)
-C1 = var(is_constant)
-C2 = var(is_constant)
-CNS = var(lambda x: is_constant(x, Namespace))
-G = var(is_constant_graph)
-NIL = var(lambda x: is_constant(x) and x.value == ())
+C = var(ANFNode.is_constant)
+C1 = var(ANFNode.is_constant)
+C2 = var(ANFNode.is_constant)
+CNS = var(lambda x: x.is_constant(Namespace))
+G = var(ANFNode.is_constant_graph)
+NIL = var(lambda x: x.is_constant() and x.value == ())
 
 Xs = SVar(Var())
 Ys = SVar(Var())
-Cs = SVar(var(is_constant))
+Cs = SVar(var(ANFNode.is_constant))
 
 
 def primset_var(*prims):
     """Create a variable that matches a Primitive node."""
-    return var(lambda node: is_constant(node) and node.value in prims)
+    return var(lambda node: node.is_constant() and node.value in prims)
 
 
 ###############################
@@ -238,13 +237,13 @@ def is_trivial_graph(g, node, args):
              for node in dfs(g.output,
                              succ_incoming,
                              freevars_boundary(g, False))
-             if is_apply(node)]
+             if node.is_apply()]
 
     if len(nodes) == 0:
         return True
     elif len(nodes) == 1:
         app, = nodes
-        return all(not is_constant_graph(inp) for inp in app.inputs[1:])
+        return all(not inp.is_constant_graph() for inp in app.inputs[1:])
     else:
         return False
 
@@ -276,13 +275,13 @@ def replace_applicator(optimizer, node, equiv):
     """
     g = equiv[G].value
     out = g.output
-    if is_apply(out) and out.inputs[1:] == g.parameters:
+    if out.is_apply() and out.inputs[1:] == g.parameters:
         inner = out.inputs[0]
         # NOTE: it is likely correct to use `inner.value.parent is not g` as
         # the condition instead of `is None`, the current code is just playing
         # it safe.
-        if is_constant(inner, Primitive) \
-                or is_constant_graph(inner) and inner.value.parent is None:
+        if inner.is_constant(Primitive) \
+                or inner.is_constant_graph() and inner.value.parent is None:
             return inner
     return node
 

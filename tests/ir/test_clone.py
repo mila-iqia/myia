@@ -4,7 +4,7 @@ import pytest
 from myia.api import scalar_parse as parse
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs
-from myia.ir import Constant, Graph, is_constant, succ_deeper, succ_incoming, \
+from myia.ir import Constant, Graph, succ_deeper, succ_incoming, \
     GraphManager, GraphCloner, clone
 from myia.prim import ops as P
 
@@ -37,7 +37,7 @@ def test_clone_simple():
     d2 = set(dfs(g2.return_, succ_deeper))
 
     common = d1 & d2
-    assert all(is_constant(x) for x in common)
+    assert all(x.is_constant() for x in common)
     assert {x.value for x in common} == {P.scalar_add, P.scalar_mul, P.return_}
 
 
