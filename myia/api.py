@@ -530,10 +530,7 @@ def _convert_result_Tuple(res, orig_t, vm_t):
         return tup
 
 
-@_convert_result_map.register(Int)
-@_convert_result_map.register(Float)
-@_convert_result_map.register(Bool)
-@_convert_result_map.register(Array)
+@_convert_result_map.register(Int, Float, Bool, Array)
 def _convert_result_leaf(arg, orig_t, vm_t):
     return arg
 

@@ -103,18 +103,13 @@ class TypeMap(dict):
         super().__init__(*args)
         self.discover = discover
 
-    def register(self, obj_t, handler=None):
-        """Register a handler to the given type.
-
-        This method may be used as a decorator.
-        """
-        if handler is None:
-            def deco(fn):
-                self[obj_t] = fn
-                return fn
-            return deco
-        else:
-            self[obj_t] = handler
+    def register(self, *obj_ts):
+        """Decorator to register a handler to the given types."""
+        def deco(handler):
+            for obj_t in obj_ts:
+                self[obj_t] = handler
+            return handler
+        return deco
 
     def __missing__(self, obj_t):
         """Get the handler for the given type."""

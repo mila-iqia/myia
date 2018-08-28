@@ -1,6 +1,6 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
-from .dtype import Tuple, List, Class, Function, Type, Number, Bool, \
+from .dtype import Tuple, List, Function, Type, Number, Bool, \
     Problem, ismyiatype
 from .ir import manage
 from .prim import Primitive, ops as P
@@ -26,11 +26,6 @@ def _validate_type_List(t):
     _validate_type(t.element_type)
 
 
-@_validate_type_map.register(Class)
-def _validate_type_Class(t):
-    raise ValidationError(f'Illegal type in the graph: {t}')
-
-
 @_validate_type_map.register(Function)
 def _validate_type_Function(t):
     for t2 in t.arguments:
@@ -38,15 +33,8 @@ def _validate_type_Function(t):
     _validate_type(t.retval)
 
 
-@_validate_type_map.register(Problem)
-def _validate_type_Problem(t):
-    if t.kind != DEAD:
-        raise ValidationError(f'Illegal type in the graph: {t}')
-
-
-@_validate_type_map.register(Bool)
-@_validate_type_map.register(Number)
-def _validate_type_Number(t):
+@_validate_type_map.register(Number, Bool, Problem[DEAD])
+def _validate_type_OK(t):
     pass
 
 
