@@ -189,33 +189,3 @@ def isomorphic(g1, g2, equiv=None):
     equiv[(g1, g2)] = rval
 
     return rval
-
-
-# ##################
-# # Misc utilities #
-# ##################
-
-
-# def is_apply(x: ANFNode) -> bool:
-#     """Return whether x is an Apply."""
-#     return isinstance(x, Apply)
-
-
-# def is_parameter(x: ANFNode) -> bool:
-#     """Return whether x is a Parameter."""
-#     return isinstance(x, Parameter)
-
-
-# def is_constant(x: ANFNode, cls: Any = object) -> bool:
-#     """Return whether x is a Constant, with value of given cls."""
-#     return isinstance(x, Constant) and isinstance(x.value, cls)
-
-
-# def is_constant_graph(x: ANFNode) -> bool:
-#     """Return whether x is a Constant with a Graph value."""
-#     return is_constant(x, Graph)
-
-
-# def is_special(x: ANFNode, cls: Any = object) -> bool:
-#     """Return whether x is a Special, with value of given cls."""
-#     return isinstance(x, Special) and isinstance(x.special, cls)
