@@ -1,11 +1,15 @@
+import numpy as np
 import pytest
 
-from myia.api import myia
-from myia.api import scalar_parse as parse, scalar_debug_compile as compile
+from myia.api import myia, convert_arg, convert_result, \
+    scalar_parse as parse, scalar_debug_compile as compile
 from myia.cconv import closure_convert
+from myia.dtype import List, Array, Tuple, Bool
 from myia.infer import InferenceError
 from myia.ir import clone
 from myia.prim.py_implementations import getitem
+
+from .common import Point, Point_t, Point3D, i64, f64, i16
 
 
 def test_myia():
@@ -42,6 +46,114 @@ def test_myia_specialize_values():
     ft = f.compile((True, 10, 20))
     ff = f.compile((False, 10, 20))
     assert ft is not ff
+
+
+def test_myia_struct_arg():
+    @myia
+    def f(pt):
+        return pt.x
+
+    x = f(Point(5, 6))
+    assert x == 5
+
+
+def test_myia_return_struct():
+    @myia
+    def f(x, y):
+        return Point(x, y)
+
+    pt = f(5, 6)
+    assert pt == Point(5, 6)
+
+
+def test_convert_arg():
+
+    # Leaves
+
+    assert convert_arg(True, Bool, Bool) is True
+    assert convert_arg(False, Bool, Bool) is False
+    assert convert_arg(10, i64, i64) == 10
+    assert convert_arg(1.5, f64, f64) == 1.5
+
+    # Class -> Tuple conversion
+
+    pt = Point(1, 2)
+    pt3 = Point3D(1, 2, 3)
+    assert convert_arg(pt, Point_t, Point_t) == pt
+    assert convert_arg(pt, Point_t, Tuple[i64, i64]) == (1, 2)
+    with pytest.raises(TypeError):
+        convert_arg(pt3, Point_t, Tuple[i64, i64])
+    with pytest.raises(TypeError):
+        convert_arg((1, 2), Point_t, Tuple[i64, i64])
+
+    assert convert_arg((pt, pt),
+                       Tuple[Point_t, Point_t],
+                       Tuple[Tuple[i64, i64], Tuple[i64, i64]]) == \
+        ((1, 2), (1, 2))
+
+    assert convert_arg([pt, pt, pt],
+                       List[Point_t],
+                       List[Tuple[i64, i64]]) == \
+        [(1, 2), (1, 2), (1, 2)]
+
+    # Arrays
+
+    fmat = np.ones((5, 8))
+    imat = np.ones((5, 8), dtype='int16')
+
+    assert convert_arg(fmat, Array[f64], Array[f64]) is fmat
+    assert convert_arg(imat, Array[i16], Array[i16]) is imat
+    with pytest.raises(TypeError):
+        convert_arg(imat, Array[i64], Array[i64])
+
+    # Misc errors
+
+    with pytest.raises(TypeError):
+        convert_arg(10, f64, f64)
+    with pytest.raises(TypeError):
+        convert_arg(1.5, i64, i64)
+    with pytest.raises(TypeError):
+        convert_arg(10, Tuple[i64, i64], Tuple[i64, i64])
+    with pytest.raises(TypeError):
+        convert_arg((1,), Tuple[i64, i64], Tuple[i64, i64])
+    with pytest.raises(TypeError):
+        convert_arg((1, 2, 3), Tuple[i64, i64], Tuple[i64, i64])
+    with pytest.raises(TypeError):
+        convert_arg((1, 2, 3), List[i64], List[i64])
+    with pytest.raises(TypeError):
+        convert_arg(pt3, Point_t, Point_t)
+    with pytest.raises(TypeError):
+        convert_arg(10, Array[i64], Array[i64])
+    with pytest.raises(TypeError):
+        convert_arg(10, Array[i64], Array[i64])
+    with pytest.raises(TypeError):
+        convert_arg(1, Bool, Bool)
+
+
+def test_convert_result():
+
+    # Leaves
+
+    assert convert_result(True, Bool, Bool) is True
+    assert convert_result(False, Bool, Bool) is False
+    assert convert_result(10, i64, i64) == 10
+    assert convert_result(1.5, f64, f64) == 1.5
+
+    # Tuple -> Class conversion
+
+    pt = Point(1, 2)
+    assert convert_result(pt, Point_t, Point_t) == pt
+    assert convert_result((1, 2), Point_t, Tuple[i64, i64]) == pt
+
+    assert convert_result(((1, 2), (1, 2)),
+                          Tuple[Point_t, Point_t],
+                          Tuple[Tuple[i64, i64], Tuple[i64, i64]]) == \
+        (pt, pt)
+
+    assert convert_result([(1, 2), (1, 2), (1, 2)],
+                          List[Point_t],
+                          List[Tuple[i64, i64]]) == \
+        [pt, pt, pt]
 
 
 def test_function_arg():

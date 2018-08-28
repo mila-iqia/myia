@@ -5,7 +5,8 @@ from myia import operations
 from myia.api import scalar_pipeline
 from myia.ir import ANFNode, Constant, isomorphic, GraphCloner
 from myia.opt import PatternSubstitutionOptimization as psub, \
-    PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph
+    PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph, \
+    cse
 from myia.prim import Primitive, ops as prim
 from myia.utils import Merge
 from myia.utils.unify import Var, var
@@ -79,15 +80,17 @@ add_zero_r = psub(
 )
 
 
-def _check_opt(before, after, *opts):
+def _check_transform(before, after, transform):
     gbefore = parse(before)
     gbefore = GraphCloner(gbefore, total=True)[gbefore]
     gafter = parse(after)
-
-    eq = PatternEquilibriumOptimizer(*opts)
-    eq(gbefore)
-
+    transform(gbefore)
     assert isomorphic(gbefore, gafter)
+
+
+def _check_opt(before, after, *opts):
+    eq = PatternEquilibriumOptimizer(*opts)
+    _check_transform(before, after, eq)
 
 
 def test_checkopt_is_cloning():
@@ -286,3 +289,30 @@ def test_constant_variable():
 
     _check_opt(before, after,
                Qct_to_P)
+
+
+def test_cse():
+
+    def helper(fn, before, after):
+        gbefore = parse(fn)
+        assert len(gbefore.nodes) == before
+
+        gafter = cse(gbefore, gbefore.manager)
+        assert len(gafter.nodes) == after
+
+    def f1(x, y):
+        a = x + y
+        b = x + y
+        c = a * b
+        return c
+
+    helper(f1, 6, 5)
+
+    def f2(x, y):
+        a = x + y
+        b = (a * y) + (a / x)
+        c = (a * y) + ((x + y) / x)
+        d = b + c
+        return d
+
+    helper(f2, 12, 8)

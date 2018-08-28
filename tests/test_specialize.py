@@ -1,22 +1,14 @@
 
 from pytest import mark
-from collections import defaultdict
 
 from myia.api import scalar_debug_pipeline
-from myia.dtype import Function, Type, Problem, External, ismyiatype
 from myia.debug.label import short_labeler as lbl
-from myia.graph_utils import dfs
-from myia.infer import Inferrer
-from myia.ir import succ_deeper
-from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import \
     typeof, hastype, partial, list_map, scalar_add, scalar_sub, \
     scalar_usub, scalar_uadd, switch
-from myia.specialize import DEAD
-from myia.utils import UNKNOWN
+from myia.validate import validate, ValidationError
 
-from .test_lang import mysum
-from .test_infer import i64, f64
+from .common import mysum, i64, f64
 
 
 specialize_pipeline = scalar_debug_pipeline \
@@ -24,52 +16,6 @@ specialize_pipeline = scalar_debug_pipeline \
     .configure(
         {'infer.tracks.value.max_depth': 1}
     )
-
-
-# Add ops as needed, but don't add getattr, resolve and other ops that we want
-# to eliminate at this stage.
-op_whitelist = [
-    P.return_, P.if_, P.partial,
-    P.scalar_add, P.scalar_mul, P.scalar_sub,
-    P.scalar_uadd, P.scalar_usub,
-    P.bool_not, P.scalar_gt, P.scalar_lt,
-    P.make_tuple, P.hastype, P.list_map, P.identity, P.switch
-]
-
-
-def validate(g):
-    """Verify that g is properly type-specialized.
-
-    Every node of each graph must have a concrete type in its type attribute,
-    every application must be compatible with its argument types, and every
-    primitive must belong to the whitelist.
-    """
-    errors = defaultdict(set)
-    for node in dfs(g.return_, succ_deeper):
-        if node.type is UNKNOWN:
-            errors[node].add('Type was not inferred')
-        elif isinstance(node.type, Inferrer):
-            errors[node].add('Uneliminated inferrer')
-        elif ismyiatype(node.type, Problem):
-            if node.type.kind is DEAD:
-                # This one is okay if it happens, because we don't really need
-                # to infer types for dead code.
-                pass
-            else:
-                errors[node].add(f'Problem type: {node.type}')
-        elif ismyiatype(node.type, External):
-            errors[node].add(f'External type: {node.type}')
-        elif not ismyiatype(node.type, Type):
-            errors[node].add(f'Unknown type: {node.type}')
-        elif node.is_apply():
-            expected = Function[[i.type for i in node.inputs[1:]], node.type]
-            if node.inputs[0].type != expected:
-                errors[node].add('Function/argument inconsistency')
-            fn = node.inputs[0]
-            if fn.is_constant(Primitive) and fn.value not in op_whitelist:
-                errors[node].add(f'Forbidden primitive: {fn.value}')
-
-    return errors
 
 
 def specialize(*arglists):
@@ -85,13 +31,17 @@ def specialize(*arglists):
                 raise res['error']
             g2 = res['graph']
 
-            errs = validate(g2)
-            if errs:
+            try:
+                validate(g2)
+            except ValidationError as verr:
                 print('Collected the following errors:')
-                for node, e in errs.items():
-                    print(f'   {lbl.label(node)}')
-                    print(f'      {" ".join(e)}')
-                raise Exception('There are errors in the specialized graph.')
+                for err in verr.errors:
+                    n = err.node
+                    nlbl = lbl.label(n)
+                    print(f'   {nlbl} ({type(n).__name__}) :: {n.type}')
+                    print(f'      {err.args[0]}')
+                raise verr
+
             result_final = res['output'](*args)
             assert result_py == result_final
 

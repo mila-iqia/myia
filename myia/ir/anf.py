@@ -254,9 +254,15 @@ class ANFNode(Node):
     # Checks #
     ##########
 
-    def is_apply(self) -> bool:
+    def is_apply(self, value: Any = None) -> bool:
         """Return whether self is an Apply."""
-        return isinstance(self, Apply)
+        if isinstance(self, Apply):
+            if value is not None:
+                fn = self.inputs[0]
+                return fn.is_constant() and fn.value is value
+            else:
+                return True
+        return False
 
     def is_parameter(self) -> bool:
         """Return whether self is a Parameter."""

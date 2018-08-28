@@ -14,8 +14,8 @@ def _sum(*args):
 
 def test_typemap():
     tmap = TypeMap()
-    tmap.register(int, 'int')
-    tmap.register(object, 'obj')
+    tmap.register(int)('int')
+    tmap.register(object)('obj')
     assert tmap[int] == 'int'
     assert tmap[str] == 'obj'
 

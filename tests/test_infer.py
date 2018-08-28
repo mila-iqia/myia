@@ -4,13 +4,11 @@ import numpy as np
 
 from pytest import mark
 from types import SimpleNamespace
-from dataclasses import dataclass
 
 from myia.api import scalar_pipeline, standard_pipeline
 from myia.debug.traceback import print_inference_error
-from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
-    Function as F, TypeType, UInt, External, pytype_to_myiatype, Number, \
-    Class
+from myia.dtype import Array as A, Int, Float, TypeType, External, \
+    Number, Class
 from myia.hypermap import HyperMap
 from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
@@ -27,58 +25,13 @@ from myia.prim.py_implementations import \
     tuple_setitem, list_setitem
 from myia.utils import RestrictedVar
 
-from .test_lang import mysum, Point
-
-
-B = Bool
-
-i16 = Int[16]
-i32 = Int[32]
-i64 = Int[64]
-
-u64 = UInt[64]
-
-f16 = Float[16]
-f32 = Float[32]
-f64 = Float[64]
-
-li16 = L[Int[16]]
-li32 = L[Int[32]]
-li64 = L[Int[64]]
-
-lf16 = L[Float[16]]
-lf32 = L[Float[32]]
-lf64 = L[Float[64]]
-
-ai16 = A[i16]
-ai32 = A[i32]
-ai64 = A[i64]
-
-af16 = A[f16]
-af32 = A[f32]
-af64 = A[f64]
-
-Nil = T[()]
+from .common import B, T, L, F, i16, i32, i64, u64, f32, f64, \
+    li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
+    Point, Point_t, Point3D, Point3D_t, mysum
 
 
 def t(tt):
     return {'type': tt}
-
-
-Point_t = pytype_to_myiatype(Point)
-
-
-@dataclass(frozen=True)
-class Point3D:
-    x: Int[64]
-    y: Int[64]
-    z: Int[64]
-
-    def abs(self):
-        return (self.x ** 2 + self.y ** 2 + self.z ** 2) ** 0.5
-
-
-Point3D_t = pytype_to_myiatype(Point3D)
 
 
 def ai64_of(*shp):

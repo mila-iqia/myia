@@ -74,13 +74,9 @@ def _cleanup_dict(d):
     return type(d)({k: cleanup(v) for k, v in d.items() if v is not DELETE})
 
 
+@_cleanup_map.register(tuple, list, set)
 def _cleanup_sequence(xs):
     return type(xs)(cleanup(x) for x in xs)
-
-
-_cleanup_map.register(tuple, _cleanup_sequence)
-_cleanup_map.register(list, _cleanup_sequence)
-_cleanup_map.register(set, _cleanup_sequence)
 
 
 def cleanup(x):

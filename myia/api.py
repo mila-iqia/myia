@@ -6,9 +6,12 @@ from types import FunctionType
 
 from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
+from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
+    Number, tag_to_dataclass, ismyiatype, type_to_np_dtype
 from .infer import InferenceEngine, ANYTHING
 from .ir import Graph, clone, GraphManager
-from .opt import PatternEquilibriumOptimizer, lib as optlib
+from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
+    EraseClass
 from .pipeline import PipelineStep, PipelineResource, PipelineDefinition
 from .prim import py_implementations, vm_implementations, ops as P
 from .prim.value_inferrers import ValueTrack, value_inferrer_constructors
@@ -278,15 +281,19 @@ class Optimizer(PipelineStep):
         graph: The optimized graph.
     """
 
-    def __init__(self, pipeline_init, opts):
+    def __init__(self, pipeline_init, pre, opts, post):
         """Initialize an Optimizer."""
         super().__init__(pipeline_init)
+        self.pre = [opt(optimizer=self) for opt in pre]
         self.opts = opts
+        self.post = [opt(optimizer=self) for opt in post]
 
     def step(self, graph):
         """Optimize the graph using the given patterns."""
         eq = PatternEquilibriumOptimizer(*self.opts, optimizer=self)
-        eq(graph)
+        seq = [*self.pre, eq, *self.post]
+        for opt in seq:
+            opt(graph)
         self.resources.manager.keep_roots(graph)
         return {'graph': graph}
 
@@ -402,11 +409,178 @@ class DebugVMExporter(PipelineStep):
         return {'output': self.vm.export(graph)}
 
 
+_convert_arg_map = TypeMap()
+
+
+@_convert_arg_map.register(Tuple)
+def _convert_arg_Tuple(arg, orig_t, vm_t):
+    if not isinstance(arg, tuple):
+        raise TypeError('Expected tuple')
+    oe = orig_t.elements
+    ve = vm_t.elements
+    if len(arg) != len(ve):
+        raise TypeError(f'Expected {len(ve)} elements')
+    return tuple(convert_arg(x, o, v)
+                 for x, o, v in zip(arg, oe, ve))
+
+
+@_convert_arg_map.register(List)
+def _convert_arg_List(arg, orig_t, vm_t):
+    if not isinstance(arg, list):
+        raise TypeError('Expected list')
+    ot = orig_t.element_type
+    vt = vm_t.element_type
+    return [convert_arg(x, ot, vt) for x in arg]
+
+
+@_convert_arg_map.register(Class)
+def _convert_arg_Class(arg, orig_t, vm_t):
+    # If the EraseClass opt was applied, vm_t may be Tuple
+    dc = tag_to_dataclass[orig_t.tag]
+    if not isinstance(arg, dc):
+        raise TypeError(f'Expected {dc.__qualname__}')
+    arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
+    oe = list(orig_t.attributes.values())
+    vm_is_tup = ismyiatype(vm_t, Tuple)
+    if vm_is_tup:
+        ve = vm_t.elements
+    else:
+        ve = vm_t.attributes.values()
+    tup = tuple(convert_arg(x, o, v)
+                for x, o, v in zip(arg, oe, ve))
+    if vm_is_tup:
+        return tup
+    else:
+        return dc(*tup)
+
+
+@_convert_arg_map.register(Array)
+def _convert_arg_Array(arg, orig_t, vm_t):
+    if not isinstance(arg, np.ndarray):
+        raise TypeError('Expected ndarray')
+    et = orig_t.elements
+    assert ismyiatype(et, Number)
+    dtype = type_to_np_dtype(et)
+    if arg.dtype != dtype:
+        raise TypeError('Wrong dtype')
+    return arg
+
+
+@_convert_arg_map.register(Int)
+def _convert_arg_Int(arg, orig_t, vm_t):
+    if not isinstance(arg, int):
+        raise TypeError(f'Expected int')
+    return arg
+
+
+@_convert_arg_map.register(Float)
+def _convert_arg_Float(arg, orig_t, vm_t):
+    if not isinstance(arg, float):
+        raise TypeError(f'Expected float')
+    return arg
+
+
+@_convert_arg_map.register(Bool)
+def _convert_arg_Bool(arg, orig_t, vm_t):
+    if not isinstance(arg, bool):
+        raise TypeError(f'Expected bool')
+    return arg
+
+
+def convert_arg(arg, orig_t, vm_t):
+    """Check that arg matches orig_t, and convert to vm_t."""
+    return _convert_arg_map[orig_t](arg, orig_t, vm_t)
+
+
+_convert_result_map = TypeMap()
+
+
+@_convert_result_map.register(Class)
+def _convert_result_Class(res, orig_t, vm_t):
+    dc = tag_to_dataclass[orig_t.tag]
+    oe = orig_t.attributes.values()
+    ve = vm_t.attributes.values()
+    tup = tuple(convert_result(getattr(res, attr), o, v)
+                for attr, o, v in zip(orig_t.attributes, oe, ve))
+    return dc(*tup)
+
+
+@_convert_result_map.register(List)
+def _convert_result_List(res, orig_t, vm_t):
+    ot = orig_t.element_type
+    vt = vm_t.element_type
+    return [convert_result(x, ot, vt) for x in res]
+
+
+@_convert_result_map.register(Tuple)
+def _convert_result_Tuple(res, orig_t, vm_t):
+    # If the EraseClass opt was applied, orig_t may be Class
+    orig_is_class = ismyiatype(orig_t, Class)
+    if orig_is_class:
+        oe = orig_t.attributes.values()
+    else:
+        oe = orig_t.elements
+    ve = vm_t.elements
+    tup = tuple(convert_result(x, o, v)
+                for x, o, v in zip(res, oe, ve))
+    if orig_is_class:
+        dc = tag_to_dataclass[orig_t.tag]
+        return dc(*tup)
+    else:
+        return tup
+
+
+@_convert_result_map.register(Int, Float, Bool, Array)
+def _convert_result_leaf(arg, orig_t, vm_t):
+    return arg
+
+
+def convert_result(res, orig_t, vm_t):
+    """Convert result from vm_t to orig_t."""
+    return _convert_result_map[vm_t](res, orig_t, vm_t)
+
+
+class OutputWrapper(PipelineStep):
+    """Pipeline step to convert to and from the VM's data format.
+
+    For example, dataclasses in the arguments may be converted to
+    tuples, and tuples returned by the VM would be converted back
+    to the appropriate dataclasses, as determined by Myia.
+
+    Inputs:
+        graph: The root graph.
+        output: The callable returned by the VM.
+        argspec: Contains the original types/etc. of the arguments.
+        inference_results: Contains the original return type.
+
+    Outputs:
+        output: The wrapped callable.
+    """
+
+    def step(self, graph, output, argspec, inference_results):
+        """Convert args to vm format, and output from vm format."""
+        fn = output
+        orig_arg_t = [arg['type'] for arg in argspec]
+        vm_arg_t = graph.type.arguments
+        orig_out_t = inference_results['type']
+        vm_out_t = graph.type.retval
+
+        def wrapped(*args):
+            args = tuple(convert_arg(arg, ot, vt) for arg, ot, vt in
+                         zip(args, orig_arg_t, vm_arg_t))
+            res = fn(*args)
+            res = convert_result(res, orig_out_t, vm_out_t)
+            return res
+        return {'output': wrapped}
+
+
 step_parse = Parser.partial()
 
 
 step_resolve = Optimizer.partial(
-    opts=[optlib.resolve_globals]
+    pre=[],
+    opts=[optlib.resolve_globals],
+    post=[],
 )
 
 
@@ -431,6 +605,7 @@ step_specialize = Specializer.partial()
 
 
 step_opt = Optimizer.partial(
+    pre=[EraseClass],
     opts=[
         optlib.simplify_always_true,
         optlib.simplify_always_false,
@@ -438,7 +613,8 @@ step_opt = Optimizer.partial(
         optlib.simplify_partial,
         optlib.replace_applicator,
         optlib.elim_identity,
-    ]
+    ],
+    post=[CSE]
 )
 
 
@@ -448,6 +624,9 @@ step_cconv = ClosureConverter.partial()
 step_debug_export = DebugVMExporter.partial(
     implementations=vm_implementations
 )
+
+
+step_wrap = OutputWrapper.partial()
 
 
 _standard_pipeline = PipelineDefinition(
@@ -481,11 +660,15 @@ standard_pipeline = _standard_pipeline \
         wrap_primitives=step_wrap_primitives,
         compile=step_compile,
         link=step_link,
-        export=step_export
+        export=step_export,
+        wrap=step_wrap,
     )
 
 standard_debug_pipeline = _standard_pipeline \
-    .insert_after(export=step_debug_export)
+    .insert_after(
+        export=step_debug_export,
+        wrap=step_wrap,
+    )
 
 
 scalar_pipeline = standard_pipeline.configure({
