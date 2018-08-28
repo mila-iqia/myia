@@ -42,10 +42,7 @@ def cse(root, manager):
                 continue  # pragma: no cover
 
             elif main.is_constant() and other.is_constant():
-                v1 = main.value
-                v2 = other.value
-                # repl = type(v1) is type(v2) and v1 == v2
-                repl = main.type is other.type and v1 == v2
+                repl = main.type is other.type and main.value == other.value
 
             elif main.is_apply() and other.is_apply():
                 # The inputs to both should have been merged beforehand
