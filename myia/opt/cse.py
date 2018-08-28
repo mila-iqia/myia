@@ -19,7 +19,7 @@ def cse(root, manager):
                 continue
 
             if node.is_constant():
-                h = hash((node.value, type(node.value)))
+                h = hash((node.value, node.type))
             elif node.is_apply():
                 h = hash(tuple(hashes[inp] for inp in node.inputs))
             elif node.is_parameter():
@@ -37,11 +37,16 @@ def cse(root, manager):
     for h, group in groups.items():
         main, *others = group
         for other in others:
-            assert main.graph is other.graph
-            if main.is_constant() and other.is_constant():
+            if main.graph is not other.graph:
+                # This could happen because of a hash collision
+                continue  # pragma: no cover
+
+            elif main.is_constant() and other.is_constant():
                 v1 = main.value
                 v2 = other.value
-                repl = type(v1) is type(v2) and v1 == v2
+                # repl = type(v1) is type(v2) and v1 == v2
+                repl = main.type is other.type and v1 == v2
+
             elif main.is_apply() and other.is_apply():
                 # The inputs to both should have been merged beforehand
                 # because groups is topologically sorted
@@ -49,8 +54,6 @@ def cse(root, manager):
                 in2 = other.inputs
                 repl = len(in1) == len(in2) \
                     and all(i1 is i2 for i1, i2 in zip(in1, in2))
-            else:
-                raise AssertionError('CSE put together incompatible nodes.')
 
             if repl:
                 manager.replace(other, main)
