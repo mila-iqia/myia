@@ -654,7 +654,7 @@ class GraphManager(Partializable):
                 continue
             uses = self.uses[node]
 
-            if uses or (is_parameter(node) and node in node.graph.parameters):
+            if uses or (node.is_parameter() and node in node.graph.parameters):
                 continue
 
             if node.is_constant_graph():

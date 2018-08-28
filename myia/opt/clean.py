@@ -1,7 +1,7 @@
 """Clean up Class types."""
 
 from ..dtype import Int, Tuple, List, Class, Function, Type, ismyiatype
-from ..ir import is_apply, is_constant, Constant
+from ..ir import Constant
 from ..prim import ops as P
 from ..utils import TypeMap
 
@@ -61,7 +61,7 @@ def erase_class(root, manager):
     for node in list(manager.all_nodes):
         new_node = None
 
-        if is_apply(node, P.getattr):
+        if node.is_apply(P.getattr):
             _, data, item = node.inputs
             dt = data.type
             assert ismyiatype(dt, Class)
@@ -72,14 +72,14 @@ def erase_class(root, manager):
             gi.type = Function[[dt, Int[64]], node.type]
             new_node = node.graph.apply(gi, data, idx)
 
-        elif is_apply(node, P.make_record):
+        elif node.is_apply(P.make_record):
             mkr, typ, *args = node.inputs
             mkt = _mkr_to_mkt(mkr)
             new_node = node.graph.apply(mkt, *args)
 
-        elif is_apply(node, P.partial):
+        elif node.is_apply(P.partial):
             orig_ptl, oper, *args = node.inputs
-            if is_constant(oper) and oper.value is P.make_record:
+            if oper.is_constant() and oper.value is P.make_record:
                 argtypes = [arg.type for arg in args[1:]]
                 mkt = _mkr_to_mkt(oper)
                 if len(args) == 1:

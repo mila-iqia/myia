@@ -254,12 +254,12 @@ class ANFNode(Node):
     # Checks #
     ##########
 
-    def is_apply(self) -> bool:
+    def is_apply(self, value: Any = None) -> bool:
         """Return whether self is an Apply."""
-        if isinstance(x, Apply):
+        if isinstance(self, Apply):
             if value is not None:
-                fn = x.inputs[0]
-                return is_constant(fn) and fn.value is value
+                fn = self.inputs[0]
+                return fn.is_constant() and fn.value is value
             else:
                 return True
         return False

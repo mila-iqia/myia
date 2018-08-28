@@ -4,7 +4,7 @@
 from collections import defaultdict
 
 from ..graph_utils import toposort
-from ..ir import succ_incoming, is_constant, is_apply, is_parameter
+from ..ir import succ_incoming
 
 
 def cse(root, manager):
@@ -18,11 +18,11 @@ def cse(root, manager):
             if node in hashes:
                 continue
 
-            if is_constant(node):
+            if node.is_constant():
                 h = hash((node.value, type(node.value)))
-            elif is_apply(node):
+            elif node.is_apply():
                 h = hash(tuple(hashes[inp] for inp in node.inputs))
-            elif is_parameter(node):
+            elif node.is_parameter():
                 h = hash(node)
             else:
                 raise TypeError(f'Unknown node type: {node}') \
@@ -38,11 +38,11 @@ def cse(root, manager):
         main, *others = group
         for other in others:
             assert main.graph is other.graph
-            if is_constant(main) and is_constant(other):
+            if main.is_constant() and other.is_constant():
                 v1 = main.value
                 v2 = other.value
                 repl = type(v1) is type(v2) and v1 == v2
-            elif is_apply(main) and is_apply(other):
+            elif main.is_apply() and other.is_apply():
                 # The inputs to both should have been merged beforehand
                 # because groups is topologically sorted
                 in1 = main.inputs

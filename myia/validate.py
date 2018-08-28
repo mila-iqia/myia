@@ -2,7 +2,7 @@
 
 from .dtype import Tuple, List, Class, Function, Type, Number, Bool, \
     Problem, ismyiatype
-from .ir import is_apply, is_constant, manage
+from .ir import manage
 from .prim import Primitive, ops as P
 from .specialize import DEAD
 from .utils import TypeMap
@@ -141,12 +141,12 @@ class Validator:
         return _validate_type(node.type)
 
     def _validate_oper(self, node):
-        if is_constant(node, Primitive):
+        if node.is_constant(Primitive):
             if node.value not in self.whitelist:
                 raise ValidationError(f'Illegal primitive: {node.value}')
 
     def _validate_consistency(self, node):
-        if is_apply(node):
+        if node.is_apply():
             expected = Function[[i.type for i in node.inputs[1:]], node.type]
             # _validate_consistency(node.inputs)
             actual = node.inputs[0].type

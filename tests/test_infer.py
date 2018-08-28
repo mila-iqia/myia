@@ -7,9 +7,8 @@ from types import SimpleNamespace
 
 from myia.api import scalar_pipeline, standard_pipeline
 from myia.debug.traceback import print_inference_error
-from myia.dtype import Array as A, Bool, Int, Float, Tuple as T, List as L, \
-    Function as F, TypeType, UInt, External, pytype_to_myiatype, Number, \
-    Class
+from myia.dtype import Array as A, Int, Float, TypeType, External, \
+    Number, Class
 from myia.hypermap import HyperMap
 from myia.infer import \
     ANYTHING, InferenceError, register_inferrer
