@@ -5,7 +5,7 @@ from types import FunctionType
 
 from ..dtype import ismyiatype, Function
 from ..debug.label import label
-from ..ir import is_constant, is_constant_graph, is_apply, GraphGenerationError
+from ..ir import GraphGenerationError
 from ..utils import Partializable, UNKNOWN, eprint
 
 from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify
@@ -498,7 +498,7 @@ class Reference(AbstractReference):
         """Initialize the Reference."""
         self.node = node
         self.engine = engine
-        g = node.value if is_constant_graph(node) else node.graph
+        g = node.value if node.is_constant_graph() else node.graph
         self.context = context.filter(g)
 
     async def __getitem__(self, track):
@@ -683,10 +683,10 @@ class InferenceEngine:
         if inferred is not UNKNOWN:
             return inferred
 
-        elif is_constant(node):
+        elif node.is_constant():
             return await track.infer_constant(ref)
 
-        elif is_apply(node):
+        elif node.is_apply():
             return await track.infer_apply(ref)
 
         else:

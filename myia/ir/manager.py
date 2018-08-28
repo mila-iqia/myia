@@ -6,7 +6,7 @@ from collections import defaultdict, Counter
 from ..graph_utils import dfs, FOLLOW, EXCLUDE
 from ..utils import Events, Partializable
 
-from .utils import succ_deeper, is_constant, is_constant_graph, is_parameter
+from .utils import succ_deeper
 
 
 class ManagerError(Exception):
@@ -162,7 +162,7 @@ class ConstantsStatistic(CounterStatistic):
     """Implements `GraphManager.constants`."""
 
     def _on_mod_edge(self, event, node, key, inp, direction):
-        if is_constant(inp):
+        if inp.is_constant():
             self.mod(node.graph, inp, direction)
 
 
@@ -170,7 +170,7 @@ class GraphConstantsStatistic(CounterStatistic):
     """Implements `GraphManager.graph_constants`."""
 
     def _on_mod_edge(self, event, node, key, inp, direction):
-        if is_constant_graph(inp):
+        if inp.is_constant_graph():
             self.mod(inp.value, inp, direction)
 
 
@@ -200,7 +200,7 @@ class GDepProxStatistic(CounterStatistic):
     def _on_mod_edge(self, event, node, key, inp, direction):
         g1 = node.graph
 
-        if is_constant_graph(inp):
+        if inp.is_constant_graph():
             ig = inp.value
             if self.mod(g1, ParentProxy(ig), direction):
                 self.manager.events.invalidate_nesting()
@@ -215,7 +215,7 @@ class GraphsUsedStatistic(CounterStatistic):
     """Implements `GraphManager.graphs_used`."""
 
     def _on_mod_edge(self, event, node, key, inp, direction):
-        if is_constant_graph(inp):
+        if inp.is_constant_graph():
             self.mod(node.graph, inp.value, direction)
 
 
@@ -223,7 +223,7 @@ class GraphUsersStatistic(CounterStatistic):
     """Implements `GraphManager.graph_users`."""
 
     def _on_mod_edge(self, event, node, key, inp, direction):
-        if is_constant_graph(inp):
+        if inp.is_constant_graph():
             self.mod(inp.value, node.graph, direction)
 
 
@@ -391,7 +391,7 @@ class FVTotalStatistic(NestingStatistic, CounterStatistic):
                 self.mod(curr, fv, direction)
                 curr = self.manager.parents[curr]
 
-        if is_constant_graph(inp):
+        if inp.is_constant_graph():
             ig = inp.value
             if self.manager._parents.valid:
                 p = self.manager._parents[ig]
@@ -603,7 +603,7 @@ class GraphManager(Partializable):
         else:
             if inp.graph is not None:
                 self.add_graph(inp.graph)
-            if is_constant_graph(inp):
+            if inp.is_constant_graph():
                 self.add_graph(inp.value)
             self.uses[inp].add((node, key))
             self.events.add_edge(node, key, inp)
@@ -652,11 +652,11 @@ class GraphManager(Partializable):
             if node not in self.all_nodes:
                 continue
             uses = self.uses[node]
-            if uses or is_parameter(node):
+            if uses or node.is_parameter():
                 # This node is still live
                 continue
 
-            if is_constant_graph(node):
+            if node.is_constant_graph():
                 graphs_to_check.add(node.value)
 
             self._process_inputs(node, -1)

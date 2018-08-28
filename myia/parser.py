@@ -38,7 +38,7 @@ from types import FunctionType
 from typing import Dict, List, NamedTuple, Optional, Tuple, overload
 
 from .info import About, DebugInherit, NamedDebugInfo
-from .ir import ANFNode, Apply, Constant, Graph, Parameter, is_constant
+from .ir import ANFNode, Apply, Constant, Graph, Parameter
 from .prim import ops as primops
 from .utils import ModuleNamespace, ClosureNamespace
 
@@ -101,7 +101,7 @@ ast_map = {
 
 def _fresh(node):
     """If node is a constant, return a copy of it."""
-    if is_constant(node):
+    if node.is_constant():
         return Constant(node.value)
     else:
         return node
@@ -439,7 +439,7 @@ class Parser:
             if isinstance(targ, ast.Name):
                 # CASE: x = value
                 anf_node.debug.name = targ.id
-                if is_constant(anf_node, Graph):
+                if anf_node.is_constant_graph():
                     if anf_node.value.debug.name is None:
                         anf_node.value.debug.name = targ.id
                 block.write(targ.id, anf_node)

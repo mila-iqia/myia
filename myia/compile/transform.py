@@ -1,7 +1,6 @@
 """Transforms a graph into lower-level code."""
 
-from ..ir import (Apply, is_apply, is_constant, is_constant_graph,
-                  is_parameter, toposort, Graph, Constant)
+from ..ir import Apply, toposort, Graph, Constant
 from ..pipeline import PipelineDefinition, PipelineStep
 from ..prim import Primitive
 from ..prim.ops import if_, partial, return_
@@ -50,7 +49,7 @@ class WrapPrimitives(PipelineStep):
         with mng.transact() as tr:
             cts = {ct for cts in mng.constants.values() for ct in cts}
             for ct in cts:
-                if is_constant(ct, Primitive):
+                if ct.is_constant(Primitive):
                     for node, key in mng.uses[ct]:
                         if key != 0:
                             g = get_prim_graph(ct.value, ct.type)
@@ -81,7 +80,7 @@ class SplitGraph(PipelineStep):
                     splits.append(split)
                 splits.append(node)
                 split = []
-            elif not (is_constant(node) or is_parameter(node)):
+            elif not (node.is_constant() or node.is_parameter()):
                 split.append(node)
 
         return {'splits': splits}
@@ -93,9 +92,9 @@ class SplitGraph(PipelineStep):
         branches, ...
 
         """
-        if is_apply(node):
+        if node.is_apply():
             fn = node.inputs[0]
-            if not is_constant(fn, Primitive):
+            if not fn.is_constant(Primitive):
                 return True
             elif fn.value in (if_, return_, partial):
                 return True
@@ -157,8 +156,8 @@ class CompileGraph(PipelineStep):
         wasn't referred to before.
 
         """
-        if node not in self.slots and is_constant(node):
-            if is_constant_graph(node):
+        if node not in self.slots and node.is_constant():
+            if node.is_constant_graph():
                 self.add_instr('push_graph', node.value)
             else:
                 assert not isinstance(node.value, Primitive)
@@ -200,7 +199,7 @@ class CompileGraph(PipelineStep):
                 assert isinstance(split, Apply)
                 fn = split.inputs[0]
 
-                if is_constant(fn, Primitive):
+                if fn.is_constant(Primitive):
                     # pre-push arguments on the stack if needed
                     for i in split.inputs[1:]:
                         self.ref(i)

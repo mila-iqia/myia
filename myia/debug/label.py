@@ -3,7 +3,6 @@
 
 from ..info import DebugInfo
 from ..ir.anf import ANFNode, Graph
-from ..ir.utils import is_constant, is_constant_graph, is_parameter, is_special
 from ..prim import Primitive
 from ..utils import Named, Namespace
 
@@ -62,7 +61,7 @@ class NodeLabeler:
         name of that function, otherwise return None.
         """
         fn = node.inputs[0] if node.inputs else None
-        if fn and is_constant(fn):
+        if fn and fn.is_constant():
             return self.label(fn, False)
         else:
             return None
@@ -91,10 +90,10 @@ class NodeLabeler:
         elif isinstance(node, Graph):
             return self.name(node.debug,
                              True if force is None else force)
-        elif is_constant_graph(node):
+        elif node.is_constant_graph():
             return self.name(node.value.debug,
                              True if force is None else force)
-        elif is_constant(node):
+        elif node.is_constant():
             v = node.value
             if v is None or v == ():
                 return repr(v)
@@ -110,9 +109,9 @@ class NodeLabeler:
                 if len(s) > 10:
                     s = f'{s[:10]}...'
                 return f'{s}::{class_name}'
-        elif is_special(node):
+        elif node.is_special():
             return f'{node.special}'
-        elif is_parameter(node):
+        elif node.is_parameter():
             return self.label(node.debug, True)
         else:
             lbl = ''

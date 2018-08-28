@@ -7,7 +7,7 @@ from myia.dtype import Function, Type, Problem, External, ismyiatype
 from myia.debug.label import short_labeler as lbl
 from myia.graph_utils import dfs
 from myia.infer import Inferrer
-from myia.ir import succ_deeper, is_apply, is_constant
+from myia.ir import succ_deeper
 from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import \
     typeof, hastype, partial, list_map, scalar_add, scalar_sub, \
@@ -61,12 +61,12 @@ def validate(g):
             errors[node].add(f'External type: {node.type}')
         elif not ismyiatype(node.type, Type):
             errors[node].add(f'Unknown type: {node.type}')
-        elif is_apply(node):
+        elif node.is_apply():
             expected = Function[[i.type for i in node.inputs[1:]], node.type]
             if node.inputs[0].type != expected:
                 errors[node].add('Function/argument inconsistency')
             fn = node.inputs[0]
-            if is_constant(fn, Primitive) and fn.value not in op_whitelist:
+            if fn.is_constant(Primitive) and fn.value not in op_whitelist:
                 errors[node].add(f'Forbidden primitive: {fn.value}')
 
     return errors

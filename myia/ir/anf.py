@@ -250,6 +250,30 @@ class ANFNode(Node):
     def __str__(self) -> str:
         return self.debug.debug_name
 
+    ##########
+    # Checks #
+    ##########
+
+    def is_apply(self) -> bool:
+        """Return whether self is an Apply."""
+        return isinstance(self, Apply)
+
+    def is_parameter(self) -> bool:
+        """Return whether self is a Parameter."""
+        return isinstance(self, Parameter)
+
+    def is_constant(self, cls: Any = object) -> bool:
+        """Return whether self is a Constant, with value of given cls."""
+        return isinstance(self, Constant) and isinstance(self.value, cls)
+
+    def is_constant_graph(self) -> bool:
+        """Return whether self is a Constant with a Graph value."""
+        return self.is_constant(Graph)
+
+    def is_special(self, cls: Any = object) -> bool:
+        """Return whether self is a Special, with value of given cls."""
+        return isinstance(self, Special) and isinstance(self.special, cls)
+
 
 class Apply(ANFNode):
     """A function application.

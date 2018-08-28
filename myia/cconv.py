@@ -3,7 +3,7 @@
 from collections import defaultdict
 
 from .info import About
-from .ir import Graph, Parameter, Constant, is_apply, is_constant_graph, manage
+from .ir import Graph, Parameter, Constant, manage
 from .prim import ops as P
 from .opt import sexp_to_node
 
@@ -56,12 +56,12 @@ def closure_convert(root):
         for g in mng.graphs:
             rg = repl[g]
             for node in g.nodes:
-                if is_apply(node):
+                if node.is_apply():
                     for i, inp in enumerate(node.inputs):
                         if inp in rg:
                             # node.inputs[i] = rg[inp]
                             tr.set_edge(node, i, rg[inp])
-                        elif is_constant_graph(inp) and inp.value in rg:
+                        elif inp.is_constant_graph() and inp.value in rg:
                             # node.inputs[i] = rg[inp.value]
                             tr.set_edge(node, i, rg[inp.value])
 

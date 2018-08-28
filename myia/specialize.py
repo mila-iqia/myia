@@ -5,7 +5,7 @@ from collections import Counter
 from .dtype import Type, Function, Number, Bool, Problem, TypeType
 from .infer import ANYTHING, Context, reify, \
     GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer
-from .ir import GraphCloner, is_apply, is_constant_graph, Constant
+from .ir import GraphCloner, Constant
 from .prim import ops as P, Primitive
 from .utils import Named, TypeMap
 
@@ -162,7 +162,7 @@ class _GraphSpecializer:
             g = None
         else:
             g = await inf.make_graph(None)
-        if not g or g.parent is None or ref and is_constant_graph(ref.node):
+        if not g or g.parent is None or ref and ref.node.is_constant_graph():
             if argrefs is None:
                 argrefs = await _find_argrefs(inf)
             v = await self.specializer._specialize(
@@ -236,7 +236,7 @@ class _GraphSpecializer:
 
         await self.fill_inferred(new_node, ref)
 
-        if is_apply(node):
+        if node.is_apply():
             new_inputs = new_node.inputs
             irefs = list(map(self.ref, node.inputs))
             for i, iref in enumerate(irefs):
@@ -249,7 +249,7 @@ class _GraphSpecializer:
                         assert repl.graph is new_inputs[i].graph
                     new_inputs[i] = repl
                 except _Unspecializable as e:
-                    if is_constant_graph(new_inputs[i]):
+                    if new_inputs[i].is_constant_graph():
                         # Graphs that cannot be specialized are replaced
                         # by a constant with the associated Problem type.
                         # We can't keep references to unspecialized graphs.
