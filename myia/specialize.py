@@ -110,10 +110,22 @@ async def _extract_type(ref, argrefs=None):
     return await _concretize_type(await ref['type'], argrefs)
 
 
+def _parents(g):
+    rval = set()
+    while g.parent:
+        g = g.parent
+        rval.add(g)
+    return rval
+
+
 class _GraphSpecializer:
     """Helper class for TypeSpecializer."""
 
     def __init__(self, parent, specializer, graph, context):
+        par = _parents(graph)
+        while parent and parent.graph not in par:
+            parent = parent.parent
+
         self.parent = parent
         self.specializer = specializer
         self.engine = specializer.engine
@@ -230,6 +242,8 @@ class _GraphSpecializer:
     async def process_node(self, node):
         ref = self.ref(node)
         new_node = self.get(node)
+        if new_node.graph is not self.new_graph:
+            raise AssertionError('Error in specializer [A]')
 
         t = await _extract_type(ref)
         new_node.type = t
@@ -242,11 +256,12 @@ class _GraphSpecializer:
             for i, iref in enumerate(irefs):
                 argrefs = irefs[1:] if i == 0 else None
                 try:
-                    repl = await self.build(ref=iref,
-                                            argrefs=argrefs)
+                    repl = await self.build(ref=iref, argrefs=argrefs)
                     await self.fill_inferred(repl, iref)
-                    if repl.graph:
-                        assert repl.graph is new_inputs[i].graph
+                    prev = new_inputs[i]
+                    if repl.graph and prev.graph \
+                            and repl.graph is not prev.graph:
+                        raise AssertionError('Error in specializer [B]')
                     new_inputs[i] = repl
                 except _Unspecializable as e:
                     if new_inputs[i].is_constant_graph():
