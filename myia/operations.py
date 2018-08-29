@@ -43,3 +43,8 @@ def next(it):  # pragma: no cover
 def hasnext(it):  # pragma: no cover
     """Myia hasnext function."""
     raise RuntimeError('This operation is not meant to be called directly.')
+
+
+def to_array(x):  # pragma: no cover
+    """Myia to_array function."""
+    raise RuntimeError('This operation is not meant to be called directly.')

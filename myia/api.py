@@ -57,6 +57,7 @@ scalar_object_map = {
     operations.iter: C.iter,
     operations.hasnext: C.hasnext,
     operations.next: C.next,
+    operations.to_array: C.to_array,
     operations.if_: P.if_,
 }
 
@@ -95,6 +96,7 @@ standard_object_map = {
     operations.iter: C.iter,
     operations.hasnext: C.hasnext,
     operations.next: C.next,
+    operations.to_array: C.to_array,
     operations.if_: P.if_,
 }
 

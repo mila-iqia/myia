@@ -1,7 +1,7 @@
 """Generate mapping graphs over classes, tuples, arrays, etc."""
 
 
-from . import composite as C
+from . import operations
 from .infer import InferenceError
 from .ir import MetaGraph, Graph
 from .dtype import Array, List, Tuple, Class, Type, tag_to_dataclass, \
@@ -135,7 +135,7 @@ class HyperMap(MetaGraph):
             rval = {}
             for arg, t in args.items():
                 if not hastype_helper(t, Array):
-                    arg = g.apply(resources.convert(C.to_array), arg)
+                    arg = g.apply(resources.convert(operations.to_array), arg)
                     t = Array[t]
                 rval[arg] = t
             return rval
