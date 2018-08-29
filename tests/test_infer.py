@@ -7,6 +7,7 @@ from pytest import mark
 from types import SimpleNamespace
 
 from myia.api import scalar_pipeline, standard_pipeline
+from myia.composite import hyper_add, zeros_like
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
     Number, Class
@@ -1684,7 +1685,6 @@ def test_dataclass_wrong_field(pt):
 hyper_map = HyperMap()
 hyper_map_notuple = HyperMap(nonleaf=(A, Class))
 hyper_map_nobroadcast = HyperMap(broadcast=False)
-hyper_add = HyperMap(fn_leaf=scalar_add)
 
 
 @infer(
@@ -1759,3 +1759,27 @@ def test_hyper_map_nobroadcast(x, y):
 )
 def test_hyper_add(x, y):
     return hyper_add(x, y)
+
+
+@infer(
+    type=[
+        (i64, i64),
+        (f64, f64),
+        (lf64, lf64),
+        (T[i64, f64], T[i64, f64]),
+        (Point_t, Point_t),
+        (ai64_of(2, 5), ai64),
+        (af32_of(2, 5), af32),
+    ],
+    value=[
+        (1, 0),
+        ((2, 3.0), (0, 0.0)),
+        (Point(1, 2), Point(0, 0)),
+    ],
+    shape=[
+        (ai64_of(2, 5), (2, 5)),
+        (af32_of(2, 5), (2, 5)),
+    ]
+)
+def test_zeros_like(x):
+    return zeros_like(x)

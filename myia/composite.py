@@ -3,11 +3,12 @@
 
 from dataclasses import dataclass
 
-from .dtype import Array, Object, Int, Number
+from .dtype import Array, Object, Int, Number, Bool, Tuple, List, Class
+from .hypermap import HyperMap
 from .ir import MultitypeGraph
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
-    switch, identity, bool_and, tail, \
+    switch, identity, bool_and, tail, typeof, scalar_cast, scalar_add, \
     scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan
 
 
@@ -453,3 +454,34 @@ def array_le(xs, ys):
 def array_ge(xs, ys):
     """Implementation of `array_ge`."""
     return broadcastable_binary(ge, xs, ys)
+
+
+hyper_add = HyperMap(fn_leaf=scalar_add)
+
+
+_leaf_zeros_like = MultitypeGraph('zeros_like')
+
+
+@_leaf_zeros_like.register(Bool)
+@core
+def _bool_zero(_):
+    return False
+
+
+@_leaf_zeros_like.register(Number)
+@core
+def _scalar_zero(x):
+    return scalar_cast(0, typeof(x))
+
+
+@_leaf_zeros_like.register(Array)
+@core
+def _array_zero(xs):
+    scalar_zero = scalar_cast(0, typeof(xs).elements)
+    return distribute(to_array(scalar_zero), shape(xs))
+
+
+zeros_like = HyperMap(
+    nonleaf=(Tuple, List, Class),
+    fn_leaf=_leaf_zeros_like
+)
