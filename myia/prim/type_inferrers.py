@@ -271,6 +271,13 @@ async def infer_type_arith_unary(track, x):
     return await track.will_check(Number, x)
 
 
+@type_inferrer(P.scalar_exp, P.scalar_log, P.scalar_sin,
+               P.scalar_cos, P.scalar_tan, nargs=1)
+async def infer_type_arith_unary_float(track, x):
+    """Infer the return type of a floating point unary arithmetic operator."""
+    return await track.will_check(Float, x)
+
+
 @type_inferrer(P.scalar_add, P.scalar_sub, P.scalar_mul, P.scalar_div,
                P.scalar_mod, P.scalar_pow, nargs=2)
 async def infer_type_arith_bin(track, x, y):

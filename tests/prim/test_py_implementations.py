@@ -2,6 +2,7 @@ import pytest
 
 from types import SimpleNamespace
 import numpy as np
+import math
 
 from myia.dtype import Int, Float, List, Tuple, External
 from myia.prim.py_implementations import setattr as myia_setattr, \
@@ -51,6 +52,31 @@ def test_prim_uadd(x):
 @parse_compare(2, -6)
 def test_prim_usub(x):
     return -x
+
+
+@parse_compare(13, 0, -3)
+def test_prim_exp(x):
+    return math.exp(x)
+
+
+@parse_compare(13, 1)
+def test_prim_log(x):
+    return math.log(x)
+
+
+@parse_compare(13, -3)
+def test_prim_sin(x):
+    return math.sin(x)
+
+
+@parse_compare(13, -3)
+def test_prim_cos(x):
+    return math.cos(x)
+
+
+@parse_compare(13, -3)
+def test_prim_tan(x):
+    return math.tan(x)
 
 
 @parse_compare((2, 7), (4, -6))

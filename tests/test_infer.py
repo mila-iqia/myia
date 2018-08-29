@@ -1,6 +1,7 @@
 
 import operator
 import numpy as np
+import math
 
 from pytest import mark
 from types import SimpleNamespace
@@ -288,6 +289,17 @@ def test_prim_tern(x, y, z):
 @infer(type=[(i64, i64), (f64, f64), (B, InferenceError)])
 def test_prim_usub(x):
     return -x
+
+
+@infer_std(type=[
+    (i64, InferenceError),
+    (f32, f32),
+    (f64, f64),
+    (af64_of(2, 5), af64),
+    (B, InferenceError)
+])
+def test_prim_log(x):
+    return math.log(x)
 
 
 @infer(

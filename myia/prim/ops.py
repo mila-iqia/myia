@@ -27,6 +27,11 @@ scalar_mod = Primitive('scalar_mod')
 scalar_pow = Primitive('scalar_pow')
 scalar_uadd = Primitive('scalar_uadd')
 scalar_usub = Primitive('scalar_usub')
+scalar_exp = Primitive('scalar_exp')
+scalar_log = Primitive('scalar_log')
+scalar_sin = Primitive('scalar_sin')
+scalar_cos = Primitive('scalar_cos')
+scalar_tan = Primitive('scalar_tan')
 
 
 ###############

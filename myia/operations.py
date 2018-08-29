@@ -6,6 +6,9 @@ from operator import (  # noqa
     pos, neg, not_, and_, or_, matmul, getitem, setitem
 )
 
+from math import (  # noqa
+    exp, log, sin, cos, tan
+)
 
 from builtins import (  # noqa
     bool, getattr, setattr, len

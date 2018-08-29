@@ -3,6 +3,7 @@
 from copy import copy
 from typing import Callable
 import numpy as np
+import math
 
 from .. import dtype as types
 from ..utils import Registry, TypeMap
@@ -95,6 +96,41 @@ def scalar_usub(x):
     """Implement `scalar_usub`."""
     _assert_scalar(x)
     return -x
+
+
+@register(primops.scalar_exp)
+def scalar_exp(x):
+    """Implement `scalar_exp`."""
+    _assert_scalar(x)
+    return math.exp(x)
+
+
+@register(primops.scalar_log)
+def scalar_log(x):
+    """Implement `scalar_log`."""
+    _assert_scalar(x)
+    return math.log(x)
+
+
+@register(primops.scalar_sin)
+def scalar_sin(x):
+    """Implement `scalar_sin`."""
+    _assert_scalar(x)
+    return math.sin(x)
+
+
+@register(primops.scalar_cos)
+def scalar_cos(x):
+    """Implement `scalar_cos`."""
+    _assert_scalar(x)
+    return math.cos(x)
+
+
+@register(primops.scalar_tan)
+def scalar_tan(x):
+    """Implement `scalar_tan`."""
+    _assert_scalar(x)
+    return math.tan(x)
 
 
 @register(primops.scalar_eq)
@@ -282,7 +318,7 @@ def _vm_getattr(vm, data, attr):
         # Don't know how else to retrieve the unwrapped method
         unwrapped = getattr(x.__objclass__, x.__name__)
         return Partial(vm.convert(unwrapped), [x.__self__], vm)
-    elif isinstance(x, BuiltinMethodType):
+    elif isinstance(x, BuiltinMethodType) and hasattr(type(data), attr):
         # This is returned by <list>.__getitem__ and maybe others.
         x = getattr(type(data), attr)
         return Partial(vm.convert(x), [data], vm)

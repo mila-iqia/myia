@@ -3,10 +3,12 @@
 
 from dataclasses import dataclass
 
-from .dtype import Array, Object, Int
+from .dtype import Array, Object, Int, Number
+from .ir import MultitypeGraph
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
-    switch, identity, bool_and, tail
+    switch, identity, bool_and, tail, \
+    scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan
 
 
 def core(fn):
@@ -100,6 +102,43 @@ def uadd(x):
 def usub(x):
     """Implementation of `usub`."""
     return x.__neg__()
+
+
+exp = MultitypeGraph('exp')
+log = MultitypeGraph('log')
+sin = MultitypeGraph('sin')
+cos = MultitypeGraph('cos')
+tan = MultitypeGraph('tan')
+
+
+@core
+@exp.register(Number)
+def _exp(x):
+    return scalar_exp(x)
+
+
+@log.register(Number)
+@core
+def _log(x):
+    return scalar_log(x)
+
+
+@sin.register(Number)
+@core
+def _sin(x):
+    return scalar_sin(x)
+
+
+@cos.register(Number)
+@core
+def _cos(x):
+    return scalar_cos(x)
+
+
+@tan.register(Number)
+@core
+def _tan(x):
+    return scalar_tan(x)
 
 
 @core
@@ -343,6 +382,41 @@ def array_uadd(xs):
 def array_usub(xs):
     """Implementation of `array_usub`."""
     return array_map(usub, xs)
+
+
+@exp.register(Array)
+@core
+def array_exp(xs):
+    """Implementation of `array_exp`."""
+    return array_map(scalar_exp, xs)
+
+
+@log.register(Array)
+@core
+def array_log(xs):
+    """Implementation of `array_log`."""
+    return array_map(scalar_log, xs)
+
+
+@sin.register(Array)
+@core
+def array_sin(xs):
+    """Implementation of `array_sin`."""
+    return array_map(scalar_sin, xs)
+
+
+@cos.register(Array)
+@core
+def array_cos(xs):
+    """Implementation of `array_cos`."""
+    return array_map(scalar_cos, xs)
+
+
+@tan.register(Array)
+@core
+def array_tan(xs):
+    """Implementation of `array_tan`."""
+    return array_map(scalar_tan, xs)
 
 
 @core
