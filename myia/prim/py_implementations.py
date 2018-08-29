@@ -445,6 +445,14 @@ def return_(x):
     return x
 
 
+@register(primops.scalar_cast)
+def scalar_cast(x, t):
+    """Implement `scalar_cast`."""
+    assert types.ismyiatype(t, types.Number)
+    dtype = types.type_to_np_dtype(t)
+    return getattr(np, dtype)(x)
+
+
 @py_register(primops.list_map)
 def list_map(f, *lsts):
     """Implement `list_map` in pure Python."""

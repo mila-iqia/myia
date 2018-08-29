@@ -151,6 +151,19 @@ async def infer_type_partial(track, fn, *args):
     return PartialInferrer(track, fn_t, args)
 
 
+@type_inferrer(P.scalar_cast, nargs=2)
+async def infer_type_scalar_cast(track, x, t):
+    """Infer the return type of scalar_cast."""
+    await track.will_check(Number, x)
+    await track.check(TypeType, t)
+    new_t = await t['value']
+    if new_t is ANYTHING:
+        raise MyiaTypeError(f'Type to cast to must be known at compile time.')
+    elif not ismyiatype(new_t, Number):
+        raise MyiaTypeError(f'Cannot cast to {new_t}')
+    return new_t
+
+
 @type_inferrer(P.make_tuple, nargs=None)
 async def infer_type_make_tuple(track, *args):
     """Infer the return type of make_tuple."""

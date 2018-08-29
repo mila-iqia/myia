@@ -23,10 +23,10 @@ from myia.prim.py_implementations import \
     typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
-    tuple_setitem, list_setitem
+    tuple_setitem, list_setitem, scalar_cast
 from myia.utils import RestrictedVar
 
-from .common import B, T, L, F, i16, i32, i64, u64, f32, f64, \
+from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
     li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
     Point, Point_t, Point3D, Point3D_t, mysum
 
@@ -1396,6 +1396,21 @@ def test_bool_or(x, y):
 )
 def test_switch(c, x, y):
     return switch(c, x, y)
+
+
+@infer(
+    type=[
+        (i64, {'value': i64}, i64),
+        (i64, {'value': i16}, i16),
+        (f64, {'value': i16}, i16),
+        (f16, {'value': f32}, f32),
+        (f16, TypeType, InferenceError),
+        (f16, {'value': B}, InferenceError),
+        (B, {'value': f32}, InferenceError),
+    ]
+)
+def test_scalar_cast(x, t):
+    return scalar_cast(x, t)
 
 
 @infer(type=[(i64, ai64),

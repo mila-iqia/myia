@@ -9,7 +9,7 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
     tuple_setitem, list_setitem, tail, hastype, typeof, \
     shape, reshape, array_map, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
-    switch, scalar_to_array, broadcast_shape
+    switch, scalar_to_array, broadcast_shape, scalar_cast
 
 from ..test_lang import parse_compare
 
@@ -327,3 +327,8 @@ def test_broadcast_shape():
                 print(f'Expected {result}, got {e}')
                 raise
         assert shp == result
+
+
+def test_scalar_cast():
+    assert isinstance(scalar_cast(1.5, Int[64]), np.int64)
+    assert isinstance(scalar_cast(1.5, Float[16]), np.float16)

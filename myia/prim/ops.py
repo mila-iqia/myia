@@ -109,6 +109,8 @@ return_ = Primitive('return')
 # Miscellaneous #
 #################
 
+
+scalar_cast = Primitive('scalar_cast')
 list_map = Primitive('list_map')
 identity = Primitive('identity')
 resolve = Primitive('resolve')
