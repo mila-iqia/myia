@@ -1630,6 +1630,61 @@ def test_max_std(x, y):
         return y
 
 
+@infer_std(
+    type=[
+        (f64, f64),
+        (i64, i64),
+    ]
+)
+def test_add1_stdx(x):
+    return 1 + x
+
+
+def _add(x, y):
+    return x + y
+
+
+@infer_std(
+    type=[
+        (f64, f64),
+        (i64, i64),
+    ]
+)
+def test_add1_std_indirect(x):
+    return _add(1, x)
+
+
+def _interference_helper(x):
+    if hastype(x, T):
+        return x[0]
+    else:
+        return x
+
+
+@infer(
+    type=[
+        (i64, i64),
+        (f64, f64),
+    ]
+)
+def test_add1_hastype_interference(x):
+    return x + _interference_helper(1)
+
+
+@infer(
+    type=[
+        (f16, f32, f64, f32),
+    ]
+)
+def test_hastype_interference(x, y, z):
+    if hastype(1, i32):
+        return x
+    elif hastype(1, i64):
+        return y
+    else:
+        return z
+
+
 @infer(
     type=[
         (Point_t, i64),

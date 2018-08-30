@@ -5,17 +5,17 @@ import asyncio
 
 from functools import partial
 
+from .. import dtype as types
 from ..dtype import pytype_to_myiatype, TypeType
 from ..infer import ValueWrapper, InferenceError, PartialInferrer, \
     ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track, \
-    unwrap, MetaGraphInferrer
+    unwrap, MetaGraphInferrer, InferenceVar, find_coherent_result
 from ..ir import Graph, MetaGraph
-from ..utils import is_dataclass_type
+from ..utils import is_dataclass_type, overload
 
 from . import ops as P
 from .inferrer_utils import static_getter
 from .ops import Primitive
-from .py_implementations import issubtype
 
 
 class LimitedValue(ValueWrapper):
@@ -215,23 +215,68 @@ async def infer_value_partial(engine, fn, *args):
     return PartialInferrer(engine, fn_t, args)
 
 
+@overload
+async def _issubtype_helper(t: types.Array, model):
+    return await issubtype(t.elements, model.elements)
+
+
+@overload  # noqa: F811
+async def _issubtype_helper(t: types.Tuple, model):
+    if len(t.elements) != len(model.elements):
+        return False
+    for t1, t2 in zip(t.elements, model.elements):
+        if not await issubtype(t1, t2):
+            return False
+    else:
+        return True
+
+
+@overload  # noqa: F811
+async def _issubtype_helper(t: types.Class, model):
+    if t.tag != model.tag:
+        return False
+    if tuple(t.attributes.keys()) != tuple(model.attributes.keys()):
+        raise AssertionError(
+            'Identical Class tags should imply identical attributes.'
+        )
+    for t1, t2 in zip(t.attributes.values(), model.attributes.values()):
+        if not await issubtype(t1, t2):
+            return False
+    else:
+        return True
+
+
+@overload  # noqa: F811
+async def _issubtype_helper(t: (types.Number, types.Bool), model):
+    return t == model
+
+
+async def issubtype(t, model):
+    """Check that type t is represented by model."""
+    if isinstance(t, InferenceVar):
+        return await find_coherent_result(t, lambda x: issubtype(x, model))
+    if types.ismyiatype(model, generic=True):
+        return types.ismyiatype(t, model)
+    elif types.get_generic(t, model):
+        return await _issubtype_helper[t.generic](t, model)
+    else:
+        return False
+
+
 @value_inferrer(P.hastype, nargs=2)
 async def infer_value_hastype(track, x, t):
     """Infer the return value of hastype."""
-    x_t = await x['type']
+    x_t = await x.get_raw('type')
     t_v = await t['value']
     if t_v is ANYTHING:
         raise InferenceError('Second argument to hastype must be constant.')
-    # TODO: Find a good way to carry ValueTrack.max_depth to here
-    # Instead of defaulting to 1
-    return limited(issubtype(x_t, t_v), track.max_depth)
+    res = await issubtype(x_t, t_v)
+    return limited(res, track.max_depth)
 
 
 @value_inferrer(P.typeof, nargs=1)
 async def infer_value_typeof(track, x):
     """Infer the return value of typeof."""
-    # TODO: Find a good way to carry ValueTrack.max_depth to here
-    # Instead of defaulting to 1
     return limited(await x['type'], track.max_depth)
 
 

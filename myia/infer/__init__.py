@@ -5,6 +5,7 @@ from .core import (  # noqa
     EvaluationCache,
     EquivalenceChecker,
     InferenceVar,
+    find_coherent_result,
     reify,
 )
 

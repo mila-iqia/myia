@@ -349,6 +349,25 @@ class InferenceVar(asyncio.Future):
         return await reify(await self)
 
 
+async def find_coherent_result(infv, fn):
+    """Try to apply fn on infv, resolving it only if needed.
+
+    fn will be tried on every possible value infv can take, and if
+    all results are the same, that result is returned. Otherwise,
+    we await on infv to resolve it and we apply fn on that value.
+    """
+    v = infv.var
+    if isinstance(v, RestrictedVar):
+        results = set()
+        for option in v.legal_values:
+            results.add(await fn(option))
+        if len(results) == 1:
+            for x in results:
+                return x
+    x = await infv
+    return await fn(x)
+
+
 @overload(method_name='__reify__')
 async def reify(x: ValueWrapper):
     """Build a concrete value from v.

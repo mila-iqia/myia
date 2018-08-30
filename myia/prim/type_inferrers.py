@@ -8,7 +8,7 @@ from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track, MetaGraphInferrer
 from ..ir import Graph, MetaGraph
-from ..utils import Namespace, FilterVar, is_dataclass_type
+from ..utils import Namespace, RestrictedVar, is_dataclass_type
 
 from ..dtype import ismyiatype
 from . import ops as P
@@ -20,8 +20,11 @@ from .py_implementations import typeof, issubtype
 type_inferrer_constructors = {}
 
 
-def _is_number(t):
-    return ismyiatype(t, Number)
+_number_types = [
+    Int[8], Int[16], Int[32], Int[64],
+    UInt[8], UInt[16], UInt[32], UInt[64],
+    Float[16], Float[32], Float[64],
+]
 
 
 def _shape_type(t):  # noqa: D400
@@ -58,7 +61,7 @@ class TypeTrack(Track):
         """Get the property for a ref of a Constant node."""
         t = self.from_value(ctref.node.value, ctref.context)
         if ismyiatype(t, Number):
-            v = FilterVar(_is_number)
+            v = RestrictedVar(_number_types)
             prio = 1 if ismyiatype(t, Float) else 0
             return self.engine.loop.create_var(v, t, prio)
         else:
@@ -387,7 +390,7 @@ async def infer_type_list_map(track, f, *lsts):
 @type_inferrer(P.identity, nargs=1)
 async def infer_type_identity(track, x):
     """Infer the return type of identity."""
-    return await x['type']
+    return await x.get_raw('type')
 
 
 @type_inferrer(P.resolve, nargs=2)
@@ -419,7 +422,7 @@ async def infer_type_getattr(track, data, item):
 @type_inferrer(P.scalar_to_array, nargs=1)
 async def infer_type_scalar_to_array(track, x):
     """Infer the return type of scalar_to_array."""
-    x_t = await track.check(Number, x)
+    x_t = await track.will_check(Number, x)
     return Array[x_t]
 
 
