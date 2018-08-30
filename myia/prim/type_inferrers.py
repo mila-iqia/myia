@@ -14,7 +14,7 @@ from ..dtype import ismyiatype
 from . import ops as P
 from .inferrer_utils import static_getter
 from .ops import Primitive
-from .py_implementations import typeof, hastype_helper
+from .py_implementations import typeof, issubtype
 
 
 type_inferrer_constructors = {}
@@ -443,7 +443,7 @@ async def infer_type_make_record(track, cls, *elems):
         cls_v.methods
     ]
 
-    if not hastype_helper(ret_t, cls_v):
+    if not issubtype(ret_t, cls_v):
         raise MyiaTypeError(
             f'Constructor {cls_v} cannot be called'
             f' with argument types {tuple(elem_types)}',

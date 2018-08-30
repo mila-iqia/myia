@@ -15,7 +15,7 @@ from ..utils import is_dataclass_type
 from . import ops as P
 from .inferrer_utils import static_getter
 from .ops import Primitive
-from .py_implementations import hastype_helper
+from .py_implementations import issubtype
 
 
 class LimitedValue(ValueWrapper):
@@ -224,7 +224,7 @@ async def infer_value_hastype(track, x, t):
         raise InferenceError('Second argument to hastype must be constant.')
     # TODO: Find a good way to carry ValueTrack.max_depth to here
     # Instead of defaulting to 1
-    return limited(hastype_helper(x_t, t_v), track.max_depth)
+    return limited(issubtype(x_t, t_v), track.max_depth)
 
 
 @value_inferrer(P.typeof, nargs=1)

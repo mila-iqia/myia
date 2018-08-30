@@ -8,7 +8,7 @@ from .dtype import Array, List, Tuple, Class, Type, tag_to_dataclass, \
     pytype_to_myiatype
 from .utils import TypeMap, Overload
 from .prim import ops as P
-from .prim.py_implementations import hastype_helper
+from .prim.py_implementations import issubtype
 
 
 class HyperMap(MetaGraph):
@@ -131,10 +131,10 @@ class HyperMap(MetaGraph):
 
     def _harmonize(self, resources, g, args):
         if self.broadcast \
-                and any(hastype_helper(t, Array) for t in args.values()):
+                and any(issubtype(t, Array) for t in args.values()):
             rval = {}
             for arg, t in args.items():
-                if not hastype_helper(t, Array):
+                if not issubtype(t, Array):
                     arg = g.apply(resources.convert(operations.to_array), arg)
                     t = Array[t]
                 rval[arg] = t

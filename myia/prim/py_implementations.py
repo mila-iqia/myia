@@ -6,7 +6,7 @@ import numpy as np
 import math
 
 from .. import dtype as types
-from ..utils import Registry, TypeMap
+from ..utils import Registry, overload
 
 from . import ops as primops
 
@@ -207,43 +207,40 @@ def typeof(x):
         return types.pytype_to_myiatype(type(x), x)
 
 
-hastype_helper_map = TypeMap()
+@overload
+def _issubtype_helper(t: types.Array, model):
+    return issubtype(t.elements, model.elements)
 
 
-@hastype_helper_map.register(types.Array)
-def _hh_Array(t, model):
-    return hastype_helper(t.elements, model.elements)
-
-
-@hastype_helper_map.register(types.Tuple)
-def _hh_Tuple(t, model):
+@overload  # noqa: F811
+def _issubtype_helper(t: types.Tuple, model):
     if len(t.elements) != len(model.elements):
         return False
-    return all(hastype_helper(t1, t2)
+    return all(issubtype(t1, t2)
                for t1, t2 in zip(t.elements, model.elements))
 
 
-@hastype_helper_map.register(types.Class)
-def _hh_Class(t, model):
+@overload  # noqa: F811
+def _issubtype_helper(t: types.Class, model):
     if t.tag != model.tag:
         return False
     if tuple(t.attributes.keys()) != tuple(model.attributes.keys()):
         raise AssertionError(
             'Identical Class tags should imply identical attributes.'
         )
-    return all(hastype_helper(t1, t2)
+    return all(issubtype(t1, t2)
                for t1, t2 in zip(t.attributes.values(),
                                  model.attributes.values()))
 
 
-def hastype_helper(t, model):
+def issubtype(t, model):
     """Check that type t is represented by model."""
     if t == model:
         return True
     elif types.ismyiatype(model, generic=True):
         return types.ismyiatype(t, model)
     elif types.get_generic(t, model):
-        return hastype_helper_map[t.generic](t, model)
+        return _issubtype_helper[t.generic](t, model)
     else:
         return False
 
@@ -251,7 +248,7 @@ def hastype_helper(t, model):
 @register(primops.hastype)
 def hastype(x, t):
     """Implement `hastype`."""
-    return hastype_helper(typeof(x), t)
+    return issubtype(typeof(x), t)
 
 
 @register(primops.make_tuple)
