@@ -5,7 +5,7 @@ from contextvars import copy_context
 from collections import deque
 
 from ..dtype import Array, List, Tuple, Function, TypeMeta
-from ..utils import TypeMap, Unification, Var, RestrictedVar, eprint
+from ..utils import Unification, Var, RestrictedVar, eprint, overload
 
 from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
 
@@ -349,66 +349,59 @@ class InferenceVar(asyncio.Future):
         return await reify(await self)
 
 
-_reify_map = TypeMap(discover=lambda cls: getattr(cls, '__reify__', None))
-
-
-@_reify_map.register(ValueWrapper)
-async def _reify_ValueWrapper(x):
-    return await reify(x.value)
-
-
-@_reify_map.register(Var)
-async def _reify_Var(v):
-    return await reify(await v._infvar)
-
-
-@_reify_map.register(Array)
-async def _reify_Array(t):
-    return Array[await reify(t.elements)]
-
-
-@_reify_map.register(List)
-async def _reify_List(t):
-    return List[await reify(t.element_type)]
-
-
-@_reify_map.register(Tuple)
-async def _reify_Tuple(t):
-    return Tuple[await reify(t.elements)]
-
-
-@_reify_map.register(Function)
-async def _reify_Function(t):
-    return Function[await reify(t.arguments), await reify(t.retval)]
-
-
-@_reify_map.register(tuple)
-async def _reify_tuple(v):
-    li = [await reify(x) for x in v]
-    return tuple(li)
-
-
-@_reify_map.register(int)
-async def _reify_int(v):
-    return v
-
-
-@_reify_map.register(TypeMeta)
-async def _reify_tmeta(v):
-    if v.is_generic():
-        return v
-    else:
-        return await _reify_map[v](v)
-
-
-@_reify_map.register(type, object)
-async def _reify_object(v):
-    return v
-
-
-async def reify(v):
+@overload(method_name='__reify__')
+async def reify(x: ValueWrapper):
     """Build a concrete value from v.
 
     All InferenceVars in v will be awaited on.
     """
-    return await _reify_map[type(v)](v)
+    return await reify(x.value)
+
+
+@overload  # noqa: F811
+async def reify(v: Var):
+    return await reify(await v._infvar)
+
+
+@overload  # noqa: F811
+async def reify(t: Array):
+    return Array[await reify(t.elements)]
+
+
+@overload  # noqa: F811
+async def reify(t: List):
+    return List[await reify(t.element_type)]
+
+
+@overload  # noqa: F811
+async def reify(t: Tuple):
+    return Tuple[await reify(t.elements)]
+
+
+@overload  # noqa: F811
+async def reify(t: Function):
+    return Function[await reify(t.arguments), await reify(t.retval)]
+
+
+@overload  # noqa: F811
+async def reify(v: tuple):
+    li = [await reify(x) for x in v]
+    return tuple(li)
+
+
+@overload  # noqa: F811
+async def reify(v: int):
+    return v
+
+
+@overload  # noqa: F811
+async def reify(v: TypeMeta):
+    if v.is_generic():
+        return v
+    else:
+        return await reify[v](v)
+
+
+@overload  # noqa: F811
+async def reify(v: (type, object)):
+    return v

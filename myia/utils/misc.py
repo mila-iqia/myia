@@ -1,6 +1,7 @@
 """Miscellaneous utilities."""
 
 import builtins
+import inspect
 import sys
 from typing import Any, Dict, List, TypeVar
 from colorama import AnsiToWin32
@@ -136,6 +137,112 @@ class TypeMap(dict):
             return handler
         else:
             raise KeyError(obj_t)
+
+
+class Overload:
+    """Overloaded function.
+
+    A function can be added with the `register` method. One of its parameters
+    should be annotated with a type, but only one, and every registered
+    function should annotate the same parameter.
+
+    Arguments:
+        method_name: If no function is registered for a type, we will try to
+            call this method on it.
+        bind_to: Binds the first argument to the given object.
+    """
+
+    def __init__(self, method_name=None, bind_to=None, _parent=None):
+        """Initialize an Overload."""
+        self.__self__ = bind_to
+        if _parent:
+            self.map = _parent.map
+            self.which = _parent.which
+            return
+        if method_name:
+            self.map = TypeMap(
+                discover=lambda cls: getattr(cls, method_name, None)
+            )
+        else:
+            self.map = TypeMap()
+        self.which = None
+
+    def register(self, fn):
+        """Register a function."""
+        ann = fn.__annotations__
+        if len(ann) != 1:
+            raise Exception('Only one parameter may be annotated.')
+        argnames = inspect.getfullargspec(fn).args
+        for i, name in enumerate(argnames):
+            t = ann.get(name, None)
+            if t is not None:
+                if isinstance(t, str):
+                    t = eval(t)
+                if self.which is None:
+                    self.which = i
+                elif self.which != i:
+                    raise Exception(
+                        'Annotation must always be on same parameter'
+                    )
+                break
+
+        ts = t if isinstance(t, tuple) else (t,)
+
+        for t in ts:
+            self.map[t] = fn
+
+        return self
+
+    def __get__(self, obj, cls):
+        return Overload(bind_to=obj, _parent=self)
+
+    def __getitem__(self, t):
+        if self.__self__:
+            return self.map[t].__get__(self.__self__)
+        else:
+            return self.map[t]
+
+    def __call__(self, *args):
+        """Call the overloaded function."""
+        if self.__self__:
+            main = args[self.which - 1]
+            return self.map[type(main)](self.__self__, *args)
+        else:
+            main = args[self.which]
+            return self.map[type(main)](*args)
+
+
+def overload(fn=None, *, method_name=None):
+    """Overload a function.
+
+    Overloading is based on the function name.
+
+    The decorated function should have one parameter annotated with a type.
+    Any parameter can be annotated, but only one, and every overloading of a
+    function should annotate the same parameter.
+
+    The decorator optionally takes keyword arguments, *only* on the first
+    use.
+
+    Arguments:
+        method_name: If no function is registered for a type, we will try to
+            call this method on it.
+    """
+    if fn is None:
+        def deco(fn):
+            return overload(fn, method_name=method_name)
+        return deco
+    mod = __import__(fn.__module__, fromlist='_')
+    dispatch = getattr(mod, fn.__name__, None)
+    if dispatch is None:
+        dispatch = Overload(method_name=method_name)
+    elif method_name is not None:
+        raise ValueError(
+            'Only the first use of @overload can take keyword arguments.'
+        )
+    if not isinstance(dispatch, Overload):
+        raise TypeError('@overload requires Overload instance')
+    return dispatch.register(fn)
 
 
 def _object_map(smap, *args):

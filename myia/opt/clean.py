@@ -1,45 +1,47 @@
 """Clean up Class types."""
 
-from ..dtype import Int, Tuple, List, Class, Function, Type, ismyiatype
+from ..dtype import Int, Tuple, List, Class, Function, Type, ismyiatype, \
+    TypeMeta
 from ..ir import Constant
 from ..prim import ops as P
-from ..utils import TypeMap
+from ..utils import overload
 
 
-_retype_map = TypeMap()
-
-
-@_retype_map.register(Tuple)
-def _retype_Tuple(t):
+@overload
+def _retype(t: Tuple):
     return Tuple[[_retype(t2) for t2 in t.elements]]
 
 
-@_retype_map.register(List)
-def _retype_List(t):
+@overload  # noqa: F811
+def _retype(t: List):
     return List[_retype(t.element_type)]
 
 
-@_retype_map.register(Class)
-def _retype_Class(t):
+@overload  # noqa: F811
+def _retype(t: Class):
     return Tuple[[_retype(t2) for t2 in t.attributes.values()]]
 
 
-@_retype_map.register(Function)
-def _retype_Function(t):
+@overload  # noqa: F811
+def _retype(t: Function):
     return Function[[_retype(t2) for t2 in t.arguments], _retype(t.retval)]
 
 
-@_retype_map.register(Type)
-def _retype_Type(t):
+@overload  # noqa: F811
+def _retype(t: Type):
     return t
 
 
-def _retype(t):
-    if not ismyiatype(t):
-        # This will be a validation error later on, and the validator
-        # will report it better than we could here.
-        return t  # pragma: no cover
-    return _retype_map[t](t)
+@overload  # noqa: F811
+def _retype(t: TypeMeta):
+    return _retype[t](t)
+
+
+@overload  # noqa: F811
+def _retype(t: object):
+    # This will be a validation error later on, and the validator
+    # will report it better than we could here.
+    return t  # pragma: no cover
 
 
 def _mkr_to_mkt(mkr):

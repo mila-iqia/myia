@@ -1,7 +1,7 @@
 """Utilities to merge dictionaries and other data structures."""
 
 
-from .misc import Named, TypeMap
+from .misc import Named, overload
 
 
 # Use in a merge to indicate that a key should be deleted
@@ -56,39 +56,38 @@ class Reset(MergeMode):
     mode = 'reset'
 
 
-_cleanup_map = TypeMap()
+###########
+# cleanup #
+###########
 
 
-@_cleanup_map.register(object)
-def _cleanup_object(value):
+@overload
+def cleanup(value: object):
     return value
 
 
-@_cleanup_map.register(MergeMode)
-def _cleanup_MergeMode(mm):
+@overload  # noqa: F811
+def cleanup(mm: MergeMode):
     return mm.value
 
 
-@_cleanup_map.register(dict)
-def _cleanup_dict(d):
+@overload  # noqa: F811
+def cleanup(d: dict):
     return type(d)({k: cleanup(v) for k, v in d.items() if v is not DELETE})
 
 
-@_cleanup_map.register(tuple, list, set)
-def _cleanup_sequence(xs):
+@overload  # noqa: F811
+def cleanup(xs: (tuple, list, set)):
     return type(xs)(cleanup(x) for x in xs)
 
 
-def cleanup(x):
-    """Remove all MergeMode and DELETE instances from the data."""
-    return _cleanup_map[type(x)](x)
+#########
+# merge #
+#########
 
 
-_merge_map = TypeMap(discover=lambda cls: getattr(cls, '__merge__', None))
-
-
-@_merge_map.register(dict)
-def _merge_dict(d1, d2, mode):
+@overload(method_name='__merge__')
+def _merge_helper(d1: dict, d2, mode):
     if mode == 'reset':
         return type(d1)(d2)
 
@@ -108,8 +107,8 @@ def _merge_dict(d1, d2, mode):
     return rval
 
 
-@_merge_map.register(tuple)
-def _merge_tuple(xs, ys, mode):
+@overload  # noqa: F811
+def _merge_helper(xs: tuple, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
     if mode == 'merge':
@@ -118,8 +117,8 @@ def _merge_tuple(xs, ys, mode):
         return ys
 
 
-@_merge_map.register(list)
-def _merge_list(xs, ys, mode):
+@overload  # noqa: F811
+def _merge_helper(xs: list, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
     if mode == 'merge':
@@ -128,8 +127,8 @@ def _merge_list(xs, ys, mode):
         return ys
 
 
-@_merge_map.register(set)
-def _merge_set(xs, ys, mode):
+@overload  # noqa: F811
+def _merge_helper(xs: set, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
     if mode == 'merge':
@@ -138,8 +137,8 @@ def _merge_set(xs, ys, mode):
         return ys
 
 
-@_merge_map.register(object)
-def _merge_object(a, b, mode):
+@overload  # noqa: F811
+def _merge_helper(a: object, b, mode):
     return cleanup(b)
 
 
@@ -160,4 +159,4 @@ def merge(a, b, mode=MergeMode.mode):
         mode = b.mode
         b = b.value
     assert not isinstance(a, MergeMode)
-    return _merge_map[type(a)](a, b, mode)
+    return _merge_helper(a, b, mode)
