@@ -6,6 +6,9 @@ from operator import (  # noqa
     pos, neg, not_, and_, or_, matmul, getitem, setitem
 )
 
+from math import (  # noqa
+    exp, log, sin, cos, tan
+)
 
 from builtins import (  # noqa
     bool, getattr, setattr, len
@@ -39,4 +42,9 @@ def next(it):  # pragma: no cover
 
 def hasnext(it):  # pragma: no cover
     """Myia hasnext function."""
+    raise RuntimeError('This operation is not meant to be called directly.')
+
+
+def to_array(x):  # pragma: no cover
+    """Myia to_array function."""
     raise RuntimeError('This operation is not meant to be called directly.')

@@ -38,6 +38,11 @@ scalar_object_map = {
     operations.ge: P.scalar_ge,
     operations.pos: P.scalar_uadd,
     operations.neg: P.scalar_usub,
+    operations.exp: P.scalar_exp,
+    operations.log: P.scalar_log,
+    operations.sin: P.scalar_sin,
+    operations.cos: P.scalar_cos,
+    operations.tan: P.scalar_tan,
     operations.not_: P.bool_not,
     operations.and_: P.bool_and,
     operations.or_: P.bool_or,
@@ -52,6 +57,7 @@ scalar_object_map = {
     operations.iter: C.iter,
     operations.hasnext: C.hasnext,
     operations.next: C.next,
+    operations.to_array: C.to_array,
     operations.if_: P.if_,
 }
 
@@ -71,6 +77,11 @@ standard_object_map = {
     operations.ge: C.ge,
     operations.pos: C.uadd,
     operations.neg: C.usub,
+    operations.exp: C.exp,
+    operations.log: C.log,
+    operations.sin: C.sin,
+    operations.cos: C.cos,
+    operations.tan: C.tan,
     operations.not_: C.not_,
     operations.and_: C.and_,
     operations.or_: C.or_,
@@ -85,6 +96,7 @@ standard_object_map = {
     operations.iter: C.iter,
     operations.hasnext: C.hasnext,
     operations.next: C.next,
+    operations.to_array: C.to_array,
     operations.if_: P.if_,
 }
 

@@ -1,11 +1,13 @@
 
 import operator
 import numpy as np
+import math
 
 from pytest import mark
 from types import SimpleNamespace
 
 from myia.api import scalar_pipeline, standard_pipeline
+from myia.composite import hyper_add, zeros_like
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
     Number, Class
@@ -22,10 +24,10 @@ from myia.prim.py_implementations import \
     typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
-    tuple_setitem, list_setitem
+    tuple_setitem, list_setitem, scalar_cast
 from myia.utils import RestrictedVar
 
-from .common import B, T, L, F, i16, i32, i64, u64, f32, f64, \
+from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
     li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
     Point, Point_t, Point3D, Point3D_t, mysum
 
@@ -288,6 +290,17 @@ def test_prim_tern(x, y, z):
 @infer(type=[(i64, i64), (f64, f64), (B, InferenceError)])
 def test_prim_usub(x):
     return -x
+
+
+@infer_std(type=[
+    (i64, InferenceError),
+    (f32, f32),
+    (f64, f64),
+    (af64_of(2, 5), af64),
+    (B, InferenceError)
+])
+def test_prim_log(x):
+    return math.log(x)
 
 
 @infer(
@@ -1386,6 +1399,21 @@ def test_switch(c, x, y):
     return switch(c, x, y)
 
 
+@infer(
+    type=[
+        (i64, {'value': i64}, i64),
+        (i64, {'value': i16}, i16),
+        (f64, {'value': i16}, i16),
+        (f16, {'value': f32}, f32),
+        (f16, TypeType, InferenceError),
+        (f16, {'value': B}, InferenceError),
+        (B, {'value': f32}, InferenceError),
+    ]
+)
+def test_scalar_cast(x, t):
+    return scalar_cast(x, t)
+
+
 @infer(type=[(i64, ai64),
              (f64, af64),
              (af64_of(9, 7), InferenceError),
@@ -1657,7 +1685,6 @@ def test_dataclass_wrong_field(pt):
 hyper_map = HyperMap()
 hyper_map_notuple = HyperMap(nonleaf=(A, Class))
 hyper_map_nobroadcast = HyperMap(broadcast=False)
-hyper_add = HyperMap(fn_leaf=scalar_add)
 
 
 @infer(
@@ -1732,3 +1759,27 @@ def test_hyper_map_nobroadcast(x, y):
 )
 def test_hyper_add(x, y):
     return hyper_add(x, y)
+
+
+@infer(
+    type=[
+        (i64, i64),
+        (f64, f64),
+        (lf64, lf64),
+        (T[i64, f64], T[i64, f64]),
+        (Point_t, Point_t),
+        (ai64_of(2, 5), ai64),
+        (af32_of(2, 5), af32),
+    ],
+    value=[
+        (1, 0),
+        ((2, 3.0), (0, 0.0)),
+        (Point(1, 2), Point(0, 0)),
+    ],
+    shape=[
+        (ai64_of(2, 5), (2, 5)),
+        (af32_of(2, 5), (2, 5)),
+    ]
+)
+def test_zeros_like(x):
+    return zeros_like(x)

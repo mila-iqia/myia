@@ -3,10 +3,13 @@
 
 from dataclasses import dataclass
 
-from .dtype import Array, Object, Int
+from .dtype import Array, Object, Int, Number, Bool, Tuple, List, Class
+from .hypermap import HyperMap
+from .ir import MultitypeGraph
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
-    switch, identity, bool_and, tail
+    switch, identity, bool_and, tail, typeof, scalar_cast, scalar_add, \
+    scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan
 
 
 def core(fn):
@@ -100,6 +103,43 @@ def uadd(x):
 def usub(x):
     """Implementation of `usub`."""
     return x.__neg__()
+
+
+exp = MultitypeGraph('exp')
+log = MultitypeGraph('log')
+sin = MultitypeGraph('sin')
+cos = MultitypeGraph('cos')
+tan = MultitypeGraph('tan')
+
+
+@exp.register(Number)
+@core
+def _exp(x):
+    return scalar_exp(x)
+
+
+@log.register(Number)
+@core
+def _log(x):
+    return scalar_log(x)
+
+
+@sin.register(Number)
+@core
+def _sin(x):
+    return scalar_sin(x)
+
+
+@cos.register(Number)
+@core
+def _cos(x):
+    return scalar_cos(x)
+
+
+@tan.register(Number)
+@core
+def _tan(x):
+    return scalar_tan(x)
 
 
 @core
@@ -345,6 +385,41 @@ def array_usub(xs):
     return array_map(usub, xs)
 
 
+@exp.register(Array)
+@core
+def array_exp(xs):
+    """Implementation of `array_exp`."""
+    return array_map(scalar_exp, xs)
+
+
+@log.register(Array)
+@core
+def array_log(xs):
+    """Implementation of `array_log`."""
+    return array_map(scalar_log, xs)
+
+
+@sin.register(Array)
+@core
+def array_sin(xs):
+    """Implementation of `array_sin`."""
+    return array_map(scalar_sin, xs)
+
+
+@cos.register(Array)
+@core
+def array_cos(xs):
+    """Implementation of `array_cos`."""
+    return array_map(scalar_cos, xs)
+
+
+@tan.register(Array)
+@core
+def array_tan(xs):
+    """Implementation of `array_tan`."""
+    return array_map(scalar_tan, xs)
+
+
 @core
 def array_eq(xs, ys):
     """Implementation of `array_eq`."""
@@ -379,3 +454,34 @@ def array_le(xs, ys):
 def array_ge(xs, ys):
     """Implementation of `array_ge`."""
     return broadcastable_binary(ge, xs, ys)
+
+
+hyper_add = HyperMap(fn_leaf=scalar_add)
+
+
+_leaf_zeros_like = MultitypeGraph('zeros_like')
+
+
+@_leaf_zeros_like.register(Bool)
+@core
+def _bool_zero(_):
+    return False
+
+
+@_leaf_zeros_like.register(Number)
+@core
+def _scalar_zero(x):
+    return scalar_cast(0, typeof(x))
+
+
+@_leaf_zeros_like.register(Array)
+@core
+def _array_zero(xs):
+    scalar_zero = scalar_cast(0, typeof(xs).elements)
+    return distribute(to_array(scalar_zero), shape(xs))
+
+
+zeros_like = HyperMap(
+    nonleaf=(Tuple, List, Class),
+    fn_leaf=_leaf_zeros_like
+)
