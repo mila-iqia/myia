@@ -51,6 +51,8 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         self._tasks = []
         self._errors = []
         self._vars = []
+        # This is used by InferenceVar and EquivalenceChecker:
+        self.equiv = {}
 
     def get_debug(self):
         """Not entirely sure what this does."""
@@ -185,7 +187,6 @@ class EquivalenceChecker:
         self.loop = loop
         self.error_callback = error_callback
         self.unif = Unification()
-        self.equiv = {}
 
     def declare_equivalent(self, x, y, refs, error_callback=None):
         """Declare that x and y should be equivalent.
@@ -237,16 +238,17 @@ class EquivalenceChecker:
 
     def merge(self, x, y):
         """Merge the two values/variables x and y."""
-        res = self.unif.unify(x, y, self.equiv)
+        res = self.unif.unify(x, y, self.loop.equiv)
         if res is None:
             return False
-        self.equiv = res
-        for var, value in self.equiv.items():
+        for var, value in res.items():
+            # TODO: Only loop on unprocessed variables
             iv = var._infvar
             if isinstance(value, Var) and not hasattr(value, '_infvar'):
                 # Unification may create additional variables
                 self.loop.create_var(value, iv.default, iv.priority)
             if not iv.done():
+                # NOTE: This updates self.loop.equiv
                 iv.set_result(value)
         return True
 
@@ -289,6 +291,7 @@ class InferenceVar(asyncio.Future):
     def __init__(self, var, default, priority, loop):
         """Initialize an InferenceVar."""
         super().__init__(loop=loop)
+        self.loop = loop
         self.var = var
         self.default = default
         self.priority = priority
@@ -332,6 +335,14 @@ class InferenceVar(asyncio.Future):
                 return res._infvar.resolved()
             else:
                 return True
+
+    def set_result(self, result):
+        """Set the result of this InferenceVar.
+
+        This updates the mapping in the loop's equivalence table.
+        """
+        self.loop.equiv[self.var] = result
+        super().set_result(result)
 
     async def __reify__(self):
         """Map this InferenceVar to a concrete value."""
@@ -390,8 +401,7 @@ async def _reify_tmeta(v):
         return await _reify_map[v](v)
 
 
-@_reify_map.register(type)
-@_reify_map.register(object)
+@_reify_map.register(type, object)
 async def _reify_object(v):
     return v
 
