@@ -134,8 +134,6 @@ def find_matching_shape(shps):
 class ShapeTrack(Track):
     """Infer the shape of a constant."""
 
-    dependencies = ['type']
-
     def __init__(self, engine, name, *,
                  constructors=shape_inferrer_constructors):
         """Initialize a ShapeTrack."""

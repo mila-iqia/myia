@@ -44,9 +44,6 @@ class TypeDispatchError(MyiaTypeError):
 class Track(Partializable):
     """Represents a property to infer."""
 
-    # List of track names this track depends on.
-    dependencies = []
-
     def __init__(self, engine, name):
         """Initialize a Track."""
         self.engine = engine
@@ -669,9 +666,6 @@ class InferenceEngine:
         """Compute the value of the Reference on the given track."""
         track_name, ref = key
         track = self.tracks[track_name]
-
-        for dep in track.dependencies:
-            await ref[dep]
 
         if isinstance(ref, (VirtualReference, TransformedReference)):
             # A VirtualReference already contains the values we need.

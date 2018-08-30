@@ -100,8 +100,6 @@ class ValueTrack(Track):
 
     """
 
-    dependencies = ['type']
-
     def __init__(self,
                  engine,
                  name,
