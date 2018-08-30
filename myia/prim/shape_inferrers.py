@@ -386,9 +386,10 @@ async def infer_shape_dot(track, a, b):
     if len(a_shp) != 2 or len(b_shp) != 2:
         raise MyiaShapeError("dot needs matrix inputs")
     if (a_shp[1] != b_shp[0] and
-        a_shp[1] is not ANYTHING and
-            b_shp[0] is not ANYTHING):
-        raise MyiaShapeError("Incompatible shapes in dot")
+            a_shp[1] is not ANYTHING and b_shp[0] is not ANYTHING):
+        raise MyiaShapeError(
+            f"Incompatible shapes in dot: {a_shp} and {b_shp}"
+        )
     return (a_shp[0], b_shp[1])
 
 

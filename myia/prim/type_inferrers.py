@@ -301,6 +301,7 @@ async def infer_type_arith_bin(track, x, y):
 @type_inferrer(P.shape, nargs=1)
 async def infer_type_shape(track, ary):
     """Infer the return type of shape."""
+    await track.check(Array, ary)
     shp = await ary['shape']
     return Tuple[[UInt[64]]*len(shp)]
 
