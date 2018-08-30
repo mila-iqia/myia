@@ -6,9 +6,9 @@ from .infer import InferenceError
 from .ir import MetaGraph, Graph
 from .dtype import Array, List, Tuple, Class, Type, tag_to_dataclass, \
     pytype_to_myiatype
-from .utils import TypeMap
+from .utils import TypeMap, Overload
 from .prim import ops as P
-from .prim.py_implementations import hastype_helper
+from .prim.py_implementations import issubtype
 
 
 class HyperMap(MetaGraph):
@@ -44,14 +44,14 @@ class HyperMap(MetaGraph):
         # Pick out only the types we want to generate a mapping over.
         self.make_map = TypeMap()
         for t in (*nonleaf, Type):
-            self.make_map[t] = self.full_make_map[t]
+            self.make_map[t] = self._full_make.map[t]
         self.nonleaf = nonleaf
         self.cache = {}
 
-    full_make_map = TypeMap()
+    _full_make = Overload()
 
-    @full_make_map.register(List)
-    def _make_List(self, resources, t, g, fnarg, argmap):
+    @_full_make.register
+    def _full_make(self, resources, t: List, g, fnarg, argmap):
         args = list(argmap.keys())
         if fnarg is None:
             fn_rec = self.fn_rec
@@ -59,8 +59,8 @@ class HyperMap(MetaGraph):
             fn_rec = g.apply(P.partial, self.fn_rec, fnarg)
         return g.apply(P.list_map, fn_rec, *args)
 
-    @full_make_map.register(Array)
-    def _make_Array(self, resources, t, g, fnarg, argmap):
+    @_full_make.register
+    def _full_make(self, resources, t: Array, g, fnarg, argmap):
         if fnarg is None:
             fnarg = resources.convert(self.fn_leaf)
 
@@ -76,8 +76,8 @@ class HyperMap(MetaGraph):
 
         return g.apply(P.array_map, fnarg, *args)
 
-    @full_make_map.register(Tuple)
-    def _make_Tuple(self, resources, t, g, fnarg, argmap):
+    @_full_make.register
+    def _full_make(self, resources, t: Tuple, g, fnarg, argmap):
         assert all(len(t.elements) == len(t2.elements)
                    for t2 in argmap.values())
         elems = []
@@ -91,8 +91,8 @@ class HyperMap(MetaGraph):
             elems.append(val)
         return g.apply(P.make_tuple, *elems)
 
-    @full_make_map.register(Class)
-    def _make_Class(self, resources, t, g, fnarg, argmap):
+    @_full_make.register
+    def _full_make(self, resources, t: Class, g, fnarg, argmap):
         assert all(t.tag == t2.tag
                    and t.attributes.keys() == t2.attributes.keys()
                    for t2 in argmap.values())
@@ -108,8 +108,8 @@ class HyperMap(MetaGraph):
         t = pytype_to_myiatype(tag_to_dataclass[t.tag])
         return g.apply(P.make_record, t, *vals)
 
-    @full_make_map.register(Type)
-    def _make_Type(self, resources, t, g, fnarg, argmap):
+    @_full_make.register
+    def _full_make(self, resources, t: Type, g, fnarg, argmap):
         if fnarg is None:
             fnarg = resources.convert(self.fn_leaf)
         return g.apply(fnarg, *argmap.keys())
@@ -131,10 +131,10 @@ class HyperMap(MetaGraph):
 
     def _harmonize(self, resources, g, args):
         if self.broadcast \
-                and any(hastype_helper(t, Array) for t in args.values()):
+                and any(issubtype(t, Array) for t in args.values()):
             rval = {}
             for arg, t in args.items():
-                if not hastype_helper(t, Array):
+                if not issubtype(t, Array):
                     arg = g.apply(resources.convert(operations.to_array), arg)
                     t = Array[t]
                 rval[arg] = t

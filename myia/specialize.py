@@ -7,7 +7,7 @@ from .infer import ANYTHING, Context, reify, \
     GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer
 from .ir import GraphCloner, Constant
 from .prim import ops as P, Primitive
-from .utils import Named, TypeMap
+from .utils import Named, Overload
 
 
 UNKNOWN = Named('UNKNOWN')
@@ -156,20 +156,19 @@ class _GraphSpecializer:
     # Build #
     #########
 
-    build_map = TypeMap()
-
     async def build(self, ref, argrefs=None, t=None):
         if t is None:
             t = await ref['type']
         if ref is not None and isinstance(t, Inferrer):
             if (await ref['value']) is ANYTHING:
                 t = await _concretize_type(t, argrefs)
-                return await self.build_generic(ref, argrefs, t)
-        handler = self.build_map[type(t)]
-        return await handler(self, ref, argrefs, t)
+                return await self._build[Type](ref, argrefs, t)
+        return await self._build(ref, argrefs, t)
 
-    @build_map.register(GraphInferrer)
-    async def build_GraphInferrer(self, ref, argrefs, inf):
+    _build = Overload()
+
+    @_build.register
+    async def _build(self, ref, argrefs, inf: GraphInferrer):
         if isinstance(inf, MetaGraphInferrer):
             g = None
         else:
@@ -184,8 +183,8 @@ class _GraphSpecializer:
         else:
             raise _Unspecializable(INACCESSIBLE)
 
-    @build_map.register(PartialInferrer)
-    async def build_PartialInferrer(self, ref, argrefs, inf):
+    @_build.register  # noqa: F811
+    async def _build(self, ref, argrefs, inf: PartialInferrer):
         all_argrefs = None if argrefs is None else [*inf.args, *argrefs]
         sub_build = await self.build(None, all_argrefs, inf.fn)
         ptl_args = [await self.build(ref) for ref in inf.args]
@@ -202,25 +201,22 @@ class _GraphSpecializer:
         res.type = res_t
         return res
 
-    @build_map.register(Inferrer)
-    async def build_Inferrer(self, ref, argrefs, inf):
+    @_build.register  # noqa: F811
+    async def _build(self, ref, argrefs, inf: Inferrer):
         v = inf.identifier
         assert isinstance(v, Primitive)
         return _const(v, await _concretize_type(inf, argrefs))
 
-    @build_map.register(Number)
-    @build_map.register(Bool)
-    @build_map.register(TypeType)
-    @build_map.register(type)
-    async def build_atom(self, ref, argrefs, t):
+    @_build.register  # noqa: F811
+    async def _build(self, ref, argrefs, t: (Number, Bool, TypeType, type)):
         v = await ref['value']
         if v is ANYTHING:
-            return await self.build_generic(ref, argrefs, t)
+            return await self._build[Type](ref, argrefs, t)
         else:
             return _const(v, t)
 
-    @build_map.register(Type)
-    async def build_generic(self, ref, argrefs, t):
+    @_build.register  # noqa: F811
+    async def _build(self, ref, argrefs, t: Type):
         new_node = self.get(ref.node)
         new_node.type = t
         return new_node

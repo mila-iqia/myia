@@ -1,52 +1,52 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
-from .dtype import Tuple, List, Function, Type, Number, Bool, \
-    Problem, ismyiatype
+from .dtype import Tuple, List, Function, Type, Number, Bool, Problem, TypeMeta
 from .ir import manage
 from .prim import Primitive, ops as P
 from .specialize import DEAD
-from .utils import TypeMap
+from .utils import overload
 
 
 class ValidationError(Exception):
     """Error validating a Graph."""
 
 
-_validate_type_map = TypeMap()
-
-
-@_validate_type_map.register(Tuple)
-def _validate_type_Tuple(t):
+@overload
+def _validate_type(t: Tuple):
     for t2 in t.elements:
         _validate_type(t2)
 
 
-@_validate_type_map.register(List)
-def _validate_type_List(t):
+@overload  # noqa: F811
+def _validate_type(t: List):
     _validate_type(t.element_type)
 
 
-@_validate_type_map.register(Function)
-def _validate_type_Function(t):
+@overload  # noqa: F811
+def _validate_type(t: Function):
     for t2 in t.arguments:
         _validate_type(t2)
     _validate_type(t.retval)
 
 
-@_validate_type_map.register(Number, Bool, Problem[DEAD])
-def _validate_type_OK(t):
+@overload  # noqa: F811
+def _validate_type(t: (Number, Bool, Problem[DEAD])):
     pass
 
 
-@_validate_type_map.register(Type)
-def _validate_type_Type(t):
+@overload  # noqa: F811
+def _validate_type(t: Type):
     raise ValidationError(f'Illegal type in the graph: {t}')
 
 
-def _validate_type(t):
-    if not ismyiatype(t):
-        raise ValidationError(f'Illegal type in the graph: {t}')
-    return _validate_type_map[t](t)
+@overload  # noqa: F811
+def _validate_type(t: TypeMeta):
+    return _validate_type[t](t)
+
+
+@overload  # noqa: F811
+def _validate_type(t: object):
+    raise ValidationError(f'Illegal type in the graph: {t}')
 
 
 # All the legal operations are listed here.

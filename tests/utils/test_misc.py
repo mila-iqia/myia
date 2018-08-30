@@ -1,6 +1,6 @@
 import pytest
 
-from myia.utils import Named, TypeMap, smap, Event, Events, NS
+from myia.utils import Named, TypeMap, smap, Event, Events, NS, Overload
 
 
 def test_named():
@@ -27,6 +27,39 @@ def test_typemap_discover():
     assert tmap[int] == 'int'
     assert tmap[str] == 'str'
     assert tmap[object] == '???'
+
+
+def test_Overload():
+    o = Overload()
+
+    @o.register
+    def f(x, y: int):
+        return 'int'
+
+    @o.register  # noqa: F811
+    def f(x, y: float):
+        return 'float'
+
+    assert f(1, 2) == 'int'
+    assert f(1, 2.0) == 'float'
+
+    with pytest.raises(Exception):
+        @o.register  # noqa: F811
+        def f(x: object, y: object):
+            return 'too many annotations'
+
+    with pytest.raises(Exception):
+        @o.register  # noqa: F811
+        def f(x: object, y):
+            return 'wrong arg to annotate'
+
+    @o.register  # noqa: F811
+    def f(x, y: 'object'):
+        return 'object'
+
+    assert f(1, 2) == 'int'
+    assert f(1, 2.0) == 'float'
+    assert f(1, 'hello') == 'object'
 
 
 def test_smap():

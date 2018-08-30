@@ -18,7 +18,7 @@ from .prim.value_inferrers import ValueTrack, value_inferrer_constructors
 from .prim.type_inferrers import TypeTrack, type_inferrer_constructors
 from .prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
 from .specialize import TypeSpecializer
-from .utils import TypeMap, as_frozen
+from .utils import TypeMap, as_frozen, overload
 from .vm import VM
 from .compile import step_wrap_primitives, step_compile, step_link, step_export
 
@@ -108,6 +108,24 @@ standard_method_map = TypeMap({
         '__bool__': P.identity,
     },
     dtype.Int: {
+        '__add__': P.scalar_add,
+        '__sub__': P.scalar_sub,
+        '__mul__': P.scalar_mul,
+        '__truediv__': P.scalar_div,
+        '__mod__': P.scalar_mod,
+        '__pow__': P.scalar_pow,
+        '__pos__': P.scalar_uadd,
+        '__neg__': P.scalar_usub,
+        '__eq__': P.scalar_eq,
+        '__ne__': P.scalar_ne,
+        '__lt__': P.scalar_lt,
+        '__gt__': P.scalar_gt,
+        '__le__': P.scalar_le,
+        '__ge__': P.scalar_ge,
+        '__bool__': C.int_bool,
+        '__myia_to_array__': P.scalar_to_array,
+    },
+    dtype.UInt: {
         '__add__': P.scalar_add,
         '__sub__': P.scalar_sub,
         '__mul__': P.scalar_mul,
@@ -421,11 +439,8 @@ class DebugVMExporter(PipelineStep):
         return {'output': self.vm.export(graph)}
 
 
-_convert_arg_map = TypeMap()
-
-
-@_convert_arg_map.register(Tuple)
-def _convert_arg_Tuple(arg, orig_t, vm_t):
+@overload
+def _convert_arg(arg, orig_t: Tuple, vm_t):
     if not isinstance(arg, tuple):
         raise TypeError('Expected tuple')
     oe = orig_t.elements
@@ -436,8 +451,8 @@ def _convert_arg_Tuple(arg, orig_t, vm_t):
                  for x, o, v in zip(arg, oe, ve))
 
 
-@_convert_arg_map.register(List)
-def _convert_arg_List(arg, orig_t, vm_t):
+@overload  # noqa: F811
+def _convert_arg(arg, orig_t: List, vm_t):
     if not isinstance(arg, list):
         raise TypeError('Expected list')
     ot = orig_t.element_type
@@ -445,8 +460,8 @@ def _convert_arg_List(arg, orig_t, vm_t):
     return [convert_arg(x, ot, vt) for x in arg]
 
 
-@_convert_arg_map.register(Class)
-def _convert_arg_Class(arg, orig_t, vm_t):
+@overload  # noqa: F811
+def _convert_arg(arg, orig_t: Class, vm_t):
     # If the EraseClass opt was applied, vm_t may be Tuple
     dc = tag_to_dataclass[orig_t.tag]
     if not isinstance(arg, dc):
@@ -466,8 +481,8 @@ def _convert_arg_Class(arg, orig_t, vm_t):
         return dc(*tup)
 
 
-@_convert_arg_map.register(Array)
-def _convert_arg_Array(arg, orig_t, vm_t):
+@overload  # noqa: F811
+def _convert_arg(arg, orig_t: Array, vm_t):
     if not isinstance(arg, np.ndarray):
         raise TypeError('Expected ndarray')
     et = orig_t.elements
@@ -478,22 +493,22 @@ def _convert_arg_Array(arg, orig_t, vm_t):
     return arg
 
 
-@_convert_arg_map.register(Int)
-def _convert_arg_Int(arg, orig_t, vm_t):
+@overload  # noqa: F811
+def _convert_arg(arg, orig_t: Int, vm_t):
     if not isinstance(arg, int):
         raise TypeError(f'Expected int')
     return arg
 
 
-@_convert_arg_map.register(Float)
-def _convert_arg_Float(arg, orig_t, vm_t):
+@overload  # noqa: F811
+def _convert_arg(arg, orig_t: Float, vm_t):
     if not isinstance(arg, float):
         raise TypeError(f'Expected float')
     return arg
 
 
-@_convert_arg_map.register(Bool)
-def _convert_arg_Bool(arg, orig_t, vm_t):
+@overload  # noqa: F811
+def _convert_arg(arg, orig_t: Bool, vm_t):
     if not isinstance(arg, bool):
         raise TypeError(f'Expected bool')
     return arg
@@ -501,14 +516,11 @@ def _convert_arg_Bool(arg, orig_t, vm_t):
 
 def convert_arg(arg, orig_t, vm_t):
     """Check that arg matches orig_t, and convert to vm_t."""
-    return _convert_arg_map[orig_t](arg, orig_t, vm_t)
+    return _convert_arg[orig_t](arg, orig_t, vm_t)
 
 
-_convert_result_map = TypeMap()
-
-
-@_convert_result_map.register(Class)
-def _convert_result_Class(res, orig_t, vm_t):
+@overload
+def _convert_result(res, orig_t, vm_t: Class):
     dc = tag_to_dataclass[orig_t.tag]
     oe = orig_t.attributes.values()
     ve = vm_t.attributes.values()
@@ -517,15 +529,15 @@ def _convert_result_Class(res, orig_t, vm_t):
     return dc(*tup)
 
 
-@_convert_result_map.register(List)
-def _convert_result_List(res, orig_t, vm_t):
+@overload  # noqa: F811
+def _convert_result(res, orig_t, vm_t: List):
     ot = orig_t.element_type
     vt = vm_t.element_type
     return [convert_result(x, ot, vt) for x in res]
 
 
-@_convert_result_map.register(Tuple)
-def _convert_result_Tuple(res, orig_t, vm_t):
+@overload  # noqa: F811
+def _convert_result(res, orig_t, vm_t: Tuple):
     # If the EraseClass opt was applied, orig_t may be Class
     orig_is_class = ismyiatype(orig_t, Class)
     if orig_is_class:
@@ -542,14 +554,14 @@ def _convert_result_Tuple(res, orig_t, vm_t):
         return tup
 
 
-@_convert_result_map.register(Int, Float, Bool, Array)
-def _convert_result_leaf(arg, orig_t, vm_t):
+@overload  # noqa: F811
+def _convert_result(arg, orig_t, vm_t: (Int, Float, Bool, Array)):
     return arg
 
 
 def convert_result(res, orig_t, vm_t):
     """Convert result from vm_t to orig_t."""
-    return _convert_result_map[vm_t](res, orig_t, vm_t)
+    return _convert_result[vm_t](res, orig_t, vm_t)
 
 
 class OutputWrapper(PipelineStep):

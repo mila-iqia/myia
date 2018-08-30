@@ -5,7 +5,7 @@ from contextvars import copy_context
 from collections import deque
 
 from ..dtype import Array, List, Tuple, Function, TypeMeta
-from ..utils import TypeMap, Unification, Var, RestrictedVar, eprint
+from ..utils import Unification, Var, RestrictedVar, eprint, overload
 
 from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
 
@@ -44,17 +44,18 @@ class InferenceLoop(asyncio.AbstractEventLoop):
     before it can evaluate the future, which suggests an infinite loop.
     """
 
-    def __init__(self, debug=False):
+    def __init__(self):
         """Initialize an InferenceLoop."""
         self._todo = deque()
-        self._debug = debug
         self._tasks = []
         self._errors = []
         self._vars = []
+        # This is used by InferenceVar and EquivalenceChecker:
+        self.equiv = {}
 
     def get_debug(self):
-        """Not entirely sure what this does."""
-        return self._debug
+        """There is no debug mode."""
+        return False
 
     def run_forever(self):
         """Run this loop until there is no more work to do."""
@@ -185,7 +186,6 @@ class EquivalenceChecker:
         self.loop = loop
         self.error_callback = error_callback
         self.unif = Unification()
-        self.equiv = {}
 
     def declare_equivalent(self, x, y, refs, error_callback=None):
         """Declare that x and y should be equivalent.
@@ -237,16 +237,17 @@ class EquivalenceChecker:
 
     def merge(self, x, y):
         """Merge the two values/variables x and y."""
-        res = self.unif.unify(x, y, self.equiv)
+        res = self.unif.unify(x, y, self.loop.equiv)
         if res is None:
             return False
-        self.equiv = res
-        for var, value in self.equiv.items():
+        for var, value in res.items():
+            # TODO: Only loop on unprocessed variables
             iv = var._infvar
             if isinstance(value, Var) and not hasattr(value, '_infvar'):
                 # Unification may create additional variables
                 self.loop.create_var(value, iv.default, iv.priority)
             if not iv.done():
+                # NOTE: This updates self.loop.equiv
                 iv.set_result(value)
         return True
 
@@ -289,6 +290,7 @@ class InferenceVar(asyncio.Future):
     def __init__(self, var, default, priority, loop):
         """Initialize an InferenceVar."""
         super().__init__(loop=loop)
+        self.loop = loop
         self.var = var
         self.default = default
         self.priority = priority
@@ -333,72 +335,90 @@ class InferenceVar(asyncio.Future):
             else:
                 return True
 
+    def set_result(self, result):
+        """Set the result of this InferenceVar.
+
+        This updates the mapping in the loop's equivalence table.
+        """
+        self.loop.equiv[self.var] = result
+        super().set_result(result)
+
     async def __reify__(self):
         """Map this InferenceVar to a concrete value."""
         return await reify(await self)
 
 
-_reify_map = TypeMap(discover=lambda cls: getattr(cls, '__reify__', None))
+async def find_coherent_result(infv, fn):
+    """Try to apply fn on infv, resolving it only if needed.
+
+    fn will be tried on every possible value infv can take, and if
+    all results are the same, that result is returned. Otherwise,
+    we await on infv to resolve it and we apply fn on that value.
+    """
+    v = infv.var
+    if isinstance(v, RestrictedVar):
+        results = set()
+        for option in v.legal_values:
+            results.add(await fn(option))
+        if len(results) == 1:
+            return results.pop()
+    x = await infv
+    return await fn(x)
 
 
-@_reify_map.register(ValueWrapper)
-async def _reify_ValueWrapper(x):
-    return await reify(x.value)
-
-
-@_reify_map.register(Var)
-async def _reify_Var(v):
-    return await reify(await v._infvar)
-
-
-@_reify_map.register(Array)
-async def _reify_Array(t):
-    return Array[await reify(t.elements)]
-
-
-@_reify_map.register(List)
-async def _reify_List(t):
-    return List[await reify(t.element_type)]
-
-
-@_reify_map.register(Tuple)
-async def _reify_Tuple(t):
-    return Tuple[await reify(t.elements)]
-
-
-@_reify_map.register(Function)
-async def _reify_Function(t):
-    return Function[await reify(t.arguments), await reify(t.retval)]
-
-
-@_reify_map.register(tuple)
-async def _reify_tuple(v):
-    li = [await reify(x) for x in v]
-    return tuple(li)
-
-
-@_reify_map.register(int)
-async def _reify_int(v):
-    return v
-
-
-@_reify_map.register(TypeMeta)
-async def _reify_tmeta(v):
-    if v.is_generic():
-        return v
-    else:
-        return await _reify_map[v](v)
-
-
-@_reify_map.register(type)
-@_reify_map.register(object)
-async def _reify_object(v):
-    return v
-
-
-async def reify(v):
+@overload(fallback_method='__reify__')
+async def reify(x: ValueWrapper):
     """Build a concrete value from v.
 
     All InferenceVars in v will be awaited on.
     """
-    return await _reify_map[type(v)](v)
+    return await reify(x.value)
+
+
+@overload  # noqa: F811
+async def reify(v: Var):
+    return await reify(await v._infvar)
+
+
+@overload  # noqa: F811
+async def reify(t: Array):
+    return Array[await reify(t.elements)]
+
+
+@overload  # noqa: F811
+async def reify(t: List):
+    return List[await reify(t.element_type)]
+
+
+@overload  # noqa: F811
+async def reify(t: Tuple):
+    return Tuple[await reify(t.elements)]
+
+
+@overload  # noqa: F811
+async def reify(t: Function):
+    return Function[await reify(t.arguments), await reify(t.retval)]
+
+
+@overload  # noqa: F811
+async def reify(v: tuple):
+    li = [await reify(x) for x in v]
+    return tuple(li)
+
+
+@overload  # noqa: F811
+async def reify(v: int):
+    return v
+
+
+@overload  # noqa: F811
+async def reify(v: TypeMeta):
+    if v.is_generic():
+        return v
+    else:
+        return await reify[v](v)
+
+
+@overload  # noqa: F811
+async def reify(v: (type, object)):
+    return v

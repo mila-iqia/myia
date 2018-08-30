@@ -2,7 +2,8 @@
 
 
 from ..dtype import Class, ismyiatype
-from ..infer import InferenceError, PartialInferrer, Context, ANYTHING, unwrap
+from ..infer import InferenceError, PartialInferrer, Context, ANYTHING, \
+    unwrap, InferenceVar, find_coherent_result
 
 
 class MyiaNameError(InferenceError):
@@ -25,16 +26,24 @@ async def static_getter(track, data, item, fetch, chk=None):
             data and item.
     """
     resources = track.engine.pipeline.resources
-    mmap = resources.method_map
 
-    data_t = await data['type']
+    data_t = await data.get_raw('type')
     item_v = await item['value']
+
     if item_v is ANYTHING:
         raise InferenceError(
             'The value of the attribute could not be inferred.'
         )
 
-    if ismyiatype(data_t, Class):
+    if isinstance(data_t, InferenceVar):
+        case, *args = await find_coherent_result(
+            data_t,
+            lambda t: _resolve_case(resources, t, item_v, chk)
+        )
+    else:
+        case, *args = await _resolve_case(resources, data_t, item_v, chk)
+
+    if case == 'class':
         # Get field from Class
         if item_v in data_t.attributes:
             if track.name == 'type':
@@ -49,7 +58,7 @@ async def static_getter(track, data, item, fetch, chk=None):
                     )
         elif item_v in data_t.methods:
             method = data_t.methods[item_v]
-            method = track.engine.pipeline.resources.convert(method)
+            method = resources.convert(method)
             inferrer = track.from_value(method, Context.empty())
             inferrer = unwrap(inferrer)
             return PartialInferrer(
@@ -60,29 +69,20 @@ async def static_getter(track, data, item, fetch, chk=None):
         else:
             raise InferenceError(f'Unknown field in {data_t}: {item_v}')
 
-    # Try method map
-    try:
-        mmap_t = mmap[data_t]
-    except KeyError:
-        mmap_t = None
+    elif case == 'method':
+        method, = args
+        method = resources.convert(method)
+        inferrer = track.from_value(method, Context.empty())
+        inferrer = unwrap(inferrer)
+        return PartialInferrer(
+            track,
+            inferrer,
+            [data]
+        )
 
-    if mmap_t is not None:
-        # Method call
-        if chk:
-            chk(None, item_v)
-        if item_v in mmap_t:
-            method = mmap_t[item_v]
-            method = track.engine.pipeline.resources.convert(method)
-            inferrer = track.from_value(method, Context.empty())
-            inferrer = unwrap(inferrer)
-            return PartialInferrer(
-                track,
-                inferrer,
-                [data]
-            )
-        else:
-            msg = f"object of type {data_t} has no attribute '{item_v}'"
-            raise MyiaAttributeError(msg)
+    elif case == 'no_method':
+        msg = f"object of type {data_t} has no attribute '{item_v}'"
+        raise MyiaAttributeError(msg)
 
     else:
         # Module or static namespace
@@ -104,3 +104,28 @@ async def static_getter(track, data, item, fetch, chk=None):
             raise InferenceError(f'Unexpected error in getter: {e!r}')
         value = resources.convert(raw)
         return track.from_value(value, Context.empty())
+
+
+async def _resolve_case(resources, data_t, item_v, chk):
+    mmap = resources.method_map
+
+    if ismyiatype(data_t, Class):
+        return ('class', data_t)
+
+    # Try method map
+    try:
+        mmap_t = mmap[data_t]
+    except KeyError:
+        mmap_t = None
+
+    if mmap_t is not None:
+        # Method call
+        if chk:
+            chk(None, item_v)
+        if item_v in mmap_t:
+            method = mmap_t[item_v]
+            return ('method', method)
+        else:
+            return ('no_method',)
+
+    return ('static',)
