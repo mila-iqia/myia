@@ -112,8 +112,8 @@ cos = MultitypeGraph('cos')
 tan = MultitypeGraph('tan')
 
 
-@core
 @exp.register(Number)
+@core
 def _exp(x):
     return scalar_exp(x)
 
