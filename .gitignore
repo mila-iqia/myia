@@ -1,5 +1,4 @@
 __pycache__/
-*.so
 .cache
 .coverage
 .pytest_cache
