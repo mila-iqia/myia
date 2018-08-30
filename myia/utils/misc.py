@@ -147,21 +147,21 @@ class Overload:
     function should annotate the same parameter.
 
     Arguments:
-        method_name: If no function is registered for a type, we will try to
-            call this method on it.
+        fallback_method: If no function is registered for a type, we will try
+            to call this method on it.
         bind_to: Binds the first argument to the given object.
     """
 
-    def __init__(self, method_name=None, bind_to=None, _parent=None):
+    def __init__(self, fallback_method=None, bind_to=None, _parent=None):
         """Initialize an Overload."""
         self.__self__ = bind_to
         if _parent:
             self.map = _parent.map
             self.which = _parent.which
             return
-        if method_name:
+        if fallback_method:
             self.map = TypeMap(
-                discover=lambda cls: getattr(cls, method_name, None)
+                discover=lambda cls: getattr(cls, fallback_method, None)
             )
         else:
             self.map = TypeMap()
@@ -212,7 +212,7 @@ class Overload:
             return self.map[type(main)](*args)
 
 
-def overload(fn=None, *, method_name=None):
+def overload(fn=None, *, fallback_method=None):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -225,18 +225,18 @@ def overload(fn=None, *, method_name=None):
     use.
 
     Arguments:
-        method_name: If no function is registered for a type, we will try to
-            call this method on it.
+        fallback_method: If no function is registered for a type, we will
+            try to call this method on it.
     """
     if fn is None:
         def deco(fn):
-            return overload(fn, method_name=method_name)
+            return overload(fn, fallback_method=fallback_method)
         return deco
     mod = __import__(fn.__module__, fromlist='_')
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
-        dispatch = Overload(method_name=method_name)
-    elif method_name is not None:
+        dispatch = Overload(fallback_method=fallback_method)
+    elif fallback_method is not None:
         raise ValueError(
             'Only the first use of @overload can take keyword arguments.'
         )

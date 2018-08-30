@@ -86,7 +86,7 @@ def cleanup(xs: (tuple, list, set)):
 #########
 
 
-@overload(method_name='__merge__')
+@overload(fallback_method='__merge__')
 def _merge_helper(d1: dict, d2, mode):
     if mode == 'reset':
         return type(d1)(d2)

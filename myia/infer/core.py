@@ -361,13 +361,12 @@ async def find_coherent_result(infv, fn):
         for option in v.legal_values:
             results.add(await fn(option))
         if len(results) == 1:
-            for x in results:
-                return x
+            return results.pop()
     x = await infv
     return await fn(x)
 
 
-@overload(method_name='__reify__')
+@overload(fallback_method='__reify__')
 async def reify(x: ValueWrapper):
     """Build a concrete value from v.
 
