@@ -44,10 +44,9 @@ class InferenceLoop(asyncio.AbstractEventLoop):
     before it can evaluate the future, which suggests an infinite loop.
     """
 
-    def __init__(self, debug=False):
+    def __init__(self):
         """Initialize an InferenceLoop."""
         self._todo = deque()
-        self._debug = debug
         self._tasks = []
         self._errors = []
         self._vars = []
@@ -55,8 +54,8 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         self.equiv = {}
 
     def get_debug(self):
-        """Not entirely sure what this does."""
-        return self._debug
+        """There is no debug mode."""
+        return False
 
     def run_forever(self):
         """Run this loop until there is no more work to do."""
