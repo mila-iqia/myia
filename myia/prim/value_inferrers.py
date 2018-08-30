@@ -286,8 +286,7 @@ async def infer_value_shape(track, ary):
     shp = await ary['shape']
     if any(s is ANYTHING for s in shp):
         return ANYTHING
-    # TODO: Should propagate ValueTrack.max_depth here
-    return limited(shp, 1)
+    return limited(shp, track.max_depth)
 
 
 @value_inferrer(P.resolve, nargs=2)
