@@ -2,7 +2,7 @@
 
 from collections import Counter
 
-from .dtype import Type, Function, Number, Bool, Problem, TypeType
+from .dtype import Type, Function, Number, Bool, Problem, TypeType, TypeMeta
 from .infer import ANYTHING, Context, reify, \
     GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer
 from .ir import GraphCloner, Constant
@@ -214,7 +214,8 @@ class _GraphSpecializer:
         return _const(v, await _concretize_type(inf, argrefs))
 
     @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs, t: (Number, Bool, TypeType, type)):
+    async def _build(self, ref, argrefs,
+                     t: (Number, Bool, TypeType, type, TypeMeta)):
         v = await ref['value']
         if v is ANYTHING:
             return await self._build[Type](ref, argrefs, t)

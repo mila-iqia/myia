@@ -7,7 +7,7 @@ from types import FunctionType
 from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
 from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
-    Number, tag_to_dataclass, ismyiatype, type_to_np_dtype
+    Number, tag_to_dataclass, ismyiatype, type_to_np_dtype, TypeMeta
 from .infer import InferenceEngine, ANYTHING
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
@@ -220,6 +220,7 @@ lax_type_map = TypeMap({
     list: _convert_sequence,
     object: _convert_identity,
     type: _convert_identity,
+    TypeMeta: _convert_identity,
 })
 
 

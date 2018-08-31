@@ -446,5 +446,5 @@ async def reify_shallow(v: InferenceVar):
 
 
 @overload  # noqa: F811
-async def reify_shallow(v: (type, object)):
+async def reify_shallow(v: (type, object, TypeMeta)):
     return v

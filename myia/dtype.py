@@ -106,6 +106,19 @@ class TypeMeta(type):
             args = f'[{", ".join([repr(a) for a in cls._params.values()])}]'
         return f'{name}{args}'
 
+    def __visit__(cls, fn):
+        """Visit function for unification purposes."""
+        if cls.is_generic():
+            fn(id(cls))
+            return cls
+        else:
+            fn(cls.generic)
+            args = {}
+            if cls._params:
+                for k, v in cls._params.items():
+                    args[k] = fn(v)
+            return cls.generic.make_subtype(**args)
+
 
 class Type(metaclass=TypeMeta):
     """Base class for all Types."""
