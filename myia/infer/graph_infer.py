@@ -463,15 +463,6 @@ class Context:
             and self.graph == other.graph \
             and self.argkey == other.argkey
 
-    async def __reify__(self):
-        """Reify this Context."""
-        return Context(
-            await reify(self.parent),
-            self.graph,
-            await reify(self.argkey),
-            True
-        )
-
 
 class AbstractReference:
     """Superclass for Reference and VirtualReference."""

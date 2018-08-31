@@ -59,7 +59,7 @@ class TypeSpecializer:
         g = await ginf.make_graph(argrefs)
         ctx = await ginf.make_context(argrefs)
 
-        ctxkey = await reify(ctx)
+        ctxkey = ctx  # TODO: Reify ctx to collapse multiple ctx into one
         if ctxkey in self.specializations:
             return self.specializations[ctxkey]
 

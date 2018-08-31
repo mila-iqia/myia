@@ -343,10 +343,6 @@ class InferenceVar(asyncio.Future):
         self.loop.equiv[self.var] = result
         super().set_result(result)
 
-    async def __reify__(self):
-        """Map this InferenceVar to a concrete value."""
-        return await reify(await self)
-
 
 async def find_coherent_result(infv, fn):
     """Try to apply fn on infv, resolving it only if needed.
@@ -366,7 +362,7 @@ async def find_coherent_result(infv, fn):
     return await fn(x)
 
 
-@overload(fallback_method='__reify__')
+@overload
 async def reify(x: ValueWrapper):
     """Build a concrete value from v.
 
@@ -378,6 +374,11 @@ async def reify(x: ValueWrapper):
 @overload  # noqa: F811
 async def reify(v: Var):
     return await reify(await v._infvar)
+
+
+@overload  # noqa: F811
+async def reify(v: InferenceVar):
+    return await reify(await v)
 
 
 @overload  # noqa: F811
