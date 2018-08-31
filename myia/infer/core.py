@@ -423,3 +423,28 @@ async def reify(v: TypeMeta):
 @overload  # noqa: F811
 async def reify(v: (type, object)):
     return v
+
+
+@overload
+async def reify_shallow(x: ValueWrapper):
+    """Build a concrete value from v.
+
+    Unlike reify which is deep, the outermost InferenceVar will be
+    awaited on.
+    """
+    return await reify_shallow(x.value)
+
+
+@overload  # noqa: F811
+async def reify_shallow(v: Var):
+    return await v._infvar
+
+
+@overload  # noqa: F811
+async def reify_shallow(v: InferenceVar):
+    return await v
+
+
+@overload  # noqa: F811
+async def reify_shallow(v: (type, object)):
+    return v
