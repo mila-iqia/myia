@@ -431,15 +431,12 @@ class Context:
         """Create an empty context."""
         return Context(None, None, ())
 
-    def __init__(self, parent, g, argvals, raw_argvals=False):
+    def __init__(self, parent, g, argvals):
         """Initialize the Context."""
         self.parent = parent
         self.graph = g
-        if raw_argvals:
-            self.argkey = argvals
-        else:
-            self.argkey = tuple(tuple(sorted(argv.items()))
-                                for argv in argvals)
+        self.argkey = tuple(tuple(sorted(argv.items()))
+                            for argv in argvals)
         self.parent_cache = dict(parent.parent_cache) if parent else {}
         self.parent_cache[g] = self
 

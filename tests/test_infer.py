@@ -1634,6 +1634,7 @@ def test_max_std(x, y):
     type=[
         (f64, f64),
         (i64, i64),
+        (af32_of(2, 5), af32),
     ]
 )
 def test_add1_stdx(x):

@@ -2,6 +2,7 @@
 
 
 from functools import partial
+from operator import getitem
 
 from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
     TypeType, Class, pytype_to_myiatype
@@ -405,7 +406,16 @@ async def infer_type_resolve(track, data, item):
             raise MyiaTypeError(
                 f'item argument to resolve must be a string, not {item_v}.'
             )
-    return await static_getter(track, data, item, (lambda x, y: x[y]), chk)
+
+    async def on_dcattr(data, data_t, item_v):  # pragma: no cover
+        raise MyiaTypeError('Cannot resolve on Class.')
+
+    return await static_getter(
+        track, data, item,
+        fetch=getitem,
+        on_dcattr=on_dcattr,
+        chk=chk
+    )
 
 
 @type_inferrer(P.getattr, nargs=2)
@@ -416,7 +426,16 @@ async def infer_type_getattr(track, data, item):
             raise MyiaTypeError(
                 f'item argument to getattr must be string, not {item_v}.'
             )
-    return await static_getter(track, data, item, getattr, chk)
+
+    async def on_dcattr(data, data_t, item_v):
+        return data_t.attributes[item_v]
+
+    return await static_getter(
+        track, data, item,
+        fetch=getattr,
+        on_dcattr=on_dcattr,
+        chk=chk
+    )
 
 
 @type_inferrer(P.scalar_to_array, nargs=1)

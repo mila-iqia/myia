@@ -14,7 +14,7 @@ class MyiaAttributeError(InferenceError):
     """Raised when an attribute is not found in a type or module."""
 
 
-async def static_getter(track, data, item, fetch, chk=None):
+async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
     """Return an inferrer for resolve or getattr.
 
     Arguments:
@@ -46,16 +46,7 @@ async def static_getter(track, data, item, fetch, chk=None):
     if case == 'class':
         # Get field from Class
         if item_v in data_t.attributes:
-            if track.name == 'type':
-                return data_t.attributes[item_v]
-            else:
-                data_v = await data['value']
-                if data_v is ANYTHING:
-                    return track.default({'type': data_t})
-                else:
-                    return track.from_value(
-                        getattr(data_v, item_v), Context.empty()
-                    )
+            return await on_dcattr(data, data_t, item_v)
         elif item_v in data_t.methods:
             method = data_t.methods[item_v]
             method = resources.convert(method)
