@@ -1,7 +1,6 @@
 
 import operator
 import numpy as np
-import math
 
 from pytest import mark
 from types import SimpleNamespace
@@ -300,7 +299,7 @@ def test_prim_usub(x):
     (B, InferenceError)
 ])
 def test_prim_log(x):
-    return math.log(x)
+    return np.log(x)
 
 
 @infer(

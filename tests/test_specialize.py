@@ -1,10 +1,11 @@
 
+import numpy
 from pytest import mark
 
-from myia.api import scalar_debug_pipeline
+from myia.api import scalar_debug_pipeline, standard_debug_pipeline
 from myia.debug.label import short_labeler as lbl
 from myia.prim.py_implementations import \
-    typeof, hastype, partial, list_map, scalar_add, scalar_sub, \
+    hastype, partial, list_map, scalar_add, scalar_sub, \
     scalar_usub, scalar_uadd, switch
 from myia.validate import validate, ValidationError
 
@@ -18,38 +19,59 @@ specialize_pipeline = scalar_debug_pipeline \
     )
 
 
-def specialize(*arglists):
+specialize_pipeline_std = standard_debug_pipeline \
+    .select('parse', 'infer', 'specialize', 'opt', 'export', 'wrap') \
+    .configure(
+        {'infer.tracks.value.max_depth': 1}
+    )
 
-    def decorate(fn):
-        def run_test(args):
-            arg_types = [{'type': typeof(arg)} for arg in args]
 
-            result_py = fn(*args)
+def specializer_decorator(pipeline):
+    def specialize(*arglists):
 
-            res = specialize_pipeline.make()(input=fn, argspec=arg_types)
-            if 'error' in res:
-                raise res['error']
-            g2 = res['graph']
+        def decorate(fn):
+            def run_test(args):
+                pip = pipeline.make()
+                argspec = tuple({'value': arg} for arg in args)
+                pip.steps.infer.fill_in(argspec)
+                print(argspec)
+                for arg in argspec:
+                    del arg['value']
 
-            try:
-                validate(g2)
-            except ValidationError as verr:
-                print('Collected the following errors:')
-                for err in verr.errors:
-                    n = err.node
-                    nlbl = lbl.label(n)
-                    print(f'   {nlbl} ({type(n).__name__}) :: {n.type}')
-                    print(f'      {err.args[0]}')
-                raise verr
+                result_py = fn(*args)
 
-            result_final = res['output'](*args)
-            assert result_py == result_final
+                res = pip(input=fn, argspec=argspec)
+                if 'error' in res:
+                    raise res['error']
+                g2 = res['graph']
 
-        m = mark.parametrize('args', arglists)(run_test)
-        m.__orig__ = fn
-        return m
+                try:
+                    validate(g2)
+                except ValidationError as verr:
+                    print('Collected the following errors:')
+                    for err in verr.errors:
+                        n = err.node
+                        nlbl = lbl.label(n)
+                        print(f'   {nlbl} ({type(n).__name__}) :: {n.type}')
+                        print(f'      {err.args[0]}')
+                    raise verr
 
-    return decorate
+                result_final = res['output'](*args)
+                if isinstance(result_py, numpy.ndarray):
+                    assert (result_py == result_final).all()
+                else:
+                    assert result_py == result_final
+
+            m = mark.parametrize('args', arglists)(run_test)
+            m.__orig__ = fn
+            return m
+
+        return decorate
+    return specialize
+
+
+specialize = specializer_decorator(specialize_pipeline)
+specialize_std = specializer_decorator(specialize_pipeline_std)
 
 
 int1 = 13

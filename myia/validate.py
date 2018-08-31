@@ -1,6 +1,7 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
-from .dtype import Tuple, List, Function, Type, Number, Bool, Problem, TypeMeta
+from .dtype import Array, Tuple, List, Function, Type, Number, Bool, Problem, \
+    TypeMeta
 from .ir import manage
 from .prim import Primitive, ops as P
 from .specialize import DEAD
@@ -15,6 +16,11 @@ class ValidationError(Exception):
 def _validate_type(t: Tuple):
     for t2 in t.elements:
         _validate_type(t2)
+
+
+@overload  # noqa: F811
+def _validate_type(t: Array):
+    _validate_type(t.elements)
 
 
 @overload  # noqa: F811
@@ -60,6 +66,11 @@ whitelist = frozenset({
     P.scalar_pow,
     P.scalar_uadd,
     P.scalar_usub,
+    P.scalar_exp,
+    P.scalar_log,
+    P.scalar_sin,
+    P.scalar_cos,
+    P.scalar_tan,
     P.scalar_eq,
     P.scalar_lt,
     P.scalar_gt,

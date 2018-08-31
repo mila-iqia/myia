@@ -1,6 +1,7 @@
 """User-friendly interfaces to Myia machinery."""
 
 import inspect
+import math
 import numpy as np
 from types import FunctionType
 
@@ -59,6 +60,11 @@ scalar_object_map = {
     operations.next: C.next,
     operations.to_array: C.to_array,
     operations.if_: P.if_,
+    math.exp: P.scalar_exp,
+    math.log: P.scalar_log,
+    math.sin: P.scalar_sin,
+    math.cos: P.scalar_cos,
+    math.tan: P.scalar_tan,
 }
 
 
@@ -98,6 +104,22 @@ standard_object_map = {
     operations.next: C.next,
     operations.to_array: C.to_array,
     operations.if_: P.if_,
+    math.exp: P.scalar_exp,
+    math.log: P.scalar_log,
+    math.sin: P.scalar_sin,
+    math.cos: P.scalar_cos,
+    math.tan: P.scalar_tan,
+    np.add: C.add,
+    np.subtract: C.sub,
+    np.multiply: C.mul,
+    np.divide: C.div,
+    np.mod: C.mod,
+    np.power: C.pow,
+    np.exp: C.exp,
+    np.log: C.log,
+    np.sin: C.sin,
+    np.cos: C.cos,
+    np.tan: C.tan,
 }
 
 
@@ -200,7 +222,8 @@ standard_method_map = TypeMap({
 
 
 @overload
-def lax_convert(env, fn: FunctionType):
+def default_convert(env, fn: FunctionType):
+    """Default converter for Python types."""
     g = clone(parser.parse(fn))
     env.resources.manager.add_graph(g)
     env.object_map[fn] = g
@@ -208,12 +231,12 @@ def lax_convert(env, fn: FunctionType):
 
 
 @overload  # noqa: F811
-def lax_convert(env, seq: (tuple, list)):
+def default_convert(env, seq: (tuple, list)):
     return type(seq)(env(x) for x in seq)
 
 
 @overload  # noqa: F811
-def lax_convert(env, x: (object, type, TypeMeta)):
+def default_convert(env, x: (object, type, TypeMeta)):
     return x
 
 
@@ -653,7 +676,7 @@ _standard_pipeline = PipelineDefinition(
         method_map=standard_method_map,
         convert=Converter.partial(
             object_map=standard_object_map,
-            converter=lax_convert
+            converter=default_convert
         ),
     ),
     steps=dict(
