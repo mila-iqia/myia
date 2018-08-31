@@ -14,6 +14,7 @@ UNKNOWN = Named('UNKNOWN')
 DEAD = Named('DEAD')
 POLY = Named('POLY')
 INACCESSIBLE = Named('INACCESSIBLE')
+AMBIGUOUS = Named('AMBIGUOUS')
 
 
 class _Unspecializable(Exception):
@@ -79,8 +80,13 @@ async def _find_argrefs(inf):
         y = await reify(y)
         key = tuple([await arg[track] for arg in x
                      for track in inf.engine.tracks])
-        if key in cache:
-            assert cache[key] == y
+        if key in cache and cache[key] != y:
+            # NOTE: It's not completely clear when/why this tends to
+            # happen. It seems to happen for PartialInferrers when
+            # the differentiation is downstream, so in practice the
+            # Problem node caused by this exception does not end up
+            # in the final graph.
+            raise _Unspecializable(AMBIGUOUS)
         cache[key] = y
 
     if len(cache) == 0:
