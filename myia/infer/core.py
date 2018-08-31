@@ -437,12 +437,12 @@ async def reify_shallow(x: ValueWrapper):
 
 @overload  # noqa: F811
 async def reify_shallow(v: Var):
-    return await v._infvar
+    return await reify_shallow(v._infvar)
 
 
 @overload  # noqa: F811
 async def reify_shallow(v: InferenceVar):
-    return await v
+    return await reify_shallow(await v)
 
 
 @overload  # noqa: F811

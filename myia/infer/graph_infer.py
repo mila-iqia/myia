@@ -211,7 +211,7 @@ class Track(Partializable):
         the same thing as all the other refs.
         """
         async def chk(ref):
-            res = await ref[self.name]
+            res = await ref.get_shallow(self.name)
             if not self.apply_predicate(predicate, res):
                 raise self.predicate_error(
                     predicate,
@@ -563,17 +563,26 @@ class TransformedReference(AbstractReference):
         self.ref = ref
         self.fn = fn
 
+    async def _parent_raw(self, track_name):
+        track = self.ref.engine.tracks[track_name]
+        return track, await self.ref.get_raw(track_name)
+
     async def get_raw(self, track_name):
         """Get the raw value for the track."""
-        track = self.ref.engine.tracks[track_name]
-        v = await self.ref.get_raw(track_name)
+        track, v = await self._parent_raw(track_name)
         return self.fn(track, v)
+
+    async def get_shallow(self, track_name):
+        """Get the raw value for the track, which might be wrapped."""
+        track, v = await self._parent_raw(track_name)
+        return self.fn(track, await reify_shallow(v))
 
     async def __getitem__(self, track_name):
         if track_name == '*':
             raise NotImplementedError('tref["*"]')
         else:
-            return await self.get_raw(track_name)
+            track, v = await self._parent_raw(track_name)
+            return self.fn(track, await reify(v))
 
 
 ########
@@ -662,7 +671,7 @@ class InferenceEngine:
 
         if isinstance(ref, (VirtualReference, TransformedReference)):
             # A VirtualReference already contains the values we need.
-            return await ref[track_name]
+            return await ref.get_raw(track_name)
 
         node = ref.node
         inferred = ref.node.inferred.get(track_name, UNKNOWN)
