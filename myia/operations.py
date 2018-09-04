@@ -6,7 +6,7 @@ from operator import (  # noqa
     pos, neg, not_, and_, or_, matmul, getitem, setitem
 )
 
-from math import (  # noqa
+from numpy import (  # noqa
     exp, log, sin, cos, tan
 )
 

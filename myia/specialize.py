@@ -2,7 +2,7 @@
 
 from collections import Counter
 
-from .dtype import Type, Function, Number, Bool, Problem, TypeType
+from .dtype import Type, Function, Number, Bool, Problem, TypeType, TypeMeta
 from .infer import ANYTHING, Context, reify, \
     GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer
 from .ir import GraphCloner, Constant
@@ -14,6 +14,7 @@ UNKNOWN = Named('UNKNOWN')
 DEAD = Named('DEAD')
 POLY = Named('POLY')
 INACCESSIBLE = Named('INACCESSIBLE')
+AMBIGUOUS = Named('AMBIGUOUS')
 
 
 class _Unspecializable(Exception):
@@ -58,7 +59,7 @@ class TypeSpecializer:
         g = await ginf.make_graph(argrefs)
         ctx = await ginf.make_context(argrefs)
 
-        ctxkey = await reify(ctx)
+        ctxkey = ctx  # TODO: Reify ctx to collapse multiple ctx into one
         if ctxkey in self.specializations:
             return self.specializations[ctxkey]
 
@@ -79,8 +80,13 @@ async def _find_argrefs(inf):
         y = await reify(y)
         key = tuple([await arg[track] for arg in x
                      for track in inf.engine.tracks])
-        if key in cache:
-            assert cache[key] == y
+        if key in cache and cache[key] != y:
+            # NOTE: It's not completely clear when/why this tends to
+            # happen. It seems to happen for PartialInferrers when
+            # the differentiation is downstream, so in practice the
+            # Problem node caused by this exception does not end up
+            # in the final graph.
+            raise _Unspecializable(AMBIGUOUS)
         cache[key] = y
 
     if len(cache) == 0:
@@ -208,7 +214,8 @@ class _GraphSpecializer:
         return _const(v, await _concretize_type(inf, argrefs))
 
     @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs, t: (Number, Bool, TypeType, type)):
+    async def _build(self, ref, argrefs,
+                     t: (Number, Bool, TypeType, type, TypeMeta)):
         v = await ref['value']
         if v is ANYTHING:
             return await self._build[Type](ref, argrefs, t)

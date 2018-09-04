@@ -4,12 +4,14 @@
 import asyncio
 
 from functools import partial
+from operator import getitem
 
 from .. import dtype as types
 from ..dtype import pytype_to_myiatype, TypeType
 from ..infer import ValueWrapper, InferenceError, PartialInferrer, \
     ANYTHING, Inferrer, GraphInferrer, register_inferrer, Track, \
-    unwrap, MetaGraphInferrer, InferenceVar, find_coherent_result
+    unwrap, MetaGraphInferrer, InferenceVar, find_coherent_result, \
+    MyiaTypeError, Context
 from ..ir import Graph, MetaGraph
 from ..utils import is_dataclass_type, overload
 
@@ -292,13 +294,33 @@ async def infer_value_shape(track, ary):
 @value_inferrer(P.resolve, nargs=2)
 async def infer_value_resolve(track, data, item):
     """Infer the return value of resolve."""
-    return await static_getter(track, data, item, lambda x, y: x[y])
+    async def on_dcattr(data, data_t, item_v):  # pragma: no cover
+        raise MyiaTypeError('Cannot resolve on Class.')
+
+    return await static_getter(
+        track, data, item,
+        fetch=getitem,
+        on_dcattr=on_dcattr
+    )
 
 
 @value_inferrer(P.getattr, nargs=2)
 async def infer_value_getattr(track, data, item):
     """Infer the return value of getattr."""
-    return await static_getter(track, data, item, getattr)
+    async def on_dcattr(data, data_t, item_v):
+        data_v = await data['value']
+        if data_v is ANYTHING:
+            return ANYTHING
+        else:
+            return track.from_value(
+                getattr(data_v, item_v), Context.empty()
+            )
+
+    return await static_getter(
+        track, data, item,
+        fetch=getattr,
+        on_dcattr=on_dcattr
+    )
 
 
 @value_inferrer(P.tuple_len, nargs=1)

@@ -38,7 +38,7 @@ def _assert_scalar(*args):
             if x.shape != ():
                 msg = f'Expected scalar, not array with shape {x.shape}'
                 raise TypeError(msg)
-        elif not isinstance(x, (int, float)):
+        elif not isinstance(x, (int, float, np.number)):
             raise TypeError(f'Expected scalar, not {type(x)}')
 
 

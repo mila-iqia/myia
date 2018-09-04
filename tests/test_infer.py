@@ -1,7 +1,6 @@
 
 import operator
 import numpy as np
-import math
 
 from pytest import mark
 from types import SimpleNamespace
@@ -300,7 +299,7 @@ def test_prim_usub(x):
     (B, InferenceError)
 ])
 def test_prim_log(x):
-    return math.log(x)
+    return np.log(x)
 
 
 @infer(
@@ -1634,6 +1633,7 @@ def test_max_std(x, y):
     type=[
         (f64, f64),
         (i64, i64),
+        (af32_of(2, 5), af32),
     ]
 )
 def test_add1_stdx(x):

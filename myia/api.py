@@ -1,13 +1,14 @@
 """User-friendly interfaces to Myia machinery."""
 
 import inspect
+import math
 import numpy as np
 from types import FunctionType
 
 from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
 from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
-    Number, tag_to_dataclass, ismyiatype, type_to_np_dtype
+    Number, tag_to_dataclass, ismyiatype, type_to_np_dtype, TypeMeta
 from .infer import InferenceEngine, ANYTHING
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
@@ -59,6 +60,11 @@ scalar_object_map = {
     operations.next: C.next,
     operations.to_array: C.to_array,
     operations.if_: P.if_,
+    math.exp: P.scalar_exp,
+    math.log: P.scalar_log,
+    math.sin: P.scalar_sin,
+    math.cos: P.scalar_cos,
+    math.tan: P.scalar_tan,
 }
 
 
@@ -98,6 +104,22 @@ standard_object_map = {
     operations.next: C.next,
     operations.to_array: C.to_array,
     operations.if_: P.if_,
+    math.exp: P.scalar_exp,
+    math.log: P.scalar_log,
+    math.sin: P.scalar_sin,
+    math.cos: P.scalar_cos,
+    math.tan: P.scalar_tan,
+    np.add: C.add,
+    np.subtract: C.sub,
+    np.multiply: C.mul,
+    np.divide: C.div,
+    np.mod: C.mod,
+    np.power: C.pow,
+    np.exp: C.exp,
+    np.log: C.log,
+    np.sin: C.sin,
+    np.cos: C.cos,
+    np.tan: C.tan,
 }
 
 
@@ -199,28 +221,23 @@ standard_method_map = TypeMap({
 })
 
 
-def _convert_identity(env, x):
-    return x
-
-
-def _convert_sequence(env, seq):
-    return type(seq)(env(x) for x in seq)
-
-
-def _convert_function(env, fn):
+@overload
+def default_convert(env, fn: FunctionType):
+    """Default converter for Python types."""
     g = clone(parser.parse(fn))
     env.resources.manager.add_graph(g)
     env.object_map[fn] = g
     return g
 
 
-lax_type_map = TypeMap({
-    FunctionType: _convert_function,
-    tuple: _convert_sequence,
-    list: _convert_sequence,
-    object: _convert_identity,
-    type: _convert_identity,
-})
+@overload  # noqa: F811
+def default_convert(env, seq: (tuple, list)):
+    return type(seq)(env(x) for x in seq)
+
+
+@overload  # noqa: F811
+def default_convert(env, x: (object, type, TypeMeta)):
+    return x
 
 
 ############
@@ -238,10 +255,10 @@ class _Unconverted:
 class Converter(PipelineResource):
     """Convert a Python object into an object that can be in a Myia graph."""
 
-    def __init__(self, pipeline_init, object_map, converters):
+    def __init__(self, pipeline_init, object_map, converter):
         """Initialize a Converter."""
         super().__init__(pipeline_init)
-        self.converters = converters
+        self.converter = converter
         self.object_map = {}
         for k, v in object_map.items():
             self.object_map[k] = _Unconverted(v)
@@ -274,14 +291,13 @@ class Converter(PipelineResource):
         try:
             v = self.object_map[value]
             if isinstance(v, _Unconverted):
-                v = v.value
-                v = self.converters[type(v)](self, v)
+                v = self.converter(self, v.value)
                 self.object_map[value] = v
             return v
         except (TypeError, KeyError):
             pass
 
-        return self.converters[type(value)](self, value)
+        return self.converter(self, value)
 
 
 class Parser(PipelineStep):
@@ -660,7 +676,7 @@ _standard_pipeline = PipelineDefinition(
         method_map=standard_method_map,
         convert=Converter.partial(
             object_map=standard_object_map,
-            converters=lax_type_map
+            converter=default_convert
         ),
     ),
     steps=dict(

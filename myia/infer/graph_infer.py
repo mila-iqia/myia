@@ -8,7 +8,8 @@ from ..debug.label import label
 from ..ir import GraphGenerationError
 from ..utils import Partializable, UNKNOWN, eprint
 
-from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify
+from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify, \
+    reify_shallow
 from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, \
     infer_trace
 
@@ -186,7 +187,7 @@ class Track(Partializable):
             refs: The references to compare.
             return_tuple: Whether to always return a tuple or not.
         """
-        coros = [ref[self.name] for ref in refs]
+        coros = [ref.get_shallow(self.name) for ref in refs]
         results = await asyncio.gather(*coros, loop=self.engine.loop)
 
         for ref, res in zip(refs, results):
@@ -430,15 +431,12 @@ class Context:
         """Create an empty context."""
         return Context(None, None, ())
 
-    def __init__(self, parent, g, argvals, raw_argvals=False):
+    def __init__(self, parent, g, argvals):
         """Initialize the Context."""
         self.parent = parent
         self.graph = g
-        if raw_argvals:
-            self.argkey = argvals
-        else:
-            self.argkey = tuple(tuple(sorted(argv.items()))
-                                for argv in argvals)
+        self.argkey = tuple(tuple(sorted(argv.items()))
+                            for argv in argvals)
         self.parent_cache = dict(parent.parent_cache) if parent else {}
         self.parent_cache[g] = self
 
@@ -462,15 +460,6 @@ class Context:
             and self.parent == other.parent \
             and self.graph == other.graph \
             and self.argkey == other.argkey
-
-    async def __reify__(self):
-        """Reify this Context."""
-        return Context(
-            await reify(self.parent),
-            self.graph,
-            await reify(self.argkey),
-            True
-        )
 
 
 class AbstractReference:
@@ -519,6 +508,10 @@ class Reference(AbstractReference):
     def get_raw(self, track):
         """Get the raw value for the track, which might be wrapped."""
         return self.engine.get_inferred(track, self)
+
+    async def get_shallow(self, track):
+        """Get the raw value for the track, which might be wrapped."""
+        return await reify_shallow(await self.get_raw(track,))
 
     def __eq__(self, other):
         return isinstance(other, Reference) \
@@ -570,17 +563,21 @@ class TransformedReference(AbstractReference):
         self.ref = ref
         self.fn = fn
 
+    async def _parent_raw(self, track_name):
+        track = self.ref.engine.tracks[track_name]
+        return track, await self.ref.get_raw(track_name)
+
     async def get_raw(self, track_name):
         """Get the raw value for the track."""
-        track = self.ref.engine.tracks[track_name]
-        v = await self.ref[track_name]
+        track, v = await self._parent_raw(track_name)
         return self.fn(track, v)
 
     async def __getitem__(self, track_name):
         if track_name == '*':
             raise NotImplementedError('tref["*"]')
         else:
-            return await self.get_raw(track_name)
+            track, v = await self._parent_raw(track_name)
+            return self.fn(track, await reify(v))
 
 
 ########
@@ -669,7 +666,7 @@ class InferenceEngine:
 
         if isinstance(ref, (VirtualReference, TransformedReference)):
             # A VirtualReference already contains the values we need.
-            return await ref[track_name]
+            return await ref.get_raw(track_name)
 
         node = ref.node
         inferred = ref.node.inferred.get(track_name, UNKNOWN)

@@ -117,7 +117,7 @@ class TypeMap(dict):
         handler = None
 
         if issubclass(obj_t, type):
-            mro = [type]
+            mro = [obj_t]
         else:
             mro = obj_t.mro()
 

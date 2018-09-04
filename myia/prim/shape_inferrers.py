@@ -6,7 +6,7 @@ from functools import partial, reduce
 
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer, \
-    InferenceError
+    InferenceError, MyiaTypeError
 from ..ir import Graph, MetaGraph
 
 from ..dtype import Array, Tuple, List, Class, TypeType, ismyiatype, \
@@ -348,7 +348,7 @@ async def infer_shape_distribute(track, v, shape):
     if shp == ANYTHING:
         shp_t = await shape['type']
         shp = (ANYTHING,) * len(shp_t.elements)
-    v_t = await v['type']
+    v_t = await v.get_shallow('type')
     if ismyiatype(v_t, Array):
         v_shp = await v['shape']
         delta = len(shp) - len(v_shp)
@@ -396,22 +396,28 @@ async def infer_shape_dot(track, a, b):
 @shape_inferrer(P.resolve, nargs=2)
 async def infer_shape_resolve(track, data, item):
     """Infer the shape of resolve."""
-    return await static_getter(track, data, item, lambda x, y: x[y])
+    async def on_dcattr(data, data_t, item_v):  # pragma: no cover
+        raise MyiaTypeError('Cannot resolve on Class.')
+
+    return await static_getter(
+        track, data, item,
+        fetch=operator.getitem,
+        on_dcattr=on_dcattr
+    )
 
 
 @shape_inferrer(P.getattr, nargs=2)
 async def infer_shape_getattr(track, data, item):
     """Infer the shape of getattr."""
-    data_typ = await data['type']
-    if ismyiatype(data_typ, Class):
-        item_v = await item['value']
-        if item_v is ANYTHING:
-            raise InferenceError(
-                "getattr with non-constant item")  # pragma: no cover
-        if item_v in data_typ.attributes:
-            data_sh = await data['shape']
-            return data_sh.shape[item_v]
-    return await static_getter(track, data, item, getattr)
+    async def on_dcattr(data, data_t, item_v):
+        data_sh = await data['shape']
+        return data_sh.shape[item_v]
+
+    return await static_getter(
+        track, data, item,
+        fetch=getattr,
+        on_dcattr=on_dcattr
+    )
 
 
 @shape_inferrer(P.identity, nargs=1)
