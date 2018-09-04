@@ -439,6 +439,7 @@ class Context:
                             for argv in argvals)
         self.parent_cache = dict(parent.parent_cache) if parent else {}
         self.parent_cache[g] = self
+        self._hash = hash((self.parent, self.graph, self.argkey))
 
     def filter(self, graph):
         """Return a context restricted to a graph's dependencies."""
@@ -453,7 +454,7 @@ class Context:
         return Context(parent, graph, argvals)
 
     def __hash__(self):
-        return hash((self.parent, self.graph, self.argkey))
+        return self._hash
 
     def __eq__(self, other):
         return type(other) is Context \
@@ -486,6 +487,7 @@ class Reference(AbstractReference):
         self.engine = engine
         g = node.value if node.is_constant_graph() else node.graph
         self.context = context.filter(g)
+        self._hash = hash((self.node, self.context))
 
     async def __getitem__(self, track):
         """Get the value for the track (asynchronous).
@@ -519,7 +521,7 @@ class Reference(AbstractReference):
             and self.context == other.context
 
     def __hash__(self):
-        return hash((self.node, self.context))
+        return self._hash
 
 
 class VirtualReference(AbstractReference):
