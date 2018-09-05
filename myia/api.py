@@ -22,6 +22,7 @@ from .specialize import TypeSpecializer
 from .utils import TypeMap, as_frozen, overload
 from .vm import VM
 from .compile import step_wrap_primitives, step_compile, step_link, step_export
+from .validate import validate, whitelist as default_whitelist
 
 
 scalar_object_map = {
@@ -416,6 +417,27 @@ class Specializer(PipelineStep):
         return {'graph': result}
 
 
+class Validator(PipelineStep):
+    """Pipeline step to validate a graph prior to compilation.
+
+    Inputs:
+        graph: The graph to validate.
+
+    Outputs:
+        None.
+    """
+
+    def __init__(self, pipeline_init, whitelist=default_whitelist):
+        """Initialize a Validator."""
+        super().__init__(pipeline_init)
+        self.whitelist = whitelist
+
+    def step(self, graph):
+        """Validate the graph."""
+        validate(graph, whitelist=self.whitelist)
+        return {}
+
+
 class ClosureConverter(PipelineStep):
     """Pipeline step to closure convert a graph.
 
@@ -658,6 +680,9 @@ step_opt = Optimizer.partial(
 )
 
 
+step_validate = Validator.partial()
+
+
 step_cconv = ClosureConverter.partial()
 
 
@@ -685,6 +710,7 @@ _standard_pipeline = PipelineDefinition(
         infer=step_infer,
         specialize=step_specialize,
         opt=step_opt,
+        validate=step_validate,
         cconv=step_cconv,
     )
 )
