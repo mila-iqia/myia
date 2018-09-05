@@ -171,10 +171,7 @@ class PipelineDefinition:
         """
         def run(arg):
             res = self.run(**{in_key: arg})
-            if 'error' in res:
-                raise res['error']
-            else:
-                return res[out_key]
+            return res[out_key]
         return run
 
     def __getitem__(self, item):
@@ -237,7 +234,12 @@ class _PipelineSlice:
         self.pipeline = pipeline
         self.slice = self.pipeline.defn.getslice(slice)
 
-    def __call__(self, **args):
+    def run_and_catch(self, **args):
+        """Run the pipeline and catch errors, if any.
+
+        Errors are put in the 'error' key of the result, and the step
+        at which an error happened is put in the 'error_step' key.
+        """
         for step in self.pipeline._seq[self.slice]:
             if 'error' in args:
                 break
@@ -253,6 +255,12 @@ class _PipelineSlice:
                     args['error'] = e
                     args['error_step'] = step
         return args
+
+    def __call__(self, **args):
+        results = self.run_and_catch(**args)
+        if 'error' in results:
+            raise results['error']
+        return results
 
 
 class PipelineResource(Partializable):

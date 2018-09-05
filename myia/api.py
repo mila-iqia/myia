@@ -803,13 +803,10 @@ class MyiaFunction:
                 arg['value'] = ANYTHING
         key = as_frozen(argspec)
         if key not in self._cache:
-            res = pip(
+            self._cache[key] = pip(
                 input=self.fn,
                 argspec=argspec
             )
-            if 'error' in res:
-                raise res['error']
-            self._cache[key] = res
         return self._cache[key]
 
     def compile(self, args):

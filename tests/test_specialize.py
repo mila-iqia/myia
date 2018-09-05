@@ -41,8 +41,6 @@ def specializer_decorator(pipeline):
                 result_py = fn(*args)
 
                 res = pip(input=fn, argspec=argspec)
-                if 'error' in res:
-                    raise res['error']
                 g2 = res['graph']
 
                 try:
