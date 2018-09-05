@@ -20,7 +20,8 @@ specialize_pipeline = scalar_debug_pipeline \
 
 
 specialize_pipeline_std = standard_debug_pipeline \
-    .select('parse', 'infer', 'specialize', 'opt', 'export', 'wrap') \
+    .select('parse', 'infer', 'specialize',
+            'prepare', 'opt', 'export', 'wrap') \
     .configure(
         {'infer.tracks.value.max_depth': 1}
     )

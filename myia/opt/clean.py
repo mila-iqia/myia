@@ -98,15 +98,3 @@ def erase_class(root, manager):
 
     for node in manager.all_nodes:
         node.type = _retype(node.type)
-
-
-class EraseClass:
-    """Remove the Class type from graphs."""
-
-    def __init__(self, optimizer):
-        """Initialize EraseClass."""
-        self.optimizer = optimizer
-
-    def __call__(self, root):
-        """Remove the Class type from graphs."""
-        erase_class(root, self.optimizer.resources.manager)

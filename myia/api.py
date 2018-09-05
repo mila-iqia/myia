@@ -12,7 +12,7 @@ from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
 from .infer import InferenceEngine, ANYTHING
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
-    EraseClass
+    erase_class
 from .pipeline import PipelineStep, PipelineResource, PipelineDefinition
 from .prim import py_implementations, vm_implementations, ops as P
 from .prim.value_inferrers import ValueTrack, value_inferrer_constructors
@@ -417,6 +417,30 @@ class Specializer(PipelineStep):
         return {'graph': result}
 
 
+class Preparator(PipelineStep):
+    """Pipeline step to prepare the graph to optimization.
+
+    This should be run on the specialized graph.
+
+    Inputs:
+        graph: The graph to prepare.
+
+    Outputs:
+        graph: The prepared graph.
+    """
+
+    def __init__(self, pipeline_init, erase_classes=True):
+        """Initialize a Preparator."""
+        super().__init__(pipeline_init)
+        self.erase_classes = erase_classes
+
+    def step(self, graph):
+        """Prepare the graph."""
+        if self.erase_classes:
+            erase_class(graph, self.resources.manager)
+        return {'graph': graph}
+
+
 class Validator(PipelineStep):
     """Pipeline step to validate a graph prior to compilation.
 
@@ -666,8 +690,13 @@ step_infer = Inferrer.partial(
 step_specialize = Specializer.partial()
 
 
+step_prepare = Preparator.partial(
+    erase_classes=True
+)
+
+
 step_opt = Optimizer.partial(
-    pre=[EraseClass],
+    pre=[],
     opts=[
         optlib.simplify_always_true,
         optlib.simplify_always_false,
@@ -709,6 +738,7 @@ _standard_pipeline = PipelineDefinition(
         resolve=step_resolve,
         infer=step_infer,
         specialize=step_specialize,
+        prepare=step_prepare,
         opt=step_opt,
         validate=step_validate,
         cconv=step_cconv,

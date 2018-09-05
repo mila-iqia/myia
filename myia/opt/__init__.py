@@ -12,5 +12,5 @@ from .cse import (  # noqa
 )
 
 from .clean import (  # noqa
-    EraseClass
+    erase_class
 )
