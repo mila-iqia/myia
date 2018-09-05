@@ -853,4 +853,5 @@ class GraphTransaction:
         return self
 
     def __exit__(self, type, value, tb):
-        self.commit()
+        if type is None:
+            self.commit()
