@@ -258,29 +258,23 @@ class ANFNode(Node):
 
     def is_apply(self, value: Any = None) -> bool:
         """Return whether self is an Apply."""
-        if isinstance(self, Apply):
-            if value is not None:
-                fn = self.inputs[0]
-                return fn.is_constant() and fn.value is value
-            else:
-                return True
         return False
 
     def is_parameter(self) -> bool:
         """Return whether self is a Parameter."""
-        return isinstance(self, Parameter)
+        return False
 
     def is_constant(self, cls: Any = object) -> bool:
         """Return whether self is a Constant, with value of given cls."""
-        return isinstance(self, Constant) and isinstance(self.value, cls)
+        return False
 
     def is_constant_graph(self) -> bool:
         """Return whether self is a Constant with a Graph value."""
-        return self.is_constant(Graph)
+        return False
 
     def is_special(self, cls: Any = object) -> bool:
         """Return whether self is a Special, with value of given cls."""
-        return isinstance(self, Special) and isinstance(self.special, cls)
+        return False
 
 
 class Apply(ANFNode):
@@ -293,6 +287,14 @@ class Apply(ANFNode):
     def __init__(self, inputs: List[ANFNode], graph: 'Graph') -> None:
         """Construct an application."""
         super().__init__(inputs, APPLY, graph)
+
+    def is_apply(self, value: Any = None) -> bool:
+        """Return whether self is an Apply."""
+        if value is not None:
+            fn = self.inputs[0]
+            return fn.is_constant() and fn.value is value
+        else:
+            return True
 
     def __visit__(self, fn):
         new_inputs = expandlist(map(fn, self.inputs))
@@ -318,6 +320,10 @@ class Parameter(ANFNode):
     def __init__(self, graph: Graph) -> None:
         """Construct the parameter."""
         super().__init__([], PARAMETER, graph)
+
+    def is_parameter(self):
+        """Return whether self is a Parameter."""
+        return True
 
     def __visit__(self, fn):
         g = noseq(fn, self.graph)
@@ -352,6 +358,14 @@ class Constant(ANFNode):
         """Construct a literal."""
         super().__init__([], value, None)
 
+    def is_constant(self, cls: Any = object) -> bool:
+        """Return whether self is a Constant, with value of given cls."""
+        return isinstance(self.value, cls)
+
+    def is_constant_graph(self) -> bool:
+        """Return whether self is a Constant with a Graph value."""
+        return self.is_constant(Graph)
+
     def __visit__(self, fn):
         ct = Constant(noseq(fn, self.value))
         ct.type = self.type
@@ -382,6 +396,10 @@ class Special(ANFNode):
         """Initialize a special node."""
         super().__init__([], SPECIAL, graph)
         self.special = special
+
+    def is_special(self, cls: Any = object) -> bool:
+        """Return whether self is a Special, with value of given cls."""
+        return isinstance(self.special, cls)
 
     def __str__(self) -> str:
         return str(self.special)  # pragma: no cover

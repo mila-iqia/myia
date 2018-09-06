@@ -3,7 +3,7 @@ import pytest
 
 from myia import operations
 from myia.api import scalar_pipeline
-from myia.ir import ANFNode, Constant, isomorphic, GraphCloner
+from myia.ir import Constant, isomorphic, GraphCloner
 from myia.opt import PatternSubstitutionOptimization as psub, \
     PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph, \
     cse
@@ -12,7 +12,7 @@ from myia.utils import Merge
 from myia.utils.unify import Var, var
 
 X = Var('X')
-V = var(ANFNode.is_constant)
+V = var(lambda n: n.is_constant())
 
 
 parse = scalar_pipeline \
