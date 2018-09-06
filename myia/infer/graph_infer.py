@@ -287,7 +287,7 @@ class Inferrer(DynamicMap):
         for x, y in self.cache.items():
             y = await reify(y)
             key = tuple([await arg[track] for arg in x
-                        for track in self.engine.tracks])
+                         for track in self.engine.tracks])
             if key in cache and cache[key] != y:
                 # NOTE: It's not completely clear when/why this tends to
                 # happen. It seems to happen for PartialInferrers when
@@ -370,7 +370,7 @@ class GraphInferrer(Inferrer):
         self._graph = graph
         self.broaden = broaden
         if context is None:
-            self.context = Context.empty()
+            self.context = self.engine.context_class.empty()
         else:
             self.context = context.filter(graph)
 
@@ -543,6 +543,35 @@ class Context:
             and self.argkey == other.argkey
 
 
+class Contextless:
+    """Singleton Context which specializes to itself.
+
+    CONTEXTLESS is essentially an empty context that is idempotent under
+    all operations. In practice it maps each node of each graph to a unique
+    type, shape and so on.
+    """
+
+    @classmethod
+    def empty(cls):
+        """Return CONTEXTLESS."""
+        return CONTEXTLESS
+
+    def filter(self, graph):
+        """Return CONTEXTLESS."""
+        return self
+
+    def add(self, graph, argvals):
+        """Return CONTEXTLESS."""
+        return self
+
+    async def __reify__(self):
+        """Return CONTEXTLESS."""
+        return self
+
+
+CONTEXTLESS = Contextless()
+
+
 class AbstractReference:
     """Superclass for Reference and VirtualReference."""
 
@@ -685,7 +714,8 @@ class InferenceEngine:
                  *,
                  tracks,
                  required_tracks=None,
-                 eq_class=EquivalenceChecker):
+                 eq_class=EquivalenceChecker,
+                 context_class=Context):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop()
         self.pipeline = pipeline
@@ -702,6 +732,7 @@ class InferenceEngine:
             loop=self.loop,
             error_callback=self.errors.append
         )
+        self.context_class = context_class
 
     def run(self, graph, argvals):
         """Run the inferrer on a graph given initial values.
@@ -716,7 +747,7 @@ class InferenceEngine:
                    for ref in argrefs]
 
         self.mng.add_graph(graph)
-        empty_context = Context.empty()
+        empty_context = self.context_class.empty()
         root_context = empty_context.add(graph, argvals)
         output_ref = self.ref(graph.return_, root_context)
 
