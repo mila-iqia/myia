@@ -12,7 +12,7 @@ from myia.utils import Merge
 from myia.utils.unify import Var, var
 
 X = Var('X')
-V = var(ANFNode.is_constant)
+V = var(lambda n: n.is_constant())
 
 
 parse = scalar_pipeline \

@@ -26,16 +26,25 @@ Y1 = Var('Y1')
 X2 = Var('X2')
 Y2 = Var('Y2')
 
-C = var(ANFNode.is_constant)
-C1 = var(ANFNode.is_constant)
-C2 = var(ANFNode.is_constant)
+
+def _is_c(n):
+    return n.is_constant()
+
+
+def _is_cg(n):
+    return n.is_constant_graph()
+
+
+C = var(_is_c)
+C1 = var(_is_c)
+C2 = var(_is_c)
 CNS = var(lambda x: x.is_constant(Namespace))
-G = var(ANFNode.is_constant_graph)
+G = var(_is_cg)
 NIL = var(lambda x: x.is_constant() and x.value == ())
 
 Xs = SVar(Var())
 Ys = SVar(Var())
-Cs = SVar(var(ANFNode.is_constant))
+Cs = SVar(var(_is_c))
 
 
 def primset_var(*prims):
