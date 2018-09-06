@@ -39,10 +39,12 @@ class NodeLabeler:
 
     def __init__(self,
                  function_in_node=True,
-                 relation_symbols={}):
+                 relation_symbols={},
+                 default_name=lambda dbg: f'#{dbg.id}'):
         """Initialize a NodeLabeler."""
         self.function_in_node = function_in_node
         self.relation_symbols = relation_symbols
+        self.default_name = default_name
 
     def combine_relation(self, name, relation):
         """Combine a name and a relation in a single string."""
@@ -77,7 +79,7 @@ class NodeLabeler:
                     node.about.relation
                 )
             elif force:
-                return f'#{node.id}'
+                return self.default_name(node)
             else:
                 return None
         else:
@@ -135,11 +137,17 @@ short_labeler = NodeLabeler(
 )
 
 
-def label(x):
+default_labeler = NodeLabeler(
+    relation_symbols=short_relation_symbols,
+    default_name=lambda dbg: dbg.debug_name
+)
+
+
+def label(x, labeler=default_labeler):
     """Return an informative textual label for a node."""
     if isinstance(x, Primitive):
         return x.name
     elif isinstance(x, (ANFNode, Graph, DebugInfo)):
-        return short_labeler.name(x)
+        return labeler.name(x, True)
     else:
         return repr(x)

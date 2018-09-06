@@ -25,7 +25,7 @@ PARAMETER = Named('PARAMETER')
 SPECIAL = Named('SPECIAL')
 APPLY = Named('APPLY')
 
-LITERALS = (bool, int, str, float)
+LITERALS = (bool, int, str, float, Primitive)
 
 
 class Graph:
@@ -191,10 +191,11 @@ class Graph:
     #################
 
     def __str__(self) -> str:
-        return self.debug.debug_name
+        from ..debug.label import label
+        return label(self)
 
     def __repr__(self) -> str:
-        return repr_(self, name=self.debug.debug_name,
+        return repr_(self, name=str(self),
                      parameters=list_str(self.parameters),
                      return_=self.return_)
 
@@ -248,7 +249,8 @@ class ANFNode(Node):
         return iter(self.inputs)
 
     def __str__(self) -> str:
-        return self.debug.debug_name
+        from ..debug.label import label
+        return label(self)
 
     ##########
     # Checks #
@@ -356,9 +358,9 @@ class Constant(ANFNode):
         return ct
 
     def __str__(self) -> str:
-        if isinstance(self.value, LITERALS):
-            return str(self.value)
-        return super().__str__()
+        if isinstance(self.value, LITERALS) or isinstance(self.value, Graph):
+            return f'_constant:{self.value}'
+        return super().__str__()  # pragma: no cover
 
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, value=self.value)
