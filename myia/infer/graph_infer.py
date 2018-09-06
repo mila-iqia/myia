@@ -11,7 +11,7 @@ from ..utils import Partializable, UNKNOWN, eprint
 from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify, \
     reify_shallow
 from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, \
-    infer_trace
+    infer_trace, Unspecializable, DEAD, POLY, AMBIGUOUS
 
 
 def type_error_nargs(ident, expected, got):
@@ -228,6 +228,28 @@ class Track(Partializable):
 ####################
 
 
+async def _concretize_type_helper(t, argrefs=None):
+    if isinstance(t, Inferrer):
+        return await t.as_function_type(argrefs)
+    else:
+        return await reify(t)
+
+
+async def concretize_type(ref, argrefs=None):
+    """Return the type of ref, resolving all Inferrer instances.
+
+    Inferrer instances are resolved to Function types if possible. If an
+    error occurs, this will return a Problem type.
+
+    Arguments:
+        ref: Either a Reference or an Inferrer.
+        argrefs: References for the arguments passed to the Inferrer at
+            the relevant call site.
+    """
+    t = (await ref['type']) if isinstance(ref, AbstractReference) else ref
+    return await _concretize_type_helper(t, argrefs)
+
+
 class Inferrer(DynamicMap):
     """Infer a property of the output of an operation.
 
@@ -246,6 +268,64 @@ class Inferrer(DynamicMap):
         self.track = track
         self.engine = track.engine
         self.identifier = identifier
+
+    async def get_unique_argrefs(self):
+        """If possible, return a unique tuple of argrefs this was called on.
+
+        Raises Unspecializable if it is not possible to get a single tuple
+        of argrefs:
+
+          * Unspecializable(DEAD) if the Inferrer was never called.
+          * Unspecializable(POLY) if the Inferrer was called with at least
+            two incompatible tuple of argrefs.
+          * Unspecializable(AMBIGUOUS) in some obscure edge cases that we
+            currently do not concern ourselves with.
+        """
+        # The cache works using References, but if two references have
+        # the same inferred type/value/etc., we can merge their entries.
+        cache = {}
+        for x, y in self.cache.items():
+            y = await reify(y)
+            key = tuple([await arg[track] for arg in x
+                        for track in self.engine.tracks])
+            if key in cache and cache[key] != y:
+                # NOTE: It's not completely clear when/why this tends to
+                # happen. It seems to happen for PartialInferrers when
+                # the differentiation is downstream, so in practice the
+                # Problem node caused by this exception does not end up
+                # in the final graph.
+                raise Unspecializable(AMBIGUOUS)
+            cache[key] = y
+
+        if len(cache) == 0:
+            raise Unspecializable(DEAD)
+        elif len(cache) == 1:
+            (argrefs, res), *_ = self.cache.items()
+            return argrefs
+        else:
+            raise Unspecializable(POLY)
+
+    async def as_function_type(self, argrefs=None):
+        """Return a Function type corresponding to this Inferrer.
+
+        Raises Unspecializable if this is not possible, e.g. if argrefs
+        are not given and the Inferrer was called multiple times on
+        different types.
+
+        Arguments:
+            argrefs: The argrefs the Inferrer was called on at the
+                call site for which we need a Function. If None,
+                we try to find suitable argrefs.
+        """
+        if argrefs is None:
+            try:
+                argrefs = await self.get_unique_argrefs()
+            except Unspecializable as e:
+                return e.args[0]
+        cached = self.cache[tuple(argrefs)]
+        return Function[[await concretize_type(argref)
+                         for argref in argrefs],
+                        await _concretize_type_helper(cached)]
 
 
 class PrimitiveInferrer(Inferrer):

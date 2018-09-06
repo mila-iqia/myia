@@ -2,9 +2,9 @@
 
 from .dtype import Array, Tuple, List, Function, Type, Number, Bool, Problem, \
     TypeMeta
+from .infer import DEAD
 from .ir import manage
 from .prim import Primitive, ops as P
-from .specialize import DEAD
 from .utils import overload
 
 

@@ -20,6 +20,7 @@ from .graph_infer import (  # noqa
     PrimitiveInferrer,
     PartialInferrer,
     register_inferrer,
+    concretize_type,
 )
 
 from .utils import (  # noqa
@@ -29,4 +30,9 @@ from .utils import (  # noqa
     MyiaShapeError,
     ValueWrapper,
     unwrap,
+    Unspecializable,
+    DEAD,
+    POLY,
+    AMBIGUOUS,
+    INACCESSIBLE,
 )
