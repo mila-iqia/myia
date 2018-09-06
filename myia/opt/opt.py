@@ -111,7 +111,7 @@ class PatternSubstitutionOptimization:
 
         """
         equiv = self.unif.unify(node, self.pattern)
-        if equiv:
+        if equiv is not None:
             if callable(self.replacement):
                 return self.replacement(optimizer, node, equiv)
             else:
