@@ -3,7 +3,7 @@ import pytest
 
 from myia import operations
 from myia.api import scalar_pipeline
-from myia.ir import ANFNode, Constant, isomorphic, GraphCloner
+from myia.ir import Constant, isomorphic, GraphCloner
 from myia.opt import PatternSubstitutionOptimization as psub, \
     PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph, \
     cse

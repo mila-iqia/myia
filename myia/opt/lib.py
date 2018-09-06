@@ -1,8 +1,7 @@
 """Library of optimizations."""
 
 from ..graph_utils import dfs
-from ..ir import ANFNode, succ_incoming, freevars_boundary, \
-    Graph, Constant, GraphCloner
+from ..ir import succ_incoming, freevars_boundary, Graph, Constant, GraphCloner
 from ..prim import Primitive, ops as P
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
