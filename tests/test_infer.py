@@ -1,8 +1,8 @@
 
+import pytest
 import operator
 import numpy as np
 
-from pytest import mark
 from types import SimpleNamespace
 
 from myia.api import scalar_pipeline, standard_pipeline
@@ -191,9 +191,6 @@ def inferrer_decorator(pipeline):
                     })
 
                     res = pip.make()(input=fn, argspec=args)
-                    if 'error' in res:
-                        raise res['error']
-
                     rval = res['inference_results']
 
                     print('Output of inferrer:')
@@ -220,7 +217,7 @@ def inferrer_decorator(pipeline):
                         print_inference_error(e)
                         raise
 
-            m = mark.parametrize('spec', list(tests))(run_test)
+            m = pytest.mark.parametrize('spec', list(tests))(run_test)
             m.__orig__ = fn
             return m
 
@@ -1526,10 +1523,6 @@ def test_forced_type():
                     [{'type': i64}, {'type': f64}]]:
 
         results = pip.run(input=fn, argspec=argspec)
-
-        if 'error' in results:
-            raise results['error']
-
         rval = results['inference_results']
 
         assert rval['type'] == f64
@@ -1555,40 +1548,28 @@ def test_forced_function_type():
         input=fn,
         argspec=[{'type': i64}, {'type': i64}]
     )
-
-    if 'error' in results:
-        raise results['error']
-
     rval = results['inference_results']
 
     assert rval['type'] == f64
 
     # Test mismatch
 
-    results = pip.run(
-        input=fn,
-        argspec=[{'type': i64}, {'type': f64}]
-    )
-
-    assert 'error' in results
-    err = results['error']
-    if not isinstance(err, InferenceError):
-        raise err
+    with pytest.raises(InferenceError):
+        results = pip.run(
+            input=fn,
+            argspec=[{'type': i64}, {'type': f64}]
+        )
 
     # Test narg mismatch
 
     def fn2(x):
         return fn(x)
 
-    results = pip.run(
-        input=fn2,
-        argspec=[{'type': i64}]
-    )
-
-    assert 'error' in results
-    err = results['error']
-    if not isinstance(err, InferenceError):
-        raise err
+    with pytest.raises(InferenceError):
+        results = pip.run(
+            input=fn2,
+            argspec=[{'type': i64}]
+        )
 
 
 ###########################

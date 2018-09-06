@@ -35,8 +35,6 @@ pip = scalar_pipeline \
 def make(*types):
     def deco(fn):
         res = pip.run(input=fn, argspec=[{'type': t} for t in types])
-        if 'error' in res:
-            raise res['error']
         return res['graph']
     return deco
 
