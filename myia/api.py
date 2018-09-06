@@ -9,7 +9,7 @@ from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
 from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
     Number, tag_to_dataclass, ismyiatype, type_to_np_dtype, TypeMeta
-from .infer import InferenceEngine, ANYTHING
+from .infer import InferenceEngine, Inferrer, ANYTHING
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
     erase_class
@@ -345,7 +345,7 @@ class Optimizer(PipelineStep):
         return {'graph': graph}
 
 
-class Inferrer(PipelineStep):
+class InferrerStep(PipelineStep):
     """Pipeline step to run type/shape/value/etc. inference.
 
     Inputs:
@@ -358,7 +358,7 @@ class Inferrer(PipelineStep):
     """
 
     def __init__(self, pipeline_init, tracks, required_tracks):
-        """Initialize an Inferrer."""
+        """Initialize an InferrerStep."""
         super().__init__(pipeline_init)
         self.tracks = tracks
         self.required_tracks = required_tracks
@@ -456,8 +456,17 @@ class Validator(PipelineStep):
         super().__init__(pipeline_init)
         self.whitelist = whitelist
 
+    async def _eliminate_inferrers(self):
+        for node in self.pipeline.resources.manager.all_nodes:
+            t = node.type
+            if isinstance(t, Inferrer):
+                node.type = await t.as_function_type()
+
     def step(self, graph):
         """Validate the graph."""
+        self.pipeline.steps.infer.engine.run_coroutine(
+            self._eliminate_inferrers()
+        )
         validate(graph, whitelist=self.whitelist)
         return {}
 
@@ -670,7 +679,7 @@ step_resolve = Optimizer.partial(
 )
 
 
-step_infer = Inferrer.partial(
+step_infer = InferrerStep.partial(
     tracks=dict(
         value=ValueTrack.partial(
             constructors=value_inferrer_constructors,
