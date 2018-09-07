@@ -6,7 +6,7 @@ from types import FunctionType
 from ..dtype import ismyiatype, Function
 from ..debug.label import label
 from ..ir import GraphGenerationError
-from ..utils import Partializable, UNKNOWN, eprint
+from ..utils import Partializable, UNKNOWN, eprint, as_frozen
 
 from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify, \
     reify_shallow
@@ -378,13 +378,7 @@ class GraphInferrer(Inferrer):
         """Return the graph to use for the given args."""
         return self._graph
 
-    async def make_context(self, args):
-        """Create a Context object for this graph with these arguments.
-
-        We await on all relevant properties of all arguments in order to
-        build a context (this cannot be done lazily, like with primitives,
-        because we need a concrete context).
-        """
+    async def _make_argkey_and_context(self, args):
         g = await self.make_graph(args)
         argvals = []
         for arg in args:
@@ -397,7 +391,18 @@ class GraphInferrer(Inferrer):
             argvals.append(argval)
 
         # Update current context using the fetched properties.
-        return self.context.add(g, argvals)
+        argkey = as_frozen(argvals)
+        return argkey, self.context.add(g, argkey)
+
+    async def make_context(self, args):
+        """Create a Context object for this graph with these arguments.
+
+        We await on all relevant properties of all arguments in order to
+        build a context (this cannot be done lazily, like with primitives,
+        because we need a concrete context).
+        """
+        _, ctx = await self._make_argkey_and_context(args)
+        return ctx
 
     async def infer(self, *args):
         """Infer a property of the operation on the given arguments."""
@@ -407,11 +412,11 @@ class GraphInferrer(Inferrer):
         if len(args) != nargs:
             raise type_error_nargs(self.identifier, nargs, len(args))
 
-        context = await self.make_context(args)
+        argkey, context = await self._make_argkey_and_context(args)
 
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
-        for p, arg in zip(g.parameters, context.argkey):
+        for p, arg in zip(g.parameters, argkey):
             for track, v in arg:
                 ref = self.engine.ref(p, context)
                 self.engine.cache.set_value((track, ref), v)
@@ -511,12 +516,11 @@ class Context:
         """Create an empty context."""
         return Context(None, None, ())
 
-    def __init__(self, parent, g, argvals):
+    def __init__(self, parent, g, argkey):
         """Initialize the Context."""
         self.parent = parent
         self.graph = g
-        self.argkey = tuple(tuple(sorted(argv.items()))
-                            for argv in argvals)
+        self.argkey = argkey
         self.parent_cache = dict(parent.parent_cache) if parent else {}
         self.parent_cache[g] = self
         self._hash = hash((self.parent, self.graph, self.argkey))
@@ -528,10 +532,10 @@ class Context:
             rval = self.parent_cache.get(graph.parent, None)
         return rval
 
-    def add(self, graph, argvals):
+    def add(self, graph, argkey):
         """Extend this context with values for another graph."""
         parent = self.parent_cache.get(graph.parent, None)
-        return Context(parent, graph, argvals)
+        return Context(parent, graph, argkey)
 
     def __hash__(self):
         return self._hash
@@ -595,7 +599,7 @@ class Reference(AbstractReference):
         self.node = node
         self.engine = engine
         g = node.value if node.is_constant_graph() else node.graph
-        self.context = context.filter(g)
+        self.context = context and context.filter(g)
         self._hash = hash((self.node, self.context))
 
     async def __getitem__(self, track):
@@ -748,7 +752,7 @@ class InferenceEngine:
 
         self.mng.add_graph(graph)
         empty_context = self.context_class.empty()
-        root_context = empty_context.add(graph, argvals)
+        root_context = empty_context.add(graph, as_frozen(argvals))
         output_ref = self.ref(graph.return_, root_context)
 
         async def _run():
