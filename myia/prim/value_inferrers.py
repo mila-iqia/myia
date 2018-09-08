@@ -154,6 +154,10 @@ class ValueTrack(Track):
 
         return self.wrap(inf)
 
+    def from_external(self, v):
+        """Convert a property provided outside the inferrer."""
+        return self.from_value(v, None)
+
     def broaden(self, v):
         """Broaden the value if we reach a certain depth in the stack."""
         if v is ANYTHING:

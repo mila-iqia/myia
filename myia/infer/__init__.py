@@ -19,6 +19,7 @@ from .graph_infer import (  # noqa
     MetaGraphInferrer,
     PrimitiveInferrer,
     PartialInferrer,
+    ExplicitInferrer,
     register_inferrer,
     concretize_type,
 )

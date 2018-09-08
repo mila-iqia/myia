@@ -65,26 +65,6 @@ class Track(Partializable):
             return ANYTHING
 
         argrefs = [self.engine.ref(node, ctx) for node in n_args]
-        if ismyiatype(inf, Function):
-            ngot = len(argrefs)
-            nexpect = len(inf.arguments)
-            if ngot != nexpect:
-                raise MyiaTypeError(
-                    'Wrong number of arguments.'
-                    f' Expected {nexpect}, got {ngot}.',
-                    refs=[],
-                    app=ref
-                )
-            for got, aref in zip(inf.arguments, argrefs):
-                expect = await aref[self.name]
-                if expect != got:
-                    raise MyiaTypeError(
-                        'Type mismatch.'
-                        f' Expected {expect}, got {got}.',
-                        refs=[aref],
-                        app=ref
-                    )
-            return inf.retval
 
         if not isinstance(inf, Inferrer):
             raise MyiaTypeError(
@@ -107,6 +87,10 @@ class Track(Partializable):
     def from_value(self, v, context=None):
         """Get the property from a value in the context."""
         raise NotImplementedError()  # pragma: no cover
+
+    def from_external(self, v):
+        """Convert a property provided outside the inferrer."""
+        return v
 
     def broaden(self, v):
         """Broaden the value for use in a graph's signature."""
@@ -482,6 +466,34 @@ class PartialInferrer(Inferrer):
                 self.fn.provably_equivalent(other.fn))
 
 
+class ExplicitInferrer(Inferrer):
+    """Requires specific input types and returns a specific output type."""
+
+    def __init__(self, track, argvals, retval):
+        """Initialize ExplicitInferrer."""
+        super().__init__(track, None)
+        self.argvals = argvals
+        self.retval = retval
+
+    async def infer(self, *args):
+        """Check arguments and return return type."""
+        ngot = len(args)
+        nexpect = len(self.argvals)
+        if ngot != nexpect:
+            raise MyiaTypeError(
+                'Wrong number of arguments.'
+                f' Expected {nexpect}, got {ngot}.',
+                refs=[],
+            )
+        for got, aref in zip(self.argvals, args):
+            self.engine.equiv.declare_equivalent(
+                got,
+                aref[self.track.name],
+                refs=[aref]
+            )
+        return self.retval
+
+
 def register_inferrer(*prims, nargs, constructors):
     """Define a PrimitiveInferrer for prims with nargs arguments.
 
@@ -789,6 +801,7 @@ class InferenceEngine:
         inferred = ref.node.inferred.get(track_name, UNKNOWN)
 
         if inferred is not UNKNOWN:
+            inferred = track.from_external(inferred)
             return inferred
 
         elif node.is_constant():

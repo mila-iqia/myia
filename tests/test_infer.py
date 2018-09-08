@@ -1441,6 +1441,15 @@ def test_call_argument(f, x):
 
 
 @infer(type=[
+    (F[[F[[f64], f64]], f64], f64),
+])
+def test_call_argument_higher_order(f):
+    def g(y):
+        return y + y
+    return f(g)
+
+
+@infer(type=[
     (i64, i16),
 ])
 def test_unif_tricks(x):

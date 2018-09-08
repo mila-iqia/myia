@@ -378,8 +378,14 @@ class InferrerStep(PipelineStep):
             if 'value' in arg:
                 v = arg['value']
                 for track_name, track in self.engine.tracks.items():
-                    if track_name not in arg or track_name == 'value':
+                    if track_name not in arg:
                         arg[track_name] = track.from_value(v, None)
+                    else:
+                        arg[track_name] = track.from_external(arg[track_name])
+            else:
+                for track_name, track in self.engine.tracks.items():
+                    if track_name in arg:
+                        arg[track_name] = track.from_external(arg[track_name])
 
     def step(self, graph, argspec):
         """Infer types, shapes, values, etc. for the graph."""
