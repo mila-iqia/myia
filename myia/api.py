@@ -9,7 +9,8 @@ from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
 from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
     Number, tag_to_dataclass, ismyiatype, type_to_np_dtype, TypeMeta
-from .infer import InferenceEngine, Inferrer, ANYTHING
+from .infer import InferenceEngine, Inferrer, ANYTHING, \
+    Context, Contextless, CONTEXTLESS
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
     erase_class
@@ -357,15 +358,21 @@ class InferrerStep(PipelineStep):
         inferrer: The inference engine.
     """
 
-    def __init__(self, pipeline_init, tracks, required_tracks):
+    def __init__(self,
+                 pipeline_init,
+                 tracks,
+                 required_tracks,
+                 context_class):
         """Initialize an InferrerStep."""
         super().__init__(pipeline_init)
         self.tracks = tracks
         self.required_tracks = required_tracks
+        self.context_class = context_class
         self.engine = InferenceEngine(
             self.pipeline,
             tracks=self.tracks,
             required_tracks=self.required_tracks,
+            context_class=self.context_class,
         )
 
     def fill_in(self, argspec):
@@ -470,7 +477,7 @@ class Validator(PipelineStep):
 
     def step(self, graph):
         """Validate the graph."""
-        self.pipeline.steps.infer.engine.run_coroutine(
+        self.pipeline.resources.live_infer.engine.run_coroutine(
             self._eliminate_inferrers()
         )
         validate(graph, whitelist=self.whitelist)
@@ -699,6 +706,7 @@ step_infer = InferrerStep.partial(
         )
     ),
     required_tracks=['type'],
+    context_class=Context,
 )
 
 
@@ -747,6 +755,22 @@ _standard_pipeline = PipelineDefinition(
             object_map=standard_object_map,
             converter=default_convert
         ),
+        live_infer=InferrerStep.partial(
+            tracks=dict(
+                value=ValueTrack.partial(
+                    constructors=value_inferrer_constructors,
+                    max_depth=1
+                ),
+                type=TypeTrack.partial(
+                    constructors=type_inferrer_constructors
+                ),
+                shape=ShapeTrack.partial(
+                    constructors=shape_inferrer_constructors
+                )
+            ),
+            required_tracks=['type'],
+            context_class=Contextless,
+        )
     ),
     steps=dict(
         parse=step_parse,
