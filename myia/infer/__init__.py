@@ -11,6 +11,8 @@ from .core import (  # noqa
 
 from .graph_infer import (  # noqa
     Context,
+    Contextless,
+    CONTEXTLESS,
     Track,
     InferenceEngine,
     Reference,
