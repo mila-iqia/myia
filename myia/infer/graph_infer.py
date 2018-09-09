@@ -584,6 +584,12 @@ class Contextless:
         """Return CONTEXTLESS."""
         return self
 
+    def __str__(self):
+        return 'CONTEXTLESS'
+
+    def __repr__(self):
+        return 'CONTEXTLESS'
+
 
 CONTEXTLESS = Contextless()
 
