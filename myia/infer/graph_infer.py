@@ -474,6 +474,9 @@ class ExplicitInferrer(Inferrer):
         super().__init__(track, None)
         self.argvals = argvals
         self.retval = retval
+        refs = [track.engine.vref({track.name: v})
+                for v in argvals]
+        self.cache[tuple(refs)] = retval
 
     async def infer(self, *args):
         """Check arguments and return return type."""
@@ -817,10 +820,7 @@ class InferenceEngine:
             return await track.infer_apply(ref)
 
         else:
-            # Values for Parameters are cached when we enter a Graph.
-            raise AssertionError(
-                f'Cannot process: {node} in track "{track_name}"'
-            )
+            return track.default({})
 
     def get_inferred(self, track, ref):
         """Get a Future for the value of the Reference on the given track.

@@ -3,15 +3,20 @@ import pytest
 
 from myia import operations
 from myia.api import scalar_pipeline
+from myia.infer import InferenceError
 from myia.ir import Constant, isomorphic, GraphCloner
 from myia.opt import PatternSubstitutionOptimization as psub, \
     PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph, \
-    cse
+    cse, lib
 from myia.prim import Primitive, ops as prim
 from myia.utils import Merge
 from myia.utils.unify import Var, var
 
+from ..common import i64
+
+
 X = Var('X')
+Y = Var('Y')
 V = var(lambda n: n.is_constant())
 
 
@@ -316,3 +321,52 @@ def test_cse():
         return d
 
     helper(f2, 12, 8)
+
+
+opt_ok = psub(
+    (prim.scalar_add, X, Y),
+    (prim.scalar_mul, X, Y),
+    name='opt_ok'
+)
+
+
+opt_err1 = psub(
+    (prim.scalar_sub, X, Y),
+    (prim.scalar_lt, X, Y),
+    name='opt_err1'
+)
+
+
+opt_err2 = psub(
+    prim.scalar_div,
+    prim.scalar_lt,
+    name='opt_err2'
+)
+
+
+def test_type_tracking():
+
+    pip = scalar_pipeline \
+        .select('parse', 'infer', 'specialize',
+                'prepare', 'opt', 'validate') \
+        .configure({
+            'opt.opts': [opt_ok, opt_err1, opt_err2],
+            'prepare.watch': True
+        })
+
+    def fn1(x, y):
+        return x + y
+
+    res = pip.run(input=fn1, argspec=({'type': i64}, {'type': i64}))
+
+    def fn2(x, y):
+        return x - y
+
+    with pytest.raises(InferenceError):
+        res = pip.run(input=fn2, argspec=({'type': i64}, {'type': i64}))
+
+    def fn3(x, y):
+        return x / y
+
+    with pytest.raises(InferenceError):
+        res = pip.run(input=fn3, argspec=({'type': i64}, {'type': i64}))

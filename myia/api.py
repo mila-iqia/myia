@@ -9,7 +9,7 @@ from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
 from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
     Number, tag_to_dataclass, ismyiatype, type_to_np_dtype, TypeMeta
-from .infer import InferenceEngine, Inferrer, ANYTHING, \
+from .infer import InferenceEngine, Inferrer, ANYTHING, Reference, \
     Context, Contextless, CONTEXTLESS
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
@@ -20,7 +20,7 @@ from .prim.value_inferrers import ValueTrack, value_inferrer_constructors
 from .prim.type_inferrers import TypeTrack, type_inferrer_constructors
 from .prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
 from .specialize import TypeSpecializer
-from .utils import TypeMap, as_frozen, overload
+from .utils import TypeMap, as_frozen, overload, UNKNOWN
 from .vm import VM
 from .compile import step_wrap_primitives, step_compile, step_link, step_export
 from .validate import validate, whitelist as default_whitelist
@@ -442,15 +442,55 @@ class Preparator(PipelineStep):
         graph: The prepared graph.
     """
 
-    def __init__(self, pipeline_init, erase_classes=True):
+    def __init__(self, pipeline_init, erase_classes=True, watch=False):
         """Initialize a Preparator."""
         super().__init__(pipeline_init)
         self.erase_classes = erase_classes
+        self.watch = watch
+        self.inferrer = self.pipeline.resources.live_infer.engine
+
+    async def _update_type(self, node, _x=True):
+        ref = Reference(self.inferrer, node, CONTEXTLESS)
+        node.inferred.clear()
+        inferred = await ref['*']
+        for track_name, expected in node.expect_inferred.items():
+            if expected is not UNKNOWN and track_name in inferred:
+                result = inferred[track_name]
+                track = self.inferrer.tracks[track_name]
+                expected = track.from_external(expected)
+                self.inferrer.equiv.declare_equivalent(result, expected, [ref])
+        node.inferred.update(inferred)
+
+    def _on_add_node(self, event, node):
+        self.inferrer.run_coroutine(self._update_type(node))
+
+    def _on_drop_node(self, event, *args):
+        pass
+
+    def _on_add_graph(self, event, *args):
+        pass
+
+    def _on_drop_graph(self, event, *args):
+        pass
+
+    def _on_add_edge(self, event, src, key, dest):
+        pass
+
+    def _on_drop_edge(self, event, *args):
+        pass
 
     def step(self, graph):
         """Prepare the graph."""
+        mng = self.resources.manager
         if self.erase_classes:
-            erase_class(graph, self.resources.manager)
+            erase_class(graph, mng)
+        if self.watch:
+            mng.events.add_node.register(self._on_add_node)
+            mng.events.drop_node.register(self._on_drop_node)
+            mng.events.add_graph.register(self._on_add_graph)
+            mng.events.drop_graph.register(self._on_drop_graph)
+            mng.events.add_edge.register(self._on_add_edge)
+            mng.events.drop_edge.register(self._on_drop_edge)
         return {'graph': graph}
 
 
