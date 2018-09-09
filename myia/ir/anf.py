@@ -232,6 +232,7 @@ class ANFNode(Node):
         self.graph = graph
         self.debug = NamedDebugInfo(self)
         self.inferred = defaultdict(lambda: UNKNOWN)
+        self.expect_inferred = defaultdict(lambda: UNKNOWN)
 
     @property
     def type(self):
