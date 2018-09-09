@@ -162,7 +162,7 @@ class Validator:
             self._test(node, self._validate_oper)
             self._test(node, self._validate_consistency)
         if self.errors:
-            errset = {f'* {err.args[0]}' for err in self.errors}
+            errset = {f'* {err.node} -- {err.args[0]}' for err in self.errors}
             errlist = "\n".join(sorted(errset))
             err = ValidationError(f'The graph is not valid:\n\n{errlist}')
             err.errors = self.errors
