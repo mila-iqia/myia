@@ -521,14 +521,14 @@ class Unification:
             else:
                 raise UnificationError("SVars in both sides of the match")
 
-        if sv != -1:
+        if sv != -1 and len(values_w) >= len(values_v) - 1:
             wb = values_w[:sv]
             diff = len(values_w) - len(values_v) + 1
             wm = Seq(values_w[sv:sv+diff])
             we = values_w[sv+diff:]
             values_w = wb + [wm] + we
 
-        if sw != -1:
+        if sw != -1 and len(values_v) >= len(values_w) - 1:
             vb = values_v[:sw]
             diff = len(values_v) - len(values_w) + 1
             vm = Seq(values_v[sw:sw+diff])
