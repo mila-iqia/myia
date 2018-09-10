@@ -596,9 +596,9 @@ class Unification:
         """
         v = self._getvar(v)
         if v in equiv:
-            v = equiv[v]
+            return equiv[v]
 
         try:
-            return self.visit(lambda u: self.reify(self._getvar(u), equiv), v)
+            return self.visit(lambda u: self.reify(u, equiv), v)
         except VisitError:
             return v
