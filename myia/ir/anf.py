@@ -244,6 +244,16 @@ class ANFNode(Node):
         self.inferred['type'] = value
 
     @property
+    def shape(self):
+        """Return the node's shape."""
+        return self.inferred['shape']
+
+    @shape.setter
+    def shape(self, value):
+        """Set the node's shape."""
+        self.inferred['shape'] = value
+
+    @property
     def incoming(self) -> Iterable['ANFNode']:
         """Return incoming nodes in order."""
         return iter(self.inputs)
