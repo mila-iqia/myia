@@ -2,7 +2,7 @@
 
 from copy import copy
 
-from .anf import Apply, Constant, Graph
+from .anf import Apply, Constant, Graph, Parameter
 from ..info import About
 from .manager import manage
 
@@ -110,11 +110,21 @@ class GraphCloner:
         for node in mng.nodes[graph]:
             if node in self.repl:
                 continue
-            with About(node.debug, self.relation):
-                new = Apply([], target_graph)
-                new.inferred = copy(node.inferred)
-                self.repl[node] = new
-                self.nodes.append((node, new))
+            if node.is_parameter():
+                # This should not happend for valid graphs, but clone
+                # is also used for debugging to if we can avoid failing
+                # that is good.
+                with About(node.debug, self.relation):
+                    p2 = Parameter(target_graph)
+                    p2.inferred = copy(node.inferred)
+                    self.repl[node] = p2
+            else:
+                assert node.is_apply()
+                with About(node.debug, self.relation):
+                    new = Apply([], target_graph)
+                    new.inferred = copy(node.inferred)
+                    self.repl[node] = new
+                    self.nodes.append((node, new))
 
         if not inline:
             target_graph.return_ = self.repl[graph.return_]
