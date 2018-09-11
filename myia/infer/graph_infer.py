@@ -822,6 +822,9 @@ class InferenceEngine:
         else:
             return track.default({})
 
+    def invalidate(self, track, ref):
+        return self.cache.invalidate((track, ref))
+
     def get_inferred(self, track, ref):
         """Get a Future for the value of the Reference on the given track.
 

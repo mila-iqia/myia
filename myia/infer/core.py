@@ -177,6 +177,15 @@ class EvaluationCache:
         fut.set_result(value)
         self.cache[key] = fut
 
+    async def invalidate(self, key):
+        """Invalidate the current key in the cache and return the old value.
+
+        Raises KeyError if the key wasn't in the cache to begin with.
+        """
+        v = self.cache[key]
+        del self.cache[key]
+        return await v
+
 
 class EquivalenceChecker:
     """Handle equivalence between values."""
