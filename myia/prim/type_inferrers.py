@@ -5,10 +5,11 @@ from functools import partial
 from operator import getitem
 
 from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
-    TypeType, Class, Function, TypeMeta, External, pytype_to_myiatype
+    TypeType, Class, Function, TypeMeta, External, pytype_to_myiatype, \
+    Problem
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track, MetaGraphInferrer, \
-    ExplicitInferrer
+    ExplicitInferrer, Inferrer
 from ..ir import Graph, MetaGraph
 from ..utils import Namespace, RestrictedVar, is_dataclass_type, overload
 
@@ -67,7 +68,8 @@ def _import_type(track, t: Class):
 
 
 @overload  # noqa: F811
-def _import_type(track, t: (Bool, Number, Array, TypeType, External)):
+def _import_type(track, t: (Bool, Number, Array, Problem,
+                            TypeType, External, Inferrer)):
     return t
 
 
