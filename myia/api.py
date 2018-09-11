@@ -8,9 +8,10 @@ from types import FunctionType
 from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
 from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
-    Number, tag_to_dataclass, ismyiatype, type_to_np_dtype, TypeMeta
+    Number, Problem, tag_to_dataclass, ismyiatype, type_to_np_dtype, \
+    TypeMeta
 from .infer import InferenceEngine, Inferrer, ANYTHING, Reference, \
-    Context, Contextless, CONTEXTLESS
+    Context, Contextless, CONTEXTLESS, reify
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
     erase_class
@@ -442,7 +443,7 @@ class Preparator(PipelineStep):
         graph: The prepared graph.
     """
 
-    def __init__(self, pipeline_init, erase_classes=True, watch=False):
+    def __init__(self, pipeline_init, erase_classes=True, watch=True):
         """Initialize a Preparator."""
         super().__init__(pipeline_init)
         self.erase_classes = erase_classes
@@ -450,15 +451,24 @@ class Preparator(PipelineStep):
         self.inferrer = self.pipeline.resources.live_infer.engine
 
     async def _update_type(self, node, _x=True):
-        ref = Reference(self.inferrer, node, CONTEXTLESS)
-        node.inferred.clear()
-        inferred = await ref['*']
-        for track_name, expected in node.expect_inferred.items():
-            if expected is not UNKNOWN and track_name in inferred:
-                result = inferred[track_name]
-                track = self.inferrer.tracks[track_name]
-                expected = track.from_external(expected)
+        ref = self.inferrer.ref(node, CONTEXTLESS)
+        inferred = {}
+        for track_name, track in self.inferrer.tracks.items():
+            if track_name != 'type':
+                continue
+            try:
+                previous = await self.inferrer.invalidate(track_name, ref)
+            except KeyError:
+                previous = UNKNOWN
+            result = await ref[track_name]
+            inferred[track_name] = result
+            expected = node.expect_inferred[track_name]
+            if expected is not UNKNOWN:
+                expected = await reify(track.from_external(expected))
                 self.inferrer.equiv.declare_equivalent(result, expected, [ref])
+            if previous is not UNKNOWN:
+                previous = await reify(previous)
+                self.inferrer.equiv.declare_equivalent(result, previous, [ref])
         node.inferred.update(inferred)
 
     def _on_add_node(self, event, node):
@@ -474,7 +484,9 @@ class Preparator(PipelineStep):
         pass
 
     def _on_add_edge(self, event, src, key, dest):
-        pass
+        src.expect_inferred.update(src.inferred)
+        src.inferred.clear()
+        self.inferrer.run_coroutine(self._update_type(src))
 
     def _on_drop_edge(self, event, *args):
         pass
@@ -510,10 +522,15 @@ class Validator(PipelineStep):
         self.whitelist = whitelist
 
     async def _eliminate_inferrers(self):
+        errs = []
         for node in self.pipeline.resources.manager.all_nodes:
             t = node.type
             if isinstance(t, Inferrer):
                 node.type = await t.as_function_type()
+                if ismyiatype(node.type, Problem):
+                    errs.append(f'{node}::{t} became {node.type}')
+        if errs:
+            raise Exception("\n".join(errs))
 
     def step(self, graph):
         """Validate the graph."""
@@ -819,8 +836,8 @@ _standard_pipeline = PipelineDefinition(
         specialize=step_specialize,
         prepare=step_prepare,
         opt=step_opt,
-        validate=step_validate,
         cconv=step_cconv,
+        validate=step_validate,
     )
 )
 

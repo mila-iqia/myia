@@ -155,7 +155,6 @@ class PatternEquilibriumOptimizer:
                     for transformer in self.node_transformers:
                         new = transformer(self.optimizer, node)
                         if new and new is not node:
-                            new.inferred.update(node.inferred)
                             new.expect_inferred.update(node.inferred)
                             tr.replace(node, new)
                             changes = True
