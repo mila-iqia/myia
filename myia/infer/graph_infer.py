@@ -474,8 +474,13 @@ class ExplicitInferrer(Inferrer):
         super().__init__(track, None)
         self.argvals = argvals
         self.retval = retval
-        refs = [track.engine.vref({track.name: v})
-                for v in argvals]
+        refs = []
+        for v in argvals:
+            # Work around having to find defaults for the other tracks
+            # TODO: check if this causes problems
+            d = {name: ANYTHING for name in self.engine.tracks.keys()}
+            d[track.name] = v
+            refs.append(VirtualReference(d))
         self.cache[tuple(refs)] = retval
 
     async def infer(self, *args):
@@ -495,6 +500,10 @@ class ExplicitInferrer(Inferrer):
                 refs=[aref]
             )
         return self.retval
+
+    async def as_function_type(self, argrefs=None):
+        """Return a Function type corresponding to this Inferrer."""
+        return Function[self.argvals, self.retval]
 
 
 def register_inferrer(*prims, nargs, constructors):
