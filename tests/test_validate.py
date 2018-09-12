@@ -5,7 +5,6 @@ from myia.api import scalar_pipeline, scalar_parse
 from myia.prim import ops as P
 from myia.prim.py_implementations import make_record, partial, list_map
 from myia.validate import validate as _validate, ValidationError
-from myia.opt.clean import erase_class
 
 from .common import L, i64, Point, Point_t
 
@@ -29,38 +28,38 @@ def validate(g):
 
 
 pip = scalar_pipeline \
-    .select('parse', 'infer', 'specialize')
+    .select('parse', 'infer', 'specialize', 'validate') \
+    .configure({'validate.whitelist': test_whitelist})
 
 
-def make(*types):
-    def deco(fn):
-        res = pip.run(input=fn, argspec=[{'type': t} for t in types])
-        return res['graph']
-    return deco
+pip_ec = scalar_pipeline \
+    .select('parse', 'infer', 'specialize', 'prepare', 'validate') \
+    .configure({'prepare.erase_classes': True,
+                'validate.whitelist': test_whitelist})
+
+
+def run(pip, fn, types):
+    res = pip.run(input=fn, argspec=[{'type': t} for t in types])
+    return res['graph']
 
 
 def valid(*types):
     def deco(fn):
-        g = make(*types)(fn)
-        validate(g)
+        run(pip, fn, types)
     return deco
 
 
 def invalid(*types):
     def deco(fn):
-        g = make(*types)(fn)
         with pytest.raises(ValidationError):
-            validate(g)
+            run(pip, fn, types)
     return deco
 
 
 def valid_after_ec(*types):
     def deco(fn):
-        g = make(*types)(fn)
-        with pytest.raises(ValidationError):
-            validate(g)
-        erase_class(g, g.manager)
-        validate(g)
+        invalid(*types)(fn)
+        run(pip_ec, fn, types)
     return deco
 
 

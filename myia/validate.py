@@ -5,6 +5,7 @@ from .dtype import Array, Tuple, List, Function, Type, Number, Bool, Problem, \
 from .infer import DEAD
 from .ir import manage
 from .prim import Primitive, ops as P
+from .prim.shape_inferrers import ListShape, TupleShape
 from .utils import overload
 
 
@@ -52,6 +53,44 @@ def _validate_type(t: TypeMeta):
 
 @overload  # noqa: F811
 def _validate_type(t: object):
+    raise ValidationError(f'Illegal type in the graph: {t}')
+
+
+@overload
+def _validate_shape(t: Array, shp):
+    if not isinstance(shp, tuple):
+        raise ValidationError(f'Shape of {t} is {shp}, should be tuple')
+
+
+@overload  # noqa: F811
+def _validate_shape(t: Tuple, shp):
+    if not isinstance(shp, TupleShape):
+        raise ValidationError(f'Shape of {t} is {shp}, should be TupleShape')
+    if len(shp.shape) != len(t.elements):
+        raise ValidationError(f'Shape of {t} has wrong length')
+    for t2, shp2 in zip(t.elements, shp.shape):
+        _validate_shape(t2, shp2)
+
+
+@overload  # noqa: F811
+def _validate_shape(t: List, shp):
+    if not isinstance(shp, ListShape):
+        raise ValidationError(f'Shape of {t} is {shp}, should be ListShape')
+    _validate_shape(t.element_type, shp.shape)
+
+
+@overload  # noqa: F811
+def _validate_shape(t: (Number, Bool, Problem[DEAD], Function), shp):
+    pass
+
+
+@overload  # noqa: F811
+def _validate_shape(t: TypeMeta, shp):
+    return _validate_shape[t](t, shp)
+
+
+@overload  # noqa: F811
+def _validate_shape(t: object, shp):
     raise ValidationError(f'Illegal type in the graph: {t}')
 
 
@@ -147,7 +186,6 @@ class Validator:
     def _validate_consistency(self, node):
         if node.is_apply():
             expected = Function[[i.type for i in node.inputs[1:]], node.type]
-            # _validate_consistency(node.inputs)
             actual = node.inputs[0].type
             if actual != expected:
                 raise ValidationError(
@@ -155,10 +193,14 @@ class Validator:
                     f'Got {actual}.'
                 )
 
+    def _validate_shape(self, node):
+        return _validate_shape(node.type, node.inferred['shape'])
+
     def _run(self, root):
         manager = manage(root)
         for node in list(manager.all_nodes):
             self._test(node, self._validate_type)
+            self._test(node, self._validate_shape)
             self._test(node, self._validate_oper)
             self._test(node, self._validate_consistency)
         if self.errors:

@@ -457,8 +457,6 @@ class _InferenceUpdater:
         ref = self.inferrer.ref(node, CONTEXTLESS)
         inferred = {}
         for track_name, track in self.inferrer.tracks.items():
-            if track_name != 'type':
-                continue
             try:
                 previous = await self.inferrer.invalidate(track_name, ref)
             except KeyError:
@@ -519,11 +517,13 @@ class Preparator(PipelineStep):
     def step(self, graph):
         """Prepare the graph."""
         mng = self.resources.manager
-        if self.erase_classes:
-            erase_class(graph, mng)
         if self.watch:
             upd = _InferenceUpdater(mng, self.inferrer)
             self.resources.inference_updater = upd
+        if self.erase_classes:
+            erase_class(graph, mng)
+        if self.watch:
+            self.resources.inference_updater.run()
         return {'graph': graph}
 
 
@@ -555,7 +555,8 @@ class Validator(PipelineStep):
 
     def step(self, graph):
         """Validate the graph."""
-        self.resources.inference_updater.run()
+        if hasattr(self.resources, 'inference_updater'):
+            self.resources.inference_updater.run()
         self.pipeline.resources.live_infer.engine.run_coroutine(
             self._eliminate_inferrers()
         )

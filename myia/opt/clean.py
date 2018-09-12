@@ -4,8 +4,8 @@ from ..dtype import Int, Tuple, List, Class, Function, Type, ismyiatype, \
     TypeMeta
 from ..ir import Constant
 from ..prim import ops as P
-from ..prim.shape_inferrers import TupleShape, ListShape, ClassShape, NOSHAPE
-from ..utils import overload
+from ..prim.shape_inferrers import TupleShape, ListShape, ClassShape
+from ..utils import overload, UNKNOWN
 
 
 @overload
@@ -65,13 +65,6 @@ def _reshape(s: object):
     return s
 
 
-def _mkr_to_mkt(mkr):
-    argtypes = mkr.type.arguments[1:]
-    mkt = Constant(P.make_tuple)
-    mkt.type = Function[argtypes, Tuple[argtypes]]
-    return mkt
-
-
 def erase_class(root, manager):
     """Remove the Class type from graphs.
 
@@ -91,34 +84,28 @@ def erase_class(root, manager):
             idx = list(dt.attributes.keys()).index(item.value)
             idx = Constant(idx)
             idx.type = Int[64]
-            idx.shape = NOSHAPE
-            gi = Constant(P.tuple_getitem)
-            gi.type = Function[[dt, Int[64]], node.type]
-            new_node = node.graph.apply(gi, data, idx)
+            new_node = node.graph.apply(P.tuple_getitem, data, idx)
 
         elif node.is_apply(P.make_record):
             mkr, typ, *args = node.inputs
-            mkt = _mkr_to_mkt(mkr)
-            new_node = node.graph.apply(mkt, *args)
+            new_node = node.graph.apply(P.make_tuple, *args)
 
         elif node.is_apply(P.partial):
             orig_ptl, oper, *args = node.inputs
             if oper.is_constant() and oper.value is P.make_record:
-                argtypes = [arg.type for arg in args[1:]]
-                mkt = _mkr_to_mkt(oper)
                 if len(args) == 1:
-                    new_node = mkt
+                    new_node = Constant(P.make_tuple)
                 elif len(args) > 1:
-                    ptl = Constant(P.partial)
-                    ret = orig_ptl.type.retval
-                    ptl.type = Function[[mkt.type, *argtypes], ret]
-                    new_node = node.graph.apply(ptl, mkt, *args[1:])
+                    new_node = node.graph.apply(
+                        P.partial, P.make_tuple, *args[1:]
+                    )
 
         if new_node is not None:
-            new_node.type = node.type
-            new_node.shape = node.shape
             manager.replace(node, new_node)
 
     for node in manager.all_nodes:
-        node.type = _retype(node.type)
-        node.shape = _reshape(node.shape)
+        node.expect_inferred.clear()
+        if node.type is not UNKNOWN:
+            node.type = _retype(node.type)
+        if node.shape is not UNKNOWN:
+            node.shape = _reshape(node.shape)
