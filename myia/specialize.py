@@ -182,7 +182,7 @@ class _GraphSpecializer:
         for name, track in self.engine.tracks.items():
             if name not in ('type', 'value'):
                 res = await ref[name]
-                if not isinstance(ref, Inferrer):
+                if not isinstance(res, Inferrer):
                     new_node.inferred[name] = res
 
     async def process_node(self, node):

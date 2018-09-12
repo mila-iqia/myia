@@ -466,9 +466,6 @@ class _InferenceUpdater:
             result = await ref[track_name]
             inferred[track_name] = result
             expected = node.expect_inferred[track_name]
-            if isinstance(result, Inferrer) \
-                    and result.engine is not self.inferrer:
-                continue
             if expected is not UNKNOWN:
                 expected = await reify(track.from_external(expected))
                 self.inferrer.equiv.declare_equivalent(result, expected, [ref])
