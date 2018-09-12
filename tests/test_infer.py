@@ -12,8 +12,8 @@ from myia.dtype import Array as A, Int, Float, TypeType, External, \
     Number, Class
 from myia.hypermap import HyperMap
 from myia.infer import \
-    ANYTHING, InferenceError, register_inferrer
-from myia.ir import MultitypeGraph
+    ANYTHING, InferenceError, register_inferrer, Contextless, CONTEXTLESS
+from myia.ir import Graph, MultitypeGraph
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive, ops as P
 from myia.prim.shape_inferrers import TupleShape, ListShape, ClassShape, \
@@ -236,6 +236,13 @@ type_signature_arith_bin = [
     (i64, f64, InferenceError),
     (B, B, InferenceError),
 ]
+
+
+def test_contextless():
+    C = CONTEXTLESS
+    assert Contextless.empty() is C
+    assert C.filter(Graph()) is C
+    assert C.add(Graph(), []) is C
 
 
 @infer(type=[(i64, i64)], value=[(89, 89)])

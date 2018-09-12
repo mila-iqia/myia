@@ -72,9 +72,6 @@ class Var:
 class Seq(tuple):
     """Class to mark sequence of values matched by an SVar."""
 
-    def __visit__(self, _):
-        raise VisitError
-
     def __repr__(self) -> str:
         return "Seq" + super().__repr__()
 
