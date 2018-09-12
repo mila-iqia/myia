@@ -4,6 +4,7 @@ from ..dtype import Int, Tuple, List, Class, Function, Type, ismyiatype, \
     TypeMeta
 from ..ir import Constant
 from ..prim import ops as P
+from ..prim.shape_inferrers import TupleShape, ListShape, ClassShape, NOSHAPE
 from ..utils import overload
 
 
@@ -44,6 +45,26 @@ def _retype(t: object):
     return t  # pragma: no cover
 
 
+@overload
+def _reshape(s: TupleShape):
+    return TupleShape(_reshape(s2) for s2 in s.shape)
+
+
+@overload  # noqa: F811
+def _reshape(s: ListShape):
+    return ListShape(_reshape(s.shape))
+
+
+@overload  # noqa: F811
+def _reshape(s: ClassShape):
+    return TupleShape(_reshape(s2) for s2 in s.shape.values())
+
+
+@overload  # noqa: F811
+def _reshape(s: object):
+    return s
+
+
 def _mkr_to_mkt(mkr):
     argtypes = mkr.type.arguments[1:]
     mkt = Constant(P.make_tuple)
@@ -70,6 +91,7 @@ def erase_class(root, manager):
             idx = list(dt.attributes.keys()).index(item.value)
             idx = Constant(idx)
             idx.type = Int[64]
+            idx.shape = NOSHAPE
             gi = Constant(P.tuple_getitem)
             gi.type = Function[[dt, Int[64]], node.type]
             new_node = node.graph.apply(gi, data, idx)
@@ -94,7 +116,9 @@ def erase_class(root, manager):
 
         if new_node is not None:
             new_node.type = node.type
+            new_node.shape = node.shape
             manager.replace(node, new_node)
 
     for node in manager.all_nodes:
         node.type = _retype(node.type)
+        node.shape = _reshape(node.shape)

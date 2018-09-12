@@ -5,7 +5,7 @@ from myia.api import scalar_parse as parse
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs
 from myia.ir import Constant, Graph, succ_deeper, succ_incoming, \
-    GraphManager, GraphCloner, clone
+    GraphManager, GraphCloner, clone, Parameter
 from myia.prim import ops as P
 
 
@@ -231,3 +231,14 @@ def test_clone_without_forcing_manager():
     clone(f)
     clone(f)
     GraphManager(f)
+
+
+def test_clone_dangling_parameters():
+    g = Graph()
+    g.output = Parameter(g)
+
+    g2 = clone(g)
+
+    assert isinstance(g2.output, Parameter)
+    assert g2.output.graph == g2
+    assert len(g2.parameters) == 0
