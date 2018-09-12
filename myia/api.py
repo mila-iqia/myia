@@ -431,6 +431,75 @@ class Specializer(PipelineStep):
         return {'graph': result}
 
 
+class _InferenceUpdater:
+
+    def __init__(self, manager, inferrer):
+        self.manager = manager
+        self.inferrer = inferrer
+        self.todo = set()
+        manager.events.add_node.register(self._on_add_node)
+        manager.events.drop_node.register(self._on_drop_node)
+        manager.events.add_graph.register(self._on_add_graph)
+        manager.events.drop_graph.register(self._on_drop_graph)
+        manager.events.add_edge.register(self._on_add_edge)
+        manager.events.drop_edge.register(self._on_drop_edge)
+
+    async def _run(self):
+        todo, self.todo = self.todo, set()
+        # print('==>', todo)
+        for node in todo:
+            await self._update_type(node)
+
+    def run(self):
+        self.inferrer.run_coroutine(self._run())
+
+    async def _update_type(self, node):
+        ref = self.inferrer.ref(node, CONTEXTLESS)
+        inferred = {}
+        for track_name, track in self.inferrer.tracks.items():
+            if track_name != 'type':
+                continue
+            try:
+                previous = await self.inferrer.invalidate(track_name, ref)
+            except KeyError:
+                previous = UNKNOWN
+            result = await ref[track_name]
+            inferred[track_name] = result
+            expected = node.expect_inferred[track_name]
+            if isinstance(result, Inferrer) \
+                    and result.engine is not self.inferrer:
+                continue
+            if expected is not UNKNOWN:
+                expected = await reify(track.from_external(expected))
+                self.inferrer.equiv.declare_equivalent(result, expected, [ref])
+            if previous is not UNKNOWN:
+                previous = await reify(previous)
+                self.inferrer.equiv.declare_equivalent(result, previous, [ref])
+        node.inferred.update(inferred)
+
+    def _on_add_node(self, event, node):
+        self.todo.add(node)
+
+    def _on_drop_node(self, event, node):
+        if node in self.todo:
+            self.todo.remove(node)
+
+    def _on_add_graph(self, event, *args):
+        pass
+
+    def _on_drop_graph(self, event, *args):
+        pass
+
+    def _on_add_edge(self, event, src, key, dest):
+        src.expect_inferred.update(src.inferred)
+        src.inferred.clear()
+        self.todo.add(src)
+        # self.run()
+
+    def _on_drop_edge(self, event, *args):
+        pass
+
+
 class Preparator(PipelineStep):
     """Pipeline step to prepare the graph to optimization.
 
@@ -450,59 +519,14 @@ class Preparator(PipelineStep):
         self.watch = watch
         self.inferrer = self.pipeline.resources.live_infer.engine
 
-    async def _update_type(self, node, _x=True):
-        ref = self.inferrer.ref(node, CONTEXTLESS)
-        inferred = {}
-        for track_name, track in self.inferrer.tracks.items():
-            if track_name != 'type':
-                continue
-            try:
-                previous = await self.inferrer.invalidate(track_name, ref)
-            except KeyError:
-                previous = UNKNOWN
-            result = await ref[track_name]
-            inferred[track_name] = result
-            expected = node.expect_inferred[track_name]
-            if expected is not UNKNOWN:
-                expected = await reify(track.from_external(expected))
-                self.inferrer.equiv.declare_equivalent(result, expected, [ref])
-            if previous is not UNKNOWN:
-                previous = await reify(previous)
-                self.inferrer.equiv.declare_equivalent(result, previous, [ref])
-        node.inferred.update(inferred)
-
-    def _on_add_node(self, event, node):
-        self.inferrer.run_coroutine(self._update_type(node))
-
-    def _on_drop_node(self, event, *args):
-        pass
-
-    def _on_add_graph(self, event, *args):
-        pass
-
-    def _on_drop_graph(self, event, *args):
-        pass
-
-    def _on_add_edge(self, event, src, key, dest):
-        src.expect_inferred.update(src.inferred)
-        src.inferred.clear()
-        self.inferrer.run_coroutine(self._update_type(src))
-
-    def _on_drop_edge(self, event, *args):
-        pass
-
     def step(self, graph):
         """Prepare the graph."""
         mng = self.resources.manager
         if self.erase_classes:
             erase_class(graph, mng)
         if self.watch:
-            mng.events.add_node.register(self._on_add_node)
-            mng.events.drop_node.register(self._on_drop_node)
-            mng.events.add_graph.register(self._on_add_graph)
-            mng.events.drop_graph.register(self._on_drop_graph)
-            mng.events.add_edge.register(self._on_add_edge)
-            mng.events.drop_edge.register(self._on_drop_edge)
+            upd = _InferenceUpdater(mng, self.inferrer)
+            self.resources.inference_updater = upd
         return {'graph': graph}
 
 
@@ -534,6 +558,7 @@ class Validator(PipelineStep):
 
     def step(self, graph):
         """Validate the graph."""
+        self.resources.inference_updater.run()
         self.pipeline.resources.live_infer.engine.run_coroutine(
             self._eliminate_inferrers()
         )

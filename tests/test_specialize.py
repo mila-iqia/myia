@@ -7,13 +7,13 @@ from myia.debug.label import short_labeler as lbl
 from myia.prim.py_implementations import \
     hastype, partial, list_map, scalar_add, scalar_sub, \
     scalar_usub, scalar_uadd, switch
-from myia.validate import validate, ValidationError
+from myia.validate import ValidationError
 
 from .common import mysum, i64, f64
 
 
 specialize_pipeline = scalar_debug_pipeline \
-    .select('parse', 'infer', 'specialize', 'export') \
+    .select('parse', 'infer', 'specialize', 'prepare', 'validate', 'export') \
     .configure(
         {'infer.tracks.value.max_depth': 1}
     )
@@ -21,7 +21,7 @@ specialize_pipeline = scalar_debug_pipeline \
 
 specialize_pipeline_std = standard_debug_pipeline \
     .select('parse', 'infer', 'specialize',
-            'prepare', 'opt', 'export', 'wrap') \
+            'prepare', 'opt', 'validate', 'export', 'wrap') \
     .configure(
         {'infer.tracks.value.max_depth': 1}
     )
@@ -41,11 +41,8 @@ def specializer_decorator(pipeline):
 
                 result_py = fn(*args)
 
-                res = pip(input=fn, argspec=argspec)
-                g2 = res['graph']
-
                 try:
-                    validate(g2)
+                    res = pip(input=fn, argspec=argspec)
                 except ValidationError as verr:
                     print('Collected the following errors:')
                     for err in verr.errors:
