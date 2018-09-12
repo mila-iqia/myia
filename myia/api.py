@@ -439,14 +439,10 @@ class _InferenceUpdater:
         self.todo = set()
         manager.events.add_node.register(self._on_add_node)
         manager.events.drop_node.register(self._on_drop_node)
-        manager.events.add_graph.register(self._on_add_graph)
-        manager.events.drop_graph.register(self._on_drop_graph)
         manager.events.add_edge.register(self._on_add_edge)
-        manager.events.drop_edge.register(self._on_drop_edge)
 
     async def _run(self):
         todo, self.todo = self.todo, set()
-        # print('==>', todo)
         for node in todo:
             await self._update_type(node)
 
@@ -479,20 +475,10 @@ class _InferenceUpdater:
         if node in self.todo:
             self.todo.remove(node)
 
-    def _on_add_graph(self, event, *args):
-        pass
-
-    def _on_drop_graph(self, event, *args):
-        pass
-
     def _on_add_edge(self, event, src, key, dest):
         src.expect_inferred.update(src.inferred)
         src.inferred.clear()
         self.todo.add(src)
-        # self.run()
-
-    def _on_drop_edge(self, event, *args):
-        pass
 
 
 class Preparator(PipelineStep):
