@@ -527,3 +527,27 @@ def as_frozen(x):
         return tuple(as_frozen(y) for y in x)
     else:
         return x
+
+
+class ErrorPool:
+    """Accumulates a list of errors.
+
+    Arguments:
+        exc_class: The exception to raise if any error occurred.
+    """
+
+    def __init__(self, *, exc_class=Exception):
+        """Initialize the ErrorPool."""
+        self.errors = []
+        self.exc_class = exc_class
+
+    def add(self, error):
+        """Add an exception to the pool."""
+        assert isinstance(error, Exception)
+        self.errors.append(error)
+
+    def trigger(self, stringify=lambda err: f'* {err.args[0]}'):
+        """Raise an exception if an error occurred."""
+        if self.errors:
+            msg = "\n".join(stringify(e) for e in self.errors)
+            raise self.exc_class(msg)

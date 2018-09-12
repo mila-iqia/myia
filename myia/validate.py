@@ -6,7 +6,7 @@ from .infer import DEAD
 from .ir import manage
 from .prim import Primitive, ops as P
 from .prim.shape_inferrers import ListShape, TupleShape
-from .utils import overload
+from .utils import overload, ErrorPool
 
 
 class ValidationError(Exception):
@@ -164,7 +164,7 @@ class Validator:
 
     def __init__(self, root, whitelist):
         """Initialize and run the Validator."""
-        self.errors = []
+        self.errors = ErrorPool(exc_class=ValidationError)
         self.whitelist = frozenset(whitelist)
         self._run(root)
 
@@ -173,7 +173,7 @@ class Validator:
             fn(node)
         except ValidationError as err:
             err.node = node
-            self.errors.append(err)
+            self.errors.add(err)
 
     def _validate_type(self, node):
         return _validate_type(node.type)
@@ -203,12 +203,11 @@ class Validator:
             self._test(node, self._validate_shape)
             self._test(node, self._validate_oper)
             self._test(node, self._validate_consistency)
-        if self.errors:
-            errset = {f'* {err.node} -- {err.args[0]}' for err in self.errors}
-            errlist = "\n".join(sorted(errset))
-            err = ValidationError(f'The graph is not valid:\n\n{errlist}')
-            err.errors = self.errors
-            raise err
+
+        def stringify(err):
+            return f'* {err.node} -- {err.args[0]}'
+
+        self.errors.trigger(stringify=stringify)
 
 
 def validate(root, whitelist=whitelist):

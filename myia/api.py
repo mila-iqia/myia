@@ -21,7 +21,7 @@ from .prim.value_inferrers import ValueTrack, value_inferrer_constructors
 from .prim.type_inferrers import TypeTrack, type_inferrer_constructors
 from .prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
 from .specialize import TypeSpecializer
-from .utils import TypeMap, as_frozen, overload, UNKNOWN
+from .utils import TypeMap, as_frozen, overload, UNKNOWN, ErrorPool
 from .vm import VM
 from .compile import step_wrap_primitives, step_compile, step_link, step_export
 from .validate import validate, whitelist as default_whitelist
@@ -543,15 +543,15 @@ class Validator(PipelineStep):
         self.whitelist = whitelist
 
     async def _eliminate_inferrers(self):
-        errs = []
+        errs = ErrorPool()
         for node in self.pipeline.resources.manager.all_nodes:
             t = node.type
             if isinstance(t, Inferrer):
                 node.type = await t.as_function_type()
-                if ismyiatype(node.type, Problem):
-                    errs.append(f'{node}::{t} became {node.type}')
-        if errs:
-            raise Exception("\n".join(errs))
+                if ismyiatype(node.type, Problem):  # pragma: no cover
+                    exc = Exception(f'{node}::{t} became {node.type}')
+                    errs.add(exc)
+        errs.trigger()
 
     def step(self, graph):
         """Validate the graph."""
