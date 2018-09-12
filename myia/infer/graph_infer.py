@@ -476,11 +476,11 @@ class ExplicitInferrer(Inferrer):
         self.retval = retval
         refs = []
         for v in argvals:
-            # Work around having to find defaults for the other tracks
-            # TODO: check if this causes problems
-            d = {name: ANYTHING for name in self.engine.tracks.keys()}
-            d[track.name] = v
-            refs.append(VirtualReference(d))
+            # NOTE: This VirtualReference lacks the other tracks, so in
+            # certain situations such as declaring an ExplicitInferrer
+            # to be equivalent to a GraphInferrer, an error might happen
+            # when the GraphInferrer is called on these references.
+            refs.append(VirtualReference({track.name: v}))
         self.cache[tuple(refs)] = retval
 
     async def infer(self, *args):

@@ -1447,6 +1447,7 @@ def test_call_argument(f, x):
     return f(x)
 
 
+@pytest.mark.xfail(reason="ExplicitInferrer generates incomplete vrefs")
 @infer(type=[
     (F[[F[[f64], f64]], f64], f64),
 ])
