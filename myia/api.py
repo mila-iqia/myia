@@ -10,7 +10,7 @@ from .cconv import closure_convert
 from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
     Number, Problem, tag_to_dataclass, ismyiatype, type_to_np_dtype, \
     TypeMeta
-from .infer import InferenceEngine, Inferrer, ANYTHING, Reference, \
+from .infer import InferenceEngine, Inferrer, ANYTHING, \
     Context, Contextless, CONTEXTLESS, reify
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \

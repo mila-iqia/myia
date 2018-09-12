@@ -456,9 +456,6 @@ def test_unify_filtervars():
 
 def test_reify():
     v1 = var()
-    v2 = var()
-    v3 = var()
-    v4 = var()
     sv = svar()
 
     d = {v1: 3.0}

@@ -7,7 +7,7 @@ from myia.infer import InferenceError
 from myia.ir import Constant, isomorphic, GraphCloner
 from myia.opt import PatternSubstitutionOptimization as psub, \
     PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph, \
-    cse, lib
+    cse
 from myia.prim import Primitive, ops as prim
 from myia.utils import Merge
 from myia.utils.unify import Var, var
@@ -357,16 +357,16 @@ def test_type_tracking():
     def fn1(x, y):
         return x + y
 
-    res = pip.run(input=fn1, argspec=({'type': i64}, {'type': i64}))
+    pip.run(input=fn1, argspec=({'type': i64}, {'type': i64}))
 
     def fn2(x, y):
         return x - y
 
     with pytest.raises(InferenceError):
-        res = pip.run(input=fn2, argspec=({'type': i64}, {'type': i64}))
+        pip.run(input=fn2, argspec=({'type': i64}, {'type': i64}))
 
     def fn3(x, y):
         return x / y
 
     with pytest.raises(InferenceError):
-        res = pip.run(input=fn3, argspec=({'type': i64}, {'type': i64}))
+        pip.run(input=fn3, argspec=({'type': i64}, {'type': i64}))

@@ -832,6 +832,10 @@ class InferenceEngine:
             return track.default({})
 
     def invalidate(self, track, ref):
+        """Invalidate the current key in the cache and return the old value.
+
+        Raises KeyError if the key wasn't in the cache to begin with.
+        """
         return self.cache.invalidate((track, ref))
 
     def get_inferred(self, track, ref):
