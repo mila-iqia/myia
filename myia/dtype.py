@@ -76,7 +76,7 @@ class TypeMeta(type):
         if not fields:
             raise TypeError(f'{cls} cannot be parameterized.')
         elif cls._params is not None:
-            raise TypeError('Already a generic')
+            raise TypeError(f'{cls} is already instantiated')
         elif list(params.keys()) != fields:
             raise TypeError('Invalid type parameterization')
         else:
@@ -232,7 +232,7 @@ class Tuple(Object):
         """Parameterize using a list of elements."""
         if len(elements) == 1 and isinstance(elements[0], (tuple, list)):
             elements, = elements
-        return cls.make_subtype(elements=elements)
+        return cls.make_subtype(elements=tuple(elements))
 
     @classmethod
     def __type_repr__(cls):

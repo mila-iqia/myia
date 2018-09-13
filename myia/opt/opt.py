@@ -111,7 +111,7 @@ class PatternSubstitutionOptimization:
 
         """
         equiv = self.unif.unify(node, self.pattern)
-        if equiv:
+        if equiv is not None:
             if callable(self.replacement):
                 return self.replacement(optimizer, node, equiv)
             else:
@@ -155,7 +155,7 @@ class PatternEquilibriumOptimizer:
                     for transformer in self.node_transformers:
                         new = transformer(self.optimizer, node)
                         if new and new is not node:
-                            new.type = node.type
+                            new.expect_inferred.update(node.inferred)
                             tr.replace(node, new)
                             changes = True
                             break

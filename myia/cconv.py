@@ -28,6 +28,10 @@ def closure_convert(root):
             for node in fvs.get(g, []):
                 with About(node.debug, 'fv'):
                     param = Parameter(g)
+                    if isinstance(node, Graph):
+                        param.type = node.type
+                    else:
+                        param.inferred.update(node.inferred)
                     new_params.append(param)
                 tr.set_parameters(g, new_params + g.parameters)
                 repl[g][node] = param
@@ -59,10 +63,8 @@ def closure_convert(root):
                 if node.is_apply():
                     for i, inp in enumerate(node.inputs):
                         if inp in rg:
-                            # node.inputs[i] = rg[inp]
                             tr.set_edge(node, i, rg[inp])
                         elif inp.is_constant_graph() and inp.value in rg:
-                            # node.inputs[i] = rg[inp.value]
                             tr.set_edge(node, i, rg[inp.value])
 
     return root

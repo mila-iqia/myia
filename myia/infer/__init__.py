@@ -11,6 +11,8 @@ from .core import (  # noqa
 
 from .graph_infer import (  # noqa
     Context,
+    Contextless,
+    CONTEXTLESS,
     Track,
     InferenceEngine,
     Reference,
@@ -19,7 +21,9 @@ from .graph_infer import (  # noqa
     MetaGraphInferrer,
     PrimitiveInferrer,
     PartialInferrer,
+    ExplicitInferrer,
     register_inferrer,
+    concretize_type,
 )
 
 from .utils import (  # noqa
@@ -29,4 +33,9 @@ from .utils import (  # noqa
     MyiaShapeError,
     ValueWrapper,
     unwrap,
+    Unspecializable,
+    DEAD,
+    POLY,
+    AMBIGUOUS,
+    INACCESSIBLE,
 )

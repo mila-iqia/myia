@@ -5,11 +5,13 @@ from functools import partial
 from operator import getitem
 
 from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
-    TypeType, Class, pytype_to_myiatype
+    TypeType, Class, Function, TypeMeta, External, pytype_to_myiatype, \
+    Problem
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
-    MyiaTypeError, register_inferrer, Track, MetaGraphInferrer
+    MyiaTypeError, register_inferrer, Track, MetaGraphInferrer, \
+    ExplicitInferrer, Inferrer
 from ..ir import Graph, MetaGraph
-from ..utils import Namespace, RestrictedVar, is_dataclass_type
+from ..utils import Namespace, RestrictedVar, is_dataclass_type, overload
 
 from ..dtype import ismyiatype
 from . import ops as P
@@ -32,6 +34,48 @@ def _shape_type(t):  # noqa: D400
     """Tuple[UInt[64] ...]"""
     # The docstring is used in the error message.
     return ismyiatype(t, Tuple) and all(x == UInt[64] for x in t.elements)
+
+
+@overload
+def _import_type(track, t: Function):
+    return ExplicitInferrer(
+        track,
+        [_import_type(track, t2) for t2 in t.arguments],
+        _import_type(track, t.retval)
+    )
+
+
+@overload  # noqa: F811
+def _import_type(track, t: Tuple):
+    return Tuple[
+        [_import_type(track, t2) for t2 in t.elements],
+    ]
+
+
+@overload  # noqa: F811
+def _import_type(track, t: List):
+    return List[_import_type(track, t.element_type)]
+
+
+@overload  # noqa: F811
+def _import_type(track, t: Class):
+    return Class[
+        t.tag,
+        {name: _import_type(track, t2)
+         for name, t2 in t.attributes.items()},
+        t.methods
+    ]
+
+
+@overload  # noqa: F811
+def _import_type(track, t: (Bool, Number, Array, Problem,
+                            TypeType, External, Inferrer)):
+    return t
+
+
+@overload  # noqa: F811
+def _import_type(track, t: TypeMeta):
+    return _import_type[t](track, t)
 
 
 class TypeTrack(Track):
@@ -83,6 +127,13 @@ class TypeTrack(Track):
             return PartialInferrer(self, rec, [vref])
         else:
             return typeof(v)
+
+    def from_external(self, t):
+        """Convert a type provided outside the inferrer.
+
+        This will replace every Function type by an ExplicitInferrer.
+        """
+        return _import_type(self, t)
 
     def to_element(self, t):
         """Return the type of each element of type t."""

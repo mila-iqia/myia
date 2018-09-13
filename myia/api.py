@@ -8,8 +8,10 @@ from types import FunctionType
 from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
 from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
-    Number, tag_to_dataclass, ismyiatype, type_to_np_dtype, TypeMeta
-from .infer import InferenceEngine, ANYTHING
+    Number, Problem, tag_to_dataclass, ismyiatype, type_to_np_dtype, \
+    TypeMeta
+from .infer import InferenceEngine, Inferrer, ANYTHING, \
+    Context, Contextless, CONTEXTLESS, reify
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
     erase_class
@@ -19,7 +21,7 @@ from .prim.value_inferrers import ValueTrack, value_inferrer_constructors
 from .prim.type_inferrers import TypeTrack, type_inferrer_constructors
 from .prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
 from .specialize import TypeSpecializer
-from .utils import TypeMap, as_frozen, overload
+from .utils import TypeMap, as_frozen, overload, UNKNOWN, ErrorPool
 from .vm import VM
 from .compile import step_wrap_primitives, step_compile, step_link, step_export
 from .validate import validate, whitelist as default_whitelist
@@ -345,7 +347,7 @@ class Optimizer(PipelineStep):
         return {'graph': graph}
 
 
-class Inferrer(PipelineStep):
+class InferrerStep(PipelineStep):
     """Pipeline step to run type/shape/value/etc. inference.
 
     Inputs:
@@ -357,15 +359,21 @@ class Inferrer(PipelineStep):
         inferrer: The inference engine.
     """
 
-    def __init__(self, pipeline_init, tracks, required_tracks):
-        """Initialize an Inferrer."""
+    def __init__(self,
+                 pipeline_init,
+                 tracks,
+                 required_tracks,
+                 context_class):
+        """Initialize an InferrerStep."""
         super().__init__(pipeline_init)
         self.tracks = tracks
         self.required_tracks = required_tracks
+        self.context_class = context_class
         self.engine = InferenceEngine(
             self.pipeline,
             tracks=self.tracks,
             required_tracks=self.required_tracks,
+            context_class=self.context_class,
         )
 
     def fill_in(self, argspec):
@@ -378,8 +386,14 @@ class Inferrer(PipelineStep):
             if 'value' in arg:
                 v = arg['value']
                 for track_name, track in self.engine.tracks.items():
-                    if track_name not in arg or track_name == 'value':
+                    if track_name not in arg:
                         arg[track_name] = track.from_value(v, None)
+                    else:
+                        arg[track_name] = track.from_external(arg[track_name])
+            else:
+                for track_name, track in self.engine.tracks.items():
+                    if track_name in arg:
+                        arg[track_name] = track.from_external(arg[track_name])
 
     def step(self, graph, argspec):
         """Infer types, shapes, values, etc. for the graph."""
@@ -417,6 +431,56 @@ class Specializer(PipelineStep):
         return {'graph': result}
 
 
+class _InferenceUpdater:
+
+    def __init__(self, manager, inferrer):
+        self.manager = manager
+        self.inferrer = inferrer
+        self.todo = set()
+        manager.events.add_node.register(self._on_add_node)
+        manager.events.drop_node.register(self._on_drop_node)
+        manager.events.add_edge.register(self._on_add_edge)
+
+    async def _run(self):
+        todo, self.todo = self.todo, set()
+        for node in todo:
+            await self._update_type(node)
+
+    def run(self):
+        self.inferrer.run_coroutine(self._run())
+
+    async def _update_type(self, node):
+        ref = self.inferrer.ref(node, CONTEXTLESS)
+        inferred = {}
+        for track_name, track in self.inferrer.tracks.items():
+            try:
+                previous = await self.inferrer.invalidate(track_name, ref)
+            except KeyError:
+                previous = UNKNOWN
+            result = await ref[track_name]
+            inferred[track_name] = result
+            expected = node.expect_inferred[track_name]
+            if expected is not UNKNOWN:
+                expected = await reify(track.from_external(expected))
+                self.inferrer.equiv.declare_equivalent(result, expected, [ref])
+            if previous is not UNKNOWN:
+                previous = await reify(previous)
+                self.inferrer.equiv.declare_equivalent(result, previous, [ref])
+        node.inferred.update(inferred)
+
+    def _on_add_node(self, event, node):
+        self.todo.add(node)
+
+    def _on_drop_node(self, event, node):
+        if node in self.todo:
+            self.todo.remove(node)
+
+    def _on_add_edge(self, event, src, key, dest):
+        src.expect_inferred.update(src.inferred)
+        src.inferred.clear()
+        self.todo.add(src)
+
+
 class Preparator(PipelineStep):
     """Pipeline step to prepare the graph to optimization.
 
@@ -429,15 +493,23 @@ class Preparator(PipelineStep):
         graph: The prepared graph.
     """
 
-    def __init__(self, pipeline_init, erase_classes=True):
+    def __init__(self, pipeline_init, erase_classes=True, watch=True):
         """Initialize a Preparator."""
         super().__init__(pipeline_init)
         self.erase_classes = erase_classes
+        self.watch = watch
+        self.inferrer = self.pipeline.resources.live_infer.engine
 
     def step(self, graph):
         """Prepare the graph."""
+        mng = self.resources.manager
+        if self.watch:
+            upd = _InferenceUpdater(mng, self.inferrer)
+            self.resources.inference_updater = upd
         if self.erase_classes:
-            erase_class(graph, self.resources.manager)
+            erase_class(graph, mng)
+        if self.watch:
+            self.resources.inference_updater.run()
         return {'graph': graph}
 
 
@@ -456,8 +528,24 @@ class Validator(PipelineStep):
         super().__init__(pipeline_init)
         self.whitelist = whitelist
 
+    async def _eliminate_inferrers(self):
+        errs = ErrorPool()
+        for node in self.pipeline.resources.manager.all_nodes:
+            t = node.type
+            if isinstance(t, Inferrer):
+                node.type = await t.as_function_type()
+                if ismyiatype(node.type, Problem):  # pragma: no cover
+                    exc = Exception(f'{node}::{t} became {node.type}')
+                    errs.add(exc)
+        errs.trigger()
+
     def step(self, graph):
         """Validate the graph."""
+        if hasattr(self.resources, 'inference_updater'):
+            self.resources.inference_updater.run()
+        self.pipeline.resources.live_infer.engine.run_coroutine(
+            self._eliminate_inferrers()
+        )
         validate(graph, whitelist=self.whitelist)
         return {}
 
@@ -670,7 +758,7 @@ step_resolve = Optimizer.partial(
 )
 
 
-step_infer = Inferrer.partial(
+step_infer = InferrerStep.partial(
     tracks=dict(
         value=ValueTrack.partial(
             constructors=value_inferrer_constructors,
@@ -684,6 +772,7 @@ step_infer = Inferrer.partial(
         )
     ),
     required_tracks=['type'],
+    context_class=Context,
 )
 
 
@@ -732,6 +821,22 @@ _standard_pipeline = PipelineDefinition(
             object_map=standard_object_map,
             converter=default_convert
         ),
+        live_infer=InferrerStep.partial(
+            tracks=dict(
+                value=ValueTrack.partial(
+                    constructors=value_inferrer_constructors,
+                    max_depth=1
+                ),
+                type=TypeTrack.partial(
+                    constructors=type_inferrer_constructors
+                ),
+                shape=ShapeTrack.partial(
+                    constructors=shape_inferrer_constructors
+                )
+            ),
+            required_tracks=['type'],
+            context_class=Contextless,
+        )
     ),
     steps=dict(
         parse=step_parse,
@@ -740,8 +845,8 @@ _standard_pipeline = PipelineDefinition(
         specialize=step_specialize,
         prepare=step_prepare,
         opt=step_opt,
-        validate=step_validate,
         cconv=step_cconv,
+        validate=step_validate,
     )
 )
 

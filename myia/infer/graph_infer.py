@@ -6,12 +6,12 @@ from types import FunctionType
 from ..dtype import ismyiatype, Function
 from ..debug.label import label
 from ..ir import GraphGenerationError
-from ..utils import Partializable, UNKNOWN, eprint
+from ..utils import Partializable, UNKNOWN, eprint, as_frozen
 
 from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify, \
     reify_shallow
 from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, \
-    infer_trace
+    infer_trace, Unspecializable, DEAD, POLY, AMBIGUOUS
 
 
 def type_error_nargs(ident, expected, got):
@@ -65,26 +65,6 @@ class Track(Partializable):
             return ANYTHING
 
         argrefs = [self.engine.ref(node, ctx) for node in n_args]
-        if ismyiatype(inf, Function):
-            ngot = len(argrefs)
-            nexpect = len(inf.arguments)
-            if ngot != nexpect:
-                raise MyiaTypeError(
-                    'Wrong number of arguments.'
-                    f' Expected {nexpect}, got {ngot}.',
-                    refs=[],
-                    app=ref
-                )
-            for got, aref in zip(inf.arguments, argrefs):
-                expect = await aref[self.name]
-                if expect != got:
-                    raise MyiaTypeError(
-                        'Type mismatch.'
-                        f' Expected {expect}, got {got}.',
-                        refs=[aref],
-                        app=ref
-                    )
-            return inf.retval
 
         if not isinstance(inf, Inferrer):
             raise MyiaTypeError(
@@ -107,6 +87,10 @@ class Track(Partializable):
     def from_value(self, v, context=None):
         """Get the property from a value in the context."""
         raise NotImplementedError()  # pragma: no cover
+
+    def from_external(self, v):
+        """Convert a property provided outside the inferrer."""
+        return v
 
     def broaden(self, v):
         """Broaden the value for use in a graph's signature."""
@@ -228,6 +212,28 @@ class Track(Partializable):
 ####################
 
 
+async def _concretize_type_helper(t, argrefs=None):
+    if isinstance(t, Inferrer):
+        return await t.as_function_type(argrefs)
+    else:
+        return await reify(t)
+
+
+async def concretize_type(ref, argrefs=None):
+    """Return the type of ref, resolving all Inferrer instances.
+
+    Inferrer instances are resolved to Function types if possible. If an
+    error occurs, this will return a Problem type.
+
+    Arguments:
+        ref: Either a Reference or an Inferrer.
+        argrefs: References for the arguments passed to the Inferrer at
+            the relevant call site.
+    """
+    t = (await ref['type']) if isinstance(ref, AbstractReference) else ref
+    return await _concretize_type_helper(t, argrefs)
+
+
 class Inferrer(DynamicMap):
     """Infer a property of the output of an operation.
 
@@ -246,6 +252,64 @@ class Inferrer(DynamicMap):
         self.track = track
         self.engine = track.engine
         self.identifier = identifier
+
+    async def get_unique_argrefs(self):
+        """If possible, return a unique tuple of argrefs this was called on.
+
+        Raises Unspecializable if it is not possible to get a single tuple
+        of argrefs:
+
+          * Unspecializable(DEAD) if the Inferrer was never called.
+          * Unspecializable(POLY) if the Inferrer was called with at least
+            two incompatible tuple of argrefs.
+          * Unspecializable(AMBIGUOUS) in some obscure edge cases that we
+            currently do not concern ourselves with.
+        """
+        # The cache works using References, but if two references have
+        # the same inferred type/value/etc., we can merge their entries.
+        cache = {}
+        for x, y in self.cache.items():
+            y = await reify(y)
+            key = tuple([await arg[track] for arg in x
+                         for track in self.engine.tracks])
+            if key in cache and cache[key] != y:
+                # NOTE: It's not completely clear when/why this tends to
+                # happen. It seems to happen for PartialInferrers when
+                # the differentiation is downstream, so in practice the
+                # Problem node caused by this exception does not end up
+                # in the final graph.
+                raise Unspecializable(AMBIGUOUS)
+            cache[key] = y
+
+        if len(cache) == 0:
+            raise Unspecializable(DEAD)
+        elif len(cache) == 1:
+            (argrefs, res), *_ = self.cache.items()
+            return argrefs
+        else:
+            raise Unspecializable(POLY)
+
+    async def as_function_type(self, argrefs=None):
+        """Return a Function type corresponding to this Inferrer.
+
+        Raises Unspecializable if this is not possible, e.g. if argrefs
+        are not given and the Inferrer was called multiple times on
+        different types.
+
+        Arguments:
+            argrefs: The argrefs the Inferrer was called on at the
+                call site for which we need a Function. If None,
+                we try to find suitable argrefs.
+        """
+        if argrefs is None:
+            try:
+                argrefs = await self.get_unique_argrefs()
+            except Unspecializable as e:
+                return e.args[0]
+        cached = self.cache[tuple(argrefs)]
+        return Function[[await concretize_type(argref)
+                         for argref in argrefs],
+                        await _concretize_type_helper(cached)]
 
 
 class PrimitiveInferrer(Inferrer):
@@ -290,7 +354,7 @@ class GraphInferrer(Inferrer):
         self._graph = graph
         self.broaden = broaden
         if context is None:
-            self.context = Context.empty()
+            self.context = self.engine.context_class.empty()
         else:
             self.context = context.filter(graph)
 
@@ -298,13 +362,7 @@ class GraphInferrer(Inferrer):
         """Return the graph to use for the given args."""
         return self._graph
 
-    async def make_context(self, args):
-        """Create a Context object for this graph with these arguments.
-
-        We await on all relevant properties of all arguments in order to
-        build a context (this cannot be done lazily, like with primitives,
-        because we need a concrete context).
-        """
+    async def _make_argkey_and_context(self, args):
         g = await self.make_graph(args)
         argvals = []
         for arg in args:
@@ -317,7 +375,18 @@ class GraphInferrer(Inferrer):
             argvals.append(argval)
 
         # Update current context using the fetched properties.
-        return self.context.add(g, argvals)
+        argkey = as_frozen(argvals)
+        return argkey, self.context.add(g, argkey)
+
+    async def make_context(self, args):
+        """Create a Context object for this graph with these arguments.
+
+        We await on all relevant properties of all arguments in order to
+        build a context (this cannot be done lazily, like with primitives,
+        because we need a concrete context).
+        """
+        _, ctx = await self._make_argkey_and_context(args)
+        return ctx
 
     async def infer(self, *args):
         """Infer a property of the operation on the given arguments."""
@@ -327,11 +396,11 @@ class GraphInferrer(Inferrer):
         if len(args) != nargs:
             raise type_error_nargs(self.identifier, nargs, len(args))
 
-        context = await self.make_context(args)
+        argkey, context = await self._make_argkey_and_context(args)
 
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
-        for p, arg in zip(g.parameters, context.argkey):
+        for p, arg in zip(g.parameters, argkey):
             for track, v in arg:
                 ref = self.engine.ref(p, context)
                 self.engine.cache.set_value((track, ref), v)
@@ -397,6 +466,46 @@ class PartialInferrer(Inferrer):
                 self.fn.provably_equivalent(other.fn))
 
 
+class ExplicitInferrer(Inferrer):
+    """Requires specific input types and returns a specific output type."""
+
+    def __init__(self, track, argvals, retval):
+        """Initialize ExplicitInferrer."""
+        super().__init__(track, None)
+        self.argvals = argvals
+        self.retval = retval
+        refs = []
+        for v in argvals:
+            # NOTE: This VirtualReference lacks the other tracks, so in
+            # certain situations such as declaring an ExplicitInferrer
+            # to be equivalent to a GraphInferrer, an error might happen
+            # when the GraphInferrer is called on these references.
+            refs.append(VirtualReference({track.name: v}))
+        self.cache[tuple(refs)] = retval
+
+    async def infer(self, *args):
+        """Check arguments and return return type."""
+        ngot = len(args)
+        nexpect = len(self.argvals)
+        if ngot != nexpect:
+            raise MyiaTypeError(
+                'Wrong number of arguments.'
+                f' Expected {nexpect}, got {ngot}.',
+                refs=[],
+            )
+        for got, aref in zip(self.argvals, args):
+            self.engine.equiv.declare_equivalent(
+                got,
+                aref[self.track.name],
+                refs=[aref]
+            )
+        return self.retval
+
+    async def as_function_type(self, argrefs=None):
+        """Return a Function type corresponding to this Inferrer."""
+        return Function[self.argvals, self.retval]
+
+
 def register_inferrer(*prims, nargs, constructors):
     """Define a PrimitiveInferrer for prims with nargs arguments.
 
@@ -431,12 +540,11 @@ class Context:
         """Create an empty context."""
         return Context(None, None, ())
 
-    def __init__(self, parent, g, argvals):
+    def __init__(self, parent, g, argkey):
         """Initialize the Context."""
         self.parent = parent
         self.graph = g
-        self.argkey = tuple(tuple(sorted(argv.items()))
-                            for argv in argvals)
+        self.argkey = argkey
         self.parent_cache = dict(parent.parent_cache) if parent else {}
         self.parent_cache[g] = self
         self._hash = hash((self.parent, self.graph, self.argkey))
@@ -448,10 +556,10 @@ class Context:
             rval = self.parent_cache.get(graph.parent, None)
         return rval
 
-    def add(self, graph, argvals):
+    def add(self, graph, argkey):
         """Extend this context with values for another graph."""
         parent = self.parent_cache.get(graph.parent, None)
-        return Context(parent, graph, argvals)
+        return Context(parent, graph, argkey)
 
     def __hash__(self):
         return self._hash
@@ -461,6 +569,31 @@ class Context:
             and self.parent == other.parent \
             and self.graph == other.graph \
             and self.argkey == other.argkey
+
+
+class Contextless:
+    """Singleton Context which specializes to itself.
+
+    CONTEXTLESS is essentially an empty context that is idempotent under
+    all operations. In practice it maps each node of each graph to a unique
+    type, shape and so on.
+    """
+
+    @classmethod
+    def empty(cls):
+        """Return CONTEXTLESS."""
+        return CONTEXTLESS
+
+    def filter(self, graph):
+        """Return CONTEXTLESS."""
+        return self
+
+    def add(self, graph, argvals):
+        """Return CONTEXTLESS."""
+        return self
+
+
+CONTEXTLESS = Contextless()
 
 
 class AbstractReference:
@@ -486,7 +619,7 @@ class Reference(AbstractReference):
         self.node = node
         self.engine = engine
         g = node.value if node.is_constant_graph() else node.graph
-        self.context = context.filter(g)
+        self.context = context and context.filter(g)
         self._hash = hash((self.node, self.context))
 
     async def __getitem__(self, track):
@@ -605,7 +738,8 @@ class InferenceEngine:
                  *,
                  tracks,
                  required_tracks=None,
-                 eq_class=EquivalenceChecker):
+                 eq_class=EquivalenceChecker,
+                 context_class=Context):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop()
         self.pipeline = pipeline
@@ -622,6 +756,7 @@ class InferenceEngine:
             loop=self.loop,
             error_callback=self.errors.append
         )
+        self.context_class = context_class
 
     def run(self, graph, argvals):
         """Run the inferrer on a graph given initial values.
@@ -636,8 +771,8 @@ class InferenceEngine:
                    for ref in argrefs]
 
         self.mng.add_graph(graph)
-        empty_context = Context.empty()
-        root_context = empty_context.add(graph, argvals)
+        empty_context = self.context_class.empty()
+        root_context = empty_context.add(graph, as_frozen(argvals))
         output_ref = self.ref(graph.return_, root_context)
 
         async def _run():
@@ -674,6 +809,7 @@ class InferenceEngine:
         inferred = ref.node.inferred.get(track_name, UNKNOWN)
 
         if inferred is not UNKNOWN:
+            inferred = track.from_external(inferred)
             return inferred
 
         elif node.is_constant():
@@ -683,10 +819,14 @@ class InferenceEngine:
             return await track.infer_apply(ref)
 
         else:
-            # Values for Parameters are cached when we enter a Graph.
-            raise AssertionError(
-                f'Cannot process: {node} in track "{track_name}"'
-            )
+            return track.default({})
+
+    def invalidate(self, track, ref):
+        """Invalidate the current key in the cache and return the old value.
+
+        Raises KeyError if the key wasn't in the cache to begin with.
+        """
+        return self.cache.invalidate((track, ref))
 
     def get_inferred(self, track, ref):
         """Get a Future for the value of the Reference on the given track.

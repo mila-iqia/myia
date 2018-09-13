@@ -3,6 +3,7 @@
 
 from contextvars import ContextVar
 
+from ..dtype import Problem
 from ..utils import Named, Event, Partializable, eprint
 
 
@@ -12,6 +13,22 @@ infer_trace.set({})
 
 # Represents an unknown value
 ANYTHING = Named('ANYTHING')
+
+# Represents specialization problems
+DEAD = Named('DEAD')
+POLY = Named('POLY')
+INACCESSIBLE = Named('INACCESSIBLE')
+AMBIGUOUS = Named('AMBIGUOUS')
+
+
+class Unspecializable(Exception):
+    """Raised when it is impossible to specialize an inferrer."""
+
+    def __init__(self, problem):
+        """Initialize Unspecializable."""
+        problem = Problem[problem]
+        super().__init__(problem)
+        self.problem = problem
 
 
 class InferenceError(Exception, Partializable):

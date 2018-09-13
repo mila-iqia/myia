@@ -430,3 +430,12 @@ async def infer_shape_identity(track, x):
 async def infer_shape_scalar_to_array(track, x):
     """Infer the shape of scalar_to_array."""
     return ()
+
+
+@shape_inferrer(P.broadcast_shape, nargs=2)
+async def infer_shape_broadcast_shape(track, shpx, shpy):
+    """Infer the shape of broadcast_shape."""
+    tx = await shpx['type']
+    ty = await shpy['type']
+    n = max(len(tx.elements), len(ty.elements))
+    return TupleShape([NOSHAPE] * n)

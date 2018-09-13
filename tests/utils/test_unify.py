@@ -456,14 +456,7 @@ def test_unify_filtervars():
 
 def test_reify():
     v1 = var()
-    v2 = var()
-    v3 = var()
-    v4 = var()
     sv = svar()
-
-    d = {v1: 2.0, v2: None, v3: 3, v4: (v1, v3)}
-    t = TU.reify(v4, d)
-    assert t == (2.0, 3)
 
     d = {v1: 3.0}
     t = TU.reify(L([v1]), d)

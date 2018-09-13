@@ -232,6 +232,7 @@ class ANFNode(Node):
         self.graph = graph
         self.debug = NamedDebugInfo(self)
         self.inferred = defaultdict(lambda: UNKNOWN)
+        self.expect_inferred = defaultdict(lambda: UNKNOWN)
 
     @property
     def type(self):
@@ -334,17 +335,6 @@ class Parameter(ANFNode):
     def is_parameter(self):
         """Return whether self is a Parameter."""
         return True
-
-    def __visit__(self, fn):
-        g = noseq(fn, self.graph)
-        if not isinstance(g, Graph) or g is not self.graph:
-            # Note: this condition will be triggered if e.g. there is a
-            # Parameter in a pattern to reify. It's not clear what that's
-            # supposed to mean unless the Parameter already exists in a
-            # concrete graph, so we raise an Exception just in case.
-            raise Exception('Unification cannot create new Parameters.') \
-                # pragma: no cover
-        return self
 
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, graph=self.graph)

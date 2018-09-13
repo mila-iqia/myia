@@ -177,6 +177,15 @@ class EvaluationCache:
         fut.set_result(value)
         self.cache[key] = fut
 
+    async def invalidate(self, key):
+        """Invalidate the current key in the cache and return the old value.
+
+        Raises KeyError if the key wasn't in the cache to begin with.
+        """
+        v = self.cache[key]
+        del self.cache[key]
+        return await v
+
 
 class EquivalenceChecker:
     """Handle equivalence between values."""
@@ -224,6 +233,8 @@ class EquivalenceChecker:
 
         if isinstance(x, DynamicMap) and isinstance(y, DynamicMap):
             if x.provably_equivalent(y):
+                x.cache.update(y.cache)
+                y.cache = x.cache
                 return
 
             self._tie_dmaps(x, y, refs)
