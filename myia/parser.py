@@ -386,6 +386,12 @@ class Parser:
         else:
             return block.graph.apply(op, *elts)
 
+    def process_List(self, block: 'Block', node: ast.List) -> ANFNode:
+        """Process list literals."""
+        op = block.operation('make_list')
+        elts = [self.process_node(block, e) for e in node.elts]
+        return block.graph.apply(op, *elts)
+
     def process_Subscript(self, block: 'Block',
                           node: ast.Subscript) -> ANFNode:
         """Process subscripts: `x[y]`."""

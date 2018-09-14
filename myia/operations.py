@@ -20,8 +20,8 @@ def make_tuple(*elts):  # pragma: no cover
     raise RuntimeError('This operation is not meant to be called directly.')
 
 
-def cons_tuple(head, tail):  # pragma: no cover
-    """Tuple builder."""
+def make_list(*elts):  # pragma: no cover
+    """List builder."""
     raise RuntimeError('This operation is not meant to be called directly.')
 
 

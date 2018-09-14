@@ -34,6 +34,7 @@ from .utils import (  # noqa
     ValueWrapper,
     unwrap,
     Unspecializable,
+    VOID,
     DEAD,
     POLY,
     AMBIGUOUS,

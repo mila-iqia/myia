@@ -9,10 +9,10 @@ from myia.api import scalar_pipeline, standard_pipeline
 from myia.composite import hyper_add, zeros_like
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
-    Number, Class
+    Number, Class, Problem
 from myia.hypermap import HyperMap
-from myia.infer import \
-    ANYTHING, InferenceError, register_inferrer, Contextless, CONTEXTLESS
+from myia.infer import ANYTHING, VOID, InferenceError, register_inferrer, \
+    Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive, ops as P
@@ -423,6 +423,33 @@ def test_too_many_args(x, y):
                TupleShape((TupleShape((NOSHAPE, NOSHAPE)), NOSHAPE)))])
 def test_tup(x, y):
     return (x, y)
+
+
+@infer(type=[(i64, i64, L[i64]),
+             (i64, f64, InferenceError)],
+       shape=[({'type': i64, 'shape': NOSHAPE},
+               {'type': i64, 'shape': NOSHAPE},
+               ListShape(NOSHAPE)),
+              ({'type': L[A[i64]], 'shape': ListShape((8, 3))},
+               {'type': L[A[i64]], 'shape': ListShape((4, 3))},
+               ListShape(ListShape((ANYTHING, 3)))),
+              (ai64_of(4, 7), ai64_of(4, 7), ListShape((4, 7))),
+              (ai64_of(4, 7), ai64_of(9, 7), ListShape((ANYTHING, 7)))])
+def test_list(x, y):
+    return [x, y]
+
+
+@infer(type=[(i64, i64, L[i64]),
+             (f64, f64, L[f64]),
+             (lf64, lf64, InferenceError),
+             (i64, f64, InferenceError)])
+def test_list_and_scalar(x, y):
+    return [x, y, 3]
+
+
+@infer(type=[(L[Problem[VOID]],)])
+def test_list_empty():
+    return []
 
 
 @infer(

@@ -65,6 +65,8 @@ hastype = Primitive('hastype')
 
 
 make_tuple = Primitive('make_tuple')
+make_list = Primitive('make_list')
+make_record = Primitive('make_record')
 tail = Primitive('tail')
 tuple_getitem = Primitive('tuple_getitem')
 list_getitem = Primitive('list_getitem')
@@ -77,6 +79,7 @@ setattr = Primitive('setattr')
 tuple_len = Primitive('tuple_len')
 list_len = Primitive('list_len')
 array_len = Primitive('array_len')
+list_map = Primitive('list_map')
 
 
 ##########
@@ -111,8 +114,6 @@ return_ = Primitive('return')
 
 
 scalar_cast = Primitive('scalar_cast')
-list_map = Primitive('list_map')
 identity = Primitive('identity')
 resolve = Primitive('resolve')
 partial = Primitive('partial')
-make_record = Primitive('make_record')

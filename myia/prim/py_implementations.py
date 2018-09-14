@@ -543,3 +543,9 @@ def make_record(typ, *args):
 def _len(x):
     """Implement `len`."""
     return len(x)
+
+
+@register(primops.make_list)
+def make_list(*xs):
+    """Implement `make_list`."""
+    return list(xs)

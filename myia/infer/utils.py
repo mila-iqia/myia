@@ -14,6 +14,9 @@ infer_trace.set({})
 # Represents an unknown value
 ANYTHING = Named('ANYTHING')
 
+# Represents inference problems
+VOID = Named('VOID')
+
 # Represents specialization problems
 DEAD = Named('DEAD')
 POLY = Named('POLY')
