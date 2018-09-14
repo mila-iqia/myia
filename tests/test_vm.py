@@ -2,7 +2,7 @@ import numpy as np
 
 from myia.api import scalar_debug_compile as compile
 from myia.prim.py_implementations import \
-    array_map, list_map, array_reduce, array_scan, scalar_usub
+    array_map, list_map, array_reduce, array_scan, scalar_usub, list_reduce
 
 from .test_lang import parse_compare
 
@@ -81,3 +81,16 @@ def test_vm_array_reduce():
     a = np.ones((2, 3))
     res = f(a)
     assert (res == a.sum(axis=0)).all()
+
+
+def test_vm_list_reduce():
+    @compile
+    def f(x):
+        def add(x, y):
+            return x + y
+
+        return list_reduce(add, x, 4)
+
+    a = [1, 2, 3]
+    res = f(a)
+    assert res == 10

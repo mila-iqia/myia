@@ -475,3 +475,13 @@ async def infer_shape_make_list(track, *elems):
     if len(shps) == 0:
         return ListShape(NOSHAPE)  # pragma: no cover
     return ListShape(find_matching_shape(shps))
+
+
+@shape_inferrer(P.list_reduce, nargs=3)
+async def infer_shape_list_reduce(track, fn, lst, dflt):
+    """Infer the return shape of list_reduce."""
+    elem = lst.transform(lambda track, x: track.to_element(x))
+    fn_inf = await fn['shape']
+    shp1 = await fn_inf(dflt, elem)
+    shp2 = await fn_inf(elem, elem)
+    return find_matching_shape([shp1, shp2])

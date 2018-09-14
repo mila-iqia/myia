@@ -23,7 +23,7 @@ from myia.prim.py_implementations import \
     typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
-    tuple_setitem, list_setitem, scalar_cast
+    tuple_setitem, list_setitem, scalar_cast, list_reduce
 from myia.utils import RestrictedVar
 
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
@@ -1343,6 +1343,26 @@ def test_array_reduce(ary, shp):
     def f(a, b):
         return a + b
     return array_reduce(f, ary, shp)
+
+
+@infer_std(
+    type=[
+        (L[i64], i64, i64),
+        (L[i64], f64, InferenceError),
+    ],
+    shape=[
+        ({'type': L[A[i64]], 'shape': ListShape((6, 7))},
+         ai64_of(6, 7),
+         (6, 7)),
+        ({'type': L[A[i64]], 'shape': ListShape((6, 7))},
+         ai64_of(6, 17),
+         InferenceError)
+    ]
+)
+def test_list_reduce(lst, dflt):
+    def f(a, b):
+        return a + b
+    return list_reduce(f, lst, dflt)
 
 
 @infer(type=[(i64, i64)],

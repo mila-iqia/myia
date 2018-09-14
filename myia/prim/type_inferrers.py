@@ -557,3 +557,14 @@ async def infer_type_make_list(track, *elems):
     else:
         t = await track.assert_same(*elems, refs=elems)
     return List[t]
+
+
+@type_inferrer(P.list_reduce, nargs=3)
+async def infer_type_list_reduce(track, fn, lst, dflt):
+    """Infer the return type of list_reduce."""
+    fn_t = await fn['type']
+    await track.check(List, lst)
+    xref = lst.transform(lambda track, x: track.to_element(x))
+    xref2 = lst.transform(lambda track, x: track.to_element(x))
+    res_elem_t = await track.assert_same(fn_t(xref, xref2), dflt)
+    return res_elem_t

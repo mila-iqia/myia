@@ -80,6 +80,7 @@ tuple_len = Primitive('tuple_len')
 list_len = Primitive('list_len')
 array_len = Primitive('array_len')
 list_map = Primitive('list_map')
+list_reduce = Primitive('list_reduce')
 
 
 ##########

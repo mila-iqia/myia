@@ -9,7 +9,7 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
     tuple_setitem, list_setitem, tail, hastype, typeof, \
     shape, reshape, array_map, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
-    switch, scalar_to_array, broadcast_shape, scalar_cast
+    switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce
 
 from ..test_lang import parse_compare
 
@@ -245,6 +245,13 @@ def test_prim_array_reduce():
 
         assert res.shape == outshp
         assert (res == value).all()
+
+
+def test_prim_list_reduce():
+    def add(a, b):
+        return a + b
+
+    assert list_reduce(add, [1, 2, 3], 4) == 10
 
 
 def test_prim_distribute():
