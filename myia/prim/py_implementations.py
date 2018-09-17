@@ -85,6 +85,13 @@ def scalar_pow(x, y):
     return x ** y
 
 
+@register(primops.scalar_floor)
+def scalar_floor(x):
+    """Implement `scalar_floor`."""
+    _assert_scalar(x)
+    return np.floor(x)
+
+
 @register(primops.scalar_uadd)
 def scalar_uadd(x):
     """Implement `scalar_uadd`."""

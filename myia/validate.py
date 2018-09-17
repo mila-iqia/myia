@@ -13,6 +13,7 @@ class ValidationError(Exception):
     """Error validating a Graph."""
 
 
+
 @type_cloner.variant
 def _validate_type(self, t: (Class, Problem, External, object)):
     raise ValidationError(f'Illegal type in the graph: {t}')
@@ -47,7 +48,7 @@ def _validate_shape(t: List, shp):
 
 
 @overload  # noqa: F811
-def _validate_shape(t: (Number, Bool, Problem[DEAD], Function), shp):
+def _validate_shape(t: (Number, TypeType, Bool, Problem[DEAD], Function), shp):
     pass
 
 
@@ -83,6 +84,7 @@ whitelist = frozenset({
     P.scalar_ne,
     P.scalar_le,
     P.scalar_ge,
+    P.scalar_floor,
     P.bool_not,
     P.bool_and,
     P.bool_or,
