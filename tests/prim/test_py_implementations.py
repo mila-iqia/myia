@@ -31,9 +31,14 @@ def test_prim_mul(x, y):
     return x * y
 
 
-@parse_compare((2, 7), (4, -6))
-def test_prim_div(x, y):
+@parse_compare((2.0, 7.0), (4.0, -6.0), (-11, 2))
+def test_prim_truediv(x, y):
     return x / y
+
+
+@parse_compare((2, 7), (4, -6), (-11, 2), (-11.0, 2.0))
+def test_prim_floordiv(x, y):
+    return x // y
 
 
 @parse_compare((2, 7), (4, -6))

@@ -117,6 +117,16 @@ def usub(x):
     return x.__neg__()
 
 
+@core
+def scalar_truediv(x, y):
+    return x.__truediv__(y)
+
+
+@core
+def scalar_floordiv(x, y):
+    return x.__floordiv__(y)
+
+
 exp = MultitypeGraph('exp')
 log = MultitypeGraph('log')
 sin = MultitypeGraph('sin')

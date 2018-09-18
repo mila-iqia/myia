@@ -68,7 +68,10 @@ def scalar_mul(x, y):
 def scalar_div(x, y):
     """Implement `scalar_div`."""
     _assert_scalar(x, y)
-    return x / y
+    if isinstance(x, (float, np.floating)):
+        return x / y
+    else:
+        return x // y
 
 
 @register(primops.scalar_mod)
@@ -240,6 +243,10 @@ def _issubtype_helper(t: types.Class, model):
                for t1, t2 in zip(t.attributes.values(),
                                  model.attributes.values()))
 
+@overload  # noqa: F811
+def _issubtype_helper(t: object, model):
+    return False
+
 
 def issubtype(t, model):
     """Check that type t is represented by model."""
@@ -315,7 +322,7 @@ def _vm_getattr(vm, data, attr):
     except AttributeError:
         mmap = vm.convert.resources.method_map[typeof(data)]
         if attr in mmap:
-            x = MethodType(mmap[attr], data)
+            return Partial(vm.convert(mmap[attr]), [data], vm)
         else:
             raise  # pragma: no cover
     if isinstance(x, method_wrapper_type):
