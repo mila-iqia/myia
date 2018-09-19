@@ -11,9 +11,15 @@ _about = threading.local()
 _about.stack = [None]
 
 
+def _stack():
+    if not hasattr(_about, 'stack'):
+        _about.stack = [None]
+    return _about.stack
+
+
 def current_info():
     """Return the `DebugInfo` for the current context."""
-    return _about.stack[-1]
+    return _stack()[-1]
 
 
 class DebugInfo(types.SimpleNamespace):
@@ -56,12 +62,12 @@ class DebugInherit(DebugInfo):
         Any `DebugInfo` created within the context of
         `with self: ...` will inherit all attributes of `self`.
         """
-        _about.stack.append(self)
+        _stack().append(self)
 
     def __exit__(self, type, value, tb):
         """Exit the context of this `DebugInherit`."""
-        assert _about.stack[-1] is self
-        _about.stack.pop()
+        assert _stack()[-1] is self
+        _stack().pop()
 
 
 class NamedDebugInfo(DebugInfo):
@@ -158,10 +164,10 @@ class About:
 
     def __enter__(self):
         """Enter the context of this `About`."""
-        _about.stack.append(DebugInherit(about=self))
+        _stack().append(DebugInherit(about=self))
 
     def __exit__(self, type, value, tb):
         """Exit the context of this `About`."""
-        top = _about.stack[-1]
+        top = _stack()[-1]
         assert isinstance(top, DebugInfo) and top.about is self
-        _about.stack.pop()
+        _stack().pop()
