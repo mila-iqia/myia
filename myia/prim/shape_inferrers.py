@@ -110,11 +110,15 @@ class ScalarShapeInferrer(Inferrer):
 
 @overload
 def _generalize_shape(s1: ListShape, s2):
+    if not isinstance(s2, ListShape):
+        raise InferenceError('Mismatched shape types')
     return ListShape(_generalize_shape(s1.shape, s2.shape))
 
 
 @overload  # noqa: F811
 def _generalize_shape(s1: TupleShape, s2):
+    if not isinstance(s2, TupleShape):
+        raise InferenceError('Mismatched shape types')
     s1 = s1.shape
     s2 = s2.shape
     if len(s1) != len(s2):
@@ -125,6 +129,8 @@ def _generalize_shape(s1: TupleShape, s2):
 
 @overload  # noqa: F811
 def _generalize_shape(s1: tuple, s2):
+    if not isinstance(s2, tuple):
+        raise InferenceError('Mismatched shape types')
     if len(s1) != len(s2):
         raise InferenceError('Arrays of differing ndim')
     return tuple(a if a == b else ANYTHING
@@ -133,6 +139,8 @@ def _generalize_shape(s1: tuple, s2):
 
 @overload  # noqa: F811
 def _generalize_shape(s1: ClassShape, s2):
+    if not isinstance(s2, ClassShape):
+        raise InferenceError('Mismatched shape types')
     d = {}
     if s1.shape.keys() != s2.shape.keys():
         raise InferenceError('Classes with different fields')
@@ -152,8 +160,6 @@ def find_matching_shape(shps):
     """Returns a shape that matches all shapes in `shps`."""
     s1, *rest = shps
     for s2 in rest:
-        if type(s1) != type(s2):
-            raise InferenceError('Mismatched shape types')
         s1 = _generalize_shape(s1, s2)
     return s1
 
