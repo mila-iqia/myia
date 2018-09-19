@@ -152,6 +152,10 @@ infer_pipeline_std = standard_pipeline.select(
 })
 
 
+def _is_exc_type(cls):
+    return isinstance(cls, type) and issubclass(cls, Exception)
+
+
 def parse_test_spec(tests_spec):
 
     tests = []
@@ -162,7 +166,7 @@ def parse_test_spec(tests_spec):
         for t in ts:
             test = []
             for entry in t:
-                if isinstance(entry, dict) or entry is InferenceError:
+                if isinstance(entry, dict) or _is_exc_type(entry):
                     test.append(entry)
                 else:
                     test.append({main_track: entry})
@@ -200,12 +204,14 @@ def inferrer_decorator(pipeline):
                 print('Expected:')
                 print(expected_out)
 
-                if isinstance(expected_out, type) \
-                        and issubclass(expected_out, Exception):
+                if _is_exc_type(expected_out):
                     try:
                         out()
-                    except InferenceError as e:
-                        print_inference_error(e)
+                    except expected_out as e:
+                        if issubclass(expected_out, InferenceError):
+                            print_inference_error(e)
+                        else:
+                            pass
                     else:
                         raise Exception(
                             f'Expected {expected_out}, got: (see stdout).'
@@ -245,7 +251,8 @@ def test_contextless():
     assert C.add(Graph(), []) is C
 
 
-@infer(type=[(i64, i64)], value=[(89, 89)])
+@infer(type=[(i64, i64)],
+       value=[(89, 89), ([], TypeError)])
 def test_identity(x):
     return x
 
@@ -447,7 +454,8 @@ def test_list_and_scalar(x, y):
     return [x, y, 3]
 
 
-@infer(type=[(L[Problem[VOID]],)])
+@infer(type=[(L[Problem[VOID]],)],
+       shape=[(InferenceError,)])
 def test_list_empty():
     return []
 

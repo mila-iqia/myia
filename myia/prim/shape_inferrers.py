@@ -206,8 +206,9 @@ class ShapeTrack(Track):
             return TupleShape(self.from_value(e, context) for e in v)
         elif isinstance(v, list):
             shps = [self.from_value(e, context) for e in v]
-            if len(shps) == 0:
-                return ListShape(NOSHAPE)  # pragma: no cover
+            if len(shps) == 0:  # pragma: no cover
+                # from_value of the type track will fail before this
+                raise InferenceError('Cannot infer the shape of []')
             return ListShape(find_matching_shape(shps))
         elif is_dataclass(v):
             if isinstance(v, type):
@@ -479,7 +480,7 @@ async def infer_shape_make_list(track, *elems):
     """Infer the return shape of make_list."""
     shps = [await e['shape'] for e in elems]
     if len(shps) == 0:
-        return ListShape(NOSHAPE)  # pragma: no cover
+        raise InferenceError('Cannot infer the shape of []')
     return ListShape(find_matching_shape(shps))
 
 
