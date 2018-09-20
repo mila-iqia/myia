@@ -115,25 +115,19 @@ class TypeMap(dict):
     def __missing__(self, obj_t):
         """Get the handler for the given type."""
         handler = None
-
-        if issubclass(obj_t, type):
-            mro = [obj_t]
-        else:
-            mro = obj_t.mro()
-
         to_set = []
 
-        for cls in mro:
+        for cls in type.mro(obj_t):
             handler = super().get(cls, None)
             if handler is None and self.discover:
                 handler = self.discover(cls)
-            if handler:
+            if handler is not None:
                 for cls2 in to_set:
                     self[cls2] = handler
                 break
             to_set.append(cls)
 
-        if handler:
+        if handler is not None:
             return handler
         else:
             raise KeyError(obj_t)
