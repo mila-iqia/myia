@@ -628,15 +628,8 @@ class Reference(AbstractReference):
         self._hash = hash((self.node, self.context))
 
     async def __getitem__(self, track):
-        """Get the value for the track (asynchronous).
-
-        If track is "*", return a dictionary with all tracks.
-        """
-        if track == '*':
-            return {track: await self[track]
-                    for track in self.engine.required_tracks}
-        else:
-            return await reify(await self.get_raw(track))
+        """Get the value for the track (asynchronous)."""
+        return await reify(await self.get_raw(track))
 
     def get(self, track="*"):
         """Get the value for the track (synchronous).
@@ -682,10 +675,7 @@ class VirtualReference(AbstractReference):
         return self.values[track]
 
     async def __getitem__(self, track):
-        if track == '*':
-            raise NotImplementedError('vref["*"]')
-        else:
-            return self.values[track]
+        return self.values[track]
 
 
 class TransformedReference(AbstractReference):
@@ -713,11 +703,8 @@ class TransformedReference(AbstractReference):
         return self.fn(track, v)
 
     async def __getitem__(self, track_name):
-        if track_name == '*':
-            raise NotImplementedError('tref["*"]')
-        else:
-            track, v = await self._parent_raw(track_name)
-            return self.fn(track, await reify(v))
+        track, v = await self._parent_raw(track_name)
+        return self.fn(track, await reify(v))
 
 
 ########
@@ -730,9 +717,6 @@ class InferenceEngine:
 
     Arguments:
         tracks: Map each track (property name) to a Track object.
-        required_tracks: A list of tracks that will be inferred for
-            the output. Other tracks may be used if requested in
-            the evaluation of a required track.
         eq_class: The class to use to check equivalence between
             values.
 
@@ -742,7 +726,6 @@ class InferenceEngine:
                  pipeline,
                  *,
                  tracks,
-                 required_tracks=None,
                  eq_class=EquivalenceChecker,
                  context_class=Context):
         """Initialize the InferenceEngine."""
@@ -754,7 +737,6 @@ class InferenceEngine:
             name: t(engine=self, name=name)
             for name, t in tracks.items()
         }
-        self.required_tracks = required_tracks or self.all_track_names
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
         self.equiv = eq_class(
@@ -763,7 +745,7 @@ class InferenceEngine:
         )
         self.context_class = context_class
 
-    def run(self, graph, argvals):
+    def run(self, graph, argvals, tracks):
         """Run the inferrer on a graph given initial values.
 
         Arguments:
@@ -781,14 +763,15 @@ class InferenceEngine:
         output_ref = self.ref(graph.return_, root_context)
 
         async def _run():
-            for track in self.required_tracks:
+            for track in tracks:
                 inf = GraphInferrer(self.tracks[track],
                                     graph, empty_context,
                                     broaden=False)
                 self.loop.schedule(inf(*argrefs))
 
         self.run_coroutine(_run())
-        return output_ref.get(), root_context
+        results = {name: output_ref.get(name) for name in tracks}
+        return results, root_context
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
