@@ -233,8 +233,7 @@ class EquivalenceChecker:
 
         if isinstance(x, DynamicMap) and isinstance(y, DynamicMap):
             if x.provably_equivalent(y):
-                x.cache.update(y.cache)
-                y.cache = x.cache
+                x.merge(y)
                 return
 
             self._tie_dmaps(x, y, refs)

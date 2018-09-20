@@ -115,6 +115,14 @@ class DynamicMap:
         """Whether this map is provably equivalent to the other."""
         return self is other  # pragma: no cover
 
+    def merge(self, other):
+        """Merge the caches of two DynamicMaps.
+
+        This assumes that provably_equivalent is True.
+        """
+        self.cache.update(other.cache)
+        other.cache = self.cache
+
     async def __call__(self, *args):
         """Infer a property of the operation on the given arguments.
 

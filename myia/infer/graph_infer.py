@@ -465,6 +465,11 @@ class PartialInferrer(Inferrer):
                 self.args == other.args and
                 self.fn.provably_equivalent(other.fn))
 
+    def merge(self, other):
+        """Merge the caches of two PartialInferrers."""
+        super().merge(other)
+        self.fn.merge(other.fn)
+
 
 class ExplicitInferrer(Inferrer):
     """Requires specific input types and returns a specific output type."""
