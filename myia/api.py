@@ -365,15 +365,18 @@ class InferrerStep(PipelineStep):
                  pipeline_init,
                  tracks,
                  required_tracks,
+                 tied_tracks,
                  context_class):
         """Initialize an InferrerStep."""
         super().__init__(pipeline_init)
         self.tracks = tracks
         self.required_tracks = required_tracks
+        self.tied_tracks = tied_tracks
         self.context_class = context_class
         self.engine = InferenceEngine(
             self.pipeline,
             tracks=self.tracks,
+            tied_tracks=self.tied_tracks,
             context_class=self.context_class,
         )
 
@@ -773,6 +776,7 @@ step_infer = InferrerStep.partial(
         )
     ),
     required_tracks=['type'],
+    tied_tracks={},
     context_class=Context,
 )
 
@@ -836,6 +840,7 @@ _standard_pipeline = PipelineDefinition(
                 )
             ),
             required_tracks=['type'],
+            tied_tracks={},
             context_class=Contextless,
         )
     ),

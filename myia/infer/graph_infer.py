@@ -726,6 +726,7 @@ class InferenceEngine:
                  pipeline,
                  *,
                  tracks,
+                 tied_tracks={},
                  eq_class=EquivalenceChecker,
                  context_class=Context):
         """Initialize the InferenceEngine."""
@@ -737,6 +738,7 @@ class InferenceEngine:
             name: t(engine=self, name=name)
             for name, t in tracks.items()
         }
+        self.tied_tracks = tied_tracks
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
         self.equiv = eq_class(
@@ -821,7 +823,10 @@ class InferenceEngine:
 
         Results are cached.
         """
-        return self.cache.get((track, ref))
+        result = self.cache.get((track, ref))
+        for other_track in self.tied_tracks.get(track, []):
+            self.loop.schedule(self.get_inferred(other_track, ref))
+        return result
 
     def run_coroutine(self, coro, throw=True):
         """Run an async function using this inferrer's loop."""
@@ -834,7 +839,11 @@ class InferenceEngine:
                 err.engine = self
             if errs_before < len(self.errors):
                 if throw:  # pragma: no cover
-                    raise self.errors[-1]
+                    for err in self.errors:
+                        if isinstance(err, InferenceError):
+                            raise err
+                    else:
+                        raise err
                 else:
                     return None  # pragma: no cover
             return fut.result()

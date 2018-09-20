@@ -99,7 +99,7 @@ class ScalarShapeInferrer(Inferrer):
         """Initialize the ScalarShapeInferrer."""
         super().__init__(track, 'scalar_shape_inferrer')
 
-    async def __call__(self, *args):
+    async def infer(self, *args):
         """Since no arrays are involved, there is no shape."""
         return NOSHAPE
 
@@ -321,6 +321,12 @@ async def infer_shape_partial(engine, fn, *args):
 @shape_inferrer(P.array_map, nargs=None)
 async def infer_shape_array_map(track, fn, *arrays):
     """Infer the shape of array_map."""
+    fn_t = await fn['shape']
+    vrefs = [a.transform(lambda track, x: track.to_element(x))
+             for a in arrays]
+    elem_shp = await fn_t(*vrefs)
+    assert elem_shp is NOSHAPE
+
     shapes = [await a['shape'] for a in arrays]
     shape0, *rest = shapes
     if any(len(s) != len(shape0) for s in rest):
