@@ -717,6 +717,10 @@ class InferenceEngine:
 
     Arguments:
         tracks: Map each track (property name) to a Track object.
+        tied_tracks: A dictionary from track names to lists of
+            track names which should be computed along with it.
+            E.g. tied_tracks={'type': ['shape']} to compute the
+            shape every time the type is computed.
         eq_class: The class to use to check equivalence between
             values.
 
