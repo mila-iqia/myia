@@ -374,7 +374,6 @@ class InferrerStep(PipelineStep):
         self.engine = InferenceEngine(
             self.pipeline,
             tracks=self.tracks,
-            required_tracks=self.required_tracks,
             context_class=self.context_class,
         )
 
@@ -402,7 +401,7 @@ class InferrerStep(PipelineStep):
         engine = self.engine
         self.fill_in(argspec)
         try:
-            res, context = engine.run(graph, argspec)
+            res, context = engine.run(graph, argspec, self.required_tracks)
             return {'inference_results': res,
                     'inference_context': context,
                     'inferrer': engine}
