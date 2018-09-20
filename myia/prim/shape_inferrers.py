@@ -11,7 +11,7 @@ from ..ir import Graph, MetaGraph
 
 from ..dtype import Array, Tuple, List, Class, TypeType, ismyiatype, \
     pytype_to_myiatype
-from ..utils import Named
+from ..utils import Named, overload
 
 from . import ops as P
 from .inferrer_utils import static_getter
@@ -108,27 +108,60 @@ class ScalarShapeInferrer(Inferrer):
         return type(self) == type(other)
 
 
+@overload
+def _generalize_shape(s1: ListShape, s2):
+    if not isinstance(s2, ListShape):
+        raise InferenceError('Mismatched shape types')
+    return ListShape(_generalize_shape(s1.shape, s2.shape))
+
+
+@overload  # noqa: F811
+def _generalize_shape(s1: TupleShape, s2):
+    if not isinstance(s2, TupleShape):
+        raise InferenceError('Mismatched shape types')
+    s1 = s1.shape
+    s2 = s2.shape
+    if len(s1) != len(s2):
+        raise InferenceError('Tuples of different lengths')
+    tup = [_generalize_shape(a, b) for a, b in zip(s1, s2)]
+    return TupleShape(tup)
+
+
+@overload  # noqa: F811
+def _generalize_shape(s1: tuple, s2):
+    if not isinstance(s2, tuple):
+        raise InferenceError('Mismatched shape types')
+    if len(s1) != len(s2):
+        raise InferenceError('Arrays of differing ndim')
+    return tuple(a if a == b else ANYTHING
+                 for a, b in zip(s1, s2))
+
+
+@overload  # noqa: F811
+def _generalize_shape(s1: ClassShape, s2):
+    if not isinstance(s2, ClassShape):
+        raise InferenceError('Mismatched shape types')
+    d = {}
+    if s1.shape.keys() != s2.shape.keys():
+        raise InferenceError('Classes with different fields')
+    for k, v in s1.shape.items():
+        d[k] = _generalize_shape(v, s2.shape[k])
+
+
+@overload  # noqa: F811
+def _generalize_shape(s1: object, s2):
+    if s1 == s2:
+        return s1
+    else:
+        raise InferenceError('Cannot match shapes')
+
+
 def find_matching_shape(shps):
     """Returns a shape that matches all shapes in `shps`."""
-    shp = shps[0]
-    shps = shps[1:]
-
-    if all(shp == s for s in shps):
-        return shp
-
-    if (not isinstance(shp, tuple) or
-            any(not isinstance(s, tuple) for s in shps)):
-        raise InferenceError("Mismatched element shapes in list")
-
-    if not all(len(shp) == len(s) for s in shps):
-        raise InferenceError("Arrays of differing ndim")
-
-    shp = list(shp)
-    for i, shp_i in enumerate(shp):
-        if any(s[i] != shp_i for s in shps):
-            shp[i] = ANYTHING
-
-    return tuple(shp)
+    s1, *rest = shps
+    for s2 in rest:
+        s1 = _generalize_shape(s1, s2)
+    return s1
 
 
 class ShapeTrack(Track):
@@ -173,8 +206,9 @@ class ShapeTrack(Track):
             return TupleShape(self.from_value(e, context) for e in v)
         elif isinstance(v, list):
             shps = [self.from_value(e, context) for e in v]
-            if len(shps) == 0:
-                return ListShape(NOSHAPE)  # pragma: no cover
+            if len(shps) == 0:  # pragma: no cover
+                # from_value of the type track will fail before this
+                raise InferenceError('Cannot infer the shape of []')
             return ListShape(find_matching_shape(shps))
         elif is_dataclass(v):
             if isinstance(v, type):
@@ -439,3 +473,22 @@ async def infer_shape_broadcast_shape(track, shpx, shpy):
     ty = await shpy['type']
     n = max(len(tx.elements), len(ty.elements))
     return TupleShape([NOSHAPE] * n)
+
+
+@shape_inferrer(P.make_list, nargs=None)
+async def infer_shape_make_list(track, *elems):
+    """Infer the return shape of make_list."""
+    shps = [await e['shape'] for e in elems]
+    if len(shps) == 0:
+        raise InferenceError('Cannot infer the shape of []')
+    return ListShape(find_matching_shape(shps))
+
+
+@shape_inferrer(P.list_reduce, nargs=3)
+async def infer_shape_list_reduce(track, fn, lst, dflt):
+    """Infer the return shape of list_reduce."""
+    elem = lst.transform(lambda track, x: track.to_element(x))
+    fn_inf = await fn['shape']
+    shp1 = await fn_inf(dflt, elem)
+    shp2 = await fn_inf(elem, elem)
+    return find_matching_shape([shp1, shp2])

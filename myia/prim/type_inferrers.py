@@ -9,9 +9,9 @@ from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
     Problem
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track, MetaGraphInferrer, \
-    ExplicitInferrer, Inferrer
+    ExplicitInferrer, Inferrer, VOID
 from ..ir import Graph, MetaGraph
-from ..utils import Namespace, RestrictedVar, is_dataclass_type, overload
+from ..utils import Namespace, Var, RestrictedVar, is_dataclass_type, overload
 
 from ..dtype import ismyiatype
 from . import ops as P
@@ -546,3 +546,25 @@ async def infer_type_array_len(track, xs):
     """Infer the return type of array_len."""
     await track.will_check(Array, xs)
     return Int[64]
+
+
+@type_inferrer(P.make_list, nargs=None)
+async def infer_type_make_list(track, *elems):
+    """Infer the return type of make_list."""
+    if len(elems) == 0:
+        v = Var('empty')
+        t = track.engine.loop.create_var(v, Problem[VOID], -1000)
+    else:
+        t = await track.assert_same(*elems, refs=elems)
+    return List[t]
+
+
+@type_inferrer(P.list_reduce, nargs=3)
+async def infer_type_list_reduce(track, fn, lst, dflt):
+    """Infer the return type of list_reduce."""
+    fn_t = await fn['type']
+    await track.check(List, lst)
+    xref = lst.transform(lambda track, x: track.to_element(x))
+    xref2 = lst.transform(lambda track, x: track.to_element(x))
+    res_elem_t = await track.assert_same(fn_t(xref, xref2), dflt)
+    return res_elem_t

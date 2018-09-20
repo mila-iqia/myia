@@ -9,10 +9,10 @@ from myia.api import scalar_pipeline, standard_pipeline
 from myia.composite import hyper_add, zeros_like
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
-    Number, Class
+    Number, Class, Problem
 from myia.hypermap import HyperMap
-from myia.infer import \
-    ANYTHING, InferenceError, register_inferrer, Contextless, CONTEXTLESS
+from myia.infer import ANYTHING, VOID, InferenceError, register_inferrer, \
+    Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive, ops as P
@@ -23,7 +23,7 @@ from myia.prim.py_implementations import \
     typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
-    tuple_setitem, list_setitem, scalar_cast
+    tuple_setitem, list_setitem, scalar_cast, list_reduce
 from myia.utils import RestrictedVar
 
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
@@ -152,6 +152,10 @@ infer_pipeline_std = standard_pipeline.select(
 })
 
 
+def _is_exc_type(cls):
+    return isinstance(cls, type) and issubclass(cls, Exception)
+
+
 def parse_test_spec(tests_spec):
 
     tests = []
@@ -162,7 +166,7 @@ def parse_test_spec(tests_spec):
         for t in ts:
             test = []
             for entry in t:
-                if isinstance(entry, dict) or entry is InferenceError:
+                if isinstance(entry, dict) or _is_exc_type(entry):
                     test.append(entry)
                 else:
                     test.append({main_track: entry})
@@ -200,12 +204,14 @@ def inferrer_decorator(pipeline):
                 print('Expected:')
                 print(expected_out)
 
-                if isinstance(expected_out, type) \
-                        and issubclass(expected_out, Exception):
+                if _is_exc_type(expected_out):
                     try:
                         out()
-                    except InferenceError as e:
-                        print_inference_error(e)
+                    except expected_out as e:
+                        if issubclass(expected_out, InferenceError):
+                            print_inference_error(e)
+                        else:
+                            pass
                     else:
                         raise Exception(
                             f'Expected {expected_out}, got: (see stdout).'
@@ -245,7 +251,8 @@ def test_contextless():
     assert C.add(Graph(), []) is C
 
 
-@infer(type=[(i64, i64)], value=[(89, 89)])
+@infer(type=[(i64, i64)],
+       value=[(89, 89), ([], TypeError)])
 def test_identity(x):
     return x
 
@@ -423,6 +430,34 @@ def test_too_many_args(x, y):
                TupleShape((TupleShape((NOSHAPE, NOSHAPE)), NOSHAPE)))])
 def test_tup(x, y):
     return (x, y)
+
+
+@infer(type=[(i64, i64, L[i64]),
+             (i64, f64, InferenceError)],
+       shape=[({'type': i64, 'shape': NOSHAPE},
+               {'type': i64, 'shape': NOSHAPE},
+               ListShape(NOSHAPE)),
+              ({'type': L[A[i64]], 'shape': ListShape((8, 3))},
+               {'type': L[A[i64]], 'shape': ListShape((4, 3))},
+               ListShape(ListShape((ANYTHING, 3)))),
+              (ai64_of(4, 7), ai64_of(4, 7), ListShape((4, 7))),
+              (ai64_of(4, 7), ai64_of(9, 7), ListShape((ANYTHING, 7)))])
+def test_list(x, y):
+    return [x, y]
+
+
+@infer(type=[(i64, i64, L[i64]),
+             (f64, f64, L[f64]),
+             (lf64, lf64, InferenceError),
+             (i64, f64, InferenceError)])
+def test_list_and_scalar(x, y):
+    return [x, y, 3]
+
+
+@infer(type=[(L[Problem[VOID]],)],
+       shape=[(InferenceError,)])
+def test_list_empty():
+    return []
 
 
 @infer(
@@ -1316,6 +1351,26 @@ def test_array_reduce(ary, shp):
     def f(a, b):
         return a + b
     return array_reduce(f, ary, shp)
+
+
+@infer_std(
+    type=[
+        (L[i64], i64, i64),
+        (L[i64], f64, InferenceError),
+    ],
+    shape=[
+        ({'type': L[A[i64]], 'shape': ListShape((6, 7))},
+         ai64_of(6, 7),
+         (6, 7)),
+        ({'type': L[A[i64]], 'shape': ListShape((6, 7))},
+         ai64_of(6, 17),
+         InferenceError)
+    ]
+)
+def test_list_reduce(lst, dflt):
+    def f(a, b):
+        return a + b
+    return list_reduce(f, lst, dflt)
 
 
 @infer(type=[(i64, i64)],

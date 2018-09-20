@@ -1,6 +1,7 @@
 """Implementations for the debug VM."""
 
 from copy import copy
+from functools import reduce
 from typing import Callable
 import numpy as np
 import math
@@ -543,3 +544,22 @@ def make_record(typ, *args):
 def _len(x):
     """Implement `len`."""
     return len(x)
+
+
+@register(primops.make_list)
+def make_list(*xs):
+    """Implement `make_list`."""
+    return list(xs)
+
+
+@py_register(primops.list_reduce)
+def list_reduce(fn, lst, dflt):
+    """Implement `list_reduce`."""
+    return reduce(fn, lst, dflt)
+
+
+@vm_register(primops.list_reduce)
+def _list_reduce_vm(vm, fn, lst, dflt):
+    def fn_(a, b):
+        return vm.call(fn, [a, b])
+    return list_reduce(fn_, lst, dflt)

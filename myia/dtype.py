@@ -359,6 +359,8 @@ def pytype_to_myiatype(pytype, instance=None):
     elif pytype is list:
         if instance is None:
             return List
+        elif len(instance) == 0:
+            raise TypeError('Cannot acquire the type of []')
         else:
             type0, *rest = [pytype_to_myiatype(type(x), x) for x in instance]
             if any(t != type0 for t in rest):
