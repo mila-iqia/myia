@@ -138,7 +138,7 @@ class Track(Partializable):
 
         def _str(p):
             if isinstance(p, FunctionType):
-                return p.__doc__
+                return p.__doc__ or str(p)
             else:
                 return str(p)
 
