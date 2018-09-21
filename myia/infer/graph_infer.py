@@ -11,7 +11,7 @@ from ..utils import Partializable, UNKNOWN, eprint, as_frozen
 from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify, \
     reify_shallow
 from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, \
-    infer_trace, Unspecializable, DEAD, POLY, AMBIGUOUS
+    infer_trace, Unspecializable, DEAD, POLY, AMBIGUOUS, unwrap
 
 
 def type_error_nargs(ident, expected, got):
@@ -604,10 +604,6 @@ CONTEXTLESS = Contextless()
 class AbstractReference:
     """Superclass for Reference and VirtualReference."""
 
-    def transform(self, fn):
-        """Create a reference transformed through the given function."""
-        return TransformedReference(self, fn)
-
 
 class Reference(AbstractReference):
     """Reference to a certain node in a certain context.
@@ -679,32 +675,30 @@ class VirtualReference(AbstractReference):
 
 
 class TransformedReference(AbstractReference):
-    """Synthetic reference that modifies another reference.
+    """Reference(s) transformed through a function.
 
-    Attributes:
-        ref: The original reference.
-        fn: The function to call on (track, value) to modify the value
-            inferred for ref.
-
+    Arguments:
+        engine: The engine to use.
+        fn: A Primitive or a Graph.
+        refs: The refs to transform through fn.
     """
 
-    def __init__(self, ref, fn):
-        """Initialize the TransformedReference."""
-        self.ref = ref
+    def __init__(self, engine, fn, *refs):
+        """Initialize a TransformedReference."""
+        self.engine = engine
         self.fn = fn
-
-    async def _parent_raw(self, track_name):
-        track = self.ref.engine.tracks[track_name]
-        return track, await self.ref.get_raw(track_name)
+        self.refs = refs
 
     async def get_raw(self, track_name):
-        """Get the raw value for the track."""
-        track, v = await self._parent_raw(track_name)
-        return self.fn(track, v)
+        """Get the raw value for the track, which might be wrapped."""
+        track = self.engine.tracks[track_name]
+        inf = unwrap(track.from_value(self.fn, None))
+        return await inf(*self.refs)
 
     async def __getitem__(self, track_name):
-        track, v = await self._parent_raw(track_name)
-        return self.fn(track, await reify(v))
+        """Get the value for the track (asynchronous)."""
+        v = await self.get_raw(track_name)
+        return await reify(v)
 
 
 ########

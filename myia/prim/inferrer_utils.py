@@ -4,6 +4,12 @@
 from ..dtype import Class, ismyiatype
 from ..infer import InferenceError, PartialInferrer, Context, ANYTHING, \
     unwrap, InferenceVar, find_coherent_result
+from ..prim import Primitive
+
+
+# These primitives are used by inferrers internally but they are not real
+# operations.
+getelement = Primitive('getelement')  # Represents getting an arbitrary element
 
 
 class MyiaNameError(InferenceError):
