@@ -9,13 +9,13 @@ from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
     Problem
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track, MetaGraphInferrer, \
-    ExplicitInferrer, Inferrer, VOID
+    ExplicitInferrer, Inferrer, VOID, TransformedReference
 from ..ir import Graph, MetaGraph
 from ..utils import Namespace, Var, RestrictedVar, is_dataclass_type, overload
 
 from ..dtype import ismyiatype
 from . import ops as P
-from .inferrer_utils import static_getter
+from .inferrer_utils import static_getter, getelement
 from .ops import Primitive
 from .py_implementations import typeof, issubtype
 
@@ -135,15 +135,6 @@ class TypeTrack(Track):
         """
         return _import_type(self, t)
 
-    def to_element(self, t):
-        """Return the type of each element of type t."""
-        if ismyiatype(t, List):
-            return t.element_type
-        elif ismyiatype(t, Array):
-            return t.elements
-        else:
-            raise AssertionError()
-
     def default(self, values):
         """Return a default type; this method raises an exception."""
         raise Exception('There is no default value for the type track.') \
@@ -252,6 +243,16 @@ async def infer_type_list_getitem(track, seq, idx):
     seq_t = await track.check(List, seq)
     await track.check(Int, idx)
     return seq_t.element_type
+
+
+@type_inferrer(getelement, nargs=1)
+async def infer_type_getelement(track, seq):
+    """Infer the return type of getting some arbitrary element."""
+    seq_t = await track.check((List, Array), seq)
+    if ismyiatype(seq_t, List):
+        return seq_t.element_type
+    else:
+        return seq_t.elements
 
 
 @type_inferrer(P.tuple_setitem, nargs=3)
@@ -366,7 +367,7 @@ async def infer_type_array_map(track, fn, *arrays):
     """Infer the return type of array_map."""
     fn_t = await fn['type']
     await track.check(Array, *arrays)
-    vrefs = [a.transform(lambda track, x: track.to_element(x))
+    vrefs = [TransformedReference(track.engine, getelement, a)
              for a in arrays]
     return Array[await fn_t(*vrefs)]
 
@@ -377,9 +378,8 @@ async def infer_type_reduce(track, fn, ary, shp):
     fn_t = await fn['type']
     await track.check(_shape_type, shp)
     await track.check(Array, ary)
-    xref = ary.transform(lambda track, x: track.to_element(x))
-    xref2 = ary.transform(lambda track, x: track.to_element(x))
-    res_elem_t = await fn_t(xref, xref2)
+    xref = TransformedReference(track.engine, getelement, ary)
+    res_elem_t = await fn_t(xref, xref)
     return Array[res_elem_t]
 
 
@@ -395,9 +395,8 @@ async def infer_type_across_array(track, fn, init, ary, ax):
                             "as array elements")
     if not ax_t == UInt[64]:
         raise MyiaTypeError("Axis must be u64")
-    xref = ary.transform(lambda track, x: track.to_element(x))
-    xref2 = ary.transform(lambda track, x: track.to_element(x))
-    return Array[await fn_t(xref, xref2)]
+    xref = TransformedReference(track.engine, getelement, ary)
+    return Array[await fn_t(xref, xref)]
 
 
 @type_inferrer(P.distribute, nargs=2)
@@ -433,7 +432,7 @@ async def infer_type_list_map(track, f, *lsts):
     """Infer the return type of list_map."""
     f_t = await f['type']
     await track.check(List, *lsts)
-    argrefs = [xs.transform(lambda track, x: track.to_element(x))
+    argrefs = [TransformedReference(track.engine, getelement, xs)
                for xs in lsts]
     ret_t = await f_t(*argrefs)
     return List[ret_t]
@@ -564,7 +563,6 @@ async def infer_type_list_reduce(track, fn, lst, dflt):
     """Infer the return type of list_reduce."""
     fn_t = await fn['type']
     await track.check(List, lst)
-    xref = lst.transform(lambda track, x: track.to_element(x))
-    xref2 = lst.transform(lambda track, x: track.to_element(x))
-    res_elem_t = await track.assert_same(fn_t(xref, xref2), dflt)
+    xref = TransformedReference(track.engine, getelement, lst)
+    res_elem_t = await track.assert_same(fn_t(xref, xref), dflt)
     return res_elem_t

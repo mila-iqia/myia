@@ -6,7 +6,7 @@ from functools import partial, reduce
 
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer, \
-    InferenceError, MyiaTypeError
+    InferenceError, MyiaTypeError, TransformedReference
 from ..ir import Graph, MetaGraph
 
 from ..dtype import Array, Tuple, List, Class, TypeType, ismyiatype, \
@@ -14,7 +14,7 @@ from ..dtype import Array, Tuple, List, Class, TypeType, ismyiatype, \
 from ..utils import Named, overload
 
 from . import ops as P
-from .inferrer_utils import static_getter
+from .inferrer_utils import static_getter, getelement
 from .ops import Primitive
 
 
@@ -223,16 +223,6 @@ class ShapeTrack(Track):
         else:
             return getattr(v, 'shape', NOSHAPE)
 
-    def to_element(self, sh):
-        """Return the type of each element of shape sh."""
-        if isinstance(sh, ListShape):
-            return sh.shape
-        elif isinstance(sh, tuple):
-            # Array
-            return NOSHAPE
-        else:
-            raise AssertionError()
-
 
 shape_inferrer = partial(register_inferrer,
                          constructors=shape_inferrer_constructors)
@@ -257,6 +247,19 @@ async def infer_shape_tuple_getitem(track, seq, idx):
     seq_sh = await seq['shape']
     idx_v = await idx['value']
     return seq_sh.shape[idx_v]
+
+
+@shape_inferrer(getelement, nargs=1)
+async def infer_shape_getelement(track, seq):
+    """Infer the shape of an arbitrary element."""
+    shp = await seq['shape']
+    if isinstance(shp, ListShape):
+        return shp.shape
+    elif isinstance(shp, tuple):
+        # Array
+        return NOSHAPE
+    else:
+        raise AssertionError()
 
 
 @shape_inferrer(P.make_record, nargs=None)
@@ -322,7 +325,7 @@ async def infer_shape_partial(engine, fn, *args):
 async def infer_shape_array_map(track, fn, *arrays):
     """Infer the shape of array_map."""
     fn_t = await fn['shape']
-    vrefs = [a.transform(lambda track, x: track.to_element(x))
+    vrefs = [TransformedReference(track.engine, getelement, a)
              for a in arrays]
     elem_shp = await fn_t(*vrefs)
     assert elem_shp is NOSHAPE
@@ -349,8 +352,8 @@ async def infer_shape_array_map(track, fn, *arrays):
 @shape_inferrer(P.list_map, nargs=None)
 async def infer_shape_list_map(track, fn, *lsts):
     """Infer the shape of list_map."""
-    argrefs = [lst.transform(lambda track, x: track.to_element(x))
-               for lst in lsts]
+    argrefs = [TransformedReference(track.engine, getelement, xs)
+               for xs in lsts]
     return ListShape(await (await fn['shape'])(*argrefs))
 
 
@@ -493,7 +496,7 @@ async def infer_shape_make_list(track, *elems):
 @shape_inferrer(P.list_reduce, nargs=3)
 async def infer_shape_list_reduce(track, fn, lst, dflt):
     """Infer the return shape of list_reduce."""
-    elem = lst.transform(lambda track, x: track.to_element(x))
+    elem = TransformedReference(track.engine, getelement, lst)
     fn_inf = await fn['shape']
     shp1 = await fn_inf(dflt, elem)
     shp2 = await fn_inf(elem, elem)

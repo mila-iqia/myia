@@ -16,7 +16,7 @@ from ..ir import Graph, MetaGraph
 from ..utils import is_dataclass_type, overload
 
 from . import ops as P
-from .inferrer_utils import static_getter
+from .inferrer_utils import static_getter, getelement
 from .ops import Primitive
 
 
@@ -165,10 +165,6 @@ class ValueTrack(Track):
         else:
             return limited(v.value, v.count - 1)
 
-    def to_element(self, v):
-        """Value of each element of v."""
-        return ANYTHING
-
 
 ########################
 # Default constructors #
@@ -306,6 +302,14 @@ async def infer_value_resolve(track, data, item):
         fetch=getitem,
         on_dcattr=on_dcattr
     )
+
+
+@value_inferrer(getelement, nargs=1)
+async def infer_value_getelement(track, seq):
+    """Infer the value of an arbitrary element."""
+    # This has to be ANYTHING unless all values in seq are identical, but
+    # that's probably not worth checking.
+    return ANYTHING
 
 
 @value_inferrer(P.getattr, nargs=2)
