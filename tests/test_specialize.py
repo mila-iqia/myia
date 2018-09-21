@@ -15,7 +15,8 @@ from .common import mysum, i64, f64
 specialize_pipeline = scalar_debug_pipeline \
     .select('parse', 'infer', 'specialize', 'prepare', 'validate', 'export') \
     .configure(
-        {'infer.tracks.value.max_depth': 1}
+        {'infer.tracks.value.max_depth': 1,
+         'infer.tied_tracks': {'type': ['shape']}}
     )
 
 
@@ -23,7 +24,8 @@ specialize_pipeline_std = standard_debug_pipeline \
     .select('parse', 'infer', 'specialize',
             'prepare', 'opt', 'validate', 'export', 'wrap') \
     .configure(
-        {'infer.tracks.value.max_depth': 1}
+        {'infer.tracks.value.max_depth': 1,
+         'infer.tied_tracks': {'type': ['shape']}}
     )
 
 
