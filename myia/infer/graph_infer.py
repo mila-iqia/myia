@@ -429,12 +429,12 @@ class MetaGraphInferrer(GraphInferrer):
 
     async def make_graph(self, args):
         """Return the graph to use for the given args."""
-        types = [await arg['type'] for arg in args]
         try:
-            return self._graph.specialize(
-                self.engine.pipeline.resources, types
+            return await self._graph.specialize(
+                self.engine.pipeline.resources, args
             )
         except GraphGenerationError as err:
+            types = err.args[0]
             raise TypeDispatchError(self._graph, types) from None
 
 

@@ -19,9 +19,16 @@ class MetaGraph:
         """Initialize a MetaGraph."""
         self.name = name
 
-    def specialize(self, resources, types):
+    async def specialize(self, resources, argrefs):
+        """Generate a Graph for the given references."""
+        types = [await arg['type'] for arg in argrefs]
+        return self.specialize_from_types(resources, types)
+
+    def specialize_from_types(self, resources, types):
         """Generate a Graph for this type signature."""
-        raise NotImplementedError('Override specialize in subclass.')
+        raise NotImplementedError(
+            'Override specialize_from_types in subclass.'
+        )
 
     def __str__(self):
         return self.name
@@ -54,7 +61,7 @@ class MultitypeGraph(MetaGraph):
         else:
             raise GraphGenerationError(types)
 
-    def specialize(self, resources, types):
+    def specialize_from_types(self, resources, types):
         """Generate a Graph for this type signature."""
         return resources.convert(self._getfn(types))
 
