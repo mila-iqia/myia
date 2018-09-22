@@ -3,8 +3,8 @@
 from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner
 from ..ir import Constant
 from ..prim import ops as P
-from ..prim.shape_inferrers import TupleShape, ListShape, ClassShape
-from ..utils import overload, UNKNOWN
+from ..dshape import TupleShape, ClassShape, shape_cloner
+from ..utils import UNKNOWN
 
 
 @type_cloner.variant
@@ -12,24 +12,9 @@ def _retype(self, t: Class):
     return Tuple[[self(t2) for t2 in t.attributes.values()]]
 
 
-@overload
-def _reshape(s: TupleShape):
-    return TupleShape(_reshape(s2) for s2 in s.shape)
-
-
-@overload  # noqa: F811
-def _reshape(s: ListShape):
-    return ListShape(_reshape(s.shape))
-
-
-@overload  # noqa: F811
-def _reshape(s: ClassShape):
-    return TupleShape(_reshape(s2) for s2 in s.shape.values())
-
-
-@overload  # noqa: F811
-def _reshape(s: object):
-    return s
+@shape_cloner.variant
+def _reshape(self, s: ClassShape):
+    return TupleShape(self(s2) for s2 in s.shape.values())
 
 
 def erase_class(root, manager):

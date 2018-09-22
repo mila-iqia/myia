@@ -2,10 +2,10 @@
 
 from .dtype import Array, Tuple, List, Function, Number, Bool, Problem, \
     TypeMeta, Class, External, type_cloner
+from .dshape import ListShape, TupleShape
 from .infer import DEAD
 from .ir import manage
 from .prim import Primitive, ops as P
-from .prim.shape_inferrers import ListShape, TupleShape
 from .utils import overload, ErrorPool
 
 

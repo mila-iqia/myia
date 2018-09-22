@@ -16,8 +16,7 @@ from myia.infer import ANYTHING, VOID, InferenceError, register_inferrer, \
 from myia.ir import Graph, MultitypeGraph
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive, ops as P
-from myia.prim.shape_inferrers import TupleShape, ListShape, ClassShape, \
-    NOSHAPE
+from myia.dshape import TupleShape, ListShape, ClassShape, NOSHAPE
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, tail, list_map, hastype, \
     typeof, scalar_usub, dot, distribute, shape, array_map, \
