@@ -62,6 +62,65 @@ def test_Overload():
     assert f(1, 'hello') == 'object'
 
 
+def test_Overload_mixins():
+
+    f = Overload()
+
+    @f.register
+    def f(t: int):
+        return t + 1
+
+    g = Overload()
+
+    @g.register
+    def g(t: str):
+        return t.upper()
+
+    h = Overload(mixins=[f, g])
+
+    assert f(15) == 16
+    with pytest.raises(KeyError):
+        f("hello")
+
+    assert g("hello") == "HELLO"
+    with pytest.raises(KeyError):
+        g(15)
+
+    assert h(15) == 16
+    assert h("hello") == "HELLO"
+
+
+def test_Overload_bootstrap():
+
+    f = Overload().bootstrap()
+
+    assert f.bootstrap() is f
+
+    @f.register
+    def f(self, xs: list):
+        return [self(x) for x in xs]
+
+    @f.register
+    def f(self, x: int):
+        return x + 1
+
+    @f.register
+    def f(self, x: object):
+        return "A"
+
+    assert f([1, 2, "xxx", [3, 4]]) == [2, 3, "A", [4, 5]]
+
+    @f.variant
+    def g(self, x: object):
+        return "B"
+
+    # This does not interfere with f
+    assert f([1, 2, "xxx", [3, 4]]) == [2, 3, "A", [4, 5]]
+
+    # The new method in g is used
+    assert g([1, 2, "xxx", [3, 4]]) == [2, 3, "B", [4, 5]]
+
+
 def test_smap():
     assert smap(_sum, 10, 20) == 30
     assert smap(_sum, 10, 20, 30, 40) == 100
