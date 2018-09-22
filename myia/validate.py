@@ -1,7 +1,7 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
-from .dtype import Array, Tuple, List, Function, Type, Number, Bool, Problem, \
-    TypeMeta
+from .dtype import Array, Tuple, List, Function, Number, Bool, Problem, \
+    TypeMeta, Class, External, type_cloner
 from .infer import DEAD
 from .ir import manage
 from .prim import Primitive, ops as P
@@ -13,47 +13,14 @@ class ValidationError(Exception):
     """Error validating a Graph."""
 
 
-@overload
-def _validate_type(t: Tuple):
-    for t2 in t.elements:
-        _validate_type(t2)
+@type_cloner.variant
+def _validate_type(self, t: (Class, Problem, External, object)):
+    raise ValidationError(f'Illegal type in the graph: {t}')
 
 
 @overload  # noqa: F811
-def _validate_type(t: Array):
-    _validate_type(t.elements)
-
-
-@overload  # noqa: F811
-def _validate_type(t: List):
-    _validate_type(t.element_type)
-
-
-@overload  # noqa: F811
-def _validate_type(t: Function):
-    for t2 in t.arguments:
-        _validate_type(t2)
-    _validate_type(t.retval)
-
-
-@overload  # noqa: F811
-def _validate_type(t: (Number, Bool, Problem[DEAD])):
+def _validate_type(self, t: Problem[DEAD]):
     pass
-
-
-@overload  # noqa: F811
-def _validate_type(t: Type):
-    raise ValidationError(f'Illegal type in the graph: {t}')
-
-
-@overload  # noqa: F811
-def _validate_type(t: TypeMeta):
-    return _validate_type[t](t)
-
-
-@overload  # noqa: F811
-def _validate_type(t: object):
-    raise ValidationError(f'Illegal type in the graph: {t}')
 
 
 @overload

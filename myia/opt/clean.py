@@ -1,48 +1,15 @@
 """Clean up Class types."""
 
-from ..dtype import Int, Tuple, List, Class, Function, Type, ismyiatype, \
-    TypeMeta
+from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner
 from ..ir import Constant
 from ..prim import ops as P
 from ..prim.shape_inferrers import TupleShape, ListShape, ClassShape
 from ..utils import overload, UNKNOWN
 
 
-@overload
-def _retype(t: Tuple):
-    return Tuple[[_retype(t2) for t2 in t.elements]]
-
-
-@overload  # noqa: F811
-def _retype(t: List):
-    return List[_retype(t.element_type)]
-
-
-@overload  # noqa: F811
-def _retype(t: Class):
-    return Tuple[[_retype(t2) for t2 in t.attributes.values()]]
-
-
-@overload  # noqa: F811
-def _retype(t: Function):
-    return Function[[_retype(t2) for t2 in t.arguments], _retype(t.retval)]
-
-
-@overload  # noqa: F811
-def _retype(t: Type):
-    return t
-
-
-@overload  # noqa: F811
-def _retype(t: TypeMeta):
-    return _retype[t](t)
-
-
-@overload  # noqa: F811
-def _retype(t: object):
-    # This will be a validation error later on, and the validator
-    # will report it better than we could here.
-    return t  # pragma: no cover
+@type_cloner.variant
+def _retype(self, t: Class):
+    return Tuple[[self(t2) for t2 in t.attributes.values()]]
 
 
 @overload

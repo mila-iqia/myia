@@ -4,7 +4,7 @@
 import numpy
 from types import FunctionType
 from typing import Tuple as TupleT, Dict as DictT, Any
-from .utils import Named, is_dataclass_type, as_frozen
+from .utils import Named, is_dataclass_type, as_frozen, overload
 
 
 _type_cache = {}
@@ -405,3 +405,103 @@ def pytype_to_myiatype(pytype, instance=None):
 
     else:
         return External[pytype]
+
+
+leaf_types = (Bool, Number, TypeType, Problem, External)
+
+
+@overload(bootstrap=True)
+def type_cloner(self, t: leaf_types, *args):
+    """Base function to clone a type recursively.
+
+    Create a variant of this function to make type transformers.
+    """
+    return t
+
+
+@overload  # noqa: F811
+def type_cloner(self, t: List, *args):
+    return List[self(t.element_type, *args)]
+
+
+@overload  # noqa: F811
+def type_cloner(self, t: Array, *args):
+    return Array[self(t.elements, *args)]
+
+
+@overload  # noqa: F811
+def type_cloner(self, t: Tuple, *args):
+    elt_t = [self(t2, *args) for t2 in t.elements]
+    return Tuple[elt_t]
+
+
+@overload  # noqa: F811
+def type_cloner(self, t: Class, *args):
+    return Class[
+        t.tag,
+        {k: self(v, *args) for k, v in t.attributes.items()},
+        t.methods
+    ]
+
+
+@overload  # noqa: F811
+def type_cloner(self, t: Function, *args):
+    return Function[
+        [self(t2, *args) for t2 in t.arguments],
+        self(t.retval, *args)
+    ]
+
+
+@overload  # noqa: F811
+def type_cloner(self, t: TypeMeta, *args):
+    return self[t](t, *args)
+
+
+@overload(bootstrap=True)
+async def type_cloner_async(self, t: leaf_types, *args):
+    """Base function to asynchronously clone a type recursively.
+
+    Create a variant of this function to make type transformers.
+    """
+    return t
+
+
+@overload  # noqa: F811
+async def type_cloner_async(self, t: List, *args):
+    return List[await self(t.element_type, *args)]
+
+
+@overload  # noqa: F811
+async def type_cloner_async(self, t: Array, *args):
+    return Array[await self(t.elements, *args)]
+
+
+@overload  # noqa: F811
+async def type_cloner_async(self, t: Tuple, *args):
+    elt_t = [await self(t2, *args) for t2 in t.elements]
+    return Tuple[elt_t]
+
+
+@overload  # noqa: F811
+async def type_cloner_async(self, t: Class, *args):
+    return Class[
+        t.tag,
+        {k: await self(v, *args) for k, v in t.attributes.items()},
+        t.methods
+    ]
+
+
+@overload  # noqa: F811
+async def type_cloner_async(self, t: Function, *args):
+    return Function[
+        [await self(t2, *args) for t2 in t.arguments],
+        await self(t.retval, *args)
+    ]
+
+
+@overload  # noqa: F811
+async def type_cloner_async(self, t: TypeMeta, *args):
+    if t.is_generic():
+        return t
+    else:
+        return await self[t](t, *args)
