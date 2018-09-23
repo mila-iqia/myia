@@ -27,7 +27,7 @@ from myia.utils import RestrictedVar
 
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
     li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
-    Point, Point_t, Point3D, Point3D_t, mysum
+    Point, Point_t, Point3D, Point3D_t, Thing_f, Thing_ftup, mysum
 
 
 def t(tt):
@@ -1013,16 +1013,25 @@ def test_typeof(x):
     return typeof(x)
 
 
+Tf4 = T[f64, f64, f64, f64]
+
+
 @infer(
     type=[
         (i64, i64),
         (f64, i64),
+        (ai64_of(2, 5), f64),
+        (af64_of(2, 5), i64),
         (T[i64, i64], i64),
+        (T[f64, f64, i64, i64], i64),
+        (Tf4, Tf4),
         (T[i64, T[f64, i64]], i64),
         (li64, f64),
         (T[i64, li64], i64),
         (Point_t, i64),
         (Point3D_t, i64),
+        (Thing_ftup, T[f64, f64]),
+        (Thing_f, i64),
     ],
     value=[
         (5, 5),
@@ -1039,14 +1048,20 @@ def test_hastype_2(x):
             return x
         elif hastype(x, f64):
             return f(_to_i64(x))
+        elif hastype(x, ai64):
+            return 0.0
         elif hastype(x, Point_t):
             return f(x.x) * f(x.y)
         elif hastype(x, Nil):
             return 0
+        elif hastype(x, Tf4):
+            return x
         elif hastype(x, T):
             return f(x[0]) + f(tail(x))
         elif hastype(x, L):
             return 1.0
+        elif hastype(x, Thing_ftup):
+            return x.contents
         else:
             return 0
 

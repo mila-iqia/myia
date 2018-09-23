@@ -282,11 +282,11 @@ def overload(fn=None, *, fallback_method=None, bootstrap=False):
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
         dispatch = Overload(fallback_method=fallback_method)
-    elif fallback_method is not None:
+    elif fallback_method is not None:  # pragma: no cover
         raise ValueError(
             'Only the first use of @overload can take keyword arguments.'
         )
-    if not isinstance(dispatch, Overload):
+    if not isinstance(dispatch, Overload):  # pragma: no cover
         raise TypeError('@overload requires Overload instance')
     ov = dispatch.register(fn)
     if bootstrap:

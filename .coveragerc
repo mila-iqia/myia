@@ -6,7 +6,7 @@ omit =
 
 [report]
 exclude_lines =
-    @overload
+    @pyoverload
     @abstractmethod
     @compile
     @core

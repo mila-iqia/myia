@@ -4,14 +4,16 @@ from types import SimpleNamespace
 import numpy as np
 import math
 
-from myia.dtype import Int, Float, List, Tuple, External
+from myia.dtype import Int, Float, List, Tuple, Class, Number, External
 from myia.prim.py_implementations import setattr as myia_setattr, \
     tuple_setitem, list_setitem, tail, hastype, typeof, \
     shape, reshape, array_map, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
-    switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce
+    switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
+    issubtype
 
 from ..test_lang import parse_compare
+from ..common import i64, f64
 
 
 @parse_compare((2, 7), (4, -6))
@@ -149,8 +151,6 @@ def test_prim_setattr():
 
 
 def test_prim_typeof():
-    i64 = Int[64]
-    f64 = Float[64]
     assert typeof(1) == i64
     assert typeof(1.2) == f64
     assert typeof((1, 2.0, (3, 4))) == Tuple[i64, f64, Tuple[i64, i64]]
@@ -158,6 +158,21 @@ def test_prim_typeof():
     with pytest.raises(TypeError):
         typeof([1, 2, 3.4])
     assert typeof(object()) == External[object]
+
+
+def test_issubtype():
+    assert issubtype(Tuple[i64, i64], Tuple)
+    assert issubtype(Tuple[i64, i64], Tuple[i64, i64])
+    assert issubtype(Tuple[i64, i64], Tuple[Number, Number])
+    assert not issubtype(Tuple[i64, i64], Tuple[i64, i64, i64])
+
+    AN = Class["A", {'x': Number}, {}]
+    Ai = Class["A", {'x': i64}, {}]
+    Bi = Class["B", {'x': i64}, {}]
+    assert issubtype(AN, Class)
+    assert issubtype(Ai, AN)
+    assert not issubtype(AN, Ai)
+    assert not issubtype(Bi, AN)
 
 
 def test_prim_ismyiatype():

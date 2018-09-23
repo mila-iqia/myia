@@ -139,6 +139,7 @@ def _generalize_shape(s1: ClassShape, s2):
         raise InferenceError('Classes with different fields')
     for k, v in s1.shape.items():
         d[k] = _generalize_shape(v, s2.shape[k])
+    return ClassShape(d)
 
 
 @overload  # noqa: F811

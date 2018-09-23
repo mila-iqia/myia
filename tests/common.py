@@ -1,7 +1,7 @@
 
 from dataclasses import dataclass
 from myia.dtype import Bool, Int, UInt, Float, List, Array, Tuple, Function, \
-    pytype_to_myiatype
+    Object, pytype_to_myiatype
 from myia.ir import MultitypeGraph
 
 
@@ -41,6 +41,11 @@ Nil = T[()]
 
 
 @dataclass(frozen=True)
+class Thing:
+    contents: Object
+
+
+@dataclass(frozen=True)
 class Point:
     x: i64
     y: i64
@@ -61,6 +66,8 @@ class Point3D:
 
 Point_t = pytype_to_myiatype(Point)
 Point3D_t = pytype_to_myiatype(Point3D)
+Thing_f = pytype_to_myiatype(Thing, Thing(1.0))
+Thing_ftup = pytype_to_myiatype(Thing, Thing((1.0, 2.0)))
 
 
 mysum = MultitypeGraph('mysum')
