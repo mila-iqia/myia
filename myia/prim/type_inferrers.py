@@ -5,13 +5,12 @@ from functools import partial
 from operator import getitem
 
 from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
-    TypeType, Class, Function, TypeMeta, External, pytype_to_myiatype, \
-    Problem
+    TypeType, Class, Function, pytype_to_myiatype, Problem, type_cloner
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track, MetaGraphInferrer, \
-    ExplicitInferrer, Inferrer, VOID, TransformedReference
+    ExplicitInferrer, VOID, TransformedReference
 from ..ir import Graph, MetaGraph
-from ..utils import Namespace, Var, RestrictedVar, is_dataclass_type, overload
+from ..utils import Namespace, Var, RestrictedVar, is_dataclass_type
 
 from ..dtype import ismyiatype
 from . import ops as P
@@ -36,46 +35,13 @@ def _shape_type(t):  # noqa: D400
     return ismyiatype(t, Tuple) and all(x == UInt[64] for x in t.elements)
 
 
-@overload
-def _import_type(track, t: Function):
+@type_cloner.variant
+def _import_type(self, t: Function, track):
     return ExplicitInferrer(
         track,
-        [_import_type(track, t2) for t2 in t.arguments],
-        _import_type(track, t.retval)
+        [self(t2, track) for t2 in t.arguments],
+        self(t.retval, track)
     )
-
-
-@overload  # noqa: F811
-def _import_type(track, t: Tuple):
-    return Tuple[
-        [_import_type(track, t2) for t2 in t.elements],
-    ]
-
-
-@overload  # noqa: F811
-def _import_type(track, t: List):
-    return List[_import_type(track, t.element_type)]
-
-
-@overload  # noqa: F811
-def _import_type(track, t: Class):
-    return Class[
-        t.tag,
-        {name: _import_type(track, t2)
-         for name, t2 in t.attributes.items()},
-        t.methods
-    ]
-
-
-@overload  # noqa: F811
-def _import_type(track, t: (Bool, Number, Array, Problem,
-                            TypeType, External, Inferrer)):
-    return t
-
-
-@overload  # noqa: F811
-def _import_type(track, t: TypeMeta):
-    return _import_type[t](track, t)
 
 
 class TypeTrack(Track):
@@ -133,7 +99,7 @@ class TypeTrack(Track):
 
         This will replace every Function type by an ExplicitInferrer.
         """
-        return _import_type(self, t)
+        return _import_type(t, self)
 
     def default(self, values):
         """Return a default type; this method raises an exception."""

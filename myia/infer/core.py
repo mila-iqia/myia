@@ -4,8 +4,9 @@ import asyncio
 from contextvars import copy_context
 from collections import deque
 
-from ..dtype import Array, List, Tuple, Function, TypeMeta
-from ..utils import Unification, Var, RestrictedVar, eprint, overload
+from ..dtype import Function, type_cloner_async
+from ..utils import Unification, Var, RestrictedVar, eprint, overload, \
+    Overload
 
 from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
 
@@ -372,89 +373,29 @@ async def find_coherent_result(infv, fn):
     return await fn(x)
 
 
-@overload
-async def reify(x: ValueWrapper):
-    """Build a concrete value from v.
-
-    All InferenceVars in v will be awaited on.
-    """
-    return await reify(x.value)
-
-
-@overload  # noqa: F811
-async def reify(v: Var):
-    return await reify(await v._infvar)
-
-
-@overload  # noqa: F811
-async def reify(v: InferenceVar):
-    return await reify(await v)
-
-
-@overload  # noqa: F811
-async def reify(t: Array):
-    return Array[await reify(t.elements)]
-
-
-@overload  # noqa: F811
-async def reify(t: List):
-    return List[await reify(t.element_type)]
-
-
-@overload  # noqa: F811
-async def reify(t: Tuple):
-    return Tuple[await reify(t.elements)]
-
-
-@overload  # noqa: F811
-async def reify(t: Function):
-    return Function[await reify(t.arguments), await reify(t.retval)]
-
-
-@overload  # noqa: F811
-async def reify(v: tuple):
-    li = [await reify(x) for x in v]
-    return tuple(li)
-
-
-@overload  # noqa: F811
-async def reify(v: int):
-    return v
-
-
-@overload  # noqa: F811
-async def reify(v: TypeMeta):
-    if v.is_generic():
-        return v
-    else:
-        return await reify[v](v)
-
-
-@overload  # noqa: F811
-async def reify(v: (type, object)):
-    return v
-
-
-@overload
-async def reify_shallow(x: ValueWrapper):
+@overload(bootstrap=True)
+async def reify_shallow(self, x: ValueWrapper):
     """Build a concrete value from v.
 
     Unlike reify which is deep, the outermost InferenceVar will be
     awaited on.
     """
-    return await reify_shallow(x.value)
+    return await self(x.value)
 
 
 @overload  # noqa: F811
-async def reify_shallow(v: Var):
-    return await reify_shallow(v._infvar)
+async def reify_shallow(self, v: Var):
+    return await self(v._infvar)
 
 
 @overload  # noqa: F811
-async def reify_shallow(v: InferenceVar):
-    return await reify_shallow(await v)
+async def reify_shallow(self, v: InferenceVar):
+    return await self(await v)
 
 
 @overload  # noqa: F811
-async def reify_shallow(v: (type, object, TypeMeta)):
+async def reify_shallow(self, v: object):
     return v
+
+
+reify = Overload(mixins=[type_cloner_async, reify_shallow]).bootstrap()

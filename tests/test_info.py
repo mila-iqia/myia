@@ -1,3 +1,4 @@
+from threading import Thread
 from myia.info import DebugInfo, DebugInherit, NamedDebugInfo, About
 
 
@@ -49,3 +50,22 @@ def test_info_find():
     assert b.find('field1') == 1
     assert b.find('field2') == 3
     assert b.find('field3') is None
+
+
+def test_info_thread():
+    exc = None
+
+    def f():
+        nonlocal exc
+        try:
+            a = NamedDebugInfo()
+            with About(a, 'thing'):
+                NamedDebugInfo()
+        except Exception as e:
+            exc = e
+
+    t = Thread(target=f)
+    t.start()
+    t.join()
+    if exc:
+        raise exc

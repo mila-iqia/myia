@@ -35,7 +35,8 @@ import asttokens
 import inspect
 import textwrap
 from types import FunctionType
-from typing import Dict, List, NamedTuple, Optional, Tuple, overload
+from typing import Dict, List, NamedTuple, Optional, Tuple, \
+    overload as pyoverload
 
 from .info import About, DebugInherit, NamedDebugInfo
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
@@ -242,15 +243,15 @@ class Parser:
         final_block = self.process_statements(function_block, node.body)
         return final_block, function_block
 
-    @overload
+    @pyoverload
     def process_node(self, block: 'Block', node: ast.expr) -> ANFNode:
         pass
 
-    @overload  # noqa
+    @pyoverload  # noqa
     def process_node(self, block: 'Block', node: ast.slice) -> ANFNode:
         pass
 
-    @overload  # noqa
+    @pyoverload  # noqa
     def process_node(self, block: 'Block', node: ast.stmt) -> 'Block':
         pass
 

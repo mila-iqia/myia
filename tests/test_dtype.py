@@ -1,10 +1,12 @@
+import asyncio
 import pytest
 import numpy
 from dataclasses import dataclass
 
 from myia.dtype import ismyiatype, Bool, Float, Function, Int, List, Number, \
     Tuple, UInt, np_dtype_to_type, type_to_np_dtype, Object, \
-    pytype_to_myiatype, Array, Class, External, get_generic
+    pytype_to_myiatype as ptm, Array, Class, External, get_generic, \
+    type_cloner, type_cloner_async
 
 
 @dataclass(frozen=True)
@@ -131,8 +133,6 @@ def test_type_conversions():
 
 
 def test_pytype_to_myiatype():
-    ptm = pytype_to_myiatype
-
     assert ptm(Int) is Int
     assert ptm(Int[64]) is Int[64]
 
@@ -167,3 +167,32 @@ def test_pytype_to_myiatype():
 
     assert ptm(str) is External[str]
     assert ptm(object) is External[object]
+
+
+def test_type_cloner():
+
+    t1 = Function[
+        [List[Int[64]], List[Float[32]]],
+        Tuple[Array[Int[32]], Class['C', {'x': Int[64]}, {}]]
+    ]
+
+    t2 = Function[
+        [List[Int[32]], List[Float[32]]],
+        Tuple[Array[Int[16]], Class['C', {'x': Int[32]}, {}]]
+    ]
+
+    assert type_cloner(t1) is t1
+
+    @type_cloner.variant
+    def halver(self, t: Int):
+        return Int[t.bits // 2]
+
+    assert halver(t1) is t2
+
+    assert asyncio.run(type_cloner_async(t1)) is t1
+
+    @type_cloner_async.variant
+    async def halver_async(self, t: Int):
+        return Int[t.bits // 2]
+
+    assert asyncio.run(halver_async(t1)) is t2

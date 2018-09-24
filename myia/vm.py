@@ -259,7 +259,7 @@ class VM:
         elif isinstance(fn, MetaGraph):
             types = [typeof(arg) for arg in args]
             res = NS(convert=self.convert, manager=self.manager)
-            g = fn.specialize(res, types)
+            g = fn.specialize_from_types(res, types)
             self._dispatch_call(node, frame, g, args)
         elif is_dataclass_type(fn):
             frame.values[node] = fn(*args)
