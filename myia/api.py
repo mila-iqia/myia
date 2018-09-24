@@ -814,6 +814,8 @@ step_opt = Optimizer.partial(
     opts=[
         optlib.simplify_always_true,
         optlib.simplify_always_false,
+        optlib.simplify_always_true_switch,
+        optlib.simplify_always_false_switch,
         optlib.inline_unique_uses,
         optlib.simplify_partial,
         optlib.replace_applicator,
