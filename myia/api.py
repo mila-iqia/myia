@@ -352,19 +352,25 @@ class Optimizer(PipelineStep):
         graph: The optimized graph.
     """
 
-    def __init__(self, pipeline_init, pre, opts, post):
+    def __init__(self, pipeline_init, phases):
         """Initialize an Optimizer."""
         super().__init__(pipeline_init)
-        self.pre = [opt(optimizer=self) for opt in pre]
-        self.opts = opts
-        self.post = [opt(optimizer=self) for opt in post]
+        self.phases = []
+        for name, spec in phases.items():
+            if isinstance(spec, list):
+                spec = PatternEquilibriumOptimizer(*spec, optimizer=self)
+            else:
+                spec = spec(optimizer=self)
+            self.phases.append(spec)
 
     def step(self, graph):
         """Optimize the graph using the given patterns."""
-        eq = PatternEquilibriumOptimizer(*self.opts, optimizer=self)
-        seq = [*self.pre, eq, *self.post]
-        for opt in seq:
-            opt(graph)
+        changes = True
+        while changes:
+            changes = False
+            for opt in self.phases:
+                if opt(graph):
+                    changes = True
         self.resources.manager.keep_roots(graph)
         return {'graph': graph}
 
@@ -776,9 +782,9 @@ step_parse = Parser.partial()
 
 
 step_resolve = Optimizer.partial(
-    pre=[],
-    opts=[optlib.resolve_globals],
-    post=[],
+    phases=dict(
+        resolve=[optlib.resolve_globals]
+    )
 )
 
 
@@ -810,18 +816,19 @@ step_prepare = Preparator.partial(
 
 
 step_opt = Optimizer.partial(
-    pre=[],
-    opts=[
-        optlib.simplify_always_true,
-        optlib.simplify_always_false,
-        optlib.simplify_always_true_switch,
-        optlib.simplify_always_false_switch,
-        optlib.inline_unique_uses,
-        optlib.simplify_partial,
-        optlib.replace_applicator,
-        optlib.elim_identity,
-    ],
-    post=[CSE]
+    phases=dict(
+        main=[
+            optlib.simplify_always_true,
+            optlib.simplify_always_false,
+            optlib.simplify_always_true_switch,
+            optlib.simplify_always_false_switch,
+            optlib.inline_unique_uses,
+            optlib.simplify_partial,
+            optlib.replace_applicator,
+            optlib.elim_identity,
+        ],
+        cse=CSE
+    )
 )
 
 

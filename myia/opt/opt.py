@@ -147,6 +147,8 @@ class PatternEquilibriumOptimizer:
         else:
             mng = manage(*graphs)
 
+        any_changes = False
+
         while True:
             changes = False
 
@@ -158,7 +160,10 @@ class PatternEquilibriumOptimizer:
                             new.expect_inferred.update(node.inferred)
                             tr.replace(node, new)
                             changes = True
+                            any_changes = True
                             break
 
             if not changes:
                 break
+
+        return any_changes

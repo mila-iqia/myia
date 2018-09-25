@@ -23,7 +23,7 @@ def parse_compare(*tests, optimize=True):
 
     """
     pipeline = compile_pipeline if optimize else \
-        compile_pipeline.configure({'opt.opts': []})
+        compile_pipeline.configure({'opt.phases.main': []})
 
     def decorate(fn):
         def test(args):
