@@ -155,26 +155,6 @@ async def infer_shape_return(track, v):
     return await v['shape']
 
 
-@shape_inferrer(P.if_, nargs=3)
-async def infer_shape_if(track, cond, tb, fb):
-    """Infer the shape of if."""
-    tb_inf = await tb['shape']
-    fb_inf = await fb['shape']
-    v = await cond['value']
-    if v is True:
-        # We only visit the first branch if the condition is provably true
-        return await tb_inf()
-    elif v is False:
-        # We only visit the second branch if the condition is provably false
-        return await fb_inf()
-    elif v is ANYTHING:
-        # The first branch to finish will return immediately. When the other
-        # branch finishes, its result will be checked against the other.
-        return await track.assert_same(tb_inf(), fb_inf(), refs=[tb, fb])
-    else:
-        raise AssertionError("Invalid condition value for if.")
-
-
 @shape_inferrer(P.switch, nargs=3)
 async def infer_shape_switch(track, cond, tb, fb):
     """Infer the shape of switch."""

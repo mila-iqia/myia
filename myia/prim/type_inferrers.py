@@ -117,27 +117,6 @@ type_inferrer = partial(register_inferrer,
                         constructors=type_inferrer_constructors)
 
 
-@type_inferrer(P.if_, nargs=3)
-async def infer_type_if(track, cond, tb, fb):
-    """Infer the return type of if."""
-    await track.check(Bool, cond)
-    tb_inf = await tb['type']
-    fb_inf = await fb['type']
-    v = await cond['value']
-    if v is True:
-        # We only visit the first branch if the condition is provably true
-        return await tb_inf()
-    elif v is False:
-        # We only visit the second branch if the condition is provably false
-        return await fb_inf()
-    elif v is ANYTHING:
-        # The first branch to finish will return immediately. When the other
-        # branch finishes, its result will be checked against the other.
-        return await track.assert_same(tb_inf(), fb_inf(), refs=[tb, fb])
-    else:
-        raise AssertionError("Invalid condition value for if")
-
-
 @type_inferrer(P.switch, nargs=3)
 async def infer_type_switch(track, cond, tb, fb):
     """Infer the return type of switch."""

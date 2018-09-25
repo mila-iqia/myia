@@ -21,7 +21,7 @@ test_whitelist = frozenset({
     P.tuple_getitem,
     P.list_map,
     P.partial,
-    P.if_,
+    P.switch,
     P.return_,
 })
 

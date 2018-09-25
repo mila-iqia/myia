@@ -3,7 +3,7 @@
 from ..ir import Apply, toposort, Graph, Constant
 from ..pipeline import PipelineDefinition, PipelineStep
 from ..prim import Primitive
-from ..prim.ops import if_, partial, return_
+from ..prim.ops import partial, return_, switch
 from .debug_lin import debug_convert
 from .vm import FinalVM
 
@@ -96,7 +96,7 @@ class SplitGraph(PipelineStep):
             fn = node.inputs[0]
             if not fn.is_constant(Primitive):
                 return True
-            elif fn.value in (if_, return_, partial):
+            elif fn.value in (return_, partial):
                 return True
         return False
 
@@ -203,19 +203,10 @@ class CompileGraph(PipelineStep):
                     # pre-push arguments on the stack if needed
                     for i in split.inputs[1:]:
                         self.ref(i)
-                    if fn.value == if_:
+                    if fn.value == switch:
                             self.add_instr('switch', self.ref(split.inputs[1]),
                                            self.ref(split.inputs[2]),
                                            self.ref(split.inputs[3]))
-                            # XXX remove this somehow
-                            self.height += 1
-                            if split is graph.output:
-                                self.add_instr('tailcall', -1, self.height, 0)
-                                # execution stops here
-                                break
-                            else:
-                                self.add_instr('call', -1)
-
                     elif fn.value == return_:
                         self.add_instr('return', self.ref(split.inputs[1]),
                                        self.height)

@@ -10,7 +10,7 @@ from typing import Iterable, Mapping, Any, List
 from .ir import Graph, Apply, Constant, Parameter, ANFNode, MetaGraph
 from .prim import Primitive
 from .prim.py_implementations import typeof
-from .prim.ops import if_, return_, partial
+from .prim.ops import return_, partial
 from .graph_utils import toposort
 from .utils import TypeMap, is_dataclass_type
 
@@ -246,11 +246,7 @@ class VM:
 
     def _dispatch_call(self, node, frame, fn, args):
         if isinstance(fn, Primitive):
-            if fn == if_:
-                cond, tb, fb = args
-                fn = tb if cond else fb
-                self._dispatch_call(node, frame, fn, [])
-            elif fn == return_:
+            if fn == return_:
                 raise self._Return(args[0])
             elif fn == partial:
                 partial_fn, *partial_args = args

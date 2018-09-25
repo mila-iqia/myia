@@ -106,7 +106,6 @@ dot = Primitive('dot')
 ##############
 
 
-if_ = Primitive('if')
 switch = Primitive('switch')
 return_ = Primitive('return')
 

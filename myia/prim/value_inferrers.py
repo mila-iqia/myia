@@ -175,27 +175,6 @@ value_inferrer = partial(register_inferrer,
                          constructors=value_inferrer_constructors)
 
 
-@value_inferrer(P.if_, nargs=3)
-async def infer_value_if(engine, cond, tb, fb):
-    """Infer the return value of if.
-
-    If the condition is ANYTHING, the return value is also ANYTHING,
-    regardless of whether the value of either or both branches can
-    be inferred.
-    """
-    v = await cond['value']
-    if v is True:
-        fn = await tb['value']
-    elif v is False:
-        fn = await fb['value']
-    elif v is ANYTHING:
-        # Note: we do not infer the values for the branches at all.
-        # If we did, we may encounter recursion and deadlock.
-        return ANYTHING
-
-    return await fn()
-
-
 @value_inferrer(P.switch, nargs=3)
 async def infer_value_switch(track, cond, tb, fb):
     """Infer the return type of switch."""

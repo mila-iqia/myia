@@ -162,15 +162,15 @@ elim_identity = psub(
 
 
 simplify_always_true = psub(
-    pattern=(P.if_, True, X, Y),
-    replacement=(X,),
+    pattern=(P.switch, True, X, Y),
+    replacement=X,
     name='simplify_always_true'
 )
 
 
 simplify_always_false = psub(
-    pattern=(P.if_, False, X, Y),
-    replacement=(Y,),
+    pattern=(P.switch, False, X, Y),
+    replacement=Y,
     name='simplify_always_false'
 )
 
@@ -333,22 +333,3 @@ def drop_into_call(optimizer, node, equiv):
     g2.output = sexp_to_node(new_output, g2)
 
     return sexp_to_node((g2, *xs), node.graph)
-
-
-@pattern_replacer((P.if_, X, Y, Z), Xs)
-def drop_into_if(optimizer, node, equiv):
-    """Drop a call on the result of if into both branches.
-
-    f(if(x, y, z)) => if(x, () -> f(y()), () -> f(z()))
-    """
-    y = equiv[Y]
-    z = equiv[Z]
-
-    y2 = Graph()
-    y2.output = sexp_to_node(((y,), *equiv[Xs]), y2)
-
-    z2 = Graph()
-    z2.output = sexp_to_node(((z,), *equiv[Xs]), z2)
-
-    new = (P.if_, equiv[X], y2, z2)
-    return sexp_to_node(new, node.graph)
