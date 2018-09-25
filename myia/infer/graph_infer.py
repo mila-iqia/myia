@@ -52,7 +52,8 @@ class Track(Partializable):
 
     async def infer_constant(self, ctref):
         """Get the property for a ref of a Constant node."""
-        return self.from_value(ctref.node.value, ctref.context)
+        v = self.engine.pipeline.resources.convert(ctref.node.value)
+        return self.from_value(v, ctref.context)
 
     async def infer_apply(self, ref):
         """Get the property for a ref of an Apply node."""
