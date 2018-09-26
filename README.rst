@@ -13,7 +13,7 @@ Myia is a new differentiable programming language. It aims to support large scal
 Status
 ------
 
-Myia is currently under development and is not yet ready for use. As of 2018/05/22 we anticipate we may be able to offer a beta for 2018/08/01. We will update that estimate regularly.
+Myia is currently under development and is not yet ready for use. As of 2018/09/26 we anticipate we may be able to offer a beta for 2018/12/01. We will update that estimate regularly.
 
 See `Roadmap`_.
 
@@ -40,45 +40,41 @@ Roadmap
 Current
 ~~~~~~~
 
-* **Parser**: Supports ``def``, ``if``, ``while``, operators, function calls.
+* **Parser**: Supports ``def``, ``if``, ``for``, ``while``, operators, function calls, ``class`` and methods (limited support).
 * **Intermediate representation**: Implemented, with an array of utilities.
 * **Debug VM**: Faithfully runs the IR.
-* **Primitives**: Only scalar primitives currently work.
-* **Type system**: Types are inferred without the need for annotations.
-* **Optimization**: Pattern-based optimizations, inlining, constant propagation.
-* **Automatic differentiation**: Works, tested up to second order, PR `#22`_ (awaiting review).
+* **VM**: Works on the simplified/optimized IR. Uses NNVM to run linear chunks.
+* **Primitives**: Scalar primitives work, as well as map, reduce and broadcasting.
+* **Type system**: Types are inferred without the need for annotations. Shapes can also be inferred.
+* **Optimization**: Pattern-based optimizations, inlining, constant propagation, common subexpression elimination, closure conversion.
+* **Automatic differentiation**: Works in a separate branch, currently being adapted to work with the type system.
 
 In development
 ~~~~~~~~~~~~~~
 
-* **Intermediate representation**: Closure conversion (`#72`_).
-* **Type system**: Shape inference.
-* **Optimization**: Common subexpression elimination.
+* **Automatic differentiation**: The algorithm has been implemented and works, but it must be adapted to work with the type system and optimization.
+* **Optimization**: The graph transformation subsystem is being adapted to maintain inferred information (types and shapes).
+* **GPU support**: NNVM is supported but only tested on CPU, so this should be a formality.
 
 Next steps
 ~~~~~~~~~~
 
-* **Broadcasting**: We are trying to figure out the best primitives to support this feature. Discussion in `#43`_.
-* **Array primitives**: Need to implement ``map`` and ``reduce`` as well as their backpropagators.
-* **GPU support**: We currently plan to integrate NNVM as a backend to compile subgraphs of array primitives.
+* **Optimization**: The optimizer will need to be adapted to optimize the output of automatic differentiation.
+* **Error messages**: We need to make sure that every likely mistake leads to an understandable and traceable error diagnosis.
 
 Near future
 ~~~~~~~~~~~
 
-* **Low level VM**: We need a VM that is more efficient and portable than the debug VM.
+* **Serialization**: Serializing optimized graphs will allow for greater performance across runs and greater portability across systems.
 * **Debugger**: Intent is to have a step debugger for Myia. There used to be a working one for a previous version of the IR, so this should not pose a problem.
-* **More Python syntax**: ``for``, ``lambda``, ``and``/``or``, ``break/continue``.
+* **More Python syntax**: ``break/continue``.
 
 After Beta
 ~~~~~~~~~~
 
 * **Even more Python syntax**: Support for these features is not certain.
 
-  * ``class`` (under restrictions)
   * Augmented assignment (under restrictions)
   * ``yield`` and ``await``
 
 * **Support other languages**: Which ones depend on demand. A new language is also a possibility.
-
-.. _#22: https://github.com/mila-udem/myia/pull/22
-.. _#72: https://github.com/mila-udem/myia/pull/72
