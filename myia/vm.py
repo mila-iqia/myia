@@ -5,7 +5,6 @@ testing or debugging.  Don't expect stellar performance from this
 implementation.
 """
 
-from collections import defaultdict
 from typing import Iterable, Mapping, Any, List
 
 from .ir import Graph, Apply, Constant, Parameter, ANFNode, MetaGraph
@@ -110,7 +109,7 @@ class VM:
         })
         self.implementations = implementations
         self.py_implementations = py_implementations
-        self._vars = defaultdict(set)
+        self._vars = dict()
 
     def _compute_fvs(self, graph):
         rval = set()
@@ -165,7 +164,7 @@ class VM:
         if len(args) != len(graph.parameters):
             raise RuntimeError("Call with wrong number of arguments")
 
-        top_frame = VMFrame(toposort(graph.return_, self._succ_vm),
+        top_frame = VMFrame(toposort(graph.return_, self._succ_vm(graph)),
                             dict(zip(graph.parameters, args)),
                             closure=closure)
         frames = [top_frame]
@@ -191,13 +190,17 @@ class VM:
                 else:
                     return self.export(r.value)
 
-    def _succ_vm(self, node: ANFNode) -> Iterable[ANFNode]:
-        """Follow node.incoming and free variables."""
-        for i in node.inputs:
-            if i.graph == node.graph or i.is_constant_graph():
-                yield i
-        if node.is_constant_graph():
-            yield from self._vars[node.value]
+    def _succ_vm(self, graph):
+        """Return a visitor for the graph."""
+        def succ(node: ANFNode) -> Iterable[ANFNode]:
+            """Follow node.incoming and free variables."""
+            for i in node.inputs:
+                if (i.graph == node.graph or
+                        i.is_constant_graph() and i.value.parent == graph):
+                    yield i
+            if node.is_constant_graph() and node.value.parent == graph:
+                yield from self._vars[node.value]
+        return succ
 
     def call(self, fn, args):
         """Call the `fn` object.
@@ -225,10 +228,13 @@ class VM:
 
         assert isinstance(graph, Graph)
 
+        if graph not in self._vars:
+            self._acquire_graph(graph)
+
         if len(args) != len(graph.parameters):
             raise RuntimeError("Call with wrong number of arguments")
 
-        raise self._Call(VMFrame(toposort(graph.return_, self._succ_vm),
+        raise self._Call(VMFrame(toposort(graph.return_, self._succ_vm(graph)),
                                  dict(zip(graph.parameters, args)),
                                  closure=clos))
 
@@ -268,9 +274,6 @@ class VM:
 
     def _handle_node(self, node: ANFNode, frame: VMFrame):
         if isinstance(node, Constant):
-            if frame.closure is not None and node in frame.closure:
-                return
-
             # We only visit constant graphs
             assert node.is_constant_graph()
             g = node.value

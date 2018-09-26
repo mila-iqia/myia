@@ -3,13 +3,14 @@
 
 from dataclasses import dataclass
 
-from .dtype import Array, Object, Int, Number, Bool, Tuple, List, Class
+from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
+    List, Class
 from .hypermap import HyperMap
 from .ir import MultitypeGraph
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
     switch, identity, bool_and, tail, typeof, scalar_cast, scalar_add, \
-    scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan
+    scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div
 
 
 def core(fn):
@@ -76,9 +77,15 @@ def mul(x, y):
 
 
 @core
-def div(x, y):
-    """Implementation of `div`."""
+def truediv(x, y):
+    """Implementation of `truediv`."""
     return arrayable_binary('__truediv__', x, y)
+
+
+@core
+def floordiv(x, y):
+    """Implementation of `floordiv`."""
+    return arrayable_binary('__floordiv__', x, y)
 
 
 @core
@@ -94,6 +101,18 @@ def pow(x, y):
 
 
 @core
+def floor(x):
+    """Implementation of `floor`."""
+    return x.__floor__()
+
+
+@core
+def trunc(x):
+    """Implementation of `trunc`."""
+    return x.__trunc__()
+
+
+@core
 def uadd(x):
     """Implementation of `uadd`."""
     return x.__pos__()
@@ -103,6 +122,18 @@ def uadd(x):
 def usub(x):
     """Implementation of `usub`."""
     return x.__neg__()
+
+
+@core
+def scalar_truediv(x, y):
+    """Implementation of `scalar_truediv`."""
+    return x.__truediv__(y)
+
+
+@core
+def scalar_floordiv(x, y):
+    """Implementation of `scalar_floordiv`."""
+    return x.__floordiv__(y)
 
 
 exp = MultitypeGraph('exp')
@@ -219,10 +250,47 @@ def int_bool(x):
     return x != 0
 
 
+# The parser/inferrer don't like when those are defined inline.
+ui8 = UInt[8]
+ui16 = UInt[16]
+i8 = Int[8]
+i16 = Int[16]
+f32 = Float[32]
+f64 = Float[64]
+
+
+@core
+def int_floordiv(x, y):
+    """Implementation of `int_floordiv`."""
+    if (x <= 0) == (y <= 0):
+        return scalar_div(x, y)
+    else:
+        return scalar_div(x, y) - 1
+
+
+@core
+def int_truediv(x, y):
+    """Implementation of `int_truediv`."""
+    if hastype(x, typeof(y)):
+        if (hastype(x, i8) or hastype(x, ui8) or
+                hastype(x, i16) or hastype(x, ui16)):
+            return scalar_cast(x, f32) / scalar_cast(y, f32)
+        return scalar_cast(x, f64) / scalar_cast(y, f64)
+    else:
+        # This branch is only here to trigger a type check error.
+        return x / y
+
+
 @core
 def float_bool(x):
     """Implementation of `float_bool`."""
     return x != 0.0
+
+
+@core
+def float_floordiv(x, y):
+    """Implementation of `float_floordiv`."""
+    return floor(x / y)
 
 
 #############
@@ -356,9 +424,15 @@ def array_mul(xs, ys):
 
 
 @core
-def array_div(xs, ys):
-    """Implementation of `array_div`."""
-    return broadcastable_binary(div, xs, ys)
+def array_truediv(xs, ys):
+    """Implementation of `array_truediv`."""
+    return broadcastable_binary(truediv, xs, ys)
+
+
+@core
+def array_floordiv(xs, ys):
+    """Implementation of `array_floordiv`."""
+    return broadcastable_binary(floordiv, xs, ys)
 
 
 @core
@@ -371,6 +445,18 @@ def array_mod(xs, ys):
 def array_pow(xs, ys):
     """Implementation of `array_pow`."""
     return broadcastable_binary(pow, xs, ys)
+
+
+@core
+def array_floor(xs):
+    """Implementation of `array_floor`."""
+    return array_map(floor, xs)
+
+
+@core
+def array_trunc(xs):
+    """Implementation of `array_trunc`."""
+    return array_map(trunc, xs)
 
 
 @core

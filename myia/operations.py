@@ -2,7 +2,7 @@
 
 
 from operator import (  # noqa
-    add, sub, mul, truediv, mod, pow, eq, ne, lt, gt, le, ge,
+    add, sub, mul, truediv, floordiv, mod, pow, eq, ne, lt, gt, le, ge,
     pos, neg, not_, and_, or_, matmul, getitem, setitem
 )
 
