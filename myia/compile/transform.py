@@ -190,6 +190,10 @@ class CompileGraph(PipelineStep):
             if isinstance(split, list):
                 run, inputs, outputs = \
                     self.pipeline.resources.lin_convert(split)
+                # prime the arguemnts because self.ref() can invalidate
+                # previously returned references if a new one is not ready
+                for i in inputs:
+                    self.ref(i)
                 args = [self.ref(i) for i in inputs]
                 self.add_instr('external', run, args)
                 for o in outputs:
@@ -200,7 +204,8 @@ class CompileGraph(PipelineStep):
                 fn = split.inputs[0]
 
                 if fn.is_constant(Primitive):
-                    # pre-push arguments on the stack if needed
+                    # prime the arguemnts because self.ref() can invalidate
+                    # previously returned references if a new one is not ready
                     for i in split.inputs[1:]:
                         self.ref(i)
                     if fn.value == switch:
