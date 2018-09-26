@@ -255,7 +255,7 @@ f64 = Float[64]
 
 @core
 def int_truediv(x, y):
-    """Implementation of `int_truediv_f64`."""
+    """Implementation of `int_truediv`."""
     if hastype(x, typeof(y)):
         if (hastype(x, i8) or hastype(x, ui8) or
                 hastype(x, i16) or hastype(x, ui16)):
@@ -274,7 +274,7 @@ def float_bool(x):
 
 @core
 def float_floordiv(x, y):
-    """Implementation of `int_truediv`."""
+    """Implementation of `float_floordiv`."""
     return floor(x / y)
 
 
