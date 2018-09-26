@@ -120,11 +120,13 @@ def usub(x):
 
 @core
 def scalar_truediv(x, y):
+    """Implementation of `scalar_truediv`."""
     return x.__truediv__(y)
 
 
 @core
 def scalar_floordiv(x, y):
+    """Implementation of `scalar_floordiv`."""
     return x.__floordiv__(y)
 
 
