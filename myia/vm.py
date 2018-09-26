@@ -274,9 +274,6 @@ class VM:
 
     def _handle_node(self, node: ANFNode, frame: VMFrame):
         if isinstance(node, Constant):
-            if frame.closure is not None and node in frame.closure:
-                return
-
             # We only visit constant graphs
             assert node.is_constant_graph()
             g = node.value
