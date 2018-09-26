@@ -10,7 +10,7 @@ from .ir import MultitypeGraph
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
     switch, identity, bool_and, tail, typeof, scalar_cast, scalar_add, \
-    scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan
+    scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div
 
 
 def core(fn):
@@ -104,6 +104,12 @@ def pow(x, y):
 def floor(x):
     """Implementation of `floor`."""
     return x.__floor__()
+
+
+@core
+def trunc(x):
+    """Implementation of `trunc`."""
+    return x.__trunc__()
 
 
 @core
@@ -251,6 +257,15 @@ i8 = Int[8]
 i16 = Int[16]
 f32 = Float[32]
 f64 = Float[64]
+
+
+@core
+def int_floordiv(x, y):
+    """Implementation of `int_floordiv`."""
+    if (x <= 0) == (y <= 0):
+        return scalar_div(x, y)
+    else:
+        return scalar_div(x, y) - 1
 
 
 @core
@@ -436,6 +451,12 @@ def array_pow(xs, ys):
 def array_floor(xs):
     """Implementation of `array_floor`."""
     return array_map(floor, xs)
+
+
+@core
+def array_trunc(xs):
+    """Implementation of `array_trunc`."""
+    return array_map(trunc, xs)
 
 
 @core

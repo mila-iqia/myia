@@ -36,7 +36,7 @@ def test_prim_truediv(x, y):
     return x / y
 
 
-@parse_compare((2, 7), (4, -6), (-11, 2), (-11.0, 2.0))
+@parse_compare((2, 7), (4, -6), (-11, 2), (-11.0, 2.0), (0, -1))
 def test_prim_floordiv(x, y):
     return x // y
 
@@ -49,6 +49,16 @@ def test_prim_mod(x, y):
 @parse_compare((2, 7), (4, -6))
 def test_prim_pow(x, y):
     return x ** y
+
+
+@parse_compare(-2, 2.3, -0.6)
+def test_prim_floor(x):
+    return math.floor(x)
+
+
+@parse_compare(-2, 2.3, -0.6)
+def test_prim_trunc(x):
+    return math.trunc(x)
 
 
 @parse_compare(2, -6)

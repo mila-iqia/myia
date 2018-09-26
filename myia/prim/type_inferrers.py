@@ -300,7 +300,8 @@ async def infer_type_arith_compare(track, x, y):
     return Bool
 
 
-@type_inferrer(P.scalar_uadd, P.scalar_usub, P.scalar_floor, nargs=1)
+@type_inferrer(P.scalar_uadd, P.scalar_usub, P.scalar_floor, P.scalar_trunc,
+               nargs=1)
 async def infer_type_arith_unary(track, x):
     """Infer the return type of a unary arithmetic operator."""
     return await track.will_check(Number, x)

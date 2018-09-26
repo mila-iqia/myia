@@ -71,7 +71,7 @@ def scalar_div(x, y):
     if isinstance(x, (float, np.floating)):
         return x / y
     else:
-        return x // y
+        return int(x / y)
 
 
 @register(primops.scalar_mod)
@@ -86,6 +86,13 @@ def scalar_pow(x, y):
     """Implement `scalar_pow`."""
     _assert_scalar(x, y)
     return x ** y
+
+
+@register(primops.scalar_trunc)
+def scalar_trunc(x):
+    """Implement `scalar_trunc`."""
+    _assert_scalar(x)
+    return np.trunc(x)
 
 
 @register(primops.scalar_floor)
