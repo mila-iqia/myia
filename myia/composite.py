@@ -3,14 +3,14 @@
 
 from dataclasses import dataclass
 
-from .dtype import Array, Object, Int, Number, Bool, Tuple, List, Class
+from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
+    List, Class
 from .hypermap import HyperMap
 from .ir import MultitypeGraph
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
     switch, identity, bool_and, tail, typeof, scalar_cast, scalar_add, \
     scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan
-from .dtype import UInt, Int, Float
 
 
 def core(fn):
@@ -98,6 +98,7 @@ def mod(x, y):
 def pow(x, y):
     """Implementation of `pow`."""
     return arrayable_binary('__pow__', x, y)
+
 
 @core
 def floor(x):
@@ -262,6 +263,7 @@ def int_truediv(x, y):
         # This branch is only here to trigger a type check error.
         return x / y
 
+
 @core
 def float_bool(x):
     """Implementation of `float_bool`."""
@@ -272,7 +274,6 @@ def float_bool(x):
 def float_floordiv(x, y):
     """Implementation of `int_truediv`."""
     return floor(x / y)
-
 
 
 #############

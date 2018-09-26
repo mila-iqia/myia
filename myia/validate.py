@@ -1,7 +1,7 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
 from .dtype import Array, Tuple, List, Function, Number, Bool, Problem, \
-    TypeMeta, Class, External, type_cloner
+    TypeMeta, TypeType, Class, External, type_cloner
 from .dshape import ListShape, TupleShape
 from .infer import DEAD
 from .ir import manage
@@ -11,7 +11,6 @@ from .utils import overload, ErrorPool
 
 class ValidationError(Exception):
     """Error validating a Graph."""
-
 
 
 @type_cloner.variant

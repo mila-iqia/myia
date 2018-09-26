@@ -5,7 +5,6 @@ testing or debugging.  Don't expect stellar performance from this
 implementation.
 """
 
-from collections import defaultdict
 from typing import Iterable, Mapping, Any, List
 
 from .ir import Graph, Apply, Constant, Parameter, ANFNode, MetaGraph

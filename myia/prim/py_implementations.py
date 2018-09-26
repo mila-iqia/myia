@@ -243,6 +243,7 @@ def _issubtype_helper(t: types.Class, model):
                for t1, t2 in zip(t.attributes.values(),
                                  model.attributes.values()))
 
+
 @overload  # noqa: F811
 def _issubtype_helper(t: object, model):
     return False
