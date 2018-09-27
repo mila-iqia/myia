@@ -110,7 +110,7 @@ class _GraphSpecializer:
             t = await ref['type']
         if ref is not None and isinstance(t, Inferrer):
             if (await ref['value']) is ANYTHING:
-                t = await concretize_type(t, argrefs)
+                t = await t.as_function_type(argrefs)
                 return await self._build[Type](ref, argrefs, t)
         return await self._build(ref, argrefs, t)
 
@@ -128,7 +128,7 @@ class _GraphSpecializer:
             v = await self.specializer._specialize(
                 self, inf, argrefs
             )
-            return _const(v, await concretize_type(inf, argrefs))
+            return _const(v, await inf.as_function_type(argrefs))
         else:
             raise Unspecializable(INACCESSIBLE)
 
@@ -137,7 +137,7 @@ class _GraphSpecializer:
         all_argrefs = None if argrefs is None else [*inf.args, *argrefs]
         sub_build = await self.build(None, all_argrefs, inf.fn)
         ptl_args = [await self.build(ref) for ref in inf.args]
-        res_t = await concretize_type(inf, argrefs)
+        res_t = await inf.as_function_type(argrefs)
         ptl = _const(P.partial, Function[
             [sub_build.type, *[a.type for a in ptl_args]],
             res_t
@@ -154,7 +154,7 @@ class _GraphSpecializer:
     async def _build(self, ref, argrefs, inf: Inferrer):
         v = inf.identifier
         assert isinstance(v, Primitive)
-        return _const(v, await concretize_type(inf, argrefs))
+        return _const(v, await inf.as_function_type(argrefs))
 
     @_build.register  # noqa: F811
     async def _build(self, ref, argrefs,
@@ -191,7 +191,7 @@ class _GraphSpecializer:
         if new_node.graph is not self.new_graph:
             raise AssertionError('Error in specializer [A]')
 
-        t = await concretize_type(ref)
+        t = await concretize_type(await ref['type'])
         new_node.type = t
 
         await self.fill_inferred(new_node, ref)
@@ -216,4 +216,5 @@ class _GraphSpecializer:
                         # We can't keep references to unspecialized graphs.
                         new_inputs[i] = _const(e.problem.kind, e.problem)
                     else:
-                        new_inputs[i].type = await concretize_type(iref)
+                        it = await iref['type']
+                        new_inputs[i].type = await concretize_type(it)
