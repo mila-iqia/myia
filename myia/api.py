@@ -24,7 +24,7 @@ from .specialize import TypeSpecializer
 from .utils import TypeMap, as_frozen, overload, UNKNOWN, ErrorPool
 from .vm import VM
 from .compile import step_wrap_primitives, step_compile, step_link, step_export
-from .validate import validate, whitelist as default_whitelist
+from .validate import validate, whitelist as default_whitelist, ValidationError
 
 
 scalar_object_map = {
@@ -555,6 +555,14 @@ class Preparator(PipelineStep):
         return {'graph': graph}
 
 
+@reify.variant
+async def _eliminate_inferrers(self, t: Inferrer):
+    t2 = await t.as_function_type()
+    if ismyiatype(t2, Problem):  # pragma: no cover
+        raise ValidationError(f'{t} became {t2}')
+    return t2
+
+
 class Validator(PipelineStep):
     """Pipeline step to validate a graph prior to compilation.
 
@@ -573,12 +581,11 @@ class Validator(PipelineStep):
     async def _eliminate_inferrers(self):
         errs = ErrorPool()
         for node in self.pipeline.resources.manager.all_nodes:
-            t = node.type
-            if isinstance(t, Inferrer):
-                node.type = await t.as_function_type()
-                if ismyiatype(node.type, Problem):  # pragma: no cover
-                    exc = Exception(f'{node}::{t} became {node.type}')
-                    errs.add(exc)
+            try:
+                node.type = await _eliminate_inferrers(node.type)
+            except ValidationError as e:  # pragma: no cover
+                exc = ValidationError(f'In {node}::{node.type}, {e.args[0]}')
+                errs.add(exc)
         errs.trigger()
 
     def step(self, graph):
