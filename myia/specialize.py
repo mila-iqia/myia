@@ -163,12 +163,12 @@ class _GraphSpecializer:
         if v is ANYTHING:
             return await self._build[Type](ref, argrefs, t)
         else:
-            return _const(v, t)
+            return _const(v, await concretize_type(t))
 
     @_build.register  # noqa: F811
     async def _build(self, ref, argrefs, t: Type):
         new_node = self.get(ref.node)
-        new_node.type = t
+        new_node.type = await concretize_type(t)
         return new_node
 
     ###########
@@ -191,8 +191,7 @@ class _GraphSpecializer:
         if new_node.graph is not self.new_graph:
             raise AssertionError('Error in specializer [A]')
 
-        t = await concretize_type(await ref['type'])
-        new_node.type = t
+        new_node.type = await concretize_type(await ref['type'])
 
         await self.fill_inferred(new_node, ref)
 
