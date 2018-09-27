@@ -1,7 +1,6 @@
 """Graph generation from number of arguments or type signatures."""
 
 
-from ..parser import parse
 from ..prim.py_implementations import issubtype, typeof
 
 
@@ -64,6 +63,7 @@ class MultitypeGraph(MetaGraph):
 
     def specialize_from_types(self, types):
         """Generate a Graph for this type signature."""
+        from ..parser import parse
         return parse(self._getfn(types))
 
     def __call__(self, *args):
