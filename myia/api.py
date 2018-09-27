@@ -256,6 +256,18 @@ def default_convert(env, fn: FunctionType):
 
 
 @overload  # noqa: F811
+def default_convert(env, g: Graph):
+    mng = env.resources.manager
+    if g._manager is not mng:
+        g2 = clone(g)
+        env.object_map[g] = g2
+        mng.add_graph(g2)
+        return g2
+    else:
+        return g
+
+
+@overload  # noqa: F811
 def default_convert(env, seq: (tuple, list)):
     return type(seq)(env(x) for x in seq)
 

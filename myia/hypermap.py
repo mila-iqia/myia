@@ -51,7 +51,7 @@ class HyperMap(MetaGraph):
     _full_make = Overload()
 
     @_full_make.register
-    def _full_make(self, resources, t: List, g, fnarg, argmap):
+    def _full_make(self, t: List, g, fnarg, argmap):
         args = list(argmap.keys())
         if fnarg is None:
             fn_rec = self.fn_rec
@@ -60,9 +60,9 @@ class HyperMap(MetaGraph):
         return g.apply(P.list_map, fn_rec, *args)
 
     @_full_make.register
-    def _full_make(self, resources, t: Array, g, fnarg, argmap):
+    def _full_make(self, t: Array, g, fnarg, argmap):
         if fnarg is None:
-            fnarg = resources.convert(self.fn_leaf)
+            fnarg = self.fn_leaf
 
         args = list(argmap.keys())
         first, *rest = args
@@ -77,7 +77,7 @@ class HyperMap(MetaGraph):
         return g.apply(P.array_map, fnarg, *args)
 
     @_full_make.register
-    def _full_make(self, resources, t: Tuple, g, fnarg, argmap):
+    def _full_make(self, t: Tuple, g, fnarg, argmap):
         assert all(len(t.elements) == len(t2.elements)
                    for t2 in argmap.values())
         elems = []
@@ -92,7 +92,7 @@ class HyperMap(MetaGraph):
         return g.apply(P.make_tuple, *elems)
 
     @_full_make.register
-    def _full_make(self, resources, t: Class, g, fnarg, argmap):
+    def _full_make(self, t: Class, g, fnarg, argmap):
         assert all(t.tag == t2.tag
                    and t.attributes.keys() == t2.attributes.keys()
                    for t2 in argmap.values())
@@ -109,12 +109,12 @@ class HyperMap(MetaGraph):
         return g.apply(P.make_record, t, *vals)
 
     @_full_make.register
-    def _full_make(self, resources, t: Type, g, fnarg, argmap):
+    def _full_make(self, t: Type, g, fnarg, argmap):
         if fnarg is None:
-            fnarg = resources.convert(self.fn_leaf)
+            fnarg = self.fn_leaf
         return g.apply(fnarg, *argmap.keys())
 
-    def _make(self, resources, g, fnarg, argmap):
+    def _make(self, g, fnarg, argmap):
         for t in argmap.values():
             # If any of the arguments is a nonleaf generic, pick it.
             if t.generic in self.nonleaf:
@@ -127,22 +127,22 @@ class HyperMap(MetaGraph):
                     raise InferenceError(
                         f'HyperMap cannot match up types {t} and {t2}'
                     )
-        return self.make_map[t](self, resources, t, g, fnarg, argmap)
+        return self.make_map[t](self, t, g, fnarg, argmap)
 
-    def _harmonize(self, resources, g, args):
+    def _harmonize(self, g, args):
         if self.broadcast \
                 and any(issubtype(t, Array) for t in args.values()):
             rval = {}
             for arg, t in args.items():
                 if not issubtype(t, Array):
-                    arg = g.apply(resources.convert(operations.to_array), arg)
+                    arg = g.apply(operations.to_array, arg)
                     t = Array[t]
                 rval[arg] = t
             return rval
         else:
             return args
 
-    def specialize_from_types(self, resources, types):
+    def specialize_from_types(self, types):
         """Create a graph for mapping over the given types."""
         types = tuple(types)
         if types in self.cache:
@@ -158,8 +158,7 @@ class HyperMap(MetaGraph):
             fnarg = None
         for t in arg_ts:
             argmap[g.add_parameter()] = t
-        argmap = self._harmonize(resources, g, argmap)
-        g.output = self._make(resources, g, fnarg, argmap)
-        resources.manager.add_graph(g)
+        argmap = self._harmonize(g, argmap)
+        g.output = self._make(g, fnarg, argmap)
         self.cache[types] = g
         return g
