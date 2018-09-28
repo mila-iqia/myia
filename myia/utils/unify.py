@@ -289,7 +289,7 @@ def default_visit(value: (list, tuple), fn):
 
 @overload  # noqa: F811
 def default_visit(value: dict, fn):
-    return {k: fn(v) for k, v in sorted(value.items())}
+    return {fn(k): fn(v) for k, v in sorted(value.items())}
 
 
 class VisitError(Exception):
