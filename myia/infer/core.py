@@ -195,7 +195,22 @@ class EquivalenceChecker:
         """Initialize the EquivalenceChecker."""
         self.loop = loop
         self.error_callback = error_callback
-        self.unif = Unification()
+        self.unif = Unification(eq=self.eq)
+
+    def eq(self, x, y):
+        """Equality check for x and y."""
+        if isinstance(x, DynamicMap) and isinstance(y, DynamicMap):
+            if x.provably_equivalent(y):
+                x.merge(y)
+                return True
+
+            self._tie_dmaps(x, y, self.__refs)
+            self._tie_dmaps(y, x, self.__refs)
+            # We return True now, but if x and y are not equal, there
+            # will be an error later.
+            return True
+        else:
+            return x == y
 
     def declare_equivalent(self, x, y, refs, error_callback=None):
         """Declare that x and y should be equivalent.
@@ -232,18 +247,10 @@ class EquivalenceChecker:
         if hasattr(y, '__await__'):
             y = await y
 
-        if isinstance(x, DynamicMap) and isinstance(y, DynamicMap):
-            if x.provably_equivalent(y):
-                x.merge(y)
-                return
-
-            self._tie_dmaps(x, y, refs)
-            self._tie_dmaps(y, x, refs)
-
-        elif x == y or self.merge(x, y):
-            pass
-
-        else:
+        # We store this here for self.eq's benefit, which is ok because
+        # merge is synchronous.
+        self.__refs = refs
+        if not self.merge(x, y):
             error_callback(MyiaTypeMismatchError(x, y, refs=refs))
 
     def merge(self, x, y):

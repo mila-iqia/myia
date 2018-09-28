@@ -30,6 +30,9 @@ class TupleShape:
     def __hash__(self):
         return hash((type(self), self.shape))
 
+    def __visit__(self, fn):
+        return TupleShape(fn(self.shape))
+
 
 class ListShape:
     """Class to represent the shape of list elements."""
@@ -50,6 +53,9 @@ class ListShape:
     def __hash__(self):
         return hash((type(self), self.shape))
 
+    def __visit__(self, fn):
+        return ListShape(fn(self.shape))
+
 
 class ClassShape:
     """Class to represent the shape of dataclass fields."""
@@ -69,6 +75,9 @@ class ClassShape:
 
     def __hash__(self):
         return hash((type(self), tuple(sorted(self.shape.items()))))
+
+    def __visit__(self, fn):
+        return ClassShape(fn(self.shape))
 
 
 @overload(bootstrap=True)
