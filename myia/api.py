@@ -364,9 +364,10 @@ class Optimizer(PipelineStep):
         graph: The optimized graph.
     """
 
-    def __init__(self, pipeline_init, phases):
+    def __init__(self, pipeline_init, phases, run_only_once=False):
         """Initialize an Optimizer."""
         super().__init__(pipeline_init)
+        self.run_only_once = run_only_once
         self.phases = []
         for name, spec in phases.items():
             if isinstance(spec, list):
@@ -383,6 +384,8 @@ class Optimizer(PipelineStep):
             for opt in self.phases:
                 if opt(graph):
                     changes = True
+            if self.run_only_once:
+                break
         self.resources.manager.keep_roots(graph)
         return {'graph': graph}
 
@@ -801,6 +804,7 @@ step_parse = Parser.partial()
 
 
 step_resolve = Optimizer.partial(
+    run_only_once=True,
     phases=dict(
         resolve=[optlib.resolve_globals]
     )
