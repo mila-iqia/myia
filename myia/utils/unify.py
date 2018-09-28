@@ -1,10 +1,11 @@
 """Unification module."""
 
+import operator
 from functools import reduce
 from typing import \
     Any, Callable, Dict, Iterable, List, Set, TypeVar, Union
 
-from . import TypeMap
+from . import overload
 
 T = TypeVar('T')
 
@@ -280,6 +281,17 @@ def noseq(fn: Callable[[T], T], u: T) -> T:
     return um
 
 
+@overload(fallback_method='__visit__')
+def default_visit(value: (list, tuple), fn):
+    xs = expandlist(fn(x) for x in value)
+    return type(value)(xs)
+
+
+@overload  # noqa: F811
+def default_visit(value: dict, fn):
+    return {k: fn(v) for k, v in sorted(value.items())}
+
+
 class VisitError(Exception):
     """Report unvisitable object."""
 
@@ -287,20 +299,19 @@ class VisitError(Exception):
 class Unification:
     """Unification engine."""
 
-    def __init__(self):
-        """Create a unification engine."""
-        def discover(cls):
-            return getattr(cls, '__visit__', None)
-        self.visitors = TypeMap(discover=discover)
+    def __init__(self, visitors=None, eq=operator.eq):
+        """Create a unification engine.
 
-    def register_visitor(self, type):
-        """Decorator to register additional visitors."""
-        return self.visitors.register(type)
+        New visitors can be added using the decorator
+        `@unif.visitors.register`
+        """
+        self.visitors = visitors or default_visit.variant()
+        self.eq = eq
 
     def visit(self, fn: Callable[[T], T], value: T) -> T:
         """Apply `fn` to each element of `value` and return the result."""
         try:
-            visit = self.visitors[type(value)]
+            visit = self.visitors.map[type(value)]
         except KeyError as e:
             raise VisitError
         return visit(value, fn)
@@ -437,12 +448,12 @@ class Unification:
         w = self._getvar(w)
         v = self._getvar(v)
 
-        while w in equiv:
+        while isinstance(w, Var) and w in equiv:
             w = equiv[w]
-        while v in equiv:
+        while isinstance(v, Var) and v in equiv:
             v = equiv[v]
 
-        if w == v:
+        if self.eq(w, v):
             return equiv
 
         if isinstance(w, UnionVar):
