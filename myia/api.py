@@ -24,7 +24,7 @@ from .specialize import TypeSpecializer
 from .utils import TypeMap, as_frozen, overload, UNKNOWN, ErrorPool
 from .vm import VM
 from .compile import step_wrap_primitives, step_compile, step_link, step_export
-from .validate import validate, whitelist as default_whitelist
+from .validate import validate, whitelist as default_whitelist, ValidationError
 
 
 scalar_object_map = {
@@ -256,6 +256,18 @@ def default_convert(env, fn: FunctionType):
 
 
 @overload  # noqa: F811
+def default_convert(env, g: Graph):
+    mng = env.resources.manager
+    if g._manager is not mng:
+        g2 = clone(g)
+        env.object_map[g] = g2
+        mng.add_graph(g2)
+        return g2
+    else:
+        return g
+
+
+@overload  # noqa: F811
 def default_convert(env, seq: (tuple, list)):
     return type(seq)(env(x) for x in seq)
 
@@ -352,19 +364,28 @@ class Optimizer(PipelineStep):
         graph: The optimized graph.
     """
 
-    def __init__(self, pipeline_init, pre, opts, post):
+    def __init__(self, pipeline_init, phases, run_only_once=False):
         """Initialize an Optimizer."""
         super().__init__(pipeline_init)
-        self.pre = [opt(optimizer=self) for opt in pre]
-        self.opts = opts
-        self.post = [opt(optimizer=self) for opt in post]
+        self.run_only_once = run_only_once
+        self.phases = []
+        for name, spec in phases.items():
+            if isinstance(spec, list):
+                spec = PatternEquilibriumOptimizer(*spec, optimizer=self)
+            else:
+                spec = spec(optimizer=self)
+            self.phases.append(spec)
 
     def step(self, graph):
         """Optimize the graph using the given patterns."""
-        eq = PatternEquilibriumOptimizer(*self.opts, optimizer=self)
-        seq = [*self.pre, eq, *self.post]
-        for opt in seq:
-            opt(graph)
+        changes = True
+        while changes:
+            changes = False
+            for opt in self.phases:
+                if opt(graph):
+                    changes = True
+            if self.run_only_once:
+                break
         self.resources.manager.keep_roots(graph)
         return {'graph': graph}
 
@@ -537,6 +558,14 @@ class Preparator(PipelineStep):
         return {'graph': graph}
 
 
+@reify.variant
+async def _eliminate_inferrers(self, t: Inferrer):
+    t2 = await t.as_function_type()
+    if ismyiatype(t2, Problem):  # pragma: no cover
+        raise ValidationError(f'{t} became {t2}')
+    return t2
+
+
 class Validator(PipelineStep):
     """Pipeline step to validate a graph prior to compilation.
 
@@ -555,12 +584,11 @@ class Validator(PipelineStep):
     async def _eliminate_inferrers(self):
         errs = ErrorPool()
         for node in self.pipeline.resources.manager.all_nodes:
-            t = node.type
-            if isinstance(t, Inferrer):
-                node.type = await t.as_function_type()
-                if ismyiatype(node.type, Problem):  # pragma: no cover
-                    exc = Exception(f'{node}::{t} became {node.type}')
-                    errs.add(exc)
+            try:
+                node.type = await _eliminate_inferrers(node.type)
+            except ValidationError as e:  # pragma: no cover
+                exc = ValidationError(f'In {node}::{node.type}, {e.args[0]}')
+                errs.add(exc)
         errs.trigger()
 
     def step(self, graph):
@@ -776,9 +804,10 @@ step_parse = Parser.partial()
 
 
 step_resolve = Optimizer.partial(
-    pre=[],
-    opts=[optlib.resolve_globals],
-    post=[],
+    run_only_once=True,
+    phases=dict(
+        resolve=[optlib.resolve_globals]
+    )
 )
 
 
@@ -810,16 +839,19 @@ step_prepare = Preparator.partial(
 
 
 step_opt = Optimizer.partial(
-    pre=[],
-    opts=[
-        optlib.simplify_always_true,
-        optlib.simplify_always_false,
-        optlib.inline_unique_uses,
-        optlib.simplify_partial,
-        optlib.replace_applicator,
-        optlib.elim_identity,
-    ],
-    post=[CSE]
+    phases=dict(
+        main=[
+            optlib.simplify_always_true,
+            optlib.simplify_always_false,
+            optlib.simplify_always_true_switch,
+            optlib.simplify_always_false_switch,
+            optlib.inline_unique_uses,
+            optlib.simplify_partial,
+            optlib.replace_applicator,
+            optlib.elim_identity,
+        ],
+        cse=CSE
+    )
 )
 
 

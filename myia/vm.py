@@ -12,7 +12,7 @@ from .prim import Primitive
 from .prim.py_implementations import typeof
 from .prim.ops import if_, return_, partial
 from .graph_utils import toposort
-from .utils import TypeMap, NS, is_dataclass_type
+from .utils import TypeMap, is_dataclass_type
 
 
 class VMFrame:
@@ -264,8 +264,7 @@ class VM:
             self._call(fn, args)
         elif isinstance(fn, MetaGraph):
             types = [typeof(arg) for arg in args]
-            res = NS(convert=self.convert, manager=self.manager)
-            g = fn.specialize_from_types(res, types)
+            g = fn.specialize_from_types(types)
             self._dispatch_call(node, frame, g, args)
         elif is_dataclass_type(fn):
             frame.values[node] = fn(*args)

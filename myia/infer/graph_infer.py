@@ -52,7 +52,8 @@ class Track(Partializable):
 
     async def infer_constant(self, ctref):
         """Get the property for a ref of a Constant node."""
-        return self.from_value(ctref.node.value, ctref.context)
+        v = self.engine.pipeline.resources.convert(ctref.node.value)
+        return self.from_value(v, ctref.context)
 
     async def infer_apply(self, ref):
         """Get the property for a ref of an Apply node."""
@@ -212,28 +213,6 @@ class Track(Partializable):
 ####################
 
 
-async def _concretize_type_helper(t, argrefs=None):
-    if isinstance(t, Inferrer):
-        return await t.as_function_type(argrefs)
-    else:
-        return await reify(t)
-
-
-async def concretize_type(ref, argrefs=None):
-    """Return the type of ref, resolving all Inferrer instances.
-
-    Inferrer instances are resolved to Function types if possible. If an
-    error occurs, this will return a Problem type.
-
-    Arguments:
-        ref: Either a Reference or an Inferrer.
-        argrefs: References for the arguments passed to the Inferrer at
-            the relevant call site.
-    """
-    t = (await ref['type']) if isinstance(ref, AbstractReference) else ref
-    return await _concretize_type_helper(t, argrefs)
-
-
 class Inferrer(DynamicMap):
     """Infer a property of the output of an operation.
 
@@ -307,9 +286,9 @@ class Inferrer(DynamicMap):
             except Unspecializable as e:
                 return e.args[0]
         cached = self.cache[tuple(argrefs)]
-        return Function[[await concretize_type(argref)
+        return Function[[await concretize_type(await argref['type'])
                          for argref in argrefs],
-                        await _concretize_type_helper(cached)]
+                        await concretize_type(cached)]
 
 
 class PrimitiveInferrer(Inferrer):
@@ -430,9 +409,11 @@ class MetaGraphInferrer(GraphInferrer):
     async def make_graph(self, args):
         """Return the graph to use for the given args."""
         try:
-            return await self._graph.specialize(
+            g = await self._graph.specialize(
                 self.engine.pipeline.resources, args
             )
+            g = self.engine.pipeline.resources.convert(g)
+            return g
         except GraphGenerationError as err:
             types = err.args[0]
             raise TypeDispatchError(self._graph, types) from None
@@ -526,6 +507,21 @@ def register_inferrer(*prims, nargs, constructors):
             constructors[prim] = make_constructor(prim)
         return fn
     return deco
+
+
+@reify.variant
+async def concretize_type(self, t: Inferrer):
+    """Return the type of ref, resolving all Inferrer instances.
+
+    Inferrer instances are resolved to Function types if possible. If an
+    error occurs, this will return a Problem type.
+
+    Arguments:
+        ref: Either a Reference or an Inferrer.
+        argrefs: References for the arguments passed to the Inferrer at
+            the relevant call site.
+    """
+    return await t.as_function_type()
 
 
 ##############

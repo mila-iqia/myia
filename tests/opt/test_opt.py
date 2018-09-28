@@ -299,11 +299,11 @@ def test_constant_variable():
 def test_cse():
 
     def helper(fn, before, after):
-        gbefore = parse(fn)
-        assert len(gbefore.nodes) == before
+        g = parse(fn)
+        assert len(g.nodes) == before
 
-        gafter = cse(gbefore, gbefore.manager)
-        assert len(gafter.nodes) == after
+        cse(g, g.manager)
+        assert len(g.nodes) == after
 
     def f1(x, y):
         a = x + y
@@ -350,7 +350,7 @@ def test_type_tracking():
         .select('parse', 'infer', 'specialize',
                 'prepare', 'opt', 'validate') \
         .configure({
-            'opt.opts': [opt_ok, opt_err1, opt_err2],
+            'opt.phases.main': [opt_ok, opt_err1, opt_err2],
             'prepare.watch': True
         })
 

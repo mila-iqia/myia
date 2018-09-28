@@ -4,7 +4,7 @@ from pytest import mark
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    tail, tuple_setitem, scalar_add, scalar_mul, identity, partial
+    tail, tuple_setitem, scalar_add, scalar_mul, identity, partial, switch
 
 
 #######################
@@ -224,6 +224,30 @@ def test_false_branch():
                lib.elim_identity,
                lib.simplify_always_false,
                lib.inline)
+
+
+def test_true_branch_switch():
+
+    def before(x, y):
+        return switch(True, x, y)
+
+    def after(x, y):
+        return x
+
+    _check_opt(before, after,
+               lib.simplify_always_true_switch)
+
+
+def test_false_branch_switch():
+
+    def before(x, y):
+        return switch(False, x, y)
+
+    def after(x, y):
+        return y
+
+    _check_opt(before, after,
+               lib.simplify_always_false_switch)
 
 
 ############

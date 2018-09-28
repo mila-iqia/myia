@@ -70,7 +70,8 @@ class TypeTrack(Track):
 
     async def infer_constant(self, ctref):
         """Get the property for a ref of a Constant node."""
-        t = self.from_value(ctref.node.value, ctref.context)
+        v = self.engine.pipeline.resources.convert(ctref.node.value)
+        t = self.from_value(v, ctref.context)
         if ismyiatype(t, Number):
             v = RestrictedVar(_number_types)
             prio = 1 if ismyiatype(t, Float) else 0

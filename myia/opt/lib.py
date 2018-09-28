@@ -175,6 +175,20 @@ simplify_always_false = psub(
 )
 
 
+simplify_always_true_switch = psub(
+    pattern=(P.switch, True, X, Y),
+    replacement=X,
+    name='simplify_always_true_switch'
+)
+
+
+simplify_always_false_switch = psub(
+    pattern=(P.switch, False, X, Y),
+    replacement=Y,
+    name='simplify_always_false_switch'
+)
+
+
 #####################
 # Simplify partials #
 #####################

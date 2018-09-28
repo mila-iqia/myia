@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 
 from myia.utils import Named, TypeMap, smap, Event, Events, NS, Overload
 
@@ -8,8 +9,9 @@ def test_named():
     assert repr(named) == 'foo'
 
 
-def _sum(*args):
-    return sum(args)
+@smap.variant
+def _sum(self, arg: object, *args):
+    return arg + sum(args)
 
 
 def test_typemap():
@@ -122,11 +124,13 @@ def test_Overload_bootstrap():
 
 
 def test_smap():
-    assert smap(_sum, 10, 20) == 30
-    assert smap(_sum, 10, 20, 30, 40) == 100
-    assert smap(_sum, (1, 2, 3), (4, 5, 6)) == (5, 7, 9)
-    assert smap(_sum, [1, 2, 3], [4, 5, 6]) == [5, 7, 9]
-    assert smap(_sum, [(1, [2]), 3], [(4, [5]), 6]) == [(5, [7]), 9]
+    assert _sum(10, 20) == 30
+    assert _sum(10, 20, 30, 40) == 100
+    assert _sum((1, 2, 3), (4, 5, 6)) == (5, 7, 9)
+    assert _sum([1, 2, 3], [4, 5, 6]) == [5, 7, 9]
+    assert _sum([(1, [2]), 3], [(4, [5]), 6]) == [(5, [7]), 9]
+    assert (_sum(np.ones((2, 2)), np.ones((2, 2)))
+            == np.ones((2, 2))*2).all()
 
 
 def test_smap_failures():
@@ -139,7 +143,7 @@ def test_smap_failures():
     ]
     for a, b in pairs:
         with pytest.raises(TypeError):
-            smap(_sum, a, b)
+            _sum(a, b)
 
 
 def test_event():

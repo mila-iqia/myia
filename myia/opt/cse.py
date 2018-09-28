@@ -12,6 +12,7 @@ def cse(root, manager):
     hashes = {}
     groups = defaultdict(list)
     manager.add_graph(root)
+    changes = False
 
     for g in manager.graphs:
         for node in toposort(g.return_, succ_incoming):
@@ -53,9 +54,10 @@ def cse(root, manager):
                     and all(i1 is i2 for i1, i2 in zip(in1, in2))
 
             if repl:
+                changes = True
                 manager.replace(other, main)
 
-    return root
+    return changes
 
 
 class CSE:
@@ -67,4 +69,4 @@ class CSE:
 
     def __call__(self, root):
         """Apply CSE on root."""
-        cse(root, self.optimizer.resources.manager)
+        return cse(root, self.optimizer.resources.manager)
