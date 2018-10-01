@@ -27,7 +27,7 @@ from myia.utils import RestrictedVar
 
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
     li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
-    Point, Point_t, Point3D, Point3D_t, Thing_f, Thing_ftup, mysum
+    Point, Point_t, Point3D, Point3D_t, Thing, Thing_f, Thing_ftup, mysum
 
 
 def t(tt):
@@ -1469,6 +1469,22 @@ def test_bool_or(x, y):
 )
 def test_switch(c, x, y):
     return switch(c, x, y)
+
+
+@infer(
+    type=[(B, i64, i64)]
+)
+def test_closure_in_data(c, x):
+    def f(x):
+        return x * x
+
+    def g(x):
+        return x + x
+
+    a = Thing((1, [f]))
+    b = Thing((2, [g]))
+    i, h = switch(c, a, b).contents
+    return h[0](x)
 
 
 @infer(

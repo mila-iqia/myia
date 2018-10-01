@@ -16,11 +16,6 @@ class L(list):
 TU = Unification()
 
 
-@TU.register_visitor(tuple)
-def visit_tuple(value, fn):
-    return tuple(expandlist(fn(e) for e in value))
-
-
 def test_Var():
     v1 = var()
     assert isinstance(v1, Var)
@@ -465,3 +460,40 @@ def test_reify():
     d = {sv: Seq((3, 4))}
     t = TU.reify((1, 2, sv), d)
     assert t == (1, 2, 3, 4)
+
+
+def test_data():
+    v1 = var()
+    v2 = var()
+
+    a = {
+        'x': v1,
+        'y': [1, v1, 2, 101],
+    }
+
+    b = {
+        'y': [1, 100, 2, v2],
+        'x': 100,
+    }
+
+    u = TU.unify(a, b)
+    assert u == {v1: 100, v2: 101}
+
+
+def test_custom_eq():
+    def eq(x, y):
+        if isinstance(x, float) and isinstance(y, float):
+            return abs(x - y) < 1e-2
+        else:
+            return x == y
+
+    v = var()
+    a = (1.000, v)
+    b = (v, 1.001)
+
+    u = TU.unify(a, b)
+    assert u is None
+
+    U2 = Unification(eq=eq)
+    u = U2.unify(a, b)
+    assert u == {v: 1.000} or u == {v: 1.001}
