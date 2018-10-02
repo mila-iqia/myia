@@ -4,6 +4,7 @@ import inspect
 import math
 import numpy as np
 from types import FunctionType
+from collections import defaultdict
 
 from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
@@ -526,6 +527,37 @@ class _InferenceUpdater:
         self.todo.add(src)
 
 
+class _Reinferrer:
+
+    def __init__(self, pipeline, graph, argspec):
+        """Initialize the Reinferrer."""
+        self.linf = pipeline.resources.live_infer
+        self.engine = self.linf.engine
+        self.manager = pipeline.resources.manager
+        self.graph = graph
+        self.argspec = argspec
+
+    def run(self):
+        """Run the Reinferrer."""
+        async def _populate():
+            for node in self.manager.all_nodes:
+                ref = self.engine.ref(node, CONTEXTLESS)
+                for track in self.engine.tracks:
+                    res = await ref[track]
+                    if isinstance(res, Inferrer):
+                        res = await res.as_function_type()
+                    node.inferred[track] = res
+
+        for node in self.manager.all_nodes:
+            node.inferred = defaultdict(lambda: UNKNOWN)
+
+        self.engine.cache.clear()
+        results = self.linf.step(graph=self.graph, argspec=self.argspec)
+        if 'error' in results:
+            raise results['error']
+        self.engine.run_coroutine(_populate())
+
+
 class Preparator(PipelineStep):
     """Pipeline step to prepare the graph to optimization.
 
@@ -538,22 +570,30 @@ class Preparator(PipelineStep):
         graph: The prepared graph.
     """
 
-    def __init__(self, pipeline_init, erase_classes=True, watch=True):
+    def __init__(self,
+                 pipeline_init,
+                 erase_classes=True,
+                 watch=True,
+                 reinfer=False):
         """Initialize a Preparator."""
         super().__init__(pipeline_init)
         self.erase_classes = erase_classes
         self.watch = watch
+        self.reinfer = reinfer
         self.inferrer = self.pipeline.resources.live_infer.engine
 
-    def step(self, graph):
+    def step(self, graph, argspec):
         """Prepare the graph."""
         mng = self.resources.manager
-        if self.watch:
+        if self.reinfer:
+            upd = _Reinferrer(self.pipeline, graph, argspec)
+            self.resources.inference_updater = upd
+        elif self.watch:
             upd = _InferenceUpdater(mng, self.inferrer)
             self.resources.inference_updater = upd
         if self.erase_classes:
             erase_class(graph, mng)
-        if self.watch:
+        if self.reinfer or self.watch:
             self.resources.inference_updater.run()
         return {'graph': graph}
 

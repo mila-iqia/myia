@@ -286,7 +286,7 @@ class Inferrer(DynamicMap):
             except Unspecializable as e:
                 return e.args[0]
         cached = self.cache[tuple(argrefs)]
-        return Function[[await concretize_type(await argref['type'])
+        return Function[[await concretize_type(await argref[self.track.name])
                          for argref in argrefs],
                         await concretize_type(cached)]
 

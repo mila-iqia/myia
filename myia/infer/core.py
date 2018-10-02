@@ -187,6 +187,10 @@ class EvaluationCache:
         del self.cache[key]
         return await v
 
+    def clear(self):
+        """Clear the cache completely."""
+        self.cache.clear()
+
 
 class EquivalenceChecker:
     """Handle equivalence between values."""
