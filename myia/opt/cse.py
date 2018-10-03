@@ -58,15 +58,3 @@ def cse(root, manager):
                 manager.replace(other, main)
 
     return changes
-
-
-class CSE:
-    """Common subexpression elimination."""
-
-    def __init__(self, optimizer):
-        """Initialize CSE."""
-        self.optimizer = optimizer
-
-    def __call__(self, root):
-        """Apply CSE on root."""
-        return cse(root, self.optimizer.resources.manager)

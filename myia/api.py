@@ -13,7 +13,7 @@ from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
     TypeMeta, Function
 from .infer import InferenceEngine, ANYTHING, Context
 from .ir import Graph, clone, GraphManager
-from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
+from .opt import PatternEquilibriumOptimizer, lib as optlib, cse, \
     erase_class
 from .pipeline import PipelineStep, PipelineResource, PipelineDefinition
 from .prim import py_implementations, vm_implementations, ops as P
@@ -443,10 +443,14 @@ class Optimizer(PipelineStep):
     def __init__(self,
                  pipeline_init,
                  phases,
+                 cse=True,
+                 renormalize=False,
                  run_only_once=False):
         """Initialize an Optimizer."""
         super().__init__(pipeline_init)
         self.run_only_once = run_only_once
+        self.renormalize = renormalize
+        self.cse = cse
         self.phases = []
         for name, spec in phases.items():
             if isinstance(spec, list):
@@ -455,7 +459,7 @@ class Optimizer(PipelineStep):
                 spec = spec(optimizer=self)
             self.phases.append(spec)
 
-    def step(self, graph, argspec=None):
+    def step(self, graph, argspec=None, outspec=None):
         """Optimize the graph using the given patterns."""
         changes = True
         while changes:
@@ -465,6 +469,13 @@ class Optimizer(PipelineStep):
                     changes = True
             if self.run_only_once:
                 break
+            if self.renormalize:
+                assert argspec is not None
+                graph = self.resources.inferrer.renormalize(
+                    graph, argspec, outspec
+                )
+            if self.cse:
+                cse(graph, self.resources.manager)
         self.resources.manager.keep_roots(graph)
         return {'graph': graph}
 
@@ -800,6 +811,7 @@ step_prepare = Preparator.partial(
 
 
 step_opt = Optimizer.partial(
+    renormalize=True,
     phases=dict(
         main=[
             optlib.simplify_always_true,
@@ -809,7 +821,9 @@ step_opt = Optimizer.partial(
             optlib.replace_applicator,
             optlib.elim_identity,
         ],
-        cse=CSE
+        grad=[
+            optlib.expand_J
+        ]
     )
 )
 

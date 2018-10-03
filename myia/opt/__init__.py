@@ -8,7 +8,7 @@ from .opt import (  # noqa
 )
 
 from .cse import (  # noqa
-    cse, CSE
+    cse
 )
 
 from .clean import (  # noqa
