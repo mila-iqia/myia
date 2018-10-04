@@ -487,10 +487,6 @@ class ExplicitInferrer(Inferrer):
             )
         return self.retval
 
-    async def as_function_type(self, argrefs=None):
-        """Return a Function type corresponding to this Inferrer."""
-        return Function[self.argvals, self.retval]
-
 
 def register_inferrer(*prims, nargs, constructors):
     """Define a PrimitiveInferrer for prims with nargs arguments.
@@ -803,14 +799,7 @@ class InferenceEngine:
             return await track.infer_apply(ref)
 
         else:
-            return track.default({})
-
-    def invalidate(self, track, ref):
-        """Invalidate the current key in the cache and return the old value.
-
-        Raises KeyError if the key wasn't in the cache to begin with.
-        """
-        return self.cache.invalidate((track, ref))
+            raise AssertionError(f'Missing information for {key}', key)
 
     def get_inferred(self, track, ref):
         """Get a Future for the value of the Reference on the given track.

@@ -9,10 +9,9 @@ from collections import defaultdict
 from . import dtype, parser, composite as C, operations
 from .cconv import closure_convert
 from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
-    Number, Problem, tag_to_dataclass, ismyiatype, type_to_np_dtype, \
-    TypeMeta
-from .infer import InferenceEngine, Inferrer, ANYTHING, \
-    Context, Contextless, CONTEXTLESS, reify
+    Number, tag_to_dataclass, ismyiatype, type_to_np_dtype, \
+    TypeMeta, Function
+from .infer import InferenceEngine, ANYTHING, Context
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
     erase_class
@@ -22,10 +21,10 @@ from .prim.value_inferrers import ValueTrack, value_inferrer_constructors
 from .prim.type_inferrers import TypeTrack, type_inferrer_constructors
 from .prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
 from .specialize import TypeSpecializer
-from .utils import TypeMap, as_frozen, overload, UNKNOWN, ErrorPool
+from .utils import TypeMap, as_frozen, overload, UNKNOWN
 from .vm import VM
 from .compile import step_wrap_primitives, step_compile, step_link, step_export
-from .validate import validate, whitelist as default_whitelist, ValidationError
+from .validate import validate, whitelist as default_whitelist
 
 
 scalar_object_map = {
@@ -338,70 +337,8 @@ class Converter(PipelineResource):
         return self.converter(self, value)
 
 
-class Parser(PipelineStep):
-    """Pipeline step to parse a function.
-
-    Inputs:
-        input: A function.
-
-    Outputs:
-        graph: A graph.
-    """
-
-    def step(self, input):
-        """Assert that input is a Graph, and set it as the 'graph' key."""
-        g = self.resources.convert(input)
-        assert isinstance(g, Graph)
-        return {'graph': g}
-
-
-class Optimizer(PipelineStep):
-    """Pipeline step to optimize a graph.
-
-    Inputs:
-        graph: The graph to optimize.
-
-    Outputs:
-        graph: The optimized graph.
-    """
-
-    def __init__(self, pipeline_init, phases, run_only_once=False):
-        """Initialize an Optimizer."""
-        super().__init__(pipeline_init)
-        self.run_only_once = run_only_once
-        self.phases = []
-        for name, spec in phases.items():
-            if isinstance(spec, list):
-                spec = PatternEquilibriumOptimizer(*spec, optimizer=self)
-            else:
-                spec = spec(optimizer=self)
-            self.phases.append(spec)
-
-    def step(self, graph):
-        """Optimize the graph using the given patterns."""
-        changes = True
-        while changes:
-            changes = False
-            for opt in self.phases:
-                if opt(graph):
-                    changes = True
-            if self.run_only_once:
-                break
-        self.resources.manager.keep_roots(graph)
-        return {'graph': graph}
-
-
-class InferrerStep(PipelineStep):
-    """Pipeline step to run type/shape/value/etc. inference.
-
-    Inputs:
-        graph: The graph to infer.
-        argspec: Information about argument types.
-
-    Outputs:
-        inference_results: Inference results for the graph's output.
-        inferrer: The inference engine.
-    """
+class InferenceResource(PipelineResource):
+    """Performs inference and specialization."""
 
     def __init__(self,
                  pipeline_init,
@@ -409,8 +346,9 @@ class InferrerStep(PipelineStep):
                  required_tracks,
                  tied_tracks,
                  context_class):
-        """Initialize an InferrerStep."""
+        """Initialize an InferenceResource."""
         super().__init__(pipeline_init)
+        self.manager = self.resources.manager
         self.tracks = tracks
         self.required_tracks = required_tracks
         self.tied_tracks = tied_tracks
@@ -440,22 +378,115 @@ class InferrerStep(PipelineStep):
                 for track_name, track in self.engine.tracks.items():
                     if track_name in arg:
                         arg[track_name] = track.from_external(arg[track_name])
+                    else:
+                        arg[track_name] = track.default(arg)
+
+    def infer(self, graph, argspec, clear=False):
+        """Perform inference."""
+        if clear:
+            self.engine.cache.clear()
+            for node in self.manager.all_nodes:
+                orig_t = node.type
+                node.inferred = defaultdict(lambda: UNKNOWN)
+                if node.is_constant() \
+                        and ismyiatype(orig_t) \
+                        and not ismyiatype(orig_t, Function):
+                    node.type = orig_t
+        self.fill_in(argspec)
+        return self.engine.run(graph, argspec, self.required_tracks)
+
+    def specialize(self, graph, context):
+        """Perform specialization."""
+        spc = TypeSpecializer(self.engine)
+        result = spc.run(graph, context)
+        self.manager.keep_roots(result)
+        return result
+
+    def renormalize(self, graph, argspec):
+        """Perform inference and specialization."""
+        _, context = self.infer(graph, argspec, clear=True)
+        return self.specialize(graph, context)
+
+
+class Parser(PipelineStep):
+    """Pipeline step to parse a function.
+
+    Inputs:
+        input: A function.
+
+    Outputs:
+        graph: A graph.
+    """
+
+    def step(self, input):
+        """Assert that input is a Graph, and set it as the 'graph' key."""
+        g = self.resources.convert(input)
+        assert isinstance(g, Graph)
+        return {'graph': g}
+
+
+class Optimizer(PipelineStep):
+    """Pipeline step to optimize a graph.
+
+    Inputs:
+        graph: The graph to optimize.
+
+    Outputs:
+        graph: The optimized graph.
+    """
+
+    def __init__(self,
+                 pipeline_init,
+                 phases,
+                 run_only_once=False):
+        """Initialize an Optimizer."""
+        super().__init__(pipeline_init)
+        self.run_only_once = run_only_once
+        self.phases = []
+        for name, spec in phases.items():
+            if isinstance(spec, list):
+                spec = PatternEquilibriumOptimizer(*spec, optimizer=self)
+            else:
+                spec = spec(optimizer=self)
+            self.phases.append(spec)
+
+    def step(self, graph, argspec=None):
+        """Optimize the graph using the given patterns."""
+        changes = True
+        while changes:
+            changes = False
+            for opt in self.phases:
+                if opt(graph):
+                    changes = True
+            if self.run_only_once:
+                break
+        self.resources.manager.keep_roots(graph)
+        return {'graph': graph}
+
+
+class InferrerStep(PipelineStep):
+    """Pipeline step to run type/shape/value/etc. inference.
+
+    Inputs:
+        graph: The graph to infer.
+        argspec: Information about argument types.
+
+    Outputs:
+        inference_results: Inference results for the graph's output.
+        inferrer: The inference engine.
+    """
 
     def step(self, graph, argspec):
         """Infer types, shapes, values, etc. for the graph."""
-        engine = self.engine
-        self.fill_in(argspec)
         try:
-            res, context = engine.run(graph, argspec, self.required_tracks)
+            res, context = self.resources.inferrer.infer(graph, argspec)
             return {'inference_results': res,
-                    'inference_context': context,
-                    'inferrer': engine}
+                    'inference_context': context}
         except Exception as exc:
             # We still want to keep the inferrer around even
             # if an error occurred.
             return {'error': exc,
-                    'error_step': self,
-                    'inferrer': engine}
+                    'error_step': self}
 
 
 class Specializer(PipelineStep):
@@ -469,93 +500,12 @@ class Specializer(PipelineStep):
         graph: The specialized graph.
     """
 
-    def step(self, graph, inferrer, inference_context):
+    def step(self, graph, inference_context):
         """Specialize the graph according to argument types."""
-        spc = TypeSpecializer(inferrer)
-        result = spc.run(graph, inference_context)
-        self.resources.manager.keep_roots(result)
-        return {'graph': result}
-
-
-class _InferenceUpdater:
-
-    def __init__(self, manager, inferrer):
-        self.manager = manager
-        self.inferrer = inferrer
-        self.todo = set()
-        manager.events.add_node.register(self._on_add_node)
-        manager.events.drop_node.register(self._on_drop_node)
-        manager.events.add_edge.register(self._on_add_edge)
-
-    async def _run(self):
-        todo, self.todo = self.todo, set()
-        for node in todo:
-            await self._update_type(node)
-
-    def run(self):
-        self.inferrer.run_coroutine(self._run())
-
-    async def _update_type(self, node):
-        ref = self.inferrer.ref(node, CONTEXTLESS)
-        inferred = {}
-        for track_name, track in self.inferrer.tracks.items():
-            try:
-                previous = await self.inferrer.invalidate(track_name, ref)
-            except KeyError:
-                previous = UNKNOWN
-            result = await ref[track_name]
-            inferred[track_name] = result
-            expected = node.expect_inferred[track_name]
-            if expected is not UNKNOWN:
-                expected = await reify(track.from_external(expected))
-                self.inferrer.equiv.declare_equivalent(result, expected, [ref])
-            if previous is not UNKNOWN:
-                previous = await reify(previous)
-                self.inferrer.equiv.declare_equivalent(result, previous, [ref])
-        node.inferred.update(inferred)
-
-    def _on_add_node(self, event, node):
-        self.todo.add(node)
-
-    def _on_drop_node(self, event, node):
-        if node in self.todo:
-            self.todo.remove(node)
-
-    def _on_add_edge(self, event, src, key, dest):
-        src.expect_inferred.update(src.inferred)
-        src.inferred.clear()
-        self.todo.add(src)
-
-
-class _Reinferrer:
-
-    def __init__(self, pipeline, graph, argspec):
-        """Initialize the Reinferrer."""
-        self.linf = pipeline.resources.live_infer
-        self.engine = self.linf.engine
-        self.manager = pipeline.resources.manager
-        self.graph = graph
-        self.argspec = argspec
-
-    def run(self):
-        """Run the Reinferrer."""
-        async def _populate():
-            for node in self.manager.all_nodes:
-                ref = self.engine.ref(node, CONTEXTLESS)
-                for track in self.engine.tracks:
-                    res = await ref[track]
-                    if isinstance(res, Inferrer):
-                        res = await res.as_function_type()
-                    node.inferred[track] = res
-
-        for node in self.manager.all_nodes:
-            node.inferred = defaultdict(lambda: UNKNOWN)
-
-        self.engine.cache.clear()
-        results = self.linf.step(graph=self.graph, argspec=self.argspec)
-        if 'error' in results:
-            raise results['error']
-        self.engine.run_coroutine(_populate())
+        new_graph = self.resources.inferrer.specialize(
+            graph, inference_context
+        )
+        return {'graph': new_graph}
 
 
 class Preparator(PipelineStep):
@@ -572,38 +522,22 @@ class Preparator(PipelineStep):
 
     def __init__(self,
                  pipeline_init,
-                 erase_classes=True,
-                 watch=True,
-                 reinfer=False):
+                 erase_classes=True):
         """Initialize a Preparator."""
         super().__init__(pipeline_init)
         self.erase_classes = erase_classes
-        self.watch = watch
-        self.reinfer = reinfer
-        self.inferrer = self.pipeline.resources.live_infer.engine
 
     def step(self, graph, argspec):
         """Prepare the graph."""
+        orig_argspec = argspec
         mng = self.resources.manager
-        if self.reinfer:
-            upd = _Reinferrer(self.pipeline, graph, argspec)
-            self.resources.inference_updater = upd
-        elif self.watch:
-            upd = _InferenceUpdater(mng, self.inferrer)
-            self.resources.inference_updater = upd
         if self.erase_classes:
             erase_class(graph, mng)
-        if self.reinfer or self.watch:
-            self.resources.inference_updater.run()
-        return {'graph': graph}
-
-
-@reify.variant
-async def _eliminate_inferrers(self, t: Inferrer):
-    t2 = await t.as_function_type()
-    if ismyiatype(t2, Problem):  # pragma: no cover
-        raise ValidationError(f'{t} became {t2}')
-    return t2
+            argspec = tuple(dict(p.inferred) for p in graph.parameters)
+        # graph = self.resources.inferrer.renormalize(graph, argspec)
+        return {'graph': graph,
+                'orig_argspec': orig_argspec,
+                'argspec': argspec}
 
 
 class Validator(PipelineStep):
@@ -621,25 +555,11 @@ class Validator(PipelineStep):
         super().__init__(pipeline_init)
         self.whitelist = whitelist
 
-    async def _eliminate_inferrers(self):
-        errs = ErrorPool()
-        for node in self.pipeline.resources.manager.all_nodes:
-            try:
-                node.type = await _eliminate_inferrers(node.type)
-            except ValidationError as e:  # pragma: no cover
-                exc = ValidationError(f'In {node}::{node.type}, {e.args[0]}')
-                errs.add(exc)
-        errs.trigger()
-
-    def step(self, graph):
+    def step(self, graph, argspec=None):
         """Validate the graph."""
-        if hasattr(self.resources, 'inference_updater'):
-            self.resources.inference_updater.run()
-        self.pipeline.resources.live_infer.engine.run_coroutine(
-            self._eliminate_inferrers()
-        )
+        graph = self.resources.inferrer.renormalize(graph, argspec)
         validate(graph, whitelist=self.whitelist)
-        return {}
+        return {'graph': graph}
 
 
 class ClosureConverter(PipelineStep):
@@ -823,10 +743,15 @@ class OutputWrapper(PipelineStep):
         output: The wrapped callable.
     """
 
-    def step(self, graph, output, argspec, inference_results):
+    def step(self,
+             graph,
+             output,
+             argspec,
+             inference_results,
+             orig_argspec=None):
         """Convert args to vm format, and output from vm format."""
         fn = output
-        orig_arg_t = [arg['type'] for arg in argspec]
+        orig_arg_t = [arg['type'] for arg in orig_argspec or argspec]
         vm_arg_t = graph.type.arguments
         orig_out_t = inference_results['type']
         vm_out_t = graph.type.retval
@@ -851,23 +776,7 @@ step_resolve = Optimizer.partial(
 )
 
 
-step_infer = InferrerStep.partial(
-    tracks=dict(
-        value=ValueTrack.partial(
-            constructors=value_inferrer_constructors,
-            max_depth=1
-        ),
-        type=TypeTrack.partial(
-            constructors=type_inferrer_constructors
-        ),
-        shape=ShapeTrack.partial(
-            constructors=shape_inferrer_constructors
-        )
-    ),
-    required_tracks=['type'],
-    tied_tracks={},
-    context_class=Context,
-)
+step_infer = InferrerStep.partial()
 
 
 step_specialize = Specializer.partial()
@@ -918,7 +827,7 @@ _standard_pipeline = PipelineDefinition(
             object_map=standard_object_map,
             converter=default_convert
         ),
-        live_infer=InferrerStep.partial(
+        inferrer=InferenceResource.partial(
             tracks=dict(
                 value=ValueTrack.partial(
                     constructors=value_inferrer_constructors,
@@ -933,7 +842,7 @@ _standard_pipeline = PipelineDefinition(
             ),
             required_tracks=['type'],
             tied_tracks={},
-            context_class=Contextless,
+            context_class=Context,
         )
     ),
     steps=dict(
@@ -1027,7 +936,7 @@ class MyiaFunction:
         cached version.
         """
         pip = standard_debug_pipeline.make()
-        inf = pip.steps.infer
+        inf = pip.resources.inferrer
         argspec = tuple({'value': arg} for arg in args)
         inf.fill_in(argspec)
         argnames = inspect.getargspec(self.fn).args

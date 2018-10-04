@@ -135,9 +135,9 @@ infer_pipeline = scalar_pipeline.select(
     'parse', 'infer'
 ).configure({
     'py_implementations': pyimpl_test,
-    'infer.tracks.value.max_depth': 10,
-    'infer.tracks.value.constructors': value_inferrer_cons_test,
-    'infer.tracks.type.constructors': type_inferrer_cons_test,
+    'inferrer.tracks.value.max_depth': 10,
+    'inferrer.tracks.value.constructors': value_inferrer_cons_test,
+    'inferrer.tracks.type.constructors': type_inferrer_cons_test,
 })
 
 
@@ -145,9 +145,9 @@ infer_pipeline_std = standard_pipeline.select(
     'parse', 'infer'
 ).configure({
     'py_implementations': pyimpl_test,
-    'infer.tracks.value.max_depth': 10,
-    'infer.tracks.value.constructors': value_inferrer_cons_test,
-    'infer.tracks.type.constructors': type_inferrer_cons_test,
+    'inferrer.tracks.value.max_depth': 10,
+    'inferrer.tracks.value.constructors': value_inferrer_cons_test,
+    'inferrer.tracks.type.constructors': type_inferrer_cons_test,
 })
 
 
@@ -190,7 +190,7 @@ def inferrer_decorator(pipeline):
 
                 def out():
                     pip = pipeline.configure({
-                        'infer.required_tracks': required_tracks
+                        'inferrer.required_tracks': required_tracks,
                     })
 
                     res = pip.make()(input=fn, argspec=args)
