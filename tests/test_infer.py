@@ -194,7 +194,7 @@ def inferrer_decorator(pipeline):
                     })
 
                     res = pip.make()(input=fn, argspec=args)
-                    rval = res['inference_results']
+                    rval = res['outspec']
 
                     print('Output of inferrer:')
                     print(rval)
@@ -1625,7 +1625,7 @@ def test_forced_type():
                     [{'type': i64}, {'type': f64}]]:
 
         results = pip.run(input=fn, argspec=argspec)
-        rval = results['inference_results']
+        rval = results['outspec']
 
         assert rval['type'] == f64
 
@@ -1650,7 +1650,7 @@ def test_forced_function_type():
         input=fn,
         argspec=[{'type': i64}, {'type': i64}]
     )
-    rval = results['inference_results']
+    rval = results['outspec']
 
     assert rval['type'] == f64
 

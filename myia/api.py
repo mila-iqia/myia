@@ -381,7 +381,7 @@ class InferenceResource(PipelineResource):
                     else:
                         arg[track_name] = track.default(arg)
 
-    def infer(self, graph, argspec, clear=False):
+    def infer(self, graph, argspec, outspec=None, clear=False):
         """Perform inference."""
         if clear:
             self.engine.cache.clear()
@@ -393,7 +393,12 @@ class InferenceResource(PipelineResource):
                         and not ismyiatype(orig_t, Function):
                     node.type = orig_t
         self.fill_in(argspec)
-        return self.engine.run(graph, argspec, self.required_tracks)
+        return self.engine.run(
+            graph,
+            argspec=argspec,
+            outspec=outspec,
+            tracks=self.required_tracks
+        )
 
     def specialize(self, graph, context):
         """Perform specialization."""
@@ -402,9 +407,9 @@ class InferenceResource(PipelineResource):
         self.manager.keep_roots(result)
         return result
 
-    def renormalize(self, graph, argspec):
+    def renormalize(self, graph, argspec, outspec=None):
         """Perform inference and specialization."""
-        _, context = self.infer(graph, argspec, clear=True)
+        _, context = self.infer(graph, argspec, outspec, clear=True)
         return self.specialize(graph, context)
 
 
@@ -472,7 +477,7 @@ class InferrerStep(PipelineStep):
         argspec: Information about argument types.
 
     Outputs:
-        inference_results: Inference results for the graph's output.
+        outspec: Inference results for the graph's output.
         inferrer: The inference engine.
     """
 
@@ -480,7 +485,7 @@ class InferrerStep(PipelineStep):
         """Infer types, shapes, values, etc. for the graph."""
         try:
             res, context = self.resources.inferrer.infer(graph, argspec)
-            return {'inference_results': res,
+            return {'outspec': res,
                     'inference_context': context}
         except Exception as exc:
             # We still want to keep the inferrer around even
@@ -527,17 +532,21 @@ class Preparator(PipelineStep):
         super().__init__(pipeline_init)
         self.erase_classes = erase_classes
 
-    def step(self, graph, argspec):
+    def step(self, graph, argspec, outspec):
         """Prepare the graph."""
         orig_argspec = argspec
+        orig_outspec = outspec
         mng = self.resources.manager
         if self.erase_classes:
             erase_class(graph, mng)
             argspec = tuple(dict(p.inferred) for p in graph.parameters)
+            outspec = dict(graph.output.inferred)
         # graph = self.resources.inferrer.renormalize(graph, argspec)
         return {'graph': graph,
                 'orig_argspec': orig_argspec,
-                'argspec': argspec}
+                'argspec': argspec,
+                'orig_outspec': orig_outspec,
+                'outspec': outspec}
 
 
 class Validator(PipelineStep):
@@ -555,9 +564,11 @@ class Validator(PipelineStep):
         super().__init__(pipeline_init)
         self.whitelist = whitelist
 
-    def step(self, graph, argspec=None):
+    def step(self, graph, argspec=None, outspec=None):
         """Validate the graph."""
-        graph = self.resources.inferrer.renormalize(graph, argspec)
+        graph = self.resources.inferrer.renormalize(
+            graph, argspec, outspec
+        )
         validate(graph, whitelist=self.whitelist)
         return {'graph': graph}
 
@@ -737,7 +748,7 @@ class OutputWrapper(PipelineStep):
         graph: The root graph.
         output: The callable returned by the VM.
         argspec: Contains the original types/etc. of the arguments.
-        inference_results: Contains the original return type.
+        outspec: Contains the original return type.
 
     Outputs:
         output: The wrapped callable.
@@ -747,13 +758,14 @@ class OutputWrapper(PipelineStep):
              graph,
              output,
              argspec,
-             inference_results,
-             orig_argspec=None):
+             outspec,
+             orig_argspec=None,
+             orig_outspec=None):
         """Convert args to vm format, and output from vm format."""
         fn = output
         orig_arg_t = [arg['type'] for arg in orig_argspec or argspec]
         vm_arg_t = graph.type.arguments
-        orig_out_t = inference_results['type']
+        orig_out_t = (orig_outspec or outspec)['type']
         vm_out_t = graph.type.retval
 
         def wrapped(*args):

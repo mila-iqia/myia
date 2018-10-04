@@ -377,63 +377,30 @@ def test_type_tracking():
         .select('parse', 'infer', 'specialize',
                 'prepare', 'opt', 'validate') \
         .configure({
-            'opt.phases.main': [opt_ok1, opt_err1, opt_err2],
-            'prepare.watch': True
+            'opt.phases.main': [opt_ok1, opt_ok2, opt_err1, opt_err2],
         })
 
-    def fn1(x, y):
+    def fn_ok1(x, y):
         return x + y
 
-    pip.run(input=fn1, argspec=({'type': i64}, {'type': i64}))
+    pip.run(input=fn_ok1, argspec=({'type': i64}, {'type': i64}))
 
-    def fn2(x, y):
+    def fn_ok2(x):
+        return -x
+
+    pip.run(input=fn_ok2, argspec=({'type': i64},))
+
+    def fn_err1(x, y):
         return x - y
 
     with pytest.raises(InferenceError):
-        pip.run(input=fn2, argspec=({'type': i64}, {'type': i64}))
+        pip.run(input=fn_err1, argspec=({'type': i64}, {'type': i64}))
 
-    def fn3(x, y):
+    def fn_err2(x, y):
         return x / y
 
     with pytest.raises(InferenceError):
-        pip.run(input=fn3, argspec=({'type': i64}, {'type': i64}))
-
-
-def test_type_tracking_reinfer():
-
-    pip = scalar_pipeline \
-        .select('parse', 'infer', 'specialize',
-                'prepare', 'opt', 'validate') \
-        .configure({
-            'opt.phases.main': [opt_ok1, opt_ok2, opt_err1, opt_err2],
-            'prepare.reinfer': True
-        })
-
-    def fn1(x, y):
-        return x + y
-
-    pip.run(input=fn1, argspec=({'type': i64}, {'type': i64}))
-
-    def fn2(x):
-        return -x
-
-    pip.run(input=fn2, argspec=({'type': i64},))
-
-    def fn3(x, y, z):
-        a = x - y
-        b = a + z
-        return b
-
-    with pytest.raises(InferenceError):
-        pip.run(input=fn3,
-                argspec=({'type': i64}, {'type': i64}, {'type': i64}))
-
-    def fn4(x, y, z):
-        return (x / y) + z
-
-    with pytest.raises(InferenceError):
-        pip.run(input=fn4,
-                argspec=({'type': f64}, {'type': f64}, {'type': f64}))
+        pip.run(input=fn_err2, argspec=({'type': i64}, {'type': i64}))
 
 
 def test_type_tracking_newgraph():
@@ -443,7 +410,6 @@ def test_type_tracking_newgraph():
                 'prepare', 'opt', 'validate') \
         .configure({
             'opt.phases.main': [opt_newg, opt_newg_bad],
-            'prepare.reinfer': True
         })
 
     def fn1(x, y):
