@@ -328,6 +328,20 @@ dataclass_to_myiaclass = {}
 tag_to_dataclass = {}
 
 
+_simple_types = {
+    bool: Bool,
+    int: Int[64],
+    float: Float[64],
+    numpy.int8: Int[8],
+    numpy.int16: Int[16],
+    numpy.int32: Int[32],
+    numpy.int64: Int[64],
+    numpy.float16: Float[16],
+    numpy.float32: Float[32],
+    numpy.float64: Float[64],
+}
+
+
 def pytype_to_myiatype(pytype, instance=None):
     """Convert a Python type into a Myia type.
 
@@ -340,14 +354,8 @@ def pytype_to_myiatype(pytype, instance=None):
             or isinstance(pytype, type) and issubclass(pytype, Type):
         return pytype
 
-    elif pytype is bool:
-        return Bool
-
-    elif pytype is int:
-        return Int[64]
-
-    elif pytype is float:
-        return Float[64]
+    elif pytype in _simple_types:
+        return _simple_types[pytype]
 
     elif pytype is tuple:
         if instance is None:
