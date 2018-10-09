@@ -566,4 +566,6 @@ class ErrorPool:
         """Raise an exception if an error occurred."""
         if self.errors:
             msg = "\n".join(stringify(e) for e in self.errors)
-            raise self.exc_class(msg)
+            exc = self.exc_class(msg)
+            exc.errors = self.errors
+            raise exc

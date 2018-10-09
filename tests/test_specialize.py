@@ -4,6 +4,8 @@ from pytest import mark
 
 from myia.api import scalar_debug_pipeline, standard_debug_pipeline
 from myia.debug.label import short_labeler as lbl
+from myia.debug.traceback import print_inference_error
+from myia.infer import InferenceError
 from myia.prim.py_implementations import \
     hastype, partial, list_map, scalar_add, scalar_sub, \
     scalar_usub, scalar_uadd, switch
@@ -15,8 +17,8 @@ from .common import mysum, i64, f64
 specialize_pipeline = scalar_debug_pipeline \
     .select('parse', 'infer', 'specialize', 'prepare', 'validate', 'export') \
     .configure(
-        {'infer.tracks.value.max_depth': 1,
-         'infer.tied_tracks': {'type': ['shape']}}
+        {'inferrer.tracks.value.max_depth': 1,
+         'inferrer.tied_tracks': {'type': ['shape']}}
     )
 
 
@@ -24,8 +26,8 @@ specialize_pipeline_std = standard_debug_pipeline \
     .select('parse', 'infer', 'specialize',
             'prepare', 'opt', 'validate', 'export', 'wrap') \
     .configure(
-        {'infer.tracks.value.max_depth': 1,
-         'infer.tied_tracks': {'type': ['shape']}}
+        {'inferrer.tracks.value.max_depth': 1,
+         'inferrer.tied_tracks': {'type': ['shape']}}
     )
 
 
@@ -36,7 +38,7 @@ def specializer_decorator(pipeline):
             def run_test(args):
                 pip = pipeline.make()
                 argspec = tuple({'value': arg} for arg in args)
-                pip.steps.infer.fill_in(argspec)
+                pip.resources.inferrer.fill_in(argspec)
                 print(argspec)
                 for arg in argspec:
                     del arg['value']
@@ -45,6 +47,8 @@ def specializer_decorator(pipeline):
 
                 try:
                     res = pip(input=fn, argspec=argspec)
+                except InferenceError as ierr:
+                    print_inference_error(ierr)
                 except ValidationError as verr:
                     print('Collected the following errors:')
                     for err in verr.errors:

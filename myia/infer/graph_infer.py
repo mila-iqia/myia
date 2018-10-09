@@ -286,7 +286,7 @@ class Inferrer(DynamicMap):
             except Unspecializable as e:
                 return e.args[0]
         cached = self.cache[tuple(argrefs)]
-        return Function[[await concretize_type(await argref['type'])
+        return Function[[await concretize_type(await argref[self.track.name])
                          for argref in argrefs],
                         await concretize_type(cached)]
 
@@ -486,10 +486,6 @@ class ExplicitInferrer(Inferrer):
                 refs=[aref]
             )
         return self.retval
-
-    async def as_function_type(self, argrefs=None):
-        """Return a Function type corresponding to this Inferrer."""
-        return Function[self.argvals, self.retval]
 
 
 def register_inferrer(*prims, nargs, constructors):
@@ -741,21 +737,24 @@ class InferenceEngine:
         )
         self.context_class = context_class
 
-    def run(self, graph, argvals, tracks):
+    def run(self, graph, *, tracks, argspec, outspec=None):
         """Run the inferrer on a graph given initial values.
 
         Arguments:
             graph: The graph to analyze.
-            argvals: The arguments. Must be a tuple of dictionaries where
+            tracks: The names of the tracks to infer.
+            argspec: The arguments. Must be a tuple of dictionaries where
                 each dictionary maps track name to value.
+            outspec (optional): Expected inference results. If provided,
+                inference results will be checked against them.
         """
-        argrefs = [self.vref(arg) for arg in argvals]
-        argvals = [{t: ref.values[t] for t in self.all_track_names}
+        argrefs = [self.vref(arg) for arg in argspec]
+        argspec = [{t: ref.values[t] for t in self.all_track_names}
                    for ref in argrefs]
 
         self.mng.add_graph(graph)
         empty_context = self.context_class.empty()
-        root_context = empty_context.add(graph, as_frozen(argvals))
+        root_context = empty_context.add(graph, as_frozen(argspec))
         output_ref = self.ref(graph.return_, root_context)
 
         async def _run():
@@ -765,7 +764,20 @@ class InferenceEngine:
                                     broaden=False)
                 self.loop.schedule(inf(*argrefs))
 
+        async def _check():
+            for track in tracks:
+                expected = outspec[track]
+                if expected not in (UNKNOWN, ANYTHING):
+                    self.equiv.declare_equivalent(
+                        output_ref.get_raw(track),
+                        expected,
+                        [output_ref]
+                    )
+
         self.run_coroutine(_run())
+        if outspec is not None:
+            self.run_coroutine(_check())
+
         results = {name: output_ref.get(name) for name in tracks}
         return results, root_context
 
@@ -803,14 +815,7 @@ class InferenceEngine:
             return await track.infer_apply(ref)
 
         else:
-            return track.default({})
-
-    def invalidate(self, track, ref):
-        """Invalidate the current key in the cache and return the old value.
-
-        Raises KeyError if the key wasn't in the cache to begin with.
-        """
-        return self.cache.invalidate((track, ref))
+            raise AssertionError(f'Missing information for {key}', key)
 
     def get_inferred(self, track, ref):
         """Get a Future for the value of the Reference on the given track.

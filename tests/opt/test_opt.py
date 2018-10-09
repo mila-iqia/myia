@@ -12,7 +12,7 @@ from myia.prim import Primitive, ops as prim
 from myia.utils import Merge
 from myia.utils.unify import Var, var
 
-from ..common import i64
+from ..common import i64, f64
 
 
 X = Var('X')
@@ -323,10 +323,17 @@ def test_cse():
     helper(f2, 12, 8)
 
 
-opt_ok = psub(
+opt_ok1 = psub(
     (prim.scalar_add, X, Y),
     (prim.scalar_mul, X, Y),
-    name='opt_ok'
+    name='opt_ok1'
+)
+
+
+opt_ok2 = psub(
+    prim.scalar_usub,
+    prim.scalar_uadd,
+    name='opt_ok2'
 )
 
 
@@ -344,29 +351,75 @@ opt_err2 = psub(
 )
 
 
+@pattern_replacer('just', prim.scalar_mul)
+def opt_newg(optimizer, node, equiv):
+    from myia.ir import clone
+
+    @parse
+    def newf(a, b):
+        return a - (a + b)
+    return Constant(clone(newf))
+
+
+@pattern_replacer('just', prim.scalar_div)
+def opt_newg_bad(optimizer, node, equiv):
+    from myia.ir import clone
+
+    @parse
+    def newf(a):
+        return a + a
+    return Constant(clone(newf))
+
+
 def test_type_tracking():
 
     pip = scalar_pipeline \
         .select('parse', 'infer', 'specialize',
                 'prepare', 'opt', 'validate') \
         .configure({
-            'opt.phases.main': [opt_ok, opt_err1, opt_err2],
-            'prepare.watch': True
+            'opt.phases.main': [opt_ok1, opt_ok2, opt_err1, opt_err2],
+        })
+
+    def fn_ok1(x, y):
+        return x + y
+
+    pip.run(input=fn_ok1, argspec=({'type': i64}, {'type': i64}))
+
+    def fn_ok2(x):
+        return -x
+
+    pip.run(input=fn_ok2, argspec=({'type': i64},))
+
+    def fn_err1(x, y):
+        return x - y
+
+    with pytest.raises(InferenceError):
+        pip.run(input=fn_err1, argspec=({'type': i64}, {'type': i64}))
+
+    def fn_err2(x, y):
+        return x / y
+
+    with pytest.raises(InferenceError):
+        pip.run(input=fn_err2, argspec=({'type': i64}, {'type': i64}))
+
+
+def test_type_tracking_newgraph():
+
+    pip = scalar_pipeline \
+        .select('parse', 'infer', 'specialize',
+                'prepare', 'opt', 'validate') \
+        .configure({
+            'opt.phases.main': [opt_newg, opt_newg_bad],
         })
 
     def fn1(x, y):
-        return x + y
+        return x * y
 
     pip.run(input=fn1, argspec=({'type': i64}, {'type': i64}))
 
     def fn2(x, y):
-        return x - y
-
-    with pytest.raises(InferenceError):
-        pip.run(input=fn2, argspec=({'type': i64}, {'type': i64}))
-
-    def fn3(x, y):
         return x / y
 
     with pytest.raises(InferenceError):
-        pip.run(input=fn3, argspec=({'type': i64}, {'type': i64}))
+        pip.run(input=fn2,
+                argspec=({'type': f64}, {'type': f64}))
