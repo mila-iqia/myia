@@ -951,7 +951,7 @@ class MyiaFunction:
         inf = pip.resources.inferrer
         argspec = tuple({'value': arg} for arg in args)
         inf.fill_in(argspec)
-        argnames = inspect.getargspec(self.fn).args
+        argnames = inspect.getfullargspec(self.fn).args
         for arg, name in zip(argspec, argnames):
             if name not in self.specialize_values:
                 arg['value'] = ANYTHING

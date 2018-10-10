@@ -847,5 +847,5 @@ class InferenceEngine:
                     return None  # pragma: no cover
             return fut.result()
         finally:
-            for task in asyncio.Task.all_tasks(self.loop):
+            for task in asyncio.all_tasks(self.loop):
                 task._log_destroy_pending = False
