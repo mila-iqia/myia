@@ -235,7 +235,7 @@ def test_true_branch_switch():
         return x
 
     _check_opt(before, after,
-               lib.simplify_always_true_switch)
+               lib.simplify_always_true)
 
 
 def test_false_branch_switch():
@@ -247,7 +247,7 @@ def test_false_branch_switch():
         return y
 
     _check_opt(before, after,
-               lib.simplify_always_false_switch)
+               lib.simplify_always_false)
 
 
 ############
@@ -600,33 +600,3 @@ def test_drop_into():
 
     _check_opt(before, after,
                lib.drop_into_call)
-
-
-def test_drop_into_if():
-
-    def before_helper(x):
-        if x < 0:
-            return scalar_mul
-        else:
-            return scalar_add
-
-    def before(x, y, z):
-        return before_helper(x)(y, z)
-
-    def after(x, y, z):
-        def after_helper(x):
-            def tb():
-                return y * z
-
-            def fb():
-                return y + z
-
-            if x < 0:
-                return tb()
-            else:
-                return fb()
-
-        return after_helper(x)
-
-    _check_opt(before, after,
-               lib.drop_into_call, lib.drop_into_if)
