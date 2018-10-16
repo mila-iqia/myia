@@ -8,7 +8,7 @@ from ..dshape import NOSHAPE, TupleShape, ListShape, ClassShape, \
     find_matching_shape
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer, \
-    InferenceError, MyiaTypeError, TransformedReference
+    InferenceError, MyiaTypeError, TransformedReference, MultiInferrer
 from ..ir import Graph, MetaGraph
 
 from ..dtype import Array, Tuple, List, Class, TypeType, ismyiatype, \
@@ -168,7 +168,12 @@ async def infer_shape_switch(track, cond, tb, fb):
     elif v is ANYTHING:
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
-        return await track.assert_same(tb, fb, refs=[tb, fb])
+        res = await track.assert_same(tb, fb, refs=[tb, fb])
+        if isinstance(res, Inferrer):
+            tinf = await tb['shape']
+            finf = await fb['shape']
+            return MultiInferrer((tinf, finf), [tb, fb])
+        return res
     else:
         raise AssertionError("Invalid condition value for switch.")
 

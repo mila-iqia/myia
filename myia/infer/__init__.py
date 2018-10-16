@@ -22,6 +22,7 @@ from .graph_infer import (  # noqa
     Inferrer,
     GraphInferrer,
     MetaGraphInferrer,
+    MultiInferrer,
     PrimitiveInferrer,
     PartialInferrer,
     ExplicitInferrer,

@@ -4,7 +4,7 @@ from pytest import mark
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    tail, tuple_setitem, scalar_add, scalar_mul, identity, partial, switch
+    tail, tuple_setitem, identity, partial, switch
 
 
 #######################

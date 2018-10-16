@@ -7,8 +7,8 @@ from operator import getitem
 from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
     TypeType, Class, Function, pytype_to_myiatype, Problem, type_cloner
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
-    MyiaTypeError, register_inferrer, Track, MetaGraphInferrer, \
-    ExplicitInferrer, VOID, TransformedReference
+    MyiaTypeError, register_inferrer, Track, Inferrer, MetaGraphInferrer, \
+    ExplicitInferrer, VOID, TransformedReference, MultiInferrer
 from ..ir import Graph, MetaGraph
 from ..utils import Namespace, Var, RestrictedVar, is_dataclass_type
 
@@ -131,7 +131,12 @@ async def infer_type_switch(track, cond, tb, fb):
     elif v is ANYTHING:
         # The first branch to finish will return immediately. When the other
         # branch finishes, its result will be checked against the other.
-        return await track.assert_same(tb, fb, refs=[tb, fb])
+        res = await track.assert_same(tb, fb, refs=[tb, fb])
+        if isinstance(res, Inferrer):
+            tinf = await tb['type']
+            finf = await fb['type']
+            return MultiInferrer((tinf, finf), [tb, fb])
+        return res
     else:
         raise AssertionError("Invalid condition value for switch")
 

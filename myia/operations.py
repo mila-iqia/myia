@@ -26,7 +26,7 @@ def make_list(*elts):  # pragma: no cover
 
 
 def switch(cond, tb, fb):  # pragma: no cover
-    """switch statement, returns one of the two values."""
+    """Switch statement, returns one of the two values."""
     raise RuntimeError('This operation is not meant to be called directly.')
 
 
