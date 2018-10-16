@@ -180,7 +180,7 @@ class FinalVM:
         args = tuple(self._ref(a) for a in args_)
         self._push(struct_partial(fn, args))
 
-    def inst_switch(self, cond, vtrue, vfalse):
+    def inst_switch(self, cond, vtrue, vfalse):  # pragma: no cover
         """Switch.
 
         This will fetch the conditional and push either vtrue or

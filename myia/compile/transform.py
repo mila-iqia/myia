@@ -208,11 +208,7 @@ class CompileGraph(PipelineStep):
                     # previously returned references if a new one is not ready
                     for i in split.inputs[1:]:
                         self.ref(i)
-                    if fn.value == switch:
-                            self.add_instr('switch', self.ref(split.inputs[1]),
-                                           self.ref(split.inputs[2]),
-                                           self.ref(split.inputs[3]))
-                    elif fn.value == return_:
+                    if fn.value == return_:
                         self.add_instr('return', self.ref(split.inputs[1]),
                                        self.height)
                         # execution stops here
@@ -221,6 +217,10 @@ class CompileGraph(PipelineStep):
                         self.add_instr(
                             'partial', self.ref(split.inputs[1]),
                             *tuple(self.ref(inp) for inp in split.inputs[2:]))
+                    elif fn.value == switch:  # pragma: no cover
+                        self.add_instr('switch', self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]),
+                                       self.ref(split.inputs[3]))
                     else:
                         raise AssertionError(f"Unknown special function "
                                              "{fn.value}")
