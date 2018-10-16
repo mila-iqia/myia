@@ -190,7 +190,7 @@ class CompileGraph(PipelineStep):
             if isinstance(split, list):
                 run, inputs, outputs = \
                     self.pipeline.resources.lin_convert(split)
-                # prime the arguemnts because self.ref() can invalidate
+                # prime the arguments because self.ref() can invalidate
                 # previously returned references if a new one is not ready
                 for i in inputs:
                     self.ref(i)
