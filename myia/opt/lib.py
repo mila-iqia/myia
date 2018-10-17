@@ -1,7 +1,7 @@
 """Library of optimizations."""
 
 from ..graph_utils import dfs
-from ..ir import succ_incoming, freevars_boundary, Constant, GraphCloner
+from ..ir import succ_incoming, freevars_boundary, Constant, GraphCloner, Graph
 from ..prim import Primitive, ops as P
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
@@ -318,3 +318,22 @@ def drop_into_call(optimizer, node, equiv):
     g2.output = sexp_to_node(new_output, g2)
 
     return sexp_to_node((g2, *xs), node.graph)
+
+
+@pattern_replacer(((P.switch, X, Y, Z),), Xs)
+def drop_into_if(optimizer, node, equiv):
+    """Drop a call on the result of if into both branches.
+
+    f(if(x, y, z)) => if(x, () -> f(y()), () -> f(z()))
+    """
+    y = equiv[Y]
+    z = equiv[Z]
+
+    y2 = Graph()
+    y2.output = sexp_to_node(((y,), *equiv[Xs]), y2)
+
+    z2 = Graph()
+    z2.output = sexp_to_node(((z,), *equiv[Xs]), z2)
+
+    new = ((P.switch, equiv[X], y2, z2),)
+    return sexp_to_node(new, node.graph)

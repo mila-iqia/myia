@@ -4,7 +4,7 @@ from pytest import mark
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    tail, tuple_setitem, identity, partial, switch
+    scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch
 
 
 #######################
@@ -600,3 +600,33 @@ def test_drop_into():
 
     _check_opt(before, after,
                lib.drop_into_call)
+
+
+def test_drop_into_if():
+
+    def before_helper(x):
+        if x < 0:
+            return scalar_mul
+        else:
+            return scalar_add
+
+    def before(x, y, z):
+        return before_helper(x)(y, z)
+
+    def after(x, y, z):
+        def after_helper(x):
+            def tb():
+                return y * z
+
+            def fb():
+                return y + z
+
+            if x < 0:
+                return tb()
+            else:
+                return fb()
+
+        return after_helper(x)
+
+    _check_opt(before, after,
+               lib.drop_into_call, lib.drop_into_if)
