@@ -261,11 +261,19 @@ def is_unique_use(g, node, args):
     return len(users) == 1 and sum(users.values()) == 1
 
 
+def is_core(g, node, args):
+    """Inline graphs that are marked as part of the core."""
+    return g.flags['core']
+
+
 inline_trivial = make_inliner(inline_criterion=is_trivial_graph,
                               check_recursive=False)
 
 inline_unique_uses = make_inliner(inline_criterion=is_unique_use,
                                   check_recursive=True)
+
+inline_core = make_inliner(inline_criterion=is_core,
+                           check_recursive=False)
 
 inline = make_inliner(inline_criterion=None, check_recursive=True)
 
