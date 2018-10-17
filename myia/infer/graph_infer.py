@@ -291,6 +291,26 @@ class Inferrer(DynamicMap):
                         await concretize_type(cached)]
 
 
+class MultiInferrer(Inferrer):
+    """Inferrer to use when the result is multiple possible callables.
+
+    This makes sure that those callables are equivalent.
+    """
+
+    def __init__(self, inferrers, refs):
+        """Set the list of possible inferrers."""
+        assert all(isinstance(inf, Inferrer) for inf in inferrers)
+        self.inferrers = inferrers
+        self.refs = refs
+        super().__init__(self.inferrers[0].track, None)
+
+    def infer(self, *args):
+        """Run the inference over all possible inferrers."""
+        return self.track.assert_same(
+            *[inf(*args) for inf in self.inferrers],
+            refs=self.refs)
+
+
 class PrimitiveInferrer(Inferrer):
     """Infer a property of the result of a primitive.
 
@@ -847,5 +867,5 @@ class InferenceEngine:
                     return None  # pragma: no cover
             return fut.result()
         finally:
-            for task in asyncio.Task.all_tasks(self.loop):
+            for task in asyncio.all_tasks(self.loop):
                 task._log_destroy_pending = False

@@ -1,7 +1,7 @@
 """Library of optimizations."""
 
 from ..graph_utils import dfs
-from ..ir import succ_incoming, freevars_boundary, Graph, Constant, GraphCloner
+from ..ir import succ_incoming, freevars_boundary, Constant, GraphCloner, Graph
 from ..prim import Primitive, ops as P
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
@@ -162,32 +162,17 @@ elim_identity = psub(
 
 
 simplify_always_true = psub(
-    pattern=(P.if_, True, X, Y),
-    replacement=(X,),
+    pattern=(P.switch, True, X, Y),
+    replacement=X,
     name='simplify_always_true'
 )
 
 
 simplify_always_false = psub(
-    pattern=(P.if_, False, X, Y),
-    replacement=(Y,),
-    name='simplify_always_false'
-)
-
-
-simplify_always_true_switch = psub(
-    pattern=(P.switch, True, X, Y),
-    replacement=X,
-    name='simplify_always_true_switch'
-)
-
-
-simplify_always_false_switch = psub(
     pattern=(P.switch, False, X, Y),
     replacement=Y,
-    name='simplify_always_false_switch'
+    name='simplify_always_false'
 )
-
 
 #####################
 # Simplify partials #
@@ -335,7 +320,7 @@ def drop_into_call(optimizer, node, equiv):
     return sexp_to_node((g2, *xs), node.graph)
 
 
-@pattern_replacer((P.if_, X, Y, Z), Xs)
+@pattern_replacer(((P.switch, X, Y, Z),), Xs)
 def drop_into_if(optimizer, node, equiv):
     """Drop a call on the result of if into both branches.
 
@@ -350,5 +335,5 @@ def drop_into_if(optimizer, node, equiv):
     z2 = Graph()
     z2.output = sexp_to_node(((z,), *equiv[Xs]), z2)
 
-    new = (P.if_, equiv[X], y2, z2)
+    new = ((P.switch, equiv[X], y2, z2),)
     return sexp_to_node(new, node.graph)

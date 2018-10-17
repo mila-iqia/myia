@@ -3,7 +3,7 @@
 from ..ir import Apply, toposort, Graph, Constant
 from ..pipeline import PipelineDefinition, PipelineStep
 from ..prim import Primitive
-from ..prim.ops import if_, partial, return_
+from ..prim.ops import partial, return_, switch
 from .debug_lin import debug_convert
 from .vm import FinalVM
 
@@ -96,7 +96,7 @@ class SplitGraph(PipelineStep):
             fn = node.inputs[0]
             if not fn.is_constant(Primitive):
                 return True
-            elif fn.value in (if_, return_, partial):
+            elif fn.value in (return_, partial):
                 return True
         return False
 
@@ -190,6 +190,10 @@ class CompileGraph(PipelineStep):
             if isinstance(split, list):
                 run, inputs, outputs = \
                     self.pipeline.resources.lin_convert(split)
+                # prime the arguments because self.ref() can invalidate
+                # previously returned references if a new one is not ready
+                for i in inputs:
+                    self.ref(i)
                 args = [self.ref(i) for i in inputs]
                 self.add_instr('external', run, args)
                 for o in outputs:
@@ -200,22 +204,11 @@ class CompileGraph(PipelineStep):
                 fn = split.inputs[0]
 
                 if fn.is_constant(Primitive):
-                    # pre-push arguments on the stack if needed
+                    # prime the arguemnts because self.ref() can invalidate
+                    # previously returned references if a new one is not ready
                     for i in split.inputs[1:]:
                         self.ref(i)
-                    if fn.value == if_:
-                        if split is graph.output:
-                            self.add_instr('tailif', self.ref(split.inputs[1]),
-                                           self.ref(split.inputs[2]),
-                                           self.ref(split.inputs[3]),
-                                           self.height)
-                            # execution stops here
-                            break
-                        else:
-                            self.add_instr('if', self.ref(split.inputs[1]),
-                                           self.ref(split.inputs[2]),
-                                           self.ref(split.inputs[3]))
-                    elif fn.value == return_:
+                    if fn.value == return_:
                         self.add_instr('return', self.ref(split.inputs[1]),
                                        self.height)
                         # execution stops here
@@ -224,6 +217,10 @@ class CompileGraph(PipelineStep):
                         self.add_instr(
                             'partial', self.ref(split.inputs[1]),
                             *tuple(self.ref(inp) for inp in split.inputs[2:]))
+                    elif fn.value == switch:  # pragma: no cover
+                        self.add_instr('switch', self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]),
+                                       self.ref(split.inputs[3]))
                     else:
                         raise AssertionError(f"Unknown special function "
                                              "{fn.value}")

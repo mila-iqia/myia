@@ -281,7 +281,7 @@ class EquivalenceChecker:
         for fut in done | pending:
             self.declare_equivalent(fut, main, refs)
 
-        # We return the first result immediately
+        # Otherwise just return one of them
         return main.result()
 
 

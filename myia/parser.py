@@ -304,10 +304,11 @@ class Parser:
                 b1.graph.output = fold(b1, rest, mode)
                 b2.graph.output = test
 
-                return block.graph.apply(block.operation('if_'),
-                                         block.force_bool(test),
-                                         true_block.graph,
-                                         false_block.graph)
+                switch = block.graph.apply(block.operation('switch'),
+                                           block.force_bool(test),
+                                           true_block.graph,
+                                           false_block.graph)
+                return block.graph.apply(switch)
             else:
                 return test
 
@@ -336,7 +337,8 @@ class Parser:
         tg.output = tb
         fg.output = fb
 
-        return block.graph.apply(block.operation('if_'), cond, tg, fg)
+        switch = block.graph.apply(block.operation('switch'), cond, tg, fg)
+        return block.graph.apply(switch)
 
     def process_Lambda(self, block: 'Block', node: ast.Lambda) -> ANFNode:
         """Process lambda: `lambda x, y: x + y`."""
@@ -792,9 +794,10 @@ class Block:
 
         """
         assert self.graph.return_ is None
-        self.graph.output = self.graph.apply(
-            self.operation('if_'),
+        switch = self.graph.apply(
+            self.operation('switch'),
             cond,
             true.graph,
             false.graph
         )
+        self.graph.output = self.graph.apply(switch)

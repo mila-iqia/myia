@@ -64,7 +64,7 @@ scalar_object_map = {
     operations.hasnext: C.hasnext,
     operations.next: C.next,
     operations.to_array: C.to_array,
-    operations.if_: P.if_,
+    operations.switch: P.switch,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -112,7 +112,7 @@ standard_object_map = {
     operations.hasnext: C.hasnext,
     operations.next: C.next,
     operations.to_array: C.to_array,
-    operations.if_: P.if_,
+    operations.switch: P.switch,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -804,8 +804,6 @@ step_opt = Optimizer.partial(
         main=[
             optlib.simplify_always_true,
             optlib.simplify_always_false,
-            optlib.simplify_always_true_switch,
-            optlib.simplify_always_false_switch,
             optlib.inline_unique_uses,
             optlib.simplify_partial,
             optlib.replace_applicator,
@@ -951,7 +949,7 @@ class MyiaFunction:
         inf = pip.resources.inferrer
         argspec = tuple({'value': arg} for arg in args)
         inf.fill_in(argspec)
-        argnames = inspect.getargspec(self.fn).args
+        argnames = inspect.getfullargspec(self.fn).args
         for arg, name in zip(argspec, argnames):
             if name not in self.specialize_values:
                 arg['value'] = ANYTHING

@@ -180,47 +180,22 @@ class FinalVM:
         args = tuple(self._ref(a) for a in args_)
         self._push(struct_partial(fn, args))
 
-    def inst_if(self, cond, ftrue, ffalse):
-        """If.
+    def inst_switch(self, cond, vtrue, vfalse):  # pragma: no cover
+        """Switch.
 
-        This will fetch the conditional and call either ftrue or
-        ffalse with no arguments depending on the value.
-
-        Arguments:
-            cond: boolean value
-            ftrue: callable reference
-            ffalse: callable reference
-
-        Note:
-            This instruction might change to instead return the chosen
-            callable in the future.
-
-        """
-        if self._ref(cond):
-            self.inst_call(ftrue)
-        else:
-            self.inst_call(ffalse)
-
-    def inst_tailif(self, cond, ftrue, ffalse, height):
-        """Tail If.
-
-        This will fetch the conditional and tail call either ftrue or
-        ffalse with no arguments depending on the value.
+        This will fetch the conditional and push either vtrue or
+        vfalse depending on its value.
 
         Arguments:
             cond: boolean value
-            ftrue: callable reference
-            ffalse: callable reference
-            height: stack height to clear
-
-        Note:
-            This instruction might disappear in the future.
+            vtrue: reference
+            vfalse: reference
 
         """
         if self._ref(cond):
-            self.inst_tailcall(ftrue, height, 0)
+            self._push(self._ref(vtrue))
         else:
-            self.inst_tailcall(ffalse, height, 0)
+            self._push(self._ref(vfalse))
 
     def inst_push(self, v):
         """Push a value on the stack.

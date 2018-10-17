@@ -120,7 +120,7 @@ def test_partial_prim(x, y):
     return partial(scalar_add, x)(y)
 
 
-def test_if_nontail():
+def test_switch_nontail():
     def fn(x, y):
         def f1():
             return x
@@ -128,7 +128,7 @@ def test_if_nontail():
         def f2():
             return y
 
-        a = P.if_(x > y, f1, f2)
+        a = P.switch(x > y, f1, f2)()
         return a * a
 
     i64 = typeof(1)

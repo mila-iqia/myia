@@ -67,7 +67,7 @@ type_inferrer_cons_test = {}
 def _test_op(cls):
     import inspect
     op = Primitive(cls.__name__)
-    nargs = len(inspect.getargspec(cls.impl).args)
+    nargs = len(inspect.getfullargspec(cls.impl).args)
     pyimpl_test[op] = cls.impl
     for method in dir(cls):
         pfx = 'infer_'

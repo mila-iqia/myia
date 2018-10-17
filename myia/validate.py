@@ -111,7 +111,6 @@ whitelist = frozenset({
     P.distribute,
     P.reshape,
     P.dot,
-    P.if_,
     P.switch,
     P.return_,
     P.list_map,
