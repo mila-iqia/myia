@@ -2,6 +2,7 @@
 
 import builtins
 import inspect
+import itertools
 import sys
 import numpy as np
 from typing import Any, Dict, List, TypeVar
@@ -83,6 +84,11 @@ def list_str(lst: List):
     """
     elements = ', '.join(str(elem) for elem in lst)
     return f'[{elements}]'
+
+
+def flatten(lst):
+    """Flatten a list of lists (one level)."""
+    return itertools.chain.from_iterable(lst)
 
 
 class TypeMap(dict):

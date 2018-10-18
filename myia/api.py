@@ -14,14 +14,14 @@ from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
 from .infer import InferenceEngine, ANYTHING, Context
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
-    erase_class
+    erase_class, erase_tuple
 from .pipeline import PipelineStep, PipelineResource, PipelineDefinition
 from .prim import py_implementations, vm_implementations, ops as P
 from .prim.value_inferrers import ValueTrack, value_inferrer_constructors
 from .prim.type_inferrers import TypeTrack, type_inferrer_constructors
 from .prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
 from .specialize import TypeSpecializer
-from .utils import TypeMap, as_frozen, overload, UNKNOWN
+from .utils import TypeMap, as_frozen, overload, flatten, UNKNOWN
 from .vm import VM
 from .compile import step_wrap_primitives, step_compile, step_link, step_export
 from .validate import validate, whitelist as default_whitelist
@@ -538,10 +538,12 @@ class Preparator(PipelineStep):
 
     def __init__(self,
                  pipeline_init,
-                 erase_classes=True):
+                 erase_classes=True,
+                 erase_tuples=True):
         """Initialize a Preparator."""
         super().__init__(pipeline_init)
         self.erase_classes = erase_classes
+        self.erase_tuples = erase_tuples
 
     def step(self, graph, argspec, outspec):
         """Prepare the graph."""
@@ -552,7 +554,11 @@ class Preparator(PipelineStep):
             erase_class(graph, mng)
             argspec = tuple(dict(p.inferred) for p in graph.parameters)
             outspec = dict(graph.output.inferred)
-        # graph = self.resources.inferrer.renormalize(graph, argspec)
+        if self.erase_tuples:
+            erase_tuple(graph, mng)
+            graph = self.resources.inferrer.renormalize(graph, argspec)
+            argspec = tuple(dict(p.inferred) for p in graph.parameters)
+            outspec = dict(graph.output.inferred)
         return {'graph': graph,
                 'orig_argspec': orig_argspec,
                 'argspec': argspec,
@@ -624,49 +630,37 @@ class DebugVMExporter(PipelineStep):
 
 
 @overload
-def _convert_arg(arg, orig_t: Tuple, vm_t):
+def _convert_arg(arg, orig_t: Tuple):
     if not isinstance(arg, tuple):
         raise TypeError('Expected tuple')
     oe = orig_t.elements
-    ve = vm_t.elements
-    if len(arg) != len(ve):
-        raise TypeError(f'Expected {len(ve)} elements')
-    return tuple(convert_arg(x, o, v)
-                 for x, o, v in zip(arg, oe, ve))
+    if len(arg) != len(oe):
+        raise TypeError(f'Expected {len(oe)} elements')
+    return flatten(convert_arg(x, o)
+                   for x, o in zip(arg, oe))
 
 
 @overload  # noqa: F811
-def _convert_arg(arg, orig_t: List, vm_t):
+def _convert_arg(arg, orig_t: List):
     if not isinstance(arg, list):
         raise TypeError('Expected list')
     ot = orig_t.element_type
-    vt = vm_t.element_type
-    return [convert_arg(x, ot, vt) for x in arg]
+    return [list(flatten(convert_arg(x, ot) for x in arg))]
 
 
 @overload  # noqa: F811
-def _convert_arg(arg, orig_t: Class, vm_t):
-    # If the EraseClass opt was applied, vm_t may be Tuple
+def _convert_arg(arg, orig_t: Class):
     dc = tag_to_dataclass[orig_t.tag]
     if not isinstance(arg, dc):
         raise TypeError(f'Expected {dc.__qualname__}')
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
-    vm_is_tup = ismyiatype(vm_t, Tuple)
-    if vm_is_tup:
-        ve = vm_t.elements
-    else:
-        ve = vm_t.attributes.values()
-    tup = tuple(convert_arg(x, o, v)
-                for x, o, v in zip(arg, oe, ve))
-    if vm_is_tup:
-        return tup
-    else:
-        return dc(*tup)
+    return flatten(convert_arg(x, o)
+                   for x, o in zip(arg, oe))
 
 
 @overload  # noqa: F811
-def _convert_arg(arg, orig_t: Array, vm_t):
+def _convert_arg(arg, orig_t: Array):
     if not isinstance(arg, np.ndarray):
         raise TypeError('Expected ndarray')
     et = orig_t.elements
@@ -678,29 +672,29 @@ def _convert_arg(arg, orig_t: Array, vm_t):
 
 
 @overload  # noqa: F811
-def _convert_arg(arg, orig_t: Int, vm_t):
+def _convert_arg(arg, orig_t: Int):
     if not isinstance(arg, int):
         raise TypeError(f'Expected int')
     return arg
 
 
 @overload  # noqa: F811
-def _convert_arg(arg, orig_t: Float, vm_t):
+def _convert_arg(arg, orig_t: Float):
     if not isinstance(arg, float):
         raise TypeError(f'Expected float')
     return arg
 
 
 @overload  # noqa: F811
-def _convert_arg(arg, orig_t: Bool, vm_t):
+def _convert_arg(arg, orig_t: Bool):
     if not isinstance(arg, bool):
         raise TypeError(f'Expected bool')
     return arg
 
 
-def convert_arg(arg, orig_t, vm_t):
+def convert_arg(arg, orig_t):
     """Check that arg matches orig_t, and convert to vm_t."""
-    return _convert_arg[orig_t](arg, orig_t, vm_t)
+    return _convert_arg[orig_t](arg, orig_t)
 
 
 @overload
@@ -775,13 +769,12 @@ class OutputWrapper(PipelineStep):
         """Convert args to vm format, and output from vm format."""
         fn = output
         orig_arg_t = [arg['type'] for arg in orig_argspec or argspec]
-        vm_arg_t = graph.type.arguments
         orig_out_t = (orig_outspec or outspec)['type']
         vm_out_t = graph.type.retval
 
         def wrapped(*args):
-            args = tuple(convert_arg(arg, ot, vt) for arg, ot, vt in
-                         zip(args, orig_arg_t, vm_arg_t))
+            args = tuple(convert_arg(arg, ot) for arg, ot in
+                         zip(args, orig_arg_t))
             res = fn(*args)
             res = convert_result(res, orig_out_t, vm_out_t)
             return res
@@ -806,7 +799,8 @@ step_specialize = Specializer.partial()
 
 
 step_prepare = Preparator.partial(
-    erase_classes=True
+    erase_classes=True,
+    erase_tuples=True
 )
 
 
