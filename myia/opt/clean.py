@@ -103,6 +103,8 @@ def expand_tuples_c(graph, inputs):
             ni = graph.apply(P.tuple_getitem, i, pos)
             ni.inputs[2].type = Int[64]
             ni.inputs[2].shape = NOSHAPE
+            ni.type = ie
+            ni.shape = ish
             new_input.append(ni)
 
         new_inputs.extend(expand_tuples_c(graph, new_input))
@@ -122,6 +124,8 @@ def erase_tuple(root, manager):
             if new_inputs != node.inputs[1:]:
                 new_node = node.graph.apply(node.inputs[0],
                                             *new_inputs)
+                new_node.type = node.type
+                new_node.shape = node.shape
                 manager.replace(node, new_node)
         elif (node.is_apply(P.partial) and
               not node.inputs[1].is_constant(Primitive)):
@@ -130,6 +134,8 @@ def erase_tuple(root, manager):
             if new_inputs != node.inputs[2:]:
                 new_node = node.graph.apply(*node.inputs[:2],
                                             *new_inputs)
+                new_node.type = node.type
+                new_node.shape = node.shape
                 manager.replace(node, new_node)
     # Modify all graph parameters
     for graph in list(manager.graphs):

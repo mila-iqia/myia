@@ -70,64 +70,55 @@ def test_convert_arg():
 
     # Leaves
 
-    assert convert_arg(True, Bool, Bool) is True
-    assert convert_arg(False, Bool, Bool) is False
-    assert convert_arg(10, i64, i64) == 10
-    assert convert_arg(1.5, f64, f64) == 1.5
+    assert convert_arg(True, Bool) == [True]
+    assert convert_arg(False, Bool) == [False]
+    assert convert_arg(10, i64) == [10]
+    assert convert_arg(1.5, f64) == [1.5]
 
     # Class -> Tuple conversion
 
     pt = Point(1, 2)
     pt3 = Point3D(1, 2, 3)
-    assert convert_arg(pt, Point_t, Point_t) == pt
-    assert convert_arg(pt, Point_t, Tuple[i64, i64]) == (1, 2)
+    assert list(convert_arg(pt, Point_t)) == [1, 2]
     with pytest.raises(TypeError):
-        convert_arg(pt3, Point_t, Tuple[i64, i64])
-    with pytest.raises(TypeError):
-        convert_arg((1, 2), Point_t, Tuple[i64, i64])
+        convert_arg((1, 2), Point_t)
 
-    assert convert_arg((pt, pt),
-                       Tuple[Point_t, Point_t],
-                       Tuple[Tuple[i64, i64], Tuple[i64, i64]]) == \
-        ((1, 2), (1, 2))
+    assert list(convert_arg((pt, pt),
+                       Tuple[Point_t, Point_t])) == [1, 2, 1, 2]
 
     assert convert_arg([pt, pt, pt],
-                       List[Point_t],
-                       List[Tuple[i64, i64]]) == \
-        [(1, 2), (1, 2), (1, 2)]
+                       List[Point_t]) == [[1, 2, 1, 2, 1, 2]]
 
     # Arrays
 
     fmat = np.ones((5, 8))
     imat = np.ones((5, 8), dtype='int16')
 
-    assert convert_arg(fmat, Array[f64], Array[f64]) is fmat
-    assert convert_arg(imat, Array[i16], Array[i16]) is imat
-    with pytest.raises(TypeError):
-        convert_arg(imat, Array[i64], Array[i64])
+    assert convert_arg(fmat, Array[f64])[0] is fmat
+    assert convert_arg(imat, Array[i16])[0] is imat
 
     # Misc errors
 
     with pytest.raises(TypeError):
-        convert_arg(10, f64, f64)
+        convert_arg(10, f64)
     with pytest.raises(TypeError):
-        convert_arg(1.5, i64, i64)
+        convert_arg(1.5, i64)
     with pytest.raises(TypeError):
-        convert_arg(10, Tuple[i64, i64], Tuple[i64, i64])
+        convert_arg(10, Tuple[i64, i64])
     with pytest.raises(TypeError):
-        convert_arg((1,), Tuple[i64, i64], Tuple[i64, i64])
+        convert_arg((1,), Tuple[i64, i64])
     with pytest.raises(TypeError):
-        convert_arg((1, 2, 3), Tuple[i64, i64], Tuple[i64, i64])
+        convert_arg((1, 2, 3), Tuple[i64, i64])
     with pytest.raises(TypeError):
-        convert_arg((1, 2, 3), List[i64], List[i64])
+        convert_arg((1, 2, 3), List[i64])
     with pytest.raises(TypeError):
-        convert_arg(pt3, Point_t, Point_t)
+        convert_arg(pt3, Point_t)
     with pytest.raises(TypeError):
-        convert_arg(10, Array[i64], Array[i64])
+        convert_arg(10, Array[i64])
     with pytest.raises(TypeError):
-        convert_arg(10, Array[i64], Array[i64])
+        convert_arg(10, Array[i64])
     with pytest.raises(TypeError):
-        convert_arg(1, Bool, Bool)
+        convert_arg(1, Bool)
 
 
 def test_convert_result():

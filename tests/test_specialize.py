@@ -58,6 +58,8 @@ def specializer_decorator(pipeline):
                         print(f'   {nlbl} ({type(n).__name__}) :: {n.type}')
                         print(f'      {err.args[0]}')
                     raise verr
+                except:
+                    raise
 
                 result_final = res['output'](*args)
                 if isinstance(result_py, numpy.ndarray):

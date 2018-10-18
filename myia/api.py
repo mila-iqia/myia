@@ -555,9 +555,10 @@ class Preparator(PipelineStep):
             argspec = tuple(dict(p.inferred) for p in graph.parameters)
             outspec = dict(graph.output.inferred)
         if self.erase_tuples:
-            erase_tuple(graph, mng)
             graph = self.resources.inferrer.renormalize(graph, argspec)
+            erase_tuple(graph, mng)
             argspec = tuple(dict(p.inferred) for p in graph.parameters)
+            graph = self.resources.inferrer.renormalize(graph, argspec)
             outspec = dict(graph.output.inferred)
         return {'graph': graph,
                 'orig_argspec': orig_argspec,
@@ -636,8 +637,8 @@ def _convert_arg(arg, orig_t: Tuple):
     oe = orig_t.elements
     if len(arg) != len(oe):
         raise TypeError(f'Expected {len(oe)} elements')
-    return flatten(convert_arg(x, o)
-                   for x, o in zip(arg, oe))
+    return list(flatten(convert_arg(x, o)
+                        for x, o in zip(arg, oe)))
 
 
 @overload  # noqa: F811
@@ -655,8 +656,8 @@ def _convert_arg(arg, orig_t: Class):
         raise TypeError(f'Expected {dc.__qualname__}')
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
-    return flatten(convert_arg(x, o)
-                   for x, o in zip(arg, oe))
+    return list(flatten(convert_arg(x, o)
+                        for x, o in zip(arg, oe)))
 
 
 @overload  # noqa: F811
@@ -668,28 +669,28 @@ def _convert_arg(arg, orig_t: Array):
     dtype = type_to_np_dtype(et)
     if arg.dtype != dtype:
         raise TypeError('Wrong dtype')
-    return arg
+    return [arg]
 
 
 @overload  # noqa: F811
 def _convert_arg(arg, orig_t: Int):
     if not isinstance(arg, int):
         raise TypeError(f'Expected int')
-    return arg
+    return [arg]
 
 
 @overload  # noqa: F811
 def _convert_arg(arg, orig_t: Float):
     if not isinstance(arg, float):
         raise TypeError(f'Expected float')
-    return arg
+    return [arg]
 
 
 @overload  # noqa: F811
 def _convert_arg(arg, orig_t: Bool):
     if not isinstance(arg, bool):
         raise TypeError(f'Expected bool')
-    return arg
+    return [arg]
 
 
 def convert_arg(arg, orig_t):
@@ -773,8 +774,8 @@ class OutputWrapper(PipelineStep):
         vm_out_t = graph.type.retval
 
         def wrapped(*args):
-            args = tuple(convert_arg(arg, ot) for arg, ot in
-                         zip(args, orig_arg_t))
+            args = tuple(flatten(convert_arg(arg, ot) for arg, ot in
+                                 zip(args, orig_arg_t)))
             res = fn(*args)
             res = convert_result(res, orig_out_t, vm_out_t)
             return res
