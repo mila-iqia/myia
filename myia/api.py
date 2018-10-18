@@ -13,7 +13,7 @@ from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
     TypeMeta, Function
 from .infer import InferenceEngine, ANYTHING, Context
 from .ir import Graph, clone, GraphManager
-from .opt import PatternEquilibriumOptimizer, lib as optlib, cse, \
+from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
     erase_class
 from .pipeline import PipelineStep, PipelineResource, PipelineDefinition
 from .prim import py_implementations, vm_implementations, ops as P
@@ -443,17 +443,15 @@ class Optimizer(PipelineStep):
     def __init__(self,
                  pipeline_init,
                  phases,
-                 cse=True,
-                 renormalize=False,
                  run_only_once=False):
         """Initialize an Optimizer."""
         super().__init__(pipeline_init)
         self.run_only_once = run_only_once
-        self.renormalize = renormalize
-        self.cse = cse
         self.phases = []
         for name, spec in phases.items():
-            if isinstance(spec, list):
+            if spec == 'renormalize':
+                pass
+            elif isinstance(spec, list):
                 spec = PatternEquilibriumOptimizer(*spec, optimizer=self)
             else:
                 spec = spec(optimizer=self)
@@ -465,17 +463,15 @@ class Optimizer(PipelineStep):
         while changes:
             changes = False
             for opt in self.phases:
-                if opt(graph):
+                if opt == 'renormalize':
+                    assert argspec is not None
+                    graph = self.resources.inferrer.renormalize(
+                        graph, argspec, outspec
+                    )
+                elif opt(graph):
                     changes = True
             if self.run_only_once:
                 break
-            if self.renormalize:
-                assert argspec is not None
-                graph = self.resources.inferrer.renormalize(
-                    graph, argspec, outspec
-                )
-            if self.cse:
-                cse(graph, self.resources.manager)
         self.resources.manager.keep_roots(graph)
         return {'graph': graph}
 
@@ -811,7 +807,6 @@ step_prepare = Preparator.partial(
 
 
 step_opt = Optimizer.partial(
-    renormalize=True,
     phases=dict(
         main=[
             optlib.simplify_always_true,
@@ -822,6 +817,8 @@ step_opt = Optimizer.partial(
             optlib.replace_applicator,
             optlib.elim_identity,
         ],
+        cse=CSE.partial(report_changes=False),
+        renormalize='renormalize'
     )
 )
 
