@@ -263,7 +263,7 @@ def is_unique_use(g, node, args):
 
 def is_core(g, node, args):
     """Inline graphs that are marked as part of the core."""
-    return g.flags['core']
+    return g.flags.get('core', False)
 
 
 inline_trivial = make_inliner(inline_criterion=is_trivial_graph,

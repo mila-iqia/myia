@@ -817,13 +817,11 @@ step_opt = Optimizer.partial(
             optlib.simplify_always_true,
             optlib.simplify_always_false,
             optlib.inline_unique_uses,
+            optlib.inline_core,
             optlib.simplify_partial,
             optlib.replace_applicator,
             optlib.elim_identity,
         ],
-        grad=[
-            optlib.expand_J
-        ]
     )
 )
 
