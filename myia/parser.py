@@ -233,6 +233,10 @@ class Parser:
 
         function_block.mature()
         function_block.graph.debug.name = node.name
+        if node.args.kwarg is not None or node.args.kwonlyargs != []:
+            raise NotImplementedError("No support for keyword arguments")
+        if node.args.vararg:
+            raise NotImplementedError("varargs")
         for arg in node.args.args:
             with DebugInherit(ast=arg, location=self.make_location(arg)):
                 anf_node = Parameter(function_block.graph)
