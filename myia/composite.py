@@ -595,3 +595,26 @@ zeros_like = HyperMap(
     nonleaf=(Tuple, List, Class),
     fn_leaf=_leaf_zeros_like
 )
+
+
+@core
+def list_reduce_c(fn, lst, dftl):
+    if len(lst) == 0:
+        return dftl
+    else:
+        res = lst[0]
+        for i in range(1, len(lst)):
+           res = fn(res, lst[i])
+        return res
+
+
+@core
+def list_map_c(fn, *lsts):
+    if len(lsts) == 0:
+        return []
+    llen = len(lsts[0])
+    for l in lsts:
+        if len(l) != llen:
+            return fatal()
+    iters = [None] * llen
+    
