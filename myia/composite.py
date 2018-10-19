@@ -12,7 +12,7 @@ from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
     switch, identity, bool_and, tail, typeof, scalar_cast, scalar_add, \
     scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, \
-    scalar_div, env_add
+    scalar_div, list_append, env_add
 from .utils import newenv
 
 
@@ -609,12 +609,10 @@ def list_reduce_c(fn, lst, dftl):
 
 
 @core
-def list_map_c(fn, *lsts):
-    if len(lsts) == 0:
-        return []
-    llen = len(lsts[0])
-    for l in lsts:
-        if len(l) != llen:
-            return fatal()
-    iters = [None] * llen
-    
+def list_map_c(fn, lst):
+    resl = []
+    i = 0
+    for l in lst:
+        resl = list_append(resl, fn(l))
+        i = i + 1
+    return resl
