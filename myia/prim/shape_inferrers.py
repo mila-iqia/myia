@@ -215,7 +215,7 @@ async def infer_shape_array_map(track, fn, *arrays):
     return tuple(rshape)
 
 
-@shape_inferrer(P.list_append, nargs=2):
+@shape_inferrer(P.list_append, nargs=2)
 async def infer_shape_list_append(track, seq, value):
     lshp = await seq['shape']
     await track.will_check(lshp.shape, await value['shape'])

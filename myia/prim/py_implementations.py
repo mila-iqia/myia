@@ -318,7 +318,7 @@ def list_setitem(data, item, value):
     return data2
 
 
-@regsister(primops.list_append)
+@register(primops.list_append)
 def list_append(data, value):
     """Implement `list_append`."""
     data2 = copy(data)
