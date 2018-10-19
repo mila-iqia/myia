@@ -243,6 +243,14 @@ async def infer_type_list_setitem(track, seq, idx, value):
     return seq_t
 
 
+@type_inferrer(P.list_append, nargs=2)
+async def infer_type_list_append(track, seq, value):
+    """Infer the return type of list_append."""
+    seq_t = await track.check(List, seq)
+    await track.will_check(seq_t.element_type, value)
+    return seq_t
+
+
 @type_inferrer(P.typeof, nargs=1)
 async def infer_type_typeof(track, _):
     """Infer the return type of typeof."""
