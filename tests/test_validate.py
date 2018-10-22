@@ -19,7 +19,7 @@ test_whitelist = frozenset({
     P.scalar_div,
     P.make_tuple,
     P.tuple_getitem,
-    P.list_map,
+    # P.list_map,
     P.partial,
     P.switch,
     P.return_,

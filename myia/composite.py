@@ -598,7 +598,7 @@ zeros_like = HyperMap(
 
 
 @core
-def list_reduce_c(fn, lst, dftl):
+def list_reduce(fn, lst, dftl):
     if len(lst) == 0:
         return dftl
     else:
@@ -609,7 +609,7 @@ def list_reduce_c(fn, lst, dftl):
 
 
 @core
-def list_map_c(fn, lst):
+def list_map(fn, lst):
     resl = []
     i = 0
     for l in lst:

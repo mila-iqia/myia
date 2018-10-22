@@ -1,7 +1,7 @@
 """Generate mapping graphs over classes, tuples, arrays, etc."""
 
 
-from . import operations
+from . import operations, composite as C
 from .infer import InferenceError
 from .ir import MetaGraph, Graph
 from .dtype import Array, List, Tuple, Class, tag_to_dataclass, \
@@ -57,7 +57,7 @@ class HyperMap(MetaGraph):
             fn_rec = self.fn_rec
         else:
             fn_rec = g.apply(P.partial, self.fn_rec, fnarg)
-        return g.apply(P.list_map, fn_rec, *args)
+        return g.apply(C.list_map, fn_rec, *args)
 
     @_full_make.register
     def _full_make(self, t: Array, g, fnarg, argmap):
