@@ -142,7 +142,7 @@ class ValueTrack(Track):
             typ = pytype_to_myiatype(v)
             vref = self.engine.vref({'value': limited(typ, self.max_depth),
                                      'type': TypeType})
-            return PartialInferrer(self, recinf, [vref])
+            inf = PartialInferrer(self, recinf, [vref])
         elif v is ANYTHING:
             return v
         else:
@@ -190,10 +190,10 @@ async def infer_value_switch(track, cond, tb, fb):
 
 
 @value_inferrer(P.partial, nargs=None)
-async def infer_value_partial(engine, fn, *args):
+async def infer_value_partial(track, fn, *args):
     """Infer the return type of partial."""
     fn_t = await fn['value']
-    return PartialInferrer(engine, fn_t, args)
+    return limited(PartialInferrer(track, fn_t, args), track.max_depth)
 
 
 @overload

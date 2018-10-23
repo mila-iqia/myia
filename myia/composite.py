@@ -617,11 +617,16 @@ class ListMap(MetaGraph):
         next_g = parse(next)
         hasnext_g = parse(hasnext)
         g = Graph()
+        g.flags['core'] = True
+        g.flags['flatten_inference'] = True
         g.debug.name = 'list_map'
         fn = g.add_parameter()
         lists = [g.add_parameter() for _ in types[1:]]
-        resl = g.apply(P.make_list)
         iters = [g.apply(list_iter_g, l) for l in lists]
+        nexts = [g.apply(next_g, it) for it in iters]
+        values = [g.apply(P.tuple_getitem, n, 0) for n in nexts]
+        iters = [g.apply(P.tuple_getitem, n, 1) for n in nexts]
+        resl = g.apply(P.make_list, g.apply(fn, *values))
 
         gnext = Graph()
         gnext.debug.name = 'body'
@@ -637,9 +642,13 @@ class ListMap(MetaGraph):
                           g.constant(True))
             gtrue = Graph()
             gtrue.debug.name = 'ftrue'
+            gtrue.flags['core'] = True
+            gtrue.flags['flatten_inference'] = True
             gtrue.output = gtrue.apply(gnext, fn, resl, *iters)
             gfalse = Graph()
             gfalse.debug.name = 'ffalse'
+            gfalse.flags['core'] = True
+            gfalse.flags['flatten_inference'] = True
             gfalse.output = resl
             g.output = g.apply(g.apply(P.switch, cond, gtrue, gfalse))
 
