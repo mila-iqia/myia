@@ -108,6 +108,7 @@ async def infer_shape_scalar(track, *args):
 
 @shape_inferrer(P.shape, nargs=1)
 async def infer_shape_shape(track, ary):
+    """Infer the shape for shape."""
     shp = await ary['shape']
     return TupleShape((NOSHAPE,) * len(shp))
 
@@ -227,6 +228,7 @@ async def infer_shape_array_map(track, fn, *arrays):
 
 @shape_inferrer(P.list_append, nargs=2)
 async def infer_shape_list_append(track, seq, value):
+    """Infer the shape for list_append."""
     lshp = await seq['shape']
     vshp = await value['shape']
     return ListShape(find_matching_shape((lshp.shape, vshp)))

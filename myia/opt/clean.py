@@ -64,6 +64,7 @@ def erase_class(root, manager):
 
 
 def expand_tuples_p(mng, graph, params):
+    """Expand tuples in graph parameters."""
     new_params = []
 
     for param in params:
@@ -89,6 +90,7 @@ def expand_tuples_p(mng, graph, params):
 
 
 def expand_tuples_c(graph, inputs):
+    """Expand tuples in graph applies."""
     new_inputs = []
     for i in inputs:
         itype = i.type
@@ -113,6 +115,10 @@ def expand_tuples_c(graph, inputs):
 
 
 def erase_tuple(root, manager):
+    """Remove most uses of tuples from the graph.
+
+    tuples that are returned will be kept.
+    """
     manager.add_graph(root)
 
     # Fix up all call sites (except primitives)

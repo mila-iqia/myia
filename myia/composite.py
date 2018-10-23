@@ -601,6 +601,7 @@ zeros_like = HyperMap(
 
 @core
 def list_reduce(fn, lst, dftl):
+    """Implementation of list_reduce."""
     res = dftl
     i = 0
     while i < len(lst):
@@ -610,7 +611,10 @@ def list_reduce(fn, lst, dftl):
 
 
 class ListMap(MetaGraph):
+    """Implementation of list_map."""
+
     def specialize_from_types(self, types):
+        """Return a graph for the number of lists."""
         from .parser import parse
         list_iter_g = clone(parse(list_iter))
         next_g = clone(parse(next))
@@ -668,6 +672,7 @@ class ListMap(MetaGraph):
         return g
 
     def __call__(self, fn, *lists):
+        """Python implementation of list_map."""
         from .prim.py_implementations import list_map
         return list_map(fn, *lists)
 

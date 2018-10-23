@@ -66,7 +66,10 @@ class Location(NamedTuple):
 
 
 class MyiaSyntaxError(Exception):
+    """Exception to indicate that the syntax is invalid for myia."""
+
     def __init__(self, msg, loc):
+        """Initialize with a message and source location."""
         super().__init__(msg)
         self.loc = loc
 
