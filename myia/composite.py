@@ -601,13 +601,12 @@ zeros_like = HyperMap(
 
 @core
 def list_reduce(fn, lst, dftl):
-    if len(lst) == 0:
-        return dftl
-    else:
-        res = lst[0]
-        for i in range(1, len(lst)):
-           res = fn(res, lst[i])
-        return res
+    res = dftl
+    i = 0
+    while i < len(lst):
+        res = fn(res, lst[i])
+        i = i + 1
+    return res
 
 
 class ListMap(MetaGraph):
