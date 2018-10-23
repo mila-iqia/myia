@@ -134,7 +134,7 @@ async def infer_shape_tuple_getitem(track, seq, idx):
 
 
 @shape_inferrer(P.list_getitem, nargs=2)
-async def infer_shape_tuple_getitem(track, seq, idx):
+async def infer_shape_list_getitem(track, seq, idx):
     """Infer the shape of list_getitem."""
     seq_sh = await seq['shape']
     return seq_sh.shape

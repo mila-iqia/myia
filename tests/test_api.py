@@ -84,7 +84,7 @@ def test_convert_arg():
         convert_arg((1, 2), Point_t)
 
     assert list(convert_arg((pt, pt),
-                       Tuple[Point_t, Point_t])) == [1, 2, 1, 2]
+                Tuple[Point_t, Point_t])) == [1, 2, 1, 2]
 
     assert convert_arg([pt, pt, pt],
                        List[Point_t]) == [[1, 2, 1, 2, 1, 2]]

@@ -14,7 +14,7 @@ from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
     switch, identity, bool_and, tail, typeof, scalar_cast, scalar_add, \
     scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, \
-    scalar_div, list_append, env_add
+    scalar_div, env_add
 from .utils import newenv
 
 

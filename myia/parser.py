@@ -250,9 +250,8 @@ class Parser:
             function_block.graph.parameters.append(anf_node)
             function_block.write(arg.arg, anf_node)
         function_block.write(node.name, Constant(function_block.graph))
-        _ = self.process_statements(function_block, node.body)
+        self.process_statements(function_block, node.body)
         if function_block.graph.return_ is None:
-            import pdb; pdb.set_trace()
             raise MyiaSyntaxError("Function doesn't return a value",
                                   self.make_location(node))
         # TODO: check that if after_block returns?
