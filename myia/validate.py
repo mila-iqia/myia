@@ -117,6 +117,8 @@ whitelist = frozenset({
     P.switch,
     P.return_,
     # P.list_map,
+    P.list_append,
+    P.make_list,
     P.identity,
     # P.resolve,
     P.partial,
