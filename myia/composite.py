@@ -8,7 +8,7 @@ from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType
 from .hypermap import HyperMap
 from .infer import Inferrer
-from .ir import MultitypeGraph, MetaGraph, Graph
+from .ir import MultitypeGraph, MetaGraph, Graph, clone
 from .prim import ops as P
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
@@ -612,9 +612,9 @@ def list_reduce(fn, lst, dftl):
 class ListMap(MetaGraph):
     def specialize_from_types(self, types):
         from .parser import parse
-        list_iter_g = parse(list_iter)
-        next_g = parse(next)
-        hasnext_g = parse(hasnext)
+        list_iter_g = clone(parse(list_iter))
+        next_g = clone(parse(next))
+        hasnext_g = clone(parse(hasnext))
         g = Graph()
         g.flags['core'] = True
         g.flags['flatten_inference'] = True
