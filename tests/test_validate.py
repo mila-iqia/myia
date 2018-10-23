@@ -2,10 +2,11 @@
 import pytest
 
 from myia.api import scalar_pipeline, scalar_parse
+from myia.composite import list_map
 from myia.dtype import Array, Tuple, List, Int
 from myia.dshape import NOSHAPE, TupleShape, ListShape
 from myia.prim import ops as P
-from myia.prim.py_implementations import make_record, partial, list_map
+from myia.prim.py_implementations import make_record, partial
 from myia.validate import validate as _validate, ValidationError, \
     _validate_shape
 

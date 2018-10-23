@@ -2,12 +2,14 @@
 
 
 from dataclasses import dataclass
+from functools import reduce
 
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType
 from .hypermap import HyperMap
 from .infer import Inferrer
-from .ir import MultitypeGraph
+from .ir import MultitypeGraph, MetaGraph, Graph
+from .prim import ops as P
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
     switch, identity, bool_and, tail, typeof, scalar_cast, scalar_add, \
@@ -608,11 +610,58 @@ def list_reduce(fn, lst, dftl):
         return res
 
 
-@core
-def list_map(fn, lst):
-    resl = []
-    i = 0
-    for l in lst:
-        resl = list_append(resl, fn(l))
-        i = i + 1
-    return resl
+class ListMap(MetaGraph):
+    def specialize_from_types(self, types):
+        from .parser import parse
+        list_iter_g = parse(list_iter)
+        next_g = parse(next)
+        hasnext_g = parse(hasnext)
+        g = Graph()
+        g.debug.name = 'list_map'
+        fn = g.add_parameter()
+        lists = [g.add_parameter() for _ in types[1:]]
+        resl = g.apply(P.make_list)
+        iters = [g.apply(list_iter_g, l) for l in lists]
+
+        gnext = Graph()
+        gnext.debug.name = 'body'
+        gcond = Graph()
+        gcond.debug.name = 'cond'
+
+        def make_cond(g):
+            fn = g.add_parameter()
+            resl = g.add_parameter()
+            iters = [g.add_parameter() for _ in lists]
+            hasnexts = [g.apply(hasnext_g, it) for it in iters]
+            cond = reduce(lambda a, b: g.apply(P.bool_and, a, b), hasnexts,
+                          g.constant(True))
+            gtrue = Graph()
+            gtrue.debug.name = 'ftrue'
+            gtrue.output = gtrue.apply(gnext, fn, resl, *iters)
+            gfalse = Graph()
+            gfalse.debug.name = 'ffalse'
+            gfalse.output = resl
+            g.output = g.apply(g.apply(P.switch, cond, gtrue, gfalse))
+
+        def make_next(g):
+            fn = g.add_parameter()
+            resl = g.add_parameter()
+            iters = [g.add_parameter() for _ in lists]
+            nexts = [g.apply(next_g, it) for it in iters]
+            values = [g.apply(P.tuple_getitem, n, 0) for n in nexts]
+            iters = [g.apply(P.tuple_getitem, n, 1) for n in nexts]
+            resl = g.apply(P.list_append, resl, g.apply(fn, *values))
+            g.output = g.apply(gcond, fn, resl, *iters)
+
+        make_cond(gcond)
+        make_next(gnext)
+        g.output = g.apply(gcond, fn, resl, *iters)
+
+        return g
+
+    def __call__(self, fn, *lists):
+        from .prim.py_implementations import list_map
+        return list_map(fn, *lists)
+
+
+list_map = ListMap('list_map')

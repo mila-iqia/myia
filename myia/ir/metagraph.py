@@ -19,13 +19,17 @@ class MetaGraph:
     def __init__(self, name):
         """Initialize a MetaGraph."""
         self.name = name
+        self.cache = {}
 
-    async def specialize(self, resources, argrefs):
+    async def specialize(self, argrefs):
         """Generate a Graph for the given references."""
-        types = [await arg['type'] for arg in argrefs]
-        return self.specialize_from_types(types)
+        types = tuple([await arg['type'] for arg in argrefs])
 
-    def specialize_from_types(self, resources, types):
+        if types not in self.cache:
+            self.cache[types] = self.specialize_from_types(types)
+        return self.cache[types]
+
+    def specialize_from_types(self, types):
         """Generate a Graph for this type signature."""
         raise NotImplementedError(
             'Override specialize_from_types in subclass.'
