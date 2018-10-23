@@ -63,6 +63,7 @@ def af16_of(*shp):
 pyimpl_test = {}
 value_inferrer_cons_test = {}
 type_inferrer_cons_test = {}
+shape_inferrer_cons_test = {}
 
 
 def _test_op(cls):
@@ -78,6 +79,8 @@ def _test_op(cls):
                 cons = type_inferrer_cons_test
             elif track == 'value':
                 cons = value_inferrer_cons_test
+            elif track == 'shape':
+                cons = shape_inferrer_cons_test
             else:
                 raise Exception(f'Unknown track to infer: {track}')
             inffn = getattr(cls, method)
@@ -96,6 +99,9 @@ class _tern:
     async def infer_type(track, x, y, z):
         return await track.will_check((Int, Float), x, y, z)
 
+    async def infer_shape(track, x, y, z):
+        return NOSHAPE
+
 
 # Coercion
 
@@ -107,6 +113,9 @@ class _to_i64:
 
     async def infer_type(track, x):
         return Int[64]
+
+    async def infer_shape(track, x):
+        return NOSHAPE
 
 
 # Unification tricks
@@ -121,6 +130,9 @@ class _unif1:
         rv = RestrictedVar({i16, f32})
         return track.engine.loop.create_var(rv, None, 0)
 
+    async def infer_shape(track, x):
+        return NOSHAPE
+
 
 @_test_op
 class _unif2:
@@ -131,6 +143,9 @@ class _unif2:
         rv = RestrictedVar({i16, f64})
         return track.engine.loop.create_var(rv, None, 0)
 
+    async def infer_shape(track, x):
+        return NOSHAPE
+
 
 infer_pipeline = scalar_pipeline.select(
     'parse', 'infer'
@@ -139,6 +154,7 @@ infer_pipeline = scalar_pipeline.select(
     'inferrer.tracks.value.max_depth': 10,
     'inferrer.tracks.value.constructors': value_inferrer_cons_test,
     'inferrer.tracks.type.constructors': type_inferrer_cons_test,
+    'inferrer.tracks.shape.constructors': shape_inferrer_cons_test,
 })
 
 
@@ -149,6 +165,7 @@ infer_pipeline_std = standard_pipeline.select(
     'inferrer.tracks.value.max_depth': 10,
     'inferrer.tracks.value.constructors': value_inferrer_cons_test,
     'inferrer.tracks.type.constructors': type_inferrer_cons_test,
+    'inferrer.tracks.shape.constructors': shape_inferrer_cons_test,
 })
 
 
