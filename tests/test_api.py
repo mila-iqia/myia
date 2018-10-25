@@ -96,6 +96,8 @@ def test_convert_arg():
 
     assert convert_arg(fmat, Array[f64])[0] is fmat
     assert convert_arg(imat, Array[i16])[0] is imat
+    with pytest.raises(TypeError):
+        convert_arg(imat, Array[i64])
 
     # Misc errors
 
