@@ -1,6 +1,7 @@
 """Graph generation from number of arguments or type signatures."""
 
 
+from ..dtype import ismyiatype
 from ..prim.py_implementations import issubtype, typeof
 
 
@@ -56,7 +57,8 @@ class MultitypeGraph(MetaGraph):
         for sig, fn in self.entries:
             if len(sig) != len(types):
                 continue
-            if all(issubtype(t2, t1) for t1, t2 in zip(sig, types)):
+            if all(issubtype(t2, t1) if ismyiatype(t1) else isinstance(t2, t1)
+                   for t1, t2 in zip(sig, types)):
                 return fn
         else:
             raise GraphGenerationError(types)
