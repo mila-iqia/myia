@@ -1973,11 +1973,26 @@ def test_J(x):
 
 @infer(
     type=[
-        (i32, i32),
-        (f64, f64),
+        (JT[i32], i32),
+        (JT[L[i32]], L[i32]),
+        (i32, InferenceError),
     ]
 )
 def test_Jinv(x):
+    return Jinv(x)
+
+
+@infer_std(
+    type=[
+        (i32, i32),
+        (f64, f64),
+        (ai64_of(4, 5), ai64),
+    ],
+    shape=[
+        (ai64_of(4, 5), (4, 5))
+    ]
+)
+def test_Jinv2(x):
     def f(x):
         return x * x
 
