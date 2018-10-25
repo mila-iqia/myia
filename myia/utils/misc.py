@@ -569,3 +569,61 @@ class ErrorPool:
             exc = self.exc_class(msg)
             exc.errors = self.errors
             raise exc
+
+
+class SymbolicKeyInstance:
+    """Stores information that corresponds to a node in the graph."""
+
+    def __init__(self, node, inferred):
+        """Initialize a SymbolicKeyInstance."""
+        self.node = node
+        self.inferred = inferred
+
+    def __eq__(self, other):
+        return (isinstance(other, SymbolicKeyInstance)
+                and self.node is other.node
+                and self.inferred == other.inferred)
+
+    def __hash__(self):
+        return hash((self.node, tuple(sorted(self.inferred.items()))))
+
+
+@smap.variant
+def _add(self, x: object, y):
+    return x + y
+
+
+class EnvInstance:
+    """Environment mapping keys to values.
+
+    Keys are SymbolicKeyInstances, which represent nodes in the graph along
+    with inferred properties.
+    """
+
+    def __init__(self, _contents={}):
+        """Initialize a EnvType."""
+        self._contents = dict(_contents)
+
+    def get(self, key, default):
+        """Get the sensitivity list for the given key."""
+        return self._contents.get(key, default)
+
+    def set(self, key, value):
+        """Set a value for the given key."""
+        rval = EnvInstance(self._contents)
+        rval._contents[key] = value
+        return rval
+
+    def add(self, other):
+        """Add two EnvInstances."""
+        rval = EnvInstance(self._contents)
+        for k, v in other._contents.items():
+            v0 = rval._contents.get(k)
+            if v0 is not None:
+                rval._contents[k] = _add(v0, v)
+            else:
+                rval._contents[k] = v
+        return rval
+
+
+newenv = EnvInstance()

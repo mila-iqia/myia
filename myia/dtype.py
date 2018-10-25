@@ -4,7 +4,8 @@
 import numpy
 from types import FunctionType
 from typing import Tuple as TupleT, Dict as DictT, Any
-from .utils import Named, is_dataclass_type, as_frozen, overload
+from .utils import Named, is_dataclass_type, as_frozen, overload, \
+    SymbolicKeyInstance, EnvInstance
 
 
 _type_cache = {}
@@ -268,6 +269,20 @@ class Function(Object):
         return cls.make_subtype(arguments=arguments, retval=retval)
 
 
+class SymbolicKeyType(Object):
+    """Type of a SymbolicKeyInstance."""
+
+
+class EnvType(Object):
+    """Represents a sensitivity map.
+
+    This is not parameterizable, but roughly corresponds to a map from
+    node identifiers to List[node.type]. It is the type of the gradient of
+    a function or closure. Different closures will get and set different
+    keys in this map, but the type itself is the same.
+    """
+
+
 class TypeType(Type):
     """The type of a Type."""
 
@@ -381,6 +396,12 @@ def pytype_to_myiatype(pytype, instance=None):
         else:
             return Array[DTYPE_MAP[instance.dtype.name]]
 
+    elif pytype is EnvInstance:
+        return EnvType
+
+    elif pytype is SymbolicKeyInstance:
+        return SymbolicKeyType
+
     elif is_dataclass_type(pytype):
         if pytype in dataclass_to_myiaclass:
             mcls = dataclass_to_myiaclass[pytype]
@@ -415,7 +436,8 @@ def pytype_to_myiatype(pytype, instance=None):
         return External[pytype]
 
 
-leaf_types = (Bool, Number, TypeType, Problem, External)
+leaf_types = (Bool, Number, TypeType, Problem, External,
+              EnvType, SymbolicKeyType)
 
 
 @overload(bootstrap=True)

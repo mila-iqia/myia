@@ -4,9 +4,10 @@ import numpy
 from dataclasses import dataclass
 
 from myia.dtype import ismyiatype, Bool, Float, Function, Int, List, Number, \
-    Tuple, UInt, np_dtype_to_type, type_to_np_dtype, Object, \
+    Tuple, UInt, SymbolicKeyType, np_dtype_to_type, type_to_np_dtype, Object, \
     pytype_to_myiatype as ptm, Array, Class, External, get_generic, \
     type_cloner, type_cloner_async
+from myia.utils import SymbolicKeyInstance
 
 
 @dataclass(frozen=True)
@@ -150,6 +151,8 @@ def test_pytype_to_myiatype():
 
     assert ptm(numpy.ndarray) is Array
     assert ptm(numpy.ndarray, numpy.ones((2, 2))) is Array[Float[64]]
+
+    assert ptm(SymbolicKeyInstance) is SymbolicKeyType
 
     # We run this before ptm(Point) to make sure it doesn't cache Float, Float
     # for the type of x and y

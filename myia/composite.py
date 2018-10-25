@@ -4,13 +4,16 @@
 from dataclasses import dataclass
 
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
-    List, Class
+    List, Class, EnvType
 from .hypermap import HyperMap
+from .infer import Inferrer
 from .ir import MultitypeGraph
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
     switch, identity, bool_and, tail, typeof, scalar_cast, scalar_add, \
-    scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div
+    scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, \
+    scalar_div, env_add
+from .utils import newenv
 
 
 def core(fn):
@@ -542,10 +545,31 @@ def array_ge(xs, ys):
     return broadcastable_binary(ge, xs, ys)
 
 
-hyper_add = HyperMap(fn_leaf=scalar_add)
+_leaf_add = MultitypeGraph('hyper_add')
+
+
+@_leaf_add.register(Number, Number)
+@core
+def _scalar_add(x, y):
+    return scalar_add(x, y)
+
+
+@_leaf_add.register(EnvType, EnvType)
+@core
+def _sm_add(x, y):
+    return env_add(x, y)
+
+
+hyper_add = HyperMap(fn_leaf=_leaf_add)
 
 
 _leaf_zeros_like = MultitypeGraph('zeros_like')
+
+
+@_leaf_zeros_like.register(Inferrer)
+@core
+def _inferrer_zero(_):
+    return newenv
 
 
 @_leaf_zeros_like.register(Bool)

@@ -1,7 +1,7 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
 from .dtype import Array, Tuple, List, Function, Number, Bool, Problem, \
-    TypeMeta, TypeType, Class, External, type_cloner
+    TypeMeta, TypeType, Class, External, EnvType, SymbolicKeyType, type_cloner
 from .dshape import ListShape, TupleShape
 from .infer import DEAD
 from .ir import manage
@@ -47,7 +47,10 @@ def _validate_shape(t: List, shp):
 
 
 @overload  # noqa: F811
-def _validate_shape(t: (Number, TypeType, Bool, Problem[DEAD], Function), shp):
+def _validate_shape(
+        t: (Number, TypeType, Bool, Problem[DEAD], Function, EnvType,
+            SymbolicKeyType),
+        shp):
     pass
 
 
@@ -118,6 +121,9 @@ whitelist = frozenset({
     # P.resolve,
     P.partial,
     # P.make_record,
+    P.env_getitem,
+    P.env_setitem,
+    P.env_add,
 })
 
 

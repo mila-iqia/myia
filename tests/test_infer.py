@@ -9,7 +9,7 @@ from myia.api import scalar_pipeline, standard_pipeline
 from myia.composite import hyper_add, zeros_like
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
-    Number, Class, Problem
+    Number, Class, Problem, EnvType as Env
 from myia.hypermap import HyperMap
 from myia.infer import ANYTHING, VOID, InferenceError, register_inferrer, \
     Contextless, CONTEXTLESS
@@ -22,8 +22,9 @@ from myia.prim.py_implementations import \
     typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
-    tuple_setitem, list_setitem, scalar_cast, list_reduce
-from myia.utils import RestrictedVar
+    tuple_setitem, list_setitem, scalar_cast, list_reduce, \
+    env_getitem, env_setitem, embed
+from myia.utils import RestrictedVar, newenv
 
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
     li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
@@ -1883,6 +1884,7 @@ def test_hyper_map_nobroadcast(x, y):
         (T[i64, f64], T[i64, f64], T[i64, f64]),
         (Point_t, Point_t, Point_t),
         (ai64_of(2, 5), ai64_of(2, 5), ai64),
+        (Env, Env, Env),
     ],
     value=[
         (1, 2, 3),
@@ -1921,3 +1923,23 @@ def test_hyper_add(x, y):
 )
 def test_zeros_like(x):
     return zeros_like(x)
+
+
+@infer(type=[(i64, Env)])
+def test_zeros_like_fn(x):
+    def f(y):
+        return x + y
+    return zeros_like(f)
+
+
+@infer(
+    type=[
+        (i32, i32, i32, i32),
+        (i32, f32, i32, InferenceError),
+        (i32, i32, f32, InferenceError),
+    ]
+)
+def test_env(x, y, z):
+    e = newenv
+    e = env_setitem(e, embed(x), y)
+    return env_getitem(e, embed(x), z)

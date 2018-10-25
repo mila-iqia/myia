@@ -9,7 +9,8 @@ from .infer import ANYTHING, Context, concretize_type, \
     Unspecializable, INACCESSIBLE
 from .ir import GraphCloner, Constant
 from .prim import ops as P, Primitive
-from .utils import Overload, overload, Namespace
+from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
+    EnvInstance
 
 
 def _const(v, t):
@@ -69,12 +70,17 @@ def _parents(g):
 
 
 _legal = (int, float, numpy.number, numpy.ndarray,
-          str, Namespace, TypeMeta)
+          str, Namespace, SymbolicKeyInstance, TypeMeta)
 
 
 @overload
 def _is_concrete_value(v: (tuple, list)):
     return all(_is_concrete_value(x) for x in v)
+
+
+@overload  # noqa: F811
+def _is_concrete_value(v: EnvInstance):
+    return all(_is_concrete_value(x) for x in v._contents.values())
 
 
 @overload  # noqa: F811
