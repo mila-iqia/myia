@@ -547,6 +547,7 @@ async def infer_type_env_setitem(track, env, key, x):
     await track.check(EnvType, env)
     await track.check(SymbolicKeyType, key)
     key_v = await key['value']
+    assert key_v is not ANYTHING
     await track.assert_same(track.engine.vref(key_v.inferred), x)
     return EnvType
 
@@ -557,6 +558,7 @@ async def infer_type_env_getitem(track, env, key, default):
     await track.check(EnvType, env)
     await track.check(SymbolicKeyType, key)
     key_v = await key['value']
+    assert key_v is not ANYTHING
     return await track.assert_same(key_v.inferred['type'], default)
 
 

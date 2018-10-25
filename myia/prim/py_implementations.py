@@ -589,7 +589,7 @@ def _list_reduce_vm(vm, fn, lst, dflt):
 
 @register(primops.embed)
 def embed(node):
-    """Implement `embed`."""
+    """Placeholder for the implementation of `embed`."""
     raise NotImplementedError()
 
 

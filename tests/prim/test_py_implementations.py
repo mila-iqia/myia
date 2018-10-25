@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 import math
 
-from myia.api import myia
+from myia.api import scalar_debug_pipeline
 from myia.dtype import Int, Float, List, Tuple, Class, Number, External
 from myia.prim.py_implementations import setattr as myia_setattr, \
     tuple_setitem, list_setitem, tail, hastype, typeof, \
@@ -374,7 +374,9 @@ def test_scalar_cast():
 
 
 def test_env():
-    @myia
+    pip1 = scalar_debug_pipeline.select('parse', 'export')
+    pip2 = scalar_debug_pipeline
+
     def f(x, y):
         e1 = env_setitem(newenv, embed(x), 100)
 
@@ -390,5 +392,9 @@ def test_env():
 
         return (a, b, c)
 
-    res = f(3, 4)
+    res = pip1.run(input=f)['output'](3, 4)
+    assert res == (110, 20, 0)
+
+    res = pip2.run(input=f,
+                   argspec=({'type': i64}, {'type': i64}))['output'](3, 4)
     assert res == (110, 20, 0)

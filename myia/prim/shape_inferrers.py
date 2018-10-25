@@ -8,12 +8,11 @@ from functools import partial, reduce
 from ..dshape import NOSHAPE, TupleShape, ListShape, ClassShape, \
     find_matching_shape
 from ..dtype import Array, Tuple, List, Class, TypeType, ismyiatype, \
-    pytype_to_myiatype, EnvType
+    pytype_to_myiatype
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer, \
     InferenceError, MyiaTypeError, TransformedReference, MultiInferrer
 from ..ir import Graph, MetaGraph
-from ..utils import EnvInstance
 
 from . import ops as P
 from .inferrer_utils import static_getter, getelement
@@ -100,8 +99,6 @@ class ShapeTrack(Track):
                 return ClassShape(
                     dict((n, self.from_value(getattr(v, n), context))
                          for n in v.__dataclass_fields__.keys()))
-        elif isinstance(v, EnvInstance):
-            return EnvType
         elif isinstance(v, numpy.ndarray):
             return v.shape
         else:
@@ -381,17 +378,18 @@ async def infer_shape_embed(track, x):
 @shape_inferrer(P.env_setitem, nargs=3)
 async def infer_shape_env_setitem(track, env, key, x):
     """Infer the return shape of env_setitem."""
-    return EnvType
+    return NOSHAPE
 
 
 @shape_inferrer(P.env_getitem, nargs=3)
 async def infer_shape_env_getitem(track, env, key, default):
     """Infer the return shape of env_getitem."""
     key_v = await key['value']
+    assert key_v is not ANYTHING
     return await track.assert_same(key_v.inferred['shape'], default)
 
 
 @shape_inferrer(P.env_add, nargs=2)
 async def infer_shape_env_add(track, env1, env2):
     """Infer the return shape of env_add."""
-    return EnvType
+    return NOSHAPE

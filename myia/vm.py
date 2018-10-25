@@ -10,9 +10,9 @@ from typing import Iterable, Mapping, Any, List
 from .ir import Graph, Apply, Constant, Parameter, ANFNode, MetaGraph
 from .prim import Primitive
 from .prim.py_implementations import typeof
-from .prim.ops import return_, partial
+from .prim.ops import return_, partial, embed
 from .graph_utils import toposort
-from .utils import TypeMap, is_dataclass_type
+from .utils import TypeMap, is_dataclass_type, SymbolicKeyInstance
 
 
 class VMFrame:
@@ -252,6 +252,9 @@ class VM:
                 partial_fn, *partial_args = args
                 res = Partial(partial_fn, partial_args, self)
                 frame.values[node] = res
+            elif fn == embed:
+                _, x = node.inputs
+                frame.values[node] = SymbolicKeyInstance(x, {})
             else:
                 frame.values[node] = self.implementations[fn](self, *args)
         elif isinstance(fn, Partial):
