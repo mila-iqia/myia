@@ -4,8 +4,8 @@
 from . import operations
 from .infer import InferenceError
 from .ir import MetaGraph, Graph
-from .dtype import Array, List, Tuple, Class, Type, tag_to_dataclass, \
-    pytype_to_myiatype
+from .dtype import Array, List, Tuple, Class, tag_to_dataclass, \
+    pytype_to_myiatype, ismyiatype
 from .utils import TypeMap, Overload
 from .prim import ops as P
 from .prim.py_implementations import issubtype
@@ -43,7 +43,7 @@ class HyperMap(MetaGraph):
         self.broadcast = broadcast
         # Pick out only the types we want to generate a mapping over.
         self.make_map = TypeMap()
-        for t in (*nonleaf, Type):
+        for t in (*nonleaf, object):
             self.make_map[t] = self._full_make.map[t]
         self.nonleaf = nonleaf
         self.cache = {}
@@ -109,7 +109,7 @@ class HyperMap(MetaGraph):
         return g.apply(P.make_record, t, *vals)
 
     @_full_make.register
-    def _full_make(self, t: Type, g, fnarg, argmap):
+    def _full_make(self, t: object, g, fnarg, argmap):
         if fnarg is None:
             fnarg = self.fn_leaf
         return g.apply(fnarg, *argmap.keys())
@@ -117,9 +117,9 @@ class HyperMap(MetaGraph):
     def _make(self, g, fnarg, argmap):
         for t in argmap.values():
             # If any of the arguments is a nonleaf generic, pick it.
-            if t.generic in self.nonleaf:
+            if hasattr(t, 'generic') and t.generic in self.nonleaf:
                 break
-        if t.generic in self.nonleaf:
+        if hasattr(t, 'generic') and t.generic in self.nonleaf:
             # In a nonleaf situation, all arguments must have the same
             # generic.
             for t2 in argmap.values():
@@ -127,6 +127,8 @@ class HyperMap(MetaGraph):
                     raise InferenceError(
                         f'HyperMap cannot match up types {t} and {t2}'
                     )
+        if not ismyiatype(t):
+            t = type(t)
         return self.make_map[t](self, t, g, fnarg, argmap)
 
     def _harmonize(self, g, args):

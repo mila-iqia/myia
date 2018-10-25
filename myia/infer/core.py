@@ -264,8 +264,17 @@ class EquivalenceChecker:
                 iv.set_result(value)
         return True
 
-    async def assert_same(self, *futs, refs=[]):
-        """Assert that all refs have the same value on the given track."""
+    async def assert_same(self, *things, refs=[]):
+        """Assert that all futures/values have the same value."""
+        futs = []
+        for x in things:
+            if hasattr(x, '__await__'):
+                futs.append(x)
+            else:
+                f = self.loop.create_future()
+                f.set_result(x)
+                futs.append(f)
+
         # We wait only for the first future to complete
         done, pending = await asyncio.wait(
             futs,

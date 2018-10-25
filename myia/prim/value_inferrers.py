@@ -13,7 +13,7 @@ from ..infer import ValueWrapper, InferenceError, PartialInferrer, \
     unwrap, MetaGraphInferrer, InferenceVar, find_coherent_result, \
     MyiaTypeError, Context
 from ..ir import Graph, MetaGraph
-from ..utils import is_dataclass_type, overload
+from ..utils import is_dataclass_type, overload, SymbolicKeyInstance
 
 from . import ops as P
 from .inferrer_utils import static_getter, getelement
@@ -315,3 +315,11 @@ async def infer_value_tuple_len(track, xs):
     """Infer the return value of tuple_len."""
     xs_t = await xs['type']
     return limited(len(xs_t.elements), track.max_depth)
+
+
+@value_inferrer(P.embed, nargs=1)
+async def infer_value_embed(track, x):
+    """Infer the return value of embed."""
+    inferred = {track_name: await x[track_name]
+                for track_name in track.engine.tracks}
+    return limited(SymbolicKeyInstance(x.node, inferred), track.max_depth)

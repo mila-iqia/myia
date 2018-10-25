@@ -4,13 +4,15 @@ from types import SimpleNamespace
 import numpy as np
 import math
 
+from myia.api import scalar_debug_pipeline
 from myia.dtype import Int, Float, List, Tuple, Class, Number, External
 from myia.prim.py_implementations import setattr as myia_setattr, \
     tuple_setitem, list_setitem, tail, hastype, typeof, \
     shape, reshape, array_map, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
-    issubtype
+    issubtype, env_getitem, env_setitem, env_add, embed
+from myia.utils import newenv
 
 from ..test_lang import parse_compare
 from ..common import i64, f64
@@ -369,3 +371,30 @@ def test_broadcast_shape():
 def test_scalar_cast():
     assert isinstance(scalar_cast(1.5, Int[64]), np.int64)
     assert isinstance(scalar_cast(1.5, Float[16]), np.float16)
+
+
+def test_env():
+    pip1 = scalar_debug_pipeline.select('parse', 'export')
+    pip2 = scalar_debug_pipeline
+
+    def f(x, y):
+        e1 = env_setitem(newenv, embed(x), 100)
+
+        e2 = newenv
+        e2 = env_setitem(newenv, embed(x), 10)
+        e2 = env_setitem(e2, embed(y), 20)
+
+        e3 = env_add(e1, e2)
+
+        a = env_getitem(e3, embed(x), 0)
+        b = env_getitem(e3, embed(y), 0)
+        c = env_getitem(e3, embed(a), 0)
+
+        return (a, b, c)
+
+    res = pip1.run(input=f)['output'](3, 4)
+    assert res == (110, 20, 0)
+
+    res = pip2.run(input=f,
+                   argspec=({'type': i64}, {'type': i64}))['output'](3, 4)
+    assert res == (110, 20, 0)

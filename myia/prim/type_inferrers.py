@@ -5,7 +5,8 @@ from functools import partial
 from operator import getitem
 
 from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
-    TypeType, Class, Function, pytype_to_myiatype, Problem, type_cloner
+    TypeType, Class, Function, pytype_to_myiatype, Problem, type_cloner, \
+    EnvType, SymbolicKeyType
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track, Inferrer, MetaGraphInferrer, \
     ExplicitInferrer, VOID, TransformedReference, MultiInferrer
@@ -532,3 +533,37 @@ async def infer_type_list_reduce(track, fn, lst, dflt):
     xref = TransformedReference(track.engine, getelement, lst)
     res_elem_t = await track.assert_same(fn_t(xref, xref), dflt)
     return res_elem_t
+
+
+@type_inferrer(P.embed, nargs=1)
+async def infer_type_embed(track, x):
+    """Infer the return type of embed."""
+    return SymbolicKeyType
+
+
+@type_inferrer(P.env_setitem, nargs=3)
+async def infer_type_env_setitem(track, env, key, x):
+    """Infer the return type of env_setitem."""
+    await track.check(EnvType, env)
+    await track.check(SymbolicKeyType, key)
+    key_v = await key['value']
+    assert key_v is not ANYTHING
+    await track.assert_same(track.engine.vref(key_v.inferred), x)
+    return EnvType
+
+
+@type_inferrer(P.env_getitem, nargs=3)
+async def infer_type_env_getitem(track, env, key, default):
+    """Infer the return type of env_getitem."""
+    await track.check(EnvType, env)
+    await track.check(SymbolicKeyType, key)
+    key_v = await key['value']
+    assert key_v is not ANYTHING
+    return await track.assert_same(key_v.inferred['type'], default)
+
+
+@type_inferrer(P.env_add, nargs=2)
+async def infer_type_env_add(track, env1, env2):
+    """Infer the return type of env_add."""
+    await track.check(EnvType, env1, env2)
+    return EnvType
