@@ -23,7 +23,7 @@ from myia.prim.py_implementations import \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
-    env_getitem, env_setitem, embed
+    env_getitem, env_setitem, embed, J, Jinv, array_to_scalar
 from myia.utils import RestrictedVar, newenv
 
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
@@ -1510,6 +1510,15 @@ def test_scalar_cast(x, t):
        shape=[({'type': i64}, ())])
 def test_scalar_to_array(x):
     return scalar_to_array(x)
+
+
+@infer(type=[(ai64_of(), i64),
+             (af64_of(), f64)],
+       shape=[(ai64_of(), NOSHAPE),
+              (ai64_of(3, 4), InferenceError),
+              (ai64_of(1, 1, 1), InferenceError)])
+def test_array_to_scalar(x):
+    return array_to_scalar(x)
 
 
 @infer(type=[

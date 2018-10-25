@@ -481,6 +481,13 @@ async def infer_type_scalar_to_array(track, x):
     return Array[x_t]
 
 
+@type_inferrer(P.array_to_scalar, nargs=1)
+async def infer_type_array_to_scalar(track, ary):
+    """Infer the return type of array_to_scalar."""
+    ary_t = await track.check(Array, ary)
+    return ary_t.elements
+
+
 @type_inferrer(P.broadcast_shape, nargs=2)
 async def infer_type_broadcast_shape(track, xs, ys):
     """Infer the return type of broadcast_shape."""

@@ -91,6 +91,7 @@ list_reduce = Primitive('list_reduce')
 
 
 scalar_to_array = Primitive('scalar_to_array')
+array_to_scalar = Primitive('array_to_scalar')
 broadcast_shape = Primitive('broadcast_shape')
 shape = Primitive('shape')
 array_map = Primitive('array_map')

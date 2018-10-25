@@ -527,6 +527,13 @@ def scalar_to_array(x):
     return np.array(x)
 
 
+@register(primops.array_to_scalar)
+def array_to_scalar(x):
+    """Implement `array_to_scalar`."""
+    assert isinstance(x, np.ndarray)
+    return x.item()
+
+
 @register(primops.broadcast_shape)
 def broadcast_shape(shpx, shpy):
     """Implement `broadcast_shape`."""

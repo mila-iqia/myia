@@ -358,6 +358,19 @@ async def infer_shape_scalar_to_array(track, x):
     return ()
 
 
+@shape_inferrer(P.array_to_scalar, nargs=1)
+async def infer_shape_array_to_scalar(track, ary):
+    """Infer the shape of array_to_scalar."""
+    shp = await ary['shape']
+    if shp == ():
+        return NOSHAPE
+    else:
+        raise MyiaTypeError(
+            'array_to_scalar only works on 0d arrays',
+            refs=[ary]
+        )
+
+
 @shape_inferrer(P.broadcast_shape, nargs=2)
 async def infer_shape_broadcast_shape(track, shpx, shpy):
     """Infer the shape of broadcast_shape."""
