@@ -817,6 +817,13 @@ step_opt = Optimizer.partial(
             optlib.simplify_partial,
             optlib.replace_applicator,
             optlib.elim_identity,
+            optlib.elim_j_jinv,
+            optlib.elim_jinv_j,
+            optlib.getitem_tuple,
+            optlib.multiply_by_one_l,
+            optlib.multiply_by_one_r,
+            optlib.multiply_by_zero_l,
+            optlib.multiply_by_zero_r,
         ],
         cse=CSE.partial(report_changes=False),
         renormalize='renormalize'

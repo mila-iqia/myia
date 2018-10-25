@@ -9,7 +9,8 @@ from ..dtype import Int, Float, Bool, Tuple, List, Array, UInt, Number, \
     JTagged, EnvType, SymbolicKeyType
 from ..infer import ANYTHING, GraphInferrer, PartialInferrer, \
     MyiaTypeError, register_inferrer, Track, Inferrer, MetaGraphInferrer, \
-    ExplicitInferrer, VOID, TransformedReference, MultiInferrer
+    ExplicitInferrer, VOID, TransformedReference, MultiInferrer, \
+    DummyInferrer, Context
 from ..infer.jinf import JInferrer
 from ..ir import Graph, MetaGraph
 from ..utils import Namespace, Var, RestrictedVar, is_dataclass_type
@@ -583,6 +584,23 @@ async def infer_type_Jinv(track, x):
     x_t = await x.get_shallow('type')
     if isinstance(x_t, JInferrer):
         return x_t.fn
+    elif isinstance(x_t, GraphInferrer):
+        g = x_t._graph
+        primal = g and g.transforms.get('primal', None)
+        if primal:
+            primal = track.engine.pipeline.resources.convert(primal)
+            if isinstance(primal, Graph) and primal.parent:
+                # The primal for a closure can't be used because it points to
+                # the original nodes of its parent, whereas we would like to
+                # point to the transformed nodes of the parent. This is
+                # fixable, and will need to be fixed to support a few edge
+                # cases.
+                return DummyInferrer(track)
+            else:
+                return track.from_value(primal, Context.empty())
+        else:
+            raise MyiaTypeError(f'Bad input type for Jinv: {x_t}',
+                                refs=[x])
     elif ismyiatype(x_t, JTagged):
         return x_t.subtype
     else:
@@ -603,7 +621,8 @@ async def infer_type_env_setitem(track, env, key, x):
     await track.check(SymbolicKeyType, key)
     key_v = await key['value']
     assert key_v is not ANYTHING
-    await track.assert_same(track.engine.vref(key_v.inferred), x)
+    t = track.stag(key_v.inferred['type'])
+    await track.assert_same(t, x['type'])
     return EnvType
 
 
@@ -614,7 +633,8 @@ async def infer_type_env_getitem(track, env, key, default):
     await track.check(SymbolicKeyType, key)
     key_v = await key['value']
     assert key_v is not ANYTHING
-    return await track.assert_same(key_v.inferred['type'], default)
+    t = track.stag(key_v.inferred['type'])
+    return await track.assert_same(t, default)
 
 
 @type_inferrer(P.env_add, nargs=2)

@@ -2061,6 +2061,13 @@ def test_Jinv2(x):
     return ff(x)
 
 
+@infer(type=[(i32, InferenceError)])
+def test_Jinv3(x):
+    def f(x):
+        return x * x
+    return Jinv(f)(x)
+
+
 @infer_std(
     type=[
         (af32_of(5, 7), T[f32, T[Env, af32]]),
@@ -2088,3 +2095,32 @@ def test_grad(x, y):
     def f(x, y):
         return x * (y + x)
     return grad(f)(x, y)
+
+
+@infer_std(
+    type=[
+        (i64, i64),
+        (f32, f32),
+        (f64, f64),
+    ]
+)
+def test_grad_cast(x):
+    def f(x):
+        return scalar_cast(x, f16)
+
+    return grad(f)(x)
+
+
+@infer_std(
+    type=[
+        (af16_of(2, 5), af16_of(2, 5), af16),
+    ],
+    shape=[
+        (af16_of(2, 5), af16_of(2, 5), (2, 5)),
+    ]
+)
+def test_grad_reduce(xs, ys):
+    def f(xs, ys):
+        return array_reduce(scalar_add, xs * ys, ())
+
+    return grad(f)(xs, ys)

@@ -20,6 +20,7 @@ from .graph_infer import (  # noqa
     VirtualReference,
     TransformedReference,
     Inferrer,
+    DummyInferrer,
     GraphInferrer,
     MetaGraphInferrer,
     MultiInferrer,
