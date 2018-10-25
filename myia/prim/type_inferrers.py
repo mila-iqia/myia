@@ -155,9 +155,12 @@ async def infer_type_scalar_cast(track, x, t):
     await track.check(TypeType, t)
     new_t = await t['value']
     if new_t is ANYTHING:
-        raise MyiaTypeError(f'Type to cast to must be known at compile time.')
+        raise MyiaTypeError(
+            f'Type to cast to must be known at compile time.',
+            refs=[x, t]
+        )
     elif not ismyiatype(new_t, Number):
-        raise MyiaTypeError(f'Cannot cast to {new_t}')
+        raise MyiaTypeError(f'Cannot cast to {new_t}', refs=[t])
     return new_t
 
 
@@ -184,7 +187,10 @@ async def infer_type_tuple_getitem(track, seq, idx):
     await track.check(Int, idx)
     idx_v = await idx['value']
     if idx_v is ANYTHING:
-        raise MyiaTypeError('Tuples must be indexed with a constant')
+        raise MyiaTypeError(
+            'Tuples must be indexed with a constant',
+            refs=[seq, idx]
+        )
     return seq_t.elements[idx_v]
 
 
@@ -213,13 +219,16 @@ async def infer_type_tuple_setitem(track, seq, idx, value):
     await track.check(Int, idx)
     idx_v = await idx['value']
     if idx_v is ANYTHING:
-        raise MyiaTypeError('Tuples must be indexed with a constant')
+        raise MyiaTypeError(
+            'Tuples must be indexed with a constant',
+            refs=[idx]
+        )
     value_t = await value['type']
     elts = seq_t.elements
     try:
         elts[idx_v]
     except IndexError:
-        raise MyiaTypeError('Index out of bounds')
+        raise MyiaTypeError('Index out of bounds', refs=[idx])
     new_elts = tuple([*elts[:idx_v], value_t, *seq_t.elements[idx_v + 1:]])
     return Tuple[new_elts]
 
@@ -343,10 +352,12 @@ async def infer_type_across_array(track, fn, init, ary, ax):
     ax_t = await ax['type']
     ary_t = await track.check(Array, ary)
     if not ary_t.elements == init_t:
-        raise MyiaTypeError("Initial value must have the same type "
-                            "as array elements")
+        raise MyiaTypeError(
+            "Initial value must have the same type as array elements",
+            refs=[init, ary]
+        )
     if not ax_t == UInt[64]:
-        raise MyiaTypeError("Axis must be u64")
+        raise MyiaTypeError("Axis must be u64", refs=[ax])
     xref = TransformedReference(track.engine, getelement, ary)
     return Array[await fn_t(xref, xref)]
 
@@ -402,11 +413,13 @@ async def infer_type_resolve(track, data, item):
     def chk(data_v, item_v):
         if not isinstance(data_v, Namespace):  # pragma: no cover
             raise MyiaTypeError(
-                f'data argument to resolve must be Namespace, not {data_v}'
+                f'data argument to resolve must be Namespace, not {data_v}',
+                refs=[data]
             )
         if not isinstance(item_v, str):  # pragma: no cover
             raise MyiaTypeError(
-                f'item argument to resolve must be a string, not {item_v}.'
+                f'item argument to resolve must be a string, not {item_v}.',
+                refs=[item]
             )
 
     async def on_dcattr(data, data_t, item_v):  # pragma: no cover
@@ -426,7 +439,8 @@ async def infer_type_getattr(track, data, item):
     def chk(data_v, item_v):
         if not isinstance(item_v, str):
             raise MyiaTypeError(
-                f'item argument to getattr must be string, not {item_v}.'
+                f'item argument to getattr must be string, not {item_v}.',
+                refs=[item]
             )
 
     async def on_dcattr(data, data_t, item_v):

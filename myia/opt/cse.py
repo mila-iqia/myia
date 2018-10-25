@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from ..graph_utils import toposort
 from ..ir import succ_incoming
+from ..utils import Partializable
 
 
 def cse(root, manager):
@@ -60,13 +61,15 @@ def cse(root, manager):
     return changes
 
 
-class CSE:
+class CSE(Partializable):
     """Common subexpression elimination."""
 
-    def __init__(self, optimizer):
+    def __init__(self, optimizer, report_changes=True):
         """Initialize CSE."""
         self.optimizer = optimizer
+        self.report_changes = report_changes
 
     def __call__(self, root):
         """Apply CSE on root."""
-        return cse(root, self.optimizer.resources.manager)
+        chg = cse(root, self.optimizer.resources.manager)
+        return chg and self.report_changes

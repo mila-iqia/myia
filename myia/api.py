@@ -449,19 +449,26 @@ class Optimizer(PipelineStep):
         self.run_only_once = run_only_once
         self.phases = []
         for name, spec in phases.items():
-            if isinstance(spec, list):
+            if spec == 'renormalize':
+                pass
+            elif isinstance(spec, list):
                 spec = PatternEquilibriumOptimizer(*spec, optimizer=self)
             else:
                 spec = spec(optimizer=self)
             self.phases.append(spec)
 
-    def step(self, graph, argspec=None):
+    def step(self, graph, argspec=None, outspec=None):
         """Optimize the graph using the given patterns."""
         changes = True
         while changes:
             changes = False
             for opt in self.phases:
-                if opt(graph):
+                if opt == 'renormalize':
+                    assert argspec is not None
+                    graph = self.resources.inferrer.renormalize(
+                        graph, argspec, outspec
+                    )
+                elif opt(graph):
                     changes = True
             if self.run_only_once:
                 break
@@ -805,11 +812,13 @@ step_opt = Optimizer.partial(
             optlib.simplify_always_true,
             optlib.simplify_always_false,
             optlib.inline_unique_uses,
+            optlib.inline_core,
             optlib.simplify_partial,
             optlib.replace_applicator,
             optlib.elim_identity,
         ],
-        cse=CSE
+        cse=CSE.partial(report_changes=False),
+        renormalize='renormalize'
     )
 )
 

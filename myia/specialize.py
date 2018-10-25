@@ -1,5 +1,6 @@
 """Specialize graphs according to the types of their arguments."""
 
+import numpy
 from collections import Counter
 
 from .dtype import Type, Function, Number, Bool, TypeType, TypeMeta
@@ -8,7 +9,7 @@ from .infer import ANYTHING, Context, concretize_type, \
     Unspecializable, INACCESSIBLE
 from .ir import GraphCloner, Constant
 from .prim import ops as P, Primitive
-from .utils import Overload
+from .utils import Overload, overload, Namespace
 
 
 def _const(v, t):
@@ -65,6 +66,25 @@ def _parents(g):
         g = g.parent
         rval.add(g)
     return rval
+
+
+_legal = (int, float, numpy.number, numpy.ndarray,
+          str, Namespace, TypeMeta)
+
+
+@overload
+def _is_concrete_value(v: (tuple, list)):
+    return all(_is_concrete_value(x) for x in v)
+
+
+@overload  # noqa: F811
+def _is_concrete_value(v: _legal):
+    return True
+
+
+@overload  # noqa: F811
+def _is_concrete_value(v: object):
+    return False
 
 
 class _GraphSpecializer:
@@ -160,10 +180,10 @@ class _GraphSpecializer:
     async def _build(self, ref, argrefs,
                      t: (Number, Bool, TypeType, type, TypeMeta)):
         v = await ref['value']
-        if v is ANYTHING:
-            return await self._build[Type](ref, argrefs, t)
-        else:
+        if _is_concrete_value(v):
             return _const(v, await concretize_type(t))
+        else:
+            return await self._build[Type](ref, argrefs, t)
 
     @_build.register  # noqa: F811
     async def _build(self, ref, argrefs, t: Type):

@@ -502,7 +502,7 @@ class ExplicitInferrer(Inferrer):
         for got, aref in zip(self.argvals, args):
             self.engine.equiv.declare_equivalent(
                 got,
-                aref[self.track.name],
+                aref.get_raw(self.track.name),
                 refs=[aref]
             )
         return self.retval

@@ -49,6 +49,7 @@ def specializer_decorator(pipeline):
                     res = pip(input=fn, argspec=argspec)
                 except InferenceError as ierr:
                     print_inference_error(ierr)
+                    raise ierr
                 except ValidationError as verr:
                     print('Collected the following errors:')
                     for err in verr.errors:
