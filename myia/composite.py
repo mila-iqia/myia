@@ -623,15 +623,10 @@ class GradOperation(MetaGraph):
         super().__init__(name)
         self.cache = {}
 
-    def make_gf(self, jf, orig_params,
-                dbg, sens_param=False, get_all=False,
-                apply_j=False):
+    def make_gf(self, jf, orig_params, dbg):
         """Make the graph for the grad."""
         with About(dbg, 'grad'):
             df = Graph()
-
-        if apply_j:
-            jf = df.apply(P.J, jf)
 
         params = []
         for orig_p in orig_params:
@@ -643,16 +638,10 @@ class GradOperation(MetaGraph):
         out = df.apply(P.Jinv, df.apply(P.tuple_getitem, app, 0))
         bprop = df.apply(P.tuple_getitem, app, 1)
 
-        if sens_param:
-            bprop_arg = df.add_parameter()
-        else:
-            bprop_arg = df.apply(_cast_helper, 1, out)
+        bprop_arg = df.apply(_cast_helper, 1, out)
 
         bapp = df.apply(bprop, bprop_arg)
-        if get_all:
-            df.output = df.apply(P.tail, bapp)
-        else:
-            df.output = df.apply(P.tuple_getitem, bapp, 1)
+        df.output = df.apply(P.tuple_getitem, bapp, 1)
         return df
 
     def specialize_from_types(self, types):

@@ -411,13 +411,6 @@ async def infer_shape_Jinv(track, x):
     shp = await x.get_shallow('shape')
     if isinstance(shp, JInferrer):
         return shp.fn
-    elif isinstance(shp, GraphInferrer):
-        g = shp._graph
-        primal = g and g.transforms.get('primal', None)
-        if primal:
-            return DummyInferrer(track)
-        else:
-            raise MyiaTypeError('Bad input type for Jinv', refs=[x])
     else:
         return shp
 

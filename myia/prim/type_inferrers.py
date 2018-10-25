@@ -573,21 +573,6 @@ async def infer_type_Jinv(track, x):
     x_t = await x.get_shallow('type')
     if isinstance(x_t, JInferrer):
         return x_t.fn
-    elif isinstance(x_t, GraphInferrer):
-        g = x_t._graph
-        primal = g and g.transforms.get('primal', None)
-        if primal:
-            # TODO: Use primal graph instead of dummy.
-            # assert primal.parent is None
-            # primal = track.engine.pipeline.resources.convert(primal)
-            # return track.from_value(primal, Context.empty())
-            node = x.node
-            dinf = DummyInferrer(track)
-            dinf.data = node
-            return dinf
-        else:
-            raise MyiaTypeError(f'Bad input type for Jinv: {x_t}',
-                                refs=[x])
     elif ismyiatype(x_t, JTagged):
         return x_t.subtype
     else:
