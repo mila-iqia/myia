@@ -6,12 +6,13 @@ from dataclasses import is_dataclass
 from functools import partial, reduce
 
 from ..dshape import NOSHAPE, TupleShape, ListShape, ClassShape, \
-    find_matching_shape
+    find_matching_shape, shape_cloner
 from ..dtype import Array, Tuple, List, Class, TypeType, ismyiatype, \
     pytype_to_myiatype
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer, \
     InferenceError, MyiaTypeError, TransformedReference, MultiInferrer
+from ..infer.jinf import JInferrer
 from ..ir import Graph, MetaGraph
 
 from . import ops as P
@@ -41,6 +42,11 @@ class ScalarShapeInferrer(Inferrer):
     def provably_equivalent(self, other):
         """This is always equal to itself."""
         return type(self) == type(other)
+
+
+@shape_cloner.variant
+def _stag_shape(self, shp: Inferrer):
+    return EnvType
 
 
 class ShapeTrack(Track):
@@ -103,6 +109,17 @@ class ShapeTrack(Track):
             return v.shape
         else:
             return NOSHAPE
+
+    def jtag(self, shp):
+        """Return type for J(x) given shape(x)."""
+        if isinstance(shp, Inferrer):
+            return JInferrer(shp, TupleShape)
+        else:
+            return shp
+
+    def stag(self, t):
+        """Return type for sensitivity of x given shape(x)."""
+        return _stag_shape(t)
 
 
 shape_inferrer = partial(register_inferrer,
@@ -367,6 +384,29 @@ async def infer_shape_list_reduce(track, fn, lst, dflt):
     shp1 = await fn_inf(dflt, elem)
     shp2 = await fn_inf(elem, elem)
     return find_matching_shape([shp1, shp2])
+
+
+@shape_inferrer(P.J, nargs=1)
+async def infer_shape_J(track, x):
+    """Infer the return shape of J."""
+    return track.jtag(await x.get_shallow('shape'))
+
+
+@shape_inferrer(P.Jinv, nargs=1)
+async def infer_shape_Jinv(track, x):
+    """Infer the return shape of Jinv."""
+    shp = await x.get_shallow('shape')
+    if isinstance(shp, JInferrer):
+        return shp.fn
+    elif isinstance(shp, GraphInferrer):
+        g = shp._graph
+        primal = g and g.transforms.get('primal', None)
+        if primal:
+            return DummyInferrer(track)
+        else:
+            raise MyiaTypeError('Bad input type for Jinv', refs=[x])
+    else:
+        return shp
 
 
 @shape_inferrer(P.embed, nargs=1)

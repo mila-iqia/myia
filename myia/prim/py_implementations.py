@@ -587,6 +587,18 @@ def _list_reduce_vm(vm, fn, lst, dflt):
     return list_reduce(fn_, lst, dflt)
 
 
+@register(primops.J)
+def J(x):
+    """Implement `J`."""
+    raise NotImplementedError()
+
+
+@register(primops.Jinv)
+def Jinv(x):
+    """Implement `Jinv`."""
+    raise NotImplementedError()
+
+
 @register(primops.embed)
 def embed(node):
     """Placeholder for the implementation of `embed`."""
