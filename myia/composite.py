@@ -6,13 +6,15 @@ from dataclasses import dataclass
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType
 from .hypermap import HyperMap
-from .infer import Inferrer
-from .ir import MultitypeGraph
+from .infer import Inferrer, GraphInferrer
+from .info import About
+from .ir import Graph, MetaGraph, MultitypeGraph, Constant
+from .prim import ops as P
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
     switch, identity, bool_and, tail, typeof, scalar_cast, scalar_add, \
     scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, \
-    scalar_div, env_add
+    scalar_div, scalar_to_array, env_add
 from .utils import newenv
 
 
@@ -595,3 +597,79 @@ zeros_like = HyperMap(
     nonleaf=(Tuple, List, Class),
     fn_leaf=_leaf_zeros_like
 )
+
+
+@core
+def _cast_helper(x, model):
+    t = typeof(model)
+    if hastype(model, Array):
+        return scalar_to_array(scalar_cast(x, t.elements))
+    else:
+        return scalar_cast(x, t)
+
+
+class GradOperation(MetaGraph):
+    """Implements the grad(f) operation.
+
+    grad(f)(x, ...) returns df(x, ...)/dx. Derivatives of other inputs are
+    thrown out.
+
+    TODO: This currently will not work on primitives, but it is an easy fix.
+    We just need to know how many parameters f takes.
+    """
+
+    def __init__(self, name):
+        """Initialize a GradOperation."""
+        super().__init__(name)
+        self.cache = {}
+
+    def make_gf(self, jf, orig_params, dbg):
+        """Make the graph for the grad."""
+        with About(dbg, 'grad'):
+            df = Graph()
+
+        params = []
+        for orig_p in orig_params:
+            with About(orig_p.debug, 'grad'):
+                params.append(df.add_parameter())
+
+        jparams = [df.apply(P.J, p) for p in params]
+        app = df.apply(jf, *jparams)
+        out = df.apply(P.Jinv, df.apply(P.tuple_getitem, app, 0))
+        bprop = df.apply(P.tuple_getitem, app, 1)
+
+        bprop_arg = df.apply(_cast_helper, 1, out)
+
+        bapp = df.apply(bprop, bprop_arg)
+        df.output = df.apply(P.tuple_getitem, bapp, 1)
+        return df
+
+    def specialize_from_types(self, types):
+        """Generate the graph."""
+        types = tuple(types)
+        if types in self.cache:
+            return self.cache[types]
+
+        ft, = types
+        assert isinstance(ft, GraphInferrer)
+        g = ft._graph
+        assert isinstance(g, Graph)
+
+        dfbuilder = Graph()
+        dfbuilder.debug.name = f"grad{len(g.parameters)}"
+
+        with About(g.debug, 'copy'):
+            fn = dfbuilder.add_parameter()
+
+        with About(g.debug, 'grad_fprop'):
+            jf = dfbuilder.apply(P.J, fn)
+
+        df = self.make_gf(jf, g.parameters, g.debug)
+
+        dfbuilder.output = Constant(df)
+
+        self.cache[types] = dfbuilder
+        return dfbuilder
+
+
+grad = GradOperation('grad')

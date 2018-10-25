@@ -11,7 +11,7 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
     shape, reshape, array_map, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
-    issubtype, env_getitem, env_setitem, env_add, embed
+    issubtype, env_getitem, env_setitem, env_add, embed, array_to_scalar
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
@@ -342,6 +342,15 @@ def test_scalar_to_array():
     b = scalar_to_array(1.5)
     assert isinstance(b, np.ndarray)
     assert b.dtype == np.float64
+
+
+def test_array_to_scalar():
+    a = array_to_scalar(np.array(1))
+    assert isinstance(a, int)
+    assert a == 1
+    b = array_to_scalar(np.array(1.5))
+    assert isinstance(b, float)
+    assert b == 1.5
 
 
 def test_broadcast_shape():

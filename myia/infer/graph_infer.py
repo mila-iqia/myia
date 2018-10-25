@@ -475,9 +475,9 @@ class PartialInferrer(Inferrer):
 class ExplicitInferrer(Inferrer):
     """Requires specific input types and returns a specific output type."""
 
-    def __init__(self, track, argvals, retval):
+    def __init__(self, track, argvals, retval, name=None):
         """Initialize ExplicitInferrer."""
-        super().__init__(track, None)
+        super().__init__(track, name)
         self.argvals = argvals
         self.retval = retval
         refs = []
