@@ -6,10 +6,10 @@ import numpy as np
 from types import SimpleNamespace
 
 from myia.api import scalar_pipeline, standard_pipeline
-from myia.composite import hyper_add, zeros_like
+from myia.composite import hyper_add, zeros_like, grad
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
-    Number, Class, Problem, EnvType as Env
+    Number, Class, Problem, EnvType as Env, JTagged as JT
 from myia.hypermap import HyperMap
 from myia.infer import ANYTHING, VOID, InferenceError, register_inferrer, \
     Contextless, CONTEXTLESS
@@ -1952,3 +1952,63 @@ def test_env(x, y, z):
     e = newenv
     e = env_setitem(e, embed(x), y)
     return env_getitem(e, embed(x), z)
+
+
+@infer(
+    type=[
+        (i32, T[JT[i32], Env, i32]),
+        (f64, T[JT[f64], Env, f64]),
+    ]
+)
+def test_J(x):
+    def f(x):
+        return x * x
+
+    jf = J(f)
+    jx = J(x)
+    jy, bprop = jf(jx)
+    df, dx = bprop(1.0)
+    return jy, df, dx
+
+
+@infer(
+    type=[
+        (i32, i32),
+        (f64, f64),
+    ]
+)
+def test_Jinv(x):
+    def f(x):
+        return x * x
+
+    ff = Jinv(J(f))
+    return ff(x)
+
+
+@infer_std(
+    type=[
+        (af32_of(5, 7), T[f32, T[Env, af32]]),
+    ],
+    shape=[
+        (af32_of(5, 7),
+         TupleShape((NOSHAPE, TupleShape((NOSHAPE, (5, 7))))))
+    ],
+)
+def test_J_array(xs):
+    def prod(xs):
+        p = array_reduce(lambda x, y: x * y, xs, ())
+        return array_to_scalar(p)
+    jy, bprop = J(prod)(J(xs))
+    return Jinv(jy), bprop(1.0)
+
+
+@infer_std(
+    type=[
+        (f32, f32, f32),
+        (i16, i16, i16),
+    ]
+)
+def test_grad(x, y):
+    def f(x, y):
+        return x * (y + x)
+    return grad(f)(x, y)

@@ -46,7 +46,7 @@ class ScalarShapeInferrer(Inferrer):
 
 @shape_cloner.variant
 def _stag_shape(self, shp: Inferrer):
-    return EnvType
+    return NOSHAPE
 
 
 class ShapeTrack(Track):

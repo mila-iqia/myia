@@ -1,6 +1,5 @@
 """Implements JInferrer."""
 
-from ..dtype import EnvType
 from ..prim import ops as P
 from ..debug.label import short_relation_symbols as syms
 
@@ -29,7 +28,7 @@ class JInferrer(Inferrer):
                 for jarg in jargs]
         res = await self.fn(*args)
         res_t = self.track.jtag(await reify_shallow(res))
-        bparams_t = [EnvType]
+        bparams_t = [self.track.stag(self)]  # EnvType for type track, etc.
         bparams_t += [self.track.stag(await x[self.track.name]) for x in args]
         bprop_t = ExplicitInferrer(
             self.track,
