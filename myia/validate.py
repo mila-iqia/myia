@@ -1,7 +1,8 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
 from .dtype import Array, Tuple, List, Function, Number, Bool, Problem, \
-    TypeMeta, TypeType, Class, External, EnvType, SymbolicKeyType, type_cloner
+    TypeMeta, TypeType, Class, External, EnvType, SymbolicKeyType, \
+    JTagged, type_cloner
 from .dshape import ListShape, TupleShape
 from .infer import DEAD
 from .ir import manage
@@ -14,12 +15,17 @@ class ValidationError(Exception):
 
 
 @type_cloner.variant
-def _validate_type(self, t: (Class, Problem, External, object)):
+def validate_type(self, t: (Class, Problem, External, JTagged, object)):
+    """Validate the type before we get to the VM.
+
+    By default, we disallow Class, Problem, External and JTagged.
+    """
     raise ValidationError(f'Illegal type in the graph: {t}')
 
 
 @overload  # noqa: F811
-def _validate_type(self, t: Problem[DEAD]):
+def validate_type(self, t: Problem[DEAD]):
+    """We allow Problem[DEAD], e.g. for unused parameters."""
     pass
 
 
@@ -44,6 +50,11 @@ def _validate_shape(t: List, shp):
     if not isinstance(shp, ListShape):
         raise ValidationError(f'Shape of {t} is {shp}, should be ListShape')
     _validate_shape(t.element_type, shp.shape)
+
+
+@overload  # noqa: F811
+def _validate_shape(t: JTagged, shp):
+    _validate_shape(t.subtype, shp)
 
 
 @overload  # noqa: F811
@@ -126,6 +137,8 @@ whitelist = frozenset({
     P.env_getitem,
     P.env_setitem,
     P.env_add,
+    # P.J,
+    # P.Jinv,
 })
 
 
@@ -137,10 +150,11 @@ class Validator:
     primitive must belong to the whitelist.
     """
 
-    def __init__(self, root, whitelist):
+    def __init__(self, root, whitelist, validate_type=validate_type):
         """Initialize and run the Validator."""
         self.errors = ErrorPool(exc_class=ValidationError)
         self.whitelist = frozenset(whitelist)
+        self._validate_type_fn = validate_type
         self._run(root)
 
     def _test(self, node, fn):
@@ -151,7 +165,7 @@ class Validator:
             self.errors.add(err)
 
     def _validate_type(self, node):
-        return _validate_type(node.type)
+        return self._validate_type_fn(node.type)
 
     def _validate_oper(self, node):
         if node.is_constant(Primitive):
@@ -185,11 +199,11 @@ class Validator:
         self.errors.trigger(stringify=stringify)
 
 
-def validate(root, whitelist=whitelist):
+def validate(root, whitelist=whitelist, validate_type=validate_type):
     """Verify that g is properly type-specialized.
 
     Every node of each graph must have a concrete type in its type attribute,
     every application must be compatible with its argument types, and every
     primitive must belong to the whitelist.
     """
-    Validator(root, whitelist)
+    Validator(root, whitelist, validate_type)

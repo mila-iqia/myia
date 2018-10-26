@@ -1,12 +1,10 @@
 """Library of optimizations."""
 
 from ..graph_utils import dfs
-from ..dtype import type_cloner, ismyiatype, JTagged, Function
-from ..infer import Inferrer
 from ..ir import succ_incoming, freevars_boundary, Graph, Constant, \
     GraphCloner
 from ..prim import Primitive, ops as P
-from ..utils import Namespace, UNKNOWN
+from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
 
 from .opt import \
@@ -383,55 +381,7 @@ def expand_J(optimizer, node, equiv):
     from ..grad import J as Jimpl
     arg = equiv[C].value
     try:
-        newg = Jimpl(arg, optimizer.resources)
+        newg = Jimpl(arg, optimizer.resources.manager)
     except NotImplementedError:
         return None
     return Constant(newg)
-
-
-@type_cloner.variant
-def _noinferrer(self, x: (Inferrer, Function)):
-    raise TypeError('Has function')
-
-
-@pattern_replacer(P.J, X)
-def elim_j(optimizer, node, equiv):
-    """Eliminate J(x) when x doesn't contain any inferrers.
-
-    This is only safe if elim_jinv/jct are also run.
-    """
-    x = equiv[X]
-    # Should only be run after a specialization pass
-    assert x.type is not UNKNOWN
-    try:
-        _noinferrer(x.type)
-        return x
-    except TypeError:
-        return node
-
-
-@pattern_replacer(P.Jinv, X)
-def elim_jinv(optimizer, node, equiv):
-    """Eliminate Jinv(x) when x doesn't contain any inferrers.
-
-    This is only safe if elim_j/jct are also run.
-    """
-    x = equiv[X]
-    # Should only be run after a specialization pass
-    assert x.type is not UNKNOWN
-    try:
-        _noinferrer(node.type)
-        return x
-    except TypeError:
-        return node
-
-
-@pattern_replacer('just', C)
-def elim_jct(optimizer, node, equiv):
-    """Strip JTagged type from constants.
-
-    This is only safe if elim_j/jinv are also run.
-    """
-    ct = equiv[C]
-    if ismyiatype(ct.type, JTagged):
-        ct.type = ct.type.subtype

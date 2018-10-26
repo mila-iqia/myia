@@ -560,18 +560,17 @@ def J(prim: Primitive, resources):
 
 
 @overload  # noqa: F811
-def J(graph: Graph, resources):
+def J(graph: Graph, manager):
     """Implement J on a Graph."""
-    mng = resources.manager
     if graph.transforms.get('grad', None):
         return graph.transforms['grad']
-    mng.add_graph(graph)
-    res = _grad(mng, graph)
+    manager.add_graph(graph)
+    res = _grad(manager, graph)
     return clone(res)
 
 
 @overload  # noqa: F811
-def J(other: object, resources):
+def J(other: object, manager):
     """We do not implement J on non-functions here."""
     name = type(other).__qualname__
     raise NotImplementedError(f'J(::{name}) not implemented')

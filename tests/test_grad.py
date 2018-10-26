@@ -3,20 +3,31 @@ import pytest
 import numpy as np
 from types import FunctionType
 
-from myia.api import standard_debug_pipeline, Optimizer
+from myia import api
+from myia.api import standard_resources, Optimizer, Validator
 from myia.composite import grad
 from myia.debug.finite_diff import GradTester
+from myia.dtype import JTagged
 from myia.grad import J as realJ
 from myia.opt import lib as optlib, CSE
-from myia.pipeline import pipeline_function
+from myia.pipeline import pipeline_function, PipelineDefinition
 from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import J, scalar_add, scalar_mul, typeof
 from myia.prim.py_implementations import py_implementations as pyi
+from myia.validate import whitelist, validate_type
 
 from .common import f64
 
 
-step_optgrad = Optimizer.partial(
+grad_whitelist = whitelist | {P.J, P.Jinv}
+
+
+@validate_type.variant
+def grad_validate_type(self, t: JTagged):
+    pass
+
+
+step_grad_opt = Optimizer.partial(
     phases=dict(
         main=[
             optlib.simplify_always_true,
@@ -30,13 +41,45 @@ step_optgrad = Optimizer.partial(
         ],
         renormalize='renormalize',
         elimj=[
-            optlib.elim_j,
-            optlib.elim_jinv,
-            optlib.elim_jct,
             optlib.elim_j_jinv,
             optlib.elim_jinv_j,
         ],
         cse=CSE.partial(report_changes=False),
+    )
+)
+
+
+step_grad_validate = Validator.partial(
+    whitelist=grad_whitelist,
+    validate_type=grad_validate_type
+)
+
+
+@pipeline_function
+def grad_wrap(self, graph):
+    if isinstance(graph, Primitive):
+        jg = realJ(graph, self.resources)
+        g = grad.make_gf(jg, jg.parameters,
+                         dbg=jg.debug, sens_param=True, get_all=True)
+    else:
+        g = grad.make_gf(graph, graph.parameters,
+                         dbg=graph.debug, sens_param=True, get_all=True,
+                         apply_j=True)
+    return g
+
+
+grad_pipeline = PipelineDefinition(
+    resources=standard_resources,
+    steps=dict(
+        parse=api.step_parse,
+        grad_wrap=grad_wrap,
+        resolve=api.step_resolve,
+        infer=api.step_infer,
+        specialize=api.step_specialize,
+        prepare=api.step_prepare,
+        opt=step_grad_opt,
+        validate=step_grad_validate,
+        export=api.step_debug_export,
     )
 )
 
@@ -103,37 +146,14 @@ prim_tests = {
 }
 
 
-@pipeline_function
-def grad_wrap(self, graph):
-    if isinstance(graph, Primitive):
-        jg = realJ(graph, self.resources)
-        g = grad.make_gf(jg, jg.parameters,
-                         dbg=jg.debug, sens_param=True, get_all=True)
-    else:
-        g = grad.make_gf(graph, graph.parameters,
-                         dbg=graph.debug, sens_param=True, get_all=True,
-                         apply_j=True)
-    return g
-
-
 def _grad_test(fn, obj, args, sens_type=f64):
     in_types = [{'type': typeof(arg)} for arg in args]
     sens_type = {'type': sens_type}
-    steps = ['resolve', 'infer', 'specialize', 'prepare',
-             'validate', 'export']
     if isinstance(obj, FunctionType):
-        res = standard_debug_pipeline \
-            .select('parse', *steps) \
-            .insert_before('infer', wrap=grad_wrap) \
-            .insert_after('prepare', opt=step_optgrad) \
-            .run(input=obj, argspec=[*in_types, sens_type])
+        res = grad_pipeline.run(input=obj, argspec=[*in_types, sens_type])
     else:
-        res = standard_debug_pipeline \
-            .select(*steps) \
-            .insert_before(wrap=grad_wrap) \
-            .insert_after('prepare', opt=step_optgrad) \
-            .run(graph=obj, argspec=[*in_types, sens_type])
-
+        pip = grad_pipeline.configure(parse=False)
+        res = pip.run(graph=obj, argspec=[*in_types, sens_type])
     gtest = GradTester(
         fn=fn,
         gfn=res['output'],
@@ -232,17 +252,14 @@ def test_hof(a, b):
     return f(g, a) + f(g, b)
 
 
-@pytest.mark.xfail(
-    reason="I think the opts to eliminate j/jinv are messing this one up."
-)
 @grad_test((4.0, 5.0))
 def test_hof_tup(a, b):
     """Test higher order functions."""
-    def f(gh, x):
+    def f(gh, x, y):
         g, h = gh
-        return g(x, x) * h(x, x)
+        return g(x, y) * h(x, y)
 
-    return f((scalar_add, scalar_mul), a)
+    return f((scalar_add, scalar_mul), a, b)
 
 
 @grad_test((4.0, 5.0))
@@ -367,12 +384,8 @@ def test_closures_in_tuples(x, y):
 
 def _runwith(f, *args):
     in_types = [{'type': typeof(arg)} for arg in args]
-    steps = ['resolve', 'infer', 'specialize', 'prepare',
-             'validate', 'export']
-    res = standard_debug_pipeline \
-        .select('parse', *steps) \
-        .insert_after('prepare', opt=step_optgrad) \
-        .run(input=f, argspec=in_types)
+    pip = grad_pipeline.configure(grad_wrap=False)
+    res = pip.run(input=f, argspec=in_types)
     return res['output'](*args)
 
 

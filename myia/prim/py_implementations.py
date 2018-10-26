@@ -602,16 +602,41 @@ def _list_reduce_vm(vm, fn, lst, dflt):
     return list_reduce(fn_, lst, dflt)
 
 
-@register(primops.J)
+@py_register(primops.J)
 def J(x):
     """Implement `J`."""
     raise NotImplementedError()
 
 
-@register(primops.Jinv)
+@py_register(primops.Jinv)
 def Jinv(x):
     """Implement `Jinv`."""
     raise NotImplementedError()
+
+
+@vm_register(primops.J)
+def _J_vm(vm, x):
+    """Implement `J`."""
+    from ..grad import J as _J
+    from ..prim import Primitive
+    from ..ir import Graph
+    if isinstance(x, (Primitive, Graph)):
+        return _J(x, vm.manager)
+    else:
+        return x
+
+
+@vm_register(primops.Jinv)
+def _Jinv_vm(vm, x):
+    """Implement `Jinv`."""
+    from ..prim import Primitive
+    from ..ir import Graph
+    if isinstance(x, Primitive):
+        raise AssertionError("Jinv on a primitive should never happen.")
+    elif isinstance(x, Graph):
+        raise NotImplementedError()
+    else:
+        return x
 
 
 @register(primops.embed)

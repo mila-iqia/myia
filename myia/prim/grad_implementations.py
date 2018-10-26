@@ -26,7 +26,7 @@ def bprop_to_augm(prim, fn):
     """Given a function for the bprop, make the augmented function."""
     info = NamedDebugInfo(prim=prim, name=prim.name)
 
-    bprop = parse(fn)
+    bprop = clone(parse(fn))
     bprop.flags['flatten_inference'] = True
     bprop.debug.name = None
     bprop.debug.about = About(info, 'grad_bprop')  # type: ignore
