@@ -1,7 +1,8 @@
 import pytest
 import numpy as np
 
-from myia.utils import Named, TypeMap, smap, Event, Events, NS, Overload
+from myia.utils import Named, TypeMap, smap, Event, Events, NS, Overload, \
+    SymbolicKeyInstance, newenv
 
 
 def test_named():
@@ -237,3 +238,29 @@ def test_NS():
     assert ns.b == 4
 
     assert repr(ns) == 'NS(x=1, y=2, a=3, b=4)'
+
+
+def test_env():
+    sk1 = SymbolicKeyInstance('x', {})
+    sk1b = SymbolicKeyInstance('x', {})
+    assert sk1 == sk1b
+
+    sk2 = SymbolicKeyInstance('y', {})
+
+    e = newenv.set(sk1, 100)
+    assert e is not newenv
+
+    assert len(newenv) == 0
+    assert len(e) == 1
+    assert e.get(sk1, 0) == 100
+    assert e.get(sk2, 0) == 0
+
+    e = e.set(sk1b, 200)
+    assert len(e) == 1
+    assert e.get(sk1, 0) == 200
+    assert e.get(sk2, 0) == 0
+
+    e = e.set(sk2, 300)
+    assert len(e) == 2
+    assert e.get(sk1, 0) == 200
+    assert e.get(sk2, 0) == 300
