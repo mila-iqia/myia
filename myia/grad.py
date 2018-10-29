@@ -1,4 +1,51 @@
-"""Generate the gradient graphs."""
+"""Generate the gradient graphs for reverse mode.
+
+The J transform on a graph produces two graphs, the forward graph (fprop)
+and the backpropagator graph (bprop). The former returns the result of the
+computation and the bprop graph, and the latter takes output sensitivities
+and returns input sensitivities. For each node `y = f(x)` of the graph,
+we generate:
+
+* Three nodes in the fprop graph, using one GraphRemapper and two
+  SlaveRemappers (it doesn't really matter which one is the master and
+  which ones are the slaves):
+
+    temp = fprop_f(fprop_x)  # FPropAppRemapper (slave)
+    fprop_y = temp[0]        # FPropRemapper    (master)
+    bprop_y = temp[1]        # BPropRemapper    (slave)
+
+* Two nodes in the bprop graph, using one GraphRemapper and one
+  SlaveRemapper:
+
+    # BPropAppRemapper (slave)
+    from_y = bprop_y(sens_y)
+
+    # SensRemapper (master)
+    sens_y = hyper_add(from_z[idx] for z, idx in uses(y))
+
+* For the output node, in the fprop graph, we generate:
+
+    return fprop_y, bprop_y
+
+* The output of the bprop graph contains the sensitivities of
+  the free variables and parameters. Sensitivities for free variables
+  are stored in an Env:
+
+    sens_allfvs = env_setitem(newenv,      embed(fv1), sens_fv1)
+    sens_allfvs = env_setitem(sens_allfvs, embed(fv2), sens_fv2)
+    ...
+    return sens_allfvs, sens_param1, sens_param_2, ...
+
+All remappers generate their nodes first, and then the nodes are linked
+with each other, which allows them to refer to each other.
+
+SensRemapper is the most complex one, mainly because it walks through
+each node's uses and has to deal with free variables. For any given node,
+SensRemapper will generate a sensitivity node in each graph that uses
+it, so e.g. in `lambda x: x + (lambda y: x + y)(123)` two different
+sensitivity nodes are created for x, because it is used in both lambda
+expressions. See `SensRemapper.link_apply` for more information.
+"""
 
 
 from functools import reduce
@@ -387,6 +434,8 @@ class SensRemapper(GraphRemapper):
             else:
                 new_node = ng.apply()
         # NOTE: First parameter to add_node is (g, node) instead of just node.
+        # This lets us dispatch to a different node depending on whether it
+        # belongs to the graph that uses it, or is a free variable.
         self.add_node((g, node), g, node, ng, new_node)
 
     def gen_child(self, g, ng, child):
@@ -417,9 +466,8 @@ class SensRemapper(GraphRemapper):
         mng = g.manager
         assert not new_node.is_parameter()
 
-        contribs = []
-
         if isinstance(node, Graph):
+            # This was added via gen_child or gen_fv_graph
             uses = set()
             for ct in g.constants:
                 if ct.value is node:
@@ -427,23 +475,47 @@ class SensRemapper(GraphRemapper):
         else:
             uses = mng.uses[node]
 
+        contribs = []
+
         for user, key in uses:
             if user.graph is g:
+                # We only concern ourselves with uses in this graph
                 if user is user.graph.return_:
+                    # This is the graph's output, so the contribution
+                    # is the output sensitivity, which is contained in
+                    # ng's sole parameter.
                     if len(ng.parameters) == 0:
+                        # This will happen if the graph returns a free
+                        # variable directly.
                         with About(g.output.debug, 'grad_sens'):
                             ng.add_parameter()
+                    # We need to call identity because we need to modify
+                    # new_node's inputs at the end of the function, we can't
+                    # simply replace it.
                     sexp = (primops.identity, ng.parameters[0])
                     contribs.append(sexp)
-                    continue
-                src = self.remappers['grad_bprop_app'].get(g, user)
-                sexp = (primops.tuple_getitem, src, key)
-                contribs.append(sexp)
+                else:
+                    # If the application is e.g. z = f(x, y), BPropAppRemapper
+                    # calculates the tuple (df, dx, dy) = backpropagator_f(dz)
+                    # If we are processing node f, x or y, we will respectively
+                    # get element 0, 1 or 2 of that tuple and add that to our
+                    # contribs list.
+                    src = self.remappers['grad_bprop_app'].get(g, user)
+                    sexp = (primops.tuple_getitem, src, key)
+                    contribs.append(sexp)
 
+        # This is equivalent to the original node.Note that we aren't really
+        # interested in the node's value: jinv is used along with embed and
+        # zeros_like, which only care about the original node's inferred type
+        # and shape.
         jinv = self.get_jinv(node)
 
         # TODO: deconstruct nested graphs
+        # TODO: figure out what I meant by "deconstruct nested graphs" :(
 
+        # These are all the graphs nested in g which have this node as a
+        # free variable. Each of these graphs has a sensitivity node, and
+        # we will extract contributions from them.
         children = {g2 for g2 in self.graphs
                     if g2.parent is g
                     and node in g2.free_variables_total}
@@ -452,7 +524,9 @@ class SensRemapper(GraphRemapper):
             assert (g, child) in self.repl
             sexp = (primops.env_getitem,
                     self.get(g, child),
+                    # This represents the node's "key" into the env.
                     (primops.embed, jinv),
+                    # This is the default, if there is no entry for this key.
                     (zeros_like, jinv))
             contribs.append(sexp)
 
@@ -460,6 +534,7 @@ class SensRemapper(GraphRemapper):
         if n == 0:
             sexp = (zeros_like, jinv)
         else:
+            # All contributions are added together with hyper_add.
             def mkadd(x, y):
                 return (hyper_add, x, y)
             sexp = reduce(mkadd, contribs)
@@ -467,7 +542,12 @@ class SensRemapper(GraphRemapper):
         new_node.inputs = sexp_to_node(sexp, ng).inputs
 
     def get_jinv(self, node):
-        """Generate Jinv(B:node) (shortcut)."""
+        """Generate Jinv(B:node) (shortcut).
+
+        This is essentially equivalent to the original node. We can't use the
+        original node directly because the graph it belongs to is not available
+        any more after the transform.
+        """
         return self.remappers['grad_fprop'].get_jinv(node)
 
     def finalize_graph(self, g, ng):
@@ -481,6 +561,8 @@ class SensRemapper(GraphRemapper):
         fv_sens = Constant(newenv)
         for fv in g.free_variables_total:
             sens = self.get(g, fv)
+            # NOTE: If sens is an application of zeros_like, it would be
+            # possible to skip adding it to the env.
             fv_sens = ng.apply(
                 primops.env_setitem,
                 fv_sens,
@@ -493,8 +575,7 @@ class SensRemapper(GraphRemapper):
                              *in_sens)
         if len(ng.parameters) == 0:
             # This can happen if the output is a constant. In that case we just
-            # add a dummy parameter, which is fine since it can't be used
-            # anywhere.
+            # add a dummy parameter to satisfy the backpropagator protocol.
             with About(g.output.debug, 'grad_sens'):
                 ng.add_parameter()
 
