@@ -6,7 +6,7 @@ import numpy as np
 from types import SimpleNamespace
 
 from myia.api import scalar_pipeline, standard_pipeline
-from myia.composite import hyper_add, zeros_like, grad
+from myia.composite import hyper_add, zeros_like, grad, list_map
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
     Number, Class, Problem, EnvType as Env, JTagged as JT
@@ -18,8 +18,8 @@ from myia.pipeline import pipeline_function
 from myia.prim import Primitive, ops as P
 from myia.dshape import TupleShape, ListShape, ClassShape, NOSHAPE
 from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, scalar_lt, tail, list_map, hastype, \
-    typeof, scalar_usub, dot, distribute, shape, array_map, \
+    scalar_add, scalar_mul, scalar_lt, tail, list_map as list_map_prim, \
+    hastype, typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
@@ -63,6 +63,7 @@ def af16_of(*shp):
 pyimpl_test = {}
 value_inferrer_cons_test = {}
 type_inferrer_cons_test = {}
+shape_inferrer_cons_test = {}
 
 
 def _test_op(cls):
@@ -78,6 +79,8 @@ def _test_op(cls):
                 cons = type_inferrer_cons_test
             elif track == 'value':
                 cons = value_inferrer_cons_test
+            elif track == 'shape':
+                cons = shape_inferrer_cons_test
             else:
                 raise Exception(f'Unknown track to infer: {track}')
             inffn = getattr(cls, method)
@@ -96,6 +99,9 @@ class _tern:
     async def infer_type(track, x, y, z):
         return await track.will_check((Int, Float), x, y, z)
 
+    async def infer_shape(track, x, y, z):
+        return NOSHAPE
+
 
 # Coercion
 
@@ -107,6 +113,9 @@ class _to_i64:
 
     async def infer_type(track, x):
         return Int[64]
+
+    async def infer_shape(track, x):
+        return NOSHAPE
 
 
 # Unification tricks
@@ -121,6 +130,9 @@ class _unif1:
         rv = RestrictedVar({i16, f32})
         return track.engine.loop.create_var(rv, None, 0)
 
+    async def infer_shape(track, x):
+        return NOSHAPE
+
 
 @_test_op
 class _unif2:
@@ -131,6 +143,9 @@ class _unif2:
         rv = RestrictedVar({i16, f64})
         return track.engine.loop.create_var(rv, None, 0)
 
+    async def infer_shape(track, x):
+        return NOSHAPE
+
 
 infer_pipeline = scalar_pipeline.select(
     'parse', 'infer'
@@ -139,6 +154,7 @@ infer_pipeline = scalar_pipeline.select(
     'inferrer.tracks.value.max_depth': 10,
     'inferrer.tracks.value.constructors': value_inferrer_cons_test,
     'inferrer.tracks.type.constructors': type_inferrer_cons_test,
+    'inferrer.tracks.shape.constructors': shape_inferrer_cons_test,
 })
 
 
@@ -149,6 +165,7 @@ infer_pipeline_std = standard_pipeline.select(
     'inferrer.tracks.value.max_depth': 10,
     'inferrer.tracks.value.constructors': value_inferrer_cons_test,
     'inferrer.tracks.type.constructors': type_inferrer_cons_test,
+    'inferrer.tracks.shape.constructors': shape_inferrer_cons_test,
 })
 
 
@@ -952,12 +969,12 @@ def test_cover_limitedvalue_eq(x, y):
         (li64, f64, InferenceError),
     ]
 )
-def test_list_map(xs, ys):
+def test_list_map_prim(xs, ys):
 
     def square(x):
         return x * x
 
-    return list_map(square, xs), list_map(square, ys)
+    return list_map_prim(square, xs), list_map_prim(square, ys)
 
 
 @infer(
@@ -966,12 +983,12 @@ def test_list_map(xs, ys):
         (li64, lf64, InferenceError),
     ]
 )
-def test_list_map2(xs, ys):
+def test_list_map_prim2(xs, ys):
 
     def mulm(x, y):
         return x * -y
 
-    return list_map(mulm, xs, ys)
+    return list_map_prim(mulm, xs, ys)
 
 
 @infer(
@@ -1086,7 +1103,7 @@ def test_map_2(xs, z):
             return x + y
         return f
 
-    return list_map(adder(z), xs)
+    return list_map_prim(adder(z), xs)
 
 
 def _square(x):
@@ -1293,6 +1310,13 @@ def test_array_map2(ary1, ary2):
     def f(v1, v2):
         return v1 + v2
     return array_map(f, ary1, ary2)
+
+
+@infer(type=[(InferenceError,)])
+def test_array_map0():
+    def f():
+        return 1
+    return array_map(f)
 
 
 @infer(shape=[(af32_of(3, 4), af32_of(3, 4), af32_of(3, 4), (3, 4)),
@@ -1939,6 +1963,43 @@ def test_zeros_like_fn(x):
     def f(y):
         return x + y
     return zeros_like(f)
+
+
+@infer(
+    type=[
+        (li64, lf64, T[li64, lf64]),
+        (li64, f64, InferenceError),
+    ]
+)
+def test_list_map(xs, ys):
+
+    def square(x):
+        return x * x
+
+    return list_map(square, xs), list_map(square, ys)
+
+
+@infer(
+    type=[
+        (li64, li64, li64),
+        (li64, lf64, InferenceError),
+    ]
+)
+def test_list_map2(xs, ys):
+
+    def mulm(x, y):
+        return x * -y
+
+    return list_map(mulm, xs, ys)
+
+
+@infer(type=[(InferenceError,)])
+def test_list_map0():
+
+    def f():
+        return 1234
+
+    return list_map(f)
 
 
 @infer(

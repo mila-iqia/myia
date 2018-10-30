@@ -11,7 +11,8 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
     shape, reshape, array_map, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
-    issubtype, env_getitem, env_setitem, env_add, embed, array_to_scalar
+    issubtype, list_map, env_getitem, env_setitem, env_add, embed, \
+    array_to_scalar
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
@@ -279,11 +280,19 @@ def test_prim_array_reduce():
         assert (res == value).all()
 
 
-def test_prim_list_reduce():
+@parse_compare([1, 2, 3])
+def test_prim_list_reduce(l):
     def add(a, b):
         return a + b
 
-    assert list_reduce(add, [1, 2, 3], 4) == 10
+    return list_reduce(add, l, 4)
+
+
+@parse_compare([1, 2, 3])
+def test_prim_list_map(l):
+    def add2(a):
+        return a + 2
+    return list_map(add2, l)
 
 
 def test_prim_distribute():

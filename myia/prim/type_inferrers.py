@@ -262,6 +262,14 @@ async def infer_type_list_setitem(track, seq, idx, value):
     return seq_t
 
 
+@type_inferrer(P.list_append, nargs=2)
+async def infer_type_list_append(track, seq, value):
+    """Infer the return type of list_append."""
+    seq_t = await track.check(List, seq)
+    await track.will_check(seq_t.element_type, value)
+    return seq_t
+
+
 @type_inferrer(P.typeof, nargs=1)
 async def infer_type_typeof(track, _):
     """Infer the return type of typeof."""
@@ -346,6 +354,8 @@ async def infer_type_shape(track, ary):
 @type_inferrer(P.array_map, nargs=None)
 async def infer_type_array_map(track, fn, *arrays):
     """Infer the return type of array_map."""
+    if len(arrays) < 1:
+        raise MyiaTypeError('array_map requires at least one array')
     fn_t = await fn['type']
     await track.check(Array, *arrays)
     vrefs = [TransformedReference(track.engine, getelement, a)

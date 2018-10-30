@@ -318,6 +318,14 @@ def list_setitem(data, item, value):
     return data2
 
 
+@register(primops.list_append)
+def list_append(data, value):
+    """Implement `list_append`."""
+    data2 = copy(data)
+    data2.append(value)
+    return data2
+
+
 @vm_register(primops.getattr)
 def _vm_getattr(vm, data, attr):
     """Implement `getattr`."""

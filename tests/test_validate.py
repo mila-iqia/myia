@@ -2,10 +2,11 @@
 import pytest
 
 from myia.api import scalar_pipeline, scalar_parse
+from myia.composite import list_map
 from myia.dtype import Array, Tuple, List, Int
 from myia.dshape import NOSHAPE, TupleShape, ListShape
 from myia.prim import ops as P
-from myia.prim.py_implementations import make_record, partial, list_map
+from myia.prim.py_implementations import make_record, partial
 from myia.validate import validate as _validate, ValidationError, \
     _validate_shape
 
@@ -19,7 +20,13 @@ test_whitelist = frozenset({
     P.scalar_div,
     P.make_tuple,
     P.tuple_getitem,
-    P.list_map,
+    # P.list_map,
+    P.bool_and,
+    P.scalar_lt,
+    P.list_len,
+    P.list_append,
+    P.list_getitem,
+    P.make_list,
     P.partial,
     P.switch,
     P.return_,
@@ -37,7 +44,7 @@ pip = scalar_pipeline \
 
 pip_ec = scalar_pipeline \
     .select('parse', 'infer', 'specialize', 'prepare', 'validate') \
-    .configure({'prepare.erase_classes': True,
+    .configure({'prepare.flatten_data_structures': True,
                 'validate.whitelist': test_whitelist})
 
 

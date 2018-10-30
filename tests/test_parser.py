@@ -1,6 +1,7 @@
 import pytest
 
 from myia.api import scalar_parse as parse, scalar_pipeline
+from myia.parser import MyiaSyntaxError
 
 
 def test_undefined():
@@ -16,6 +17,13 @@ def test_defined_later():
     with pytest.raises(UnboundLocalError):
         parse(f)
     c = 3
+
+
+def test_no_return():
+    def f():
+        1 + 2
+    with pytest.raises(MyiaSyntaxError):
+        parse(f)
 
 
 def test_maybe():

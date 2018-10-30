@@ -28,22 +28,6 @@ def prod(iterable):
 shape_inferrer_constructors = {}
 
 
-class ScalarShapeInferrer(Inferrer):
-    """Shape inferrer for all primitives that don't take arrays."""
-
-    def __init__(self, track):
-        """Initialize the ScalarShapeInferrer."""
-        super().__init__(track, 'scalar_shape_inferrer')
-
-    async def infer(self, *args):
-        """Since no arrays are involved, there is no shape."""
-        return NOSHAPE
-
-    def provably_equivalent(self, other):
-        """This is always equal to itself."""
-        return type(self) == type(other)
-
-
 @shape_cloner.variant
 def _stag_shape(self, shp: Inferrer):
     return NOSHAPE
@@ -79,10 +63,7 @@ class ShapeTrack(Track):
     def from_value(self, v, context):
         """Infer the shape of a constant."""
         if isinstance(v, Primitive):
-            if v in self.constructors:
-                return self.constructors[v](self)
-            else:
-                return ScalarShapeInferrer(self)
+            return self.constructors[v](self)
         elif isinstance(v, Graph):
             return GraphInferrer(self, v, context)
         elif isinstance(v, MetaGraph):
@@ -126,6 +107,29 @@ shape_inferrer = partial(register_inferrer,
                          constructors=shape_inferrer_constructors)
 
 
+@shape_inferrer(P.scalar_add, P.scalar_sub, P.scalar_mul, P.scalar_div,
+                P.scalar_mod, P.scalar_pow, P.scalar_trunc, P.scalar_floor,
+                P.scalar_uadd, P.scalar_usub, P.scalar_exp, P.scalar_log,
+                P.scalar_sin, P.scalar_cos, P.scalar_tan,
+                P.scalar_eq, P.scalar_lt, P.scalar_gt, P.scalar_ne,
+                P.scalar_le, P.scalar_ge,
+                P.bool_not, P.bool_and, P.bool_or,
+                P.typeof, P.hastype,
+                P.tuple_len, P.list_len, P.array_len,
+                P.scalar_cast,
+                nargs=None)
+async def infer_shape_scalar(track, *args):
+    """Infer the shape of all scalar primitives."""
+    return NOSHAPE
+
+
+@shape_inferrer(P.shape, nargs=1)
+async def infer_shape_shape(track, ary):
+    """Infer the shape for shape."""
+    shp = await ary['shape']
+    return TupleShape((NOSHAPE,) * len(shp))
+
+
 @shape_inferrer(P.make_tuple, nargs=None)
 async def infer_shape_make_tuple(track, *args):
     """Infer the shape for make_tuple."""
@@ -145,6 +149,13 @@ async def infer_shape_tuple_getitem(track, seq, idx):
     seq_sh = await seq['shape']
     idx_v = await idx['value']
     return seq_sh.shape[idx_v]
+
+
+@shape_inferrer(P.list_getitem, nargs=2)
+async def infer_shape_list_getitem(track, seq, idx):
+    """Infer the shape of list_getitem."""
+    seq_sh = await seq['shape']
+    return seq_sh.shape
 
 
 @shape_inferrer(getelement, nargs=1)
@@ -230,6 +241,14 @@ async def infer_shape_array_map(track, fn, *arrays):
         else:
             raise MyiaShapeError("Expect same shapes for array_map")
     return tuple(rshape)
+
+
+@shape_inferrer(P.list_append, nargs=2)
+async def infer_shape_list_append(track, seq, value):
+    """Infer the shape for list_append."""
+    lshp = await seq['shape']
+    vshp = await value['shape']
+    return ListShape(find_matching_shape((lshp.shape, vshp)))
 
 
 @shape_inferrer(P.list_map, nargs=None)

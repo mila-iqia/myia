@@ -2,11 +2,12 @@
 
 
 from dataclasses import dataclass
+from functools import reduce
 
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType
 from .hypermap import HyperMap
-from .infer import Inferrer, GraphInferrer
+from .infer import Inferrer, GraphInferrer, MyiaTypeError
 from .info import About
 from .ir import Graph, MetaGraph, MultitypeGraph, Constant
 from .prim import ops as P
@@ -600,6 +601,85 @@ zeros_like = HyperMap(
 
 
 @core
+def list_reduce(fn, lst, dftl):
+    """Implementation of list_reduce."""
+    res = dftl
+    i = 0
+    while i < len(lst):
+        res = fn(res, lst[i])
+        i = i + 1
+    return res
+
+
+class ListMap(MetaGraph):
+    """Implementation of list_map."""
+
+    def specialize_from_types(self, types):
+        """Return a graph for the number of lists."""
+        if len(types) < 2:
+            raise MyiaTypeError('list_map takes at least two arguments')
+
+        g = Graph()
+        g.flags['core'] = True
+        g.flags['flatten_inference'] = True
+        g.debug.name = 'list_map'
+        fn = g.add_parameter()
+        lists = [g.add_parameter() for _ in types[1:]]
+        iters = [g.apply(list_iter, l) for l in lists]
+        nexts = [g.apply(next, it) for it in iters]
+        values = [g.apply(P.tuple_getitem, n, 0) for n in nexts]
+        iters = [g.apply(P.tuple_getitem, n, 1) for n in nexts]
+        resl = g.apply(P.make_list, g.apply(fn, *values))
+
+        gnext = Graph()
+        gnext.debug.name = 'body'
+        gcond = Graph()
+        gcond.debug.name = 'cond'
+
+        def make_cond(g):
+            fn = g.add_parameter()
+            resl = g.add_parameter()
+            iters = [g.add_parameter() for _ in lists]
+            hasnexts = [g.apply(hasnext, it) for it in iters]
+            cond = reduce(lambda a, b: g.apply(P.bool_and, a, b), hasnexts)
+            gtrue = Graph()
+            gtrue.debug.name = 'ftrue'
+            gtrue.flags['core'] = True
+            gtrue.flags['flatten_inference'] = True
+            gtrue.output = gtrue.apply(gnext, fn, resl, *iters)
+            gfalse = Graph()
+            gfalse.debug.name = 'ffalse'
+            gfalse.flags['core'] = True
+            gfalse.flags['flatten_inference'] = True
+            gfalse.output = resl
+            g.output = g.apply(g.apply(P.switch, cond, gtrue, gfalse))
+
+        def make_next(g):
+            fn = g.add_parameter()
+            resl = g.add_parameter()
+            iters = [g.add_parameter() for _ in lists]
+            nexts = [g.apply(next, it) for it in iters]
+            values = [g.apply(P.tuple_getitem, n, 0) for n in nexts]
+            iters = [g.apply(P.tuple_getitem, n, 1) for n in nexts]
+            resl = g.apply(P.list_append, resl, g.apply(fn, *values))
+            g.output = g.apply(gcond, fn, resl, *iters)
+
+        make_cond(gcond)
+        make_next(gnext)
+        g.output = g.apply(gcond, fn, resl, *iters)
+
+        return g
+
+    def __call__(self, fn, *lists):
+        """Python implementation of list_map."""
+        from .prim.py_implementations import list_map
+        return list_map(fn, *lists)
+
+
+list_map = ListMap('list_map')
+
+
+@core
 def _cast_helper(x, model):
     t = typeof(model)
     if hastype(model, Array):
@@ -617,11 +697,6 @@ class GradOperation(MetaGraph):
     TODO: This currently will not work on primitives, but it is an easy fix.
     We just need to know how many parameters f takes.
     """
-
-    def __init__(self, name):
-        """Initialize a GradOperation."""
-        super().__init__(name)
-        self.cache = {}
 
     def make_gf(self, jf, orig_params, dbg):
         """Make the graph for the grad."""
@@ -646,10 +721,6 @@ class GradOperation(MetaGraph):
 
     def specialize_from_types(self, types):
         """Generate the graph."""
-        types = tuple(types)
-        if types in self.cache:
-            return self.cache[types]
-
         ft, = types
         assert isinstance(ft, GraphInferrer)
         g = ft._graph
@@ -668,7 +739,6 @@ class GradOperation(MetaGraph):
 
         dfbuilder.output = Constant(df)
 
-        self.cache[types] = dfbuilder
         return dfbuilder
 
 

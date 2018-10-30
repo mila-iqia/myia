@@ -1,7 +1,7 @@
 """Generate mapping graphs over classes, tuples, arrays, etc."""
 
 
-from . import operations
+from . import operations, composite as C
 from .infer import InferenceError
 from .ir import MetaGraph, Graph
 from .dtype import Array, List, Tuple, Class, tag_to_dataclass, \
@@ -35,9 +35,10 @@ class HyperMap(MetaGraph):
                  nonleaf=(Array, List, Tuple, Class)):
         """Initialize a HyperMap."""
         if fn_leaf is None:
-            self.name = 'hyper_map'
+            name = 'hyper_map'
         else:
-            self.name = f'hyper_map[{fn_leaf}]'
+            name = f'hyper_map[{fn_leaf}]'
+        super().__init__(name)
         self.fn_leaf = fn_leaf
         self.fn_rec = fn_rec or self
         self.broadcast = broadcast
@@ -46,7 +47,6 @@ class HyperMap(MetaGraph):
         for t in (*nonleaf, object):
             self.make_map[t] = self._full_make.map[t]
         self.nonleaf = nonleaf
-        self.cache = {}
 
     _full_make = Overload()
 
@@ -57,7 +57,7 @@ class HyperMap(MetaGraph):
             fn_rec = self.fn_rec
         else:
             fn_rec = g.apply(P.partial, self.fn_rec, fnarg)
-        return g.apply(P.list_map, fn_rec, *args)
+        return g.apply(C.list_map, fn_rec, *args)
 
     @_full_make.register
     def _full_make(self, t: Array, g, fnarg, argmap):
@@ -146,9 +146,6 @@ class HyperMap(MetaGraph):
 
     def specialize_from_types(self, types):
         """Create a graph for mapping over the given types."""
-        types = tuple(types)
-        if types in self.cache:
-            return self.cache[types]
         g = Graph()
         g.debug.name = 'hyper_map'
         argmap = {}
@@ -162,5 +159,4 @@ class HyperMap(MetaGraph):
             argmap[g.add_parameter()] = t
         argmap = self._harmonize(g, argmap)
         g.output = self._make(g, fnarg, argmap)
-        self.cache[types] = g
         return g

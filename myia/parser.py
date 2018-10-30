@@ -65,6 +65,15 @@ class Location(NamedTuple):
     node: ast.AST
 
 
+class MyiaSyntaxError(Exception):
+    """Exception to indicate that the syntax is invalid for myia."""
+
+    def __init__(self, msg, loc):
+        """Initialize with a message and source location."""
+        super().__init__(msg)
+        self.loc = loc
+
+
 operations_ns = ModuleNamespace('myia.operations')
 builtins_ns = ModuleNamespace('builtins')
 
@@ -204,7 +213,7 @@ class Parser:
         tree = asttokens.ASTTokens(src, parse=True).tree
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
-        graph = self._process_function(None, function_def)[1].graph
+        graph = self._process_function(None, function_def).graph
         return graph
 
     def process_FunctionDef(self, block: 'Block',
@@ -217,7 +226,7 @@ class Parser:
             node: The function definition.
 
         """
-        _, function_block = self._process_function(block, node)
+        function_block = self._process_function(block, node)
         block.write(node.name, Constant(function_block.graph))
         return block
 
@@ -233,6 +242,10 @@ class Parser:
 
         function_block.mature()
         function_block.graph.debug.name = node.name
+        if node.args.kwarg is not None or node.args.kwonlyargs != []:
+            raise NotImplementedError("No support for keyword arguments")
+        if node.args.vararg:
+            raise NotImplementedError("No support for varargs")
         for arg in node.args.args:
             with DebugInherit(ast=arg, location=self.make_location(arg)):
                 anf_node = Parameter(function_block.graph)
@@ -240,8 +253,12 @@ class Parser:
             function_block.graph.parameters.append(anf_node)
             function_block.write(arg.arg, anf_node)
         function_block.write(node.name, Constant(function_block.graph))
-        final_block = self.process_statements(function_block, node.body)
-        return final_block, function_block
+        self.process_statements(function_block, node.body)
+        if function_block.graph.return_ is None:
+            raise MyiaSyntaxError("Function doesn't return a value",
+                                  self.make_location(node))
+        # TODO: check that if after_block returns?
+        return function_block
 
     @pyoverload
     def process_node(self, block: 'Block', node: ast.expr) -> ANFNode:

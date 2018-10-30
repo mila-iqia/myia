@@ -3,11 +3,12 @@ import numpy
 from pytest import mark
 
 from myia.api import scalar_debug_pipeline, standard_debug_pipeline
+from myia.composite import list_map
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
 from myia.infer import InferenceError
 from myia.prim.py_implementations import \
-    hastype, partial, list_map, scalar_add, scalar_sub, \
+    hastype, partial, scalar_add, scalar_sub, \
     scalar_usub, scalar_uadd, switch
 from myia.validate import ValidationError
 
