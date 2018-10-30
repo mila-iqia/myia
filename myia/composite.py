@@ -7,8 +7,8 @@ from functools import reduce
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType
 from .hypermap import HyperMap
-from .infer import Inferrer
-from .ir import MultitypeGraph, MetaGraph, Graph, clone
+from .infer import Inferrer, MyiaTypeError
+from .ir import MultitypeGraph, MetaGraph, Graph
 from .prim import ops as P
 from .prim.py_implementations import \
     array_map, bool_not, hastype, distribute, shape, broadcast_shape, \
@@ -615,18 +615,17 @@ class ListMap(MetaGraph):
 
     def specialize_from_types(self, types):
         """Return a graph for the number of lists."""
-        from .parser import parse
-        list_iter_g = clone(parse(list_iter))
-        next_g = clone(parse(next))
-        hasnext_g = clone(parse(hasnext))
+        if len(types) < 2:
+            raise MyiaTypeError('list_map takes at least two arguments')
+
         g = Graph()
         g.flags['core'] = True
         g.flags['flatten_inference'] = True
         g.debug.name = 'list_map'
         fn = g.add_parameter()
         lists = [g.add_parameter() for _ in types[1:]]
-        iters = [g.apply(list_iter_g, l) for l in lists]
-        nexts = [g.apply(next_g, it) for it in iters]
+        iters = [g.apply(list_iter, l) for l in lists]
+        nexts = [g.apply(next, it) for it in iters]
         values = [g.apply(P.tuple_getitem, n, 0) for n in nexts]
         iters = [g.apply(P.tuple_getitem, n, 1) for n in nexts]
         resl = g.apply(P.make_list, g.apply(fn, *values))
@@ -640,9 +639,8 @@ class ListMap(MetaGraph):
             fn = g.add_parameter()
             resl = g.add_parameter()
             iters = [g.add_parameter() for _ in lists]
-            hasnexts = [g.apply(hasnext_g, it) for it in iters]
-            cond = reduce(lambda a, b: g.apply(P.bool_and, a, b), hasnexts,
-                          g.constant(True))
+            hasnexts = [g.apply(hasnext, it) for it in iters]
+            cond = reduce(lambda a, b: g.apply(P.bool_and, a, b), hasnexts)
             gtrue = Graph()
             gtrue.debug.name = 'ftrue'
             gtrue.flags['core'] = True
@@ -659,7 +657,7 @@ class ListMap(MetaGraph):
             fn = g.add_parameter()
             resl = g.add_parameter()
             iters = [g.add_parameter() for _ in lists]
-            nexts = [g.apply(next_g, it) for it in iters]
+            nexts = [g.apply(next, it) for it in iters]
             values = [g.apply(P.tuple_getitem, n, 0) for n in nexts]
             iters = [g.apply(P.tuple_getitem, n, 1) for n in nexts]
             resl = g.apply(P.list_append, resl, g.apply(fn, *values))

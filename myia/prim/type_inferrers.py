@@ -335,6 +335,8 @@ async def infer_type_shape(track, ary):
 @type_inferrer(P.array_map, nargs=None)
 async def infer_type_array_map(track, fn, *arrays):
     """Infer the return type of array_map."""
+    if len(arrays) < 1:
+        raise MyiaTypeError('array_map requires at least one array')
     fn_t = await fn['type']
     await track.check(Array, *arrays)
     vrefs = [TransformedReference(track.engine, getelement, a)

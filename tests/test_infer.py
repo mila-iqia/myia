@@ -6,7 +6,7 @@ import numpy as np
 from types import SimpleNamespace
 
 from myia.api import scalar_pipeline, standard_pipeline
-from myia.composite import hyper_add, zeros_like
+from myia.composite import hyper_add, zeros_like, list_map
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
     Number, Class, Problem, EnvType as Env
@@ -18,8 +18,8 @@ from myia.pipeline import pipeline_function
 from myia.prim import Primitive, ops as P
 from myia.dshape import TupleShape, ListShape, ClassShape, NOSHAPE
 from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, scalar_lt, tail, list_map, hastype, \
-    typeof, scalar_usub, dot, distribute, shape, array_map, \
+    scalar_add, scalar_mul, scalar_lt, tail, list_map as list_map_prim, \
+    hastype, typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
@@ -969,12 +969,12 @@ def test_cover_limitedvalue_eq(x, y):
         (li64, f64, InferenceError),
     ]
 )
-def test_list_map(xs, ys):
+def test_list_map_prim(xs, ys):
 
     def square(x):
         return x * x
 
-    return list_map(square, xs), list_map(square, ys)
+    return list_map_prim(square, xs), list_map_prim(square, ys)
 
 
 @infer(
@@ -983,12 +983,12 @@ def test_list_map(xs, ys):
         (li64, lf64, InferenceError),
     ]
 )
-def test_list_map2(xs, ys):
+def test_list_map_prim2(xs, ys):
 
     def mulm(x, y):
         return x * -y
 
-    return list_map(mulm, xs, ys)
+    return list_map_prim(mulm, xs, ys)
 
 
 @infer(
@@ -1103,7 +1103,7 @@ def test_map_2(xs, z):
             return x + y
         return f
 
-    return list_map(adder(z), xs)
+    return list_map_prim(adder(z), xs)
 
 
 def _square(x):
@@ -1310,6 +1310,13 @@ def test_array_map2(ary1, ary2):
     def f(v1, v2):
         return v1 + v2
     return array_map(f, ary1, ary2)
+
+
+@infer(type=[(InferenceError,)])
+def test_array_map0():
+    def f():
+        return 1
+    return array_map(f)
 
 
 @infer(shape=[(af32_of(3, 4), af32_of(3, 4), af32_of(3, 4), (3, 4)),
@@ -1947,6 +1954,43 @@ def test_zeros_like_fn(x):
     def f(y):
         return x + y
     return zeros_like(f)
+
+
+@infer(
+    type=[
+        (li64, lf64, T[li64, lf64]),
+        (li64, f64, InferenceError),
+    ]
+)
+def test_list_map(xs, ys):
+
+    def square(x):
+        return x * x
+
+    return list_map(square, xs), list_map(square, ys)
+
+
+@infer(
+    type=[
+        (li64, li64, li64),
+        (li64, lf64, InferenceError),
+    ]
+)
+def test_list_map2(xs, ys):
+
+    def mulm(x, y):
+        return x * -y
+
+    return list_map(mulm, xs, ys)
+
+
+@infer(type=[(InferenceError,)])
+def test_list_map0():
+
+    def f():
+        return 1234
+
+    return list_map(f)
 
 
 @infer(

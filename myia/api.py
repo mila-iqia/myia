@@ -538,23 +538,19 @@ class Preparator(PipelineStep):
 
     def __init__(self,
                  pipeline_init,
-                 erase_classes=True,
-                 erase_tuples=True):
+                 flatten_data_structures=True):
         """Initialize a Preparator."""
         super().__init__(pipeline_init)
-        self.erase_classes = erase_classes
-        self.erase_tuples = erase_tuples
+        self.flatten_data_structures = flatten_data_structures
 
     def step(self, graph, argspec, outspec):
         """Prepare the graph."""
         orig_argspec = argspec
         orig_outspec = outspec
-        mng = self.resources.manager
-        if self.erase_classes:
+        if self.flatten_data_structures:
+            mng = self.resources.manager
             erase_class(graph, mng)
             argspec = tuple(dict(p.inferred) for p in graph.parameters)
-            outspec = dict(graph.output.inferred)
-        if self.erase_tuples:
             graph = self.resources.inferrer.renormalize(graph, argspec)
             erase_tuple(graph, mng)
             argspec = tuple(dict(p.inferred) for p in graph.parameters)
@@ -768,6 +764,11 @@ class OutputWrapper(PipelineStep):
              orig_argspec=None,
              orig_outspec=None):
         """Convert args to vm format, and output from vm format."""
+        prep_step = getattr(self.pipeline.steps, 'prepare', None)
+        if prep_step is None or not prep_step.flatten_data_structures:
+            raise AssertionError(
+                'OutputWrapper step requires prepare.flatten_data_structures'
+            )
         fn = output
         orig_arg_t = [arg['type'] for arg in orig_argspec or argspec]
         orig_out_t = (orig_outspec or outspec)['type']
@@ -800,8 +801,7 @@ step_specialize = Specializer.partial()
 
 
 step_prepare = Preparator.partial(
-    erase_classes=True,
-    erase_tuples=True
+    flatten_data_structures=True,
 )
 
 

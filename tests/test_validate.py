@@ -44,7 +44,7 @@ pip = scalar_pipeline \
 
 pip_ec = scalar_pipeline \
     .select('parse', 'infer', 'specialize', 'prepare', 'validate') \
-    .configure({'prepare.erase_classes': True,
+    .configure({'prepare.flatten_data_structures': True,
                 'validate.whitelist': test_whitelist})
 
 
