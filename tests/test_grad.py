@@ -76,7 +76,6 @@ grad_pipeline = PipelineDefinition(
         resolve=api.step_resolve,
         infer=api.step_infer,
         specialize=api.step_specialize,
-        prepare=api.step_prepare,
         opt=step_grad_opt,
         validate=step_grad_validate,
         export=api.step_debug_export,

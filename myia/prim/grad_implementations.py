@@ -208,17 +208,8 @@ def __fprop__switch(jcond, jtb, jfb):
 class MakeTupleGradient(MetaGraph):
     """Generate the gradient graph for make_tuple."""
 
-    def __init__(self, name):
-        """Initialize a MakeTupleGradient."""
-        super().__init__(name)
-        self.cache = {}
-
     def specialize_from_types(self, types):
         """Generate the gradient graph."""
-        types = tuple(types)
-        if types in self.cache:
-            return self.cache[types]
-
         g = Graph()
 
         params = [g.add_parameter() for t in types]
@@ -238,7 +229,6 @@ class MakeTupleGradient(MetaGraph):
         b.flags['flatten_inference'] = True
         g.flags['flatten_inference'] = True
 
-        self.cache[types] = g
         return g
 
 
