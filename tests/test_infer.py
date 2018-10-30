@@ -6,10 +6,10 @@ import numpy as np
 from types import SimpleNamespace
 
 from myia.api import scalar_pipeline, standard_pipeline
-from myia.composite import hyper_add, zeros_like, list_map
+from myia.composite import hyper_add, zeros_like, grad, list_map
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
-    Number, Class, Problem, EnvType as Env
+    Number, Class, Problem, EnvType as Env, JTagged as JT
 from myia.hypermap import HyperMap
 from myia.infer import ANYTHING, VOID, InferenceError, register_inferrer, \
     Contextless, CONTEXTLESS
@@ -23,7 +23,7 @@ from myia.prim.py_implementations import \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
-    env_getitem, env_setitem, embed
+    env_getitem, env_setitem, embed, J, Jinv, array_to_scalar
 from myia.utils import RestrictedVar, newenv
 
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
@@ -1536,6 +1536,15 @@ def test_scalar_to_array(x):
     return scalar_to_array(x)
 
 
+@infer(type=[(ai64_of(), i64),
+             (af64_of(), f64)],
+       shape=[(ai64_of(), NOSHAPE),
+              (ai64_of(3, 4), InferenceError),
+              (ai64_of(1, 1, 1), InferenceError)])
+def test_array_to_scalar(x):
+    return array_to_scalar(x)
+
+
 @infer(type=[
     (T[u64], T[u64], T[u64]),
     (T[u64, u64], T[u64], T[u64, u64]),
@@ -2004,3 +2013,78 @@ def test_env(x, y, z):
     e = newenv
     e = env_setitem(e, embed(x), y)
     return env_getitem(e, embed(x), z)
+
+
+@infer(
+    type=[
+        (i32, T[JT[i32], Env, i32]),
+        (f64, T[JT[f64], Env, f64]),
+    ]
+)
+def test_J(x):
+    def f(x):
+        return x * x
+
+    jf = J(f)
+    jx = J(x)
+    jy, bprop = jf(jx)
+    df, dx = bprop(1.0)
+    return jy, df, dx
+
+
+@infer(
+    type=[
+        (JT[i32], i32),
+        (JT[L[i32]], L[i32]),
+        (i32, InferenceError),
+    ]
+)
+def test_Jinv(x):
+    return Jinv(x)
+
+
+@infer_std(
+    type=[
+        (i32, i32),
+        (f64, f64),
+        (ai64_of(4, 5), ai64),
+    ],
+    shape=[
+        (ai64_of(4, 5), (4, 5))
+    ]
+)
+def test_Jinv2(x):
+    def f(x):
+        return x * x
+
+    ff = Jinv(J(f))
+    return ff(x)
+
+
+@infer_std(
+    type=[
+        (af32_of(5, 7), T[f32, T[Env, af32]]),
+    ],
+    shape=[
+        (af32_of(5, 7),
+         TupleShape((NOSHAPE, TupleShape((NOSHAPE, (5, 7))))))
+    ],
+)
+def test_J_array(xs):
+    def prod(xs):
+        p = array_reduce(lambda x, y: x * y, xs, ())
+        return array_to_scalar(p)
+    jy, bprop = J(prod)(J(xs))
+    return Jinv(jy), bprop(1.0)
+
+
+@infer_std(
+    type=[
+        (f32, f32, f32),
+        (i16, i16, i16),
+    ]
+)
+def test_grad(x, y):
+    def f(x, y):
+        return x * (y + x)
+    return grad(f)(x, y)

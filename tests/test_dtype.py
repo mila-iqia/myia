@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from myia.dtype import ismyiatype, Bool, Float, Function, Int, List, Number, \
     Tuple, UInt, SymbolicKeyType, np_dtype_to_type, type_to_np_dtype, Object, \
-    pytype_to_myiatype as ptm, Array, Class, External, get_generic, \
+    pytype_to_myiatype as ptm, Array, Class, External, JTagged, get_generic, \
     type_cloner, type_cloner_async
 from myia.utils import SymbolicKeyInstance
 
@@ -175,12 +175,12 @@ def test_pytype_to_myiatype():
 def test_type_cloner():
 
     t1 = Function[
-        [List[Int[64]], List[Float[32]]],
+        [List[JTagged[Int[64]]], List[Float[32]]],
         Tuple[Array[Int[32]], Class['C', {'x': Int[64]}, {}]]
     ]
 
     t2 = Function[
-        [List[Int[32]], List[Float[32]]],
+        [List[JTagged[Int[32]]], List[Float[32]]],
         Tuple[Array[Int[16]], Class['C', {'x': Int[32]}, {}]]
     ]
 

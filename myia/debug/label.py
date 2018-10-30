@@ -4,7 +4,7 @@
 from ..info import DebugInfo
 from ..ir.anf import ANFNode, Graph
 from ..prim import Primitive
-from ..utils import Named, Namespace
+from ..utils import Named, Namespace, EnvInstance, SymbolicKeyInstance
 
 
 short_relation_symbols = {
@@ -22,7 +22,13 @@ short_relation_symbols = {
     'for_header': '⤾',
     'for_body': '⥁',
     'for_after': '↓',
-    'specialized': '+'
+    'specialized': '+',
+    'equiv': '',
+    'grad_fprop_app': '',
+    'grad_bprop_app': '▼',
+    'grad_fprop': '▶',
+    'grad_bprop': '◀',
+    'grad_sens': '∇',
 }
 
 
@@ -105,6 +111,13 @@ class NodeLabeler:
                 return v.name
             elif isinstance(v, CosmeticPrimitive):
                 return v.label
+            elif isinstance(v, SymbolicKeyInstance):
+                return f'{self.name(v.node)}::Node'
+            elif isinstance(v, EnvInstance):
+                if len(v):
+                    return 'EnvType(...)'
+                else:
+                    return "∅"
             else:
                 class_name = v.__class__.__name__
                 s = str(v)

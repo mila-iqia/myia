@@ -243,6 +243,8 @@ standard_method_map = TypeMap({
         '__setitem__': P.array_setitem,
         '__myia_iter__': C.array_iter,
     },
+    dtype.JTagged: {
+    },
     dtype.SymbolicKeyType: {
     },
     dtype.EnvType: {

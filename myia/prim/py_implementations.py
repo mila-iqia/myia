@@ -535,6 +535,13 @@ def scalar_to_array(x):
     return np.array(x)
 
 
+@register(primops.array_to_scalar)
+def array_to_scalar(x):
+    """Implement `array_to_scalar`."""
+    assert isinstance(x, np.ndarray)
+    return x.item()
+
+
 @register(primops.broadcast_shape)
 def broadcast_shape(shpx, shpy):
     """Implement `broadcast_shape`."""
@@ -593,6 +600,18 @@ def _list_reduce_vm(vm, fn, lst, dflt):
     def fn_(a, b):
         return vm.call(fn, [a, b])
     return list_reduce(fn_, lst, dflt)
+
+
+@register(primops.J)
+def J(x):
+    """Implement `J`."""
+    raise NotImplementedError()
+
+
+@register(primops.Jinv)
+def Jinv(x):
+    """Implement `Jinv`."""
+    raise NotImplementedError()
 
 
 @register(primops.embed)

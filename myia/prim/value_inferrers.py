@@ -317,6 +317,24 @@ async def infer_value_tuple_len(track, xs):
     return limited(len(xs_t.elements), track.max_depth)
 
 
+@value_inferrer(P.J, nargs=1)
+async def infer_value_J(track, x):
+    """Infer the return value of J."""
+    # TODO: Wrap x['value']
+    t = await x['type']
+    if isinstance(t, Inferrer):
+        return ANYTHING
+    else:
+        return await x.get_raw('value')
+
+
+@value_inferrer(P.Jinv, nargs=1)
+async def infer_value_Jinv(track, x):
+    """Infer the return value of Jinv."""
+    # TODO: Unwrap x['value']
+    return await x.get_raw('value')
+
+
 @value_inferrer(P.embed, nargs=1)
 async def infer_value_embed(track, x):
     """Infer the return value of embed."""
