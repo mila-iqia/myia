@@ -601,7 +601,6 @@ zeros_like = HyperMap(
 
 
 @core
-<<<<<<< HEAD
 def list_reduce(fn, lst, dftl):
     """Implementation of list_reduce."""
     res = dftl
@@ -678,7 +677,9 @@ class ListMap(MetaGraph):
 
 
 list_map = ListMap('list_map')
-=======
+
+
+@core
 def _cast_helper(x, model):
     t = typeof(model)
     if hastype(model, Array):
@@ -696,11 +697,6 @@ class GradOperation(MetaGraph):
     TODO: This currently will not work on primitives, but it is an easy fix.
     We just need to know how many parameters f takes.
     """
-
-    def __init__(self, name):
-        """Initialize a GradOperation."""
-        super().__init__(name)
-        self.cache = {}
 
     def make_gf(self, jf, orig_params, dbg):
         """Make the graph for the grad."""
@@ -725,10 +721,6 @@ class GradOperation(MetaGraph):
 
     def specialize_from_types(self, types):
         """Generate the graph."""
-        types = tuple(types)
-        if types in self.cache:
-            return self.cache[types]
-
         ft, = types
         assert isinstance(ft, GraphInferrer)
         g = ft._graph
@@ -747,9 +739,7 @@ class GradOperation(MetaGraph):
 
         dfbuilder.output = Constant(df)
 
-        self.cache[types] = dfbuilder
         return dfbuilder
 
 
 grad = GradOperation('grad')
->>>>>>> master
