@@ -297,8 +297,6 @@ def test_if(a, b):
 
 @grad_test((4.0, 5.0), (6.4, -7.8))
 def test_if2(a, b):
-    # This is max, but what this is really testing is the most basic
-    # if statement, so I prefer to name the test 'test_if'
     if a > b:
         return a * a
     else:
