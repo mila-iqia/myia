@@ -1,6 +1,4 @@
 
-from pytest import mark
-
 from .test_opt import _check_opt
 from myia.opt import lib
 from myia.prim.py_implementations import \
@@ -445,7 +443,6 @@ def test_inline_trivial():
                lib.inline_trivial)
 
 
-@mark.xfail(reason="inline_trivial does not look into closures properly")
 def test_inline_nontrivial_through_fv():
 
     def nontrivial(x):

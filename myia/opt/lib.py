@@ -1,8 +1,6 @@
 """Library of optimizations."""
 
-from ..graph_utils import dfs
-from ..ir import succ_incoming, freevars_boundary, Graph, Constant, \
-    GraphCloner
+from ..ir import Graph, Constant, GraphCloner
 from ..prim import Primitive, ops as P
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
@@ -244,19 +242,10 @@ def is_trivial_graph(g, node, args):
     A trivial graph is a graph that contains at most one function
     application.
     """
-    nodes = [node
-             for node in dfs(g.output,
-                             succ_incoming,
-                             freevars_boundary(g, False))
-             if node.is_apply()]
-
-    if len(nodes) == 0:
-        return True
-    elif len(nodes) == 1:
-        app, = nodes
-        return all(not inp.is_constant_graph() for inp in app.inputs[1:])
-    else:
-        return False
+    nodes = [node for node in g.nodes if node.is_apply()]
+    # One node will be the return node, so len(nodes) == 1 if the node
+    # returns a constant or a free variable.
+    return len(nodes) <= 2
 
 
 def is_unique_use(g, node, args):
