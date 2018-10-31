@@ -85,6 +85,7 @@ class PatternSubstitutionOptimization:
                  pattern,
                  replacement,
                  *,
+                 condition=None,
                  name=None,
                  multigraph=True):
         """Initialize va PatternSubstitutionOptimization."""
@@ -95,6 +96,7 @@ class PatternSubstitutionOptimization:
         else:
             self.replacement = sexp_to_node(replacement, g)
         self.unif = Unification()
+        self.condition = condition
         self.name = name
 
     def __call__(self, optimizer, node):
@@ -114,7 +116,7 @@ class PatternSubstitutionOptimization:
         if equiv is not None:
             if callable(self.replacement):
                 return self.replacement(optimizer, node, equiv)
-            else:
+            elif self.condition is None or self.condition(equiv):
                 return self.unif.reify(self.replacement, equiv)
         else:
             return None
