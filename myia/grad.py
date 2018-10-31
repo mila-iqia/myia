@@ -504,7 +504,7 @@ class SensRemapper(GraphRemapper):
                     sexp = (primops.tuple_getitem, src, key)
                     contribs.append(sexp)
 
-        # This is equivalent to the original node.Note that we aren't really
+        # This is equivalent to the original node. Note that we aren't really
         # interested in the node's value: jinv is used along with embed and
         # zeros_like, which only care about the original node's inferred type
         # and shape.
