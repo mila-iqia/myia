@@ -101,11 +101,16 @@ class Track(Partializable):
         """Default value for this track, if nothing is known."""
         raise NotImplementedError()  # pragma: no cover
 
+    def as_future(self, thing, method='__getitem__'):
+        """Return a future from the given ref or value."""
+        if isinstance(thing, AbstractReference):
+            return getattr(thing, method)(self.name)
+        else:
+            return self.engine.loop.as_future(thing)
+
     def assert_same(self, *vals, refs=[]):
         """Assert that all vals are the same on this track."""
-        futs = [ref.get_raw(self.name)
-                if isinstance(ref, AbstractReference) else ref
-                for ref in vals]
+        futs = [self.as_future(val, 'get_raw') for val in vals]
         return self.engine.equiv.assert_same(*futs, refs=refs)
 
     def apply_predicate(self, predicate, res):
@@ -172,7 +177,7 @@ class Track(Partializable):
             refs: The references to compare.
             return_tuple: Whether to always return a tuple or not.
         """
-        coros = [ref.get_shallow(self.name) for ref in refs]
+        coros = [self.as_future(ref, 'get_shallow') for ref in refs]
         results = await asyncio.gather(*coros, loop=self.engine.loop)
 
         for ref, res in zip(refs, results):
@@ -196,7 +201,7 @@ class Track(Partializable):
         the same thing as all the other refs.
         """
         async def chk(ref):
-            res = await ref[self.name]
+            res = await self.as_future(ref)
             if not self.apply_predicate(predicate, res):
                 raise self.predicate_error(
                     predicate,

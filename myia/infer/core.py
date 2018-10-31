@@ -135,6 +135,15 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         """Create a Future using this loop."""
         return asyncio.Future(loop=self)
 
+    def as_future(self, value):
+        """Create a future that resolves to the given value."""
+        if hasattr(value, '__await__'):
+            return value
+        else:
+            fut = self.create_future()
+            fut.set_result(value)
+            return fut
+
     def create_var(self, var, default, priority=0):
         """Create an InferenceVar running on this loop."""
         v = InferenceVar(var, default, priority, loop=self)
@@ -239,9 +248,9 @@ class EquivalenceChecker:
         if error_callback is None:
             error_callback = self.error_callback
 
-        if hasattr(x, '__await__'):
+        if hasattr(x, '__await__') and not isinstance(x, InferenceVar):
             x = await x
-        if hasattr(y, '__await__'):
+        if hasattr(y, '__await__') and not isinstance(y, InferenceVar):
             y = await y
 
         if not self.merge(x, y, refs):
@@ -266,14 +275,7 @@ class EquivalenceChecker:
 
     async def assert_same(self, *things, refs=[]):
         """Assert that all futures/values have the same value."""
-        futs = []
-        for x in things:
-            if hasattr(x, '__await__'):
-                futs.append(x)
-            else:
-                f = self.loop.create_future()
-                f.set_result(x)
-                futs.append(f)
+        futs = [self.loop.as_future(x) for x in things]
 
         # We wait only for the first future to complete
         done, pending = await asyncio.wait(
