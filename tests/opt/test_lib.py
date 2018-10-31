@@ -1,8 +1,10 @@
 
 from .test_opt import _check_opt
+from myia import dtype
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch
+    scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch, \
+    distribute, array_reduce
 
 
 #######################
@@ -183,6 +185,49 @@ def test_elim_identity():
         return x + y
 
     _check_opt(before, after, lib.elim_identity)
+
+
+#######################
+# Array optimizations #
+#######################
+
+
+def test_elim_distribute():
+
+    def before(x):
+        return distribute(x, (3, 5))
+
+    def after(x):
+        return x
+
+    _check_opt(before, after,
+               lib.elim_distribute,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 5)}])
+
+    _check_opt(before, before,
+               lib.elim_distribute,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 1)}])
+
+
+def test_elim_array_reduce():
+
+    def before(x):
+        return array_reduce(scalar_add, x, (3, 1))
+
+    def after(x):
+        return x
+
+    _check_opt(before, after,
+               lib.elim_array_reduce,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 1)}])
+
+    _check_opt(before, before,
+               lib.elim_array_reduce,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 5)}])
 
 
 ######################

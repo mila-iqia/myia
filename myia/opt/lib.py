@@ -158,6 +158,29 @@ elim_identity = psub(
 )
 
 
+#########################
+# Array simplifications #
+#########################
+
+
+# distribute(x, shp) => x when x.shape == shp
+elim_distribute = psub(
+    pattern=(P.distribute, X, C),
+    replacement=X,
+    condition=lambda equiv: equiv[X].shape == equiv[C].value,
+    name='elim_distribute'
+)
+
+
+# array_reduce(f, x, shp) => x when x.shape == shp
+elim_array_reduce = psub(
+    pattern=(P.array_reduce, Y, X, C),
+    replacement=X,
+    condition=lambda equiv: equiv[X].shape == equiv[C].value,
+    name='elim_array_reduce'
+)
+
+
 ######################
 # Branch elimination #
 ######################
