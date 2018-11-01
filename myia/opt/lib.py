@@ -181,6 +181,37 @@ elim_array_reduce = psub(
 )
 
 
+#############################
+# Env-related optimizations #
+#############################
+
+
+@pattern_replacer(P.env_getitem, (P.env_setitem, X, C1, Y), C2, Z)
+def cancel_env_set_get(optimizer, node, equiv):
+    """Simplify combinations of env_get/setitem.
+
+    * get(set(env, k1, v), k2, dflt) =>
+        * v                  when k1 == k2
+        * get(env, k2, dflt) when k1 != k2
+    """
+    key1 = equiv[C1]
+    key2 = equiv[C2]
+    if key1.value == key2.value:
+        return equiv[Y]
+    else:
+        sexp = (P.env_getitem, equiv[X], key2, equiv[Z])
+        return sexp_to_node(sexp, node.graph)
+
+
+# getitem(newenv, key, default) => default
+getitem_newenv = psub(
+    pattern=(P.env_getitem, C1, C2, Y),
+    replacement=Y,
+    condition=lambda equiv: len(equiv[C1].value) == 0,
+    name='getitem_newenv'
+)
+
+
 ######################
 # Branch elimination #
 ######################

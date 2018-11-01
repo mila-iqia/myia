@@ -4,7 +4,8 @@ from myia import dtype
 from myia.opt import lib
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch, \
-    distribute, array_reduce
+    distribute, array_reduce, env_getitem, env_setitem, embed
+from myia.utils import newenv
 
 
 #######################
@@ -109,6 +110,41 @@ def test_op_tuple_binary():
 
     _check_opt(before, after,
                lib.bubble_op_tuple_binary)
+
+
+#######################
+# Env simplifications #
+#######################
+
+
+def test_getitem_newenv():
+
+    def before(x):
+        return env_getitem(newenv, embed(x), 1234)
+
+    def after(x):
+        return 1234
+
+    _check_opt(before, after,
+               lib.getitem_newenv,
+               argspec=[{'type': dtype.Float[64]}])
+
+
+def test_env_get_set():
+
+    def before(x, y):
+        a = 5678
+        e = env_setitem(newenv, embed(x), y)
+        e = env_setitem(e, embed(a), a)
+        return env_getitem(e, embed(x), 1234)
+
+    def after(x, y):
+        return y
+
+    _check_opt(before, after,
+               lib.cancel_env_set_get,
+               argspec=[{'type': dtype.Float[64]},
+                        {'type': dtype.Float[64]}])
 
 
 ##############################
