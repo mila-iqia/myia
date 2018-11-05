@@ -1,8 +1,6 @@
 Myia
 ====
 
-[NOTE: PR #135 currently contains the code for gradient generation. It should be merged shortly.]
-
 Myia is a new differentiable programming language. It aims to support large scale high performance computations (e.g. linear algebra) and their gradients. The main application Myia aims to support is research in artificial intelligence, in particular deep learning algorithms.
 
 * Define a model using a subset of Python, which is compiled to Myia (interfaces in other languages than Python may follow). This subset is general purpose and includes looping constructs and recursion. It excludes side effects and inplace operations.
@@ -15,7 +13,7 @@ Myia is a new differentiable programming language. It aims to support large scal
 Status
 ------
 
-Myia is currently under development and is not yet ready for use. As of 2018/10/26 we anticipate we may be able to offer a beta for 2018/12/01. We will update that estimate regularly.
+Myia is currently under development and is not yet ready for use. As of 2018/11/05 we anticipate we may be able to offer a beta for 2018/12/01. We will update that estimate regularly.
 
 See `Roadmap`_.
 
@@ -49,7 +47,7 @@ Current
 * **Primitives**: Scalar primitives work, as well as map, reduce and broadcasting.
 * **Type system**: Types are inferred without the need for annotations. Shapes can also be inferred.
 * **Optimization**: Pattern-based optimizations, inlining, constant propagation, common subexpression elimination, closure conversion.
-* **Automatic differentiation**: Support is in #135, which should be merged shortly.
+* **Automatic differentiation**: Supported for scalar optimizations. Second order differentiation is not yet in working order.
 
 In development
 ~~~~~~~~~~~~~~
