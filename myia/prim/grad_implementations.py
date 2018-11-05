@@ -22,12 +22,17 @@ parse = standard_pipeline \
     .make_transformer('input', 'graph')
 
 
+_flags = {
+    'flatten_inference': True,
+}
+
+
 def bprop_to_augm(prim, fn):
     """Given a function for the bprop, make the augmented function."""
     info = NamedDebugInfo(prim=prim, name=prim.name)
 
     bprop = clone(parse(fn))
-    bprop.flags['flatten_inference'] = True
+    bprop.flags.update(_flags)
     bprop.debug.name = None
     bprop.debug.about = About(info, 'grad_bprop')  # type: ignore
     bprop.output = bprop.apply(
@@ -40,7 +45,7 @@ def bprop_to_augm(prim, fn):
 
     with About(info, 'grad_fprop'):
         outer = Graph()
-        outer.flags['flatten_inference'] = True
+        outer.flags.update(_flags)
         outer.transforms['primal'] = prim
         outer.output = Constant(None)
 
@@ -226,8 +231,8 @@ class MakeTupleGradient(MetaGraph):
         g.output = g.apply(primops.make_tuple, out, b)
         g.transforms['primal'] = primops.make_tuple
 
-        b.flags['flatten_inference'] = True
-        g.flags['flatten_inference'] = True
+        b.flags.update(_flags)
+        g.flags.update(_flags)
 
         return g
 
