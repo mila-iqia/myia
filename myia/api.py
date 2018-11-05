@@ -24,7 +24,8 @@ from .specialize import TypeSpecializer
 from .utils import TypeMap, as_frozen, overload, flatten, UNKNOWN
 from .vm import VM
 from .compile import step_wrap_primitives, step_compile, step_link, step_export
-from .validate import validate, whitelist as default_whitelist
+from .validate import validate, whitelist as default_whitelist, \
+    validate_type as default_validate_type
 
 
 scalar_object_map = {
@@ -575,17 +576,23 @@ class Validator(PipelineStep):
         None.
     """
 
-    def __init__(self, pipeline_init, whitelist=default_whitelist):
+    def __init__(self,
+                 pipeline_init,
+                 whitelist=default_whitelist,
+                 validate_type=default_validate_type):
         """Initialize a Validator."""
         super().__init__(pipeline_init)
         self.whitelist = whitelist
+        self.validate_type = validate_type
 
     def step(self, graph, argspec=None, outspec=None):
         """Validate the graph."""
         graph = self.resources.inferrer.renormalize(
             graph, argspec, outspec
         )
-        validate(graph, whitelist=self.whitelist)
+        validate(graph,
+                 whitelist=self.whitelist,
+                 validate_type=self.validate_type)
         return {'graph': graph}
 
 
@@ -817,6 +824,13 @@ step_opt = Optimizer.partial(
             optlib.simplify_partial,
             optlib.replace_applicator,
             optlib.elim_identity,
+            optlib.elim_j_jinv,
+            optlib.elim_jinv_j,
+            optlib.getitem_tuple,
+            optlib.multiply_by_one_l,
+            optlib.multiply_by_one_r,
+            optlib.multiply_by_zero_l,
+            optlib.multiply_by_zero_r,
         ],
         cse=CSE.partial(report_changes=False),
         renormalize='renormalize'
@@ -838,33 +852,36 @@ step_debug_export = DebugVMExporter.partial(
 step_wrap = OutputWrapper.partial()
 
 
-_standard_pipeline = PipelineDefinition(
-    resources=dict(
-        manager=GraphManager.partial(),
-        py_implementations=py_implementations,
-        method_map=standard_method_map,
-        convert=Converter.partial(
-            object_map=standard_object_map,
-            converter=default_convert
-        ),
-        inferrer=InferenceResource.partial(
-            tracks=dict(
-                value=ValueTrack.partial(
-                    constructors=value_inferrer_constructors,
-                    max_depth=1
-                ),
-                type=TypeTrack.partial(
-                    constructors=type_inferrer_constructors
-                ),
-                shape=ShapeTrack.partial(
-                    constructors=shape_inferrer_constructors
-                )
-            ),
-            required_tracks=['type'],
-            tied_tracks={},
-            context_class=Context,
-        )
+standard_resources = dict(
+    manager=GraphManager.partial(),
+    py_implementations=py_implementations,
+    method_map=standard_method_map,
+    convert=Converter.partial(
+        object_map=standard_object_map,
+        converter=default_convert
     ),
+    inferrer=InferenceResource.partial(
+        tracks=dict(
+            value=ValueTrack.partial(
+                constructors=value_inferrer_constructors,
+                max_depth=1
+            ),
+            type=TypeTrack.partial(
+                constructors=type_inferrer_constructors
+            ),
+            shape=ShapeTrack.partial(
+                constructors=shape_inferrer_constructors
+            )
+        ),
+        required_tracks=['type'],
+        tied_tracks={},
+        context_class=Context,
+    )
+)
+
+
+_standard_pipeline = PipelineDefinition(
+    resources=standard_resources,
     steps=dict(
         parse=step_parse,
         resolve=step_resolve,

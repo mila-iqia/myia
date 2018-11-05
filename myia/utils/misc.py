@@ -631,5 +631,8 @@ class EnvInstance:
                 rval._contents[k] = v
         return rval
 
+    def __len__(self):
+        return len(self._contents)
+
 
 newenv = EnvInstance()

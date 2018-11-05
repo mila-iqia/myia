@@ -11,7 +11,8 @@ from ..dtype import Array, Tuple, List, Class, TypeType, ismyiatype, \
     pytype_to_myiatype
 from ..infer import ANYTHING, GraphInferrer, register_inferrer, \
     PartialInferrer, Track, MyiaShapeError, Inferrer,  MetaGraphInferrer, \
-    InferenceError, MyiaTypeError, TransformedReference, MultiInferrer
+    InferenceError, MyiaTypeError, TransformedReference, MultiInferrer, \
+    DummyInferrer, Context
 from ..infer.jinf import JInferrer
 from ..ir import Graph, MetaGraph
 
@@ -149,6 +150,17 @@ async def infer_shape_tuple_getitem(track, seq, idx):
     seq_sh = await seq['shape']
     idx_v = await idx['value']
     return seq_sh.shape[idx_v]
+
+
+@shape_inferrer(P.tuple_setitem, nargs=3)
+async def infer_shape_tuple_setitem(track, seq, idx, value):
+    """Infer the shape of tuple_setitem."""
+    seq_sh = await seq['shape']
+    idx_v = await idx['value']
+    value_sh = await value['shape']
+    new_sh = list(seq_sh.shape)
+    new_sh[idx_v] = value_sh
+    return TupleShape(new_sh)
 
 
 @shape_inferrer(P.list_getitem, nargs=2)
@@ -430,6 +442,18 @@ async def infer_shape_Jinv(track, x):
     shp = await x.get_shallow('shape')
     if isinstance(shp, JInferrer):
         return shp.fn
+    elif isinstance(shp, GraphInferrer):
+        g = shp._graph
+        primal = g and g.transforms.get('primal', None)
+        if primal:
+            primal = track.engine.pipeline.resources.convert(primal)
+            if isinstance(primal, Graph) and primal.parent:
+                return DummyInferrer(track)
+            else:
+                return track.from_value(primal, Context.empty())
+        else:  # pragma: no cover
+            # This error is also caught by the type inferrer
+            raise MyiaTypeError('Bad input type for Jinv', refs=[x])
     else:
         return shp
 
@@ -451,7 +475,8 @@ async def infer_shape_env_getitem(track, env, key, default):
     """Infer the return shape of env_getitem."""
     key_v = await key['value']
     assert key_v is not ANYTHING
-    return await track.assert_same(key_v.inferred['shape'], default)
+    shp = track.stag(key_v.inferred['shape'])
+    return await track.assert_same(shp, default)
 
 
 @shape_inferrer(P.env_add, nargs=2)

@@ -1,7 +1,8 @@
 """Library of optimizations."""
 
 from ..graph_utils import dfs
-from ..ir import succ_incoming, freevars_boundary, Constant, GraphCloner, Graph
+from ..ir import succ_incoming, freevars_boundary, Graph, Constant, \
+    GraphCloner
 from ..prim import Primitive, ops as P
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
@@ -99,7 +100,10 @@ _BubbleBinary = primset_var(P.scalar_add)
 
 @pattern_replacer(_BubbleBinary, (P.make_tuple, Xs), (P.make_tuple, Ys))
 def bubble_op_tuple_binary(optimizer, node, equiv):
-    """Replace (x, y, ...) + (a, b, ...) => (x + a, y + b, ...)."""
+    """Replace F((x, y, ...), (a, b, ...)) => (F(x, a), F(y, b), ...).
+
+    Only works for a specific list of Fs.
+    """
     xs = equiv[Xs]
     ys = equiv[Ys]
     op = equiv[_BubbleBinary]
@@ -345,3 +349,39 @@ def drop_into_if(optimizer, node, equiv):
 
     new = ((P.switch, equiv[X], y2, z2),)
     return sexp_to_node(new, node.graph)
+
+
+#################
+# Gradient opts #
+#################
+
+
+# J(Jinv(x)) ==> x
+elim_j_jinv = psub(
+    pattern=(P.J, (P.Jinv, X)),
+    replacement=X,
+    name='elim_j_jinv'
+)
+
+
+# Jinv(J(x)) ==> x
+elim_jinv_j = psub(
+    pattern=(P.Jinv, (P.J, X)),
+    replacement=X,
+    name='elim_jinv_j'
+)
+
+
+@pattern_replacer(P.J, C)
+def expand_J(optimizer, node, equiv):
+    """Replaces a call to J(f) by the graph for J(f).
+
+    This will not replace J(x) when x is not a constant graph.
+    """
+    from ..grad import J as Jimpl
+    arg = equiv[C].value
+    try:
+        newg = Jimpl(arg, optimizer.resources.manager)
+    except NotImplementedError:
+        return None
+    return Constant(newg)

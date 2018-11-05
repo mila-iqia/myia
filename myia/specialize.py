@@ -6,7 +6,7 @@ from collections import Counter
 from .dtype import Type, Function, Number, Bool, TypeType, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
     GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer, \
-    Unspecializable, INACCESSIBLE
+    Unspecializable, DEAD, INACCESSIBLE
 from .ir import GraphCloner, Constant
 from .prim import ops as P, Primitive
 from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
@@ -179,8 +179,10 @@ class _GraphSpecializer:
     @_build.register  # noqa: F811
     async def _build(self, ref, argrefs, inf: Inferrer):
         v = inf.identifier
-        assert isinstance(v, Primitive)
-        return _const(v, await inf.as_function_type(argrefs))
+        if isinstance(v, Primitive):
+            return _const(v, await inf.as_function_type(argrefs))
+        else:
+            raise Unspecializable(DEAD)
 
     @_build.register  # noqa: F811
     async def _build(self, ref, argrefs,

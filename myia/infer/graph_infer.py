@@ -291,6 +291,18 @@ class Inferrer(DynamicMap):
                         await concretize_type(cached)]
 
 
+class DummyInferrer(Inferrer):
+    """Has the Inferrer class but cannot be called."""
+
+    def __init__(self, track):
+        """Initialize the DummyInferrer."""
+        super().__init__(track, 'dummy')
+
+    async def infer(self, *args):
+        """Nada."""
+        raise AssertionError('Cannot call DummyInferrer.')
+
+
 class MultiInferrer(Inferrer):
     """Inferrer to use when the result is multiple possible callables.
 
@@ -356,6 +368,7 @@ class GraphInferrer(Inferrer):
             self.context = self.engine.context_class.empty()
         else:
             self.context = context.filter(graph)
+        assert self.context is not None
 
     async def make_graph(self, args):
         """Return the graph to use for the given args."""
@@ -504,6 +517,10 @@ class ExplicitInferrer(Inferrer):
                 refs=[aref]
             )
         return self.retval
+
+    async def as_function_type(self, argrefs=None):
+        """Return a Function type corresponding to this Inferrer."""
+        return Function[self.argvals, self.retval]
 
 
 def register_inferrer(*prims, nargs, constructors):
