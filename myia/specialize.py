@@ -1,7 +1,6 @@
 """Specialize graphs according to the types of their arguments."""
 
 import numpy
-from collections import Counter
 
 from .dtype import Type, Function, Number, Bool, TypeType, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
@@ -11,6 +10,9 @@ from .ir import GraphCloner, Constant
 from .prim import ops as P, Primitive
 from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
     EnvInstance
+
+
+_count = 0
 
 
 def _const(v, t):
@@ -29,7 +31,6 @@ class TypeSpecializer:
         self.node_map = self.mng.nodes
         self.originals = {}
         self.specializations = {}
-        self.counts = Counter()
 
     def run(self, graph, context):
         """Run the specializer on the given graph in the given context."""
@@ -52,7 +53,6 @@ class TypeSpecializer:
         if ctxkey in self.specializations:
             return self.specializations[ctxkey]
 
-        self.counts[g] += 1
         gspec = _GraphSpecializer(parent, self, g, ctx)
         g2 = gspec.new_graph
         self.originals[g2] = g
@@ -108,7 +108,9 @@ class _GraphSpecializer:
         self.context = context
         self.nodes = specializer.node_map[self.graph]
 
-        rel = f'{self.specializer.counts[self.graph]}'
+        global _count
+        _count += 1
+        rel = _count
         g = self.graph
         if self.parent:
             g = self.parent.get(g)
