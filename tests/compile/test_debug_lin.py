@@ -30,3 +30,8 @@ def parse_compare(*tests):
 @parse_compare((1,))
 def test_debug_add(a):
     return a + 2
+
+
+@parse_compare((2, 3))
+def test_debug_floordiv(x, y):
+    return x // y
