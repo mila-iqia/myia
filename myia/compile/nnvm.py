@@ -29,7 +29,7 @@ SIMPLE_MAP = {
     P.scalar_exp: sym.exp,
     P.scalar_log: sym.log,
     # This is not right tangent vs hyperbolic tangent
-    #P.scalar_tan: sym.tanh,
+    # P.scalar_tan: sym.tanh,
 
     P.scalar_eq: sym.broadcast_equal,
     P.scalar_lt: sym.broadcast_less,
@@ -45,11 +45,13 @@ SIMPLE_MAP = {
 
 
 def nnvm_bool_not(c, arg):
+    """Implementation of boolean not."""
     zero = c.make_constant(0, nnvm_type=nnvm_type_map(arg.type))
     return sym.broadcast_equal(zero, c.ref(arg))
 
 
 def nnvm_distribute(c, v, shp):
+    """Implementation of distribute."""
     nv = c.ref(v)
     assert shp.is_constant()
     shp = shp.value
@@ -64,12 +66,14 @@ def nnvm_distribute(c, v, shp):
 
 
 def nnvm_dot(c, a, b):
+    """Implemetation of dot."""
     na = c.ref(a)
     nb = c.ref(b)
     return sym.dense(na, sym.transpose(nb), units=b.shape[1], use_bias=False)
 
 
 def nnvm_array_map(c, fn, *array):
+    """Implementation of array_map."""
     assert fn.is_constant()
     fn = fn.value
     if fn in SIMPLE_MAP:
@@ -98,6 +102,7 @@ COMPLEX_MAP = {
 
 
 def nnvm_type_map(type):
+    """Map a numpy type to an NNVM type."""
     dt = type_to_np_dtype(type)
     if dt == 'bool':
         dt = 'uint8'
@@ -149,6 +154,8 @@ class NNVMRunner:
 
 
 class NNVMConverter:
+    """Convert a linear portion of the graph to an NNVM function."""
+
     def __init__(self, simple_map=None, complex_map=None):
         """Create a converter."""
         self.mapping = {}
@@ -186,9 +193,8 @@ class NNVMConverter:
 
     def ref(self, n):
         """Resolve a reference to a node."""
-
         def setn(name, n):
-            """Associate name with n"""
+            """Associate name with n."""
             self.eqv[n] = sym.Variable(name)
             if ismyiatype(n.type, Array):
                 self.types[name] = nnvm_type_map(n.type.elements)
@@ -231,7 +237,6 @@ class NNVMConverter:
             This implementation converts the nodes to NNVM and compiles it.
 
         """
-
         self.c = counter()
         self.eqv = {}
         self.inputs = []
