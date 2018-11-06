@@ -3,7 +3,7 @@ import pytest
 import math
 import numpy as np
 
-from myia.prim.py_implementations import distribute, scalar_to_array
+from myia.prim.py_implementations import distribute, scalar_to_array, dot
 
 from ..test_compile import parse_compare
 
@@ -134,3 +134,9 @@ def test_distribute3(x):
                array=True)
 def test_array_map(x, y):
     return x + y
+
+
+@parse_compare((np.ones((2, 3)), np.ones((3, 4))),
+               array=True)
+def test_dot(x, y):
+    return dot(x, y)
