@@ -98,7 +98,7 @@ class SplitGraph(PipelineStep):
             fn = node.inputs[0]
             if not fn.is_constant(Primitive):
                 return True
-            elif fn.value in (return_, partial):
+            elif fn.value in (return_, partial, switch):
                 return True
         return False
 
