@@ -146,7 +146,7 @@ class NNVMRunner:
         assert len(args) == len(self.input_names)
         nnvm_args = dict()
         for n, tp, v in zip(self.input_names, self.input_types, args):
-            nnvm_args[n] = np.asarray(v, dtype=tp)
+            nnvm_args[n] = np.array(v, dtype=tp, copy=False, ndmin=1)
         self.mod.set_input(**nnvm_args)
         self.mod.run()
         for i, out in enumerate(self._outs):
@@ -186,7 +186,8 @@ class NNVMConverter:
         key = (val, type)
         if key not in self.constant_vars:
             name = f"_cst{val}{type}"
-            self.constants[name] = np.asarray([val], dtype=nnvm_type)
+            self.constants[name] = np.array([val], dtype=nnvm_type,
+                                            copy=False, ndmin=1)
             self.constant_vars[key] = sym.Variable(name)
             self.types[name] = nnvm_type
             self.shapes[name] = (1,)
@@ -210,8 +211,9 @@ class NNVMConverter:
 
         if n.is_constant() and not n.is_constant_graph():
             name = f"cst{self.c()}"
-            self.constants[name] = np.asarray([n.value],
-                                              dtype=type_to_np_dtype(n.type))
+            self.constants[name] = np.array([n.value],
+                                            dtype=type_to_np_dtype(n.type),
+                                            copy=False, ndmin=1)
             setn(name, n)
         elif n not in self.eqv:
             name = f"i{self.c()}"
