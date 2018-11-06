@@ -5,10 +5,12 @@ from ..pipeline import PipelineDefinition, PipelineStep
 from ..prim import Primitive
 from ..prim.ops import partial, return_, switch
 from .debug_lin import debug_convert
+from .nnvm import nnvm_convert
 from .vm import FinalVM
 
 LIN_IMPLS = dict(
     debug=debug_convert,
+    nnvm=nnvm_convert,
 )
 
 
@@ -267,7 +269,7 @@ class OptimizeInstrs(PipelineStep):
 
 graph_transform = PipelineDefinition(
     resources=dict(
-        lin_convert=debug_convert,
+        lin_convert=nnvm_convert,
     ),
     steps=dict(
         split=SplitGraph.partial(),
@@ -364,6 +366,6 @@ class VMExporter(PipelineStep):
 
 
 step_wrap_primitives = WrapPrimitives.partial()
-step_compile = CompileGraphs.partial(linear_impl='debug')
+step_compile = CompileGraphs.partial(linear_impl='nnvm')
 step_link = LinkInstrs.partial()
 step_export = VMExporter.partial()
