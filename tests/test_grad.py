@@ -15,11 +15,11 @@ from myia.pipeline import pipeline_function, PipelineDefinition
 from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import J, scalar_add, scalar_mul, typeof, \
     array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
-    distribute, dot, reshape
+    distribute, dot, reshape, transpose, scalar_cast
 from myia.prim.py_implementations import py_implementations as pyi
 from myia.validate import whitelist, validate_type
 
-from .common import f64
+from .common import f64, u64
 
 
 A = np.array([[1.7, -6.3,  8.1],
@@ -429,6 +429,27 @@ def test_array_operations_std(xs, ys):
 @grad_test((A, C),)
 def test_dot(x, y):
     d = dot(x, y)
+    sm = array_reduce(scalar_add, d, ())
+    return array_to_scalar(sm)
+
+
+@grad_test((C, A),)
+def test_transpose(x, y):
+    xt = transpose(x, (1, 0))
+    yt = transpose(y, (1, 0))
+    d = dot(xt, yt)
+    sm = array_reduce(scalar_add, d, ())
+    return array_to_scalar(sm)
+
+
+@pytest.mark.xfail(reason="Permutation must be known statically.")
+@grad_test((C, A, 1, 0),)
+def test_transpose2(x, y, axis1, axis2):
+    perm = (scalar_cast(axis1, u64),
+            scalar_cast(axis2, u64))
+    xt = transpose(x, perm)
+    yt = transpose(y, perm)
+    d = dot(xt, yt)
     sm = array_reduce(scalar_add, d, ())
     return array_to_scalar(sm)
 

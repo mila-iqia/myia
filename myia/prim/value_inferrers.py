@@ -16,7 +16,7 @@ from ..ir import Graph, MetaGraph
 from ..utils import is_dataclass_type, overload, SymbolicKeyInstance
 
 from . import ops as P
-from .inferrer_utils import static_getter, getelement
+from .inferrer_utils import static_getter, getelement, invert_permutation
 from .ops import Primitive
 
 
@@ -289,6 +289,18 @@ async def infer_value_getelement(track, seq):
     # This has to be ANYTHING unless all values in seq are identical, but
     # that's probably not worth checking.
     return ANYTHING
+
+
+@value_inferrer(invert_permutation, nargs=1)
+async def infer_value_invert_permutation(track, permutation):
+    """Infer the value of invert_permutation."""
+    perm = await permutation['value']
+    if perm is ANYTHING:
+        raise MyiaTypeError(
+            'Must know the value of permutation statically',
+            refs=[permutation]
+        )
+    return tuple(perm.index(i) for i in range(len(perm)))
 
 
 @value_inferrer(P.getattr, nargs=2)
