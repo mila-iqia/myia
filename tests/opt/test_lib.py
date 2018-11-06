@@ -1,10 +1,11 @@
 
-from pytest import mark
-
 from .test_opt import _check_opt
+from myia import dtype
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch
+    scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch, \
+    distribute, array_reduce, env_getitem, env_setitem, embed
+from myia.utils import newenv
 
 
 #######################
@@ -111,6 +112,41 @@ def test_op_tuple_binary():
                lib.bubble_op_tuple_binary)
 
 
+#######################
+# Env simplifications #
+#######################
+
+
+def test_getitem_newenv():
+
+    def before(x):
+        return env_getitem(newenv, embed(x), 1234)
+
+    def after(x):
+        return 1234
+
+    _check_opt(before, after,
+               lib.getitem_newenv,
+               argspec=[{'type': dtype.Float[64]}])
+
+
+def test_env_get_set():
+
+    def before(x, y):
+        a = 5678
+        e = env_setitem(newenv, embed(x), y)
+        e = env_setitem(e, embed(a), a)
+        return env_getitem(e, embed(x), 1234)
+
+    def after(x, y):
+        return y
+
+    _check_opt(before, after,
+               lib.cancel_env_set_get,
+               argspec=[{'type': dtype.Float[64]},
+                        {'type': dtype.Float[64]}])
+
+
 ##############################
 # Arithmetic simplifications #
 ##############################
@@ -185,6 +221,49 @@ def test_elim_identity():
         return x + y
 
     _check_opt(before, after, lib.elim_identity)
+
+
+#######################
+# Array optimizations #
+#######################
+
+
+def test_elim_distribute():
+
+    def before(x):
+        return distribute(x, (3, 5))
+
+    def after(x):
+        return x
+
+    _check_opt(before, after,
+               lib.elim_distribute,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 5)}])
+
+    _check_opt(before, before,
+               lib.elim_distribute,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 1)}])
+
+
+def test_elim_array_reduce():
+
+    def before(x):
+        return array_reduce(scalar_add, x, (3, 1))
+
+    def after(x):
+        return x
+
+    _check_opt(before, after,
+               lib.elim_array_reduce,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 1)}])
+
+    _check_opt(before, before,
+               lib.elim_array_reduce,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 5)}])
 
 
 ######################
@@ -445,7 +524,6 @@ def test_inline_trivial():
                lib.inline_trivial)
 
 
-@mark.xfail(reason="inline_trivial does not look into closures properly")
 def test_inline_nontrivial_through_fv():
 
     def nontrivial(x):

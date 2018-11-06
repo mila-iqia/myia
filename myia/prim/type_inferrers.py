@@ -32,10 +32,11 @@ _number_types = [
 ]
 
 
-def _shape_type(t):  # noqa: D400
-    """Tuple[UInt[64] ...]"""
-    # The docstring is used in the error message.
-    return ismyiatype(t, Tuple) and all(x == UInt[64] for x in t.elements)
+async def _check_shape_type(track, shp):
+    shp_t = await track.check(Tuple, shp)
+    for elem_t in shp_t.elements:
+        track.engine.equiv.declare_equivalent(UInt[64], elem_t, [])
+    return shp_t
 
 
 @type_cloner.variant
@@ -188,7 +189,7 @@ async def infer_type_scalar_cast(track, x, t):
 @type_inferrer(P.make_tuple, nargs=None)
 async def infer_type_make_tuple(track, *args):
     """Infer the return type of make_tuple."""
-    elts = [await x['type'] for x in args]
+    elts = [await x.get_raw('type') for x in args]
     return Tuple[elts]
 
 
@@ -368,7 +369,7 @@ async def infer_type_array_map(track, fn, *arrays):
 async def infer_type_reduce(track, fn, ary, shp):
     """Infer the return type of array_reduce."""
     fn_t = await fn['type']
-    await track.check(_shape_type, shp)
+    await _check_shape_type(track, shp)
     await track.check(Array, ary)
     xref = TransformedReference(track.engine, getelement, ary)
     res_elem_t = await fn_t(xref, xref)
@@ -397,7 +398,7 @@ async def infer_type_across_array(track, fn, init, ary, ax):
 async def infer_type_distribute(track, v, shp):
     """Infer the return type of distribute."""
     v_t = await track.check(Array, v)
-    await track.check(_shape_type, shp)
+    await _check_shape_type(track, shp)
     return v_t
 
 
@@ -405,7 +406,7 @@ async def infer_type_distribute(track, v, shp):
 async def infer_type_reshape(track, v, shape):
     """Infer the return type of reshape."""
     v_t = await track.check(Array, v)
-    await track.check(_shape_type, shape)
+    await _check_shape_type(track, shape)
     return v_t
 
 
@@ -502,7 +503,8 @@ async def infer_type_array_to_scalar(track, ary):
 @type_inferrer(P.broadcast_shape, nargs=2)
 async def infer_type_broadcast_shape(track, xs, ys):
     """Infer the return type of broadcast_shape."""
-    xs_t, ys_t = await track.check(_shape_type, xs, ys)
+    xs_t = await _check_shape_type(track, xs)
+    ys_t = await _check_shape_type(track, ys)
     shp_xs_n = len(xs_t.elements)
     shp_ys_n = len(ys_t.elements)
     return Tuple[[UInt[64] for i in range(max(shp_xs_n, shp_ys_n))]]

@@ -28,6 +28,13 @@ parse = scalar_pipeline \
     .make_transformer('input', 'graph')
 
 
+specialize = scalar_pipeline \
+    .configure({
+        'convert.object_map': Merge({operations.getitem: prim.tuple_getitem})
+    }) \
+    .select('parse', 'resolve', 'infer', 'specialize')
+
+
 # We will optimize patterns of these fake primitives
 
 
@@ -85,17 +92,21 @@ add_zero_r = psub(
 )
 
 
-def _check_transform(before, after, transform):
-    gbefore = parse(before)
+def _check_transform(before, after, transform, argspec=None):
+    if argspec is None:
+        gbefore = parse(before)
+        gafter = parse(after)
+    else:
+        gbefore = specialize.run(input=before, argspec=argspec)['graph']
+        gafter = specialize.run(input=after, argspec=argspec)['graph']
     gbefore = GraphCloner(gbefore, total=True)[gbefore]
-    gafter = parse(after)
     transform(gbefore)
     assert isomorphic(gbefore, gafter)
 
 
-def _check_opt(before, after, *opts):
+def _check_opt(before, after, *opts, argspec=None):
     eq = PatternEquilibriumOptimizer(*opts)
-    _check_transform(before, after, eq)
+    _check_transform(before, after, eq, argspec)
 
 
 def test_checkopt_is_cloning():

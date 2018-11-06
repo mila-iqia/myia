@@ -1,8 +1,6 @@
 """Library of optimizations."""
 
-from ..graph_utils import dfs
-from ..ir import succ_incoming, freevars_boundary, Graph, Constant, \
-    GraphCloner
+from ..ir import Graph, Constant, GraphCloner
 from ..prim import Primitive, ops as P
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
@@ -160,6 +158,60 @@ elim_identity = psub(
 )
 
 
+#########################
+# Array simplifications #
+#########################
+
+
+# distribute(x, shp) => x when x.shape == shp
+elim_distribute = psub(
+    pattern=(P.distribute, X, C),
+    replacement=X,
+    condition=lambda equiv: equiv[X].shape == equiv[C].value,
+    name='elim_distribute'
+)
+
+
+# array_reduce(f, x, shp) => x when x.shape == shp
+elim_array_reduce = psub(
+    pattern=(P.array_reduce, Y, X, C),
+    replacement=X,
+    condition=lambda equiv: equiv[X].shape == equiv[C].value,
+    name='elim_array_reduce'
+)
+
+
+#############################
+# Env-related optimizations #
+#############################
+
+
+@pattern_replacer(P.env_getitem, (P.env_setitem, X, C1, Y), C2, Z)
+def cancel_env_set_get(optimizer, node, equiv):
+    """Simplify combinations of env_get/setitem.
+
+    * get(set(env, k1, v), k2, dflt) =>
+        * v                  when k1 == k2
+        * get(env, k2, dflt) when k1 != k2
+    """
+    key1 = equiv[C1]
+    key2 = equiv[C2]
+    if key1.value == key2.value:
+        return equiv[Y]
+    else:
+        sexp = (P.env_getitem, equiv[X], key2, equiv[Z])
+        return sexp_to_node(sexp, node.graph)
+
+
+# getitem(newenv, key, default) => default
+getitem_newenv = psub(
+    pattern=(P.env_getitem, C1, C2, Y),
+    replacement=Y,
+    condition=lambda equiv: len(equiv[C1].value) == 0,
+    name='getitem_newenv'
+)
+
+
 ######################
 # Branch elimination #
 ######################
@@ -244,19 +296,10 @@ def is_trivial_graph(g, node, args):
     A trivial graph is a graph that contains at most one function
     application.
     """
-    nodes = [node
-             for node in dfs(g.output,
-                             succ_incoming,
-                             freevars_boundary(g, False))
-             if node.is_apply()]
-
-    if len(nodes) == 0:
-        return True
-    elif len(nodes) == 1:
-        app, = nodes
-        return all(not inp.is_constant_graph() for inp in app.inputs[1:])
-    else:
-        return False
+    nodes = [node for node in g.nodes if node.is_apply()]
+    # One node will be the return node, so len(nodes) == 1 if the node
+    # returns a constant or a free variable.
+    return len(nodes) <= 2
 
 
 def is_unique_use(g, node, args):

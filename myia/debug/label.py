@@ -52,44 +52,41 @@ class NodeLabeler:
         self.relation_symbols = relation_symbols
         self.default_name = default_name
 
-    def combine_relation(self, name, relation):
-        """Combine a name and a relation in a single string."""
-        rel = self.relation_symbols.get(relation, f'{relation}:')
-        if rel is None:
-            return None
-        if rel:
-            return f'{rel}{name or ""}'
+    def _root_name(self, node, force):
+        if isinstance(node, DebugInfo):
+            if node.name:
+                return node.name, []
+            elif node.about:
+                root_name, relations = self._root_name(node.about.debug, force)
+                relations.append(node.about.relation)
+                return root_name, relations
+            elif force:
+                return self.default_name(node), []
+            else:
+                return None, []
         else:
-            return name
+            return self._root_name(node.debug, force)
 
-    def const_fn(self, node):
-        """Return name of function, if constant.
-
-        Given an `Apply` node of a constant function, return the
-        name of that function, otherwise return None.
-        """
-        fn = node.inputs[0] if node.inputs else None
-        if fn and fn.is_constant():
-            return self.label(fn, False)
-        else:
+    def combine_relations(self, root_name, relations):
+        """Combine a name and a list of relations in a single string."""
+        if root_name is None:
             return None
+
+        ids = [r for r in relations if isinstance(r, int)]
+        relations = [r for r in relations if not isinstance(r, int)]
+
+        if ids:
+            relations.append(ids[-1])
+
+        tags = [self.relation_symbols.get(r, f'{r}:')
+                for r in reversed(relations)]
+
+        return ''.join(tags) + root_name
 
     def name(self, node, force=False):
         """Return a node's name."""
-        if isinstance(node, DebugInfo):
-            if node.name:
-                return node.name
-            elif node.about:
-                return self.combine_relation(
-                    self.name(node.about.debug, force),
-                    node.about.relation
-                )
-            elif force:
-                return self.default_name(node)
-            else:
-                return None
-        else:
-            return self.name(node.debug, force)
+        root_name, relations = self._root_name(node, force)
+        return self.combine_relations(root_name, relations)
 
     def label(self, node, force=None, fn_label=None):
         """Label a node."""
@@ -143,6 +140,18 @@ class NodeLabeler:
                 else:
                     lbl = name
             return lbl or '·'
+
+    def const_fn(self, node):
+        """Return name of function, if constant.
+
+        Given an `Apply` node of a constant function, return the
+        name of that function, otherwise return None.
+        """
+        fn = node.inputs[0] if node.inputs else None
+        if fn and fn.is_constant():
+            return self.label(fn, False)
+        else:
+            return None
 
 
 short_labeler = NodeLabeler(
