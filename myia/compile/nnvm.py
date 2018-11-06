@@ -200,7 +200,8 @@ class NNVMConverter:
             if ismyiatype(n.type, Array):
                 self.types[name] = nnvm_type_map(n.type.elements)
                 self.shapes[name] = n.shape
-            elif n.is_constant_graph():
+            elif n.is_constant_graph():  # pragma: no cover
+                raise Exception("This isn't tested")
                 self.types[name] = 'int64'
                 self.shapes[name] = (1,)
             else:
