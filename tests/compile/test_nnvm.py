@@ -64,6 +64,7 @@ def test_exp(x):
 def test_log(x):
     return math.log(x)
 
+
 @pytest.mark.xfail(reason="not implemented")
 @parse_compare((2.0,))
 def test_tan(x):
@@ -133,7 +134,3 @@ def test_distribute3(x):
                array=True)
 def test_array_map(x, y):
     return x + y
-
-
-
-
