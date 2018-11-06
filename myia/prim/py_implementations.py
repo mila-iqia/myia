@@ -469,6 +469,12 @@ def reshape(v, shape):
     return np.reshape(v, shape)
 
 
+@register(primops.transpose)
+def transpose(v, permutation):
+    """Implement `transpose`."""
+    return np.transpose(v, permutation)
+
+
 @register(primops.dot)
 def dot(a, b):
     """Implement `dot`."""

@@ -101,6 +101,7 @@ array_scan = Primitive('array_scan')
 array_reduce = Primitive('array_reduce')
 distribute = Primitive('distribute')
 reshape = Primitive('reshape')
+transpose = Primitive('transpose')
 dot = Primitive('dot')
 
 

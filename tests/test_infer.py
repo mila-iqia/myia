@@ -23,7 +23,8 @@ from myia.prim.py_implementations import \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
-    env_getitem, env_setitem, embed, J, Jinv, array_to_scalar
+    env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
+    transpose
 from myia.utils import RestrictedVar, newenv
 
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
@@ -1296,6 +1297,33 @@ def test_distribute2(v):
               InferenceError)])
 def test_reshape(v, shp):
     return reshape(v, shp)
+
+
+@infer(shape=[(af16_of(6, 7),
+               {'type': T[u64, u64], 'value': (1, 0)},
+               (7, 6)),
+              (af16_of(6, 7),
+               {'type': T[u64, u64], 'value': (0, 1)},
+               (6, 7)),
+              (af16_of(3, 4, 5),
+               {'type': T[u64, u64, u64], 'value': (2, 0, 1)},
+               (5, 3, 4)),
+              (af16_of(3, 4, 5),
+               {'type': T[u64, u64, u64]},
+               (ANYTHING, ANYTHING, ANYTHING)),
+              (af16_of(3, 4, 5),
+               {'type': T[u64, u64], 'value': (1, 0)},
+               InferenceError),
+              (af16_of(3, 4, 5),
+               {'type': T[u64, u64], 'value': (1, 0)},
+               InferenceError),
+              (af16_of(3, 4, 5),
+               {'type': T[u64, u64], 'value': (1, 2, 9)},
+               InferenceError)],
+       type=[(af16_of(2, 3), T[u64, u64], af16),
+             (af16_of(2, 3), T[i64, i64], InferenceError)])
+def test_transpose(v, perm):
+    return transpose(v, perm)
 
 
 @infer(shape=[({'type': af32, 'shape': (3, 4)}, (3, 4))],
