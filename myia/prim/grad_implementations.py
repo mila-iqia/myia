@@ -6,6 +6,7 @@ the (augmented) original primitive's output and a backpropagator function.
 
 from ..api import standard_pipeline
 from ..composite import zeros_like
+from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import NamedDebugInfo, About
 from ..ir import Constant, Graph, manage, clone, MetaGraph
 from ..utils import Registry, newenv
@@ -13,8 +14,9 @@ from ..utils import Registry, newenv
 from . import ops as primops
 from .py_implementations import \
     Jinv, J, \
-    scalar_mul, scalar_div, scalar_sub, scalar_usub, scalar_log, scalar_pow, \
-    tuple_setitem, switch
+    scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
+    scalar_log, scalar_pow, tuple_setitem, switch, shape, \
+    array_to_scalar, scalar_to_array, distribute, array_reduce
 
 
 parse = standard_pipeline \
@@ -94,8 +96,6 @@ def register_bprop(prim):
 
 def register_augm(prim):
     """Register an augmented function for prim."""
-    from ..debug.label import short_labeler, short_relation_symbols as syms
-
     def deco(fn):
         g = parse(fn)
         for g2 in manage(g, weak=True).graphs:
@@ -182,6 +182,31 @@ def bprop_tuple_getitem(data, idx, out, dout):
             zeros_like(idx))
 
 
+@register_bprop(primops.identity)
+def bprop_identity(x, out, dout):
+    """Backpropagator for primitive `identity`."""
+    return (dout,)
+
+
+@register_bprop(primops.scalar_to_array)
+def bprop_scalar_to_array(x, out, dout):
+    """Backpropagator for primitive `scalar_to_array`."""
+    return (array_to_scalar(dout),)
+
+
+@register_bprop(primops.array_to_scalar)
+def bprop_array_to_scalar(x, out, dout):
+    """Backpropagator for primitive `array_to_scalar`."""
+    return (scalar_to_array(dout),)
+
+
+@register_bprop(primops.distribute)
+def bprop_distribute(arr, shp, out, dout):
+    """Backpropagator for primitive `distribute`."""
+    return (array_reduce(scalar_add, dout, shape(arr)),
+            zeros_like(shp))
+
+
 @register_bprop(primops.J)
 def bprop_J(x, out, dout):
     """Backpropagator for primitive `J`."""
@@ -238,3 +263,92 @@ class MakeTupleGradient(MetaGraph):
 
 
 register(primops.make_tuple)(MakeTupleGradient(name='make_tuple_gradient'))
+
+
+class ArrayMapGradient(MetaGraph):
+    """Generate the gradient graph for array_map.
+
+    Sketch of the transform:
+
+        array_map(f, xs, ys, ...) =>
+
+        def fprop_array_map(jf, jxs, jys, ...):
+            f, xs, ys, ... = Jinv(jf), Jinv(jxs), Jinv(jys), ...
+            ret = array_map(f, xs, ys, ...)
+
+            def bprop_array_map(dout):
+                df = newenv
+                f_dxs = lambda d, jx, jy, ...: jf(jx, jy, ...)[1](d)[1]
+                dxs = array_map(f_dxs, dout, jxs, jys, ...)
+                f_dys = lambda d, jx, jy, ...: jf(jx, jy, ...)[1](d)[2]
+                dys = array_map(f_dys, dout, jxs, jys, ...)
+                ...
+                return df, dxs, dys, ...
+
+            return ret, bprop_array_map
+    """
+
+    def specialize_from_types(self, types):
+        """Generate the gradient graph."""
+        g = Graph()
+        nargs = len(types) - 1
+        params = [g.add_parameter() for _ in range(nargs + 1)]
+        jf, *jargs = params
+        f, *args = [g.apply(primops.Jinv, p) for p in params]
+        ret = g.apply(primops.array_map, f, *args)
+
+        b = Graph()
+        dout = b.add_parameter()
+
+        results = []
+
+        for i in range(nargs):
+            func = Graph()
+            fparams = [func.add_parameter() for _ in range(nargs + 1)]
+            fparams[0].debug.name = f'{syms["grad_sens"]}out'
+            fjparams = [func.apply(primops.J, p) for p in fparams]
+            call = func.apply(jf, *fjparams[1:])
+            bprop = func.apply(primops.tuple_getitem, call, 1)
+            sens = func.apply(bprop, fparams[0])
+            func.output = func.apply(primops.tuple_getitem, sens, i + 1)
+            result = b.apply(primops.array_map, func, dout, *args)
+            results.append(result)
+
+        b.output = b.apply(primops.make_tuple, newenv, newenv, *results)
+
+        ret = g.apply(primops.J, ret)
+        g.output = g.apply(primops.make_tuple, ret, b)
+
+        b.flags.update(_flags)
+        g.flags.update(_flags)
+
+        return g
+
+
+register(primops.array_map)(ArrayMapGradient(name='array_map_gradient'))
+
+
+def bprop_sum(fn, xs, shp, out, dout):  # pragma: no cover
+    """Backpropagator for sum(xs) = array_reduce(scalar_add, xs, shp)."""
+    return (newenv,
+            distribute(dout, shape(xs)),
+            zeros_like(shp))
+
+
+class ArrayReduceGradient(MetaGraph):
+    """Generate the gradient graph for array_reduce.
+
+    For the time being, the gradient of array_reduce is only supported
+    over the `scalar_add` operation (sum, basically).
+    """
+
+    def specialize_from_types(self, types):
+        """Generate the gradient graph."""
+        jf, jarr, jshp = types
+        assert jf._graph.transforms['primal'] is primops.scalar_add
+        return bprop_to_augm(primops.array_reduce, bprop_sum)
+
+
+register(primops.array_reduce)(
+    ArrayReduceGradient(name='array_reduce_gradient')
+)

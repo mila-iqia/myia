@@ -118,6 +118,7 @@ whitelist = frozenset({
     P.list_len,
     P.array_len,
     P.scalar_to_array,
+    P.array_to_scalar,
     P.broadcast_shape,
     P.shape,
     P.array_map,
