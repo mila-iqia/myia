@@ -1279,6 +1279,8 @@ def test_distribute(v, shp):
 @infer(type=[(ai32_of(3, 7), ai32)],
        shape=[(ai32_of(3, 7), (3, 7)),
               (ai32_of(7), (3, 7)),
+              (ai32_of(1), (3, 7)),
+              (ai32_of(1, 7), (3, 7)),
               (ai32_of(3), InferenceError)])
 def test_distribute2(v):
     return distribute(v, (3, 7))
