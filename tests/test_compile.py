@@ -79,12 +79,12 @@ def test_call(x, y):
 
 @parse_compare((42,))
 def test_tailcall(x):
-    def fact(x, a):
+    def fsum(x, a):
         if x == 1:
             return a
         else:
-            return fact(x - 1, a * x)
-    return fact(x, 1)
+            return fsum(x - 1, a + x)
+    return fsum(x, 1)
 
 
 @parse_compare((-1,), (1,))
