@@ -142,6 +142,12 @@ def scalar_floordiv(x, y):
     return x.__floordiv__(y)
 
 
+@core
+def bool_ne(x, y):
+    """Implementation of `bool_ne`."""
+    return bool_not(bool_eq(x, y))
+
+
 exp = MultitypeGraph('exp')
 log = MultitypeGraph('log')
 sin = MultitypeGraph('sin')

@@ -39,6 +39,7 @@ SIMPLE_MAP = {
     P.scalar_ge: sym.broadcast_greater_equal,
     # P.bool_and: sym.logical_and,
     # P.bool_or: sym.logical_or
+    P.bool_eq: sym.broadcast_equal,
 
     P.scalar_to_array: lambda x: x
 }

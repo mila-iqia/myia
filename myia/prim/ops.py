@@ -50,6 +50,7 @@ scalar_ge = Primitive('scalar_ge')
 bool_not = Primitive('bool_not')
 bool_and = Primitive('bool_and')
 bool_or = Primitive('bool_or')
+bool_eq = Primitive('bool_eq')
 
 
 ######################
