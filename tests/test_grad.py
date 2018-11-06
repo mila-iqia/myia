@@ -15,7 +15,7 @@ from myia.pipeline import pipeline_function, PipelineDefinition
 from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import J, scalar_add, scalar_mul, typeof, \
     array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
-    distribute, dot
+    distribute, dot, reshape
 from myia.prim.py_implementations import py_implementations as pyi
 from myia.validate import whitelist, validate_type
 
@@ -402,9 +402,18 @@ def test_array_operations(xs, ys):
 
 
 @grad_test((3.1, 7.6),)
-def test_array_operations2(x, y):
+def test_array_operations_distribute(x, y):
     xs = distribute(scalar_to_array(x), (4, 3))
     ys = distribute(scalar_to_array(y), (4, 3))
+    div = array_map(scalar_div, xs, ys)
+    sm = array_reduce(scalar_add, div, ())
+    return array_to_scalar(sm)
+
+
+@grad_test((A, B),)
+def test_array_operations_reshape(xs, ys):
+    xs = reshape(xs, (6,))
+    ys = reshape(ys, (6,))
     div = array_map(scalar_div, xs, ys)
     sm = array_reduce(scalar_add, div, ())
     return array_to_scalar(sm)
