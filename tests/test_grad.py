@@ -15,18 +15,22 @@ from myia.pipeline import pipeline_function, PipelineDefinition
 from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import J, scalar_add, scalar_mul, typeof, \
     array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
-    distribute
+    distribute, dot
 from myia.prim.py_implementations import py_implementations as pyi
 from myia.validate import whitelist, validate_type
 
 from .common import f64
 
 
-A = np.array([[1.7, 6.3, 8.1],
-              [5.4, 2.1, 3.3]])
+A = np.array([[1.7, -6.3,  8.1],
+              [5.4,  2.1, -3.3]])
 
-B = np.array([[3.2, 8.1, 5.5],
-              [0.5, 4.0, 7.9]])
+B = np.array([[3.2, -8.1, -5.5],
+              [0.5,  4.0,  7.9]])
+
+C = np.array([[1.4,  5.3, -8.6, -9.9],
+              [4.5,  1.0,  7.4,  6.5],
+              [4.1, -3.0,  3.1,  2.2]])
 
 
 grad_whitelist = whitelist | {P.J, P.Jinv}
@@ -410,6 +414,13 @@ def test_array_operations2(x, y):
 def test_array_operations_std(xs, ys):
     div = xs / ys
     sm = array_reduce(scalar_add, div, ())
+    return array_to_scalar(sm)
+
+
+@grad_test((A, C),)
+def test_dot(x, y):
+    d = dot(x, y)
+    sm = array_reduce(scalar_add, d, ())
     return array_to_scalar(sm)
 
 

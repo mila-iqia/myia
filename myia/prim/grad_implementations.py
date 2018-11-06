@@ -15,8 +15,8 @@ from . import ops as primops
 from .py_implementations import \
     Jinv, J, \
     scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
-    scalar_log, scalar_pow, tuple_setitem, switch, shape, \
-    array_to_scalar, scalar_to_array, distribute, array_reduce
+    scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
+    array_to_scalar, scalar_to_array, distribute, array_reduce, dot
 
 
 parse = standard_pipeline \
@@ -198,6 +198,13 @@ def bprop_scalar_to_array(x, out, dout):
 def bprop_array_to_scalar(x, out, dout):
     """Backpropagator for primitive `array_to_scalar`."""
     return (scalar_to_array(dout),)
+
+
+@register_bprop(primops.dot)
+def bprop_dot(x, y, out, dout):
+    """Backpropagator for primitive `dot`."""
+    return (dot(dout, transpose(y, (1, 0))),
+            dot(transpose(x, (1, 0)), dout))
 
 
 @register_bprop(primops.distribute)
