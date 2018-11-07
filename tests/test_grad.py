@@ -19,18 +19,7 @@ from myia.prim.py_implementations import J, scalar_add, scalar_mul, typeof, \
 from myia.prim.py_implementations import py_implementations as pyi
 from myia.validate import whitelist, validate_type
 
-from .common import f64, u64
-
-
-A = np.array([[1.7, -6.3,  8.1],
-              [5.4,  2.1, -3.3]])
-
-B = np.array([[3.2, -8.1, -5.5],
-              [0.5,  4.0,  7.9]])
-
-C = np.array([[1.4,  5.3, -8.6, -9.9],
-              [4.5,  1.0,  7.4,  6.5],
-              [4.1, -3.0,  3.1,  2.2]])
+from .common import f64, u64, MA, MB
 
 
 grad_whitelist = whitelist | {P.J, P.Jinv}
@@ -395,7 +384,7 @@ def test_closures_in_tuples(x, y):
     return ff() + gg()
 
 
-@grad_test((A, B),)
+@grad_test((MA(2, 3), MB(2, 3)),)
 def test_array_operations(xs, ys):
     div = array_map(scalar_div, xs, ys)
     sm = array_reduce(scalar_add, div, ())
@@ -411,7 +400,7 @@ def test_array_operations_distribute(x, y):
     return array_to_scalar(sm)
 
 
-@grad_test((A, B),)
+@grad_test((MA(2, 3), MB(2, 3)),)
 def test_array_operations_reshape(xs, ys):
     xs = reshape(xs, (6,))
     ys = reshape(ys, (6,))
@@ -420,21 +409,21 @@ def test_array_operations_reshape(xs, ys):
     return array_to_scalar(sm)
 
 
-@grad_test((A, B),)
+@grad_test((MA(2, 3), MB(2, 3)),)
 def test_array_operations_std(xs, ys):
     div = xs / ys
     sm = array_reduce(scalar_add, div, ())
     return array_to_scalar(sm)
 
 
-@grad_test((A, C),)
+@grad_test((MA(2, 3), MB(3, 4)),)
 def test_dot(x, y):
     d = dot(x, y)
     sm = array_reduce(scalar_add, d, ())
     return array_to_scalar(sm)
 
 
-@grad_test((C, A),)
+@grad_test((MA(3, 4), MB(2, 3)),)
 def test_transpose(x, y):
     xt = transpose(x, (1, 0))
     yt = transpose(y, (1, 0))
@@ -443,7 +432,7 @@ def test_transpose(x, y):
     return array_to_scalar(sm)
 
 
-@grad_test((C, A, NoTestGrad(1), NoTestGrad(0)),)
+@grad_test((MA(3, 4), MB(2, 3), NoTestGrad(1), NoTestGrad(0)),)
 def test_transpose2(x, y, axis1, axis2):
     perm = (scalar_cast(axis1, u64),
             scalar_cast(axis2, u64))
