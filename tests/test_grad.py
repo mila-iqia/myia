@@ -6,7 +6,7 @@ from types import FunctionType
 from myia import api
 from myia.api import standard_resources, Optimizer, Validator
 from myia.composite import grad
-from myia.debug.finite_diff import GradTester
+from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.dtype import JTagged
 from myia.dshape import NOSHAPE
 from myia.grad import J as realJ
@@ -161,7 +161,8 @@ prim_tests = {
 
 def _grad_test(fn, obj, args, sens_type=f64):
     in_types = [{'type': typeof(arg),
-                 'shape': getattr(arg, 'shape', NOSHAPE)} for arg in args]
+                 'shape': getattr(arg, 'shape', NOSHAPE)}
+                for arg in clean_args(args)]
     sens_type = {'type': sens_type}
     if isinstance(obj, FunctionType):
         res = grad_pipeline.run(input=obj, argspec=[*in_types, sens_type])
@@ -442,8 +443,7 @@ def test_transpose(x, y):
     return array_to_scalar(sm)
 
 
-@pytest.mark.xfail(reason="Permutation must be known statically.")
-@grad_test((C, A, 1, 0),)
+@grad_test((C, A, NoTestGrad(1), NoTestGrad(0)),)
 def test_transpose2(x, y, axis1, axis2):
     perm = (scalar_cast(axis1, u64),
             scalar_cast(axis2, u64))

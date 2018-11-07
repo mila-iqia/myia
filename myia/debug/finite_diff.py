@@ -144,8 +144,9 @@ class GradTester:
         self.fn = fn
         self.gfn = gfn
         self.args = args
+        self.clean_args = clean_args(args)
         self.argnames = argnames
-        out = fn(*clean_args(args))
+        out = fn(*self.clean_args)
         outname = fn.__name__
         if isinstance(out, tuple):
             self.outnames = list(f'{outname}_{i+1}' for i in range(len(out)))
@@ -182,7 +183,7 @@ class GradTester:
         results: Dict[str, float] = {}
         z = _zeros_like(self.out)
         for (out_sen,), opath in gen_variants(z, lambda x: [1.0], ()):
-            grads = self.gfn(*self.args, self.unwrap(out_sen))
+            grads = self.gfn(*self.clean_args, self.unwrap(out_sen))
             for ipath in gen_paths(grads, ()):
                 if isinstance(resolve_path(self.args, ipath), NoTestGrad):
                     continue

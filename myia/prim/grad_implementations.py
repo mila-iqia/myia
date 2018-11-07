@@ -9,7 +9,6 @@ from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import NamedDebugInfo, About
 from ..ir import Constant, Graph, manage, clone, MetaGraph
-from ..prim.inferrer_utils import invert_permutation
 from ..utils import Registry, newenv
 
 from . import ops as primops
@@ -18,7 +17,7 @@ from .py_implementations import \
     scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
     scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
     array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
-    reshape, scalar_cast, typeof
+    reshape, scalar_cast, typeof, invert_permutation
 
 
 parse = standard_pipeline \

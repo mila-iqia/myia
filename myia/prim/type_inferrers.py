@@ -17,7 +17,7 @@ from ..utils import Namespace, Var, RestrictedVar, is_dataclass_type
 
 from ..dtype import ismyiatype
 from . import ops as P
-from .inferrer_utils import static_getter, getelement, invert_permutation
+from .inferrer_utils import static_getter, getelement
 from .ops import Primitive
 from .py_implementations import typeof, issubtype
 
@@ -411,7 +411,7 @@ async def infer_type_transpose(track, v, permutation):
     return v_t
 
 
-@type_inferrer(invert_permutation, nargs=1)
+@type_inferrer(P.invert_permutation, nargs=1)
 async def infer_type_invert_permutation(track, permutation):
     """Infer the return type of invert_permutation."""
     return await permutation.get_raw('type')

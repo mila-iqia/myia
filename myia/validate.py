@@ -120,6 +120,7 @@ whitelist = frozenset({
     P.scalar_to_array,
     P.array_to_scalar,
     P.broadcast_shape,
+    P.invert_permutation,
     P.shape,
     P.array_map,
     P.array_scan,
@@ -142,6 +143,7 @@ whitelist = frozenset({
     P.env_add,
     # P.J,
     # P.Jinv,
+    P.scalar_cast,
 })
 
 

@@ -582,6 +582,12 @@ def broadcast_shape(shpx, shpy):
     return tuple(shp)
 
 
+@register(primops.invert_permutation)
+def invert_permutation(perm):
+    """Implement `invert_permutation`."""
+    return tuple(perm.index(i) for i in range(len(perm)))
+
+
 @register(primops.make_record)
 def make_record(typ, *args):
     """Implement `make_record`."""

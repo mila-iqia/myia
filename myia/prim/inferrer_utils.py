@@ -10,7 +10,6 @@ from ..prim import Primitive
 # These primitives are used by inferrers internally but they are not real
 # operations.
 getelement = Primitive('getelement')  # Represents getting an arbitrary element
-invert_permutation = Primitive('invert_permutation')  # Invert transpose perm
 
 
 class MyiaNameError(InferenceError):

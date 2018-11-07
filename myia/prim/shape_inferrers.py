@@ -17,7 +17,7 @@ from ..infer.jinf import JInferrer
 from ..ir import Graph, MetaGraph
 
 from . import ops as P
-from .inferrer_utils import static_getter, getelement, invert_permutation
+from .inferrer_utils import static_getter, getelement
 from .ops import Primitive
 
 
@@ -355,7 +355,7 @@ async def infer_shape_transpose(track, v, permutation):
     return shp
 
 
-@shape_inferrer(invert_permutation, nargs=1)
+@shape_inferrer(P.invert_permutation, nargs=1)
 async def infer_shape_invert_permutation(track, permutation):
     """Infer the shape for invert_permutation."""
     t = await permutation['type']
