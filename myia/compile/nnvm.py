@@ -122,7 +122,7 @@ def counter():
 
 
 class NNVMRunner:
-    """Adpater to run an NNVM module."""
+    """Adapter to run an NNVM module."""
 
     def __init__(self, mod, input_names, input_types, output_specs):
         """Intialize the runner.
