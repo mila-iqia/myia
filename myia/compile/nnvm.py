@@ -85,9 +85,8 @@ def nnvm_array_map(c, fn, *array):
         node = fn.output
         # Handle wrapping graphs
         if (len(fn.parameters) == (len(node.inputs) - 1) and
-            node.inputs[0].is_constant() and
-            all(ni is gi for ni, gi
-                in zip(fn.parameters, node.inputs[1:]))):
+                node.inputs[0].is_constant() and
+                tuple(node.inputs[1:]) == tuple(fn.parameters)):
             fn = node.inputs[0].value
             if fn in SIMPLE_MAP:
                 return SIMPLE_MAP[fn](*[c.ref(a) for a in array])
