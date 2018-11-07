@@ -31,16 +31,7 @@ def parse_compare(*tests, optimize=True, array=False):
             if not isinstance(args, tuple):
                 args = (args,)
             py_result = fn(*map(copy, args))
-            if array:
-                argspec = []
-                for a in args:
-                    spec = {'type': typeof(a)}
-                    if hasattr(a, 'shape'):
-                        spec['shape'] = a.shape
-                    argspec.append(spec)
-                argspec = tuple(argspec)
-            else:
-                argspec = tuple({'type': typeof(a)} for a in args)
+            argspec = tuple({'value': a} for a in args)
             res = pipeline.run(input=fn, argspec=argspec)
             myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))

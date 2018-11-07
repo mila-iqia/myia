@@ -8,12 +8,11 @@ from myia.api import standard_resources, Optimizer, Validator
 from myia.composite import grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.dtype import JTagged
-from myia.dshape import NOSHAPE
 from myia.grad import J as realJ
 from myia.opt import lib as optlib, CSE
 from myia.pipeline import pipeline_function, PipelineDefinition
 from myia.prim import ops as P, Primitive
-from myia.prim.py_implementations import J, scalar_add, scalar_mul, typeof, \
+from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
     array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
     distribute, dot, reshape, transpose, scalar_cast
 from myia.prim.py_implementations import py_implementations as pyi
@@ -149,15 +148,13 @@ prim_tests = {
 
 
 def _grad_test(fn, obj, args, sens_type=f64):
-    in_types = [{'type': typeof(arg),
-                 'shape': getattr(arg, 'shape', NOSHAPE)}
-                for arg in clean_args(args)]
+    argspec = [{'value': arg} for arg in clean_args(args)]
     sens_type = {'type': sens_type}
     if isinstance(obj, FunctionType):
-        res = grad_pipeline.run(input=obj, argspec=[*in_types, sens_type])
+        res = grad_pipeline.run(input=obj, argspec=[*argspec, sens_type])
     else:
         pip = grad_pipeline.configure(parse=False)
-        res = pip.run(graph=obj, argspec=[*in_types, sens_type])
+        res = pip.run(graph=obj, argspec=[*argspec, sens_type])
     gtest = GradTester(
         fn=fn,
         gfn=res['output'],
@@ -444,9 +441,9 @@ def test_transpose2(x, y, axis1, axis2):
 
 
 def _runwith(f, *args):
-    in_types = [{'type': typeof(arg)} for arg in args]
+    argspec = [{'value': arg} for arg in args]
     pip = grad_pipeline.configure(grad_wrap=False)
-    res = pip.run(input=f, argspec=in_types)
+    res = pip.run(input=f, argspec=argspec)
     return res['output'](*args)
 
 
