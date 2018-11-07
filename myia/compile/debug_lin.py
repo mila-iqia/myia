@@ -7,7 +7,7 @@ from ..prim import Primitive, vm_implementations, ops as P
 from ..vm import VM
 
 
-def debug_convert(lst):
+def debug_convert(lst, *, target='cpu', dev_id=0):
     """Converts the list of nodes to a runnable form.
 
     All the nodes in the list must represent linear flow (no calls,
@@ -32,6 +32,8 @@ def debug_convert(lst):
     outputs = []
 
     g = Graph()
+
+    assert target == 'cpu'
 
     def ref(n):
         if n.is_constant() and not n.is_constant_graph():

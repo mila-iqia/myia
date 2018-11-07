@@ -191,7 +191,10 @@ class CompileGraph(PipelineStep):
         for split in splits:
             if isinstance(split, list):
                 run, inputs, outputs = \
-                    self.pipeline.resources.lin_convert(split)
+                    self.pipeline.resources.lin_convert(
+                        split,
+                        target=self.pipeline.resources.target,
+                        dev_id=self.pipeline.resources.dev_id)
                 # prime the arguments because self.ref() can invalidate
                 # previously returned references if a new one is not ready
                 for i in inputs:
@@ -270,6 +273,8 @@ class OptimizeInstrs(PipelineStep):
 graph_transform = PipelineDefinition(
     resources=dict(
         lin_convert=nnvm_convert,
+        target='cpu',
+        dev_id=0,
     ),
     steps=dict(
         split=SplitGraph.partial(),
@@ -292,7 +297,7 @@ class CompileGraphs(PipelineStep):
 
     """
 
-    def __init__(self, pipeline_init, linear_impl):
+    def __init__(self, pipeline_init, linear_impl, target, dev_id):
         """Initialize a CompileGraphs.
 
         Arguments:
@@ -301,7 +306,9 @@ class CompileGraphs(PipelineStep):
         """
         super().__init__(pipeline_init)
         self.transform = graph_transform.configure(
-            lin_convert=LIN_IMPLS[linear_impl]).make()
+            lin_convert=LIN_IMPLS[linear_impl],
+            target=target,
+            dev_id=dev_id).make()
 
     def reset(self):
         """Clear/set local variables."""
@@ -366,6 +373,7 @@ class VMExporter(PipelineStep):
 
 
 step_wrap_primitives = WrapPrimitives.partial()
-step_compile = CompileGraphs.partial(linear_impl='nnvm')
+step_compile = CompileGraphs.partial(
+    linear_impl='nnvm', target='cpu', dev_id=0)
 step_link = LinkInstrs.partial()
 step_export = VMExporter.partial()
