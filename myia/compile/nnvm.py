@@ -112,7 +112,7 @@ def nnvm_type_map(type):
 class NNVMRunner:
     """Adapter to run an NNVM module."""
 
-    def __init__(self, mod, input_names, input_types, output_specs):
+    def __init__(self, mod, input_names, input_types, output_specs, context):
         """Intialize the runner.
 
         Arguments:
@@ -120,13 +120,14 @@ class NNVMRunner:
             input_names: list of the names of inputs (in order)
             output_specs: list of shape and dtype for outputs
                           [(shp0, dtype0), ...]
+            context: TVMContext for the runtime and arrays
 
         """
         self.mod = mod
         self.input_names = input_names
         self.input_types = input_types
         self.output_specs = output_specs
-        self._outs = [tvm.nd.empty(spec[0], dtype=spec[1])
+        self._outs = [tvm.nd.empty(spec[0], dtype=spec[1], ctx=context)
                       for spec in self.output_specs]
 
     def __call__(self, *args):
@@ -210,7 +211,7 @@ class NNVMConverter:
             setn(name, n)
         return self.eqv[n]
 
-    def convert(self, lst):
+    def convert(self, lst, *, target='cpu', dev_id=0):
         """Converts the list of nodes to a runnable form.
 
         All the nodes in the list must represent linear flow (no calls,
@@ -250,9 +251,13 @@ class NNVMConverter:
 
         outputs = get_outputs(lst, lst[0].graph.manager.uses,
                               set(self.eqv.keys()))
+
+        if target == 'cpu':
+            target = 'llvm'
+
         g = nnvm.graph.create(sym.Group(list(self.eqv[o] for o in outputs)))
         dg, lib, params = nnvm.compiler.build(
-            g, target="llvm", shape=self.shapes, dtype=self.types,
+            g, target=target, shape=self.shapes, dtype=self.types,
             params=self.constants)
 
         shape = dg.json_attr('shape')
@@ -266,14 +271,21 @@ class NNVMConverter:
         output_specs = [spec(index.entry_id(x)) for x in index.output_entries]
         assert len(output_specs) == len(outputs)
 
-        module = graph_runtime.create(dg, lib, tvm.cpu())
+        if target == 'llvm':
+            context = tvm.cpu(dev_id)
+        elif target == 'cuda':  # pragma: no cover
+            context = tvm.gpu(dev_id)
+        else:  # pragma: no cover
+            raise Exception(f"Unsupported target: {target}")
+
+        module = graph_runtime.create(dg, lib, context)
 
         for n, p in params.items():
             module.set_input(n, p)
 
         input_types = [self.types[i] for i in self.input_names]
         return (NNVMRunner(module, self.input_names,
-                           input_types, output_specs),
+                           input_types, output_specs, context),
                 self.inputs, outputs)
 
 
