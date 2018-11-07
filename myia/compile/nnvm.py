@@ -1,6 +1,7 @@
 """Linear implementation using NNVM."""
 
 import numpy as np
+from itertools import count
 
 import nnvm.compiler
 import nnvm.symbol as sym
@@ -84,8 +85,7 @@ def nnvm_array_map(c, fn, *array):
         assert isinstance(fn, Graph)
         node = fn.output
         # Handle wrapping graphs
-        if (len(fn.parameters) == (len(node.inputs) - 1) and
-                node.inputs[0].is_constant() and
+        if (node.inputs[0].is_constant() and
                 tuple(node.inputs[1:]) == tuple(fn.parameters)):
             fn = node.inputs[0].value
             if fn in SIMPLE_MAP:
@@ -107,17 +107,6 @@ def nnvm_type_map(type):
     if dt == 'bool':
         dt = 'uint8'
     return dt
-
-
-def counter():
-    """Returns a function that returns increasing numbers with each call."""
-    val = -1
-
-    def next():
-        nonlocal val
-        val += 1
-        return val
-    return next
 
 
 class NNVMRunner:
@@ -209,13 +198,13 @@ class NNVMConverter:
                 self.shapes[name] = (1,)
 
         if n.is_constant() and not n.is_constant_graph():
-            name = f"cst{self.c()}"
+            name = f"cst{next(self.c)}"
             self.constants[name] = np.array([n.value],
                                             dtype=type_to_np_dtype(n.type),
                                             copy=False, ndmin=1)
             setn(name, n)
         elif n not in self.eqv:
-            name = f"i{self.c()}"
+            name = f"i{next(self.c)}"
             self.inputs.append(n)
             self.input_names.append(name)
             setn(name, n)
@@ -240,7 +229,7 @@ class NNVMConverter:
             This implementation converts the nodes to NNVM and compiles it.
 
         """
-        self.c = counter()
+        self.c = count()
         self.eqv = {}
         self.inputs = []
         self.input_names = []
