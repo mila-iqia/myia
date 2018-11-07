@@ -31,6 +31,16 @@ def test_vm_icall_clos(l):
     return list_map(add2, l)
 
 
+@parse_compare((2, 3), (2.0, 3.0))
+def test_vm_floordiv(x, y):
+    return x // y
+
+
+@parse_compare((2, 3), (2.0, 3.0))
+def test_vm_truediv(x, y):
+    return x / y
+
+
 def test_vm_array_map():
     @compile
     def f(x):

@@ -524,7 +524,7 @@ class ClosureNamespace(Namespace):
         d, = self.dicts
         try:
             return d[name].cell_contents
-        except ValueError as e:
+        except ValueError:
             raise UnboundLocalError(name)
 
 

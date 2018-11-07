@@ -95,6 +95,8 @@ class FinalVM:
         # Calling convention is to push arguments from last to first
         # because it makes partial application easier.
         for a in reversed(args):
+            if isinstance(a, bool):
+                a = int(a)
             self._push(a)
 
         # Main runtime loop

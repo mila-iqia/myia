@@ -22,7 +22,7 @@ setup(
         'Programming Language :: Python :: 3.7'
     ],
     packages=find_packages(exclude=['docs', 'tests']),
-    install_requires=['asttokens', 'colorama'],
+    install_requires=['asttokens', 'colorama', 'numpy', 'nnvm'],
     extras_require={
         'test': ['flake8', 'pytest', 'codecov',
                  'pytest-cov', 'pydocstyle'],

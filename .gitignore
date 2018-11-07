@@ -3,3 +3,5 @@ __pycache__/
 .coverage
 .pytest_cache
 *.egg-info
+prof/
+myia_debug/

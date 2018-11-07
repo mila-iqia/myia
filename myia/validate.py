@@ -101,6 +101,7 @@ whitelist = frozenset({
     P.bool_not,
     P.bool_and,
     P.bool_or,
+    P.bool_eq,
     # P.typeof,
     # P.hastype,
     P.make_tuple,

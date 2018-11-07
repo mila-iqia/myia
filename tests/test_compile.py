@@ -1,5 +1,6 @@
 from pytest import mark
 from copy import copy
+import numpy as np
 
 from myia.api import standard_pipeline
 from myia.prim import ops as P
@@ -9,7 +10,7 @@ from myia.prim.py_implementations import \
 compile_pipeline = standard_pipeline
 
 
-def parse_compare(*tests, optimize=True):
+def parse_compare(*tests, optimize=True, array=False):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -30,11 +31,23 @@ def parse_compare(*tests, optimize=True):
             if not isinstance(args, tuple):
                 args = (args,)
             py_result = fn(*map(copy, args))
-            argspec = tuple({'type': typeof(a)} for a in args)
+            if array:
+                argspec = []
+                for a in args:
+                    spec = {'type': typeof(a)}
+                    if hasattr(a, 'shape'):
+                        spec['shape'] = a.shape
+                    argspec.append(spec)
+                argspec = tuple(argspec)
+            else:
+                argspec = tuple({'type': typeof(a)} for a in args)
             res = pipeline.run(input=fn, argspec=argspec)
             myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))
-            assert py_result == myia_result
+            if array:
+                np.testing.assert_allclose(py_result, myia_result)
+            else:
+                assert py_result == myia_result
 
         m = mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
@@ -79,12 +92,12 @@ def test_call(x, y):
 
 @parse_compare((42,))
 def test_tailcall(x):
-    def fact(x, a):
+    def fsum(x, a):
         if x == 1:
             return a
         else:
-            return fact(x - 1, a * x)
-    return fact(x, 1)
+            return fsum(x - 1, a + x)
+    return fsum(x, 1)
 
 
 @parse_compare((-1,), (1,))

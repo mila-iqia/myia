@@ -216,6 +216,14 @@ def bool_or(x, y):
     return x or y
 
 
+@register(primops.bool_eq)
+def bool_eq(x, y):
+    """Implement `bool_eq`."""
+    assert x is True or x is False
+    assert y is True or y is False
+    return x == y
+
+
 @register(primops.typeof)
 def typeof(x):
     """Implement typeof."""

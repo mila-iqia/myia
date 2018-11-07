@@ -296,16 +296,9 @@ async def infer_type_bool_not(track, x):
     return Bool
 
 
-@type_inferrer(P.bool_and, nargs=2)
+@type_inferrer(P.bool_and, P.bool_or, P.bool_eq, nargs=2)
 async def infer_type_bool_and(track, x, y):
     """Infer the return type of bool_and."""
-    await track.will_check(Bool, x, y)
-    return Bool
-
-
-@type_inferrer(P.bool_or, nargs=2)
-async def infer_type_bool_or(track, x, y):
-    """Infer the return type of bool_or."""
     await track.will_check(Bool, x, y)
     return Bool
 
