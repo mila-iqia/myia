@@ -67,7 +67,7 @@ def nnvm_distribute(c, v, shp):
 
 
 def nnvm_dot(c, a, b):
-    """Implemetation of dot."""
+    """Implementation of dot."""
     na = c.ref(a)
     nb = c.ref(b)
     return sym.dense(na, sym.transpose(nb), units=b.shape[1], use_bias=False)
