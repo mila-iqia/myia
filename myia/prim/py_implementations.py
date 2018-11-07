@@ -469,6 +469,12 @@ def reshape(v, shape):
     return np.reshape(v, shape)
 
 
+@register(primops.transpose)
+def transpose(v, permutation):
+    """Implement `transpose`."""
+    return np.transpose(v, permutation)
+
+
 @register(primops.dot)
 def dot(a, b):
     """Implement `dot`."""
@@ -574,6 +580,12 @@ def broadcast_shape(shpx, shpy):
                 f'Cannot broadcast shapes {orig_shpx} and {orig_shpy}.'
             )
     return tuple(shp)
+
+
+@register(primops.invert_permutation)
+def invert_permutation(perm):
+    """Implement `invert_permutation`."""
+    return tuple(perm.index(i) for i in range(len(perm)))
 
 
 @register(primops.make_record)

@@ -403,6 +403,20 @@ async def infer_type_reshape(track, v, shape):
     return v_t
 
 
+@type_inferrer(P.transpose, nargs=2)
+async def infer_type_transpose(track, v, permutation):
+    """Infer the return type of transpose."""
+    v_t = await track.check(Array, v)
+    await _check_shape_type(track, permutation)
+    return v_t
+
+
+@type_inferrer(P.invert_permutation, nargs=1)
+async def infer_type_invert_permutation(track, permutation):
+    """Infer the return type of invert_permutation."""
+    return await permutation.get_raw('type')
+
+
 @type_inferrer(P.dot, nargs=2)
 async def infer_type_dot(track, a, b):
     """Infer the return type of dot."""

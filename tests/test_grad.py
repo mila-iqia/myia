@@ -6,17 +6,31 @@ from types import FunctionType
 from myia import api
 from myia.api import standard_resources, Optimizer, Validator
 from myia.composite import grad
-from myia.debug.finite_diff import GradTester
+from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.dtype import JTagged
+from myia.dshape import NOSHAPE
 from myia.grad import J as realJ
 from myia.opt import lib as optlib, CSE
 from myia.pipeline import pipeline_function, PipelineDefinition
 from myia.prim import ops as P, Primitive
-from myia.prim.py_implementations import J, scalar_add, scalar_mul, typeof
+from myia.prim.py_implementations import J, scalar_add, scalar_mul, typeof, \
+    array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
+    distribute, dot, reshape, transpose, scalar_cast
 from myia.prim.py_implementations import py_implementations as pyi
 from myia.validate import whitelist, validate_type
 
-from .common import f64
+from .common import f64, u64
+
+
+A = np.array([[1.7, -6.3,  8.1],
+              [5.4,  2.1, -3.3]])
+
+B = np.array([[3.2, -8.1, -5.5],
+              [0.5,  4.0,  7.9]])
+
+C = np.array([[1.4,  5.3, -8.6, -9.9],
+              [4.5,  1.0,  7.4,  6.5],
+              [4.1, -3.0,  3.1,  2.2]])
 
 
 grad_whitelist = whitelist | {P.J, P.Jinv}
@@ -146,7 +160,9 @@ prim_tests = {
 
 
 def _grad_test(fn, obj, args, sens_type=f64):
-    in_types = [{'type': typeof(arg)} for arg in args]
+    in_types = [{'type': typeof(arg),
+                 'shape': getattr(arg, 'shape', NOSHAPE)}
+                for arg in clean_args(args)]
     sens_type = {'type': sens_type}
     if isinstance(obj, FunctionType):
         res = grad_pipeline.run(input=obj, argspec=[*in_types, sens_type])
@@ -377,6 +393,65 @@ def test_closures_in_tuples(x, y):
     tup = f, g
     ff, gg = tup
     return ff() + gg()
+
+
+@grad_test((A, B),)
+def test_array_operations(xs, ys):
+    div = array_map(scalar_div, xs, ys)
+    sm = array_reduce(scalar_add, div, ())
+    return array_to_scalar(sm)
+
+
+@grad_test((3.1, 7.6),)
+def test_array_operations_distribute(x, y):
+    xs = distribute(scalar_to_array(x), (4, 3))
+    ys = distribute(scalar_to_array(y), (4, 3))
+    div = array_map(scalar_div, xs, ys)
+    sm = array_reduce(scalar_add, div, ())
+    return array_to_scalar(sm)
+
+
+@grad_test((A, B),)
+def test_array_operations_reshape(xs, ys):
+    xs = reshape(xs, (6,))
+    ys = reshape(ys, (6,))
+    div = array_map(scalar_div, xs, ys)
+    sm = array_reduce(scalar_add, div, ())
+    return array_to_scalar(sm)
+
+
+@grad_test((A, B),)
+def test_array_operations_std(xs, ys):
+    div = xs / ys
+    sm = array_reduce(scalar_add, div, ())
+    return array_to_scalar(sm)
+
+
+@grad_test((A, C),)
+def test_dot(x, y):
+    d = dot(x, y)
+    sm = array_reduce(scalar_add, d, ())
+    return array_to_scalar(sm)
+
+
+@grad_test((C, A),)
+def test_transpose(x, y):
+    xt = transpose(x, (1, 0))
+    yt = transpose(y, (1, 0))
+    d = dot(xt, yt)
+    sm = array_reduce(scalar_add, d, ())
+    return array_to_scalar(sm)
+
+
+@grad_test((C, A, NoTestGrad(1), NoTestGrad(0)),)
+def test_transpose2(x, y, axis1, axis2):
+    perm = (scalar_cast(axis1, u64),
+            scalar_cast(axis2, u64))
+    xt = transpose(x, perm)
+    yt = transpose(y, perm)
+    d = dot(xt, yt)
+    sm = array_reduce(scalar_add, d, ())
+    return array_to_scalar(sm)
 
 
 def _runwith(f, *args):

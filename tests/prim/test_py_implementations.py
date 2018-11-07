@@ -12,7 +12,7 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
     issubtype, list_map, env_getitem, env_setitem, env_add, embed, \
-    array_to_scalar
+    array_to_scalar, transpose
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
@@ -301,6 +301,11 @@ def test_prim_distribute():
 
 def test_prim_reshape():
     assert reshape(np.empty((2, 3)), (6,)).shape == (6,)
+
+
+def test_prim_transpose():
+    assert transpose(np.empty((2, 3)), (1, 0)).shape == (3, 2)
+    assert transpose(np.empty((2, 3, 4)), (2, 0, 1)).shape == (4, 2, 3)
 
 
 def test_prim_dot():

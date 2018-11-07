@@ -335,6 +335,33 @@ async def infer_shape_reshape(track, v, shape):
     return shp
 
 
+@shape_inferrer(P.transpose, nargs=2)
+async def infer_shape_transpose(track, v, permutation):
+    """Infer the shape of transpose."""
+    perm = await permutation['value']
+    if perm == ANYTHING:
+        perm_t = await permutation['type']
+        return (ANYTHING,) * len(perm_t.elements)
+
+    v_shp = await v['shape']
+    if list(sorted(perm)) != list(range(len(v_shp))):
+        raise MyiaShapeError(
+            'The second argument of transpose must be a permutation of'
+            ' all of the array\'s axes.',
+            refs=[permutation]
+        )
+
+    shp = tuple(v_shp[i] for i in perm)
+    return shp
+
+
+@shape_inferrer(P.invert_permutation, nargs=1)
+async def infer_shape_invert_permutation(track, permutation):
+    """Infer the shape for invert_permutation."""
+    t = await permutation['type']
+    return TupleShape([NOSHAPE for _ in t.elements])
+
+
 @shape_inferrer(P.dot, nargs=2)
 async def infer_shape_dot(track, a, b):
     """Infer the shape of dot."""
