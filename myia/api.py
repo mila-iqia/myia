@@ -828,20 +828,41 @@ step_prepare = Preparator.partial(
 step_opt = Optimizer.partial(
     phases=dict(
         main=[
+            # Branch culling
             optlib.simplify_always_true,
             optlib.simplify_always_false,
+
+            # Safe inlining
+            optlib.inline_trivial,
             optlib.inline_unique_uses,
             optlib.inline_core,
             optlib.simplify_partial,
             optlib.replace_applicator,
-            optlib.elim_identity,
-            optlib.elim_j_jinv,
-            optlib.elim_jinv_j,
-            optlib.getitem_tuple,
+
+            # Arithmetic simplifications
             optlib.multiply_by_one_l,
             optlib.multiply_by_one_r,
             optlib.multiply_by_zero_l,
             optlib.multiply_by_zero_r,
+            optlib.add_zero_l,
+            optlib.add_zero_r,
+
+            # Array simplifications
+            optlib.elim_distribute,
+            optlib.elim_array_reduce,
+
+            # Miscellaneous
+            optlib.elim_identity,
+            optlib.getitem_tuple,
+            optlib.setitem_tuple,
+            optlib.tail_tuple,
+            optlib.elim_j_jinv,
+            optlib.elim_jinv_j,
+            optlib.cancel_env_set_get,
+            optlib.getitem_newenv,
+        ],
+        grad=[
+            optlib.expand_J,
         ],
         cse=CSE.partial(report_changes=False),
         renormalize='renormalize'
