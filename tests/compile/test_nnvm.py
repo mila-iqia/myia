@@ -8,6 +8,10 @@ from myia.prim.py_implementations import distribute, scalar_to_array, dot
 from ..test_compile import parse_compare
 
 
+def arange_array(shp):
+    return np.arange(np.prod(shp)).reshape(shp)
+
+
 @parse_compare((2, 3))
 def test_add(x, y):
     return x + y
@@ -128,15 +132,15 @@ def test_distribute3(x):
     return distribute(x, (2, 3))
 
 
-@parse_compare((np.ones((2, 3)), np.ones((2, 3))),
-               (np.ones((1, 3)), np.ones((2, 3))),
-               (np.ones((2, 1)), np.ones((2, 3))),
+@parse_compare((arange_array((2, 3)), arange_array((2, 3))),
+               (arange_array((1, 3)), arange_array((2, 3))),
+               (arange_array((2, 1)), arange_array((2, 3))),
                array=True)
 def test_array_map(x, y):
     return x + y
 
 
-@parse_compare((np.ones((2, 3)), np.ones((3, 4))),
+@parse_compare((arange_array((2, 3)), arange_array((3, 4))),
                array=True)
 def test_dot(x, y):
     return dot(x, y)
