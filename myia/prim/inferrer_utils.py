@@ -93,7 +93,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
             chk(data_v, item_v)
         try:
             raw = fetch(data_v, item_v)
-        except NameError as e:
+        except NameError:
             raise MyiaNameError(f"Cannot resolve name '{item_v}'")
         except AttributeError as e:
             raise MyiaAttributeError(str(e))

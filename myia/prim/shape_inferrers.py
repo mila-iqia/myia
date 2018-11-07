@@ -268,7 +268,7 @@ async def infer_shape_list_map(track, fn, *lsts):
     """Infer the shape of list_map."""
     argrefs = [TransformedReference(track.engine, getelement, xs)
                for xs in lsts]
-    return ListShape(await (await fn['shape'])(*argrefs))
+    return ListShape(await (await fn['shape'])(*argrefs))  # noqa: W606
 
 
 @shape_inferrer(P.array_scan, nargs=4)

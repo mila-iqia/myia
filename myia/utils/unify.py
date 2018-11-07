@@ -312,7 +312,7 @@ class Unification:
         """Apply `fn` to each element of `value` and return the result."""
         try:
             visit = self.visitors.map[type(value)]
-        except KeyError as e:
+        except KeyError:
             raise VisitError
         return visit(value, fn)
 
