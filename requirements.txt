@@ -1,7 +1,2 @@
 asttokens
-colorama
-pytest
-pytest-cov
 codecov
-flake8==3.5.0
-pydocstyle==2.1.1

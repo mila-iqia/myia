@@ -1,11 +1,16 @@
 language: python
-dist: xenial
-sudo: true
-python:
-  - 3.7
+
 install:
+  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda install --file=requirements.conda
   - pip install -r requirements.txt
   - pip install -e . --no-deps
+  - conda install -c abergeron nnvm=0.5.dev
 env:
   - TEST_SUITE=static
   - TEST_SUITE=unit
