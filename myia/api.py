@@ -831,6 +831,8 @@ step_opt = Optimizer.partial(
             # Branch culling
             optlib.simplify_always_true,
             optlib.simplify_always_false,
+            optlib.simplify_switch1,
+            optlib.simplify_switch2,
 
             # Safe inlining
             optlib.inline_trivial,

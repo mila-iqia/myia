@@ -23,6 +23,8 @@ X1 = Var('X1')
 Y1 = Var('Y1')
 X2 = Var('X2')
 Y2 = Var('Y2')
+X3 = Var('X3')
+X4 = Var('X4')
 
 
 def _is_c(n):
@@ -229,6 +231,23 @@ simplify_always_false = psub(
     replacement=Y,
     name='simplify_always_false'
 )
+
+
+# Simplify nested switch with the same condition (case 1)
+simplify_switch1 = psub(
+    pattern=(P.switch, X1, (P.switch, X1, X2, X3), X4),
+    replacement=(P.switch, X1, X2, X4),
+    name='simplify_switch1'
+)
+
+
+# Simplify nested switch with the same condition (case 2)
+simplify_switch2 = psub(
+    pattern=(P.switch, X1, X2, (P.switch, X1, X3, X4)),
+    replacement=(P.switch, X1, X2, X4),
+    name='simplify_switch2'
+)
+
 
 #####################
 # Simplify partials #

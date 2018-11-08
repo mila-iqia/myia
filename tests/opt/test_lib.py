@@ -329,6 +329,33 @@ def test_false_branch_switch():
                lib.simplify_always_false)
 
 
+def test_nested_switch_same_cond():
+
+    def before(a, b, c, d):
+        x = a < 0
+        return switch(x, switch(x, a, b), switch(x, c, d))
+
+    def after(a, b, c, d):
+        x = a < 0
+        return switch(x, a, d)
+
+    _check_opt(before, after,
+               lib.simplify_switch1,
+               lib.simplify_switch2)
+
+
+def test_nested_switch_diff_cond():
+
+    def before(a, b, c, d):
+        x = a < 0
+        y = b < 0
+        return switch(x, switch(y, a, b), switch(y, c, d))
+
+    _check_opt(before, before,
+               lib.simplify_switch1,
+               lib.simplify_switch2)
+
+
 ############
 # Partials #
 ############
