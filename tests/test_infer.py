@@ -152,6 +152,7 @@ infer_pipeline = scalar_pipeline.select(
     'parse', 'infer'
 ).configure({
     'py_implementations': pyimpl_test,
+    'inferrer.erase_value': False,
     'inferrer.tracks.value.max_depth': 10,
     'inferrer.tracks.value.constructors': value_inferrer_cons_test,
     'inferrer.tracks.type.constructors': type_inferrer_cons_test,
@@ -163,6 +164,7 @@ infer_pipeline_std = standard_pipeline.select(
     'parse', 'infer'
 ).configure({
     'py_implementations': pyimpl_test,
+    'inferrer.erase_value': False,
     'inferrer.tracks.value.max_depth': 10,
     'inferrer.tracks.value.constructors': value_inferrer_cons_test,
     'inferrer.tracks.type.constructors': type_inferrer_cons_test,

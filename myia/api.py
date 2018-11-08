@@ -11,7 +11,7 @@ from .cconv import closure_convert
 from .dtype import Tuple, List, Class, Array, Int, Float, Bool, \
     Number, tag_to_dataclass, ismyiatype, type_to_np_dtype, \
     TypeMeta, Function
-from .infer import InferenceEngine, ANYTHING, Context
+from .infer import InferenceEngine, ANYTHING, Context, MyiaTypeError
 from .ir import Graph, clone, GraphManager
 from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
     erase_class, erase_tuple
@@ -354,7 +354,8 @@ class InferenceResource(PipelineResource):
                  tracks,
                  required_tracks,
                  tied_tracks,
-                 context_class):
+                 context_class,
+                 erase_value):
         """Initialize an InferenceResource."""
         super().__init__(pipeline_init)
         self.manager = self.resources.manager
@@ -362,6 +363,7 @@ class InferenceResource(PipelineResource):
         self.required_tracks = required_tracks
         self.tied_tracks = tied_tracks
         self.context_class = context_class
+        self.erase_value = erase_value
         self.engine = InferenceEngine(
             self.pipeline,
             tracks=self.tracks,
@@ -376,6 +378,11 @@ class InferenceResource(PipelineResource):
         since it needs to be wrapped for the inferrer to use it.
         """
         for arg in argspec:
+            if '_erase_value' in arg:
+                erase = arg['_erase_value']
+                del arg['_erase_value']
+            else:
+                erase = self.erase_value
             if 'value' in arg:
                 v = arg['value']
                 for track_name, track in self.engine.tracks.items():
@@ -383,6 +390,8 @@ class InferenceResource(PipelineResource):
                         arg[track_name] = track.from_value(v, None)
                     else:
                         arg[track_name] = track.from_external(arg[track_name])
+                if erase:
+                    arg['value'] = ANYTHING
             else:
                 for track_name, track in self.engine.tracks.items():
                     if track_name in arg:
@@ -819,20 +828,41 @@ step_prepare = Preparator.partial(
 step_opt = Optimizer.partial(
     phases=dict(
         main=[
+            # Branch culling
             optlib.simplify_always_true,
             optlib.simplify_always_false,
+
+            # Safe inlining
+            optlib.inline_trivial,
             optlib.inline_unique_uses,
             optlib.inline_core,
             optlib.simplify_partial,
             optlib.replace_applicator,
-            optlib.elim_identity,
-            optlib.elim_j_jinv,
-            optlib.elim_jinv_j,
-            optlib.getitem_tuple,
+
+            # Arithmetic simplifications
             optlib.multiply_by_one_l,
             optlib.multiply_by_one_r,
             optlib.multiply_by_zero_l,
             optlib.multiply_by_zero_r,
+            optlib.add_zero_l,
+            optlib.add_zero_r,
+
+            # Array simplifications
+            optlib.elim_distribute,
+            optlib.elim_array_reduce,
+
+            # Miscellaneous
+            optlib.elim_identity,
+            optlib.getitem_tuple,
+            optlib.setitem_tuple,
+            optlib.tail_tuple,
+            optlib.elim_j_jinv,
+            optlib.elim_jinv_j,
+            optlib.cancel_env_set_get,
+            optlib.getitem_newenv,
+        ],
+        grad=[
+            optlib.expand_J,
         ],
         cse=CSE.partial(report_changes=False),
         renormalize='renormalize'
@@ -878,6 +908,7 @@ standard_resources = dict(
         required_tracks=['type'],
         tied_tracks={},
         context_class=Context,
+        erase_value=True,
     )
 )
 
@@ -976,12 +1007,19 @@ class MyiaFunction:
         """
         pip = standard_debug_pipeline.make()
         inf = pip.resources.inferrer
-        argspec = tuple({'value': arg} for arg in args)
-        inf.fill_in(argspec)
+
         argnames = inspect.getfullargspec(self.fn).args
-        for arg, name in zip(argspec, argnames):
-            if name not in self.specialize_values:
-                arg['value'] = ANYTHING
+        n1 = len(argnames)
+        n2 = len(args)
+        if n1 != n2:
+            raise MyiaTypeError(
+                f'Wrong number of arguments: expected {n1}, got {n2}'
+            )
+
+        argspec = tuple({'value': arg,
+                         '_erase_value': name not in self.specialize_values}
+                        for arg, name in zip(args, argnames))
+        inf.fill_in(argspec)
         key = as_frozen(argspec)
         if key not in self._cache:
             self._cache[key] = pip(

@@ -2,7 +2,6 @@ from copy import copy
 from pytest import mark
 
 from myia.api import standard_pipeline
-from myia.prim.py_implementations import typeof
 
 
 debug_lin_pipeline = standard_pipeline.configure({
@@ -15,7 +14,7 @@ def parse_compare(*tests):
             if not isinstance(args, tuple):
                 args = (args,)
             py_result = fn(*map(copy, args))
-            argspec = tuple({'type': typeof(a)} for a in args)
+            argspec = tuple({'value': a} for a in args)
             res = debug_lin_pipeline.run(input=fn, argspec=argspec)
             myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))

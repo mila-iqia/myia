@@ -6,10 +6,7 @@ import numpy as np
 from myia.prim.py_implementations import distribute, scalar_to_array, dot
 
 from ..test_compile import parse_compare
-
-
-def arange_array(shp):
-    return np.arange(np.prod(shp)).reshape(shp)
+from ..common import MA, MB
 
 
 @parse_compare((2, 3))
@@ -127,20 +124,20 @@ def test_distribute2(x):
 
 
 @pytest.mark.xfail(reason="devolves to empty function")
-@parse_compare(np.ones((2, 3)), array=True)
+@parse_compare(MA(2, 3), array=True, optimize=False)
 def test_distribute3(x):
     return distribute(x, (2, 3))
 
 
-@parse_compare((arange_array((2, 3)), arange_array((2, 3))),
-               (arange_array((1, 3)), arange_array((2, 3))),
-               (arange_array((2, 1)), arange_array((2, 3))),
+@parse_compare((MA(2, 3), MB(2, 3)),
+               (MA(1, 3), MB(2, 3)),
+               (MA(2, 1), MB(2, 3)),
                array=True)
 def test_array_map(x, y):
     return x + y
 
 
-@parse_compare((arange_array((2, 3)), arange_array((3, 4))),
+@parse_compare((MA(2, 3), MB(3, 4)),
                array=True)
 def test_dot(x, y):
     return dot(x, y)
