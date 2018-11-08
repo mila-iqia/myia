@@ -1,14 +1,13 @@
 """Library of optimizations."""
 
-from ..ir import Graph, Constant, GraphCloner
+from ..ir import Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
 
 from .opt import \
-    sexp_to_node, \
-    PatternSubstitutionOptimization as psub, \
-    pattern_replacer
+    sexp_to_node, pattern_replacer, GraphTransform, \
+    PatternSubstitutionOptimization as psub
 
 
 #####################
@@ -40,6 +39,8 @@ C1 = var(_is_c)
 C2 = var(_is_c)
 CNS = var(lambda x: x.is_constant(Namespace))
 G = var(_is_cg)
+G1 = var(_is_cg)
+G2 = var(_is_cg)
 NIL = var(lambda x: x.is_constant() and x.value == ())
 
 Xs = SVar(Var())
@@ -367,49 +368,112 @@ def replace_applicator(optimizer, node, equiv):
     return node
 
 
-##########################
-# Drop calls into graphs #
-##########################
+#################
+# Incorporation #
+#################
+
+
+@GraphTransform
+def getitem_transform(graph, idx):
+    """Map to a graph that only returns the idx-th output.
+
+    If idx == 1, then:
+
+    (x -> (a, b, c)) => (x -> b)
+    """
+    graph = transformable_clone(graph, relation=f'[{idx}]')
+    graph.output = graph.apply(P.tuple_getitem, graph.output, idx)
+    return graph
+
+
+@pattern_replacer(P.tuple_getitem, (G, Xs), C)
+def incorporate_getitem(optimizer, node, equiv):
+    """Incorporate a getitem into a call.
+
+    For example:
+
+        (lambda x: (a, b, c, ...))(x)[0]
+            => (lambda x: a)(x)
+    """
+    g = equiv[G].value
+    idx = equiv[C].value
+    return node.graph.apply(getitem_transform(g, idx), *equiv[Xs])
+
+
+@pattern_replacer(P.tuple_getitem, ((P.switch, X, G1, G2), Xs), C)
+def incorporate_getitem_through_switch(optimizer, node, equiv):
+    """Incorporate a getitem into both branches.
+
+    Example:
+
+        switch(x, f, g)(y)[i]
+        => switch(x, f2, g2)(y)
+
+    Where f2 and g2 are modified versions of f and g that return their
+    ith element.
+    """
+    g1 = equiv[G1].value
+    g2 = equiv[G2].value
+    idx = equiv[C].value
+    xs = equiv[Xs]
+
+    g1t = getitem_transform(g1, idx)
+    g2t = getitem_transform(g2, idx)
+
+    new = ((P.switch, equiv[X], g1t, g2t), *xs)
+    return sexp_to_node(new, node.graph)
+
+
+@GraphTransform
+def call_output_transform(graph, nargs):
+    """Map to a graph that calls its output.
+
+    ((*args1) -> (*args2) -> f) => (*args1, *args2) -> f(*args2)
+    """
+    graph = transformable_clone(graph, relation='call')
+    newp = [graph.add_parameter() for _ in range(nargs)]
+    graph.output = graph.apply(graph.output, *newp)
+    return graph
 
 
 @pattern_replacer((G, Xs), Ys)
-def drop_into_call(optimizer, node, equiv):
-    """Drop a call into the graph that returns the function.
+def incorporate_call(optimizer, node, equiv):
+    """Incorporate a call into the graph that returns the function.
 
-    g(x)(y) => g2(x, y)
+    Example:
+
+        g(x)(y) => g2(x, y)
 
     Where g2 is a modified copy of g that incorporates the call on y.
     """
     g = equiv[G].value
-    g2 = GraphCloner(g)[g]
+    xs = equiv[Xs]
+    ys = equiv[Ys]
+    g2 = call_output_transform(g, len(ys))
+    return node.graph.apply(g2, *xs, *ys)
 
+
+@pattern_replacer(((P.switch, X, G1, G2), Xs), Ys)
+def incorporate_call_through_switch(optimizer, node, equiv):
+    """Incorporate a call to both branches.
+
+    Example:
+
+        switch(x, f, g)(y)(z)
+        => switch(x, f2, g2)(y, z)
+
+    Where f2 and g2 are modified copies of f and g that incorporate the
+    call on both y and z.
+    """
+    g1 = equiv[G1].value
+    g2 = equiv[G2].value
     xs = equiv[Xs]
     ys = equiv[Ys]
 
-    new_output = (g2.output, *ys)
+    g1t = call_output_transform(g1, len(ys))
+    g2t = call_output_transform(g2, len(ys))
 
-    g2.output = Constant('DUMMY')
-    g2.output = sexp_to_node(new_output, g2)
-
-    return sexp_to_node((g2, *xs), node.graph)
-
-
-@pattern_replacer(((P.switch, X, Y, Z),), Xs)
-def drop_into_if(optimizer, node, equiv):
-    """Drop a call on the result of if into both branches.
-
-    f(if(x, y, z)) => if(x, () -> f(y()), () -> f(z()))
-    """
-    y = equiv[Y]
-    z = equiv[Z]
-
-    y2 = Graph()
-    y2.output = sexp_to_node(((y,), *equiv[Xs]), y2)
-
-    z2 = Graph()
-    z2.output = sexp_to_node(((z,), *equiv[Xs]), z2)
-
-    new = ((P.switch, equiv[X], y2, z2),)
+    new = ((P.switch, equiv[X], g1t, g2t), *xs, *ys)
     return sexp_to_node(new, node.graph)
 
 

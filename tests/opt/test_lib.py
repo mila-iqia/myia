@@ -682,12 +682,52 @@ def test_replace_applicator_2():
                lib.replace_applicator)
 
 
-##################
-# Drop call into #
-##################
+#################
+# Incorporation #
+#################
 
 
-def test_drop_into():
+def test_incorporate_getitem():
+
+    def before(x, y):
+        def b_help(x, y):
+            return x * y, x + y
+        return b_help(x, y)[0]
+
+    def after(x, y):
+        def a_help(x, y):
+            return (x * y, x + y)[0]
+        return a_help(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_getitem)
+
+
+def test_incorporate_getitem_through_switch():
+
+    def before(x, y):
+        def f1(x, y):
+            return x, y
+
+        def f2(x, y):
+            return y, x
+
+        return switch(x < 0, f1, f2)(x, y)[0]
+
+    def after(x, y):
+        def f1(x, y):
+            return (x, y)[0]
+
+        def f2(x, y):
+            return (y, x)[0]
+
+        return switch(x < 0, f1, f2)(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_getitem_through_switch)
+
+
+def test_incorporate_call():
     def b_help(q):
         def subf(z):
             return q * z
@@ -697,17 +737,17 @@ def test_drop_into():
         return b_help(x)(y)
 
     def after(x, y):
-        def a_help(q):
+        def a_help(q, y):
             def subf(z):
                 return q * z
             return subf(y)
-        return a_help(x)
+        return a_help(x, y)
 
     _check_opt(before, after,
-               lib.drop_into_call)
+               lib.incorporate_call)
 
 
-def test_drop_into_if():
+def test_incorporate_call_through_switch():
 
     def before_helper(x):
         if x < 0:
@@ -719,19 +759,18 @@ def test_drop_into_if():
         return before_helper(x)(y, z)
 
     def after(x, y, z):
-        def after_helper(x):
-            def tb():
-                return y * z
+        def after_helper(x, y, z):
+            def tb(y, z):
+                return scalar_mul(y, z)
 
-            def fb():
-                return y + z
+            def fb(y, z):
+                return scalar_add(y, z)
 
-            if x < 0:
-                return tb()
-            else:
-                return fb()
+            return switch(x < 0, tb, fb)(y, z)
 
-        return after_helper(x)
+        return after_helper(x, y, z)
 
     _check_opt(before, after,
-               lib.drop_into_call, lib.drop_into_if)
+               lib.elim_identity,
+               lib.incorporate_call,
+               lib.incorporate_call_through_switch)

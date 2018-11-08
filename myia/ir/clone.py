@@ -190,3 +190,21 @@ def clone(g,
                        relation=relation,
                        clone_constants=clone_constants,
                        graph_relation=graph_relation)[g]
+
+
+def transformable_clone(graph, relation='transform'):
+    """Return a clone of the graph that can be safely transformed.
+
+    If the graph is recursive, recursive calls will point to the original
+    graph and not to the clone. This allows us to modify the returned graph
+    safely, without messing up the recursive call sites.
+    """
+    with About(graph.debug, relation):
+        newg = Graph()
+    for p in graph.parameters:
+        with About(p.debug, 'copy'):
+            newg.add_parameter()
+    cl = GraphCloner()
+    cl.add_clone(graph, newg, newg.parameters)
+    newg.output = cl[graph.output]
+    return newg
