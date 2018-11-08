@@ -1,10 +1,13 @@
 
 import numpy
 from dataclasses import dataclass
-from numpy import cast, ones as _ones, zeros as _zeros
+from numpy import cast, ones as _ones, zeros as _zeros, asscalar
 from numpy.random import rand as _rand
-from myia.dtype import Array, Tuple
+from myia.dtype import Array, Tuple, pytype_to_myiatype
 from myia.infer import InferenceError
+from myia.composite import grad
+from myia.prim.py_implementations import array_reduce, scalar_add
+from myia.prim.shape_inferrers import ClassShape, TupleShape
 
 from .test_infer import infer_std
 from .test_specialize import specialize_std
@@ -74,6 +77,15 @@ def make_model(dtype='float64'):
     )
 
 
+Model_t = pytype_to_myiatype(Model, make_model())
+Model_t_f32 = pytype_to_myiatype(Model, make_model('float32'))
+
+
+def cost(model, x, y):
+    yy = model.apply(x)
+    return asscalar(array_reduce(scalar_add, (yy - y)**2, ()))
+
+
 @infer_std(
     type=[
         ({'value': make_model()},
@@ -102,3 +114,36 @@ def test_forward_infer(model, x):
 @specialize_std((make_model(), rand(3, 10)))
 def test_forward_specialize(model, x):
     return model.apply(x)
+
+
+@infer_std(
+    type=[
+        ({'value': make_model()},
+         {'value': rand(3, 10)},
+         {'value': rand(3, 8)},
+         Model_t),
+        ({'value': make_model('float32')},
+         {'value': rand(3, 10)},
+         {'value': rand(3, 8)},
+         InferenceError),
+        ({'value': make_model('float32')},
+         {'value': rand(3, 10, dtype='float32')},
+         {'value': rand(3, 8, dtype='float32')},
+         Model_t_f32),
+    ],
+    shape=[
+        ({'value': make_model()},
+         {'value': rand(3, 10)},
+         {'value': rand(3, 8)},
+         ClassShape({
+             'layers': TupleShape((ClassShape({'W': (10, 15), 'b': (1, 15)}),
+                                   ClassShape({'W': (15, 8), 'b': (1, 8)})))})
+        ),
+        ({'value': make_model()},
+         {'value': rand(3, 14)},
+         {'value': rand(3, 8)},
+         InferenceError),
+    ]
+)
+def test_backward_infer(model, x, y):
+    return grad(cost)(model, x, y)

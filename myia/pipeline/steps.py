@@ -264,6 +264,9 @@ step_opt = Optimizer.partial(
             optlib.getitem_env_add,
             optlib.simplify_array_map,
         ],
+        unfuse=[
+            optlib.unfuse_composite,
+        ],
         main2=[
             # Costlier optimizations
             optlib.float_tuple_getitem_through_switch,
