@@ -47,6 +47,7 @@ step_grad_opt = Optimizer.partial(
             optlib.elim_jinv_j,
         ],
         cse=CSE.partial(report_changes=False),
+        jelim=optlib.JElim.partial(),
     )
 )
 

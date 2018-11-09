@@ -1,9 +1,11 @@
 """Library of optimizations."""
 
 from ..composite import hyper_add
+from ..dtype import type_cloner, Function, JTagged, ismyiatype
+from ..infer import Inferrer
 from ..ir import Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
-from ..utils import Namespace
+from ..utils import Namespace, Partializable
 from ..utils.unify import Var, var, SVar
 
 from .opt import \
@@ -623,3 +625,42 @@ def expand_J(optimizer, node, equiv):
     except NotImplementedError:
         return None
     return Constant(newg)
+
+
+@type_cloner.variant
+def _nofunction(self, f: (Function, Inferrer)):
+    raise TypeError('Function found')
+
+
+class JElim(Partializable):
+    """Eliminate J, iff it is only applied to non-functions."""
+
+    def __init__(self, optimizer):
+        """Initialize JElim."""
+        self.optimizer = optimizer
+
+    def __call__(self, root):
+        """Apply JElim on root."""
+        mng = self.optimizer.resources.manager
+        mng.keep_roots(root)
+        nodes = []
+        typesubs = []
+        for node in mng.all_nodes:
+            if node.is_apply(P.J) or node.is_apply(P.Jinv):
+                _, x = node.inputs
+                try:
+                    _nofunction(x.type)
+                except TypeError:
+                    return False
+                nodes.append((node, x))
+            elif node.is_constant() and ismyiatype(node.type, JTagged):
+                typesubs.append((node, node.type.subtype))
+
+        with mng.transact() as tr:
+            for node, repl in nodes:
+                tr.replace(node, repl)
+
+        for node, newtype in typesubs:
+            node.type = newtype
+
+        return len(nodes) > 0
