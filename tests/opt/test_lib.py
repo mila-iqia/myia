@@ -380,6 +380,34 @@ def test_nested_switch_diff_cond():
                lib.simplify_switch2)
 
 
+def test_switch_same_branch():
+
+    def before(x, y):
+        a = y * y
+        return switch(x < 0, a, a)
+
+    def after(x, y):
+        return y * y
+
+    _check_opt(before, after,
+               lib.simplify_switch_idem)
+
+
+def test_combine_switch():
+
+    def before(x, y):
+        cond = x < 0
+        a = switch(cond, x, y)
+        b = switch(cond, y, x)
+        return a + b
+
+    def after(x, y):
+        return switch(x < 0, x + y, y + x)
+
+    _check_opt(before, after,
+               lib.combine_switches)
+
+
 ############
 # Partials #
 ############

@@ -25,6 +25,7 @@ X2 = Var('X2')
 Y2 = Var('Y2')
 X3 = Var('X3')
 X4 = Var('X4')
+X5 = Var('X5')
 
 
 def _is_c(n):
@@ -259,6 +260,34 @@ simplify_switch2 = psub(
     pattern=(P.switch, X1, X2, (P.switch, X1, X3, X4)),
     replacement=(P.switch, X1, X2, X4),
     name='simplify_switch2'
+)
+
+
+# Simplify switch when both branches are the same node
+simplify_switch_idem = psub(
+    pattern=(P.switch, X, Y, Y),
+    replacement=Y,
+    name='simplify_switch_idem'
+)
+
+
+_PutInSwitch = primset_var(
+    P.scalar_add,
+    P.scalar_sub,
+    P.scalar_mul,
+    P.scalar_div,
+    P.scalar_mod,
+    P.scalar_pow,
+)
+
+
+# Binary operations on switches with same conditions are transformed into
+# a switch on two operations, e.g.
+# switch(x, a, b) + switch(x, c, d) => switch(x, a + c, b + d)
+combine_switches = psub(
+    pattern=(_PutInSwitch, (P.switch, X1, X2, X3), (P.switch, X1, X4, X5)),
+    replacement=(P.switch, X1, (_PutInSwitch, X2, X4), (_PutInSwitch, X3, X5)),
+    name='combine_switches'
 )
 
 
