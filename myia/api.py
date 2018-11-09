@@ -824,6 +824,31 @@ step_prepare = Preparator.partial(
 )
 
 
+step_debug_opt = Optimizer.partial(
+    phases=dict(
+        main=[
+            # Branch culling
+            optlib.simplify_always_true,
+            optlib.simplify_always_false,
+
+            # Safe inlining
+            optlib.inline_core,
+            optlib.simplify_partial,
+
+            # Miscellaneous
+            optlib.elim_j_jinv,
+            optlib.elim_jinv_j,
+        ],
+        grad=[
+            optlib.expand_J,
+        ],
+        renormalize='renormalize',
+        cse=CSE.partial(report_changes=False),
+        jelim=optlib.JElim.partial(),
+    )
+)
+
+
 step_opt = Optimizer.partial(
     phases=dict(
         main=[
@@ -832,6 +857,8 @@ step_opt = Optimizer.partial(
             optlib.simplify_always_false,
             optlib.simplify_switch1,
             optlib.simplify_switch2,
+            optlib.simplify_switch_idem,
+            optlib.combine_switches,
 
             # Safe inlining
             optlib.inline_trivial,
@@ -839,6 +866,9 @@ step_opt = Optimizer.partial(
             optlib.inline_core,
             optlib.simplify_partial,
             optlib.replace_applicator,
+
+            # Specialization
+            optlib.specialize_on_graph_arguments,
 
             # Arithmetic simplifications
             optlib.multiply_by_one_l,
@@ -861,12 +891,20 @@ step_opt = Optimizer.partial(
             optlib.elim_jinv_j,
             optlib.cancel_env_set_get,
             optlib.getitem_newenv,
+            optlib.getitem_env_add,
+            optlib.incorporate_getitem,
+            optlib.incorporate_env_getitem,
+            optlib.incorporate_call,
+            optlib.incorporate_getitem_through_switch,
+            optlib.incorporate_env_getitem_through_switch,
+            optlib.incorporate_call_through_switch,
         ],
         grad=[
             optlib.expand_J,
         ],
+        renormalize='renormalize',
         cse=CSE.partial(report_changes=False),
-        renormalize='renormalize'
+        jelim=optlib.JElim.partial(),
     )
 )
 
@@ -914,7 +952,12 @@ standard_resources = dict(
 )
 
 
-_standard_pipeline = PipelineDefinition(
+######################
+# Pre-made pipelines #
+######################
+
+
+standard_pipeline = PipelineDefinition(
     resources=standard_resources,
     steps=dict(
         parse=step_parse,
@@ -925,29 +968,30 @@ _standard_pipeline = PipelineDefinition(
         opt=step_opt,
         cconv=step_cconv,
         validate=step_validate,
-    )
-)
-
-
-######################
-# Pre-made pipelines #
-######################
-
-
-standard_pipeline = _standard_pipeline \
-    .insert_after(
         wrap_primitives=step_wrap_primitives,
         compile=step_compile,
         link=step_link,
         export=step_export,
         wrap=step_wrap,
     )
+)
 
-standard_debug_pipeline = _standard_pipeline \
-    .insert_after(
+
+standard_debug_pipeline = PipelineDefinition(
+    resources=standard_resources,
+    steps=dict(
+        parse=step_parse,
+        resolve=step_resolve,
+        infer=step_infer,
+        specialize=step_specialize,
+        prepare=step_prepare,
+        opt=step_debug_opt,
+        cconv=step_cconv,
+        validate=step_validate,
         export=step_debug_export,
         wrap=step_wrap,
     )
+)
 
 
 scalar_pipeline = standard_pipeline.configure({
