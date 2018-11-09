@@ -259,7 +259,6 @@ standard_method_map = TypeMap({
 def default_convert(env, fn: FunctionType):
     """Default converter for Python types."""
     g = clone(parser.parse(fn))
-    env.resources.manager.add_graph(g)
     env.object_map[fn] = g
     return g
 
@@ -270,7 +269,6 @@ def default_convert(env, g: Graph):
     if g._manager is not mng:
         g2 = clone(g)
         env.object_map[g] = g2
-        mng.add_graph(g2)
         return g2
     else:
         return g
@@ -339,11 +337,12 @@ class Converter(PipelineResource):
             if isinstance(v, _Unconverted):
                 v = self.converter(self, v.value)
                 self.object_map[value] = v
-            return v
         except (TypeError, KeyError):
-            pass
+            v = self.converter(self, value)
 
-        return self.converter(self, value)
+        if isinstance(v, Graph):
+            self.resources.manager.add_graph(v)
+        return v
 
 
 class InferenceResource(PipelineResource):
