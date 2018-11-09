@@ -103,6 +103,7 @@ def register_augm(prim):
             name = short_labeler.name(g2)
             name = name.replace('__fprop__', syms['grad_fprop'])
             g2.debug.name = name.replace('__bprop__', syms['grad_bprop'])
+            g2.flags.update(_flags)
         g.transforms['primal'] = prim
         return register(prim)(g)
     return deco
