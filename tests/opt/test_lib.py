@@ -1,10 +1,12 @@
 
 from .test_opt import _check_opt
 from myia import dtype
+from myia.composite import hyper_add
 from myia.opt import lib
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch, \
-    distribute, array_reduce, env_getitem, env_setitem, embed, scalar_usub
+    distribute, array_reduce, env_getitem, env_setitem, embed, env_add, \
+    scalar_usub
 from myia.utils import newenv
 
 
@@ -145,6 +147,28 @@ def test_env_get_set():
                lib.cancel_env_set_get,
                argspec=[{'type': dtype.Float[64]},
                         {'type': dtype.Float[64]}])
+
+
+def test_env_get_add():
+
+    def before(x, y):
+        e1 = env_setitem(newenv, embed(x), x)
+        e1 = env_setitem(e1, embed(y), y)
+
+        e2 = env_setitem(newenv, embed(y), y)
+        e2 = env_setitem(e2, embed(x), x)
+
+        return env_getitem(env_add(e1, e2), embed(x), 0)
+
+    def after(x, y):
+        return hyper_add(x, x)
+
+    _check_opt(before, after,
+               lib.getitem_env_add,
+               lib.cancel_env_set_get,
+               argspec=[{'type': dtype.Int[64]},
+                        {'type': dtype.Int[64]}],
+               argspec_after=False)
 
 
 ##############################

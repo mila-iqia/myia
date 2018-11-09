@@ -1,5 +1,6 @@
 """Library of optimizations."""
 
+from ..composite import hyper_add
 from ..ir import Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace
@@ -212,6 +213,17 @@ getitem_newenv = psub(
     replacement=Y,
     condition=lambda equiv: len(equiv[C1].value) == 0,
     name='getitem_newenv'
+)
+
+
+# getitem(env_add(e1, e2), key, default)
+#     => hyper_add(getitem(e1, key, default), getitem(e2, key, default))
+getitem_env_add = psub(
+    pattern=(P.env_getitem, (P.env_add, X, Y), C, Z),
+    replacement=(hyper_add,
+                 (P.env_getitem, X, C, Z),
+                 (P.env_getitem, Y, C, Z)),
+    name='getitem_env_add'
 )
 
 
