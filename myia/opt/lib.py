@@ -463,6 +463,39 @@ def incorporate_getitem_through_switch(optimizer, node, equiv):
 
 
 @GraphTransform
+def env_getitem_transform(graph, key, default):
+    """Map to a graph that incorporates a call to env_getitem."""
+    graph = transformable_clone(graph, relation=f'[{key.node}]')
+    graph.output = graph.apply(P.env_getitem, graph.output, key, default)
+    return graph
+
+
+@pattern_replacer(P.env_getitem, (G, Xs), C, Y)
+def incorporate_env_getitem(optimizer, node, equiv):
+    """Incorporate an env_getitem into a call."""
+    g = equiv[G].value
+    key = equiv[C].value
+    dflt = equiv[Y]
+    return node.graph.apply(env_getitem_transform(g, key, dflt), *equiv[Xs])
+
+
+@pattern_replacer(P.env_getitem, ((P.switch, X, G1, G2), Xs), C, Y)
+def incorporate_env_getitem_through_switch(optimizer, node, equiv):
+    """Incorporate an env_getitem into both branches."""
+    g1 = equiv[G1].value
+    g2 = equiv[G2].value
+    key = equiv[C].value
+    dflt = equiv[Y]
+    xs = equiv[Xs]
+
+    g1t = env_getitem_transform(g1, key, dflt)
+    g2t = env_getitem_transform(g2, key, dflt)
+
+    new = ((P.switch, equiv[X], g1t, g2t), *xs)
+    return sexp_to_node(new, node.graph)
+
+
+@GraphTransform
 def call_output_transform(graph, nargs):
     """Map to a graph that calls its output.
 

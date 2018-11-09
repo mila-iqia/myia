@@ -753,6 +753,56 @@ def test_incorporate_getitem_through_switch():
                lib.incorporate_getitem_through_switch)
 
 
+def test_incorporate_env_getitem():
+
+    def before(x, y):
+        key = embed(x)
+
+        def b_help(x, y):
+            return env_setitem(newenv, key, x * y)
+        return env_getitem(b_help(x, y), key, 0)
+
+    def after(x, y):
+        def a_help(x, y):
+            return x * y
+        return a_help(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_env_getitem,
+               lib.cancel_env_set_get,
+               argspec=[{'type': dtype.Float[64]},
+                        {'type': dtype.Float[64]}])
+
+
+def test_incorporate_env_getitem_through_switch():
+
+    def before(x, y):
+        key = embed(x)
+
+        def f1(x, y):
+            return env_setitem(newenv, key, x * y)
+
+        def f2(x, y):
+            return env_setitem(newenv, key, x + y)
+
+        return env_getitem(switch(x < 0, f1, f2)(x, y), key, 0)
+
+    def after(x, y):
+        def f1(x, y):
+            return x * y
+
+        def f2(x, y):
+            return x + y
+
+        return switch(x < 0, f1, f2)(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_env_getitem_through_switch,
+               lib.cancel_env_set_get,
+               argspec=[{'type': dtype.Float[64]},
+                        {'type': dtype.Float[64]}])
+
+
 def test_incorporate_call():
     def b_help(q):
         def subf(z):
