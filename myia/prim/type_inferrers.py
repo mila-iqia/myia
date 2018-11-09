@@ -213,6 +213,13 @@ async def infer_type_tuple_getitem(track, seq, idx):
             'Tuples must be indexed with a constant',
             refs=[seq, idx]
         )
+    nelems = len(seq_t.elements)
+    if not -nelems <= idx_v < nelems:
+        raise MyiaTypeError(
+            'Tuple element out of range',
+            refs=[seq, idx]
+        )
+
     return seq_t.elements[idx_v]
 
 
