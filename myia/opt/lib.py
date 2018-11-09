@@ -1,6 +1,6 @@
 """Library of optimizations."""
 
-from ..ir import Constant, GraphCloner, transformable_clone
+from ..ir import Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace
 from ..utils.unify import Var, var, SVar
@@ -366,6 +366,44 @@ def replace_applicator(optimizer, node, equiv):
                 or inner.is_constant_graph() and inner.value.parent is None:
             return inner
     return node
+
+
+##################
+# Specialization #
+##################
+
+
+@GraphTransform
+def specialize_transform(graph, args):
+    """Specialize on provided non-None args.
+
+    Parameters that are specialized on are removed.
+    """
+    mng = graph.manager
+    graph = transformable_clone(graph, relation=f'sp')
+    mng.add_graph(graph)
+    for p, arg in zip(graph.parameters, args):
+        if arg is not None:
+            mng.replace(p, Constant(arg))
+    new_parameters = [p for p, arg in zip(graph.parameters, args)
+                      if arg is None]
+    mng.set_parameters(graph, new_parameters)
+    return graph
+
+
+@pattern_replacer(G, Xs)
+def specialize_on_graph_arguments(optimizer, node, equiv):
+    """Specialize a call on constant graph arguments."""
+    g = equiv[G].value
+    xs = equiv[Xs]
+    specialize = [x.is_constant((Graph, Primitive)) for x in xs]
+    if not any(specialize):
+        return node
+    specialize_map = tuple(x.value if s else None
+                           for x, s in zip(xs, specialize))
+    new_xs = [x for x, s in zip(xs, specialize) if not s]
+    g2 = specialize_transform(g, specialize_map)
+    return node.graph.apply(g2, *new_xs)
 
 
 #################

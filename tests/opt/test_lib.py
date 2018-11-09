@@ -4,7 +4,7 @@ from myia import dtype
 from myia.opt import lib
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch, \
-    distribute, array_reduce, env_getitem, env_setitem, embed
+    distribute, array_reduce, env_getitem, env_setitem, embed, scalar_usub
 from myia.utils import newenv
 
 
@@ -680,6 +680,32 @@ def test_replace_applicator_2():
 
     _check_opt(before, before,
                lib.replace_applicator)
+
+
+##################
+# Specialization #
+##################
+
+
+def test_specialize_on_graph_arguments():
+
+    def square(x):
+        return x * x
+
+    def before(x, y):
+        def helper(f, x, g, y):
+            return f(x) + g(y)
+
+        return helper(square, x, scalar_usub, y)
+
+    def after(x, y):
+        def helper(x, y):
+            return square(x) + scalar_usub(y)
+
+        return helper(x, y)
+
+    _check_opt(before, after,
+               lib.specialize_on_graph_arguments)
 
 
 #################
