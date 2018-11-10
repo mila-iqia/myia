@@ -481,7 +481,10 @@ def getitem_transform(graph, idx):
     (x -> (a, b, c)) => (x -> b)
     """
     graph = transformable_clone(graph, relation=f'[{idx}]')
-    graph.output = graph.apply(P.tuple_getitem, graph.output, idx)
+    if graph.output.is_apply(P.make_tuple):
+        graph.output = graph.output.inputs[idx + 1]
+    else:
+        graph.output = graph.apply(P.tuple_getitem, graph.output, idx)
     return graph
 
 
@@ -526,8 +529,15 @@ def incorporate_getitem_through_switch(optimizer, node, equiv):
 @GraphTransform
 def env_getitem_transform(graph, key, default):
     """Map to a graph that incorporates a call to env_getitem."""
-    graph = transformable_clone(graph, relation=f'[{key.node}]')
-    graph.output = graph.apply(P.env_getitem, graph.output, key, default)
+    rel = getattr(key, 'node', key)
+    graph = transformable_clone(graph, relation=f'[{rel}]')
+    out = graph.output
+    while out.is_apply(P.env_setitem):
+        _, out, key2, value = out.inputs
+        if key == key2.value:
+            graph.output = value
+            return graph
+    graph.output = graph.apply(P.env_getitem, out, key, default)
     return graph
 
 

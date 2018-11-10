@@ -801,7 +801,23 @@ def test_incorporate_getitem():
 
     def after(x, y):
         def a_help(x, y):
-            return (x * y, x + y)[0]
+            return x * y
+        return a_help(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_getitem)
+
+
+def test_incorporate_getitem_2():
+
+    def before(x, y):
+        def b_help(x, y):
+            return x
+        return b_help(x, y)[0]
+
+    def after(x, y):
+        def a_help(x, y):
+            return x[0]
         return a_help(x, y)
 
     _check_opt(before, after,
@@ -821,10 +837,10 @@ def test_incorporate_getitem_through_switch():
 
     def after(x, y):
         def f1(x, y):
-            return (x, y)[0]
+            return x
 
         def f2(x, y):
-            return (y, x)[0]
+            return y
 
         return switch(x < 0, f1, f2)(x, y)
 
@@ -851,6 +867,23 @@ def test_incorporate_env_getitem():
                lib.cancel_env_set_get,
                argspec=[{'type': dtype.Float[64]},
                         {'type': dtype.Float[64]}])
+
+
+def test_incorporate_env_getitem_2():
+
+    def before(x, y):
+        def b_help(x, y):
+            return x
+        return env_getitem(b_help(x, y), 1234, 0)
+
+    def after(x, y):
+        def a_help(x, y):
+            return env_getitem(x, 1234, 0)
+        return a_help(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_env_getitem,
+               lib.cancel_env_set_get)
 
 
 def test_incorporate_env_getitem_through_switch():
