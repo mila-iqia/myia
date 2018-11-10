@@ -408,6 +408,33 @@ def test_combine_switch():
                lib.combine_switches)
 
 
+def test_float_tuple_getitem_through_switch():
+
+    def before(x, y):
+        return switch(x < 0, x, y)[0]
+
+    def after(x, y):
+        return switch(x < 0, x[0], y[0])
+
+    _check_opt(before, after,
+               lib.float_tuple_getitem_through_switch)
+
+
+def test_float_env_getitem_through_switch():
+
+    def before(x, y):
+        return env_getitem(switch(x < 0, newenv, newenv), embed(y), 5)
+
+    def after(x, y):
+        key = embed(y)
+        return switch(x < 0,
+                      env_getitem(newenv, key, 5),
+                      env_getitem(newenv, key, 5))
+
+    _check_opt(before, after,
+               lib.float_env_getitem_through_switch)
+
+
 ############
 # Partials #
 ############

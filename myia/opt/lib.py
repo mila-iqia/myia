@@ -293,6 +293,24 @@ combine_switches = psub(
 )
 
 
+float_tuple_getitem_through_switch = psub(
+    pattern=(P.tuple_getitem, (P.switch, X1, X2, X3), C),
+    replacement=(P.switch, X1,
+                 (P.tuple_getitem, X2, C),
+                 (P.tuple_getitem, X3, C)),
+    name='float_tuple_getitem_through_switch'
+)
+
+
+float_env_getitem_through_switch = psub(
+    pattern=(P.env_getitem, (P.switch, X1, X2, X3), X4, X5),
+    replacement=(P.switch, X1,
+                 (P.env_getitem, X2, X4, X5),
+                 (P.env_getitem, X3, X4, X5)),
+    name='float_env_getitem_through_switch'
+)
+
+
 #####################
 # Simplify partials #
 #####################
