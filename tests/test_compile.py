@@ -2,15 +2,19 @@ from pytest import mark
 from copy import copy
 import numpy as np
 
-from myia.pipeline import standard_pipeline
+
+from myia.pipeline import standard_pipeline, standard_debug_pipeline
 from myia.prim import ops as P
 from myia.prim.py_implementations import \
     typeof, scalar_add, partial
 
 compile_pipeline = standard_pipeline
 
+debug_fn = standard_debug_pipeline \
+    .select('parse', 'resolve', 'infer', 'specialize', 'export')
 
-def parse_compare(*tests, optimize=True, array=False):
+
+def parse_compare(*tests, optimize=True, array=False, python=True):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -30,15 +34,17 @@ def parse_compare(*tests, optimize=True, array=False):
         def test(args):
             if not isinstance(args, tuple):
                 args = (args,)
-            py_result = fn(*map(copy, args))
+            if python:
+                ref_result = fn(*map(copy, args))
             argspec = tuple({'value': a} for a in args)
             res = pipeline.run(input=fn, argspec=argspec)
             myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))
-            if array:
-                np.testing.assert_allclose(py_result, myia_result)
-            else:
-                assert py_result == myia_result
+            if python:
+                if array:
+                    np.testing.assert_allclose(ref_result, myia_result)
+                else:
+                    assert ref_result == myia_result
 
         m = mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
