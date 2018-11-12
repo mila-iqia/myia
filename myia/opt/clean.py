@@ -1,6 +1,6 @@
 """Clean up Class types."""
 
-from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner
+from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner, JTagged
 from ..ir import Constant, Parameter
 from ..prim import ops as P, Primitive
 from ..dshape import TupleShape, ClassShape, shape_cloner, NOSHAPE
@@ -71,6 +71,8 @@ def expand_tuples_p(mng, graph, params):
         ttype = param.type
         tshape = param.shape
         if not ismyiatype(ttype, Tuple):
+            if ismyiatype(ttype, JTagged):
+                import pdb; pdb.set_trace()
             new_params.append(param)
             continue
 
@@ -95,11 +97,21 @@ def expand_tuples_c(graph, inputs):
     for i in inputs:
         itype = i.type
         ishape = i.shape
+        jtagged = False
         if not ismyiatype(itype, Tuple):
-            new_inputs.append(i)
-            continue
+            if (ismyiatype(itype, JTagged) and
+                    ismyiatype(itype.subtype, Tuple)):
+                assert i.is_apply(P.J)
+                jtagged = True
+                i = i.inputs[1]
+                itype = i.type
+                ishape = i.shape
+            else:
+                new_inputs.append(i)
+                continue
 
         new_input = []
+
         for pos, ie, ish in zip(range(len(itype.elements)),
                                 itype.elements, ishape.shape):
             ni = graph.apply(P.tuple_getitem, i, pos)
@@ -107,6 +119,10 @@ def expand_tuples_c(graph, inputs):
             ni.inputs[2].shape = NOSHAPE
             ni.type = ie
             ni.shape = ish
+            if jtagged:
+                ni = graph.apply(P.J, ni)
+                ni.type = JTagged[ie]
+                ni.shape = ish
             new_input.append(ni)
 
         new_inputs.extend(expand_tuples_c(graph, new_input))
