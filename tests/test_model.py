@@ -10,7 +10,7 @@ from myia.prim.py_implementations import array_reduce, scalar_add
 from myia.prim.shape_inferrers import ClassShape, TupleShape
 
 from .test_infer import infer_std
-from .test_specialize import specialize_std
+from .test_compile import parse_compare
 from .common import af32, af64
 
 
@@ -111,7 +111,7 @@ def test_forward_infer(model, x):
     return model.apply(x)
 
 
-@specialize_std((make_model(), rand(3, 10)))
+@parse_compare((make_model(), rand(3, 10)), array=True)
 def test_forward_specialize(model, x):
     return model.apply(x)
 
@@ -146,4 +146,10 @@ def test_forward_specialize(model, x):
     ]
 )
 def test_backward_infer(model, x, y):
+    return grad(cost)(model, x, y)
+
+
+@parse_compare((make_model(), rand(3, 10), rand(3, 8)),
+               array=True, python=False)
+def test_backward_specialize(model, x, y):
     return grad(cost)(model, x, y)
