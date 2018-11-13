@@ -93,11 +93,18 @@ def nnvm_array_map(c, fn, *array):
         raise NotImplementedError("Only support primitives for array_map")
 
 
+def nnvm_transpose(c, a, ax):
+    na = c.ref(a)
+    assert ax.is_constant(tuple)
+    return sym.transpose(na, axes=ax.value)
+
+
 COMPLEX_MAP = {
     P.bool_not: nnvm_bool_not,
     P.distribute: nnvm_distribute,
     P.dot: nnvm_dot,
     P.array_map: nnvm_array_map,
+    P.transpose: nnvm_transpose,
 }
 
 
