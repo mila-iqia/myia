@@ -892,6 +892,11 @@ step_opt = Optimizer.partial(
             optlib.cancel_env_set_get,
             optlib.getitem_newenv,
             optlib.getitem_env_add,
+        ],
+        main2=[
+            # Costlier optimizations
+            optlib.float_tuple_getitem_through_switch,
+            optlib.float_env_getitem_through_switch,
             optlib.incorporate_getitem,
             optlib.incorporate_env_getitem,
             optlib.incorporate_call,
