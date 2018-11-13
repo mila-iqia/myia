@@ -1,7 +1,8 @@
 """Library of optimizations."""
 
 from ..composite import hyper_add
-from ..dtype import type_cloner, Function, JTagged, ismyiatype
+from ..dtype import type_cloner, Function, JTagged, Number, ismyiatype, \
+    Tuple, UInt
 from ..infer import Inferrer
 from ..ir import Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
@@ -186,6 +187,62 @@ elim_array_reduce = psub(
     condition=lambda equiv: equiv[X].shape == equiv[C].value,
     name='elim_array_reduce'
 )
+
+
+@pattern_replacer(P.array_map, G, Xs)
+def simplify_array_map(optimizer, node, equiv):
+    """Simplify array_map on certain graphs.
+
+    If the graph cannot be eliminated, it is marked with the flag
+    `inline_inside`, meaning that all calls within it must be inlined.
+
+    Examples:
+        array_map(lambda x, y: f(x, y), xs, ys)
+            => array_map(f, xs, ys)
+
+        array_map(lambda x, y: f(y, x), xs, ys)
+            => array_map(f, ys, xs)
+
+        array_map(lambda x, y: x, xs, ys)
+            => xs
+
+        array_map(lambda x: f(x, 3), xs)
+            => array_map(f, xs, distribute(scalar_to_array(3), shape(xs)))
+
+    """
+    g = equiv[G].value
+    xs = equiv[Xs]
+
+    def to_outer(x):
+        if x.is_parameter():
+            idx = g.parameters.index(x)
+            return xs[idx]
+        elif x.is_constant() and ismyiatype(x.type, Number):
+            shp = Constant(xs[0].shape)
+            shp.type = Tuple[[UInt[64] for _ in shp.value]]
+            sexp = (P.distribute, (P.scalar_to_array, x), shp)
+            return sexp_to_node(sexp, node.graph)
+        else:
+            # Raise a semi-rare exception that won't hide bugs
+            raise NotImplementedError()
+
+    if len(g.scope) > 1:
+        return node
+
+    out = g.output
+
+    try:
+        if out.is_parameter() or out.is_constant():
+            return to_outer(out)
+        elif out.inputs[0].is_constant():
+            args = [to_outer(arg) for arg in out.inputs[1:]]
+            return node.graph.apply(P.array_map, out.inputs[0], *args)
+        else:
+            return node
+
+    except NotImplementedError:
+        g.flags['inline_inside'] = True
+        return node
 
 
 #############################
@@ -394,6 +451,11 @@ def is_core(g, node, args):
     return g.flags.get('core', False)
 
 
+def caller_is_marked(g, node, args):
+    """Inline into graphs that are marked."""
+    return node.graph.flags.get('inline_inside', False)
+
+
 inline_trivial = make_inliner(inline_criterion=is_trivial_graph,
                               check_recursive=False)
 
@@ -402,6 +464,10 @@ inline_unique_uses = make_inliner(inline_criterion=is_unique_use,
 
 inline_core = make_inliner(inline_criterion=is_core,
                            check_recursive=False)
+
+inline_inside_marked_caller = \
+    make_inliner(inline_criterion=caller_is_marked,
+                 check_recursive=False)
 
 inline = make_inliner(inline_criterion=None, check_recursive=True)
 
