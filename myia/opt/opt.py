@@ -1,5 +1,6 @@
 """Graph optimization routines."""
 
+from weakref import WeakKeyDictionary
 from ..ir import ANFNode, Apply, Constant, Graph, Special, manage
 from ..utils.unify import Unification, Var
 
@@ -168,3 +169,32 @@ class PatternEquilibriumOptimizer:
                 break
 
         return any_changes
+
+
+class GraphTransform:
+    """Represents a graph transform.
+
+    The transform of a graph is unique and it is stored in graph.transforms.
+    Here are examples of graph transforms:
+
+    * A graph's gradient.
+    * A copy of the graph, except the output is called.
+    * A copy of the graph, except it returns the ith element of the output.
+    """
+
+    def __init__(self, compute):
+        """Initialize a GraphTransform."""
+        self.cache = WeakKeyDictionary()
+        self.compute = compute
+
+    def __call__(self, graph, *args):
+        """Return the transformed graph.
+
+        Computes the transform if it isn't already available.
+        """
+        if graph not in self.cache:
+            self.cache[graph] = {}
+        cache = self.cache[graph]
+        if args not in cache:
+            cache[args] = self.compute(graph, *args)
+        return cache[args]

@@ -4,12 +4,11 @@ import numpy as np
 from types import FunctionType
 
 from myia import api
-from myia.api import standard_resources, Optimizer, Validator
+from myia.api import standard_resources, Validator
 from myia.composite import grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.dtype import JTagged
 from myia.grad import J as realJ
-from myia.opt import lib as optlib, CSE
 from myia.pipeline import pipeline_function, PipelineDefinition
 from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
@@ -27,28 +26,6 @@ grad_whitelist = whitelist | {P.J, P.Jinv}
 @validate_type.variant
 def grad_validate_type(self, t: JTagged):
     pass
-
-
-step_grad_opt = Optimizer.partial(
-    phases=dict(
-        main=[
-            optlib.simplify_always_true,
-            optlib.simplify_always_false,
-            optlib.inline_core,
-            optlib.simplify_partial,
-            optlib.elim_identity,
-        ],
-        grad=[
-            optlib.expand_J,
-        ],
-        renormalize='renormalize',
-        elimj=[
-            optlib.elim_j_jinv,
-            optlib.elim_jinv_j,
-        ],
-        cse=CSE.partial(report_changes=False),
-    )
-)
 
 
 step_grad_validate = Validator.partial(
@@ -78,7 +55,7 @@ grad_pipeline = PipelineDefinition(
         resolve=api.step_resolve,
         infer=api.step_infer,
         specialize=api.step_specialize,
-        opt=step_grad_opt,
+        opt=api.step_debug_opt,
         validate=step_grad_validate,
         export=api.step_debug_export,
     )

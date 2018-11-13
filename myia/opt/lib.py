@@ -1,14 +1,16 @@
 """Library of optimizations."""
 
-from ..ir import Graph, Constant, GraphCloner
+from ..composite import hyper_add
+from ..dtype import type_cloner, Function, JTagged, ismyiatype
+from ..infer import Inferrer
+from ..ir import Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
-from ..utils import Namespace
+from ..utils import Namespace, Partializable
 from ..utils.unify import Var, var, SVar
 
 from .opt import \
-    sexp_to_node, \
-    PatternSubstitutionOptimization as psub, \
-    pattern_replacer
+    sexp_to_node, pattern_replacer, GraphTransform, \
+    PatternSubstitutionOptimization as psub
 
 
 #####################
@@ -23,6 +25,9 @@ X1 = Var('X1')
 Y1 = Var('Y1')
 X2 = Var('X2')
 Y2 = Var('Y2')
+X3 = Var('X3')
+X4 = Var('X4')
+X5 = Var('X5')
 
 
 def _is_c(n):
@@ -38,6 +43,8 @@ C1 = var(_is_c)
 C2 = var(_is_c)
 CNS = var(lambda x: x.is_constant(Namespace))
 G = var(_is_cg)
+G1 = var(_is_cg)
+G2 = var(_is_cg)
 NIL = var(lambda x: x.is_constant() and x.value == ())
 
 Xs = SVar(Var())
@@ -212,6 +219,17 @@ getitem_newenv = psub(
 )
 
 
+# getitem(env_add(e1, e2), key, default)
+#     => hyper_add(getitem(e1, key, default), getitem(e2, key, default))
+getitem_env_add = psub(
+    pattern=(P.env_getitem, (P.env_add, X, Y), C, Z),
+    replacement=(hyper_add,
+                 (P.env_getitem, X, C, Z),
+                 (P.env_getitem, Y, C, Z)),
+    name='getitem_env_add'
+)
+
+
 ######################
 # Branch elimination #
 ######################
@@ -229,6 +247,69 @@ simplify_always_false = psub(
     replacement=Y,
     name='simplify_always_false'
 )
+
+
+# Simplify nested switch with the same condition (case 1)
+simplify_switch1 = psub(
+    pattern=(P.switch, X1, (P.switch, X1, X2, X3), X4),
+    replacement=(P.switch, X1, X2, X4),
+    name='simplify_switch1'
+)
+
+
+# Simplify nested switch with the same condition (case 2)
+simplify_switch2 = psub(
+    pattern=(P.switch, X1, X2, (P.switch, X1, X3, X4)),
+    replacement=(P.switch, X1, X2, X4),
+    name='simplify_switch2'
+)
+
+
+# Simplify switch when both branches are the same node
+simplify_switch_idem = psub(
+    pattern=(P.switch, X, Y, Y),
+    replacement=Y,
+    name='simplify_switch_idem'
+)
+
+
+_PutInSwitch = primset_var(
+    P.scalar_add,
+    P.scalar_sub,
+    P.scalar_mul,
+    P.scalar_div,
+    P.scalar_mod,
+    P.scalar_pow,
+)
+
+
+# Binary operations on switches with same conditions are transformed into
+# a switch on two operations, e.g.
+# switch(x, a, b) + switch(x, c, d) => switch(x, a + c, b + d)
+combine_switches = psub(
+    pattern=(_PutInSwitch, (P.switch, X1, X2, X3), (P.switch, X1, X4, X5)),
+    replacement=(P.switch, X1, (_PutInSwitch, X2, X4), (_PutInSwitch, X3, X5)),
+    name='combine_switches'
+)
+
+
+float_tuple_getitem_through_switch = psub(
+    pattern=(P.tuple_getitem, (P.switch, X1, X2, X3), C),
+    replacement=(P.switch, X1,
+                 (P.tuple_getitem, X2, C),
+                 (P.tuple_getitem, X3, C)),
+    name='float_tuple_getitem_through_switch'
+)
+
+
+float_env_getitem_through_switch = psub(
+    pattern=(P.env_getitem, (P.switch, X1, X2, X3), X4, X5),
+    replacement=(P.switch, X1,
+                 (P.env_getitem, X2, X4, X5),
+                 (P.env_getitem, X3, X4, X5)),
+    name='float_env_getitem_through_switch'
+)
+
 
 #####################
 # Simplify partials #
@@ -348,49 +429,193 @@ def replace_applicator(optimizer, node, equiv):
     return node
 
 
-##########################
-# Drop calls into graphs #
-##########################
+##################
+# Specialization #
+##################
+
+
+@GraphTransform
+def specialize_transform(graph, args):
+    """Specialize on provided non-None args.
+
+    Parameters that are specialized on are removed.
+    """
+    mng = graph.manager
+    graph = transformable_clone(graph, relation=f'sp')
+    mng.add_graph(graph)
+    for p, arg in zip(graph.parameters, args):
+        if arg is not None:
+            mng.replace(p, Constant(arg))
+    new_parameters = [p for p, arg in zip(graph.parameters, args)
+                      if arg is None]
+    mng.set_parameters(graph, new_parameters)
+    return graph
+
+
+@pattern_replacer(G, Xs)
+def specialize_on_graph_arguments(optimizer, node, equiv):
+    """Specialize a call on constant graph arguments."""
+    g = equiv[G].value
+    xs = equiv[Xs]
+    specialize = [x.is_constant((Graph, Primitive)) for x in xs]
+    if not any(specialize):
+        return node
+    specialize_map = tuple(x.value if s else None
+                           for x, s in zip(xs, specialize))
+    new_xs = [x for x, s in zip(xs, specialize) if not s]
+    g2 = specialize_transform(g, specialize_map)
+    return node.graph.apply(g2, *new_xs)
+
+
+#################
+# Incorporation #
+#################
+
+
+@GraphTransform
+def getitem_transform(graph, idx):
+    """Map to a graph that only returns the idx-th output.
+
+    If idx == 1, then:
+
+    (x -> (a, b, c)) => (x -> b)
+    """
+    graph = transformable_clone(graph, relation=f'[{idx}]')
+    if graph.output.is_apply(P.make_tuple):
+        graph.output = graph.output.inputs[idx + 1]
+    else:
+        graph.output = graph.apply(P.tuple_getitem, graph.output, idx)
+    return graph
+
+
+@pattern_replacer(P.tuple_getitem, (G, Xs), C)
+def incorporate_getitem(optimizer, node, equiv):
+    """Incorporate a getitem into a call.
+
+    For example:
+
+        (lambda x: (a, b, c, ...))(x)[0]
+            => (lambda x: a)(x)
+    """
+    g = equiv[G].value
+    idx = equiv[C].value
+    return node.graph.apply(getitem_transform(g, idx), *equiv[Xs])
+
+
+@pattern_replacer(P.tuple_getitem, ((P.switch, X, G1, G2), Xs), C)
+def incorporate_getitem_through_switch(optimizer, node, equiv):
+    """Incorporate a getitem into both branches.
+
+    Example:
+
+        switch(x, f, g)(y)[i]
+        => switch(x, f2, g2)(y)
+
+    Where f2 and g2 are modified versions of f and g that return their
+    ith element.
+    """
+    g1 = equiv[G1].value
+    g2 = equiv[G2].value
+    idx = equiv[C].value
+    xs = equiv[Xs]
+
+    g1t = getitem_transform(g1, idx)
+    g2t = getitem_transform(g2, idx)
+
+    new = ((P.switch, equiv[X], g1t, g2t), *xs)
+    return sexp_to_node(new, node.graph)
+
+
+@GraphTransform
+def env_getitem_transform(graph, key, default):
+    """Map to a graph that incorporates a call to env_getitem."""
+    rel = getattr(key, 'node', key)
+    graph = transformable_clone(graph, relation=f'[{rel}]')
+    out = graph.output
+    while out.is_apply(P.env_setitem):
+        _, out, key2, value = out.inputs
+        if key == key2.value:
+            graph.output = value
+            return graph
+    graph.output = graph.apply(P.env_getitem, out, key, default)
+    return graph
+
+
+@pattern_replacer(P.env_getitem, (G, Xs), C, Y)
+def incorporate_env_getitem(optimizer, node, equiv):
+    """Incorporate an env_getitem into a call."""
+    g = equiv[G].value
+    key = equiv[C].value
+    dflt = equiv[Y]
+    return node.graph.apply(env_getitem_transform(g, key, dflt), *equiv[Xs])
+
+
+@pattern_replacer(P.env_getitem, ((P.switch, X, G1, G2), Xs), C, Y)
+def incorporate_env_getitem_through_switch(optimizer, node, equiv):
+    """Incorporate an env_getitem into both branches."""
+    g1 = equiv[G1].value
+    g2 = equiv[G2].value
+    key = equiv[C].value
+    dflt = equiv[Y]
+    xs = equiv[Xs]
+
+    g1t = env_getitem_transform(g1, key, dflt)
+    g2t = env_getitem_transform(g2, key, dflt)
+
+    new = ((P.switch, equiv[X], g1t, g2t), *xs)
+    return sexp_to_node(new, node.graph)
+
+
+@GraphTransform
+def call_output_transform(graph, nargs):
+    """Map to a graph that calls its output.
+
+    ((*args1) -> (*args2) -> f) => (*args1, *args2) -> f(*args2)
+    """
+    graph = transformable_clone(graph, relation='call')
+    newp = [graph.add_parameter() for _ in range(nargs)]
+    graph.output = graph.apply(graph.output, *newp)
+    return graph
 
 
 @pattern_replacer((G, Xs), Ys)
-def drop_into_call(optimizer, node, equiv):
-    """Drop a call into the graph that returns the function.
+def incorporate_call(optimizer, node, equiv):
+    """Incorporate a call into the graph that returns the function.
 
-    g(x)(y) => g2(x, y)
+    Example:
+
+        g(x)(y) => g2(x, y)
 
     Where g2 is a modified copy of g that incorporates the call on y.
     """
     g = equiv[G].value
-    g2 = GraphCloner(g)[g]
+    xs = equiv[Xs]
+    ys = equiv[Ys]
+    g2 = call_output_transform(g, len(ys))
+    return node.graph.apply(g2, *xs, *ys)
 
+
+@pattern_replacer(((P.switch, X, G1, G2), Xs), Ys)
+def incorporate_call_through_switch(optimizer, node, equiv):
+    """Incorporate a call to both branches.
+
+    Example:
+
+        switch(x, f, g)(y)(z)
+        => switch(x, f2, g2)(y, z)
+
+    Where f2 and g2 are modified copies of f and g that incorporate the
+    call on both y and z.
+    """
+    g1 = equiv[G1].value
+    g2 = equiv[G2].value
     xs = equiv[Xs]
     ys = equiv[Ys]
 
-    new_output = (g2.output, *ys)
+    g1t = call_output_transform(g1, len(ys))
+    g2t = call_output_transform(g2, len(ys))
 
-    g2.output = Constant('DUMMY')
-    g2.output = sexp_to_node(new_output, g2)
-
-    return sexp_to_node((g2, *xs), node.graph)
-
-
-@pattern_replacer(((P.switch, X, Y, Z),), Xs)
-def drop_into_if(optimizer, node, equiv):
-    """Drop a call on the result of if into both branches.
-
-    f(if(x, y, z)) => if(x, () -> f(y()), () -> f(z()))
-    """
-    y = equiv[Y]
-    z = equiv[Z]
-
-    y2 = Graph()
-    y2.output = sexp_to_node(((y,), *equiv[Xs]), y2)
-
-    z2 = Graph()
-    z2.output = sexp_to_node(((z,), *equiv[Xs]), z2)
-
-    new = ((P.switch, equiv[X], y2, z2),)
+    new = ((P.switch, equiv[X], g1t, g2t), *xs, *ys)
     return sexp_to_node(new, node.graph)
 
 
@@ -428,3 +653,42 @@ def expand_J(optimizer, node, equiv):
     except NotImplementedError:
         return None
     return Constant(newg)
+
+
+@type_cloner.variant
+def _nofunction(self, f: (Function, Inferrer)):
+    raise TypeError('Function found')
+
+
+class JElim(Partializable):
+    """Eliminate J, iff it is only applied to non-functions."""
+
+    def __init__(self, optimizer):
+        """Initialize JElim."""
+        self.optimizer = optimizer
+
+    def __call__(self, root):
+        """Apply JElim on root."""
+        mng = self.optimizer.resources.manager
+        mng.keep_roots(root)
+        nodes = []
+        typesubs = []
+        for node in mng.all_nodes:
+            if node.is_apply(P.J) or node.is_apply(P.Jinv):
+                _, x = node.inputs
+                try:
+                    _nofunction(x.type)
+                except TypeError:
+                    return False
+                nodes.append((node, x))
+            elif node.is_constant() and ismyiatype(node.type, JTagged):
+                typesubs.append((node, node.type.subtype))
+
+        with mng.transact() as tr:
+            for node, repl in nodes:
+                tr.replace(node, repl)
+
+        for node, newtype in typesubs:
+            node.type = newtype
+
+        return len(nodes) > 0

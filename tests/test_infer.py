@@ -538,6 +538,21 @@ def test_tuple_getitem(x, y):
     return (x, y)[0]
 
 
+@infer(type=[(i64, f64, f64), (f64, i64, i64)])
+def test_tuple_getitem_negative(x, y):
+    return (x, y)[-1]
+
+
+@infer(type=[(i64, f64, InferenceError)])
+def test_tuple_outofbound(x, y):
+    return (x, y)[2]
+
+
+@infer(type=[(i64, f64, InferenceError)])
+def test_tuple_outofbound_negative(x, y):
+    return (x, y)[-3]
+
+
 @infer(
     type=[
         (li64, i64, i64),

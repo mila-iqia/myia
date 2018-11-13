@@ -92,21 +92,28 @@ add_zero_r = psub(
 )
 
 
-def _check_transform(before, after, transform, argspec=None):
+def _check_transform(before, after, transform,
+                     argspec=None,
+                     argspec_after=None):
     if argspec is None:
         gbefore = parse(before)
         gafter = parse(after)
     else:
+        if argspec_after is None:
+            argspec_after = argspec
         gbefore = specialize.run(input=before, argspec=argspec)['graph']
-        gafter = specialize.run(input=after, argspec=argspec)['graph']
+        if argspec_after:
+            gafter = specialize.run(input=after, argspec=argspec)['graph']
+        else:
+            gafter = parse(after)
     gbefore = GraphCloner(gbefore, total=True)[gbefore]
     transform(gbefore)
     assert isomorphic(gbefore, gafter)
 
 
-def _check_opt(before, after, *opts, argspec=None):
+def _check_opt(before, after, *opts, argspec=None, argspec_after=None):
     eq = PatternEquilibriumOptimizer(*opts)
-    _check_transform(before, after, eq, argspec)
+    _check_transform(before, after, eq, argspec, argspec_after)
 
 
 def test_checkopt_is_cloning():

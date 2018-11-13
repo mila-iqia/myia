@@ -1,10 +1,12 @@
 
 from .test_opt import _check_opt
 from myia import dtype
+from myia.composite import hyper_add
 from myia.opt import lib
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch, \
-    distribute, array_reduce, env_getitem, env_setitem, embed
+    distribute, array_reduce, env_getitem, env_setitem, embed, env_add, \
+    scalar_usub
 from myia.utils import newenv
 
 
@@ -145,6 +147,28 @@ def test_env_get_set():
                lib.cancel_env_set_get,
                argspec=[{'type': dtype.Float[64]},
                         {'type': dtype.Float[64]}])
+
+
+def test_env_get_add():
+
+    def before(x, y):
+        e1 = env_setitem(newenv, embed(x), x)
+        e1 = env_setitem(e1, embed(y), y)
+
+        e2 = env_setitem(newenv, embed(y), y)
+        e2 = env_setitem(e2, embed(x), x)
+
+        return env_getitem(env_add(e1, e2), embed(x), 0)
+
+    def after(x, y):
+        return hyper_add(x, x)
+
+    _check_opt(before, after,
+               lib.getitem_env_add,
+               lib.cancel_env_set_get,
+               argspec=[{'type': dtype.Int[64]},
+                        {'type': dtype.Int[64]}],
+               argspec_after=False)
 
 
 ##############################
@@ -327,6 +351,88 @@ def test_false_branch_switch():
 
     _check_opt(before, after,
                lib.simplify_always_false)
+
+
+def test_nested_switch_same_cond():
+
+    def before(a, b, c, d):
+        x = a < 0
+        return switch(x, switch(x, a, b), switch(x, c, d))
+
+    def after(a, b, c, d):
+        x = a < 0
+        return switch(x, a, d)
+
+    _check_opt(before, after,
+               lib.simplify_switch1,
+               lib.simplify_switch2)
+
+
+def test_nested_switch_diff_cond():
+
+    def before(a, b, c, d):
+        x = a < 0
+        y = b < 0
+        return switch(x, switch(y, a, b), switch(y, c, d))
+
+    _check_opt(before, before,
+               lib.simplify_switch1,
+               lib.simplify_switch2)
+
+
+def test_switch_same_branch():
+
+    def before(x, y):
+        a = y * y
+        return switch(x < 0, a, a)
+
+    def after(x, y):
+        return y * y
+
+    _check_opt(before, after,
+               lib.simplify_switch_idem)
+
+
+def test_combine_switch():
+
+    def before(x, y):
+        cond = x < 0
+        a = switch(cond, x, y)
+        b = switch(cond, y, x)
+        return a + b
+
+    def after(x, y):
+        return switch(x < 0, x + y, y + x)
+
+    _check_opt(before, after,
+               lib.combine_switches)
+
+
+def test_float_tuple_getitem_through_switch():
+
+    def before(x, y):
+        return switch(x < 0, x, y)[0]
+
+    def after(x, y):
+        return switch(x < 0, x[0], y[0])
+
+    _check_opt(before, after,
+               lib.float_tuple_getitem_through_switch)
+
+
+def test_float_env_getitem_through_switch():
+
+    def before(x, y):
+        return env_getitem(switch(x < 0, newenv, newenv), embed(y), 5)
+
+    def after(x, y):
+        key = embed(y)
+        return switch(x < 0,
+                      env_getitem(newenv, key, 5),
+                      env_getitem(newenv, key, 5))
+
+    _check_opt(before, after,
+               lib.float_env_getitem_through_switch)
 
 
 ############
@@ -656,11 +762,160 @@ def test_replace_applicator_2():
 
 
 ##################
-# Drop call into #
+# Specialization #
 ##################
 
 
-def test_drop_into():
+def test_specialize_on_graph_arguments():
+
+    def square(x):
+        return x * x
+
+    def before(x, y):
+        def helper(f, x, g, y):
+            return f(x) + g(y)
+
+        return helper(square, x, scalar_usub, y)
+
+    def after(x, y):
+        def helper(x, y):
+            return square(x) + scalar_usub(y)
+
+        return helper(x, y)
+
+    _check_opt(before, after,
+               lib.specialize_on_graph_arguments)
+
+
+#################
+# Incorporation #
+#################
+
+
+def test_incorporate_getitem():
+
+    def before(x, y):
+        def b_help(x, y):
+            return x * y, x + y
+        return b_help(x, y)[0]
+
+    def after(x, y):
+        def a_help(x, y):
+            return x * y
+        return a_help(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_getitem)
+
+
+def test_incorporate_getitem_2():
+
+    def before(x, y):
+        def b_help(x, y):
+            return x
+        return b_help(x, y)[0]
+
+    def after(x, y):
+        def a_help(x, y):
+            return x[0]
+        return a_help(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_getitem)
+
+
+def test_incorporate_getitem_through_switch():
+
+    def before(x, y):
+        def f1(x, y):
+            return x, y
+
+        def f2(x, y):
+            return y, x
+
+        return switch(x < 0, f1, f2)(x, y)[0]
+
+    def after(x, y):
+        def f1(x, y):
+            return x
+
+        def f2(x, y):
+            return y
+
+        return switch(x < 0, f1, f2)(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_getitem_through_switch)
+
+
+def test_incorporate_env_getitem():
+
+    def before(x, y):
+        key = embed(x)
+
+        def b_help(x, y):
+            return env_setitem(newenv, key, x * y)
+        return env_getitem(b_help(x, y), key, 0)
+
+    def after(x, y):
+        def a_help(x, y):
+            return x * y
+        return a_help(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_env_getitem,
+               lib.cancel_env_set_get,
+               argspec=[{'type': dtype.Float[64]},
+                        {'type': dtype.Float[64]}])
+
+
+def test_incorporate_env_getitem_2():
+
+    def before(x, y):
+        def b_help(x, y):
+            return x
+        return env_getitem(b_help(x, y), 1234, 0)
+
+    def after(x, y):
+        def a_help(x, y):
+            return env_getitem(x, 1234, 0)
+        return a_help(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_env_getitem,
+               lib.cancel_env_set_get)
+
+
+def test_incorporate_env_getitem_through_switch():
+
+    def before(x, y):
+        key = embed(x)
+
+        def f1(x, y):
+            return env_setitem(newenv, key, x * y)
+
+        def f2(x, y):
+            return env_setitem(newenv, key, x + y)
+
+        return env_getitem(switch(x < 0, f1, f2)(x, y), key, 0)
+
+    def after(x, y):
+        def f1(x, y):
+            return x * y
+
+        def f2(x, y):
+            return x + y
+
+        return switch(x < 0, f1, f2)(x, y)
+
+    _check_opt(before, after,
+               lib.incorporate_env_getitem_through_switch,
+               lib.cancel_env_set_get,
+               argspec=[{'type': dtype.Float[64]},
+                        {'type': dtype.Float[64]}])
+
+
+def test_incorporate_call():
     def b_help(q):
         def subf(z):
             return q * z
@@ -670,17 +925,17 @@ def test_drop_into():
         return b_help(x)(y)
 
     def after(x, y):
-        def a_help(q):
+        def a_help(q, y):
             def subf(z):
                 return q * z
             return subf(y)
-        return a_help(x)
+        return a_help(x, y)
 
     _check_opt(before, after,
-               lib.drop_into_call)
+               lib.incorporate_call)
 
 
-def test_drop_into_if():
+def test_incorporate_call_through_switch():
 
     def before_helper(x):
         if x < 0:
@@ -692,19 +947,18 @@ def test_drop_into_if():
         return before_helper(x)(y, z)
 
     def after(x, y, z):
-        def after_helper(x):
-            def tb():
-                return y * z
+        def after_helper(x, y, z):
+            def tb(y, z):
+                return scalar_mul(y, z)
 
-            def fb():
-                return y + z
+            def fb(y, z):
+                return scalar_add(y, z)
 
-            if x < 0:
-                return tb()
-            else:
-                return fb()
+            return switch(x < 0, tb, fb)(y, z)
 
-        return after_helper(x)
+        return after_helper(x, y, z)
 
     _check_opt(before, after,
-               lib.drop_into_call, lib.drop_into_if)
+               lib.elim_identity,
+               lib.incorporate_call,
+               lib.incorporate_call_through_switch)

@@ -2,7 +2,7 @@
 
 from .abstract import Node  # noqa
 from .anf import Graph, ANFNode, Apply, Constant, Parameter, Special  # noqa
-from .clone import clone, GraphCloner  # noqa
+from .clone import clone, GraphCloner, transformable_clone  # noqa
 from .manager import (  # noqa
     ManagerError, manage, ParentProxy, GraphManager
 )
