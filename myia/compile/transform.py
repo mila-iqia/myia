@@ -2,7 +2,7 @@
 
 from ..ir import Apply, toposort, Graph, Constant
 from ..pipeline import PipelineDefinition, PipelineStep
-from ..prim import Primitive
+from ..prim import Primitive, ops as P
 from ..prim.ops import partial, return_, switch
 from .debug_lin import debug_convert
 from .nnvm import nnvm_convert
@@ -54,6 +54,9 @@ class WrapPrimitives(PipelineStep):
                 if ct.is_constant(Primitive):
                     for node, key in mng.uses[ct]:
                         if key != 0:
+                            if node.inputs[0].is_constant():
+                                if node.inputs[0].value == P.array_map:
+                                    continue
                             g = get_prim_graph(ct.value, ct.type)
                             tr.set_edge(node, key, Constant(g))
 
