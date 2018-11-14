@@ -12,8 +12,7 @@ from tvm.contrib import graph_runtime
 from .utils import get_outputs
 
 from ..dtype import type_to_np_dtype, ismyiatype, Array
-from ..prim import Primitive
-from ..prim import ops as P
+from ..prim import Primitive, ops as P
 from ..ir import Graph
 
 
@@ -76,21 +75,9 @@ def nnvm_dot(c, a, b):
 
 def nnvm_array_map(c, fn, *array):
     """Implementation of array_map."""
-    assert fn.is_constant()
+    assert fn.is_constant(Primitive)
     fn = fn.value
-    if fn in SIMPLE_MAP:
-        # This might go away at some point since we have wrap_primitives
-        return SIMPLE_MAP[fn](*[c.ref(a) for a in array])  # pragma: no cover
-    else:
-        assert isinstance(fn, Graph)
-        node = fn.output
-        # Handle wrapping graphs
-        if (node.inputs[0].is_constant() and
-                tuple(node.inputs[1:]) == tuple(fn.parameters)):
-            fn = node.inputs[0].value
-            if fn in SIMPLE_MAP:
-                return SIMPLE_MAP[fn](*[c.ref(a) for a in array])
-        raise NotImplementedError("Only support primitives for array_map")
+    return SIMPLE_MAP[fn](*[c.ref(a) for a in array])
 
 
 def nnvm_transpose(c, a, ax):
