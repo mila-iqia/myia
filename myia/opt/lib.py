@@ -241,8 +241,11 @@ def simplify_array_map(optimizer, node, equiv):
             return node
 
     except NotImplementedError:
-        g.flags['inline_inside'] = True
-        return node
+        if g.flags.get('inline_inside'):
+            return node
+        else:
+            g.flags['inline_inside'] = True
+            return True
 
 
 #############################
