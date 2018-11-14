@@ -182,6 +182,37 @@ elim_array_reduce = psub(
 
 
 @pattern_replacer(P.array_map, G, Xs)
+def unfuse_composite(optimizer, node, equiv):
+    from ..grad import GraphRemapper
+    # This has to be defined inline because of circular imports
+    class UnfuseRemapper(GraphRemapper):
+        def __init__(self, g):
+	    # might be g and all subgraphs
+            super().__init__('unfused', g.graphs_used.keys() | {g})
+
+        def link_apply(self, g, ng, node, new_node):
+            if node.inputs[0].is_constant(Primitive):
+                ni = [self.get(g, i) for i in node.inputs[1:]]
+                new_node.inputs = \
+                    [ng.constant(P.array_map), node.inputs[0]] + ni
+            else:
+                ni = [self.get(g, i) for i in node.inputs]
+                new_node.inputs = ni
+
+        def finalize_graph(self, g, ng):
+            ng.output = self.get(g, g.output)
+
+    g = equiv[G].value
+    xs = equiv[Xs]
+    r = UnfuseRemapper(g)
+    r.populate()
+    r.link()
+    r.finalize()
+    ng = r.get_graph(g)
+    return node.graph.apply(ng, *xs)
+
+
+@pattern_replacer(P.array_map, G, Xs)
 def simplify_array_map(optimizer, node, equiv):
     """Simplify array_map on certain graphs.
 
