@@ -126,7 +126,7 @@ class Type(metaclass=TypeMeta):
 
     def __init__(self, *args, **kwargs):
         """Type cannot be initialized."""
-        raise RuntimeError('Cannot instantiate Myia types.')
+        raise RuntimeError(f'Cannot instantiate Myia type {type(self)}.')
 
 
 class Object(Type):
