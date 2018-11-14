@@ -195,13 +195,10 @@ def unfuse_composite(optimizer, node, equiv):
             super().__init__('unfused', g.graphs_used.keys() | {g})
 
         def link_apply(self, g, ng, node, new_node):
-            if node.inputs[0].is_constant(Primitive):
-                ni = [self.get(g, i) for i in node.inputs[1:]]
-                new_node.inputs = \
-                    [ng.constant(P.array_map), node.inputs[0]] + ni
-            else:
-                ni = [self.get(g, i) for i in node.inputs]
-                new_node.inputs = ni
+            assert node.inputs[0].is_constant(Primitive)
+            ni = [self.get(g, i) for i in node.inputs[1:]]
+            new_node.inputs = \
+                [ng.constant(P.array_map), node.inputs[0]] + ni
 
         def finalize_graph(self, g, ng):
             ng.output = self.get(g, g.output)

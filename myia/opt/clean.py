@@ -72,7 +72,7 @@ def expand_tuples_p(mng, graph, params):
         tshape = param.shape
         if not ismyiatype(ttype, Tuple):
             if ismyiatype(ttype, JTagged):
-                import pdb; pdb.set_trace()
+                raise NotImplementedError()
             new_params.append(param)
             continue
 
