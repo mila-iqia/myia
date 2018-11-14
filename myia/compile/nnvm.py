@@ -13,7 +13,6 @@ from .utils import get_outputs
 
 from ..dtype import type_to_np_dtype, ismyiatype, Array
 from ..prim import Primitive, ops as P
-from ..ir import Graph
 
 
 SIMPLE_MAP = {
