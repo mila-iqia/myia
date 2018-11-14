@@ -94,6 +94,7 @@ def nnvm_array_map(c, fn, *array):
 
 
 def nnvm_transpose(c, a, ax):
+    """Implementation of transpose."""
     na = c.ref(a)
     assert ax.is_constant(tuple)
     return sym.transpose(na, axes=ax.value)

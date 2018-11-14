@@ -183,6 +183,10 @@ elim_array_reduce = psub(
 
 @pattern_replacer(P.array_map, G, Xs)
 def unfuse_composite(optimizer, node, equiv):
+    """Tranform array_map on a graph to a graph of array_maps.
+
+    This must be applied to scalar-only graphs.
+    """
     from ..grad import GraphRemapper
     # This has to be defined inline because of circular imports
     class UnfuseRemapper(GraphRemapper):
