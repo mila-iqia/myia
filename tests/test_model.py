@@ -139,7 +139,7 @@ def test_forward_specialize(model, x):
          ClassShape({
              'layers': TupleShape((ClassShape({'W': (10, 15), 'b': (1, 15)}),
                                    ClassShape({'W': (15, 8), 'b': (1, 8)})))})
-        ),
+         ),
         ({'value': make_model()},
          {'value': rand(3, 14)},
          {'value': rand(3, 8)},

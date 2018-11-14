@@ -188,10 +188,10 @@ def unfuse_composite(optimizer, node, equiv):
     This must be applied to scalar-only graphs.
     """
     from ..grad import GraphRemapper
+
     # This has to be defined inline because of circular imports
     class UnfuseRemapper(GraphRemapper):
         def __init__(self, g):
-	    # might be g and all subgraphs
             super().__init__('unfused', g.graphs_used.keys() | {g})
 
         def link_apply(self, g, ng, node, new_node):
