@@ -6,7 +6,7 @@ from myia.opt import lib
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch, \
     distribute, array_reduce, env_getitem, env_setitem, embed, env_add, \
-    scalar_usub
+    scalar_usub, array_map, scalar_to_array
 from myia.utils import newenv
 
 
@@ -288,6 +288,97 @@ def test_elim_array_reduce():
                lib.elim_array_reduce,
                argspec=[{'type': dtype.Array[dtype.Float[64]],
                          'shape': (3, 5)}])
+
+
+def test_simplify_array_map():
+
+    def before(xs, ys):
+        def f(x, y):
+            return scalar_add(y, x)
+        return array_map(f, xs, ys)
+
+    def after(xs, ys):
+        return array_map(scalar_add, ys, xs)
+
+    _check_opt(before, after,
+               lib.simplify_array_map)
+
+
+def test_simplify_array_map_2():
+
+    def before(xs, ys):
+        def f(x, y):
+            return y
+        return array_map(f, xs, ys)
+
+    def after(xs, ys):
+        return ys
+
+    _check_opt(before, after,
+               lib.simplify_array_map)
+
+
+def test_simplify_array_map_3():
+
+    def before(xs, ys):
+        def f(x, y):
+            return x * x + y * y
+        return array_map(f, xs, ys)
+
+    _check_opt(before, before,
+               lib.simplify_array_map)
+
+
+def test_simplify_array_map_4():
+
+    def before(xs):
+        def f(x):
+            return 3
+        return array_map(f, xs)
+
+    def after(xs):
+        return distribute(scalar_to_array(3), (3, 5))
+
+    _check_opt(before, after,
+               lib.simplify_array_map,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 5)}])
+
+
+def test_simplify_array_map_5():
+
+    def before(xs, ys, z):
+        def g(x):
+            return x * x * x
+
+        def f(x, y):
+            return g(x) + g(y)
+        return array_map(f, xs, ys), g(z + 1), g(z + 2)
+
+    def after(xs, ys, z):
+        def g(x):
+            return x * x * x
+
+        def f(x, y):
+            return (x * x * x) + (y * y * y)
+        return array_map(f, xs, ys), g(z + 1), g(z + 2)
+
+    _check_opt(before, after,
+               lib.simplify_array_map,
+               lib.inline_inside_marked_caller)
+
+
+def test_simplify_array_map_6():
+
+    def before(xs, ys, z):
+        def f(x, y):
+            def g(x):
+                return x * y
+            return g(x)
+        return array_map(f, xs, ys)
+
+    _check_opt(before, before,
+               lib.simplify_array_map)
 
 
 ######################

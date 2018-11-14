@@ -863,6 +863,7 @@ step_opt = Optimizer.partial(
             # Safe inlining
             optlib.inline_trivial,
             optlib.inline_unique_uses,
+            optlib.inline_inside_marked_caller,
             optlib.inline_core,
             optlib.simplify_partial,
             optlib.replace_applicator,
@@ -892,6 +893,7 @@ step_opt = Optimizer.partial(
             optlib.cancel_env_set_get,
             optlib.getitem_newenv,
             optlib.getitem_env_add,
+            optlib.simplify_array_map,
         ],
         main2=[
             # Costlier optimizations
