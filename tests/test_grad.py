@@ -4,7 +4,8 @@ import numpy as np
 from types import FunctionType
 
 from myia import api
-from myia.api import standard_resources, Validator
+from myia.api import standard_resources
+from myia.steps import Validator
 from myia.composite import grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.dtype import JTagged

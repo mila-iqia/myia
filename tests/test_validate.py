@@ -44,8 +44,7 @@ pip = scalar_pipeline \
 
 pip_ec = scalar_pipeline \
     .select('parse', 'infer', 'specialize', 'prepare', 'validate') \
-    .configure({'prepare.flatten_data_structures': True,
-                'validate.whitelist': test_whitelist})
+    .configure({'validate.whitelist': test_whitelist})
 
 
 def run(pip, fn, types):
