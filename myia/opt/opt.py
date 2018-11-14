@@ -158,7 +158,11 @@ class PatternEquilibriumOptimizer:
                 for node in list(mng.all_nodes):
                     for transformer in self.node_transformers:
                         new = transformer(self.optimizer, node)
-                        if new and new is not node:
+                        if new is True:
+                            changes = True
+                            any_changes = True
+                            break
+                        elif new and new is not node:
                             new.expect_inferred.update(node.inferred)
                             tr.replace(node, new)
                             changes = True
