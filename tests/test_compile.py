@@ -2,7 +2,7 @@ from pytest import mark
 from copy import copy
 import numpy as np
 
-from myia.api import standard_pipeline
+from myia.pipeline import standard_pipeline
 from myia.prim import ops as P
 from myia.prim.py_implementations import \
     typeof, scalar_add, partial

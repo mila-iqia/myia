@@ -2,7 +2,7 @@
 import pytest
 
 from myia import operations
-from myia.api import scalar_pipeline
+from myia.pipeline import scalar_pipeline
 from myia.infer import InferenceError
 from myia.ir import Constant, isomorphic, GraphCloner
 from myia.opt import PatternSubstitutionOptimization as psub, \

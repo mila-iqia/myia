@@ -5,7 +5,7 @@ import numpy as np
 
 from types import SimpleNamespace
 
-from myia.api import scalar_pipeline, standard_pipeline
+from myia.pipeline import scalar_pipeline, standard_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \

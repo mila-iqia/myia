@@ -3,7 +3,7 @@ from copy import copy
 from pytest import mark
 from types import SimpleNamespace
 
-from myia.api import standard_debug_pipeline
+from myia.pipeline import standard_debug_pipeline
 
 from .common import mysum, Point
 

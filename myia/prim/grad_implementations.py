@@ -4,11 +4,11 @@ Each primitive is associated to an augmented function, which returns a pair of
 the (augmented) original primitive's output and a backpropagator function.
 """
 
-from ..api import standard_pipeline
 from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import NamedDebugInfo, About
 from ..ir import Constant, Graph, manage, clone, MetaGraph
+from ..pipeline import standard_pipeline
 from ..utils import Registry, newenv
 
 from . import ops as primops

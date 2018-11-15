@@ -5,17 +5,19 @@ The steps are listed in roughly the same order they should be called.
 
 
 import numpy as np
-from . import dtype
-from .cconv import closure_convert
-from .ir import Graph
-from .opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
+
+from .. import dtype
+from ..cconv import closure_convert
+from ..ir import Graph
+from ..opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
     erase_class, erase_tuple
-from .pipeline import pipeline_function, PipelineStep
-from .prim import vm_implementations
-from .utils import overload, flatten
-from .validate import validate, whitelist as default_whitelist, \
+from ..prim import vm_implementations
+from ..utils import overload, flatten
+from ..validate import validate, whitelist as default_whitelist, \
     validate_type as default_validate_type
-from .vm import VM
+from ..vm import VM
+
+from .pipeline import pipeline_function, PipelineStep
 
 
 #############

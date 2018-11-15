@@ -1,7 +1,7 @@
 
 import pytest
 
-from myia.api import scalar_pipeline, scalar_parse
+from myia.pipeline import scalar_pipeline, scalar_parse
 from myia.composite import list_map
 from myia.dtype import Array, Tuple, List, Int
 from myia.dshape import NOSHAPE, TupleShape, ListShape
