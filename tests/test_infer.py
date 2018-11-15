@@ -6,7 +6,7 @@ import numpy as np
 from types import SimpleNamespace
 
 from myia.pipeline import scalar_pipeline, standard_pipeline
-from myia.composite import hyper_add, zeros_like, grad, list_map
+from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
     Number, Class, Problem, EnvType as Env, JTagged as JT
@@ -18,7 +18,7 @@ from myia.pipeline import pipeline_function
 from myia.prim import Primitive, ops as P
 from myia.dshape import TupleShape, ListShape, ClassShape, NOSHAPE
 from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, scalar_lt, tail, list_map as list_map_prim, \
+    scalar_add, scalar_mul, scalar_lt, list_map as list_map_prim, \
     hastype, typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
@@ -530,6 +530,11 @@ def test_array_len(xs):
                TupleShape((TupleShape((NOSHAPE, NOSHAPE)),)))])
 def test_tail_tuple(tup):
     return tail(tup)
+
+
+@infer(type=[(T[i64], T[f64], InferenceError)])
+def test_tail_tuple_wrong(x, y):
+    return tail(x, y)
 
 
 @infer(type=[(i64, f64, i64), (f64, i64, f64)],

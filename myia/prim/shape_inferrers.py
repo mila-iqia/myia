@@ -138,12 +138,6 @@ async def infer_shape_make_tuple(track, *args):
     return TupleShape(sh)
 
 
-@shape_inferrer(P.tail, nargs=1)
-async def infer_shape_tail(track, tup):
-    """Infer the shape of tail."""
-    return TupleShape((await tup['shape']).shape[1:])
-
-
 @shape_inferrer(P.tuple_getitem, nargs=2)
 async def infer_shape_tuple_getitem(track, seq, idx):
     """Infer the shape of tuple_getitem."""

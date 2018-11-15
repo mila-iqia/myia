@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from functools import reduce
 
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
-    List, Class, EnvType
+    List, Class, EnvType, ismyiatype
 from .hypermap import HyperMap
 from .infer import Inferrer, GraphInferrer, MyiaTypeError
 from .info import About
@@ -13,7 +13,7 @@ from .ir import Graph, MetaGraph, MultitypeGraph, Constant
 from .prim import ops as P
 from .prim.py_implementations import \
     array_map, bool_not, bool_eq, hastype, distribute, shape, \
-    broadcast_shape, switch, identity, bool_and, tail, typeof, scalar_cast, \
+    broadcast_shape, switch, identity, bool_and, typeof, scalar_cast, \
     scalar_add, scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, \
     scalar_div, scalar_to_array, env_add
 from .utils import newenv
@@ -388,6 +388,35 @@ def tuple_hasnext(xs):
     return len(xs) > 0
 
 
+class Tail(MetaGraph):
+    """Implementation of tail."""
+
+    def specialize_from_types(self, types):
+        """Generate tail specialized for the given Tuple type.
+
+        tail(x) generates make_tuple(x[1], x[2], ...)
+        """
+        if len(types) != 1:
+            raise MyiaTypeError('tail takes one argument')
+        t, = types
+        if not ismyiatype(t, Tuple):
+            raise MyiaTypeError('tail requires a Tuple')
+        if len(t.elements) == 0:
+            raise MyiaTypeError('tail requires a non-empty Tuple')
+        g = Graph()
+        g.flags['core'] = True
+        g.flags['flatten_inference'] = True
+        tup = g.add_parameter()
+        tup.debug.name = "tup"
+        elems = [g.apply(P.tuple_getitem, tup, i)
+                 for i in range(1, len(t.elements))]
+        g.output = g.apply(P.make_tuple, *elems)
+        return g
+
+
+tail = Tail('tail')
+
+
 #################
 # Array methods #
 #################
@@ -731,7 +760,7 @@ class GradOperation(MetaGraph):
 
         bapp = df.apply(bprop, bprop_arg)
         if get_all:
-            df.output = df.apply(P.tail, bapp)
+            df.output = df.apply(tail, bapp)
         else:
             df.output = df.apply(P.tuple_getitem, bapp, 1)
         return df

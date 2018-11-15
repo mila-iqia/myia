@@ -288,12 +288,6 @@ def make_tuple(*args):
     return args
 
 
-@register(primops.tail)
-def tail(tup):
-    """Implement `tail`."""
-    return tup[1:]
-
-
 @py_register(primops.tuple_getitem)
 @py_register(primops.list_getitem)
 @py_register(primops.array_getitem)

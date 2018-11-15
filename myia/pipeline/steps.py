@@ -257,7 +257,6 @@ step_opt = Optimizer.partial(
             optlib.elim_identity,
             optlib.getitem_tuple,
             optlib.setitem_tuple,
-            optlib.tail_tuple,
             optlib.elim_j_jinv,
             optlib.elim_jinv_j,
             optlib.cancel_env_set_get,

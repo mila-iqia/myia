@@ -193,15 +193,6 @@ async def infer_type_make_tuple(track, *args):
     return Tuple[elts]
 
 
-@type_inferrer(P.tail, nargs=1)
-async def infer_type_tail(track, tup):
-    """Infer the return type of tail."""
-    tup_t = await track.check(Tuple, tup)
-    if not len(tup_t.elements) >= 1:
-        raise MyiaTypeError('tail on empty tuple', refs=[tup])
-    return Tuple[tup_t.elements[1:]]
-
-
 @type_inferrer(P.tuple_getitem, nargs=2)
 async def infer_type_tuple_getitem(track, seq, idx):
     """Infer the return type of tuple_getitem."""
