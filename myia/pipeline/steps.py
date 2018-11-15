@@ -157,14 +157,14 @@ def step_specialize(self, graph, inference_context):
     return {'graph': new_graph}
 
 
-###########
-# Prepare #
-###########
+####################
+# Erase Class type #
+####################
 
 
 @pipeline_function
-def step_prepare(self, graph, argspec, outspec):
-    """Prepare the graph.
+def step_erase_class(self, graph, argspec, outspec):
+    """Replace the Class type by Tuple type.
 
     This should be run on the specialized graph.
 
@@ -174,22 +174,17 @@ def step_prepare(self, graph, argspec, outspec):
     Outputs:
         graph: The prepared graph.
     """
-    orig_argspec = argspec
-    orig_outspec = outspec
     mng = self.resources.manager
     erase_class(graph, mng)
-    argspec = tuple(dict(p.inferred) for p in graph.parameters)
-    graph = self.resources.inferrer.renormalize(graph, argspec)
-    erase_tuple(graph, mng)
-    argspec = tuple(dict(p.inferred) for p in graph.parameters)
-    graph = self.resources.inferrer.renormalize(graph, argspec)
-    outspec = dict(graph.output.inferred)
+    new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+    graph = self.resources.inferrer.renormalize(graph, new_argspec)
+    new_outspec = dict(graph.output.inferred)
     return {'graph': graph,
-            'orig_argspec': orig_argspec,
-            'argspec': argspec,
-            'orig_outspec': orig_outspec,
-            'outspec': outspec,
-            'flattened_data_structures': True}
+            'orig_argspec': argspec,
+            'argspec': new_argspec,
+            'orig_outspec': outspec,
+            'outspec': new_outspec,
+            'erase_class': True}
 
 
 ############
@@ -289,6 +284,35 @@ step_opt = Optimizer.partial(
         jelim=optlib.JElim.partial(),
     )
 )
+
+
+####################
+# Erase Tuple type #
+####################
+
+
+@pipeline_function
+def step_erase_tuple(self, graph, argspec, outspec, erase_class=False):
+    """Expand Tuple in graph parameters whenever possible.
+
+    This should be run on the specialized graph.
+
+    Inputs:
+        graph: The graph to prepare.
+
+    Outputs:
+        graph: The prepared graph.
+    """
+    assert erase_class
+    mng = self.resources.manager
+    erase_tuple(graph, mng)
+    new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+    graph = self.resources.inferrer.renormalize(graph, new_argspec)
+    new_outspec = dict(graph.output.inferred)
+    return {'graph': graph,
+            'argspec': new_argspec,
+            'outspec': new_outspec,
+            'erase_tuple': True}
 
 
 ############
@@ -475,11 +499,12 @@ def step_wrap(self,
               outspec,
               orig_argspec=None,
               orig_outspec=None,
-              flattened_data_structures=False):
+              erase_class=False,
+              erase_tuple=False):
         """Convert args to vm format, and output from vm format."""
-        if not flattened_data_structures:
+        if not (erase_class and erase_tuple):
             raise AssertionError(
-                'OutputWrapper step requires the prepare step'
+                'OutputWrapper step requires the erase_class/tuple steps'
             )
         fn = output
         orig_arg_t = [arg['type'] for arg in orig_argspec or argspec]

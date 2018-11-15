@@ -43,7 +43,8 @@ pip = scalar_pipeline \
 
 
 pip_ec = scalar_pipeline \
-    .select('parse', 'infer', 'specialize', 'prepare', 'validate') \
+    .select('parse', 'infer', 'specialize',
+            'erase_class', 'erase_tuple', 'validate') \
     .configure({'validate.whitelist': test_whitelist})
 
 

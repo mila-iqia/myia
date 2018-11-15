@@ -16,7 +16,9 @@ from .common import mysum, i64, f64
 
 
 specialize_pipeline = scalar_debug_pipeline \
-    .select('parse', 'infer', 'specialize', 'prepare', 'validate', 'export') \
+    .select('parse', 'infer', 'specialize',
+            'erase_class', 'erase_tuple',
+            'validate', 'export') \
     .configure(
         {'inferrer.tracks.value.max_depth': 1,
          'inferrer.tied_tracks': {'type': ['shape']}}
@@ -25,7 +27,8 @@ specialize_pipeline = scalar_debug_pipeline \
 
 specialize_pipeline_std = standard_debug_pipeline \
     .select('parse', 'infer', 'specialize',
-            'prepare', 'opt', 'validate', 'export', 'wrap') \
+            'erase_class', 'opt', 'erase_tuple',
+            'validate', 'export', 'wrap') \
     .configure(
         {'inferrer.tracks.value.max_depth': 1,
          'inferrer.tied_tracks': {'type': ['shape']}}
