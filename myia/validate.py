@@ -105,7 +105,6 @@ whitelist = frozenset({
     # P.typeof,
     # P.hastype,
     P.make_tuple,
-    P.tail,
     P.tuple_getitem,
     P.list_getitem,
     P.array_getitem,

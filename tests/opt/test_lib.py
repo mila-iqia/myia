@@ -4,7 +4,7 @@ from myia import dtype
 from myia.composite import hyper_add
 from myia.opt import lib
 from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, tail, tuple_setitem, identity, partial, switch, \
+    scalar_add, scalar_mul, tuple_setitem, identity, partial, switch, \
     distribute, array_reduce, env_getitem, env_setitem, embed, env_add, \
     scalar_usub, array_map, scalar_to_array
 from myia.utils import newenv
@@ -30,38 +30,25 @@ def test_getitem_tuple_elem0():
 
 def test_getitem_tuple_elem3():
 
-    def before1(x):
+    def before(x):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tup[3]
-
-    def before2(x):
-        tup = (x + 1, x + 2, x + 3, x + 4)
-        return tail(tail(tail(tup)))[0]
 
     def after(x):
         return x + 4
 
-    _check_opt(before1, after,
+    _check_opt(before, after,
                lib.getitem_tuple)
-
-    _check_opt(before2, after,
-               lib.getitem_tuple, lib.tail_tuple)
 
 
 def test_getitem_tuple_noopt():
 
-    def before1(x, y):
+    def before(x, y):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tup[y]
 
-    def before2(x):
-        return tail(x)
-
-    _check_opt(before1, before1,
+    _check_opt(before, before,
                lib.getitem_tuple)
-
-    _check_opt(before2, before2,
-               lib.tail_tuple)
 
 
 def test_setitem_tuple_elem0():

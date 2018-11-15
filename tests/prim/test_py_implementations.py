@@ -7,7 +7,7 @@ import math
 from myia.pipeline import scalar_debug_pipeline
 from myia.dtype import Int, Float, List, Tuple, Class, Number, External
 from myia.prim.py_implementations import setattr as myia_setattr, \
-    tuple_setitem, list_setitem, tail, hastype, typeof, \
+    tuple_setitem, list_setitem, hastype, typeof, \
     shape, reshape, array_map, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
@@ -142,11 +142,6 @@ def test_prim_tuple(x, y):
 @parse_compare(((1, 2, 3), 0), ((4, -6, 7), 2))
 def test_prim_getitem(data, item):
     return data[item]
-
-
-def test_prim_tail():
-    tup = (1, 2, 3, 4)
-    assert tail(tup) == (2, 3, 4)
 
 
 def test_prim_tuple_setitem():

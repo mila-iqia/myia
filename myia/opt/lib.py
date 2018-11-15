@@ -91,14 +91,6 @@ def setitem_tuple(optimizer, node, equiv):
     return sexp_to_node((P.make_tuple, *elems), node.graph)
 
 
-# tail((a, b, ...)) => (b, ...)
-tail_tuple = psub(
-    pattern=(P.tail, (P.make_tuple, X, Xs)),
-    replacement=(P.make_tuple, Xs),
-    name='tail_tuple'
-)
-
-
 # f((a, b, ...), (p, q, ...)) => (f(a, p), f(b, q), ...)
 # For f in the following list:
 _BubbleBinary = primset_var(P.scalar_add)
