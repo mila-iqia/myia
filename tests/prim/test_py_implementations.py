@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 import math
 
-from myia.api import scalar_debug_pipeline
+from myia.pipeline import scalar_debug_pipeline
 from myia.dtype import Int, Float, List, Tuple, Class, Number, External
 from myia.prim.py_implementations import setattr as myia_setattr, \
     tuple_setitem, list_setitem, tail, hastype, typeof, \

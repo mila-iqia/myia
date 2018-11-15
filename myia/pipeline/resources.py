@@ -5,13 +5,14 @@ import numpy as np
 from collections import defaultdict
 from types import FunctionType
 
-from . import dtype, operations, parser, composite as C
-from .infer import InferenceEngine, ANYTHING
-from .ir import Graph, clone
+from .. import dtype, operations, parser, composite as C
+from ..infer import InferenceEngine, ANYTHING
+from ..ir import Graph, clone
+from ..prim import ops as P
+from ..specialize import TypeSpecializer
+from ..utils import overload, TypeMap, UNKNOWN
+
 from .pipeline import PipelineResource
-from .prim import ops as P
-from .specialize import TypeSpecializer
-from .utils import overload, TypeMap, UNKNOWN
 
 
 scalar_object_map = {

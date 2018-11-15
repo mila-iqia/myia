@@ -1,7 +1,8 @@
 """Tools to generate and configure Myia's operation pipeline."""
 
 
-from .utils import merge, Merge, NS, Partial, Partializable, partition_keywords
+from ..utils import merge, Merge, NS, Partial, Partializable, \
+    partition_keywords
 
 
 class PipelineDefinition:

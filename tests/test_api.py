@@ -1,14 +1,15 @@
 import numpy as np
 import pytest
 
-from myia.api import myia, \
-    scalar_parse as parse, scalar_debug_compile as compile
+from myia.api import myia
 from myia.cconv import closure_convert
 from myia.dtype import List, Array, Tuple, Bool
 from myia.infer import InferenceError
 from myia.ir import clone
+from myia.pipeline import \
+    scalar_parse as parse, scalar_debug_compile as compile
+from myia.pipeline.steps import convert_arg, convert_result
 from myia.prim.py_implementations import getitem
-from myia.steps import convert_arg, convert_result
 
 from .common import Point, Point_t, Point3D, i64, f64, i16
 

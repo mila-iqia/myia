@@ -3,7 +3,7 @@ import pytest
 
 from collections import Counter
 
-from myia.api import scalar_parse as parse
+from myia.pipeline import scalar_parse as parse
 from myia.debug.label import short_labeler
 from myia.ir import manage, GraphManager, GraphCloner, ManagerError
 from myia.prim import Primitive

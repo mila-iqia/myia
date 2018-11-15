@@ -1,6 +1,6 @@
 import pytest
 
-from myia.api import scalar_parse as parse, scalar_pipeline
+from myia.pipeline import scalar_parse as parse, scalar_pipeline
 from myia.parser import MyiaSyntaxError
 
 

@@ -1,7 +1,7 @@
 
 import pytest
 
-from myia.api import scalar_parse as parse
+from myia.pipeline import scalar_parse as parse
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs
 from myia.ir import Constant, Graph, succ_deeper, succ_incoming, \

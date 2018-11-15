@@ -1,7 +1,7 @@
 from copy import copy
 from pytest import mark
 
-from myia.api import standard_pipeline
+from myia.pipeline import standard_pipeline
 
 
 debug_lin_pipeline = standard_pipeline.configure({

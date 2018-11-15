@@ -1,7 +1,7 @@
 
 from pytest import mark
 
-from myia.api import standard_debug_pipeline
+from myia.pipeline import standard_debug_pipeline
 from myia.ir import manage
 
 

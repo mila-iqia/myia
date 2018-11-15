@@ -3,14 +3,13 @@ import pytest
 import numpy as np
 from types import FunctionType
 
-from myia import api
-from myia.api import standard_resources
-from myia.steps import Validator
+from myia.pipeline import standard_resources
 from myia.composite import grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.dtype import JTagged
 from myia.grad import J as realJ
-from myia.pipeline import pipeline_function, PipelineDefinition
+from myia.pipeline import pipeline_function, PipelineDefinition, steps
+from myia.pipeline.steps import Validator
 from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
     array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
@@ -51,14 +50,14 @@ def grad_wrap(self, graph):
 grad_pipeline = PipelineDefinition(
     resources=standard_resources,
     steps=dict(
-        parse=api.step_parse,
+        parse=steps.step_parse,
         grad_wrap=grad_wrap,
-        resolve=api.step_resolve,
-        infer=api.step_infer,
-        specialize=api.step_specialize,
-        opt=api.step_debug_opt,
+        resolve=steps.step_resolve,
+        infer=steps.step_infer,
+        specialize=steps.step_specialize,
+        opt=steps.step_debug_opt,
         validate=step_grad_validate,
-        export=api.step_debug_export,
+        export=steps.step_debug_export,
     )
 )
 

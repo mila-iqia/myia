@@ -1,6 +1,6 @@
 import numpy as np
 
-from myia.api import scalar_debug_compile as compile
+from myia.pipeline import scalar_debug_compile as compile
 from myia.composite import list_reduce
 from myia.prim.py_implementations import \
     array_map, array_reduce, array_scan, scalar_usub, list_map
