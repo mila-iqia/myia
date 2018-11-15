@@ -393,7 +393,7 @@ def test_type_tracking():
 
     pip = scalar_pipeline \
         .select('parse', 'infer', 'specialize',
-                'prepare', 'opt', 'validate') \
+                'erase_class', 'opt', 'erase_tuple', 'validate') \
         .configure({
             'opt.phases.main': [opt_ok1, opt_ok2, opt_err1, opt_err2],
         })
@@ -425,7 +425,7 @@ def test_type_tracking_newgraph():
 
     pip = scalar_pipeline \
         .select('parse', 'infer', 'specialize',
-                'prepare', 'opt', 'validate') \
+                'erase_class', 'opt', 'erase_tuple', 'validate') \
         .configure({
             'opt.phases.main': [opt_newg, opt_newg_bad],
         })
