@@ -3,7 +3,7 @@
 import numpy
 from itertools import count
 
-from .dtype import Type, Function, TypeMeta
+from .dtype import Function, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
     GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer, \
     Unspecializable, DEAD, INACCESSIBLE
@@ -129,19 +129,24 @@ class _GraphSpecializer:
     # Build #
     #########
 
-    async def build(self, ref, argrefs=None, t=None):
-        if t is None:
-            t = await ref['type']
-        if ref is not None and isinstance(t, Inferrer):
-            if (await ref['value']) is ANYTHING:
-                t = await t.as_function_type(argrefs)
-                return await self._build[Type](ref, argrefs, t)
-        return await self._build(ref, argrefs, t)
+    async def build(self, ref, argrefs=None):
+        t = await ref['type']
+        v = await ref['value']
+        if isinstance(t, Inferrer) and v is not ANYTHING:
+            return await self._build_inferrer(t, argrefs)
+        elif _is_concrete_value(v):
+            return _const(v, await concretize_type(t))
+        elif not _visible(self.graph, ref.node):
+            raise Unspecializable(INACCESSIBLE)
+        else:
+            new_node = self.get(ref.node)
+            new_node.type = await concretize_type(t)
+            return new_node
 
-    _build = Overload()
+    _build_inferrer = Overload()
 
-    @_build.register
-    async def _build(self, ref, argrefs, inf: GraphInferrer):
+    @_build_inferrer.register
+    async def _build_inferrer(self, inf: GraphInferrer, argrefs):
         if isinstance(inf, MetaGraphInferrer):
             g = None
         else:
@@ -154,10 +159,10 @@ class _GraphSpecializer:
         else:
             raise Unspecializable(INACCESSIBLE)
 
-    @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs, inf: PartialInferrer):
+    @_build_inferrer.register  # noqa: F811
+    async def _build_inferrer(self, inf: PartialInferrer, argrefs):
         all_argrefs = None if argrefs is None else [*inf.args, *argrefs]
-        sub_build = await self._build(None, all_argrefs, inf.fn)
+        sub_build = await self._build_inferrer(inf.fn, all_argrefs)
         ptl_args = [await self.build(ref) for ref in inf.args]
         res_t = await inf.as_function_type(argrefs)
         ptl = _const(P.partial, Function[
@@ -172,25 +177,13 @@ class _GraphSpecializer:
         res.type = res_t
         return res
 
-    @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs, inf: Inferrer):
+    @_build_inferrer.register  # noqa: F811
+    async def _build_inferrer(self, inf: Inferrer, argrefs):
         v = inf.identifier
         if isinstance(v, Primitive):
             return _const(v, await inf.as_function_type(argrefs))
         else:
             raise Unspecializable(DEAD)
-
-    @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs, t: object):
-        v = await ref['value']
-        if _is_concrete_value(v):
-            return _const(v, await concretize_type(t))
-        elif not _visible(self.graph, ref.node):
-            raise Unspecializable(INACCESSIBLE)
-        else:
-            new_node = self.get(ref.node)
-            new_node.type = await concretize_type(t)
-            return new_node
 
     ###########
     # Process #
