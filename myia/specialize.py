@@ -66,6 +66,13 @@ _legal = (int, float, numpy.number, numpy.ndarray,
           str, Namespace, SymbolicKeyInstance, TypeMeta)
 
 
+def _visible(g, node):
+    g2 = node.graph
+    while g and g2 is not g:
+        g = g.parent
+    return g2 is g
+
+
 @overload
 def _is_concrete_value(v: (tuple, list)):
     return all(_is_concrete_value(x) for x in v)
@@ -181,6 +188,8 @@ class _GraphSpecializer:
 
     @_build.register  # noqa: F811
     async def _build(self, ref, argrefs, t: Type):
+        if not _visible(self.graph, ref.node):
+            raise Unspecializable(INACCESSIBLE)
         new_node = self.get(ref.node)
         new_node.type = await concretize_type(t)
         return new_node

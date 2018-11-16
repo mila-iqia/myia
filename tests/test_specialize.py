@@ -299,3 +299,34 @@ def test_switch2(c, x, y):
 @specialize((int1, int2, int2))
 def test_multitype(x, y, z):
     return mysum(x) * mysum(x, y) * mysum(x, y, z)
+
+
+@specialize((int1, int2))
+def test_closure_stays_in_scope(x, y):
+    # The inferrer knows that h(x + y) is the graph for g, but
+    # it shouldn't try to replace the expression with that graph,
+    # because it points to a fv in f.
+    def f(z):
+        def g():
+            return z
+        return g
+
+    def h(z):
+        a = z * z
+        return f(a)
+
+    return h(x + y)()
+
+
+@specialize((int1, int2))
+def test_partial_outside_scope(x, y):
+    # The inferrer knows that g(x) is a partial of f, but it can't
+    # build it inside the main function.
+    def f(x, y):
+        return x * y
+
+    def g(x):
+        z = x * x
+        return partial(f, z)
+
+    return g(x)(y)
