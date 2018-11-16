@@ -29,8 +29,6 @@ class TypeSpecializer:
         """Initialize a TypeSpecializer."""
         self.engine = engine
         self.mng = self.engine.mng
-        self.node_map = self.mng.nodes
-        self.originals = {}
         self.specializations = {Context.empty(): None}
 
     def run(self, graph, context):
@@ -56,7 +54,6 @@ class TypeSpecializer:
 
         gspec = _GraphSpecializer(self, g, ctx)
         g2 = gspec.new_graph
-        self.originals[g2] = g
         self.specializations[ctxkey] = gspec
         await gspec.run()
         return g2
@@ -105,13 +102,13 @@ class _GraphSpecializer:
         self.engine = specializer.engine
         self.graph = graph
         self.context = context
-        self.nodes = specializer.node_map[self.graph]
-
         g = self.graph
         if self.parent:
             g = self.parent.get(g)
         self.cl = GraphCloner(g, total=False, graph_relation=next(_count))
         self.new_graph = self.cl[g]
+        self.todo = [self.graph.return_] + list(self.graph.parameters)
+        self.marked = set()
 
     def get(self, node):
         if self.parent:
@@ -119,7 +116,17 @@ class _GraphSpecializer:
         return self.cl[node]
 
     async def run(self):
-        for node in self.nodes:
+        while self.todo:
+            node = self.todo.pop()
+            if node.graph is None:
+                continue
+            if node.graph is not self.graph:
+                self.parent.todo.append(node)
+                await self.parent.run()
+                continue
+            if node in self.marked:
+                continue
+            self.marked.add(node)
             await self.process_node(node)
 
     def ref(self, node):
@@ -141,6 +148,7 @@ class _GraphSpecializer:
         elif not _visible(self.graph, ref.node):
             raise Unspecializable(INACCESSIBLE)
         else:
+            self.todo.append(ref.node)
             new_node = self.get(ref.node)
             new_node.type = await concretize_type(t)
             return new_node
@@ -218,7 +226,10 @@ class _GraphSpecializer:
                     if repl.graph and prev.graph \
                             and repl.graph is not prev.graph:
                         raise AssertionError('Error in specializer [B]')
-                    new_inputs[i] = repl
+                    if repl is not new_inputs[i]:
+                        new_inputs[i] = repl
+                    else:
+                        self.todo.append(node.inputs[i])
                 except Unspecializable as e:
                     if new_inputs[i].is_constant_graph():
                         # Graphs that cannot be specialized are replaced
@@ -226,5 +237,6 @@ class _GraphSpecializer:
                         # We can't keep references to unspecialized graphs.
                         new_inputs[i] = _const(e.problem.kind, e.problem)
                     else:
+                        self.todo.append(node.inputs[i])
                         it = await iref['type']
                         new_inputs[i].type = await concretize_type(it)
