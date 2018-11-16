@@ -35,7 +35,7 @@ import gc
 import copy
 import pickle
 
-from myia.utils.orderedset import *
+from myia.utils.orderedset import OrderedSet
 
 
 class TestOrderedset(unittest.TestCase):
@@ -240,7 +240,7 @@ class TestOrderedset(unittest.TestCase):
         self.assertEqual(oset1, oset2.union("abc"))
 
     def test_union_with_iterable(self):
-        oset1  = OrderedSet([1])
+        oset1 = OrderedSet([1])
 
         self.assertEqual(oset1.union([2, 1]), OrderedSet([1, 2]))
         self.assertEqual(OrderedSet([1, 2]) | OrderedSet([3, 1, 2, 4]),
@@ -310,8 +310,6 @@ class TestOrderedset(unittest.TestCase):
         self.assertNotEqual(oset1, None)
 
         self.assertEqual(oset1, oset2)
-        #self.assertEqual(oset1, set(self.lst))
-        #self.assertEqual(oset1, list(self.lst))
 
     def test_ordering(self):
         oset1 = OrderedSet(self.lst)
