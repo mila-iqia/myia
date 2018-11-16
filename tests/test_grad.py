@@ -342,9 +342,6 @@ def test_functions_in_tuples(x, y):
     return f(x, y) + g(x, y)
 
 
-@pytest.mark.xfail(
-    reason="A DummyInferrer is unfortunately propagated into a call."
-)
 @grad_test((4.5, 6.7),)
 def test_closures_in_tuples(x, y):
     def f():

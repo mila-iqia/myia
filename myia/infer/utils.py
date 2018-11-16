@@ -21,7 +21,6 @@ VOID = Named('VOID')
 DEAD = Named('DEAD')
 POLY = Named('POLY')
 INACCESSIBLE = Named('INACCESSIBLE')
-AMBIGUOUS = Named('AMBIGUOUS')
 
 
 class Unspecializable(Exception):

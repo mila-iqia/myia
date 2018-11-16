@@ -252,8 +252,6 @@ def test_poly_with_constants(c, x, y):
     return choose(c)(x, y), choose(not c)(x, y)
 
 
-@mark.xfail(reason="Distinct contexts are created for 2 and 3, "
-                   "leading to Problem(POLY).")
 @specialize((True, int1, int2))
 def test_poly_with_constants2(c, x, y):
     def f1(x, y):
