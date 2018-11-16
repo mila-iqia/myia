@@ -20,3 +20,5 @@ from .unify import (  # noqa
     Unification, Var, Seq, SVar, UnionVar, RestrictedVar, PredicateSet,
     FilterVar, var, svar, uvar, expandlist, noseq, VisitError
 )
+
+from .orderedset import OrderedSet  # noqa
