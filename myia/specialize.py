@@ -3,11 +3,11 @@
 import numpy
 from itertools import count
 
-from .dtype import Type, Function, Number, Bool, TypeType, TypeMeta
+from .dtype import Type, Function, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
     GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer, \
     Unspecializable, DEAD, INACCESSIBLE
-from .ir import GraphCloner, Constant
+from .ir import GraphCloner, Constant, Graph
 from .prim import ops as P, Primitive
 from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
     EnvInstance
@@ -67,7 +67,10 @@ _legal = (int, float, numpy.number, numpy.ndarray,
 
 
 def _visible(g, node):
-    g2 = node.graph
+    if isinstance(node, Graph):
+        g2 = node.parent
+    else:
+        g2 = node.graph
     while g and g2 is not g:
         g = g.parent
     return g2 is g
@@ -143,7 +146,7 @@ class _GraphSpecializer:
             g = None
         else:
             g = await inf.make_graph(None)
-        if not g or g.parent is None or ref and ref.node.is_constant_graph():
+        if g is None or _visible(self.graph, g):
             if argrefs is None:
                 argrefs = await inf.get_unique_argrefs()
             v = await self.specializer._specialize(inf, argrefs)
@@ -154,7 +157,7 @@ class _GraphSpecializer:
     @_build.register  # noqa: F811
     async def _build(self, ref, argrefs, inf: PartialInferrer):
         all_argrefs = None if argrefs is None else [*inf.args, *argrefs]
-        sub_build = await self.build(None, all_argrefs, inf.fn)
+        sub_build = await self._build(None, all_argrefs, inf.fn)
         ptl_args = [await self.build(ref) for ref in inf.args]
         res_t = await inf.as_function_type(argrefs)
         ptl = _const(P.partial, Function[
@@ -178,21 +181,16 @@ class _GraphSpecializer:
             raise Unspecializable(DEAD)
 
     @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs,
-                     t: (Number, Bool, TypeType, type, TypeMeta)):
+    async def _build(self, ref, argrefs, t: object):
         v = await ref['value']
         if _is_concrete_value(v):
             return _const(v, await concretize_type(t))
-        else:
-            return await self._build[Type](ref, argrefs, t)
-
-    @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs, t: Type):
-        if not _visible(self.graph, ref.node):
+        elif not _visible(self.graph, ref.node):
             raise Unspecializable(INACCESSIBLE)
-        new_node = self.get(ref.node)
-        new_node.type = await concretize_type(t)
-        return new_node
+        else:
+            new_node = self.get(ref.node)
+            new_node.type = await concretize_type(t)
+            return new_node
 
     ###########
     # Process #
