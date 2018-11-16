@@ -1,6 +1,7 @@
 """Specialize graphs according to the types of their arguments."""
 
 import numpy
+from itertools import count
 
 from .dtype import Type, Function, Number, Bool, TypeType, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
@@ -12,7 +13,7 @@ from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
     EnvInstance
 
 
-_count = 0
+_count = count()
 
 
 def _const(v, t):
@@ -30,7 +31,7 @@ class TypeSpecializer:
         self.mng = self.engine.mng
         self.node_map = self.mng.nodes
         self.originals = {}
-        self.specializations = {}
+        self.specializations = {Context.empty(): None}
 
     def run(self, graph, context):
         """Run the specializer on the given graph in the given context."""
@@ -42,31 +43,23 @@ class TypeSpecializer:
                    for p in graph.parameters]
 
         return self.engine.run_coroutine(
-            self._specialize(None, ginf, argrefs)
+            self._specialize(ginf, argrefs)
         )
 
-    async def _specialize(self, parent, ginf, argrefs):
+    async def _specialize(self, ginf, argrefs):
         g = await ginf.make_graph(argrefs)
         ctx = await ginf.make_context(argrefs)
 
         ctxkey = ctx  # TODO: Reify ctx to collapse multiple ctx into one
         if ctxkey in self.specializations:
-            return self.specializations[ctxkey]
+            return self.specializations[ctxkey].new_graph
 
-        gspec = _GraphSpecializer(parent, self, g, ctx)
+        gspec = _GraphSpecializer(self, g, ctx)
         g2 = gspec.new_graph
         self.originals[g2] = g
-        self.specializations[ctxkey] = g2
+        self.specializations[ctxkey] = gspec
         await gspec.run()
         return g2
-
-
-def _parents(g):
-    rval = set()
-    while g.parent:
-        g = g.parent
-        rval.add(g)
-    return rval
 
 
 _legal = (int, float, numpy.number, numpy.ndarray,
@@ -96,25 +89,18 @@ def _is_concrete_value(v: object):
 class _GraphSpecializer:
     """Helper class for TypeSpecializer."""
 
-    def __init__(self, parent, specializer, graph, context):
-        par = _parents(graph)
-        while parent and parent.graph not in par:
-            parent = parent.parent
-
-        self.parent = parent
+    def __init__(self, specializer, graph, context):
+        self.parent = specializer.specializations[context.parent]
         self.specializer = specializer
         self.engine = specializer.engine
         self.graph = graph
         self.context = context
         self.nodes = specializer.node_map[self.graph]
 
-        global _count
-        _count += 1
-        rel = _count
         g = self.graph
         if self.parent:
             g = self.parent.get(g)
-        self.cl = GraphCloner(g, total=False, graph_relation=rel)
+        self.cl = GraphCloner(g, total=False, graph_relation=next(_count))
         self.new_graph = self.cl[g]
 
     def get(self, node):
@@ -153,9 +139,7 @@ class _GraphSpecializer:
         if not g or g.parent is None or ref and ref.node.is_constant_graph():
             if argrefs is None:
                 argrefs = await inf.get_unique_argrefs()
-            v = await self.specializer._specialize(
-                self, inf, argrefs
-            )
+            v = await self.specializer._specialize(inf, argrefs)
             return _const(v, await inf.as_function_type(argrefs))
         else:
             raise Unspecializable(INACCESSIBLE)
