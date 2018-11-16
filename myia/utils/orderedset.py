@@ -3,7 +3,9 @@
 
 class OrderedSet:
     """Like set(), but ordered."""
+
     def __init__(self, elems=[]):
+        """Create an OrderedSet."""
         self._d = dict()
         for e in elems:
             self.add(e)
@@ -24,6 +26,7 @@ class OrderedSet:
         self._d.pop(e, None)
 
     def copy(self):
+        """Return a shallow copy."""
         res = OrderedSet.__new__(OrderedSet)
         res._d = self._d.copy()
         return res
@@ -38,6 +41,7 @@ class OrderedSet:
         return f"OrderedSet({list(self._d)})"
 
     def clear(self):
+        """Remove all entries."""
         self._d.clear()
 
     def __eq__(self, other):
@@ -90,9 +94,7 @@ class OrderedSet:
     __and__ = intersection
 
     def difference(self, *others):
-        """
-        Return a new set with elements in the set that are not in the others.
-        """
+        """Return a new set with elements that are not in the others."""
         res = self.copy()
         res.difference_update(*others)
         return res
@@ -100,9 +102,7 @@ class OrderedSet:
     __sub__ = difference
 
     def symmetric_difference(self, other):
-        """
-        Return a new set with elements in either the set or other but not both.
-        """
+        """New set with the with the elements that are not in common."""
         res = self.copy()
         res.symmetric_difference_update(other)
         return res
@@ -129,10 +129,7 @@ class OrderedSet:
                 self.discard(e)
 
     def symmetric_difference_update(self, other):
-        """
-        Update the set, keeping only elements found in either set,
-        but not in both.
-        """
+        """Update the set, keeping only the difference from both sets."""
         for e in other:
             if e in self:
                 self.remove(e)
