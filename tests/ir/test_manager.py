@@ -7,7 +7,7 @@ from myia.pipeline import scalar_parse as parse
 from myia.debug.label import short_labeler
 from myia.ir import manage, GraphManager, GraphCloner, ManagerError
 from myia.prim import Primitive
-
+from myia.utils import OrderedSet
 
 swap1 = Primitive('swap1')
 swap2 = Primitive('swap2')
@@ -64,7 +64,7 @@ class NestingSpecs:
             if k is None:
                 continue
             k = self.name(k)
-            if isinstance(v, (Counter, set, dict)):
+            if isinstance(v, (Counter, OrderedSet, set, dict)):
                 v = {self.name(x) for x in v}
                 v = {x for x in v if x}
             elif v:
@@ -712,16 +712,16 @@ def test_keep_roots():
         return x + y
 
     mng = manage(f)
-    assert mng.graphs == {f}
+    assert mng.graphs == OrderedSet([f])
 
     mng.add_graph(g)
-    assert mng.graphs == {f, g}
+    assert mng.graphs == OrderedSet([f, g])
 
     mng.keep_roots()
-    assert mng.graphs == {f}
+    assert mng.graphs == OrderedSet([f])
 
     mng.keep_roots(g)
-    assert mng.graphs == {g}
+    assert mng.graphs == OrderedSet([g])
 
 
 def test_keep_roots_recursion():

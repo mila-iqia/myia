@@ -4,7 +4,7 @@
 from collections import defaultdict, Counter
 
 from ..graph_utils import dfs, FOLLOW, EXCLUDE
-from ..utils import Events, Partializable
+from ..utils import Events, Partializable, OrderedSet
 
 from .utils import succ_deeper
 
@@ -100,7 +100,7 @@ class PerGraphStatistic(dict):
 class NodesStatistic(PerGraphStatistic):
     """Implements `GraphManager.nodes`."""
 
-    constructor = set
+    constructor = OrderedSet
     include_graph_none = True
 
     def _on_add_node(self, event, node):
@@ -498,11 +498,11 @@ class GraphManager(Partializable):
             drop_edge=None,
             invalidate_nesting=None,
         )
-        roots = set(self.roots) if self.roots else set()
-        self.roots = set()
-        self.graphs = set()
-        self.all_nodes = set()
-        self.uses = defaultdict(set)
+        roots = OrderedSet(self.roots) if self.roots else OrderedSet()
+        self.roots = OrderedSet()
+        self.graphs = OrderedSet()
+        self.all_nodes = OrderedSet()
+        self.uses = defaultdict(OrderedSet)
 
         self.nodes = NodesStatistic(self)
         self.constants = ConstantsStatistic(self)
@@ -543,12 +543,12 @@ class GraphManager(Partializable):
         If no roots are given, existing roots will be used.
         """
         if roots:
-            self.roots = set()
+            self.roots = OrderedSet()
             for root in roots:
                 self.add_graph(root, True)
         else:
             roots = self.roots
-        keep = set()
+        keep = OrderedSet()
         for root in roots:
             keep.update(self.graphs_reachable[root])
         self._maybe_drop_graphs(self.graphs - keep, ignore_users=True)
@@ -562,7 +562,7 @@ class GraphManager(Partializable):
         self.graphs.add(graph)
 
     def _maybe_drop_graphs(self, graphs, ignore_users=False):
-        todo = set(graphs)
+        todo = OrderedSet(graphs)
         dropped = set()
 
         while todo:
@@ -577,11 +577,11 @@ class GraphManager(Partializable):
 
             dropped.add(graph)
 
-            todo |= self._maybe_drop_nodes({graph.return_})
+            todo |= self._maybe_drop_nodes(OrderedSet([graph.return_]))
 
         for g in dropped:
             self.events.drop_graph(g)
-            self.all_nodes -= set(g.parameters)
+            self.all_nodes.difference_update(g.parameters)
             self.graphs.remove(g)
             if g._manager is self:
                 g._manager = None
@@ -628,9 +628,9 @@ class GraphManager(Partializable):
             else:
                 return FOLLOW
 
-        acq = set()
+        acq = OrderedSet()
         for node in nodes:
-            new_nodes = set(dfs(node, succ_deeper, limit))
+            new_nodes = OrderedSet(dfs(node, succ_deeper, limit))
             self.all_nodes |= new_nodes
             acq |= new_nodes
 
@@ -643,10 +643,10 @@ class GraphManager(Partializable):
 
     def _maybe_drop_nodes(self, nodes):
         """Check if the nodes are connected to a graph, drop them if not."""
-        nodes = set(nodes)
+        nodes = OrderedSet(nodes)
 
         # Set of graphs to check if we want to drop them or not
-        graphs_to_check = set()
+        graphs_to_check = OrderedSet()
 
         while nodes:
             node = nodes.pop()

@@ -56,7 +56,7 @@ from .ir import Constant, Graph, clone
 from .opt import sexp_to_node
 from .prim import ops as primops, Primitive
 from .prim.grad_implementations import augmented_graphs
-from .utils import Partializable, overload, newenv
+from .utils import Partializable, overload, newenv, OrderedSet
 
 
 class GraphRemapper(Partializable):
@@ -468,7 +468,7 @@ class SensRemapper(GraphRemapper):
 
         if isinstance(node, Graph):
             # This was added via gen_child or gen_fv_graph
-            uses = set()
+            uses = OrderedSet()
             for ct in g.constants:
                 if ct.value is node:
                     uses |= mng.uses[ct]
