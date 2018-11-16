@@ -93,7 +93,7 @@ class Track(Partializable):
         """Convert a property provided outside the inferrer."""
         return v
 
-    def broaden(self, v):
+    def broaden(self, v, maximal=False):
         """Broaden the value for use in a graph's signature."""
         return v
 
@@ -268,7 +268,27 @@ class Inferrer(DynamicMap):
             (argrefs, res), *_ = self.cache.items()
             return argrefs
         else:
-            raise Unspecializable(POLY)
+            # We try to find argrefs that subsume all the existing argrefs
+            broadened = set()
+            for argrefs in self.cache:
+                vrefs = []
+                for arg in argrefs:
+                    vref = self.engine.vref({
+                        track_name: track.broaden(
+                            await arg[track_name],
+                            maximal=True
+                        )
+                        for track_name, track in self.engine.tracks.items()
+                    })
+                    vrefs.append(vref)
+                broadened.add(tuple(vrefs))
+            if len(broadened) == 1:
+                vrefs, = broadened
+                # We run the inference so that it's available in the cache
+                await self(*vrefs)
+                return vrefs
+            else:
+                raise Unspecializable(POLY)
 
     async def as_function_type(self, argrefs=None):
         """Return a Function type corresponding to this Inferrer.
@@ -701,6 +721,13 @@ class VirtualReference(AbstractReference):
 
     async def __getitem__(self, track):
         return self.values[track]
+
+    def __hash__(self):
+        return hash(tuple(sorted(self.values.items())))
+
+    def __eq__(self, other):
+        return isinstance(other, VirtualReference) \
+            and self.values == other.values
 
 
 class TransformedReference(AbstractReference):

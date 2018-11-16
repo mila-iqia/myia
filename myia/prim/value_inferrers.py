@@ -158,10 +158,10 @@ class ValueTrack(Track):
         """Convert a property provided outside the inferrer."""
         return self.from_value(v, None)
 
-    def broaden(self, v):
+    def broaden(self, v, maximal=False):
         """Broaden the value if we reach a certain depth in the stack."""
-        if v is ANYTHING:
-            return v
+        if v is ANYTHING or maximal:
+            return ANYTHING
         else:
             return limited(v.value, v.count - 1)
 
