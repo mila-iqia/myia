@@ -5,8 +5,8 @@ from itertools import count
 
 from .dtype import Function, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
-    GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer, \
-    Unspecializable, DEAD, INACCESSIBLE
+    GraphInferrer, PartialInferrer, Inferrer, Unspecializable, \
+    DEAD, INACCESSIBLE
 from .ir import GraphCloner, Constant, Graph
 from .prim import ops as P, Primitive
 from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
@@ -133,6 +133,8 @@ class _GraphSpecializer:
         t = await ref['type']
         v = await ref['value']
         if isinstance(t, Inferrer) and v is not ANYTHING:
+            if argrefs is None:
+                argrefs = await t.get_unique_argrefs()
             return await self._build_inferrer(t, argrefs)
         elif _is_concrete_value(v):
             return _const(v, await concretize_type(t))
@@ -147,13 +149,8 @@ class _GraphSpecializer:
 
     @_build_inferrer.register
     async def _build_inferrer(self, inf: GraphInferrer, argrefs):
-        if isinstance(inf, MetaGraphInferrer):
-            g = None
-        else:
-            g = await inf.make_graph(None)
-        if g is None or _visible(self.graph, g):
-            if argrefs is None:
-                argrefs = await inf.get_unique_argrefs()
+        g = await inf.make_graph(argrefs)
+        if _visible(self.graph, g):
             v = await self.specializer._specialize(inf, argrefs)
             return _const(v, await inf.as_function_type(argrefs))
         else:
