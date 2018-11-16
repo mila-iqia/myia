@@ -331,7 +331,10 @@ def test_nested_closure(x):
     def f():
         def g():
             return a + b
-        return g
+
+        def h():
+            return a * b
+        return g if x < 0 else h
     return f()()
 
 
