@@ -86,12 +86,17 @@ def nnvm_transpose(c, a, ax):
     return sym.transpose(na, axes=ax.value)
 
 
+def nnvm_make_tuple(c, *els):
+    return sym.Group(list(c.ref(e) for e in els))
+
+
 COMPLEX_MAP = {
     P.bool_not: nnvm_bool_not,
     P.distribute: nnvm_distribute,
     P.dot: nnvm_dot,
     P.array_map: nnvm_array_map,
     P.transpose: nnvm_transpose,
+    P.make_tuple: nnvm_make_tuple,
 }
 
 
