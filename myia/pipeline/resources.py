@@ -232,6 +232,7 @@ standard_method_map = TypeMap({
         '__getitem__': P.array_getitem,
         '__setitem__': P.array_setitem,
         '__myia_iter__': C.array_iter,
+        '__myia_to_array__': P.identity,
         'item': P.array_to_scalar,
     },
     dtype.JTagged: {

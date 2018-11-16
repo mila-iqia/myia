@@ -1,6 +1,6 @@
 """Library of optimizations."""
 
-from ..composite import hyper_add
+from ..composite import hyper_add, to_array
 from ..dtype import type_cloner, Function, JTagged, Number, ismyiatype, \
     Tuple, UInt
 from ..infer import Inferrer
@@ -191,12 +191,20 @@ def unfuse_composite(optimizer, node, equiv):
 
     # This has to be defined inline because of circular imports
     class UnfuseRemapper(GraphRemapper):
-        def __init__(self, g):
+        def __init__(self, g, shape):
             super().__init__('unfused', g.graphs_used.keys() | {g})
+            self.shape = shape
+
+        def asarray(self, ng, i):
+            if i.is_constant():
+                return ng.apply(P.distribute, ng.apply(to_array, i),
+                                self.shape)
+            else:
+                return i
 
         def link_apply(self, g, ng, node, new_node):
             assert node.inputs[0].is_constant(Primitive)
-            ni = [self.get(g, i) for i in node.inputs[1:]]
+            ni = [self.asarray(ng, self.get(g, i)) for i in node.inputs[1:]]
             new_node.inputs = \
                 [ng.constant(P.array_map), node.inputs[0]] + ni
 
@@ -205,7 +213,7 @@ def unfuse_composite(optimizer, node, equiv):
 
     g = equiv[G].value
     xs = equiv[Xs]
-    r = UnfuseRemapper(g)
+    r = UnfuseRemapper(g, xs[0].shape)
     r.populate()
     r.link()
     r.finalize()
