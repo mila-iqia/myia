@@ -13,7 +13,7 @@ from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
     EnvInstance
 
 
-_count = count()
+_count = count(1)
 
 
 def _const(v, t):
@@ -102,18 +102,24 @@ class _GraphSpecializer:
         self.engine = specializer.engine
         self.graph = graph
         self.context = context
-        g = self.graph
-        if self.parent:
-            g = self.parent.get(g)
-        self.cl = GraphCloner(g, total=False, graph_relation=next(_count))
-        self.new_graph = self.cl[g]
+        cl = GraphCloner(
+            self.graph,
+            total=False,
+            clone_children=False,
+            graph_relation=next(_count)
+        )
+        cl.run()
+        self.repl = cl.repl
+        self.new_graph = self.repl[self.graph]
         self.todo = [self.graph.return_] + list(self.graph.parameters)
         self.marked = set()
 
     def get(self, node):
-        if self.parent:
-            node = self.parent.get(node)
-        return self.cl[node]
+        g = node.graph
+        sp = self
+        while g is not None and g is not sp.graph:
+            sp = sp.parent
+        return sp.repl.get(node, node)
 
     async def run(self):
         while self.todo:
@@ -222,21 +228,18 @@ class _GraphSpecializer:
                 try:
                     repl = await self.build(ref=iref, argrefs=argrefs)
                     await self.fill_inferred(repl, iref)
-                    prev = new_inputs[i]
-                    if repl.graph and prev.graph \
-                            and repl.graph is not prev.graph:
-                        raise AssertionError('Error in specializer [B]')
-                    if repl is not new_inputs[i]:
-                        new_inputs[i] = repl
-                    else:
-                        self.todo.append(node.inputs[i])
                 except Unspecializable as e:
                     if new_inputs[i].is_constant_graph():
                         # Graphs that cannot be specialized are replaced
                         # by a constant with the associated Problem type.
                         # We can't keep references to unspecialized graphs.
-                        new_inputs[i] = _const(e.problem.kind, e.problem)
+                        repl = _const(e.problem.kind, e.problem)
                     else:
                         self.todo.append(node.inputs[i])
                         it = await iref['type']
-                        new_inputs[i].type = await concretize_type(it)
+                        repl = self.get(node.inputs[i])
+                        repl.type = await concretize_type(it)
+                if repl is not new_inputs[i]:
+                    new_inputs[i] = repl
+                else:
+                    self.todo.append(node.inputs[i])
