@@ -227,7 +227,6 @@ class _GraphSpecializer:
                 argrefs = irefs[1:] if i == 0 else None
                 try:
                     repl = await self.build(ref=iref, argrefs=argrefs)
-                    await self.fill_inferred(repl, iref)
                 except Unspecializable as e:
                     if new_inputs[i].is_constant_graph():
                         # Graphs that cannot be specialized are replaced
@@ -240,6 +239,7 @@ class _GraphSpecializer:
                         repl = self.get(node.inputs[i])
                         repl.type = await concretize_type(it)
                 if repl is not new_inputs[i]:
+                    await self.fill_inferred(repl, iref)
                     new_inputs[i] = repl
                 else:
                     self.todo.append(node.inputs[i])

@@ -148,8 +148,8 @@ class GraphCloner:
 
         if self.clone_children:
             self.todo += [(g, None, None)
-                        for g in mng.scopes[graph]
-                        if g is not graph]
+                          for g in mng.scopes[graph]
+                          if g is not graph]
         if self.total:
             self.todo += [(g, None, None)
                           for g in mng.graphs_used[graph]]
