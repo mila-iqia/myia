@@ -43,12 +43,14 @@ class GraphCloner:
                  total=False,
                  relation='copy',
                  clone_constants=False,
+                 clone_children=True,
                  graph_relation=None):
         """Initialize a GraphCloner."""
         self.todo = []
         self.status = {}
         self.nodes = []
         self.clone_constants = clone_constants
+        self.clone_children = clone_children
         # repl maps a node or a graph to its clone
         self.repl = {None: None}
         self.total = total
@@ -144,9 +146,10 @@ class GraphCloner:
 
         self.status[graph] = inline
 
-        self.todo += [(g, None, None)
-                      for g in mng.scopes[graph]
-                      if g is not graph]
+        if self.clone_children:
+            self.todo += [(g, None, None)
+                          for g in mng.scopes[graph]
+                          if g is not graph]
         if self.total:
             self.todo += [(g, None, None)
                           for g in mng.graphs_used[graph]]

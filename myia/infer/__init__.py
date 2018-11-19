@@ -42,6 +42,5 @@ from .utils import (  # noqa
     VOID,
     DEAD,
     POLY,
-    AMBIGUOUS,
     INACCESSIBLE,
 )

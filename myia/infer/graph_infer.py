@@ -11,7 +11,7 @@ from ..utils import Partializable, UNKNOWN, eprint, as_frozen
 from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify, \
     reify_shallow
 from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, \
-    infer_trace, Unspecializable, DEAD, POLY, AMBIGUOUS, unwrap
+    infer_trace, Unspecializable, DEAD, POLY, unwrap
 
 
 def type_error_nargs(ident, expected, got):
@@ -93,7 +93,7 @@ class Track(Partializable):
         """Convert a property provided outside the inferrer."""
         return v
 
-    def broaden(self, v):
+    def broaden(self, v, maximal=False):
         """Broaden the value for use in a graph's signature."""
         return v
 
@@ -246,8 +246,6 @@ class Inferrer(DynamicMap):
           * Unspecializable(DEAD) if the Inferrer was never called.
           * Unspecializable(POLY) if the Inferrer was called with at least
             two incompatible tuple of argrefs.
-          * Unspecializable(AMBIGUOUS) in some obscure edge cases that we
-            currently do not concern ourselves with.
         """
         # The cache works using References, but if two references have
         # the same inferred type/value/etc., we can merge their entries.
@@ -256,13 +254,12 @@ class Inferrer(DynamicMap):
             y = await reify(y)
             key = tuple([await arg[track] for arg in x
                          for track in self.engine.tracks])
-            if key in cache and cache[key] != y:
-                # NOTE: It's not completely clear when/why this tends to
-                # happen. It seems to happen for PartialInferrers when
-                # the differentiation is downstream, so in practice the
-                # Problem node caused by this exception does not end up
-                # in the final graph.
-                raise Unspecializable(AMBIGUOUS)
+            # NOTE: It's not completely clear when/why this tends to
+            # happen. It seems to happen for PartialInferrers when
+            # the differentiation is downstream, so in practice the
+            # Problem node caused by this exception does not end up
+            # in the final graph.
+            assert not (key in cache and cache[key] != y)
             cache[key] = y
 
         if len(cache) == 0:
@@ -271,7 +268,27 @@ class Inferrer(DynamicMap):
             (argrefs, res), *_ = self.cache.items()
             return argrefs
         else:
-            raise Unspecializable(POLY)
+            # We try to find argrefs that subsume all the existing argrefs
+            broadened = set()
+            for argrefs in self.cache:
+                vrefs = []
+                for arg in argrefs:
+                    vref = self.engine.vref({
+                        track_name: track.broaden(
+                            await arg[track_name],
+                            maximal=True
+                        )
+                        for track_name, track in self.engine.tracks.items()
+                    })
+                    vrefs.append(vref)
+                broadened.add(tuple(vrefs))
+            if len(broadened) == 1:
+                vrefs, = broadened
+                # We run the inference so that it's available in the cache
+                await self(*vrefs)
+                return vrefs
+            else:
+                raise Unspecializable(POLY)
 
     async def as_function_type(self, argrefs=None):
         """Return a Function type corresponding to this Inferrer.
@@ -704,6 +721,13 @@ class VirtualReference(AbstractReference):
 
     async def __getitem__(self, track):
         return self.values[track]
+
+    def __hash__(self):
+        return hash(tuple(sorted(self.values.items())))
+
+    def __eq__(self, other):
+        return isinstance(other, VirtualReference) \
+            and self.values == other.values
 
 
 class TransformedReference(AbstractReference):

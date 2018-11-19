@@ -1,18 +1,19 @@
 """Specialize graphs according to the types of their arguments."""
 
 import numpy
+from itertools import count
 
-from .dtype import Type, Function, Number, Bool, TypeType, TypeMeta
+from .dtype import Function, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
-    GraphInferrer, MetaGraphInferrer, PartialInferrer, Inferrer, \
-    Unspecializable, DEAD, INACCESSIBLE
-from .ir import GraphCloner, Constant
+    GraphInferrer, PartialInferrer, Inferrer, Unspecializable, \
+    DEAD, INACCESSIBLE
+from .ir import GraphCloner, Constant, Graph
 from .prim import ops as P, Primitive
 from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
     EnvInstance
 
 
-_count = 0
+_count = count(1)
 
 
 def _const(v, t):
@@ -28,9 +29,7 @@ class TypeSpecializer:
         """Initialize a TypeSpecializer."""
         self.engine = engine
         self.mng = self.engine.mng
-        self.node_map = self.mng.nodes
-        self.originals = {}
-        self.specializations = {}
+        self.specializations = {Context.empty(): None}
 
     def run(self, graph, context):
         """Run the specializer on the given graph in the given context."""
@@ -42,35 +41,36 @@ class TypeSpecializer:
                    for p in graph.parameters]
 
         return self.engine.run_coroutine(
-            self._specialize(None, ginf, argrefs)
+            self._specialize(ginf, argrefs)
         )
 
-    async def _specialize(self, parent, ginf, argrefs):
+    async def _specialize(self, ginf, argrefs):
         g = await ginf.make_graph(argrefs)
         ctx = await ginf.make_context(argrefs)
 
         ctxkey = ctx  # TODO: Reify ctx to collapse multiple ctx into one
         if ctxkey in self.specializations:
-            return self.specializations[ctxkey]
+            return self.specializations[ctxkey].new_graph
 
-        gspec = _GraphSpecializer(parent, self, g, ctx)
+        gspec = _GraphSpecializer(self, g, ctx)
         g2 = gspec.new_graph
-        self.originals[g2] = g
-        self.specializations[ctxkey] = g2
+        self.specializations[ctxkey] = gspec
         await gspec.run()
         return g2
 
 
-def _parents(g):
-    rval = set()
-    while g.parent:
-        g = g.parent
-        rval.add(g)
-    return rval
-
-
 _legal = (int, float, numpy.number, numpy.ndarray,
           str, Namespace, SymbolicKeyInstance, TypeMeta)
+
+
+def _visible(g, node):
+    if isinstance(node, Graph):
+        g2 = node.parent
+    else:
+        g2 = node.graph
+    while g and g2 is not g:
+        g = g.parent
+    return g2 is g
 
 
 @overload
@@ -96,34 +96,43 @@ def _is_concrete_value(v: object):
 class _GraphSpecializer:
     """Helper class for TypeSpecializer."""
 
-    def __init__(self, parent, specializer, graph, context):
-        par = _parents(graph)
-        while parent and parent.graph not in par:
-            parent = parent.parent
-
-        self.parent = parent
+    def __init__(self, specializer, graph, context):
+        self.parent = specializer.specializations[context.parent]
         self.specializer = specializer
         self.engine = specializer.engine
         self.graph = graph
         self.context = context
-        self.nodes = specializer.node_map[self.graph]
-
-        global _count
-        _count += 1
-        rel = _count
-        g = self.graph
-        if self.parent:
-            g = self.parent.get(g)
-        self.cl = GraphCloner(g, total=False, graph_relation=rel)
-        self.new_graph = self.cl[g]
+        cl = GraphCloner(
+            self.graph,
+            total=False,
+            clone_children=False,
+            graph_relation=next(_count)
+        )
+        cl.run()
+        self.repl = cl.repl
+        self.new_graph = self.repl[self.graph]
+        self.todo = [self.graph.return_] + list(self.graph.parameters)
+        self.marked = set()
 
     def get(self, node):
-        if self.parent:
-            node = self.parent.get(node)
-        return self.cl[node]
+        g = node.graph
+        sp = self
+        while g is not None and g is not sp.graph:
+            sp = sp.parent
+        return sp.repl.get(node, node)
 
     async def run(self):
-        for node in self.nodes:
+        while self.todo:
+            node = self.todo.pop()
+            if node.graph is None:
+                continue
+            if node.graph is not self.graph:
+                self.parent.todo.append(node)
+                await self.parent.run()
+                continue
+            if node in self.marked:
+                continue
+            self.marked.add(node)
             await self.process_node(node)
 
     def ref(self, node):
@@ -133,37 +142,38 @@ class _GraphSpecializer:
     # Build #
     #########
 
-    async def build(self, ref, argrefs=None, t=None):
-        if t is None:
-            t = await ref['type']
-        if ref is not None and isinstance(t, Inferrer):
-            if (await ref['value']) is ANYTHING:
-                t = await t.as_function_type(argrefs)
-                return await self._build[Type](ref, argrefs, t)
-        return await self._build(ref, argrefs, t)
-
-    _build = Overload()
-
-    @_build.register
-    async def _build(self, ref, argrefs, inf: GraphInferrer):
-        if isinstance(inf, MetaGraphInferrer):
-            g = None
-        else:
-            g = await inf.make_graph(None)
-        if not g or g.parent is None or ref and ref.node.is_constant_graph():
+    async def build(self, ref, argrefs=None):
+        t = await ref['type']
+        v = await ref['value']
+        if isinstance(t, Inferrer) and v is not ANYTHING:
             if argrefs is None:
-                argrefs = await inf.get_unique_argrefs()
-            v = await self.specializer._specialize(
-                self, inf, argrefs
-            )
+                argrefs = await t.get_unique_argrefs()
+            return await self._build_inferrer(t, argrefs)
+        elif _is_concrete_value(v):
+            return _const(v, await concretize_type(t))
+        elif not _visible(self.graph, ref.node):
+            raise Unspecializable(INACCESSIBLE)
+        else:
+            self.todo.append(ref.node)
+            new_node = self.get(ref.node)
+            new_node.type = await concretize_type(t)
+            return new_node
+
+    _build_inferrer = Overload()
+
+    @_build_inferrer.register
+    async def _build_inferrer(self, inf: GraphInferrer, argrefs):
+        g = await inf.make_graph(argrefs)
+        if _visible(self.graph, g):
+            v = await self.specializer._specialize(inf, argrefs)
             return _const(v, await inf.as_function_type(argrefs))
         else:
             raise Unspecializable(INACCESSIBLE)
 
-    @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs, inf: PartialInferrer):
+    @_build_inferrer.register  # noqa: F811
+    async def _build_inferrer(self, inf: PartialInferrer, argrefs):
         all_argrefs = None if argrefs is None else [*inf.args, *argrefs]
-        sub_build = await self.build(None, all_argrefs, inf.fn)
+        sub_build = await self._build_inferrer(inf.fn, all_argrefs)
         ptl_args = [await self.build(ref) for ref in inf.args]
         res_t = await inf.as_function_type(argrefs)
         ptl = _const(P.partial, Function[
@@ -178,28 +188,13 @@ class _GraphSpecializer:
         res.type = res_t
         return res
 
-    @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs, inf: Inferrer):
+    @_build_inferrer.register  # noqa: F811
+    async def _build_inferrer(self, inf: Inferrer, argrefs):
         v = inf.identifier
         if isinstance(v, Primitive):
             return _const(v, await inf.as_function_type(argrefs))
         else:
             raise Unspecializable(DEAD)
-
-    @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs,
-                     t: (Number, Bool, TypeType, type, TypeMeta)):
-        v = await ref['value']
-        if _is_concrete_value(v):
-            return _const(v, await concretize_type(t))
-        else:
-            return await self._build[Type](ref, argrefs, t)
-
-    @_build.register  # noqa: F811
-    async def _build(self, ref, argrefs, t: Type):
-        new_node = self.get(ref.node)
-        new_node.type = await concretize_type(t)
-        return new_node
 
     ###########
     # Process #
@@ -232,18 +227,19 @@ class _GraphSpecializer:
                 argrefs = irefs[1:] if i == 0 else None
                 try:
                     repl = await self.build(ref=iref, argrefs=argrefs)
-                    await self.fill_inferred(repl, iref)
-                    prev = new_inputs[i]
-                    if repl.graph and prev.graph \
-                            and repl.graph is not prev.graph:
-                        raise AssertionError('Error in specializer [B]')
-                    new_inputs[i] = repl
                 except Unspecializable as e:
                     if new_inputs[i].is_constant_graph():
                         # Graphs that cannot be specialized are replaced
                         # by a constant with the associated Problem type.
                         # We can't keep references to unspecialized graphs.
-                        new_inputs[i] = _const(e.problem.kind, e.problem)
+                        repl = _const(e.problem.kind, e.problem)
                     else:
+                        self.todo.append(node.inputs[i])
                         it = await iref['type']
-                        new_inputs[i].type = await concretize_type(it)
+                        repl = self.get(node.inputs[i])
+                        repl.type = await concretize_type(it)
+                if repl is not new_inputs[i]:
+                    await self.fill_inferred(repl, iref)
+                    new_inputs[i] = repl
+                else:
+                    self.todo.append(node.inputs[i])
