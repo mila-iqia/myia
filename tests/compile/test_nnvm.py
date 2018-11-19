@@ -3,7 +3,8 @@ import pytest
 import math
 import numpy as np
 
-from myia.prim.py_implementations import distribute, scalar_to_array, dot
+from myia.prim.py_implementations import distribute, scalar_to_array, dot, \
+    scalar_add, array_reduce, transpose
 
 from ..test_compile import parse_compare
 from ..common import MA, MB
@@ -101,6 +102,11 @@ def test_ge(x, y):
     return x >= y
 
 
+@parse_compare((True, False), (True, True))
+def test_bool_eq(x, y):
+    return x == y
+
+
 @parse_compare((2,))
 def test_to_array(x):
     return scalar_to_array(x)
@@ -126,6 +132,12 @@ def test_distribute3(x):
     return distribute(x, (2, 3))
 
 
+@parse_compare((MA(2, 3), MB(3, 4)),
+               array=True)
+def test_dot(x, y):
+    return dot(x, y)
+
+
 @parse_compare((MA(2, 3), MB(2, 3)),
                (MA(1, 3), MB(2, 3)),
                (MA(2, 1), MB(2, 3)),
@@ -134,7 +146,11 @@ def test_array_map(x, y):
     return x + y
 
 
-@parse_compare((MA(2, 3), MB(3, 4)),
-               array=True)
-def test_dot(x, y):
-    return dot(x, y)
+@parse_compare((MA(2, 3),), (MA(1, 3),), array=True)
+def test_array_reduce(x):
+    return array_reduce(scalar_add, x, (1, 3))
+
+
+@parse_compare((MA(2, 3),), array=True)
+def test_transpose(x):
+    return transpose(x, (1, 0))
