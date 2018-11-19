@@ -182,7 +182,7 @@ class FinalVM:
         args = tuple(self._ref(a) for a in args_)
         self._push(struct_partial(fn, args))
 
-    def inst_switch(self, cond, vtrue, vfalse):  # pragma: no cover
+    def inst_switch(self, cond, vtrue, vfalse):
         """Switch.
 
         This will fetch the conditional and push either vtrue or
@@ -198,6 +198,9 @@ class FinalVM:
             self._push(self._ref(vtrue))
         else:
             self._push(self._ref(vfalse))
+
+    def inst_tuple(self, *args):
+        return tuple(self._ref(a) for a in args)
 
     def inst_push(self, v):
         """Push a value on the stack.

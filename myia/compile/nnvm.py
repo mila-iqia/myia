@@ -79,6 +79,25 @@ def nnvm_array_map(c, fn, *array):
     return SIMPLE_MAP[fn](*[c.ref(a) for a in array])
 
 
+def nnvm_array_reduce(c, fn, array, shape):
+    """Implementation of array_reduce."""
+    assert fn.is_constant(Primitive)
+    assert shape.is_constant(tuple)
+    fn = fn.value
+    tshp = shape.value
+    ary = c.ref(array)
+    if fn == P.scalar_add:
+        ashp = array.shape
+        axis = tuple(i for i, t in enumerate(tshp) if t == 1)
+        res = sym.sum(ary, axis=axis, keepdims=1)
+        if len(tshp) < len(ashp):
+            axis = tuple(range(len(tshp), len(ashp)))
+            res = sym.sum(res, axis=axis)
+        return res
+    else:
+        raise NotImplementedError(f"reduce with {fn}")
+
+
 def nnvm_transpose(c, a, ax):
     """Implementation of transpose."""
     na = c.ref(a)
@@ -95,8 +114,8 @@ COMPLEX_MAP = {
     P.distribute: nnvm_distribute,
     P.dot: nnvm_dot,
     P.array_map: nnvm_array_map,
+    P.array_reduce: nnvm_array_reduce,
     P.transpose: nnvm_transpose,
-    P.make_tuple: nnvm_make_tuple,
 }
 
 
