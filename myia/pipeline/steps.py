@@ -264,9 +264,6 @@ step_opt = Optimizer.partial(
             optlib.getitem_env_add,
             optlib.simplify_array_map,
         ],
-        unfuse=[
-            optlib.unfuse_composite,
-        ],
         main2=[
             # Costlier optimizations
             optlib.float_tuple_getitem_through_switch,
@@ -284,6 +281,65 @@ step_opt = Optimizer.partial(
         renormalize='renormalize',
         cse=CSE.partial(report_changes=False),
         jelim=optlib.JElim.partial(),
+    )
+)
+
+# Final optimization pass
+step_opt2 = Optimizer.partial(
+    phases=dict(
+        main=[
+            # Branch culling
+            optlib.simplify_always_true,
+            optlib.simplify_always_false,
+            optlib.simplify_switch1,
+            optlib.simplify_switch2,
+            optlib.simplify_switch_idem,
+            optlib.combine_switches,
+
+            # Safe inlining
+            optlib.inline_trivial,
+            optlib.inline_unique_uses,
+            optlib.inline_core,
+            optlib.simplify_partial,
+            optlib.replace_applicator,
+
+            # Specialization
+            optlib.specialize_on_graph_arguments,
+
+            # Arithmetic simplifications
+            optlib.multiply_by_one_l,
+            optlib.multiply_by_one_r,
+            optlib.multiply_by_zero_l,
+            optlib.multiply_by_zero_r,
+            optlib.add_zero_l,
+            optlib.add_zero_r,
+
+            # Array simplifications
+            optlib.elim_distribute,
+            optlib.elim_array_reduce,
+
+            # Miscellaneous
+            optlib.elim_identity,
+            optlib.getitem_tuple,
+            optlib.setitem_tuple,
+            optlib.simplify_array_map,
+        ],
+        unfuse=[
+            optlib.unfuse_composite,
+        ],
+        main2=[
+            # Costlier optimizations
+            optlib.float_tuple_getitem_through_switch,
+            optlib.float_env_getitem_through_switch,
+            optlib.incorporate_getitem,
+            optlib.incorporate_env_getitem,
+            optlib.incorporate_call,
+            optlib.incorporate_getitem_through_switch,
+            optlib.incorporate_env_getitem_through_switch,
+            optlib.incorporate_call_through_switch,
+        ],
+        renormalize='renormalize',
+        cse=CSE.partial(report_changes=False),
     )
 )
 
