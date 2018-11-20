@@ -97,15 +97,10 @@ def expand_tuples_c(graph, inputs):
     for i in inputs:
         itype = i.type
         ishape = i.shape
-        jtagged = False
         if not ismyiatype(itype, Tuple):
             if (ismyiatype(itype, JTagged) and
                     ismyiatype(itype.subtype, Tuple)):
-                assert i.is_apply(P.J)
-                jtagged = True
-                i = i.inputs[1]
-                itype = i.type
-                ishape = i.shape
+                raise NotImplementedError("JTagged")
             else:
                 new_inputs.append(i)
                 continue
@@ -119,10 +114,6 @@ def expand_tuples_c(graph, inputs):
             ni.inputs[2].shape = NOSHAPE
             ni.type = ie
             ni.shape = ish
-            if jtagged:
-                ni = graph.apply(P.J, ni)
-                ni.type = JTagged[ie]
-                ni.shape = ish
             new_input.append(ni)
 
         new_inputs.extend(expand_tuples_c(graph, new_input))
