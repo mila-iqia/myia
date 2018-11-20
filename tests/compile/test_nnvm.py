@@ -45,7 +45,6 @@ def test_pow(x, y):
     return x ** y
 
 
-@pytest.mark.xfail(reason="Devolves to empty function")
 @parse_compare((2,))
 def test_uadd(x):
     return +x
@@ -102,7 +101,6 @@ def test_ge(x, y):
     return x >= y
 
 
-@pytest.mark.xfail(reason="Devolves to empty function")
 @parse_compare((2,))
 def test_to_array(x):
     return scalar_to_array(x)
@@ -123,7 +121,6 @@ def test_distribute2(x):
     return distribute(x, (2, 3))
 
 
-@pytest.mark.xfail(reason="devolves to empty function")
 @parse_compare(MA(2, 3), array=True, optimize=False)
 def test_distribute3(x):
     return distribute(x, (2, 3))
