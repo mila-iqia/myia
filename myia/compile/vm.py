@@ -200,6 +200,12 @@ class FinalVM:
             self._push(self._ref(vfalse))
 
     def inst_tuple(self, *args):
+        """Create a tuple from the given arguments and push it on the stack.
+
+        Arguments:
+           *args: tuple elements
+
+        """
         self._push(tuple(self._ref(a) for a in args))
 
     def inst_push(self, v):

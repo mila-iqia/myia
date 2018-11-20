@@ -68,7 +68,8 @@ def nnvm_dot(c, a, b):
     """Implementation of dot."""
     na = c.ref(a)
     nb = c.ref(b)
-    return sym.dense(na, sym.transpose(nb, axes=(1, 0)), units=b.shape[1], use_bias=False)
+    return sym.dense(na, sym.transpose(nb, axes=(1, 0)), units=b.shape[1],
+                     use_bias=False)
 
 
 def nnvm_array_map(c, fn, *array):
@@ -104,10 +105,6 @@ def nnvm_transpose(c, a, ax):
     na = c.ref(a)
     assert ax.is_constant(tuple)
     return sym.transpose(na, axes=ax.value)
-
-
-def nnvm_make_tuple(c, *els):
-    return sym.Group(list(c.ref(e) for e in els))
 
 
 COMPLEX_MAP = {
@@ -163,6 +160,10 @@ class NNVMRunner:
 
 
 def ashape(a):
+    """Get an array shape.
+
+    Handles NNVM brain-damage around empty shapes.
+    """
     shp = a.shape
     if shp == ():
         return (1,)
