@@ -84,7 +84,7 @@ Model_t_f32 = pytype_to_myiatype(Model, make_model('float32'))
 def cost(model, x, y):
     yy = model.apply(x)
     diff = (yy - y)
-    return asscalar(array_reduce(scalar_add, diff * diff, ()))
+    return asscalar(array_reduce(scalar_add, diff ** 2, ()))
 
 
 @infer_std(
