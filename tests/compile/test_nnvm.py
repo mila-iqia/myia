@@ -127,6 +127,7 @@ def test_distribute2(x):
     return distribute(x, (2, 3))
 
 
+@pytest.mark.xfail(reason="Devolves to empty function")
 @parse_compare(MA(2, 3), array=True, optimize=False)
 def test_distribute3(x):
     return distribute(x, (2, 3))

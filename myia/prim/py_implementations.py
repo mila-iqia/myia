@@ -438,10 +438,11 @@ def array_reduce(fn, array, shp):
         if idx is not None:
             array = ufn.reduce(array, axis=idx, keepdims=keep)
 
-    array = array.astype(idtype)
     if not isinstance(array, np.ndarray):
         # Force result to be ndarray, even if it's 0d
         array = np.array(array)
+
+    array = array.astype(idtype)
 
     return array
 
