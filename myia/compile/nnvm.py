@@ -88,13 +88,17 @@ def nnvm_array_reduce(c, fn, array, shape):
     ary = c.ref(array)
     if fn == P.scalar_add:
         ashp = ashape(array)
-        axis = list(i for i, t in enumerate(tshp) if t == 1)
+        if len(tshp) < len(ashp):
+            ts = (1,) * (len(ashp) - len(tshp)) + tshp
+        else:
+            ts = tshp
+        axis = list(i for i, t in enumerate(ts) if t == 1)
         if len(axis) == 1:
             axis = axis[0]
+        print(ts, ashp, axis)
         res = sym.sum(ary, axis=axis, keepdims=1)
         if len(tshp) < len(ashp):
-            axis = tuple(range(len(tshp), len(ashp)))
-            res = sym.sum(res, axis=axis)
+            res = sym.reshape(res, shape=tshp)
         return res
     else:
         raise NotImplementedError(f"reduce with {fn}")
