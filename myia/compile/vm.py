@@ -200,7 +200,7 @@ class FinalVM:
             self._push(self._ref(vfalse))
 
     def inst_tuple(self, *args):
-        return tuple(self._ref(a) for a in args)
+        self._push(tuple(self._ref(a) for a in args))
 
     def inst_push(self, v):
         """Push a value on the stack.
