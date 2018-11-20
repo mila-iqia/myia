@@ -55,11 +55,10 @@ def nnvm_distribute(c, v, shp):
     nv = c.ref(v)
     assert shp.is_constant()
     shp = shp.value
-    vshp = v.shape
+    vshp = ashape(v)
     if len(shp) != len(vshp):
         # We need to pad the shape
-        vshp = (1,) * (len(shp) - len(vshp)) + vshp
-        nv = sym.reshape(nv, shape=vshp)
+        nv = sym.expand_dims(nv, axis=0, num_newaxis=len(shp) - len(vshp))
     if shp == vshp:
         return nv
     return sym.broadcast_to(nv, shape=shp)
@@ -69,7 +68,7 @@ def nnvm_dot(c, a, b):
     """Implementation of dot."""
     na = c.ref(a)
     nb = c.ref(b)
-    return sym.dense(na, sym.transpose(nb), units=b.shape[1], use_bias=False)
+    return sym.dense(na, sym.transpose(nb, axes=(1, 0)), units=b.shape[1], use_bias=False)
 
 
 def nnvm_array_map(c, fn, *array):
@@ -87,7 +86,7 @@ def nnvm_array_reduce(c, fn, array, shape):
     tshp = shape.value
     ary = c.ref(array)
     if fn == P.scalar_add:
-        ashp = array.shape
+        ashp = ashape(array)
         axis = list(i for i, t in enumerate(tshp) if t == 1)
         if len(axis) == 1:
             axis = axis[0]
@@ -163,6 +162,13 @@ class NNVMRunner:
         return [o.asnumpy() for o in self._outs]
 
 
+def ashape(a):
+    shp = a.shape
+    if shp == ():
+        return (1,)
+    return shp
+
+
 class NNVMConverter:
     """Convert a linear portion of the graph to an NNVM function."""
 
@@ -209,7 +215,7 @@ class NNVMConverter:
             self.eqv[n] = sym.Variable(name)
             if ismyiatype(n.type, Array):
                 self.types[name] = nnvm_type_map(n.type.elements)
-                self.shapes[name] = n.shape
+                self.shapes[name] = ashape(n)
             elif n.is_constant_graph():  # pragma: no cover
                 raise Exception("This isn't tested")
                 self.types[name] = 'int64'
