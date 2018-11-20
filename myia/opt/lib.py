@@ -197,8 +197,10 @@ def unfuse_composite(optimizer, node, equiv):
 
         def asarray(self, ng, i):
             if i.is_constant():
+                shp = Constant(self.shape)
+                shp.type = Tuple[[UInt[64] for _ in shp.value]]
                 return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i),
-                                self.shape)
+                                shp)
             else:
                 return i
 
