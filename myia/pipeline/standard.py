@@ -61,6 +61,7 @@ standard_pipeline = PipelineDefinition(
         erase_class=steps.step_erase_class,
         opt=steps.step_opt,
         erase_tuple=steps.step_erase_tuple,
+        opt2=steps.step_opt2,
         cconv=steps.step_cconv,
         validate=steps.step_validate,
         wrap_primitives=step_wrap_primitives,

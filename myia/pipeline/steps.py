@@ -284,6 +284,19 @@ step_opt = Optimizer.partial(
     )
 )
 
+# Final optimization pass
+step_opt2 = Optimizer.partial(
+    phases=dict(
+        unfuse=[
+            optlib.unfuse_composite,
+        ],
+        main2=[
+            optlib.incorporate_getitem,
+            optlib.getitem_tuple,
+        ],
+    )
+)
+
 
 ####################
 # Erase Tuple type #

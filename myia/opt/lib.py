@@ -182,6 +182,46 @@ elim_array_reduce = psub(
 
 
 @pattern_replacer(P.array_map, G, Xs)
+def unfuse_composite(optimizer, node, equiv):
+    """Tranform array_map on a graph to a graph of array_maps.
+
+    This must be applied to scalar-only graphs.
+    """
+    from ..grad import GraphRemapper
+
+    # This has to be defined inline because of circular imports
+    class UnfuseRemapper(GraphRemapper):
+        def __init__(self, g, shape):
+            super().__init__('unfused', g.graphs_used.keys() | {g})
+            self.shape = shape
+
+        def asarray(self, ng, i):
+            if i.is_constant():
+                return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i),
+                                self.shape)
+            else:
+                return i
+
+        def link_apply(self, g, ng, node, new_node):
+            assert node.inputs[0].is_constant(Primitive)
+            ni = [self.asarray(ng, self.get(g, i)) for i in node.inputs[1:]]
+            new_node.inputs = \
+                [ng.constant(P.array_map), node.inputs[0]] + ni
+
+        def finalize_graph(self, g, ng):
+            ng.output = self.get(g, g.output)
+
+    g = equiv[G].value
+    xs = equiv[Xs]
+    r = UnfuseRemapper(g, xs[0].shape)
+    r.populate()
+    r.link()
+    r.finalize()
+    ng = r.get_graph(g)
+    return node.graph.apply(ng, *xs)
+
+
+@pattern_replacer(P.array_map, G, Xs)
 def simplify_array_map(optimizer, node, equiv):
     """Simplify array_map on certain graphs.
 

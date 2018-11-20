@@ -1,6 +1,6 @@
 """Clean up Class types."""
 
-from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner
+from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner, JTagged
 from ..ir import Constant, Parameter
 from ..prim import ops as P, Primitive
 from ..dshape import TupleShape, ClassShape, shape_cloner, NOSHAPE
@@ -71,6 +71,8 @@ def expand_tuples_p(mng, graph, params):
         ttype = param.type
         tshape = param.shape
         if not ismyiatype(ttype, Tuple):
+            if ismyiatype(ttype, JTagged):
+                raise NotImplementedError()
             new_params.append(param)
             continue
 
@@ -96,10 +98,15 @@ def expand_tuples_c(graph, inputs):
         itype = i.type
         ishape = i.shape
         if not ismyiatype(itype, Tuple):
-            new_inputs.append(i)
-            continue
+            if (ismyiatype(itype, JTagged) and
+                    ismyiatype(itype.subtype, Tuple)):
+                raise NotImplementedError("JTagged")
+            else:
+                new_inputs.append(i)
+                continue
 
         new_input = []
+
         for pos, ie, ish in zip(range(len(itype.elements)),
                                 itype.elements, ishape.shape):
             ni = graph.apply(P.tuple_getitem, i, pos)

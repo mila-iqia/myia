@@ -141,6 +141,12 @@ def bprop_scalar_pow(x, y, out, dout):
             scalar_mul(dout, scalar_mul(scalar_log(x), out)))
 
 
+@register_bprop(primops.scalar_exp)
+def bprop_scalar_exp(x, out, dout):
+    """Backpropagator for primitive `scalar_exp`."""
+    return (dout * out,)
+
+
 @register_bprop(primops.scalar_uadd)
 def bprop_scalar_uadd(x, out, dout):
     """Backpropagator for primitive `scalar_uadd`."""

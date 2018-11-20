@@ -12,9 +12,7 @@ from tvm.contrib import graph_runtime
 from .utils import get_outputs
 
 from ..dtype import type_to_np_dtype, ismyiatype, Array
-from ..prim import Primitive
-from ..prim import ops as P
-from ..ir import Graph
+from ..prim import Primitive, ops as P
 
 
 SIMPLE_MAP = {
@@ -57,11 +55,10 @@ def nnvm_distribute(c, v, shp):
     nv = c.ref(v)
     assert shp.is_constant()
     shp = shp.value
-    vshp = v.shape
+    vshp = ashape(v)
     if len(shp) != len(vshp):
         # We need to pad the shape
-        vshp = (1,) * (len(shp) - len(vshp)) + vshp
-        nv = sym.reshape(nv, shape=vshp)
+        nv = sym.expand_dims(nv, axis=0, num_newaxis=len(shp) - len(vshp))
     if shp == vshp:
         return nv
     return sym.broadcast_to(nv, shape=shp)
@@ -71,26 +68,46 @@ def nnvm_dot(c, a, b):
     """Implementation of dot."""
     na = c.ref(a)
     nb = c.ref(b)
-    return sym.dense(na, sym.transpose(nb), units=b.shape[1], use_bias=False)
+    return sym.dense(na, sym.transpose(nb, axes=(1, 0)), units=b.shape[1],
+                     use_bias=False)
 
 
 def nnvm_array_map(c, fn, *array):
     """Implementation of array_map."""
-    assert fn.is_constant()
+    assert fn.is_constant(Primitive)
     fn = fn.value
-    if fn in SIMPLE_MAP:
-        # This might go away at some point since we have wrap_primitives
-        return SIMPLE_MAP[fn](*[c.ref(a) for a in array])  # pragma: no cover
+    return SIMPLE_MAP[fn](*[c.ref(a) for a in array])
+
+
+def nnvm_array_reduce(c, fn, array, shape):
+    """Implementation of array_reduce."""
+    assert fn.is_constant(Primitive)
+    assert shape.is_constant(tuple)
+    fn = fn.value
+    tshp = shape.value
+    ary = c.ref(array)
+    if fn == P.scalar_add:
+        ashp = ashape(array)
+        if len(tshp) < len(ashp):
+            ts = (1,) * (len(ashp) - len(tshp)) + tshp
+        else:
+            ts = tshp
+        axis = list(i for i, t in enumerate(ts) if t == 1)
+        if len(axis) == 1:
+            axis = axis[0]
+        res = sym.sum(ary, axis=axis, keepdims=1)
+        if len(tshp) < len(ashp):
+            res = sym.reshape(res, shape=tshp)
+        return res
     else:
-        assert isinstance(fn, Graph)
-        node = fn.output
-        # Handle wrapping graphs
-        if (node.inputs[0].is_constant() and
-                tuple(node.inputs[1:]) == tuple(fn.parameters)):
-            fn = node.inputs[0].value
-            if fn in SIMPLE_MAP:
-                return SIMPLE_MAP[fn](*[c.ref(a) for a in array])
-        raise NotImplementedError("Only support primitives for array_map")
+        raise NotImplementedError(f"reduce with {fn}")
+
+
+def nnvm_transpose(c, a, ax):
+    """Implementation of transpose."""
+    na = c.ref(a)
+    assert ax.is_constant(tuple)
+    return sym.transpose(na, axes=ax.value)
 
 
 COMPLEX_MAP = {
@@ -98,6 +115,8 @@ COMPLEX_MAP = {
     P.distribute: nnvm_distribute,
     P.dot: nnvm_dot,
     P.array_map: nnvm_array_map,
+    P.array_reduce: nnvm_array_reduce,
+    P.transpose: nnvm_transpose,
 }
 
 
@@ -141,6 +160,17 @@ class NNVMRunner:
         for i, out in enumerate(self._outs):
             out = self.mod.get_output(i, out)
         return [o.asnumpy() for o in self._outs]
+
+
+def ashape(a):
+    """Get an array shape.
+
+    Handles NNVM brain-damage around empty shapes.
+    """
+    shp = a.shape
+    if shp == ():
+        return (1,)
+    return shp
 
 
 class NNVMConverter:
@@ -189,7 +219,7 @@ class NNVMConverter:
             self.eqv[n] = sym.Variable(name)
             if ismyiatype(n.type, Array):
                 self.types[name] = nnvm_type_map(n.type.elements)
-                self.shapes[name] = n.shape
+                self.shapes[name] = ashape(n)
             elif n.is_constant_graph():  # pragma: no cover
                 raise Exception("This isn't tested")
                 self.types[name] = 'int64'

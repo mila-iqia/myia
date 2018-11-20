@@ -414,6 +414,7 @@ def _array_scan_vm(vm, fn, init, array, axis):
 @py_register(primops.array_reduce)
 def array_reduce(fn, array, shp):
     """Implement `array_reduce`."""
+    idtype = array.dtype
     ufn = np.frompyfunc(fn, 2, 1)
     delta = len(array.shape) - len(shp)
     if delta < 0:
@@ -440,6 +441,8 @@ def array_reduce(fn, array, shp):
     if not isinstance(array, np.ndarray):
         # Force result to be ndarray, even if it's 0d
         array = np.array(array)
+
+    array = array.astype(idtype)
 
     return array
 

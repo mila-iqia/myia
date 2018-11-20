@@ -2,8 +2,8 @@
 
 from ..ir import Apply, toposort, Graph, Constant
 from ..pipeline import PipelineDefinition, PipelineStep
-from ..prim import Primitive
-from ..prim.ops import partial, return_, switch
+from ..prim import Primitive, ops as P
+from ..prim.ops import partial, return_, switch, make_tuple
 from .debug_lin import debug_convert
 from .nnvm import nnvm_convert
 from .vm import FinalVM
@@ -54,6 +54,10 @@ class WrapPrimitives(PipelineStep):
                 if ct.is_constant(Primitive):
                     for node, key in mng.uses[ct]:
                         if key != 0:
+                            if node.inputs[0].is_constant():
+                                if node.inputs[0].value in (P.array_map,
+                                                            P.array_reduce):
+                                    continue
                             g = get_prim_graph(ct.value, ct.type)
                             tr.set_edge(node, key, Constant(g))
 
@@ -98,7 +102,7 @@ class SplitGraph(PipelineStep):
             fn = node.inputs[0]
             if not fn.is_constant(Primitive):
                 return True
-            elif fn.value in (return_, partial, switch):
+            elif fn.value in (return_, partial, switch, make_tuple):
                 return True
         return False
 
@@ -235,6 +239,10 @@ class CompileGraph(PipelineStep):
                         self.add_instr('switch', self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]),
                                        self.ref(split.inputs[3]))
+
+                    elif fn.value == make_tuple:
+                        self.add_instr('tuple', *[self.ref(i)
+                                                  for i in split.inputs[1:]])
                     else:
                         raise AssertionError(f"Unknown special function "
                                              "{fn.value}")
