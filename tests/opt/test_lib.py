@@ -368,6 +368,25 @@ def test_simplify_array_map_6():
                lib.simplify_array_map)
 
 
+def test_unfuse_composite_constant():
+
+    def before(x):
+        def p1(x):
+            return x + 1
+        return array_map(p1, x)
+
+    def after(x):
+        def up1(x):
+            return array_map(scalar_add, x,
+                             distribute(scalar_to_array(1), (2, 3)))
+        return up1(x)
+
+    _check_opt(before, after,
+               lib.unfuse_composite,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (2, 3)}])
+
+
 ######################
 # Branch elimination #
 ######################

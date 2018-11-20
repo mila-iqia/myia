@@ -1,6 +1,6 @@
 """Library of optimizations."""
 
-from ..composite import hyper_add, to_array
+from ..composite import hyper_add
 from ..dtype import type_cloner, Function, JTagged, Number, ismyiatype, \
     Tuple, UInt
 from ..infer import Inferrer
@@ -197,7 +197,7 @@ def unfuse_composite(optimizer, node, equiv):
 
         def asarray(self, ng, i):
             if i.is_constant():
-                return ng.apply(P.distribute, ng.apply(to_array, i),
+                return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i),
                                 self.shape)
             else:
                 return i
