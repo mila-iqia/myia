@@ -3,7 +3,7 @@
 import inspect
 
 from .infer import MyiaTypeError
-from .pipeline import standard_debug_pipeline
+from .pipeline import standard_pipeline
 from .utils import as_frozen
 
 
@@ -38,7 +38,7 @@ class MyiaFunction:
         Returns a Pipeline. If the argument types were seen before, returns a
         cached version.
         """
-        pip = standard_debug_pipeline.make()
+        pip = standard_pipeline.make()
         inf = pip.resources.inferrer
 
         argnames = inspect.getfullargspec(self.fn).args
