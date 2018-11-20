@@ -252,6 +252,12 @@ class NNVMConverter:
         outputs = get_outputs(lst, lst[0].graph.manager.uses,
                               set(self.eqv.keys()))
 
+        inmap = dict((self.eqv[i], i) for i in self.inputs)
+
+        # Check for empty functions
+        if all(self.eqv[o] in inmap for o in outputs):
+            return None, [inmap[self.eqv[o]] for o in outputs], outputs
+
         if target == 'cpu':
             target = 'llvm'
 

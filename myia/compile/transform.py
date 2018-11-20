@@ -151,6 +151,10 @@ class CompileGraph(PipelineStep):
         self.slots[node] = self.height
         self.height += 1
 
+    def tie(self, n1, n2):
+        """Declare two nodes as equivalent."""
+        self.slots[n2] = self.slots[n1]
+
     def ref(self, node):
         """Get the stack reference for the value of a node.
 
@@ -195,6 +199,11 @@ class CompileGraph(PipelineStep):
                         split,
                         target=self.pipeline.resources.target,
                         dev_id=self.pipeline.resources.dev_id)
+                if run is None:  # empty function
+                    assert len(inputs) == len(outputs)
+                    for i, o in zip(inputs, outputs):
+                        self.tie(i, o)
+                    continue
                 # prime the arguments because self.ref() can invalidate
                 # previously returned references if a new one is not ready
                 for i in inputs:
