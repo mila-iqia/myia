@@ -494,8 +494,15 @@ def _convert_result(res, orig_t, vm_t: dtype.Tuple):
 
 
 @overload  # noqa: F811
-def _convert_result(arg, orig_t,
-                    vm_t: (dtype.Int, dtype.Float, dtype.Bool, dtype.Array)):
+def _convert_result(arg, orig_t, vm_t: (dtype.Int, dtype.Float)):
+    if isinstance(arg, np.ndarray):
+        return arg.item()
+    else:
+        return arg
+
+
+@overload  # noqa: F811
+def _convert_result(arg, orig_t, vm_t: (dtype.Bool, dtype.Array)):
     return arg
 
 
