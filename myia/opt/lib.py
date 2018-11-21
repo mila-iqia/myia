@@ -91,6 +91,23 @@ def setitem_tuple(optimizer, node, equiv):
     return sexp_to_node((P.make_tuple, *elems), node.graph)
 
 
+@pattern_replacer(P.tuple_setitem, C1, C2, Z)
+def setitem_tuple_ct(optimizer, node, equiv):
+    """Match a constant setitem in an explicit tuple.
+
+    setitem((a, b, c, ...), 0, z) => (z, b, c, ...)
+    setitem((a, b, c, ...), 1, z) => (a, z, c, ...)
+    ...
+    """
+    tup = equiv[C1].value
+    i = equiv[C2].value
+    assert isinstance(tup, tuple)
+    assert isinstance(i, int)
+    elems = list(tup)
+    elems[i] = equiv[Z]
+    return sexp_to_node((P.make_tuple, *elems), node.graph)
+
+
 # f((a, b, ...), (p, q, ...)) => (f(a, p), f(b, q), ...)
 # For f in the following list:
 _BubbleBinary = primset_var(P.scalar_add)
