@@ -1,6 +1,7 @@
 """Estimate gradients with finite differences."""
 
 
+from dataclasses import is_dataclass
 from typing import Callable, Dict, List, Any
 import numpy
 import itertools
@@ -62,13 +63,20 @@ def gen_paths(self, obj: numpy.ndarray, path):
 
 @overload  # noqa: F811
 def gen_paths(self, obj: object, path):
-    yield path
+    if is_dataclass(obj):
+        for name, field in obj.__dataclass_fields__.items():
+            yield from gen_paths(getattr(obj, name), path + (name,))
+    else:
+        yield path
 
 
 def resolve_path(obj, path):
     """Follow the given path on the given object."""
     for p in path:
-        obj = obj[p]
+        if is_dataclass(obj):
+            obj = getattr(obj, p)
+        else:
+            obj = obj[p]
     return obj
 
 
@@ -96,7 +104,19 @@ def gen_variants(self, obj: NoTestGrad, gen, path):
 
 @overload  # noqa: F811
 def gen_variants(self, obj: object, gen, path):
-    yield (gen(obj), path)
+    if is_dataclass(obj):
+        fields = list(obj.__dataclass_fields__.keys())
+        for field in fields:
+            x = getattr(obj, field)
+            for variants, p in self(x, gen, path + (field,)):
+                new_variants = []
+                for variant in variants:
+                    d = {f2: (variant if f2 == field else getattr(obj, f2))
+                         for f2 in fields}
+                    new_variants.append(type(obj)(**d))
+                yield (new_variants, p)
+    else:
+        yield (gen(obj), path)
 
 
 @overload  # noqa: F811
@@ -139,8 +159,12 @@ class GradTester:
                  gfn: Callable,
                  args: List[Any],
                  argnames: List[str],
-                 outnames: List[str] = None) -> None:
+                 outnames: List[str] = None,
+                 epsilon: float = eps,
+                 rel_error: float = rel_error) -> None:
         """Initialize a GradTester."""
+        self.epsilon = epsilon
+        self.rel_error = rel_error
         self.fn = fn
         self.gfn = gfn
         self.args = args
@@ -194,7 +218,7 @@ class GradTester:
 
     def wiggle(self, x):
         """Return x +- some epsilon."""
-        return x - eps, x + eps
+        return x - self.epsilon, x + self.epsilon
 
     def compute_finite_diff(self) -> Dict[str, float]:
         """
@@ -212,6 +236,8 @@ class GradTester:
 
             under_res = self.wrap(self.fn(*under))
             over_res = self.wrap(self.fn(*over))
+
+            eps = self.epsilon
 
             @smap.variant
             def mkdiff(self, a: object, b):
@@ -237,10 +263,11 @@ class GradTester:
         exact = self.compute_exact()
         fin = self.compute_finite_diff()
         results = {}
+        rel = self.rel_error
         for k in exact:
             e = exact[k]
             f = fin[k]
-            threshold = max(abs(rel_error * e), abs(rel_error * f))
+            threshold = max(abs(rel * e), abs(rel * f))
             results[k] = dict(
                 exact=e,
                 difference=f,
