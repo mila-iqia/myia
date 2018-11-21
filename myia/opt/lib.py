@@ -91,6 +91,23 @@ def setitem_tuple(optimizer, node, equiv):
     return sexp_to_node((P.make_tuple, *elems), node.graph)
 
 
+@pattern_replacer(P.tuple_setitem, C1, C2, Z)
+def setitem_tuple_ct(optimizer, node, equiv):
+    """Match a constant setitem in an explicit tuple.
+
+    setitem((a, b, c, ...), 0, z) => (z, b, c, ...)
+    setitem((a, b, c, ...), 1, z) => (a, z, c, ...)
+    ...
+    """
+    tup = equiv[C1].value
+    i = equiv[C2].value
+    assert isinstance(tup, tuple)
+    assert isinstance(i, int)
+    elems = list(tup)
+    elems[i] = equiv[Z]
+    return sexp_to_node((P.make_tuple, *elems), node.graph)
+
+
 # f((a, b, ...), (p, q, ...)) => (f(a, p), f(b, q), ...)
 # For f in the following list:
 _BubbleBinary = primset_var(P.scalar_add)
@@ -181,6 +198,28 @@ elim_array_reduce = psub(
 )
 
 
+@pattern_replacer(P.transpose, X, C)
+def elim_transpose(optimizer, node, equiv):
+    """Remove transposes that correspond to identity."""
+    axes = equiv[C].value
+    if axes == tuple(range(len(axes))):
+        return equiv[X]
+    else:
+        return node
+
+
+@pattern_replacer(P.transpose, (P.transpose, X, C1), C2)
+def merge_transposes(optimizer, node, equiv):
+    """Merge transpose operations into a single transpose."""
+    axes1 = equiv[C1].value
+    axes2 = equiv[C2].value
+    assert len(axes1) == len(axes2)
+    axes_final = tuple(axes1.index(x) for x in axes2)
+    axes_ct = Constant(axes_final)
+    axes_ct.type = Tuple[[UInt[64] for _ in axes_ct.value]]
+    return node.graph.apply(P.transpose, equiv[X], axes_ct)
+
+
 @pattern_replacer(P.array_map, G, Xs)
 def unfuse_composite(optimizer, node, equiv):
     """Tranform array_map on a graph to a graph of array_maps.
@@ -197,8 +236,10 @@ def unfuse_composite(optimizer, node, equiv):
 
         def asarray(self, ng, i):
             if i.is_constant():
+                shp = Constant(self.shape)
+                shp.type = Tuple[[UInt[64] for _ in shp.value]]
                 return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i),
-                                self.shape)
+                                shp)
             else:
                 return i
 

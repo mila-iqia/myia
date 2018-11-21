@@ -252,11 +252,14 @@ step_opt = Optimizer.partial(
             # Array simplifications
             optlib.elim_distribute,
             optlib.elim_array_reduce,
+            optlib.merge_transposes,
+            optlib.elim_transpose,
 
             # Miscellaneous
             optlib.elim_identity,
             optlib.getitem_tuple,
             optlib.setitem_tuple,
+            optlib.setitem_tuple_ct,
             optlib.elim_j_jinv,
             optlib.elim_jinv_j,
             optlib.cancel_env_set_get,
@@ -493,8 +496,15 @@ def _convert_result(res, orig_t, vm_t: dtype.Tuple):
 
 
 @overload  # noqa: F811
-def _convert_result(arg, orig_t,
-                    vm_t: (dtype.Int, dtype.Float, dtype.Bool, dtype.Array)):
+def _convert_result(arg, orig_t, vm_t: (dtype.Int, dtype.Float)):
+    if isinstance(arg, np.ndarray):
+        return arg.item()
+    else:
+        return arg
+
+
+@overload  # noqa: F811
+def _convert_result(arg, orig_t, vm_t: (dtype.Bool, dtype.Array)):
     return arg
 
 

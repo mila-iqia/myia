@@ -96,9 +96,13 @@ class FixedMatrix:
         """Initialize a FixedMatrix."""
         self.array = np.array(array)
 
-    def __call__(self, r, c):
+    def __call__(self, r, c, dtype='float64'):
         """Create a r by c matrix."""
-        return self.array[:r, :c]
+        return self.array[:r, :c].astype(dtype)
+
+    def __mul__(self, factor):
+        """Scale the matrix by a factor."""
+        return FixedMatrix(self.array * factor)
 
 
 MA = FixedMatrix([
