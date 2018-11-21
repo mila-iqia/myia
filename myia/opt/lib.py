@@ -197,6 +197,27 @@ elim_array_reduce = psub(
     name='elim_array_reduce'
 )
 
+@pattern_replacer(P.transpose, X, C)
+def elim_transpose(optimizer, node, equiv):
+    """Remove transposes that correspond to identity."""
+    axes = equiv[C].value
+    if axes == tuple(range(len(axes))):
+        return equiv[X]
+    else:
+        return node
+
+
+@pattern_replacer(P.transpose, (P.transpose, X, C1), C2)
+def merge_transposes(optimizer, node, equiv):
+    """Merge transpose operations into a single transpose."""
+    axes1 = equiv[C1].value
+    axes2 = equiv[C2].value
+    assert len(axes1) == len(axes2)
+    axes_final = tuple(axes1.index(x) for x in axes2)
+    axes_ct = Constant(axes_final)
+    axes_ct.type = Tuple[[UInt[64] for _ in axes_ct.value]]
+    return node.graph.apply(P.transpose, equiv[X], axes_ct)
+
 
 @pattern_replacer(P.array_map, G, Xs)
 def unfuse_composite(optimizer, node, equiv):

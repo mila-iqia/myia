@@ -6,7 +6,7 @@ from myia.opt import lib
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, tuple_setitem, identity, partial, switch, \
     distribute, array_reduce, env_getitem, env_setitem, embed, env_add, \
-    scalar_usub, array_map, scalar_to_array
+    scalar_usub, array_map, scalar_to_array, transpose
 from myia.utils import newenv
 
 
@@ -256,6 +256,40 @@ def test_elim_distribute():
                lib.elim_distribute,
                argspec=[{'type': dtype.Array[dtype.Float[64]],
                          'shape': (3, 1)}])
+
+
+def test_elim_transpose():
+
+    def before1(x):
+        return transpose(x, (0, 1))
+
+    def before2(x):
+        x = transpose(x, (1, 0))
+        x = transpose(x, (1, 0))
+        return x
+
+    def before3(x):
+        return transpose(x, (1, 0))
+
+    def after(x):
+        return x
+
+    _check_opt(before1, after,
+               lib.elim_transpose,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 5)}])
+
+    _check_opt(before2, after,
+               lib.merge_transposes,
+               lib.elim_transpose,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 5)}])
+
+    _check_opt(before3, before3,
+               lib.merge_transposes,
+               lib.elim_transpose,
+               argspec=[{'type': dtype.Array[dtype.Float[64]],
+                         'shape': (3, 5)}])
 
 
 def test_elim_array_reduce():

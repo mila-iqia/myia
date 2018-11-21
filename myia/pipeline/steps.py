@@ -252,6 +252,8 @@ step_opt = Optimizer.partial(
             # Array simplifications
             optlib.elim_distribute,
             optlib.elim_array_reduce,
+            optlib.merge_transposes,
+            optlib.elim_transpose,
 
             # Miscellaneous
             optlib.elim_identity,
