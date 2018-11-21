@@ -2,8 +2,9 @@
 import pytest
 import numpy as np
 from types import FunctionType
+from dataclasses import dataclass
 
-from myia.pipeline import standard_resources
+from myia.pipeline import standard_resources, standard_pipeline
 from myia.composite import grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.dtype import JTagged
@@ -18,6 +19,15 @@ from myia.prim.py_implementations import py_implementations as pyi
 from myia.validate import whitelist, validate_type
 
 from .common import f64, u64, MA, MB
+
+
+@dataclass
+class Point:
+    x: f64
+    y: f64
+
+    def abs(self):
+        return (self.x ** 2 + self.y ** 2) ** 0.5
 
 
 grad_whitelist = whitelist | {P.J, P.Jinv}
@@ -51,7 +61,6 @@ grad_pipeline = PipelineDefinition(
     resources=standard_resources,
     steps=dict(
         parse=steps.step_parse,
-        grad_wrap=grad_wrap,
         resolve=steps.step_resolve,
         infer=steps.step_infer,
         specialize=steps.step_specialize,
@@ -124,20 +133,25 @@ prim_tests = {
 }
 
 
-def _grad_test(fn, obj, args, sens_type=f64):
+def _grad_test(fn, obj, args,
+               sens_type=f64,
+               pipeline=grad_pipeline,
+               rel_error=1e-3):
+    pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
     argspec = [{'value': arg} for arg in clean_args(args)]
     sens_type = {'type': sens_type}
     if isinstance(obj, FunctionType):
-        res = grad_pipeline.run(input=obj, argspec=[*argspec, sens_type])
+        res = pipeline.run(input=obj, argspec=[*argspec, sens_type])
     else:
-        pip = grad_pipeline.configure(parse=False)
+        pip = pipeline.configure(parse=False)
         res = pip.run(graph=obj, argspec=[*argspec, sens_type])
     gtest = GradTester(
         fn=fn,
         gfn=res['output'],
         args=args,
         argnames=[f'in{i}' for i in range(len(args))],
-        outnames=None
+        outnames=None,
+        rel_error=rel_error
     )
     gtest.assert_match()
 
@@ -148,7 +162,7 @@ def test_prim_grads(prim, cases):
         _grad_test(pyi[prim], prim, case)
 
 
-def grad_test(*tests):
+def grad_test(*tests, pipeline=grad_pipeline, rel_error=1e-3):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -165,7 +179,7 @@ def grad_test(*tests):
             if not isinstance(args, tuple):
                 args = (args,)
 
-            _grad_test(fn, fn, args)
+            _grad_test(fn, fn, args, pipeline=pipeline, rel_error=rel_error)
 
         m = pytest.mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
@@ -216,6 +230,16 @@ def test_tuples(x, y):
     tup = x + y, x * y
     z = tup[0] + tup[1]
     return z
+
+
+@grad_test((Point(3.0, 5.0),), pipeline=standard_pipeline)
+def test_dataclass(pt):
+    return pt.x * pt.y
+
+
+@grad_test((Point(3.0, 5.0),), pipeline=standard_pipeline)
+def test_dataclass_2(pt):
+    return pt.abs()
 
 
 @grad_test((4.0, 5.0))
@@ -419,8 +443,7 @@ def test_transpose2(x, y, axis1, axis2):
 
 def _runwith(f, *args):
     argspec = [{'value': arg} for arg in args]
-    pip = grad_pipeline.configure(grad_wrap=False)
-    res = pip.run(input=f, argspec=argspec)
+    res = grad_pipeline.run(input=f, argspec=argspec)
     return res['output'](*args)
 
 
