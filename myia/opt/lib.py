@@ -197,6 +197,7 @@ elim_array_reduce = psub(
     name='elim_array_reduce'
 )
 
+
 @pattern_replacer(P.transpose, X, C)
 def elim_transpose(optimizer, node, equiv):
     """Remove transposes that correspond to identity."""
