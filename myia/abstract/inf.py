@@ -1,11 +1,21 @@
 
 from .. import dtype, dshape
-from ..infer import Track
+from ..infer import Track, MyiaTypeError
+from ..infer.graph_infer import type_error_nargs
 from ..infer.utils import infer_trace
 from ..ir import Graph
 from ..prim import Primitive
+from ..prim.py_implementations import typeof
+from ..utils import as_frozen, Var, RestrictedVar
 
-from .base import from_vref
+from .base import from_vref, shapeof, AbstractValue
+
+
+_number_types = [
+    dtype.Int[8], dtype.Int[16], dtype.Int[32], dtype.Int[64],
+    dtype.UInt[8], dtype.UInt[16], dtype.UInt[32], dtype.UInt[64],
+    dtype.Float[16], dtype.Float[32], dtype.Float[64],
+]
 
 
 class AbstractTrack(Track):
@@ -40,23 +50,50 @@ class AbstractTrack(Track):
         )
 
     async def infer_constant(self, ctref):
-        v = ctref.node.value
-        if isinstance(v, Graph):
-            return GraphXInferrer(v, ctref.context)
-        elif isinstance(v, Primitive):
-            return self.constructors[v]()
-        else:
-            return from_vref(
-                v,
-                dtype.pytype_to_myiatype(type(v), v),
-                dshape.NOSHAPE,
-            )
+        """Get the property for a ref of a Constant node."""
+        v = self.engine.pipeline.resources.convert(ctref.node.value)
+        res = self.from_value(v, ctref.context)
+        t = res.build('type')
+        if dtype.ismyiatype(t, dtype.Number):
+            v = RestrictedVar(_number_types)
+            prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
+            res.values['type'] = self.engine.loop.create_var(v, t, prio)
+        return res
+
+    # async def infer_constant(self, ctref):
+    #     v = ctref.node.value
+    #     if isinstance(v, Graph):
+    #         return GraphXInferrer(v, ctref.context)
+    #     elif isinstance(v, Primitive):
+    #         return self.constructors[v]()
+    #     else:
+    #         return from_vref(
+    #             v,
+    #             dtype.pytype_to_myiatype(type(v), v),
+    #             dshape.NOSHAPE,
+    #         )
+
+    # def from_value(self, v, context):
+    #     return 8911
 
     def from_value(self, v, context):
-        return 8911
+        """Infer the type of a constant."""
+        if isinstance(v, Primitive):
+            return self.constructors[v]()
+        elif isinstance(v, Graph):
+            return GraphXInferrer(v, context)
+        # elif isinstance(v, MetaGraph):
+        #     return MetaGraphInferrer(self, v)
+        # elif is_dataclass_type(v):
+        #     rec = self.constructors[P.make_record]()
+        #     typ = dtype.pytype_to_myiatype(v)
+        #     vref = self.engine.vref({'value': typ, 'type': TypeType})
+        #     return PartialInferrer(self, rec, [vref])
+        else:
+            return from_vref(v, typeof(v), shapeof(v))
 
     def from_external(self, t):
-        return 21
+        return t
 
     def default(self, values):
         # return AbstractValue(values)
@@ -68,9 +105,13 @@ class AbstractTrack(Track):
         )
 
 
-class XInferrer:
-    def __init__(self):
+class XInferrer(AbstractValue):
+    def __init__(self, values={}):
         self.cache = {}
+        super().__init__(values)
+
+    def build(self, field):
+        return None
 
     async def __call__(self, track, *refs):
         args = tuple([await ref['abstract'] for ref in refs])
@@ -81,11 +122,14 @@ class XInferrer:
     async def infer(self, track, *args):
         raise NotImplementedError()
 
+    def __repr__(self):
+        return f'{type(self)}'
+
 
 class GraphXInferrer(XInferrer):
 
     def __init__(self, graph, context, broaden=True):
-        super().__init__()
+        super().__init__({'value': graph, 'type': None, 'shape': None})
         self._graph = graph
         self.broaden = broaden
         if context is None:
@@ -129,7 +173,7 @@ class GraphXInferrer(XInferrer):
         nargs = len(g.parameters)
 
         if len(args) != nargs:
-            raise type_error_nargs(self.identifier, nargs, len(args))
+            raise type_error_nargs(self, nargs, len(args))
 
         argkey, context = await self._make_argkey_and_context(track, args)
 

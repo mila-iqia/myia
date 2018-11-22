@@ -7,6 +7,7 @@ from .base import (  # noqa
     AbstractArray,
     AbstractList,
     AbstractClass,
+    from_vref,
 )
 
 

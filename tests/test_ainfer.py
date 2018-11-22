@@ -5,11 +5,14 @@ import numpy as np
 
 from types import SimpleNamespace
 
+from myia.abstract import from_vref
+from myia.abstract.base import shapeof
 from myia.pipeline.standard import new_pipeline, scalar_new_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
-    Number, Class, Problem, EnvType as Env, JTagged as JT
+    Number, Class, Problem, EnvType as Env, JTagged as JT, ismyiatype, \
+    Array, Tuple, List
 from myia.hypermap import HyperMap
 from myia.infer import ANYTHING, VOID, InferenceError, register_inferrer, \
     Contextless, CONTEXTLESS
@@ -54,6 +57,22 @@ def af32_of(*shp):
 
 def af16_of(*shp):
     return {'type': af16, 'shape': shp}
+
+
+def type_to_shape(typ):
+    """Default value for ShapeTrack."""
+    if ismyiatype(typ, Array):
+        raise Exception(
+            'There is no default value for Arrays on the shape track.'
+        )  # pragma: no cover
+    if ismyiatype(typ, Tuple):
+        return TupleShape(type_to_shape(e) for e in typ.elements)
+    elif ismyiatype(typ, List):
+        return ListShape(type_to_shape(typ.element_type))
+    elif ismyiatype(typ, Class):
+        return ClassShape(dict((attr, type_to_shape(tp))
+                                for attr, tp in typ.attributes.items()))
+    return NOSHAPE
 
 
 ########################
@@ -197,11 +216,24 @@ def inferrer_decorator(pipeline):
         def decorate(fn):
             def run_test(spec):
                 main_track, (*args, expected_out) = spec
+                new_args = []
+                for arg in args:
+                    v = arg.get('value', ANYTHING)
+                    t = arg.get('type', typeof(v))
+                    s = arg.get('shape',
+                                type_to_shape(t)
+                                if v is ANYTHING else shapeof(v))
+                    new_arg = from_vref(v, t, s)
+                    print(new_arg, v, t, s, type(new_arg))
+                    new_args.append({'abstract': new_arg})
+
+                args = new_args
 
                 print('Args:')
                 print(args)
 
-                required_tracks = [main_track]
+                # required_tracks = [main_track]
+                required_tracks = ['abstract']
 
                 def out():
                     pip = pipeline.configure({
@@ -213,7 +245,7 @@ def inferrer_decorator(pipeline):
 
                     print('Output of inferrer:')
                     print(rval)
-                    return rval
+                    return {main_track: rval['abstract'].build(main_track)}
 
                 print('Expected:')
                 print(expected_out)
@@ -222,10 +254,11 @@ def inferrer_decorator(pipeline):
                     try:
                         out()
                     except expected_out as e:
-                        if issubclass(expected_out, InferenceError):
-                            print_inference_error(e)
-                        else:
-                            pass
+                        # if issubclass(expected_out, InferenceError):
+                        #     print_inference_error(e)
+                        # else:
+                        #     pass
+                        pass
                     else:
                         raise Exception(
                             f'Expected {expected_out}, got: (see stdout).'
@@ -266,34 +299,36 @@ def test_contextless():
 
 
 @infer(type=[(i64, i64)],
-       value=[(89, 89), ([], TypeError)])
+       value=[(89, 89),
+            #   ([], TypeError)
+             ])
 def test_identity(x):
     return x
 
 
-# @infer(type=[(i64,)], value=[(16,)])
-# def test_constants_int():
-#     return 2 * 8
+@infer(type=[(i64,)], value=[(16,)])
+def test_constants_int():
+    return 2 * 8
 
 
-# @infer(type=[(f64,)], value=[(12.0,)])
-# def test_constants_float():
-#     return 1.5 * 8.0
+@infer(type=[(f64,)], value=[(12.0,)])
+def test_constants_float():
+    return 1.5 * 8.0
 
 
-# @infer(type=[(f64,)], value=[(12.0,)])
-# def test_constants_intxfloat():
-#     return 8 * 1.5
+@infer(type=[(f64,)], value=[(12.0,)])
+def test_constants_intxfloat():
+    return 8 * 1.5
 
 
-# @infer(type=[(f64,)], value=[(12.0,)])
-# def test_constants_floatxint():
-#     return 1.5 * 8
+@infer(type=[(f64,)], value=[(12.0,)])
+def test_constants_floatxint():
+    return 1.5 * 8
 
 
-# @infer(type=type_signature_arith_bin)
-# def test_prim_mul(x, y):
-#     return x * y
+@infer(type=type_signature_arith_bin)
+def test_prim_mul(x, y):
+    return x * y
 
 
 # @infer(type=[
@@ -311,9 +346,9 @@ def test_identity(x):
 #     return _tern(x, y, z)
 
 
-# @infer(type=[(i64, i64), (f64, f64), (B, InferenceError)])
-# def test_prim_usub(x):
-#     return -x
+@infer(type=[(i64, i64), (f64, f64), (B, InferenceError)])
+def test_prim_usub(x):
+    return -x
 
 
 # @infer_std(type=[
@@ -395,55 +430,55 @@ def test_identity(x):
 #     return rval
 
 
-# @infer(type=(i64, f64, T[i64, f64]))
-# def test_nullary_closure(x, y):
-#     def make(z):
-#         def inner():
-#             return z
-#         return inner
-#     a = make(x)
-#     b = make(y)
-#     return a(), b()
+@infer(type=(i64, f64, T[i64, f64]))
+def test_nullary_closure(x, y):
+    def make(z):
+        def inner():
+            return z
+        return inner
+    a = make(x)
+    b = make(y)
+    return a(), b()
 
 
-# @infer(type=(i64, f64, T[i64, f64]))
-# def test_merge_point(x, y):
-#     def mul2():
-#         return scalar_mul
-#     m = mul2()
-#     return m(x, x), m(y, y)
+@infer(type=(i64, f64, T[i64, f64]))
+def test_merge_point(x, y):
+    def mul2():
+        return scalar_mul
+    m = mul2()
+    return m(x, x), m(y, y)
 
 
-# @infer(type=[(i64, InferenceError)])
-# def test_not_enough_args_prim(x):
-#     return scalar_mul(x)
+@infer(type=[(i64, InferenceError)])
+def test_not_enough_args_prim(x):
+    return scalar_mul(x)
 
 
-# @infer(type=[(i64, i64, i64, InferenceError)])
-# def test_too_many_args_prim(x, y, z):
-#     return scalar_mul(x, y, z)
+@infer(type=[(i64, i64, i64, InferenceError)])
+def test_too_many_args_prim(x, y, z):
+    return scalar_mul(x, y, z)
 
 
-# @infer(type=[(i64, InferenceError)])
-# def test_not_enough_args(x):
-#     def g(x, y):
-#         return x * y
-#     return g(x)
+@infer(type=[(i64, InferenceError)])
+def test_not_enough_args(x):
+    def g(x, y):
+        return x * y
+    return g(x)
 
 
-# @infer(type=[(i64, i64, InferenceError)])
-# def test_too_many_args(x, y):
-#     def g(x):
-#         return x * x
-#     return g(x, y)
+@infer(type=[(i64, i64, InferenceError)])
+def test_too_many_args(x, y):
+    def g(x):
+        return x * x
+    return g(x, y)
 
 
-# @infer(type=(i64, f64, T[i64, f64]),
-#        shape=[(t(i64), t(f64), TupleShape((NOSHAPE, NOSHAPE))),
-#               (t(T[i64, i64]), t(f64),
-#                TupleShape((TupleShape((NOSHAPE, NOSHAPE)), NOSHAPE)))])
-# def test_tup(x, y):
-#     return (x, y)
+@infer(type=(i64, f64, T[i64, f64]),
+       shape=[(t(i64), t(f64), TupleShape((NOSHAPE, NOSHAPE))),
+              (t(T[i64, i64]), t(f64),
+               TupleShape((TupleShape((NOSHAPE, NOSHAPE)), NOSHAPE)))])
+def test_tup(x, y):
+    return (x, y)
 
 
 # @infer(type=[(i64, i64, L[i64]),
@@ -474,21 +509,21 @@ def test_identity(x):
 #     return []
 
 
-# @infer(
-#     type=[
-#         (T[i64, f64], i64),
-#         (lf64, InferenceError),
-#         (af64_of(2, 5), InferenceError),
-#         (i64, InferenceError),
-#     ],
-#     value=[
-#         ((), 0),
-#         ((1,), 1),
-#         ((1, 2), 2),
-#     ]
-# )
-# def test_tuple_len(xs):
-#     return P.tuple_len(xs)
+@infer(
+    type=[
+        (T[i64, f64], i64),
+        (lf64, InferenceError),
+        (af64_of(2, 5), InferenceError),
+        (i64, InferenceError),
+    ],
+    value=[
+        ((), 0),
+        ((1,), 1),
+        ((1, 2), 2),
+    ]
+)
+def test_tuple_len(xs):
+    return P.tuple_len(xs)
 
 
 # @infer(

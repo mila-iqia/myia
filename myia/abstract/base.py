@@ -1,7 +1,10 @@
 
+import numpy
+from dataclasses import is_dataclass
+
 from .. import dtype, dshape
 from ..debug.utils import mixin
-from ..infer import ANYTHING
+from ..infer import ANYTHING, InferenceError
 from ..utils import overload, UNKNOWN, Named
 
 
@@ -36,7 +39,7 @@ class AbstractValue:
         self.values = values
 
     def build(self, name):
-        v = self.values[name]
+        v = self.values.get(name, ABSENT)
         if v is not ABSENT:
             return v
         else:
@@ -58,6 +61,10 @@ class AbstractValue:
     def _resolve(self, key, value):
         self.values[key] = value
 
+    def __repr__(self):
+        contents = [f'{k}={v}' for k, v in self.values.items()]
+        return f'V({", ".join(contents)})'
+
 
 class AbstractTuple(AbstractValue):
     def __init__(self, elements):
@@ -76,6 +83,9 @@ class AbstractTuple(AbstractValue):
     def make_key(self):
         return (self._key, self.elements)
 
+    def __repr__(self):
+        return f'T({", ".join(map(repr, self.elements))})'
+
 
 class AbstractArray(AbstractValue):
     def __init__(self, element, values=None):
@@ -87,6 +97,9 @@ class AbstractArray(AbstractValue):
 
     def make_key(self):
         return (self._key, self.element)
+
+    def __repr__(self):
+        return f'A({self.element}, shape={self.values["shape"]})'
 
 
 class AbstractList(AbstractValue):
@@ -102,6 +115,9 @@ class AbstractList(AbstractValue):
 
     def make_key(self):
         return (self._key, self.element)
+
+    def __repr__(self):
+        return f'L({self.element})'
 
 
 class AbstractClass(AbstractValue):
@@ -126,6 +142,10 @@ class AbstractClass(AbstractValue):
 
     def make_key(self):
         return (tag, tuple(sorted(self.attributes.items())))
+
+    def __repr__(self):
+        elems = [f'{k}={v}' for k, v in self.attributes.items()]
+        return f'{self.tag}({", ".join(elems)})'
 
 
 # class AbstractFunction:
@@ -202,6 +222,38 @@ def from_vref(self, v, t: dtype.Class, s):
 @overload
 def from_vref(self, v, t: dtype.TypeMeta, s):
     return self[t](v, t, s)
+
+
+###########
+# shapeof #
+###########
+
+
+def shapeof(v):
+    """Infer the shape of a constant."""
+    if isinstance(v, tuple):
+        return dshape.TupleShape(shapeof(e) for e in v)
+    elif isinstance(v, list):
+        shps = [shapeof(e) for e in v]
+        if len(shps) == 0:  # pragma: no cover
+            # from_value of the type track will fail before this
+            raise InferenceError('Cannot infer the shape of []')
+        return dshape.ListShape(dshape.find_matching_shape(shps))
+    elif is_dataclass(v):
+        if isinstance(v, type):
+            assert False
+            # rec = self.constructors[P.make_record](self)
+            # typ = pytype_to_myiatype(v)
+            # vref = self.engine.vref({'value': typ, 'type': TypeType})
+            # return PartialInferrer(self, rec, [vref])
+        else:
+            return dshape.ClassShape(
+                dict((n, shapeof(getattr(v, n)))
+                     for n in v.__dataclass_fields__.keys()))
+    elif isinstance(v, numpy.ndarray):
+        return v.shape
+    else:
+        return dshape.NOSHAPE
 
 
 ##################
