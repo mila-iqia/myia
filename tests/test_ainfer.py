@@ -220,9 +220,10 @@ def inferrer_decorator(pipeline):
                 for arg in args:
                     v = arg.get('value', ANYTHING)
                     t = arg.get('type', typeof(v))
-                    s = arg.get('shape',
-                                type_to_shape(t)
-                                if v is ANYTHING else shapeof(v))
+                    if 'shape' in arg:
+                        s = arg['shape']
+                    else:
+                        s = type_to_shape(t) if v is ANYTHING else shapeof(v)
                     new_arg = from_vref(v, t, s)
                     print(new_arg, v, t, s, type(new_arg))
                     new_args.append({'abstract': new_arg})
@@ -526,28 +527,28 @@ def test_tuple_len(xs):
     return P.tuple_len(xs)
 
 
-# @infer(
-#     type=[
-#         (T[i64, f64], InferenceError),
-#         (lf64, i64),
-#         (af64_of(2, 5), InferenceError),
-#         (i64, InferenceError),
-#     ],
-# )
-# def test_list_len(xs):
-#     return P.list_len(xs)
+@infer(
+    type=[
+        (T[i64, f64], InferenceError),
+        (lf64, i64),
+        (af64_of(2, 5), InferenceError),
+        (i64, InferenceError),
+    ],
+)
+def test_list_len(xs):
+    return P.list_len(xs)
 
 
-# @infer(
-#     type=[
-#         (T[i64, f64], InferenceError),
-#         (lf64, InferenceError),
-#         (af64_of(2, 5), i64),
-#         (i64, InferenceError),
-#     ],
-# )
-# def test_array_len(xs):
-#     return P.array_len(xs)
+@infer(
+    type=[
+        (T[i64, f64], InferenceError),
+        (lf64, InferenceError),
+        (af64_of(2, 5), i64),
+        (i64, InferenceError),
+    ],
+)
+def test_array_len(xs):
+    return P.array_len(xs)
 
 
 # @infer(type=[(T[i64, f64], T[f64]),

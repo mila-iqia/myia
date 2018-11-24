@@ -1,14 +1,15 @@
 
 from .. import dtype, dshape
-from ..infer import Track, MyiaTypeError
+from ..infer import Track, MyiaTypeError, Context
 from ..infer.graph_infer import type_error_nargs
 from ..infer.utils import infer_trace
 from ..ir import Graph
 from ..prim import Primitive
 from ..prim.py_implementations import typeof
-from ..utils import as_frozen, Var, RestrictedVar
+from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable
 
-from .base import from_vref, shapeof, AbstractValue
+from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
+    ABSENT, GraphAndContext
 
 
 _number_types = [
@@ -25,8 +26,29 @@ class AbstractTrack(Track):
                  *,
                  constructors):
         super().__init__(engine, name)
-        self.constructors = constructors
+        self.constructors = {
+            prim: cons()
+            for prim, cons in constructors.items()
+        }
         self.subtracks = ['value', 'type', 'shape']
+
+    get_inferrer_for = Overload()
+
+    @get_inferrer_for.register
+    def get_inferrer_for(self, prim: Primitive):
+        return self.constructors[prim]
+
+    @get_inferrer_for.register
+    def get_inferrer_for(self, g: Graph):
+        if g not in self.constructors:
+            self.constructors[g] = GraphXInferrer(g, Context.empty())
+        return self.constructors[g]
+
+    @get_inferrer_for.register
+    def get_inferrer_for(self, g: GraphAndContext):
+        if g not in self.constructors:
+            self.constructors[g] = GraphXInferrer(g.graph, g.context)
+        return self.constructors[g]
 
     async def infer_apply(self, ref):
         """Get the property for a ref of an Apply node."""
@@ -34,16 +56,13 @@ class AbstractTrack(Track):
         n_fn, *n_args = ref.node.inputs
         # We await on the function node to get the inferrer
         fn_ref = self.engine.ref(n_fn, ctx)
-        inf = await fn_ref[self.name]
+        fn = await fn_ref[self.name]
         argrefs = [self.engine.ref(node, ctx) for node in n_args]
-        if not isinstance(inf, XInferrer):
-            raise MyiaTypeError(
-                f'Trying to call a non-callable type: {inf}',
-                refs=[fn_ref],
-                app=ref
-            )
+
+        infs = [self.get_inferrer_for(poss) for poss in fn.values['value']]
+
         return await self.engine.loop.schedule(
-            inf(self, *argrefs),
+            execute_inferrers(self, infs, argrefs),
             context_map={
                 infer_trace: {**infer_trace.get(), ctx: ref}
             }
@@ -60,28 +79,22 @@ class AbstractTrack(Track):
             res.values['type'] = self.engine.loop.create_var(v, t, prio)
         return res
 
-    # async def infer_constant(self, ctref):
-    #     v = ctref.node.value
-    #     if isinstance(v, Graph):
-    #         return GraphXInferrer(v, ctref.context)
-    #     elif isinstance(v, Primitive):
-    #         return self.constructors[v]()
-    #     else:
-    #         return from_vref(
-    #             v,
-    #             dtype.pytype_to_myiatype(type(v), v),
-    #             dshape.NOSHAPE,
-    #         )
-
-    # def from_value(self, v, context):
-    #     return 8911
-
     def from_value(self, v, context):
         """Infer the type of a constant."""
         if isinstance(v, Primitive):
-            return self.constructors[v]()
+            return AbstractScalar({
+                'value': Possibilities([v]),
+                'type': dtype.Function,
+                'shape': dshape.NOSHAPE,
+            })
         elif isinstance(v, Graph):
-            return GraphXInferrer(v, context)
+            if v.parent:
+                v = GraphAndContext(v, context)
+            return AbstractScalar({
+                'value': Possibilities([v]),
+                'type': dtype.Function,
+                'shape': dshape.NOSHAPE,
+            })
         # elif isinstance(v, MetaGraph):
         #     return MetaGraphInferrer(self, v)
         # elif is_dataclass_type(v):
@@ -96,8 +109,6 @@ class AbstractTrack(Track):
         return t
 
     def default(self, values):
-        # return AbstractValue(values)
-        # return AbstractTuple((1, 2, 3))
         return from_vref(
             values['value'],
             values['type'],
@@ -105,10 +116,9 @@ class AbstractTrack(Track):
         )
 
 
-class XInferrer(AbstractValue):
-    def __init__(self, values={}):
+class XInferrer(Partializable):
+    def __init__(self):
         self.cache = {}
-        super().__init__(values)
 
     def build(self, field):
         return None
@@ -129,7 +139,7 @@ class XInferrer(AbstractValue):
 class GraphXInferrer(XInferrer):
 
     def __init__(self, graph, context, broaden=True):
-        super().__init__({'value': graph, 'type': None, 'shape': None})
+        super().__init__()
         self._graph = graph
         self.broaden = broaden
         if context is None:
@@ -186,3 +196,12 @@ class GraphXInferrer(XInferrer):
 
         out = engine.ref(g.return_, context)
         return await engine.get_inferred('abstract', out)
+
+
+async def execute_inferrers(track, inferrers, args):
+    if len(inferrers) == 1:
+        inf, = inferrers
+        return await inf(track, *args)
+
+    else:
+        assert False

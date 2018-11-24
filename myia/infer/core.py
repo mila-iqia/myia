@@ -73,7 +73,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
                 pending_vars.sort(key=lambda x: -x.priority)
                 v1, *self._vars = pending_vars
                 try:
-                    v1.resolve_to_default()
+                    v1.force_resolve()
                 except InferenceError as e:
                     self._errors.append(e)
                 else:
@@ -149,6 +149,11 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         v = InferenceVar(var, default, priority, loop=self)
         self._vars.append(v)
         return v
+
+    def create_pending(self, resolve, priority=0):
+        pending = Pending(resolve, priority, loop=self)
+        self._vars.append(pending)
+        return pending
 
 
 class EvaluationCache:
@@ -296,7 +301,24 @@ class EquivalenceChecker:
         return main.result()
 
 
-class InferenceVar(asyncio.Future):
+class Pending(asyncio.Future):
+    def __init__(self, resolve, priority, loop):
+        super().__init__(loop=loop)
+        self.priority = priority
+        self._resolve = resolve
+
+    def force_resolve(self):
+        """Resolve to the default value."""
+        self.resolve_to(self._resolve())
+
+    def resolve_to(self, value):
+        self.set_result(value)
+
+    def resolved(self):
+        return self.done()
+
+
+class InferenceVar(Pending):
     """Hold a Var that stands in for an inference result.
 
     This is a Future which can be awaited. Await on the `reify` function to
@@ -313,20 +335,19 @@ class InferenceVar(asyncio.Future):
 
     def __init__(self, var, default, priority, loop):
         """Initialize an InferenceVar."""
-        super().__init__(loop=loop)
+        super().__init__(None, priority, loop=loop)
         self.loop = loop
         self.var = var
         self.default = default
-        self.priority = priority
         self.__var__ = var
         var._infvar = self
 
-    def resolve_to_default(self):
+    def force_resolve(self):
         """Resolve to the default value."""
         default = self.default
         if default is None:
             if self.done():
-                self.result()._infvar.resolve_to_default()
+                self.result()._infvar.force_resolve()
                 return
             elif isinstance(self.var, RestrictedVar) \
                     and len(self.var.legal_values) == 1:

@@ -1,11 +1,14 @@
 
 import inspect
+from functools import reduce
+from collections import defaultdict
 from operator import getitem
 
 from .base import (
     ABSENT,
     AbstractBase,
     AbstractValue,
+    AbstractScalar,
     AbstractTuple,
     AbstractArray,
     AbstractList,
@@ -19,7 +22,10 @@ from .inf import (
 )
 
 from .. import dtype, dshape
-from ..infer import ANYTHING, InferenceVar, Context, MyiaTypeError
+from ..dtype import Number, Bool
+from ..infer import ANYTHING, InferenceVar, Context, MyiaTypeError, \
+    InferenceError
+from ..infer.core import Pending
 from ..prim import ops as P
 from ..utils import Namespace
 
@@ -35,119 +41,129 @@ def reg(*prims):
     return deco
 
 
-@reg(P.identity, P.return_)
-class IdentityXInferrer(XInferrer):
-    async def infer(self, track, x):
-        return x
+class StandardXInferrer(XInferrer):
+    def __init__(self, infer):
+        super().__init__()
+        self._infer = infer
+        data = inspect.getfullargspec(infer)
+        assert data.varkw is None
+        assert data.defaults is None
+        assert data.kwonlyargs == []
+        assert data.kwonlydefaults is None
+        self.nargs = None if data.varargs else len(data.args) - 1
+        self.typemap = {}
+        for name, ann in data.annotations.items():
+            self.typemap[data.args.index(name) - 1] = ann
 
-
-class PrimitiveXInferrer(XInferrer):
     async def infer(self, track, *args):
-        rval = await self.infer_structure(track, *args)
-        for t in track.subtracks:
-            method = getattr(self, f'infer_{t}')
-            rval.values[t] = await method(track, *args)
-        return rval
-
-    async def infer_structure(self, track, *args):
-        raise NotImplementedError()
-
-    async def infer_value(self, track, *args):
-        raise NotImplementedError()
-
-    async def infer_type(self, track, *args):
-        raise NotImplementedError()
-
-    async def infer_shape(self, track, *args):
-        raise NotImplementedError()
+        if self.nargs is not None and len(args) != self.nargs:
+            raise MyiaTypeError('Wrong number of arguments.')
+        for i, arg in enumerate(args):
+            typ = self.typemap.get(i)
+            print(typ, typ and issubclass(typ, AbstractBase))
+            if typ is None:
+                pass
+            elif dtype.ismyiatype(typ):
+                await track.check(typ, arg.values['type'])
+            elif issubclass(typ, AbstractBase):
+                if not isinstance(arg, typ):
+                    raise MyiaTypeError('Wrong type')
+        return await self._infer(track, *args)
 
 
-class StructuralXInferrer(PrimitiveXInferrer):
-
-    async def infer_value(self, track, *args):
-        return ANYTHING
-
-    async def infer_type(self, track, *args):
-        return ABSENT
-
-    async def infer_shape(self, track, *args):
-        return ABSENT
+def standard_prim(*prims):
+    def deco(fn):
+        xinf = StandardXInferrer.partial(infer=fn)
+        for prim in prims:
+            abstract_inferrer_constructors[prim] = xinf
+    return deco
 
 
-@reg(P.make_tuple)
-class MakeTupleXInferrer(StructuralXInferrer):
-    async def infer_structure(self, track, *args):
-        return AbstractTuple(args)
+@standard_prim(P.identity, P.return_)
+async def identity_prim(track, x):
+    return x
 
 
-@reg(P.tuple_getitem)
-class TupleGetitemXInferrer(XInferrer):
-    async def infer(self, track, arg, idx):
-        i = idx.values['value']
-        return arg.elements[i]
+@standard_prim(P.make_tuple)
+async def make_tuple_prim(track, *args):
+    return AbstractTuple(args)
 
 
-class ArithScalarXInferrer(PrimitiveXInferrer):
+@standard_prim(P.tuple_getitem)
+async def tuple_getitem_prim(track, arg: AbstractTuple, idx: dtype.Int[64]):
+    i = idx.values['value']
+    return arg.elements[i]
 
-    async def infer_structure(self, track, *args):
-        assert all(isinstance(arg, AbstractValue) for arg in args)
-        return AbstractValue({})
 
-    async def infer_value(self, track, *args):
+class UniformPrimitiveXInferrer(XInferrer):
+    def __init__(self, impl):
+        super().__init__()
+        self.impl = impl
+        data = inspect.getfullargspec(impl)
+        assert data.varargs is None
+        assert data.varkw is None
+        assert data.defaults is None
+        assert data.kwonlyargs == []
+        assert data.kwonlydefaults is None
+        self.nargs = len(data.args)
+        self.typemap = defaultdict(list)
+        for i, arg in enumerate(data.args):
+            self.typemap[data.annotations[arg]].append(i)
+        self.outtype = data.annotations['return']
+
+    async def infer(self, track, *args):
+        if len(args) != self.nargs:
+            raise MyiaTypeError('Wrong number of arguments.')
+
+        outtype = self.outtype
+        ts = [arg.values['type'] for arg in args]
+        for typ, indexes in self.typemap.items():
+            selection = [ts[i] for i in indexes]
+            res = await track.will_check(typ, *selection)
+            if typ == self.outtype:
+                outtype = res
+
         values = [arg.values['value'] for arg in args]
         if any(v is ANYTHING for v in values):
-            return ANYTHING
-        return self.impl(*values)
+            outval = ANYTHING
+        else:
+            outval = self.impl(*values)
 
-    async def infer_type(self, track, *args):
-        nargs = len(inspect.getfullargspec(self.impl).args) - 1
-        if len(args) != nargs:
-            raise MyiaTypeError(f'Wrong number of arguments')
-        ts = [arg.values['type'] for arg in args]
-        return await track.will_check(dtype.Number, *ts)
-
-    async def infer_shape(self, track, *args):
-        return dshape.NOSHAPE
+        return AbstractScalar({
+            'value': outval,
+            'type': outtype,
+            'shape': dshape.NOSHAPE
+        })
 
 
-@reg(P.scalar_usub)
-class USubXInferrer(ArithScalarXInferrer):
-    def impl(self, x):
-        return -x
+def uniform_prim(prim):
+    def deco(fn):
+        xinf = UniformPrimitiveXInferrer.partial(impl=fn)
+        abstract_inferrer_constructors[prim] = xinf
+    return deco
 
 
-@reg(P.scalar_add)
-class AddXInferrer(ArithScalarXInferrer):
-    def impl(self, x, y):
-        return x + y
+@uniform_prim(P.scalar_usub)
+def prim_usub(x: Number) -> Number:
+    return -x
 
 
-@reg(P.scalar_mul)
-class MulXInferrer(ArithScalarXInferrer):
-    def impl(self, x, y):
-        return x * y
+@uniform_prim(P.scalar_add)
+def prim_add(x: Number, y: Number) -> Number:
+    return x + y
 
 
-# @abstract_inferrer(P.switch, nargs=3)
-# async def infer_abstract_switch(track, cond, tb, fb):
-#     pass
-#     # """Infer the return type of if."""
-#     # await track.check(Bool, cond)
-#     # tb_inf = await tb['type']
-#     # fb_inf = await fb['type']
-#     # v = await cond['value']
-#     # if v is True:
-#     #     # We only visit the first branch if the condition is provably true
-#     #     return await tb_inf()
-#     # elif v is False:
-#     #     # We only visit the second branch if the condition is provably false
-#     #     return await fb_inf()
-#     # elif v is ANYTHING:
-#     #     # The first branch to finish will return immediately. When the other
-#     #     # branch finishes, its result will be checked against the other.
-#     #     return await track.assert_same(tb_inf(), fb_inf(), refs=[tb, fb])
-#     # else:
-#     #     raise AssertionError("Invalid condition value for if")
+@uniform_prim(P.scalar_mul)
+def prim_mul(x: Number, y: Number) -> Number:
+    return x * y
+
+
+class MyiaNameError(InferenceError):
+    """Raised when a name is not found in scope."""
+
+
+class MyiaAttributeError(InferenceError):
+    """Raised when an attribute is not found in a type or module."""
 
 
 async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
@@ -258,28 +274,152 @@ async def _resolve_case(resources, data_t, item_v, chk):
     return ('static',)
 
 
-@reg(P.resolve)
-class ResolveXInferrer(XInferrer):
-    async def infer(self, track, data, item):
-        """Infer the return type of resolve."""
-        def chk(data_v, item_v):
-            if not isinstance(data_v, Namespace):  # pragma: no cover
-                raise MyiaTypeError(
-                    f'data argument to resolve must be Namespace, not {data_v}',
-                    refs=[data]
-                )
-            if not isinstance(item_v, str):  # pragma: no cover
-                raise MyiaTypeError(
-                    f'item argument to resolve must be a string, not {item_v}.',
-                    refs=[item]
-                )
+@standard_prim(P.resolve)
+async def resolve_prim(track, data, item):
+    def chk(data_v, item_v):
+        if not isinstance(data_v, Namespace):  # pragma: no cover
+            raise MyiaTypeError(
+                f'data argument to resolve must be Namespace, not {data_v}',
+                refs=[data]
+            )
+        if not isinstance(item_v, str):  # pragma: no cover
+            raise MyiaTypeError(
+                f'item argument to resolve must be a string, not {item_v}.',
+                refs=[item]
+            )
 
-        async def on_dcattr(data, data_t, item_v):  # pragma: no cover
-            raise MyiaTypeError('Cannot resolve on Class.')
+    async def on_dcattr(data, data_t, item_v):  # pragma: no cover
+        raise MyiaTypeError('Cannot resolve on Class.')
 
-        return await static_getter(
-            track, data, item,
-            fetch=getitem,
-            on_dcattr=on_dcattr,
-            chk=chk
-        )
+    return await static_getter(
+        track, data, item,
+        fetch=getitem,
+        on_dcattr=on_dcattr,
+        chk=chk
+    )
+
+
+@standard_prim(P.getattr)
+async def getattr_prim(track, data, item):
+    def chk(data_v, item_v):
+        if not isinstance(item_v, str):  # pragma: no cover
+            raise MyiaTypeError(
+                f'item argument to resolve must be a string, not {item_v}.'
+            )
+
+    async def on_dcattr(data, data_t, item_v):
+        return data_t.attributes[item_v]
+
+    return await static_getter(
+        track, data, item,
+        fetch=getattr,
+        on_dcattr=on_dcattr,
+        chk=chk
+    )
+
+
+@standard_prim(P.array_len)
+async def array_len_prim(track, xs: AbstractArray):
+    return AbstractScalar({
+        'value': ANYTHING,
+        'type': dtype.Int[64],
+        'shape': dshape.NOSHAPE
+    })
+
+
+@standard_prim(P.list_len)
+async def list_len_prim(track, xs: AbstractList):
+    return AbstractScalar({
+        'value': ANYTHING,
+        'type': dtype.Int[64],
+        'shape': dshape.NOSHAPE
+    })
+
+
+@standard_prim(P.tuple_len)
+async def tuple_len_prim(track, xs: AbstractTuple):
+    return AbstractScalar({
+        'value': len(xs.elements),
+        'type': dtype.Int[64],
+        'shape': dshape.NOSHAPE
+    })
+
+
+@standard_prim(P.switch)
+async def switch_prim(self, track, cond: Bool, tb, fb):
+    v = cond.values['value']
+    if v is True:
+        return tb
+    elif v is False:
+        return fb
+    elif v is ANYTHING:
+        return abstract_merge(tb, fb)
+    else:
+        raise AssertionError("Invalid condition value for switch")
+
+
+def abstract_merge(*values):
+    resolved = set()
+    pending = set()
+    committed = None
+    for v in values:
+        if isinstance(v, Pending):
+            if v.resolved():
+                resolved.add(v.result())
+            else:
+                pending.add(v)
+        else:
+            resolved.add(v)
+
+    if pending:
+        def resolve(fut):
+            pending.remove(fut)
+            resolved.append(fut.result())
+            if not pending:
+                v = force_merge(values, model=committed)
+                rval.resolve_to(v)
+
+        for p in pending:
+            p.add_done_callback(resolve)
+
+        def premature_resolve():
+            nonlocal committed
+            committed = force_merge(resolved)
+            resolved.clear()
+            return committed
+
+        rval = Pending(premature_resolve)
+        return rval
+    else:
+        return force_merge(resolved)
+
+
+def force_merge(values, model=None):
+    if model is None:
+        return reduce(lambda v1, v2: v1.merge(v2), values)
+    else:
+        return reduce(lambda v1, v2: v1.accept(v2), values, model)
+
+
+# @type_inferrer(P.switch, nargs=3)
+# async def infer_type_switch(track, cond, tb, fb):
+#     """Infer the return type of switch."""
+#     await track.check(Bool, cond)
+#     v = await cond['value']
+#     if v is True:
+#         # We only visit the first branch if the condition is provably true
+#         return await tb['type']
+#     elif v is False:
+#         # We only visit the second branch if the condition is provably false
+#         return await fb['type']
+#     elif v is ANYTHING:
+#         # The first branch to finish will return immediately. When the other
+#         # branch finishes, its result will be checked against the other.
+#         res = await track.assert_same(tb, fb, refs=[tb, fb])
+#         if isinstance(res, Inferrer):
+#             tinf = await tb['type']
+#             finf = await fb['type']
+#             return MultiInferrer((tinf, finf), [tb, fb])
+#         return res
+#     else:
+#         raise AssertionError("Invalid condition value for switch")

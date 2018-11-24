@@ -16,6 +16,24 @@ ABSENT = Named('ABSENT')
 #################
 
 
+class Possibilities(frozenset):
+    pass
+
+
+class GraphAndContext:
+    def __init__(self, graph, context):
+        self.graph = graph
+        self.context = context
+
+    def __hash__(self):
+        return hash((self.graph, self.context))
+
+    def __eq__(self, other):
+        return isinstance(other, GraphAndContext) \
+            and self.graph == other.graph \
+            and self.context == other.context
+
+
 class AbstractBase:
 
     def make_key(self):
@@ -28,13 +46,13 @@ class AbstractBase:
 
     def __eq__(self, other):
         return type(self) is type(other) \
-            and self._key == other._key
+            and self.key() == other.key()
 
     def __hash__(self):
-        return hash(self._key)
+        return hash(self.key())
 
 
-class AbstractValue:
+class AbstractValue(AbstractBase):
     def __init__(self, values):
         self.values = values
 
@@ -56,7 +74,7 @@ class AbstractValue:
         raise NotImplementedError()
 
     def make_key(self):
-        return tuple(sorted(values.items()))
+        return tuple(sorted(self.values.items()))
 
     def _resolve(self, key, value):
         self.values[key] = value
@@ -64,6 +82,12 @@ class AbstractValue:
     def __repr__(self):
         contents = [f'{k}={v}' for k, v in self.values.items()]
         return f'V({", ".join(contents)})'
+
+
+class AbstractScalar(AbstractValue):
+    def __repr__(self):
+        contents = [f'{k}={v}' for k, v in self.values.items()]
+        return f'S({", ".join(contents)})'
 
 
 class AbstractTuple(AbstractValue):
@@ -81,7 +105,7 @@ class AbstractTuple(AbstractValue):
         return dshape.TupleShape([e.build('shape') for e in self.elements])
 
     def make_key(self):
-        return (self._key, self.elements)
+        return (super().make_key(), self.elements)
 
     def __repr__(self):
         return f'T({", ".join(map(repr, self.elements))})'
@@ -96,7 +120,7 @@ class AbstractArray(AbstractValue):
         return dtype.Array[self.element.build('type')]
 
     def make_key(self):
-        return (self._key, self.element)
+        return (super().make_key(), self.element)
 
     def __repr__(self):
         return f'A({self.element}, shape={self.values["shape"]})'
@@ -114,7 +138,7 @@ class AbstractList(AbstractValue):
         return dshape.ListShape(self.element.build('shape'))
 
     def make_key(self):
-        return (self._key, self.element)
+        return (super().make_key(), self.element)
 
     def __repr__(self):
         return f'L({self.element})'
@@ -201,7 +225,7 @@ def from_vref(self, v, t: dtype.List, s):
 
 @overload
 def from_vref(self, v, t: (dtype.Number, dtype.Bool, dtype.External), s):
-    return AbstractValue({'value': v, 'type': t, 'shape': s})
+    return AbstractScalar({'value': v, 'type': t, 'shape': s})
 
 
 @overload
