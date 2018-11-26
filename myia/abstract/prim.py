@@ -24,7 +24,7 @@ from .inf import (
 from .. import dtype, dshape
 from ..dtype import Number, Bool
 from ..infer import ANYTHING, InferenceVar, Context, MyiaTypeError, \
-    InferenceError
+    InferenceError, reify
 from ..infer.core import Pending
 from ..prim import ops as P
 from ..utils import Namespace
@@ -60,7 +60,6 @@ class StandardXInferrer(XInferrer):
             raise MyiaTypeError('Wrong number of arguments.')
         for i, arg in enumerate(args):
             typ = self.typemap.get(i)
-            print(typ, typ and issubclass(typ, AbstractBase))
             if typ is None:
                 pass
             elif dtype.ismyiatype(typ):
@@ -119,7 +118,17 @@ class UniformPrimitiveXInferrer(XInferrer):
         ts = [arg.values['type'] for arg in args]
         for typ, indexes in self.typemap.items():
             selection = [ts[i] for i in indexes]
-            res = await track.will_check(typ, *selection)
+            # res = await track.will_check(typ, *selection)
+            res = track.chk(typ, *selection)
+
+            # print('sel:', selection)
+            # res = track.abstract_merge(*selection)
+            # res2 = await reify(res)
+            # print('typ:', typ)
+            # print('res:', res)
+            # print('res2:', res2)
+            # assert res2 == typ
+
             if typ == self.outtype:
                 outtype = res
 
@@ -156,6 +165,31 @@ def prim_add(x: Number, y: Number) -> Number:
 @uniform_prim(P.scalar_mul)
 def prim_mul(x: Number, y: Number) -> Number:
     return x * y
+
+
+@uniform_prim(P.scalar_eq)
+def prim_eq(x: Number, y: Number) -> Bool:
+    return x == y
+
+
+@uniform_prim(P.scalar_gt)
+def prim_gt(x: Number, y: Number) -> Bool:
+    return x > y
+
+
+@uniform_prim(P.scalar_lt)
+def prim_lt(x: Number, y: Number) -> Bool:
+    return x < y
+
+
+@uniform_prim(P.bool_and)
+def prim_bool_and(x: Bool, y: Bool) -> Bool:
+    return x and y
+
+
+@uniform_prim(P.bool_or)
+def prim_bool_or(x: Bool, y: Bool) -> Bool:
+    return x or y
 
 
 class MyiaNameError(InferenceError):
@@ -346,59 +380,21 @@ async def tuple_len_prim(track, xs: AbstractTuple):
 
 
 @standard_prim(P.switch)
-async def switch_prim(self, track, cond: Bool, tb, fb):
+async def switch_prim(track, cond: Bool, tb, fb):
     v = cond.values['value']
     if v is True:
         return tb
     elif v is False:
         return fb
     elif v is ANYTHING:
-        return abstract_merge(tb, fb)
+        print('---')
+        print(tb)
+        print(fb)
+        print(track.abstract_merge(tb, fb))
+        print('----')
+        return track.abstract_merge(tb, fb)
     else:
         raise AssertionError("Invalid condition value for switch")
-
-
-def abstract_merge(*values):
-    resolved = set()
-    pending = set()
-    committed = None
-    for v in values:
-        if isinstance(v, Pending):
-            if v.resolved():
-                resolved.add(v.result())
-            else:
-                pending.add(v)
-        else:
-            resolved.add(v)
-
-    if pending:
-        def resolve(fut):
-            pending.remove(fut)
-            resolved.append(fut.result())
-            if not pending:
-                v = force_merge(values, model=committed)
-                rval.resolve_to(v)
-
-        for p in pending:
-            p.add_done_callback(resolve)
-
-        def premature_resolve():
-            nonlocal committed
-            committed = force_merge(resolved)
-            resolved.clear()
-            return committed
-
-        rval = Pending(premature_resolve)
-        return rval
-    else:
-        return force_merge(resolved)
-
-
-def force_merge(values, model=None):
-    if model is None:
-        return reduce(lambda v1, v2: v1.merge(v2), values)
-    else:
-        return reduce(lambda v1, v2: v1.accept(v2), values, model)
 
 
 # @type_inferrer(P.switch, nargs=3)

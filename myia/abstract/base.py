@@ -4,7 +4,8 @@ from dataclasses import is_dataclass
 
 from .. import dtype, dshape
 from ..debug.utils import mixin
-from ..infer import ANYTHING, InferenceError
+from ..infer import ANYTHING, InferenceError, MyiaTypeError
+from ..infer.core import Pending
 from ..utils import overload, UNKNOWN, Named
 
 
@@ -53,13 +54,17 @@ class AbstractBase:
 
 
 class AbstractValue(AbstractBase):
-    def __init__(self, values):
+    def __init__(self, values, count=1):
         self.values = values
+        self.count = count
 
     def build(self, name):
         v = self.values.get(name, ABSENT)
         if v is not ABSENT:
-            return v
+            if isinstance(v, Pending):
+                return v.result()
+            else:
+                return v
         else:
             method = getattr(self, f'build_{name}')
             return method()
@@ -71,6 +76,41 @@ class AbstractValue(AbstractBase):
         raise NotImplementedError()
 
     def build_shape(self):
+        raise NotImplementedError()
+
+    def broaden(self):
+        return self
+
+    def merge(self, other):
+        if type(self) is not type(other):
+            raise MyiaTypeError(f'Expected {type(self).__name__}')
+        rval = self.merge_structure(other)
+        for track in ['type', 'value', 'shape']:
+            v1 = self.values.get(track, ABSENT)
+            v2 = other.values.get(track, ABSENT)
+            method = getattr(self, f'merge_{track}')
+            rval.values[track] = method(v1, v2)
+        return rval
+
+    def merge_value(self, v1, v2):
+        if v1 == v2:
+            return v1
+        elif isinstance(v1, Possibilities):
+            return Possibilities(v1 | v2)
+        else:
+            return ANYTHING
+
+    def merge_type(self, v1, v2):
+        if v1 != v2:
+            raise MyiaTypeError(f'Cannot merge {v1} and {v2} (3)')
+        return v1
+
+    def merge_shape(self, v1, v2):
+        if v1 != v2:
+            raise MyiaTypeError(f'Cannot merge {v1} and {v2} (shp)')
+        return v1
+
+    def accept(self, other):
         raise NotImplementedError()
 
     def make_key(self):
@@ -85,15 +125,25 @@ class AbstractValue(AbstractBase):
 
 
 class AbstractScalar(AbstractValue):
+
+    def merge_structure(self, other):
+        return AbstractScalar({})
+
     def __repr__(self):
         contents = [f'{k}={v}' for k, v in self.values.items()]
         return f'S({", ".join(contents)})'
 
 
 class AbstractTuple(AbstractValue):
-    def __init__(self, elements):
-        super().__init__({})
+    def __init__(self, elements, values=None):
+        super().__init__(values or {})
         self.elements = tuple(elements)
+
+    def merge_structure(self, other):
+        assert len(self.elements) == len(other.elements)
+        return AbstractTuple(
+            [x.merge(y) for x, y in zip(self.elements, other.elements)]
+        )
 
     def build_value(self):
         return tuple(e.build('value') for e in self.elements)
@@ -115,6 +165,9 @@ class AbstractArray(AbstractValue):
     def __init__(self, element, values=None):
         super().__init__(values or {})
         self.element = element
+
+    def merge_structure(self, other):
+        return AbstractArray(self.element.merge(other.element))
 
     def build_type(self):
         return dtype.Array[self.element.build('type')]
@@ -246,6 +299,201 @@ def from_vref(self, v, t: dtype.Class, s):
 @overload
 def from_vref(self, v, t: dtype.TypeMeta, s):
     return self[t](v, t, s)
+
+
+#########
+# Merge #
+#########
+
+
+@overload(bootstrap=True)
+def _amerge(self, x1: Possibilities, x2, loop, forced):
+    if x1.issuperset(x2):
+        return x1
+    if forced:
+        raise MyiaTypeError('Cannot merge Possibilities')
+    else:
+        return Possibilities(x1 | x2)
+
+
+@overload
+def _amerge(self, x1: dtype.TypeMeta, x2, loop, forced):
+    if x1 != x2:
+        raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
+    return x1
+
+
+@overload
+def _amerge(self, x1: dict, x2, loop, forced):
+    if set(x1.keys()) != set(x2.keys()):
+        raise MyiaTypeError(f'Keys mismatch')
+    changes = False
+    rval = {}
+    for k, v in x1.items():
+        res = self(v, x2[k], loop, forced)
+        if res is not v:
+            changes = True
+        rval[k] = res
+    return x1 if forced or not changes else rval
+
+
+@overload
+def _amerge(self, x1: tuple, x2, loop, forced):
+    if len(x1) != len(x2):
+        raise MyiaTypeError(f'Tuple length mismatch')
+    changes = False
+    rval = []
+    for v1, v2 in zip(x1, x2):
+        res = self(v1, v2, loop, forced)
+        if res is not v1:
+            changes = True
+        rval.append(res)
+    return x1 if forced or not changes else tuple(rval)
+
+
+@overload
+def _amerge(self, x1: AbstractScalar, x2, loop, forced):
+    values = self(x1.values, x2.values, loop, forced)
+    if forced or values is x1.values:
+        return x1
+    return AbstractScalar(values)
+
+
+@overload
+def _amerge(self, x1: AbstractTuple, x2, loop, forced):
+    args1 = (x1.elements, x1.values)
+    args2 = (x2.elements, x2.values)
+    merged = self(args1, args2, loop, forced)
+    if forced or merged is args1:
+        return x1
+    return AbstractTuple(*merged)
+
+
+@overload
+def _amerge(self, x1: AbstractArray, x2, loop, forced):
+    args1 = (x1.element, x1.values)
+    args2 = (x2.element, x2.values)
+    merged = self(args1, args2, loop, forced)
+    if forced or merged is args1:
+        return x1
+    return AbstractArray(*merged)
+
+
+@overload
+def _amerge(self, x1: AbstractList, x2, loop, forced):
+    args1 = (x1.element, x1.values)
+    args2 = (x2.element, x2.values)
+    merged = self(args1, args2, loop, forced)
+    if forced or merged is args1:
+        return x1
+    return AbstractList(*merged)
+
+
+@overload
+def _amerge(self, x1: (int, float, bool), x2, loop, forced):
+    if x1 is ANYTHING:
+        return x1
+    if forced:
+        if x1 != x2:
+            raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
+    elif x2 is ANYTHING:
+        return ANYTHING
+    return x1
+
+
+@overload
+def _amerge(self, x1: object, x2, loop, forced):
+    if x1 is ANYTHING:
+        if x2 is ANYTHING:
+            return x1
+        return self[type(x2)](x1, x2, loop, forced)
+    if x1 != x2:
+        raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
+    return x1
+
+
+def amerge(x1, x2, loop, forced):
+    if isinstance(x1, Pending):
+        assert False
+    elif isinstance(x2, Pending):
+        assert False
+    elif type(x1) is not type(x2):
+        raise MyiaTypeError(f'Type mismatch: {type(x1)} != {type(x2)}')
+    else:
+        return _amerge(x1, x2, loop, forced)
+
+
+###########
+# Broaden #
+###########
+
+
+@overload(bootstrap=True)
+def abroaden(x: object, count):
+    if x is ANYTHING or count == 0:
+        return ANYTHING
+    else:
+        return x
+
+
+@overload
+def abroaden(x: dict, count):
+    pass
+
+
+###########
+# Cleanup #
+###########
+
+
+# @overload(bootstrap=True)
+# def reify_sync(self, p: Pending):
+#     return p.result()
+
+
+# @overload
+# def reify_sync(self, d: dict):
+#     rval = {}
+#     changes = False
+#     for k, v in d.items():
+#         v2 = self(v)
+#         if v2 is not v:
+#             changes = True
+#         rval[k] = v2
+#     return rval if changes else d
+
+
+# @overload
+# def reify_sync(self, tup: tuple):
+#     rval = []
+#     changes = False
+#     for x in tup:
+#         x2 = self(x)
+#         if x2 is not x:
+#             changes = True
+#         rval.append(x2)
+#     return rval if changes else tup
+
+
+# @overload
+# def reify_sync(self, v: AbstractValue):
+#     d2 = reify_sync(v.values)
+#     if d2 is v.values:
+#         return v
+#     return AbstractValue(d2)
+
+
+# @overload
+# def reify_sync(self, v: AbstractValue):
+#     d2 = reify_sync(v.values)
+#     if d2 is v.values:
+#         return v
+#     return AbstractValue(d2)
+
+
+# @overload
+# def reify_sync(self, v: object):
+#     return v
 
 
 ###########

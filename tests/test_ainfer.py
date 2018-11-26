@@ -30,6 +30,7 @@ from myia.prim.py_implementations import \
     transpose
 from myia.utils import RestrictedVar, newenv
 
+from .test_abs import type_to_shape
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
     li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
     Point, Point_t, Point3D, Point3D_t, Thing, Thing_f, Thing_ftup, mysum
@@ -58,21 +59,6 @@ def af32_of(*shp):
 def af16_of(*shp):
     return {'type': af16, 'shape': shp}
 
-
-def type_to_shape(typ):
-    """Default value for ShapeTrack."""
-    if ismyiatype(typ, Array):
-        raise Exception(
-            'There is no default value for Arrays on the shape track.'
-        )  # pragma: no cover
-    if ismyiatype(typ, Tuple):
-        return TupleShape(type_to_shape(e) for e in typ.elements)
-    elif ismyiatype(typ, List):
-        return ListShape(type_to_shape(typ.element_type))
-    elif ismyiatype(typ, Class):
-        return ClassShape(dict((attr, type_to_shape(tp))
-                                for attr, tp in typ.attributes.items()))
-    return NOSHAPE
 
 
 ########################
@@ -268,7 +254,7 @@ def inferrer_decorator(pipeline):
                     try:
                         assert out() == expected_out
                     except InferenceError as e:
-                        print_inference_error(e)
+                        # print_inference_error(e)
                         raise
 
             m = pytest.mark.parametrize('spec', list(tests))(run_test)
@@ -325,6 +311,11 @@ def test_constants_intxfloat():
 @infer(type=[(f64,)], value=[(12.0,)])
 def test_constants_floatxint():
     return 1.5 * 8
+
+
+@infer(type=[(f64,)])
+def test_constants_floatxint2():
+    return (8 * 7) + 4.0
 
 
 @infer(type=type_signature_arith_bin)
@@ -1527,63 +1518,63 @@ def test_array_len(xs):
 #     return g(x < 42)(x)
 
 
-# @infer(type=[(i64, i64)],
-#        shape=[(ai64_of(6, 13), (6, 13))])
-# def test_identity_function(x):
-#     return identity(x)
+@infer(type=[(i64, i64)],
+       shape=[(ai64_of(6, 13), (6, 13))])
+def test_identity_function(x):
+    return identity(x)
 
 
-# @infer(type=[(B, B, B),
-#              (i64, B, InferenceError),
-#              (B, i64, InferenceError)])
-# def test_bool_and(x, y):
-#     return bool_and(x, y)
+@infer(type=[(B, B, B),
+             (i64, B, InferenceError),
+             (B, i64, InferenceError)])
+def test_bool_and(x, y):
+    return bool_and(x, y)
 
 
-# @infer(type=[(B, B, B),
-#              (i64, B, InferenceError),
-#              (B, i64, InferenceError)])
-# def test_bool_or(x, y):
-#     return bool_or(x, y)
+@infer(type=[(B, B, B),
+             (i64, B, InferenceError),
+             (B, i64, InferenceError)])
+def test_bool_or(x, y):
+    return bool_or(x, y)
 
 
-# @infer(
-#     type=[
-#         (B, i64, i64, i64),
-#         (i64, i64, i64, InferenceError),
-#         (B, i64, f64, InferenceError),
-#         ({'value': True}, i64, f64, i64),
-#         ({'value': False}, i64, f64, f64),
-#     ],
-#     value=[
-#         (True, 1, 2, 1),
-#         (False, 1, 2, 2),
-#         ({'type': B, 'value': ANYTHING}, 1, 2, ANYTHING),
-#     ],
-#     shape=[
-#         ({'type': B},
-#          ai64_of(6, 13),
-#          ai64_of(6, 13),
-#          (6, 13)),
+@infer(
+    type=[
+        (B, i64, i64, i64),
+        (i64, i64, i64, InferenceError),
+        (B, i64, f64, InferenceError),
+        ({'value': True}, i64, f64, i64),
+        ({'value': False}, i64, f64, f64),
+    ],
+    value=[
+        (True, 1, 2, 1),
+        (False, 1, 2, 2),
+        ({'type': B, 'value': ANYTHING}, 1, 2, ANYTHING),
+    ],
+    shape=[
+        ({'type': B},
+         ai64_of(6, 13),
+         ai64_of(6, 13),
+         (6, 13)),
 
-#         ({'type': B},
-#          ai64_of(6, 13),
-#          ai64_of(6, 14),
-#          InferenceError),
+        ({'type': B},
+         ai64_of(6, 13),
+         ai64_of(6, 14),
+         InferenceError),
 
-#         ({'type': B, 'value': True},
-#          ai64_of(6, 13),
-#          ai64_of(6, 14),
-#          (6, 13)),
+        ({'type': B, 'value': True},
+         ai64_of(6, 13),
+         ai64_of(6, 14),
+         (6, 13)),
 
-#         ({'type': B, 'value': False},
-#          ai64_of(6, 13),
-#          ai64_of(6, 14),
-#          (6, 14)),
-#     ]
-# )
-# def test_switch(c, x, y):
-#     return switch(c, x, y)
+        ({'type': B, 'value': False},
+         ai64_of(6, 13),
+         ai64_of(6, 14),
+         (6, 14)),
+    ]
+)
+def test_switch(c, x, y):
+    return switch(c, x, y)
 
 
 # @infer(

@@ -144,7 +144,7 @@ def print_inference_error(err):
 
 def myia_excepthook(exc_type, exc_value, tb):
     """Print out InferenceError specially."""
-    if isinstance(exc_value, InferenceError):
+    if isinstance(exc_value, InferenceError) and hasattr(exc_value, 'engine'):
         print_inference_error(exc_value)
     else:
         _previous_excepthook(exc_type, exc_value, tb)

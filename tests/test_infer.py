@@ -297,6 +297,11 @@ def test_constants_floatxint():
     return 1.5 * 8
 
 
+@infer(type=[(f64,)])
+def test_constants_floatxint2():
+    return (8 * 7) + 4.0
+
+
 @infer(type=type_signature_arith_bin)
 def test_prim_mul(x, y):
     return x * y

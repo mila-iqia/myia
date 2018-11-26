@@ -1,6 +1,9 @@
 
+from functools import reduce
+
 from .. import dtype, dshape
 from ..infer import Track, MyiaTypeError, Context
+from ..infer.core import Pending
 from ..infer.graph_infer import type_error_nargs
 from ..infer.utils import infer_trace
 from ..ir import Graph
@@ -9,7 +12,7 @@ from ..prim.py_implementations import typeof
 from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable
 
 from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
-    ABSENT, GraphAndContext
+    ABSENT, GraphAndContext, AbstractBase
 
 
 _number_types = [
@@ -74,9 +77,13 @@ class AbstractTrack(Track):
         res = self.from_value(v, ctref.context)
         t = res.build('type')
         if dtype.ismyiatype(t, dtype.Number):
-            v = RestrictedVar(_number_types)
             prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
-            res.values['type'] = self.engine.loop.create_var(v, t, prio)
+            res.values['type'] = self.engine.loop.create_pending_from_list(
+                _number_types, t, prio
+            )
+            # v = RestrictedVar(_number_types)
+            # prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
+            # res.values['type'] = self.engine.loop.create_var(v, t, prio)
         return res
 
     def from_value(self, v, context):
@@ -114,6 +121,107 @@ class AbstractTrack(Track):
             values['type'],
             values['shape'],
         )
+
+    def abstract_merge(self, *values):
+        resolved = []
+        pending = set()
+        committed = None
+        informed = False
+        for v in values:
+            if isinstance(v, Pending):
+                if v.resolved():
+                    resolved.append(v.result())
+                else:
+                    pending.add(v)
+            else:
+                resolved.append(v)
+
+        if pending:
+            for r in resolved:
+                for p in pending:
+                    p.inform(r)
+                informed = True
+                break
+            def resolve(fut):
+                nonlocal informed
+                pending.remove(fut)
+                result = fut.result()
+                resolved.append(result)
+                if not pending:
+                    v = self.force_merge(resolved, model=committed)
+                    rval.resolve_to(v)
+                elif not informed:
+                    for p in pending:
+                        p.inform(result)
+                    informed = True
+
+            for p in pending:
+                p.add_done_callback(resolve)
+
+            def premature_resolve():
+                nonlocal committed
+                committed = self.force_merge(resolved)
+                resolved.clear()
+                return committed
+
+            rval = self.engine.loop.create_pending(
+                resolve=premature_resolve,
+                priority=-1,
+                parents=pending
+            )
+            return rval
+        else:
+            return self.force_merge(resolved)
+
+    def force_merge(self, values, model=None):
+        if model is None:
+            # return reduce(lambda v1, v2: v1.merge(v2), values)
+            return reduce(self.merge, values)
+        else:
+            # return reduce(lambda v1, v2: v1.accept(v2), values, model)
+            return reduce(self.accept, values)
+
+    def merge(self, x, y):
+        if isinstance(x, AbstractBase):
+            return x.merge(y)
+        else:
+            if x != y:
+                raise MyiaTypeError(f'Cannot merge {x} and {y} (1)')
+            return x
+
+    def accept(self, x, y):
+        if isinstance(x, AbstractBase):
+            return x.accept(y)
+        else:
+            if x != y:
+                raise MyiaTypeError(f'Cannot merge {x} and {y} (2)')
+            return x
+
+    def check_predicate(self, predicate, res):
+        if isinstance(predicate, tuple):
+            return any(self.check_predicate(p, res) for p in predicate)
+        elif dtype.ismyiatype(predicate):
+            return dtype.ismyiatype(res, predicate)
+        elif callable(predicate):
+            return predicate(res)
+        else:
+            raise ValueError(predicate)  # pragma: no cover
+
+    def assert_predicate(self, predicate, res):
+        if not self.check_predicate(predicate, res):
+            raise MyiaTypeError(f'Expected {predicate}')
+
+    def chk(self, predicate, *values):
+        for value in values:
+            if isinstance(value, Pending):
+                value.add_done_callback(
+                    lambda fut: self.assert_predicate(
+                        predicate, fut.result()
+                    )
+                )
+            else:
+                self.assert_predicate(predicate, value)
+        return self.abstract_merge(*values)
 
 
 class XInferrer(Partializable):

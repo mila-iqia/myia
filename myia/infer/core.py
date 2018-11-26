@@ -80,6 +80,12 @@ class InferenceLoop(asyncio.AbstractEventLoop):
                     continue  # pragma: no cover
             break
 
+    def call_exception_handler(self, ctx):
+        if 'exception' in ctx:
+            raise ctx['exception']
+        else:
+            raise Exception('????')
+
     def schedule(self, x, context_map=None):
         """Schedule a task."""
         if context_map:
@@ -150,8 +156,13 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         self._vars.append(v)
         return v
 
-    def create_pending(self, resolve, priority=0):
-        pending = Pending(resolve, priority, loop=self)
+    def create_pending(self, resolve, priority=0, parents=()):
+        pending = Pending(resolve, priority, loop=self, parents=parents)
+        self._vars.append(pending)
+        return pending
+
+    def create_pending_from_list(self, poss, dflt, priority=0):
+        pending = PendingFromList(poss, dflt, priority, loop=self)
         self._vars.append(pending)
         return pending
 
@@ -302,10 +313,12 @@ class EquivalenceChecker:
 
 
 class Pending(asyncio.Future):
-    def __init__(self, resolve, priority, loop):
+    def __init__(self, resolve, priority, loop, parents=[]):
         super().__init__(loop=loop)
         self.priority = priority
+        self.parents = parents
         self._resolve = resolve
+        self.information = None
 
     def force_resolve(self):
         """Resolve to the default value."""
@@ -316,6 +329,31 @@ class Pending(asyncio.Future):
 
     def resolved(self):
         return self.done()
+
+    def inform(self, other):
+        self.information = other
+        for parent in self.parents:
+            if not parent.done():
+                parent.inform(other)
+
+
+class PendingFromList(Pending):
+    def __init__(self, possibilities, default, priority, loop):
+        super().__init__(
+            resolve=lambda: default,
+            priority=priority,
+            loop=loop
+        )
+        self.possibilities = possibilities
+
+    def inform(self, other):
+        if self.done():
+            return
+        if other in self.possibilities:
+            self.resolve_to(other)
+        else:
+            exc = MyiaTypeError('Mismatch.')
+            self.set_exception(exc)
 
 
 class InferenceVar(Pending):
@@ -423,8 +461,13 @@ async def reify_shallow(self, v: Var):
 
 
 @overload  # noqa: F811
-async def reify_shallow(self, v: InferenceVar):
+async def reify_shallow(self, v: Pending):
     return await self(await v)
+
+
+# @overload  # noqa: F811
+# async def reify_shallow(self, v: InferenceVar):
+#     return await self(await v)
 
 
 @overload  # noqa: F811
