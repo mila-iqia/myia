@@ -25,7 +25,7 @@ def test_mul(x, y):
     return x * y
 
 
-@pytest.mark.xfail(reason="truediv doesn't work for ints")
+@pytest.mark.xfail(reason="scalar_cast is needed for ints")
 @parse_compare((2, 3), (2.0, 3.0))
 def test_truediv(x, y):
     return x / y
