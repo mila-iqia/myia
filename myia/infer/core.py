@@ -11,6 +11,10 @@ from ..utils import Unification, Var, RestrictedVar, eprint, overload, \
 from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
 
 
+class Later(Exception):
+    pass
+
+
 class MyiaTypeMismatchError(MyiaTypeError):
     """Error where two values should have the same type, but don't."""
 
@@ -64,18 +68,22 @@ class InferenceLoop(asyncio.AbstractEventLoop):
             while self._todo:
                 h = self._todo.popleft()
                 h._run()
-            pending_vars = [fut for fut in self._vars if not fut.resolved()]
-            if pending_vars:
+            self._vars = [fut for fut in self._vars if not fut.resolved()]
+            if self._vars:
                 # If some literals weren't forced to a concrete type by some
                 # operation, we sort by priority (i.e. floats first) and we
                 # force the first one to take its default concrete type. Then
                 # we resume the loop.
-                pending_vars.sort(key=lambda x: -x.priority)
-                v1, *self._vars = pending_vars
+                self._vars.sort(key=lambda x: x.priority)
+                v1 = self._vars.pop()
                 try:
                     v1.force_resolve()
                 except InferenceError as e:
                     self._errors.append(e)
+                except Later:
+                    if self._vars:
+                        v1.priority = self._vars[0].priority - 1
+                    self._vars.append(v1)
                 else:
                     continue  # pragma: no cover
             break
@@ -157,8 +165,9 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         return v
 
     def create_pending(self, resolve, priority=0, parents=()):
-        pending = Pending(resolve, priority, loop=self, parents=parents)
-        self._vars.append(pending)
+        pending = Pending(resolve, priority, loop=self)
+        if priority is not None:
+            self._vars.append(pending)
         return pending
 
     def create_pending_from_list(self, poss, dflt, priority=0):
@@ -313,12 +322,12 @@ class EquivalenceChecker:
 
 
 class Pending(asyncio.Future):
-    def __init__(self, resolve, priority, loop, parents=[]):
+    def __init__(self, resolve, priority, loop):
         super().__init__(loop=loop)
         self.priority = priority
-        self.parents = parents
-        self._resolve = resolve
-        self.information = None
+        if resolve is not None:
+            self._resolve = resolve
+        self.equiv = set()
 
     def force_resolve(self):
         """Resolve to the default value."""
@@ -330,30 +339,41 @@ class Pending(asyncio.Future):
     def resolved(self):
         return self.done()
 
-    def inform(self, other):
-        self.information = other
-        for parent in self.parents:
-            if not parent.done():
-                parent.inform(other)
+    def tie(self, other):
+        if isinstance(other, Pending):
+            other.equiv |= self.equiv
+            self.equiv |= other.equiv
+            self.equiv = other.equiv
 
 
 class PendingFromList(Pending):
     def __init__(self, possibilities, default, priority, loop):
         super().__init__(
-            resolve=lambda: default,
+            resolve=None,
             priority=priority,
             loop=loop
         )
+        self.default = default
         self.possibilities = possibilities
 
-    def inform(self, other):
-        if self.done():
-            return
-        if other in self.possibilities:
-            self.resolve_to(other)
-        else:
-            exc = MyiaTypeError('Mismatch.')
-            self.set_exception(exc)
+    def _resolve_from_equiv(self):
+        for e in self.equiv:
+            if isinstance(e, Pending):
+                if e.done():
+                    return e.result()
+            else:
+                return e
+        return None
+
+    def _resolve(self):
+        x = self._resolve_from_equiv()
+        return self.default if x is None else x
+
+    def tie(self, other):
+        super().tie(other)
+        x = self._resolve_from_equiv()
+        if x is not None:
+            self.resolve_to(x)
 
 
 class InferenceVar(Pending):

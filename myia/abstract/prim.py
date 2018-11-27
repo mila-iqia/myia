@@ -120,15 +120,6 @@ class UniformPrimitiveXInferrer(XInferrer):
             selection = [ts[i] for i in indexes]
             # res = await track.will_check(typ, *selection)
             res = track.chk(typ, *selection)
-
-            # print('sel:', selection)
-            # res = track.abstract_merge(*selection)
-            # res2 = await reify(res)
-            # print('typ:', typ)
-            # print('res:', res)
-            # print('res2:', res2)
-            # assert res2 == typ
-
             if typ == self.outtype:
                 outtype = res
 
@@ -162,6 +153,11 @@ def prim_add(x: Number, y: Number) -> Number:
     return x + y
 
 
+@uniform_prim(P.scalar_sub)
+def prim_sub(x: Number, y: Number) -> Number:
+    return x - y
+
+
 @uniform_prim(P.scalar_mul)
 def prim_mul(x: Number, y: Number) -> Number:
     return x * y
@@ -180,6 +176,16 @@ def prim_gt(x: Number, y: Number) -> Bool:
 @uniform_prim(P.scalar_lt)
 def prim_lt(x: Number, y: Number) -> Bool:
     return x < y
+
+
+@uniform_prim(P.scalar_ge)
+def prim_ge(x: Number, y: Number) -> Bool:
+    return x >= y
+
+
+@uniform_prim(P.scalar_le)
+def prim_le(x: Number, y: Number) -> Bool:
+    return x <= y
 
 
 @uniform_prim(P.bool_and)
@@ -387,11 +393,6 @@ async def switch_prim(track, cond: Bool, tb, fb):
     elif v is False:
         return fb
     elif v is ANYTHING:
-        print('---')
-        print(tb)
-        print(fb)
-        print(track.abstract_merge(tb, fb))
-        print('----')
         return track.abstract_merge(tb, fb)
     else:
         raise AssertionError("Invalid condition value for switch")

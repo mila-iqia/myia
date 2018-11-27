@@ -354,56 +354,56 @@ def test_prim_usub(x):
 #     return np.log(x)
 
 
-# @infer(
-#     type=[
-#         (B, f64, f64, f64),
-#         (B, f64, i64, InferenceError),
-#         ({'value': True}, f64, i64, f64),
-#         ({'value': False}, f64, i64, i64),
-#         # Note: scalar_pipeline will not convert i64 to bool,
-#         # so the following is an InferenceError even though it
-#         # will work with the standard_pipeline
-#         (i64, f64, f64, InferenceError),
-#     ],
-#     value=[
-#         (True, 7, 4, 49),
-#         (False, 7, 4, 16),
-#         ({'type': B, 'value': ANYTHING}, 7, 4, ANYTHING),
-#     ]
-# )
-# def test_if(c, x, y):
-#     if c:
-#         return x * x
-#     else:
-#         return y * y
+@infer(
+    type=[
+        (B, f64, f64, f64),
+        (B, f64, i64, InferenceError),
+        ({'value': True}, f64, i64, f64),
+        ({'value': False}, f64, i64, i64),
+        # Note: scalar_pipeline will not convert i64 to bool,
+        # so the following is an InferenceError even though it
+        # will work with the standard_pipeline
+        (i64, f64, f64, InferenceError),
+    ],
+    value=[
+        (True, 7, 4, 49),
+        (False, 7, 4, 16),
+        ({'type': B, 'value': ANYTHING}, 7, 4, ANYTHING),
+    ]
+)
+def test_if(c, x, y):
+    if c:
+        return x * x
+    else:
+        return y * y
 
 
-# @infer(type=type_signature_arith_bin)
-# def test_if2(x, y):
-#     if x > y:
-#         return x
-#     else:
-#         return y
+@infer(type=type_signature_arith_bin)
+def test_if2(x, y):
+    if x > y:
+        return x
+    else:
+        return y
 
 
-# @infer(
-#     type=[
-#         (i64, i64, i64),
-#         (i64, f64, f64),
-#         (f64, f64, f64),
-#         ({'value': 1_000_000}, i64, i64)
-#     ],
-#     value=[
-#         (2, 3, 27),
-#         (1_000_000, 3, ANYTHING)
-#     ]
-# )
-# def test_while(x, y):
-#     rval = y
-#     while x > 0:
-#         rval = rval * y
-#         x = x - 1
-#     return rval
+@infer(
+    type=[
+        (i64, i64, i64),
+        (i64, f64, f64),
+        (f64, f64, f64),
+        # ({'value': 1_000_000}, i64, i64)
+    ],
+    value=[
+        (2, 3, 27),
+        # (1_000_000, 3, ANYTHING)
+    ]
+)
+def test_while(x, y):
+    rval = y
+    while x > 0:
+        rval = rval * y
+        x = x - 1
+    return rval
 
 
 # @infer(
@@ -616,162 +616,165 @@ def test_array_len(xs):
 #     return list_setitem(xs, idx, x)
 
 
-# @infer(type=(i64, f64, T[i64, f64]))
-# def test_multitype_function(x, y):
-#     def mul(a, b):
-#         return a * b
-#     return (mul(x, x), mul(y, y))
+@infer(type=(i64, f64, T[i64, f64]))
+def test_multitype_function(x, y):
+    def mul(a, b):
+        return a * b
+    return (mul(x, x), mul(y, y))
 
 
-# @infer(type=type_signature_arith_bin)
-# def test_closure(x, y):
-#     def mul(a):
-#         return a * x
-#     return mul(x) + mul(y)
+@infer(type=type_signature_arith_bin)
+def test_closure(x, y):
+    def mul(a):
+        return a * x
+    return mul(x) + mul(y)
 
 
-# @infer(
-#     type=[
-#         (i64, i64, i64, i64, T[i64, i64]),
-#         (f64, f64, f64, f64, T[f64, f64]),
-#         (i64, i64, f64, f64, T[i64, f64]),
-#         (i64, f64, f64, f64, InferenceError),
-#         (i64, i64, i64, f64, InferenceError),
-#     ]
-# )
-# def test_return_closure(w, x, y, z):
-#     def mul(a):
-#         def clos(b):
-#             return a * b
-#         return clos
-#     return (mul(w)(x), mul(y)(z))
+@infer(
+    type=[
+        (i64, i64, i64, i64, T[i64, i64]),
+        (f64, f64, f64, f64, T[f64, f64]),
+        (i64, i64, f64, f64, T[i64, f64]),
+        (i64, f64, f64, f64, InferenceError),
+        (i64, i64, i64, f64, InferenceError),
+    ]
+)
+def test_return_closure(w, x, y, z):
+    def mul(a):
+        def clos(b):
+            return a * b
+        return clos
+    return (mul(w)(x), mul(y)(z))
 
 
-# @infer(type=[(i64, i64), (f64, f64)])
-# def test_fact(n):
-#     def fact(n):
-#         if n <= 1:
-#             return 1
-#         else:
-#             return n * fact(n - 1)
-#     return fact(n)
+@infer(type=[
+    (i64, i64),
+    (f64, f64),
+])
+def test_fact(n):
+    def fact(n):
+        if n <= 1:
+            return 1
+        else:
+            return n * fact(n - 1)
+    return fact(n)
 
 
-# def even(n):
-#     if n == 0:
-#         return True
-#     else:
-#         return odd(n - 1)
+def even(n):
+    if n == 0:
+        return True
+    else:
+        return odd(n - 1)
 
 
-# def odd(n):
-#     if n == 0:
-#         return False
-#     else:
-#         return even(n - 1)
+def odd(n):
+    if n == 0:
+        return False
+    else:
+        return even(n - 1)
 
 
-# @infer(type=[(i64, B), (f64, B)])
-# def test_even_odd(n):
-#     return even(n)
+@infer(type=[(i64, B), (f64, B)])
+def test_even_odd(n):
+    return even(n)
 
 
-# @infer(type=[(i64, i64), (f64, f64)])
-# def test_pow10(x):
-#     v = x
-#     j = 0
-#     while j < 3:
-#         i = 0
-#         while i < 3:
-#             v = v * x
-#             i = i + 1
-#         j = j + 1
-#     return v
+@infer(type=[(i64, i64), (f64, f64)])
+def test_pow10(x):
+    v = x
+    j = 0
+    while j < 3:
+        i = 0
+        while i < 3:
+            v = v * x
+            i = i + 1
+        j = j + 1
+    return v
 
 
-# @infer(
-#     type=[
-#         (i64, i64, i64, i64),
-#         (i64, f64, f64, f64)
-#     ]
-# )
-# def test_choose_prim(i, x, y):
+@infer(
+    type=[
+        (i64, i64, i64, i64),
+        (i64, f64, f64, f64)
+    ]
+)
+def test_choose_prim(i, x, y):
 
-#     def choose(i):
-#         if i == 0:
-#             return scalar_add
-#         else:
-#             return scalar_mul
+    def choose(i):
+        if i == 0:
+            return scalar_add
+        else:
+            return scalar_mul
 
-#     return choose(i)(x, y)
-
-
-# @infer(
-#     type=[
-#         (i64, i64, i64, InferenceError),
-#         ({'value': 0}, i64, i64, i64),
-#         ({'value': 1}, i64, i64, B),
-#     ]
-# )
-# def test_choose_prim_incompatible(i, x, y):
-
-#     def choose(i):
-#         if i == 0:
-#             return scalar_add
-#         else:
-#             return scalar_lt
-
-#     return choose(i)(x, y)
+    return choose(i)(x, y)
 
 
-# @infer(
-#     type=[
-#         (i64, i64, i64, InferenceError),
-#         ({'value': 0}, i64, i64, i64),
-#         ({'value': 1}, i64, i64, B),
-#     ]
-# )
-# def test_choose_incompatible(i, x, y):
+@infer(
+    type=[
+        (i64, i64, i64, InferenceError),
+        ({'value': 0}, i64, i64, i64),
+        ({'value': 1}, i64, i64, B),
+    ]
+)
+def test_choose_prim_incompatible(i, x, y):
 
-#     def add2(x, y):
-#         return x + y
+    def choose(i):
+        if i == 0:
+            return scalar_add
+        else:
+            return scalar_lt
 
-#     def lt2(x, y):
-#         return x < y
-
-#     def choose(i):
-#         if i == 0:
-#             return add2
-#         else:
-#             return lt2
-
-#     return choose(i)(x, y)
+    return choose(i)(x, y)
 
 
-# @infer(
-#     type=[
-#         (i64, i64, i64),
-#         (i64, f64, f64)
-#     ],
-#     shape=[
-#         (t(i64), t(i64), NOSHAPE)
-#     ]
-# )
-# def test_choose_indirect(i, x):
+@infer(
+    type=[
+        (i64, i64, i64, InferenceError),
+        ({'value': 0}, i64, i64, i64),
+        ({'value': 1}, i64, i64, B),
+    ]
+)
+def test_choose_incompatible(i, x, y):
 
-#     def double(x):
-#         return x + x
+    def add2(x, y):
+        return x + y
 
-#     def square(x):
-#         return x * x
+    def lt2(x, y):
+        return x < y
 
-#     def choose(i):
-#         if i == 0:
-#             return double
-#         else:
-#             return square
+    def choose(i):
+        if i == 0:
+            return add2
+        else:
+            return lt2
 
-#     return choose(i)(x)
+    return choose(i)(x, y)
+
+
+@infer(
+    type=[
+        (i64, i64, i64),
+        (i64, f64, f64)
+    ],
+    shape=[
+        (t(i64), t(i64), NOSHAPE)
+    ]
+)
+def test_choose_indirect(i, x):
+
+    def double(x):
+        return x + x
+
+    def square(x):
+        return x * x
+
+    def choose(i):
+        if i == 0:
+            return double
+        else:
+            return square
+
+    return choose(i)(x)
 
 
 # @infer(
@@ -915,82 +918,82 @@ def test_array_len(xs):
 #     return pick_hof(c1)(pick_f(c2))(x, y)
 
 
-# @infer(
-#     type=[
-#         (i64, i64, i64)
-#     ]
-# )
-# def test_func_arg(x, y):
-#     def g(func, x, y):
-#         return func(x, y)
+@infer(
+    type=[
+        (i64, i64, i64)
+    ]
+)
+def test_func_arg(x, y):
+    def g(func, x, y):
+        return func(x, y)
 
-#     def h(x, y):
-#         return x + y
-#     return g(h, x, y)
-
-
-# @infer(
-#     type=[
-#         (i64, InferenceError)
-#     ]
-# )
-# def test_func_arg3(x):
-#     def g(func, x):
-#         z = func + x
-#         return func(z)
-
-#     def h(x):
-#         return x
-
-#     return g(h, x)
+    def h(x, y):
+        return x + y
+    return g(h, x, y)
 
 
-# @infer(
-#     type=[
-#         (i64, i64),
-#         (f64, f64),
-#     ]
-# )
-# def test_func_arg4(x):
-#     def h(x):
-#         return x
+@infer(
+    type=[
+        (i64, InferenceError)
+    ]
+)
+def test_func_arg3(x):
+    def g(func, x):
+        z = func + x
+        return func(z)
 
-#     def g(fn, x):
-#         return fn(h, x)
+    def h(x):
+        return x
 
-#     def t(fn, x):
-#         return fn(x)
-
-#     return g(t, x)
+    return g(h, x)
 
 
-# @infer(type=(i64,), value=(4,))
-# def test_closure_deep():
-#     def g(x):
-#         def h():
-#             return x * x
-#         return h
-#     return g(2)()
+@infer(
+    type=[
+        (i64, i64),
+        (f64, f64),
+    ]
+)
+def test_func_arg4(x):
+    def h(x):
+        return x
+
+    def g(fn, x):
+        return fn(h, x)
+
+    def t(fn, x):
+        return fn(x)
+
+    return g(t, x)
 
 
-# @infer(
-#     type=[
-#         (i64, i64, i64)
-#     ],
-#     value=[
-#         (5, 7, 15)
-#     ]
-# )
-# def test_closure_passing(x, y):
-#     def adder(x):
-#         def f(y):
-#             return x + y
-#         return f
+@infer(type=(i64,), value=(4,))
+def test_closure_deep():
+    def g(x):
+        def h():
+            return x * x
+        return h
+    return g(2)()
 
-#     a1 = adder(1)
-#     a2 = adder(2)
 
-#     return a1(x) + a2(y)
+@infer(
+    type=[
+        (i64, i64, i64)
+    ],
+    value=[
+        (5, 7, 15)
+    ]
+)
+def test_closure_passing(x, y):
+    def adder(x):
+        def f(y):
+            return x + y
+        return f
+
+    a1 = adder(1)
+    a2 = adder(2)
+
+    return a1(x) + a2(y)
 
 
 # @infer(type=[(B, B), (i64, InferenceError)])
@@ -1240,12 +1243,12 @@ def test_array_len(xs):
 #     return x.unknown(y)
 
 
-# @infer(type=[(i64, InferenceError)])
-# def test_infinite_recursion(x):
-#     def ouroboros(x):
-#         return ouroboros(x - 1)
+@infer(type=[(i64, InferenceError)])
+def test_infinite_recursion(x):
+    def ouroboros(x):
+        return ouroboros(x - 1)
 
-#     return ouroboros(x)
+    return ouroboros(x)
 
 
 # @infer(type=[(i64, InferenceError)])
@@ -1259,17 +1262,17 @@ def test_array_len(xs):
 #     return ouroboros(x)
 
 
-# def ping():
-#     return pong()
+def ping():
+    return pong()
 
 
-# def pong():
-#     return ping()
+def pong():
+    return ping()
 
 
-# @infer(type=[(i64, InferenceError)])
-# def test_infinite_mutual_recursion(x):
-#     return ping()
+@infer(type=[(i64, InferenceError)])
+def test_infinite_mutual_recursion(x):
+    return ping()
 
 
 # @infer(type=[({'shape': (2, 3), 'type': ai16}, T[u64, u64])],
@@ -1560,7 +1563,7 @@ def test_bool_or(x, y):
         ({'type': B},
          ai64_of(6, 13),
          ai64_of(6, 14),
-         InferenceError),
+         (6, ANYTHING)),
 
         ({'type': B, 'value': True},
          ai64_of(6, 13),

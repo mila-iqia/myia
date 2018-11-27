@@ -12,7 +12,7 @@ from ..prim.py_implementations import typeof
 from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable
 
 from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
-    ABSENT, GraphAndContext, AbstractBase
+    ABSENT, GraphAndContext, AbstractBase, amerge, bind
 
 
 _number_types = [
@@ -122,80 +122,75 @@ class AbstractTrack(Track):
             values['shape'],
         )
 
+    # def abstract_merge(self, *values):
+    #     resolved = []
+    #     pending = set()
+    #     committed = None
+    #     for v in values:
+    #         if isinstance(v, Pending):
+    #             if v.resolved():
+    #                 resolved.append(v.result())
+    #             else:
+    #                 pending.add(v)
+    #         else:
+    #             resolved.append(v)
+
+    #     if pending:
+    #         def resolve(fut):
+    #             pending.remove(fut)
+    #             result = fut.result()
+    #             resolved.append(result)
+    #             if not pending:
+    #                 v = self.force_merge(resolved, model=committed)
+    #                 rval.resolve_to(v)
+
+    #         for p in pending:
+    #             p.add_done_callback(resolve)
+
+    #         def premature_resolve():
+    #             nonlocal committed
+    #             committed = self.force_merge(resolved)
+    #             resolved.clear()
+    #             return committed
+
+    #         rval = self.engine.loop.create_pending(
+    #             resolve=premature_resolve,
+    #             priority=-1,
+    #         )
+    #         rval.equiv.update(values)
+    #         for p in pending:
+    #             p.tie(rval)
+    #         return rval
+    #     else:
+    #         return self.force_merge(resolved)
+
+    # def force_merge(self, values, model=None):
+    #     if model is None:
+    #         return reduce(self.merge, values)
+    #     else:
+    #         return reduce(self.accept, values)
+
+    # def merge(self, x, y):
+    #     if isinstance(x, AbstractBase):
+    #         return x.merge(y)
+    #     else:
+    #         if x != y:
+    #             raise MyiaTypeError(f'Cannot merge {x} and {y} (1)')
+    #         return x
+
+    # def accept(self, x, y):
+    #     if isinstance(x, AbstractBase):
+    #         return x.accept(y)
+    #     else:
+    #         if x != y:
+    #             raise MyiaTypeError(f'Cannot merge {x} and {y} (2)')
+    #         return x
+
     def abstract_merge(self, *values):
-        resolved = []
-        pending = set()
-        committed = None
-        informed = False
-        for v in values:
-            if isinstance(v, Pending):
-                if v.resolved():
-                    resolved.append(v.result())
-                else:
-                    pending.add(v)
-            else:
-                resolved.append(v)
+        return reduce(self._merge, values)
 
-        if pending:
-            for r in resolved:
-                for p in pending:
-                    p.inform(r)
-                informed = True
-                break
-            def resolve(fut):
-                nonlocal informed
-                pending.remove(fut)
-                result = fut.result()
-                resolved.append(result)
-                if not pending:
-                    v = self.force_merge(resolved, model=committed)
-                    rval.resolve_to(v)
-                elif not informed:
-                    for p in pending:
-                        p.inform(result)
-                    informed = True
-
-            for p in pending:
-                p.add_done_callback(resolve)
-
-            def premature_resolve():
-                nonlocal committed
-                committed = self.force_merge(resolved)
-                resolved.clear()
-                return committed
-
-            rval = self.engine.loop.create_pending(
-                resolve=premature_resolve,
-                priority=-1,
-                parents=pending
-            )
-            return rval
-        else:
-            return self.force_merge(resolved)
-
-    def force_merge(self, values, model=None):
-        if model is None:
-            # return reduce(lambda v1, v2: v1.merge(v2), values)
-            return reduce(self.merge, values)
-        else:
-            # return reduce(lambda v1, v2: v1.accept(v2), values, model)
-            return reduce(self.accept, values)
-
-    def merge(self, x, y):
-        if isinstance(x, AbstractBase):
-            return x.merge(y)
-        else:
-            if x != y:
-                raise MyiaTypeError(f'Cannot merge {x} and {y} (1)')
-            return x
-
-    def accept(self, x, y):
-        if isinstance(x, AbstractBase):
-            return x.accept(y)
-        else:
-            if x != y:
-                raise MyiaTypeError(f'Cannot merge {x} and {y} (2)')
-            return x
+    def _merge(self, x1, x2):
+        return amerge(x1, x2, loop=self.engine.loop, forced=False)
 
     def check_predicate(self, predicate, res):
         if isinstance(predicate, tuple):
@@ -306,10 +301,26 @@ class GraphXInferrer(XInferrer):
         return await engine.get_inferred('abstract', out)
 
 
+async def _xinf_helper(track, inf, args, p):
+    result = await inf(track, *args)
+    p.resolve_to(result)
+
+
 async def execute_inferrers(track, inferrers, args):
     if len(inferrers) == 1:
         inf, = inferrers
         return await inf(track, *args)
 
     else:
-        assert False
+        pending = []
+        for inf in inferrers:
+            p = track.engine.loop.create_pending(
+                resolve=None,
+                priority=None
+            )
+            pending.append(p)
+            track.engine.loop.schedule(
+                _xinf_helper(track, inf, args, p)
+            )
+
+        return bind(track.engine.loop, None, [], pending)

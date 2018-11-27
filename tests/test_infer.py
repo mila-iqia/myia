@@ -631,7 +631,10 @@ def test_return_closure(w, x, y, z):
     return (mul(w)(x), mul(y)(z))
 
 
-@infer(type=[(i64, i64), (f64, f64)])
+@infer(type=[
+    (i64, i64),
+    (f64, f64),
+])
 def test_fact(n):
     def fact(n):
         if n <= 1:

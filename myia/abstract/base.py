@@ -1,11 +1,13 @@
 
+import math
 import numpy
 from dataclasses import is_dataclass
+from functools import reduce
 
 from .. import dtype, dshape
 from ..debug.utils import mixin
 from ..infer import ANYTHING, InferenceError, MyiaTypeError
-from ..infer.core import Pending
+from ..infer.core import Pending, Later
 from ..utils import overload, UNKNOWN, Named
 
 
@@ -301,6 +303,36 @@ def from_vref(self, v, t: dtype.TypeMeta, s):
     return self[t](v, t, s)
 
 
+###########
+# Broaden #
+###########
+
+
+def _broaden_values(d):
+    return {
+        'value': broaden(d['value']),
+        'type': d['type'],
+        'shape': d['shape'],
+    }
+
+@overload(bootstrap=True)
+def broaden(self, x: AbstractScalar):
+    return AbstractScalar(_broaden_values(x.values))
+
+
+@overload(bootstrap=True)
+def broaden(self, x: AbstractTuple):
+    return AbstractTuple(
+        [self(y) for y in x.elements],
+        _broaden_values(x.values)
+    )
+
+
+@overload(bootstrap=True)
+def broaden(self, x: object):
+    return ANYTHING
+
+
 #########
 # Merge #
 #########
@@ -330,7 +362,7 @@ def _amerge(self, x1: dict, x2, loop, forced):
     changes = False
     rval = {}
     for k, v in x1.items():
-        res = self(v, x2[k], loop, forced)
+        res = amerge(v, x2[k], loop, forced)
         if res is not v:
             changes = True
         rval[k] = res
@@ -344,7 +376,7 @@ def _amerge(self, x1: tuple, x2, loop, forced):
     changes = False
     rval = []
     for v1, v2 in zip(x1, x2):
-        res = self(v1, v2, loop, forced)
+        res = amerge(v1, v2, loop, forced)
         if res is not v1:
             changes = True
         rval.append(res)
@@ -353,7 +385,7 @@ def _amerge(self, x1: tuple, x2, loop, forced):
 
 @overload
 def _amerge(self, x1: AbstractScalar, x2, loop, forced):
-    values = self(x1.values, x2.values, loop, forced)
+    values = amerge(x1.values, x2.values, loop, forced)
     if forced or values is x1.values:
         return x1
     return AbstractScalar(values)
@@ -363,7 +395,7 @@ def _amerge(self, x1: AbstractScalar, x2, loop, forced):
 def _amerge(self, x1: AbstractTuple, x2, loop, forced):
     args1 = (x1.elements, x1.values)
     args2 = (x2.elements, x2.values)
-    merged = self(args1, args2, loop, forced)
+    merged = amerge(args1, args2, loop, forced)
     if forced or merged is args1:
         return x1
     return AbstractTuple(*merged)
@@ -373,7 +405,7 @@ def _amerge(self, x1: AbstractTuple, x2, loop, forced):
 def _amerge(self, x1: AbstractArray, x2, loop, forced):
     args1 = (x1.element, x1.values)
     args2 = (x2.element, x2.values)
-    merged = self(args1, args2, loop, forced)
+    merged = amerge(args1, args2, loop, forced)
     if forced or merged is args1:
         return x1
     return AbstractArray(*merged)
@@ -383,7 +415,7 @@ def _amerge(self, x1: AbstractArray, x2, loop, forced):
 def _amerge(self, x1: AbstractList, x2, loop, forced):
     args1 = (x1.element, x1.values)
     args2 = (x2.element, x2.values)
-    merged = self(args1, args2, loop, forced)
+    merged = amerge(args1, args2, loop, forced)
     if forced or merged is args1:
         return x1
     return AbstractList(*merged)
@@ -396,7 +428,7 @@ def _amerge(self, x1: (int, float, bool), x2, loop, forced):
     if forced:
         if x1 != x2:
             raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
-    elif x2 is ANYTHING:
+    elif x2 is ANYTHING or x1 != x2:
         return ANYTHING
     return x1
 
@@ -412,15 +444,146 @@ def _amerge(self, x1: object, x2, loop, forced):
     return x1
 
 
-def amerge(x1, x2, loop, forced):
-    if isinstance(x1, Pending):
-        assert False
-    elif isinstance(x2, Pending):
-        assert False
-    elif type(x1) is not type(x2):
-        raise MyiaTypeError(f'Type mismatch: {type(x1)} != {type(x2)}')
+def amerge(x1, x2, loop, forced, accept_pending=True):
+    isp1 = isinstance(x1, Pending)
+    isp2 = isinstance(x2, Pending)
+    if (isp1 or isp2) and not accept_pending:
+        raise AssertionError('Cannot have Pending here.')
+    if isp1 and isp2:
+        return bind(loop, x1 if forced else None, [], [x1, x2])
+    elif isp1:
+        return bind(loop, x1 if forced else None, [x2], [x1])
+    elif isp2:
+        return bind(loop, x1 if forced else None, [x1], [x2])
+    elif x1 is ANYTHING:
+        if x2 is ANYTHING:
+            return x1
+        return _amerge[type(x2)](x1, x2, loop, forced)
+    elif x2 is not ANYTHING and type(x1) is not type(x2):
+        raise MyiaTypeError(
+            f'Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}'
+        )
     else:
         return _amerge(x1, x2, loop, forced)
+
+
+def is_simple(x):
+    if dtype.ismyiatype(x):
+        return True
+    else:
+        return False
+
+
+def bind(loop, committed, resolved, pending):
+
+    def amergeall():
+        if committed is None:
+            v = reduce(lambda x1, x2: amerge(x1, x2,
+                                             loop=loop,
+                                             forced=False,
+                                             accept_pending=False),
+                       resolved)
+        else:
+            v = reduce(lambda x1, x2: amerge(x1, x2,
+                                             loop=loop,
+                                             forced=True,
+                                             accept_pending=False),
+                       resolved, committed)
+        return v
+
+    resolved = list(resolved)
+    pending = set(pending)
+    assert pending
+
+    def resolve(fut):
+        nonlocal committed
+        pending.remove(fut)
+        result = fut.result()
+        if fut is committed:
+            committed = result
+        resolved.append(result)
+        if not pending:
+            v = amergeall()
+            if rval is not None and not rval.done():
+                rval.resolve_to(v)
+
+    for p in pending:
+        p.add_done_callback(resolve)
+
+    def premature_resolve():
+        nonlocal committed
+        if not resolved and committed is False:
+            raise Later()
+        committed = amergeall()
+        committed = broaden(committed)
+        resolved.clear()
+        return committed
+
+    if resolved and all(is_simple(x) for x in resolved):
+        rval = None
+        for p in pending:
+            p.equiv.update(resolved)
+            p.equiv.update(resolved)
+        return resolved[0]
+    else:
+        priority = (1000
+                    if any(p.priority is None for p in pending)
+                    else min(p.priority for p in pending) - 1)
+        rval = loop.create_pending(
+            resolve=premature_resolve,
+            priority=priority,
+        )
+        rval.equiv.update(resolved)
+        rval.equiv.update(pending)
+        for p in pending:
+            p.tie(rval)
+
+        return rval
+
+
+
+    # def abstract_merge(self, *values):
+    #     resolved = []
+    #     pending = set()
+    #     committed = None
+    #     for v in values:
+    #         if isinstance(v, Pending):
+    #             if v.resolved():
+    #                 resolved.append(v.result())
+    #             else:
+    #                 pending.add(v)
+    #         else:
+    #             resolved.append(v)
+
+    #     if pending:
+    #         def resolve(fut):
+    #             pending.remove(fut)
+    #             result = fut.result()
+    #             resolved.append(result)
+    #             if not pending:
+    #                 v = self.force_merge(resolved, model=committed)
+    #                 rval.resolve_to(v)
+
+    #         for p in pending:
+    #             p.add_done_callback(resolve)
+
+    #         def premature_resolve():
+    #             nonlocal committed
+    #             committed = self.force_merge(resolved)
+    #             resolved.clear()
+    #             return committed
+
+    #         rval = self.engine.loop.create_pending(
+    #             resolve=premature_resolve,
+    #             priority=-1,
+    #         )
+    #         rval.equiv.update(values)
+    #         for p in pending:
+    #             p.tie(rval)
+    #         return rval
+    #     else:
+    #         return self.force_merge(resolved)
+
 
 
 ###########
