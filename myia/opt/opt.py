@@ -1,6 +1,8 @@
 """Graph optimization routines."""
 
 from weakref import WeakKeyDictionary
+from collections import deque
+
 from ..ir import ANFNode, Apply, Constant, Graph, Special, manage
 from ..utils.unify import Unification, Var
 
@@ -131,6 +133,47 @@ def pattern_replacer(*pattern):
     def deco(f):
         return PatternSubstitutionOptimization(pattern, f, name=f.__name__)
     return deco
+
+
+class GlobalPassOptimizer:
+    """Apply a set of local optimizations in bfs order."""
+
+    def __init__(self, *node_transformers, optimizer=None):
+        """Initialize a GlobalPassOptimizer."""
+        self.node_transformers = node_transformers
+        self.optimizer = optimizer
+
+
+    def __call__(self, graph):
+        """Apply optimizations on given graphs in node order."""
+        if self.optimizer is not None:
+            mng = self.optimizer.resources.manager
+            mng.add_graph(graph)
+        else:
+            mng = manage(graph)
+
+        avoid = set([graph])
+        todo = deque()
+        todo.appendleft(graph.output)
+
+        while len(todo) > 0:
+            n = todo.pop()
+            if n in avoid:
+                continue
+            avoid.add(n)
+            if n.is_constant(Graph):
+                todo.append(n.value.output)
+                continue
+            for transformer in self.node_transformers:
+                new = transformer(self.optimizer, n)
+                if new is True:
+                    # Workaround for the old system
+                    new = None
+                if new and new is not n:
+                    new.expect_inferred.update(n.inferred)
+                    mng.replace(n, new)
+                    n = new
+            todo.extendleft(n.inputs)
 
 
 class PatternEquilibriumOptimizer:
