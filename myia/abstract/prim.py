@@ -1,4 +1,5 @@
 
+import numpy as np
 import inspect
 from functools import reduce
 from collections import defaultdict
@@ -80,22 +81,6 @@ def standard_prim(*prims):
     return deco
 
 
-@standard_prim(P.identity, P.return_)
-async def identity_prim(track, x):
-    return x
-
-
-@standard_prim(P.make_tuple)
-async def make_tuple_prim(track, *args):
-    return AbstractTuple(args)
-
-
-@standard_prim(P.tuple_getitem)
-async def tuple_getitem_prim(track, arg: AbstractTuple, idx: dtype.Int[64]):
-    i = idx.values['value']
-    return arg.elements[i]
-
-
 class WithImplXInferrer(XInferrer):
     def __init__(self, impl):
         super().__init__()
@@ -161,61 +146,6 @@ def uniform_prim(prim):
         xinf = UniformPrimitiveXInferrer.partial(impl=fn)
         abstract_inferrer_constructors[prim] = xinf
     return deco
-
-
-@uniform_prim(P.scalar_usub)
-def prim_usub(x: Number) -> Number:
-    return -x
-
-
-@uniform_prim(P.scalar_add)
-def prim_add(x: Number, y: Number) -> Number:
-    return x + y
-
-
-@uniform_prim(P.scalar_sub)
-def prim_sub(x: Number, y: Number) -> Number:
-    return x - y
-
-
-@uniform_prim(P.scalar_mul)
-def prim_mul(x: Number, y: Number) -> Number:
-    return x * y
-
-
-@uniform_prim(P.scalar_eq)
-def prim_eq(x: Number, y: Number) -> Bool:
-    return x == y
-
-
-@uniform_prim(P.scalar_gt)
-def prim_gt(x: Number, y: Number) -> Bool:
-    return x > y
-
-
-@uniform_prim(P.scalar_lt)
-def prim_lt(x: Number, y: Number) -> Bool:
-    return x < y
-
-
-@uniform_prim(P.scalar_ge)
-def prim_ge(x: Number, y: Number) -> Bool:
-    return x >= y
-
-
-@uniform_prim(P.scalar_le)
-def prim_le(x: Number, y: Number) -> Bool:
-    return x <= y
-
-
-@uniform_prim(P.bool_and)
-def prim_bool_and(x: Bool, y: Bool) -> Bool:
-    return x and y
-
-
-@uniform_prim(P.bool_or)
-def prim_bool_or(x: Bool, y: Bool) -> Bool:
-    return x or y
 
 
 class MyiaNameError(InferenceError):
@@ -340,8 +270,286 @@ async def _resolve_case(resources, data_t, item_v, chk):
     return ('static',)
 
 
+##############
+# Arithmetic #
+##############
+
+
+@uniform_prim(P.scalar_add)
+def _inf_scalar_add(x: Number, y: Number) -> Number:
+    return x + y
+
+
+@uniform_prim(P.scalar_sub)
+def _inf_scalar_sub(x: Number, y: Number) -> Number:
+    return x - y
+
+
+@uniform_prim(P.scalar_mul)
+def _inf_scalar_mul(x: Number, y: Number) -> Number:
+    return x * y
+
+
+@uniform_prim(P.scalar_div)
+def _inf_scalar_div(x: Number, y: Number) -> Number:
+    if isinstance(x, (float, np.floating)):
+        return x / y
+    else:
+        return int(x / y)
+
+
+@uniform_prim(P.scalar_mod)
+def _inf_scalar_mod(x: Number, y: Number) -> Number:
+    return x % y
+
+
+@uniform_prim(P.scalar_pow)
+def _inf_scalar_pow(x: Number, y: Number) -> Number:
+    return x ** y
+
+
+@uniform_prim(P.scalar_trunc)
+def _inf_scalar_trunc(x: Number) -> Number:
+    return np.trunc(x)
+
+
+@uniform_prim(P.scalar_floor)
+def _inf_scalar_floor(x: Number) -> Number:
+    return np.floor(x)
+
+
+@uniform_prim(P.scalar_uadd)
+def _inf_scalar_uadd(x: Number) -> Number:
+    return x
+
+
+@uniform_prim(P.scalar_usub)
+def _inf_scalar_usub(x: Number) -> Number:
+    return -x
+
+
+@uniform_prim(P.scalar_exp)
+def _inf_scalar_exp(x: Number) -> Number:
+    return math.exp(x)
+
+
+@uniform_prim(P.scalar_log)
+def _inf_scalar_log(x: Number) -> Number:
+    return math.log(x)
+
+
+@uniform_prim(P.scalar_sin)
+def _inf_scalar_sin(x: Number) -> Number:
+    return math.sin(x)
+
+
+@uniform_prim(P.scalar_cos)
+def _inf_scalar_cos(x: Number) -> Number:
+    return math.cos(x)
+
+
+@uniform_prim(P.scalar_tan)
+def _inf_scalar_tan(x: Number) -> Number:
+    return math.tan(x)
+
+
+###############
+# Comparisons #
+###############
+
+
+@uniform_prim(P.scalar_eq)
+def _inf_scalar_eq(x: Number, y: Number) -> Bool:
+    return x == y
+
+
+@uniform_prim(P.scalar_lt)
+def _inf_scalar_lt(x: Number, y: Number) -> Bool:
+    return x < y
+
+
+@uniform_prim(P.scalar_gt)
+def _inf_scalar_gt(x: Number, y: Number) -> Bool:
+    return x > y
+
+
+@uniform_prim(P.scalar_ne)
+def _inf_scalar_ne(x: Number, y: Number) -> Bool:
+    return x != y
+
+
+@uniform_prim(P.scalar_le)
+def _inf_scalar_le(x: Number, y: Number) -> Bool:
+    return x <= y
+
+
+@uniform_prim(P.scalar_ge)
+def _inf_scalar_ge(x: Number, y: Number) -> Bool:
+    return x >= y
+
+
+@uniform_prim(P.bool_not)
+def _inf_bool_not(x: Bool) -> Bool:
+    return x >= y
+
+
+@uniform_prim(P.bool_and)
+def _inf_bool_and(x: Bool, y: Bool) -> Bool:
+    return x and y
+
+
+@uniform_prim(P.bool_or)
+def _inf_bool_or(x: Bool, y: Bool) -> Bool:
+    return x or y
+
+
+@uniform_prim(P.bool_eq)
+def _inf_bool_eq(x: Bool, y: Bool) -> Bool:
+    return x == y
+
+
+######################
+# Type introspection #
+######################
+
+
+# typeof = Primitive('typeof')
+# hastype = Primitive('hastype')
+
+
+###################
+# Data structures #
+###################
+
+
+@standard_prim(P.make_tuple)
+async def _inf_make_tuple(track, *args):
+    return AbstractTuple(args)
+
+
+# make_list = Primitive('make_list')
+# make_record = Primitive('make_record')
+# tuple_getitem = Primitive('tuple_getitem')
+# list_getitem = Primitive('list_getitem')
+# array_getitem = Primitive('array_getitem')
+
+
+@standard_prim(P.tuple_getitem)
+async def _inf_tuple_getitem(track, arg: AbstractTuple, idx: dtype.Int[64]):
+    i = idx.values['value']
+    return arg.elements[i]
+
+
+# list_setitem = Primitive('list_setitem')
+# array_setitem = Primitive('array_setitem')
+# list_append = Primitive('list_append')
+
+
+@standard_prim(P.getattr)
+async def _inf_getattr(track, data, item):
+    def chk(data_v, item_v):
+        if not isinstance(item_v, str):  # pragma: no cover
+            raise MyiaTypeError(
+                f'item argument to resolve must be a string, not {item_v}.'
+            )
+
+    async def on_dcattr(data, data_t, item_v):
+        return data_t.attributes[item_v]
+
+    return await static_getter(
+        track, data, item,
+        fetch=getattr,
+        on_dcattr=on_dcattr,
+        chk=chk
+    )
+
+
+# setattr = Primitive('setattr')
+
+
+@standard_prim(P.tuple_len)
+async def _inf_tuple_len(track, xs: AbstractTuple):
+    return AbstractScalar({
+        'value': len(xs.elements),
+        'type': dtype.Int[64],
+        'shape': dshape.NOSHAPE
+    })
+
+
+@standard_prim(P.list_len)
+async def _inf_list_len(track, xs: AbstractList):
+    return AbstractScalar({
+        'value': ANYTHING,
+        'type': dtype.Int[64],
+        'shape': dshape.NOSHAPE
+    })
+
+
+@standard_prim(P.array_len)
+async def _inf_array_len(track, xs: AbstractArray):
+    return AbstractScalar({
+        'value': ANYTHING,
+        'type': dtype.Int[64],
+        'shape': dshape.NOSHAPE
+    })
+
+
+# list_map = Primitive('list_map')
+# list_reduce = Primitive('list_reduce')
+
+
+##########
+# Arrays #
+##########
+
+
+# scalar_to_array = Primitive('scalar_to_array')
+# array_to_scalar = Primitive('array_to_scalar')
+# broadcast_shape = Primitive('broadcast_shape')
+# invert_permutation = Primitive('invert_permutation')
+# shape = Primitive('shape')
+# array_map = Primitive('array_map')
+# array_scan = Primitive('array_scan')
+# array_reduce = Primitive('array_reduce')
+# distribute = Primitive('distribute')
+# reshape = Primitive('reshape')
+# transpose = Primitive('transpose')
+# dot = Primitive('dot')
+
+
+##############
+# Statements #
+##############
+
+
+@standard_prim(P.switch)
+async def switch_prim(track, cond: Bool, tb, fb):
+    v = cond.values['value']
+    if v is True:
+        return tb
+    elif v is False:
+        return fb
+    elif v is ANYTHING:
+        return track.abstract_merge(tb, fb)
+    else:
+        raise AssertionError("Invalid condition value for switch")
+
+
+#################
+# Miscellaneous #
+#################
+
+
+# scalar_cast = Primitive('scalar_cast')
+
+
+@standard_prim(P.identity, P.return_)
+async def _inf_identity(track, x):
+    return x
+
+
 @standard_prim(P.resolve)
-async def resolve_prim(track, data, item):
+async def _inf_resolve(track, data, item):
     def chk(data_v, item_v):
         if not isinstance(data_v, Namespace):  # pragma: no cover
             raise MyiaTypeError(
@@ -365,89 +573,6 @@ async def resolve_prim(track, data, item):
     )
 
 
-@standard_prim(P.getattr)
-async def getattr_prim(track, data, item):
-    def chk(data_v, item_v):
-        if not isinstance(item_v, str):  # pragma: no cover
-            raise MyiaTypeError(
-                f'item argument to resolve must be a string, not {item_v}.'
-            )
-
-    async def on_dcattr(data, data_t, item_v):
-        return data_t.attributes[item_v]
-
-    return await static_getter(
-        track, data, item,
-        fetch=getattr,
-        on_dcattr=on_dcattr,
-        chk=chk
-    )
-
-
-@standard_prim(P.array_len)
-async def array_len_prim(track, xs: AbstractArray):
-    return AbstractScalar({
-        'value': ANYTHING,
-        'type': dtype.Int[64],
-        'shape': dshape.NOSHAPE
-    })
-
-
-@standard_prim(P.list_len)
-async def list_len_prim(track, xs: AbstractList):
-    return AbstractScalar({
-        'value': ANYTHING,
-        'type': dtype.Int[64],
-        'shape': dshape.NOSHAPE
-    })
-
-
-@standard_prim(P.tuple_len)
-async def tuple_len_prim(track, xs: AbstractTuple):
-    return AbstractScalar({
-        'value': len(xs.elements),
-        'type': dtype.Int[64],
-        'shape': dshape.NOSHAPE
-    })
-
-
-@standard_prim(P.switch)
-async def switch_prim(track, cond: Bool, tb, fb):
-    v = cond.values['value']
-    if v is True:
-        return tb
-    elif v is False:
-        return fb
-    elif v is ANYTHING:
-        return track.abstract_merge(tb, fb)
-    else:
-        raise AssertionError("Invalid condition value for switch")
-
-
-# @type_inferrer(P.switch, nargs=3)
-# async def infer_type_switch(track, cond, tb, fb):
-#     """Infer the return type of switch."""
-#     await track.check(Bool, cond)
-#     v = await cond['value']
-#     if v is True:
-#         # We only visit the first branch if the condition is provably true
-#         return await tb['type']
-#     elif v is False:
-#         # We only visit the second branch if the condition is provably false
-#         return await fb['type']
-#     elif v is ANYTHING:
-#         # The first branch to finish will return immediately. When the other
-#         # branch finishes, its result will be checked against the other.
-#         res = await track.assert_same(tb, fb, refs=[tb, fb])
-#         if isinstance(res, Inferrer):
-#             tinf = await tb['type']
-#             finf = await fb['type']
-#             return MultiInferrer((tinf, finf), [tb, fb])
-#         return res
-#     else:
-#         raise AssertionError("Invalid condition value for switch")
-
-
 @standard_prim(P.partial)
 async def partial_prim(track, fn, *args):
     fns = fn.values['value']
@@ -459,3 +584,11 @@ async def partial_prim(track, fn, *args):
         'type': dtype.Function,
         'shape': dshape.NOSHAPE
     })
+
+
+# J = Primitive('J')
+# Jinv = Primitive('Jinv')
+# embed = Primitive('embed')
+# env_setitem = Primitive('env_setitem')
+# env_getitem = Primitive('env_getitem')
+# env_add = Primitive('env_add')
