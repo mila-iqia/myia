@@ -74,24 +74,34 @@ class AbstractValue(AbstractBase):
         self.values = values
         self.count = count
 
-    def build(self, name):
+    def build(self, name, default=None):
+        try:
+            return self._build(name)
+        except ValueError:
+            if default is None:
+                raise
+            return default
+
+    def _build(self, name):
         v = self.values.get(name, ABSENT)
-        if v is not ABSENT:
+        if v is ANYTHING:
+            raise ValueError('ANYTHING')
+        elif v is not ABSENT:
             if isinstance(v, Pending):
                 return v.result()
             else:
                 return v
         else:
-            method = getattr(self, f'build_{name}')
+            method = getattr(self, f'_build_{name}')
             return method()
 
-    def build_value(self):
+    def _build_value(self):
         raise NotImplementedError()
 
-    def build_type(self):
+    def _build_type(self):
         raise NotImplementedError()
 
-    def build_shape(self):
+    def _build_shape(self):
         raise NotImplementedError()
 
     def broaden(self):
@@ -161,13 +171,13 @@ class AbstractTuple(AbstractValue):
             [x.merge(y) for x, y in zip(self.elements, other.elements)]
         )
 
-    def build_value(self):
+    def _build_value(self):
         return tuple(e.build('value') for e in self.elements)
 
-    def build_type(self):
+    def _build_type(self):
         return dtype.Tuple[[e.build('type') for e in self.elements]]
 
-    def build_shape(self):
+    def _build_shape(self):
         return dshape.TupleShape([e.build('shape') for e in self.elements])
 
     def make_key(self):
@@ -185,7 +195,7 @@ class AbstractArray(AbstractValue):
     def merge_structure(self, other):
         return AbstractArray(self.element.merge(other.element))
 
-    def build_type(self):
+    def _build_type(self):
         return dtype.Array[self.element.build('type')]
 
     def make_key(self):
@@ -200,10 +210,10 @@ class AbstractList(AbstractValue):
         super().__init__(values or {})
         self.element = element
 
-    def build_type(self):
+    def _build_type(self):
         return dtype.List[self.element.build('type')]
 
-    def build_shape(self):
+    def _build_shape(self):
         return dshape.ListShape(self.element.build('shape'))
 
     def make_key(self):
@@ -215,11 +225,12 @@ class AbstractList(AbstractValue):
 
 class AbstractClass(AbstractValue):
     def __init__(self, tag, attributes, methods):
+        super().__init__({})
         self.tag = tag
         self.attributes = attributes
         self.methods = methods
 
-    def build_type(self):
+    def _build_type(self):
         return dtype.Class[
             self.tag,
             {name: x.build('type')
@@ -227,14 +238,14 @@ class AbstractClass(AbstractValue):
             self.methods
         ]
 
-    def build_shape(self):
+    def _build_shape(self):
         return dshape.ClassShape(
             {name: x.build('shape')
              for name, x in self.attributes.items()},
         )
 
     def make_key(self):
-        return (tag, tuple(sorted(self.attributes.items())))
+        return (self.tag, tuple(sorted(self.attributes.items())))
 
     def __repr__(self):
         elems = [f'{k}={v}' for k, v in self.attributes.items()]
@@ -621,6 +632,16 @@ def abroaden(x: dict, count):
 ###########
 # Cleanup #
 ###########
+
+
+@overload(bootstrap=True)
+async def reify(self, p: Pending):
+    return await p
+
+
+@overload
+async def reify(self, p: object):
+    return p
 
 
 # @overload(bootstrap=True)

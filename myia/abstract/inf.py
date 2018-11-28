@@ -7,12 +7,14 @@ from ..infer.core import Pending
 from ..infer.graph_infer import type_error_nargs, VirtualReference
 from ..infer.utils import infer_trace
 from ..ir import Graph
-from ..prim import Primitive
+from ..prim import Primitive, ops as P
 from ..prim.py_implementations import typeof
-from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable
+from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
+    is_dataclass_type
 
 from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
-    ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication
+    ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
+    reify
 
 
 _number_types = [
@@ -61,6 +63,11 @@ class AbstractTrack(Track):
                 part.args
             )
         return self.constructors[part]
+
+    async def execute(self, fn, *args):
+        infs = [self.get_inferrer_for(poss) for poss in fn.values['value']]
+        argrefs = [VirtualReference({'abstract': a}) for a in args]
+        return await execute_inferrers(self, infs, argrefs)
 
     async def infer_apply(self, ref):
         """Get the property for a ref of an Apply node."""
@@ -113,11 +120,28 @@ class AbstractTrack(Track):
             })
         # elif isinstance(v, MetaGraph):
         #     return MetaGraphInferrer(self, v)
-        # elif is_dataclass_type(v):
-        #     rec = self.constructors[P.make_record]()
-        #     typ = dtype.pytype_to_myiatype(v)
-        #     vref = self.engine.vref({'value': typ, 'type': TypeType})
-        #     return PartialInferrer(self, rec, [vref])
+        elif is_dataclass_type(v):
+            # rec = self.constructors[P.make_record]()
+            # typ = dtype.pytype_to_myiatype(v)
+            # vref = self.engine.vref({'value': typ, 'type': TypeType})
+            # return PartialInferrer(self, rec, [vref])
+
+            typ = dtype.pytype_to_myiatype(v)
+            typarg = AbstractScalar({
+                'value': typ,
+                'type': dtype.TypeType,
+                'shape': dshape.NOSHAPE,
+            })
+            return AbstractScalar({
+                'value': Possibilities([
+                    PartialApplication(
+                        P.make_record,
+                        (typarg,)
+                    )
+                ]),
+                'type': dtype.Function,
+                'shape': dshape.NOSHAPE,
+            })
         else:
             return from_vref(v, typeof(v), shapeof(v))
 
@@ -206,18 +230,23 @@ class AbstractTrack(Track):
             return any(self.check_predicate(p, res) for p in predicate)
         elif dtype.ismyiatype(predicate):
             return dtype.ismyiatype(res, predicate)
+        elif isinstance(predicate, type) \
+                and issubclass(predicate, AbstractBase):
+            return isinstance(res, predicate)
         elif callable(predicate):
-            return predicate(res)
+            return predicate(self, res)
         else:
             raise ValueError(predicate)  # pragma: no cover
 
     def assert_predicate(self, predicate, res):
         if not self.check_predicate(predicate, res):
-            raise MyiaTypeError(f'Expected {predicate}')
+            raise MyiaTypeError(f'Expected {predicate}, not {res}')
 
     def chk(self, predicate, *values):
         for value in values:
             if isinstance(value, Pending):
+                # if dtype.ismyiatype(predicate):
+                #     value.equiv.add(predicate)
                 value.add_done_callback(
                     lambda fut: self.assert_predicate(
                         predicate, fut.result()
@@ -226,6 +255,9 @@ class AbstractTrack(Track):
             else:
                 self.assert_predicate(predicate, value)
         return self.abstract_merge(*values)
+
+    async def chkimm(self, predicate, *values):
+        return await reify(self.chk(predicate, *values))
 
 
 class XInferrer(Partializable):
@@ -324,7 +356,6 @@ class PartialXInferrer(XInferrer):
         if args not in self.cache:
             self.cache[args] = await self.fn(track, *args)
         return self.cache[args]
-
 
 
 async def _xinf_helper(track, inf, args, p):
