@@ -391,11 +391,11 @@ def test_if2(x, y):
         (i64, i64, i64),
         (i64, f64, f64),
         (f64, f64, f64),
-        # ({'value': 1_000_000}, i64, i64)
+        ({'value': 1_000_000}, i64, i64)
     ],
     value=[
         (2, 3, 27),
-        # (1_000_000, 3, ANYTHING)
+        (1_000_000, 3, ANYTHING)
     ]
 )
 def test_while(x, y):
@@ -777,23 +777,23 @@ def test_choose_indirect(i, x):
     return choose(i)(x)
 
 
-# @infer(
-#     type=[
-#         (i64, i64)
-#     ]
-# )
-# def test_hof(x):
+@infer(
+    type=[
+        (i64, i64)
+    ]
+)
+def test_hof(x):
 
-#     def double(x):
-#         return x + x
+    def double(x):
+        return x + x
 
-#     def square(x):
-#         return x * x
+    def square(x):
+        return x * x
 
-#     def hof(f, tup):
-#         return f(tup[0]) + f(tup[1])
+    def hof(f, tup):
+        return f(tup[0]) + f(tup[1])
 
-#     return hof(double, (x + 1, x + 2)) + hof(square, (x + 3, x + 4))
+    return hof(double, (x + 1, x + 2)) + hof(square, (x + 3, x + 4))
 
 
 # @infer(
@@ -835,51 +835,51 @@ def test_choose_indirect(i, x):
 #     return pick2(c, pick(c))(x + x)
 
 
-# @infer(
-#     type=[
-#         (i64, T[T[i64, i64], T[B, B]])
-#     ]
-# )
-# def test_hof_3(x):
+@infer(
+    type=[
+        (i64, T[T[i64, i64], T[B, B]])
+    ]
+)
+def test_hof_3(x):
 
-#     def double(x):
-#         return x + x
+    def double(x):
+        return x + x
 
-#     def is_zero(x):
-#         return x == 0
+    def is_zero(x):
+        return x == 0
 
-#     def hof(f, tup):
-#         return (f(tup[0]), f(tup[1]))
+    def hof(f, tup):
+        return (f(tup[0]), f(tup[1]))
 
-#     return (hof(double, (x + 1, x + 2)), hof(is_zero, (x + 3, x + 4)))
+    return (hof(double, (x + 1, x + 2)), hof(is_zero, (x + 3, x + 4)))
 
 
-# @infer(
-#     type=[
-#         (i64, i64, InferenceError),
-#         ({'value': -1}, i64, i64),
-#         ({'value': 1}, i64, T[i64, i64]),
-#     ]
-# )
-# def test_hof_4(x, y):
+@infer(
+    type=[
+        (i64, i64, InferenceError),
+        ({'value': -1}, i64, i64),
+        ({'value': 1}, i64, T[i64, i64]),
+    ]
+)
+def test_hof_4(x, y):
 
-#     def double(x):
-#         return x + x
+    def double(x):
+        return x + x
 
-#     def hof_sum(f, tup):
-#         return f(tup[0]) + f(tup[1])
+    def hof_sum(f, tup):
+        return f(tup[0]) + f(tup[1])
 
-#     def hof_tup(f, tup):
-#         return (f(tup[0]), f(tup[1]))
+    def hof_tup(f, tup):
+        return (f(tup[0]), f(tup[1]))
 
-#     def pick(x):
-#         if x < 0:
-#             return hof_sum
-#         else:
-#             return hof_tup
+    def pick(x):
+        if x < 0:
+            return hof_sum
+        else:
+            return hof_tup
 
-#     f = pick(x)
-#     return f(double, (y + 3, y + 4))
+    f = pick(x)
+    return f(double, (y + 3, y + 4))
 
 
 # @infer(
@@ -1153,13 +1153,13 @@ def test_closure_passing(x, y):
 #     return list_map_prim(adder(z), xs)
 
 
-# def _square(x):
-#     return x * x
+def _square(x):
+    return x * x
 
 
-# @infer(type=(InferenceError,))
-# def test_nonexistent_variable():
-#     return xxxx + yz  # noqa
+@infer(type=(InferenceError,))
+def test_nonexistent_variable():
+    return xxxx + yz  # noqa
 
 
 # class helpers:
@@ -1496,29 +1496,29 @@ def test_infinite_mutual_recursion(x):
 #     return list_reduce(f, lst, dflt)
 
 
-# @infer(type=[(i64, i64)],
-#        value=[(40, 42)],
-#        shape=[({'type': i64}, NOSHAPE)])
-# def test_partial_1(x):
-#     def f(a, b):
-#         return a + b
-#     f2 = myia_partial(f, 2)
-#     return f2(x)
+@infer(type=[(i64, i64)],
+       value=[(40, 42)],
+       shape=[({'type': i64}, NOSHAPE)])
+def test_partial_1(x):
+    def f(a, b):
+        return a + b
+    f2 = myia_partial(f, 2)
+    return f2(x)
 
 
-# @infer(type=[(i64, i64)])
-# def test_partial_2(x):
-#     def f(a, b):
-#         return a + b
+@infer(type=[(i64, i64)])
+def test_partial_2(x):
+    def f(a, b):
+        return a + b
 
-#     def g(c):
-#         f2 = myia_partial(f, 2)
-#         f3 = myia_partial(f, -2)
-#         if c:
-#             return f2
-#         else:
-#             return f3
-#     return g(x < 42)(x)
+    def g(c):
+        f2 = myia_partial(f, 2)
+        f3 = myia_partial(f, -2)
+        if c:
+            return f2
+        else:
+            return f3
+    return g(x < 42)(x)
 
 
 @infer(type=[(i64, i64)],

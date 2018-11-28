@@ -4,7 +4,7 @@ from functools import reduce
 from .. import dtype, dshape
 from ..infer import Track, MyiaTypeError, Context
 from ..infer.core import Pending
-from ..infer.graph_infer import type_error_nargs
+from ..infer.graph_infer import type_error_nargs, VirtualReference
 from ..infer.utils import infer_trace
 from ..ir import Graph
 from ..prim import Primitive
@@ -12,7 +12,7 @@ from ..prim.py_implementations import typeof
 from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable
 
 from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
-    ABSENT, GraphAndContext, AbstractBase, amerge, bind
+    ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication
 
 
 _number_types = [
@@ -52,6 +52,15 @@ class AbstractTrack(Track):
         if g not in self.constructors:
             self.constructors[g] = GraphXInferrer(g.graph, g.context)
         return self.constructors[g]
+
+    @get_inferrer_for.register
+    def get_inferrer_for(self, part: PartialApplication):
+        if part not in self.constructors:
+            self.constructors[part] = PartialXInferrer(
+                self.get_inferrer_for(part.fn),
+                part.args
+            )
+        return self.constructors[part]
 
     async def infer_apply(self, ref):
         """Get the property for a ref of an Apply node."""
@@ -299,6 +308,23 @@ class GraphXInferrer(XInferrer):
 
         out = engine.ref(g.return_, context)
         return await engine.get_inferred('abstract', out)
+
+
+class PartialXInferrer(XInferrer):
+
+    def __init__(self, fn, args):
+        super().__init__()
+        self.fn = fn
+        self.args = args
+
+    async def __call__(self, track, *refs):
+        args = tuple([await ref['abstract'] for ref in refs])
+        args = tuple(VirtualReference({'abstract': arg})
+                     for arg in self.args + args)
+        if args not in self.cache:
+            self.cache[args] = await self.fn(track, *args)
+        return self.cache[args]
+
 
 
 async def _xinf_helper(track, inf, args, p):

@@ -37,6 +37,20 @@ class GraphAndContext:
             and self.context == other.context
 
 
+class PartialApplication:
+    def __init__(self, fn, args):
+        self.fn = fn
+        self.args = args
+
+    def __hash__(self):
+        return hash((self.fn, self.args))
+
+    def __eq__(self, other):
+        return isinstance(other, PartialApplication) \
+            and self.fn == other.fn \
+            and self.args == other.args
+
+
 class AbstractBase:
 
     def make_key(self):
@@ -56,7 +70,7 @@ class AbstractBase:
 
 
 class AbstractValue(AbstractBase):
-    def __init__(self, values, count=1):
+    def __init__(self, values, count=10):
         self.values = values
         self.count = count
 
@@ -512,7 +526,7 @@ def bind(loop, committed, resolved, pending):
 
     def premature_resolve():
         nonlocal committed
-        if not resolved and committed is False:
+        if not resolved and committed is None:
             raise Later()
         committed = amergeall()
         committed = broaden(committed)

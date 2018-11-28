@@ -13,6 +13,8 @@ from .base import (
     AbstractArray,
     AbstractList,
     AbstractClass,
+    PartialApplication,
+    Possibilities,
 )
 
 from .inf import (
@@ -94,7 +96,7 @@ async def tuple_getitem_prim(track, arg: AbstractTuple, idx: dtype.Int[64]):
     return arg.elements[i]
 
 
-class UniformPrimitiveXInferrer(XInferrer):
+class WithImplXInferrer(XInferrer):
     def __init__(self, impl):
         super().__init__()
         self.impl = impl
@@ -105,6 +107,34 @@ class UniformPrimitiveXInferrer(XInferrer):
         assert data.kwonlyargs == []
         assert data.kwonlydefaults is None
         self.nargs = len(data.args)
+        self.impl_data = data
+
+    def run_impl(self, args, outtype):
+        min_count = min((arg.count for arg in args), default=0)
+        if min_count <= 0:
+            outval = ANYTHING
+        else:
+            values = [arg.values['value'] for arg in args]
+            if any(v is ANYTHING for v in values):
+                outval = ANYTHING
+            else:
+                outval = self.impl(*values)
+
+        if outval is ANYTHING:
+            min_count = 0
+        rval = AbstractScalar({
+            'value': outval,
+            'type': outtype,
+            'shape': dshape.NOSHAPE
+        })
+        rval.count = max(min_count - 1, 0)
+        return rval
+
+
+class UniformPrimitiveXInferrer(WithImplXInferrer):
+    def __init__(self, impl):
+        super().__init__(impl)
+        data = self.impl_data
         self.typemap = defaultdict(list)
         for i, arg in enumerate(data.args):
             self.typemap[data.annotations[arg]].append(i)
@@ -123,17 +153,7 @@ class UniformPrimitiveXInferrer(XInferrer):
             if typ == self.outtype:
                 outtype = res
 
-        values = [arg.values['value'] for arg in args]
-        if any(v is ANYTHING for v in values):
-            outval = ANYTHING
-        else:
-            outval = self.impl(*values)
-
-        return AbstractScalar({
-            'value': outval,
-            'type': outtype,
-            'shape': dshape.NOSHAPE
-        })
+        return self.run_impl(args, outtype)
 
 
 def uniform_prim(prim):
@@ -243,12 +263,15 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
             method = data_t.methods[item_v]
             method = resources.convert(method)
             inferrer = track.from_value(method, Context.empty())
-            inferrer = unwrap(inferrer)
-            return PartialInferrer(
-                track,
-                inferrer,
-                [data]
-            )
+            fns = inferrer.values['value']
+            assert isinstance(fns, Possibilities)
+            return AbstractScalar({
+                'value': Possibilities(
+                    PartialApplication(fn, (data,)) for fn in fns
+                ),
+                'type': dtype.Function,
+                'shape': dshape.NOSHAPE,
+            })
         else:
             raise InferenceError(f'Unknown field in {data_t}: {item_v}')
 
@@ -256,12 +279,15 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
         method, = args
         method = resources.convert(method)
         inferrer = track.from_value(method, Context.empty())
-        inferrer = unwrap(inferrer)
-        return PartialInferrer(
-            track,
-            inferrer,
-            [data]
-        )
+        fns = inferrer.values['value']
+        assert isinstance(fns, Possibilities)
+        return AbstractScalar({
+            'value': Possibilities(
+                PartialApplication(fn, (data,)) for fn in fns
+            ),
+            'type': dtype.Function,
+            'shape': dshape.NOSHAPE,
+        })
 
     elif case == 'no_method':
         msg = f"object of type {data_t} has no attribute '{item_v}'"
@@ -420,3 +446,16 @@ async def switch_prim(track, cond: Bool, tb, fb):
 #         return res
 #     else:
 #         raise AssertionError("Invalid condition value for switch")
+
+
+@standard_prim(P.partial)
+async def partial_prim(track, fn, *args):
+    fns = fn.values['value']
+    assert isinstance(fns, Possibilities)
+    return AbstractScalar({
+        'value': Possibilities([
+            PartialApplication(fn, args) for fn in fns
+        ]),
+        'type': dtype.Function,
+        'shape': dshape.NOSHAPE
+    })
