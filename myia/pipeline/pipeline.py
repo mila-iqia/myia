@@ -256,13 +256,14 @@ class _PipelineSlice:
                     results = step.step(**valid_args)
                     if profile:
                         end = perf_counter()
+                    if not isinstance(results, dict) and len(valid_args) == 1:
+                        field_name, = valid_args.keys()
+                        results = {field_name: results}
+                    if profile:
                         subp = results.pop('profile', end - start)
                         if isinstance(subp, dict):
                             subp['__total__'] = end - start
                         profd[step.name] = subp
-                    if not isinstance(results, dict) and len(valid_args) == 1:
-                        field_name, = valid_args.keys()
-                        results = {field_name: results}
                     args = {**args, **results}
                 except Exception as e:
                     args['error'] = e
