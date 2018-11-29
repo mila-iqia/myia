@@ -3,7 +3,9 @@
 from weakref import WeakKeyDictionary
 from collections import deque
 
-from ..ir import ANFNode, Apply, Constant, Graph, Special, manage
+from ..ir import ANFNode, Apply, Constant, Graph, Special, manage, \
+    succ_deeper
+from ..graph_utils import dfs
 from ..utils.unify import Unification, Var
 
 
@@ -196,21 +198,28 @@ class PatternEquilibriumOptimizer:
 
         while True:
             changes = False
+            nodes = list(dfs(graph.output, succ_deeper))
+            def new_node(_, n):
+                nodes.append(n)
+            mng.events.add_node.register(new_node)
 
-            with mng.transact() as tr:
-                for node in list(mng.all_nodes):
-                    for transformer in self.node_transformers:
-                        new = transformer(self.optimizer, node)
-                        if new is True:
-                            changes = True
-                            any_changes = True
-                            break
-                        elif new and new is not node:
-                            new.expect_inferred.update(node.inferred)
-                            tr.replace(node, new)
-                            changes = True
-                            any_changes = True
-                            break
+            for node in nodes:
+                if node not in mng.all_nodes:
+                    continue
+                for transformer in self.node_transformers:
+                    new = transformer(self.optimizer, node)
+                    if new is True:
+                        changes = True
+                        any_changes = True
+                        break
+                    elif new and new is not node:
+                        new.expect_inferred.update(node.inferred)
+                        mng.replace(node, new)
+                        changes = True
+                        any_changes = True
+                        break
+
+            mng.events.add_node.remove(new_node)
 
             if not changes:
                 break
