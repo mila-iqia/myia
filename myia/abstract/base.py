@@ -160,6 +160,24 @@ class AbstractScalar(AbstractValue):
         return f'S({", ".join(contents)})'
 
 
+class AbstractType(AbstractValue):
+
+    def merge_structure(self, other):
+        return AbstractType({'type': dtype.TypeType})
+
+    def __repr__(self):
+        return f'Ty({self.values["value"]})'
+
+
+class AbstractFunction(AbstractValue):
+
+    def merge_structure(self, other):
+        return AbstractFunction({'type': dtype.Function})
+
+    def __repr__(self):
+        return f'Fn({self.values["value"]})'
+
+
 class AbstractTuple(AbstractValue):
     def __init__(self, elements, values=None):
         super().__init__(values or {})
@@ -321,6 +339,11 @@ def from_vref(self, v, t: dtype.Class, s):
         t.methods
         # {'value': v, 'type': t, 'shape': s}
     )
+
+
+@overload
+def from_vref(self, v, t: dtype.TypeType, s):
+    return AbstractType({'value': v, 'type': t, 'shape': s})
 
 
 @overload

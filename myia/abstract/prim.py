@@ -11,6 +11,8 @@ from .base import (
     AbstractBase,
     AbstractValue,
     AbstractScalar,
+    AbstractType,
+    AbstractFunction,
     AbstractTuple,
     AbstractArray,
     AbstractList,
@@ -28,7 +30,7 @@ from .inf import (
 from .. import dtype, dshape
 from ..dtype import Number, Bool
 from ..infer import ANYTHING, InferenceVar, Context, MyiaTypeError, \
-    InferenceError, reify, MyiaShapeError
+    InferenceError, reify, MyiaShapeError, VOID
 from ..infer.core import Pending
 from ..prim import ops as P
 from ..utils import Namespace
@@ -133,6 +135,8 @@ class UniformPrimitiveXInferrer(WithImplXInferrer):
             raise MyiaTypeError('Wrong number of arguments.')
 
         outtype = self.outtype
+        if any(not isinstance(arg, AbstractScalar) for arg in args):
+            raise MyiaTypeError('Expected scalar')
         ts = [arg.values['type'] for arg in args]
         for typ, indexes in self.typemap.items():
             selection = [ts[i] for i in indexes]
@@ -173,7 +177,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
     resources = track.engine.pipeline.resources
 
     data_t = data.build('type')
-    item_v = item.build('value')
+    item_v = item.build('value', default=ANYTHING)
 
     if item_v is ANYTHING:
         raise InferenceError(
@@ -228,7 +232,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
 
     else:
         # Module or static namespace
-        data_v = data.build('value')
+        data_v = data.build('value', default=ANYTHING)
         if data_v is ANYTHING:
             raise InferenceError(
                 'Could not infer the type or the value of the object'
@@ -443,7 +447,20 @@ async def _inf_make_tuple(track, *args):
     return AbstractTuple(args)
 
 
-# make_list = Primitive('make_list')
+@standard_prim(P.make_list)
+async def _inf_make_list(track, *args):
+    if len(args) == 0:
+        assert False
+        # dflt = AbstractScalar({
+        #     'value': ANYTHING,
+        #     'type': dtype.Problem[VOID],
+        #     'shape': dshape.NOSHAPE,
+        # })
+    else:
+        res = track.abstract_merge(*args)
+    return AbstractList(res)
+
+
 # make_record = Primitive('make_record')
 
 
@@ -567,8 +584,22 @@ async def _inf_array_len(track, xs: AbstractArray):
     })
 
 
-# list_map = Primitive('list_map')
-# list_reduce = Primitive('list_reduce')
+@standard_prim(P.list_map)
+async def _inf_list_map(track, fn, *lists):
+    if len(lists) < 1:
+        raise MyiaTypeError('list_map requires at least one list')
+    await track.chkimm(AbstractList, *lists)
+    subargs = [l.element for l in lists]
+    result = await track.execute(fn, *subargs)
+    return AbstractList(result)
+
+
+@standard_prim(P.list_reduce)
+async def _inf_list_reduce(track, fn, lst: AbstractList, dflt):
+    result1 = await track.execute(fn, lst.element, lst.element)
+    result2 = await track.execute(fn, dflt, lst.element)
+    result = track.abstract_merge(result1, result2)
+    return result
 
 
 ##########
@@ -657,7 +688,6 @@ async def _inf_array_reduce(track,
 
     shp_i = await reify(a.values['shape'])
     shp_v = shp.build('value', default=ANYTHING)
-    print(shp)
     if shp_v == ANYTHING:
         raise AssertionError(
             'We currently require knowing the shape for reduce.'
@@ -714,7 +744,6 @@ async def _inf_transpose(track, a: AbstractArray, permutation: _shape_type):
         shp = (ANYTHING,) * len(permutation.elements)
     else:
         a_shp = await reify(a.values['shape'])
-        print(a_shp, perm)
         if list(sorted(perm)) != list(range(len(a_shp))):
             raise MyiaShapeError(
                 'The second argument of transpose must be a permutation of'
@@ -766,6 +795,18 @@ async def _inf_switch(track, cond: Bool, tb, fb):
 
 
 # scalar_cast = Primitive('scalar_cast')
+
+
+@standard_prim(P.scalar_cast)
+async def _inf_scalar_cast(track,
+                           scalar: Number,
+                           typ: AbstractType):
+    t = typ.values['value']
+    if t is ANYTHING:
+        raise MyiaTypeError('Must have concrete type for scalar_cast')
+    track.chk(Number, t)
+    values = {**scalar.values, 'type': t}
+    return AbstractScalar(values)
 
 
 @standard_prim(P.identity, P.return_)

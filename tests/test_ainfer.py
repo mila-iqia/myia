@@ -500,26 +500,26 @@ def test_tup(x, y):
     return (x, y)
 
 
-# @infer(type=[(i64, i64, L[i64]),
-#              (i64, f64, InferenceError)],
-#        shape=[({'type': i64, 'shape': NOSHAPE},
-#                {'type': i64, 'shape': NOSHAPE},
-#                ListShape(NOSHAPE)),
-#               ({'type': L[A[i64]], 'shape': ListShape((8, 3))},
-#                {'type': L[A[i64]], 'shape': ListShape((4, 3))},
-#                ListShape(ListShape((ANYTHING, 3)))),
-#               (ai64_of(4, 7), ai64_of(4, 7), ListShape((4, 7))),
-#               (ai64_of(4, 7), ai64_of(9, 7), ListShape((ANYTHING, 7)))])
-# def test_list(x, y):
-#     return [x, y]
+@infer(type=[(i64, i64, L[i64]),
+             (i64, f64, InferenceError)],
+       shape=[({'type': i64, 'shape': NOSHAPE},
+               {'type': i64, 'shape': NOSHAPE},
+               ListShape(NOSHAPE)),
+              ({'type': L[A[i64]], 'shape': ListShape((8, 3))},
+               {'type': L[A[i64]], 'shape': ListShape((4, 3))},
+               ListShape(ListShape((ANYTHING, 3)))),
+              (ai64_of(4, 7), ai64_of(4, 7), ListShape((4, 7))),
+              (ai64_of(4, 7), ai64_of(9, 7), ListShape((ANYTHING, 7)))])
+def test_list(x, y):
+    return [x, y]
 
 
-# @infer(type=[(i64, i64, L[i64]),
-#              (f64, f64, L[f64]),
-#              (lf64, lf64, InferenceError),
-#              (i64, f64, InferenceError)])
-# def test_list_and_scalar(x, y):
-#     return [x, y, 3]
+@infer(type=[(i64, i64, L[i64]),
+             (f64, f64, L[f64]),
+             (lf64, lf64, InferenceError),
+             (i64, f64, InferenceError)])
+def test_list_and_scalar(x, y):
+    return [x, y, 3]
 
 
 # @infer(type=[(L[Problem[VOID]],)],
@@ -1037,32 +1037,32 @@ def test_cover_limitedvalue_eq(x, y):
     return square(x) + square(y)
 
 
-# @infer(
-#     type=[
-#         (li64, lf64, T[li64, lf64]),
-#         (li64, f64, InferenceError),
-#     ]
-# )
-# def test_list_map_prim(xs, ys):
+@infer(
+    type=[
+        (li64, lf64, T[li64, lf64]),
+        (li64, f64, InferenceError),
+    ]
+)
+def test_list_map_prim(xs, ys):
 
-#     def square(x):
-#         return x * x
+    def square(x):
+        return x * x
 
-#     return list_map_prim(square, xs), list_map_prim(square, ys)
+    return list_map_prim(square, xs), list_map_prim(square, ys)
 
 
-# @infer(
-#     type=[
-#         (li64, li64, li64),
-#         (li64, lf64, InferenceError),
-#     ]
-# )
-# def test_list_map_prim2(xs, ys):
+@infer(
+    type=[
+        (li64, li64, li64),
+        (li64, lf64, InferenceError),
+    ]
+)
+def test_list_map_prim2(xs, ys):
 
-#     def mulm(x, y):
-#         return x * -y
+    def mulm(x, y):
+        return x * -y
 
-#     return list_map_prim(mulm, xs, ys)
+    return list_map_prim(mulm, xs, ys)
 
 
 # @infer(
@@ -1199,56 +1199,56 @@ class data:
     a25 = np.ones((2, 5))
 
 
-# @infer(
-#     type=[
-#         (i64, i64, T[i64, i64]),
-#         (i64, f64, InferenceError),
-#     ],
-#     value=[
-#         (2, 3, (5, 36))
-#     ]
-# )
-# def test_getattr(x, y):
-#     a = helpers.add(x, y)
-#     b = helpers.mul(x, y)
-#     c = helpers.square(b)
-#     return a, c
+@infer(
+    type=[
+        (i64, i64, T[i64, i64]),
+        (i64, f64, InferenceError),
+    ],
+    value=[
+        (2, 3, (5, 36))
+    ]
+)
+def test_getattr(x, y):
+    a = helpers.add(x, y)
+    b = helpers.mul(x, y)
+    c = helpers.square(b)
+    return a, c
 
 
-# @infer(
-#     type=[
-#         (i64, i64, T[i64, i64]),
-#         (i64, f64, T[i64, f64]),
-#     ]
-# )
-# def test_getattr_multitype(x, y):
-#     a = helpers.add(x, x)
-#     b = helpers.add(y, y)
-#     return a, b
+@infer(
+    type=[
+        (i64, i64, T[i64, i64]),
+        (i64, f64, T[i64, f64]),
+    ]
+)
+def test_getattr_multitype(x, y):
+    a = helpers.add(x, x)
+    b = helpers.add(y, y)
+    return a, b
 
 
-# @infer(
-#     shape=[
-#         ((2, 5),),
-#     ]
-# )
-# def test_getattr_shape():
-#     return data.a25
+@infer(
+    shape=[
+        ((2, 5),),
+    ]
+)
+def test_getattr_shape():
+    return data.a25
 
 
-# _getattr = getattr
+_getattr = getattr
 
 
-# @infer(
-#     type=[
-#         ({'value': 'add'}, i64, i64),
-#         ({'value': 'bad'}, i64, InferenceError),
-#         ({'value': 1234}, i64, InferenceError),
-#         (External[str], i64, InferenceError),
-#     ]
-# )
-# def test_getattr_flex(name, x):
-#     return _getattr(helpers, name)(x, x)
+@infer(
+    type=[
+        ({'value': 'add'}, i64, i64),
+        ({'value': 'bad'}, i64, InferenceError),
+        ({'value': 1234}, i64, InferenceError),
+        (External[str], i64, InferenceError),
+    ]
+)
+def test_getattr_flex(name, x):
+    return _getattr(helpers, name)(x, x)
 
 
 @infer(type=[
@@ -1629,19 +1629,19 @@ def test_switch(c, x, y):
 #     return h[0](x)
 
 
-# @infer(
-#     type=[
-#         (i64, {'value': i64}, i64),
-#         (i64, {'value': i16}, i16),
-#         (f64, {'value': i16}, i16),
-#         (f16, {'value': f32}, f32),
-#         (f16, TypeType, InferenceError),
-#         (f16, {'value': B}, InferenceError),
-#         (B, {'value': f32}, InferenceError),
-#     ]
-# )
-# def test_scalar_cast(x, t):
-#     return scalar_cast(x, t)
+@infer(
+    type=[
+        (i64, {'value': i64}, i64),
+        (i64, {'value': i16}, i16),
+        (f64, {'value': i16}, i16),
+        (f16, {'value': f32}, f32),
+        (f16, TypeType, InferenceError),
+        (f16, {'value': B}, InferenceError),
+        (B, {'value': f32}, InferenceError),
+    ]
+)
+def test_scalar_cast(x, t):
+    return scalar_cast(x, t)
 
 
 @infer(type=[(i64, ai64),
