@@ -5,6 +5,8 @@ The steps are listed in roughly the same order they should be called.
 
 
 import numpy as np
+from time import perf_counter
+from itertools import count
 
 from .. import dtype
 from ..cconv import closure_convert
@@ -46,6 +48,7 @@ class Optimizer(PipelineStep):
         super().__init__(pipeline_init)
         self.run_only_once = run_only_once
         self.phases = []
+        self.names = []
         for name, spec in phases.items():
             if spec == 'renormalize':
                 pass
@@ -53,14 +56,27 @@ class Optimizer(PipelineStep):
                 spec = PatternEquilibriumOptimizer(*spec, optimizer=self)
             else:
                 spec = spec(optimizer=self)
+            self.names.append(name)
             self.phases.append(spec)
 
-    def step(self, graph, argspec=None, outspec=None):
+    def step(self, graph, argspec=None, outspec=None, profile=False):
         """Optimize the graph using the given patterns."""
+        if profile:
+            profd = dict()
+            gstart = perf_counter()
+            counter = count(1)
         changes = True
         while changes:
+            if profile:
+                lstart = perf_counter()
+                loop = str(next(counter))
+                lp = dict()
+                nn = iter(self.names)
             changes = False
             for opt in self.phases:
+                if profile:
+                    subp = dict()
+                    start = perf_counter()
                 if opt == 'renormalize':
                     assert argspec is not None
                     graph = self.resources.inferrer.renormalize(
@@ -68,10 +84,28 @@ class Optimizer(PipelineStep):
                     )
                 elif opt(graph):
                     changes = True
+                if profile:
+                    end = perf_counter()
+                    lp[next(nn)] = end - start
+            if profile:
+                lend = perf_counter()
+                lp['__total__'] = lend - lstart
+                profd[f"Cycle {loop}"] = lp
             if self.run_only_once:
                 break
+        if profile:
+            start = perf_counter()
         self.resources.manager.keep_roots(graph)
-        return {'graph': graph}
+        if profile:
+            end = perf_counter()
+            profd['keep_roots'] = end - start
+        res = {'graph': graph}
+        if profile:
+            gend = perf_counter()
+            profd['__count__'] = next(counter) - 1
+            profd['__total__'] = gend - gstart
+            res['profile'] = profd
+        return res
 
 
 #########
