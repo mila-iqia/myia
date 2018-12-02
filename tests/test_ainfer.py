@@ -1096,13 +1096,13 @@ def test_hastype(x, y):
     return hastype(x, y)
 
 
-# @infer(
-#     type=[(i64, TypeType)],
-#     value=[(t(i64), i64),
-#            (t(f64), f64)]
-# )
-# def test_typeof(x):
-#     return typeof(x)
+@infer(
+    type=[(i64, TypeType)],
+    value=[(t(i64), i64),
+           (t(f64), f64)]
+)
+def test_typeof(x):
+    return typeof(x)
 
 
 Tf4 = T[f64, f64, f64, f64]
@@ -1122,14 +1122,14 @@ Tf4 = T[f64, f64, f64, f64]
         (T[i64, li64], i64),
         (Point_t, i64),
         (Point3D_t, i64),
-        # (Thing_ftup, T[f64, f64]),  # TODO
+        (Thing_ftup, T[f64, f64]),
         (Thing_f, i64),
     ],
     value=[
         (5, 5),
         (6.0, 6),
         ((5, 7, (3.2, 1.8)), 16),
-        # (Point(5, 7), 35),  # TODO
+        (Point(5, 7), 35),
         (Point3D(5, 7, 9), 0),
     ]
 )
@@ -2051,28 +2051,28 @@ def test_hyper_add(x, y):
     return hyper_add(x, y)
 
 
-# @infer(
-#     type=[
-#         (i64, i64),
-#         (f64, f64),
-#         (lf64, lf64),
-#         (T[i64, f64], T[i64, f64]),
-#         (Point_t, Point_t),
-#         (ai64_of(2, 5), ai64),
-#         (af32_of(2, 5), af32),
-#     ],
-#     value=[
-#         (1, 0),
-#         ((2, 3.0), (0, 0.0)),
-#         (Point(1, 2), Point(0, 0)),
-#     ],
-#     shape=[
-#         (ai64_of(2, 5), (2, 5)),
-#         (af32_of(2, 5), (2, 5)),
-#     ]
-# )
-# def test_zeros_like(x):
-#     return zeros_like(x)
+@infer(
+    type=[
+        (i64, i64),
+        (f64, f64),
+        (lf64, lf64),
+        (T[i64, f64], T[i64, f64]),
+        (Point_t, Point_t),
+        (ai64_of(2, 5), ai64),
+        (af32_of(2, 5), af32),
+    ],
+    value=[
+        (1, 0),
+        ((2, 3.0), (0, 0.0)),
+        (Point(1, 2), Point(0, 0)),
+    ],
+    shape=[
+        (ai64_of(2, 5), (2, 5)),
+        (af32_of(2, 5), (2, 5)),
+    ]
+)
+def test_zeros_like(x):
+    return zeros_like(x)
 
 
 # @infer(type=[(i64, Env)])

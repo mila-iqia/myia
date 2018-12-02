@@ -315,6 +315,12 @@ async def issubtype(x, model):
     elif dtype.ismyiatype(model, dtype.List):
         return isinstance(x, AbstractList) \
             and await issubtype(x.element, model.elements)
+    elif dtype.ismyiatype(model, dtype.Class):
+        return isinstance(x, AbstractClass) \
+            and x.tag == model.tag \
+            and all([await issubtype(x.attributes[name], attr_t)
+                     for name, attr_t in model.attributes.items()])
+
     elif dtype.ismyiatype(model, dtype.Number):
         if not isinstance(x, AbstractScalar):
             return False
@@ -472,8 +478,14 @@ def _inf_bool_eq(x: Bool, y: Bool) -> Bool:
 ######################
 
 
-# typeof = Primitive('typeof')
-# hastype = Primitive('hastype')
+@standard_prim(P.typeof)
+async def _inf_typeof(track, value):
+    t = value.build('type')
+    return AbstractType({
+        'value': t,
+        'type': dtype.TypeType,
+        'shape': dshape.NOSHAPE
+    })
 
 
 @standard_prim(P.hastype)
