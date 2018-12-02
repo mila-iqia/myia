@@ -1065,35 +1065,35 @@ def test_list_map_prim2(xs, ys):
     return list_map_prim(mulm, xs, ys)
 
 
-# @infer(
-#     type=[(i64, B)],
-#     value=[(t(i64), True),
-#            (t(f64), False)]
-# )
-# def test_hastype_simple(x):
-#     return hastype(x, i64)
+@infer(
+    type=[(i64, B)],
+    value=[(t(i64), True),
+           (t(f64), False)]
+)
+def test_hastype_simple(x):
+    return hastype(x, i64)
 
 
-# @infer(
-#     type=[
-#         (i64, i64, InferenceError),
-#         (i64, {'type': TypeType, 'value': Int[64]}, B),
-#     ],
-#     value=[
-#         ({'type': i64, 'value': ANYTHING},
-#          {'type': TypeType, 'value': ANYTHING}, InferenceError),
-#         ({'type': i64, 'value': ANYTHING},
-#          {'type': TypeType, 'value': i64}, {'value': True}),
-#         ({'type': f64, 'value': ANYTHING},
-#          {'type': TypeType, 'value': i64}, {'value': False}),
-#         ({'type': T[i64, i64], 'value': ANYTHING},
-#          {'type': TypeType, 'value': T[i64, i64]}, {'value': True}),
-#         ({'type': T[i64, i64], 'value': ANYTHING},
-#          {'type': TypeType, 'value': T[Number, Number]}, {'value': True}),
-#     ]
-# )
-# def test_hastype(x, y):
-#     return hastype(x, y)
+@infer(
+    type=[
+        (i64, i64, InferenceError),
+        (i64, {'type': TypeType, 'value': Int[64]}, B),
+    ],
+    value=[
+        ({'type': i64, 'value': ANYTHING},
+         {'type': TypeType, 'value': ANYTHING}, InferenceError),
+        ({'type': i64, 'value': ANYTHING},
+         {'type': TypeType, 'value': i64}, {'value': True}),
+        ({'type': f64, 'value': ANYTHING},
+         {'type': TypeType, 'value': i64}, {'value': False}),
+        ({'type': T[i64, i64], 'value': ANYTHING},
+         {'type': TypeType, 'value': T[i64, i64]}, {'value': True}),
+        ({'type': T[i64, i64], 'value': ANYTHING},
+         {'type': TypeType, 'value': T[Number, Number]}, {'value': True}),
+    ]
+)
+def test_hastype(x, y):
+    return hastype(x, y)
 
 
 # @infer(
@@ -1830,93 +1830,93 @@ def test_broadcast_shape(xs, ys):
 # ###########################
 
 
-# @infer_std(
-#     type=[
-#         (i64, i64, i64),
-#         (ai64_of(7, 9), ai64_of(7, 9), ai64),
-#         (ai64_of(7, 9), i64, ai64),
-#         (i64, ai64_of(7, 9), ai64),
-#         (i64, f64, InferenceError),
-#         ({'type': i64, 'value': 3}, ai64_of(7, 9), ai64)
-#     ],
-#     shape=[
-#         (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
-#         (ai64_of(2, 5), ai64_of(2, 1), (2, 5)),
-#         (ai64_of(1, 5), ai64_of(2, 1), (2, 5)),
-#         (ai64_of(5,), ai64_of(2, 1), (2, 5)),
-#         (ai64_of(2, 3, 4), ai64_of(3, 4), (2, 3, 4)),
-#         (ai64_of(5,), ai64_of(2,), InferenceError),
-#         ({'type': i64}, ai64_of(2, 5), (2, 5)),
-#         (ai64_of(2, 5), {'type': i64}, (2, 5)),
-#     ]
-# )
-# def test_add_std(x, y):
-#     return x + y
+@infer_std(
+    type=[
+        (i64, i64, i64),
+        (ai64_of(7, 9), ai64_of(7, 9), ai64),
+        (ai64_of(7, 9), i64, ai64),
+        (i64, ai64_of(7, 9), ai64),
+        (i64, f64, InferenceError),
+        ({'type': i64, 'value': 3}, ai64_of(7, 9), ai64)
+    ],
+    shape=[
+        (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
+        (ai64_of(2, 5), ai64_of(2, 1), (2, 5)),
+        (ai64_of(1, 5), ai64_of(2, 1), (2, 5)),
+        (ai64_of(5,), ai64_of(2, 1), (2, 5)),
+        (ai64_of(2, 3, 4), ai64_of(3, 4), (2, 3, 4)),
+        (ai64_of(5,), ai64_of(2,), InferenceError),
+        ({'type': i64}, ai64_of(2, 5), (2, 5)),
+        (ai64_of(2, 5), {'type': i64}, (2, 5)),
+    ]
+)
+def test_add_std(x, y):
+    return x + y
 
 
-# @infer_std(type=[(i64, i64, i64),
-#                  (ai64_of(7, 9), i64, InferenceError)])
-# def test_max_std(x, y):
-#     if x > y:
-#         return x
-#     else:
-#         return y
+@infer_std(type=[(i64, i64, i64),
+                 (ai64_of(7, 9), i64, InferenceError)])
+def test_max_std(x, y):
+    if x > y:
+        return x
+    else:
+        return y
 
 
-# @infer_std(
-#     type=[
-#         (f64, f64),
-#         (i64, i64),
-#         (af32_of(2, 5), af32),
-#     ]
-# )
-# def test_add1_stdx(x):
-#     return 1 + x
+@infer_std(
+    type=[
+        (f64, f64),
+        (i64, i64),
+        (af32_of(2, 5), af32),
+    ]
+)
+def test_add1_stdx(x):
+    return 1 + x
 
 
-# def _add(x, y):
-#     return x + y
+def _add(x, y):
+    return x + y
 
 
-# @infer_std(
-#     type=[
-#         (f64, f64),
-#         (i64, i64),
-#     ]
-# )
-# def test_add1_std_indirect(x):
-#     return _add(1, x)
+@infer_std(
+    type=[
+        (f64, f64),
+        (i64, i64),
+    ]
+)
+def test_add1_std_indirect(x):
+    return _add(1, x)
 
 
-# def _interference_helper(x):
-#     if hastype(x, T):
-#         return x[0]
-#     else:
-#         return x
+def _interference_helper(x):
+    if hastype(x, T):
+        return x[0]
+    else:
+        return x
 
 
-# @infer(
-#     type=[
-#         (i64, i64),
-#         (f64, f64),
-#     ]
-# )
-# def test_add1_hastype_interference(x):
-#     return x + _interference_helper(1)
+@infer(
+    type=[
+        (i64, i64),
+        (f64, f64),
+    ]
+)
+def test_add1_hastype_interference(x):
+    return x + _interference_helper(1)
 
 
-# @infer(
-#     type=[
-#         (f16, f32, f64, f32),
-#     ]
-# )
-# def test_hastype_interference(x, y, z):
-#     if hastype(1, i32):
-#         return x
-#     elif hastype(1, i64):
-#         return y
-#     else:
-#         return z
+@infer(
+    type=[
+        (f16, f32, f64, f32),
+    ]
+)
+def test_hastype_interference(x, y, z):
+    if hastype(1, i32):
+        return x
+    elif hastype(1, i64):
+        return y
+    else:
+        return z
 
 
 @infer(

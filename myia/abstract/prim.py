@@ -31,7 +31,7 @@ from .. import dtype, dshape
 from ..dtype import Number, Bool
 from ..infer import ANYTHING, InferenceVar, Context, MyiaTypeError, \
     InferenceError, reify, MyiaShapeError, VOID
-from ..infer.core import Pending
+from ..infer.core import Pending, find_coherent_result_2
 from ..prim import ops as P
 from ..utils import Namespace
 
@@ -184,8 +184,8 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
             'The value of the attribute could not be inferred.'
         )
 
-    if isinstance(data_t, InferenceVar):
-        case, *args = await find_coherent_result(
+    if isinstance(data_t, Pending):
+        case, *args = await find_coherent_result_2(
             data_t,
             lambda t: _resolve_case(resources, t, item_v, chk)
         )
@@ -288,6 +288,41 @@ def _shape_type(track, shp):
 def prod(iterable):
     """Return the product of the elements of the iterator."""
     return reduce(operator.mul, iterable, 1)
+
+
+async def issubtype(x, model):
+    if model is dtype.Tuple:
+        return isinstance(x, AbstractTuple)
+    elif model is dtype.Array:
+        return isinstance(x, AbstractArray)
+    elif model is dtype.List:
+        return isinstance(x, AbstractList)
+    elif model is dtype.Class:
+        return isinstance(x, AbstractClass)
+
+    elif dtype.ismyiatype(model, dtype.Tuple):
+        return isinstance(x, AbstractTuple) \
+            and len(x.elements) == len(model.elements) \
+            and all([await issubtype(xe, me)
+                     for xe, me in zip(x.elements, model.elements)])
+    elif dtype.ismyiatype(model, dtype.Array):
+        return isinstance(x, AbstractArray) \
+            and await issubtype(x.element, model.elements)
+    elif dtype.ismyiatype(model, dtype.List):
+        return isinstance(x, AbstractList) \
+            and await issubtype(x.element, model.elements)
+    elif dtype.ismyiatype(model, dtype.Number):
+        if not isinstance(x, AbstractScalar):
+            return False
+        t = x.values['type']
+        if isinstance(t, Pending):
+            async def chk(t):
+                return dtype.ismyiatype(t, model)
+            return await find_coherent_result_2(t, chk)
+        else:
+            return dtype.ismyiatype(t, model)
+    else:
+        return False
 
 
 ##############
@@ -410,7 +445,7 @@ def _inf_scalar_ge(x: Number, y: Number) -> Bool:
 
 @uniform_prim(P.bool_not)
 def _inf_bool_not(x: Bool) -> Bool:
-    return x >= y
+    return not x
 
 
 @uniform_prim(P.bool_and)
@@ -435,6 +470,20 @@ def _inf_bool_eq(x: Bool, y: Bool) -> Bool:
 
 # typeof = Primitive('typeof')
 # hastype = Primitive('hastype')
+
+
+@standard_prim(P.hastype)
+async def _inf_hastype(track, value, model: dtype.TypeType):
+    model_t = model.values['value']
+    if model_t is ANYTHING:
+        raise MyiaTypeError('hastype must be resolvable statically')
+    else:
+        v = await issubtype(value, model_t)
+    return AbstractScalar({
+        'value': v,
+        'type': dtype.Bool,
+        'shape': dshape.NOSHAPE
+    })
 
 
 ###################
@@ -608,7 +657,7 @@ async def _inf_list_reduce(track, fn, lst: AbstractList, dflt):
 
 
 @standard_prim(P.scalar_to_array)
-async def _inf_scalar_to_array(track, a: Number):
+async def _inf_scalar_to_array(track, a: AbstractScalar):
     return AbstractArray(a, {'shape': ()})
 
 
@@ -624,12 +673,30 @@ async def _inf_array_to_scalar(track, a: AbstractArray):
 async def _inf_broadcast_shape(track, xs: _shape_type, ys: _shape_type):
     shp_xs_n = len(xs.elements)
     shp_ys_n = len(ys.elements)
-    uint = AbstractScalar({
-        'value': ANYTHING,
-        'type': dtype.UInt[64],
-        'shape': dshape.NOSHAPE
-    })
-    return AbstractTuple([uint for i in range(max(shp_xs_n, shp_ys_n))])
+
+    from ..prim.py_implementations import broadcast_shape
+    shp_x = xs.build('value', default=ANYTHING)
+    shp_y = ys.build('value', default=ANYTHING)
+    elems = []
+    if shp_x is ANYTHING or shp_y is ANYTHING:
+        for i in range(max(shp_xs_n, shp_ys_n)):
+            elems.append(AbstractScalar({
+                'value': ANYTHING,
+                'type': dtype.UInt[64],
+                'shape': dshape.NOSHAPE
+            }))
+    else:
+        try:
+            res = broadcast_shape(shp_x, shp_y)
+        except ValueError:
+            raise MyiaTypeError('Cannot broadcast')
+        for n in res:
+            elems.append(AbstractScalar({
+                'value': n,
+                'type': dtype.UInt[64],
+                'shape': dshape.NOSHAPE
+            }))
+    return AbstractTuple(elems)
 
 
 # invert_permutation = Primitive('invert_permutation')
@@ -786,7 +853,7 @@ async def _inf_switch(track, cond: Bool, tb, fb):
     elif v is ANYTHING:
         return track.abstract_merge(tb, fb)
     else:
-        raise AssertionError("Invalid condition value for switch")
+        raise AssertionError(f"Invalid condition value for switch: {v}")
 
 
 #################

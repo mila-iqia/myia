@@ -465,6 +465,17 @@ async def find_coherent_result(infv, fn):
     return await fn(x)
 
 
+async def find_coherent_result_2(v, fn):
+    if isinstance(v, PendingFromList):
+        results = set()
+        for option in v.possibilities:
+            results.add(await fn(option))
+        if len(results) == 1:
+            return results.pop()
+    x = await v
+    return await fn(x)
+
+
 @overload(bootstrap=True)
 async def reify_shallow(self, x: ValueWrapper):
     """Build a concrete value from v.

@@ -87,7 +87,7 @@ class AbstractValue(AbstractBase):
         if v is ANYTHING:
             raise ValueError('ANYTHING')
         elif v is not ABSENT:
-            if isinstance(v, Pending):
+            if isinstance(v, Pending) and v.done():
                 return v.result()
             else:
                 return v
