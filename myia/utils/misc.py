@@ -591,7 +591,11 @@ class SymbolicKeyInstance:
                 and self.inferred == other.inferred)
 
     def __hash__(self):
-        return hash((self.node, tuple(sorted(self.inferred.items()))))
+        if isinstance(self.inferred, dict):
+            infk = tuple(sorted(self.inferred.items()))
+        else:
+            infk = self.inferred
+        return hash((self.node, infk))
 
 
 @smap.variant

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from functools import reduce
 
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
-    List, Class, EnvType, ismyiatype
+    List, Class, EnvType, ismyiatype, Function
 from .hypermap import HyperMap
 from .infer import Inferrer, GraphInferrer, MyiaTypeError
 from .info import About
@@ -607,6 +607,12 @@ _leaf_zeros_like = MultitypeGraph('zeros_like')
 @_leaf_zeros_like.register(Inferrer)
 @core
 def _inferrer_zero(_):
+    return newenv
+
+
+@_leaf_zeros_like.register(Function)
+@core
+def _function_zero(_):
     return newenv
 
 

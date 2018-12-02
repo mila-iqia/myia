@@ -19,6 +19,7 @@ from .base import (
     AbstractClass,
     PartialApplication,
     Possibilities,
+    sensitivity_transform,
 )
 
 from .inf import (
@@ -33,7 +34,7 @@ from ..infer import ANYTHING, InferenceVar, Context, MyiaTypeError, \
     InferenceError, reify, MyiaShapeError, VOID
 from ..infer.core import Pending, find_coherent_result_2
 from ..prim import ops as P
-from ..utils import Namespace
+from ..utils import Namespace, SymbolicKeyInstance
 
 
 abstract_inferrer_constructors = {}
@@ -897,9 +898,6 @@ async def _inf_switch(track, cond: Bool, tb, fb):
 #################
 
 
-# scalar_cast = Primitive('scalar_cast')
-
-
 @standard_prim(P.scalar_cast)
 async def _inf_scalar_cast(track,
                            scalar: Number,
@@ -957,7 +955,53 @@ async def _inf_partial(track, fn, *args):
 
 # J = Primitive('J')
 # Jinv = Primitive('Jinv')
-# embed = Primitive('embed')
-# env_setitem = Primitive('env_setitem')
-# env_getitem = Primitive('env_getitem')
-# env_add = Primitive('env_add')
+
+
+class _EmbedXInferrer(XInferrer):
+    async def __call__(self, track, *argrefs):
+        if len(argrefs) != 1:
+            raise MyiaTypeError('Wrong number of arguments')
+        xref, = argrefs
+        x = await xref['abstract']
+        key = SymbolicKeyInstance(xref.node, sensitivity_transform(x))
+        return AbstractScalar({
+            'value': key,
+            'type': dtype.SymbolicKeyType,
+            'shape': dshape.NOSHAPE,
+        })
+
+
+abstract_inferrer_constructors[P.embed] = _EmbedXInferrer.partial()
+
+
+@standard_prim(P.env_getitem)
+async def _inf_env_getitem(track,
+                           env: dtype.EnvType,
+                           key: dtype.SymbolicKeyType,
+                           dflt):
+    expected = key.values['value'].inferred
+    track.abstract_merge(expected, dflt)
+    return expected
+
+
+@standard_prim(P.env_setitem)
+async def _inf_env_setitem(track,
+                           env: dtype.EnvType,
+                           key: dtype.SymbolicKeyType,
+                           value):
+    expected = key.values['value'].inferred
+    track.abstract_merge(expected, value)
+    return AbstractScalar({
+        'value': ANYTHING,
+        'type': dtype.EnvType,
+        'shape': dshape.NOSHAPE,
+    })
+
+
+@standard_prim(P.env_add)
+async def _inf_env_add(track, env1, env2):
+    return AbstractScalar({
+        'value': ANYTHING,
+        'type': dtype.EnvType,
+        'shape': dshape.NOSHAPE,
+    })

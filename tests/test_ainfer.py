@@ -1981,7 +1981,7 @@ hyper_map_nobroadcast = HyperMap(broadcast=False)
         (i64, i64, i64),
         (f64, f64, f64),
         (lf64, lf64, lf64),
-        # (L[lf64], L[lf64], L[lf64]), TODO
+        # (L[lf64], L[lf64], L[lf64]),  # TODO
         (lf64, f64, InferenceError),
         (L[f64], L[lf64], InferenceError),
         (T[i64, f64], T[i64, f64], T[i64, f64]),
@@ -2034,7 +2034,7 @@ def test_hyper_map_nobroadcast(x, y):
         (T[i64, f64], T[i64, f64], T[i64, f64]),
         (Point_t, Point_t, Point_t),
         (ai64_of(2, 5), ai64_of(2, 5), ai64),
-        # (Env, Env, Env), TODO
+        (Env, Env, Env),
     ],
     value=[
         (1, 2, 3),
@@ -2075,11 +2075,11 @@ def test_zeros_like(x):
     return zeros_like(x)
 
 
-# @infer(type=[(i64, Env)])
-# def test_zeros_like_fn(x):
-#     def f(y):
-#         return x + y
-#     return zeros_like(f)
+@infer(type=[(i64, Env)])
+def test_zeros_like_fn(x):
+    def f(y):
+        return x + y
+    return zeros_like(f)
 
 
 @infer(
@@ -2119,17 +2119,26 @@ def test_list_map0():
     return list_map(f)
 
 
-# @infer(
-#     type=[
-#         (i32, i32, i32, i32),
-#         (i32, f32, i32, InferenceError),
-#         (i32, i32, f32, InferenceError),
-#     ]
-# )
-# def test_env(x, y, z):
-#     e = newenv
-#     e = env_setitem(e, embed(x), y)
-#     return env_getitem(e, embed(x), z)
+@infer(
+    type=[
+        (i32, i32, i32, i32),
+        (i32, f32, i32, InferenceError),
+        (i32, i32, f32, InferenceError),
+    ]
+)
+def test_env(x, y, z):
+    e = newenv
+    e = env_setitem(e, embed(x), y)
+    return env_getitem(e, embed(x), z)
+
+
+@infer(type=[(Env,),])
+def test_env_onfn():
+    def f(x):
+        return x * x
+    e = newenv
+    e = env_setitem(e, embed(f), newenv)
+    return env_getitem(e, embed(f), newenv)
 
 
 # @infer(

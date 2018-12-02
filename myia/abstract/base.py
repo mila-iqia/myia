@@ -351,6 +351,11 @@ def from_vref(self, v, t: dtype.Class, s):
 
 
 @overload
+def from_vref(self, v, t: dtype.EnvType, s):
+    return AbstractScalar({'value': v, 'type': t, 'shape': s})
+
+
+@overload
 def from_vref(self, v, t: dtype.TypeType, s):
     return AbstractType({'value': v, 'type': t, 'shape': s})
 
@@ -361,43 +366,44 @@ def from_vref(self, v, t: dtype.TypeMeta, s):
 
 
 ###########
-# Broaden #
+# Cloning #
 ###########
 
 
-def _broaden_values(d):
+@overload(bootstrap=True)
+def abstract_clone(self, x: AbstractScalar):
+    return AbstractScalar(self(x.values))
+
+
+@overload
+def abstract_clone(self, d: dict):
     return {
-        'value': broaden(d['value']),
+        'value': self(d['value']),
         'type': d['type'],
         'shape': d['shape'],
     }
 
 
-@overload(bootstrap=True)
-def broaden(self, x: AbstractScalar):
-    return AbstractScalar(_broaden_values(x.values))
-
-
 @overload
-def broaden(self, x: AbstractTuple):
+def abstract_clone(self, x: AbstractTuple):
     return AbstractTuple(
         [self(y) for y in x.elements],
-        _broaden_values(x.values)
+        self(x.values)
     )
 
 
 @overload
-def broaden(self, x: AbstractList):
+def abstract_clone(self, x: AbstractList):
     return AbstractList(self(x.element))
 
 
 @overload
-def broaden(self, x: AbstractArray):
+def abstract_clone(self, x: AbstractArray):
     return AbstractArray(self(x.element))
 
 
 @overload
-def broaden(self, x: AbstractClass):
+def abstract_clone(self, x: AbstractClass):
     return AbstractClass(
         x.tag,
         {k: self(v) for k, v in x.attributes.items()},
@@ -406,8 +412,36 @@ def broaden(self, x: AbstractClass):
 
 
 @overload
+def abstract_clone(self, x: object):
+    return x
+
+
+###########
+# Broaden #
+###########
+
+
+@abstract_clone.variant
 def broaden(self, x: object):
     return ANYTHING
+
+
+###############
+# Sensitivity #
+###############
+
+
+@abstract_clone.variant
+def sensitivity_transform(self, x: AbstractScalar):
+    v = x.values['value']
+    if isinstance(v, Possibilities):
+        return AbstractScalar({
+            'value': ANYTHING,
+            'type': dtype.EnvType,
+            'shape': dshape.NOSHAPE
+        })
+    else:
+        return AbstractScalar(self(x.values))
 
 
 #########
@@ -521,11 +555,20 @@ def _amerge(self, x1: (int, float, bool), x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: object, x2, loop, forced):
+def _amerge(self, x1: Named, x2, loop, forced):
     if x1 is ANYTHING:
         if x2 is ANYTHING:
             return x1
         return self[type(x2)](x1, x2, loop, forced)
+    if x1 != x2:
+        raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
+    return x1
+
+
+@overload
+def _amerge(self, x1: object, x2, loop, forced):
+    if x1 is ANYTHING or x2 is ANYTHING:
+        return x1
     if x1 != x2:
         raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
     return x1
