@@ -370,15 +370,15 @@ def test_prim_usub(x):
     return -x
 
 
-# @infer_std(type=[
-#     (i64, InferenceError),
-#     (f32, f32),
-#     (f64, f64),
-#     (af64_of(2, 5), af64),
-#     (B, InferenceError)
-# ])
-# def test_prim_log(x):
-#     return np.log(x)
+@infer_std(type=[
+    (i64, InferenceError),
+    (f32, f32),
+    (f64, f64),
+    (af64_of(2, 5), af64),
+    (B, InferenceError)
+])
+def test_prim_log(x):
+    return np.log(x)
 
 
 @infer(
@@ -433,20 +433,20 @@ def test_while(x, y):
     return rval
 
 
-# @infer(
-#     type=[
-#         (li64, i64, i64),
-#         (li64, f64, InferenceError),
-#         (i64, i64, InferenceError),
-#         (T[i64, i64, i64], i64, i64),
-#         (T[i64, f64, i64], i64, InferenceError),
-#     ]
-# )
-# def test_for(xs, y):
-#     rval = y
-#     for x in xs:
-#         rval = rval + x
-#     return rval
+@infer(
+    type=[
+        (li64, i64, i64),
+        (li64, f64, InferenceError),
+        (i64, i64, InferenceError),
+        (T[i64, i64, i64], i64, i64),
+        (T[i64, f64, i64], i64, InferenceError),
+    ]
+)
+def test_for(xs, y):
+    rval = y
+    for x in xs:
+        rval = rval + x
+    return rval
 
 
 @infer(type=(i64, f64, T[i64, f64]))
@@ -569,20 +569,20 @@ def test_array_len(xs):
     return P.array_len(xs)
 
 
-# @infer(type=[(T[i64, f64], T[f64]),
-#              (T[f64, i64], T[i64]),
-#              (T[()], InferenceError),
-#              (f64, InferenceError)],
-#        shape=[(t(T[f64, i64]), TupleShape((NOSHAPE,))),
-#               (t(T[i64, T[i64, f64]]),
-#                TupleShape((TupleShape((NOSHAPE, NOSHAPE)),)))])
-# def test_tail_tuple(tup):
-#     return tail(tup)
+@infer(type=[(T[i64, f64], T[f64]),
+             (T[f64, i64], T[i64]),
+             (T[()], InferenceError),
+             (f64, InferenceError)],
+       shape=[(t(T[f64, i64]), TupleShape((NOSHAPE,))),
+              (t(T[i64, T[i64, f64]]),
+               TupleShape((TupleShape((NOSHAPE, NOSHAPE)),)))])
+def test_tail_tuple(tup):
+    return tail(tup)
 
 
-# @infer(type=[(T[i64], T[f64], InferenceError)])
-# def test_tail_tuple_wrong(x, y):
-#     return tail(x, y)
+@infer(type=[(T[i64], T[f64], InferenceError)])
+def test_tail_tuple_wrong(x, y):
+    return tail(x, y)
 
 
 @infer(type=[(i64, f64, i64), (f64, i64, f64)],
@@ -1105,79 +1105,79 @@ def test_hastype(x, y):
 #     return typeof(x)
 
 
-# Tf4 = T[f64, f64, f64, f64]
+Tf4 = T[f64, f64, f64, f64]
 
 
-# @infer(
-#     type=[
-#         (i64, i64),
-#         (f64, i64),
-#         (ai64_of(2, 5), f64),
-#         (af64_of(2, 5), i64),
-#         (T[i64, i64], i64),
-#         (T[f64, f64, i64, i64], i64),
-#         (Tf4, Tf4),
-#         (T[i64, T[f64, i64]], i64),
-#         (li64, f64),
-#         (T[i64, li64], i64),
-#         (Point_t, i64),
-#         (Point3D_t, i64),
-#         (Thing_ftup, T[f64, f64]),
-#         (Thing_f, i64),
-#     ],
-#     value=[
-#         (5, 5),
-#         (6.0, 6),
-#         ((5, 7, (3.2, 1.8)), 16),
-#         (Point(5, 7), 35),
-#         (Point3D(5, 7, 9), 0),
-#     ]
-# )
-# def test_hastype_2(x):
+@infer(
+    type=[
+        (i64, i64),
+        (f64, i64),
+        (ai64_of(2, 5), f64),
+        (af64_of(2, 5), i64),
+        (T[i64, i64], i64),
+        (T[f64, f64, i64, i64], i64),
+        (Tf4, Tf4),
+        (T[i64, T[f64, i64]], i64),
+        (li64, f64),
+        (T[i64, li64], i64),
+        (Point_t, i64),
+        (Point3D_t, i64),
+        # (Thing_ftup, T[f64, f64]),  # TODO
+        (Thing_f, i64),
+    ],
+    value=[
+        (5, 5),
+        (6.0, 6),
+        ((5, 7, (3.2, 1.8)), 16),
+        # (Point(5, 7), 35),  # TODO
+        (Point3D(5, 7, 9), 0),
+    ]
+)
+def test_hastype_2(x):
 
-#     def f(x):
-#         if hastype(x, i64):
-#             return x
-#         elif hastype(x, f64):
-#             return f(_to_i64(x))
-#         elif hastype(x, ai64):
-#             return 0.0
-#         elif hastype(x, Point_t):
-#             return f(x.x) * f(x.y)
-#         elif hastype(x, Nil):
-#             return 0
-#         elif hastype(x, Tf4):
-#             return x
-#         elif hastype(x, T):
-#             return f(x[0]) + f(tail(x))
-#         elif hastype(x, L):
-#             return 1.0
-#         elif hastype(x, Thing_ftup):
-#             return x.contents
-#         else:
-#             return 0
+    def f(x):
+        if hastype(x, i64):
+            return x
+        elif hastype(x, f64):
+            return f(_to_i64(x))
+        elif hastype(x, ai64):
+            return 0.0
+        elif hastype(x, Point_t):
+            return f(x.x) * f(x.y)
+        elif hastype(x, Nil):
+            return 0
+        elif hastype(x, Tf4):
+            return x
+        elif hastype(x, T):
+            return f(x[0]) + f(tail(x))
+        elif hastype(x, L):
+            return 1.0
+        elif hastype(x, Thing_ftup):
+            return x.contents
+        else:
+            return 0
 
-#     return f(x)
+    return f(x)
 
 
-# @infer_std(
-#     type=[
-#         (li64, i64, li64),
-#         (lf64, i64, InferenceError),
-#         ({'type': L[ai64], 'shape': ListShape((2, 3))}, i64, L[ai64]),
-#     ],
-#     shape=[(t(li64), t(i64), ListShape(NOSHAPE)),
-#            ({'type': L[ai64], 'shape': ListShape((2, 3))}, ai64_of(2, 3),
-#             ListShape((2, 3)))]
-# )
-# def test_map_2(xs, z):
+@infer_std(
+    type=[
+        (li64, i64, li64),
+        (lf64, i64, InferenceError),
+        ({'type': L[ai64], 'shape': ListShape((2, 3))}, i64, L[ai64]),
+    ],
+    shape=[(t(li64), t(i64), ListShape(NOSHAPE)),
+           ({'type': L[ai64], 'shape': ListShape((2, 3))}, ai64_of(2, 3),
+            ListShape((2, 3)))]
+)
+def test_map_2(xs, z):
 
-#     def adder(x):
-#         def f(y):
-#             return x + y
-#         return f
+    def adder(x):
+        def f(y):
+            return x + y
+        return f
 
-#     return list_map_prim(adder(z), xs)
+    return list_map_prim(adder(z), xs)
 
 
 def _square(x):
@@ -1613,20 +1613,20 @@ def test_switch(c, x, y):
     return switch(c, x, y)
 
 
-# @infer(
-#     type=[(B, i64, i64)]
-# )
-# def test_closure_in_data(c, x):
-#     def f(x):
-#         return x * x
+@infer(
+    type=[(B, i64, i64)]
+)
+def test_closure_in_data(c, x):
+    def f(x):
+        return x * x
 
-#     def g(x):
-#         return x + x
+    def g(x):
+        return x + x
 
-#     a = Thing((1, [f]))
-#     b = Thing((2, [g]))
-#     i, h = switch(c, a, b).contents
-#     return h[0](x)
+    a = Thing((1, [f]))
+    b = Thing((2, [g]))
+    i, h = switch(c, a, b).contents
+    return h[0](x)
 
 
 @infer(
@@ -1716,47 +1716,47 @@ def test_broadcast_shape(xs, ys):
 #     return a + a
 
 
-# @infer(
-#     value=[
-#         (2, 3, 4, 90)
-#     ],
-#     type=[
-#         (i64, i64, i64, i64),
-#         (f64, f64, f64, InferenceError),
-#     ]
-# )
-# def test_multitype(x, y, z):
-#     return mysum(x) * mysum(x, y) * mysum(x, y, z)
+@infer(
+    value=[
+        (2, 3, 4, 90)
+    ],
+    type=[
+        (i64, i64, i64, i64),
+        (f64, f64, f64, InferenceError),
+    ]
+)
+def test_multitype(x, y, z):
+    return mysum(x) * mysum(x, y) * mysum(x, y, z)
 
 
-# mystery = MultitypeGraph('mystery')
+mystery = MultitypeGraph('mystery')
 
 
-# @mystery.register(ai64, ai64)
-# def _mystery1(x, y):
-#     return x @ y
+@mystery.register(ai64, ai64)
+def _mystery1(x, y):
+    return x @ y
 
 
-# @mystery.register(af64, af64)
-# def _mystery2(x, y):
-#     return array_map(scalar_add, x, y)
+@mystery.register(af64, af64)
+def _mystery2(x, y):
+    return array_map(scalar_add, x, y)
 
 
-# @infer(
-#     type=[
-#         (ai64_of(7, 9), ai64_of(9, 2), ai64),
-#         (af64_of(7, 9), af64_of(7, 9), af64),
-#         (f64, f64, InferenceError),
-#     ],
-#     shape=[
-#         (ai64_of(2, 5), ai64_of(5, 3), (2, 3)),
-#         (af64_of(2, 5), af64_of(5, 3), InferenceError),
-#         (ai64_of(2, 5), ai64_of(2, 5), InferenceError),
-#         (af64_of(2, 5), af64_of(2, 5), (2, 5)),
-#     ]
-# )
-# def test_multitype_2(x, y):
-#     return mystery(x, y)
+@infer(
+    type=[
+        (ai64_of(7, 9), ai64_of(9, 2), ai64),
+        (af64_of(7, 9), af64_of(7, 9), af64),
+        (f64, f64, InferenceError),
+    ],
+    shape=[
+        (ai64_of(2, 5), ai64_of(5, 3), (2, 3)),
+        (af64_of(2, 5), af64_of(5, 3), InferenceError),
+        (ai64_of(2, 5), ai64_of(2, 5), InferenceError),
+        (af64_of(2, 5), af64_of(2, 5), (2, 5)),
+    ]
+)
+def test_multitype_2(x, y):
+    return mystery(x, y)
 
 
 # def test_forced_type():
@@ -1947,23 +1947,23 @@ def test_dataclass_method(pt):
     return pt.abs()
 
 
-# @infer(
-#     type=[
-#         (i64, i64, i64, i64, Point_t),
-#         (f64, f64, f64, f64, InferenceError),
-#     ],
-#     value=[
-#         (1, 2, 3, 4, Point(4, 6)),
-#     ],
-#     shape=[
-#         (t(i64), t(i64), t(i64), t(i64),
-#          ClassShape({'x': NOSHAPE, 'y': NOSHAPE}))
-#     ]
-# )
-# def test_dataclass_inst(x1, y1, x2, y2):
-#     pt1 = Point(x1, y1)
-#     pt2 = Point(x2, y2)
-#     return Point(pt1.x + pt2.x, pt1.y + pt2.y)
+@infer(
+    type=[
+        (i64, i64, i64, i64, Point_t),
+        (f64, f64, f64, f64, InferenceError),
+    ],
+    value=[
+        (1, 2, 3, 4, Point(4, 6)),
+    ],
+    shape=[
+        (t(i64), t(i64), t(i64), t(i64),
+         ClassShape({'x': NOSHAPE, 'y': NOSHAPE}))
+    ]
+)
+def test_dataclass_inst(x1, y1, x2, y2):
+    pt1 = Point(x1, y1)
+    pt2 = Point(x2, y2)
+    return Point(pt1.x + pt2.x, pt1.y + pt2.y)
 
 
 @infer(type=[(Point_t, InferenceError)])
@@ -1971,84 +1971,84 @@ def test_dataclass_wrong_field(pt):
     return pt.z
 
 
-# hyper_map = HyperMap()
-# hyper_map_notuple = HyperMap(nonleaf=(A, Class))
-# hyper_map_nobroadcast = HyperMap(broadcast=False)
+hyper_map = HyperMap()
+hyper_map_notuple = HyperMap(nonleaf=(A, Class))
+hyper_map_nobroadcast = HyperMap(broadcast=False)
 
 
-# @infer(
-#     type=[
-#         (i64, i64, i64),
-#         (f64, f64, f64),
-#         (lf64, lf64, lf64),
-#         (L[lf64], L[lf64], L[lf64]),
-#         (lf64, f64, InferenceError),
-#         (L[f64], L[lf64], InferenceError),
-#         (T[i64, f64], T[i64, f64], T[i64, f64]),
-#         (Point_t, Point_t, Point_t),
-#         (ai64_of(2, 5), ai64_of(2, 5), ai64),
-#         (i64, f64, InferenceError),
-#         (lf64, f64, InferenceError),
-#         (ai64_of(2, 5), af64_of(2, 5), InferenceError),
-#     ],
-#     value=[
-#         (1, 2, 3),
-#         (4.5, 7.5, 12.0),
-#         (Point(1, 2), Point(3, 4), Point(4, 6)),
-#     ],
-#     shape=[
-#         (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
-#         (ai64_of(2, 5), ai64_of(2, 1), (2, 5)),
-#         (ai64_of(2, 5), {'type': i64}, (2, 5)),
-#     ]
-# )
-# def test_hyper_map(x, y):
-#     return hyper_map(scalar_add, x, y)
+@infer(
+    type=[
+        (i64, i64, i64),
+        (f64, f64, f64),
+        (lf64, lf64, lf64),
+        # (L[lf64], L[lf64], L[lf64]), TODO
+        (lf64, f64, InferenceError),
+        (L[f64], L[lf64], InferenceError),
+        (T[i64, f64], T[i64, f64], T[i64, f64]),
+        (Point_t, Point_t, Point_t),
+        (ai64_of(2, 5), ai64_of(2, 5), ai64),
+        (i64, f64, InferenceError),
+        (lf64, f64, InferenceError),
+        (ai64_of(2, 5), af64_of(2, 5), InferenceError),
+    ],
+    value=[
+        (1, 2, 3),
+        (4.5, 7.5, 12.0),
+        (Point(1, 2), Point(3, 4), Point(4, 6)),
+    ],
+    shape=[
+        (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
+        (ai64_of(2, 5), ai64_of(2, 1), (2, 5)),
+        (ai64_of(2, 5), {'type': i64}, (2, 5)),
+    ]
+)
+def test_hyper_map(x, y):
+    return hyper_map(scalar_add, x, y)
 
 
-# @infer(
-#     type=[
-#         (T[i64, f64], T[i64, f64], InferenceError),
-#     ],
-# )
-# def test_hyper_map_notuple(x, y):
-#     return hyper_map_notuple(scalar_add, x, y)
+@infer(
+    type=[
+        (T[i64, f64], T[i64, f64], InferenceError),
+    ],
+)
+def test_hyper_map_notuple(x, y):
+    return hyper_map_notuple(scalar_add, x, y)
 
 
-# @infer(
-#     shape=[
-#         (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
-#         (ai64_of(2, 5), ai64_of(2, 1), InferenceError),
-#         (ai64_of(2, 5), {'type': i64}, InferenceError),
-#     ]
-# )
-# def test_hyper_map_nobroadcast(x, y):
-#     return hyper_map_nobroadcast(scalar_add, x, y)
+@infer(
+    shape=[
+        (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
+        (ai64_of(2, 5), ai64_of(2, 1), InferenceError),
+        (ai64_of(2, 5), {'type': i64}, InferenceError),
+    ]
+)
+def test_hyper_map_nobroadcast(x, y):
+    return hyper_map_nobroadcast(scalar_add, x, y)
 
 
-# @infer(
-#     type=[
-#         (i64, i64, i64),
-#         (f64, f64, f64),
-#         (lf64, lf64, lf64),
-#         (T[i64, f64], T[i64, f64], T[i64, f64]),
-#         (Point_t, Point_t, Point_t),
-#         (ai64_of(2, 5), ai64_of(2, 5), ai64),
-#         (Env, Env, Env),
-#     ],
-#     value=[
-#         (1, 2, 3),
-#         (4.5, 7.5, 12.0),
-#         (Point(1, 2), Point(3, 4), Point(4, 6)),
-#     ],
-#     shape=[
-#         (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
-#         (ai64_of(2, 5), ai64_of(2, 1), (2, 5)),
-#         (ai64_of(2, 5), {'type': i64}, (2, 5)),
-#     ]
-# )
-# def test_hyper_add(x, y):
-#     return hyper_add(x, y)
+@infer(
+    type=[
+        (i64, i64, i64),
+        (f64, f64, f64),
+        (lf64, lf64, lf64),
+        (T[i64, f64], T[i64, f64], T[i64, f64]),
+        (Point_t, Point_t, Point_t),
+        (ai64_of(2, 5), ai64_of(2, 5), ai64),
+        # (Env, Env, Env), TODO
+    ],
+    value=[
+        (1, 2, 3),
+        (4.5, 7.5, 12.0),
+        (Point(1, 2), Point(3, 4), Point(4, 6)),
+    ],
+    shape=[
+        (ai64_of(2, 5), ai64_of(2, 5), (2, 5)),
+        (ai64_of(2, 5), ai64_of(2, 1), (2, 5)),
+        (ai64_of(2, 5), {'type': i64}, (2, 5)),
+    ]
+)
+def test_hyper_add(x, y):
+    return hyper_add(x, y)
 
 
 # @infer(
@@ -2082,41 +2082,41 @@ def test_dataclass_wrong_field(pt):
 #     return zeros_like(f)
 
 
-# @infer(
-#     type=[
-#         (li64, lf64, T[li64, lf64]),
-#         (li64, f64, InferenceError),
-#     ]
-# )
-# def test_list_map(xs, ys):
+@infer(
+    type=[
+        (li64, lf64, T[li64, lf64]),
+        (li64, f64, InferenceError),
+    ]
+)
+def test_list_map(xs, ys):
 
-#     def square(x):
-#         return x * x
+    def square(x):
+        return x * x
 
-#     return list_map(square, xs), list_map(square, ys)
-
-
-# @infer(
-#     type=[
-#         (li64, li64, li64),
-#         (li64, lf64, InferenceError),
-#     ]
-# )
-# def test_list_map2(xs, ys):
-
-#     def mulm(x, y):
-#         return x * -y
-
-#     return list_map(mulm, xs, ys)
+    return list_map(square, xs), list_map(square, ys)
 
 
-# @infer(type=[(InferenceError,)])
-# def test_list_map0():
+@infer(
+    type=[
+        (li64, li64, li64),
+        (li64, lf64, InferenceError),
+    ]
+)
+def test_list_map2(xs, ys):
 
-#     def f():
-#         return 1234
+    def mulm(x, y):
+        return x * -y
 
-#     return list_map(f)
+    return list_map(mulm, xs, ys)
+
+
+@infer(type=[(InferenceError,)])
+def test_list_map0():
+
+    def f():
+        return 1234
+
+    return list_map(f)
 
 
 # @infer(

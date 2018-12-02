@@ -6,7 +6,7 @@ from ..infer import Track, MyiaTypeError, Context
 from ..infer.core import Pending
 from ..infer.graph_infer import type_error_nargs, VirtualReference
 from ..infer.utils import infer_trace
-from ..ir import Graph
+from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
 from ..prim.py_implementations import typeof
 from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
@@ -40,32 +40,43 @@ class AbstractTrack(Track):
     get_inferrer_for = Overload()
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, prim: Primitive):
+    def get_inferrer_for(self, prim: Primitive, args):
         return self.constructors[prim]
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, g: Graph):
+    def get_inferrer_for(self, g: Graph, args):
         if g not in self.constructors:
             self.constructors[g] = GraphXInferrer(g, Context.empty())
         return self.constructors[g]
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, g: GraphAndContext):
+    def get_inferrer_for(self, g: GraphAndContext, args):
         if g not in self.constructors:
             self.constructors[g] = GraphXInferrer(g.graph, g.context)
         return self.constructors[g]
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, part: PartialApplication):
+    def get_inferrer_for(self, part: PartialApplication, args):
         if part not in self.constructors:
             self.constructors[part] = PartialXInferrer(
-                self.get_inferrer_for(part.fn),
+                self.get_inferrer_for(part.fn, (*part.args, *args)),
                 part.args
             )
         return self.constructors[part]
 
+    @get_inferrer_for.register
+    def get_inferrer_for(self, mg: MetaGraph, args):
+        types = [arg.build('type') for arg in args]
+        try:
+            g = mg.specialize_from_types(types)
+        except GraphGenerationError:
+            raise MyiaTypeError('Graph gen error')
+        g = self.engine.pipeline.resources.convert(g)
+        return self.get_inferrer_for(g, args)
+
     async def execute(self, fn, *args):
-        infs = [self.get_inferrer_for(poss) for poss in fn.values['value']]
+        infs = [self.get_inferrer_for(poss, args)
+                for poss in fn.values['value']]
         argrefs = [VirtualReference({'abstract': a}) for a in args]
         return await execute_inferrers(self, infs, argrefs)
 
@@ -78,7 +89,9 @@ class AbstractTrack(Track):
         fn = await fn_ref[self.name]
         argrefs = [self.engine.ref(node, ctx) for node in n_args]
 
-        infs = [self.get_inferrer_for(poss) for poss in fn.values['value']]
+        args = [await ref['abstract'] for ref in argrefs]
+        infs = [self.get_inferrer_for(poss, args)
+                for poss in fn.values['value']]
 
         return await self.engine.loop.schedule(
             execute_inferrers(self, infs, argrefs),
@@ -118,8 +131,13 @@ class AbstractTrack(Track):
                 'type': dtype.Function,
                 'shape': dshape.NOSHAPE,
             })
-        # elif isinstance(v, MetaGraph):
-        #     return MetaGraphInferrer(self, v)
+        elif isinstance(v, MetaGraph):
+            return AbstractScalar({
+                'value': Possibilities([v]),
+                'type': dtype.Function,
+                'shape': dshape.NOSHAPE,
+            })
+            # return MetaGraphInferrer(self, v)
         elif is_dataclass_type(v):
             # rec = self.constructors[P.make_record]()
             # typ = dtype.pytype_to_myiatype(v)

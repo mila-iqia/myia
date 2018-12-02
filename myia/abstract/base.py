@@ -199,7 +199,8 @@ class AbstractTuple(AbstractValue):
         return dshape.TupleShape([e.build('shape') for e in self.elements])
 
     def make_key(self):
-        return (super().make_key(), self.elements)
+        elms = tuple(e.make_key() for e in self.elements)
+        return (super().make_key(), elms)
 
     def __repr__(self):
         return f'T({", ".join(map(repr, self.elements))})'
@@ -217,7 +218,7 @@ class AbstractArray(AbstractValue):
         return dtype.Array[self.element.build('type')]
 
     def make_key(self):
-        return (super().make_key(), self.element)
+        return (super().make_key(), self.element.make_key())
 
     def __repr__(self):
         return f'A({self.element}, shape={self.values["shape"]})'
@@ -235,18 +236,25 @@ class AbstractList(AbstractValue):
         return dshape.ListShape(self.element.build('shape'))
 
     def make_key(self):
-        return (super().make_key(), self.element)
+        return (super().make_key(), self.element.make_key())
 
     def __repr__(self):
         return f'L({self.element})'
 
 
 class AbstractClass(AbstractValue):
-    def __init__(self, tag, attributes, methods):
+    def __init__(self, tag, attributes, methods, values={}):
         super().__init__({})
         self.tag = tag
         self.attributes = attributes
         self.methods = methods
+        self.values = values
+
+    def _build_value(self):
+        kls = dtype.tag_to_dataclass[self.tag]
+        args = {k: v.build('value')
+                for k, v in self.attributes.items()}
+        return kls(**args)
 
     def _build_type(self):
         return dtype.Class[
@@ -263,7 +271,8 @@ class AbstractClass(AbstractValue):
         )
 
     def make_key(self):
-        return (self.tag, tuple(sorted(self.attributes.items())))
+        attrs = tuple((k, v.make_key()) for k, v in self.attributes.items())
+        return (self.tag, attrs)
 
     def __repr__(self):
         elems = [f'{k}={v}' for k, v in self.attributes.items()]
@@ -363,12 +372,13 @@ def _broaden_values(d):
         'shape': d['shape'],
     }
 
+
 @overload(bootstrap=True)
 def broaden(self, x: AbstractScalar):
     return AbstractScalar(_broaden_values(x.values))
 
 
-@overload(bootstrap=True)
+@overload
 def broaden(self, x: AbstractTuple):
     return AbstractTuple(
         [self(y) for y in x.elements],
@@ -376,7 +386,26 @@ def broaden(self, x: AbstractTuple):
     )
 
 
-@overload(bootstrap=True)
+@overload
+def broaden(self, x: AbstractList):
+    return AbstractList(self(x.element))
+
+
+@overload
+def broaden(self, x: AbstractArray):
+    return AbstractArray(self(x.element))
+
+
+@overload
+def broaden(self, x: AbstractClass):
+    return AbstractClass(
+        x.tag,
+        {k: self(v) for k, v in x.attributes.items()},
+        x.methods
+    )
+
+
+@overload
 def broaden(self, x: object):
     return ANYTHING
 
@@ -470,6 +499,16 @@ def _amerge(self, x1: AbstractList, x2, loop, forced):
 
 
 @overload
+def _amerge(self, x1: AbstractClass, x2, loop, forced):
+    args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
+    args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
+    merged = amerge(args1, args2, loop, forced)
+    if forced or merged is args1:
+        return x1
+    return AbstractClass(*merged)
+
+
+@overload
 def _amerge(self, x1: (int, float, bool), x2, loop, forced):
     if x1 is ANYTHING:
         return x1
@@ -495,6 +534,12 @@ def _amerge(self, x1: object, x2, loop, forced):
 def amerge(x1, x2, loop, forced, accept_pending=True):
     isp1 = isinstance(x1, Pending)
     isp2 = isinstance(x2, Pending)
+    if isp1 and x1.done():
+        x1 = x1.result()
+        isp1 = False
+    if isp2 and x2.done():
+        x2 = x2.result()
+        isp2 = False
     if (isp1 or isp2) and not accept_pending:
         raise AssertionError('Cannot have Pending here.')
     if isp1 and isp2:

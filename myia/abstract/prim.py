@@ -28,7 +28,7 @@ from .inf import (
 )
 
 from .. import dtype, dshape
-from ..dtype import Number, Bool
+from ..dtype import Number, Float, Bool
 from ..infer import ANYTHING, InferenceVar, Context, MyiaTypeError, \
     InferenceError, reify, MyiaShapeError, VOID
 from ..infer.core import Pending, find_coherent_result_2
@@ -72,7 +72,9 @@ class StandardXInferrer(XInferrer):
                 await reify(track.chk(typ, arg.values.get('type', ABSENT)))
             elif isinstance(typ, type) and issubclass(typ, AbstractBase):
                 if not isinstance(arg, typ):
-                    raise MyiaTypeError('Wrong type')
+                    raise MyiaTypeError(
+                        f'Wrong type {arg} != {typ} for {self._infer}'
+                    )
             elif callable(typ):
                 await reify(track.chk(typ, arg))
         return await self._infer(track, *args)
@@ -291,7 +293,9 @@ def prod(iterable):
 
 
 async def issubtype(x, model):
-    if model is dtype.Tuple:
+    if model is dtype.Object:
+        return True
+    elif model is dtype.Tuple:
         return isinstance(x, AbstractTuple)
     elif model is dtype.Array:
         return isinstance(x, AbstractArray)
@@ -389,7 +393,7 @@ def _inf_scalar_exp(x: Number) -> Number:
 
 
 @uniform_prim(P.scalar_log)
-def _inf_scalar_log(x: Number) -> Number:
+def _inf_scalar_log(x: Float) -> Float:
     return math.log(x)
 
 
@@ -510,7 +514,27 @@ async def _inf_make_list(track, *args):
     return AbstractList(res)
 
 
-# make_record = Primitive('make_record')
+@standard_prim(P.make_record)
+async def infer_type_make_record(track, _cls: dtype.TypeType, *elems):
+    """Infer the return type of make_record."""
+    cls = _cls.values['value']
+    if cls is ANYTHING:
+        raise MyiaTypeError('Expected a class to inst')
+    expected = list(cls.attributes.items())
+    if len(expected) != len(elems):
+        raise MyiaTypeError('Wrong class inst')
+    for (name, t), elem in zip(expected, elems):
+        if not (await issubtype(elem, t)):
+            raise MyiaTypeError('Wrong class inst')
+
+    return AbstractClass(
+        cls.tag,
+        {
+            name: elem
+            for (name, _), elem in zip(expected, elems)
+        },
+        cls.methods
+    )
 
 
 @standard_prim(P.tuple_getitem)
@@ -578,7 +602,7 @@ async def _inf_array_setitem(track,
 
 @standard_prim(P.list_append)
 async def _inf_list_append(track,
-                           arg: AbstractArray,
+                           arg: AbstractList,
                            value: AbstractBase):
     track.abstract_merge(arg.element, value)
     return arg
