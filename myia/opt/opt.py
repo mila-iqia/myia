@@ -185,34 +185,52 @@ class LocalPassOptimizer:
         else:
             mng = manage(graph)
 
-        avoid = set([graph])
+        seen = set([graph])
         todo = deque()
+        topo = list()
         todo.appendleft(graph.output)
 
         while len(todo) > 0:
             n = todo.pop()
-            if n in avoid:
+            if n in seen:
                 continue
-            avoid.add(n)
+            seen.add(n)
 
             if n.is_constant(Graph):
+                if n.value in seen:
+                    continue
                 todo.append(n.value.output)
                 continue
-            
-            new = True
-            while new:
-                new = False
-                for transformer in self.node_map.get(n):
-                    new = transformer(self.optimizer, n)
-                    if new is True:
-                        break
-                    if new and new is not n:
-                        new.expect_inferred.update(n.inferred)
-                        mng.replace(n, new)
-                        n = new
-                        new = True
-                        break
-            todo.extendleft(n.inputs)
+
+            new = self.apply_opt(mng, n)
+
+            if new.is_constant(Graph):
+                todo.append(new)
+            else:
+                topo.append(new)
+                todo.extendleft(new.inputs)
+
+        for node in reversed(topo):
+            self.apply_opt(mng, node)
+
+    def apply_opt(self, mng, n):
+        """Apply optimizations passes according to the node map."""
+        loop = True
+        while loop:
+            loop = False
+            for transformer in self.node_map.get(n):
+                new = transformer(self.optimizer, n)
+                if new is True:
+                    loop = True
+                    break
+                if new and new is not n:
+                    new.expect_inferred.update(n.inferred)
+                    mng.replace(n, new)
+                    n = new
+                    loop = True
+                    break
+        return n
+
 
 
 class PatternEquilibriumOptimizer:
