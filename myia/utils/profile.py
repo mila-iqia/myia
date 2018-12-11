@@ -18,9 +18,9 @@ def print_profile(prof, *, indent=0):
 
     print(f"{ind}Total time taken: {unit(total)}")
     if count is not None:
-        print(f"{ind}  Number of loops: {count}") 
-    print(f"{ind}  Overhead: {unit(overhead)}")
-    print(f"{ind}  Time spent in runtime: {unit(runtime)}")
+        print(f"{ind} Number of loops: {count}")
+    print(f"{ind} Overhead: {unit(overhead)}")
+    print(f"{ind} Time spent in runtime: {unit(runtime)}")
     for k, v in prof.items():
         if isinstance(v, dict):
             print(f"{ind}  {k}:")
