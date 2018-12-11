@@ -12,7 +12,7 @@ from .. import dtype
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
-    erase_class, erase_tuple
+    erase_class, erase_tuple, NodeMap
 from ..prim import vm_implementations
 from ..utils import overload, flatten
 from ..validate import validate, whitelist as default_whitelist, \
@@ -53,7 +53,10 @@ class Optimizer(PipelineStep):
             if spec == 'renormalize':
                 pass
             elif isinstance(spec, list):
-                spec = PatternEquilibriumOptimizer(*spec, optimizer=self)
+                nmap = NodeMap()
+                for opt in spec:
+                    nmap.register(None, opt)
+                spec = PatternEquilibriumOptimizer(nmap, optimizer=self)
             else:
                 spec = spec(optimizer=self)
             self.names.append(name)

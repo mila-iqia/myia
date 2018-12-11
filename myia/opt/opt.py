@@ -5,6 +5,7 @@ from collections import deque
 
 from ..ir import ANFNode, Apply, Constant, Graph, Special, manage, \
     succ_deeper
+from ..prim import Primitive
 from ..graph_utils import dfs
 from ..utils.unify import Unification, Var
 
@@ -137,12 +138,42 @@ def pattern_replacer(*pattern):
     return deco
 
 
-class GlobalPassOptimizer:
+class NodeMap:
+    def __init__(self):
+        self._d = dict()
+
+    def register(self, interests, opt=None):
+
+        def do_register(opt):
+            nonlocal interests
+            if interests is None:
+                self._d.setdefault(None, []).append(opt)
+                return
+            if not isinstance(interests, tuple):
+                interests = (interests,)
+            for interest in interests:
+                assert isinstance(interest, Primitive)
+                self._d.setdefault(interest, []).append(opt)
+
+        if opt is None:
+            return do_register
+        else:
+            do_register(opt)
+
+    def get(self, node):
+        res = []
+        res.extend(self._d.get(None, []))
+        if node.is_apply(Primitive):
+            res.extend(self._d.get(node.inputs[0].value, []))
+        return res
+
+
+class LocalPassOptimizer:
     """Apply a set of local optimizations in bfs order."""
 
-    def __init__(self, *node_transformers, optimizer=None):
-        """Initialize a GlobalPassOptimizer."""
-        self.node_transformers = node_transformers
+    def __init__(self, node_map, optimizer=None):
+        """Initialize a LocalPassOptimizer."""
+        self.node_map = node_map
         self.optimizer = optimizer
 
 
@@ -163,27 +194,33 @@ class GlobalPassOptimizer:
             if n in avoid:
                 continue
             avoid.add(n)
+
             if n.is_constant(Graph):
                 todo.append(n.value.output)
                 continue
-            for transformer in self.node_transformers:
-                new = transformer(self.optimizer, n)
-                if new is True:
-                    # Workaround for the old system
-                    new = None
-                if new and new is not n:
-                    new.expect_inferred.update(n.inferred)
-                    mng.replace(n, new)
-                    n = new
+            
+            new = True
+            while new:
+                new = False
+                for transformer in self.node_map.get(n):
+                    new = transformer(self.optimizer, n)
+                    if new is True:
+                        break
+                    if new and new is not n:
+                        new.expect_inferred.update(n.inferred)
+                        mng.replace(n, new)
+                        n = new
+                        new = True
+                        break
             todo.extendleft(n.inputs)
 
 
 class PatternEquilibriumOptimizer:
     """Apply a set of local pattern optimizations until equilibrium."""
 
-    def __init__(self, *node_transformers, optimizer=None):
+    def __init__(self, node_map, optimizer=None):
         """Initialize a PatternEquilibriumOptimizer."""
-        self.node_transformers = node_transformers
+        self.node_map = node_map
         self.optimizer = optimizer
 
     def __call__(self, graph):
@@ -206,7 +243,7 @@ class PatternEquilibriumOptimizer:
             for node in nodes:
                 if node not in mng.all_nodes:
                     continue
-                for transformer in self.node_transformers:
+                for transformer in self.node_map.get(node):
                     new = transformer(self.optimizer, node)
                     if new is True:
                         changes = True
