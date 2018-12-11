@@ -17,7 +17,9 @@ from .base import (
     AbstractArray,
     AbstractList,
     AbstractClass,
+    AbstractJTagged,
     PartialApplication,
+    JTransformedFunction,
     Possibilities,
     sensitivity_transform,
 )
@@ -1005,3 +1007,39 @@ async def _inf_env_add(track, env1, env2):
         'type': dtype.EnvType,
         'shape': dshape.NOSHAPE,
     })
+
+
+@standard_prim(P.J)
+async def _inf_J(track, x):
+    if isinstance(x, AbstractScalar):
+        v = x.values['value']
+        if isinstance(v, Possibilities):
+            return AbstractScalar({
+                'value': Possibilities(JTransformedFunction(poss)
+                                       for poss in v),
+                'type': dtype.Function,
+                'shape': dshape.NOSHAPE,
+            })
+    return AbstractJTagged(x)
+
+
+@standard_prim(P.Jinv)
+async def _inf_Jinv(track, x):
+    if isinstance(x, AbstractScalar):
+        v = x.values['value']
+        if isinstance(v, Possibilities):
+            results = []
+            for f in v:
+                if isinstance(f, JTransformedFunction):
+                    results.append(f.fn)
+                else:
+                    raise MyiaTypeError('Expected JTransformedFunction')
+            return AbstractScalar({
+                'value': Possibilities(results),
+                'type': dtype.Function,
+                'shape': dshape.NOSHAPE,
+            })
+    if isinstance(x, AbstractJTagged):
+        return x.element
+    else:
+        raise MyiaTypeError('Expected JTagged')

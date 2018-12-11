@@ -2141,112 +2141,112 @@ def test_env_onfn():
     return env_getitem(e, embed(f), newenv)
 
 
-# @infer(
-#     type=[
-#         (i32, T[JT[i32], Env, i32]),
-#         (f64, T[JT[f64], Env, f64]),
-#     ]
-# )
-# def test_J(x):
-#     def f(x):
-#         return x * x
+@infer(
+    type=[
+        (i32, T[JT[i32], Env, i32]),
+        (f64, T[JT[f64], Env, f64]),
+    ]
+)
+def test_J(x):
+    def f(x):
+        return x * x
 
-#     jf = J(f)
-#     jx = J(x)
-#     jy, bprop = jf(jx)
-#     df, dx = bprop(1.0)
-#     return jy, df, dx
-
-
-# @infer(
-#     type=[
-#         (JT[i32], i32),
-#         (JT[L[i32]], L[i32]),
-#         (i32, InferenceError),
-#     ]
-# )
-# def test_Jinv(x):
-#     return Jinv(x)
+    jf = J(f)
+    jx = J(x)
+    jy, bprop = jf(jx)
+    df, dx = bprop(1.0)
+    return jy, df, dx
 
 
-# @infer_std(
-#     type=[
-#         (i32, i32),
-#         (f64, f64),
-#         (ai64_of(4, 5), ai64),
-#     ],
-#     shape=[
-#         (ai64_of(4, 5), (4, 5))
-#     ]
-# )
-# def test_Jinv2(x):
-#     def f(x):
-#         return x * x
-
-#     ff = Jinv(J(f))
-#     return ff(x)
+@infer(
+    type=[
+        (JT[i32], i32),
+        (JT[L[i32]], L[i32]),
+        (i32, InferenceError),
+    ]
+)
+def test_Jinv(x):
+    return Jinv(x)
 
 
-# @infer(type=[(i32, InferenceError)])
-# def test_Jinv3(x):
-#     def f(x):
-#         return x * x
-#     return Jinv(f)(x)
+@infer_std(
+    type=[
+        (i32, i32),
+        (f64, f64),
+        (ai64_of(4, 5), ai64),
+    ],
+    shape=[
+        (ai64_of(4, 5), (4, 5))
+    ]
+)
+def test_Jinv2(x):
+    def f(x):
+        return x * x
+
+    ff = Jinv(J(f))
+    return ff(x)
 
 
-# @infer_std(
-#     type=[
-#         (af32_of(5, 7), T[f32, T[Env, af32]]),
-#     ],
-#     shape=[
-#         (af32_of(5, 7),
-#          TupleShape((NOSHAPE, TupleShape((NOSHAPE, (5, 7))))))
-#     ],
-# )
-# def test_J_array(xs):
-#     def prod(xs):
-#         p = array_reduce(lambda x, y: x * y, xs, ())
-#         return array_to_scalar(p)
-#     jy, bprop = J(prod)(J(xs))
-#     return Jinv(jy), bprop(1.0)
+@infer(type=[(i32, InferenceError)])
+def test_Jinv3(x):
+    def f(x):
+        return x * x
+    return Jinv(f)(x)
 
 
-# @infer_std(
-#     type=[
-#         (f32, f32, f32),
-#         (i16, i16, i16),
-#     ]
-# )
-# def test_grad(x, y):
-#     def f(x, y):
-#         return x * (y + x)
-#     return grad(f)(x, y)
+@infer_std(
+    type=[
+        (af32_of(5, 7), T[f32, T[Env, af32]]),
+    ],
+    shape=[
+        (af32_of(5, 7),
+         TupleShape((NOSHAPE, TupleShape((NOSHAPE, (5, 7))))))
+    ],
+)
+def test_J_array(xs):
+    def prod(xs):
+        p = array_reduce(lambda x, y: x * y, xs, ())
+        return array_to_scalar(p)
+    jy, bprop = J(prod)(J(xs))
+    return Jinv(jy), bprop(1.0)
 
 
-# @infer_std(
-#     type=[
-#         (i64, i64),
-#         (f32, f32),
-#         (f64, f64),
-#     ]
-# )
-# def test_grad_cast(x):
-#     def f(x):
-#         return scalar_cast(x, f16)
-
-#     return grad(f)(x)
+@infer_std(
+    type=[
+        (f32, f32, f32),
+        (i16, i16, i16),
+    ]
+)
+def test_grad(x, y):
+    def f(x, y):
+        return x * (y + x)
+    return grad(f)(x, y)
 
 
-# @infer_std(
-#     type=[
-#         (af16_of(2, 5), af16_of(2, 5), af16),
-#     ],
-#     shape=[
-#         (af16_of(2, 5), af16_of(2, 5), (2, 5)),
-#     ]
-# )
-# def test_grad_reduce(xs, ys):
-#     def f(xs, ys):
-#         return array_reduce(scalar_add, xs * ys, ())
+@infer_std(
+    type=[
+        (i64, i64),
+        (f32, f32),
+        (f64, f64),
+    ]
+)
+def test_grad_cast(x):
+    def f(x):
+        return scalar_cast(x, f16)
 
-#     return grad(f)(xs, ys)
+    return grad(f)(x)
+
+
+@infer_std(
+    type=[
+        (af16_of(2, 5), af16_of(2, 5), af16),
+    ],
+    shape=[
+        (af16_of(2, 5), af16_of(2, 5), (2, 5)),
+    ]
+)
+def test_grad_reduce(xs, ys):
+    def f(xs, ys):
+        return array_reduce(scalar_add, xs * ys, ())
+
+    return grad(f)(xs, ys)

@@ -14,7 +14,8 @@ from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
 
 from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
-    reify
+    reify, JTransformedFunction, AbstractJTagged, AbstractTuple, \
+    sensitivity_transform, VirtualFunction
 
 
 _number_types = [
@@ -65,12 +66,29 @@ class AbstractTrack(Track):
         return self.constructors[part]
 
     @get_inferrer_for.register
+    def get_inferrer_for(self, j: JTransformedFunction, args):
+        if j not in self.constructors:
+            self.constructors[j] = JXInferrer(
+                self.get_inferrer_for(j.fn, args),
+                j.fn
+            )
+        return self.constructors[j]
+
+    @get_inferrer_for.register
+    def get_inferrer_for(self, vf: VirtualFunction, args):
+        if vf not in self.constructors:
+            self.constructors[vf] = VirtualXInferrer(
+                vf.args,
+                vf.output
+            )
+        return self.constructors[vf]
+
+    @get_inferrer_for.register
     def get_inferrer_for(self, mg: MetaGraph, args):
-        types = [arg.build('type') for arg in args]
         try:
-            g = mg.specialize_from_types(types)
-        except GraphGenerationError:
-            raise MyiaTypeError('Graph gen error')
+            g = mg.specialize_from_abstract(args)
+        except GraphGenerationError as err:
+            raise MyiaTypeError(f'Graph gen error: {err}')
         g = self.engine.pipeline.resources.convert(g)
         return self.get_inferrer_for(g, args)
 
@@ -373,6 +391,81 @@ class PartialXInferrer(XInferrer):
                      for arg in self.args + args)
         if args not in self.cache:
             self.cache[args] = await self.fn(track, *args)
+        return self.cache[args]
+
+
+class VirtualXInferrer(XInferrer):
+
+    def __init__(self, args, output):
+        super().__init__()
+        self.args = args
+        self.output = output
+
+    async def infer(self, track, *args):
+        if len(args) != len(self.args):
+            raise MyiaTypeError('Wrong number of arguments')
+        for given, expected in zip(args, self.args):
+            track.abstract_merge(given, expected)
+        return self.output
+
+
+def _jinv(x):
+    if isinstance(x, AbstractScalar):
+        v = x.values['value']
+        if isinstance(v, Possibilities):
+            pass
+    if isinstance(x, AbstractJTagged):
+        return x.element
+    else:
+        raise MyiaTypeError('Expected JTagged')
+
+
+def _jtag(x):
+    if isinstance(x, AbstractScalar):
+        v = x.values['value']
+        if isinstance(v, Possibilities):
+            return AbstractScalar({
+                'value': Possibilities(JTransformedFunction(poss)
+                                       for poss in v),
+                'type': dtype.Function,
+                'shape': dshape.NOSHAPE,
+            })
+    return AbstractJTagged(x)
+
+
+class JXInferrer(XInferrer):
+
+    def __init__(self, fn, orig_fn):
+        super().__init__()
+        self.fn = fn
+        self.orig_fn = orig_fn
+
+    async def __call__(self, track, *refs):
+        args = tuple([await ref['abstract'] for ref in refs])
+        if args not in self.cache:
+            jinv_args = tuple(_jinv(a) for a in args)
+            jinv_argrefs = tuple(VirtualReference({'abstract': arg})
+                                 for arg in jinv_args)
+            res = await self.fn(track, *jinv_argrefs)
+            res_wrapped = _jtag(res)
+            orig_fn = AbstractScalar({
+                'value': Possibilities({self.orig_fn}),
+                'type': dtype.Function,
+                'shape': dshape.NOSHAPE,
+            })
+            # bparams = [sensitivity_transform(self.orig_fn)]
+            bparams = [sensitivity_transform(orig_fn)]
+            bparams += [sensitivity_transform(a) for a in args]
+            bparams_final = AbstractTuple(bparams)
+            bprop = AbstractScalar({
+                'value': Possibilities({VirtualFunction(
+                    (sensitivity_transform(res),),
+                    bparams_final
+                )}),
+                'type': dtype.Function,
+                'shape': dshape.NOSHAPE,
+            })
+            self.cache[args] = AbstractTuple([res_wrapped, bprop])
         return self.cache[args]
 
 

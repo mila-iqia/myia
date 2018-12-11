@@ -771,6 +771,38 @@ class GradOperation(MetaGraph):
             df.output = df.apply(P.tuple_getitem, bapp, 1)
         return df
 
+    def specialize_from_abstract(self, args):
+        """Generate the graph."""
+        from .abstract.base import \
+            AbstractScalar, Possibilities, GraphAndContext
+
+        ft, = args
+        if isinstance(ft, AbstractScalar):
+            poss = ft.values['value']
+            assert isinstance(poss, Possibilities)
+            for g in poss:
+                if isinstance(g, GraphAndContext):
+                    g = g.graph
+        else:
+            raise MyiaTypeError(f'Wrong argument for grad: {ft}')
+
+        assert isinstance(g, Graph)
+
+        dfbuilder = Graph()
+        dfbuilder.debug.name = f"grad{len(g.parameters)}"
+
+        with About(g.debug, 'copy'):
+            fn = dfbuilder.add_parameter()
+
+        with About(g.debug, 'grad_fprop'):
+            jf = dfbuilder.apply(P.J, fn)
+
+        df = self.make_gf(jf, g.parameters, g.debug)
+
+        dfbuilder.output = Constant(df)
+
+        return dfbuilder
+
     def specialize_from_types(self, types):
         """Generate the graph."""
         ft, = types

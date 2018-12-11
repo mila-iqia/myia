@@ -51,6 +51,32 @@ class PartialApplication:
             and self.args == other.args
 
 
+class JTransformedFunction:
+    def __init__(self, fn):
+        self.fn = fn
+
+    def __hash__(self):
+        return hash(self.fn)
+
+    def __eq__(self, other):
+        return isinstance(other, JTransformedFunction) \
+            and self.fn == other.fn
+
+
+class VirtualFunction:
+    def __init__(self, args, output):
+        self.args = args
+        self.output = output
+
+    def __hash__(self):
+        return hash((self.args, self.output))
+
+    def __eq__(self, other):
+        return isinstance(other, VirtualFunction) \
+            and self.args == other.args \
+            and self.output == other.output
+
+
 class AbstractBase:
 
     def make_key(self):
@@ -207,8 +233,8 @@ class AbstractTuple(AbstractValue):
 
 
 class AbstractArray(AbstractValue):
-    def __init__(self, element, values=None):
-        super().__init__(values or {})
+    def __init__(self, element, values):
+        super().__init__(values)
         self.element = element
 
     def merge_structure(self, other):
@@ -244,7 +270,7 @@ class AbstractList(AbstractValue):
 
 class AbstractClass(AbstractValue):
     def __init__(self, tag, attributes, methods, values={}):
-        super().__init__({})
+        super().__init__(values)
         self.tag = tag
         self.attributes = attributes
         self.methods = methods
@@ -279,24 +305,19 @@ class AbstractClass(AbstractValue):
         return f'{self.tag}({", ".join(elems)})'
 
 
-# class AbstractFunction:
-#     pass
+class AbstractJTagged(AbstractValue):
+    def __init__(self, element):
+        super().__init__({})
+        self.element = element
 
+    def _build_type(self):
+        return dtype.JTagged[self.element.build('type')]
 
-# class AbstractMonoFunction:
-#     pass
+    def make_key(self):
+        return (super().make_key(), self.element.make_key())
 
-
-# class AbstractPolyFunction:
-#     pass
-
-
-# class AbstractPartial:
-#     pass
-
-
-# class Merged:
-#     pass
+    def __repr__(self):
+        return f'J({self.element})'
 
 
 #############
@@ -351,6 +372,11 @@ def from_vref(self, v, t: dtype.Class, s):
 
 
 @overload
+def from_vref(self, v, t: dtype.JTagged, s):
+    return AbstractJTagged(self(v, t.subtype, s))
+
+
+@overload
 def from_vref(self, v, t: dtype.EnvType, s):
     return AbstractScalar({'value': v, 'type': t, 'shape': s})
 
@@ -377,11 +403,9 @@ def abstract_clone(self, x: AbstractScalar):
 
 @overload
 def abstract_clone(self, d: dict):
-    return {
-        'value': self(d['value']),
-        'type': d['type'],
-        'shape': d['shape'],
-    }
+    to_transform = {'value'}
+    return {k: self(v) if k in to_transform else v
+            for k, v in d.items()}
 
 
 @overload
@@ -394,12 +418,12 @@ def abstract_clone(self, x: AbstractTuple):
 
 @overload
 def abstract_clone(self, x: AbstractList):
-    return AbstractList(self(x.element))
+    return AbstractList(self(x.element), self(x.values))
 
 
 @overload
 def abstract_clone(self, x: AbstractArray):
-    return AbstractArray(self(x.element))
+    return AbstractArray(self(x.element), self(x.values))
 
 
 @overload
@@ -407,7 +431,8 @@ def abstract_clone(self, x: AbstractClass):
     return AbstractClass(
         x.tag,
         {k: self(v) for k, v in x.attributes.items()},
-        x.methods
+        x.methods,
+        self(x.values)
     )
 
 
@@ -442,6 +467,11 @@ def sensitivity_transform(self, x: AbstractScalar):
         })
     else:
         return AbstractScalar(self(x.values))
+
+
+@overload
+def sensitivity_transform(self, x: AbstractJTagged):
+    return self(x.element)
 
 
 #########

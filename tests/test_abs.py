@@ -42,6 +42,8 @@ def type_to_shape(typ):
     elif ty.ismyiatype(typ, ty.Class):
         return sh.ClassShape(dict((attr, type_to_shape(tp))
                                 for attr, tp in typ.attributes.items()))
+    elif ty.ismyiatype(typ, ty.JTagged):
+        return type_to_shape(typ.subtype)
     return sh.NOSHAPE
 
 
