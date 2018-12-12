@@ -185,9 +185,22 @@ class LocalPassOptimizer:
         else:
             mng = manage(graph)
 
+        changes = False
+        again = True
+        count = 1
+        while again:
+            topo, seen, chg = self.backwards(mng, graph)
+            again = self.forward(mng, topo)
+            changes |= (chg | again)
+            again |= mng.all_nodes.issuperset(seen)
+
+        return changes
+
+    def backwards(self, mng, graph):
         seen = set([graph])
         todo = deque()
         topo = list()
+        changes = False
         todo.appendleft(graph.output)
 
         while len(todo) > 0:
@@ -202,7 +215,8 @@ class LocalPassOptimizer:
                 todo.append(n.value.output)
                 continue
 
-            new = self.apply_opt(mng, n)
+            new, chg = self.apply_opt(mng, n)
+            changes |= chg
 
             if new.is_constant(Graph):
                 todo.append(new)
@@ -210,26 +224,36 @@ class LocalPassOptimizer:
                 topo.append(new)
                 todo.extendleft(new.inputs)
 
+        return topo, seen, changes
+
+    def forward(self, mng, topo):
+        change = False
         for node in reversed(topo):
-            self.apply_opt(mng, node)
+            if node in mng.all_nodes:
+                change |= self.apply_opt(mng, node) is True
+        return change
 
     def apply_opt(self, mng, n):
         """Apply optimizations passes according to the node map."""
         loop = True
+        changes = False
         while loop:
             loop = False
             for transformer in self.node_map.get(n):
                 new = transformer(self.optimizer, n)
                 if new is True:
                     loop = True
+                    changes = True
                     break
                 if new and new is not n:
                     new.expect_inferred.update(n.inferred)
                     mng.replace(n, new)
                     n = new
                     loop = True
+                    changes = True
                     break
-        return n
+
+        return n, changes
 
 
 
