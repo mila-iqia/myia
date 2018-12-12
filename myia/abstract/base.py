@@ -96,7 +96,7 @@ class AbstractBase:
 
 
 class AbstractValue(AbstractBase):
-    def __init__(self, values, count=10):
+    def __init__(self, values, count=0):
         self.values = values
         self.count = count
 

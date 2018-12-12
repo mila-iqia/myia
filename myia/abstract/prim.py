@@ -104,9 +104,9 @@ class WithImplXInferrer(XInferrer):
         self.nargs = len(data.args)
         self.impl_data = data
 
-    def run_impl(self, args, outtype):
-        min_count = min((arg.count for arg in args), default=0)
-        if min_count <= 0:
+    def run_impl(self, track, args, outtype):
+        depth = max((arg.count for arg in args), default=0)
+        if depth >= track.max_depth:
             outval = ANYTHING
         else:
             values = [arg.values['value'] for arg in args]
@@ -116,13 +116,13 @@ class WithImplXInferrer(XInferrer):
                 outval = self.impl(*values)
 
         if outval is ANYTHING:
-            min_count = 0
+            depth = track.max_depth
         rval = AbstractScalar({
             'value': outval,
             'type': outtype,
             'shape': dshape.NOSHAPE
         })
-        rval.count = max(min_count - 1, 0)
+        rval.count = min(depth + 1, track.max_depth)
         return rval
 
 
@@ -150,7 +150,7 @@ class UniformPrimitiveXInferrer(WithImplXInferrer):
             if typ == self.outtype:
                 outtype = res
 
-        return self.run_impl(args, outtype)
+        return self.run_impl(track, args, outtype)
 
 
 def uniform_prim(prim):

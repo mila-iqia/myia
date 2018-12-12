@@ -30,12 +30,14 @@ class AbstractTrack(Track):
                  engine,
                  name,
                  *,
-                 constructors):
+                 constructors,
+                 max_depth=1):
         super().__init__(engine, name)
         self.constructors = {
             prim: cons()
             for prim, cons in constructors.items()
         }
+        self.max_depth = max_depth
         self.subtracks = ['value', 'type', 'shape']
 
     get_inferrer_for = Overload()
