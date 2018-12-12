@@ -331,8 +331,16 @@ step_opt2 = Optimizer.partial(
             optlib.unfuse_composite,
         ],
         main2=[
-            optlib.incorporate_getitem,
             optlib.getitem_tuple,
+            optlib.setitem_tuple,
+            optlib.setitem_tuple_ct,
+            optlib.float_tuple_getitem_through_switch,
+            optlib.incorporate_getitem,
+            optlib.incorporate_getitem_through_switch,
+            optlib.inline_trivial,
+            optlib.inline_unique_uses,
+            optlib.inline_inside_marked_caller,
+            optlib.inline_core,
         ],
     )
 )
