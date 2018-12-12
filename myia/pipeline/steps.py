@@ -56,7 +56,6 @@ class Optimizer(PipelineStep):
                 nmap = NodeMap()
                 for opt in spec:
                     nmap.register(None, opt)
-                #spec = PatternEquilibriumOptimizer(nmap, optimizer=self)
                 spec = LocalPassOptimizer(nmap, optimizer=self)
             else:
                 spec = spec(optimizer=self)
