@@ -1,8 +1,7 @@
 """Tools to generate and configure Myia's operation pipeline."""
 
-from time import perf_counter
 from ..utils import merge, Merge, NS, Partial, Partializable, \
-    partition_keywords
+    partition_keywords, prof_counter
 
 
 class PipelineDefinition:
@@ -244,7 +243,7 @@ class _PipelineSlice:
         profile = args.get('profile', True)
         if profile:
             profd = dict()
-            gstart = perf_counter()
+            gstart = prof_counter()
         for step in self.pipeline._seq[self.slice]:
             if 'error' in args:
                 break
@@ -252,10 +251,10 @@ class _PipelineSlice:
                 valid_args, rest = partition_keywords(step.step, args)
                 try:
                     if profile:
-                        start = perf_counter()
+                        start = prof_counter()
                     results = step.step(**valid_args)
                     if profile:
-                        end = perf_counter()
+                        end = prof_counter()
                     if not isinstance(results, dict) and len(valid_args) == 1:
                         field_name, = valid_args.keys()
                         results = {field_name: results}
@@ -269,7 +268,7 @@ class _PipelineSlice:
                     args['error'] = e
                     args['error_step'] = step
         if profile:
-            gend = perf_counter()
+            gend = prof_counter()
             profd['__total__'] = gend - gstart
             args['profile'] = profd
         return args

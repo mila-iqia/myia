@@ -8,6 +8,7 @@ from ..ir import ANFNode, Apply, Constant, Graph, Special, manage, \
 from ..prim import Primitive
 from ..graph_utils import dfs
 from ..utils.unify import Unification, Var
+from ..utils import prof_counter
 
 
 class VarNode(Special):

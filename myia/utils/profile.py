@@ -1,3 +1,5 @@
+from time import perf_counter as prof_counter
+
 def unit(secs):
     return "%.3gs" % secs
 
