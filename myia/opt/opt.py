@@ -148,11 +148,24 @@ def pattern_replacer(*pattern):
 
 
 class NodeMap:
+    """Mapping of node to optimizer.
+
+    This helps global optimizers select the relevant optimizers to
+    apply for each node.
+
+    Optimizers that are mapped to None are considered relevant for all
+    nodes.
+
+    Other than None, only primitives are currently supported as interests.
+
+    """
+
     def __init__(self):
+        """Create a NodeMap."""
         self._d = dict()
 
     def register(self, interests, opt=None):
-
+        """Register an optimizer for some interests."""
         def do_register(opt):
             ints = interests
             if ints is None:
@@ -170,6 +183,7 @@ class NodeMap:
             do_register(opt)
 
     def get(self, node):
+        """Get a list of optimizers that could apply for a node."""
         res = []
         res.extend(self._d.get(None, []))
         if node.is_apply() and node.inputs[0].is_constant():
@@ -204,6 +218,15 @@ class LocalPassOptimizer:
         return changes
 
     def backwards(self, mng, graph):
+        """Do a backwards pass over the graph.
+
+        This will visit the nodes from the output to the inputs in a
+        bfs manner while avoiding parts of the graph that are dropped
+        due to optimizations.
+
+        It returns a visitation order for a forward pass.
+
+        """
         seen = set([graph])
         todo = deque()
         topo = list()
@@ -234,6 +257,13 @@ class LocalPassOptimizer:
         return topo, seen, changes
 
     def forward(self, mng, topo):
+        """Do a pass over the nodes.
+
+        This will visit nodes in the passed-in order, skipping those
+        that are no longer part of the manager.  It doesn't attempt to
+        visit new subgraphs.
+
+        """
         change = False
         for node in reversed(topo):
             if node in mng.all_nodes:

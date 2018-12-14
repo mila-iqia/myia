@@ -1,11 +1,14 @@
+"""Utilities to help support profiling."""
+
 from time import perf_counter as prof_counter  # noqa
 
 
-def unit(secs):
+def _unit(secs):
     return "%.3gs" % secs
 
 
 def print_profile(prof, *, indent=0):
+    """Print a visualisation of a profile."""
     total = prof.pop('__total__')
     count = prof.pop('__count__', None)
     runtime = 0
@@ -18,14 +21,14 @@ def print_profile(prof, *, indent=0):
 
     overhead = total - runtime
 
-    print(f"{ind}Total time taken: {unit(total)}")
+    print(f"{ind}Total time taken: {_unit(total)}")
     if count is not None:
         print(f"{ind} Number of loops: {count}")
-    print(f"{ind} Overhead: {unit(overhead)}")
-    print(f"{ind} Time spent in runtime: {unit(runtime)}")
+    print(f"{ind} Overhead: {_unit(overhead)}")
+    print(f"{ind} Time spent in runtime: {_unit(runtime)}")
     for k, v in prof.items():
         if isinstance(v, dict):
             print(f"{ind}  {k}:")
             print_profile(v, indent=indent + 4)
         else:
-            print(f"{ind}  {k}: {unit(v)}")
+            print(f"{ind}  {k}: {_unit(v)}")
