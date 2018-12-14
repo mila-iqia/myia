@@ -155,13 +155,13 @@ class NodeMap:
     def register(self, interests, opt=None):
 
         def do_register(opt):
-            nonlocal interests
-            if interests is None:
+            ints = interests
+            if ints is None:
                 self._d.setdefault(None, []).append(opt)
                 return
-            if not isinstance(interests, tuple):
-                interests = (interests,)
-            for interest in interests:
+            if not isinstance(ints, tuple):
+                ints = (ints,)
+            for interest in ints:
                 assert isinstance(interest, Primitive)
                 self._d.setdefault(interest, []).append(opt)
 
@@ -173,7 +173,7 @@ class NodeMap:
     def get(self, node):
         res = []
         res.extend(self._d.get(None, []))
-        if node.is_apply(Primitive):
+        if node.is_apply() and node.inputs[0].is_constant():
             res.extend(self._d.get(node.inputs[0].value, []))
         return res
 

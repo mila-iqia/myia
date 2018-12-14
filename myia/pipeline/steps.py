@@ -54,7 +54,7 @@ class Optimizer(PipelineStep):
             elif isinstance(spec, list):
                 nmap = NodeMap()
                 for opt in spec:
-                    nmap.register(None, opt)
+                    nmap.register(getattr(opt, 'interest', None), opt)
                 spec = LocalPassOptimizer(nmap, optimizer=self)
             else:
                 spec = spec(optimizer=self)
