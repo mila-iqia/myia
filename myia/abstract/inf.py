@@ -303,61 +303,39 @@ class XInferrer(Partializable):
 
 class GraphXInferrer(XInferrer):
 
-    def __init__(self, graph, context, broaden=True):
+    def __init__(self, graph, context):
         super().__init__()
         self._graph = graph
-        self.broaden = broaden
         if context is None:
             self.context = Context.empty()
         else:
             self.context = context.filter(graph)
         assert self.context is not None
 
-    async def make_graph(self, args):
-        return self._graph
-
-    async def make_context(self, track, args):
-        _, ctx = await self._make_argkey_and_context(track, args)
+    def make_context(self, track, args):
+        _, ctx = self._make_argkey_and_context(track, args)
         return ctx
 
-    async def _make_argkey_and_context(self, track, args):
-        engine = track.engine
-        g = await self.make_graph(args)
-        argvals = []
-        for arg in args:
-            argval = {}
-            for track_name, track in engine.tracks.items():
-                result = await engine.get_inferred(track_name, arg)
-                if self.broaden and not g.flags.get('flatten_inference'):
-                    result = track.broaden(result)
-                argval[track_name] = result
-            argvals.append(argval)
-
-        # Update current context using the fetched properties.
+    def _make_argkey_and_context(self, track, argvals):
         argkey = as_frozen(argvals)
-        return argkey, self.context.add(g, argkey)
-
-    async def __call__(self, track, *args):
-        if args not in self.cache:
-            self.cache[args] = await self.infer(track, *args)
-        return self.cache[args]
+        # Update current context using the fetched properties.
+        return argkey, self.context.add(self._graph, argkey)
 
     async def infer(self, track, *args):
         engine = track.engine
-        g = await self.make_graph(args)
+        g = self._graph
         nargs = len(g.parameters)
 
         if len(args) != nargs:
             raise type_error_nargs(self, nargs, len(args))
 
-        argkey, context = await self._make_argkey_and_context(track, args)
+        argkey, context = self._make_argkey_and_context(track, args)
 
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
         for p, arg in zip(g.parameters, argkey):
-            for track, v in arg:
-                ref = engine.ref(p, context)
-                engine.cache.set_value((track, ref), v)
+            ref = engine.ref(p, context)
+            engine.cache.set_value(('abstract', ref), arg)
 
         out = engine.ref(g.return_, context)
         return await engine.get_inferred('abstract', out)
