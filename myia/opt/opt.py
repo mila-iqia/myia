@@ -94,7 +94,8 @@ class PatternSubstitutionOptimization:
                  *,
                  condition=None,
                  name=None,
-                 multigraph=True):
+                 multigraph=True,
+                 interest=False):
         """Initialize va PatternSubstitutionOptimization."""
         g: Var = Var('RootG')
         self.pattern = sexp_to_node(pattern, g, multigraph)
@@ -105,6 +106,14 @@ class PatternSubstitutionOptimization:
         self.unif = Unification()
         self.condition = condition
         self.name = name
+        if interest is False:
+            if (self.pattern.is_apply() and
+                self.pattern.inputs[0].is_constant(Primitive)):
+                interest = self.pattern.inputs[0].value
+            else:
+                # Maybe warn in this case?
+                interest = None
+        self.interest = interest
 
     def __call__(self, optimizer, node):
         """Return a replacement for the node, if the pattern matches.
