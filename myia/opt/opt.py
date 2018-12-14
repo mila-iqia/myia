@@ -227,7 +227,7 @@ class LocalPassOptimizer:
         """
         seen = set([graph])
         todo = deque()
-        topo = list()
+        fwd = list()
         changes = False
         todo.appendleft(graph.output)
 
@@ -237,22 +237,18 @@ class LocalPassOptimizer:
                 continue
             seen.add(n)
 
-            if n.is_constant(Graph):
-                if n.value in seen:
-                    continue
-                todo.append(n.value.output)
-                continue
-
             new, chg = self.apply_opt(mng, n)
             changes |= chg
 
+            fwd.append(new)
             if new.is_constant(Graph):
-                todo.append(new)
+                if new.value not in seen:
+                    todo.append(new.value.output)
+                    seen.add(new.value)
             else:
-                topo.append(new)
                 todo.extendleft(new.inputs)
 
-        return topo, seen, changes
+        return fwd, seen, changes
 
     def forward(self, mng, topo):
         """Do a pass over the nodes.
