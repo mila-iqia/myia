@@ -240,7 +240,7 @@ class _PipelineSlice:
         Errors are put in the 'error' key of the result, and the step
         at which an error happened is put in the 'error_step' key.
         """
-        profile = args.get('profile', True)
+        profile = args.get('profile', False)
         if profile:
             profd = dict()
             gstart = prof_counter()
