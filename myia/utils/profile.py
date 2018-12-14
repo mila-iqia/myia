@@ -3,11 +3,11 @@
 from time import perf_counter as prof_counter  # noqa
 
 
-def _unit(secs):
+def _unit(secs):  # pragma: no cover
     return "%.3gs" % secs
 
 
-def print_profile(prof, *, indent=0):
+def print_profile(prof, *, indent=0):  # pragma: no cover
     """Print a visualisation of a profile."""
     total = prof.pop('__total__')
     count = prof.pop('__count__', None)
