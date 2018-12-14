@@ -774,10 +774,10 @@ class GradOperation(MetaGraph):
     def specialize_from_abstract(self, args):
         """Generate the graph."""
         from .abstract.base import \
-            AbstractScalar, Possibilities, GraphAndContext
+            AbstractFunction, Possibilities, GraphAndContext
 
         ft, = args
-        if isinstance(ft, AbstractScalar):
+        if isinstance(ft, AbstractFunction):
             poss = ft.values['value']
             assert isinstance(poss, Possibilities)
             for g in poss:

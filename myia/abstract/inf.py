@@ -15,7 +15,7 @@ from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
 from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
     reify, JTransformedFunction, AbstractJTagged, AbstractTuple, \
-    sensitivity_transform, VirtualFunction
+    sensitivity_transform, VirtualFunction, AbstractFunction
 
 
 _number_types = [
@@ -138,26 +138,13 @@ class AbstractTrack(Track):
     def from_value(self, v, context):
         """Infer the type of a constant."""
         if isinstance(v, Primitive):
-            return AbstractScalar({
-                'value': Possibilities([v]),
-                'type': dtype.Function,
-                'shape': dshape.NOSHAPE,
-            })
+            return AbstractFunction(v)
         elif isinstance(v, Graph):
             if v.parent:
                 v = GraphAndContext(v, context)
-            return AbstractScalar({
-                'value': Possibilities([v]),
-                'type': dtype.Function,
-                'shape': dshape.NOSHAPE,
-            })
+            return AbstractFunction(v)
         elif isinstance(v, MetaGraph):
-            return AbstractScalar({
-                'value': Possibilities([v]),
-                'type': dtype.Function,
-                'shape': dshape.NOSHAPE,
-            })
-            # return MetaGraphInferrer(self, v)
+            return AbstractFunction(v)
         elif is_dataclass_type(v):
             # rec = self.constructors[P.make_record]()
             # typ = dtype.pytype_to_myiatype(v)
@@ -170,16 +157,12 @@ class AbstractTrack(Track):
                 'type': dtype.TypeType,
                 'shape': dshape.NOSHAPE,
             })
-            return AbstractScalar({
-                'value': Possibilities([
-                    PartialApplication(
-                        P.make_record,
-                        (typarg,)
-                    )
-                ]),
-                'type': dtype.Function,
-                'shape': dshape.NOSHAPE,
-            })
+            return AbstractFunction(
+                PartialApplication(
+                    P.make_record,
+                    (typarg,)
+                )
+            )
         else:
             return from_vref(v, typeof(v), shapeof(v))
 
@@ -412,7 +395,7 @@ class VirtualXInferrer(XInferrer):
 
 
 def _jinv(x):
-    if isinstance(x, AbstractScalar):
+    if isinstance(x, AbstractFunction):
         v = x.values['value']
         if isinstance(v, Possibilities):
             pass
@@ -423,15 +406,11 @@ def _jinv(x):
 
 
 def _jtag(x):
-    if isinstance(x, AbstractScalar):
+    if isinstance(x, AbstractFunction):
         v = x.values['value']
         if isinstance(v, Possibilities):
-            return AbstractScalar({
-                'value': Possibilities(JTransformedFunction(poss)
-                                       for poss in v),
-                'type': dtype.Function,
-                'shape': dshape.NOSHAPE,
-            })
+            return AbstractFunction(*[JTransformedFunction(poss)
+                                      for poss in v])
     return AbstractJTagged(x)
 
 
@@ -450,23 +429,17 @@ class JXInferrer(XInferrer):
                                  for arg in jinv_args)
             res = await self.fn(track, *jinv_argrefs)
             res_wrapped = _jtag(res)
-            orig_fn = AbstractScalar({
-                'value': Possibilities({self.orig_fn}),
-                'type': dtype.Function,
-                'shape': dshape.NOSHAPE,
-            })
+            orig_fn = AbstractFunction(self.orig_fn)
             # bparams = [sensitivity_transform(self.orig_fn)]
             bparams = [sensitivity_transform(orig_fn)]
             bparams += [sensitivity_transform(a) for a in args]
             bparams_final = AbstractTuple(bparams)
-            bprop = AbstractScalar({
-                'value': Possibilities({VirtualFunction(
+            bprop = AbstractFunction(
+                VirtualFunction(
                     (sensitivity_transform(res),),
                     bparams_final
-                )}),
-                'type': dtype.Function,
-                'shape': dshape.NOSHAPE,
-            })
+                )
+            )
             self.cache[args] = AbstractTuple([res_wrapped, bprop])
         return self.cache[args]
 

@@ -196,9 +196,15 @@ class AbstractType(AbstractValue):
 
 
 class AbstractFunction(AbstractValue):
+    def __init__(self, *poss):
+        super().__init__({
+            'value': Possibilities(poss),
+            'type': dtype.Function,
+            'shape': dshape.NOSHAPE
+        })
 
     def merge_structure(self, other):
-        return AbstractFunction({'type': dtype.Function})
+        return AbstractFunction(*self.values['value'])
 
     def __repr__(self):
         return f'Fn({self.values["value"]})'
@@ -402,6 +408,11 @@ def abstract_clone(self, x: AbstractScalar):
 
 
 @overload
+def abstract_clone(self, x: AbstractFunction):
+    return AbstractFunction(*self(x.values['value']))
+
+
+@overload
 def abstract_clone(self, d: dict):
     to_transform = {'value'}
     return {k: self(v) if k in to_transform else v
@@ -457,16 +468,13 @@ def broaden(self, x: object):
 
 
 @abstract_clone.variant
-def sensitivity_transform(self, x: AbstractScalar):
+def sensitivity_transform(self, x: AbstractFunction):
     v = x.values['value']
-    if isinstance(v, Possibilities):
-        return AbstractScalar({
-            'value': ANYTHING,
-            'type': dtype.EnvType,
-            'shape': dshape.NOSHAPE
-        })
-    else:
-        return AbstractScalar(self(x.values))
+    return AbstractScalar({
+        'value': ANYTHING,
+        'type': dtype.EnvType,
+        'shape': dshape.NOSHAPE
+    })
 
 
 @overload
@@ -530,6 +538,14 @@ def _amerge(self, x1: AbstractScalar, x2, loop, forced):
     if forced or values is x1.values:
         return x1
     return AbstractScalar(values)
+
+
+@overload
+def _amerge(self, x1: AbstractFunction, x2, loop, forced):
+    values = amerge(x1.values['value'], x2.values['value'], loop, forced)
+    if forced or values is x1.values:
+        return x1
+    return AbstractFunction(*values)
 
 
 @overload

@@ -207,13 +207,9 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
             inferrer = track.from_value(method, Context.empty())
             fns = inferrer.values['value']
             assert isinstance(fns, Possibilities)
-            return AbstractScalar({
-                'value': Possibilities(
-                    PartialApplication(fn, (data,)) for fn in fns
-                ),
-                'type': dtype.Function,
-                'shape': dshape.NOSHAPE,
-            })
+            return AbstractFunction(*[
+                PartialApplication(fn, (data,)) for fn in fns
+            ])
         else:
             raise InferenceError(f'Unknown field in {data_t}: {item_v}')
 
@@ -223,13 +219,9 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
         inferrer = track.from_value(method, Context.empty())
         fns = inferrer.values['value']
         assert isinstance(fns, Possibilities)
-        return AbstractScalar({
-            'value': Possibilities(
-                PartialApplication(fn, (data,)) for fn in fns
-            ),
-            'type': dtype.Function,
-            'shape': dshape.NOSHAPE,
-        })
+        return AbstractFunction(*[
+            PartialApplication(fn, (data,)) for fn in fns
+        ])
 
     elif case == 'no_method':
         msg = f"object of type {data_t} has no attribute '{item_v}'"
@@ -788,7 +780,7 @@ async def _inf_array_map(track, fn, *arrays):
 
 @standard_prim(P.array_reduce)
 async def _inf_array_reduce(track,
-                            fn: AbstractScalar,
+                            fn: AbstractFunction,
                             a: AbstractArray,
                             shp: _shape_type):
 
@@ -946,13 +938,9 @@ async def _inf_resolve(track, data, item):
 async def _inf_partial(track, fn, *args):
     fns = fn.values['value']
     assert isinstance(fns, Possibilities)
-    return AbstractScalar({
-        'value': Possibilities([
-            PartialApplication(fn, args) for fn in fns
-        ]),
-        'type': dtype.Function,
-        'shape': dshape.NOSHAPE
-    })
+    return AbstractFunction(*[
+        PartialApplication(fn, args) for fn in fns
+    ])
 
 
 # J = Primitive('J')
@@ -1011,21 +999,17 @@ async def _inf_env_add(track, env1, env2):
 
 @standard_prim(P.J)
 async def _inf_J(track, x):
-    if isinstance(x, AbstractScalar):
+    if isinstance(x, AbstractFunction):
         v = x.values['value']
         if isinstance(v, Possibilities):
-            return AbstractScalar({
-                'value': Possibilities(JTransformedFunction(poss)
-                                       for poss in v),
-                'type': dtype.Function,
-                'shape': dshape.NOSHAPE,
-            })
+            return AbstractFunction(*[JTransformedFunction(poss)
+                                      for poss in v])
     return AbstractJTagged(x)
 
 
 @standard_prim(P.Jinv)
 async def _inf_Jinv(track, x):
-    if isinstance(x, AbstractScalar):
+    if isinstance(x, AbstractFunction):
         v = x.values['value']
         if isinstance(v, Possibilities):
             results = []
@@ -1034,11 +1018,7 @@ async def _inf_Jinv(track, x):
                     results.append(f.fn)
                 else:
                     raise MyiaTypeError('Expected JTransformedFunction')
-            return AbstractScalar({
-                'value': Possibilities(results),
-                'type': dtype.Function,
-                'shape': dshape.NOSHAPE,
-            })
+            return AbstractFunction(*results)
     if isinstance(x, AbstractJTagged):
         return x.element
     else:
