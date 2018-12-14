@@ -10,8 +10,8 @@ from itertools import count
 from .. import dtype
 from ..cconv import closure_convert
 from ..ir import Graph
-from ..opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
-    erase_class, erase_tuple, NodeMap, LocalPassOptimizer
+from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
+    LocalPassOptimizer
 from ..prim import vm_implementations
 from ..utils import overload, flatten, prof_counter
 from ..validate import validate, whitelist as default_whitelist, \

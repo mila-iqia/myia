@@ -8,7 +8,6 @@ from ..ir import ANFNode, Apply, Constant, Graph, Special, manage, \
 from ..prim import Primitive
 from ..graph_utils import dfs
 from ..utils.unify import Unification, Var
-from ..utils import prof_counter
 
 
 class VarNode(Special):
@@ -108,7 +107,7 @@ class PatternSubstitutionOptimization:
         self.name = name
         if interest is False:
             if (self.pattern.is_apply() and
-                self.pattern.inputs[0].is_constant(Primitive)):
+                    self.pattern.inputs[0].is_constant(Primitive)):
                 interest = self.pattern.inputs[0].value
             else:
                 # Maybe warn in this case?
@@ -186,7 +185,6 @@ class LocalPassOptimizer:
         self.node_map = node_map
         self.optimizer = optimizer
 
-
     def __call__(self, graph):
         """Apply optimizations on given graphs in node order."""
         if self.optimizer is not None:
@@ -197,7 +195,6 @@ class LocalPassOptimizer:
 
         changes = False
         again = True
-        count = 1
         while again:
             topo, seen, chg = self.backwards(mng, graph)
             again = self.forward(mng, topo)
@@ -266,7 +263,6 @@ class LocalPassOptimizer:
         return n, changes
 
 
-
 class PatternEquilibriumOptimizer:
     """Apply a set of local pattern optimizations until equilibrium."""
 
@@ -288,6 +284,7 @@ class PatternEquilibriumOptimizer:
         while True:
             changes = False
             nodes = list(dfs(graph.output, succ_deeper))
+
             def new_node(_, n):
                 nodes.append(n)
             mng.events.add_node.register(new_node)

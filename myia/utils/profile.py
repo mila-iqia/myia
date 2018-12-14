@@ -1,11 +1,11 @@
-from time import perf_counter as prof_counter
+from time import perf_counter as prof_counter  # noqa
+
 
 def unit(secs):
     return "%.3gs" % secs
 
 
 def print_profile(prof, *, indent=0):
-    steps = dict()
     total = prof.pop('__total__')
     count = prof.pop('__count__', None)
     runtime = 0
