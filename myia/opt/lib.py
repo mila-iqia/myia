@@ -311,7 +311,7 @@ def simplify_array_map(optimizer, node, equiv):
             args = [to_outer(arg) for arg in out.inputs[1:]]
             return node.graph.apply(P.array_map, out.inputs[0], *args)
         else:
-            return node
+            return node  # pragma: no cover
 
     except NotImplementedError:
         if g.flags.get('inline_inside'):

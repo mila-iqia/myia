@@ -177,10 +177,8 @@ class NodeMap:
                 assert isinstance(interest, Primitive)
                 self._d.setdefault(interest, []).append(opt)
 
-        if opt is None:
-            return do_register
-        else:
-            do_register(opt)
+        # There could be the option to return do_register also.
+        do_register(opt)
 
     def get(self, node):
         """Get a list of optimizers that could apply for a node."""
@@ -205,7 +203,7 @@ class LocalPassOptimizer:
             mng = self.optimizer.resources.manager
             mng.add_graph(graph)
         else:
-            mng = manage(graph)
+            mng = manage(graph)  # noqa
 
         changes = False
         again = True
@@ -291,56 +289,6 @@ class LocalPassOptimizer:
                     break
 
         return n, changes
-
-
-class PatternEquilibriumOptimizer:
-    """Apply a set of local pattern optimizations until equilibrium."""
-
-    def __init__(self, node_map, optimizer=None):
-        """Initialize a PatternEquilibriumOptimizer."""
-        self.node_map = node_map
-        self.optimizer = optimizer
-
-    def __call__(self, graph):
-        """Apply optimizations until equilibrium on given graphs."""
-        if self.optimizer is not None:
-            mng = self.optimizer.resources.manager
-            mng.add_graph(graph)
-        else:
-            mng = manage(graph)
-
-        any_changes = False
-
-        while True:
-            changes = False
-            nodes = list(dfs(graph.output, succ_deeper))
-
-            def new_node(_, n):
-                nodes.append(n)
-            mng.events.add_node.register(new_node)
-
-            for node in nodes:
-                if node not in mng.all_nodes:
-                    continue
-                for transformer in self.node_map.get(node):
-                    new = transformer(self.optimizer, node)
-                    if new is True:
-                        changes = True
-                        any_changes = True
-                        break
-                    elif new and new is not node:
-                        new.expect_inferred.update(node.inferred)
-                        mng.replace(node, new)
-                        changes = True
-                        any_changes = True
-                        break
-
-            mng.events.add_node.remove(new_node)
-
-            if not changes:
-                break
-
-        return any_changes
 
 
 class GraphTransform:

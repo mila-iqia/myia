@@ -5,7 +5,6 @@ from .opt import (  # noqa
     PatternSubstitutionOptimization,
     NodeMap, pattern_replacer,
     LocalPassOptimizer,
-    PatternEquilibriumOptimizer,
     GraphTransform,
 )
 

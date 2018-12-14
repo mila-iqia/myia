@@ -14,7 +14,8 @@ debug_fn = standard_debug_pipeline \
     .select('parse', 'resolve', 'infer', 'specialize', 'export')
 
 
-def parse_compare(*tests, optimize=True, array=False, python=True):
+def parse_compare(*tests, optimize=True, array=False, profile=False,
+                  python=True):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -37,7 +38,7 @@ def parse_compare(*tests, optimize=True, array=False, python=True):
             if python:
                 ref_result = fn(*map(copy, args))
             argspec = tuple({'value': a} for a in args)
-            res = pipeline.run(input=fn, argspec=argspec)
+            res = pipeline.run(input=fn, argspec=argspec, profile=profile)
             myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))
             if python:
