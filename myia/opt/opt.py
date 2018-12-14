@@ -3,10 +3,8 @@
 from weakref import WeakKeyDictionary
 from collections import deque
 
-from ..ir import ANFNode, Apply, Constant, Graph, Special, manage, \
-    succ_deeper
+from ..ir import ANFNode, Apply, Constant, Graph, Special, manage
 from ..prim import Primitive
-from ..graph_utils import dfs
 from ..utils.unify import Unification, Var
 
 
