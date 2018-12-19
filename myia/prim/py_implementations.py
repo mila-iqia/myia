@@ -57,6 +57,13 @@ def scalar_sub(x, y):
     return x - y
 
 
+@register(primops.scalar_maximum)
+def scalar_maximum(x, y):
+    """Implement `scalar_exp`."""
+    _assert_scalar(x, y)
+    return np.maximum(x, y)
+
+
 @register(primops.scalar_mul)
 def scalar_mul(x, y):
     """Implement `scalar_mul`."""

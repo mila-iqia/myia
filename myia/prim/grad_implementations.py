@@ -17,7 +17,7 @@ from .py_implementations import \
     scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
     scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
     array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
-    reshape, scalar_cast, typeof, invert_permutation
+    reshape, scalar_cast, typeof, invert_permutation, scalar_maximum
 
 
 parse = standard_pipeline \
@@ -119,6 +119,12 @@ def bprop_scalar_add(x, y, out, dout):
 def bprop_scalar_sub(x, y, out, dout):
     """Backpropagator for primitive `scalar_sub`."""
     return (dout, scalar_usub(dout))
+
+
+@register_bprop(primops.scalar_maximum)
+def bprop_scalar_maximum(x, y, out, dout):
+    """Backpropagator fŒor primitive `scalar_maximum`."""
+    return (scalar_maximum(dout, 0.0), scalar_maximum(dout, 0.0))
 
 
 @register_bprop(primops.scalar_mul)

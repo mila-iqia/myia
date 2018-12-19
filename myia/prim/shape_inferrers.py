@@ -110,7 +110,7 @@ shape_inferrer = partial(register_inferrer,
 
 @shape_inferrer(P.scalar_add, P.scalar_sub, P.scalar_mul, P.scalar_div,
                 P.scalar_mod, P.scalar_pow, P.scalar_trunc, P.scalar_floor,
-                P.scalar_uadd, P.scalar_usub, P.scalar_exp, P.scalar_log,
+                P.scalar_uadd, P.scalar_usub, P.scalar_exp, P.scalar_log, P.scalar_maximum,
                 P.scalar_sin, P.scalar_cos, P.scalar_tan,
                 P.scalar_eq, P.scalar_lt, P.scalar_gt, P.scalar_ne,
                 P.scalar_le, P.scalar_ge,

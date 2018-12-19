@@ -391,6 +391,6 @@ class VMExporter(PipelineStep):
 
 step_wrap_primitives = WrapPrimitives.partial()
 step_compile = CompileGraphs.partial(
-    linear_impl='nnvm', target='cpu', dev_id=0)
+    linear_impl='debug', target='cpu', dev_id=0)
 step_link = LinkInstrs.partial()
 step_export = VMExporter.partial()

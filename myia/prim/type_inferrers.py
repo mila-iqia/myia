@@ -329,7 +329,7 @@ async def infer_type_arith_unary_float(track, x):
     return await track.will_check(Float, x)
 
 
-@type_inferrer(P.scalar_add, P.scalar_sub, P.scalar_mul, P.scalar_div,
+@type_inferrer(P.scalar_add, P.scalar_sub, P.scalar_mul, P.scalar_div, P.scalar_maximum,
                P.scalar_mod, P.scalar_pow, nargs=2)
 async def infer_type_arith_bin(track, x, y):
     """Infer the return type of a binary arithmetic operator."""

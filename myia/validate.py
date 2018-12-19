@@ -87,6 +87,7 @@ whitelist = frozenset({
     P.scalar_uadd,
     P.scalar_usub,
     P.scalar_exp,
+    P.scalar_maximum,
     P.scalar_log,
     P.scalar_sin,
     P.scalar_cos,

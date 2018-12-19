@@ -71,6 +71,12 @@ def add(x, y):
 
 
 @core
+def maximum(x, y):
+    """Implementation of `maximum`."""
+    return arrayable_binary('__maximum__', x, y)
+
+
+@core
 def sub(x, y):
     """Implementation of `sub`."""
     return arrayable_binary('__sub__', x, y)
@@ -98,6 +104,12 @@ def floordiv(x, y):
 def mod(x, y):
     """Implementation of `mod`."""
     return arrayable_binary('__mod__', x, y)
+
+
+@core
+def pow(x, y):
+    """Implementation of `pow`."""
+    return arrayable_binary('__pow__', x, y)
 
 
 @core
@@ -462,6 +474,12 @@ def array_sub(xs, ys):
 def array_mul(xs, ys):
     """Implementation of `array_mul`."""
     return broadcastable_binary(mul, xs, ys)
+
+
+@core
+def array_maximum(xs, ys):
+    """Implementation of `array_maximum`."""
+    return broadcastable_binary(maximum, xs, ys)
 
 
 @core

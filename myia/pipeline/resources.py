@@ -121,6 +121,7 @@ standard_object_map = {
     np.sin: C.sin,
     np.cos: C.cos,
     np.tan: C.tan,
+    np.maximum: C.maximum,
 }
 
 
@@ -134,6 +135,7 @@ standard_method_map = TypeMap({
     },
     dtype.Int: {
         '__add__': P.scalar_add,
+        '__maximum__': P.scalar_maximum,
         '__sub__': P.scalar_sub,
         '__mul__': P.scalar_mul,
         '__floordiv__': C.int_floordiv,
@@ -155,6 +157,7 @@ standard_method_map = TypeMap({
     },
     dtype.UInt: {
         '__add__': P.scalar_add,
+        '__maximum__': P.scalar_maximum,
         '__sub__': P.scalar_sub,
         '__mul__': P.scalar_mul,
         '__floordiv__': P.scalar_div,
@@ -176,6 +179,7 @@ standard_method_map = TypeMap({
     },
     dtype.Float: {
         '__add__': P.scalar_add,
+        '__maximum__': P.scalar_maximum,
         '__sub__': P.scalar_sub,
         '__mul__': P.scalar_mul,
         '__floordiv__': C.float_floordiv,
@@ -211,6 +215,7 @@ standard_method_map = TypeMap({
     },
     dtype.Array: {
         '__add__': C.array_add,
+        '__maximum__': C.array_maximum,
         '__sub__': C.array_sub,
         '__mul__': C.array_mul,
         '__truediv__': C.array_truediv,
