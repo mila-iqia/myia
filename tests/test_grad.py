@@ -297,7 +297,7 @@ def test_if(a, b):
     else:
         return b
 
-@grad_test((1.0, 4.0), (5.0, -13.0))
+@grad_test((1.0, 4.0), (5.0, -13.0), (4.0,4.0))
 def test_grad_maxmium(x, y):
     return scalar_maximum(x, y)
 

@@ -124,7 +124,7 @@ def bprop_scalar_sub(x, y, out, dout):
 @register_bprop(primops.scalar_maximum)
 def bprop_scalar_maximum(x, y, out, dout):
     """Backpropagator fŒor primitive `scalar_maximum`."""
-    return (switch(x>=y, dout, zeros_like(x)), switch(y>=x, dout, zeros_like(y)))
+    return (switch(x>y, dout, switch(x==y, dout/2, zeros_like(x))), switch(y>x, dout, switch(x==y, dout/2, zeros_like(y))))
 
 
 @register_bprop(primops.scalar_mul)
