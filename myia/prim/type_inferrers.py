@@ -420,6 +420,12 @@ async def infer_type_dot(track, a, b):
     """Infer the return type of dot."""
     return await track.will_check(Array, a, b)
 
+@type_inferrer(P.conv_op, nargs=5)
+async def infer_type_conv_op(track, a, b,c,d,e):
+    """Infer the return type of dot."""
+    return await track.will_check(Array, a)
+
+
 
 @type_inferrer(P.return_, nargs=1)
 async def infer_type_return_(track, x):

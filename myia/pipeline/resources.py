@@ -12,6 +12,7 @@ from ..prim import ops as P
 from ..specialize import TypeSpecializer
 from ..utils import overload, TypeMap, UNKNOWN
 
+from conv_op import conv_op
 from .pipeline import PipelineResource
 
 
@@ -40,6 +41,8 @@ scalar_object_map = {
     operations.and_: P.bool_and,
     operations.or_: P.bool_or,
     operations.matmul: P.dot,
+    #kpy
+    conv_op: P.conv_op,
     operations.getitem: C.getitem,
     operations.setitem: C.setitem,
     operations.bool: P.identity,
@@ -233,6 +236,8 @@ standard_method_map = TypeMap({
         '__le__': C.array_le,
         '__ge__': C.array_ge,
         '__matmul__': P.dot,
+        #kpy
+        '__conv__': P.conv_op,
         '__len__': P.array_len,
         '__getitem__': P.array_getitem,
         '__setitem__': P.array_setitem,

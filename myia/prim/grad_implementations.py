@@ -120,12 +120,10 @@ def bprop_scalar_sub(x, y, out, dout):
     """Backpropagator for primitive `scalar_sub`."""
     return (dout, scalar_usub(dout))
 
-
 @register_bprop(primops.scalar_maximum)
 def bprop_scalar_maximum(x, y, out, dout):
     """Backpropagator fŒor primitive `scalar_maximum`."""
     return (switch(x>y, dout, switch(x==y, dout/2, zeros_like(x))), switch(y>x, dout, switch(x==y, dout/2, zeros_like(y))))
-
 
 @register_bprop(primops.scalar_mul)
 def bprop_scalar_mul(x, y, out, dout):
@@ -225,6 +223,43 @@ def bprop_dot(x, y, out, dout):
     """Backpropagator for primitive `dot`."""
     return (dot(dout, transpose(y, (1, 0))),
             dot(transpose(x, (1, 0)), dout))
+
+@register_bprop(primops.conv_op)
+def bprop_conv_op(x, height, width, y, z,out, dout):
+    """Backpropagator for primitive `conv_op`."""
+    #height, width = x.shape
+    h_size = (height - y)//z+1
+    w_size = (width - y)//z+1
+    dx = zeros_like((height, width))
+    h = 0
+    w = 0
+    while h < h_size:
+        while w< w_size:
+    #for h in range(h_size):
+    #    for w in range(w_size):
+            db = reshape(dout[h*w_size+w], (y, y))
+            #dx[h:h+1, w:w+1] = dx[h:h+1, w:w+1] + db
+            a=dx[h]
+            b=a[w]
+            #c=array_to_scalar(b)
+            #c = c+array_to_scalar(db[0][0])
+            c=b+db[0][0]
+            tuple_setitem(a, w, c)
+            tuple_setitem(dx, h, a)
+
+            #dx[h] = db[0]
+           # tuple_setitem(dx, h, dx[h]+db[0])
+            #tuple_setitem(dx, (h,w), dx[h][w]+db)
+            #tuple_setitem(dx, (h,w), dx[h][w]+db)
+            #dx[h][w] = db[0][0]
+            #dx[h][w+1] = db[0][1]
+            #dx[h+1][w] = db[1][0]
+            #dx[h+1][w+1] = db[1][1]
+            #dx[h+w_size+w] = db[0]
+            #dx[h+w_size+w+1] = db[1]
+            w = w +1
+        h = h +1
+    return (dx,0,0,0,0)
 
 
 @register_bprop(primops.reshape)

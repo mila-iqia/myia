@@ -129,6 +129,8 @@ whitelist = frozenset({
     P.reshape,
     P.transpose,
     P.dot,
+    #kpy
+    P.conv_op,
     P.switch,
     P.return_,
     # P.list_map,
