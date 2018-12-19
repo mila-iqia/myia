@@ -12,7 +12,7 @@ from myia.grad import J as realJ
 from myia.pipeline import pipeline_function, PipelineDefinition, steps
 from myia.pipeline.steps import Validator
 from myia.prim import ops as P, Primitive
-from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
+from myia.prim.py_implementations import J, scalar_add, scalar_mul, scalar_maximum, \
     array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
     distribute, dot, reshape, transpose, scalar_cast
 from myia.prim.py_implementations import py_implementations as pyi
@@ -296,6 +296,10 @@ def test_if(a, b):
         return a
     else:
         return b
+
+@grad_test((1.0, 4.0), (5.0, -13.0))
+def test_grad_maxmium(x, y):
+    return scalar_maximum(x, y)
 
 
 @grad_test((4.0, 5.0), (6.4, -7.8))
