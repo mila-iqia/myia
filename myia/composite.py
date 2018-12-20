@@ -113,12 +113,6 @@ def pow(x, y):
 
 
 @core
-def pow(x, y):
-    """Implementation of `pow`."""
-    return arrayable_binary('__pow__', x, y)
-
-
-@core
 def floor(x):
     """Implementation of `floor`."""
     return x.__floor__()

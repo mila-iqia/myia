@@ -355,12 +355,14 @@ async def infer_shape_invert_permutation(track, permutation):
     t = await permutation['type']
     return TupleShape([NOSHAPE for _ in t.elements])
 
-@shape_inferrer(P.conv_op, nargs=5)
-async def infer_shape_conv_op(track, a, b,c,e,f):
+
+@shape_inferrer(P.array_conv, nargs=5)
+async def infer_shape_array_conv(track, a, height, width, kernel_size, stride):
     a_shp = await a['shape']
     #h_size = (a_shp[0] - b)//c+1
     #w_size = (a_shp[1] - b)//c+1
     return (4, 4)
+
 
 @shape_inferrer(P.dot, nargs=2)
 async def infer_shape_dot(track, a, b):

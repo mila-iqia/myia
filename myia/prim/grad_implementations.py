@@ -224,9 +224,10 @@ def bprop_dot(x, y, out, dout):
     return (dot(dout, transpose(y, (1, 0))),
             dot(transpose(x, (1, 0)), dout))
 
-@register_bprop(primops.conv_op)
-def bprop_conv_op(x, height, width, y, z,out, dout):
-    """Backpropagator for primitive `conv_op`."""
+
+@register_bprop(primops.array_conv)
+def bprop_array_conv(x, height, width, y, z, out, dout):
+    """Backpropagator for primitive `array_conv`."""
     #height, width = x.shape
     h_size = (height - y)//z+1
     w_size = (width - y)//z+1

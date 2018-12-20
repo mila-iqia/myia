@@ -104,8 +104,8 @@ distribute = Primitive('distribute')
 reshape = Primitive('reshape')
 transpose = Primitive('transpose')
 dot = Primitive('dot')
-#kpy
-conv_op = Primitive('conv_op')
+# exprimental
+array_conv = Primitive('array_conv')
 
 
 ##############
