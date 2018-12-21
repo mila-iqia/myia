@@ -350,12 +350,12 @@ class PartialXInferrer(XInferrer):
         self.args = args
 
     async def __call__(self, track, *refs):
-        args = tuple([await ref['abstract'] for ref in refs])
-        args = tuple(VirtualReference({'abstract': arg})
-                     for arg in self.args + args)
-        if args not in self.cache:
-            self.cache[args] = await self.fn(track, *args)
-        return self.cache[args]
+        argvals = tuple([await ref['abstract'] for ref in refs])
+        if argvals not in self.cache:
+            args = tuple(VirtualReference({'abstract': arg})
+                        for arg in self.args + argvals)
+            self.cache[argvals] = await self.fn(track, *args)
+        return self.cache[argvals]
 
 
 class VirtualXInferrer(XInferrer):
