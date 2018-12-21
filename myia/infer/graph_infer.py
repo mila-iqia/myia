@@ -812,38 +812,72 @@ class InferenceEngine:
             outspec (optional): Expected inference results. If provided,
                 inference results will be checked against them.
         """
-        argrefs = [self.vref(arg) for arg in argspec]
-        argspec = [{t: ref.values[t] for t in self.all_track_names}
-                   for ref in argrefs]
+        if 'abstract' in self.tracks:
+            argrefs = [self.vref(arg) for arg in argspec]
+            argspec = [ref.values['abstract'] for ref in argrefs]
 
-        self.mng.add_graph(graph)
-        empty_context = self.context_class.empty()
-        root_context = empty_context.add(graph, as_frozen(argspec))
-        output_ref = self.ref(graph.return_, root_context)
+            self.mng.add_graph(graph)
+            empty_context = self.context_class.empty()
+            root_context = empty_context.add(graph, as_frozen(argspec))
+            output_ref = self.ref(graph.return_, root_context)
 
-        async def _run():
-            for track in tracks:
-                inf = GraphInferrer(self.tracks[track],
-                                    graph, empty_context,
-                                    broaden=False)
-                self.loop.schedule(inf(*argrefs))
+            async def _run():
+                from ..abstract.inf import GraphXInferrer
+                inf = GraphXInferrer(graph, empty_context)
+                self.loop.schedule(
+                    inf(self.tracks['abstract'], None, argrefs)
+                )
 
-        async def _check():
-            for track in tracks:
-                expected = outspec[track]
-                if expected not in (UNKNOWN, ANYTHING):
-                    self.equiv.declare_equivalent(
-                        output_ref.get_raw(track),
-                        expected,
-                        [output_ref]
-                    )
+            async def _check():
+                for track in tracks:
+                    expected = outspec[track]
+                    if expected not in (UNKNOWN, ANYTHING):
+                        self.equiv.declare_equivalent(
+                            output_ref.get_raw(track),
+                            expected,
+                            [output_ref]
+                        )
 
-        self.run_coroutine(_run())
-        if outspec is not None:
-            self.run_coroutine(_check())
+            self.run_coroutine(_run())
+            if outspec is not None:
+                self.run_coroutine(_check())
 
-        results = {name: output_ref.get(name) for name in tracks}
-        return results, root_context
+            results = {name: output_ref.get(name) for name in tracks}
+            return results, root_context
+
+        else:
+            argrefs = [self.vref(arg) for arg in argspec]
+            argspec = [{t: ref.values[t] for t in self.all_track_names}
+                       for ref in argrefs]
+
+            self.mng.add_graph(graph)
+            empty_context = self.context_class.empty()
+            root_context = empty_context.add(graph, as_frozen(argspec))
+            output_ref = self.ref(graph.return_, root_context)
+
+            async def _run():
+                for track in tracks:
+                    inf = GraphInferrer(self.tracks[track],
+                                        graph, empty_context,
+                                        broaden=False)
+                    self.loop.schedule(inf(*argrefs))
+
+            async def _check():
+                for track in tracks:
+                    expected = outspec[track]
+                    if expected not in (UNKNOWN, ANYTHING):
+                        self.equiv.declare_equivalent(
+                            output_ref.get_raw(track),
+                            expected,
+                            [output_ref]
+                        )
+
+            self.run_coroutine(_run())
+            if outspec is not None:
+                self.run_coroutine(_check())
+
+            results = {name: output_ref.get(name) for name in tracks}
+            return results, root_context
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""

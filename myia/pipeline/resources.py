@@ -343,7 +343,8 @@ class InferenceResource(PipelineResource):
                  required_tracks,
                  tied_tracks,
                  context_class,
-                 erase_value):
+                 erase_value,
+                 version=1):
         """Initialize an InferenceResource."""
         super().__init__(pipeline_init)
         self.manager = self.resources.manager
@@ -352,6 +353,7 @@ class InferenceResource(PipelineResource):
         self.tied_tracks = tied_tracks
         self.context_class = context_class
         self.erase_value = erase_value
+        self.version = version
         self.engine = InferenceEngine(
             self.pipeline,
             tracks=self.tracks,
@@ -386,18 +388,31 @@ class InferenceResource(PipelineResource):
                         arg[track_name] = track.from_external(arg[track_name])
                     else:
                         arg[track_name] = track.default(arg)
+        if self.erase_value:
+            from ..abstract.base import broaden
+            for arg in argspec:
+                if 'abstract' in arg:
+                    arg['abstract'] = broaden(arg['abstract'])
 
     def infer(self, graph, argspec, outspec=None, clear=False):
         """Perform inference."""
         if clear:
             self.engine.cache.clear()
             for node in self.manager.all_nodes:
-                orig_t = node.type
-                node.inferred = defaultdict(lambda: UNKNOWN)
-                if node.is_constant() \
-                        and dtype.ismyiatype(orig_t) \
-                        and not dtype.ismyiatype(orig_t, dtype.Function):
-                    node.type = orig_t
+                if self.resources.inferrer.version == 1:
+                    orig_t = node.type
+                    node.inferred = defaultdict(lambda: UNKNOWN)
+                    if node.is_constant() \
+                            and dtype.ismyiatype(orig_t) \
+                            and not dtype.ismyiatype(orig_t, dtype.Function):
+                        node.type = orig_t
+                else:
+                    from ..abstract.base import AbstractScalar
+                    orig_t = node.abstract
+                    node.inferred = defaultdict(lambda: UNKNOWN)
+                    if node.is_constant() \
+                            and isinstance(orig_t, AbstractScalar):
+                        node.abstract = orig_t
         self.fill_in(argspec)
         return self.engine.run(
             graph,
@@ -408,7 +423,11 @@ class InferenceResource(PipelineResource):
 
     def specialize(self, graph, context):
         """Perform specialization."""
-        spc = TypeSpecializer(self.engine)
+        if self.version == 1:
+            spc = TypeSpecializer(self.engine)
+        else:
+            from ..aspecialize import TypeSpecializer as TypeSpecializer2
+            spc = TypeSpecializer2(self.engine)
         result = spc.run(graph, context)
         self.manager.keep_roots(result)
         return result

@@ -174,17 +174,20 @@ def step_erase_class(self, graph, argspec, outspec):
     Outputs:
         graph: The prepared graph.
     """
-    mng = self.resources.manager
-    erase_class(graph, mng)
-    new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
-    graph = self.resources.inferrer.renormalize(graph, new_argspec)
-    new_outspec = dict(graph.output.inferred)
-    return {'graph': graph,
-            'orig_argspec': argspec,
-            'argspec': new_argspec,
-            'orig_outspec': outspec,
-            'outspec': new_outspec,
-            'erase_class': True}
+    if self.resources.inferrer.version == 1:
+        mng = self.resources.manager
+        erase_class(graph, mng)
+        new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+        graph = self.resources.inferrer.renormalize(graph, new_argspec)
+        new_outspec = dict(graph.output.inferred)
+        return {'graph': graph,
+                'orig_argspec': argspec,
+                'argspec': new_argspec,
+                'orig_outspec': outspec,
+                'outspec': new_outspec,
+                'erase_class': True}
+    else:
+        return {}
 
 
 ############
@@ -318,16 +321,19 @@ def step_erase_tuple(self, graph, argspec, outspec, erase_class=False):
     Outputs:
         graph: The prepared graph.
     """
-    assert erase_class
-    mng = self.resources.manager
-    erase_tuple(graph, mng)
-    new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
-    graph = self.resources.inferrer.renormalize(graph, new_argspec)
-    new_outspec = dict(graph.output.inferred)
-    return {'graph': graph,
-            'argspec': new_argspec,
-            'outspec': new_outspec,
-            'erase_tuple': True}
+    if self.resources.inferrer.version == 1:
+        assert erase_class
+        mng = self.resources.manager
+        erase_tuple(graph, mng)
+        new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+        graph = self.resources.inferrer.renormalize(graph, new_argspec)
+        new_outspec = dict(graph.output.inferred)
+        return {'graph': graph,
+                'argspec': new_argspec,
+                'outspec': new_outspec,
+                'erase_tuple': True}
+    else:
+        return {}
 
 
 ############

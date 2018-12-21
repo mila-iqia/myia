@@ -8,10 +8,31 @@ from .infer import DEAD
 from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
+from .abstract.base import abstract_clone, \
+    AbstractClass, AbstractJTagged, AbstractFunction, AbstractScalar
 
 
 class ValidationError(Exception):
     """Error validating a Graph."""
+
+
+@abstract_clone.variant
+def validate_abstract(self, a: (AbstractClass, AbstractJTagged)):
+    raise ValidationError(f'Illegal type in the graph: {a}')
+
+
+@overload
+def validate_abstract(self, a: AbstractScalar):
+    t = a.values['type']
+    if ismyiatype(t, (Problem, External)):
+        raise ValidationError(f'Illegal type in the graph: {a}')
+
+
+@overload
+def validate_abstract(self, a: AbstractFunction):
+    v = a.values['value']
+    if len(v) != 1:
+        raise ValidationError(f'Multiple possibilities for function: {a}')
 
 
 @type_cloner.variant
@@ -189,13 +210,20 @@ class Validator:
     def _validate_shape(self, node):
         return _validate_shape(node.type, node.inferred['shape'])
 
+    def _validate_abstract(self, node):
+        return validate_abstract(node.inferred['abstract'])
+
     def _run(self, root):
         manager = manage(root)
         for node in list(manager.all_nodes):
-            self._test(node, self._validate_type)
-            self._test(node, self._validate_shape)
-            self._test(node, self._validate_oper)
-            self._test(node, self._validate_consistency)
+            if self._validate_type_fn is None:
+                self._test(node, self._validate_abstract)
+                self._test(node, self._validate_oper)
+            else:
+                self._test(node, self._validate_type)
+                self._test(node, self._validate_shape)
+                self._test(node, self._validate_oper)
+                self._test(node, self._validate_consistency)
 
         def stringify(err):
             return f'* {err.node} -- {err.args[0]}'

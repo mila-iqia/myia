@@ -154,6 +154,29 @@ scalar_new_pipeline = new_pipeline.configure({
 })
 
 
+debug_new_pipeline = PipelineDefinition(
+    resources=new_resources,
+    steps=dict(
+        parse=steps.step_parse,
+        resolve=steps.step_resolve,
+        infer=steps.step_infer,
+        specialize=steps.step_specialize,
+        erase_class=steps.step_erase_class,
+        opt=steps.step_opt,
+        erase_tuple=steps.step_erase_tuple,
+        cconv=steps.step_cconv,
+        validate=steps.step_validate,
+        export=steps.step_debug_export,
+        wrap=steps.step_wrap,
+    )
+)
+
+
+scalar_debug_new_pipeline = debug_new_pipeline.configure({
+    'convert.object_map': scalar_object_map
+})
+
+
 ######################
 # Pre-made utilities #
 ######################
