@@ -15,7 +15,8 @@ from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
 from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
     reify, JTransformedFunction, AbstractJTagged, AbstractTuple, \
-    sensitivity_transform, VirtualFunction, AbstractFunction
+    sensitivity_transform, VirtualFunction, AbstractFunction, \
+    VALUE, TYPE, SHAPE
 
 
 _number_types = [
@@ -38,7 +39,7 @@ class AbstractTrack(Track):
             for prim, cons in constructors.items()
         }
         self.max_depth = max_depth
-        self.subtracks = ['value', 'type', 'shape']
+        self.subtracks = [VALUE, TYPE, SHAPE]
 
     get_inferrer_for = Overload()
 
@@ -96,7 +97,7 @@ class AbstractTrack(Track):
 
     async def execute(self, fn, *args):
         infs = [self.get_inferrer_for(poss, args)
-                for poss in fn.values['value']]
+                for poss in fn.values[VALUE]]
         argrefs = [VirtualReference({'abstract': a}) for a in args]
         return await execute_inferrers(self, infs, argrefs)
 
@@ -111,7 +112,7 @@ class AbstractTrack(Track):
 
         args = [await ref['abstract'] for ref in argrefs]
         infs = [self.get_inferrer_for(poss, args)
-                for poss in fn.values['value']]
+                for poss in fn.values[VALUE]]
 
         return await self.engine.loop.schedule(
             execute_inferrers(self, infs, argrefs),
@@ -124,15 +125,15 @@ class AbstractTrack(Track):
         """Get the property for a ref of a Constant node."""
         v = self.engine.pipeline.resources.convert(ctref.node.value)
         res = self.from_value(v, ctref.context)
-        t = res.build('type')
+        t = res.build(TYPE)
         if dtype.ismyiatype(t, dtype.Number):
             prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
-            res.values['type'] = self.engine.loop.create_pending_from_list(
+            res.values[TYPE] = self.engine.loop.create_pending_from_list(
                 _number_types, t, prio
             )
             # v = RestrictedVar(_number_types)
             # prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
-            # res.values['type'] = self.engine.loop.create_var(v, t, prio)
+            # res.values[TYPE] = self.engine.loop.create_var(v, t, prio)
         return res
 
     def from_value(self, v, context):
@@ -148,14 +149,14 @@ class AbstractTrack(Track):
         elif is_dataclass_type(v):
             # rec = self.constructors[P.make_record]()
             # typ = dtype.pytype_to_myiatype(v)
-            # vref = self.engine.vref({'value': typ, 'type': TypeType})
+            # vref = self.engine.vref({VALUE: typ, TYPE: TypeType})
             # return PartialInferrer(self, rec, [vref])
 
             typ = dtype.pytype_to_myiatype(v)
             typarg = AbstractScalar({
-                'value': typ,
-                'type': dtype.TypeType,
-                'shape': dshape.NOSHAPE,
+                VALUE: typ,
+                TYPE: dtype.TypeType,
+                SHAPE: dshape.NOSHAPE,
             })
             return AbstractFunction(
                 PartialApplication(
@@ -374,7 +375,7 @@ class VirtualXInferrer(XInferrer):
 
 def _jinv(x):
     if isinstance(x, AbstractFunction):
-        v = x.values['value']
+        v = x.values[VALUE]
         if isinstance(v, Possibilities):
             pass
     if isinstance(x, AbstractJTagged):
@@ -385,7 +386,7 @@ def _jinv(x):
 
 def _jtag(x):
     if isinstance(x, AbstractFunction):
-        v = x.values['value']
+        v = x.values[VALUE]
         if isinstance(v, Possibilities):
             return AbstractFunction(*[JTransformedFunction(poss)
                                       for poss in v])

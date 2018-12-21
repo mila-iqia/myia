@@ -22,6 +22,7 @@ from .base import (
     JTransformedFunction,
     Possibilities,
     sensitivity_transform,
+    VALUE, TYPE, SHAPE,
 )
 
 from .inf import (
@@ -72,7 +73,7 @@ class StandardXInferrer(XInferrer):
             if typ is None:
                 pass
             elif dtype.ismyiatype(typ):
-                await reify(track.chk(typ, arg.values.get('type', ABSENT)))
+                await reify(track.chk(typ, arg.values.get(TYPE, ABSENT)))
             elif isinstance(typ, type) and issubclass(typ, AbstractBase):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
@@ -109,7 +110,7 @@ class WithImplXInferrer(XInferrer):
         if depth >= track.max_depth:
             outval = ANYTHING
         else:
-            values = [arg.values['value'] for arg in args]
+            values = [arg.values[VALUE] for arg in args]
             if any(v is ANYTHING for v in values):
                 outval = ANYTHING
             else:
@@ -118,9 +119,9 @@ class WithImplXInferrer(XInferrer):
         if outval is ANYTHING:
             depth = track.max_depth
         rval = AbstractScalar({
-            'value': outval,
-            'type': outtype,
-            'shape': dshape.NOSHAPE
+            VALUE: outval,
+            TYPE: outtype,
+            SHAPE: dshape.NOSHAPE
         })
         rval.count = min(depth + 1, track.max_depth)
         return rval
@@ -142,7 +143,7 @@ class UniformPrimitiveXInferrer(WithImplXInferrer):
         outtype = self.outtype
         if any(not isinstance(arg, AbstractScalar) for arg in args):
             raise MyiaTypeError('Expected scalar')
-        ts = [arg.values['type'] for arg in args]
+        ts = [arg.values[TYPE] for arg in args]
         for typ, indexes in self.typemap.items():
             selection = [ts[i] for i in indexes]
             # res = await track.will_check(typ, *selection)
@@ -181,8 +182,8 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
     """
     resources = track.engine.pipeline.resources
 
-    data_t = data.build('type')
-    item_v = item.build('value', default=ANYTHING)
+    data_t = data.build(TYPE)
+    item_v = item.build(VALUE, default=ANYTHING)
 
     if item_v is ANYTHING:
         raise InferenceError(
@@ -205,7 +206,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
             method = data_t.methods[item_v]
             method = resources.convert(method)
             inferrer = track.from_value(method, Context.empty())
-            fns = inferrer.values['value']
+            fns = inferrer.values[VALUE]
             assert isinstance(fns, Possibilities)
             return AbstractFunction(*[
                 PartialApplication(fn, (data,)) for fn in fns
@@ -217,7 +218,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
         method, = args
         method = resources.convert(method)
         inferrer = track.from_value(method, Context.empty())
-        fns = inferrer.values['value']
+        fns = inferrer.values[VALUE]
         assert isinstance(fns, Possibilities)
         return AbstractFunction(*[
             PartialApplication(fn, (data,)) for fn in fns
@@ -229,7 +230,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
 
     else:
         # Module or static namespace
-        data_v = data.build('value', default=ANYTHING)
+        data_v = data.build(VALUE, default=ANYTHING)
         if data_v is ANYTHING:
             raise InferenceError(
                 'Could not infer the type or the value of the object'
@@ -277,8 +278,8 @@ async def _resolve_case(resources, data_t, item_v, chk):
 def _shape_type(track, shp):
     shp_t = track.chk(AbstractTuple, shp)
     for elem_t in shp_t.elements:
-        # track.chk(dtype.UInt[64], elem_t.values['type'])
-        track.abstract_merge(dtype.UInt[64], elem_t.values['type'])
+        # track.chk(dtype.UInt[64], elem_t.values[TYPE])
+        track.abstract_merge(dtype.UInt[64], elem_t.values[TYPE])
     return shp_t
 
 
@@ -319,7 +320,7 @@ async def issubtype(x, model):
     elif dtype.ismyiatype(model, dtype.Number):
         if not isinstance(x, AbstractScalar):
             return False
-        t = x.values['type']
+        t = x.values[TYPE]
         if isinstance(t, Pending):
             async def chk(t):
                 return dtype.ismyiatype(t, model)
@@ -475,25 +476,25 @@ def _inf_bool_eq(x: Bool, y: Bool) -> Bool:
 
 @standard_prim(P.typeof)
 async def _inf_typeof(track, value):
-    t = value.build('type')
+    t = value.build(TYPE)
     return AbstractType({
-        'value': t,
-        'type': dtype.TypeType,
-        'shape': dshape.NOSHAPE
+        VALUE: t,
+        TYPE: dtype.TypeType,
+        SHAPE: dshape.NOSHAPE
     })
 
 
 @standard_prim(P.hastype)
 async def _inf_hastype(track, value, model: dtype.TypeType):
-    model_t = model.values['value']
+    model_t = model.values[VALUE]
     if model_t is ANYTHING:
         raise MyiaTypeError('hastype must be resolvable statically')
     else:
         v = await issubtype(value, model_t)
     return AbstractScalar({
-        'value': v,
-        'type': dtype.Bool,
-        'shape': dshape.NOSHAPE
+        VALUE: v,
+        TYPE: dtype.Bool,
+        SHAPE: dshape.NOSHAPE
     })
 
 
@@ -512,9 +513,9 @@ async def _inf_make_list(track, *args):
     if len(args) == 0:
         assert False
         # dflt = AbstractScalar({
-        #     'value': ANYTHING,
-        #     'type': dtype.Problem[VOID],
-        #     'shape': dshape.NOSHAPE,
+        #     VALUE: ANYTHING,
+        #     TYPE: dtype.Problem[VOID],
+        #     SHAPE: dshape.NOSHAPE,
         # })
     else:
         res = track.abstract_merge(*args)
@@ -524,7 +525,7 @@ async def _inf_make_list(track, *args):
 @standard_prim(P.make_record)
 async def infer_type_make_record(track, _cls: dtype.TypeType, *elems):
     """Infer the return type of make_record."""
-    cls = _cls.values['value']
+    cls = _cls.values[VALUE]
     if cls is ANYTHING:
         raise MyiaTypeError('Expected a class to inst')
     expected = list(cls.attributes.items())
@@ -546,7 +547,7 @@ async def infer_type_make_record(track, _cls: dtype.TypeType, *elems):
 
 @standard_prim(P.tuple_getitem)
 async def _inf_tuple_getitem(track, arg: AbstractTuple, idx: dtype.Int[64]):
-    idx_v = idx.values['value']
+    idx_v = idx.values[VALUE]
     if idx_v is ANYTHING:
         raise MyiaTypeError(
             'Tuples must be indexed with a constant'
@@ -574,7 +575,7 @@ async def _inf_tuple_setitem(track,
                              arg: AbstractTuple,
                              idx: dtype.Int[64],
                              value: AbstractBase):
-    idx_v = idx.values['value']
+    idx_v = idx.values[VALUE]
     if idx_v is ANYTHING:
         raise MyiaTypeError(
             'Tuples must be indexed with a constant'
@@ -640,27 +641,27 @@ async def _inf_getattr(track, data, item):
 @standard_prim(P.tuple_len)
 async def _inf_tuple_len(track, xs: AbstractTuple):
     return AbstractScalar({
-        'value': len(xs.elements),
-        'type': dtype.Int[64],
-        'shape': dshape.NOSHAPE
+        VALUE: len(xs.elements),
+        TYPE: dtype.Int[64],
+        SHAPE: dshape.NOSHAPE
     })
 
 
 @standard_prim(P.list_len)
 async def _inf_list_len(track, xs: AbstractList):
     return AbstractScalar({
-        'value': ANYTHING,
-        'type': dtype.Int[64],
-        'shape': dshape.NOSHAPE
+        VALUE: ANYTHING,
+        TYPE: dtype.Int[64],
+        SHAPE: dshape.NOSHAPE
     })
 
 
 @standard_prim(P.array_len)
 async def _inf_array_len(track, xs: AbstractArray):
     return AbstractScalar({
-        'value': ANYTHING,
-        'type': dtype.Int[64],
-        'shape': dshape.NOSHAPE
+        VALUE: ANYTHING,
+        TYPE: dtype.Int[64],
+        SHAPE: dshape.NOSHAPE
     })
 
 
@@ -689,12 +690,12 @@ async def _inf_list_reduce(track, fn, lst: AbstractList, dflt):
 
 @standard_prim(P.scalar_to_array)
 async def _inf_scalar_to_array(track, a: AbstractScalar):
-    return AbstractArray(a, {'shape': ()})
+    return AbstractArray(a, {SHAPE: ()})
 
 
 @standard_prim(P.array_to_scalar)
 async def _inf_array_to_scalar(track, a: AbstractArray):
-    a_shp = a.values['shape']
+    a_shp = a.values[SHAPE]
     if len(a_shp) != 0:
         raise MyiaShapeError("array_to_scalar requires shape ()")
     return a.element
@@ -706,15 +707,15 @@ async def _inf_broadcast_shape(track, xs: _shape_type, ys: _shape_type):
     shp_ys_n = len(ys.elements)
 
     from ..prim.py_implementations import broadcast_shape
-    shp_x = xs.build('value', default=ANYTHING)
-    shp_y = ys.build('value', default=ANYTHING)
+    shp_x = xs.build(VALUE, default=ANYTHING)
+    shp_y = ys.build(VALUE, default=ANYTHING)
     elems = []
     if shp_x is ANYTHING or shp_y is ANYTHING:
         for i in range(max(shp_xs_n, shp_ys_n)):
             elems.append(AbstractScalar({
-                'value': ANYTHING,
-                'type': dtype.UInt[64],
-                'shape': dshape.NOSHAPE
+                VALUE: ANYTHING,
+                TYPE: dtype.UInt[64],
+                SHAPE: dshape.NOSHAPE
             }))
     else:
         try:
@@ -723,9 +724,9 @@ async def _inf_broadcast_shape(track, xs: _shape_type, ys: _shape_type):
             raise MyiaTypeError('Cannot broadcast')
         for n in res:
             elems.append(AbstractScalar({
-                'value': n,
-                'type': dtype.UInt[64],
-                'shape': dshape.NOSHAPE
+                VALUE: n,
+                TYPE: dtype.UInt[64],
+                SHAPE: dshape.NOSHAPE
             }))
     return AbstractTuple(elems)
 
@@ -735,12 +736,12 @@ async def _inf_broadcast_shape(track, xs: _shape_type, ys: _shape_type):
 
 @standard_prim(P.shape)
 async def _inf_shape(track, a: AbstractArray):
-    shp = await reify(a.values['shape'])
+    shp = await reify(a.values[SHAPE])
     values = [
         AbstractScalar({
-            'value': entry,
-            'type': dtype.UInt[64],
-            'shape': dshape.NOSHAPE
+            VALUE: entry,
+            TYPE: dtype.UInt[64],
+            SHAPE: dshape.NOSHAPE
         })
         for entry in shp
     ]
@@ -755,7 +756,7 @@ async def _inf_array_map(track, fn, *arrays):
     subargs = [a.element for a in arrays]
     result = await track.execute(fn, *subargs)
 
-    shapes = [a.values['shape'] for a in arrays]
+    shapes = [a.values[SHAPE] for a in arrays]
     shape0, *rest = shapes
     if any(len(s) != len(shape0) for s in rest):
         raise MyiaShapeError("Expect same shapes for array_map")
@@ -772,7 +773,7 @@ async def _inf_array_map(track, fn, *arrays):
         else:
             raise MyiaShapeError("Expect same shapes for array_map")
 
-    return AbstractArray(result, {'shape': tuple(rshape)})
+    return AbstractArray(result, {SHAPE: tuple(rshape)})
 
 
 # array_scan = Primitive('array_scan')
@@ -784,8 +785,8 @@ async def _inf_array_reduce(track,
                             a: AbstractArray,
                             shp: _shape_type):
 
-    shp_i = await reify(a.values['shape'])
-    shp_v = shp.build('value', default=ANYTHING)
+    shp_i = await reify(a.values[SHAPE])
+    shp_v = shp.build(VALUE, default=ANYTHING)
     if shp_v == ANYTHING:
         raise AssertionError(
             'We currently require knowing the shape for reduce.'
@@ -801,15 +802,15 @@ async def _inf_array_reduce(track,
             )
 
     res = await track.execute(fn, a.element, a.element)
-    return AbstractArray(res, {'shape': shp_v})
+    return AbstractArray(res, {SHAPE: shp_v})
 
 
 @standard_prim(P.distribute)
 async def _inf_distribute(track, a: AbstractArray, _shp: _shape_type):
-    shp = _shp.build('value', default=ANYTHING)
+    shp = _shp.build(VALUE, default=ANYTHING)
     if shp == ANYTHING:
         shp = (ANYTHING,) * len(_shp.elements)
-    a_shp = await reify(a.values['shape'])
+    a_shp = await reify(a.values[SHAPE])
     delta = len(shp) - len(a_shp)
     if delta < 0:
         raise MyiaShapeError("Cannot distribute to smaller shape")
@@ -818,30 +819,30 @@ async def _inf_distribute(track, a: AbstractArray, _shp: _shape_type):
     for vs, s in zip(a_shp, shp):
         if vs != s and vs not in (1, ANYTHING) and s not in (1, ANYTHING):
             raise MyiaShapeError("Cannot change shape when distributing")
-    return AbstractArray(a.element, {'shape': shp})
+    return AbstractArray(a.element, {SHAPE: shp})
 
 
 @standard_prim(P.reshape)
 async def _inf_reshape(track, a: AbstractArray, _shp: _shape_type):
-    shp = _shp.build('value', default=ANYTHING)
+    shp = _shp.build(VALUE, default=ANYTHING)
     if shp == ANYTHING:
         shp = (ANYTHING,) * len(_shp.elements)
-    a_shp = await reify(a.values['shape'])
+    a_shp = await reify(a.values[SHAPE])
     if (all(s is not ANYTHING for s in shp) and
         all(s is not ANYTHING for s in a_shp) and
             prod(shp) != prod(a_shp)):
         raise MyiaShapeError("Cannot change the total number of elements "
                              "in reshape")
-    return AbstractArray(a.element, {'shape': shp})
+    return AbstractArray(a.element, {SHAPE: shp})
 
 
 @standard_prim(P.transpose)
 async def _inf_transpose(track, a: AbstractArray, permutation: _shape_type):
-    perm = permutation.build('value', default=ANYTHING)
+    perm = permutation.build(VALUE, default=ANYTHING)
     if perm == ANYTHING:
         shp = (ANYTHING,) * len(permutation.elements)
     else:
-        a_shp = await reify(a.values['shape'])
+        a_shp = await reify(a.values[SHAPE])
         if list(sorted(perm)) != list(range(len(a_shp))):
             raise MyiaShapeError(
                 'The second argument of transpose must be a permutation of'
@@ -850,13 +851,13 @@ async def _inf_transpose(track, a: AbstractArray, permutation: _shape_type):
             )
 
         shp = tuple(a_shp[i] for i in perm)
-    return AbstractArray(a.element, {'shape': shp})
+    return AbstractArray(a.element, {SHAPE: shp})
 
 
 @standard_prim(P.dot)
 async def _inf_dot(track, a: AbstractArray, b: AbstractArray):
-    a_shp = a.values['shape']
-    b_shp = b.values['shape']
+    a_shp = a.values[SHAPE]
+    b_shp = b.values[SHAPE]
     if len(a_shp) != 2 or len(b_shp) != 2:
         raise MyiaShapeError("dot needs matrix inputs")
     if (a_shp[1] != b_shp[0] and
@@ -866,7 +867,7 @@ async def _inf_dot(track, a: AbstractArray, b: AbstractArray):
         )
     track.abstract_merge(a.element, b.element)
     c_shp = (a_shp[0], b_shp[1])
-    return AbstractArray(a.element, {'shape': c_shp})
+    return AbstractArray(a.element, {SHAPE: c_shp})
 
 
 ##############
@@ -876,7 +877,7 @@ async def _inf_dot(track, a: AbstractArray, b: AbstractArray):
 
 @standard_prim(P.switch)
 async def _inf_switch(track, cond: Bool, tb, fb):
-    v = cond.values['value']
+    v = cond.values[VALUE]
     if v is True:
         return tb
     elif v is False:
@@ -896,11 +897,11 @@ async def _inf_switch(track, cond: Bool, tb, fb):
 async def _inf_scalar_cast(track,
                            scalar: Number,
                            typ: AbstractType):
-    t = typ.values['value']
+    t = typ.values[VALUE]
     if t is ANYTHING:
         raise MyiaTypeError('Must have concrete type for scalar_cast')
     track.chk(Number, t)
-    values = {**scalar.values, 'type': t}
+    values = {**scalar.values, TYPE: t}
     return AbstractScalar(values)
 
 
@@ -936,7 +937,7 @@ async def _inf_resolve(track, data, item):
 
 @standard_prim(P.partial)
 async def _inf_partial(track, fn, *args):
-    fns = fn.values['value']
+    fns = fn.values[VALUE]
     assert isinstance(fns, Possibilities)
     return AbstractFunction(*[
         PartialApplication(fn, args) for fn in fns
@@ -955,9 +956,9 @@ class _EmbedXInferrer(XInferrer):
         x = await xref['abstract']
         key = SymbolicKeyInstance(xref.node, sensitivity_transform(x))
         return AbstractScalar({
-            'value': key,
-            'type': dtype.SymbolicKeyType,
-            'shape': dshape.NOSHAPE,
+            VALUE: key,
+            TYPE: dtype.SymbolicKeyType,
+            SHAPE: dshape.NOSHAPE,
         })
 
 
@@ -969,7 +970,7 @@ async def _inf_env_getitem(track,
                            env: dtype.EnvType,
                            key: dtype.SymbolicKeyType,
                            dflt):
-    expected = key.values['value'].inferred
+    expected = key.values[VALUE].inferred
     track.abstract_merge(expected, dflt)
     return expected
 
@@ -979,28 +980,28 @@ async def _inf_env_setitem(track,
                            env: dtype.EnvType,
                            key: dtype.SymbolicKeyType,
                            value):
-    expected = key.values['value'].inferred
+    expected = key.values[VALUE].inferred
     track.abstract_merge(expected, value)
     return AbstractScalar({
-        'value': ANYTHING,
-        'type': dtype.EnvType,
-        'shape': dshape.NOSHAPE,
+        VALUE: ANYTHING,
+        TYPE: dtype.EnvType,
+        SHAPE: dshape.NOSHAPE,
     })
 
 
 @standard_prim(P.env_add)
 async def _inf_env_add(track, env1, env2):
     return AbstractScalar({
-        'value': ANYTHING,
-        'type': dtype.EnvType,
-        'shape': dshape.NOSHAPE,
+        VALUE: ANYTHING,
+        TYPE: dtype.EnvType,
+        SHAPE: dshape.NOSHAPE,
     })
 
 
 @standard_prim(P.J)
 async def _inf_J(track, x):
     if isinstance(x, AbstractFunction):
-        v = x.values['value']
+        v = x.values[VALUE]
         if isinstance(v, Possibilities):
             return AbstractFunction(*[JTransformedFunction(poss)
                                       for poss in v])
@@ -1010,7 +1011,7 @@ async def _inf_J(track, x):
 @standard_prim(P.Jinv)
 async def _inf_Jinv(track, x):
     if isinstance(x, AbstractFunction):
-        v = x.values['value']
+        v = x.values[VALUE]
         if isinstance(v, Possibilities):
             results = []
             for f in v:

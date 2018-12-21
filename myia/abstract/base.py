@@ -108,8 +108,8 @@ class AbstractValue(AbstractBase):
                 raise
             return default
 
-    def _build(self, name):
-        v = self.values.get(name, ABSENT)
+    def _build(self, subtrack):
+        v = self.values.get(subtrack, ABSENT)
         if v is ANYTHING:
             raise ValueError('ANYTHING')
         elif v is not ABSENT:
@@ -118,6 +118,7 @@ class AbstractValue(AbstractBase):
             else:
                 return v
         else:
+            name = str(subtrack).lower()
             method = getattr(self, f'_build_{name}')
             return method()
 
@@ -137,7 +138,7 @@ class AbstractValue(AbstractBase):
         if type(self) is not type(other):
             raise MyiaTypeError(f'Expected {type(self).__name__}')
         rval = self.merge_structure(other)
-        for track in ['type', 'value', 'shape']:
+        for track in [TYPE, VALUE, SHAPE]:
             v1 = self.values.get(track, ABSENT)
             v2 = other.values.get(track, ABSENT)
             method = getattr(self, f'merge_{track}')
@@ -189,25 +190,25 @@ class AbstractScalar(AbstractValue):
 class AbstractType(AbstractValue):
 
     def merge_structure(self, other):
-        return AbstractType({'type': dtype.TypeType})
+        return AbstractType({TYPE: dtype.TypeType})
 
     def __repr__(self):
-        return f'Ty({self.values["value"]})'
+        return f'Ty({self.values[VALUE]})'
 
 
 class AbstractFunction(AbstractValue):
     def __init__(self, *poss):
         super().__init__({
-            'value': Possibilities(poss),
-            'type': dtype.Function,
-            'shape': dshape.NOSHAPE
+            VALUE: Possibilities(poss),
+            TYPE: dtype.Function,
+            SHAPE: dshape.NOSHAPE
         })
 
     def merge_structure(self, other):
-        return AbstractFunction(*self.values['value'])
+        return AbstractFunction(*self.values[VALUE])
 
     def __repr__(self):
-        return f'Fn({self.values["value"]})'
+        return f'Fn({self.values[VALUE]})'
 
 
 class AbstractTuple(AbstractValue):
@@ -222,13 +223,13 @@ class AbstractTuple(AbstractValue):
         )
 
     def _build_value(self):
-        return tuple(e.build('value') for e in self.elements)
+        return tuple(e.build(VALUE) for e in self.elements)
 
     def _build_type(self):
-        return dtype.Tuple[[e.build('type') for e in self.elements]]
+        return dtype.Tuple[[e.build(TYPE) for e in self.elements]]
 
     def _build_shape(self):
-        return dshape.TupleShape([e.build('shape') for e in self.elements])
+        return dshape.TupleShape([e.build(SHAPE) for e in self.elements])
 
     def make_key(self):
         elms = tuple(e.make_key() for e in self.elements)
@@ -247,13 +248,13 @@ class AbstractArray(AbstractValue):
         return AbstractArray(self.element.merge(other.element))
 
     def _build_type(self):
-        return dtype.Array[self.element.build('type')]
+        return dtype.Array[self.element.build(TYPE)]
 
     def make_key(self):
         return (super().make_key(), self.element.make_key())
 
     def __repr__(self):
-        return f'A({self.element}, shape={self.values["shape"]})'
+        return f'A({self.element}, shape={self.values[SHAPE]})'
 
 
 class AbstractList(AbstractValue):
@@ -262,10 +263,10 @@ class AbstractList(AbstractValue):
         self.element = element
 
     def _build_type(self):
-        return dtype.List[self.element.build('type')]
+        return dtype.List[self.element.build(TYPE)]
 
     def _build_shape(self):
-        return dshape.ListShape(self.element.build('shape'))
+        return dshape.ListShape(self.element.build(SHAPE))
 
     def make_key(self):
         return (super().make_key(), self.element.make_key())
@@ -284,21 +285,21 @@ class AbstractClass(AbstractValue):
 
     def _build_value(self):
         kls = dtype.tag_to_dataclass[self.tag]
-        args = {k: v.build('value')
+        args = {k: v.build(VALUE)
                 for k, v in self.attributes.items()}
         return kls(**args)
 
     def _build_type(self):
         return dtype.Class[
             self.tag,
-            {name: x.build('type')
+            {name: x.build(TYPE)
              for name, x in self.attributes.items()},
             self.methods
         ]
 
     def _build_shape(self):
         return dshape.ClassShape(
-            {name: x.build('shape')
+            {name: x.build(SHAPE)
              for name, x in self.attributes.items()},
         )
 
@@ -317,13 +318,31 @@ class AbstractJTagged(AbstractValue):
         self.element = element
 
     def _build_type(self):
-        return dtype.JTagged[self.element.build('type')]
+        return dtype.JTagged[self.element.build(TYPE)]
 
     def make_key(self):
         return (super().make_key(), self.element.make_key())
 
     def __repr__(self):
         return f'J({self.element})'
+
+
+##########
+# Tracks #
+##########
+
+
+class Subtrack(Named):
+    def __init__(self, name):
+        super().__init__(name)
+
+    def __lt__(self, other):
+        return self.name < other.name
+
+
+VALUE = Subtrack('VALUE')
+TYPE = Subtrack('TYPE')
+SHAPE = Subtrack('SHAPE')
 
 
 #############
@@ -346,7 +365,7 @@ def from_vref(self, v, t: dtype.Array, s):
     vv = ANYTHING
     tt = t.elements
     ss = dshape.NOSHAPE
-    return AbstractArray(self(vv, tt, ss), {'shape': s})
+    return AbstractArray(self(vv, tt, ss), {SHAPE: s})
 
 
 @overload
@@ -359,7 +378,7 @@ def from_vref(self, v, t: dtype.List, s):
 
 @overload
 def from_vref(self, v, t: (dtype.Number, dtype.Bool, dtype.External), s):
-    return AbstractScalar({'value': v, 'type': t, 'shape': s})
+    return AbstractScalar({VALUE: v, TYPE: t, SHAPE: s})
 
 
 @overload
@@ -373,7 +392,7 @@ def from_vref(self, v, t: dtype.Class, s):
         t.tag,
         attrs,
         t.methods
-        # {'value': v, 'type': t, 'shape': s}
+        # {VALUE: v, TYPE: t, SHAPE: s}
     )
 
 
@@ -384,12 +403,12 @@ def from_vref(self, v, t: dtype.JTagged, s):
 
 @overload
 def from_vref(self, v, t: dtype.EnvType, s):
-    return AbstractScalar({'value': v, 'type': t, 'shape': s})
+    return AbstractScalar({VALUE: v, TYPE: t, SHAPE: s})
 
 
 @overload
 def from_vref(self, v, t: dtype.TypeType, s):
-    return AbstractType({'value': v, 'type': t, 'shape': s})
+    return AbstractType({VALUE: v, TYPE: t, SHAPE: s})
 
 
 @overload
@@ -409,12 +428,12 @@ def abstract_clone(self, x: AbstractScalar):
 
 @overload
 def abstract_clone(self, x: AbstractFunction):
-    return AbstractFunction(*self(x.values['value']))
+    return AbstractFunction(*self(x.values[VALUE]))
 
 
 @overload
 def abstract_clone(self, d: dict):
-    to_transform = {'value'}
+    to_transform = {VALUE}
     return {k: self(v) if k in to_transform else v
             for k, v in d.items()}
 
@@ -469,11 +488,11 @@ def broaden(self, x: object):
 
 @abstract_clone.variant
 def sensitivity_transform(self, x: AbstractFunction):
-    v = x.values['value']
+    v = x.values[VALUE]
     return AbstractScalar({
-        'value': ANYTHING,
-        'type': dtype.EnvType,
-        'shape': dshape.NOSHAPE
+        VALUE: ANYTHING,
+        TYPE: dtype.EnvType,
+        SHAPE: dshape.NOSHAPE
     })
 
 
@@ -542,7 +561,7 @@ def _amerge(self, x1: AbstractScalar, x2, loop, forced):
 
 @overload
 def _amerge(self, x1: AbstractFunction, x2, loop, forced):
-    values = amerge(x1.values['value'], x2.values['value'], loop, forced)
+    values = amerge(x1.values[VALUE], x2.values[VALUE], loop, forced)
     if forced or values is x1.values:
         return x1
     return AbstractFunction(*values)
@@ -871,7 +890,7 @@ def shapeof(v):
             assert False
             # rec = self.constructors[P.make_record](self)
             # typ = pytype_to_myiatype(v)
-            # vref = self.engine.vref({'value': typ, 'type': TypeType})
+            # vref = self.engine.vref({VALUE: typ, TYPE: TypeType})
             # return PartialInferrer(self, rec, [vref])
         else:
             return dshape.ClassShape(

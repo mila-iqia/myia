@@ -30,7 +30,8 @@ class MetaGraph:
         return self.cache[types]
 
     def specialize_from_abstract(self, args):
-        types = [arg.build('type') for arg in args]
+        from ..abstract.base import TYPE
+        types = [arg.build(TYPE) for arg in args]
         return self.specialize_from_types(types)
 
     def specialize_from_types(self, types):

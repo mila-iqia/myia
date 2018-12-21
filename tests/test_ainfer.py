@@ -6,7 +6,7 @@ import numpy as np
 from types import SimpleNamespace
 
 from myia.abstract import from_vref
-from myia.abstract.base import shapeof
+from myia.abstract.base import shapeof, VALUE, TYPE, SHAPE
 from myia.pipeline.standard import new_pipeline, scalar_new_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
@@ -34,6 +34,13 @@ from .test_abs import type_to_shape
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
     li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
     Point, Point_t, Point3D, Point3D_t, Thing, Thing_f, Thing_ftup, mysum
+
+
+name_to_track = {
+    'value': VALUE,
+    'type': TYPE,
+    'shape': SHAPE,
+}
 
 
 def t(tt):
@@ -257,8 +264,9 @@ def inferrer_decorator(pipeline):
 
                     print('Output of inferrer:')
                     print(rval)
+                    key = name_to_track[main_track]
                     return {main_track: rval['abstract'].build(
-                        main_track, default=ANYTHING
+                        key, default=ANYTHING
                     )}
 
                 print('Expected:')
