@@ -944,12 +944,8 @@ async def _inf_partial(track, fn, *args):
     ])
 
 
-# J = Primitive('J')
-# Jinv = Primitive('Jinv')
-
-
 class _EmbedXInferrer(XInferrer):
-    async def __call__(self, track, *argrefs):
+    async def __call__(self, track, outref, argrefs):
         if len(argrefs) != 1:
             raise MyiaTypeError('Wrong number of arguments')
         xref, = argrefs

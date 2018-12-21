@@ -99,7 +99,7 @@ class AbstractTrack(Track):
         infs = [self.get_inferrer_for(poss, args)
                 for poss in fn.values[VALUE]]
         argrefs = [VirtualReference({'abstract': a}) for a in args]
-        return await execute_inferrers(self, infs, argrefs)
+        return await execute_inferrers(self, infs, None, argrefs)
 
     async def infer_apply(self, ref):
         """Get the property for a ref of an Apply node."""
@@ -115,7 +115,7 @@ class AbstractTrack(Track):
                 for poss in fn.values[VALUE]]
 
         return await self.engine.loop.schedule(
-            execute_inferrers(self, infs, argrefs),
+            execute_inferrers(self, infs, ref, argrefs),
             context_map={
                 infer_trace: {**infer_trace.get(), ctx: ref}
             }
@@ -289,8 +289,8 @@ class XInferrer(Partializable):
     def build(self, field):
         return None
 
-    async def __call__(self, track, *refs):
-        args = tuple([await ref['abstract'] for ref in refs])
+    async def __call__(self, track, outref, argrefs):
+        args = tuple([await ref['abstract'] for ref in argrefs])
         if args not in self.cache:
             self.cache[args] = await self.infer(track, *args)
         return self.cache[args]
@@ -349,12 +349,12 @@ class PartialXInferrer(XInferrer):
         self.fn = fn
         self.args = args
 
-    async def __call__(self, track, *refs):
-        argvals = tuple([await ref['abstract'] for ref in refs])
+    async def __call__(self, track, outref, argrefs):
+        argvals = tuple([await ref['abstract'] for ref in argrefs])
         if argvals not in self.cache:
             args = tuple(VirtualReference({'abstract': arg})
-                        for arg in self.args + argvals)
-            self.cache[argvals] = await self.fn(track, *args)
+                         for arg in self.args + argvals)
+            self.cache[argvals] = await self.fn(track, outref, args)
         return self.cache[argvals]
 
 
@@ -400,13 +400,13 @@ class JXInferrer(XInferrer):
         self.fn = fn
         self.orig_fn = orig_fn
 
-    async def __call__(self, track, *refs):
-        args = tuple([await ref['abstract'] for ref in refs])
+    async def __call__(self, track, outref, argrefs):
+        args = tuple([await ref['abstract'] for ref in argrefs])
         if args not in self.cache:
             jinv_args = tuple(_jinv(a) for a in args)
             jinv_argrefs = tuple(VirtualReference({'abstract': arg})
                                  for arg in jinv_args)
-            res = await self.fn(track, *jinv_argrefs)
+            res = await self.fn(track, None, jinv_argrefs)
             res_wrapped = _jtag(res)
             orig_fn = AbstractFunction(self.orig_fn)
             # bparams = [sensitivity_transform(self.orig_fn)]
@@ -423,15 +423,15 @@ class JXInferrer(XInferrer):
         return self.cache[args]
 
 
-async def _xinf_helper(track, inf, args, p):
-    result = await inf(track, *args)
+async def _xinf_helper(track, inf, outref, argrefs, p):
+    result = await inf(track, outref, argrefs)
     p.resolve_to(result)
 
 
-async def execute_inferrers(track, inferrers, args):
+async def execute_inferrers(track, inferrers, outref, argrefs):
     if len(inferrers) == 1:
         inf, = inferrers
-        return await inf(track, *args)
+        return await inf(track, outref, argrefs)
 
     else:
         pending = []
@@ -442,7 +442,7 @@ async def execute_inferrers(track, inferrers, args):
             )
             pending.append(p)
             track.engine.loop.schedule(
-                _xinf_helper(track, inf, args, p)
+                _xinf_helper(track, inf, outref, argrefs, p)
             )
 
         return bind(track.engine.loop, None, [], pending)
