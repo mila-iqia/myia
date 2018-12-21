@@ -471,6 +471,71 @@ def abstract_clone(self, x: object):
     return x
 
 
+#################
+# Async cloning #
+#################
+
+
+@overload(bootstrap=True)
+async def abstract_clone_async(self, x: AbstractScalar):
+    return AbstractScalar(await self(x.values))
+
+
+@overload
+async def abstract_clone_async(self, x: AbstractFunction):
+    return AbstractFunction(*(await self(x.values[VALUE])))
+
+
+@overload
+async def abstract_clone_async(self, d: dict):
+    to_transform = {VALUE}
+    return {k: (await self(v)) if k in to_transform else v
+            for k, v in d.items()}
+
+
+@overload
+async def abstract_clone_async(self, x: AbstractTuple):
+    return AbstractTuple(
+        [(await self(y)) for y in x.elements],
+        await self(x.values)
+    )
+
+
+@overload
+async def abstract_clone_async(self, x: AbstractList):
+    return AbstractList(await self(x.element), await self(x.values))
+
+
+@overload
+async def abstract_clone_async(self, x: AbstractArray):
+    return AbstractArray(await self(x.element), await self(x.values))
+
+
+@overload
+async def abstract_clone_async(self, x: AbstractClass):
+    return AbstractClass(
+        x.tag,
+        {k: (await self(v)) for k, v in x.attributes.items()},
+        x.methods,
+        await self(x.values)
+    )
+
+
+@overload
+async def abstract_clone_async(self, x: object):
+    return x
+
+
+##############
+# Concretize #
+##############
+
+
+@abstract_clone_async.variant
+async def concretize_abstract(self, x: Pending):
+    return await self(await x)
+
+
 ###########
 # Broaden #
 ###########
