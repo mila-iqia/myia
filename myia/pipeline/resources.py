@@ -12,7 +12,7 @@ from ..prim import ops as P
 from ..specialize import TypeSpecializer
 from ..utils import overload, TypeMap, UNKNOWN
 
-import ..prim.custom_ops as custom
+from ..prim import custom_ops as custom
 from .pipeline import PipelineResource
 
 
@@ -43,6 +43,7 @@ scalar_object_map = {
     operations.matmul: P.dot,
     # experimental
     custom.array_conv: P.array_conv,
+    custom.cal_conv_grad: P.cal_conv_grad,
     operations.getitem: C.getitem,
     operations.setitem: C.setitem,
     operations.bool: P.identity,
@@ -237,7 +238,6 @@ standard_method_map = TypeMap({
         '__ge__': C.array_ge,
         '__matmul__': P.dot,
         # experimental
-        '__conv__': P.array_conv,
         '__len__': P.array_len,
         '__getitem__': P.array_getitem,
         '__setitem__': P.array_setitem,

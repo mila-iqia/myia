@@ -426,6 +426,11 @@ async def infer_type_array_conv(track, bottom, height, width, kernel_size, strid
     """Infer the return type of conv."""
     return await track.will_check(Array, bottom)
 
+@type_inferrer(P.cal_conv_grad, nargs=5)
+async def infer_type_conv_grad(track, a, b,c,d,e):
+    """Infer the return type of dot."""
+    return await track.will_check(Array, a)
+
 
 @type_inferrer(P.return_, nargs=1)
 async def infer_type_return_(track, x):

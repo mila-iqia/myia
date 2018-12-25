@@ -17,7 +17,8 @@ from .py_implementations import \
     scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
     scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
     array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
-    reshape, scalar_cast, typeof, invert_permutation, scalar_maximum
+    reshape, scalar_cast, typeof, invert_permutation, scalar_maximum, cal_conv_grad
+
 
 
 parse = standard_pipeline \
@@ -228,38 +229,8 @@ def bprop_dot(x, y, out, dout):
 @register_bprop(primops.array_conv)
 def bprop_array_conv(x, height, width, y, z, out, dout):
     """Backpropagator for primitive `array_conv`."""
-    #height, width = x.shape
-    h_size = (height - y)//z+1
-    w_size = (width - y)//z+1
-    dx = zeros_like((height, width))
-    h = 0
-    w = 0
-    while h < h_size:
-        while w< w_size:
-    #for h in range(h_size):
-    #    for w in range(w_size):
-            db = reshape(dout[h*w_size+w], (y, y))
-            #dx[h:h+1, w:w+1] = dx[h:h+1, w:w+1] + db
-            a=dx[h]
-            b=a[w]
-            #c=array_to_scalar(b)
-            #c = c+array_to_scalar(db[0][0])
-            c=b+db[0][0]
-            tuple_setitem(a, w, c)
-            tuple_setitem(dx, h, a)
-
-            #dx[h] = db[0]
-           # tuple_setitem(dx, h, dx[h]+db[0])
-            #tuple_setitem(dx, (h,w), dx[h][w]+db)
-            #tuple_setitem(dx, (h,w), dx[h][w]+db)
-            #dx[h][w] = db[0][0]
-            #dx[h][w+1] = db[0][1]
-            #dx[h+1][w] = db[1][0]
-            #dx[h+1][w+1] = db[1][1]
-            #dx[h+w_size+w] = db[0]
-            #dx[h+w_size+w+1] = db[1]
-            w = w +1
-        h = h +1
+    #dx = zeros_like(x)
+    dx = cal_conv_grad(dout, height,width,y,z)
     return (dx,0,0,0,0)
 
 

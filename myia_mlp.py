@@ -1,6 +1,6 @@
 from numpy import asscalar
 from dataclasses import dataclass
-from sgd import SGD
+from myia.optimizer.sgd import SGD
 
 from myia.api import myia
 from myia.dtype import *
@@ -135,6 +135,17 @@ def DenseLayer(inNum, outNum, init='random', dtype=np.float64):
             self.W, moments.W = opt(self.W, grads.W, moments.W)
 
     return DenseLayerBase(W, b)
+
+@dataclass(frozen=True)
+class ConvLayer:
+    W: Array
+
+    def apply(self, input):
+        a=array_conv(input, 5, 5, 2, 1)
+        w=reshape(self.W, (4,1))
+        xs = a @ w
+        xs = reshape(xs, (4,4))
+        return xs
 
 
 @dataclass(frozen=True)

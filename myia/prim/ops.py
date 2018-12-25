@@ -106,6 +106,7 @@ transpose = Primitive('transpose')
 dot = Primitive('dot')
 # exprimental
 array_conv = Primitive('array_conv')
+cal_conv_grad = Primitive('cal_conv_grad')
 
 
 ##############

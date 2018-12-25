@@ -500,6 +500,17 @@ def array_conv(bottom, height, width, kernel_size, stride):
             top[h*w_size+w] = t.reshape(1, kernel_size*kernel_size)
     return top
 
+@register(primops.cal_conv_grad)
+def cal_conv_grad(dout, height, width, kernel_size, stride):
+    h_size = (height - kernel_size)//stride+1
+    w_size = (width - kernel_size)//stride+1
+    dx = np.zeros(shape=(height,width))
+    for h in range(h_size):
+        for w in range(w_size):
+            db = reshape(dout[h * w_size + w], (kernel_size, kernel_size))
+            dx[h:h + 2, w:w + 2] = dx[h:h + 2, w:w + 2] + db
+    return dx
+
 
 @register(primops.return_)
 def return_(x):
