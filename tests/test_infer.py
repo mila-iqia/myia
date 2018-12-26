@@ -27,7 +27,7 @@ from myia.prim.py_implementations import \
     transpose
 from myia.utils import RestrictedVar, newenv
 
-from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
+from common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
     li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
     Point, Point_t, Point3D, Point3D_t, Thing, Thing_f, Thing_ftup, mysum
 

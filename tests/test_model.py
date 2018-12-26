@@ -9,10 +9,12 @@ from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import array_reduce, scalar_add
 from myia.prim.shape_inferrers import ClassShape, TupleShape
 
-from .test_compile import parse_compare
-from .test_grad import grad_test
-from .test_infer import infer_std
-from .common import af32, af64, MA, MB, MC, MD
+from test_compile import parse_compare
+from test_grad import grad_test
+from test_infer import infer_std
+from common import af32, af64, MA, MB, MC, MD
+from myia.prim.py_implementations import *
+from myia.api import myia
 
 
 MA = MA * 0.1
@@ -62,6 +64,16 @@ class Model:
             x = layer.apply(x)
         return x
 
+@dataclass(frozen=True)
+class ConvLayer:
+    W: Array
+
+    def apply(self, input):
+        a=array_conv(input, 5, 5, 2, 1)
+        w=reshape(self.W, (4,1))
+        xs = a @ w
+        xs = reshape(xs, (4,4))
+        return xs
 
 #########
 # Tests #
@@ -71,8 +83,9 @@ class Model:
 def make_model(dtype='float64'):
     return Model(
         layers=(
-            TanhLayer(MA(6, 10, dtype=dtype), zeros(1, 10, dtype=dtype)),
-            TanhLayer(MB(10, 8, dtype=dtype), zeros(1, 8, dtype=dtype)),
+            #TanhLayer(MA(6, 10, dtype=dtype), zeros(1, 10, dtype=dtype)),
+            #TanhLayer(MB(10, 8, dtype=dtype), zeros(1, 8, dtype=dtype)),
+            ConvLayer(MB(2, 2, dtype=dtype)),
         )
     )
 
@@ -83,6 +96,7 @@ Model_t_f32 = pytype_to_myiatype(Model, make_model('float32'))
 
 def cost(model, x, y):
     yy = model.apply(x)
+    print("yy", yy)
     diff = (yy - y)
     return asscalar(array_reduce(scalar_add, diff ** 2, ()))
 
@@ -155,3 +169,10 @@ def test_backward_infer(model, x, y):
            rel_error=1e-1)
 def test_backward_specialize(model, x, y):
     return cost(model, x, y)
+
+@myia
+def test_backward_grad(model, x, y):
+    return grad(cost)(model, x, y)
+
+print("grad",test_backward_grad(make_model(),MA(5, 5), MB(4,4)))
+

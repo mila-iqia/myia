@@ -18,7 +18,7 @@ from myia.prim.py_implementations import J, scalar_add, scalar_mul, scalar_maxim
 from myia.prim.py_implementations import py_implementations as pyi
 from myia.validate import whitelist, validate_type
 
-from .common import f64, u64, MA, MB
+from common import f64, u64, MA, MB
 
 
 @dataclass
