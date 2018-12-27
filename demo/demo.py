@@ -49,39 +49,6 @@ def getOptPip(fn):
                             {'_erase_value': True, 'value': np.array(1.0).astype(np.float32)}))['graph']
     return fn
 
-def getInferPip(fn):
-    pip = standard_pipeline.select(
-        'parse', 'resolve', 'infer'
-    ).configure({
-        'inferrer.erase_value': False,
-        'inferrer.tracks.value.max_depth': 10
-    }).make()
-    fn = pip(input=fn, argspec=({'_erase_value': True, 'value': np.array([1.0,1.0]).astype(np.float32)},
-                            {'_erase_value': True, 'value': np.array([1.0,1.0]).astype(np.float32)}))['graph']
-    return fn
-
-def getSpecializePip(fn):
-    pip = standard_pipeline.select(
-        'parse', 'resolve', 'infer', 'specialize'
-    ).configure({
-        'inferrer.erase_value': False,
-        'inferrer.tracks.value.max_depth': 10
-    }).make()
-    fn = pip(input=fn, argspec=({'_erase_value': True, 'value': np.array(1.0).astype(np.float32)},
-                            {'_erase_value': True, 'value': np.array(1.0).astype(np.float32)}))['graph']
-    return fn
-
-def getOptPip(fn):
-    pip = standard_pipeline.select(
-        'parse', 'resolve', 'infer', 'specialize', 'erase_class', 'opt', 'erase_tuple'
-    ).configure({
-        'inferrer.erase_value': False,
-        'inferrer.tracks.value.max_depth': 10
-    }).make()
-    fn = pip(input=fn, argspec=({'_erase_value': True, 'value': np.array(1.0).astype(np.float32)},
-                            {'_erase_value': True, 'value': np.array(1.0).astype(np.float32)}))['graph']
-    return fn
-
 def f(x, y):
     a = x * y
     return a
