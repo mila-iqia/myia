@@ -132,11 +132,6 @@ class Type(metaclass=TypeMeta):
 class Object(Type):
     """Some object."""
 
-
-class Bool(Object):
-    """Boolean values."""
-
-
 class Number(Object):
     """Numerical values.
 
@@ -155,6 +150,8 @@ class Number(Object):
             raise ValueError(f"Unsupported number of bits: {bits}")
         return cls.make_subtype(bits=bits)
 
+class Bool(Number):
+    """Boolean values."""
 
 class Float(Number):
     """Represents float values.
@@ -353,6 +350,7 @@ _simple_types = {
     bool: Bool,
     int: Int[64],
     float: Float[64],
+    numpy.bool_: Bool,
     numpy.int8: Int[8],
     numpy.int16: Int[16],
     numpy.int32: Int[32],

@@ -169,6 +169,20 @@ async def infer_type_partial(track, fn, *args):
     fn_t = await fn['type']
     return PartialInferrer(track, fn_t, args)
 
+@type_inferrer(P.array_cast, nargs=2)
+async def infer_shape_array_cast(track, xs, t):
+    """Infer the shape for array_cast."""
+    await track.will_check(Array, xs)
+    await track.check(TypeType, t)
+    new_t = await t['value']
+    if new_t is ANYTHING:
+        raise MyiaTypeError(
+            f'Type to cast to must be known at compile time.',
+            refs=[xs, t]
+        )
+    elif not ismyiatype(new_t, Number):
+        raise MyiaTypeError(f'Cannot cast to {new_t}', refs=[t])
+    return Array[new_t]
 
 @type_inferrer(P.scalar_cast, nargs=2)
 async def infer_type_scalar_cast(track, x, t):

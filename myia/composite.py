@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from functools import reduce
 
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
-    List, Class, EnvType, ismyiatype
+    List, Class, EnvType, TypeType, ismyiatype
 from .hypermap import HyperMap
 from .infer import Inferrer, GraphInferrer, MyiaTypeError
 from .info import About
@@ -13,7 +13,7 @@ from .ir import Graph, MetaGraph, MultitypeGraph, Constant
 from .prim import ops as P
 from .prim.py_implementations import \
     array_map, bool_not, bool_eq, hastype, distribute, shape, \
-    broadcast_shape, switch, identity, bool_and, typeof, scalar_cast, \
+    broadcast_shape, switch, identity, bool_and, typeof, scalar_cast, array_cast, \
     scalar_add, scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, \
     scalar_div, scalar_to_array, env_add
 from .utils import newenv
@@ -159,7 +159,7 @@ log = MultitypeGraph('log')
 sin = MultitypeGraph('sin')
 cos = MultitypeGraph('cos')
 tan = MultitypeGraph('tan')
-
+cast = MultitypeGraph('cast')
 
 @exp.register(Number)
 @core
@@ -178,6 +178,10 @@ def _log(x):
 def _sin(x):
     return scalar_sin(x)
 
+@cast.register(Number, TypeType)
+@core
+def _cast(x, t):
+    return scalar_cast(x, t)
 
 @cos.register(Number)
 @core
@@ -544,6 +548,11 @@ def array_sin(xs):
     """Implementation of `array_sin`."""
     return array_map(scalar_sin, xs)
 
+@cast.register(Array, TypeType)
+@core
+def _array_cast(xs, t):
+    """Implementation of `array_sin`."""
+    return array_cast(xs, t)
 
 @cos.register(Array)
 @core

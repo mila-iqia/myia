@@ -525,6 +525,11 @@ def scalar_cast(x, t):
     dtype = types.type_to_np_dtype(t)
     return getattr(np, dtype)(x)
 
+@register(primops.array_cast)
+def array_cast(x, t):
+    """Implement `array_cast`."""
+    dtype = types.type_to_np_dtype(t)
+    return x.astype(getattr(np, dtype))
 
 @py_register(primops.list_map)
 def list_map(f, *lsts):

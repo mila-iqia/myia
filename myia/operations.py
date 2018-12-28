@@ -29,6 +29,8 @@ def switch(cond, tb, fb):  # pragma: no cover
     """Switch statement, returns one of the two values."""
     raise RuntimeError('This operation is not meant to be called directly.')
 
+def cast(x,t):
+    raise RuntimeError('This operation is not meant to be called directly.')
 
 def iter(xs):  # pragma: no cover
     """Myia iterator function."""

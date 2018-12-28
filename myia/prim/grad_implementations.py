@@ -17,7 +17,7 @@ from .py_implementations import \
     scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
     scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
     array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
-    reshape, scalar_cast, typeof, invert_permutation, scalar_maximum, cal_conv_grad
+    reshape, scalar_cast, array_cast, typeof, invert_permutation, scalar_maximum, cal_conv_grad
 
 
 
@@ -193,6 +193,10 @@ def bprop_scalar_cast(x, t, out, dout):
     """Backpropagator for primitive `scalar_cast`."""
     return (scalar_cast(dout, typeof(x)), t)
 
+@register_bprop(primops.array_cast)
+def bprop_array_cast(x, t, out, dout):
+    """Backpropagator for primitive `array_cast`."""
+    return (array_cast(dout, typeof(x).elements), t)
 
 @register_bprop(primops.tuple_getitem)
 def bprop_tuple_getitem(data, idx, out, dout):

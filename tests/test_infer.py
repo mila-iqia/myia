@@ -22,7 +22,7 @@ from myia.prim.py_implementations import \
     hastype, typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_scan, array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
-    tuple_setitem, list_setitem, scalar_cast, list_reduce, \
+    tuple_setitem, list_setitem, scalar_cast, array_cast, list_reduce, \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
     transpose
 from myia.utils import RestrictedVar, newenv
@@ -1579,12 +1579,21 @@ def test_closure_in_data(c, x):
         (f64, {'value': i16}, i16),
         (f16, {'value': f32}, f32),
         (f16, TypeType, InferenceError),
-        (f16, {'value': B}, InferenceError),
-        (B, {'value': f32}, InferenceError),
+        (f16, {'value': B}, B),
+        (B, {'value': f32}, f32),
     ]
 )
 def test_scalar_cast(x, t):
     return scalar_cast(x, t)
+
+@infer(
+    type=[
+        (ai64_of(4), {'value': i64, 'type': TypeType}, ai64),
+        (ai64_of(4), {'value': f64, 'type': TypeType}, af64),
+    ]
+)
+def test_array_cast(x, t):
+    return array_cast(x, t)
 
 
 @infer(type=[(i64, ai64),
@@ -2170,6 +2179,18 @@ def test_grad_cast(x):
 
     return grad(f)(x)
 
+@infer_std(
+    type=[
+        (ai64_of(4), ai64),
+        (af32_of(4), af32),
+        (af64_of(4), af64),
+    ]
+)
+def test_grad_array_cast(x):
+    def f(x):
+        return array_cast(x, f16)
+
+    return grad(f)(x)
 
 @infer_std(
     type=[

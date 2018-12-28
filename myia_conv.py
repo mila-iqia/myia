@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from myia.optimizer.sgd import SGD
 
 from myia.api import myia
-from myia.dtype import *
-from myia.composite import grad
+from myia.dtype import Float, Tuple, Array
+from myia.composite import grad, cast
 from myia.prim.py_implementations import *
 
 
@@ -46,17 +46,12 @@ def get_slice(a, beg, end, delta=1):
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
-
 def tanh(x):
     e = np.exp(-2 * x)
     return (1 - e) / (1 + e)
 
-
-# need to be done
 def relu(x):
-    return np.maximum(x, 0.0)
-    # return np.add(x, 0.0)
-
+    return cast(x, typeof(1.0))
 
 def SigmoidLayer(inNum, outNum, init='random', dtype=np.float64):
     if init == 'zero':
@@ -99,27 +94,13 @@ def TanhLayer(inNum, outNum, init='random', dtype=np.float64):
 
     return TanhLayerBase(W, b)
 
+@dataclass()
+class ReluLayer:
+    def apply(self, input):
+        return relu(input)
 
-def ReluLayer(inNum, outNum, init='random', dtype=np.float64):
-    if init == 'zero':
-        W = np.zeros((inNum, outNum)).astype(dtype)
-    else:
-        W = np.random.randn(inNum, outNum).astype(dtype)
-    b = np.zeros((1, outNum)).astype(dtype)
-
-    @dataclass()
-    class ReluLayerBase:
-        W: Array
-        b: Array
-
-        def apply(self, input):
-            return relu(input @ self.W + self.b)
-
-        def update(self, opt, grads, moments):
-            self.W, moments.W = opt(self.W, grads.W, moments.W)
-
-    return ReluLayerBase(W, b[:])
-
+    def update(self, opt, grads, moments):
+        pass
 
 def SoftmaxLayer(inNum, outNum, init='random', dtype=np.float64):
     if init == 'zero':
@@ -191,10 +172,9 @@ class Model:
 def make_model(dtype=np.float64):
     return Model(
         layers=(
-            TanhLayer(1, 2),
-            TanhLayer(2, 1),
-            #LinearLayer(np.random.randn(1, 2).astype(dtype), np.zeros((1, 2)).astype(dtype)),
-            #LinearLayer(np.random.randn(2, 1).astype(dtype), np.zeros((1, 1)).astype(dtype)),
+            DenseLayer(1, 2),
+            ReluLayer(),
+            DenseLayer(2, 1)
         )
     )
 
@@ -218,41 +198,29 @@ def test_forward_infer(model, x):
 def test_backward_infer(model, x, y):
     return grad(cost)(model, x, y)
 
-
 def run_model(n):
 
     model = make_model()
+    
     moments = make_model()
     sgd = SGD()
 
     A = 2
     b = 0
     error = 0.1
+    # Let's make some data for a linear regression.
+    N = 1
+    X = np.random.randn(N, 1)
+
+    # (noisy) Target values that we want to learn.
+    t = A * X + b + np.random.randn(N,1) * error
     for i in range(n):
-        # Let's make some data for a linear regression.
-        N = 1
-        X = np.random.randn(N, 1)
-
-        # (noisy) Target values that we want to learn.
-        t = A * X + b + np.random.randn(N,1) * error
-
-        print('no.', i)
-        print('run model x: ', X[0:N,:])
-        print('run model y: ', t[0:N,:])
         loss = test_forward_specialize(model, X[0:N, :], t[0:N, :])
-        print("loss:", loss)
+        print('no.', i, "loss:", loss)
         grads = test_backward_infer(model, X[0:N, :], t[0:N, :])
         sgd.update()
-
-        print('model: ', model)
-        print('grad: ', grads)
-        print('moments: ', moments)
-
         model.update(sgd.step, grads, moments)
-        print('update: ')
-        print('model: ', model)
-        print('moments: ', moments)
-        print(' ')
+    print('model: ', model)
 
 
 if __name__ == '__main__':

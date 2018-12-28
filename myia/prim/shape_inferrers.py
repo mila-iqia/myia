@@ -123,6 +123,10 @@ async def infer_shape_scalar(track, *args):
     """Infer the shape of all scalar primitives."""
     return NOSHAPE
 
+@shape_inferrer(P.array_cast, nargs=2)
+async def infer_shape_array_cast(track, xs, t):
+    """Infer the shape for array_cast."""
+    return await xs['shape']
 
 @shape_inferrer(P.shape, nargs=1)
 async def infer_shape_shape(track, ary):

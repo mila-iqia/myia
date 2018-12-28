@@ -57,6 +57,7 @@ scalar_object_map = {
     operations.next: C.next,
     operations.to_array: C.to_array,
     operations.switch: P.switch,
+    operations.cast: C.cast,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -105,6 +106,7 @@ standard_object_map = {
     operations.next: C.next,
     operations.to_array: C.to_array,
     operations.switch: P.switch,
+    operations.cast: C.cast,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -219,7 +221,6 @@ standard_method_map = TypeMap({
     },
     dtype.Array: {
         '__add__': C.array_add,
-        '__maximum__': C.array_maximum,
         '__sub__': C.array_sub,
         '__mul__': C.array_mul,
         '__truediv__': C.array_truediv,

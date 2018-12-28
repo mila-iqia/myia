@@ -122,8 +122,9 @@ return_ = Primitive('return')
 # Miscellaneous #
 #################
 
-
+cast = Primitive('cast')
 scalar_cast = Primitive('scalar_cast')
+array_cast = Primitive('array_cast')
 identity = Primitive('identity')
 resolve = Primitive('resolve')
 partial = Primitive('partial')
