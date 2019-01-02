@@ -237,6 +237,15 @@ async def infer_type_list_getitem(track, seq, idx):
         return seq_t
     return seq_t.element_type
 
+@type_inferrer(P.array_getitem, nargs=2)
+async def infer_type_array_getitem(track, seq, idx):
+    """Infer the return type of array_getitem."""
+    seq_t = await track.check(Array, seq)
+    idx_t = await track.check((Tuple, Int), idx)
+    if ismyiatype(idx_t, Tuple):
+        return seq_t
+    return seq_t.elements
+    
 
 @type_inferrer(getelement, nargs=1)
 async def infer_type_getelement(track, seq):
@@ -277,6 +286,16 @@ async def infer_type_list_setitem(track, seq, idx, value):
     await track.will_check(seq_t.element_type, value)
     return seq_t
 
+@type_inferrer(P.array_setitem, nargs=3)
+async def infer_type_array_setitem(track, seq, idx, value):
+    """Infer the return type of array_setitem."""
+    seq_t = await track.check(Array, seq)
+    idx_t = await track.check((Int, Tuple), idx)
+    if ismyiatype(idx_t, Tuple):
+        await track.will_check(seq_t, value)
+    else:
+        await track.will_check(seq_t.elements, value)
+    return seq_t
 
 @type_inferrer(P.list_append, nargs=2)
 async def infer_type_list_append(track, seq, value):

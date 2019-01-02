@@ -176,6 +176,21 @@ async def infer_shape_list_setitem(track, seq, idx, value):
     seq_sh = await seq['shape']
     return seq_sh
 
+@shape_inferrer(P.array_getitem, nargs=2)
+async def infer_shape_array_getitem(track, seq, idx):
+    """Infer the shape of array_getitem."""
+    seq_sh = await seq['shape']
+    idx_t = await idx['type']
+    if ismyiatype(idx_t, Tuple):
+        return seq_sh
+    else
+        return NOSHAPE
+
+@shape_inferrer(P.array_setitem, nargs=3)
+async def infer_shape_array_setitem(track, seq, idx, value):
+    """Infer the shape of list_setitem."""
+    seq_sh = await seq['shape']
+    return seq_sh
 
 @shape_inferrer(getelement, nargs=1)
 async def infer_shape_getelement(track, seq):

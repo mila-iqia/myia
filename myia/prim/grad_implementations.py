@@ -15,7 +15,7 @@ from . import ops as primops
 from .py_implementations import \
     Jinv, J, \
     scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
-    scalar_log, scalar_pow, list_setitem, tuple_setitem, switch, shape, transpose, \
+    scalar_log, scalar_pow, array_setitem, list_setitem, tuple_setitem, switch, shape, transpose, \
     array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
     reshape, scalar_cast, array_cast, typeof, invert_permutation, scalar_maximum, cal_conv_grad
 
@@ -113,16 +113,25 @@ def register_augm(prim):
 ### self-defined operators start ###
 ### backprogator for list ###
 @register_bprop(primops.list_len)
-def bprop_list_len(x, out, dout):
+def bprop_list_len(data, out, dout):
     """Backpropagator for primitive `list_len`."""
-    return (out, )
-
+    return (scalar_cast(1, typeof(data[0])), )
 
 @register_bprop(primops.list_getitem)
 def bprop_list_getitem(data, idx, out, dout):
     """Backpropagator for primitive `list_getitem`."""
     return (list_setitem(zeros_like(data), idx, dout), zeros_like(idx))
-    #return (1, y)
+    #return (1, dout)
+
+@register_bprop(primops.array_len)
+def bprop_array_len(data, out, dout):
+    """Backpropagator for primitive `array_len`."""
+    return (scalar_cast(1, typeof(data[0])), )
+
+@register_bprop(primops.array_getitem)
+def bprop_array_getitem(data, idx, out, dout):
+    """Backpropagator for primitive `list_getitem`."""
+    return (array_setitem(zeros_like(data), idx, dout), zeros_like(idx))
 ### self-defined operators end ###
 
 @register_bprop(primops.scalar_add)

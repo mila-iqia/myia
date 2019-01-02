@@ -298,6 +298,8 @@ def make_tuple(*args):
 @py_register(primops.array_getitem)
 def getitem(data, item):
     """Implement `getitem`."""
+    if isinstance(item, tuple):
+        item = slice(*item)      
     return data[item]
 
 
@@ -306,6 +308,8 @@ def getitem(data, item):
 @vm_register(primops.array_getitem)
 def _vm_getitem(vm, data, item):
     """Implement `getitem`."""
+    if isinstance(item, tuple):
+        item = slice(*item)      
     return vm.convert(data[item])
 
 
@@ -317,19 +321,28 @@ def tuple_setitem(data, item, value):
 
 
 @register(primops.list_setitem)
-@register(primops.array_setitem)
 def list_setitem(data, item, value):
-    """Implement `list/array_setitem`."""
+    """Implement `list_setitem`."""
     data2 = copy(data)
-    data2[item] = value
+    if isinstance(item, tuple):
+        item = range(*item)
+        for idx in item:
+            data2[idx] = value[idx]
+    else:
+        data2[item] = value
     return data2
 
 
-@register(primops.list_append)
-def list_append(data, value):
-    """Implement `list_append`."""
+@register(primops.array_setitem)
+def array_setitem(data, item, value):
+    """Implement `array_setitem`."""
     data2 = copy(data)
-    data2.append(value)
+    if isinstance(item, tuple):
+        item = range(*item)
+        for idx in item:
+            data2[idx] = value[idx]
+    else:
+        data2[item] = value
     return data2
 
 
