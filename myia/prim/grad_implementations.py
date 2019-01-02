@@ -121,7 +121,7 @@ def bprop_list_len(x, out, dout):
 @register_bprop(primops.list_getitem)
 def bprop_list_getitem(data, idx, out, dout):
     """Backpropagator for primitive `list_getitem`."""
-    return (tuple_setitem(zeros_like(data), idx, dout), zeros_like(idx))
+    return (list_setitem(zeros_like(data), idx, dout), zeros_like(idx))
     #return (1, y)
 ### self-defined operators end ###
 
