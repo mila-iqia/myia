@@ -165,7 +165,16 @@ async def infer_shape_tuple_setitem(track, seq, idx, value):
 async def infer_shape_list_getitem(track, seq, idx):
     """Infer the shape of list_getitem."""
     seq_sh = await seq['shape']
+    idx_t = await idx['type']
+    if ismyiatype(idx_t, Tuple):
+        return seq_sh
     return seq_sh.shape
+
+@shape_inferrer(P.list_setitem, nargs=3)
+async def infer_shape_list_setitem(track, seq, idx, value):
+    """Infer the shape of list_setitem."""
+    seq_sh = await seq['shape']
+    return seq_sh
 
 
 @shape_inferrer(getelement, nargs=1)

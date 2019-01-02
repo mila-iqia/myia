@@ -232,7 +232,9 @@ async def infer_type_tuple_getitem(track, seq, idx):
 async def infer_type_list_getitem(track, seq, idx):
     """Infer the return type of list_getitem."""
     seq_t = await track.check(List, seq)
-    await track.check(Int, idx)
+    idx_t = await track.check((Tuple, Int), idx)
+    if ismyiatype(idx_t, Tuple):
+        return seq_t
     return seq_t.element_type
 
 
@@ -271,7 +273,7 @@ async def infer_type_tuple_setitem(track, seq, idx, value):
 async def infer_type_list_setitem(track, seq, idx, value):
     """Infer the return type of list_setitem."""
     seq_t = await track.check(List, seq)
-    await track.check(Int, idx)
+    await track.check((Int, Tuple), idx)
     await track.will_check(seq_t.element_type, value)
     return seq_t
 

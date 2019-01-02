@@ -283,6 +283,50 @@ class Parser:
             raise NotImplementedError(node)  # pragma: no cover
 
     # Expression implementations
+    def process_Subscript(self, block: 'Block',
+                            node: ast.Subscript) -> ANFNode:
+            op = block.operation('getitem')
+            value = self.process_node(block, node.value)
+            if type(node.slice) == ast.Slice:
+                slice = self.__process_Slice(block, node.slice, value)
+            elif type(node.slice) == ast.ExtSlice:
+                slice = self.__process_ExtSlice(block, node.slice, value)
+            else:
+                slice = self.process_node(block, node.slice)
+
+            return Apply([op, value, slice], block.graph)
+
+    def __process_Slice(self, block: 'Block', node: ast.Slice, value: ANFNode) -> ANFNode:
+        if node.lower == None:
+            lower = Constant(0)
+        else:
+            lower = self.process_node(block, node.lower)
+        if node.upper == None:
+            upper = self.graph.apply(
+                block.make_resolve(self.global_namespace, 'len'), value)
+        else:
+            upper = self.process_node(block, node.upper)
+        if node.step == None:
+            step = Constant(1)
+        else:
+            step = self.process_node(block, node.step)
+        slice = self.graph.apply(block.operation('make_tuple'), *(lower, upper, step))
+        return slice
+
+    def __process_ExtSlice(self, block: 'Block', node: ast.ExtSlice, value: ANFNode) -> ANFNode:
+        elts = []
+        for dim in node.dims:
+            if isinstance(dim, ast.Index):
+                elts.append(self.process_node(block, dim.value))
+            elif isinstance(dim, ast.Slice):
+                elts.append(self.__process_Slice(block, dim, value))
+            else:
+                raise AssertionError(f'Unknown subscript: {dim}')
+        op = block.operation('make_tuple')
+        if len(elts) == 0:
+            return Constant(())
+        else:
+            return block.graph.apply(op, *elts)
 
     def process_BinOp(self, block: 'Block', node: ast.BinOp) -> ANFNode:
         """Process binary operators: `a + b`, `a | b`, etc."""

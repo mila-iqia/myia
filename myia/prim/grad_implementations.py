@@ -15,7 +15,7 @@ from . import ops as primops
 from .py_implementations import \
     Jinv, J, \
     scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
-    scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
+    scalar_log, scalar_pow, list_setitem, tuple_setitem, switch, shape, transpose, \
     array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
     reshape, scalar_cast, array_cast, typeof, invert_permutation, scalar_maximum, cal_conv_grad
 
@@ -109,6 +109,21 @@ def register_augm(prim):
         return register(prim)(g)
     return deco
 
+
+### self-defined operators start ###
+### backprogator for list ###
+@register_bprop(primops.list_len)
+def bprop_list_len(x, out, dout):
+    """Backpropagator for primitive `list_len`."""
+    return (out, )
+
+
+@register_bprop(primops.list_getitem)
+def bprop_list_getitem(data, idx, out, dout):
+    """Backpropagator for primitive `list_getitem`."""
+    return (tuple_setitem(zeros_like(data), idx, dout), zeros_like(idx))
+    #return (1, y)
+### self-defined operators end ###
 
 @register_bprop(primops.scalar_add)
 def bprop_scalar_add(x, y, out, dout):
