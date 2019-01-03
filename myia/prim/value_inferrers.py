@@ -316,6 +316,11 @@ async def infer_value_tuple_len(track, xs):
     xs_t = await xs['type']
     return limited(len(xs_t.elements), track.max_depth)
 
+@value_inferrer(P.array_len, nargs=1)
+async def infer_value_array_len(track, xs):
+    """Infer the return value of array_len."""
+    xs_sh = await xs['shape']
+    return limited(xs_sh[0], track.max_depth)
 
 @value_inferrer(P.J, nargs=1)
 async def infer_value_J(track, x):
