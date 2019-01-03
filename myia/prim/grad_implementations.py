@@ -127,9 +127,7 @@ def bprop_list_getitem(data, idx, out, dout):
 @register_bprop(primops.array_len)
 def bprop_array_len(data, out, dout):
     """Backpropagator for primitive `array_len`."""
-    return (zeros_like(data), )
-
-    #return (scalar_cast(0, typeof(data[0])), )
+    return (scalar_cast(0, typeof(data[0])), )
 
 @register_bprop(primops.array_getitem)
 def bprop_array_getitem(data, idx, out, dout):
