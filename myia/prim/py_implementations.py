@@ -309,7 +309,16 @@ def getitem(data, item):
 def _vm_getitem(vm, data, item):
     """Implement `getitem`."""
     if isinstance(item, tuple):
-        item = slice(*item)      
+        if isinstance(item[0], tuple):
+            idx_s = []
+            for item_axis in item:
+                if item_axis == None:
+                    continue
+                idx_s.append(slice(*item_axis))
+            return vm.convert(data[tuple(idx_s)]) 
+        else:
+            item = slice(*item)
+            return vm.convert(data[item])      
     return vm.convert(data[item])
 
 
@@ -338,9 +347,16 @@ def array_setitem(data, item, value):
     """Implement `array_setitem`."""
     data2 = copy(data)
     if isinstance(item, tuple):
-        item = range(*item)
-        for v_idx, d_idx in enumerate(item):
-            data2[d_idx] = value[v_idx]
+        if isinstance(item[0], tuple):
+            idx_s = []
+            for item_axis in item:
+                if item_axis == None:
+                    continue
+                idx_s.append(slice(*item_axis))
+            data2[tuple(idx_s)] = value
+        else:
+            idx_s = slice(*item)
+            data2[idx_s] = value
     else:
         data2[item] = value
     return data2
@@ -351,7 +367,7 @@ def list_append(data, value):
     data2 = copy(data)
     data2.append(value)
     return data2
-    
+
 @vm_register(primops.getattr)
 def _vm_getattr(vm, data, attr):
     """Implement `getattr`."""

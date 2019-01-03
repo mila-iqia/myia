@@ -182,9 +182,27 @@ async def infer_shape_array_getitem(track, seq, idx):
     seq_sh = await seq['shape']
     idx_t = await idx['type']
     idx_v = await idx['value']
+    
     if ismyiatype(idx_t, Tuple):
-        sh_new = (idx_v[1] - idx_v[0]) // idx_v[2]
-        return tuple([sh_new])
+        if ismyiatype(idx_t.elements[0], Tuple):
+            len_idx = len(idx_v)
+            if len(seq_sh) < len_idx:
+                raise MyiaShapeError("can not slice on data with {seq_sh} with idx {idx_v}, too much.")
+            new_shape = []
+            for low, upper, step in idx_v:
+                sh_new = (upper - low) // step
+                new_shape.append(sh_new)
+            for i in range(len(seq_sh) - len_idx):
+                new_shape.append(seq_sh[len_idx + i])
+            return tuple(new_shape)
+        else:
+            len_idx = 1
+            low, upper, step = idx_v
+            sh_new = (upper - low) // step
+            new_shape = [sh_new]
+            for i in range(len(seq_sh) - len_idx):
+                new_shape.append(seq_sh[len_idx + i])
+            return tuple(new_shape)
     else:
         return NOSHAPE
 
