@@ -181,9 +181,11 @@ async def infer_shape_array_getitem(track, seq, idx):
     """Infer the shape of array_getitem."""
     seq_sh = await seq['shape']
     idx_t = await idx['type']
+    idx_v = await idx['value']
     if ismyiatype(idx_t, Tuple):
-        return seq_sh
-    else
+        sh_new = (idx_v[1] - idx_v[0]) // idx_v[2]
+        return tuple([sh_new])
+    else:
         return NOSHAPE
 
 @shape_inferrer(P.array_setitem, nargs=3)

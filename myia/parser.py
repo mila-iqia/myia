@@ -456,14 +456,6 @@ class Parser:
         elts = [self.process_node(block, e) for e in node.elts]
         return block.graph.apply(op, *elts)
 
-    def process_Subscript(self, block: 'Block',
-                          node: ast.Subscript) -> ANFNode:
-        """Process subscripts: `x[y]`."""
-        op = block.operation('getitem')
-        value = self.process_node(block, node.value)
-        slice = self.process_node(block, node.slice)
-        return Apply([op, value, slice], block.graph)
-
     def process_Index(self, block: 'Block', node: ast.Index) -> ANFNode:
         """Process subscript indexes."""
         return self.process_node(block, node.value)

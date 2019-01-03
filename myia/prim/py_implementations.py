@@ -339,8 +339,8 @@ def array_setitem(data, item, value):
     data2 = copy(data)
     if isinstance(item, tuple):
         item = range(*item)
-        for idx in item:
-            data2[idx] = value[idx]
+        for v_idx, d_idx in enumerate(item):
+            data2[d_idx] = value[v_idx]
     else:
         data2[item] = value
     return data2
