@@ -401,6 +401,10 @@ def test_array_operations_distribute(x, y):
     sm = array_reduce(scalar_add, div, ())
     return array_to_scalar(sm)
 
+@grad_test((np.array([1.0, 3.0, 4.0])),)
+def test_array_operations_getitem(xs):
+    return xs[0] * xs[1]
+
 
 @grad_test((MA(2, 3), MB(2, 3)),)
 def test_array_operations_reshape(xs, ys):
