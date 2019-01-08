@@ -201,7 +201,7 @@ class LocalPassOptimizer:
             mng = self.optimizer.resources.manager
             mng.add_graph(graph)
         else:
-            mng = manage(graph)  # noqa
+            mng = manage(graph)
 
         changes = False
         again = True
@@ -209,7 +209,6 @@ class LocalPassOptimizer:
             topo, seen, chg = self.backwards(mng, graph)
             again = self.forward(mng, topo)
             changes |= (chg | again)
-            again |= mng.all_nodes.issuperset(seen)
 
         return changes
 
