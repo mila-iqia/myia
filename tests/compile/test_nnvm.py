@@ -25,7 +25,7 @@ def test_mul(x, y):
     return x * y
 
 
-@pytest.mark.xfail(reason="truediv doesn't work for ints")
+@pytest.mark.xfail(reason="scalar_cast is needed for ints")
 @parse_compare((2, 3), (2.0, 3.0))
 def test_truediv(x, y):
     return x / y
@@ -127,7 +127,6 @@ def test_distribute2(x):
     return distribute(x, (2, 3))
 
 
-@pytest.mark.xfail(reason="Devolves to empty function")
 @parse_compare(MA(2, 3), array=True, optimize=False)
 def test_distribute3(x):
     return distribute(x, (2, 3))

@@ -16,6 +16,8 @@ from .partial import (  # noqa
     partition_keywords, Partial, Partializable
 )
 
+from .profile import prof_counter, print_profile  # noqa
+
 from .unify import (  # noqa
     Unification, Var, Seq, SVar, UnionVar, RestrictedVar, PredicateSet,
     FilterVar, var, svar, uvar, expandlist, noseq, VisitError

@@ -6,8 +6,8 @@ from myia.pipeline import scalar_pipeline
 from myia.infer import InferenceError
 from myia.ir import Constant, isomorphic, GraphCloner
 from myia.opt import PatternSubstitutionOptimization as psub, \
-    PatternEquilibriumOptimizer, pattern_replacer, sexp_to_graph, \
-    cse
+    LocalPassOptimizer, pattern_replacer, sexp_to_graph, \
+    cse, NodeMap
 from myia.prim import Primitive, ops as prim
 from myia.utils import Merge
 from myia.utils.unify import Var, var
@@ -112,7 +112,10 @@ def _check_transform(before, after, transform,
 
 
 def _check_opt(before, after, *opts, argspec=None, argspec_after=None):
-    eq = PatternEquilibriumOptimizer(*opts)
+    nmap = NodeMap()
+    for opt in opts:
+        nmap.register(getattr(opt, 'interest', None), opt)
+    eq = LocalPassOptimizer(nmap)
     _check_transform(before, after, eq, argspec, argspec_after)
 
 
