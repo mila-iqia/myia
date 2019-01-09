@@ -11,8 +11,6 @@ import cifar10 as cf
 from models.tf import MiniVGG as tf_vgg
 from models.myia import MiniVGG as myia_vgg
 
-import matplotlib.pyplot as plt
-
 import logging
 logger = logging.getLogger('bigcat')
 

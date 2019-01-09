@@ -1,6 +1,6 @@
 """CIFAR10 small images classification dataset.
    N.B.(yanjie, 20190109): part of codes are mofified from tensorflow repo, 
-                           lic. declaration required.
+   lic. declaration would be required to add later.
 """
 from __future__ import absolute_import
 from __future__ import division
