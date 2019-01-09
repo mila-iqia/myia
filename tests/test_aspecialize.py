@@ -116,22 +116,22 @@ def test_polymorphic_closure(x, y):
     return construct(x + x)(x), construct(y + y)(y)
 
 
-# @specialize((True, int1, int2),
-#             # (True, fp1, int1)  # TODO: mark this one as xfail
-#             )
-# def test_switch_fn(c, x, y):
-#     def dee(y):
-#         return y * y
+@specialize((True, int1, int2),
+            # (True, fp1, int1)  # TODO: mark this one as xfail
+            )
+def test_switch_fn(c, x, y):
+    def dee(y):
+        return y * y
 
-#     def doo(y):
-#         return y + y
+    def doo(y):
+        return y + y
 
-#     if c:
-#         f = dee
-#     else:
-#         f = doo
+    if c:
+        f = dee
+    else:
+        f = doo
 
-#     return f(x), f(y)
+    return f(x), f(y)
 
 
 @specialize((int1, int2), (int1, fp1))
@@ -207,17 +207,17 @@ def test_unused_parameter(x, y):
     return x * x
 
 
-# @specialize((int1,))
-# def test_unused_function_parameter(x):
-#     # The type of square will be Problem(DEAD), but that's not really an issue
-#     # because it is indeed not used, and we can simply replace the reference
-#     # by a dummy.
-#     def square(x):
-#         return x * x
+@specialize((int1,))
+def test_unused_function_parameter(x):
+    # The type of square will be Problem(DEAD), but that's not really an issue
+    # because it is indeed not used, and we can simply replace the reference
+    # by a dummy.
+    def square(y):
+        return y * y
 
-#     def helper(f, a):
-#         return a * a
-#     return helper(square, x)
+    def helper(f, a):
+        return a * a
+    return helper(square, x)
 
 
 @specialize((int1,))
@@ -278,9 +278,9 @@ def test_method(x, y):
     return x.__add__(y)
 
 
-# @specialize((int1, fp1))
-# def test_method_polymorphic(x, y):
-#     return x.__add__(x), y.__add__(y)
+@specialize((int1, fp1))
+def test_method_polymorphic(x, y):
+    return x.__add__(x), y.__add__(y)
 
 
 @specialize((True, int1), (False, int1))
@@ -288,14 +288,14 @@ def test_switch(c, x):
     return switch(c, scalar_usub, scalar_uadd)(x)
 
 
-# @specialize((True, int1, int2), (False, int1, int2))
-# def test_switch2(c, x, y):
-#     fn = switch(
-#         c,
-#         partial(scalar_sub, x),
-#         partial(scalar_add, x)
-#     )
-#     return fn(y)
+@specialize((True, int1, int2), (False, int1, int2))
+def test_switch2(c, x, y):
+    fn = switch(
+        c,
+        partial(scalar_sub, x),
+        partial(scalar_add, x)
+    )
+    return fn(y)
 
 
 # @specialize((int1, int2, int2))

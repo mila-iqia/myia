@@ -596,6 +596,7 @@ class Context:
 
     def __init__(self, parent, g, argkey):
         """Initialize the Context."""
+        assert argkey is not None
         self.parent = parent
         self.graph = g
         self.argkey = argkey

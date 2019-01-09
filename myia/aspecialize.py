@@ -6,7 +6,7 @@ from itertools import count
 from .abstract import GraphXInferrer
 from .abstract.base import GraphAndContext, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
-    AbstractFunction, PartialApplication
+    AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, REF
 from .dtype import Function, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
     GraphInferrer, PartialInferrer, Inferrer, Unspecializable, \
@@ -169,27 +169,31 @@ class _GraphSpecializer:
 
     @build.register
     async def build(self, a: AbstractFunction, argvals=None):
-        fns = a.values['value']
+        fns = a.values[VALUE]
         if len(fns) != 1:
-            raise Unspecializable('xx')
+            raise Unspecializable('xx1')
         fn, = fns
         return await self.build_inferrer(a, fn, argvals)
 
     @build.register
     async def build(self, a: AbstractScalar, argvals=None):
-        v = a.values['value']
+        v = a.values[VALUE]
         if v is ANYTHING:
-            raise Unspecializable('xxx')
+            node = a.values[REF].get(self.context)
+            if node:
+                return self.get(node)
+            else:
+                raise Unspecializable('xx2')
         else:
             return _const2(v, a)
 
     @build.register
     async def build(self, a: AbstractTuple, argvals=None):
-        raise Unspecializable('xx')
+        raise Unspecializable('xx3')
 
     @build.register
     async def build(self, a: object, argvals=None):
-        raise Unspecializable('xx')
+        raise Unspecializable('xx4')
 
     build_inferrer = Overload()
 
@@ -199,22 +203,20 @@ class _GraphSpecializer:
 
     @build_inferrer.register
     async def build_inferrer(self, a, fn: Graph, argvals):
-        inf = self.specializer.track.get_inferrer_for(fn, None)
-        # res = inf.cache[tuple(argvals)]
-        ctx = inf.make_context(self.specializer.track, argvals)
-        v = await self.specializer._specialize(fn, ctx, None)
-        return _const2(v, a)
+        return await self.build_inferrer(
+            a, GraphAndContext(fn, Context.empty()), argvals
+        )
 
     @build_inferrer.register
     async def build_inferrer(self, a, fn: GraphAndContext, argvals):
         if not _visible(self.graph, fn.graph):
-            raise Unspecializable('xx')
+            raise Unspecializable('xx5')
         inf = self.specializer.track.get_inferrer_for(fn, None)
         if argvals is None:
             if len(inf.cache) == 1:
                 argvals, = inf.cache.keys()
             else:
-                raise Unspecializable('xx')
+                raise Unspecializable('xx7')
         ctx = inf.make_context(self.specializer.track, argvals)
         v = await self.specializer._specialize(fn.graph, ctx, None)
         return _const2(v, a)

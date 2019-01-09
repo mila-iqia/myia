@@ -97,7 +97,8 @@ class AbstractBase:
 
 class AbstractValue(AbstractBase):
     def __init__(self, values, count=0):
-        self.values = values
+        self.values = TrackDict(values)
+        self.values.setdefault(REF, {})
         self.count = count
 
     def build(self, name, default=None):
@@ -167,7 +168,8 @@ class AbstractValue(AbstractBase):
         raise NotImplementedError()
 
     def make_key(self):
-        return tuple(sorted(self.values.items()))
+        return tuple(sorted((k, v) for k, v in self.values.items()
+                            if k.eq_relevant()))
 
     def _resolve(self, key, value):
         self.values[key] = value
@@ -281,7 +283,6 @@ class AbstractClass(AbstractValue):
         self.tag = tag
         self.attributes = attributes
         self.methods = methods
-        self.values = values
 
     def _build_value(self):
         kls = dtype.tag_to_dataclass[self.tag]
@@ -305,7 +306,7 @@ class AbstractClass(AbstractValue):
 
     def make_key(self):
         attrs = tuple((k, v.make_key()) for k, v in self.attributes.items())
-        return (self.tag, attrs)
+        return (super().make_key(), self.tag, attrs)
 
     def __repr__(self):
         elems = [f'{k}={v}' for k, v in self.attributes.items()]
@@ -332,17 +333,61 @@ class AbstractJTagged(AbstractValue):
 ##########
 
 
-class Subtrack(Named):
+class TrackDict(dict):
+    pass
+
+
+class Subtrack:
     def __init__(self, name):
-        super().__init__(name)
+        self.name = name
+
+    def __str__(self):
+        return self.name
 
     def __lt__(self, other):
         return self.name < other.name
 
+    def clone(self, v, recurse):
+        return recurse(v)
 
-VALUE = Subtrack('VALUE')
-TYPE = Subtrack('TYPE')
-SHAPE = Subtrack('SHAPE')
+    async def async_clone(self, v, recurse):
+        return await recurse(v)
+
+    def broaden(self, v, recurse):
+        return recurse(v)
+
+    def eq_relevant(self):
+        return True
+
+
+class ValueSubtrack(Subtrack):
+    def broaden(self, v, recurse):
+        return ANYTHING
+
+
+class TypeSubtrack(Subtrack):
+    pass
+
+
+class ShapeSubtrack(Subtrack):
+    pass
+
+
+class RefSubtrack(Subtrack):
+    def eq_relevant(self):
+        return False
+
+    async def async_clone(self, v, recurse):
+        return {}
+
+    def clone(self, v, recurse):
+        return {}
+
+
+VALUE = ValueSubtrack('VALUE')
+TYPE = TypeSubtrack('TYPE')
+SHAPE = ShapeSubtrack('SHAPE')
+REF = RefSubtrack('REF')
 
 
 #############
@@ -432,10 +477,8 @@ def abstract_clone(self, x: AbstractFunction):
 
 
 @overload
-def abstract_clone(self, d: dict):
-    to_transform = {VALUE}
-    return {k: self(v) if k in to_transform else v
-            for k, v in d.items()}
+def abstract_clone(self, d: TrackDict):
+    return {k: k.clone(v, self) for k, v in d.items()}
 
 
 @overload
@@ -487,9 +530,8 @@ async def abstract_clone_async(self, x: AbstractFunction):
 
 
 @overload
-async def abstract_clone_async(self, d: dict):
-    to_transform = {VALUE}
-    return {k: (await self(v)) if k in to_transform else v
+async def abstract_clone_async(self, d: TrackDict):
+    return {k: (await k.async_clone(v, self))
             for k, v in d.items()}
 
 
@@ -542,8 +584,8 @@ async def concretize_abstract(self, x: Pending):
 
 
 @abstract_clone.variant
-def broaden(self, x: object):
-    return ANYTHING
+def broaden(self, d: TrackDict):
+    return {k: k.broaden(v, self) for k, v in d.items()}
 
 
 ###############
@@ -589,12 +631,14 @@ def _amerge(self, x1: dtype.TypeMeta, x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: dict, x2, loop, forced):
+def _amerge(self, x1: (dict, TrackDict), x2, loop, forced):
     if set(x1.keys()) != set(x2.keys()):
         raise MyiaTypeError(f'Keys mismatch')
     changes = False
-    rval = {}
+    rval = type(x1)()
     for k, v in x1.items():
+        if isinstance(k, Subtrack) and not k.eq_relevant():
+            continue
         res = amerge(v, x2[k], loop, forced)
         if res is not v:
             changes = True
@@ -974,7 +1018,7 @@ def shapeof(v):
 
 def _clean(values):
     return {k: v for k, v in values.items()
-            if v not in {ANYTHING, UNKNOWN, dshape.NOSHAPE}}
+            if k is not REF and v not in {ANYTHING, UNKNOWN, dshape.NOSHAPE}}
 
 
 @mixin(AbstractValue)

@@ -244,26 +244,45 @@ class ANFNode(Node):
         self.graph = graph
         self.debug = NamedDebugInfo(self)
         self.inferred = defaultdict(lambda: UNKNOWN)
+        self._abstract = None
         self.expect_inferred = defaultdict(lambda: UNKNOWN)
+
+    @property
+    def abstract(self):
+        return self._abstract
+
+    @abstract.setter
+    def abstract(self, value):
+        self._abstract = value
 
     @property
     def type(self):
         """Return the node's type."""
-        return self.inferred['type']
+        if self._abstract is None:
+            return self.inferred['type']
+        else:
+            from ..abstract.base import TYPE, SHAPE
+            return self._abstract.build(TYPE)
 
     @type.setter
     def type(self, value):
         """Set the node's type."""
+        assert self._abstract is None
         self.inferred['type'] = value
 
     @property
     def shape(self):
         """Return the node's shape."""
-        return self.inferred['shape']
+        if self._abstract is None:
+            return self.inferred['shape']
+        else:
+            from ..abstract.base import TYPE, SHAPE
+            return self._abstract.build(SHAPE)
 
     @shape.setter
     def shape(self, value):
         """Set the node's shape."""
+        assert self._abstract is None
         self.inferred['shape'] = value
 
     @property

@@ -16,7 +16,7 @@ from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
     reify, JTransformedFunction, AbstractJTagged, AbstractTuple, \
     sensitivity_transform, VirtualFunction, AbstractFunction, \
-    VALUE, TYPE, SHAPE
+    VALUE, TYPE, SHAPE, REF
 
 
 _number_types = [
@@ -134,6 +134,7 @@ class AbstractTrack(Track):
             # v = RestrictedVar(_number_types)
             # prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
             # res.values[TYPE] = self.engine.loop.create_var(v, t, prio)
+        res.values[REF].setdefault(ctref.context, ctref.node)
         return res
 
     def from_value(self, v, context):
@@ -318,6 +319,7 @@ class GraphXInferrer(XInferrer):
         return ctx
 
     def _make_argkey_and_context(self, track, argvals):
+        assert argvals is not None
         argkey = as_frozen(argvals)
         # Update current context using the fetched properties.
         return argkey, self.context.add(self._graph, argkey)
@@ -335,6 +337,7 @@ class GraphXInferrer(XInferrer):
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
         for p, arg in zip(g.parameters, argkey):
+            arg.values[REF].setdefault(context, p)
             ref = engine.ref(p, context)
             engine.cache.set_value(('abstract', ref), arg)
 
@@ -425,6 +428,7 @@ class JXInferrer(XInferrer):
 
 async def _xinf_helper(track, inf, outref, argrefs, p):
     result = await inf(track, outref, argrefs)
+    result.values[REF].setdefault(outref.context, outref.node)
     p.resolve_to(result)
 
 
