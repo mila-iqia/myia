@@ -9,8 +9,8 @@ class MiniVGG:
     """
     A mini version of VGG.
     
-    With hyper-parameters (lr=003, batch_size=128, dropout=0.1), the performance 
-    is test accuracy: 0.681600, test loss: 1.024199.
+    With hyper-parameters (lr=003, batch_size=128, dropout=0.1, epochs=10), the 
+    performance is test accuracy: 0.681600, test loss: 1.024199.
     """
     def __init__(self, lr=.003, dropout=0.5, name='mini_vgg'):
         self.sess = tf.Session()
