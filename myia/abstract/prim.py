@@ -169,7 +169,8 @@ class MyiaAttributeError(InferenceError):
     """Raised when an attribute is not found in a type or module."""
 
 
-async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
+async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
+                        dataref=None, outref=None):
     """Return an inferrer for resolve or getattr.
 
     Arguments:
@@ -180,6 +181,10 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
         chk: A function to check the values inferred for the
             data and item.
     """
+    from ..prim import Primitive
+    from ..ir import Graph
+    from ..infer import Reference
+
     resources = track.engine.pipeline.resources
 
     data_t = data.build(TYPE)
@@ -208,9 +213,15 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
             inferrer = track.from_value(method, Context.empty())
             fns = inferrer.values[VALUE]
             assert isinstance(fns, Possibilities)
-            return AbstractFunction(*[
-                PartialApplication(fn, (data,)) for fn in fns
-            ])
+            assert len(fns) == 1
+            fn, = fns
+            assert isinstance(fn, (Primitive, Graph))
+            g = outref.node.graph
+            eng = outref.engine
+            ref = Reference(outref.engine,
+                            g.apply(P.partial, fn, dataref.node),
+                            outref.context)
+            return await eng.forward_reference('abstract', outref, ref)
         else:
             raise InferenceError(f'Unknown field in {data_t}: {item_v}')
 
@@ -220,9 +231,15 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None):
         inferrer = track.from_value(method, Context.empty())
         fns = inferrer.values[VALUE]
         assert isinstance(fns, Possibilities)
-        return AbstractFunction(*[
-            PartialApplication(fn, (data,)) for fn in fns
-        ])
+        assert len(fns) == 1
+        fn, = fns
+        assert isinstance(fn, (Primitive, Graph))
+        g = outref.node.graph
+        eng = outref.engine
+        ref = Reference(outref.engine,
+                        g.apply(P.partial, fn, dataref.node),
+                        outref.context)
+        return await eng.forward_reference('abstract', outref, ref)
 
     elif case == 'no_method':
         msg = f"object of type {data_t} has no attribute '{item_v}'"
@@ -616,23 +633,34 @@ async def _inf_list_append(track,
     return arg
 
 
-@standard_prim(P.getattr)
-async def _inf_getattr(track, data, item):
-    def chk(data_v, item_v):
-        if not isinstance(item_v, str):  # pragma: no cover
-            raise MyiaTypeError(
-                f'item argument to resolve must be a string, not {item_v}.'
-            )
+class _GetAttrXInferrer(XInferrer):
+    async def __call__(self, track, outref, argrefs):
+        if len(argrefs) != 2:
+            raise MyiaTypeError('Wrong number of arguments')
+        r_data, r_item = argrefs
+        data = await r_data['abstract']
+        item = await r_item['abstract']
 
-    async def on_dcattr(data, data_t, item_v):
-        return data.attributes[item_v]
+        def chk(data_v, item_v):
+            if not isinstance(item_v, str):  # pragma: no cover
+                raise MyiaTypeError(
+                    f'item argument to resolve must be a string, not {item_v}.'
+                )
 
-    return await static_getter(
-        track, data, item,
-        fetch=getattr,
-        on_dcattr=on_dcattr,
-        chk=chk
-    )
+        async def on_dcattr(data, data_t, item_v):
+            return data.attributes[item_v]
+
+        return await static_getter(
+            track, data, item,
+            fetch=getattr,
+            on_dcattr=on_dcattr,
+            chk=chk,
+            outref=outref,
+            dataref=r_data,
+        )
+
+
+abstract_inferrer_constructors[P.getattr] = _GetAttrXInferrer.partial()
 
 
 # setattr = Primitive('setattr')

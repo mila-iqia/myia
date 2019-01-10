@@ -239,21 +239,21 @@ def test_indirect_graph(x):
     return f2()(x)
 
 
-# @specialize((True, int1, int2))
-# def test_poly_with_constants(c, x, y):
-#     def f1(x, y):
-#         return x + y
+@specialize((True, int1, int2))
+def test_poly_with_constants(c, x, y):
+    def f1(x, y):
+        return x + y
 
-#     def f2(x, y):
-#         return x * y
+    def f2(x, y):
+        return x * y
 
-#     def choose(c):
-#         if c:
-#             return f1
-#         else:
-#             return f2
+    def choose(c):
+        if c:
+            return f1
+        else:
+            return f2
 
-#     return choose(c)(x, y), choose(not c)(x, y)
+    return choose(c)(x, y), choose(not c)(x, y)
 
 
 # @specialize((True, int1, int2))
@@ -283,6 +283,13 @@ def test_method_polymorphic(x, y):
     return x.__add__(x), y.__add__(y)
 
 
+# @specialize((int1, fp1))
+# def test_partial_polymorphic(x, y):
+#     def f(a, b):
+#         return a + b
+#     return partial(f, x)(x), partial(f, y)(y)
+
+
 @specialize((True, int1), (False, int1))
 def test_switch(c, x):
     return switch(c, scalar_usub, scalar_uadd)(x)
@@ -298,9 +305,9 @@ def test_switch2(c, x, y):
     return fn(y)
 
 
-# @specialize((int1, int2, int2))
-# def test_multitype(x, y, z):
-#     return mysum(x) * mysum(x, y) * mysum(x, y, z)
+@specialize((int1, int2, int2))
+def test_multitype(x, y, z):
+    return mysum(x) * mysum(x, y) * mysum(x, y, z)
 
 
 @specialize((int1, int2))
@@ -320,15 +327,15 @@ def test_closure_stays_in_scope(x, y):
     return h(x + y)()
 
 
-# @specialize((int1, int2))
-# def test_partial_outside_scope(x, y):
-#     # The inferrer knows that g(x) is a partial of f, but it can't
-#     # build it inside the main function.
-#     def f(x, y):
-#         return x * y
+@specialize((int1, int2))
+def test_partial_outside_scope(x, y):
+    # The inferrer knows that g(x) is a partial of f, but it can't
+    # build it inside the main function.
+    def f(x, y):
+        return x * y
 
-#     def g(x):
-#         z = x * x
-#         return partial(f, z)
+    def g(x):
+        z = x * x
+        return partial(f, z)
 
-#     return g(x)(y)
+    return g(x)(y)

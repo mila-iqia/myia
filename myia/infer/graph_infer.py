@@ -801,6 +801,7 @@ class InferenceEngine:
             error_callback=self.errors.append
         )
         self.context_class = context_class
+        self.reference_map = {}
 
     def run(self, graph, *, tracks, argspec, outspec=None):
         """Run the inferrer on a graph given initial values.
@@ -925,6 +926,10 @@ class InferenceEngine:
         for other_track in self.tied_tracks.get(track, []):
             self.loop.schedule(self.get_inferred(other_track, ref))
         return result
+
+    async def forward_reference(self, track, orig, new):
+        self.reference_map[orig] = new
+        return await self.get_inferred(track, new)
 
     def run_coroutine(self, coro, throw=True):
         """Run an async function using this inferrer's loop."""

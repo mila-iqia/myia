@@ -31,8 +31,10 @@ class MetaGraph:
 
     def specialize_from_abstract(self, args):
         from ..abstract.base import TYPE
-        types = [arg.build(TYPE) for arg in args]
-        return self.specialize_from_types(types)
+        types = tuple([arg.build(TYPE) for arg in args])
+        if types not in self.cache:
+            self.cache[types] = self.specialize_from_types(types)
+        return self.cache[types]
 
     def specialize_from_types(self, types):
         """Generate a Graph for this type signature."""

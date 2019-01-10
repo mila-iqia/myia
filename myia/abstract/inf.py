@@ -49,9 +49,7 @@ class AbstractTrack(Track):
 
     @get_inferrer_for.register
     def get_inferrer_for(self, g: Graph, args):
-        if g not in self.constructors:
-            self.constructors[g] = GraphXInferrer(g, Context.empty())
-        return self.constructors[g]
+        return self.get_inferrer_for(GraphAndContext(g, Context.empty()), args)
 
     @get_inferrer_for.register
     def get_inferrer_for(self, g: GraphAndContext, args):

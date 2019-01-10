@@ -6,7 +6,8 @@ from functools import reduce
 
 from .. import dtype, dshape
 from ..debug.utils import mixin
-from ..infer import ANYTHING, InferenceError, MyiaTypeError
+from ..infer import ANYTHING, InferenceError, MyiaTypeError, \
+    Reference, Context
 from ..infer.core import Pending, Later
 from ..utils import overload, UNKNOWN, Named
 
@@ -110,6 +111,7 @@ class AbstractValue(AbstractBase):
             return default
 
     def _build(self, subtrack):
+        assert not isinstance(subtrack, str)
         v = self.values.get(subtrack, ABSENT)
         if v is ANYTHING:
             raise ValueError('ANYTHING')
@@ -196,6 +198,21 @@ class AbstractType(AbstractValue):
 
     def __repr__(self):
         return f'Ty({self.values[VALUE]})'
+
+
+class AbstractError(AbstractValue):
+    def __init__(self, err):
+        super().__init__({
+            VALUE: err,
+            TYPE: dtype.Problem[err],
+            SHAPE: dshape.NOSHAPE,
+        })
+
+    def merge_structure(self, other):
+        return AbstractError(self.values[VALUE])
+
+    def __repr__(self):
+        return f'E({self.values[VALUE]})'
 
 
 class AbstractFunction(AbstractValue):
@@ -376,6 +393,9 @@ class ShapeSubtrack(Subtrack):
 class RefSubtrack(Subtrack):
     def eq_relevant(self):
         return False
+
+    def broaden(self, v, recurse):
+        return {}
 
     async def async_clone(self, v, recurse):
         return {}
@@ -576,6 +596,25 @@ async def abstract_clone_async(self, x: object):
 @abstract_clone_async.variant
 async def concretize_abstract(self, x: Pending):
     return await self(await x)
+
+
+@overload
+async def concretize_abstract(self, r: Reference):
+    return Reference(
+        r.engine,
+        r.node,
+        await self(r.context)
+    )
+
+
+@overload
+async def concretize_abstract(self, ctx: Context):
+    c_argkey = [await self(x) for x in ctx.argkey]
+    return Context(
+        await self(ctx.parent),
+        ctx.graph,
+        tuple(c_argkey)
+    )
 
 
 ###########
@@ -1088,4 +1127,14 @@ class _AbstractClass:
             self.attributes.items(),
             delimiter="↦",
             cls='abstract'
+        )
+
+
+@mixin(GraphAndContext)
+class _GraphAndContext:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_object(
+            'Gr+Ctx',
+            (('graph', self.graph), ('context', self.context)),
+            delimiter="↦",
         )
