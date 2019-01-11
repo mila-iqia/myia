@@ -13,7 +13,7 @@ from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
     LocalPassOptimizer
 from ..prim import vm_implementations
-from ..utils import overload, flatten, prof_counter
+from ..utils import overload, flatten, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
     validate_type as default_validate_type
 from ..vm import VM
@@ -61,52 +61,30 @@ class Optimizer(PipelineStep):
             self.names.append(name)
             self.phases.append(spec)
 
-    def step(self, graph, argspec=None, outspec=None, profile=False):
+    def step(self, graph, argspec=None, outspec=None, profile=no_prof):
         """Optimize the graph using the given patterns."""
-        if profile:
-            profd = dict()
-            gstart = prof_counter()
+        with profile.main():
             counter = count(1)
-        changes = True
-        while changes:
-            if profile:
-                lstart = prof_counter()
-                loop = str(next(counter))
-                lp = dict()
-                nn = iter(self.names)
-            changes = False
-            for opt in self.phases:
-                if profile:
-                    start = prof_counter()
-                if opt == 'renormalize':
-                    assert argspec is not None
-                    graph = self.resources.inferrer.renormalize(
-                        graph, argspec, outspec
-                    )
-                elif opt(graph):
-                    changes = True
-                if profile:
-                    end = prof_counter()
-                    lp[next(nn)] = end - start
-            if profile:
-                lend = prof_counter()
-                lp['__total__'] = lend - lstart
-                profd[f"Cycle {loop}"] = lp
-            if self.run_only_once:
-                break
-        if profile:
-            start = prof_counter()
-        self.resources.manager.keep_roots(graph)
-        if profile:
-            end = prof_counter()
-            profd['keep_roots'] = end - start
-        res = {'graph': graph}
-        if profile:
-            gend = prof_counter()
-            profd['__count__'] = next(counter) - 1
-            profd['__total__'] = gend - gstart
-            res['profile'] = profd
-        return res
+            changes = True
+            while changes:
+                with profile.lap(next(counter)):
+                    changes = False
+                    nn = iter(self.names)
+                    for opt in self.phases:
+                        with profile.step(next(nn)):
+                            if opt == 'renormalize':
+                                assert argspec is not None
+                                graph = self.resources.inferrer.renormalize(
+                                    graph, argspec, outspec
+                                )
+                            elif opt(graph):
+                                changes = True
+                        if self.run_only_once:
+                            break
+            with profile.step('keep_roots'):
+                self.resources.manager.keep_roots(graph)
+            res = {'graph': graph}
+            return res
 
 
 #########

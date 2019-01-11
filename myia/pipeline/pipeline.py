@@ -1,7 +1,7 @@
 """Tools to generate and configure Myia's operation pipeline."""
 
 from ..utils import merge, Merge, NS, Partial, Partializable, \
-    partition_keywords, prof_counter
+    partition_keywords, no_prof
 
 
 class PipelineDefinition:
@@ -240,38 +240,23 @@ class _PipelineSlice:
         Errors are put in the 'error' key of the result, and the step
         at which an error happened is put in the 'error_step' key.
         """
-        profile = args.get('profile', False)
-        if profile:
-            profd = dict()
-            gstart = prof_counter()
-        for step in self.pipeline._seq[self.slice]:
-            if 'error' in args:
-                break
-            if step.active:
-                valid_args, rest = partition_keywords(step.step, args)
-                try:
-                    if profile:
-                        start = prof_counter()
-                    results = step.step(**valid_args)
-                    if profile:
-                        end = prof_counter()
-                    if not isinstance(results, dict) and len(valid_args) == 1:
-                        field_name, = valid_args.keys()
-                        results = {field_name: results}
-                    if profile:
-                        subp = results.pop('profile', end - start)
-                        if isinstance(subp, dict):
-                            subp['__total__'] = end - start
-                        profd[step.name] = subp
-                    args = {**args, **results}
-                except Exception as e:
-                    args['error'] = e
-                    args['error_step'] = step
-        if profile:
-            gend = prof_counter()
-            profd['__total__'] = gend - gstart
-            args['profile'] = profd
-        return args
+        profile = args.get('profile', no_prof)
+        with profile.main():
+            for step in self.pipeline._seq[self.slice]:
+                if 'error' in args:
+                    break
+                if step.active:
+                    valid_args, rest = partition_keywords(step.step, args)
+                    try:
+                        with profile.step(step.name):
+                            results = step.step(**valid_args)
+                            if not isinstance(results, dict) and len(valid_args) == 1:
+                                field_name, = valid_args.keys()
+                                results = {field_name: results}
+                    except Exception as e:
+                        args['error'] = e
+                        args['error_step'] = step
+            return args
 
     def __call__(self, **args):
         results = self.run_and_catch(**args)
