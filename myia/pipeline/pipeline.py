@@ -254,6 +254,7 @@ class _PipelineSlice:
                                     len(valid_args) == 1):
                                 field_name, = valid_args.keys()
                                 results = {field_name: results}
+                            args = {**args, **results}
                     except Exception as e:
                         args['error'] = e
                         args['error_step'] = step

@@ -33,11 +33,12 @@ def print_profile(prof, *, indent=0):  # pragma: no cover
 
 class Profile:
     def __init__(self):
-        self.ctx = self
+        self.ctx = None
+        self.ctx = ProfContext(None, self)
         self.d = dict()
+        self.ctx.d = self.d
 
     def main(self):
-        self.ctx = ProfContext('__total__', self)
         return self.ctx
 
     def step(self, name):
@@ -45,7 +46,7 @@ class Profile:
         return self.ctx
 
     def lap(self, count):
-        self.ctx = ProfContext('Cycle {count}', self)
+        self.ctx = ProfContext(f'Cycle {count}', self)
         return self.ctx
 
     def _pop(self):
@@ -66,11 +67,12 @@ class ProfContext:
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.stop = prof_counter()
         self.d['__total__'] = self.stop - self.start
-        if len(self.d) > 1:
-            self.parent.d[self.name] = self.d
-        else:
-            self.parent.d[self.name] = self.d['__total__']
-        self.p._pop()
+        if self.parent:
+            if len(self.d) > 1:
+                self.parent.d[self.name] = self.d
+            else:
+                self.parent.d[self.name] = self.d['__total__']
+            self.p._pop()
         return None
 
 
