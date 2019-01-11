@@ -48,7 +48,7 @@ class Profile:
         self.ctx = ProfContext('Cycle {count}', self)
         return self.ctx
 
-    def pop(self):
+    def _pop(self):
         self.ctx = self.ctx.parent
 
 
@@ -70,16 +70,19 @@ class ProfContext:
             self.parent.d[self.name] = self.d
         else:
             self.parent.d[self.name] = self.d['__total__']
-        self.p.pop()
+        self.p._pop()
         return None
 
 
 class NoProf:
     def main(self):
-        return DummyContext()
+        return NoProfContext()
 
     def step(self, name):
-        return DummyContext()
+        return NoProfContext()
+
+    def lap(self, count):
+        return NoProfContext()
 
 
 class NoProfContext:

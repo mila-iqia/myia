@@ -250,7 +250,8 @@ class _PipelineSlice:
                     try:
                         with profile.step(step.name):
                             results = step.step(**valid_args)
-                            if not isinstance(results, dict) and len(valid_args) == 1:
+                            if (not isinstance(results, dict) and
+                                    len(valid_args) == 1):
                                 field_name, = valid_args.keys()
                                 results = {field_name: results}
                     except Exception as e:
