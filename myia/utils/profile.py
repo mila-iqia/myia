@@ -38,8 +38,14 @@ class Profile:
         self.d = dict()
         self.ctx.d = self.d
 
-    def main(self):
+    def __enter__(self):
+        self.ctx.start = prof_counter()
         return self.ctx
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.ctx.stop = prof_counter()
+        self.ctx.d['__total__'] = self.ctx.stop - self.ctx.start
+        return None
 
     def step(self, name):
         self.ctx = ProfContext(name, self)
@@ -50,6 +56,7 @@ class Profile:
         return self.ctx
 
     def _pop(self):
+        assert self.ctx.name is not None
         self.ctx = self.ctx.parent
 
 
@@ -77,8 +84,11 @@ class ProfContext:
 
 
 class NoProf:
-    def main(self):
-        return NoProfContext()
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        return None
 
     def step(self, name):
         return NoProfContext()

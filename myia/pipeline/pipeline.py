@@ -241,7 +241,7 @@ class _PipelineSlice:
         at which an error happened is put in the 'error_step' key.
         """
         profile = args.get('profile', no_prof)
-        with profile.main():
+        with profile:
             for step in self.pipeline._seq[self.slice]:
                 if 'error' in args:
                     break

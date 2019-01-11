@@ -63,7 +63,7 @@ class Optimizer(PipelineStep):
 
     def step(self, graph, argspec=None, outspec=None, profile=no_prof):
         """Optimize the graph using the given patterns."""
-        with profile.main():
+        with profile:
             counter = count(1)
             changes = True
             while changes:
