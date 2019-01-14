@@ -37,7 +37,7 @@ from ..infer import ANYTHING, InferenceVar, Context, MyiaTypeError, \
     InferenceError, reify, MyiaShapeError, VOID
 from ..infer.core import Pending, find_coherent_result_2
 from ..prim import ops as P
-from ..utils import Namespace, SymbolicKeyInstance
+from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
 
 
 abstract_inferrer_constructors = {}
@@ -264,7 +264,16 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
         except Exception as e:  # pragma: no cover
             raise InferenceError(f'Unexpected error in getter: {e!r}')
         value = resources.convert(raw)
-        return track.from_value(value, Context.empty())
+        if is_dataclass_type(value):
+            typ = dtype.pytype_to_myiatype(value)
+            g = outref.node.graph
+            eng = outref.engine
+            ref = Reference(outref.engine,
+                            g.apply(P.partial, P.make_record, typ),
+                            outref.context)
+            return await eng.forward_reference('abstract', outref, ref)
+        else:
+            return track.from_value(value, Context.empty())
 
 
 async def _resolve_case(resources, data_t, item_v, chk):
@@ -938,29 +947,40 @@ async def _inf_identity(track, x):
     return x
 
 
-@standard_prim(P.resolve)
-async def _inf_resolve(track, data, item):
-    def chk(data_v, item_v):
-        if not isinstance(data_v, Namespace):  # pragma: no cover
-            raise MyiaTypeError(
-                f'data argument to resolve must be Namespace, not {data_v}',
-                refs=[data]
-            )
-        if not isinstance(item_v, str):  # pragma: no cover
-            raise MyiaTypeError(
-                f'item argument to resolve must be a string, not {item_v}.',
-                refs=[item]
-            )
+class _ResolveXInferrer(XInferrer):
+    async def __call__(self, track, outref, argrefs):
+        if len(argrefs) != 2:
+            raise MyiaTypeError('Wrong number of arguments')
+        r_data, r_item = argrefs
+        data = await r_data['abstract']
+        item = await r_item['abstract']
 
-    async def on_dcattr(data, data_t, item_v):  # pragma: no cover
-        raise MyiaTypeError('Cannot resolve on Class.')
+        def chk(data_v, item_v):
+            if not isinstance(data_v, Namespace):  # pragma: no cover
+                raise MyiaTypeError(
+                    f'data argument to resolve must be Namespace, not {data_v}',
+                    refs=[data]
+                )
+            if not isinstance(item_v, str):  # pragma: no cover
+                raise MyiaTypeError(
+                    f'item argument to resolve must be a string, not {item_v}.',
+                    refs=[item]
+                )
 
-    return await static_getter(
-        track, data, item,
-        fetch=getitem,
-        on_dcattr=on_dcattr,
-        chk=chk
-    )
+        async def on_dcattr(data, data_t, item_v):  # pragma: no cover
+            raise MyiaTypeError('Cannot resolve on Class.')
+
+        return await static_getter(
+            track, data, item,
+            fetch=getitem,
+            on_dcattr=on_dcattr,
+            chk=chk,
+            outref=outref,
+            dataref=r_data,
+        )
+
+
+abstract_inferrer_constructors[P.resolve] = _ResolveXInferrer.partial()
 
 
 @standard_prim(P.partial)

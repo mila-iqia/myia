@@ -11,6 +11,7 @@ from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
     erase_class, erase_tuple
+from ..opt.clean import erase_class2, erase_tuple2
 from ..prim import vm_implementations
 from ..utils import overload, flatten
 from ..validate import validate, whitelist as default_whitelist, \
@@ -187,7 +188,17 @@ def step_erase_class(self, graph, argspec, outspec):
                 'outspec': new_outspec,
                 'erase_class': True}
     else:
-        return {}
+        mng = self.resources.manager
+        erase_class2(graph, mng)
+        new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+        # graph = self.resources.inferrer.renormalize(graph, new_argspec)
+        new_outspec = dict(graph.output.inferred)
+        return {'graph': graph,
+                'orig_argspec': argspec,
+                'argspec': new_argspec,
+                'orig_outspec': outspec,
+                'outspec': new_outspec,
+                'erase_class': True}
 
 
 ############
@@ -333,7 +344,16 @@ def step_erase_tuple(self, graph, argspec, outspec, erase_class=False):
                 'outspec': new_outspec,
                 'erase_tuple': True}
     else:
-        return {}
+        assert erase_class
+        mng = self.resources.manager
+        erase_tuple2(graph, mng)
+        new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+        # graph = self.resources.inferrer.renormalize(graph, new_argspec)
+        new_outspec = dict(graph.output.inferred)
+        return {'graph': graph,
+                'argspec': new_argspec,
+                'outspec': new_outspec,
+                'erase_tuple': True}
 
 
 ############
@@ -519,6 +539,119 @@ def convert_result(res, orig_t, vm_t):
     return _convert_result[vm_t](res, orig_t, vm_t)
 
 
+from ..abstract.base import AbstractTuple, AbstractList, AbstractClass, \
+    AbstractArray, TYPE, AbstractScalar
+
+
+@overload(bootstrap=True)
+def convert_arg2(self, arg, orig_t: AbstractTuple):
+    if not isinstance(arg, tuple):
+        raise TypeError('Expected tuple')
+    oe = orig_t.elements
+    if len(arg) != len(oe):
+        raise TypeError(f'Expected {len(oe)} elements')
+    return list(flatten(self(x, o)
+                        for x, o in zip(arg, oe)))
+
+
+@overload  # noqa: F811
+def convert_arg2(self, arg, orig_t: AbstractList):
+    if not isinstance(arg, list):
+        raise TypeError('Expected list')
+    ot = orig_t.element
+    return [list(flatten(self(x, ot) for x in arg))]
+
+
+@overload  # noqa: F811
+def convert_arg2(self, arg, orig_t: AbstractClass):
+    dc = dtype.tag_to_dataclass[orig_t.tag]
+    if not isinstance(arg, dc):
+        raise TypeError(f'Expected {dc.__qualname__}')
+    arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
+    oe = list(orig_t.attributes.values())
+    return list(flatten(self(x, o)
+                        for x, o in zip(arg, oe)))
+
+
+@overload  # noqa: F811
+def convert_arg2(self, arg, orig_t: AbstractArray):
+    if not isinstance(arg, np.ndarray):
+        raise TypeError('Expected ndarray')
+    et = orig_t.element
+    assert isinstance(et, AbstractScalar)
+    et = et.values[TYPE]
+    assert dtype.ismyiatype(et, dtype.Number)
+    dt = dtype.type_to_np_dtype(et)
+    if arg.dtype != dt:
+        raise TypeError('Wrong dtype')
+    return [arg]
+
+
+@overload  # noqa: F811
+def convert_arg2(self, arg, orig_t: AbstractScalar):
+    t = orig_t.values[TYPE]
+    if dtype.ismyiatype(t, dtype.Int):
+        if not isinstance(arg, int):
+            raise TypeError(f'Expected int')
+    elif dtype.ismyiatype(t, dtype.Float):
+        if not isinstance(arg, float):
+            raise TypeError(f'Expected float')
+    elif dtype.ismyiatype(t, dtype.Bool):
+        if not isinstance(arg, bool):
+            raise TypeError(f'Expected bool')
+    else:
+        raise TypeError(f'Invalid type: {t}')
+    return [arg]
+
+
+@overload(bootstrap=True)
+def convert_result2(self, res, orig_t, vm_t: AbstractClass):
+    dc = dtype.tag_to_dataclass[orig_t.tag]
+    oe = orig_t.attributes.values()
+    ve = vm_t.attributes.values()
+    tup = tuple(self(getattr(res, attr), o, v)
+                for attr, o, v in zip(orig_t.attributes, oe, ve))
+    return dc(*tup)
+
+
+@overload  # noqa: F811
+def convert_result2(self, res, orig_t, vm_t: AbstractList):
+    ot = orig_t.element
+    vt = vm_t.element
+    return [self(x, ot, vt) for x in res]
+
+
+@overload  # noqa: F811
+def convert_result2(self, res, orig_t, vm_t: AbstractTuple):
+    # If the EraseClass opt was applied, orig_t may be Class
+    orig_is_class = isinstance(orig_t, AbstractClass)
+    if orig_is_class:
+        oe = orig_t.attributes.values()
+    else:
+        oe = orig_t.elements
+    ve = vm_t.elements
+    tup = tuple(self(x, o, v)
+                for x, o, v in zip(res, oe, ve))
+    if orig_is_class:
+        dc = dtype.tag_to_dataclass[orig_t.tag]
+        return dc(*tup)
+    else:
+        return tup
+
+
+@overload  # noqa: F811
+def convert_result2(self, arg, orig_t, vm_t: AbstractScalar):
+    if isinstance(arg, np.ndarray):
+        return arg.item()
+    else:
+        return arg
+
+
+@overload  # noqa: F811
+def convert_result2(self, arg, orig_t, vm_t: AbstractArray):
+    return arg
+
+
 @pipeline_function
 def step_wrap(self,
               graph,
@@ -535,16 +668,30 @@ def step_wrap(self,
                 'OutputWrapper step requires the erase_class/tuple steps'
             )
         fn = output
-        orig_arg_t = [arg['type'] for arg in orig_argspec or argspec]
-        orig_out_t = (orig_outspec or outspec)['type']
-        vm_out_t = graph.type.retval
 
-        def wrapped(*args):
-            args = tuple(flatten(convert_arg(arg, ot) for arg, ot in
-                                 zip(args, orig_arg_t)))
-            res = fn(*args)
-            res = convert_result(res, orig_out_t, vm_out_t)
-            return res
+        if self.resources.inferrer.version == 1:
+            orig_arg_t = [arg['type'] for arg in orig_argspec or argspec]
+            orig_out_t = (orig_outspec or outspec)['type']
+            vm_out_t = graph.type.retval
+
+            def wrapped(*args):
+                args = tuple(flatten(convert_arg(arg, ot) for arg, ot in
+                                     zip(args, orig_arg_t)))
+                res = fn(*args)
+                res = convert_result(res, orig_out_t, vm_out_t)
+                return res
+
+        else:
+            orig_arg_t = [arg['abstract'] for arg in orig_argspec or argspec]
+            orig_out_t = (orig_outspec or outspec)['abstract']
+            vm_out_t = graph.return_.abstract
+
+            def wrapped(*args):
+                args = tuple(flatten(convert_arg2(arg, ot) for arg, ot in
+                                     zip(args, orig_arg_t)))
+                res = fn(*args)
+                res = convert_result2(res, orig_out_t, vm_out_t)
+                return res
         return {'output': wrapped}
 
 

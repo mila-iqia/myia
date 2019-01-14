@@ -109,6 +109,10 @@ class AbstractTrack(Track):
         argrefs = [self.engine.ref(node, ctx) for node in n_args]
 
         args = [await ref['abstract'] for ref in argrefs]
+
+        if not isinstance(fn, AbstractFunction):
+            raise Exception(f'Not a function: {fn}')
+
         infs = [self.get_inferrer_for(poss, args)
                 for poss in fn.values[VALUE]]
 

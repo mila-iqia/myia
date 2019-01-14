@@ -253,6 +253,7 @@ class ANFNode(Node):
 
     @abstract.setter
     def abstract(self, value):
+        self.inferred['abstract'] = value
         self._abstract = value
 
     @property

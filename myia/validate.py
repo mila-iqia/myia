@@ -2,14 +2,15 @@
 
 from .dtype import Array, Tuple, List, Function, Number, Bool, Problem, \
     TypeMeta, TypeType, Class, External, EnvType, SymbolicKeyType, \
-    JTagged, type_cloner
+    JTagged, type_cloner, ismyiatype
 from .dshape import ListShape, TupleShape
 from .infer import DEAD
 from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
 from .abstract.base import abstract_clone, \
-    AbstractClass, AbstractJTagged, AbstractFunction, AbstractScalar
+    AbstractClass, AbstractJTagged, AbstractFunction, AbstractScalar, \
+    TYPE, VALUE, AbstractType
 
 
 class ValidationError(Exception):
@@ -23,16 +24,17 @@ def validate_abstract(self, a: (AbstractClass, AbstractJTagged)):
 
 @overload
 def validate_abstract(self, a: AbstractScalar):
-    t = a.values['type']
+    t = a.values[TYPE]
     if ismyiatype(t, (Problem, External)):
         raise ValidationError(f'Illegal type in the graph: {a}')
 
 
 @overload
-def validate_abstract(self, a: AbstractFunction):
-    v = a.values['value']
-    if len(v) != 1:
-        raise ValidationError(f'Multiple possibilities for function: {a}')
+def validate_abstract(self, a: AbstractType):
+    t = a.values[VALUE]
+    if ismyiatype(t, Problem):
+        if t.kind is not DEAD:
+            raise ValidationError(f'Illegal type in the graph: {a}')
 
 
 @type_cloner.variant

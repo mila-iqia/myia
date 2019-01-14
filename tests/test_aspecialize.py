@@ -9,16 +9,16 @@ from myia.debug.traceback import print_inference_error
 from myia.infer import InferenceError
 from myia.prim.py_implementations import \
     hastype, partial, scalar_add, scalar_sub, \
-    scalar_usub, scalar_uadd, switch
+    scalar_usub, scalar_uadd, switch, array_map
 from myia.validate import ValidationError
 
-from .common import mysum, i64, f64
+from .common import mysum, i64, f64, Point
 
 
 specialize_pipeline = scalar_debug_new_pipeline \
     .select('parse', 'infer', 'specialize',
             'erase_class', 'erase_tuple',
-            'validate', 'export') \
+            'validate', 'export', 'wrap') \
     .configure(
         {'inferrer.tracks.abstract.max_depth': 1,
          'inferrer.erase_value': True,
@@ -169,12 +169,40 @@ def test_hastype(x, y):
     return helper(x), helper(y), helper(())
 
 
-# @specialize(([fp1, fp2],))
-# def test_list_map(xs):
+@specialize((int1, int2))
+def test_struct(x, y):
+    return Point(x, y)
+
+
+@specialize((int1, int2))
+def test_struct2(x, y):
+    p = Point(x, y)
+    return p.x + p.y
+
+
+@specialize((numpy.array([fp1, fp2]),))
+def test_array_map(xs):
+    def square(x):
+        return x * x
+
+    return array_map(square, xs)
+
+
+# @specialize((numpy.array([fp1, fp2]),
+#              numpy.array([int1, int2])))
+# def test_array_map_polymorphic(xs, ys):
 #     def square(x):
 #         return x * x
 
-#     return list_map(square, xs)
+#     return array_map(square, xs), array_map(square, ys)
+
+
+@specialize(([fp1, fp2],))
+def test_list_map(xs):
+    def square(x):
+        return x * x
+
+    return list_map(square, xs)
 
 
 # @specialize(([fp1, fp2], [int1, int2]))
@@ -283,11 +311,11 @@ def test_method_polymorphic(x, y):
     return x.__add__(x), y.__add__(y)
 
 
-# @specialize((int1, fp1))
-# def test_partial_polymorphic(x, y):
-#     def f(a, b):
-#         return a + b
-#     return partial(f, x)(x), partial(f, y)(y)
+@specialize((int1, fp1))
+def test_partial_polymorphic(x, y):
+    def f(a, b):
+        return a + b
+    return partial(f, x)(x), partial(f, y)(y)
 
 
 @specialize((True, int1), (False, int1))

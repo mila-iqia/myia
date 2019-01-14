@@ -1138,3 +1138,13 @@ class _GraphAndContext:
             (('graph', self.graph), ('context', self.context)),
             delimiter="↦",
         )
+
+
+@mixin(PartialApplication)
+class _PartialApplication:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_object(
+            'Partial',
+            (('fn', self.fn), ('args', self.args)),
+            delimiter="↦",
+        )
