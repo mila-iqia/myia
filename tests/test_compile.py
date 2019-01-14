@@ -7,6 +7,7 @@ from myia.pipeline import standard_pipeline, standard_debug_pipeline
 from myia.prim import ops as P
 from myia.prim.py_implementations import \
     typeof, scalar_add, partial
+from myia.utils import no_prof, Profile
 
 compile_pipeline = standard_pipeline
 
@@ -14,8 +15,8 @@ debug_fn = standard_debug_pipeline \
     .select('parse', 'resolve', 'infer', 'specialize', 'export')
 
 
-def parse_compare(*tests, optimize=True, array=False, profile=False,
-                  python=True):
+def parse_compare(*tests, optimize=True, array=False, python=True,
+                  profile=no_prof):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -33,12 +34,16 @@ def parse_compare(*tests, optimize=True, array=False, profile=False,
 
     def decorate(fn):
         def test(args):
+            nonlocal profile
             if not isinstance(args, tuple):
                 args = (args,)
             if python:
                 ref_result = fn(*map(copy, args))
             argspec = tuple({'value': a} for a in args)
+            if profile is True:
+                profile = Profile()
             res = pipeline.run(input=fn, argspec=argspec, profile=profile)
+            profile.print()
             myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))
             if python:
