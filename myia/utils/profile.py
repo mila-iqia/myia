@@ -3,11 +3,11 @@
 from time import perf_counter as prof_counter  # noqa
 
 
-def _unit(secs):  # pragma: no cover
+def _unit(secs):
     return "%.3gs" % secs
 
 
-def print_profile(prof, *, indent=0):  # pragma: no cover
+def print_profile(prof, *, indent=0):
     """Print a visualisation of a profile."""
     total = prof.pop('__total__')
     runtime = 0
@@ -66,6 +66,10 @@ class Profile:
         self.ctx.stop = prof_counter()
         self.ctx.d['__total__'] = self.ctx.stop - self.ctx.start
         return None
+
+    def print(self):
+        """Print a formatted version of the profile."""
+        return print_profile(self.d)
 
     def step(self, name):
         """Start a step in the current context with the given name.
@@ -136,6 +140,10 @@ class NoProf:
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         return None
+
+    def print(self):
+        """Does nothing."""
+        pass
 
     def step(self, name):
         """Does nothing."""
