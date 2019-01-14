@@ -32,7 +32,27 @@ def print_profile(prof, *, indent=0):  # pragma: no cover
 
 
 class Profile:
+    """Class to collect a hierachical profile of activities.
+
+    Every profile is in a context (except the top-level one) and has a
+    name associated with it in its parent context.
+
+    It is expected that the sum of sub-profiles will equal the time
+    spent in a specific step.  Any difference is reported as overhead.
+
+    A profile is delimited using the python with statement:
+
+        with profile:
+            # do something
+
+    For sub-profiles, use one of the appropriate methods and next the
+    with statements.  The nesting can be through functions calls of
+    other forms of control flow.
+
+    """
+
     def __init__(self):
+        """Create a Profile with its initial context."""
         self.ctx = None
         self.ctx = ProfContext(None, self)
         self.d = dict()
@@ -48,10 +68,32 @@ class Profile:
         return None
 
     def step(self, name):
+        """Start a step in the current context with the given name.
+
+        Nomes must be unique otherwise the previous record will be
+        overwritten.
+
+            with profile:
+                with profile.step('start'):
+                    # Start stuff
+                with profile.step('end'):
+                    # End stuff
+
+        """
         self.ctx = ProfContext(name, self)
         return self.ctx
 
     def lap(self, count):
+        """Creates subcontext for a repeated action.
+
+        Count should be monotonically increasing.
+
+            with profile:
+                for i in range(10):
+                    with profile.lap(i):
+                        # loop stuff
+
+        """
         self.ctx = ProfContext(f'Cycle {count}', self)
         return self.ctx
 
@@ -61,7 +103,10 @@ class Profile:
 
 
 class ProfContext:
+    """Utility class for Profile."""
+
     def __init__(self, name, p):
+        """Initialize a subcontext."""
         self.name = name
         self.p = p
         self.parent = p.ctx
@@ -84,6 +129,8 @@ class ProfContext:
 
 
 class NoProf:
+    """Class that mimics Profile, but does nothing."""
+
     def __enter__(self):
         return self
 
@@ -91,18 +138,12 @@ class NoProf:
         return None
 
     def step(self, name):
-        return NoProfContext()
-
-    def lap(self, count):
-        return NoProfContext()
-
-
-class NoProfContext:
-    def __enter__(self):
+        """Does nothing."""
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        return None
+    def lap(self, count):
+        """Does nothing."""
+        return self
 
 
 no_prof = NoProf()
