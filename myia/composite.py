@@ -659,6 +659,9 @@ class ListMap(MetaGraph):
         """Return a graph for the number of lists."""
         if len(types) < 2:
             raise MyiaTypeError('list_map takes at least two arguments')
+        for t in types[1:]:
+            if not ismyiatype(t, List):
+                raise MyiaTypeError(f'list_map requires lists, not {t}')
 
         g = Graph()
         g.flags['core'] = True

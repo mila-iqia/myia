@@ -1989,7 +1989,7 @@ hyper_map_nobroadcast = HyperMap(broadcast=False)
         (i64, i64, i64),
         (f64, f64, f64),
         (lf64, lf64, lf64),
-        # (L[lf64], L[lf64], L[lf64]),  # TODO
+        (L[lf64], L[lf64], L[lf64]),
         (lf64, f64, InferenceError),
         (L[f64], L[lf64], InferenceError),
         (T[i64, f64], T[i64, f64], T[i64, f64]),

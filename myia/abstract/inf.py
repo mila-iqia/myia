@@ -59,30 +59,24 @@ class AbstractTrack(Track):
 
     @get_inferrer_for.register
     def get_inferrer_for(self, part: PartialApplication, args):
-        if part not in self.constructors:
-            self.constructors[part] = PartialXInferrer(
-                self.get_inferrer_for(part.fn, (*part.args, *args)),
-                part.args
-            )
-        return self.constructors[part]
+        return PartialXInferrer(
+            self.get_inferrer_for(part.fn, (*part.args, *args)),
+            part.args
+        )
 
     @get_inferrer_for.register
     def get_inferrer_for(self, j: JTransformedFunction, args):
-        if j not in self.constructors:
-            self.constructors[j] = JXInferrer(
-                self.get_inferrer_for(j.fn, args),
-                j.fn
-            )
-        return self.constructors[j]
+        return JXInferrer(
+            self.get_inferrer_for(j.fn, args),
+            j.fn
+        )
 
     @get_inferrer_for.register
     def get_inferrer_for(self, vf: VirtualFunction, args):
-        if vf not in self.constructors:
-            self.constructors[vf] = VirtualXInferrer(
-                vf.args,
-                vf.output
-            )
-        return self.constructors[vf]
+        return VirtualXInferrer(
+            vf.args,
+            vf.output
+        )
 
     @get_inferrer_for.register
     def get_inferrer_for(self, mg: MetaGraph, args):
