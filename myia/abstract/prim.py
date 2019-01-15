@@ -786,7 +786,7 @@ async def _inf_shape(track, a: AbstractArray):
 
 
 @standard_prim(P.array_map)
-async def _inf_array_map(track, fn, *arrays):
+async def _inf_array_map(track, fn: AbstractFunction, *arrays):
     if len(arrays) < 1:
         raise MyiaTypeError('array_map requires at least one array')
     await track.chkimm(AbstractArray, *arrays)

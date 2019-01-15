@@ -4,7 +4,7 @@ import asyncio
 from contextvars import copy_context
 from collections import deque
 
-from ..dtype import Function, type_cloner_async
+from ..dtype import Function, type_cloner_async, ismyiatype
 from ..utils import Unification, Var, RestrictedVar, eprint, overload, \
     Overload
 
@@ -39,6 +39,20 @@ class MyiaFunctionMismatchError(MyiaTypeMismatchError):
         eprint(f'{type(self).__qualname__}: {m}: {self.message}')
 
 
+class InferenceTask(asyncio.Task):
+    def __init__(self, coro, loop, key=None):
+        super().__init__(coro, loop=loop)
+        self.key = key
+
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_object(
+            'Task',
+            (('wait_for', self._fut_waiter),
+             ('key', self.key)),
+            delimiter="↦",
+        )
+
+
 class InferenceLoop(asyncio.AbstractEventLoop):
     """EventLoop implementation for use with the inferrer.
 
@@ -62,6 +76,23 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         """There is no debug mode."""
         return False
 
+    def _resolve_var(self):
+        found = False
+        later = []
+        while self._vars:
+            v1 = self._vars.pop()
+            try:
+                v1.force_resolve()
+            except InferenceError as e:
+                self._errors.append(e)
+            except Later:
+                later.append(v1)
+            else:
+                found = True
+                break
+        self._vars = later + self._vars
+        return found
+
     def run_forever(self):
         """Run this loop until there is no more work to do."""
         while True:
@@ -75,17 +106,8 @@ class InferenceLoop(asyncio.AbstractEventLoop):
                 # force the first one to take its default concrete type. Then
                 # we resume the loop.
                 self._vars.sort(key=lambda x: x.priority)
-                v1 = self._vars.pop()
-                try:
-                    v1.force_resolve()
-                except InferenceError as e:
-                    self._errors.append(e)
-                except Later:
-                    if self._vars:
-                        v1.priority = self._vars[0].priority - 1
-                    self._vars.append(v1)
-                else:
-                    continue  # pragma: no cover
+                if self._resolve_var():
+                    continue
             break
 
     def call_exception_handler(self, ctx):
@@ -102,6 +124,8 @@ class InferenceLoop(asyncio.AbstractEventLoop):
             fut = ctx.run(asyncio.ensure_future, x, loop=self)
         else:
             fut = asyncio.ensure_future(x, loop=self)
+        if isinstance(fut, InferenceTask):
+            fut.key = context_map
         self._tasks.append(fut)
         return fut
 
@@ -143,7 +167,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
     def create_task(self, coro):
         """Create a task from the given coroutine."""
-        return asyncio.Task(coro, loop=self)
+        return InferenceTask(coro, loop=self)
 
     def create_future(self):
         """Create a Future using this loop."""
@@ -321,13 +345,25 @@ class EquivalenceChecker:
         return main.result()
 
 
+def is_simple(x):
+    if isinstance(x, Pending):
+        return x.is_simple()
+    elif ismyiatype(x):
+        return True
+    else:
+        return False
+
+
 class Pending(asyncio.Future):
     def __init__(self, resolve, priority, loop):
         super().__init__(loop=loop)
         self.priority = priority
         if resolve is not None:
             self._resolve = resolve
-        self.equiv = set()
+        self.equiv = {self}
+
+    def is_simple(self):
+        return False
 
     def force_resolve(self):
         """Resolve to the default value."""
@@ -335,15 +371,20 @@ class Pending(asyncio.Future):
 
     def resolve_to(self, value):
         self.set_result(value)
+        if is_simple(self):
+            for e in self.equiv:
+                if isinstance(e, Pending) and not e.done():
+                    e.set_result(value)
 
     def resolved(self):
         return self.done()
 
     def tie(self, other):
         if isinstance(other, Pending):
-            other.equiv |= self.equiv
             self.equiv |= other.equiv
-            self.equiv = other.equiv
+            e = self.equiv
+            for p in self.equiv:
+                p.equiv = e
 
 
 class PendingFromList(Pending):
@@ -355,6 +396,9 @@ class PendingFromList(Pending):
         )
         self.default = default
         self.possibilities = possibilities
+
+    def is_simple(self):
+        return all(is_simple(p) for p in self.possibilities)
 
     def _resolve_from_equiv(self):
         for e in self.equiv:

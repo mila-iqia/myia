@@ -3,12 +3,13 @@ import math
 import numpy
 from dataclasses import is_dataclass
 from functools import reduce
+from itertools import chain
 
 from .. import dtype, dshape
 from ..debug.utils import mixin
 from ..infer import ANYTHING, InferenceError, MyiaTypeError, \
     Reference, Context
-from ..infer.core import Pending, Later
+from ..infer.core import Pending, Later, is_simple
 from ..utils import overload, UNKNOWN, Named
 
 
@@ -816,13 +817,6 @@ def amerge(x1, x2, loop, forced, accept_pending=True):
         return _amerge(x1, x2, loop, forced)
 
 
-def is_simple(x):
-    if dtype.ismyiatype(x):
-        return True
-    else:
-        return False
-
-
 def bind(loop, committed, resolved, pending):
 
     def amergeall():
@@ -868,12 +862,23 @@ def bind(loop, committed, resolved, pending):
         resolved.clear()
         return committed
 
-    if resolved and all(is_simple(x) for x in resolved):
+    if any(is_simple(x) for x in chain(resolved, pending)):
         rval = None
-        for p in pending:
+
+        if pending:
+            p, *rest = pending
             p.equiv.update(resolved)
-            p.equiv.update(resolved)
-        return resolved[0]
+            for p2 in rest:
+                p.tie(p2)
+
+        if resolved:
+            return resolved[0]
+        else:
+            for p in pending:
+                if is_simple(p):
+                    return p
+            return p
+
     else:
         priority = (1000
                     if any(p.priority is None for p in pending)
@@ -883,12 +888,10 @@ def bind(loop, committed, resolved, pending):
             priority=priority,
         )
         rval.equiv.update(resolved)
-        rval.equiv.update(pending)
         for p in pending:
-            p.tie(rval)
+            rval.tie(p)
 
         return rval
-
 
 
     # def abstract_merge(self, *values):
@@ -932,7 +935,6 @@ def bind(loop, committed, resolved, pending):
     #         return rval
     #     else:
     #         return self.force_merge(resolved)
-
 
 
 ###########
