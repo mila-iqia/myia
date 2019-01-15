@@ -1,6 +1,7 @@
 """Utilities to generate or map labels for nodes and graphs."""
 
 
+from types import FunctionType
 from ..info import DebugInfo
 from ..ir.anf import ANFNode, Graph
 from ..prim import Primitive
@@ -104,6 +105,8 @@ class NodeLabeler:
                 return repr(v)
             elif isinstance(v, (int, float, str, Named, Namespace)):
                 return repr(v)
+            elif isinstance(v, FunctionType):
+                return f'{v.__name__}::function'
             elif isinstance(v, Primitive):
                 return v.name
             elif isinstance(v, CosmeticPrimitive):
