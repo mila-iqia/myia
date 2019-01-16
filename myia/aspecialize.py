@@ -51,6 +51,7 @@ class TypeSpecializer:
     def __init__(self, engine):
         """Initialize a TypeSpecializer."""
         self.engine = engine
+        self.seen = set()
         assert len(self.engine.tracks) == 1
         self.track = self.engine.tracks['abstract']
         self.mng = self.engine.mng
@@ -419,6 +420,10 @@ class _GraphSpecializer:
                     new_inputs[i] = repl
 
     async def process_apply(self, new_node):
+        if new_node in self.specializer.seen:
+            return
+        self.specializer.seen.add(new_node)
+
         async def _helper(i, node, a, argvals):
             if node.is_constant_graph() or node.is_constant(MetaGraph):
                 fns = a.values[VALUE]
