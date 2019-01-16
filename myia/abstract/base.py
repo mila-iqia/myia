@@ -79,6 +79,10 @@ class VirtualFunction:
             and self.output == other.output
 
 
+class DummyFunction:
+    pass
+
+
 class AbstractBase:
 
     def make_key(self):
@@ -531,6 +535,11 @@ def abstract_clone(self, x: AbstractClass):
 
 
 @overload
+def abstract_clone(self, x: AbstractJTagged):
+    return AbstractJTagged(self(x.element))
+
+
+@overload
 def abstract_clone(self, x: object):
     return x
 
@@ -754,6 +763,16 @@ def _amerge(self, x1: AbstractClass, x2, loop, forced):
     if forced or merged is args1:
         return x1
     return AbstractClass(*merged)
+
+
+@overload
+def _amerge(self, x1: AbstractJTagged, x2, loop, forced):
+    args1 = (x1.element)
+    args2 = (x2.element)
+    merged = amerge(args1, args2, loop, forced)
+    if forced or merged is args1:
+        return x1
+    return AbstractJTagged(*merged)
 
 
 @overload
@@ -1071,6 +1090,35 @@ class _AbstractValue:
             '★Value',
             _clean(self.values).items(),
             delimiter="↦",
+            cls='abstract',
+        )
+
+
+@mixin(AbstractFunction)
+class _AbstractFunction:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            self.values[VALUE],
+            before='★Function',
+            cls='abstract',
+        )
+
+
+@mixin(AbstractJTagged)
+class _AbstractJTagged:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            [
+                H.div(
+                    hrepr.stdrepr_object(
+                        '', _clean(self.values).items(), delimiter="↦",
+                        cls='noborder'
+                    ),
+                    hrepr(self.element),
+                    style='display:flex;flex-direction:column;'
+                )
+            ],
+            before='★J',
             cls='abstract',
         )
 

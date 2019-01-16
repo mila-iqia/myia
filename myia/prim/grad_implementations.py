@@ -276,6 +276,7 @@ class MakeTupleGradient(MetaGraph):
     def specialize_from_types(self, types):
         """Generate the gradient graph."""
         g = Graph()
+        g.debug.name = f'{syms["grad_fprop"]}make_tuple_{len(types)}'
 
         params = [g.add_parameter() for t in types]
         jinv_params = [g.apply(primops.Jinv, p) for p in params]
@@ -283,6 +284,7 @@ class MakeTupleGradient(MetaGraph):
         out = g.apply(primops.J, tup)
 
         b = Graph()
+        b.debug.name = f'{syms["grad_bprop"]}make_tuple_{len(types)}'
         dout = b.add_parameter()
         grads = [b.apply(primops.tuple_getitem, dout, i)
                  for i, p in enumerate(params)]

@@ -143,17 +143,17 @@ def test_while(n, x):
     return rval
 
 
-# @specialize((int1,), (fp1,))
-# def test_pow10(x):
-#     v = x
-#     j = 0
-#     while j < 3:
-#         i = 0
-#         while i < 3:
-#             v = v * x
-#             i = i + 1
-#         j = j + 1
-#     return v
+@specialize((int1,), (fp1,))
+def test_pow10(x):
+    v = x
+    j = 0
+    while j < 3:
+        i = 0
+        while i < 3:
+            v = v * x
+            i = i + 1
+        j = j + 1
+    return v
 
 
 @specialize((int1, fp1))

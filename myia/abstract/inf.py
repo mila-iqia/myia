@@ -16,7 +16,7 @@ from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
     reify, JTransformedFunction, AbstractJTagged, AbstractTuple, \
     sensitivity_transform, VirtualFunction, AbstractFunction, \
-    VALUE, TYPE, SHAPE, REF
+    VALUE, TYPE, SHAPE, REF, DummyFunction
 
 
 _number_types = [
@@ -77,6 +77,10 @@ class AbstractTrack(Track):
             vf.args,
             vf.output
         )
+
+    @get_inferrer_for.register
+    def get_inferrer_for(self, df: DummyFunction, args):
+        raise MyiaTypeError(f'Trying to call dummy')
 
     @get_inferrer_for.register
     def get_inferrer_for(self, mg: MetaGraph, args):
@@ -168,10 +172,12 @@ class AbstractTrack(Track):
         return t
 
     def default(self, values):
+        from ..infer import ANYTHING
+        from ..dshape import NOSHAPE
         return from_vref(
-            values['value'],
+            values.get('value', ANYTHING),
             values['type'],
-            values['shape'],
+            values.get('shape', NOSHAPE),
         )
 
     # def abstract_merge(self, *values):

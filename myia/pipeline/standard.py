@@ -69,6 +69,7 @@ new_resources = dict(
         tied_tracks={},
         context_class=Context,
         erase_value=True,
+        version=2,
     )
 )
 
@@ -138,6 +139,7 @@ new_pipeline = PipelineDefinition(
         erase_class=steps.step_erase_class,
         opt=steps.step_opt,
         erase_tuple=steps.step_erase_tuple,
+        opt2=steps.step_opt2,
         cconv=steps.step_cconv,
         validate=steps.step_validate,
         wrap_primitives=step_wrap_primitives,
@@ -146,6 +148,8 @@ new_pipeline = PipelineDefinition(
         export=step_export,
         wrap=steps.step_wrap,
     )
+).configure(
+    {'validate.validate_type': None}
 )
 
 

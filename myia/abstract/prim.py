@@ -21,6 +21,8 @@ from .base import (
     PartialApplication,
     JTransformedFunction,
     Possibilities,
+    GraphAndContext,
+    DummyFunction,
     sensitivity_transform,
     VALUE, TYPE, SHAPE,
 )
@@ -32,6 +34,7 @@ from .inf import (
 )
 
 from .. import dtype, dshape
+from ..ir import Graph
 from ..dtype import Number, Float, Bool
 from ..infer import ANYTHING, InferenceVar, Context, MyiaTypeError, \
     InferenceError, reify, MyiaShapeError, VOID
@@ -1063,8 +1066,29 @@ async def _inf_Jinv(track, x):
             for f in v:
                 if isinstance(f, JTransformedFunction):
                     results.append(f.fn)
+                elif isinstance(f, (Graph, GraphAndContext)):
+                    if isinstance(f, GraphAndContext):
+                        g = f.graph
+                    else:
+                        g = f
+                    primal = g and g.transforms.get('primal', None)
+                    if primal:
+                        primal = track.engine.pipeline.resources.convert(primal)
+                        if isinstance(primal, Graph) and primal.parent:
+                            # The primal for a closure can't be used because it points to
+                            # the original nodes of its parent, whereas we would like to
+                            # point to the transformed nodes of the parent. This is
+                            # fixable, and will need to be fixed to support a few edge
+                            # cases.
+                            results.append(DummyFunction())
+                        else:
+                            results.append(primal)
+                    else:
+                        raise MyiaTypeError(f'Bad input type for Jinv: {f}')
                 else:
-                    raise MyiaTypeError('Expected JTransformedFunction')
+                    raise MyiaTypeError(
+                        f'Expected JTransformedFunction, not {f}'
+                    )
             return AbstractFunction(*results)
     if isinstance(x, AbstractJTagged):
         return x.element
