@@ -191,7 +191,7 @@ def step_erase_class(self, graph, argspec, outspec):
         mng = self.resources.manager
         erase_class2(graph, mng)
         new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
-        # graph = self.resources.inferrer.renormalize(graph, new_argspec)
+        graph = self.resources.inferrer.renormalize(graph, new_argspec)
         new_outspec = dict(graph.output.inferred)
         return {'graph': graph,
                 'orig_argspec': argspec,
@@ -348,7 +348,7 @@ def step_erase_tuple(self, graph, argspec, outspec, erase_class=False):
         mng = self.resources.manager
         erase_tuple2(graph, mng)
         new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
-        # graph = self.resources.inferrer.renormalize(graph, new_argspec)
+        graph = self.resources.inferrer.renormalize(graph, new_argspec)
         new_outspec = dict(graph.output.inferred)
         return {'graph': graph,
                 'argspec': new_argspec,
