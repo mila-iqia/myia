@@ -781,8 +781,10 @@ def _amerge(self, x1: Named, x2, loop, forced):
 
 @overload
 def _amerge(self, x1: object, x2, loop, forced):
-    if x1 is ANYTHING or x2 is ANYTHING:
-        return x1
+    if x1 is ANYTHING:
+        return ANYTHING
+    elif x2 is ANYTHING and not forced:
+        return ANYTHING
     if x1 != x2:
         raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
     return x1
