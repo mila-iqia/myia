@@ -93,9 +93,10 @@ def standard_prim(*prims):
 
 
 class WithImplXInferrer(XInferrer):
-    def __init__(self, impl):
+    def __init__(self, impl, nolimit=False):
         super().__init__()
         self.impl = impl
+        self.nolimit = nolimit
         data = inspect.getfullargspec(impl)
         assert data.varargs is None
         assert data.varkw is None
@@ -107,7 +108,7 @@ class WithImplXInferrer(XInferrer):
 
     def run_impl(self, track, args, outtype):
         depth = max((arg.count for arg in args), default=0)
-        if depth >= track.max_depth:
+        if not self.nolimit and depth >= track.max_depth:
             outval = ANYTHING
         else:
             values = [arg.values[VALUE] for arg in args]
@@ -128,13 +129,14 @@ class WithImplXInferrer(XInferrer):
 
 
 class UniformPrimitiveXInferrer(WithImplXInferrer):
-    def __init__(self, impl):
-        super().__init__(impl)
+    def __init__(self, impl, nolimit=False):
+        super().__init__(impl, nolimit)
         data = self.impl_data
         self.typemap = defaultdict(list)
         for i, arg in enumerate(data.args):
             self.typemap[data.annotations[arg]].append(i)
         self.outtype = data.annotations['return']
+        self.nolimit = nolimit
 
     async def infer(self, track, *args):
         if len(args) != self.nargs:
@@ -154,9 +156,9 @@ class UniformPrimitiveXInferrer(WithImplXInferrer):
         return self.run_impl(track, args, outtype)
 
 
-def uniform_prim(prim):
+def uniform_prim(prim, nolimit=False):
     def deco(fn):
-        xinf = UniformPrimitiveXInferrer.partial(impl=fn)
+        xinf = UniformPrimitiveXInferrer.partial(impl=fn, nolimit=nolimit)
         abstract_inferrer_constructors[prim] = xinf
     return deco
 
@@ -475,22 +477,22 @@ def _inf_scalar_ge(x: Number, y: Number) -> Bool:
     return x >= y
 
 
-@uniform_prim(P.bool_not)
+@uniform_prim(P.bool_not, nolimit=True)
 def _inf_bool_not(x: Bool) -> Bool:
     return not x
 
 
-@uniform_prim(P.bool_and)
+@uniform_prim(P.bool_and, nolimit=True)
 def _inf_bool_and(x: Bool, y: Bool) -> Bool:
     return x and y
 
 
-@uniform_prim(P.bool_or)
+@uniform_prim(P.bool_or, nolimit=True)
 def _inf_bool_or(x: Bool, y: Bool) -> Bool:
     return x or y
 
 
-@uniform_prim(P.bool_eq)
+@uniform_prim(P.bool_eq, nolimit=True)
 def _inf_bool_eq(x: Bool, y: Bool) -> Bool:
     return x == y
 
