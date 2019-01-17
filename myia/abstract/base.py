@@ -182,7 +182,8 @@ class AbstractValue(AbstractBase):
         self.values[key] = value
 
     def __repr__(self):
-        contents = [f'{k}={v}' for k, v in self.values.items()]
+        contents = [f'{k}={v}' for k, v in self.values.items()
+                    if k is not REF]
         return f'V({", ".join(contents)})'
 
 
@@ -192,7 +193,8 @@ class AbstractScalar(AbstractValue):
         return AbstractScalar({})
 
     def __repr__(self):
-        contents = [f'{k}={v}' for k, v in self.values.items()]
+        contents = [f'{k}={v}' for k, v in self.values.items()
+                    if k is not REF]
         return f'S({", ".join(contents)})'
 
 
@@ -375,15 +377,15 @@ class Subtrack:
     async def async_clone(self, v, recurse):
         return await recurse(v)
 
-    def broaden(self, v, recurse):
-        return recurse(v)
+    def broaden(self, v, recurse, loop):
+        return recurse(v, loop)
 
     def eq_relevant(self):
         return True
 
 
 class ValueSubtrack(Subtrack):
-    def broaden(self, v, recurse):
+    def broaden(self, v, recurse, loop):
         return ANYTHING
 
 
@@ -399,7 +401,7 @@ class RefSubtrack(Subtrack):
     def eq_relevant(self):
         return False
 
-    def broaden(self, v, recurse):
+    def broaden(self, v, recurse, loop):
         return {}
 
     async def async_clone(self, v, recurse):
@@ -492,55 +494,55 @@ def from_vref(self, v, t: dtype.TypeMeta, s):
 
 
 @overload(bootstrap=True)
-def abstract_clone(self, x: AbstractScalar):
-    return AbstractScalar(self(x.values))
+def abstract_clone(self, x: AbstractScalar, *args):
+    return AbstractScalar(self(x.values, *args))
 
 
 @overload
-def abstract_clone(self, x: AbstractFunction):
-    return AbstractFunction(*self(x.values[VALUE]))
+def abstract_clone(self, x: AbstractFunction, *args):
+    return AbstractFunction(*self(x.values[VALUE], *args))
 
 
 @overload
-def abstract_clone(self, d: TrackDict):
+def abstract_clone(self, d: TrackDict, *args):
     return {k: k.clone(v, self) for k, v in d.items()}
 
 
 @overload
-def abstract_clone(self, x: AbstractTuple):
+def abstract_clone(self, x: AbstractTuple, *args):
     return AbstractTuple(
-        [self(y) for y in x.elements],
-        self(x.values)
+        [self(y, *args) for y in x.elements],
+        self(x.values, *args)
     )
 
 
 @overload
-def abstract_clone(self, x: AbstractList):
-    return AbstractList(self(x.element), self(x.values))
+def abstract_clone(self, x: AbstractList, *args):
+    return AbstractList(self(x.element, *args), self(x.values, *args))
 
 
 @overload
-def abstract_clone(self, x: AbstractArray):
-    return AbstractArray(self(x.element), self(x.values))
+def abstract_clone(self, x: AbstractArray, *args):
+    return AbstractArray(self(x.element, *args), self(x.values, *args))
 
 
 @overload
-def abstract_clone(self, x: AbstractClass):
+def abstract_clone(self, x: AbstractClass, *args):
     return AbstractClass(
         x.tag,
-        {k: self(v) for k, v in x.attributes.items()},
+        {k: self(v, *args) for k, v in x.attributes.items()},
         x.methods,
-        self(x.values)
+        self(x.values, *args)
     )
 
 
 @overload
-def abstract_clone(self, x: AbstractJTagged):
-    return AbstractJTagged(self(x.element))
+def abstract_clone(self, x: AbstractJTagged, *args):
+    return AbstractJTagged(self(x.element, *args))
 
 
 @overload
-def abstract_clone(self, x: object):
+def abstract_clone(self, x: object, *args):
     return x
 
 
@@ -633,8 +635,8 @@ async def concretize_abstract(self, ctx: Context):
 
 
 @abstract_clone.variant
-def broaden(self, d: TrackDict):
-    return {k: k.broaden(v, self) for k, v in d.items()}
+def broaden(self, d: TrackDict, loop):
+    return {k: k.broaden(v, self, loop) for k, v in d.items()}
 
 
 ###############
@@ -879,7 +881,7 @@ def bind(loop, committed, resolved, pending):
         if not resolved and committed is None:
             raise Later()
         committed = amergeall()
-        committed = broaden(committed)
+        committed = broaden(committed, loop)
         resolved.clear()
         return committed
 

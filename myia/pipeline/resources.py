@@ -392,7 +392,7 @@ class InferenceResource(PipelineResource):
             from ..abstract.base import broaden
             for arg in argspec:
                 if 'abstract' in arg:
-                    arg['abstract'] = broaden(arg['abstract'])
+                    arg['abstract'] = broaden(arg['abstract'], None)
 
     def infer(self, graph, argspec, outspec=None, clear=False):
         """Perform inference."""
