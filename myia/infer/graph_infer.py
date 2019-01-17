@@ -841,8 +841,8 @@ class InferenceEngine:
                         )
 
             self.run_coroutine(_run())
-            if outspec is not None:
-                self.run_coroutine(_check())
+            # if outspec is not None:
+            #     self.run_coroutine(_check())
 
             results = {name: output_ref.get(name) for name in tracks}
             return results, root_context

@@ -401,29 +401,29 @@ def test_closures_in_tuples(x, y):
     return ff() + gg()
 
 
-# @grad_test((MA(2, 3), MB(2, 3)),)
-# def test_array_operations(xs, ys):
-#     div = array_map(scalar_div, xs, ys)
-#     sm = array_reduce(scalar_add, div, ())
-#     return array_to_scalar(sm)
+@grad_test((MA(2, 3), MB(2, 3)),)
+def test_array_operations(xs, ys):
+    div = array_map(scalar_div, xs, ys)
+    sm = array_reduce(scalar_add, div, ())
+    return array_to_scalar(sm)
 
 
-# @grad_test((3.1, 7.6),)
-# def test_array_operations_distribute(x, y):
-#     xs = distribute(scalar_to_array(x), (4, 3))
-#     ys = distribute(scalar_to_array(y), (4, 3))
-#     div = array_map(scalar_div, xs, ys)
-#     sm = array_reduce(scalar_add, div, ())
-#     return array_to_scalar(sm)
+@grad_test((3.1, 7.6),)
+def test_array_operations_distribute(x, y):
+    xs = distribute(scalar_to_array(x), (4, 3))
+    ys = distribute(scalar_to_array(y), (4, 3))
+    div = array_map(scalar_div, xs, ys)
+    sm = array_reduce(scalar_add, div, ())
+    return array_to_scalar(sm)
 
 
-# @grad_test((MA(2, 3), MB(2, 3)),)
-# def test_array_operations_reshape(xs, ys):
-#     xs = reshape(xs, (6,))
-#     ys = reshape(ys, (6,))
-#     div = array_map(scalar_div, xs, ys)
-#     sm = array_reduce(scalar_add, div, ())
-#     return array_to_scalar(sm)
+@grad_test((MA(2, 3), MB(2, 3)),)
+def test_array_operations_reshape(xs, ys):
+    xs = reshape(xs, (6,))
+    ys = reshape(ys, (6,))
+    div = array_map(scalar_div, xs, ys)
+    sm = array_reduce(scalar_add, div, ())
+    return array_to_scalar(sm)
 
 
 # @grad_test((MA(2, 3), MB(2, 3)),)
@@ -433,31 +433,31 @@ def test_closures_in_tuples(x, y):
 #     return array_to_scalar(sm)
 
 
-# @grad_test((MA(2, 3), MB(3, 4)),)
-# def test_dot(x, y):
-#     d = dot(x, y)
-#     sm = array_reduce(scalar_add, d, ())
-#     return array_to_scalar(sm)
+@grad_test((MA(2, 3), MB(3, 4)),)
+def test_dot(x, y):
+    d = dot(x, y)
+    sm = array_reduce(scalar_add, d, ())
+    return array_to_scalar(sm)
 
 
-# @grad_test((MA(3, 4), MB(2, 3)),)
-# def test_transpose(x, y):
-#     xt = transpose(x, (1, 0))
-#     yt = transpose(y, (1, 0))
-#     d = dot(xt, yt)
-#     sm = array_reduce(scalar_add, d, ())
-#     return array_to_scalar(sm)
+@grad_test((MA(3, 4), MB(2, 3)),)
+def test_transpose(x, y):
+    xt = transpose(x, (1, 0))
+    yt = transpose(y, (1, 0))
+    d = dot(xt, yt)
+    sm = array_reduce(scalar_add, d, ())
+    return array_to_scalar(sm)
 
 
-# @grad_test((MA(3, 4), MB(2, 3), NoTestGrad(1), NoTestGrad(0)),)
-# def test_transpose2(x, y, axis1, axis2):
-#     perm = (scalar_cast(axis1, u64),
-#             scalar_cast(axis2, u64))
-#     xt = transpose(x, perm)
-#     yt = transpose(y, perm)
-#     d = dot(xt, yt)
-#     sm = array_reduce(scalar_add, d, ())
-#     return array_to_scalar(sm)
+@grad_test((MA(3, 4), MB(2, 3), NoTestGrad(1), NoTestGrad(0)),)
+def test_transpose2(x, y, axis1, axis2):
+    perm = (scalar_cast(axis1, u64),
+            scalar_cast(axis2, u64))
+    xt = transpose(x, perm)
+    yt = transpose(y, perm)
+    d = dot(xt, yt)
+    sm = array_reduce(scalar_add, d, ())
+    return array_to_scalar(sm)
 
 
 def _runwith(f, *args):

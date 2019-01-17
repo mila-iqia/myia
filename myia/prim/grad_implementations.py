@@ -242,6 +242,18 @@ def bprop_distribute(arr, shp, out, dout):
             zeros_like(shp))
 
 
+@register_bprop(primops.shape)
+def bprop_shape(arr, out, dout):
+    """Backpropagator for primitive `shape`."""
+    return (zeros_like(arr),)
+
+
+@register_bprop(primops.broadcast_shape)
+def bprop_broadcast_shape(shp1, shp2, out, dout):
+    """Backpropagator for primitive `broadcast_shape`."""
+    return (zeros_like(shp1), zeros_like(shp2))
+
+
 @register_bprop(primops.J)
 def bprop_J(x, out, dout):
     """Backpropagator for primitive `J`."""
@@ -382,7 +394,7 @@ class ArrayReduceGradient(MetaGraph):
     def specialize_from_types(self, types):
         """Generate the gradient graph."""
         jf, jarr, jshp = types
-        assert jf._graph.transforms['primal'] is primops.scalar_add
+        # assert jf._graph.transforms['primal'] is primops.scalar_add
         return bprop_to_augm(primops.array_reduce, bprop_sum)
 
 
