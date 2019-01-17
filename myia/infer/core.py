@@ -77,20 +77,23 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         return False
 
     def _resolve_var(self):
+        varlist = [fut for fut in self._vars if not fut.resolved()]
+        later = [fut for fut in varlist if fut.priority() is None]
+        varlist = [fut for fut in varlist if fut.priority() is not None]
+        if not varlist:
+            return False
+        varlist.sort(key=lambda x: x.priority())
         found = False
-        later = []
-        while self._vars:
-            v1 = self._vars.pop()
+        while varlist:
+            v1 = varlist.pop()
             try:
                 v1.force_resolve()
             except InferenceError as e:
                 self._errors.append(e)
-            except Later:
-                later.append(v1)
             else:
                 found = True
                 break
-        self._vars = later + self._vars
+        self._vars = later + varlist
         return found
 
     def run_forever(self):
@@ -99,16 +102,12 @@ class InferenceLoop(asyncio.AbstractEventLoop):
             while self._todo:
                 h = self._todo.popleft()
                 h._run()
-            self._vars = [fut for fut in self._vars if not fut.resolved()]
-            if self._vars:
-                # If some literals weren't forced to a concrete type by some
-                # operation, we sort by priority (i.e. floats first) and we
-                # force the first one to take its default concrete type. Then
-                # we resume the loop.
-                self._vars.sort(key=lambda x: x.priority)
-                if self._resolve_var():
-                    continue
-            break
+            # If some literals weren't forced to a concrete type by some
+            # operation, we sort by priority (i.e. floats first) and we
+            # force the first one to take its default concrete type. Then
+            # we resume the loop.
+            if not self._resolve_var():
+                break
 
     def call_exception_handler(self, ctx):
         if 'exception' in ctx:
@@ -188,13 +187,12 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         self._vars.append(v)
         return v
 
-    def create_pending(self, resolve, priority=0, parents=()):
-        pending = Pending(resolve, priority, loop=self)
-        if priority is not None:
-            self._vars.append(pending)
+    def create_pending(self, resolve, priority, parents=()):
+        pending = Pending(resolve=resolve, priority=priority, loop=self)
+        self._vars.append(pending)
         return pending
 
-    def create_pending_from_list(self, poss, dflt, priority=0):
+    def create_pending_from_list(self, poss, dflt, priority):
         pending = PendingFromList(poss, dflt, priority, loop=self)
         self._vars.append(pending)
         return pending
@@ -346,8 +344,11 @@ class EquivalenceChecker:
 
 
 def is_simple(x):
+    from ..abstract.base import AbstractScalar, TYPE
     if isinstance(x, Pending):
         return x.is_simple()
+    if isinstance(x, AbstractScalar):
+        return is_simple(x.values[TYPE])
     elif ismyiatype(x):
         return True
     else:

@@ -317,12 +317,12 @@ def test_if(a, b):
 #     return f()
 
 
-# # @grad_test((4.0, 5.0), (6.4, -7.8))
-# # def test_if2(a, b):
-# #     if a > b:
-# #         return a * a
-# #     else:
-# #         return b + b
+@grad_test((4.0, 5.0), (6.4, -7.8))
+def test_if2(a, b):
+    if a > b:
+        return a * a
+    else:
+        return b + b
 
 
 # @grad_test(4.1,)
@@ -366,19 +366,19 @@ def test_if(a, b):
 #     return v
 
 
-# @grad_test(4.5,)
-# def test_nested_closure(x):
-#     a = x * x
-#     b = x + 5
+@grad_test(4.5,)
+def test_nested_closure(x):
+    a = x * x
+    b = x + 5
 
-#     def f():
-#         def g():
-#             return a + b
+    def f():
+        def g():
+            return a + b
 
-#         def h():
-#             return a * b
-#         return g if x < 0 else h
-#     return f()()
+        def h():
+            return a * b
+        return g if x < 0 else h
+    return f()()
 
 
 @grad_test((4.5, 6.7),)

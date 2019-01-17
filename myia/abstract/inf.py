@@ -129,7 +129,7 @@ class AbstractTrack(Track):
         if dtype.ismyiatype(t, dtype.Number):
             prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
             res.values[TYPE] = self.engine.loop.create_pending_from_list(
-                _number_types, t, prio
+                _number_types, t, lambda: prio
             )
             # v = RestrictedVar(_number_types)
             # prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
@@ -444,7 +444,7 @@ async def execute_inferrers(track, inferrers, outref, argrefs):
         for inf in inferrers:
             p = track.engine.loop.create_pending(
                 resolve=None,
-                priority=None
+                priority=lambda: None
             )
             pending.append(p)
             track.engine.loop.schedule(

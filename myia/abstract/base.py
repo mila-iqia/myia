@@ -885,6 +885,13 @@ def bind(loop, committed, resolved, pending):
         resolved.clear()
         return committed
 
+    def priority():
+        if not resolved and committed is None:
+            return None
+        if any(is_simple(x) for x in chain([committed], resolved, pending)):
+            return 1000
+        return prio
+
     if any(is_simple(x) for x in chain(resolved, pending)):
         rval = None
 
@@ -903,9 +910,9 @@ def bind(loop, committed, resolved, pending):
             return p
 
     else:
-        priority = (1000
-                    if any(p.priority is None for p in pending)
-                    else min(p.priority for p in pending) - 1)
+        prio = (-1000
+                if any(p.priority() is None for p in pending)
+                else min(p.priority() for p in pending) - 1)
         rval = loop.create_pending(
             resolve=premature_resolve,
             priority=priority,
