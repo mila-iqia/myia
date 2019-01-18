@@ -230,7 +230,7 @@ class LocalPassOptimizer:
 
         while len(todo) > 0:
             n = todo.pop()
-            if n in seen:
+            if n in seen or n not in mng.all_nodes:
                 continue
             seen.add(n)
 
