@@ -284,21 +284,21 @@ def test_poly_with_constants(c, x, y):
     return choose(c)(x, y), choose(not c)(x, y)
 
 
-# @specialize((True, int1, int2))
-# def test_poly_with_constants2(c, x, y):
-#     def f1(x, y):
-#         return x + y
+@specialize((True, int1, int2))
+def test_poly_with_constants2(c, x, y):
+    def f1(x, y):
+        return x + y
 
-#     def f2(x, y):
-#         return x * y
+    def f2(x, y):
+        return x * y
 
-#     def choose(c):
-#         if c:
-#             return f1
-#         else:
-#             return f2
+    def choose(c):
+        if c:
+            return f1
+        else:
+            return f2
 
-#     return choose(c)(x, 2), choose(not c)(y, 3)
+    return choose(c)(x, 2), choose(not c)(y, 3)
 
 
 @specialize((int1, int2), (fp1, fp2))
