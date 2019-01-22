@@ -188,13 +188,14 @@ def test_array_map(xs):
     return array_map(square, xs)
 
 
-# @specialize((numpy.array([fp1, fp2]),
-#              numpy.array([int1, int2])))
-# def test_array_map_polymorphic(xs, ys):
-#     def square(x):
-#         return x * x
+@mark.xfail(reason="TODO")
+@specialize((numpy.array([fp1, fp2]),
+             numpy.array([int1, int2])))
+def test_array_map_polymorphic(xs, ys):
+    def square(x):
+        return x * x
 
-#     return array_map(square, xs), array_map(square, ys)
+    return array_map(square, xs), array_map(square, ys)
 
 
 @specialize(([fp1, fp2],))
@@ -205,12 +206,13 @@ def test_list_map(xs):
     return list_map(square, xs)
 
 
-# @specialize(([fp1, fp2], [int1, int2]))
-# def test_list_map_polymorphic(xs, ys):
-#     def square(x):
-#         return x * x
+@mark.xfail(reason="TODO")
+@specialize(([fp1, fp2], [int1, int2]))
+def test_list_map_polymorphic(xs, ys):
+    def square(x):
+        return x * x
 
-#     return list_map(square, xs), list_map(square, ys)
+    return list_map(square, xs), list_map(square, ys)
 
 
 # @mark.xfail(reason="Cannot specialize f")
@@ -284,21 +286,22 @@ def test_poly_with_constants(c, x, y):
     return choose(c)(x, y), choose(not c)(x, y)
 
 
-# @specialize((True, int1, int2))
-# def test_poly_with_constants2(c, x, y):
-#     def f1(x, y):
-#         return x + y
+@mark.xfail(reason="TODO")
+@specialize((True, int1, int2))
+def test_poly_with_constants2(c, x, y):
+    def f1(x, y):
+        return x + y
 
-#     def f2(x, y):
-#         return x * y
+    def f2(x, y):
+        return x * y
 
-#     def choose(c):
-#         if c:
-#             return f1
-#         else:
-#             return f2
+    def choose(c):
+        if c:
+            return f1
+        else:
+            return f2
 
-#     return choose(c)(x, 2), choose(not c)(y, 3)
+    return choose(c)(x, 2), choose(not c)(y, 3)
 
 
 @specialize((int1, int2), (fp1, fp2))
