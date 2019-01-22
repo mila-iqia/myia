@@ -93,7 +93,7 @@ class AbstractTrack(Track):
 
     async def execute(self, fn, *args):
         infs = [self.get_inferrer_for(poss, args)
-                for poss in fn.values[VALUE]]
+                for poss in await fn.get()]
         argrefs = [VirtualReference({'abstract': a}) for a in args]
         return await execute_inferrers(self, infs, None, argrefs)
 
@@ -112,7 +112,7 @@ class AbstractTrack(Track):
             raise Exception(f'Not a function: {fn}')
 
         infs = [self.get_inferrer_for(poss, args)
-                for poss in fn.values[VALUE]]
+                for poss in await fn.get()]
 
         return await self.engine.loop.schedule(
             execute_inferrers(self, infs, ref, argrefs),

@@ -1060,46 +1060,44 @@ async def _inf_env_add(track, env1, env2):
 @standard_prim(P.J)
 async def _inf_J(track, x):
     if isinstance(x, AbstractFunction):
-        v = x.values[VALUE]
-        if isinstance(v, Possibilities):
-            return AbstractFunction(*[JTransformedFunction(poss)
-                                      for poss in v])
+        v = await x.get()
+        return AbstractFunction(*[JTransformedFunction(poss)
+                                  for poss in v])
     return AbstractJTagged(x)
 
 
 @standard_prim(P.Jinv)
 async def _inf_Jinv(track, x):
     if isinstance(x, AbstractFunction):
-        v = x.values[VALUE]
-        if isinstance(v, Possibilities):
-            results = []
-            for f in v:
-                if isinstance(f, JTransformedFunction):
-                    results.append(f.fn)
-                elif isinstance(f, (Graph, GraphAndContext)):
-                    if isinstance(f, GraphAndContext):
-                        g = f.graph
-                    else:
-                        g = f
-                    primal = g and g.transforms.get('primal', None)
-                    if primal:
-                        primal = track.engine.pipeline.resources.convert(primal)
-                        if isinstance(primal, Graph) and primal.parent:
-                            # The primal for a closure can't be used because it points to
-                            # the original nodes of its parent, whereas we would like to
-                            # point to the transformed nodes of the parent. This is
-                            # fixable, and will need to be fixed to support a few edge
-                            # cases.
-                            results.append(DummyFunction())
-                        else:
-                            results.append(primal)
-                    else:
-                        raise MyiaTypeError(f'Bad input type for Jinv: {f}')
+        v = await x.get()
+        results = []
+        for f in v:
+            if isinstance(f, JTransformedFunction):
+                results.append(f.fn)
+            elif isinstance(f, (Graph, GraphAndContext)):
+                if isinstance(f, GraphAndContext):
+                    g = f.graph
                 else:
-                    raise MyiaTypeError(
-                        f'Expected JTransformedFunction, not {f}'
-                    )
-            return AbstractFunction(*results)
+                    g = f
+                primal = g and g.transforms.get('primal', None)
+                if primal:
+                    primal = track.engine.pipeline.resources.convert(primal)
+                    if isinstance(primal, Graph) and primal.parent:
+                        # The primal for a closure can't be used because it points to
+                        # the original nodes of its parent, whereas we would like to
+                        # point to the transformed nodes of the parent. This is
+                        # fixable, and will need to be fixed to support a few edge
+                        # cases.
+                        results.append(DummyFunction())
+                    else:
+                        results.append(primal)
+                else:
+                    raise MyiaTypeError(f'Bad input type for Jinv: {f}')
+            else:
+                raise MyiaTypeError(
+                    f'Expected JTransformedFunction, not {f}'
+                )
+        return AbstractFunction(*results)
     if isinstance(x, AbstractJTagged):
         return x.element
     else:

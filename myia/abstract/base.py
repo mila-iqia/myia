@@ -9,7 +9,7 @@ from .. import dtype, dshape
 from ..debug.utils import mixin
 from ..infer import ANYTHING, InferenceError, MyiaTypeError, \
     Reference, Context
-from ..infer.core import Pending, Later, is_simple
+from ..infer.core import Pending, Later, is_simple, PendingTentative
 from ..utils import overload, UNKNOWN, Named
 
 
@@ -223,15 +223,20 @@ class AbstractError(AbstractValue):
 
 
 class AbstractFunction(AbstractValue):
-    def __init__(self, *poss):
+    def __init__(self, *poss, value=None):
+        v = Possibilities(poss) if value is None else value
         super().__init__({
-            VALUE: Possibilities(poss),
+            VALUE: v,
             TYPE: dtype.Function,
             SHAPE: dshape.NOSHAPE
         })
 
+    async def get(self):
+        v = self.values[VALUE]
+        return (await v if isinstance(v, Pending) else v)
+
     def merge_structure(self, other):
-        return AbstractFunction(*self.values[VALUE])
+        return AbstractFunction(value=self.values[VALUE])
 
     def __repr__(self):
         return f'Fn({self.values[VALUE]})'
@@ -500,7 +505,7 @@ def abstract_clone(self, x: AbstractScalar, *args):
 
 @overload
 def abstract_clone(self, x: AbstractFunction, *args):
-    return AbstractFunction(*self(x.values[VALUE], *args))
+    return AbstractFunction(value=self(x.values[VALUE], *args))
 
 
 @overload
@@ -639,6 +644,17 @@ def broaden(self, d: TrackDict, loop):
     return {k: k.broaden(v, self, loop) for k, v in d.items()}
 
 
+@overload
+def broaden(self, p: Pending, loop):
+    return p
+
+
+@overload
+def broaden(self, p: Possibilities, loop):
+    assert loop is not None
+    return loop.create_pending_tentative(tentative=p)
+
+
 ###############
 # Sensitivity #
 ###############
@@ -769,12 +785,12 @@ def _amerge(self, x1: AbstractClass, x2, loop, forced):
 
 @overload
 def _amerge(self, x1: AbstractJTagged, x2, loop, forced):
-    args1 = (x1.element)
-    args2 = (x2.element)
+    args1 = x1.element
+    args2 = x2.element
     merged = amerge(args1, args2, loop, forced)
     if forced or merged is args1:
         return x1
-    return AbstractJTagged(*merged)
+    return AbstractJTagged(merged)
 
 
 @overload
@@ -815,11 +831,16 @@ def amerge(x1, x2, loop, forced, accept_pending=True):
     isp1 = isinstance(x1, Pending)
     isp2 = isinstance(x2, Pending)
     if isp1 and x1.done():
+        assert forced is False  # TODO: fix this?
         x1 = x1.result()
         isp1 = False
     if isp2 and x2.done():
         x2 = x2.result()
         isp2 = False
+    if isinstance(x1, PendingTentative):
+        assert not x1.done()  # TODO: fix this?
+        x1.tentative = amerge(x1.tentative, x2, loop, False, True)
+        return x1
     if (isp1 or isp2) and not accept_pending:
         raise AssertionError('Cannot have Pending here.')
     if isp1 and isp2:

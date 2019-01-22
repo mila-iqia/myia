@@ -80,6 +80,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         varlist = [fut for fut in self._vars if not fut.resolved()]
         later = [fut for fut in varlist if fut.priority() is None]
         varlist = [fut for fut in varlist if fut.priority() is not None]
+        self._vars = later
         if not varlist:
             return False
         varlist.sort(key=lambda x: x.priority())
@@ -93,7 +94,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
             else:
                 found = True
                 break
-        self._vars = later + varlist
+        self._vars += varlist
         return found
 
     def run_forever(self):
@@ -194,6 +195,11 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
     def create_pending_from_list(self, poss, dflt, priority):
         pending = PendingFromList(poss, dflt, priority, loop=self)
+        self._vars.append(pending)
+        return pending
+
+    def create_pending_tentative(self, tentative):
+        pending = PendingTentative(tentative=tentative, loop=self)
         self._vars.append(pending)
         return pending
 
@@ -358,6 +364,8 @@ def is_simple(x):
 class Pending(asyncio.Future):
     def __init__(self, resolve, priority, loop):
         super().__init__(loop=loop)
+        if not callable(priority):
+            priority = lambda p=priority: p
         self.priority = priority
         if resolve is not None:
             self._resolve = resolve
@@ -372,10 +380,11 @@ class Pending(asyncio.Future):
 
     def resolve_to(self, value):
         self.set_result(value)
-        if is_simple(self):
-            for e in self.equiv:
-                if isinstance(e, Pending) and not e.done():
-                    e.set_result(value)
+        # TODO: check whether this makes _resolve_from_equiv unneeded
+        # if is_simple(self):
+        #     for e in self.equiv:
+        #         if isinstance(e, Pending) and not e.done():
+        #             e.set_result(value)
 
     def resolved(self):
         return self.done()
@@ -419,6 +428,36 @@ class PendingFromList(Pending):
         x = self._resolve_from_equiv()
         if x is not None:
             self.resolve_to(x)
+
+
+class PendingTentative(Pending):
+    def __init__(self, tentative, loop):
+        super().__init__(
+            resolve=None,
+            priority=self._priority,
+            loop=loop
+        )
+        self.tentative = tentative
+
+    def _priority(self):
+        if isinstance(self.tentative, Pending):
+            assert False  # TODO
+            return None
+        else:
+            return -1001
+
+    def force_resolve(self):
+        """Resolve to the tentative value."""
+        self.resolve_to(self.tentative)
+
+    def __hrepr__(self, H, hrepr):
+        # TODO: move
+        return hrepr.stdrepr_object(
+            'PendingTentative',
+            (('tentative', self.tentative),
+             ('done', self.resolved()),
+             ('prio', self.priority()))
+        )
 
 
 class InferenceVar(Pending):

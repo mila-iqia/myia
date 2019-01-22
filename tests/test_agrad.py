@@ -305,18 +305,6 @@ def test_if(a, b):
         return b
 
 
-# from myia.prim.py_implementations import scalar_gt, switch
-
-# @grad_test((4.0, 5.0), (6.4, -7.8))
-# def test_if2(a, b):
-#     def f1():
-#         return scalar_mul(a, a)
-#     def f2():
-#         return scalar_add(b, b)
-#     f = switch(scalar_gt(a, b), f1, f2)
-#     return f()
-
-
 @grad_test((4.0, 5.0), (6.4, -7.8))
 def test_if2(a, b):
     if a > b:
@@ -325,45 +313,45 @@ def test_if2(a, b):
         return b + b
 
 
-# @grad_test(4.1,)
-# def test_fact(x):
-#     def fact(n):
-#         if n <= 1:
-#             return 1
-#         else:
-#             return n * fact(n - 1)
-#     return fact(x)
+@grad_test(4.1,)
+def test_fact(x):
+    def fact(n):
+        if n <= 1:
+            return 1
+        else:
+            return n * fact(n - 1)
+    return fact(x)
 
 
-# @grad_test((4.0,))
-# def test_while(x):
-#     rval = x
-#     while rval < 100:
-#         rval = rval * rval
-#     return rval
+@grad_test((4.0,))
+def test_while(x):
+    rval = x
+    while rval < 10:
+        rval = rval * rval
+    return rval
 
 
-# @grad_test((4.0, 5.0, 2.0),)
-# def test_while_2(x, y, z):
-#     rval = 0
-#     # Cannot compare to 0 or finite diff is unstable
-#     while x > -0.1:
-#         rval = rval + y
-#         x = x - z
-#     return rval
+@grad_test((4.0, 5.0, 2.0),)
+def test_while_2(x, y, z):
+    rval = 0
+    # Cannot compare to 0 or finite diff is unstable
+    while x > -0.1:
+        rval = rval + y
+        x = x - z
+    return rval
 
 
-# @grad_test(2.0,)
-# def test_pow10(x):
-#     v = x
-#     j = 0
-#     while j < 3:
-#         i = 0
-#         while i < 3:
-#             v = v * x
-#             i = i + 1
-#         j = j + 1
-#     return v
+@grad_test(2.0,)
+def test_pow10(x):
+    v = x
+    j = 0
+    while j < 3:
+        i = 0
+        while i < 3:
+            v = v * x
+            i = i + 1
+        j = j + 1
+    return v
 
 
 @grad_test(4.5,)

@@ -101,7 +101,7 @@ class NodeLabeler:
                              True if force is None else force)
         elif node.is_constant():
             v = node.value
-            if v is None or v == ():
+            if v is None or (isinstance(v, tuple) and v == ()):
                 return repr(v)
             elif isinstance(v, (int, float, str, Named, Namespace)):
                 return repr(v)
