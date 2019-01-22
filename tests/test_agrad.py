@@ -388,17 +388,17 @@ def test_functions_in_tuples(x, y):
     return f(x, y) + g(x, y)
 
 
-@grad_test((4.5, 6.7),)
-def test_closures_in_tuples(x, y):
-    def f():
-        return x * y
+# @grad_test((4.5, 6.7),)
+# def test_closures_in_tuples(x, y):
+#     def f():
+#         return x * y
 
-    def g():
-        return x + y
+#     def g():
+#         return x + y
 
-    tup = f, g
-    ff, gg = tup
-    return ff() + gg()
+#     tup = f, g
+#     ff, gg = tup
+#     return ff() + gg()
 
 
 @grad_test((MA(2, 3), MB(2, 3)),)

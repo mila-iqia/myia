@@ -284,21 +284,21 @@ def test_poly_with_constants(c, x, y):
     return choose(c)(x, y), choose(not c)(x, y)
 
 
-@specialize((True, int1, int2))
-def test_poly_with_constants2(c, x, y):
-    def f1(x, y):
-        return x + y
+# @specialize((True, int1, int2))
+# def test_poly_with_constants2(c, x, y):
+#     def f1(x, y):
+#         return x + y
 
-    def f2(x, y):
-        return x * y
+#     def f2(x, y):
+#         return x * y
 
-    def choose(c):
-        if c:
-            return f1
-        else:
-            return f2
+#     def choose(c):
+#         if c:
+#             return f1
+#         else:
+#             return f2
 
-    return choose(c)(x, 2), choose(not c)(y, 3)
+#     return choose(c)(x, 2), choose(not c)(y, 3)
 
 
 @specialize((int1, int2), (fp1, fp2))
@@ -353,6 +353,21 @@ def test_closure_stays_in_scope(x, y):
         return f(a)
 
     return h(x + y)()
+
+
+@specialize((int1,))
+def test_return_closure(x):
+    # The specializer should be careful not to replace `f(z - 1)[0]`
+    # by a reference to `g`, because `g` is closed over `z` whereas
+    # `f(z - 1)[0]` refers to a version of `g` closed on `z - 1`.
+    def f(z):
+        def g():
+            return z
+        def h():
+            return f(z - 1)[0]()
+        return (g, h)
+
+    return f(x)[1]()
 
 
 @specialize((int1, int2))

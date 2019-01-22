@@ -363,7 +363,7 @@ class _GraphSpecializer:
     build2 = Overload()
 
     @build2.register
-    async def build2(self, a: AbstractFunction):
+    async def build2(self, ref, a: AbstractFunction):
         fns = a.values[VALUE]
         if len(fns) == 1:
             fn, = fns
@@ -373,7 +373,10 @@ class _GraphSpecializer:
                 g = fn.graph
             else:
                 return None
-            if not isinstance(g, Graph) or _visible(self.graph, g):
+            if not isinstance(g, Graph) \
+                    or g.parent is None \
+                    or (ref.node.is_constant_graph()
+                        and _visible(self.graph, g)):
                 return _const2(g, a)
             else:
                 return None
@@ -381,7 +384,7 @@ class _GraphSpecializer:
             return None
 
     @build2.register
-    async def build2(self, a: AbstractScalar):
+    async def build2(self, ref, a: AbstractScalar):
         v = a.values[VALUE]
         if v is ANYTHING:
             return None
@@ -389,7 +392,7 @@ class _GraphSpecializer:
             return _const2(v, a)
 
     @build2.register
-    async def build2(self, a: AbstractValue):
+    async def build2(self, ref, a: AbstractValue):
         # Default case
         return None
 
@@ -408,7 +411,7 @@ class _GraphSpecializer:
                      for iref in irefs]
             for i, ival in enumerate(ivals):
                 iref = irefs[i]
-                repl = await self.build2(ival)
+                repl = await self.build2(iref, ival)
                 if repl is None:
                     while iref in self.specializer.engine.reference_map:
                         iref = self.specializer.engine.reference_map[iref]
