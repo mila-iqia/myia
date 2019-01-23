@@ -7,11 +7,11 @@ from .abstract import GraphXInferrer
 from .abstract.base import GraphAndContext, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
     AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, REF, \
-    AbstractError, AbstractValue
+    AbstractError, AbstractValue, TrackableFunction
 from .dtype import Function, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
     GraphInferrer, PartialInferrer, Inferrer, Unspecializable, \
-    DEAD, INACCESSIBLE, POLY
+    DEAD, INACCESSIBLE, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
 from .prim import ops as P, Primitive
 from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
@@ -240,13 +240,34 @@ class _GraphSpecializer:
 
     @build_inferrer.register
     async def build_inferrer(self, a, fn: MetaGraph, argvals):
-        assert argvals is not None
         inf = self.specializer.track.get_inferrer_for(fn, argvals)
         return await self._build_inferrer_x(a, inf, argvals)
 
     @build_inferrer.register
+    async def build_inferrer(self, a, fn: TrackableFunction, argvals):
+        inf = self.specializer.track.get_inferrer_for(fn, argvals)
+        argvals = await self._find_unique_argvals(inf, argvals)
+        return await self.build_inferrer(a, fn.fn, argvals)
+
+    @build_inferrer.register
     async def build_inferrer(self, a, fn: object, argvals):
         raise Exception(f'Unrecognized: {fn}')
+
+    async def _find_generalized(self, inf):
+        from .abstract.base import broaden
+        choices = set()
+        for argvals in inf.cache:
+            argvals = [await concretize_abstract(broaden(v, None))
+                       for v in argvals]
+            argvals = tuple(broaden(v, None) for v in argvals)
+            choices.add(argvals)
+        if len(choices) == 1:
+            choice, = choices
+            argrefs = [VirtualReference({'abstract': v}) for v in choice]
+            await inf(self.specializer.track, None, argrefs)
+            return choice
+        else:
+            return None
 
     async def _find_unique_argvals(self, inf, argvals):
         if argvals is None:
@@ -272,6 +293,9 @@ class _GraphSpecializer:
         elif len(choices) == 0:
             raise Unspecializable(DEAD)
         else:
+            generalized = await self._find_generalized(inf)
+            if generalized is not None:
+                return generalized
             raise Unspecializable(POLY)
 
         # if argvals is None:
@@ -289,7 +313,7 @@ class _GraphSpecializer:
     async def _build_inferrer_x(self, a, inf, argvals):
         argvals = await self._find_unique_argvals(inf, argvals)
         ctx = inf.make_context(self.specializer.track, argvals)
-        v = await self.specializer._specialize(inf._graph, ctx, None)
+        v = await self.specializer._specialize(ctx.graph, ctx, None)
         return _const2(v, a)
 
     ###########
@@ -367,6 +391,8 @@ class _GraphSpecializer:
         fns = a.values[VALUE]
         if len(fns) == 1:
             fn, = fns
+            if isinstance(fn, TrackableFunction):
+                fn = fn.fn
             if isinstance(fn, (Primitive, Graph, MetaGraph)):
                 g = fn
             elif isinstance(fn, GraphAndContext):

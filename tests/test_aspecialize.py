@@ -11,6 +11,7 @@ from myia.prim.py_implementations import \
     hastype, partial, scalar_add, scalar_sub, \
     scalar_usub, scalar_uadd, switch, array_map
 from myia.validate import ValidationError
+from myia.utils import overload
 
 from .common import mysum, i64, f64, Point
 
@@ -37,6 +38,22 @@ specialize_pipeline_std = debug_new_pipeline \
          'inferrer.version': 2,
          'validate.validate_type': None}
     )
+
+
+@overload
+def _eq(t1: tuple, t2):
+    return (isinstance(t2, tuple)
+            and all(_eq(x1, x2) for x1, x2 in zip(t1, t2)))
+
+
+@overload
+def _eq(a1: numpy.ndarray, a2):
+    return (a1 == a2).all()
+
+
+@overload
+def _eq(x: object, y):
+    return x == y
 
 
 def specializer_decorator(pipeline):
@@ -68,10 +85,7 @@ def specializer_decorator(pipeline):
                     raise verr
 
                 result_final = res['output'](*args)
-                if isinstance(result_py, numpy.ndarray):
-                    assert (result_py == result_final).all()
-                else:
-                    assert result_py == result_final
+                assert _eq(result_py, result_final)
 
             m = mark.parametrize('args', arglists)(run_test)
             m.__orig__ = fn
@@ -188,7 +202,6 @@ def test_array_map(xs):
     return array_map(square, xs)
 
 
-@mark.xfail(reason="TODO")
 @specialize((numpy.array([fp1, fp2]),
              numpy.array([int1, int2])))
 def test_array_map_polymorphic(xs, ys):
@@ -206,7 +219,6 @@ def test_list_map(xs):
     return list_map(square, xs)
 
 
-@mark.xfail(reason="TODO")
 @specialize(([fp1, fp2], [int1, int2]))
 def test_list_map_polymorphic(xs, ys):
     def square(x):
@@ -215,21 +227,21 @@ def test_list_map_polymorphic(xs, ys):
     return list_map(square, xs), list_map(square, ys)
 
 
-# @mark.xfail(reason="Cannot specialize f")
-# @specialize((True, [fp1, fp2], [int1, int2]))
-# def test_list_map_polymorphic_2(c, xs, ys):
-#     def square(x):
-#         return x * x
+@mark.xfail(reason="Cannot specialize f")
+@specialize((True, [fp1, fp2], [int1, int2]))
+def test_list_map_polymorphic_2(c, xs, ys):
+    def square(x):
+        return x * x
 
-#     def double(x):
-#         return x + x
+    def double(x):
+        return x + x
 
-#     if c:
-#         f = square
-#     else:
-#         f = double
+    if c:
+        f = square
+    else:
+        f = double
 
-#     return list_map(f, xs), list_map(f, ys)
+    return list_map(f, xs), list_map(f, ys)
 
 
 @specialize((int1, int2))
@@ -286,7 +298,6 @@ def test_poly_with_constants(c, x, y):
     return choose(c)(x, y), choose(not c)(x, y)
 
 
-@mark.xfail(reason="TODO")
 @specialize((True, int1, int2))
 def test_poly_with_constants2(c, x, y):
     def f1(x, y):

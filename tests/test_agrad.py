@@ -378,7 +378,7 @@ def test_functions_in_tuples(x, y):
     return f(x, y) + g(x, y)
 
 
-@mark.xfail(reason="TODO")
+@mark.xfail(reason="A DummyInferrer ends up being called")
 @grad_test((4.5, 6.7),)
 def test_closures_in_tuples(x, y):
     def f():
@@ -417,7 +417,6 @@ def test_array_operations_reshape(xs, ys):
     return array_to_scalar(sm)
 
 
-@mark.xfail(reason="TODO")
 @grad_test((MA(2, 3), MB(2, 3)),)
 def test_array_operations_std(xs, ys):
     div = xs / ys

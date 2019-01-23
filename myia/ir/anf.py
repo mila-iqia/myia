@@ -243,9 +243,19 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.debug = NamedDebugInfo(self)
-        self.inferred = defaultdict(lambda: UNKNOWN)
+        self._inferred = defaultdict(lambda: UNKNOWN)
         self._abstract = None
         self.expect_inferred = defaultdict(lambda: UNKNOWN)
+
+    @property
+    def inferred(self):
+        return self._inferred
+
+    @inferred.setter
+    def inferred(self, value):
+        if 'abstract' in value:
+            self._abstract = value['abstract']
+        self._inferred = value
 
     @property
     def abstract(self):

@@ -20,6 +20,7 @@ from .base import (
     AbstractJTagged,
     PartialApplication,
     JTransformedFunction,
+    TrackableFunction,
     Possibilities,
     GraphAndContext,
     DummyFunction,
@@ -174,6 +175,19 @@ class MyiaAttributeError(InferenceError):
     """Raised when an attribute is not found in a type or module."""
 
 
+def _prim_or_graph(afn):
+    from ..prim import Primitive
+    from ..ir import Graph
+    fns = afn.values[VALUE]
+    assert isinstance(fns, Possibilities)
+    assert len(fns) == 1
+    fn, = fns
+    if isinstance(fn, TrackableFunction):
+        fn = fn.fn
+    assert isinstance(fn, (Primitive, Graph))
+    return fn
+
+
 async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
                         dataref=None, outref=None):
     """Return an inferrer for resolve or getattr.
@@ -186,8 +200,6 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
         chk: A function to check the values inferred for the
             data and item.
     """
-    from ..prim import Primitive
-    from ..ir import Graph
     from ..infer import Reference
 
     resources = track.engine.pipeline.resources
@@ -215,12 +227,8 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
         elif item_v in data_t.methods:
             method = data_t.methods[item_v]
             method = resources.convert(method)
-            inferrer = track.from_value(method, Context.empty())
-            fns = inferrer.values[VALUE]
-            assert isinstance(fns, Possibilities)
-            assert len(fns) == 1
-            fn, = fns
-            assert isinstance(fn, (Primitive, Graph))
+            inferrer = track.from_value(method, Context.empty(), ref=outref)
+            fn = _prim_or_graph(inferrer)
             g = outref.node.graph
             eng = outref.engine
             ref = Reference(outref.engine,
@@ -233,12 +241,8 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
     elif case == 'method':
         method, = args
         method = resources.convert(method)
-        inferrer = track.from_value(method, Context.empty())
-        fns = inferrer.values[VALUE]
-        assert isinstance(fns, Possibilities)
-        assert len(fns) == 1
-        fn, = fns
-        assert isinstance(fn, (Primitive, Graph))
+        inferrer = track.from_value(method, Context.empty(), ref=outref)
+        fn = _prim_or_graph(inferrer)
         g = outref.node.graph
         eng = outref.engine
         ref = Reference(outref.engine,
@@ -278,7 +282,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
                             outref.context)
             return await eng.forward_reference('abstract', outref, ref)
         else:
-            return track.from_value(value, Context.empty())
+            return track.from_value(value, Context.empty(), ref=outref)
 
 
 async def _resolve_case(resources, data_t, item_v, chk):
@@ -1072,6 +1076,8 @@ async def _inf_Jinv(track, x):
         v = await x.get()
         results = []
         for f in v:
+            if isinstance(f, TrackableFunction):
+                f = f.fn
             if isinstance(f, JTransformedFunction):
                 results.append(f.fn)
             elif isinstance(f, (Graph, GraphAndContext)):

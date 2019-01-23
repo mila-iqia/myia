@@ -16,7 +16,7 @@ from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
     reify, JTransformedFunction, AbstractJTagged, AbstractTuple, \
     sensitivity_transform, VirtualFunction, AbstractFunction, \
-    VALUE, TYPE, SHAPE, REF, DummyFunction
+    VALUE, TYPE, SHAPE, REF, DummyFunction, TrackableFunction
 
 
 _number_types = [
@@ -58,6 +58,14 @@ class AbstractTrack(Track):
         return self.constructors[g]
 
     @get_inferrer_for.register
+    def get_inferrer_for(self, tf: TrackableFunction, args):
+        if tf not in self.constructors:
+            self.constructors[tf] = TrackableXInferrer(
+                self.get_inferrer_for(tf.fn, args)
+            )
+        return self.constructors[tf]
+
+    @get_inferrer_for.register
     def get_inferrer_for(self, part: PartialApplication, args):
         return PartialXInferrer(
             self.get_inferrer_for(part.fn, (*part.args, *args)),
@@ -84,12 +92,18 @@ class AbstractTrack(Track):
 
     @get_inferrer_for.register
     def get_inferrer_for(self, mg: MetaGraph, args):
-        try:
-            g = mg.specialize_from_abstract(args)
-        except GraphGenerationError as err:
-            raise MyiaTypeError(f'Graph gen error: {err}')
-        g = self.engine.pipeline.resources.convert(g)
-        return self.get_inferrer_for(g, args)
+        if mg not in self.constructors:
+            self.constructors[mg] = MetaGraphXInferrer(mg)
+        return self.constructors[mg]
+
+    # @get_inferrer_for.register
+    # def get_inferrer_for(self, mg: MetaGraph, args):
+    #     try:
+    #         g = mg.specialize_from_abstract(args)
+    #     except GraphGenerationError as err:
+    #         raise MyiaTypeError(f'Graph gen error: {err}')
+    #     g = self.engine.pipeline.resources.convert(g)
+    #     return self.get_inferrer_for(g, args)
 
     async def execute(self, fn, *args):
         infs = [self.get_inferrer_for(poss, args)
@@ -124,7 +138,7 @@ class AbstractTrack(Track):
     async def infer_constant(self, ctref):
         """Get the property for a ref of a Constant node."""
         v = self.engine.pipeline.resources.convert(ctref.node.value)
-        res = self.from_value(v, ctref.context)
+        res = self.from_value(v, ctref.context, ref=ctref)
         t = res.build(TYPE)
         if dtype.ismyiatype(t, dtype.Number):
             prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
@@ -137,15 +151,21 @@ class AbstractTrack(Track):
         res.values[REF].setdefault(ctref.context, ctref.node)
         return res
 
-    def from_value(self, v, context):
+    def from_value(self, v, context, ref=None):
         """Infer the type of a constant."""
         if isinstance(v, Primitive):
+            # if ref is not None:
+            #     v = TrackableFunction(v, id=ref.node)
             return AbstractFunction(v)
         elif isinstance(v, Graph):
             if v.parent:
                 v = GraphAndContext(v, context)
+            if ref is not None:
+                v = TrackableFunction(v, id=ref.node)
             return AbstractFunction(v)
         elif isinstance(v, MetaGraph):
+            if ref is not None:
+                v = TrackableFunction(v, id=ref.node)
             return AbstractFunction(v)
         elif is_dataclass_type(v):
             # rec = self.constructors[P.make_record]()
@@ -305,6 +325,18 @@ class XInferrer(Partializable):
         return f'{type(self)}'
 
 
+class TrackableXInferrer(XInferrer):
+    def __init__(self, subinf):
+        super().__init__()
+        self.subinf = subinf
+
+    async def __call__(self, track, outref, argrefs):
+        args = tuple([await ref['abstract'] for ref in argrefs])
+        if args not in self.cache:
+            self.cache[args] = await self.subinf(track, outref, argrefs)
+        return self.cache[args]
+
+
 class GraphXInferrer(XInferrer):
 
     def __init__(self, graph, context):
@@ -315,6 +347,9 @@ class GraphXInferrer(XInferrer):
         else:
             self.context = context.filter(graph)
         assert self.context is not None
+
+    def get_graph(self, track, args):
+        return self._graph
 
     def make_context(self, track, args):
         _, ctx = self._make_argkey_and_context(track, args)
@@ -329,6 +364,59 @@ class GraphXInferrer(XInferrer):
     async def infer(self, track, *args):
         engine = track.engine
         g = self._graph
+        nargs = len(g.parameters)
+
+        if len(args) != nargs:
+            raise type_error_nargs(self, nargs, len(args))
+
+        argkey, context = self._make_argkey_and_context(track, args)
+
+        # We associate each parameter of the Graph with its value for each
+        # property, in the context we built.
+        for p, arg in zip(g.parameters, argkey):
+            arg.values[REF].setdefault(context, p)
+            ref = engine.ref(p, context)
+            engine.cache.set_value(('abstract', ref), arg)
+
+        out = engine.ref(g.return_, context)
+        return await engine.get_inferred('abstract', out)
+
+
+class MetaGraphXInferrer(XInferrer):
+
+    def __init__(self, metagraph):
+        super().__init__()
+        self.metagraph = metagraph
+        self.context = Context.empty()
+        self.graph_cache = {}
+
+    def get_graph(self, track, argvals):
+        if argvals not in self.graph_cache:
+            try:
+                g = self.metagraph.specialize_from_abstract(argvals)
+            except GraphGenerationError as err:
+                raise MyiaTypeError(f'Graph gen error: {err}')
+            g = track.engine.pipeline.resources.convert(g)
+            self.graph_cache[argvals] = g
+        return self.graph_cache[argvals]
+
+    def make_context(self, track, args):
+        _, ctx = self._make_argkey_and_context(track, args)
+        return ctx
+
+    def _make_argkey_and_context(self, track, argvals):
+        assert argvals is not None
+        g = self.get_graph(track, argvals)
+        argkey = as_frozen(argvals)
+        # Update current context using the fetched properties.
+        return argkey, self.context.add(g, argkey)
+
+    async def infer(self, track, *args):
+        # TODO: reuse GraphXInferrer code
+
+        engine = track.engine
+        g = self.get_graph(track, args)
+
         nargs = len(g.parameters)
 
         if len(args) != nargs:

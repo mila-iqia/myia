@@ -25,6 +25,20 @@ class Possibilities(frozenset):
     pass
 
 
+class TrackableFunction:
+    def __init__(self, fn, id):
+        self.fn = fn
+        self.id = id
+
+    def __hash__(self):
+        return hash((self.fn, self.id))
+
+    def __eq__(self, other):
+        return isinstance(other, TrackableFunction) \
+            and self.fn == other.fn \
+            and self.id == other.id
+
+
 class GraphAndContext:
     def __init__(self, graph, context):
         self.graph = graph
@@ -1118,6 +1132,17 @@ class _AbstractValue:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
             '★Value',
+            _clean(self.values).items(),
+            delimiter="↦",
+            cls='abstract',
+        )
+
+
+@mixin(AbstractScalar)
+class _AbstractScalar:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_object(
+            '★Scalar',
             _clean(self.values).items(),
             delimiter="↦",
             cls='abstract',
