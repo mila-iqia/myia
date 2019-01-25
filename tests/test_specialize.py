@@ -2,37 +2,58 @@
 import numpy
 from pytest import mark
 
-from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
+from myia.pipeline.standard import scalar_debug_new_pipeline, debug_new_pipeline
 from myia.composite import list_map
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
 from myia.infer import InferenceError
 from myia.prim.py_implementations import \
     hastype, partial, scalar_add, scalar_sub, \
-    scalar_usub, scalar_uadd, switch
+    scalar_usub, scalar_uadd, switch, array_map
 from myia.validate import ValidationError
+from myia.utils import overload
 
-from .common import mysum, i64, f64
+from .common import mysum, i64, f64, Point
 
 
-specialize_pipeline = scalar_debug_pipeline \
+specialize_pipeline = scalar_debug_new_pipeline \
     .select('parse', 'infer', 'specialize',
             'erase_class', 'erase_tuple',
-            'validate', 'export') \
+            'validate', 'export', 'wrap') \
     .configure(
-        {'inferrer.tracks.value.max_depth': 1,
-         'inferrer.tied_tracks': {'type': ['shape']}}
+        {'inferrer.tracks.abstract.max_depth': 1,
+         'inferrer.erase_value': True,
+         'inferrer.version': 2,
+         'validate.validate_type': None}
     )
 
 
-specialize_pipeline_std = standard_debug_pipeline \
+specialize_pipeline_std = debug_new_pipeline \
     .select('parse', 'infer', 'specialize',
             'erase_class', 'opt', 'erase_tuple',
             'validate', 'export', 'wrap') \
     .configure(
-        {'inferrer.tracks.value.max_depth': 1,
-         'inferrer.tied_tracks': {'type': ['shape']}}
+        {'inferrer.tracks.abstract.max_depth': 1,
+         'inferrer.erase_value': True,
+         'inferrer.version': 2,
+         'validate.validate_type': None}
     )
+
+
+@overload
+def _eq(t1: tuple, t2):
+    return (isinstance(t2, tuple)
+            and all(_eq(x1, x2) for x1, x2 in zip(t1, t2)))
+
+
+@overload
+def _eq(a1: numpy.ndarray, a2):
+    return (a1 == a2).all()
+
+
+@overload
+def _eq(x: object, y):
+    return x == y
 
 
 def specializer_decorator(pipeline):
@@ -64,10 +85,7 @@ def specializer_decorator(pipeline):
                     raise verr
 
                 result_final = res['output'](*args)
-                if isinstance(result_py, numpy.ndarray):
-                    assert (result_py == result_final).all()
-                else:
-                    assert result_py == result_final
+                assert _eq(result_py, result_final)
 
             m = mark.parametrize('args', arglists)(run_test)
             m.__orig__ = fn
@@ -165,6 +183,34 @@ def test_hastype(x, y):
     return helper(x), helper(y), helper(())
 
 
+@specialize((int1, int2))
+def test_struct(x, y):
+    return Point(x, y)
+
+
+@specialize((int1, int2))
+def test_struct2(x, y):
+    p = Point(x, y)
+    return p.x + p.y
+
+
+@specialize((numpy.array([fp1, fp2]),))
+def test_array_map(xs):
+    def square(x):
+        return x * x
+
+    return array_map(square, xs)
+
+
+@specialize((numpy.array([fp1, fp2]),
+             numpy.array([int1, int2])))
+def test_array_map_polymorphic(xs, ys):
+    def square(x):
+        return x * x
+
+    return array_map(square, xs), array_map(square, ys)
+
+
 @specialize(([fp1, fp2],))
 def test_list_map(xs):
     def square(x):
@@ -208,8 +254,8 @@ def test_unused_function_parameter(x):
     # The type of square will be Problem(DEAD), but that's not really an issue
     # because it is indeed not used, and we can simply replace the reference
     # by a dummy.
-    def square(x):
-        return x * x
+    def square(y):
+        return y * y
 
     def helper(f, a):
         return a * a
@@ -279,6 +325,13 @@ def test_method_polymorphic(x, y):
     return x.__add__(x), y.__add__(y)
 
 
+@specialize((int1, fp1))
+def test_partial_polymorphic(x, y):
+    def f(a, b):
+        return a + b
+    return partial(f, x)(x), partial(f, y)(y)
+
+
 @specialize((True, int1), (False, int1))
 def test_switch(c, x):
     return switch(c, scalar_usub, scalar_uadd)(x)
@@ -314,6 +367,21 @@ def test_closure_stays_in_scope(x, y):
         return f(a)
 
     return h(x + y)()
+
+
+@specialize((int1,))
+def test_return_closure(x):
+    # The specializer should be careful not to replace `f(z - 1)[0]`
+    # by a reference to `g`, because `g` is closed over `z` whereas
+    # `f(z - 1)[0]` refers to a version of `g` closed on `z - 1`.
+    def f(z):
+        def g():
+            return z
+        def h():
+            return f(z - 1)[0]()
+        return (g, h)
+
+    return f(x)[1]()
 
 
 @specialize((int1, int2))
