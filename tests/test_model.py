@@ -120,6 +120,11 @@ def test_forward_specialize(model, x):
     return model.apply(x)
 
 
+@parse_compare((make_model(), MC(3, 6)), array=True, profile=True)
+def test_forward_profile(model, x):
+    return model.apply(x)
+
+
 @infer_std(
     type=[
         ({'value': make_model()},

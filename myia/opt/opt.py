@@ -1,7 +1,10 @@
 """Graph optimization routines."""
 
 from weakref import WeakKeyDictionary
+from collections import deque
+
 from ..ir import ANFNode, Apply, Constant, Graph, Special, manage
+from ..prim import Primitive
 from ..utils.unify import Unification, Var
 
 
@@ -88,7 +91,8 @@ class PatternSubstitutionOptimization:
                  *,
                  condition=None,
                  name=None,
-                 multigraph=True):
+                 multigraph=True,
+                 interest=False):
         """Initialize va PatternSubstitutionOptimization."""
         g: Var = Var('RootG')
         self.pattern = sexp_to_node(pattern, g, multigraph)
@@ -99,6 +103,14 @@ class PatternSubstitutionOptimization:
         self.unif = Unification()
         self.condition = condition
         self.name = name
+        if interest is False:
+            if (self.pattern.is_apply() and
+                    self.pattern.inputs[0].is_constant(Primitive)):
+                interest = self.pattern.inputs[0].value
+            else:
+                # Maybe warn in this case?
+                interest = None
+        self.interest = interest
 
     def __call__(self, optimizer, node):
         """Return a replacement for the node, if the pattern matches.
@@ -133,46 +145,143 @@ def pattern_replacer(*pattern):
     return deco
 
 
-class PatternEquilibriumOptimizer:
-    """Apply a set of local pattern optimizations until equilibrium."""
+class NodeMap:
+    """Mapping of node to optimizer.
 
-    def __init__(self, *node_transformers, optimizer=None):
-        """Initialize a PatternEquilibriumOptimizer."""
-        self.node_transformers = node_transformers
+    This helps global optimizers select the relevant optimizers to
+    apply for each node.
+
+    Optimizers that are mapped to None are considered relevant for all
+    nodes.
+
+    Other than None, only primitives are currently supported as interests.
+
+    """
+
+    def __init__(self):
+        """Create a NodeMap."""
+        self._d = dict()
+
+    def register(self, interests, opt=None):
+        """Register an optimizer for some interests."""
+        def do_register(opt):
+            ints = interests
+            if ints is None:
+                self._d.setdefault(None, []).append(opt)
+                return
+            if not isinstance(ints, tuple):
+                ints = (ints,)
+            for interest in ints:
+                assert isinstance(interest, Primitive)
+                self._d.setdefault(interest, []).append(opt)
+
+        # There could be the option to return do_register also.
+        do_register(opt)
+
+    def get(self, node):
+        """Get a list of optimizers that could apply for a node."""
+        res = []
+        res.extend(self._d.get(None, []))
+        if node.is_apply() and node.inputs[0].is_constant():
+            res.extend(self._d.get(node.inputs[0].value, []))
+        return res
+
+
+class LocalPassOptimizer:
+    """Apply a set of local optimizations in bfs order."""
+
+    def __init__(self, node_map, optimizer=None):
+        """Initialize a LocalPassOptimizer."""
+        self.node_map = node_map
         self.optimizer = optimizer
 
     def __call__(self, graph):
-        """Apply optimizations until equilibrium on given graphs."""
+        """Apply optimizations on given graphs in node order."""
         if self.optimizer is not None:
             mng = self.optimizer.resources.manager
             mng.add_graph(graph)
         else:
             mng = manage(graph)
 
-        any_changes = False
+        changes = False
+        again = True
+        while again:
+            topo, seen, chg = self.backwards(mng, graph)
+            again = self.forward(mng, topo)
+            changes |= (chg | again)
 
-        while True:
-            changes = False
+        return changes
 
-            with mng.transact() as tr:
-                for node in list(mng.all_nodes):
-                    for transformer in self.node_transformers:
-                        new = transformer(self.optimizer, node)
-                        if new is True:
-                            changes = True
-                            any_changes = True
-                            break
-                        elif new and new is not node:
-                            new.expect_inferred.update(node.inferred)
-                            tr.replace(node, new)
-                            changes = True
-                            any_changes = True
-                            break
+    def backwards(self, mng, graph):
+        """Do a backwards pass over the graph.
 
-            if not changes:
-                break
+        This will visit the nodes from the output to the inputs in a
+        bfs manner while avoiding parts of the graph that are dropped
+        due to optimizations.
 
-        return any_changes
+        It returns a visitation order for a forward pass.
+
+        """
+        seen = set([graph])
+        todo = deque()
+        fwd = list()
+        changes = False
+        todo.appendleft(graph.output)
+
+        while len(todo) > 0:
+            n = todo.pop()
+            if n in seen or n not in mng.all_nodes:
+                continue
+            seen.add(n)
+
+            new, chg = self.apply_opt(mng, n)
+            changes |= chg
+
+            fwd.append(new)
+            if new.is_constant(Graph):
+                if new.value not in seen:
+                    todo.append(new.value.output)
+                    seen.add(new.value)
+            else:
+                todo.extendleft(new.inputs)
+
+        return fwd, seen, changes
+
+    def forward(self, mng, topo):
+        """Do a pass over the nodes.
+
+        This will visit nodes in the passed-in order, skipping those
+        that are no longer part of the manager.  It doesn't attempt to
+        visit new subgraphs.
+
+        """
+        change = False
+        for node in reversed(topo):
+            if node in mng.all_nodes:
+                change |= self.apply_opt(mng, node) is True
+        return change
+
+    def apply_opt(self, mng, n):
+        """Apply optimizations passes according to the node map."""
+        loop = True
+        changes = False
+        while loop:
+            loop = False
+            for transformer in self.node_map.get(n):
+                new = transformer(self.optimizer, n)
+                if new is True:
+                    loop = True
+                    changes = True
+                    break
+                if new and new is not n:
+                    new.expect_inferred.update(n.inferred)
+                    mng.replace(n, new)
+                    n = new
+                    loop = True
+                    changes = True
+                    break
+
+        return n, changes
 
 
 class GraphTransform:

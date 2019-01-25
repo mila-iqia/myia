@@ -5,15 +5,16 @@ The steps are listed in roughly the same order they should be called.
 
 
 import numpy as np
+from itertools import count
 
 from .. import dtype
 from ..cconv import closure_convert
 from ..ir import Graph
-from ..opt import PatternEquilibriumOptimizer, lib as optlib, CSE, \
-    erase_class, erase_tuple
+from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
+    LocalPassOptimizer
 from ..opt.clean import erase_class2, erase_tuple2
 from ..prim import vm_implementations
-from ..utils import overload, flatten
+from ..utils import overload, flatten, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
     validate_type as default_validate_type
 from ..vm import VM
@@ -47,32 +48,44 @@ class Optimizer(PipelineStep):
         super().__init__(pipeline_init)
         self.run_only_once = run_only_once
         self.phases = []
+        self.names = []
         for name, spec in phases.items():
             if spec == 'renormalize':
                 pass
             elif isinstance(spec, list):
-                spec = PatternEquilibriumOptimizer(*spec, optimizer=self)
+                nmap = NodeMap()
+                for opt in spec:
+                    nmap.register(getattr(opt, 'interest', None), opt)
+                spec = LocalPassOptimizer(nmap, optimizer=self)
             else:
                 spec = spec(optimizer=self)
+            self.names.append(name)
             self.phases.append(spec)
 
-    def step(self, graph, argspec=None, outspec=None):
+    def step(self, graph, argspec=None, outspec=None, profile=no_prof):
         """Optimize the graph using the given patterns."""
-        changes = True
-        while changes:
-            changes = False
-            for opt in self.phases:
-                if opt == 'renormalize':
-                    assert argspec is not None
-                    graph = self.resources.inferrer.renormalize(
-                        graph, argspec, outspec
-                    )
-                elif opt(graph):
-                    changes = True
-            if self.run_only_once:
-                break
-        self.resources.manager.keep_roots(graph)
-        return {'graph': graph}
+        with profile:
+            counter = count(1)
+            changes = True
+            while changes:
+                with profile.lap(next(counter)):
+                    changes = False
+                    nn = iter(self.names)
+                    for opt in self.phases:
+                        with profile.step(next(nn)):
+                            if opt == 'renormalize':
+                                assert argspec is not None
+                                graph = self.resources.inferrer.renormalize(
+                                    graph, argspec, outspec
+                                )
+                            elif opt(graph):
+                                changes = True
+                        if self.run_only_once:
+                            break
+            with profile.step('keep_roots'):
+                self.resources.manager.keep_roots(graph)
+            res = {'graph': graph}
+            return res
 
 
 #########
@@ -308,8 +321,16 @@ step_opt2 = Optimizer.partial(
             optlib.unfuse_composite,
         ],
         main2=[
-            optlib.incorporate_getitem,
             optlib.getitem_tuple,
+            optlib.setitem_tuple,
+            optlib.setitem_tuple_ct,
+            optlib.float_tuple_getitem_through_switch,
+            optlib.incorporate_getitem,
+            optlib.incorporate_getitem_through_switch,
+            optlib.inline_trivial,
+            optlib.inline_unique_uses,
+            optlib.inline_inside_marked_caller,
+            optlib.inline_core,
         ],
     )
 )

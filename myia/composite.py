@@ -286,11 +286,11 @@ def int_truediv(x, y):
     if hastype(x, typeof(y)):
         if (hastype(x, i8) or hastype(x, ui8) or
                 hastype(x, i16) or hastype(x, ui16)):
-            return scalar_cast(x, f32) / scalar_cast(y, f32)
-        return scalar_cast(x, f64) / scalar_cast(y, f64)
+            return scalar_div(scalar_cast(x, f32), scalar_cast(y, f32))
+        return scalar_div(scalar_cast(x, f64), scalar_cast(y, f64))
     else:
         # This branch is only here to trigger a type check error.
-        return x / y
+        return scalar_div(x, y)
 
 
 @core

@@ -115,7 +115,7 @@ class VM:
         rval = set()
         for fv in graph.free_variables_total:
             if isinstance(fv, Graph):
-                rval.update(ct for ct in graph.constants if ct.value is fv)
+                rval.update(graph.manager.graph_constants[fv])
             else:
                 rval.add(fv)
         return rval
@@ -274,6 +274,8 @@ class VM:
         if isinstance(node, Constant):
             # We only visit constant graphs
             assert node.is_constant_graph()
+            if frame.closure is not None and node in frame.closure:
+                return
             g = node.value
             if len(self._vars[g]) != 0:
                 frame.values[node] = self._make_closure(g, frame)
