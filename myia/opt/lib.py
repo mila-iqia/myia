@@ -1,8 +1,10 @@
 """Library of optimizations."""
 
+from ..abstract.base import AbstractTuple, AbstractScalar, VALUE, TYPE, SHAPE
 from ..composite import hyper_add
 from ..dtype import type_cloner, Function, JTagged, Number, ismyiatype, \
     Tuple, UInt
+from ..dshape import NOSHAPE
 from ..infer import Inferrer
 from ..ir import Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
@@ -56,6 +58,17 @@ Cs = SVar(var(_is_c))
 def primset_var(*prims):
     """Create a variable that matches a Primitive node."""
     return var(lambda node: node.is_constant() and node.value in prims)
+
+
+def shptup(values):
+    return AbstractTuple([
+        AbstractScalar({
+            VALUE: v,
+            TYPE: UInt[64],
+            SHAPE: NOSHAPE
+        })
+        for v in values
+    ])
 
 
 ###############################
@@ -217,6 +230,7 @@ def merge_transposes(optimizer, node, equiv):
     axes_final = tuple(axes1.index(x) for x in axes2)
     axes_ct = Constant(axes_final)
     axes_ct.type = Tuple[[UInt[64] for _ in axes_ct.value]]
+    axes_ct.abstract = shptup(axes_ct.value)
     return node.graph.apply(P.transpose, equiv[X], axes_ct)
 
 
@@ -238,6 +252,7 @@ def unfuse_composite(optimizer, node, equiv):
             if i.is_constant():
                 shp = Constant(self.shape)
                 shp.type = Tuple[[UInt[64] for _ in shp.value]]
+                shp.abstract = shptup(shp.value)
                 return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i),
                                 shp)
             else:
@@ -293,6 +308,7 @@ def simplify_array_map(optimizer, node, equiv):
         elif x.is_constant() and ismyiatype(x.type, Number):
             shp = Constant(xs[0].shape)
             shp.type = Tuple[[UInt[64] for _ in shp.value]]
+            shp.abstract = shptup(shp.value)
             sexp = (P.distribute, (P.scalar_to_array, x), shp)
             return sexp_to_node(sexp, node.graph)
         else:
@@ -810,6 +826,16 @@ def _nofunction2(self, f: AbstractFunction):
     raise TypeError('Function found')
 
 
+@abstract_clone.variant
+def _jelim_retype(self, j: AbstractJTagged):
+    return _jelim_retype_helper(j.element)
+
+
+@abstract_clone.variant
+def _jelim_retype_helper(self, f: AbstractFunction):
+    raise TypeError('Function found')
+
+
 class JElim(Partializable):
     """Eliminate J, iff it is only applied to non-functions."""
 
@@ -819,22 +845,46 @@ class JElim(Partializable):
 
     def __call__(self, root):
         """Apply JElim on root."""
+        # if self.optimizer.resources.inferrer.version == 2:
+        #     mng = self.optimizer.resources.manager
+        #     mng.keep_roots(root)
+        #     nodes = []
+        #     typesubs = []
+        #     for node in mng.all_nodes:
+        #         if node.is_apply(P.J) or node.is_apply(P.Jinv):
+        #             _, x = node.inputs
+        #             try:
+        #                 _nofunction2(x.abstract)
+        #             except TypeError as e:
+        #                 return False
+        #             nodes.append((node, x))
+        #         elif node.is_constant() \
+        #                 and isinstance(node.abstract, AbstractJTagged):
+        #             typesubs.append((node, node.abstract.element))
+
+        #     with mng.transact() as tr:
+        #         for node, repl in nodes:
+        #             tr.replace(node, repl)
+
+        #     for node, newtype in typesubs:
+        #         node.abstract = newtype
+
+        #     return len(nodes) > 0
+
         if self.optimizer.resources.inferrer.version == 2:
             mng = self.optimizer.resources.manager
             mng.keep_roots(root)
             nodes = []
             typesubs = []
             for node in mng.all_nodes:
+                try:
+                    newtype = _jelim_retype(node.abstract)
+                except TypeError as e:
+                    return False
                 if node.is_apply(P.J) or node.is_apply(P.Jinv):
                     _, x = node.inputs
-                    try:
-                        _nofunction2(x.abstract)
-                    except TypeError as e:
-                        return False
                     nodes.append((node, x))
-                elif node.is_constant() \
-                        and isinstance(node.abstract, AbstractJTagged):
-                    typesubs.append((node, node.abstract.element))
+                typesubs.append((node, newtype))
 
             with mng.transact() as tr:
                 for node, repl in nodes:
@@ -853,11 +903,9 @@ class JElim(Partializable):
             for node in mng.all_nodes:
                 if node.is_apply(P.J) or node.is_apply(P.Jinv):
                     _, x = node.inputs
-                    buche('Try', x.type)
                     try:
                         _nofunction(x.type)
                     except TypeError:
-                        buche('not ok!')
                         return False
                     nodes.append((node, x))
                 elif node.is_constant() and ismyiatype(node.type, JTagged):

@@ -7,7 +7,7 @@ from .abstract import GraphXInferrer
 from .abstract.base import GraphAndContext, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
     AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, REF, \
-    AbstractError, AbstractValue, TrackableFunction
+    AbstractError, AbstractValue, TrackableFunction, to_value
 from .dtype import Function, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
     GraphInferrer, PartialInferrer, Inferrer, Unspecializable, \
@@ -43,6 +43,20 @@ async def concretize_cache2(cache):
     for k, v in list(cache.items()):
         kc = await concretize_abstract(k)
         cache[kc] = v
+
+
+@to_value.variant
+def to_value_nofunc(self, x: AbstractFunction):
+    raise ValueError('Cannot build function')
+
+
+@overload
+def to_value_nofunc(self, x: AbstractScalar):
+    v = x.values[VALUE]
+    if v is ANYTHING:
+        raise ValueError('Cannot build ANYTHING')
+    else:
+        return v
 
 
 class TypeSpecializer:
@@ -413,6 +427,15 @@ class _GraphSpecializer:
     async def build2(self, ref, a: AbstractScalar):
         v = a.values[VALUE]
         if v is ANYTHING:
+            return None
+        else:
+            return _const2(v, a)
+
+    @build2.register
+    async def build2(self, ref, a: AbstractTuple):
+        try:
+            v = to_value_nofunc(a)
+        except ValueError:
             return None
         else:
             return _const2(v, a)

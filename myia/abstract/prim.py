@@ -781,7 +781,7 @@ async def _inf_broadcast_shape(track, xs: _shape_type, ys: _shape_type):
 async def _inf_invert_permutation(track, perm: _shape_type):
     v = [x.values[VALUE] for x in perm.elements]
     return AbstractTuple(
-        [perm.elements[v.index(i)] if i in v else AbstractScalar({
+        [perm.elements[i] if i in v else AbstractScalar({
              VALUE: ANYTHING,
              TYPE: dtype.UInt[64],
              SHAPE: dshape.NOSHAPE,

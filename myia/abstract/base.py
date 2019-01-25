@@ -507,6 +507,51 @@ def from_vref(self, v, t: dtype.TypeMeta, s):
     return self[t](v, t, s)
 
 
+############
+# Building #
+############
+
+
+@overload(bootstrap=True)
+def to_value(self, x: AbstractScalar, *args):
+    return x.values[VALUE]
+
+
+@overload
+def to_value(self, x: AbstractFunction, *args):
+    return x.values[VALUE]
+
+
+@overload
+def to_value(self, x: AbstractTuple, *args):
+    return tuple(self(y, *args) for y in x.elements)
+
+
+@overload
+def to_value(self, x: AbstractList, *args):
+    raise ValueError('Cannot build list.')
+
+
+@overload
+def to_value(self, x: AbstractArray, *args):
+    raise ValueError('Cannot build array.')
+
+
+@overload
+def to_value(self, x: AbstractClass, *args):
+    raise ValueError('Cannot build struct.')
+
+
+@overload
+def to_value(self, x: AbstractJTagged, *args):
+    raise ValueError('Cannot build jtagged.')
+
+
+@overload
+def to_value(self, x: AbstractType, *args):
+    raise ValueError('Cannot build type.')
+
+
 ###########
 # Cloning #
 ###########
@@ -1245,6 +1290,12 @@ class _GraphAndContext:
             (('graph', self.graph), ('context', self.context)),
             delimiter="↦",
         )
+
+
+@mixin(TrackableFunction)
+class _TrackableFunction:
+    def __hrepr__(self, H, hrepr):
+        return hrepr(self.fn)
 
 
 @mixin(PartialApplication)

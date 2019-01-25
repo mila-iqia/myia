@@ -407,12 +407,13 @@ class InferenceResource(PipelineResource):
                             and not dtype.ismyiatype(orig_t, dtype.Function):
                         node.type = orig_t
                 else:
-                    from ..abstract.base import AbstractScalar
+                    from ..abstract.base import AbstractFunction
                     orig_t = node.abstract
                     node.inferred = defaultdict(lambda: UNKNOWN)
                     if node.is_constant() \
-                            and isinstance(orig_t, AbstractScalar):
-                        node.abstract = orig_t
+                            and not isinstance(orig_t, AbstractFunction):
+                        if orig_t is not None:
+                            node.abstract = orig_t
         self.fill_in(argspec)
         return self.engine.run(
             graph,

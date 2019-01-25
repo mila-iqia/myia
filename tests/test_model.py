@@ -6,11 +6,13 @@ from myia.dtype import Array, Tuple, pytype_to_myiatype
 from myia.infer import InferenceError
 from myia.composite import grad
 from myia.pipeline import standard_pipeline
+from myia.pipeline.standard import new_pipeline
 from myia.prim.py_implementations import array_reduce, scalar_add
 from myia.prim.shape_inferrers import ClassShape, TupleShape
 
 from .test_compile import parse_compare
 from .test_grad import grad_test
+from .test_agrad import grad_test as agrad_test
 from .test_infer import infer_std
 from .test_ainfer import infer_std as infer_std2
 from .common import af32, af64, MA, MB, MC, MD
@@ -155,6 +157,13 @@ def test_backward_infer(model, x, y):
            pipeline=standard_pipeline,
            rel_error=1e-1)
 def test_backward_specialize(model, x, y):
+    return cost(model, x, y)
+
+
+@agrad_test((make_model(), MC(3, 6), MD(3, 8)),
+            pipeline=new_pipeline,
+            rel_error=1e-1)
+def test_backward_specialize2(model, x, y):
     return cost(model, x, y)
 
 
