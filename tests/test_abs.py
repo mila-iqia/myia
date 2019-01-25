@@ -9,23 +9,24 @@ from myia.abstract.base import (
     AbstractList as L, AbstractClass as C,
     shapeof,
     amerge,
-    Possibilities as _Poss
+    Possibilities as _Poss,
+    VALUE, TYPE, SHAPE
 )
 
 
 def S(v=ANYTHING, t=None, s=None):
     return _S({
-        'value': v,
-        'type': t or typeof(v),
-        'shape': s or (type_to_shape(t) if v is ANYTHING else shapeof(v))
+        VALUE: v,
+        TYPE: t or typeof(v),
+        SHAPE: s or (type_to_shape(t) if v is ANYTHING else shapeof(v))
     })
 
 
 def Poss(*things):
     return _S({
-        'value': _Poss(things),
-        'type': typeof(things[0]),
-        'shape': shapeof(things[0])
+        VALUE: _Poss(things),
+        TYPE: typeof(things[0]),
+        SHAPE: shapeof(things[0])
     })
 
 
