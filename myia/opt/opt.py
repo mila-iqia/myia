@@ -196,35 +196,20 @@ class LocalPassOptimizer:
         self.optimizer = optimizer
 
     def __call__(self, graph):
-        """Apply optimizations on given graphs in node order."""
+        """Apply optimizations on given graphs in node order.
+
+        This will visit the nodes from the output to the inputs in a
+        bfs manner while avoiding parts of the graph that are dropped
+        due to optimizations.
+        """
         if self.optimizer is not None:
             mng = self.optimizer.resources.manager
             mng.add_graph(graph)
         else:
             mng = manage(graph)
 
-        changes = False
-        again = True
-        while again:
-            topo, seen, chg = self.backwards(mng, graph)
-            again = self.forward(mng, topo)
-            changes |= (chg | again)
-
-        return changes
-
-    def backwards(self, mng, graph):
-        """Do a backwards pass over the graph.
-
-        This will visit the nodes from the output to the inputs in a
-        bfs manner while avoiding parts of the graph that are dropped
-        due to optimizations.
-
-        It returns a visitation order for a forward pass.
-
-        """
         seen = set([graph])
         todo = deque()
-        fwd = list()
         changes = False
         todo.appendleft(graph.output)
 
@@ -235,31 +220,25 @@ class LocalPassOptimizer:
             seen.add(n)
 
             new, chg = self.apply_opt(mng, n)
+
             changes |= chg
 
-            fwd.append(new)
+            if chg:
+                # If changes, re-do the parent node(s)
+                uses = mng.uses[new]
+                # TODO: grab all constants for a graph
+                seen.difference_update(uses)
+                todo.extend(uses)
+                continue
+
             if new.is_constant(Graph):
                 if new.value not in seen:
-                    todo.append(new.value.output)
+                    todo.appendleft(new.value.output)
                     seen.add(new.value)
             else:
                 todo.extendleft(new.inputs)
 
-        return fwd, seen, changes
-
-    def forward(self, mng, topo):
-        """Do a pass over the nodes.
-
-        This will visit nodes in the passed-in order, skipping those
-        that are no longer part of the manager.  It doesn't attempt to
-        visit new subgraphs.
-
-        """
-        change = False
-        for node in reversed(topo):
-            if node in mng.all_nodes:
-                change |= self.apply_opt(mng, node) is True
-        return change
+        return changes
 
     def apply_opt(self, mng, n):
         """Apply optimizations passes according to the node map."""
@@ -270,9 +249,8 @@ class LocalPassOptimizer:
             for transformer in self.node_map.get(n):
                 new = transformer(self.optimizer, n)
                 if new is True:
-                    loop = True
                     changes = True
-                    break
+                    continue
                 if new and new is not n:
                     new.expect_inferred.update(n.inferred)
                     mng.replace(n, new)
