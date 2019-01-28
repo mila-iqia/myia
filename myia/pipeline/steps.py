@@ -282,8 +282,6 @@ step_opt = Optimizer.partial(
             optlib.getitem_newenv,
             optlib.getitem_env_add,
             optlib.simplify_array_map,
-        ],
-        main2=[
             # Costlier optimizations
             optlib.float_tuple_getitem_through_switch,
             optlib.float_env_getitem_through_switch,
@@ -303,13 +301,12 @@ step_opt = Optimizer.partial(
     )
 )
 
+
 # Final optimization pass
 step_opt2 = Optimizer.partial(
     phases=dict(
-        unfuse=[
+        main=[
             optlib.unfuse_composite,
-        ],
-        main2=[
             optlib.getitem_tuple,
             optlib.setitem_tuple,
             optlib.setitem_tuple_ct,
