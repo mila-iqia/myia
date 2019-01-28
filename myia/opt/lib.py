@@ -406,7 +406,7 @@ simplify_switch_idem = psub(
 )
 
 
-_PutInSwitch = (
+_PutInSwitch_l = (
     P.scalar_add,
     P.scalar_sub,
     P.scalar_mul,
@@ -415,16 +415,16 @@ _PutInSwitch = (
     P.scalar_pow,
 )
 
+_PutInSwitch = primset_var(*_PutInSwitch_l)
 
 # Binary operations on switches with same conditions are transformed into
 # a switch on two operations, e.g.
 # switch(x, a, b) + switch(x, c, d) => switch(x, a + c, b + d)
 combine_switches = psub(
-    pattern=(primset_var(_PutInSwitch),
-             (P.switch, X1, X2, X3), (P.switch, X1, X4, X5)),
+    pattern=(_PutInSwitch, (P.switch, X1, X2, X3), (P.switch, X1, X4, X5)),
     replacement=(P.switch, X1, (_PutInSwitch, X2, X4), (_PutInSwitch, X3, X5)),
     name='combine_switches',
-    interest=_PutInSwitch
+    interest=_PutInSwitch_l
 )
 
 
