@@ -173,6 +173,7 @@ def erase_class2(root, manager):
     * make_record(cls, *args) => make_tuple(*args)
     """
     from ..abstract import AbstractClass
+    from ..utils import is_dataclass_type
 
     manager.add_graph(root)
 
@@ -205,6 +206,9 @@ def erase_class2(root, manager):
                     new_node = node.graph.apply(
                         P.partial, P.make_tuple, *args[1:]
                     )
+
+        elif node.is_constant() and is_dataclass_type(node.value):
+            new_node = Constant(P.make_tuple)
 
         if new_node is not None:
             new_node.abstract = node.abstract

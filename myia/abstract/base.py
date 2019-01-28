@@ -463,7 +463,7 @@ def from_vref(self, v, t: dtype.Array, s):
 def from_vref(self, v, t: dtype.List, s):
     vv = ANYTHING
     tt = t.element_type
-    ss = s.shape
+    ss = getattr(s, 'shape', dshape.NOSHAPE)
     return AbstractList(self(vv, tt, ss), {})
 
 
@@ -477,7 +477,8 @@ def from_vref(self, v, t: dtype.Class, s):
     attrs = {}
     for k, tt in t.attributes.items():
         vv = ANYTHING if v in (ANYTHING, UNKNOWN) else getattr(v, k)
-        ss = ANYTHING if s in (ANYTHING, UNKNOWN) else s.shape[k]
+        ss = (ANYTHING if s in (ANYTHING, UNKNOWN, dshape.NOSHAPE)
+              else s.shape[k])
         attrs[k] = self(vv, tt, ss)
     return AbstractClass(
         t.tag,

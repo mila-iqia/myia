@@ -370,7 +370,7 @@ class InferenceResource(PipelineResource):
         for arg in argspec:
             if '_erase_value' in arg:
                 erase = arg['_erase_value']
-                del arg['_erase_value']
+                # del arg['_erase_value']
             else:
                 erase = self.erase_value
             if 'value' in arg:
@@ -388,11 +388,16 @@ class InferenceResource(PipelineResource):
                         arg[track_name] = track.from_external(arg[track_name])
                     else:
                         arg[track_name] = track.default(arg)
-        if self.erase_value:
-            from ..abstract.base import broaden
-            for arg in argspec:
-                if 'abstract' in arg:
-                    arg['abstract'] = broaden(arg['abstract'], None)
+
+        from ..abstract.base import broaden
+        for arg in argspec:
+            if '_erase_value' in arg:
+                erase = arg['_erase_value']
+                del arg['_erase_value']
+            else:
+                erase = self.erase_value
+            if erase and 'abstract' in arg:
+                arg['abstract'] = broaden(arg['abstract'], None)
 
     def infer(self, graph, argspec, outspec=None, clear=False):
         """Perform inference."""

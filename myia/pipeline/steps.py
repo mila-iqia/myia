@@ -16,7 +16,7 @@ from ..opt.clean import erase_class2, erase_tuple2
 from ..prim import vm_implementations
 from ..utils import overload, flatten, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
-    validate_type as default_validate_type
+    validate_abstract as default_validate_abstract
 from ..vm import VM
 
 from .pipeline import pipeline_function, PipelineStep
@@ -395,11 +395,11 @@ class Validator(PipelineStep):
     def __init__(self,
                  pipeline_init,
                  whitelist=default_whitelist,
-                 validate_type=default_validate_type):
+                 validate_abstract=default_validate_abstract):
         """Initialize a Validator."""
         super().__init__(pipeline_init)
         self.whitelist = whitelist
-        self.validate_type = validate_type
+        self.validate_abstract = validate_abstract
 
     def step(self, graph, argspec=None, outspec=None):
         """Validate the graph."""
@@ -408,7 +408,7 @@ class Validator(PipelineStep):
         )
         validate(graph,
                  whitelist=self.whitelist,
-                 validate_type=self.validate_type)
+                 validate_abstract=self.validate_abstract)
         return {'graph': graph}
 
 

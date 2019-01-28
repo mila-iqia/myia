@@ -37,6 +37,11 @@ def validate_abstract(self, a: AbstractType):
             raise ValidationError(f'Illegal type in the graph: {a}')
 
 
+@overload
+def validate_abstract(self, a: type(None)):
+    raise ValidationError(f'Illegal type in the graph: {a}')
+
+
 @type_cloner.variant
 def validate_type(self, t: (Class, Problem, External, JTagged, object)):
     """Validate the type before we get to the VM.
@@ -177,11 +182,12 @@ class Validator:
     primitive must belong to the whitelist.
     """
 
-    def __init__(self, root, whitelist, validate_type=validate_type):
+    def __init__(self, root, whitelist, _validate_abstract=validate_abstract):
         """Initialize and run the Validator."""
+        # assert _validate_abstract is validate_abstract
         self.errors = ErrorPool(exc_class=ValidationError)
         self.whitelist = frozenset(whitelist)
-        self._validate_type_fn = validate_type
+        self._validate_abstract_fn = _validate_abstract
         self._run(root)
 
     def _test(self, node, fn):
@@ -191,41 +197,40 @@ class Validator:
             err.node = node
             self.errors.add(err)
 
-    def _validate_type(self, node):
-        return self._validate_type_fn(node.type)
+    # def _validate_type(self, node):
+    #     return self._validate_type_fn(node.type)
 
     def _validate_oper(self, node):
         if node.is_constant(Primitive):
             if node.value not in self.whitelist:
                 raise ValidationError(f'Illegal primitive: {node.value}')
 
-    def _validate_consistency(self, node):
-        if node.is_apply():
-            expected = Function[[i.type for i in node.inputs[1:]], node.type]
-            actual = node.inputs[0].type
-            if actual != expected:
-                raise ValidationError(
-                    f'Function/argument inconsistency: Expected {expected}, '
-                    f'Got {actual}.'
-                )
+    # def _validate_consistency(self, node):
+    #     if node.is_apply():
+    #         expected = Function[[i.type for i in node.inputs[1:]], node.type]
+    #         actual = node.inputs[0].type
+    #         if actual != expected:
+    #             raise ValidationError(
+    #                 f'Function/argument inconsistency: Expected {expected}, '
+    #                 f'Got {actual}.'
+    #             )
 
-    def _validate_shape(self, node):
-        return _validate_shape(node.type, node.inferred['shape'])
+    # def _validate_shape(self, node):
+    #     return _validate_shape(node.type, node.inferred['shape'])
 
     def _validate_abstract(self, node):
-        return validate_abstract(node.inferred['abstract'])
+        return self._validate_abstract_fn(node.abstract)
 
     def _run(self, root):
         manager = manage(root)
         for node in list(manager.all_nodes):
-            if self._validate_type_fn is None:
-                self._test(node, self._validate_abstract)
-                self._test(node, self._validate_oper)
-            else:
-                self._test(node, self._validate_type)
-                self._test(node, self._validate_shape)
-                self._test(node, self._validate_oper)
-                self._test(node, self._validate_consistency)
+            self._test(node, self._validate_abstract)
+            self._test(node, self._validate_oper)
+            # else:
+            #     self._test(node, self._validate_type)
+            #     self._test(node, self._validate_shape)
+            #     self._test(node, self._validate_oper)
+            #     self._test(node, self._validate_consistency)
 
         def stringify(err):
             return f'* {err.node} -- {err.args[0]}'
@@ -233,11 +238,11 @@ class Validator:
         self.errors.trigger(stringify=stringify)
 
 
-def validate(root, whitelist=whitelist, validate_type=validate_type):
+def validate(root, whitelist=whitelist, validate_abstract=validate_abstract):
     """Verify that g is properly type-specialized.
 
     Every node of each graph must have a concrete type in its type attribute,
     every application must be compatible with its argument types, and every
     primitive must belong to the whitelist.
     """
-    Validator(root, whitelist, validate_type)
+    Validator(root, whitelist, validate_abstract)

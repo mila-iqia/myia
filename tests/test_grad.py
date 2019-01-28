@@ -5,6 +5,7 @@ import numpy as np
 from types import FunctionType
 from dataclasses import dataclass
 
+from myia.abstract.base import AbstractJTagged
 from myia.pipeline import standard_resources, standard_pipeline
 from myia.pipeline.standard import new_resources, new_pipeline
 from myia.composite import grad
@@ -18,7 +19,7 @@ from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
     array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
     distribute, dot, reshape, transpose, scalar_cast
 from myia.prim.py_implementations import py_implementations as pyi
-from myia.validate import whitelist, validate_type
+from myia.validate import whitelist, validate_type, validate_abstract
 
 from .common import f64, u64, MA, MB
 
@@ -40,9 +41,14 @@ def grad_validate_type(self, t: JTagged):
     pass
 
 
+@validate_abstract.variant
+def grad_validate_abstract(self, t: AbstractJTagged):
+    pass
+
+
 step_grad_validate = Validator.partial(
     whitelist=grad_whitelist,
-    validate_type=grad_validate_type
+    validate_abstract=grad_validate_abstract
 )
 
 
@@ -67,7 +73,7 @@ grad_pipeline = PipelineDefinition(
         infer=steps.step_infer,
         specialize=steps.step_specialize,
         opt=steps.step_debug_opt,
-        # validate=step_grad_validate,
+        validate=step_grad_validate,
         export=steps.step_debug_export,
     )
 ).configure(
