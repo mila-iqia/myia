@@ -211,10 +211,10 @@ class LocalPassOptimizer:
         seen = set([graph])
         todo = deque()
         changes = False
-        todo.appendleft(graph.output)
+        todo.append(graph.output)
 
         while len(todo) > 0:
-            n = todo.pop()
+            n = todo.popleft()
             if n in seen or n not in mng.all_nodes:
                 continue
             seen.add(n)
@@ -223,20 +223,19 @@ class LocalPassOptimizer:
 
             changes |= chg
 
-            if chg:
-                # If changes, re-do the parent node(s)
-                uses = mng.uses[new]
-                # TODO: grab all constants for a graph
-                seen.difference_update(uses)
-                todo.extend(uses)
-                continue
-
             if new.is_constant(Graph):
                 if new.value not in seen:
                     todo.appendleft(new.value.output)
                     seen.add(new.value)
             else:
-                todo.extendleft(new.inputs)
+                todo.extendleft(reversed(new.inputs))
+
+            if chg:
+                # If changes, re-do the parent node(s)
+                uses = set(u[0] for u in mng.uses[new])
+                # TODO: grab all constants for a graph
+                seen.difference_update(uses)
+                todo.extendleft(uses)
 
         return changes
 
