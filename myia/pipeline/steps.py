@@ -61,6 +61,9 @@ class Optimizer(PipelineStep):
             self.names.append(name)
             self.phases.append(spec)
 
+        if len(self.phases) == 1:
+            self.run_only_once = True
+
     def step(self, graph, argspec=None, outspec=None, profile=no_prof):
         """Optimize the graph using the given patterns."""
         with profile:
