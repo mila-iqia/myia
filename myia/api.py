@@ -31,7 +31,7 @@ class MyiaFunction:
         self.fn = fn
         self.specialize_values = set(specialize_values)
         self._cache = {}
-        self.pip = standard_pipeline.make()
+        # self.pip = standard_pipeline.make()
 
     def specialize(self, args):
         """Specialize on the types of the given arguments.
@@ -39,6 +39,7 @@ class MyiaFunction:
         Returns a Pipeline. If the argument types were seen before, returns a
         cached version.
         """
+        self.pip = standard_pipeline.make()
         inf = self.pip.resources.inferrer
 
         argnames = inspect.getfullargspec(self.fn).args
