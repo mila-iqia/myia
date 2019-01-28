@@ -135,13 +135,14 @@ class PatternSubstitutionOptimization:
             return None
 
 
-def pattern_replacer(*pattern):
+def pattern_replacer(*pattern, interest=False):
     """Create a PatternSubstitutionOptimization using this function."""
     if len(pattern) == 2 and pattern[0] == 'just':
         pattern = pattern[1]
 
     def deco(f):
-        return PatternSubstitutionOptimization(pattern, f, name=f.__name__)
+        return PatternSubstitutionOptimization(pattern, f, name=f.__name__,
+                                               interest=interest)
     return deco
 
 
@@ -172,7 +173,8 @@ class NodeMap:
             if not isinstance(ints, tuple):
                 ints = (ints,)
             for interest in ints:
-                assert isinstance(interest, Primitive)
+                assert (isinstance(interest, Primitive) or
+                        (interest in (Graph, Apply)))
                 self._d.setdefault(interest, []).append(opt)
 
         # There could be the option to return do_register also.
@@ -182,8 +184,13 @@ class NodeMap:
         """Get a list of optimizers that could apply for a node."""
         res = []
         res.extend(self._d.get(None, []))
-        if node.is_apply() and node.inputs[0].is_constant():
-            res.extend(self._d.get(node.inputs[0].value, []))
+        if node.is_apply():
+            if node.inputs[0].is_constant():
+                res.extend(self._d.get(node.inputs[0].value, []))
+            if node.inputs[0].is_constant_graph():
+                res.extend(self._d.get(Graph, []))
+            if node.inputs[0].is_apply():
+                res.extend(self._d.get(Apply, []))
         return res
 
 

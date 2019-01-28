@@ -79,8 +79,8 @@ class Optimizer(PipelineStep):
                                 )
                             elif opt(graph):
                                 changes = True
-                        if self.run_only_once:
-                            break
+                    if self.run_only_once:
+                        break
             with profile.step('keep_roots'):
                 self.resources.manager.keep_roots(graph)
             res = {'graph': graph}
