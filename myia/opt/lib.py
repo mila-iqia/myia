@@ -406,7 +406,6 @@ simplify_switch_idem = psub(
 )
 
 
-
 _PutInSwitch = (
     P.scalar_add,
     P.scalar_sub,
@@ -552,7 +551,7 @@ inline_inside_marked_caller = \
 inline = make_inliner(inline_criterion=None, check_recursive=True)
 
 
-@pattern_replacer('just', G, interest=Graph)
+@pattern_replacer('just', G, interest=None)
 def replace_applicator(optimizer, node, equiv):
     """Replace a function that applies another by the other function.
 

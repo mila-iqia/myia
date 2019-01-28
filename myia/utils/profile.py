@@ -39,6 +39,7 @@ def print_profile(prof, *, indent=0, sums=None):
         for k, v in sums.items():
             print(f"  {k:20}: {_unit(v):10}: {(v/total)*100:5.2f}%")
 
+
 class Profile:
     """Class to collect a hierachical profile of activities.
 
