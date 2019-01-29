@@ -3,7 +3,7 @@ from functools import reduce
 
 from .. import dtype, dshape
 from ..infer import Track, MyiaTypeError, Context
-from ..infer.core import Pending
+from ..infer.core import Pending, reify
 from ..infer.graph_infer import type_error_nargs, VirtualReference
 from ..infer.utils import infer_trace
 from ..ir import Graph, MetaGraph, GraphGenerationError
@@ -14,7 +14,7 @@ from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
 
 from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
-    reify, JTransformedFunction, AbstractJTagged, AbstractTuple, \
+    JTransformedFunction, AbstractJTagged, AbstractTuple, \
     sensitivity_transform, VirtualFunction, AbstractFunction, \
     VALUE, TYPE, SHAPE, REF, DummyFunction, TrackableFunction, TypedPrimitive
 
@@ -96,15 +96,6 @@ class AbstractTrack(Track):
             self.constructors[mg] = MetaGraphXInferrer(mg)
         return self.constructors[mg]
 
-    # @get_inferrer_for.register
-    # def get_inferrer_for(self, mg: MetaGraph):
-    #     try:
-    #         g = mg.specialize_from_abstract(args)
-    #     except GraphGenerationError as err:
-    #         raise MyiaTypeError(f'Graph gen error: {err}')
-    #     g = self.engine.pipeline.resources.convert(g)
-    #     return self.get_inferrer_for(g)
-
     async def execute(self, fn, *args):
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]
@@ -145,9 +136,6 @@ class AbstractTrack(Track):
             res.values[TYPE] = self.engine.loop.create_pending_from_list(
                 _number_types, t, lambda: prio
             )
-            # v = RestrictedVar(_number_types)
-            # prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
-            # res.values[TYPE] = self.engine.loop.create_var(v, t, prio)
         res.values[REF].setdefault(ctref.context, ctref.node)
         return res
 
@@ -168,11 +156,6 @@ class AbstractTrack(Track):
                 v = TrackableFunction(v, id=ref.node)
             return AbstractFunction(v)
         elif is_dataclass_type(v):
-            # rec = self.constructors[P.make_record]()
-            # typ = dtype.pytype_to_myiatype(v)
-            # vref = self.engine.vref({VALUE: typ, TYPE: TypeType})
-            # return PartialInferrer(self, rec, [vref])
-
             typ = dtype.pytype_to_myiatype(v)
             typarg = AbstractScalar({
                 VALUE: typ,
@@ -200,70 +183,6 @@ class AbstractTrack(Track):
             values.get('shape', NOSHAPE),
         )
 
-    # def abstract_merge(self, *values):
-    #     resolved = []
-    #     pending = set()
-    #     committed = None
-    #     for v in values:
-    #         if isinstance(v, Pending):
-    #             if v.resolved():
-    #                 resolved.append(v.result())
-    #             else:
-    #                 pending.add(v)
-    #         else:
-    #             resolved.append(v)
-
-    #     if pending:
-    #         def resolve(fut):
-    #             pending.remove(fut)
-    #             result = fut.result()
-    #             resolved.append(result)
-    #             if not pending:
-    #                 v = self.force_merge(resolved, model=committed)
-    #                 rval.resolve_to(v)
-
-    #         for p in pending:
-    #             p.add_done_callback(resolve)
-
-    #         def premature_resolve():
-    #             nonlocal committed
-    #             committed = self.force_merge(resolved)
-    #             resolved.clear()
-    #             return committed
-
-    #         rval = self.engine.loop.create_pending(
-    #             resolve=premature_resolve,
-    #             priority=-1,
-    #         )
-    #         rval.equiv.update(values)
-    #         for p in pending:
-    #             p.tie(rval)
-    #         return rval
-    #     else:
-    #         return self.force_merge(resolved)
-
-    # def force_merge(self, values, model=None):
-    #     if model is None:
-    #         return reduce(self.merge, values)
-    #     else:
-    #         return reduce(self.accept, values)
-
-    # def merge(self, x, y):
-    #     if isinstance(x, AbstractBase):
-    #         return x.merge(y)
-    #     else:
-    #         if x != y:
-    #             raise MyiaTypeError(f'Cannot merge {x} and {y} (1)')
-    #         return x
-
-    # def accept(self, x, y):
-    #     if isinstance(x, AbstractBase):
-    #         return x.accept(y)
-    #     else:
-    #         if x != y:
-    #             raise MyiaTypeError(f'Cannot merge {x} and {y} (2)')
-    #         return x
-
     def abstract_merge(self, *values):
         return reduce(self._merge, values)
 
@@ -290,8 +209,6 @@ class AbstractTrack(Track):
     def chk(self, predicate, *values):
         for value in values:
             if isinstance(value, Pending):
-                # if dtype.ismyiatype(predicate):
-                #     value.equiv.add(predicate)
                 value.add_done_callback(
                     lambda fut: self.assert_predicate(
                         predicate, fut.result()

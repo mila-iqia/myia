@@ -12,7 +12,7 @@ from ..prim import Primitive
 from ..debug.utils import mixin
 from ..infer import ANYTHING, InferenceError, MyiaTypeError, \
     Reference, Context
-from ..infer.core import Pending, Later, is_simple, PendingTentative
+from ..infer.core import Pending, is_simple, PendingTentative
 from ..utils import overload, UNKNOWN, Named
 
 
@@ -127,44 +127,9 @@ class AbstractValue(AbstractBase):
     def broaden(self):
         return self
 
-    def merge(self, other):
-        if type(self) is not type(other):
-            raise MyiaTypeError(f'Expected {type(self).__name__}')
-        rval = self.merge_structure(other)
-        for track in [TYPE, VALUE, SHAPE]:
-            v1 = self.values.get(track, ABSENT)
-            v2 = other.values.get(track, ABSENT)
-            method = getattr(self, f'merge_{track}')
-            rval.values[track] = method(v1, v2)
-        return rval
-
-    def merge_value(self, v1, v2):
-        if v1 == v2:
-            return v1
-        elif isinstance(v1, Possibilities):
-            return Possibilities(v1 | v2)
-        else:
-            return ANYTHING
-
-    def merge_type(self, v1, v2):
-        if v1 != v2:
-            raise MyiaTypeError(f'Cannot merge {v1} and {v2} (3)')
-        return v1
-
-    def merge_shape(self, v1, v2):
-        if v1 != v2:
-            raise MyiaTypeError(f'Cannot merge {v1} and {v2} (shp)')
-        return v1
-
-    def accept(self, other):
-        raise NotImplementedError()
-
     def make_key(self):
         return tuple(sorted((k, v) for k, v in self.values.items()
                             if k.eq_relevant()))
-
-    def _resolve(self, key, value):
-        self.values[key] = value
 
     def __repr__(self):
         contents = [f'{k}={v}' for k, v in self.values.items()
@@ -173,10 +138,6 @@ class AbstractValue(AbstractBase):
 
 
 class AbstractScalar(AbstractValue):
-
-    def merge_structure(self, other):
-        return AbstractScalar({})
-
     def __repr__(self):
         contents = [f'{k}={v}' for k, v in self.values.items()
                     if k is not REF]
@@ -184,10 +145,6 @@ class AbstractScalar(AbstractValue):
 
 
 class AbstractType(AbstractValue):
-
-    def merge_structure(self, other):
-        return AbstractType({TYPE: dtype.TypeType})
-
     def __repr__(self):
         return f'Ty({self.values[VALUE]})'
 
@@ -199,9 +156,6 @@ class AbstractError(AbstractValue):
             TYPE: dtype.Problem[err],
             SHAPE: dshape.NOSHAPE,
         })
-
-    def merge_structure(self, other):
-        return AbstractError(self.values[VALUE])
 
     def __repr__(self):
         return f'E({self.values[VALUE]})'
@@ -220,9 +174,6 @@ class AbstractFunction(AbstractValue):
         v = self.values[VALUE]
         return (await v if isinstance(v, Pending) else v)
 
-    def merge_structure(self, other):
-        return AbstractFunction(value=self.values[VALUE])
-
     def __repr__(self):
         return f'Fn({self.values[VALUE]})'
 
@@ -231,12 +182,6 @@ class AbstractTuple(AbstractValue):
     def __init__(self, elements, values=None):
         super().__init__(values or {})
         self.elements = tuple(elements)
-
-    def merge_structure(self, other):
-        assert len(self.elements) == len(other.elements)
-        return AbstractTuple(
-            [x.merge(y) for x, y in zip(self.elements, other.elements)]
-        )
 
     def _build_value(self):
         return tuple(e.build(VALUE) for e in self.elements)
@@ -259,9 +204,6 @@ class AbstractArray(AbstractValue):
     def __init__(self, element, values):
         super().__init__(values)
         self.element = element
-
-    def merge_structure(self, other):
-        return AbstractArray(self.element.merge(other.element))
 
     def _build_type(self):
         return dtype.Array[self.element.build(TYPE)]
@@ -935,8 +877,6 @@ def bind(loop, committed, resolved, pending):
 
     def premature_resolve():
         nonlocal committed
-        if not resolved and committed is None:
-            raise Later()
         committed = amergeall()
         committed = broaden(committed, loop)
         resolved.clear()
@@ -981,49 +921,6 @@ def bind(loop, committed, resolved, pending):
         return rval
 
 
-    # def abstract_merge(self, *values):
-    #     resolved = []
-    #     pending = set()
-    #     committed = None
-    #     for v in values:
-    #         if isinstance(v, Pending):
-    #             if v.resolved():
-    #                 resolved.append(v.result())
-    #             else:
-    #                 pending.add(v)
-    #         else:
-    #             resolved.append(v)
-
-    #     if pending:
-    #         def resolve(fut):
-    #             pending.remove(fut)
-    #             result = fut.result()
-    #             resolved.append(result)
-    #             if not pending:
-    #                 v = self.force_merge(resolved, model=committed)
-    #                 rval.resolve_to(v)
-
-    #         for p in pending:
-    #             p.add_done_callback(resolve)
-
-    #         def premature_resolve():
-    #             nonlocal committed
-    #             committed = self.force_merge(resolved)
-    #             resolved.clear()
-    #             return committed
-
-    #         rval = self.engine.loop.create_pending(
-    #             resolve=premature_resolve,
-    #             priority=-1,
-    #         )
-    #         rval.equiv.update(values)
-    #         for p in pending:
-    #             p.tie(rval)
-    #         return rval
-    #     else:
-    #         return self.force_merge(resolved)
-
-
 ###########
 # Broaden #
 ###########
@@ -1040,71 +937,6 @@ def abroaden(x: object, count):
 @overload
 def abroaden(x: dict, count):
     pass
-
-
-###########
-# Cleanup #
-###########
-
-
-@overload(bootstrap=True)
-async def reify(self, p: Pending):
-    return await p
-
-
-@overload
-async def reify(self, p: object):
-    return p
-
-
-# @overload(bootstrap=True)
-# def reify_sync(self, p: Pending):
-#     return p.result()
-
-
-# @overload
-# def reify_sync(self, d: dict):
-#     rval = {}
-#     changes = False
-#     for k, v in d.items():
-#         v2 = self(v)
-#         if v2 is not v:
-#             changes = True
-#         rval[k] = v2
-#     return rval if changes else d
-
-
-# @overload
-# def reify_sync(self, tup: tuple):
-#     rval = []
-#     changes = False
-#     for x in tup:
-#         x2 = self(x)
-#         if x2 is not x:
-#             changes = True
-#         rval.append(x2)
-#     return rval if changes else tup
-
-
-# @overload
-# def reify_sync(self, v: AbstractValue):
-#     d2 = reify_sync(v.values)
-#     if d2 is v.values:
-#         return v
-#     return AbstractValue(d2)
-
-
-# @overload
-# def reify_sync(self, v: AbstractValue):
-#     d2 = reify_sync(v.values)
-#     if d2 is v.values:
-#         return v
-#     return AbstractValue(d2)
-
-
-# @overload
-# def reify_sync(self, v: object):
-#     return v
 
 
 ###########

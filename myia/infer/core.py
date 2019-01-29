@@ -11,10 +11,6 @@ from ..utils import Unification, Var, RestrictedVar, eprint, overload, \
 from .utils import InferenceError, MyiaTypeError
 
 
-class Later(Exception):
-    pass
-
-
 class MyiaTypeMismatchError(MyiaTypeError):
     """Error where two values should have the same type, but don't."""
 
