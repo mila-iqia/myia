@@ -6,10 +6,10 @@ from collections import defaultdict
 from types import FunctionType
 
 from .. import dtype, operations, parser, composite as C
+from ..abstract.base import AbstractFunction
 from ..infer import InferenceEngine, ANYTHING
 from ..ir import Graph, clone
 from ..prim import ops as P
-from ..specialize import TypeSpecializer
 from ..utils import overload, TypeMap, UNKNOWN
 
 from .pipeline import PipelineResource
@@ -404,21 +404,12 @@ class InferenceResource(PipelineResource):
         if clear:
             self.engine.cache.clear()
             for node in self.manager.all_nodes:
-                if self.resources.inferrer.version == 1:
-                    orig_t = node.type
-                    node.inferred = defaultdict(lambda: UNKNOWN)
-                    if node.is_constant() \
-                            and dtype.ismyiatype(orig_t) \
-                            and not dtype.ismyiatype(orig_t, dtype.Function):
-                        node.type = orig_t
-                else:
-                    from ..abstract.base import AbstractFunction
-                    orig_t = node.abstract
-                    node.inferred = defaultdict(lambda: UNKNOWN)
-                    if node.is_constant() \
-                            and not isinstance(orig_t, AbstractFunction):
-                        if orig_t is not None:
-                            node.abstract = orig_t
+                orig_t = node.abstract
+                node.inferred = defaultdict(lambda: UNKNOWN)
+                if node.is_constant() \
+                        and not isinstance(orig_t, AbstractFunction):
+                    if orig_t is not None:
+                        node.abstract = orig_t
         self.fill_in(argspec)
         return self.engine.run(
             graph,

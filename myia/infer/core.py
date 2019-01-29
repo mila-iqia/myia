@@ -8,7 +8,7 @@ from ..dtype import Function, type_cloner_async, ismyiatype
 from ..utils import Unification, Var, RestrictedVar, eprint, overload, \
     Overload
 
-from .utils import InferenceError, DynamicMap, MyiaTypeError, ValueWrapper
+from .utils import InferenceError, MyiaTypeError
 
 
 class Later(Exception):
@@ -169,25 +169,6 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         """Create a task from the given coroutine."""
         return InferenceTask(coro, loop=self)
 
-    def create_future(self):
-        """Create a Future using this loop."""
-        return asyncio.Future(loop=self)
-
-    def as_future(self, value):
-        """Create a future that resolves to the given value."""
-        if hasattr(value, '__await__'):
-            return value
-        else:
-            fut = self.create_future()
-            fut.set_result(value)
-            return fut
-
-    def create_var(self, var, default, priority=0):
-        """Create an InferenceVar running on this loop."""
-        v = InferenceVar(var, default, priority, loop=self)
-        self._vars.append(v)
-        return v
-
     def create_pending(self, resolve, priority, parents=()):
         pending = Pending(resolve=resolve, priority=priority, loop=self)
         self._vars.append(pending)
@@ -245,110 +226,6 @@ class EvaluationCache:
         self.cache.clear()
 
 
-class EquivalenceChecker:
-    """Handle equivalence between values."""
-
-    def __init__(self, loop, error_callback):
-        """Initialize the EquivalenceChecker."""
-        self.loop = loop
-        self.error_callback = error_callback
-
-    def _make_eq(self, refs):
-        def eq(x, y):
-            """Equality check for x and y."""
-            if isinstance(x, DynamicMap) and isinstance(y, DynamicMap):
-                if x.provably_equivalent(y):
-                    x.merge(y)
-                    return True
-
-                self._tie_dmaps(x, y, refs)
-                self._tie_dmaps(y, x, refs)
-                # We return True now, but if x and y are not equal, there
-                # will be an error later.
-                return True
-            else:
-                return x == y
-
-        return eq
-
-    def declare_equivalent(self, x, y, refs, error_callback=None):
-        """Declare that x and y should be equivalent.
-
-        If an error occurs, the refs argument is to be packaged with it.
-        """
-        coro = self._process_equivalence(x, y, refs, error_callback)
-        self.loop.schedule(coro)
-
-    def _tie_dmaps(self, src, dest, refs, hist=True):
-        def evt(_, argrefs, res_src):
-            async def acb(err):
-                # TODO: this should fetch the appropriate track, not
-                # necessarily 'type'
-                argt = [await ref['type'] for ref in argrefs]
-                t1 = Function[argt, err.type1]
-                t2 = Function[argt, err.type2]
-                err = MyiaFunctionMismatchError(t1, t2, refs=err.refs)
-                self.error_callback(err)
-
-            def cb(err):
-                self.loop.schedule(acb(err))
-
-            res_dest = dest(*argrefs)
-            self.declare_equivalent(res_src, res_dest, refs, cb)
-        src.on_result.register(evt, run_history=hist)
-
-    async def _process_equivalence(self, x, y, refs, error_callback=None):
-        if error_callback is None:
-            error_callback = self.error_callback
-
-        if hasattr(x, '__await__') and not isinstance(x, InferenceVar):
-            x = await x
-        if hasattr(y, '__await__') and not isinstance(y, InferenceVar):
-            y = await y
-
-        if not self.merge(x, y, refs):
-            error_callback(MyiaTypeMismatchError(x, y, refs=refs))
-
-    def merge(self, x, y, refs=[]):
-        """Merge the two values/variables x and y."""
-        unif = Unification(eq=self._make_eq(refs))
-        res = unif.unify(x, y, self.loop.equiv)
-        if res is None:
-            return False
-        for var, value in res.items():
-            # TODO: Only loop on unprocessed variables
-            iv = var._infvar
-            if isinstance(value, Var) and not hasattr(value, '_infvar'):
-                # Unification may create additional variables
-                self.loop.create_var(value, iv.default, iv.priority)
-            if not iv.done():
-                # NOTE: This updates self.loop.equiv
-                iv.set_result(value)
-        return True
-
-    async def assert_same(self, *things, refs=[]):
-        """Assert that all futures/values have the same value."""
-        futs = [self.loop.as_future(x) for x in things]
-
-        # We wait only for the first future to complete
-        done, pending = await asyncio.wait(
-            futs,
-            loop=self.loop,
-            return_when=asyncio.FIRST_COMPLETED
-        )
-
-        # We must now tell equiv that all remaining futures must return the
-        # same thing as the first one. This will essentially schedule a
-        # bunch of tasks to wait for the remaining futures and verify that
-        # they match. See EquivalenceChecker.
-        main = done.pop()
-        for fut in done | pending:
-            self.declare_equivalent(fut, main, refs)
-
-        # Otherwise just return one of them
-        return main.result()
-
-
 def is_simple(x):
     from ..abstract.base import AbstractScalar, TYPE
     if isinstance(x, Pending):
@@ -364,8 +241,6 @@ def is_simple(x):
 class Pending(asyncio.Future):
     def __init__(self, resolve, priority, loop):
         super().__init__(loop=loop)
-        if not callable(priority):
-            priority = lambda p=priority: p
         self.priority = priority
         if resolve is not None:
             self._resolve = resolve
@@ -460,96 +335,7 @@ class PendingTentative(Pending):
         )
 
 
-class InferenceVar(Pending):
-    """Hold a Var that stands in for an inference result.
-
-    This is a Future which can be awaited. Await on the `reify` function to
-    get the concrete inference value for this InferenceVar.
-
-    Arguments:
-        var: A Var instance that can be unified with other Vars and values.
-        default: The concrete value this InferenceVar will resolve to if
-            the unification process fails to force a value.
-        priority: When multiple InferenceVars have to be forced to their
-            default values, those with higher priority are processed first.
-        loop: The InferenceLoop this InferenceVar is attached to.
-    """
-
-    def __init__(self, var, default, priority, loop):
-        """Initialize an InferenceVar."""
-        super().__init__(None, priority, loop=loop)
-        self.loop = loop
-        self.var = var
-        self.default = default
-        self.__var__ = var
-        var._infvar = self
-
-    def force_resolve(self):
-        """Resolve to the default value."""
-        default = self.default
-        if default is None:
-            if self.done():
-                self.result()._infvar.force_resolve()
-                return
-            elif isinstance(self.var, RestrictedVar) \
-                    and len(self.var.legal_values) == 1:
-                for val in self.var.legal_values:
-                    self.set_result(val)
-                    return
-            raise InferenceError('Could not resolve a variable type.', refs=[])
-        else:
-            if self.done():
-                self.result()._infvar.resolve_to(default)
-            else:
-                self.set_result(default)
-
-    def resolve_to(self, value):
-        """Resolve to the provided value."""
-        if self.done():
-            # This used to happen, not sure how to trigger now.
-            self.result()._infvar.resolve_to(value)  # pragma: no cover
-        else:
-            self.set_result(value)
-
-    def resolved(self):
-        """Whether this was resolved to a concrete value."""
-        if not self.done():
-            return False
-        else:
-            res = self.result()
-            if isinstance(res, Var):
-                return res._infvar.resolved()
-            else:
-                return True
-
-    def set_result(self, result):
-        """Set the result of this InferenceVar.
-
-        This updates the mapping in the loop's equivalence table.
-        """
-        self.loop.equiv[self.var] = result
-        super().set_result(result)
-
-
-async def find_coherent_result(infv, fn):
-    """Try to apply fn on infv, resolving it only if needed.
-
-    fn will be tried on every possible value infv can take, and if
-    all results are the same, that result is returned. Otherwise,
-    we await on infv to resolve it and we apply fn on that value.
-    """
-    v = infv.var
-    if isinstance(v, RestrictedVar):
-        results = set()
-        for option in v.legal_values:
-            results.add(await fn(option))
-        if len(results) == 1:
-            return results.pop()
-    x = await infv
-    return await fn(x)
-
-
-async def find_coherent_result_2(v, fn):
+async def find_coherent_result(v, fn):
     if isinstance(v, PendingFromList):
         results = set()
         for option in v.possibilities:
@@ -560,34 +346,8 @@ async def find_coherent_result_2(v, fn):
     return await fn(x)
 
 
-@overload(bootstrap=True)
-async def reify_shallow(self, x: ValueWrapper):
-    """Build a concrete value from v.
-
-    Unlike reify which is deep, the outermost InferenceVar will be
-    awaited on.
-    """
-    return await self(x.value)
-
-
-@overload  # noqa: F811
-async def reify_shallow(self, v: Var):
-    return await self(v._infvar)
-
-
-@overload  # noqa: F811
-async def reify_shallow(self, v: Pending):
-    return await self(await v)
-
-
-# @overload  # noqa: F811
-# async def reify_shallow(self, v: InferenceVar):
-#     return await self(await v)
-
-
-@overload  # noqa: F811
-async def reify_shallow(self, v: object):
-    return v
-
-
-reify = Overload(mixins=[type_cloner_async, reify_shallow]).bootstrap()
+async def reify(v):
+    if isinstance(v, Pending):
+        return await v
+    else:
+        return v

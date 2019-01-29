@@ -42,67 +42,6 @@ def validate_abstract(self, a: type(None)):
     raise ValidationError(f'Illegal type in the graph: {a}')
 
 
-@type_cloner.variant
-def validate_type(self, t: (Class, Problem, External, JTagged, object)):
-    """Validate the type before we get to the VM.
-
-    By default, we disallow Class, Problem, External and JTagged.
-    """
-    raise ValidationError(f'Illegal type in the graph: {t}')
-
-
-@overload  # noqa: F811
-def validate_type(self, t: Problem[DEAD]):
-    """We allow Problem[DEAD], e.g. for unused parameters."""
-    pass
-
-
-@overload
-def _validate_shape(t: Array, shp):
-    if not isinstance(shp, tuple):
-        raise ValidationError(f'Shape of {t} is {shp}, should be tuple')
-
-
-@overload  # noqa: F811
-def _validate_shape(t: Tuple, shp):
-    if not isinstance(shp, TupleShape):
-        raise ValidationError(f'Shape of {t} is {shp}, should be TupleShape')
-    if len(shp.shape) != len(t.elements):
-        raise ValidationError(f'Shape of {t} has wrong length')
-    for t2, shp2 in zip(t.elements, shp.shape):
-        _validate_shape(t2, shp2)
-
-
-@overload  # noqa: F811
-def _validate_shape(t: List, shp):
-    if not isinstance(shp, ListShape):
-        raise ValidationError(f'Shape of {t} is {shp}, should be ListShape')
-    _validate_shape(t.element_type, shp.shape)
-
-
-@overload  # noqa: F811
-def _validate_shape(t: JTagged, shp):
-    _validate_shape(t.subtype, shp)
-
-
-@overload  # noqa: F811
-def _validate_shape(
-        t: (Number, TypeType, Bool, Problem[DEAD], Function, EnvType,
-            SymbolicKeyType),
-        shp):
-    pass
-
-
-@overload  # noqa: F811
-def _validate_shape(t: TypeMeta, shp):
-    return _validate_shape[t](t, shp)
-
-
-@overload  # noqa: F811
-def _validate_shape(t: object, shp):
-    raise ValidationError(f'Illegal type in the graph: {t}')
-
-
 # All the legal operations are listed here.
 # Illegal ones are commented out.
 whitelist = frozenset({
@@ -184,7 +123,6 @@ class Validator:
 
     def __init__(self, root, whitelist, _validate_abstract=validate_abstract):
         """Initialize and run the Validator."""
-        # assert _validate_abstract is validate_abstract
         self.errors = ErrorPool(exc_class=ValidationError)
         self.whitelist = frozenset(whitelist)
         self._validate_abstract_fn = _validate_abstract
@@ -197,26 +135,10 @@ class Validator:
             err.node = node
             self.errors.add(err)
 
-    # def _validate_type(self, node):
-    #     return self._validate_type_fn(node.type)
-
     def _validate_oper(self, node):
         if node.is_constant(Primitive):
             if node.value not in self.whitelist:
                 raise ValidationError(f'Illegal primitive: {node.value}')
-
-    # def _validate_consistency(self, node):
-    #     if node.is_apply():
-    #         expected = Function[[i.type for i in node.inputs[1:]], node.type]
-    #         actual = node.inputs[0].type
-    #         if actual != expected:
-    #             raise ValidationError(
-    #                 f'Function/argument inconsistency: Expected {expected}, '
-    #                 f'Got {actual}.'
-    #             )
-
-    # def _validate_shape(self, node):
-    #     return _validate_shape(node.type, node.inferred['shape'])
 
     def _validate_abstract(self, node):
         return self._validate_abstract_fn(node.abstract)
@@ -226,11 +148,6 @@ class Validator:
         for node in list(manager.all_nodes):
             self._test(node, self._validate_abstract)
             self._test(node, self._validate_oper)
-            # else:
-            #     self._test(node, self._validate_type)
-            #     self._test(node, self._validate_shape)
-            #     self._test(node, self._validate_oper)
-            #     self._test(node, self._validate_consistency)
 
         def stringify(err):
             return f'* {err.node} -- {err.args[0]}'

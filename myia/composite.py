@@ -7,7 +7,7 @@ from functools import reduce
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType, ismyiatype, Function
 from .hypermap import HyperMap
-from .infer import Inferrer, GraphInferrer, MyiaTypeError
+from .infer import MyiaTypeError
 from .info import About
 from .ir import Graph, MetaGraph, MultitypeGraph, Constant
 from .prim import ops as P
@@ -604,12 +604,6 @@ hyper_add = HyperMap(fn_leaf=_leaf_add)
 _leaf_zeros_like = MultitypeGraph('zeros_like')
 
 
-@_leaf_zeros_like.register(Inferrer)
-@core
-def _inferrer_zero(_):
-    return newenv
-
-
 @_leaf_zeros_like.register(Function)
 @core
 def _function_zero(_):
@@ -793,28 +787,6 @@ class GradOperation(MetaGraph):
         else:
             raise MyiaTypeError(f'Wrong argument for grad: {ft}')
 
-        assert isinstance(g, Graph)
-
-        dfbuilder = Graph()
-        dfbuilder.debug.name = f"grad{len(g.parameters)}"
-
-        with About(g.debug, 'copy'):
-            fn = dfbuilder.add_parameter()
-
-        with About(g.debug, 'grad_fprop'):
-            jf = dfbuilder.apply(P.J, fn)
-
-        df = self.make_gf(jf, g.parameters, g.debug)
-
-        dfbuilder.output = Constant(df)
-
-        return dfbuilder
-
-    def specialize_from_types(self, types):
-        """Generate the graph."""
-        ft, = types
-        assert isinstance(ft, GraphInferrer)
-        g = ft._graph
         assert isinstance(g, Graph)
 
         dfbuilder = Graph()

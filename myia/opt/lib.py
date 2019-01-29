@@ -1,11 +1,12 @@
 """Library of optimizations."""
 
-from ..abstract.base import AbstractTuple, AbstractScalar, VALUE, TYPE, SHAPE
+from ..abstract.base import \
+    abstract_clone, AbstractFunction, AbstractJTagged, AbstractTuple, \
+    AbstractScalar, VALUE, TYPE, SHAPE
 from ..composite import hyper_add
 from ..dtype import type_cloner, Function, JTagged, Number, ismyiatype, \
     Tuple, UInt
 from ..dshape import NOSHAPE
-from ..infer import Inferrer
 from ..ir import Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable
@@ -813,19 +814,6 @@ def expand_J(optimizer, node, equiv):
     return Constant(newg)
 
 
-@type_cloner.variant
-def _nofunction(self, f: (Function, Inferrer)):
-    raise TypeError('Function found')
-
-
-from ..abstract.base import abstract_clone, AbstractFunction, AbstractJTagged
-
-
-@abstract_clone.variant
-def _nofunction2(self, f: AbstractFunction):
-    raise TypeError('Function found')
-
-
 @abstract_clone.variant
 def _jelim_retype(self, j: AbstractJTagged):
     return _jelim_retype_helper(j.element)
@@ -845,77 +833,26 @@ class JElim(Partializable):
 
     def __call__(self, root):
         """Apply JElim on root."""
-        # if self.optimizer.resources.inferrer.version == 2:
-        #     mng = self.optimizer.resources.manager
-        #     mng.keep_roots(root)
-        #     nodes = []
-        #     typesubs = []
-        #     for node in mng.all_nodes:
-        #         if node.is_apply(P.J) or node.is_apply(P.Jinv):
-        #             _, x = node.inputs
-        #             try:
-        #                 _nofunction2(x.abstract)
-        #             except TypeError as e:
-        #                 return False
-        #             nodes.append((node, x))
-        #         elif node.is_constant() \
-        #                 and isinstance(node.abstract, AbstractJTagged):
-        #             typesubs.append((node, node.abstract.element))
+        mng = self.optimizer.resources.manager
+        mng.keep_roots(root)
+        nodes = []
+        typesubs = []
+        for node in mng.all_nodes:
+            try:
+                newtype = _jelim_retype(node.abstract)
+            except TypeError as e:
+                return False
+            if node.is_apply(P.J) or node.is_apply(P.Jinv):
+                _, x = node.inputs
+                nodes.append((node, x))
+            typesubs.append((node, newtype))
 
-        #     with mng.transact() as tr:
-        #         for node, repl in nodes:
-        #             tr.replace(node, repl)
+        with mng.transact() as tr:
+            for node, repl in nodes:
+                tr.replace(node, repl)
 
-        #     for node, newtype in typesubs:
-        #         node.abstract = newtype
+        for node, newtype in typesubs:
+            node.abstract = newtype
 
-        #     return len(nodes) > 0
+        return len(nodes) > 0
 
-        if self.optimizer.resources.inferrer.version == 2:
-            mng = self.optimizer.resources.manager
-            mng.keep_roots(root)
-            nodes = []
-            typesubs = []
-            for node in mng.all_nodes:
-                try:
-                    newtype = _jelim_retype(node.abstract)
-                except TypeError as e:
-                    return False
-                if node.is_apply(P.J) or node.is_apply(P.Jinv):
-                    _, x = node.inputs
-                    nodes.append((node, x))
-                typesubs.append((node, newtype))
-
-            with mng.transact() as tr:
-                for node, repl in nodes:
-                    tr.replace(node, repl)
-
-            for node, newtype in typesubs:
-                node.abstract = newtype
-
-            return len(nodes) > 0
-
-        else:
-            mng = self.optimizer.resources.manager
-            mng.keep_roots(root)
-            nodes = []
-            typesubs = []
-            for node in mng.all_nodes:
-                if node.is_apply(P.J) or node.is_apply(P.Jinv):
-                    _, x = node.inputs
-                    try:
-                        _nofunction(x.type)
-                    except TypeError:
-                        return False
-                    nodes.append((node, x))
-                elif node.is_constant() and ismyiatype(node.type, JTagged):
-                    typesubs.append((node, node.type.subtype))
-
-            with mng.transact() as tr:
-                for node, repl in nodes:
-                    tr.replace(node, repl)
-
-            for node, newtype in typesubs:
-                node.type = newtype
-
-            return len(nodes) > 0

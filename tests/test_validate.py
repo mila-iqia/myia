@@ -7,8 +7,7 @@ from myia.dtype import Array, Tuple, List, Int
 from myia.dshape import NOSHAPE, TupleShape, ListShape
 from myia.prim import ops as P
 from myia.prim.py_implementations import make_record, partial
-from myia.validate import validate as _validate, ValidationError, \
-    _validate_shape
+from myia.validate import validate as _validate, ValidationError
 
 from .common import L, i64, Point, Point_t
 
@@ -137,26 +136,3 @@ def test_clean():
         def f(pt):
             return pt.x + pt.y
         return list_map(f, xs)
-
-
-def test_validate_shape():
-    # Can't cover this if the type/shape inferrers do their job correctly.
-
-    with pytest.raises(ValidationError):
-        _validate_shape(List[Int[64]], (1, 2, 3))
-
-    with pytest.raises(ValidationError):
-        _validate_shape(Array[Int[64]],
-                        ListShape((1, 2, 3)))
-
-    with pytest.raises(ValidationError):
-        _validate_shape(List[Array[Int[64]]],
-                        ListShape(ListShape((1, 2, 3))))
-
-    with pytest.raises(ValidationError):
-        _validate_shape(Tuple[Array[Int[64]]],
-                        ListShape((1, 2, 3)))
-
-    with pytest.raises(ValidationError):
-        _validate_shape(Tuple[Int[64], Int[64], Int[64]],
-                        TupleShape([NOSHAPE, NOSHAPE]))

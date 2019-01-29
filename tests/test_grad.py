@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 from myia.abstract.base import AbstractJTagged
 from myia.pipeline import standard_resources, standard_pipeline
-from myia.pipeline.standard import new_resources, new_pipeline
 from myia.composite import grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.dtype import JTagged
@@ -19,7 +18,7 @@ from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
     array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
     distribute, dot, reshape, transpose, scalar_cast
 from myia.prim.py_implementations import py_implementations as pyi
-from myia.validate import whitelist, validate_type, validate_abstract
+from myia.validate import whitelist, validate_abstract
 
 from .common import f64, u64, MA, MB
 
@@ -34,11 +33,6 @@ class Point:
 
 
 grad_whitelist = whitelist | {P.J, P.Jinv}
-
-
-@validate_type.variant
-def grad_validate_type(self, t: JTagged):
-    pass
 
 
 @validate_abstract.variant
@@ -66,7 +60,7 @@ def grad_wrap(self, graph):
 
 
 grad_pipeline = PipelineDefinition(
-    resources=new_resources,
+    resources=standard_resources,
     steps=dict(
         parse=steps.step_parse,
         resolve=steps.step_resolve,
@@ -245,12 +239,12 @@ def test_tuples(x, y):
     return z
 
 
-@grad_test((Point(3.0, 5.0),), pipeline=new_pipeline)
+@grad_test((Point(3.0, 5.0),), pipeline=standard_pipeline)
 def test_dataclass(pt):
     return pt.x * pt.y
 
 
-@grad_test((Point(3.0, 5.0),), pipeline=new_pipeline)
+@grad_test((Point(3.0, 5.0),), pipeline=standard_pipeline)
 def test_dataclass_2(pt):
     return pt.abs()
 

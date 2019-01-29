@@ -7,14 +7,14 @@ from types import SimpleNamespace
 
 from myia.abstract import from_vref
 from myia.abstract.base import shapeof, VALUE, TYPE, SHAPE
-from myia.pipeline.standard import new_pipeline, scalar_new_pipeline
+from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
     Number, Class, Problem, EnvType as Env, JTagged as JT, ismyiatype, \
     Array, Tuple, List
 from myia.hypermap import HyperMap
-from myia.infer import ANYTHING, VOID, InferenceError, register_inferrer, \
+from myia.infer import ANYTHING, VOID, InferenceError, \
     Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
 from myia.pipeline import pipeline_function
@@ -183,7 +183,7 @@ def _to_i64(x: Number) -> Int[64]:
 #         return NOSHAPE
 
 
-infer_pipeline = scalar_new_pipeline.select(
+infer_pipeline = scalar_pipeline.select(
     'parse', 'infer'
 ).configure({
     'py_implementations': pyimpl_test,
@@ -193,7 +193,7 @@ infer_pipeline = scalar_new_pipeline.select(
 })
 
 
-infer_pipeline_std = new_pipeline.select(
+infer_pipeline_std = standard_pipeline.select(
     'parse', 'infer'
 ).configure({
     'py_implementations': pyimpl_test,

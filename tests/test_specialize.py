@@ -2,7 +2,7 @@
 import numpy
 from pytest import mark
 
-from myia.pipeline.standard import scalar_debug_new_pipeline, debug_new_pipeline
+from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.composite import list_map
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
@@ -16,7 +16,7 @@ from myia.utils import overload
 from .common import mysum, i64, f64, Point
 
 
-specialize_pipeline = scalar_debug_new_pipeline \
+specialize_pipeline = scalar_debug_pipeline \
     .select('parse', 'infer', 'specialize',
             'erase_class', 'erase_tuple',
             'validate', 'export', 'wrap') \
@@ -27,7 +27,7 @@ specialize_pipeline = scalar_debug_new_pipeline \
     )
 
 
-specialize_pipeline_std = debug_new_pipeline \
+specialize_pipeline_std = standard_debug_pipeline \
     .select('parse', 'infer', 'specialize',
             'erase_class', 'opt', 'erase_tuple',
             'validate', 'export', 'wrap') \

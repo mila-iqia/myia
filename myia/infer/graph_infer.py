@@ -8,10 +8,9 @@ from ..debug.label import label
 from ..ir import GraphGenerationError
 from ..utils import Partializable, UNKNOWN, eprint, as_frozen
 
-from .core import InferenceLoop, EvaluationCache, EquivalenceChecker, reify, \
-    reify_shallow
-from .utils import ANYTHING, InferenceError, MyiaTypeError, DynamicMap, \
-    infer_trace, Unspecializable, DEAD, POLY, unwrap
+from .core import InferenceLoop, EvaluationCache, reify
+from .utils import ANYTHING, InferenceError, MyiaTypeError, \
+    infer_trace, Unspecializable, DEAD, POLY
 
 
 def type_error_nargs(ident, expected, got):
@@ -50,37 +49,6 @@ class Track(Partializable):
         self.engine = engine
         self.name = name
 
-    async def infer_constant(self, ctref):
-        """Get the property for a ref of a Constant node."""
-        v = self.engine.pipeline.resources.convert(ctref.node.value)
-        return self.from_value(v, ctref.context)
-
-    async def infer_apply(self, ref):
-        """Get the property for a ref of an Apply node."""
-        ctx = ref.context
-        n_fn, *n_args = ref.node.inputs
-        # We await on the function node to get the inferrer
-        fn_ref = self.engine.ref(n_fn, ctx)
-        inf = await fn_ref[self.name]
-        if inf is ANYTHING:
-            return ANYTHING
-
-        argrefs = [self.engine.ref(node, ctx) for node in n_args]
-
-        if not isinstance(inf, Inferrer):
-            raise MyiaTypeError(
-                f'Trying to call a non-callable type: {inf}',
-                refs=[fn_ref],
-                app=ref
-            )
-
-        return await self.engine.loop.schedule(
-            inf(*argrefs),
-            context_map={
-                infer_trace: {**infer_trace.get(), ctx: ref}
-            }
-        )
-
     def to_element(self, v):
         """Returns the value on this track for each element of v."""
         raise NotImplementedError()  # pragma: no cover
@@ -89,492 +57,9 @@ class Track(Partializable):
         """Get the property from a value in the context."""
         raise NotImplementedError()  # pragma: no cover
 
-    def from_external(self, v):
-        """Convert a property provided outside the inferrer."""
-        return v
-
-    def broaden(self, v, maximal=False):
-        """Broaden the value for use in a graph's signature."""
-        return v
-
     def default(self, values):
         """Default value for this track, if nothing is known."""
         raise NotImplementedError()  # pragma: no cover
-
-    def as_future(self, thing, method='__getitem__'):
-        """Return a future from the given ref or value."""
-        if isinstance(thing, AbstractReference):
-            return getattr(thing, method)(self.name)
-        else:
-            return self.engine.loop.as_future(thing)
-
-    def assert_same(self, *vals, refs=[]):
-        """Assert that all vals are the same on this track."""
-        futs = [self.as_future(val, 'get_raw') for val in vals]
-        return self.engine.equiv.assert_same(*futs, refs=refs)
-
-    def apply_predicate(self, predicate, res):
-        """Apply a predicate on a value.
-
-        The predicate can be a type, a callable, or a tuple of these
-        things.
-        """
-        if isinstance(predicate, tuple):
-            return any(self.apply_predicate(p, res) for p in predicate)
-        elif ismyiatype(predicate):
-            return ismyiatype(res, predicate)
-        elif callable(predicate):
-            return predicate(res)
-        else:
-            raise ValueError(predicate)  # pragma: no cover
-
-    def predicate_error(self, predicate, res, ref):
-        """Raise an error for the given predicate when a value doesn't match.
-
-        Arguments:
-            predicate: The predicate.
-            res: The value that did not match the predicate.
-            ref: The reference that produced the value.
-        """
-        def is_type(preds):
-            return any(ismyiatype(pred) for pred in preds)
-
-        if not isinstance(predicate, tuple):
-            predicate = (predicate,)
-
-        def _str(p):
-            if isinstance(p, FunctionType):
-                return p.__doc__ or str(p)
-            else:
-                return str(p)
-
-        descrs = [_str(p) for p in predicate]
-        if len(descrs) == 1:
-            expected, = descrs
-        else:  # pragma: no cover
-            expected = ", ".join(descrs[:-1]) + ' or ' + descrs[-1]
-
-        if is_type(predicate):
-            err_cls = MyiaTypeError
-        else:
-            err_cls = InferenceError
-
-        return err_cls(
-            f'Expected: {expected}; Got: {res}',
-            [ref]
-        )
-
-    async def check(self, predicate, *refs, return_tuple=False):
-        """Assert that all refs match predicate, return values.
-
-        This differs from will_check by resolving the values of each
-        ref immediately, and returning them all instead of whichever
-        resolves first.
-
-        Arguments:
-            predicate: A type that all refs must have, or a predicate
-                function, or a tuple of types/predicates.
-            refs: The references to compare.
-            return_tuple: Whether to always return a tuple or not.
-        """
-        coros = [self.as_future(ref, 'get_shallow') for ref in refs]
-        results = await asyncio.gather(*coros, loop=self.engine.loop)
-
-        for ref, res in zip(refs, results):
-            if not self.apply_predicate(predicate, res):
-                raise self.predicate_error(
-                    predicate,
-                    res,
-                    ref
-                )
-
-        if len(results) == 1 and not return_tuple:
-            results, = results
-        return results
-
-    async def will_check(self, predicate, *refs):
-        """Check that all refs match the predicate and each other.
-
-        Checks are asynchronous and the value for one of the refs is
-        returned (whichever is resolved first). That value may be
-        an InferenceVar, which is guaranteed to *eventually* resolve to
-        the same thing as all the other refs.
-        """
-        async def chk(ref):
-            res = await self.as_future(ref)
-            if not self.apply_predicate(predicate, res):
-                raise self.predicate_error(
-                    predicate,
-                    res,
-                    ref
-                )
-        for ref in refs:
-            self.engine.loop.schedule(chk(ref))
-        return await self.assert_same(*refs, refs=refs)
-
-
-####################
-# Inferrer classes #
-####################
-
-
-class Inferrer(DynamicMap):
-    """Infer a property of the output of an operation.
-
-    Attributes:
-        engine: The InferenceEngine used by this inferrer.
-        identifier: A Reference, Primitive, Graph, etc. that identifies
-            the operation this Inferrer is about, for debugging purposes.
-        cache: A cache of arguments (References) given to the operation,
-            mapped to the result of the inference.
-
-    """
-
-    def __init__(self, track, identifier):
-        """Initialize the Inferrer."""
-        super().__init__()
-        self.track = track
-        self.engine = track.engine
-        self.identifier = identifier
-
-    async def get_unique_argrefs(self):
-        """If possible, return a unique tuple of argrefs this was called on.
-
-        Raises Unspecializable if it is not possible to get a single tuple
-        of argrefs:
-
-          * Unspecializable(DEAD) if the Inferrer was never called.
-          * Unspecializable(POLY) if the Inferrer was called with at least
-            two incompatible tuple of argrefs.
-        """
-        # The cache works using References, but if two references have
-        # the same inferred type/value/etc., we can merge their entries.
-        cache = {}
-        for x, y in self.cache.items():
-            y = await reify(y)
-            key = tuple([await arg[track] for arg in x
-                         for track in self.engine.tracks])
-            # NOTE: It's not completely clear when/why this tends to
-            # happen. It seems to happen for PartialInferrers when
-            # the differentiation is downstream, so in practice the
-            # Problem node caused by this exception does not end up
-            # in the final graph.
-            assert not (key in cache and cache[key] != y)
-            cache[key] = y
-
-        if len(cache) == 0:
-            raise Unspecializable(DEAD)
-        elif len(cache) == 1:
-            (argrefs, res), *_ = self.cache.items()
-            return argrefs
-        else:
-            # We try to find argrefs that subsume all the existing argrefs
-            broadened = set()
-            for argrefs in self.cache:
-                vrefs = []
-                for arg in argrefs:
-                    vref = self.engine.vref({
-                        track_name: track.broaden(
-                            await arg[track_name],
-                            maximal=True
-                        )
-                        for track_name, track in self.engine.tracks.items()
-                    })
-                    vrefs.append(vref)
-                broadened.add(tuple(vrefs))
-            if len(broadened) == 1:
-                vrefs, = broadened
-                # We run the inference so that it's available in the cache
-                await self(*vrefs)
-                return vrefs
-            else:
-                raise Unspecializable(POLY)
-
-    async def as_function_type(self, argrefs=None):
-        """Return a Function type corresponding to this Inferrer.
-
-        Raises Unspecializable if this is not possible, e.g. if argrefs
-        are not given and the Inferrer was called multiple times on
-        different types.
-
-        Arguments:
-            argrefs: The argrefs the Inferrer was called on at the
-                call site for which we need a Function. If None,
-                we try to find suitable argrefs.
-        """
-        if argrefs is None:
-            try:
-                argrefs = await self.get_unique_argrefs()
-            except Unspecializable as e:
-                return e.args[0]
-        cached = self.cache[tuple(argrefs)]
-        return Function[[await concretize_type(await argref[self.track.name])
-                         for argref in argrefs],
-                        await concretize_type(cached)]
-
-
-class DummyInferrer(Inferrer):
-    """Has the Inferrer class but cannot be called."""
-
-    def __init__(self, track):
-        """Initialize the DummyInferrer."""
-        super().__init__(track, 'dummy')
-
-    async def infer(self, *args):
-        """Nada."""
-        raise AssertionError('Cannot call DummyInferrer.')
-
-
-class MultiInferrer(Inferrer):
-    """Inferrer to use when the result is multiple possible callables.
-
-    This makes sure that those callables are equivalent.
-    """
-
-    def __init__(self, inferrers, refs):
-        """Set the list of possible inferrers."""
-        assert all(isinstance(inf, Inferrer) for inf in inferrers)
-        self.inferrers = inferrers
-        self.refs = refs
-        super().__init__(self.inferrers[0].track, None)
-
-    def infer(self, *args):
-        """Run the inference over all possible inferrers."""
-        return self.track.assert_same(
-            *[inf(*args) for inf in self.inferrers],
-            refs=self.refs)
-
-
-class PrimitiveInferrer(Inferrer):
-    """Infer a property of the result of a primitive.
-
-    Attributes:
-        inferrer_fn: A function to infer a property of the result of a
-            primitive.
-
-    """
-
-    def __init__(self, track, prim, nargs, inferrer_fn):
-        """Initialize the PrimitiveInferrer."""
-        super().__init__(track, prim)
-        self.inferrer_fn = inferrer_fn
-        self.nargs = nargs
-
-    def infer(self, *args):
-        """Infer a property of the operation on the given arguments."""
-        if self.nargs is not None and len(args) != self.nargs:
-            raise type_error_nargs(self.identifier, self.nargs, len(args))
-        return self.inferrer_fn(self.track, *args)
-
-    def provably_equivalent(self, other):
-        """Whether this inferrer is provably equivalent to the other.
-
-        Two PrimitiveInferrers are equivalent if they use the same
-        inferrer function.
-        """
-        return isinstance(other, PrimitiveInferrer) \
-            and other.nargs == self.nargs \
-            and other.inferrer_fn == self.inferrer_fn
-
-
-class GraphInferrer(Inferrer):
-    """Infer a property of the result of calling a Graph."""
-
-    def __init__(self, track, graph, context, broaden=True):
-        """Initialize the GraphInferrer."""
-        super().__init__(track, graph)
-        self.track = track
-        self._graph = graph
-        self.broaden = broaden
-        if context is None:
-            self.context = self.engine.context_class.empty()
-        else:
-            self.context = context.filter(graph)
-        assert self.context is not None
-
-    async def make_graph(self, args):
-        """Return the graph to use for the given args."""
-        return self._graph
-
-    async def _make_argkey_and_context(self, args):
-        g = await self.make_graph(args)
-        argvals = []
-        for arg in args:
-            argval = {}
-            for track_name, track in self.engine.tracks.items():
-                result = await self.engine.get_inferred(track_name, arg)
-                if self.broaden and not g.flags.get('flatten_inference'):
-                    result = track.broaden(result)
-                argval[track_name] = result
-            argvals.append(argval)
-
-        # Update current context using the fetched properties.
-        argkey = as_frozen(argvals)
-        return argkey, self.context.add(g, argkey)
-
-    async def make_context(self, args):
-        """Create a Context object for this graph with these arguments.
-
-        We await on all relevant properties of all arguments in order to
-        build a context (this cannot be done lazily, like with primitives,
-        because we need a concrete context).
-        """
-        _, ctx = await self._make_argkey_and_context(args)
-        return ctx
-
-    async def infer(self, *args):
-        """Infer a property of the operation on the given arguments."""
-        g = await self.make_graph(args)
-        nargs = len(g.parameters)
-
-        if len(args) != nargs:
-            raise type_error_nargs(self.identifier, nargs, len(args))
-
-        argkey, context = await self._make_argkey_and_context(args)
-
-        # We associate each parameter of the Graph with its value for each
-        # property, in the context we built.
-        for p, arg in zip(g.parameters, argkey):
-            for track, v in arg:
-                ref = self.engine.ref(p, context)
-                self.engine.cache.set_value((track, ref), v)
-
-        out = self.engine.ref(g.return_, context)
-        return await self.engine.get_inferred(self.track.name, out)
-
-    def provably_equivalent(self, other):
-        """Whether this inferrer is provably equivalent to the other.
-
-        Two GraphInferrers are equivalent if they infer the same property
-        on the same graph in the same context.
-        """
-        return isinstance(other, GraphInferrer) \
-            and other.track == self.track \
-            and other._graph == self._graph \
-            and other.context == self.context
-
-
-class MetaGraphInferrer(GraphInferrer):
-    """Infer a property of the result of calling a MetaGraph."""
-
-    def __init__(self, track, metagraph):
-        """Initialize the MetaGraphInferrer."""
-        super().__init__(track, metagraph, None)
-
-    async def make_graph(self, args):
-        """Return the graph to use for the given args."""
-        try:
-            g = await self._graph.specialize(args)
-            g = self.engine.pipeline.resources.convert(g)
-            return g
-        except GraphGenerationError as err:
-            types = err.args[0]
-            raise TypeDispatchError(self._graph, types) from None
-
-
-class PartialInferrer(Inferrer):
-    """Infer a property on a partial.
-
-    This wraps another inferrer and defers all the work to it,
-    prepending some arguments to all calls.
-    """
-
-    def __init__(self, track, fn, args):
-        """Initialize the PartialInferrer."""
-        super().__init__(track, 'partial')
-        self.fn = fn
-        self.args = tuple(args)
-
-    async def infer(self, *args):
-        """Add the partial arguments and defer to the wrapped inferrer."""
-        return await self.fn(*(self.args + args))
-
-    def provably_equivalent(self, other):
-        """Wether this inferrer is equivalent to another.
-
-        Two PartialInferrers are equivalent if the wrap the same
-        inferrer and add the same arguments.
-        """
-        return (isinstance(other, PartialInferrer) and
-                self.args == other.args and
-                self.fn.provably_equivalent(other.fn))
-
-    def merge(self, other):
-        """Merge the caches of two PartialInferrers."""
-        super().merge(other)
-        self.fn.merge(other.fn)
-
-
-class ExplicitInferrer(Inferrer):
-    """Requires specific input types and returns a specific output type."""
-
-    def __init__(self, track, argvals, retval, name=None):
-        """Initialize ExplicitInferrer."""
-        super().__init__(track, name)
-        self.argvals = argvals
-        self.retval = retval
-        refs = []
-        for v in argvals:
-            # NOTE: This VirtualReference lacks the other tracks, so in
-            # certain situations such as declaring an ExplicitInferrer
-            # to be equivalent to a GraphInferrer, an error might happen
-            # when the GraphInferrer is called on these references.
-            refs.append(VirtualReference({track.name: v}))
-        self.cache[tuple(refs)] = retval
-
-    async def infer(self, *args):
-        """Check arguments and return return type."""
-        ngot = len(args)
-        nexpect = len(self.argvals)
-        if ngot != nexpect:
-            raise MyiaTypeError(
-                'Wrong number of arguments.'
-                f' Expected {nexpect}, got {ngot}.',
-                refs=[],
-            )
-        for got, aref in zip(self.argvals, args):
-            self.engine.equiv.declare_equivalent(
-                got,
-                aref.get_raw(self.track.name),
-                refs=[aref]
-            )
-        return self.retval
-
-    async def as_function_type(self, argrefs=None):
-        """Return a Function type corresponding to this Inferrer."""
-        return Function[self.argvals, self.retval]
-
-
-def register_inferrer(*prims, nargs, constructors):
-    """Define a PrimitiveInferrer for prims with nargs arguments.
-
-    For each primitive, this registers a constructor for a PrimitiveInferrer
-    that takes a track argument, in the constructors dictionary.
-    """
-    def deco(fn):
-        def make_constructor(prim):
-            def constructor(track):
-                return PrimitiveInferrer(track, prim, nargs, fn)
-            return constructor
-        for prim in prims:
-            constructors[prim] = make_constructor(prim)
-        return fn
-    return deco
-
-
-@reify.variant
-async def concretize_type(self, t: Inferrer):
-    """Return the type of ref, resolving all Inferrer instances.
-
-    Inferrer instances are resolved to Function types if possible. If an
-    error occurs, this will return a Problem type.
-
-    Arguments:
-        ref: Either a Reference or an Inferrer.
-        argrefs: References for the arguments passed to the Inferrer at
-            the relevant call site.
-    """
-    return await t.as_function_type()
 
 
 ##############
@@ -688,10 +173,6 @@ class Reference(AbstractReference):
         """Get the raw value for the track, which might be wrapped."""
         return self.engine.get_inferred(track, self)
 
-    async def get_shallow(self, track):
-        """Get the raw value for the track, which might be wrapped."""
-        return await reify_shallow(await self.get_raw(track,))
-
     def __eq__(self, other):
         return isinstance(other, Reference) \
             and self.node is other.node \
@@ -731,33 +212,6 @@ class VirtualReference(AbstractReference):
             and self.values == other.values
 
 
-class TransformedReference(AbstractReference):
-    """Reference(s) transformed through a function.
-
-    Arguments:
-        engine: The engine to use.
-        fn: A Primitive or a Graph.
-        refs: The refs to transform through fn.
-    """
-
-    def __init__(self, engine, fn, *refs):
-        """Initialize a TransformedReference."""
-        self.engine = engine
-        self.fn = fn
-        self.refs = refs
-
-    async def get_raw(self, track_name):
-        """Get the raw value for the track, which might be wrapped."""
-        track = self.engine.tracks[track_name]
-        inf = unwrap(track.from_value(self.fn, None))
-        return await inf(*self.refs)
-
-    async def __getitem__(self, track_name):
-        """Get the value for the track (asynchronous)."""
-        v = await self.get_raw(track_name)
-        return await reify(v)
-
-
 ########
 # Core #
 ########
@@ -772,8 +226,6 @@ class InferenceEngine:
             track names which should be computed along with it.
             E.g. tied_tracks={'type': ['shape']} to compute the
             shape every time the type is computed.
-        eq_class: The class to use to check equivalence between
-            values.
 
     """
 
@@ -782,7 +234,6 @@ class InferenceEngine:
                  *,
                  tracks,
                  tied_tracks={},
-                 eq_class=EquivalenceChecker,
                  context_class=Context):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop()
@@ -796,10 +247,6 @@ class InferenceEngine:
         self.tied_tracks = tied_tracks
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
-        self.equiv = eq_class(
-            loop=self.loop,
-            error_callback=self.errors.append
-        )
         self.context_class = context_class
         self.reference_map = {}
 
@@ -814,66 +261,32 @@ class InferenceEngine:
             outspec (optional): Expected inference results. If provided,
                 inference results will be checked against them.
         """
-        if 'abstract' in self.tracks:
-            argrefs = [self.vref(arg) for arg in argspec]
-            argspec = [ref.values['abstract'] for ref in argrefs]
+        assert 'abstract' in self.tracks
+        argrefs = [self.vref(arg) for arg in argspec]
+        argspec = [ref.values['abstract'] for ref in argrefs]
 
-            self.mng.add_graph(graph)
-            empty_context = self.context_class.empty()
-            root_context = empty_context.add(graph, as_frozen(argspec))
-            output_ref = self.ref(graph.return_, root_context)
+        self.mng.add_graph(graph)
+        empty_context = self.context_class.empty()
+        root_context = empty_context.add(graph, as_frozen(argspec))
+        output_ref = self.ref(graph.return_, root_context)
 
-            async def _run():
-                from ..abstract.inf import GraphXInferrer
-                inf = GraphXInferrer(graph, empty_context)
-                self.loop.schedule(
-                    inf(self.tracks['abstract'], None, argrefs)
-                )
+        async def _run():
+            from ..abstract.inf import GraphXInferrer
+            inf = GraphXInferrer(graph, empty_context)
+            self.loop.schedule(
+                inf(self.tracks['abstract'], None, argrefs)
+            )
 
-            async def _check():
-                from ..abstract.inf import amerge
-                amerge(await output_ref['abstract'], outspec['abstract'], loop=self.loop, forced=False)
+        async def _check():
+            from ..abstract.inf import amerge
+            amerge(await output_ref['abstract'], outspec['abstract'], loop=self.loop, forced=False)
 
-            self.run_coroutine(_run())
-            if outspec is not None:
-                self.run_coroutine(_check())
+        self.run_coroutine(_run())
+        if outspec is not None:
+            self.run_coroutine(_check())
 
-            results = {name: output_ref.get(name) for name in tracks}
-            return results, root_context
-
-        else:
-            argrefs = [self.vref(arg) for arg in argspec]
-            argspec = [{t: ref.values[t] for t in self.all_track_names}
-                       for ref in argrefs]
-
-            self.mng.add_graph(graph)
-            empty_context = self.context_class.empty()
-            root_context = empty_context.add(graph, as_frozen(argspec))
-            output_ref = self.ref(graph.return_, root_context)
-
-            async def _run():
-                for track in tracks:
-                    inf = GraphInferrer(self.tracks[track],
-                                        graph, empty_context,
-                                        broaden=False)
-                    self.loop.schedule(inf(*argrefs))
-
-            async def _check():
-                for track in tracks:
-                    expected = outspec[track]
-                    if expected not in (UNKNOWN, ANYTHING):
-                        self.equiv.declare_equivalent(
-                            output_ref.get_raw(track),
-                            expected,
-                            [output_ref]
-                        )
-
-            self.run_coroutine(_run())
-            if outspec is not None:
-                self.run_coroutine(_check())
-
-            results = {name: output_ref.get(name) for name in tracks}
-            return results, root_context
+        results = {name: output_ref.get(name) for name in tracks}
+        return results, root_context
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
@@ -881,9 +294,6 @@ class InferenceEngine:
 
     def vref(self, values):
         """Return a VirtualReference using the given property values."""
-        for track_obj in self.tracks.values():
-            if track_obj.name not in values:
-                values[track_obj.name] = track_obj.default(values)
         return VirtualReference(values)
 
     async def compute_ref(self, key):
@@ -891,9 +301,7 @@ class InferenceEngine:
         track_name, ref = key
         track = self.tracks[track_name]
 
-        if isinstance(ref, (VirtualReference, TransformedReference)):
-            # A VirtualReference already contains the values we need.
-            return await ref.get_raw(track_name)
+        assert isinstance(ref, Reference)
 
         node = ref.node
         inferred = ref.node.inferred.get(track_name, UNKNOWN)
@@ -916,10 +324,7 @@ class InferenceEngine:
 
         Results are cached.
         """
-        result = self.cache.get((track, ref))
-        for other_track in self.tied_tracks.get(track, []):
-            self.loop.schedule(self.get_inferred(other_track, ref))
-        return result
+        return self.cache.get((track, ref))
 
     async def forward_reference(self, track, orig, new):
         self.reference_map[orig] = new

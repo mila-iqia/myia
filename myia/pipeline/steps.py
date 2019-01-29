@@ -12,7 +12,6 @@ from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
     LocalPassOptimizer
-from ..opt.clean import erase_class2, erase_tuple2
 from ..prim import vm_implementations
 from ..utils import overload, flatten, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
@@ -188,30 +187,17 @@ def step_erase_class(self, graph, argspec, outspec):
     Outputs:
         graph: The prepared graph.
     """
-    if self.resources.inferrer.version == 1:
-        mng = self.resources.manager
-        erase_class(graph, mng)
-        new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
-        graph = self.resources.inferrer.renormalize(graph, new_argspec)
-        new_outspec = dict(graph.output.inferred)
-        return {'graph': graph,
-                'orig_argspec': argspec,
-                'argspec': new_argspec,
-                'orig_outspec': outspec,
-                'outspec': new_outspec,
-                'erase_class': True}
-    else:
-        mng = self.resources.manager
-        erase_class2(graph, mng)
-        new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
-        graph = self.resources.inferrer.renormalize(graph, new_argspec)
-        new_outspec = dict(graph.output.inferred)
-        return {'graph': graph,
-                'orig_argspec': argspec,
-                'argspec': new_argspec,
-                'orig_outspec': outspec,
-                'outspec': new_outspec,
-                'erase_class': True}
+    mng = self.resources.manager
+    erase_class(graph, mng)
+    new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+    graph = self.resources.inferrer.renormalize(graph, new_argspec)
+    new_outspec = dict(graph.output.inferred)
+    return {'graph': graph,
+            'orig_argspec': argspec,
+            'argspec': new_argspec,
+            'orig_outspec': outspec,
+            'outspec': new_outspec,
+            'erase_class': True}
 
 
 ############
@@ -353,28 +339,16 @@ def step_erase_tuple(self, graph, argspec, outspec, erase_class=False):
     Outputs:
         graph: The prepared graph.
     """
-    if self.resources.inferrer.version == 1:
-        assert erase_class
-        mng = self.resources.manager
-        erase_tuple(graph, mng)
-        new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
-        graph = self.resources.inferrer.renormalize(graph, new_argspec)
-        new_outspec = dict(graph.output.inferred)
-        return {'graph': graph,
-                'argspec': new_argspec,
-                'outspec': new_outspec,
-                'erase_tuple': True}
-    else:
-        assert erase_class
-        mng = self.resources.manager
-        erase_tuple2(graph, mng)
-        new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
-        graph = self.resources.inferrer.renormalize(graph, new_argspec)
-        new_outspec = dict(graph.output.inferred)
-        return {'graph': graph,
-                'argspec': new_argspec,
-                'outspec': new_outspec,
-                'erase_tuple': True}
+    assert erase_class
+    mng = self.resources.manager
+    erase_tuple(graph, mng)
+    new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+    graph = self.resources.inferrer.renormalize(graph, new_argspec)
+    new_outspec = dict(graph.output.inferred)
+    return {'graph': graph,
+            'argspec': new_argspec,
+            'outspec': new_outspec,
+            'erase_tuple': True}
 
 
 ############
@@ -689,30 +663,17 @@ def step_wrap(self,
                 'OutputWrapper step requires the erase_class/tuple steps'
             )
         fn = output
+        orig_arg_t = [arg['abstract'] for arg in orig_argspec or argspec]
+        orig_out_t = (orig_outspec or outspec)['abstract']
+        vm_out_t = graph.return_.abstract
 
-        if self.resources.inferrer.version == 1:
-            orig_arg_t = [arg['type'] for arg in orig_argspec or argspec]
-            orig_out_t = (orig_outspec or outspec)['type']
-            vm_out_t = graph.type.retval
+        def wrapped(*args):
+            args = tuple(flatten(convert_arg2(arg, ot) for arg, ot in
+                                    zip(args, orig_arg_t)))
+            res = fn(*args)
+            res = convert_result2(res, orig_out_t, vm_out_t)
+            return res
 
-            def wrapped(*args):
-                args = tuple(flatten(convert_arg(arg, ot) for arg, ot in
-                                     zip(args, orig_arg_t)))
-                res = fn(*args)
-                res = convert_result(res, orig_out_t, vm_out_t)
-                return res
-
-        else:
-            orig_arg_t = [arg['abstract'] for arg in orig_argspec or argspec]
-            orig_out_t = (orig_outspec or outspec)['abstract']
-            vm_out_t = graph.return_.abstract
-
-            def wrapped(*args):
-                args = tuple(flatten(convert_arg2(arg, ot) for arg, ot in
-                                     zip(args, orig_arg_t)))
-                res = fn(*args)
-                res = convert_result2(res, orig_out_t, vm_out_t)
-                return res
         return {'output': wrapped}
 
 

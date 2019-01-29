@@ -37,9 +37,9 @@ from .inf import (
 from .. import dtype, dshape
 from ..ir import Graph
 from ..dtype import Number, Float, Bool
-from ..infer import ANYTHING, InferenceVar, Context, MyiaTypeError, \
+from ..infer import ANYTHING, Context, MyiaTypeError, \
     InferenceError, reify, MyiaShapeError, VOID
-from ..infer.core import Pending, find_coherent_result_2
+from ..infer.core import Pending, find_coherent_result
 from ..prim import ops as P
 from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
 
@@ -213,7 +213,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
         )
 
     if isinstance(data_t, Pending):
-        case, *args = await find_coherent_result_2(
+        case, *args = await find_coherent_result(
             data_t,
             lambda t: _resolve_case(resources, t, item_v, chk)
         )
@@ -359,7 +359,7 @@ async def issubtype(x, model):
         if isinstance(t, Pending):
             async def chk(t):
                 return dtype.ismyiatype(t, model)
-            return await find_coherent_result_2(t, chk)
+            return await find_coherent_result(t, chk)
         else:
             return dtype.ismyiatype(t, model)
     else:
