@@ -71,10 +71,7 @@ grad_pipeline = PipelineDefinition(
         export=steps.step_debug_export,
     )
 ).configure(
-    {'inferrer.tracks.abstract.max_depth': 1,
-     'inferrer.version': 2,
-    #  'validate.validate_type': None
-     }
+    {'inferrer.tracks.abstract.max_depth': 1}
 )
 
 

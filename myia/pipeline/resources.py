@@ -6,6 +6,7 @@ from collections import defaultdict
 from types import FunctionType
 
 from .. import dtype, operations, parser, composite as C
+from ..aspecialize import TypeSpecializer
 from ..abstract.base import AbstractFunction
 from ..infer import InferenceEngine, ANYTHING
 from ..ir import Graph, clone
@@ -343,8 +344,7 @@ class InferenceResource(PipelineResource):
                  required_tracks,
                  tied_tracks,
                  context_class,
-                 erase_value,
-                 version=1):
+                 erase_value):
         """Initialize an InferenceResource."""
         super().__init__(pipeline_init)
         self.manager = self.resources.manager
@@ -353,7 +353,6 @@ class InferenceResource(PipelineResource):
         self.tied_tracks = tied_tracks
         self.context_class = context_class
         self.erase_value = erase_value
-        self.version = version
         self.engine = InferenceEngine(
             self.pipeline,
             tracks=self.tracks,
@@ -420,11 +419,7 @@ class InferenceResource(PipelineResource):
 
     def specialize(self, graph, context):
         """Perform specialization."""
-        if self.version == 1:
-            spc = TypeSpecializer(self.engine)
-        else:
-            from ..aspecialize import TypeSpecializer as TypeSpecializer2
-            spc = TypeSpecializer2(self.engine)
+        spc = TypeSpecializer(self.engine)
         result = spc.run(graph, context)
         self.manager.keep_roots(result)
         return result

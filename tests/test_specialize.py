@@ -22,8 +22,7 @@ specialize_pipeline = scalar_debug_pipeline \
             'validate', 'export', 'wrap') \
     .configure(
         {'inferrer.tracks.abstract.max_depth': 1,
-         'inferrer.erase_value': True,
-         'inferrer.version': 2}
+         'inferrer.erase_value': True}
     )
 
 
@@ -33,8 +32,7 @@ specialize_pipeline_std = standard_debug_pipeline \
             'validate', 'export', 'wrap') \
     .configure(
         {'inferrer.tracks.abstract.max_depth': 1,
-         'inferrer.erase_value': True,
-         'inferrer.version': 2}
+         'inferrer.erase_value': True}
     )
 
 

@@ -33,7 +33,6 @@ standard_resources = dict(
         tied_tracks={},
         context_class=Context,
         erase_value=True,
-        version=2,
     )
 )
 
