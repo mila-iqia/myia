@@ -93,6 +93,22 @@ class VirtualFunction:
             and self.output == other.output
 
 
+class TypedPrimitive:
+    def __init__(self, prim, args, output):
+        self.prim = prim
+        self.args = args
+        self.output = output
+
+    def __hash__(self):
+        return hash((self.prim, self.args, self.output))
+
+    def __eq__(self, other):
+        return isinstance(other, TypedPrimitive) \
+            and self.prim == other.prim \
+            and self.args == other.args \
+            and self.output == other.output
+
+
 class DummyFunction:
     pass
 
@@ -526,6 +542,11 @@ def to_value(self, x: AbstractFunction, *args):
 @overload
 def to_value(self, x: AbstractTuple, *args):
     return tuple(self(y, *args) for y in x.elements)
+
+
+@overload
+def to_value(self, x: AbstractError, *args):
+    raise ValueError('Cannot build error.')
 
 
 @overload
@@ -1296,7 +1317,11 @@ class _GraphAndContext:
 @mixin(TrackableFunction)
 class _TrackableFunction:
     def __hrepr__(self, H, hrepr):
-        return hrepr(self.fn)
+        return hrepr.stdrepr_object(
+            'Trackable',
+            (('fn', self.fn), ('id', self.id)),
+            delimiter="↦",
+        )
 
 
 @mixin(PartialApplication)
@@ -1305,5 +1330,15 @@ class _PartialApplication:
         return hrepr.stdrepr_object(
             'Partial',
             (('fn', self.fn), ('args', self.args)),
+            delimiter="↦",
+        )
+
+
+@mixin(TypedPrimitive)
+class _TypedPrimitive:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_object(
+            'TypedPrimitive',
+            (('prim', self.prim), ('args', self.args), ('output', self.output)),
             delimiter="↦",
         )

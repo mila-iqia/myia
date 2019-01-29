@@ -668,7 +668,7 @@ class _GetAttrXInferrer(XInferrer):
         async def on_dcattr(data, data_t, item_v):
             return data.attributes[item_v]
 
-        return await static_getter(
+        rval = await static_getter(
             track, data, item,
             fetch=getattr,
             on_dcattr=on_dcattr,
@@ -676,6 +676,8 @@ class _GetAttrXInferrer(XInferrer):
             outref=outref,
             dataref=r_data,
         )
+        self.cache[(data, item)] = rval
+        return rval
 
 
 abstract_inferrer_constructors[P.getattr] = _GetAttrXInferrer.partial()
@@ -989,7 +991,7 @@ class _ResolveXInferrer(XInferrer):
         async def on_dcattr(data, data_t, item_v):  # pragma: no cover
             raise MyiaTypeError('Cannot resolve on Class.')
 
-        return await static_getter(
+        rval = await static_getter(
             track, data, item,
             fetch=getitem,
             on_dcattr=on_dcattr,
@@ -997,6 +999,8 @@ class _ResolveXInferrer(XInferrer):
             outref=outref,
             dataref=r_data,
         )
+        self.cache[(data, item)] = rval
+        return rval
 
 
 abstract_inferrer_constructors[P.resolve] = _ResolveXInferrer.partial()
@@ -1076,10 +1080,12 @@ async def _inf_Jinv(track, x):
         v = await x.get()
         results = []
         for f in v:
+            ref = None
             if isinstance(f, TrackableFunction):
+                ref = f.id
                 f = f.fn
             if isinstance(f, JTransformedFunction):
-                results.append(f.fn)
+                res = f.fn
             elif isinstance(f, (Graph, GraphAndContext)):
                 if isinstance(f, GraphAndContext):
                     g = f.graph
@@ -1094,15 +1100,18 @@ async def _inf_Jinv(track, x):
                         # point to the transformed nodes of the parent. This is
                         # fixable, and will need to be fixed to support a few edge
                         # cases.
-                        results.append(DummyFunction())
+                        res = DummyFunction()
                     else:
-                        results.append(primal)
+                        res = primal
                 else:
                     raise MyiaTypeError(f'Bad input type for Jinv: {f}')
             else:
                 raise MyiaTypeError(
                     f'Expected JTransformedFunction, not {f}'
                 )
+            if ref:
+                res = TrackableFunction(res, ref)
+            results.append(res)
         return AbstractFunction(*results)
     if isinstance(x, AbstractJTagged):
         return x.element

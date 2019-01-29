@@ -33,17 +33,19 @@ class WrapPrimitives(PipelineStep):
         prim_graphs = {}
 
         def get_prim_graph(prim, typ):
+            from ..abstract.base import VALUE
             if (prim, typ) not in prim_graphs:
                 g = Graph()
                 args = []
-                for t in typ.arguments:
+                tp = list(typ.values[VALUE])[0]
+                for t in tp.args:
                     p = g.add_parameter()
-                    p.type = t
+                    p.abstract = t
                     args.append(p)
                 primct = Constant(prim)
-                primct.type = typ
+                primct.abstract = typ
                 out = g.apply(primct, *args)
-                out.type = typ.retval
+                out.abstract = tp.output
                 g.output = out
                 prim_graphs[(prim, typ)] = g
             return prim_graphs[(prim, typ)]
@@ -58,7 +60,7 @@ class WrapPrimitives(PipelineStep):
                                 if node.inputs[0].value in (P.array_map,
                                                             P.array_reduce):
                                     continue
-                            g = get_prim_graph(ct.value, ct.type)
+                            g = get_prim_graph(ct.value, ct.abstract)
                             tr.set_edge(node, key, Constant(g))
 
         return {'graph': graph}

@@ -7,7 +7,7 @@ from .abstract import GraphXInferrer
 from .abstract.base import GraphAndContext, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
     AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, REF, \
-    AbstractError, AbstractValue, TrackableFunction, to_value
+    AbstractError, AbstractValue, TrackableFunction, to_value, TypedPrimitive
 from .dtype import Function, TypeMeta
 from .infer import ANYTHING, Context, concretize_type, \
     GraphInferrer, PartialInferrer, Inferrer, Unspecializable, \
@@ -144,7 +144,6 @@ class _GraphSpecializer:
     """Helper class for TypeSpecializer."""
 
     def __init__(self, specializer, graph, context):
-        # buche(context)
         self.parent = specializer.specializations[context.parent]
         self.specializer = specializer
         self.engine = specializer.engine
@@ -221,7 +220,14 @@ class _GraphSpecializer:
     build_inferrer = Overload()
 
     @build_inferrer.register
+    async def build_inferrer(self, a, fn: TypedPrimitive, argvals):
+        return _const2(fn.prim, a)
+
+    @build_inferrer.register
     async def build_inferrer(self, a, fn: Primitive, argvals):
+        inf = self.specializer.track.get_inferrer_for(fn, argvals)
+        argvals, outval = await self._find_unique_argvals(a, inf, argvals)
+        a = AbstractFunction(TypedPrimitive(fn, argvals, outval))
         return _const2(fn, a)
 
     @build_inferrer.register
@@ -260,7 +266,7 @@ class _GraphSpecializer:
     @build_inferrer.register
     async def build_inferrer(self, a, fn: TrackableFunction, argvals):
         inf = self.specializer.track.get_inferrer_for(fn, argvals)
-        argvals = await self._find_unique_argvals(inf, argvals)
+        argvals, _ = await self._find_unique_argvals(a, inf, argvals)
         return await self.build_inferrer(a, fn.fn, argvals)
 
     @build_inferrer.register
@@ -278,38 +284,38 @@ class _GraphSpecializer:
         if len(choices) == 1:
             choice, = choices
             argrefs = [VirtualReference({'abstract': v}) for v in choice]
-            await inf(self.specializer.track, None, argrefs)
-            return choice
+            res = await inf(self.specializer.track, None, argrefs)
+            return choice, res
         else:
-            return None
+            return None, None
 
-    async def _find_unique_argvals(self, inf, argvals):
+    async def _find_unique_argvals(self, a, inf, argvals):
         if argvals is None:
             argvals = ()
 
         argvals = tuple(argvals)
 
         if argvals in inf.cache:
-            return argvals
+            return argvals, inf.cache[argvals]
 
         n = len(argvals)
-        choices = set()
+        choices = {}
         await concretize_cache2(inf.cache)
         for k, v in inf.cache.items():
             k = tuple([await concretize_abstract(x) for x in k])
             if k[:n] == argvals:
-                choices.add(k)
+                choices[k] = v
 
         if len(choices) == 1:
-            for choice in choices:
+            for choice in choices.items():
                 # Return the only element
                 return choice
         elif len(choices) == 0:
             raise Unspecializable(DEAD)
         else:
-            generalized = await self._find_generalized(inf)
+            generalized, outval = await self._find_generalized(inf)
             if generalized is not None:
-                return generalized
+                return generalized, outval
             raise Unspecializable(POLY)
 
         # if argvals is None:
@@ -325,7 +331,7 @@ class _GraphSpecializer:
         #     return argvals
 
     async def _build_inferrer_x(self, a, inf, argvals):
-        argvals = await self._find_unique_argvals(inf, argvals)
+        argvals, _ = await self._find_unique_argvals(a, inf, argvals)
         ctx = inf.make_context(self.specializer.track, argvals)
         v = await self.specializer._specialize(ctx.graph, ctx, None)
         return _const2(v, a)
@@ -477,7 +483,9 @@ class _GraphSpecializer:
         self.specializer.seen.add(new_node)
 
         async def _helper(i, node, a, argvals):
-            if node.is_constant_graph() or node.is_constant(MetaGraph):
+            if node.is_constant_graph() \
+                    or node.is_constant(MetaGraph) \
+                    or node.is_constant(Primitive):
                 fns = a.values[VALUE]
                 try:
                     if len(fns) != 1:

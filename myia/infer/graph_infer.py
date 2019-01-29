@@ -831,18 +831,12 @@ class InferenceEngine:
                 )
 
             async def _check():
-                for track in tracks:
-                    expected = outspec[track]
-                    if expected not in (UNKNOWN, ANYTHING):
-                        self.equiv.declare_equivalent(
-                            output_ref.get_raw(track),
-                            expected,
-                            [output_ref]
-                        )
+                from ..abstract.inf import amerge
+                amerge(await output_ref['abstract'], outspec['abstract'], loop=self.loop, forced=False)
 
             self.run_coroutine(_run())
-            # if outspec is not None:
-            #     self.run_coroutine(_check())
+            if outspec is not None:
+                self.run_coroutine(_check())
 
             results = {name: output_ref.get(name) for name in tracks}
             return results, root_context

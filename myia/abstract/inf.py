@@ -16,7 +16,7 @@ from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
     reify, JTransformedFunction, AbstractJTagged, AbstractTuple, \
     sensitivity_transform, VirtualFunction, AbstractFunction, \
-    VALUE, TYPE, SHAPE, REF, DummyFunction, TrackableFunction
+    VALUE, TYPE, SHAPE, REF, DummyFunction, TrackableFunction, TypedPrimitive
 
 
 _number_types = [
@@ -80,7 +80,7 @@ class AbstractTrack(Track):
         )
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, vf: VirtualFunction, args):
+    def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive), args):
         return VirtualXInferrer(
             vf.args,
             vf.output
@@ -154,8 +154,8 @@ class AbstractTrack(Track):
     def from_value(self, v, context, ref=None):
         """Infer the type of a constant."""
         if isinstance(v, Primitive):
-            # if ref is not None:
-            #     v = TrackableFunction(v, id=ref.node)
+            if ref is not None:
+                v = TrackableFunction(v, id=ref.node)
             return AbstractFunction(v)
         elif isinstance(v, Graph):
             if v.parent:
@@ -332,8 +332,7 @@ class TrackableXInferrer(XInferrer):
 
     async def __call__(self, track, outref, argrefs):
         args = tuple([await ref['abstract'] for ref in argrefs])
-        if args not in self.cache:
-            self.cache[args] = await self.subinf(track, outref, argrefs)
+        self.cache[args] = await self.subinf(track, outref, argrefs)
         return self.cache[args]
 
 
