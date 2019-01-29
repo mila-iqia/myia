@@ -44,69 +44,69 @@ class AbstractTrack(Track):
     get_inferrer_for = Overload()
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, prim: Primitive, args):
+    def get_inferrer_for(self, prim: Primitive):
         return self.constructors[prim]
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, g: Graph, args):
-        return self.get_inferrer_for(GraphAndContext(g, Context.empty()), args)
+    def get_inferrer_for(self, g: Graph):
+        return self.get_inferrer_for(GraphAndContext(g, Context.empty()))
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, g: GraphAndContext, args):
+    def get_inferrer_for(self, g: GraphAndContext):
         if g not in self.constructors:
             self.constructors[g] = GraphXInferrer(g.graph, g.context)
         return self.constructors[g]
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, tf: TrackableFunction, args):
+    def get_inferrer_for(self, tf: TrackableFunction):
         if tf not in self.constructors:
             self.constructors[tf] = TrackableXInferrer(
-                self.get_inferrer_for(tf.fn, args)
+                self.get_inferrer_for(tf.fn)
             )
         return self.constructors[tf]
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, part: PartialApplication, args):
+    def get_inferrer_for(self, part: PartialApplication):
         return PartialXInferrer(
-            self.get_inferrer_for(part.fn, (*part.args, *args)),
+            self.get_inferrer_for(part.fn),
             part.args
         )
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, j: JTransformedFunction, args):
+    def get_inferrer_for(self, j: JTransformedFunction):
         return JXInferrer(
-            self.get_inferrer_for(j.fn, args),
+            self.get_inferrer_for(j.fn),
             j.fn
         )
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive), args):
+    def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive)):
         return VirtualXInferrer(
             vf.args,
             vf.output
         )
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, df: DummyFunction, args):
+    def get_inferrer_for(self, df: DummyFunction):
         raise MyiaTypeError(f'Trying to call dummy')
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, mg: MetaGraph, args):
+    def get_inferrer_for(self, mg: MetaGraph):
         if mg not in self.constructors:
             self.constructors[mg] = MetaGraphXInferrer(mg)
         return self.constructors[mg]
 
     # @get_inferrer_for.register
-    # def get_inferrer_for(self, mg: MetaGraph, args):
+    # def get_inferrer_for(self, mg: MetaGraph):
     #     try:
     #         g = mg.specialize_from_abstract(args)
     #     except GraphGenerationError as err:
     #         raise MyiaTypeError(f'Graph gen error: {err}')
     #     g = self.engine.pipeline.resources.convert(g)
-    #     return self.get_inferrer_for(g, args)
+    #     return self.get_inferrer_for(g)
 
     async def execute(self, fn, *args):
-        infs = [self.get_inferrer_for(poss, args)
+        infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]
         argrefs = [VirtualReference({'abstract': a}) for a in args]
         return await execute_inferrers(self, infs, None, argrefs)
@@ -125,7 +125,7 @@ class AbstractTrack(Track):
         if not isinstance(fn, AbstractFunction):
             raise Exception(f'Not a function: {fn}')
 
-        infs = [self.get_inferrer_for(poss, args)
+        infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]
 
         return await self.engine.loop.schedule(
