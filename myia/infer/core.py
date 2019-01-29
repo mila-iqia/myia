@@ -44,14 +44,6 @@ class InferenceTask(asyncio.Task):
         super().__init__(coro, loop=loop)
         self.key = key
 
-    def __hrepr__(self, H, hrepr):
-        return hrepr.stdrepr_object(
-            'Task',
-            (('wait_for', self._fut_waiter),
-             ('key', self.key)),
-            delimiter="↦",
-        )
-
 
 class InferenceLoop(asyncio.AbstractEventLoop):
     """EventLoop implementation for use with the inferrer.
@@ -324,15 +316,6 @@ class PendingTentative(Pending):
     def force_resolve(self):
         """Resolve to the tentative value."""
         self.resolve_to(self.tentative)
-
-    def __hrepr__(self, H, hrepr):
-        # TODO: move
-        return hrepr.stdrepr_object(
-            'PendingTentative',
-            (('tentative', self.tentative),
-             ('done', self.resolved()),
-             ('prio', self.priority()))
-        )
 
 
 async def find_coherent_result(v, fn):
