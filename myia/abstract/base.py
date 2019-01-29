@@ -1,11 +1,14 @@
 
 import math
 import numpy
-from dataclasses import is_dataclass
+from dataclasses import dataclass, is_dataclass
 from functools import reduce
 from itertools import chain
+from typing import Tuple
 
 from .. import dtype, dshape
+from ..ir import Graph
+from ..prim import Primitive
 from ..debug.utils import mixin
 from ..infer import ANYTHING, InferenceError, MyiaTypeError, \
     Reference, Context
@@ -25,88 +28,40 @@ class Possibilities(frozenset):
     pass
 
 
+@dataclass(frozen=True)
 class TrackableFunction:
-    def __init__(self, fn, id):
-        self.fn = fn
-        self.id = id
-
-    def __hash__(self):
-        return hash((self.fn, self.id))
-
-    def __eq__(self, other):
-        return isinstance(other, TrackableFunction) \
-            and self.fn == other.fn \
-            and self.id == other.id
+    fn: object
+    id: object
 
 
+@dataclass(frozen=True)
 class GraphAndContext:
-    def __init__(self, graph, context):
-        self.graph = graph
-        self.context = context
-
-    def __hash__(self):
-        return hash((self.graph, self.context))
-
-    def __eq__(self, other):
-        return isinstance(other, GraphAndContext) \
-            and self.graph == other.graph \
-            and self.context == other.context
+    graph: Graph
+    context: Context
 
 
+@dataclass(frozen=True)
 class PartialApplication:
-    def __init__(self, fn, args):
-        self.fn = fn
-        self.args = args
-
-    def __hash__(self):
-        return hash((self.fn, self.args))
-
-    def __eq__(self, other):
-        return isinstance(other, PartialApplication) \
-            and self.fn == other.fn \
-            and self.args == other.args
+    fn: object
+    args: object
 
 
+@dataclass(frozen=True)
 class JTransformedFunction:
-    def __init__(self, fn):
-        self.fn = fn
-
-    def __hash__(self):
-        return hash(self.fn)
-
-    def __eq__(self, other):
-        return isinstance(other, JTransformedFunction) \
-            and self.fn == other.fn
+    fn: object
 
 
+@dataclass(frozen=True)
 class VirtualFunction:
-    def __init__(self, args, output):
-        self.args = args
-        self.output = output
-
-    def __hash__(self):
-        return hash((self.args, self.output))
-
-    def __eq__(self, other):
-        return isinstance(other, VirtualFunction) \
-            and self.args == other.args \
-            and self.output == other.output
+    args: Tuple['AbstractBase']
+    output: 'AbstractBase'
 
 
+@dataclass(frozen=True)
 class TypedPrimitive:
-    def __init__(self, prim, args, output):
-        self.prim = prim
-        self.args = args
-        self.output = output
-
-    def __hash__(self):
-        return hash((self.prim, self.args, self.output))
-
-    def __eq__(self, other):
-        return isinstance(other, TypedPrimitive) \
-            and self.prim == other.prim \
-            and self.args == other.args \
-            and self.output == other.output
+    prim: Primitive
+    args: Tuple['AbstractBase']
+    output: 'AbstractBase'
 
 
 class DummyFunction:
