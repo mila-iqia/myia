@@ -160,18 +160,17 @@ class Reference(AbstractReference):
 
     async def __getitem__(self, track):
         """Get the value for the track (asynchronous)."""
-        return await reify(await self.get_raw(track))
+        assert track == 'abstract'
+        return await self.get()
 
-    def get(self, track="*"):
-        """Get the value for the track (synchronous).
+    async def get(self):
+        """Get the value for the track (asynchronous)."""
+        raw = self.engine.get_inferred(self)
+        return await reify(await raw)
 
-        If track is "*", return a dictionary with all tracks.
-        """
-        return self.engine.run_coroutine(self[track], throw=True)
-
-    def get_raw(self, track):
-        """Get the raw value for the track, which might be wrapped."""
-        return self.engine.get_inferred(track, self)
+    def get_sync(self):
+        """Get the value for the track (synchronous)."""
+        return self.engine.run_coroutine(self['abstract'], throw=True)
 
     def __eq__(self, other):
         return isinstance(other, Reference) \
@@ -193,23 +192,28 @@ class VirtualReference(AbstractReference):
 
     """
 
-    def __init__(self, values):
+    def __init__(self, abstract):
         """Initialize the VirtualReference."""
-        self.values = values
-
-    async def get_raw(self, track):
-        """Get the raw value for the track, which might be wrapped."""
-        return self.values[track]
+        self.abstract = abstract
 
     async def __getitem__(self, track):
-        return self.values[track]
+        assert track == 'abstract'
+        return self.abstract
+
+    async def get(self):
+        """Get the value for the track (asynchronous)."""
+        return self.abstract
+
+    def get_sync(self):
+        """Get the value for the track (synchronous)."""
+        return self.abstract
 
     def __hash__(self):
-        return hash(tuple(sorted(self.values.items())))
+        return hash(self.abstract)
 
     def __eq__(self, other):
         return isinstance(other, VirtualReference) \
-            and self.values == other.values
+            and self.abstract == other.abstract
 
 
 ########
@@ -222,10 +226,6 @@ class InferenceEngine:
 
     Arguments:
         tracks: Map each track (property name) to a Track object.
-        tied_tracks: A dictionary from track names to lists of
-            track names which should be computed along with it.
-            E.g. tied_tracks={'type': ['shape']} to compute the
-            shape every time the type is computed.
 
     """
 
@@ -233,37 +233,32 @@ class InferenceEngine:
                  pipeline,
                  *,
                  tracks,
-                 tied_tracks={},
                  context_class=Context):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop()
         self.pipeline = pipeline
         self.mng = self.pipeline.resources.manager
         self.all_track_names = tuple(tracks.keys())
-        self.tracks = {
-            name: t(engine=self, name=name)
-            for name, t in tracks.items()
-        }
-        self.tied_tracks = tied_tracks
+        self.track = tracks['abstract'](engine=self, name='abstract')
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
         self.context_class = context_class
         self.reference_map = {}
 
-    def run(self, graph, *, tracks, argspec, outspec=None):
+    def run(self, graph, *, argspec, outspec=None):
         """Run the inferrer on a graph given initial values.
 
         Arguments:
             graph: The graph to analyze.
-            tracks: The names of the tracks to infer.
             argspec: The arguments. Must be a tuple of dictionaries where
                 each dictionary maps track name to value.
             outspec (optional): Expected inference results. If provided,
                 inference results will be checked against them.
         """
-        assert 'abstract' in self.tracks
-        argrefs = [self.vref(arg) for arg in argspec]
-        argspec = [ref.values['abstract'] for ref in argrefs]
+        from ..abstract.inf import GraphXInferrer
+        from ..abstract.base import AbstractBase
+        assert not isinstance(outspec, dict)
+        argrefs = [VirtualReference(arg) for arg in argspec]
 
         self.mng.add_graph(graph)
         empty_context = self.context_class.empty()
@@ -271,35 +266,33 @@ class InferenceEngine:
         output_ref = self.ref(graph.return_, root_context)
 
         async def _run():
-            from ..abstract.inf import GraphXInferrer
             inf = GraphXInferrer(graph, empty_context)
             self.loop.schedule(
-                inf(self.tracks['abstract'], None, argrefs)
+                inf(self.track, None, argrefs)
             )
 
         async def _check():
             from ..abstract.inf import amerge
-            amerge(await output_ref['abstract'], outspec['abstract'], loop=self.loop, forced=False)
+            amerge(await output_ref.get(),
+                   outspec,
+                   loop=self.loop,
+                   forced=False)
 
         self.run_coroutine(_run())
         if outspec is not None:
             self.run_coroutine(_check())
 
-        results = {name: output_ref.get(name) for name in tracks}
-        return results, root_context
+        return output_ref.get_sync(), root_context
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
         return Reference(self, node, context)
 
-    def vref(self, values):
-        """Return a VirtualReference using the given property values."""
-        return VirtualReference(values)
-
     async def compute_ref(self, key):
         """Compute the value of the Reference on the given track."""
         track_name, ref = key
-        track = self.tracks[track_name]
+        assert track_name == 'abstract'
+        track = self.track
 
         assert isinstance(ref, Reference)
 
@@ -319,16 +312,17 @@ class InferenceEngine:
         else:
             raise AssertionError(f'Missing information for {key}', key)
 
-    def get_inferred(self, track, ref):
+    def get_inferred(self, ref):
         """Get a Future for the value of the Reference on the given track.
 
         Results are cached.
         """
+        track = 'abstract'
         return self.cache.get((track, ref))
 
-    async def forward_reference(self, track, orig, new):
+    async def forward_reference(self, orig, new):
         self.reference_map[orig] = new
-        return await self.get_inferred(track, new)
+        return await self.get_inferred(new)
 
     def run_coroutine(self, coro, throw=True):
         """Run an async function using this inferrer's loop."""

@@ -99,7 +99,7 @@ class AbstractTrack(Track):
     async def execute(self, fn, *args):
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]
-        argrefs = [VirtualReference({'abstract': a}) for a in args]
+        argrefs = [VirtualReference(a) for a in args]
         return await execute_inferrers(self, infs, None, argrefs)
 
     async def infer_apply(self, ref):
@@ -295,7 +295,7 @@ class GraphXInferrer(XInferrer):
             engine.cache.set_value(('abstract', ref), arg)
 
         out = engine.ref(g.return_, context)
-        return await engine.get_inferred('abstract', out)
+        return await engine.get_inferred(out)
 
 
 class MetaGraphXInferrer(XInferrer):
@@ -348,7 +348,7 @@ class MetaGraphXInferrer(XInferrer):
             engine.cache.set_value(('abstract', ref), arg)
 
         out = engine.ref(g.return_, context)
-        return await engine.get_inferred('abstract', out)
+        return await engine.get_inferred(out)
 
 
 class PartialXInferrer(XInferrer):
@@ -361,7 +361,7 @@ class PartialXInferrer(XInferrer):
     async def __call__(self, track, outref, argrefs):
         argvals = tuple([await ref['abstract'] for ref in argrefs])
         if argvals not in self.cache:
-            args = tuple(VirtualReference({'abstract': arg})
+            args = tuple(VirtualReference(arg)
                          for arg in self.args + argvals)
             self.cache[argvals] = await self.fn(track, outref, args)
         return self.cache[argvals]
@@ -413,7 +413,7 @@ class JXInferrer(XInferrer):
         args = tuple([await ref['abstract'] for ref in argrefs])
         if args not in self.cache:
             jinv_args = tuple(_jinv(a) for a in args)
-            jinv_argrefs = tuple(VirtualReference({'abstract': arg})
+            jinv_argrefs = tuple(VirtualReference(arg)
                                  for arg in jinv_args)
             res = await self.fn(track, None, jinv_argrefs)
             res_wrapped = _jtag(res)

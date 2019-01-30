@@ -59,8 +59,7 @@ class TypeSpecializer:
         """Initialize a TypeSpecializer."""
         self.engine = engine
         self.seen = set()
-        assert len(self.engine.tracks) == 1
-        self.track = self.engine.tracks['abstract']
+        self.track = self.engine.track
         self.mng = self.engine.mng
         self.specializations = {Context.empty(): None}
 
@@ -79,7 +78,7 @@ class TypeSpecializer:
         await concretize_cache(self.engine.cache.cache)
         await concretize_cache2(self.engine.reference_map)
         g = ginf._graph
-        argvals = [await self.engine.get_inferred('abstract', ref)
+        argvals = [await self.engine.get_inferred(ref)
                    for ref in argrefs]
         ctx = ginf.make_context(self.track, argvals)
         return await self._specialize(g, ctx, argrefs)
@@ -200,7 +199,7 @@ class _GraphSpecializer:
             choices.add(argvals)
         if len(choices) == 1:
             choice, = choices
-            argrefs = [VirtualReference({'abstract': v}) for v in choice]
+            argrefs = [VirtualReference(v) for v in choice]
             res = await inf(self.specializer.track, None, argrefs)
             return choice, res
         else:

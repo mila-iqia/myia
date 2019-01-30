@@ -341,62 +341,47 @@ class InferenceResource(PipelineResource):
     def __init__(self,
                  pipeline_init,
                  tracks,
-                 required_tracks,
-                 tied_tracks,
                  context_class,
                  erase_value):
         """Initialize an InferenceResource."""
         super().__init__(pipeline_init)
         self.manager = self.resources.manager
         self.tracks = tracks
-        self.required_tracks = required_tracks
-        self.tied_tracks = tied_tracks
         self.context_class = context_class
         self.erase_value = erase_value
         self.engine = InferenceEngine(
             self.pipeline,
             tracks=self.tracks,
-            tied_tracks=self.tied_tracks,
             context_class=self.context_class,
         )
 
     def fill_in(self, argspec):
-        """Fill in argspec with values for all tracks.
+        """Transform argspec into AbstractBase instances."""
+        from ..abstract.base import AbstractBase, broaden
 
-        The 'value' track will also be filled in even if it already exists,
-        since it needs to be wrapped for the inferrer to use it.
-        """
-        for arg in argspec:
-            if '_erase_value' in arg:
-                erase = arg['_erase_value']
-                # del arg['_erase_value']
-            else:
-                erase = self.erase_value
-            if 'value' in arg:
-                v = arg['value']
-                for track_name, track in self.engine.tracks.items():
-                    if track_name not in arg:
-                        arg[track_name] = track.from_value(v, None)
-                    else:
-                        arg[track_name] = track.from_external(arg[track_name])
-                if erase:
-                    arg['value'] = ANYTHING
-            else:
-                for track_name, track in self.engine.tracks.items():
-                    if track_name in arg:
-                        arg[track_name] = track.from_external(arg[track_name])
-                    else:
-                        arg[track_name] = track.default(arg)
+        new_args = []
 
-        from ..abstract.base import broaden
         for arg in argspec:
+            if isinstance(arg, AbstractBase):
+                arg = {'abstract': arg}
+
             if '_erase_value' in arg:
                 erase = arg['_erase_value']
                 del arg['_erase_value']
             else:
                 erase = self.erase_value
-            if erase and 'abstract' in arg:
+
+            if 'value' in arg:
+                v = arg['value']
+                arg['abstract'] = self.engine.track.from_value(v, None)
+                del arg['value']
+
+            if erase:
                 arg['abstract'] = broaden(arg['abstract'], None)
+
+            new_args.append(arg)
+
+        return tuple(new_args)
 
     def infer(self, graph, argspec, outspec=None, clear=False):
         """Perform inference."""
@@ -409,12 +394,12 @@ class InferenceResource(PipelineResource):
                         and not isinstance(orig_t, AbstractFunction):
                     if orig_t is not None:
                         node.abstract = orig_t
-        self.fill_in(argspec)
+        argspec = self.fill_in(argspec)
         return self.engine.run(
             graph,
-            argspec=argspec,
+            argspec=tuple(arg['abstract'] if isinstance(arg, dict)
+                          else arg for arg in argspec),
             outspec=outspec,
-            tracks=self.required_tracks
         )
 
     def specialize(self, graph, context):

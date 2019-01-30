@@ -59,10 +59,8 @@ def specializer_decorator(pipeline):
             def run_test(args):
                 pip = pipeline.make()
                 argspec = tuple({'value': arg} for arg in args)
-                pip.resources.inferrer.fill_in(argspec)
+                argspec = pip.resources.inferrer.fill_in(argspec)
                 print(argspec)
-                for arg in argspec:
-                    del arg['value']
 
                 result_py = fn(*args)
 

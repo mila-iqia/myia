@@ -12,7 +12,7 @@ from myia.prim import Primitive, ops as prim
 from myia.utils import Merge
 from myia.utils.unify import Var, var
 
-from ..common import i64, f64
+from ..common import i64, f64, to_abstract
 
 
 X = Var('X')
@@ -404,24 +404,24 @@ def test_type_tracking():
     def fn_ok1(x, y):
         return x + y
 
-    pip.run(input=fn_ok1, argspec=({'type': i64}, {'type': i64}))
+    pip.run(input=fn_ok1, argspec=(to_abstract(i64), to_abstract(i64)))
 
     def fn_ok2(x):
         return -x
 
-    pip.run(input=fn_ok2, argspec=({'type': i64},))
+    pip.run(input=fn_ok2, argspec=(to_abstract(i64),))
 
     def fn_err1(x, y):
         return x - y
 
     with pytest.raises(InferenceError):
-        pip.run(input=fn_err1, argspec=({'type': i64}, {'type': i64}))
+        pip.run(input=fn_err1, argspec=(to_abstract(i64), to_abstract(i64)))
 
     def fn_err2(x, y):
         return x / y
 
     with pytest.raises(InferenceError):
-        pip.run(input=fn_err2, argspec=({'type': i64}, {'type': i64}))
+        pip.run(input=fn_err2, argspec=(to_abstract(i64), to_abstract(i64)))
 
 
 def test_type_tracking_newgraph():
@@ -436,11 +436,12 @@ def test_type_tracking_newgraph():
     def fn1(x, y):
         return x * y
 
-    pip.run(input=fn1, argspec=({'type': i64}, {'type': i64}))
+    pip.run(input=fn1, argspec=(to_abstract(i64), to_abstract(i64)))
 
     def fn2(x, y):
         return x / y
 
     with pytest.raises(InferenceError):
         pip.run(input=fn2,
-                argspec=({'type': f64}, {'type': f64}))
+                argspec=(to_abstract(f64),
+                         to_abstract(f64)))

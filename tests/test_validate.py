@@ -9,7 +9,10 @@ from myia.prim import ops as P
 from myia.prim.py_implementations import make_record, partial
 from myia.validate import validate as _validate, ValidationError
 
-from .common import L, i64, Point, Point_t
+from .common import L, i64, Point, Point_t, to_abstract
+
+
+Point_a = Point(i64, i64)
 
 
 test_whitelist = frozenset({
@@ -48,7 +51,8 @@ pip_ec = scalar_pipeline \
 
 
 def run(pip, fn, types):
-    res = pip.run(input=fn, argspec=[{'type': t} for t in types])
+    res = pip.run(input=fn,
+                  argspec=[to_abstract(t) for t in types])
     return res['graph']
 
 
@@ -103,13 +107,13 @@ def test_validate():
 
     # Cannot have Class types
     # erase_class should remove it
-    @valid_after_ec(Point_t)
+    @valid_after_ec(Point_a)
     def f7(pt):
         return pt
 
     # Cannot have getattr
     # erase_class should remove it
-    @valid_after_ec(Point_t)
+    @valid_after_ec(Point_a)
     def f8(pt):
         return pt.x
 
@@ -131,7 +135,7 @@ def test_clean():
     def f2(x, y):
         return partial(make_record, Point_t, x)(y)
 
-    @valid_after_ec(L[Point_t])
+    @valid_after_ec([Point_a])
     def f3(xs):
         def f(pt):
             return pt.x + pt.y

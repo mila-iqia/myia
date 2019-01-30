@@ -38,126 +38,8 @@ from myia import dtype
 from .test_abs import type_to_shape
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
     li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
-    Point, Point_t, Point3D, Point3D_t, Thing, Thing_f, Thing_ftup, mysum
-
-
-###########################
-# Abstract value builders #
-###########################
-
-
-def arr_of(t, shp, value):
-    return AbstractArray(AbstractScalar({
-        VALUE: value,
-        TYPE: t,
-        SHAPE: NOSHAPE
-    }), {SHAPE: shp})
-
-
-def ai64_of(*shp, value=ANYTHING):
-    return arr_of(i64, shp, value)
-
-
-def ai32_of(*shp, value=ANYTHING):
-    return arr_of(i32, shp, value)
-
-
-def af64_of(*shp, value=ANYTHING):
-    return arr_of(f64, shp, value)
-
-
-def af32_of(*shp, value=ANYTHING):
-    return arr_of(f32, shp, value)
-
-
-def af16_of(*shp, value=ANYTHING):
-    return arr_of(f16, shp, value)
-
-
-def JT(a):
-    return AbstractJTagged(to_abstract(a))
-
-
-def S(x, t=None):
-    return AbstractScalar({
-        VALUE: x,
-        TYPE: t or dtype.pytype_to_myiatype(type(x)),
-        SHAPE: NOSHAPE
-    })
-
-
-def Shp(*vals):
-    return to_abstract(tuple(S(v, u64) for v in vals))
-
-
-def Ty(t):
-    # TODO: fix interface
-    return AbstractType({VALUE: t, TYPE: TypeType, SHAPE: NOSHAPE})
-
-
-@overload(bootstrap=True)
-def to_abstract(self, x: (bool, int, float, str, EnvInstance)):
-    return AbstractScalar({
-        VALUE: x,
-        TYPE: dtype.pytype_to_myiatype(type(x)),
-        SHAPE: NOSHAPE
-    })
-
-
-@overload  # noqa: F811
-def to_abstract(self, x: (dtype.Number, dtype.Bool,
-                          dtype.External, dtype.EnvType)):
-    return AbstractScalar({VALUE: ANYTHING, TYPE: x, SHAPE: NOSHAPE})
-
-
-@overload  # noqa: F811
-def to_abstract(self, x: np.ndarray):
-    return AbstractArray(
-        AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: dtype.np_dtype_to_type(str(x.dtype)),
-            SHAPE: NOSHAPE
-        }),
-        {SHAPE: x.shape}
-    )
-
-
-@overload  # noqa: F811
-def to_abstract(self, x: AbstractBase):
-    return x
-
-
-@overload  # noqa: F811
-def to_abstract(self, tup: tuple):
-    return AbstractTuple([self(x) for x in tup])
-
-
-@overload  # noqa: F811
-def to_abstract(self, l: list):
-    assert len(l) == 1
-    return AbstractList(self(l[0]))
-
-
-@overload  # noqa: F811
-def to_abstract(self, x: Exception):
-    return x
-
-
-@overload  # noqa: F811
-def to_abstract(self, t: type):
-    return self[t](t)
-
-
-@overload  # noqa: F811
-def to_abstract(self, x: object):
-    if is_dataclass(x):
-        typ = dtype.pytype_to_myiatype(type(x), x)
-        new_args = {}
-        for name, field in x.__dataclass_fields__.items():
-            new_args[name] = self(getattr(x, name))
-        return AbstractClass(typ.tag, new_args, typ.methods)
-    else:
-        raise Exception(f'Cannot convert: {x}')
+    Point, Point_t, Point3D, Point3D_t, Thing, Thing_f, Thing_ftup, mysum, \
+    ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, to_abstract
 
 
 ########################
@@ -226,13 +108,11 @@ def inferrer_decorator(pipeline):
                 print(args)
 
                 def out():
-                    _args = [{'abstract': arg} for arg in args]
                     pip = pipeline.make()
-                    res = pip(input=fn, argspec=_args)
+                    res = pip(input=fn, argspec=args)
                     rval = res['outspec']
 
                     print('Output of inferrer:')
-                    rval = rval['abstract']
                     rval = pip.resources.inferrer.engine.run_coroutine(
                         concretize_abstract(rval)
                     )

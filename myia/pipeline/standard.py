@@ -29,8 +29,6 @@ standard_resources = dict(
                 constructors=abstract_inferrer_constructors
             )
         ),
-        required_tracks=['abstract'],
-        tied_tracks={},
         context_class=Context,
         erase_value=True,
     )

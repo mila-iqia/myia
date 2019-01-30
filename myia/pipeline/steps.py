@@ -191,7 +191,7 @@ def step_erase_class(self, graph, argspec, outspec):
     erase_class(graph, mng)
     new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
     graph = self.resources.inferrer.renormalize(graph, new_argspec)
-    new_outspec = dict(graph.output.inferred)
+    new_outspec = graph.output.abstract
     return {'graph': graph,
             'orig_argspec': argspec,
             'argspec': new_argspec,
@@ -344,7 +344,7 @@ def step_erase_tuple(self, graph, argspec, outspec, erase_class=False):
     erase_tuple(graph, mng)
     new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
     graph = self.resources.inferrer.renormalize(graph, new_argspec)
-    new_outspec = dict(graph.output.inferred)
+    new_outspec = graph.output.abstract
     return {'graph': graph,
             'argspec': new_argspec,
             'outspec': new_outspec,
@@ -664,7 +664,7 @@ def step_wrap(self,
             )
         fn = output
         orig_arg_t = [arg['abstract'] for arg in orig_argspec or argspec]
-        orig_out_t = (orig_outspec or outspec)['abstract']
+        orig_out_t = orig_outspec or outspec
         vm_out_t = graph.return_.abstract
 
         def wrapped(*args):

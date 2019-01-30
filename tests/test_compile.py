@@ -9,6 +9,10 @@ from myia.prim.py_implementations import \
     typeof, scalar_add, partial
 from myia.utils import no_prof, Profile
 
+
+from .common import to_abstract
+
+
 compile_pipeline = standard_pipeline
 
 debug_fn = standard_debug_pipeline \
@@ -148,7 +152,7 @@ def test_switch_nontail():
         return a * a
 
     i64 = typeof(1)
-    argspec = ({'type': i64}, {'type': i64})
+    argspec = ({'abstract': to_abstract(i64)}, {'abstract': to_abstract(i64)})
     myia_fn = compile_pipeline.run(input=fn,
                                    argspec=argspec)['output']
 

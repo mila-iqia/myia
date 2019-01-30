@@ -53,7 +53,7 @@ class MyiaFunction:
         argspec = tuple({'value': arg,
                          '_erase_value': name not in self.specialize_values}
                         for arg, name in zip(args, argnames))
-        inf.fill_in(argspec)
+        argspec = inf.fill_in(argspec)
         key = as_frozen(argspec)
         if key not in self._cache:
             self._cache[key] = self.pip(
