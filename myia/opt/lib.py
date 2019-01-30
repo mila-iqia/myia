@@ -230,7 +230,6 @@ def merge_transposes(optimizer, node, equiv):
     assert len(axes1) == len(axes2)
     axes_final = tuple(axes1.index(x) for x in axes2)
     axes_ct = Constant(axes_final)
-    axes_ct.type = Tuple[[UInt[64] for _ in axes_ct.value]]
     axes_ct.abstract = shptup(axes_ct.value)
     return node.graph.apply(P.transpose, equiv[X], axes_ct)
 
@@ -252,7 +251,6 @@ def unfuse_composite(optimizer, node, equiv):
         def asarray(self, ng, i):
             if i.is_constant():
                 shp = Constant(self.shape)
-                shp.type = Tuple[[UInt[64] for _ in shp.value]]
                 shp.abstract = shptup(shp.value)
                 return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i),
                                 shp)
@@ -308,7 +306,6 @@ def simplify_array_map(optimizer, node, equiv):
             return xs[idx]
         elif x.is_constant() and ismyiatype(x.type, Number):
             shp = Constant(xs[0].shape)
-            shp.type = Tuple[[UInt[64] for _ in shp.value]]
             shp.abstract = shptup(shp.value)
             sexp = (P.distribute, (P.scalar_to_array, x), shp)
             return sexp_to_node(sexp, node.graph)

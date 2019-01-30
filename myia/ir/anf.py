@@ -65,6 +65,15 @@ class Graph:
                         self.output.type]
 
     @property
+    def abstract(self):
+        """Return the graph's type based on parameter/output types."""
+        from ..abstract.base import VirtualFunction
+        if any(p.abstract is None for p in self.parameters):
+            return None
+        return VirtualFunction(tuple(p.abstract for p in self.parameters),
+                               self.output.abstract)
+
+    @property
     def output(self) -> 'ANFNode':
         """
         Return the graph's output.
@@ -290,12 +299,6 @@ class ANFNode(Node):
             from ..abstract.base import TYPE, SHAPE
             return self._abstract.build(SHAPE)
 
-    @shape.setter
-    def shape(self, value):
-        """Set the node's shape."""
-        assert self._abstract is None
-        self.inferred['shape'] = value
-
     @property
     def incoming(self) -> Iterable['ANFNode']:
         """Return incoming nodes in order."""
@@ -353,7 +356,7 @@ class Apply(ANFNode):
         new_inputs = expandlist(map(fn, self.inputs))
         g = noseq(fn, self.graph)
         app = Apply(new_inputs, g)
-        app.type = self.type
+        app.abstract = self.abstract
         return app
 
     def __repr__(self) -> str:
@@ -410,7 +413,7 @@ class Constant(ANFNode):
 
     def __visit__(self, fn):
         ct = Constant(noseq(fn, self.value))
-        ct.type = self.type
+        ct.abstract = self.abstract
         return ct
 
     def __str__(self) -> str:
