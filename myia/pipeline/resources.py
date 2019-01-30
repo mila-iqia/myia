@@ -6,7 +6,7 @@ from collections import defaultdict
 from types import FunctionType
 
 from .. import dtype, operations, parser, composite as C
-from ..aspecialize import TypeSpecializer
+from ..specialize import TypeSpecializer
 from ..abstract.base import AbstractFunction
 from ..infer import InferenceEngine, ANYTHING
 from ..ir import Graph, clone
