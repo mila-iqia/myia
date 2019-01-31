@@ -286,19 +286,7 @@ class TrackableXInferrer(XInferrer):
         return self.cache[args]
 
 
-class GraphXInferrer(XInferrer):
-
-    def __init__(self, graph, context):
-        super().__init__()
-        self._graph = graph
-        if context is None:
-            self.context = Context.empty()
-        else:
-            self.context = context.filter(graph)
-        assert self.context is not None
-
-    def get_graph(self, track, args):
-        return self._graph
+class BaseGraphXInferrer(XInferrer):
 
     def make_context(self, track, args):
         _, ctx = self._make_argkey_and_context(track, args)
@@ -306,13 +294,14 @@ class GraphXInferrer(XInferrer):
 
     def _make_argkey_and_context(self, track, argvals):
         assert argvals is not None
+        g = self.get_graph(track, argvals)
         argkey = tuple(argvals)
         # Update current context using the fetched properties.
-        return argkey, self.context.add(self._graph, argkey)
+        return argkey, self.context.add(g, argkey)
 
     async def infer(self, track, *args):
         engine = track.engine
-        g = self._graph
+        g = self.get_graph(track, args)
         nargs = len(g.parameters)
 
         if len(args) != nargs:
@@ -330,7 +319,22 @@ class GraphXInferrer(XInferrer):
         return await engine.get_inferred(out)
 
 
-class MetaGraphXInferrer(XInferrer):
+class GraphXInferrer(BaseGraphXInferrer):
+
+    def __init__(self, graph, context):
+        super().__init__()
+        self._graph = graph
+        if context is None:
+            self.context = Context.empty()
+        else:
+            self.context = context.filter(graph)
+        assert self.context is not None
+
+    def get_graph(self, track, args):
+        return self._graph
+
+
+class MetaGraphXInferrer(BaseGraphXInferrer):
 
     def __init__(self, metagraph):
         super().__init__()
@@ -347,39 +351,6 @@ class MetaGraphXInferrer(XInferrer):
             g = track.engine.pipeline.resources.convert(g)
             self.graph_cache[argvals] = g
         return self.graph_cache[argvals]
-
-    def make_context(self, track, args):
-        _, ctx = self._make_argkey_and_context(track, args)
-        return ctx
-
-    def _make_argkey_and_context(self, track, argvals):
-        assert argvals is not None
-        g = self.get_graph(track, argvals)
-        argkey = tuple(argvals)
-        # Update current context using the fetched properties.
-        return argkey, self.context.add(g, argkey)
-
-    async def infer(self, track, *args):
-        # TODO: reuse GraphXInferrer code
-
-        engine = track.engine
-        g = self.get_graph(track, args)
-
-        nargs = len(g.parameters)
-
-        if len(args) != nargs:
-            raise type_error_nargs(self, nargs, len(args))
-
-        argkey, context = self._make_argkey_and_context(track, args)
-
-        # We associate each parameter of the Graph with its value for each
-        # property, in the context we built.
-        for p, arg in zip(g.parameters, argkey):
-            ref = engine.ref(p, context)
-            engine.cache.set_value(ref, arg)
-
-        out = engine.ref(g.return_, context)
-        return await engine.get_inferred(out)
 
 
 class PartialXInferrer(XInferrer):
