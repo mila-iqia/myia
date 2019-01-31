@@ -832,21 +832,3 @@ def bind(loop, committed, resolved, pending):
             rval.tie(p)
 
         return rval
-
-
-###########
-# Broaden #
-###########
-
-
-@overload(bootstrap=True)
-def abroaden(x: object, count):
-    if x is ANYTHING or count == 0:
-        return ANYTHING
-    else:
-        return x
-
-
-@overload
-def abroaden(x: dict, count):
-    pass

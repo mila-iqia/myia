@@ -121,7 +121,6 @@ class AbstractTrack(Track):
             for prim, cons in constructors.items()
         }
         self.max_depth = max_depth
-        self.subtracks = [VALUE, TYPE, SHAPE]
 
     get_inferrer_for = Overload()
 
@@ -264,9 +263,6 @@ class XInferrer(Partializable):
     def __init__(self):
         self.cache = {}
 
-    def build(self, field):
-        return None
-
     async def __call__(self, track, outref, argrefs):
         args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
@@ -311,7 +307,7 @@ class GraphXInferrer(XInferrer):
 
     def _make_argkey_and_context(self, track, argvals):
         assert argvals is not None
-        argkey = as_frozen(argvals)
+        argkey = tuple(argvals)
         # Update current context using the fetched properties.
         return argkey, self.context.add(self._graph, argkey)
 
@@ -361,7 +357,7 @@ class MetaGraphXInferrer(XInferrer):
     def _make_argkey_and_context(self, track, argvals):
         assert argvals is not None
         g = self.get_graph(track, argvals)
-        argkey = as_frozen(argvals)
+        argkey = tuple(argvals)
         # Update current context using the fetched properties.
         return argkey, self.context.add(g, argkey)
 
@@ -421,10 +417,6 @@ class VirtualXInferrer(XInferrer):
 
 
 def _jinv(x):
-    if isinstance(x, AbstractFunction):
-        v = x.values[VALUE]
-        if isinstance(v, Possibilities):
-            pass
     if isinstance(x, AbstractJTagged):
         return x.element
     else:
