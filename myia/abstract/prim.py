@@ -1023,7 +1023,7 @@ async def _inf_env_getitem(track,
                            env: dtype.EnvType,
                            key: dtype.SymbolicKeyType,
                            dflt):
-    expected = key.values[VALUE].inferred
+    expected = key.values[VALUE].abstract
     track.abstract_merge(expected, dflt)
     return expected
 
@@ -1033,7 +1033,7 @@ async def _inf_env_setitem(track,
                            env: dtype.EnvType,
                            key: dtype.SymbolicKeyType,
                            value):
-    expected = key.values[VALUE].inferred
+    expected = key.values[VALUE].abstract
     track.abstract_merge(expected, value)
     return AbstractScalar({
         VALUE: ANYTHING,

@@ -254,7 +254,7 @@ class VM:
                 frame.values[node] = res
             elif fn == embed:
                 _, x = node.inputs
-                frame.values[node] = SymbolicKeyInstance(x, {})
+                frame.values[node] = SymbolicKeyInstance(x, node.abstract)
             else:
                 frame.values[node] = self.implementations[fn](self, *args)
         elif isinstance(fn, Partial):
