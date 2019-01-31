@@ -61,6 +61,9 @@ class Optimizer(PipelineStep):
             self.names.append(name)
             self.phases.append(spec)
 
+        if len(self.phases) == 1:
+            self.run_only_once = True
+
     def step(self, graph, argspec=None, outspec=None, profile=no_prof):
         """Optimize the graph using the given patterns."""
         with profile:
@@ -79,8 +82,8 @@ class Optimizer(PipelineStep):
                                 )
                             elif opt(graph):
                                 changes = True
-                        if self.run_only_once:
-                            break
+                    if self.run_only_once:
+                        break
             with profile.step('keep_roots'):
                 self.resources.manager.keep_roots(graph)
             res = {'graph': graph}
@@ -279,8 +282,6 @@ step_opt = Optimizer.partial(
             optlib.getitem_newenv,
             optlib.getitem_env_add,
             optlib.simplify_array_map,
-        ],
-        main2=[
             # Costlier optimizations
             optlib.float_tuple_getitem_through_switch,
             optlib.float_env_getitem_through_switch,
@@ -300,13 +301,12 @@ step_opt = Optimizer.partial(
     )
 )
 
+
 # Final optimization pass
 step_opt2 = Optimizer.partial(
     phases=dict(
-        unfuse=[
+        main=[
             optlib.unfuse_composite,
-        ],
-        main2=[
             optlib.getitem_tuple,
             optlib.setitem_tuple,
             optlib.setitem_tuple_ct,

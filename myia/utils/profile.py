@@ -7,11 +7,13 @@ def _unit(secs):
     return "%.3gs" % secs
 
 
-def print_profile(prof, *, indent=0):
+def print_profile(prof, *, indent=0, sums=None):
     """Print a visualisation of a profile."""
     total = prof.pop('__total__')
     runtime = 0
     ind = " " * indent
+    if sums is None:
+        sums = dict()
 
     for v in prof.values():
         if isinstance(v, dict):
@@ -26,9 +28,16 @@ def print_profile(prof, *, indent=0):
     for k, v in prof.items():
         if isinstance(v, dict):
             print(f"{ind}  {k}:")
-            print_profile(v, indent=indent + 4)
+            print_profile(v, indent=indent + 4, sums=sums)
         else:
+            sums[k] = sums.setdefault(k, 0) + v
             print(f"{ind}  {k}: {_unit(v)}")
+
+    if indent == 0:
+        total = sum(sums.values())
+        print("Sums")
+        for k, v in sums.items():
+            print(f"  {k:20}: {_unit(v):10}: {(v/total)*100:5.2f}%")
 
 
 class Profile:

@@ -4,7 +4,7 @@ from ..composite import hyper_add
 from ..dtype import type_cloner, Function, JTagged, Number, ismyiatype, \
     Tuple, UInt
 from ..infer import Inferrer
-from ..ir import Graph, Constant, GraphCloner, transformable_clone
+from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable
 from ..utils.unify import Var, var, SVar
@@ -406,7 +406,7 @@ simplify_switch_idem = psub(
 )
 
 
-_PutInSwitch = primset_var(
+_PutInSwitch_l = (
     P.scalar_add,
     P.scalar_sub,
     P.scalar_mul,
@@ -415,6 +415,7 @@ _PutInSwitch = primset_var(
     P.scalar_pow,
 )
 
+_PutInSwitch = primset_var(*_PutInSwitch_l)
 
 # Binary operations on switches with same conditions are transformed into
 # a switch on two operations, e.g.
@@ -422,7 +423,8 @@ _PutInSwitch = primset_var(
 combine_switches = psub(
     pattern=(_PutInSwitch, (P.switch, X1, X2, X3), (P.switch, X1, X4, X5)),
     replacement=(P.switch, X1, (_PutInSwitch, X2, X4), (_PutInSwitch, X3, X5)),
-    name='combine_switches'
+    name='combine_switches',
+    interest=_PutInSwitch_l
 )
 
 
@@ -452,7 +454,8 @@ float_env_getitem_through_switch = psub(
 simplify_partial = psub(
     pattern=((P.partial, X, Xs), Ys),
     replacement=(X, Xs, Ys),
-    name='simplify_partial'
+    name='simplify_partial',
+    interest=Apply,
 )
 
 
@@ -484,7 +487,7 @@ def make_inliner(inline_criterion, check_recursive):
         check_recursive: Check whether a function is possibly recursive
             before inlining it. If it is, don't inline.
     """
-    @pattern_replacer(G, Xs)
+    @pattern_replacer(G, Xs, interest=Graph)
     def inline(optimizer, node, equiv):
         g = equiv[G].value
         args = equiv[Xs]
@@ -548,7 +551,7 @@ inline_inside_marked_caller = \
 inline = make_inliner(inline_criterion=None, check_recursive=True)
 
 
-@pattern_replacer('just', G)
+@pattern_replacer('just', G, interest=None)
 def replace_applicator(optimizer, node, equiv):
     """Replace a function that applies another by the other function.
 
@@ -594,7 +597,7 @@ def specialize_transform(graph, args):
     return graph
 
 
-@pattern_replacer(G, Xs)
+@pattern_replacer(G, Xs, interest=Graph)
 def specialize_on_graph_arguments(optimizer, node, equiv):
     """Specialize a call on constant graph arguments."""
     g = equiv[G].value
@@ -720,7 +723,7 @@ def call_output_transform(graph, nargs):
     return graph
 
 
-@pattern_replacer((G, Xs), Ys)
+@pattern_replacer((G, Xs), Ys, interest=Apply)
 def incorporate_call(optimizer, node, equiv):
     """Incorporate a call into the graph that returns the function.
 
@@ -737,7 +740,7 @@ def incorporate_call(optimizer, node, equiv):
     return node.graph.apply(g2, *xs, *ys)
 
 
-@pattern_replacer(((P.switch, X, G1, G2), Xs), Ys)
+@pattern_replacer(((P.switch, X, G1, G2), Xs), Ys, interest=Apply)
 def incorporate_call_through_switch(optimizer, node, equiv):
     """Incorporate a call to both branches.
 
