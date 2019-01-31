@@ -99,7 +99,7 @@ def Shp(*vals):
 
 def Ty(t):
     # TODO: fix interface
-    return AbstractType({VALUE: t, TYPE: TypeType, SHAPE: NOSHAPE})
+    return AbstractType(t)
 
 
 @overload(bootstrap=True)

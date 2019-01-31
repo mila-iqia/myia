@@ -93,11 +93,7 @@ def to_abstract(v, context=None, ref=None):
         return AbstractList(to_abstract(v[0], context))
 
     elif dtype.ismyiatype(v):
-        return AbstractType({
-            VALUE: v,
-            TYPE: dtype.TypeType,
-            SHAPE: dtype.NOSHAPE
-        })
+        return AbstractType(v)
 
     else:
         typ = dtype.pytype_to_myiatype(type(v), v)

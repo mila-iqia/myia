@@ -139,6 +139,13 @@ class AbstractScalar(AbstractValue):
 
 
 class AbstractType(AbstractValue):
+    def __init__(self, typ):
+        super().__init__({
+            VALUE: typ,
+            TYPE: dtype.TypeType,
+            SHAPE: dtype.NOSHAPE,
+        })
+
     def __repr__(self):
         return f'Ty({self.values[VALUE]})'
 

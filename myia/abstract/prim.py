@@ -513,11 +513,7 @@ def _inf_bool_eq(x: Bool, y: Bool) -> Bool:
 @standard_prim(P.typeof)
 async def _inf_typeof(track, value):
     t = value.build(TYPE)
-    return AbstractType({
-        VALUE: t,
-        TYPE: dtype.TypeType,
-        SHAPE: dtype.NOSHAPE
-    })
+    return AbstractType(t)
 
 
 @standard_prim(P.hastype)
