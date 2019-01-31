@@ -6,7 +6,7 @@ from types import FunctionType
 from ..dtype import ismyiatype, Function
 from ..debug.label import label
 from ..ir import GraphGenerationError
-from ..utils import Partializable, UNKNOWN, eprint, as_frozen
+from ..utils import Partializable, UNKNOWN, eprint
 
 from .core import InferenceLoop, EvaluationCache, reify
 from .utils import ANYTHING, InferenceError, MyiaTypeError, \
@@ -210,13 +210,21 @@ class InferenceEngine:
     def __init__(self,
                  pipeline,
                  *,
-                 track,
+                 constructors,
+                 max_depth=1,
                  context_class=Context):
         """Initialize the InferenceEngine."""
+        from ..abstract import AbstractTrack
         self.loop = InferenceLoop()
         self.pipeline = pipeline
         self.mng = self.pipeline.resources.manager
-        self.track = track(engine=self)
+        self.constructors = constructors
+        self.max_depth = max_depth
+        self.track = AbstractTrack(
+            engine=self,
+            constructors=constructors,
+            max_depth=max_depth,
+        )
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
         self.context_class = context_class
@@ -238,7 +246,7 @@ class InferenceEngine:
 
         self.mng.add_graph(graph)
         empty_context = self.context_class.empty()
-        root_context = empty_context.add(graph, as_frozen(argspec))
+        root_context = empty_context.add(graph, argspec)
         output_ref = self.ref(graph.return_, root_context)
 
         async def _run():

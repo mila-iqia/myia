@@ -22,8 +22,7 @@ specialize_pipeline = scalar_debug_pipeline \
             'erase_class', 'erase_tuple',
             'validate', 'export', 'wrap') \
     .configure(
-        {'inferrer.track.max_depth': 1,
-         'inferrer.erase_value': True}
+        {'inferrer.max_depth': 1}
     )
 
 
@@ -32,8 +31,7 @@ specialize_pipeline_std = standard_debug_pipeline \
             'erase_class', 'opt', 'erase_tuple',
             'validate', 'export', 'wrap') \
     .configure(
-        {'inferrer.track.max_depth': 1,
-         'inferrer.erase_value': True}
+        {'inferrer.max_depth': 1}
     )
 
 

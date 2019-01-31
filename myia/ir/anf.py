@@ -88,6 +88,7 @@ class Graph:
     @output.setter
     def output(self, value: 'ANFNode') -> None:
         """Set the graph's output."""
+        from ..abstract.base import AbstractFunction
         if self.return_:
             if self._manager:
                 self._manager.set_edge(self.return_, 1, value)
@@ -95,9 +96,8 @@ class Graph:
                 self.return_.inputs[1] = value
         else:
             self.return_ = Apply([Constant(primops.return_), value], self)
-        self.return_.type = value.type
-        if value.type is not UNKNOWN:
-            self.return_.inputs[0].type = Function[(value.type,), value.type]
+        self.return_.abstract = value.abstract
+        self.return_.inputs[0].abstract = AbstractFunction(primops.return_)
 
     def add_parameter(self) -> 'Parameter':
         """Add a new parameter to this graph (appended to the end)."""
