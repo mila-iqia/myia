@@ -524,8 +524,10 @@ def broaden(self, p: Pending, loop):
 
 @overload
 def broaden(self, p: Possibilities, loop):
-    assert loop is not None
-    return loop.create_pending_tentative(tentative=p)
+    if loop is None:
+        return p
+    else:
+        return loop.create_pending_tentative(tentative=p)
 
 
 ###############
