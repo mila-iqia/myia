@@ -250,10 +250,9 @@ class InferenceEngine:
 
         Arguments:
             graph: The graph to analyze.
-            argspec: The arguments. Must be a tuple of dictionaries where
-                each dictionary maps track name to value.
-            outspec (optional): Expected inference results. If provided,
-                inference results will be checked against them.
+            argspec: The arguments. Must be a tuple of AbstractBase.
+            outspec (optional): Expected inference result. If provided,
+                inference result will be checked against it.
         """
         from ..abstract.inf import GraphXInferrer
         from ..abstract.base import AbstractBase
@@ -288,19 +287,16 @@ class InferenceEngine:
         """Return a Reference to the node in the given context."""
         return Reference(self, node, context)
 
-    async def compute_ref(self, key):
+    async def compute_ref(self, ref):
         """Compute the value of the Reference on the given track."""
-        track_name, ref = key
-        assert track_name == 'abstract'
+        assert isinstance(ref, Reference)
         track = self.track
 
-        assert isinstance(ref, Reference)
-
         node = ref.node
-        inferred = ref.node.inferred.get(track_name, UNKNOWN)
+        inferred = ref.node.inferred.get('abstract', UNKNOWN)
 
         if inferred is not UNKNOWN:
-            inferred = track.from_external(inferred)
+            assert inferred is ref.node.abstract
             return inferred
 
         elif node.is_constant():
@@ -310,15 +306,14 @@ class InferenceEngine:
             return await track.infer_apply(ref)
 
         else:
-            raise AssertionError(f'Missing information for {key}', key)
+            raise AssertionError(f'Missing information for {ref}', ref)
 
     def get_inferred(self, ref):
         """Get a Future for the value of the Reference on the given track.
 
         Results are cached.
         """
-        track = 'abstract'
-        return self.cache.get((track, ref))
+        return self.cache.get(ref)
 
     async def forward_reference(self, orig, new):
         self.reference_map[orig] = new

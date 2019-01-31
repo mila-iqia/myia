@@ -171,18 +171,6 @@ class AbstractTrack(Track):
         else:
             return from_vref(v, typeof(v), shapeof(v))
 
-    def from_external(self, t):
-        return t
-
-    def default(self, values):
-        from ..infer import ANYTHING
-        from ..dshape import NOSHAPE
-        return from_vref(
-            values.get('value', ANYTHING),
-            values['type'],
-            values.get('shape', NOSHAPE),
-        )
-
     def abstract_merge(self, *values):
         return reduce(self._merge, values)
 
@@ -292,7 +280,7 @@ class GraphXInferrer(XInferrer):
         for p, arg in zip(g.parameters, argkey):
             arg.values[REF].setdefault(context, p)
             ref = engine.ref(p, context)
-            engine.cache.set_value(('abstract', ref), arg)
+            engine.cache.set_value(ref, arg)
 
         out = engine.ref(g.return_, context)
         return await engine.get_inferred(out)
@@ -345,7 +333,7 @@ class MetaGraphXInferrer(XInferrer):
         for p, arg in zip(g.parameters, argkey):
             arg.values[REF].setdefault(context, p)
             ref = engine.ref(p, context)
-            engine.cache.set_value(('abstract', ref), arg)
+            engine.cache.set_value(ref, arg)
 
         out = engine.ref(g.return_, context)
         return await engine.get_inferred(out)

@@ -27,12 +27,6 @@ def _const(v, t):
 
 
 async def concretize_cache(cache):
-    for (track, k), v in list(cache.items()):
-        kc = await concretize_abstract(k)
-        cache[(track, kc)] = v
-
-
-async def concretize_cache2(cache):
     for k, v in list(cache.items()):
         kc = await concretize_abstract(k)
         cache[kc] = v
@@ -76,7 +70,7 @@ class TypeSpecializer:
 
     async def _specialize_helper(self, ginf, argrefs):
         await concretize_cache(self.engine.cache.cache)
-        await concretize_cache2(self.engine.reference_map)
+        await concretize_cache(self.engine.reference_map)
         g = ginf._graph
         argvals = [await self.engine.get_inferred(ref)
                    for ref in argrefs]
@@ -216,7 +210,7 @@ class _GraphSpecializer:
 
         n = len(argvals)
         choices = {}
-        await concretize_cache2(inf.cache)
+        await concretize_cache(inf.cache)
         for k, v in inf.cache.items():
             k = tuple([await concretize_abstract(x) for x in k])
             if k[:n] == argvals:
