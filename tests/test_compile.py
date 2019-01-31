@@ -152,7 +152,7 @@ def test_switch_nontail():
         return a * a
 
     i64 = typeof(1)
-    argspec = ({'abstract': to_abstract(i64)}, {'abstract': to_abstract(i64)})
+    argspec = (to_abstract(i64), to_abstract(i64))
     myia_fn = compile_pipeline.run(input=fn,
                                    argspec=argspec)['output']
 

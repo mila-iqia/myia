@@ -414,6 +414,6 @@ def test_env():
     assert res == (110, 20, 0)
 
     res = pip2.run(input=f,
-                   argspec=({'abstract': to_abstract(i64)},
-                            {'abstract': to_abstract(i64)}))['output'](3, 4)
+                   argspec=(to_abstract(i64),
+                            to_abstract(i64)))['output'](3, 4)
     assert res == (110, 20, 0)

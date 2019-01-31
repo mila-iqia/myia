@@ -143,7 +143,7 @@ def _grad_test(fn, obj, args,
                rel_error=1e-3):
     pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
     argspec = [{'value': arg} for arg in clean_args(args)]
-    sens_type = {'abstract': to_abstract(sens_type)}
+    sens_type = to_abstract(sens_type)
     if isinstance(obj, FunctionType):
         res = pipeline.run(input=obj, argspec=[*argspec, sens_type])
     else:

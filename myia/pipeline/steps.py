@@ -138,8 +138,10 @@ def step_infer(self, graph, argspec):
         inference_context: The Context for the root graph.
     """
     try:
+        argspec = self.resources.inferrer.fill_in(argspec)
         res, context = self.resources.inferrer.infer(graph, argspec)
         return {'outspec': res,
+                'argspec': argspec,
                 'inference_context': context}
     except Exception as exc:
         # We still want to keep the inferrer around even
@@ -189,7 +191,7 @@ def step_erase_class(self, graph, argspec, outspec):
     """
     mng = self.resources.manager
     erase_class(graph, mng)
-    new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+    new_argspec = tuple(p.abstract for p in graph.parameters)
     graph = self.resources.inferrer.renormalize(graph, new_argspec)
     new_outspec = graph.output.abstract
     return {'graph': graph,
@@ -342,7 +344,7 @@ def step_erase_tuple(self, graph, argspec, outspec, erase_class=False):
     assert erase_class
     mng = self.resources.manager
     erase_tuple(graph, mng)
-    new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+    new_argspec = tuple(p.abstract for p in graph.parameters)
     graph = self.resources.inferrer.renormalize(graph, new_argspec)
     new_outspec = graph.output.abstract
     return {'graph': graph,
@@ -663,7 +665,7 @@ def step_wrap(self,
                 'OutputWrapper step requires the erase_class/tuple steps'
             )
         fn = output
-        orig_arg_t = [arg['abstract'] for arg in orig_argspec or argspec]
+        orig_arg_t = orig_argspec or argspec
         orig_out_t = orig_outspec or outspec
         vm_out_t = graph.return_.abstract
 

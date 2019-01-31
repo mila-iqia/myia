@@ -380,7 +380,7 @@ class InferenceResource(PipelineResource):
             if erase:
                 arg['abstract'] = broaden(arg['abstract'], None)
 
-            new_args.append(arg)
+            new_args.append(arg['abstract'])
 
         return tuple(new_args)
 
@@ -390,6 +390,7 @@ class InferenceResource(PipelineResource):
             self.engine.cache.clear()
             for node in self.manager.all_nodes:
                 orig_t = node.abstract
+                node.abstract = None
                 node.inferred = defaultdict(lambda: UNKNOWN)
                 if node.is_constant() \
                         and not isinstance(orig_t, AbstractFunction):

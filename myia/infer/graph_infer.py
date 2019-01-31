@@ -270,10 +270,9 @@ class InferenceEngine:
         track = self.track
 
         node = ref.node
-        inferred = ref.node.inferred.get('abstract', UNKNOWN)
+        inferred = ref.node.abstract
 
-        if inferred is not UNKNOWN:
-            assert inferred is ref.node.abstract
+        if inferred is not None:
             return inferred
 
         elif node.is_constant():
