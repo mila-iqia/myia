@@ -56,6 +56,7 @@ class TypeSpecializer:
         self.track = self.engine.track
         self.mng = self.engine.mng
         self.specializations = {Context.empty(): None}
+        self.infcaches = {}
 
     def run(self, graph, context):
         """Run the specializer on the given graph in the given context."""
@@ -183,40 +184,43 @@ class _GraphSpecializer:
     async def build_inferrer(self, a, fn: object, argvals):
         raise Exception(f'Unrecognized: {fn}')
 
+    async def _find_choices(self, inf):
+        if inf not in self.specializer.infcaches:
+            rcache = {}
+            for k, v in list(inf.cache.items()):
+                kc = tuple([await concretize_abstract(x) for x in k])
+                inf.cache[kc] = v
+                rcache[kc] = v
+            self.specializer.infcaches[inf] = rcache
+        return self.specializer.infcaches[inf]
+
     async def _find_generalized(self, inf):
         from .abstract.base import broaden
         choices = set()
-        for argvals in inf.cache:
-            argvals = [await concretize_abstract(broaden(v, None))
-                       for v in argvals]
-            argvals = tuple(broaden(v, None) for v in argvals)
+        for argvals in self.specializer.infcaches[inf]:
+            argvals = tuple([broaden(v, None) for v in argvals])
             choices.add(argvals)
         if len(choices) == 1:
             choice, = choices
             argrefs = [VirtualReference(v) for v in choice]
             res = await inf(self.specializer.track, None, argrefs)
+            self.specializer.infcaches[inf] = {choice: res}
             return choice, res
         else:
             return None, None
 
     async def _find_unique_argvals(self, a, inf, argvals):
-        if argvals is None:
-            argvals = ()
-
-        argvals = tuple(argvals)
-
+        if argvals is not None:
+            argvals = tuple(argvals)
         if argvals in inf.cache:
+            # We do this first because it's inexpensive
             return argvals, inf.cache[argvals]
-
-        n = len(argvals)
-        choices = {}
-        await concretize_cache(inf.cache)
-        for k, v in inf.cache.items():
-            k = tuple([await concretize_abstract(x) for x in k])
-            if k[:n] == argvals:
-                choices[k] = v
-
-        if len(choices) == 1:
+        choices = await self._find_choices(inf)
+        if argvals in inf.cache:
+            # We do this a second time because _find_choices may have
+            # added what we are looking for.
+            return argvals, inf.cache[argvals]
+        elif len(choices) == 1:
             for choice in choices.items():
                 # Return the only element
                 return choice
