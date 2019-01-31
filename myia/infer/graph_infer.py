@@ -231,7 +231,7 @@ class InferenceEngine:
             outspec (optional): Expected inference result. If provided,
                 inference result will be checked against it.
         """
-        from ..abstract.inf import GraphXInferrer
+        from ..abstract.inf import GraphInferrer
         from ..abstract.base import AbstractBase
         assert not isinstance(outspec, dict)
         argrefs = [VirtualReference(arg) for arg in argspec]
@@ -242,7 +242,7 @@ class InferenceEngine:
         output_ref = self.ref(graph.return_, root_context)
 
         async def _run():
-            inf = GraphXInferrer(graph, empty_context)
+            inf = GraphInferrer(graph, empty_context)
             self.loop.schedule(
                 inf(self.track, None, argrefs)
             )

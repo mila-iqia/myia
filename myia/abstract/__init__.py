@@ -12,8 +12,8 @@ from .base import (  # noqa
 
 from .inf import (  # noqa
     AbstractTrack,
-    XInferrer,
-    GraphXInferrer,
+    Inferrer,
+    GraphInferrer,
     from_value,
     to_abstract,
 )

@@ -48,12 +48,12 @@ pyimpl_test = {}
 abstract_inferrer_cons_test = {}
 
 
-from myia.abstract.prim import UniformPrimitiveXInferrer
+from myia.abstract.prim import UniformPrimitiveInferrer
 
 
 def _test_op(fn):
     prim = Primitive(fn.__name__)
-    xinf = UniformPrimitiveXInferrer.partial(impl=fn)
+    xinf = UniformPrimitiveInferrer.partial(impl=fn)
     abstract_inferrer_cons_test[prim] = xinf
     return prim
 

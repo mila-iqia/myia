@@ -3,7 +3,7 @@
 import numpy
 from itertools import count
 
-from .abstract import GraphXInferrer
+from .abstract import GraphInferrer
 from .abstract.base import GraphAndContext, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
     AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, \

@@ -30,8 +30,8 @@ from .base import (
 
 from .inf import (
     AbstractTrack,
-    XInferrer,
-    GraphXInferrer,
+    Inferrer,
+    GraphInferrer,
     from_value,
 )
 
@@ -56,7 +56,7 @@ def reg(*prims):
     return deco
 
 
-class StandardXInferrer(XInferrer):
+class StandardInferrer(Inferrer):
     def __init__(self, infer):
         super().__init__()
         self._infer = infer
@@ -91,13 +91,13 @@ class StandardXInferrer(XInferrer):
 
 def standard_prim(*prims):
     def deco(fn):
-        xinf = StandardXInferrer.partial(infer=fn)
+        xinf = StandardInferrer.partial(infer=fn)
         for prim in prims:
             abstract_inferrer_constructors[prim] = xinf
     return deco
 
 
-class WithImplXInferrer(XInferrer):
+class WithImplInferrer(Inferrer):
     def __init__(self, impl, nolimit=False):
         super().__init__()
         self.impl = impl
@@ -132,7 +132,7 @@ class WithImplXInferrer(XInferrer):
         return rval
 
 
-class UniformPrimitiveXInferrer(WithImplXInferrer):
+class UniformPrimitiveInferrer(WithImplInferrer):
     def __init__(self, impl, nolimit=False):
         super().__init__(impl, nolimit)
         data = self.impl_data
@@ -162,7 +162,7 @@ class UniformPrimitiveXInferrer(WithImplXInferrer):
 
 def uniform_prim(prim, nolimit=False):
     def deco(fn):
-        xinf = UniformPrimitiveXInferrer.partial(impl=fn, nolimit=nolimit)
+        xinf = UniformPrimitiveInferrer.partial(impl=fn, nolimit=nolimit)
         abstract_inferrer_constructors[prim] = xinf
     return deco
 
@@ -645,7 +645,7 @@ async def _inf_list_append(track,
     return arg
 
 
-class _GetAttrXInferrer(XInferrer):
+class _GetAttrInferrer(Inferrer):
     async def __call__(self, track, outref, argrefs):
         if len(argrefs) != 2:
             raise MyiaTypeError('Wrong number of arguments')
@@ -674,7 +674,7 @@ class _GetAttrXInferrer(XInferrer):
         return rval
 
 
-abstract_inferrer_constructors[P.getattr] = _GetAttrXInferrer.partial()
+abstract_inferrer_constructors[P.getattr] = _GetAttrInferrer.partial()
 
 
 # setattr = Primitive('setattr')
@@ -955,7 +955,7 @@ async def _inf_identity(track, x):
     return x
 
 
-class _ResolveXInferrer(XInferrer):
+class _ResolveInferrer(Inferrer):
     async def __call__(self, track, outref, argrefs):
         if len(argrefs) != 2:
             raise MyiaTypeError('Wrong number of arguments')
@@ -990,7 +990,7 @@ class _ResolveXInferrer(XInferrer):
         return rval
 
 
-abstract_inferrer_constructors[P.resolve] = _ResolveXInferrer.partial()
+abstract_inferrer_constructors[P.resolve] = _ResolveInferrer.partial()
 
 
 @standard_prim(P.partial)
@@ -1002,7 +1002,7 @@ async def _inf_partial(track, fn, *args):
     ])
 
 
-class _EmbedXInferrer(XInferrer):
+class _EmbedInferrer(Inferrer):
     async def __call__(self, track, outref, argrefs):
         if len(argrefs) != 1:
             raise MyiaTypeError('Wrong number of arguments')
@@ -1015,7 +1015,7 @@ class _EmbedXInferrer(XInferrer):
         })
 
 
-abstract_inferrer_constructors[P.embed] = _EmbedXInferrer.partial()
+abstract_inferrer_constructors[P.embed] = _EmbedInferrer.partial()
 
 
 @standard_prim(P.env_getitem)

@@ -127,34 +127,34 @@ class AbstractTrack(Track):
     @get_inferrer_for.register
     def get_inferrer_for(self, g: GraphAndContext):
         if g not in self.constructors:
-            self.constructors[g] = GraphXInferrer(g.graph, g.context)
+            self.constructors[g] = GraphInferrer(g.graph, g.context)
         return self.constructors[g]
 
     @get_inferrer_for.register
     def get_inferrer_for(self, tf: TrackableFunction):
         if tf not in self.constructors:
-            self.constructors[tf] = TrackableXInferrer(
+            self.constructors[tf] = TrackableInferrer(
                 self.get_inferrer_for(tf.fn)
             )
         return self.constructors[tf]
 
     @get_inferrer_for.register
     def get_inferrer_for(self, part: PartialApplication):
-        return PartialXInferrer(
+        return PartialInferrer(
             self.get_inferrer_for(part.fn),
             part.args
         )
 
     @get_inferrer_for.register
     def get_inferrer_for(self, j: JTransformedFunction):
-        return JXInferrer(
+        return JInferrer(
             self.get_inferrer_for(j.fn),
             j.fn
         )
 
     @get_inferrer_for.register
     def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive)):
-        return VirtualXInferrer(
+        return VirtualInferrer(
             vf.args,
             vf.output
         )
@@ -166,7 +166,7 @@ class AbstractTrack(Track):
     @get_inferrer_for.register
     def get_inferrer_for(self, mg: MetaGraph):
         if mg not in self.constructors:
-            self.constructors[mg] = MetaGraphXInferrer(mg)
+            self.constructors[mg] = MetaGraphInferrer(mg)
         return self.constructors[mg]
 
     async def execute(self, fn, *args):
@@ -250,7 +250,7 @@ class AbstractTrack(Track):
         return await reify(self.chk(predicate, *values))
 
 
-class XInferrer(Partializable):
+class Inferrer(Partializable):
     def __init__(self):
         self.cache = {}
 
@@ -267,7 +267,7 @@ class XInferrer(Partializable):
         return f'{type(self)}'
 
 
-class TrackableXInferrer(XInferrer):
+class TrackableInferrer(Inferrer):
     def __init__(self, subinf):
         super().__init__()
         self.subinf = subinf
@@ -278,7 +278,7 @@ class TrackableXInferrer(XInferrer):
         return self.cache[args]
 
 
-class BaseGraphXInferrer(XInferrer):
+class BaseGraphInferrer(Inferrer):
 
     def make_context(self, track, args):
         _, ctx = self._make_argkey_and_context(track, args)
@@ -311,7 +311,7 @@ class BaseGraphXInferrer(XInferrer):
         return await engine.get_inferred(out)
 
 
-class GraphXInferrer(BaseGraphXInferrer):
+class GraphInferrer(BaseGraphInferrer):
 
     def __init__(self, graph, context):
         super().__init__()
@@ -326,7 +326,7 @@ class GraphXInferrer(BaseGraphXInferrer):
         return self._graph
 
 
-class MetaGraphXInferrer(BaseGraphXInferrer):
+class MetaGraphInferrer(BaseGraphInferrer):
 
     def __init__(self, metagraph):
         super().__init__()
@@ -345,7 +345,7 @@ class MetaGraphXInferrer(BaseGraphXInferrer):
         return self.graph_cache[argvals]
 
 
-class PartialXInferrer(XInferrer):
+class PartialInferrer(Inferrer):
 
     def __init__(self, fn, args):
         super().__init__()
@@ -361,7 +361,7 @@ class PartialXInferrer(XInferrer):
         return self.cache[argvals]
 
 
-class VirtualXInferrer(XInferrer):
+class VirtualInferrer(Inferrer):
 
     def __init__(self, args, output):
         super().__init__()
@@ -392,7 +392,7 @@ def _jtag(x):
     return AbstractJTagged(x)
 
 
-class JXInferrer(XInferrer):
+class JInferrer(Inferrer):
 
     def __init__(self, fn, orig_fn):
         super().__init__()
