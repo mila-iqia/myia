@@ -15,7 +15,7 @@ from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
     Number, Class, Problem, EnvType as Env, JTagged as JT, ismyiatype, \
-    Array, Tuple, List, NOSHAPE
+    Array, Tuple, List
 from myia.hypermap import HyperMap
 from myia.infer import ANYTHING, VOID, InferenceError, \
     Contextless, CONTEXTLESS

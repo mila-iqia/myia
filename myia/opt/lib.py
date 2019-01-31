@@ -5,7 +5,7 @@ from ..abstract.base import \
     AbstractScalar, VALUE, TYPE, SHAPE
 from ..composite import hyper_add
 from ..dtype import type_cloner, Function, JTagged, Number, ismyiatype, \
-    Tuple, UInt, NOSHAPE
+    Tuple, UInt
 from ..ir import Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable
@@ -65,7 +65,6 @@ def shptup(values):
         AbstractScalar({
             VALUE: v,
             TYPE: UInt[64],
-            SHAPE: NOSHAPE
         })
         for v in values
     ])

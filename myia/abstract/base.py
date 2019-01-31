@@ -143,7 +143,6 @@ class AbstractType(AbstractValue):
         super().__init__({
             VALUE: typ,
             TYPE: dtype.TypeType,
-            SHAPE: dtype.NOSHAPE,
         })
 
     def __repr__(self):
@@ -155,7 +154,6 @@ class AbstractError(AbstractValue):
         super().__init__({
             VALUE: err,
             TYPE: dtype.Problem[err],
-            SHAPE: dtype.NOSHAPE,
         })
 
     def __repr__(self):
@@ -168,7 +166,6 @@ class AbstractFunction(AbstractValue):
         super().__init__({
             VALUE: v,
             TYPE: dtype.Function,
-            SHAPE: dtype.NOSHAPE
         })
 
     async def get(self):
@@ -548,7 +545,6 @@ def sensitivity_transform(self, x: AbstractFunction):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.EnvType,
-        SHAPE: dtype.NOSHAPE
     })
 
 

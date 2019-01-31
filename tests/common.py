@@ -7,7 +7,7 @@ from myia.abstract.base import VALUE, TYPE, SHAPE, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged
 from myia.dtype import Bool, Int, UInt, Float, List, Array, Tuple, Function, \
-    Object, pytype_to_myiatype, TypeType, NOSHAPE
+    Object, pytype_to_myiatype, TypeType
 from myia.infer import ANYTHING
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance
@@ -57,7 +57,6 @@ def arr_of(t, shp, value):
     return AbstractArray(AbstractScalar({
         VALUE: value,
         TYPE: t,
-        SHAPE: NOSHAPE
     }), {SHAPE: shp})
 
 
@@ -89,7 +88,6 @@ def S(x, t=None):
     return AbstractScalar({
         VALUE: x,
         TYPE: t or dtype.pytype_to_myiatype(type(x)),
-        SHAPE: NOSHAPE
     })
 
 
@@ -107,14 +105,13 @@ def to_abstract(self, x: (bool, int, float, str, EnvInstance)):
     return AbstractScalar({
         VALUE: x,
         TYPE: dtype.pytype_to_myiatype(type(x)),
-        SHAPE: NOSHAPE
     })
 
 
 @overload  # noqa: F811
 def to_abstract(self, x: (dtype.Number, dtype.Bool,
                           dtype.External, dtype.EnvType)):
-    return AbstractScalar({VALUE: ANYTHING, TYPE: x, SHAPE: NOSHAPE})
+    return AbstractScalar({VALUE: ANYTHING, TYPE: x})
 
 
 @overload  # noqa: F811
@@ -123,7 +120,6 @@ def to_abstract(self, x: np.ndarray):
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: dtype.np_dtype_to_type(str(x.dtype)),
-            SHAPE: NOSHAPE
         }),
         {SHAPE: x.shape}
     )

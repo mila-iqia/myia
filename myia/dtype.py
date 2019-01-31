@@ -8,9 +8,6 @@ from .utils import Named, is_dataclass_type, as_frozen, overload, \
     SymbolicKeyInstance, EnvInstance
 
 
-NOSHAPE = Named('NOSHAPE')
-
-
 _type_cache = {}
 
 

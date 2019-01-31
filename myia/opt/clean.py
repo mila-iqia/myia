@@ -1,7 +1,6 @@
 """Clean up Class types."""
 
-from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner, JTagged, \
-    NOSHAPE
+from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner, JTagged
 from ..ir import Constant, Parameter
 from ..prim import ops as P, Primitive
 from ..utils import UNKNOWN
@@ -38,7 +37,6 @@ def erase_class(root, manager):
             idx_c.abstract = AbstractScalar({
                 VALUE: idx,
                 TYPE: Int[64],
-                SHAPE: NOSHAPE
             })
             new_node = node.graph.apply(P.tuple_getitem, data, idx_c)
 
@@ -114,7 +112,6 @@ def expand_tuples_c(graph, inputs):
             ni.inputs[2].abstract = AbstractScalar({
                 VALUE: pos,
                 TYPE: Int[64],
-                SHAPE: NOSHAPE,
             })
             ni.abstract = elem
             new_input.append(ni)
