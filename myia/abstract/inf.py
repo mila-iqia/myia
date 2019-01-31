@@ -18,7 +18,7 @@ from .base import AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     sensitivity_transform, VirtualFunction, AbstractFunction, \
-    VALUE, TYPE, SHAPE, REF, DummyFunction, TrackableFunction, \
+    VALUE, TYPE, SHAPE, DummyFunction, TrackableFunction, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
     AbstractList, broaden as _broaden
 
@@ -217,7 +217,6 @@ class AbstractTrack(Track):
             res.values[TYPE] = self.engine.loop.create_pending_from_list(
                 _number_types, t, lambda: prio
             )
-        res.values[REF].setdefault(ctref.context, ctref.node)
         return res
 
     def abstract_merge(self, *values):
@@ -324,7 +323,6 @@ class GraphXInferrer(XInferrer):
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
         for p, arg in zip(g.parameters, argkey):
-            arg.values[REF].setdefault(context, p)
             ref = engine.ref(p, context)
             engine.cache.set_value(ref, arg)
 
@@ -377,7 +375,6 @@ class MetaGraphXInferrer(XInferrer):
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
         for p, arg in zip(g.parameters, argkey):
-            arg.values[REF].setdefault(context, p)
             ref = engine.ref(p, context)
             engine.cache.set_value(ref, arg)
 
@@ -464,7 +461,6 @@ class JXInferrer(XInferrer):
 
 async def _xinf_helper(track, inf, outref, argrefs, p):
     result = await inf(track, outref, argrefs)
-    result.values[REF].setdefault(outref.context, outref.node)
     p.resolve_to(result)
 
 

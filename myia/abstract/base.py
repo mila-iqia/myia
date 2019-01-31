@@ -89,7 +89,6 @@ class AbstractBase:
 class AbstractValue(AbstractBase):
     def __init__(self, values, count=0):
         self.values = TrackDict(values)
-        self.values.setdefault(REF, {})
         self.count = count
 
     def build(self, name, default=None):
@@ -129,15 +128,13 @@ class AbstractValue(AbstractBase):
                             if k.eq_relevant()))
 
     def __repr__(self):
-        contents = [f'{k}={v}' for k, v in self.values.items()
-                    if k is not REF]
+        contents = [f'{k}={v}' for k, v in self.values.items()]
         return f'V({", ".join(contents)})'
 
 
 class AbstractScalar(AbstractValue):
     def __repr__(self):
-        contents = [f'{k}={v}' for k, v in self.values.items()
-                    if k is not REF]
+        contents = [f'{k}={v}' for k, v in self.values.items()]
         return f'S({", ".join(contents)})'
 
 
@@ -314,24 +311,9 @@ class ShapeSubtrack(Subtrack):
     pass
 
 
-class RefSubtrack(Subtrack):
-    def eq_relevant(self):
-        return False
-
-    def broaden(self, v, recurse, loop):
-        return {}
-
-    async def async_clone(self, v, recurse):
-        return {}
-
-    def clone(self, v, recurse):
-        return {}
-
-
 VALUE = ValueSubtrack('VALUE')
 TYPE = TypeSubtrack('TYPE')
 SHAPE = ShapeSubtrack('SHAPE')
-REF = RefSubtrack('REF')
 
 
 ############

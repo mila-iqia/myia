@@ -6,7 +6,7 @@ from itertools import count
 from .abstract import GraphXInferrer
 from .abstract.base import GraphAndContext, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
-    AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, REF, \
+    AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, \
     AbstractError, AbstractValue, TrackableFunction, to_value, TypedPrimitive
 from .dtype import Function, TypeMeta
 from .infer import ANYTHING, Context, Unspecializable, \
