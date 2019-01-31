@@ -24,10 +24,8 @@ standard_resources = dict(
         converter=default_convert
     ),
     inferrer=InferenceResource.partial(
-        tracks=dict(
-            abstract=AbstractTrack.partial(
-                constructors=abstract_inferrer_constructors
-            )
+        track=AbstractTrack.partial(
+            constructors=abstract_inferrer_constructors
         ),
         context_class=Context,
         erase_value=True,

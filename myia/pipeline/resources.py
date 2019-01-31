@@ -8,6 +8,7 @@ from types import FunctionType
 from .. import dtype, operations, parser, composite as C
 from ..specialize import TypeSpecializer
 from ..abstract.base import AbstractFunction
+from ..abstract.inf import from_value
 from ..infer import InferenceEngine, ANYTHING
 from ..ir import Graph, clone
 from ..prim import ops as P
@@ -340,18 +341,18 @@ class InferenceResource(PipelineResource):
 
     def __init__(self,
                  pipeline_init,
-                 tracks,
+                 track,
                  context_class,
                  erase_value):
         """Initialize an InferenceResource."""
         super().__init__(pipeline_init)
         self.manager = self.resources.manager
-        self.tracks = tracks
+        self.track = track
         self.context_class = context_class
         self.erase_value = erase_value
         self.engine = InferenceEngine(
             self.pipeline,
-            tracks=self.tracks,
+            track=self.track,
             context_class=self.context_class,
         )
 
@@ -373,7 +374,7 @@ class InferenceResource(PipelineResource):
 
             if 'value' in arg:
                 v = arg['value']
-                arg['abstract'] = self.engine.track.from_value(v, None)
+                arg['abstract'] = from_value(v, None)
                 del arg['value']
 
             if erase:

@@ -44,22 +44,9 @@ class TypeDispatchError(MyiaTypeError):
 class Track(Partializable):
     """Represents a property to infer."""
 
-    def __init__(self, engine, name):
+    def __init__(self, engine):
         """Initialize a Track."""
         self.engine = engine
-        self.name = name
-
-    def to_element(self, v):
-        """Returns the value on this track for each element of v."""
-        raise NotImplementedError()  # pragma: no cover
-
-    def from_value(self, v, context=None):
-        """Get the property from a value in the context."""
-        raise NotImplementedError()  # pragma: no cover
-
-    def default(self, values):
-        """Default value for this track, if nothing is known."""
-        raise NotImplementedError()  # pragma: no cover
 
 
 ##############
@@ -158,11 +145,6 @@ class Reference(AbstractReference):
         self.context = context and context.filter(g)
         self._hash = hash((self.node, self.context))
 
-    async def __getitem__(self, track):
-        """Get the value for the track (asynchronous)."""
-        assert track == 'abstract'
-        return await self.get()
-
     async def get(self):
         """Get the value for the track (asynchronous)."""
         raw = self.engine.get_inferred(self)
@@ -170,15 +152,15 @@ class Reference(AbstractReference):
 
     def get_sync(self):
         """Get the value for the track (synchronous)."""
-        return self.engine.run_coroutine(self['abstract'], throw=True)
+        return self.engine.run_coroutine(self.get(), throw=True)
+
+    def __hash__(self):
+        return self._hash
 
     def __eq__(self, other):
         return isinstance(other, Reference) \
             and self.node is other.node \
             and self.context == other.context
-
-    def __hash__(self):
-        return self._hash
 
 
 class VirtualReference(AbstractReference):
@@ -195,10 +177,6 @@ class VirtualReference(AbstractReference):
     def __init__(self, abstract):
         """Initialize the VirtualReference."""
         self.abstract = abstract
-
-    async def __getitem__(self, track):
-        assert track == 'abstract'
-        return self.abstract
 
     async def get(self):
         """Get the value for the track (asynchronous)."""
@@ -232,14 +210,13 @@ class InferenceEngine:
     def __init__(self,
                  pipeline,
                  *,
-                 tracks,
+                 track,
                  context_class=Context):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop()
         self.pipeline = pipeline
         self.mng = self.pipeline.resources.manager
-        self.all_track_names = tuple(tracks.keys())
-        self.track = tracks['abstract'](engine=self, name='abstract')
+        self.track = track(engine=self)
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
         self.context_class = context_class

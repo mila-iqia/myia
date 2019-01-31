@@ -26,14 +26,46 @@ _number_types = [
 ]
 
 
+def from_value(v, context, ref=None):
+    """Infer the type of a constant."""
+    if isinstance(v, Primitive):
+        if ref is not None:
+            v = TrackableFunction(v, id=ref.node)
+        return AbstractFunction(v)
+    elif isinstance(v, Graph):
+        if v.parent:
+            v = GraphAndContext(v, context)
+        if ref is not None:
+            v = TrackableFunction(v, id=ref.node)
+        return AbstractFunction(v)
+    elif isinstance(v, MetaGraph):
+        if ref is not None:
+            v = TrackableFunction(v, id=ref.node)
+        return AbstractFunction(v)
+    elif is_dataclass_type(v):
+        typ = dtype.pytype_to_myiatype(v)
+        typarg = AbstractScalar({
+            VALUE: typ,
+            TYPE: dtype.TypeType,
+            SHAPE: dshape.NOSHAPE,
+        })
+        return AbstractFunction(
+            PartialApplication(
+                P.make_record,
+                (typarg,)
+            )
+        )
+    else:
+        return from_vref(v, typeof(v), shapeof(v))
+
+
 class AbstractTrack(Track):
     def __init__(self,
                  engine,
-                 name,
                  *,
                  constructors,
                  max_depth=1):
-        super().__init__(engine, name)
+        super().__init__(engine)
         self.constructors = {
             prim: cons()
             for prim, cons in constructors.items()
@@ -108,10 +140,10 @@ class AbstractTrack(Track):
         n_fn, *n_args = ref.node.inputs
         # We await on the function node to get the inferrer
         fn_ref = self.engine.ref(n_fn, ctx)
-        fn = await fn_ref[self.name]
+        fn = await fn_ref.get()
         argrefs = [self.engine.ref(node, ctx) for node in n_args]
 
-        args = [await ref['abstract'] for ref in argrefs]
+        args = [await ref.get() for ref in argrefs]
 
         if not isinstance(fn, AbstractFunction):
             raise Exception(f'Not a function: {fn}')
@@ -129,7 +161,7 @@ class AbstractTrack(Track):
     async def infer_constant(self, ctref):
         """Get the property for a ref of a Constant node."""
         v = self.engine.pipeline.resources.convert(ctref.node.value)
-        res = self.from_value(v, ctref.context, ref=ctref)
+        res = from_value(v, ctref.context, ref=ctref)
         t = res.build(TYPE)
         if dtype.ismyiatype(t, dtype.Number):
             prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
@@ -138,38 +170,6 @@ class AbstractTrack(Track):
             )
         res.values[REF].setdefault(ctref.context, ctref.node)
         return res
-
-    def from_value(self, v, context, ref=None):
-        """Infer the type of a constant."""
-        if isinstance(v, Primitive):
-            if ref is not None:
-                v = TrackableFunction(v, id=ref.node)
-            return AbstractFunction(v)
-        elif isinstance(v, Graph):
-            if v.parent:
-                v = GraphAndContext(v, context)
-            if ref is not None:
-                v = TrackableFunction(v, id=ref.node)
-            return AbstractFunction(v)
-        elif isinstance(v, MetaGraph):
-            if ref is not None:
-                v = TrackableFunction(v, id=ref.node)
-            return AbstractFunction(v)
-        elif is_dataclass_type(v):
-            typ = dtype.pytype_to_myiatype(v)
-            typarg = AbstractScalar({
-                VALUE: typ,
-                TYPE: dtype.TypeType,
-                SHAPE: dshape.NOSHAPE,
-            })
-            return AbstractFunction(
-                PartialApplication(
-                    P.make_record,
-                    (typarg,)
-                )
-            )
-        else:
-            return from_vref(v, typeof(v), shapeof(v))
 
     def abstract_merge(self, *values):
         return reduce(self._merge, values)
@@ -218,7 +218,7 @@ class XInferrer(Partializable):
         return None
 
     async def __call__(self, track, outref, argrefs):
-        args = tuple([await ref['abstract'] for ref in argrefs])
+        args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
             self.cache[args] = await self.infer(track, *args)
         return self.cache[args]
@@ -236,7 +236,7 @@ class TrackableXInferrer(XInferrer):
         self.subinf = subinf
 
     async def __call__(self, track, outref, argrefs):
-        args = tuple([await ref['abstract'] for ref in argrefs])
+        args = tuple([await ref.get() for ref in argrefs])
         self.cache[args] = await self.subinf(track, outref, argrefs)
         return self.cache[args]
 
@@ -347,7 +347,7 @@ class PartialXInferrer(XInferrer):
         self.args = args
 
     async def __call__(self, track, outref, argrefs):
-        argvals = tuple([await ref['abstract'] for ref in argrefs])
+        argvals = tuple([await ref.get() for ref in argrefs])
         if argvals not in self.cache:
             args = tuple(VirtualReference(arg)
                          for arg in self.args + argvals)
@@ -398,7 +398,7 @@ class JXInferrer(XInferrer):
         self.orig_fn = orig_fn
 
     async def __call__(self, track, outref, argrefs):
-        args = tuple([await ref['abstract'] for ref in argrefs])
+        args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
             jinv_args = tuple(_jinv(a) for a in args)
             jinv_argrefs = tuple(VirtualReference(arg)

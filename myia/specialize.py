@@ -313,12 +313,12 @@ class _GraphSpecializer:
         if new_node.graph is not self.new_graph:
             raise AssertionError('Error in specializer [A]')
 
-        new_node.abstract = await concretize_abstract(await ref['abstract'])
+        new_node.abstract = await concretize_abstract(await ref.get())
 
         if node.is_apply():
             new_inputs = new_node.inputs
             irefs = list(map(self.ref, node.inputs))
-            ivals = [await concretize_abstract(await iref['abstract'])
+            ivals = [await concretize_abstract(await iref.get())
                      for iref in irefs]
             for i, ival in enumerate(ivals):
                 iref = irefs[i]

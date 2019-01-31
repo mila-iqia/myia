@@ -32,6 +32,7 @@ from .inf import (
     AbstractTrack,
     XInferrer,
     GraphXInferrer,
+    from_value,
 )
 
 from .. import dtype, dshape
@@ -227,7 +228,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
         elif item_v in data_t.methods:
             method = data_t.methods[item_v]
             method = resources.convert(method)
-            inferrer = track.from_value(method, Context.empty(), ref=outref)
+            inferrer = from_value(method, Context.empty(), ref=outref)
             fn = _prim_or_graph(inferrer)
             g = outref.node.graph
             eng = outref.engine
@@ -241,7 +242,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
     elif case == 'method':
         method, = args
         method = resources.convert(method)
-        inferrer = track.from_value(method, Context.empty(), ref=outref)
+        inferrer = from_value(method, Context.empty(), ref=outref)
         fn = _prim_or_graph(inferrer)
         g = outref.node.graph
         eng = outref.engine
@@ -282,7 +283,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
                             outref.context)
             return await eng.forward_reference(outref, ref)
         else:
-            return track.from_value(value, Context.empty(), ref=outref)
+            return from_value(value, Context.empty(), ref=outref)
 
 
 async def _resolve_case(resources, data_t, item_v, chk):
@@ -656,8 +657,8 @@ class _GetAttrXInferrer(XInferrer):
         if len(argrefs) != 2:
             raise MyiaTypeError('Wrong number of arguments')
         r_data, r_item = argrefs
-        data = await r_data['abstract']
-        item = await r_item['abstract']
+        data = await r_data.get()
+        item = await r_item.get()
 
         def chk(data_v, item_v):
             if not isinstance(item_v, str):  # pragma: no cover
@@ -973,8 +974,8 @@ class _ResolveXInferrer(XInferrer):
         if len(argrefs) != 2:
             raise MyiaTypeError('Wrong number of arguments')
         r_data, r_item = argrefs
-        data = await r_data['abstract']
-        item = await r_item['abstract']
+        data = await r_data.get()
+        item = await r_item.get()
 
         def chk(data_v, item_v):
             if not isinstance(data_v, Namespace):  # pragma: no cover
@@ -1020,7 +1021,7 @@ class _EmbedXInferrer(XInferrer):
         if len(argrefs) != 1:
             raise MyiaTypeError('Wrong number of arguments')
         xref, = argrefs
-        x = await xref['abstract']
+        x = await xref.get()
         key = SymbolicKeyInstance(xref.node, sensitivity_transform(x))
         return AbstractScalar({
             VALUE: key,
