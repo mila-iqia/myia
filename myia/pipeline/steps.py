@@ -138,7 +138,6 @@ def step_infer(self, graph, argspec):
         inference_context: The Context for the root graph.
     """
     try:
-        argspec = self.resources.inferrer.fill_in(argspec)
         res, context = self.resources.inferrer.infer(graph, argspec)
         return {'outspec': res,
                 'argspec': argspec,

@@ -50,17 +50,20 @@ class MyiaFunction:
                 f'Wrong number of arguments: expected {n1}, got {n2}'
             )
 
-        argspec = tuple({'value': arg,
-                         '_erase_value': name not in self.specialize_values}
-                        for arg, name in zip(args, argnames))
-        argspec = inf.fill_in(argspec)
-        key = as_frozen(argspec)
-        if key not in self._cache:
-            self._cache[key] = self.pip(
+        from .abstract.inf import from_value
+        from .abstract.base import broaden
+
+        argspec = tuple(from_value(arg) for arg in args)
+        argspec = tuple(broaden(arg, None)
+                         if name not in self.specialize_values else arg
+                         for arg, name in zip(argspec, argnames))
+
+        if argspec not in self._cache:
+            self._cache[argspec] = self.pip(
                 input=self.fn,
                 argspec=argspec
             )
-        return self._cache[key]
+        return self._cache[argspec]
 
     def compile(self, args):
         """Returns a function specialized for the given args."""

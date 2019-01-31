@@ -7,7 +7,6 @@ from .base import (  # noqa
     AbstractArray,
     AbstractList,
     AbstractClass,
-    from_vref,
 )
 
 
@@ -15,6 +14,8 @@ from .inf import (  # noqa
     AbstractTrack,
     XInferrer,
     GraphXInferrer,
+    from_value,
+    to_abstract,
 )
 
 

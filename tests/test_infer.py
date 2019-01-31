@@ -6,8 +6,7 @@ import numpy as np
 from types import SimpleNamespace
 from dataclasses import is_dataclass
 
-from myia.abstract import from_vref
-from myia.abstract.base import shapeof, VALUE, TYPE, SHAPE, \
+from myia.abstract.base import VALUE, TYPE, SHAPE, \
     AbstractBase, AbstractScalar, AbstractArray, concretize_abstract, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged
@@ -35,7 +34,6 @@ from myia.prim.py_implementations import \
 from myia.utils import RestrictedVar, newenv, overload, EnvInstance
 from myia import dtype
 
-from .test_abs import type_to_shape
 from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
     li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
     Point, Point_t, Point3D, Point3D_t, Thing, Thing_f, Thing_ftup, mysum, \

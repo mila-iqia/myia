@@ -2,6 +2,7 @@
 import numpy
 from pytest import mark
 
+from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.composite import list_map
 from myia.debug.label import short_labeler as lbl
@@ -58,9 +59,7 @@ def specializer_decorator(pipeline):
         def decorate(fn):
             def run_test(args):
                 pip = pipeline.make()
-                argspec = tuple({'value': arg} for arg in args)
-                argspec = pip.resources.inferrer.fill_in(argspec)
-                print(argspec)
+                argspec = tuple(from_value(arg, broaden=True) for arg in args)
 
                 result_py = fn(*args)
 

@@ -2,7 +2,7 @@
 import numpy as np
 from dataclasses import dataclass, is_dataclass
 from myia import dtype
-from myia.abstract.base import shapeof, VALUE, TYPE, SHAPE, \
+from myia.abstract.base import VALUE, TYPE, SHAPE, \
     AbstractBase, AbstractScalar, AbstractArray, concretize_abstract, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged

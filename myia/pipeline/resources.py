@@ -356,34 +356,6 @@ class InferenceResource(PipelineResource):
             context_class=self.context_class,
         )
 
-    def fill_in(self, argspec):
-        """Transform argspec into AbstractBase instances."""
-        from ..abstract.base import AbstractBase, broaden
-
-        new_args = []
-
-        for arg in argspec:
-            if isinstance(arg, AbstractBase):
-                arg = {'abstract': arg}
-
-            if '_erase_value' in arg:
-                erase = arg['_erase_value']
-                del arg['_erase_value']
-            else:
-                erase = self.erase_value
-
-            if 'value' in arg:
-                v = arg['value']
-                arg['abstract'] = from_value(v, None)
-                del arg['value']
-
-            if erase:
-                arg['abstract'] = broaden(arg['abstract'], None)
-
-            new_args.append(arg['abstract'])
-
-        return tuple(new_args)
-
     def infer(self, graph, argspec, outspec=None, clear=False):
         """Perform inference."""
         if clear:
@@ -396,7 +368,6 @@ class InferenceResource(PipelineResource):
                         and not isinstance(orig_t, AbstractFunction):
                     if orig_t is not None:
                         node.abstract = orig_t
-        argspec = self.fill_in(argspec)
         return self.engine.run(
             graph,
             argspec=tuple(arg['abstract'] if isinstance(arg, dict)

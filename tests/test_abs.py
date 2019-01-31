@@ -7,10 +7,9 @@ from myia.prim.py_implementations import typeof
 from myia.abstract.base import (
     AbstractScalar as _S, AbstractTuple as T, AbstractArray as A,
     AbstractList as L, AbstractClass as C,
-    shapeof,
     amerge,
     Possibilities as _Poss,
-    VALUE, TYPE, SHAPE
+    VALUE, TYPE
 )
 
 
@@ -18,7 +17,6 @@ def S(v=ANYTHING, t=None, s=None):
     return _S({
         VALUE: v,
         TYPE: t or typeof(v),
-        SHAPE: s or (type_to_shape(t) if v is ANYTHING else shapeof(v))
     })
 
 
@@ -26,26 +24,7 @@ def Poss(*things):
     return _S({
         VALUE: _Poss(things),
         TYPE: typeof(things[0]),
-        SHAPE: shapeof(things[0])
     })
-
-
-def type_to_shape(typ):
-    """Default value for ShapeTrack."""
-    if ty.ismyiatype(typ, ty.Array):
-        raise Exception(
-            'There is no default value for Arrays on the shape track.'
-        )  # pragma: no cover
-    if ty.ismyiatype(typ, ty.Tuple):
-        return sh.TupleShape(type_to_shape(e) for e in typ.elements)
-    elif ty.ismyiatype(typ, ty.List):
-        return sh.ListShape(type_to_shape(typ.element_type))
-    elif ty.ismyiatype(typ, ty.Class):
-        return sh.ClassShape(dict((attr, type_to_shape(tp))
-                                for attr, tp in typ.attributes.items()))
-    elif ty.ismyiatype(typ, ty.JTagged):
-        return type_to_shape(typ.subtype)
-    return sh.NOSHAPE
 
 
 def test_merge():

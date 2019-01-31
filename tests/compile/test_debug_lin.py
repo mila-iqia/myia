@@ -1,6 +1,7 @@
 from copy import copy
 from pytest import mark
 
+from myia.abstract import from_value
 from myia.pipeline import standard_pipeline
 
 
@@ -14,7 +15,7 @@ def parse_compare(*tests):
             if not isinstance(args, tuple):
                 args = (args,)
             py_result = fn(*map(copy, args))
-            argspec = tuple({'value': a} for a in args)
+            argspec = tuple(from_value(arg, broaden=True) for arg in args)
             res = debug_lin_pipeline.run(input=fn, argspec=argspec)
             myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))

@@ -1,8 +1,10 @@
 
+import numpy as np
 from functools import reduce
+from dataclasses import is_dataclass
 
 from .. import dtype, dshape
-from ..infer import Track, MyiaTypeError, Context
+from ..infer import Track, MyiaTypeError, Context, ANYTHING
 from ..infer.core import Pending, reify
 from ..infer.graph_infer import type_error_nargs, VirtualReference
 from ..infer.utils import infer_trace
@@ -12,11 +14,13 @@ from ..prim.py_implementations import typeof
 from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
     is_dataclass_type
 
-from .base import from_vref, shapeof, AbstractScalar, Possibilities, \
+from .base import AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     sensitivity_transform, VirtualFunction, AbstractFunction, \
-    VALUE, TYPE, SHAPE, REF, DummyFunction, TrackableFunction, TypedPrimitive
+    VALUE, TYPE, SHAPE, REF, DummyFunction, TrackableFunction, \
+    TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
+    AbstractList, broaden as _broaden
 
 
 _number_types = [
@@ -26,22 +30,22 @@ _number_types = [
 ]
 
 
-def from_value(v, context, ref=None):
-    """Infer the type of a constant."""
-    if isinstance(v, Primitive):
+def from_value(v, context=None, ref=None, broaden=False):
+    a = to_abstract(v, context, ref)
+    if broaden:
+        a = _broaden(a, None)
+    return a
+
+
+def to_abstract(v, context=None, ref=None):
+    """Translate the value to an abstract value."""
+    if isinstance(v, (Primitive, Graph, MetaGraph)):
+        if isinstance(v, Graph) and v.parent:
+            v = GraphAndContext(v, context or Context.empty())
         if ref is not None:
             v = TrackableFunction(v, id=ref.node)
         return AbstractFunction(v)
-    elif isinstance(v, Graph):
-        if v.parent:
-            v = GraphAndContext(v, context)
-        if ref is not None:
-            v = TrackableFunction(v, id=ref.node)
-        return AbstractFunction(v)
-    elif isinstance(v, MetaGraph):
-        if ref is not None:
-            v = TrackableFunction(v, id=ref.node)
-        return AbstractFunction(v)
+
     elif is_dataclass_type(v):
         typ = dtype.pytype_to_myiatype(v)
         typarg = AbstractScalar({
@@ -55,8 +59,54 @@ def from_value(v, context, ref=None):
                 (typarg,)
             )
         )
+
+    elif is_dataclass(v):
+        typ = dtype.pytype_to_myiatype(type(v), v)
+        new_args = {}
+        for name, field in v.__dataclass_fields__.items():
+            new_args[name] = to_abstract(getattr(v, name), context)
+        return AbstractClass(typ.tag, new_args, typ.methods)
+
+    elif isinstance(v, (int, float, str)):
+        return AbstractScalar({
+            VALUE: v,
+            TYPE: dtype.pytype_to_myiatype(type(v), v),
+            SHAPE: dshape.NOSHAPE,
+        })
+
+    elif isinstance(v, tuple):
+        return AbstractTuple([to_abstract(elem, context) for elem in v])
+
+    elif isinstance(v, np.ndarray):
+        return AbstractArray(
+            AbstractScalar({
+                VALUE: ANYTHING,
+                TYPE: dtype.np_dtype_to_type(str(v.dtype)),
+                SHAPE: dshape.NOSHAPE
+            }),
+            {SHAPE: v.shape}
+        )
+
+    elif isinstance(v, list):
+        if len(v) == 0:
+            raise Exception('No support for empty lists yet.')
+        return AbstractList(to_abstract(v[0], context))
+
+    elif dtype.ismyiatype(v):
+        return AbstractType({
+            VALUE: v,
+            TYPE: dtype.TypeType,
+            SHAPE: dshape.NOSHAPE
+        })
+
     else:
-        return from_vref(v, typeof(v), shapeof(v))
+        typ = dtype.pytype_to_myiatype(type(v), v)
+        assert dtype.ismyiatype(typ, (dtype.External, dtype.EnvType))
+        return AbstractScalar({
+            VALUE: v,
+            TYPE: typ,
+            SHAPE: dshape.NOSHAPE,
+        })
 
 
 class AbstractTrack(Track):
