@@ -35,7 +35,7 @@ from .inf import (
     from_value,
 )
 
-from .. import dtype, dshape
+from .. import dtype
 from ..ir import Graph
 from ..dtype import Number, Float, Bool
 from ..infer import ANYTHING, Context, MyiaTypeError, \
@@ -127,7 +127,7 @@ class WithImplXInferrer(XInferrer):
         rval = AbstractScalar({
             VALUE: outval,
             TYPE: outtype,
-            SHAPE: dshape.NOSHAPE
+            SHAPE: dtype.NOSHAPE
         })
         rval.count = min(depth + 1, track.max_depth)
         return rval
@@ -516,7 +516,7 @@ async def _inf_typeof(track, value):
     return AbstractType({
         VALUE: t,
         TYPE: dtype.TypeType,
-        SHAPE: dshape.NOSHAPE
+        SHAPE: dtype.NOSHAPE
     })
 
 
@@ -530,7 +530,7 @@ async def _inf_hastype(track, value, model: dtype.TypeType):
     return AbstractScalar({
         VALUE: v,
         TYPE: dtype.Bool,
-        SHAPE: dshape.NOSHAPE
+        SHAPE: dtype.NOSHAPE
     })
 
 
@@ -551,7 +551,7 @@ async def _inf_make_list(track, *args):
         # dflt = AbstractScalar({
         #     VALUE: ANYTHING,
         #     TYPE: dtype.Problem[VOID],
-        #     SHAPE: dshape.NOSHAPE,
+        #     SHAPE: dtype.NOSHAPE,
         # })
     else:
         res = track.abstract_merge(*args)
@@ -692,7 +692,7 @@ async def _inf_tuple_len(track, xs: AbstractTuple):
     return AbstractScalar({
         VALUE: len(xs.elements),
         TYPE: dtype.Int[64],
-        SHAPE: dshape.NOSHAPE
+        SHAPE: dtype.NOSHAPE
     })
 
 
@@ -701,7 +701,7 @@ async def _inf_list_len(track, xs: AbstractList):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.Int[64],
-        SHAPE: dshape.NOSHAPE
+        SHAPE: dtype.NOSHAPE
     })
 
 
@@ -710,7 +710,7 @@ async def _inf_array_len(track, xs: AbstractArray):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.Int[64],
-        SHAPE: dshape.NOSHAPE
+        SHAPE: dtype.NOSHAPE
     })
 
 
@@ -764,7 +764,7 @@ async def _inf_broadcast_shape(track, xs: _shape_type, ys: _shape_type):
             elems.append(AbstractScalar({
                 VALUE: ANYTHING,
                 TYPE: dtype.UInt[64],
-                SHAPE: dshape.NOSHAPE
+                SHAPE: dtype.NOSHAPE
             }))
     else:
         try:
@@ -775,7 +775,7 @@ async def _inf_broadcast_shape(track, xs: _shape_type, ys: _shape_type):
             elems.append(AbstractScalar({
                 VALUE: n,
                 TYPE: dtype.UInt[64],
-                SHAPE: dshape.NOSHAPE
+                SHAPE: dtype.NOSHAPE
             }))
     return AbstractTuple(elems)
 
@@ -787,7 +787,7 @@ async def _inf_invert_permutation(track, perm: _shape_type):
         [perm.elements[i] if i in v else AbstractScalar({
              VALUE: ANYTHING,
              TYPE: dtype.UInt[64],
-             SHAPE: dshape.NOSHAPE,
+             SHAPE: dtype.NOSHAPE,
          })
          for i in range(len(v))]
     )
@@ -800,7 +800,7 @@ async def _inf_shape(track, a: AbstractArray):
         AbstractScalar({
             VALUE: entry,
             TYPE: dtype.UInt[64],
-            SHAPE: dshape.NOSHAPE
+            SHAPE: dtype.NOSHAPE
         })
         for entry in shp
     ]
@@ -1026,7 +1026,7 @@ class _EmbedXInferrer(XInferrer):
         return AbstractScalar({
             VALUE: key,
             TYPE: dtype.SymbolicKeyType,
-            SHAPE: dshape.NOSHAPE,
+            SHAPE: dtype.NOSHAPE,
         })
 
 
@@ -1053,7 +1053,7 @@ async def _inf_env_setitem(track,
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.EnvType,
-        SHAPE: dshape.NOSHAPE,
+        SHAPE: dtype.NOSHAPE,
     })
 
 
@@ -1062,7 +1062,7 @@ async def _inf_env_add(track, env1, env2):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.EnvType,
-        SHAPE: dshape.NOSHAPE,
+        SHAPE: dtype.NOSHAPE,
     })
 
 

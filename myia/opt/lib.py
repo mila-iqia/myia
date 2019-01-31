@@ -5,8 +5,7 @@ from ..abstract.base import \
     AbstractScalar, VALUE, TYPE, SHAPE
 from ..composite import hyper_add
 from ..dtype import type_cloner, Function, JTagged, Number, ismyiatype, \
-    Tuple, UInt
-from ..dshape import NOSHAPE
+    Tuple, UInt, NOSHAPE
 from ..ir import Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable

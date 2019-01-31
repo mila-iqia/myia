@@ -3,7 +3,6 @@
 from .dtype import Array, Tuple, List, Function, Number, Bool, Problem, \
     TypeMeta, TypeType, Class, External, EnvType, SymbolicKeyType, \
     JTagged, type_cloner, ismyiatype
-from .dshape import ListShape, TupleShape
 from .infer import DEAD
 from .ir import manage
 from .prim import Primitive, ops as P

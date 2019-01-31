@@ -1,7 +1,7 @@
 
 import pytest
 
-from myia import dtype as ty, dshape as sh
+from myia import dtype as ty
 from myia.infer import ANYTHING, MyiaTypeError
 from myia.prim.py_implementations import typeof
 from myia.abstract.base import (

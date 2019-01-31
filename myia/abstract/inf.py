@@ -3,7 +3,7 @@ import numpy as np
 from functools import reduce
 from dataclasses import is_dataclass
 
-from .. import dtype, dshape
+from .. import dtype
 from ..infer import Track, MyiaTypeError, Context, ANYTHING
 from ..infer.core import Pending, reify
 from ..infer.graph_infer import type_error_nargs, VirtualReference
@@ -51,7 +51,7 @@ def to_abstract(v, context=None, ref=None):
         typarg = AbstractScalar({
             VALUE: typ,
             TYPE: dtype.TypeType,
-            SHAPE: dshape.NOSHAPE,
+            SHAPE: dtype.NOSHAPE,
         })
         return AbstractFunction(
             PartialApplication(
@@ -71,7 +71,7 @@ def to_abstract(v, context=None, ref=None):
         return AbstractScalar({
             VALUE: v,
             TYPE: dtype.pytype_to_myiatype(type(v), v),
-            SHAPE: dshape.NOSHAPE,
+            SHAPE: dtype.NOSHAPE,
         })
 
     elif isinstance(v, tuple):
@@ -82,7 +82,7 @@ def to_abstract(v, context=None, ref=None):
             AbstractScalar({
                 VALUE: ANYTHING,
                 TYPE: dtype.np_dtype_to_type(str(v.dtype)),
-                SHAPE: dshape.NOSHAPE
+                SHAPE: dtype.NOSHAPE
             }),
             {SHAPE: v.shape}
         )
@@ -96,7 +96,7 @@ def to_abstract(v, context=None, ref=None):
         return AbstractType({
             VALUE: v,
             TYPE: dtype.TypeType,
-            SHAPE: dshape.NOSHAPE
+            SHAPE: dtype.NOSHAPE
         })
 
     else:
@@ -105,7 +105,7 @@ def to_abstract(v, context=None, ref=None):
         return AbstractScalar({
             VALUE: v,
             TYPE: typ,
-            SHAPE: dshape.NOSHAPE,
+            SHAPE: dtype.NOSHAPE,
         })
 
 

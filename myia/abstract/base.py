@@ -6,7 +6,7 @@ from functools import reduce
 from itertools import chain
 from typing import Tuple
 
-from .. import dtype, dshape
+from .. import dtype
 from ..ir import Graph
 from ..prim import Primitive
 from ..debug.utils import mixin
@@ -121,9 +121,6 @@ class AbstractValue(AbstractBase):
     def _build_type(self):
         raise NotImplementedError()
 
-    def _build_shape(self):
-        raise NotImplementedError()
-
     def broaden(self):
         return self
 
@@ -154,7 +151,7 @@ class AbstractError(AbstractValue):
         super().__init__({
             VALUE: err,
             TYPE: dtype.Problem[err],
-            SHAPE: dshape.NOSHAPE,
+            SHAPE: dtype.NOSHAPE,
         })
 
     def __repr__(self):
@@ -167,7 +164,7 @@ class AbstractFunction(AbstractValue):
         super().__init__({
             VALUE: v,
             TYPE: dtype.Function,
-            SHAPE: dshape.NOSHAPE
+            SHAPE: dtype.NOSHAPE
         })
 
     async def get(self):
@@ -188,9 +185,6 @@ class AbstractTuple(AbstractValue):
 
     def _build_type(self):
         return dtype.Tuple[[e.build(TYPE) for e in self.elements]]
-
-    def _build_shape(self):
-        return dshape.TupleShape([e.build(SHAPE) for e in self.elements])
 
     def make_key(self):
         elms = tuple(e.make_key() for e in self.elements)
@@ -223,9 +217,6 @@ class AbstractList(AbstractValue):
     def _build_type(self):
         return dtype.List[self.element.build(TYPE)]
 
-    def _build_shape(self):
-        return dshape.ListShape(self.element.build(SHAPE))
-
     def make_key(self):
         return (super().make_key(), self.element.make_key())
 
@@ -253,12 +244,6 @@ class AbstractClass(AbstractValue):
              for name, x in self.attributes.items()},
             self.methods
         ]
-
-    def _build_shape(self):
-        return dshape.ClassShape(
-            {name: x.build(SHAPE)
-             for name, x in self.attributes.items()},
-        )
 
     def make_key(self):
         attrs = tuple((k, v.make_key()) for k, v in self.attributes.items())
@@ -572,7 +557,7 @@ def sensitivity_transform(self, x: AbstractFunction):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.EnvType,
-        SHAPE: dshape.NOSHAPE
+        SHAPE: dtype.NOSHAPE
     })
 
 

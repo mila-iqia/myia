@@ -2,7 +2,6 @@
 import numpy
 from dataclasses import dataclass
 from numpy import ones as _ones, zeros as _zeros, asscalar
-from myia.dshape import ClassShape, TupleShape
 from myia.dtype import Array, Tuple, pytype_to_myiatype
 from myia.infer import InferenceError
 from myia.composite import grad

@@ -15,14 +15,13 @@ from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, Float, TypeType, External, \
     Number, Class, Problem, EnvType as Env, JTagged as JT, ismyiatype, \
-    Array, Tuple, List
+    Array, Tuple, List, NOSHAPE
 from myia.hypermap import HyperMap
 from myia.infer import ANYTHING, VOID, InferenceError, \
     Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
 from myia.pipeline import pipeline_function
 from myia.prim import Primitive, ops as P
-from myia.dshape import TupleShape, ListShape, ClassShape, NOSHAPE
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, list_map as list_map_prim, \
     hastype, typeof, scalar_usub, dot, distribute, shape, array_map, \

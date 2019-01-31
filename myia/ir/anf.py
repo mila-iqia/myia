@@ -296,8 +296,12 @@ class ANFNode(Node):
         if self._abstract is None:
             return self.inferred['shape']
         else:
-            from ..abstract.base import TYPE, SHAPE
-            return self._abstract.build(SHAPE)
+            from ..abstract.base import AbstractArray, SHAPE
+            a = self._abstract
+            if isinstance(a, AbstractArray):
+                return a.values[SHAPE]
+            else:
+                return None
 
     @property
     def incoming(self) -> Iterable['ANFNode']:
