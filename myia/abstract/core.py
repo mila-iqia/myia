@@ -8,32 +8,6 @@ from ..dtype import Function, type_cloner_async, ismyiatype
 from ..utils import Unification, Var, RestrictedVar, eprint, overload, \
     Overload
 
-from .utils import InferenceError, MyiaTypeError
-
-
-class MyiaTypeMismatchError(MyiaTypeError):
-    """Error where two values should have the same type, but don't."""
-
-    def __init__(self, type1, type2, *, refs):
-        """Initialize a MyiaTypeMismatchError."""
-        msg = f'{type1} != {type2}'
-        super().__init__(msg, refs=refs)
-        self.type1 = type1
-        self.type2 = type2
-
-
-class MyiaFunctionMismatchError(MyiaTypeMismatchError):
-    """Error where two functions should have the same type, but don't."""
-
-    def __init__(self, type1, type2, *, refs):
-        """Initialize a MyiaFunctionMismatchError."""
-        super().__init__(type1, type2, refs=refs)
-
-    def print_tb_end(self, fn_ctx, args_ctx, is_prim):
-        """Print the error message at the end of a traceback."""
-        m = "Two functions with incompatible return types may be called here"
-        eprint(f'{type(self).__qualname__}: {m}: {self.message}')
-
 
 class InferenceTask(asyncio.Task):
     def __init__(self, coro, loop, key=None):
@@ -51,14 +25,13 @@ class InferenceLoop(asyncio.AbstractEventLoop):
     before it can evaluate the future, which suggests an infinite loop.
     """
 
-    def __init__(self):
+    def __init__(self, errtype):
         """Initialize an InferenceLoop."""
         self._todo = deque()
         self._tasks = []
         self._errors = []
         self._vars = []
-        # This is used by InferenceVar and EquivalenceChecker:
-        self.equiv = {}
+        self.errtype = errtype
 
     def get_debug(self):
         """There is no debug mode."""
@@ -77,7 +50,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
             v1 = varlist.pop()
             try:
                 v1.force_resolve()
-            except InferenceError as e:
+            except self.errtype as e:
                 self._errors.append(e)
             else:
                 found = True
@@ -125,7 +98,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
             if fut.done():
                 exc = fut.exception()
             else:
-                exc = InferenceError(
+                exc = self.errtype(
                     f'Could not run inference to completion.'
                     ' There might be an infinite loop in the program'
                     ' which prevents type inference from working.',
@@ -171,47 +144,6 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         pending = PendingTentative(tentative=tentative, loop=self)
         self._vars.append(pending)
         return pending
-
-
-class EvaluationCache:
-    """Key/value store where keys are associated to Futures.
-
-    Attributes:
-        cache: The cache.
-        loop: The InferenceLoop for async evaluation.
-        keycalc: An async function that takes a key and returns
-            the value associated to that key.
-
-    """
-
-    def __init__(self, loop, keycalc):
-        """Initialize an EvaluationCache."""
-        self.cache = {}
-        self.loop = loop
-        self.keycalc = keycalc
-
-    def get(self, key):
-        """Get the future associated to the key."""
-        if key not in self.cache:
-            self.set(key, self.keycalc(key))
-        return self.cache[key]
-
-    def set(self, key, coro):
-        """Associate a key to a coroutine."""
-        self.cache[key] = self.loop.create_task(coro)
-
-    def set_value(self, key, value):
-        """Associate a key to a value.
-
-        This will wrap the value in a Future.
-        """
-        fut = asyncio.Future(loop=self.loop)
-        fut.set_result(value)
-        self.cache[key] = fut
-
-    def clear(self):
-        """Clear the cache completely."""
-        self.cache.clear()
 
 
 def is_simple(x):
@@ -325,7 +257,7 @@ async def find_coherent_result(v, fn):
     return await fn(x)
 
 
-async def reify(v):
+async def force_pending(v):
     if isinstance(v, Pending):
         return await v
     else:

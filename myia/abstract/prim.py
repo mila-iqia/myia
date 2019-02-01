@@ -41,10 +41,10 @@ from ..dtype import Number, Float, Bool
 from ..prim import ops as P
 from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
 
-from .core import Pending, find_coherent_result, reify
-from .graph_infer import Context
-from .utils import ANYTHING, MyiaTypeError, \
+from .core import Pending, find_coherent_result, force_pending
+from .data import ANYTHING, MyiaTypeError, \
     InferenceError, MyiaShapeError, VOID
+from .graph_infer import Context
 
 
 abstract_inferrer_constructors = {}
@@ -80,14 +80,14 @@ class StandardInferrer(Inferrer):
             if typ is None:
                 pass
             elif dtype.ismyiatype(typ):
-                await reify(track.chk(typ, arg.values.get(TYPE, ABSENT)))
+                await force_pending(track.chk(typ, arg.values.get(TYPE, ABSENT)))
             elif isinstance(typ, type) and issubclass(typ, AbstractBase):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
                         f'Wrong type {arg} != {typ} for {self._infer}'
                     )
             elif callable(typ):
-                await reify(track.chk(typ, arg))
+                await force_pending(track.chk(typ, arg))
         return await self._infer(track, *args)
 
 
@@ -784,7 +784,7 @@ async def _inf_invert_permutation(track, perm: _shape_type):
 
 @standard_prim(P.shape)
 async def _inf_shape(track, a: AbstractArray):
-    shp = await reify(a.values[SHAPE])
+    shp = await force_pending(a.values[SHAPE])
     values = [
         AbstractScalar({
             VALUE: entry,
@@ -832,7 +832,7 @@ async def _inf_array_reduce(track,
                             a: AbstractArray,
                             shp: _shape_type):
 
-    shp_i = await reify(a.values[SHAPE])
+    shp_i = await force_pending(a.values[SHAPE])
     shp_v = shp.build(VALUE, default=ANYTHING)
     if shp_v == ANYTHING:
         raise AssertionError(
@@ -857,7 +857,7 @@ async def _inf_distribute(track, a: AbstractArray, _shp: _shape_type):
     shp = _shp.build(VALUE, default=ANYTHING)
     if shp == ANYTHING:
         shp = (ANYTHING,) * len(_shp.elements)
-    a_shp = await reify(a.values[SHAPE])
+    a_shp = await force_pending(a.values[SHAPE])
     delta = len(shp) - len(a_shp)
     if delta < 0:
         raise MyiaShapeError("Cannot distribute to smaller shape")
@@ -874,7 +874,7 @@ async def _inf_reshape(track, a: AbstractArray, _shp: _shape_type):
     shp = _shp.build(VALUE, default=ANYTHING)
     if shp == ANYTHING:
         shp = (ANYTHING,) * len(_shp.elements)
-    a_shp = await reify(a.values[SHAPE])
+    a_shp = await force_pending(a.values[SHAPE])
     if (all(s is not ANYTHING for s in shp) and
         all(s is not ANYTHING for s in a_shp) and
             prod(shp) != prod(a_shp)):
@@ -889,7 +889,7 @@ async def _inf_transpose(track, a: AbstractArray, permutation: _shape_type):
     if perm == ANYTHING:
         shp = (ANYTHING,) * len(permutation.elements)
     else:
-        a_shp = await reify(a.values[SHAPE])
+        a_shp = await force_pending(a.values[SHAPE])
         if list(sorted(perm)) != list(range(len(a_shp))):
             raise MyiaShapeError(
                 'The second argument of transpose must be a permutation of'

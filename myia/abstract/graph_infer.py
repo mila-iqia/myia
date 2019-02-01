@@ -8,8 +8,8 @@ from ..debug.label import label
 from ..ir import GraphGenerationError
 from ..utils import Partializable, UNKNOWN, eprint
 
-from .core import InferenceLoop, EvaluationCache, reify
-from .utils import ANYTHING, InferenceError, MyiaTypeError, \
+from .core import InferenceLoop, force_pending
+from .data import ANYTHING, InferenceError, MyiaTypeError, \
     infer_trace, Unspecializable, DEAD, POLY
 
 
@@ -148,7 +148,7 @@ class Reference(AbstractReference):
     async def get(self):
         """Get the value for the track (asynchronous)."""
         raw = self.engine.get_inferred(self)
-        return await reify(await raw)
+        return await force_pending(await raw)
 
     def get_sync(self):
         """Get the value for the track (synchronous)."""
@@ -199,6 +199,47 @@ class VirtualReference(AbstractReference):
 ########
 
 
+class EvaluationCache:
+    """Key/value store where keys are associated to Futures.
+
+    Attributes:
+        cache: The cache.
+        loop: The InferenceLoop for async evaluation.
+        keycalc: An async function that takes a key and returns
+            the value associated to that key.
+
+    """
+
+    def __init__(self, loop, keycalc):
+        """Initialize an EvaluationCache."""
+        self.cache = {}
+        self.loop = loop
+        self.keycalc = keycalc
+
+    def get(self, key):
+        """Get the future associated to the key."""
+        if key not in self.cache:
+            self.set(key, self.keycalc(key))
+        return self.cache[key]
+
+    def set(self, key, coro):
+        """Associate a key to a coroutine."""
+        self.cache[key] = self.loop.create_task(coro)
+
+    def set_value(self, key, value):
+        """Associate a key to a value.
+
+        This will wrap the value in a Future.
+        """
+        fut = asyncio.Future(loop=self.loop)
+        fut.set_result(value)
+        self.cache[key] = fut
+
+    def clear(self):
+        """Clear the cache completely."""
+        self.cache.clear()
+
+
 class InferenceEngine:
     """Infer various properties about nodes in graphs.
 
@@ -215,7 +256,7 @@ class InferenceEngine:
                  context_class=Context):
         """Initialize the InferenceEngine."""
         from ..abstract import AbstractTrack
-        self.loop = InferenceLoop()
+        self.loop = InferenceLoop(InferenceError)
         self.pipeline = pipeline
         self.mng = self.pipeline.resources.manager
         self.constructors = constructors

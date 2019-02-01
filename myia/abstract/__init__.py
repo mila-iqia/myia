@@ -1,42 +1,64 @@
 
 from .core import (  # noqa
     InferenceLoop,
-    EvaluationCache,
+    InferenceTask,
+    Pending,
+    PendingFromList,
+    PendingTentative,
     find_coherent_result,
-    reify,
+    force_pending,
 )
+
+
+from .data import (  # noqa
+    ABSENT,
+    ANYTHING,
+    VOID,
+    DEAD,
+    POLY,
+    INACCESSIBLE,
+    Possibilities,
+    TrackableFunction,
+    GraphAndContext,
+    PartialApplication,
+    JTransformedFunction,
+    VirtualFunction,
+    TypedPrimitive,
+    DummyFunction,
+    AbstractBase,
+    AbstractValue,
+    AbstractScalar,
+    AbstractType,
+    AbstractError,
+    AbstractFunction,
+    AbstractTuple,
+    AbstractArray,
+    AbstractList,
+    AbstractClass,
+    AbstractJTagged,
+    TrackDict,
+    Subtrack,
+    VALUE,
+    TYPE,
+    SHAPE,
+    infer_trace,
+    Unspecializable,
+    InferenceError,
+    MyiaTypeError,
+    MyiaShapeError,
+)
+
 
 from .graph_infer import (  # noqa
     Context,
     Contextless,
     CONTEXTLESS,
     Track,
-    InferenceEngine,
     AbstractReference,
     Reference,
     VirtualReference,
-)
-
-from .utils import (  # noqa
-    ANYTHING,
-    InferenceError,
-    MyiaTypeError,
-    MyiaShapeError,
-    Unspecializable,
-    VOID,
-    DEAD,
-    POLY,
-    INACCESSIBLE,
-)
-
-from .base import (  # noqa
-    ABSENT,
-    AbstractBase,
-    AbstractValue,
-    AbstractTuple,
-    AbstractArray,
-    AbstractList,
-    AbstractClass,
+    InferenceEngine,
+    EvaluationCache,
 )
 
 

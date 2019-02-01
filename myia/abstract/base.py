@@ -13,312 +13,42 @@ from ..debug.utils import mixin
 from ..utils import overload, UNKNOWN, Named
 
 from .core import Pending, is_simple, PendingTentative
-from .utils import ANYTHING, InferenceError, MyiaTypeError
 from .graph_infer import Reference, Context
 
-
-ABSENT = Named('ABSENT')
-
-
-#################
-# Abstract data #
-#################
-
-
-class Possibilities(frozenset):
-    pass
-
-
-@dataclass(frozen=True)
-class TrackableFunction:
-    fn: object
-    id: object
-
-
-@dataclass(frozen=True)
-class GraphAndContext:
-    graph: Graph
-    context: Context
-
-
-@dataclass(frozen=True)
-class PartialApplication:
-    fn: object
-    args: object
-
-
-@dataclass(frozen=True)
-class JTransformedFunction:
-    fn: object
-
-
-@dataclass(frozen=True)
-class VirtualFunction:
-    args: Tuple['AbstractBase']
-    output: 'AbstractBase'
-
-
-@dataclass(frozen=True)
-class TypedPrimitive:
-    prim: Primitive
-    args: Tuple['AbstractBase']
-    output: 'AbstractBase'
-
-
-class DummyFunction:
-    pass
-
-
-class AbstractBase:
-
-    def make_key(self):
-        raise NotImplementedError()
-
-    def key(self):
-        if not hasattr(self, '_key'):
-            self._key = self.make_key()
-        return self._key
-
-    def __eq__(self, other):
-        return type(self) is type(other) \
-            and self.key() == other.key()
-
-    def __hash__(self):
-        return hash(self.key())
-
-
-class AbstractValue(AbstractBase):
-    def __init__(self, values, count=0):
-        self.values = TrackDict(values)
-        self.count = count
-
-    def build(self, name, default=None):
-        try:
-            return self._build(name)
-        except ValueError:
-            if default is None:
-                raise
-            return default
-
-    def _build(self, subtrack):
-        assert not isinstance(subtrack, str)
-        v = self.values.get(subtrack, ABSENT)
-        if v is ANYTHING:
-            raise ValueError('ANYTHING')
-        elif v is not ABSENT:
-            if isinstance(v, Pending) and v.done():
-                return v.result()
-            else:
-                return v
-        else:
-            name = str(subtrack).lower()
-            method = getattr(self, f'_build_{name}')
-            return method()
-
-    def _build_value(self):
-        raise NotImplementedError()
-
-    def _build_type(self):
-        raise NotImplementedError()
-
-    def broaden(self):
-        return self
-
-    def make_key(self):
-        return tuple(sorted((k, v) for k, v in self.values.items()
-                            if k.eq_relevant()))
-
-    def __repr__(self):
-        contents = [f'{k}={v}' for k, v in self.values.items()]
-        return f'V({", ".join(contents)})'
-
-
-class AbstractScalar(AbstractValue):
-    def __repr__(self):
-        contents = [f'{k}={v}' for k, v in self.values.items()]
-        return f'S({", ".join(contents)})'
-
-
-class AbstractType(AbstractValue):
-    def __init__(self, typ):
-        super().__init__({
-            VALUE: typ,
-            TYPE: dtype.TypeType,
-        })
-
-    def __repr__(self):
-        return f'Ty({self.values[VALUE]})'
-
-
-class AbstractError(AbstractValue):
-    def __init__(self, err):
-        super().__init__({
-            VALUE: err,
-            TYPE: dtype.Problem[err],
-        })
-
-    def __repr__(self):
-        return f'E({self.values[VALUE]})'
-
-
-class AbstractFunction(AbstractValue):
-    def __init__(self, *poss, value=None):
-        v = Possibilities(poss) if value is None else value
-        super().__init__({
-            VALUE: v,
-            TYPE: dtype.Function,
-        })
-
-    async def get(self):
-        v = self.values[VALUE]
-        return (await v if isinstance(v, Pending) else v)
-
-    def __repr__(self):
-        return f'Fn({self.values[VALUE]})'
-
-
-class AbstractTuple(AbstractValue):
-    def __init__(self, elements, values=None):
-        super().__init__(values or {})
-        self.elements = tuple(elements)
-
-    def _build_value(self):
-        return tuple(e.build(VALUE) for e in self.elements)
-
-    def _build_type(self):
-        return dtype.Tuple[[e.build(TYPE) for e in self.elements]]
-
-    def make_key(self):
-        elms = tuple(e.make_key() for e in self.elements)
-        return (super().make_key(), elms)
-
-    def __repr__(self):
-        return f'T({", ".join(map(repr, self.elements))})'
-
-
-class AbstractArray(AbstractValue):
-    def __init__(self, element, values):
-        super().__init__(values)
-        self.element = element
-
-    def _build_type(self):
-        return dtype.Array[self.element.build(TYPE)]
-
-    def make_key(self):
-        return (super().make_key(), self.element.make_key())
-
-    def __repr__(self):
-        return f'A({self.element}, shape={self.values[SHAPE]})'
-
-
-class AbstractList(AbstractValue):
-    def __init__(self, element, values=None):
-        super().__init__(values or {})
-        self.element = element
-
-    def _build_type(self):
-        return dtype.List[self.element.build(TYPE)]
-
-    def make_key(self):
-        return (super().make_key(), self.element.make_key())
-
-    def __repr__(self):
-        return f'L({self.element})'
-
-
-class AbstractClass(AbstractValue):
-    def __init__(self, tag, attributes, methods, values={}):
-        super().__init__(values)
-        self.tag = tag
-        self.attributes = attributes
-        self.methods = methods
-
-    def _build_value(self):
-        kls = dtype.tag_to_dataclass[self.tag]
-        args = {k: v.build(VALUE)
-                for k, v in self.attributes.items()}
-        return kls(**args)
-
-    def _build_type(self):
-        return dtype.Class[
-            self.tag,
-            {name: x.build(TYPE)
-             for name, x in self.attributes.items()},
-            self.methods
-        ]
-
-    def make_key(self):
-        attrs = tuple((k, v.make_key()) for k, v in self.attributes.items())
-        return (super().make_key(), self.tag, attrs)
-
-    def __repr__(self):
-        elems = [f'{k}={v}' for k, v in self.attributes.items()]
-        return f'{self.tag}({", ".join(elems)})'
-
-
-class AbstractJTagged(AbstractValue):
-    def __init__(self, element):
-        super().__init__({})
-        self.element = element
-
-    def _build_type(self):
-        return dtype.JTagged[self.element.build(TYPE)]
-
-    def make_key(self):
-        return (super().make_key(), self.element.make_key())
-
-    def __repr__(self):
-        return f'J({self.element})'
-
-
-##########
-# Tracks #
-##########
-
-
-class TrackDict(dict):
-    pass
-
-
-class Subtrack:
-    def __init__(self, name):
-        self.name = name
-
-    def __str__(self):
-        return self.name
-
-    def __lt__(self, other):
-        return self.name < other.name
-
-    def clone(self, v, recurse):
-        return recurse(v)
-
-    async def async_clone(self, v, recurse):
-        return await recurse(v)
-
-    def broaden(self, v, recurse, loop):
-        return recurse(v, loop)
-
-    def eq_relevant(self):
-        return True
-
-
-class ValueSubtrack(Subtrack):
-    def broaden(self, v, recurse, loop):
-        return ANYTHING
-
-
-class TypeSubtrack(Subtrack):
-    pass
-
-
-class ShapeSubtrack(Subtrack):
-    pass
-
-
-VALUE = ValueSubtrack('VALUE')
-TYPE = TypeSubtrack('TYPE')
-SHAPE = ShapeSubtrack('SHAPE')
+from .data import (  # noqa
+    ABSENT,
+    ANYTHING,
+    VOID,
+    DEAD,
+    POLY,
+    INACCESSIBLE,
+    Possibilities,
+    TrackableFunction,
+    GraphAndContext,
+    PartialApplication,
+    JTransformedFunction,
+    VirtualFunction,
+    TypedPrimitive,
+    DummyFunction,
+    AbstractBase,
+    AbstractValue,
+    AbstractScalar,
+    AbstractType,
+    AbstractError,
+    AbstractFunction,
+    AbstractTuple,
+    AbstractArray,
+    AbstractList,
+    AbstractClass,
+    AbstractJTagged,
+    TrackDict,
+    Subtrack,
+    VALUE,
+    TYPE,
+    SHAPE,
+    InferenceError,
+    MyiaTypeError,
+)
 
 
 ############

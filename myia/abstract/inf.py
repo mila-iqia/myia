@@ -10,18 +10,18 @@ from ..prim.py_implementations import typeof
 from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
     is_dataclass_type
 
-from .core import Pending, reify
+from .core import Pending, force_pending
 from .graph_infer import Track, type_error_nargs, VirtualReference, \
     Context
-from .utils import infer_trace, MyiaTypeError, ANYTHING
-
-from .base import AbstractScalar, Possibilities, \
-    ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \
+from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
+    ABSENT, GraphAndContext, AbstractBase, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
-    sensitivity_transform, VirtualFunction, AbstractFunction, \
+    VirtualFunction, AbstractFunction, \
     VALUE, TYPE, SHAPE, DummyFunction, TrackableFunction, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractList, broaden as _broaden
+    AbstractList, Possibilities
+from .base import broaden as _broaden, sensitivity_transform, amerge, \
+    bind
 
 
 _number_types = [
@@ -248,7 +248,7 @@ class AbstractTrack(Track):
         return self.abstract_merge(*values)
 
     async def chkimm(self, predicate, *values):
-        return await reify(self.chk(predicate, *values))
+        return await force_pending(self.chk(predicate, *values))
 
 
 class Inferrer(Partializable):
