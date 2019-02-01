@@ -106,7 +106,7 @@ class GraphCloner:
             for p in graph.parameters:
                 with About(p.debug, self.relation):
                     p2 = target_graph.add_parameter()
-                    p2.inferred = copy(p.inferred)
+                    p2.abstract = p.abstract
                     self.repl[p] = p2
             self.repl[graph] = target_graph
 
@@ -118,14 +118,14 @@ class GraphCloner:
             for ct in mng.graph_constants[graph]:
                 with About(ct.debug, self.relation):
                     new = Constant(target_graph)
-                    new.inferred = copy(ct.inferred)
+                    new.abstract = ct.abstract
                     self.repl[ct] = new
 
         if self.clone_constants:
             for ct in mng.constants[graph]:
                 if ct not in self.repl:
                     new = Constant(ct.value)
-                    new.inferred = copy(ct.inferred)
+                    new.abstract = ct.abstract
                     self.repl[ct] = new
 
         self.status[graph] = inline
@@ -147,12 +147,12 @@ class GraphCloner:
             # that is good.
             with About(node.debug, self.relation):
                 p2 = Parameter(target_graph)
-                p2.inferred = copy(node.inferred)
+                p2.abstract = node.abstract
                 self.repl[node] = p2
         elif node.is_apply():
             with About(node.debug, self.relation):
                 new = Apply([], target_graph)
-                new.inferred = copy(node.inferred)
+                new.abstract = node.abstract
                 self.repl[node] = new
                 self.nodes.append((node, new))
         elif node.is_constant():

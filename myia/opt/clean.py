@@ -62,7 +62,6 @@ def erase_class(root, manager):
             manager.replace(node, new_node)
 
     for node in manager.all_nodes:
-        node.expect_inferred.clear()
         node.abstract = _reabs(node.abstract)
 
 

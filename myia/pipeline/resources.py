@@ -362,7 +362,6 @@ class InferenceResource(PipelineResource):
             for node in self.manager.all_nodes:
                 orig_t = node.abstract
                 node.abstract = None
-                node.inferred = defaultdict(lambda: UNKNOWN)
                 if node.is_constant() \
                         and not isinstance(orig_t, AbstractFunction):
                     if orig_t is not None:

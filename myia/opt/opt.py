@@ -258,7 +258,6 @@ class LocalPassOptimizer:
                     changes = True
                     continue
                 if new and new is not n:
-                    new.expect_inferred.update(n.inferred)
                     mng.replace(n, new)
                     n = new
                     loop = True

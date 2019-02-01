@@ -49,18 +49,6 @@ def test_graph_helpers():
     assert list(g.output.inputs) == [add, temp, x]
 
 
-def test_graph_type():
-    g = Graph()
-    x = g.add_parameter()
-    y = g.add_parameter()
-    assert g.type is UNKNOWN
-    x.type = Int[16]
-    y.type = Float[32]
-    g.output = g.apply('mul', x, y)
-    g.output.type = Float[64]
-    assert g.type == Function[(Int[16], Float[32]), Float[64]]
-
-
 def test_graph_output():
     g = Graph()
     with pytest.raises(Exception):

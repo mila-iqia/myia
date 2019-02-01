@@ -57,21 +57,14 @@ class Graph:
         self._manager = None
 
     @property
-    def type(self):
-        """Return the graph's type based on parameter/output types."""
-        if any(p.type is UNKNOWN for p in self.parameters):
-            return UNKNOWN
-        return Function[tuple(p.type for p in self.parameters),
-                        self.output.type]
-
-    @property
     def abstract(self):
         """Return the graph's type based on parameter/output types."""
-        from ..abstract import VirtualFunction
+        from ..abstract import VirtualFunction, AbstractFunction
         if any(p.abstract is None for p in self.parameters):
             return None
-        return VirtualFunction(tuple(p.abstract for p in self.parameters),
-                               self.output.abstract)
+        vf = VirtualFunction(tuple(p.abstract for p in self.parameters),
+                             self.output.abstract)
+        return AbstractFunction(vf)
 
     @property
     def output(self) -> 'ANFNode':
@@ -252,56 +245,23 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.debug = NamedDebugInfo(self)
-        self._inferred = defaultdict(lambda: UNKNOWN)
-        self._abstract = None
-        self.expect_inferred = defaultdict(lambda: UNKNOWN)
-
-    @property
-    def inferred(self):
-        return self._inferred
-
-    @inferred.setter
-    def inferred(self, value):
-        if 'abstract' in value:
-            self._abstract = value['abstract']
-        self._inferred = value
-
-    @property
-    def abstract(self):
-        return self._abstract
-
-    @abstract.setter
-    def abstract(self, value):
-        self.inferred['abstract'] = value
-        self._abstract = value
+        self.abstract = None
 
     @property
     def type(self):
         """Return the node's type."""
-        if self._abstract is None:
-            return self.inferred['type']
-        else:
-            from ..abstract import TYPE, SHAPE
-            return self._abstract.build(TYPE)
-
-    @type.setter
-    def type(self, value):
-        """Set the node's type."""
-        assert self._abstract is None
-        self.inferred['type'] = value
+        from ..abstract import TYPE
+        return self.abstract and self.abstract.build(TYPE)
 
     @property
     def shape(self):
         """Return the node's shape."""
-        if self._abstract is None:
-            return self.inferred['shape']
+        from ..abstract import AbstractArray, SHAPE
+        a = self.abstract
+        if a is not None and isinstance(a, AbstractArray):
+            return a.values[SHAPE]
         else:
-            from ..abstract import AbstractArray, SHAPE
-            a = self._abstract
-            if isinstance(a, AbstractArray):
-                return a.values[SHAPE]
-            else:
-                return None
+            return None
 
     @property
     def incoming(self) -> Iterable['ANFNode']:
