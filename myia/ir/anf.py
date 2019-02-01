@@ -67,7 +67,7 @@ class Graph:
     @property
     def abstract(self):
         """Return the graph's type based on parameter/output types."""
-        from ..abstract.base import VirtualFunction
+        from ..abstract import VirtualFunction
         if any(p.abstract is None for p in self.parameters):
             return None
         return VirtualFunction(tuple(p.abstract for p in self.parameters),
@@ -88,7 +88,7 @@ class Graph:
     @output.setter
     def output(self, value: 'ANFNode') -> None:
         """Set the graph's output."""
-        from ..abstract.base import AbstractFunction
+        from ..abstract import AbstractFunction
         if self.return_:
             if self._manager:
                 self._manager.set_edge(self.return_, 1, value)
@@ -281,7 +281,7 @@ class ANFNode(Node):
         if self._abstract is None:
             return self.inferred['type']
         else:
-            from ..abstract.base import TYPE, SHAPE
+            from ..abstract import TYPE, SHAPE
             return self._abstract.build(TYPE)
 
     @type.setter
@@ -296,7 +296,7 @@ class ANFNode(Node):
         if self._abstract is None:
             return self.inferred['shape']
         else:
-            from ..abstract.base import AbstractArray, SHAPE
+            from ..abstract import AbstractArray, SHAPE
             a = self._abstract
             if isinstance(a, AbstractArray):
                 return a.values[SHAPE]

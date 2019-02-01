@@ -6,7 +6,7 @@ import numpy as np
 from types import SimpleNamespace
 from dataclasses import is_dataclass
 
-from myia.abstract.base import VALUE, TYPE, SHAPE, \
+from myia.abstract import VALUE, TYPE, SHAPE, \
     AbstractBase, AbstractScalar, AbstractArray, concretize_abstract, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged

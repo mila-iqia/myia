@@ -1,6 +1,7 @@
 """Graph generation from number of arguments or type signatures."""
 
 
+from ..abstract.data import TYPE
 from ..dtype import ismyiatype
 from ..prim.py_implementations import issubtype, typeof
 
@@ -22,7 +23,6 @@ class MetaGraph:
         self.cache = {}
 
     def specialize_from_abstract(self, args):
-        from ..abstract.base import TYPE
         types = tuple([arg.build(TYPE) for arg in args])
         if types not in self.cache:
             self.cache[types] = self.specialize_from_types(types)

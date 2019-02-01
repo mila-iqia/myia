@@ -8,6 +8,8 @@ import numpy as np
 from itertools import count
 
 from .. import dtype
+from ..abstract import AbstractTuple, AbstractList, AbstractClass, \
+    AbstractArray, TYPE, AbstractScalar
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
@@ -533,10 +535,6 @@ def _convert_result(arg, orig_t, vm_t: (dtype.Bool, dtype.Array)):
 def convert_result(res, orig_t, vm_t):
     """Convert result from vm_t to orig_t."""
     return _convert_result[vm_t](res, orig_t, vm_t)
-
-
-from ..abstract.base import AbstractTuple, AbstractList, AbstractClass, \
-    AbstractArray, TYPE, AbstractScalar
 
 
 @overload(bootstrap=True)

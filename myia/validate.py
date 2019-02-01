@@ -3,13 +3,12 @@
 from .dtype import Array, Tuple, List, Function, Number, Bool, Problem, \
     TypeMeta, TypeType, Class, External, EnvType, SymbolicKeyType, \
     JTagged, type_cloner, ismyiatype
-from .abstract import DEAD
 from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
-from .abstract.base import abstract_clone, \
+from .abstract import abstract_clone, \
     AbstractClass, AbstractJTagged, AbstractFunction, AbstractScalar, \
-    TYPE, VALUE, AbstractType
+    TYPE, VALUE, AbstractType, DEAD
 
 
 class ValidationError(Exception):

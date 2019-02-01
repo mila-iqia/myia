@@ -1,6 +1,6 @@
 """Library of optimizations."""
 
-from ..abstract.base import \
+from ..abstract import \
     abstract_clone, AbstractFunction, AbstractJTagged, AbstractTuple, \
     AbstractScalar, VALUE, TYPE, SHAPE
 from ..composite import hyper_add

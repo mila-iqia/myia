@@ -4,7 +4,7 @@ from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner, JTagged
 from ..ir import Constant, Parameter
 from ..prim import ops as P, Primitive
 from ..utils import UNKNOWN
-from ..abstract.base import abstract_clone, AbstractClass, AbstractTuple, \
+from ..abstract import abstract_clone, AbstractClass, AbstractTuple, \
     AbstractScalar, VALUE, TYPE, SHAPE, ANYTHING, AbstractJTagged
 
 

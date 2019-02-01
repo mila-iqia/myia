@@ -7,7 +7,6 @@ from itertools import chain
 from typing import Tuple
 
 from .. import dtype
-from ..ir import Graph
 from ..prim import Primitive
 from ..debug.utils import mixin
 from ..utils import overload, UNKNOWN, Named

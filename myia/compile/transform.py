@@ -1,5 +1,6 @@
 """Transforms a graph into lower-level code."""
 
+from ..abstract import VALUE
 from ..ir import Apply, toposort, Graph, Constant
 from ..pipeline import PipelineDefinition, PipelineStep
 from ..prim import Primitive, ops as P
@@ -33,7 +34,6 @@ class WrapPrimitives(PipelineStep):
         prim_graphs = {}
 
         def get_prim_graph(prim, typ):
-            from ..abstract.base import VALUE
             if (prim, typ) not in prim_graphs:
                 g = Graph()
                 args = []

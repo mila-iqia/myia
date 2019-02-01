@@ -6,7 +6,7 @@ from functools import reduce
 from collections import defaultdict
 from operator import getitem
 
-from .base import (
+from .data import (
     ABSENT,
     AbstractBase,
     AbstractValue,
@@ -24,9 +24,10 @@ from .base import (
     Possibilities,
     GraphAndContext,
     DummyFunction,
-    sensitivity_transform,
     VALUE, TYPE, SHAPE,
 )
+
+from .utils import  sensitivity_transform
 
 from .inf import (
     Inferrer,

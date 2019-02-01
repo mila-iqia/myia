@@ -3,11 +3,11 @@
 import numpy
 from itertools import count
 
-from .abstract import GraphInferrer
-from .abstract.base import GraphAndContext, concretize_abstract, \
+from .abstract import GraphAndContext, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
     AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, \
-    AbstractError, AbstractValue, TrackableFunction, to_value, TypedPrimitive
+    AbstractError, AbstractValue, TrackableFunction, to_value, \
+    TypedPrimitive, GraphInferrer, broaden
 from .dtype import Function, TypeMeta
 from .abstract import ANYTHING, Context, Unspecializable, \
     DEAD, INACCESSIBLE, POLY, VirtualReference
@@ -195,7 +195,6 @@ class _GraphSpecializer:
         return self.specializer.infcaches[inf]
 
     async def _find_generalized(self, inf):
-        from .abstract.base import broaden
         choices = set()
         for argvals in self.specializer.infcaches[inf]:
             argvals = tuple([broaden(v, None) for v in argvals])

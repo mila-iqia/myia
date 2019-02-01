@@ -21,7 +21,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
     AbstractList, Possibilities, type_error_nargs, AbstractBase, \
     InferenceError
-from .base import broaden as _broaden, sensitivity_transform, amerge, \
+from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind
 
 

@@ -2,7 +2,7 @@
 
 import inspect
 
-from .abstract import MyiaTypeError
+from .abstract import MyiaTypeError, from_value, broaden
 from .pipeline import standard_pipeline
 from .utils import as_frozen
 
@@ -49,9 +49,6 @@ class MyiaFunction:
             raise MyiaTypeError(
                 f'Wrong number of arguments: expected {n1}, got {n2}'
             )
-
-        from .abstract.inf import from_value
-        from .abstract.base import broaden
 
         argspec = tuple(from_value(arg) for arg in args)
         argspec = tuple(broaden(arg, None)

@@ -4,6 +4,9 @@
 from dataclasses import dataclass
 from functools import reduce
 
+from .abstract import \
+    AbstractFunction, Possibilities, GraphAndContext, VALUE, \
+    TrackableFunction
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType, ismyiatype, Function
 from .hypermap import HyperMap
@@ -770,10 +773,6 @@ class GradOperation(MetaGraph):
 
     def specialize_from_abstract(self, args):
         """Generate the graph."""
-        from .abstract.base import \
-            AbstractFunction, Possibilities, GraphAndContext, VALUE, \
-            TrackableFunction
-
         ft, = args
         if isinstance(ft, AbstractFunction):
             poss = ft.values[VALUE]

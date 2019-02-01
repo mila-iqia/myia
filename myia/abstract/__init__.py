@@ -9,6 +9,17 @@ from .loop import (  # noqa
     force_pending,
 )
 
+from .utils import (  # noqa
+    to_value,
+    abstract_clone,
+    abstract_clone_async,
+    concretize_abstract,
+    broaden,
+    sensitivity_transform,
+    amerge,
+    bind,
+)
+
 
 from .data import (  # noqa
     ABSENT,

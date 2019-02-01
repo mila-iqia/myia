@@ -7,9 +7,7 @@ from types import FunctionType
 
 from .. import dtype, operations, parser, composite as C
 from ..specialize import TypeSpecializer
-from ..abstract.base import AbstractFunction
-from ..abstract.inf import from_value
-from ..abstract import InferenceEngine, ANYTHING
+from ..abstract import AbstractFunction, from_value, InferenceEngine, ANYTHING
 from ..ir import Graph, clone
 from ..prim import ops as P
 from ..utils import overload, TypeMap, UNKNOWN

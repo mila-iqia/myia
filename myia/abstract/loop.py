@@ -147,7 +147,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
 
 def is_simple(x):
-    from .base import AbstractScalar, TYPE
+    from .data import AbstractScalar, TYPE
     if isinstance(x, Pending):
         return x.is_simple()
     if isinstance(x, AbstractScalar):
