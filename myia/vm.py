@@ -7,6 +7,7 @@ implementation.
 
 from typing import Iterable, Mapping, Any, List
 
+from .abstract import to_abstract
 from .ir import Graph, Apply, Constant, Parameter, ANFNode, MetaGraph
 from .prim import Primitive
 from .prim.py_implementations import typeof
@@ -262,8 +263,8 @@ class VM:
         elif isinstance(fn, (Graph, Closure)):
             self._call(fn, args)
         elif isinstance(fn, MetaGraph):
-            types = [typeof(arg) for arg in args]
-            g = fn.specialize_from_types(types)
+            absargs = [to_abstract(arg) for arg in args]
+            g = fn.specialize_from_abstract(absargs)
             self._dispatch_call(node, frame, g, args)
         elif is_dataclass_type(fn):
             frame.values[node] = fn(*args)

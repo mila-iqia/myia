@@ -6,7 +6,7 @@ from functools import reduce
 
 from .abstract import \
     AbstractFunction, Possibilities, GraphAndContext, VALUE, \
-    TrackableFunction
+    TrackableFunction, AbstractList, AbstractTuple
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType, ismyiatype, Function
 from .hypermap import HyperMap
@@ -394,17 +394,17 @@ def tuple_hasnext(xs):
 class Tail(MetaGraph):
     """Implementation of tail."""
 
-    def specialize_from_types(self, types):
+    def specialize_from_abstract(self, args):
         """Generate tail specialized for the given Tuple type.
 
         tail(x) generates make_tuple(x[1], x[2], ...)
         """
-        if len(types) != 1:
+        if len(args) != 1:
             raise MyiaTypeError('tail takes one argument')
-        t, = types
-        if not ismyiatype(t, Tuple):
+        a, = args
+        if not isinstance(a, AbstractTuple):
             raise MyiaTypeError('tail requires a Tuple')
-        if len(t.elements) == 0:
+        if len(a.elements) == 0:
             raise MyiaTypeError('tail requires a non-empty Tuple')
         g = Graph()
         g.flags['core'] = True
@@ -412,7 +412,7 @@ class Tail(MetaGraph):
         tup = g.add_parameter()
         tup.debug.name = "tup"
         elems = [g.apply(P.tuple_getitem, tup, i)
-                 for i in range(1, len(t.elements))]
+                 for i in range(1, len(a.elements))]
         g.output = g.apply(P.make_tuple, *elems)
         return g
 
@@ -652,12 +652,12 @@ def list_reduce(fn, lst, dftl):
 class ListMap(MetaGraph):
     """Implementation of list_map."""
 
-    def specialize_from_types(self, types):
+    def specialize_from_abstract(self, args):
         """Return a graph for the number of lists."""
-        if len(types) < 2:
+        if len(args) < 2:
             raise MyiaTypeError('list_map takes at least two arguments')
-        for t in types[1:]:
-            if not ismyiatype(t, List):
+        for t in args[1:]:
+            if not isinstance(t, AbstractList):
                 raise MyiaTypeError(f'list_map requires lists, not {t}')
 
         g = Graph()
@@ -665,7 +665,7 @@ class ListMap(MetaGraph):
         g.flags['flatten_inference'] = True
         g.debug.name = 'list_map'
         fn = g.add_parameter()
-        lists = [g.add_parameter() for _ in types[1:]]
+        lists = [g.add_parameter() for _ in args[1:]]
         iters = [g.apply(list_iter, l) for l in lists]
         nexts = [g.apply(next, it) for it in iters]
         values = [g.apply(P.tuple_getitem, n, 0) for n in nexts]
