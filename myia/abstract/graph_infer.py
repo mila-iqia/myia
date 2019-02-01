@@ -8,7 +8,7 @@ from ..debug.label import label
 from ..ir import GraphGenerationError
 from ..utils import Partializable, UNKNOWN, eprint
 
-from .core import InferenceLoop, force_pending
+from .loop import InferenceLoop, force_pending
 from .data import ANYTHING, InferenceError, MyiaTypeError, \
     infer_trace, Unspecializable, DEAD, POLY
 

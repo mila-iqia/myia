@@ -10,7 +10,7 @@ from ..prim.py_implementations import typeof
 from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
     is_dataclass_type
 
-from .core import Pending, force_pending
+from .loop import Pending, force_pending
 from .graph_infer import Track, type_error_nargs, VirtualReference, \
     Context
 from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \

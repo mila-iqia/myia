@@ -41,7 +41,7 @@ from ..dtype import Number, Float, Bool
 from ..prim import ops as P
 from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
 
-from .core import Pending, find_coherent_result, force_pending
+from .loop import Pending, find_coherent_result, force_pending
 from .data import ANYTHING, MyiaTypeError, \
     InferenceError, MyiaShapeError, VOID
 from .graph_infer import Context

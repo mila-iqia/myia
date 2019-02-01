@@ -1,5 +1,5 @@
 
-from .core import (  # noqa
+from .loop import (  # noqa
     InferenceLoop,
     InferenceTask,
     Pending,
