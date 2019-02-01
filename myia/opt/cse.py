@@ -3,9 +3,17 @@
 
 from collections import defaultdict
 
+from ..abstract import AbstractFunction
 from ..graph_utils import toposort
 from ..ir import succ_incoming
 from ..utils import Partializable
+
+
+def absof(node):
+    if isinstance(node.abstract, AbstractFunction):
+        return None
+    else:
+        return node.abstract
 
 
 def cse(root, manager):
@@ -21,7 +29,7 @@ def cse(root, manager):
                 continue
 
             if node.is_constant():
-                h = hash((node.value, node.type))
+                h = hash((node.value, absof(node)))
             elif node.is_apply():
                 h = hash(tuple(hashes[inp] for inp in node.inputs))
             elif node.is_parameter():
@@ -44,7 +52,8 @@ def cse(root, manager):
                 continue  # pragma: no cover
 
             elif main.is_constant() and other.is_constant():
-                repl = main.type is other.type and main.value == other.value
+                repl = absof(main) == absof(other) \
+                    and main.value == other.value
 
             elif main.is_apply() and other.is_apply():
                 # The inputs to both should have been merged beforehand
