@@ -53,14 +53,13 @@ class TypeSpecializer:
         """Initialize a TypeSpecializer."""
         self.engine = engine
         self.seen = set()
-        self.track = self.engine.track
         self.mng = self.engine.mng
         self.specializations = {Context.empty(): None}
         self.infcaches = {}
 
     def run(self, graph, context):
         """Run the specializer on the given graph in the given context."""
-        ginf = self.track.get_inferrer_for(GraphAndContext(graph, context))
+        ginf = self.engine.get_inferrer_for(GraphAndContext(graph, context))
 
         argrefs = [self.engine.ref(p, context)
                    for p in graph.parameters]
@@ -75,7 +74,7 @@ class TypeSpecializer:
         g = ginf._graph
         argvals = [await self.engine.get_inferred(ref)
                    for ref in argrefs]
-        ctx = ginf.make_context(self.track, argvals)
+        ctx = ginf.make_context(self.engine, argvals)
         return await self._specialize(g, ctx, argrefs)
 
     async def _specialize(self, g, ctx, argrefs):
@@ -151,7 +150,7 @@ class _GraphSpecializer:
 
     @build_inferrer.register
     async def build_inferrer(self, a, fn: Primitive, argvals):
-        inf = self.specializer.track.get_inferrer_for(fn)
+        inf = self.specializer.engine.get_inferrer_for(fn)
         argvals, outval = await self._find_unique_argvals(a, inf, argvals)
         a = AbstractFunction(TypedPrimitive(fn, argvals, outval))
         return _const(fn, a)
@@ -166,17 +165,17 @@ class _GraphSpecializer:
     async def build_inferrer(self, a, fn: GraphAndContext, argvals):
         if not _visible(self.graph, fn.graph):
             raise Unspecializable('xx5')
-        inf = self.specializer.track.get_inferrer_for(fn)
+        inf = self.specializer.engine.get_inferrer_for(fn)
         return await self._build_inferrer_x(a, inf, argvals)
 
     @build_inferrer.register
     async def build_inferrer(self, a, fn: MetaGraph, argvals):
-        inf = self.specializer.track.get_inferrer_for(fn)
+        inf = self.specializer.engine.get_inferrer_for(fn)
         return await self._build_inferrer_x(a, inf, argvals)
 
     @build_inferrer.register
     async def build_inferrer(self, a, fn: TrackableFunction, argvals):
-        inf = self.specializer.track.get_inferrer_for(fn)
+        inf = self.specializer.engine.get_inferrer_for(fn)
         argvals, _ = await self._find_unique_argvals(a, inf, argvals)
         return await self.build_inferrer(a, fn.fn, argvals)
 
@@ -202,7 +201,7 @@ class _GraphSpecializer:
         if len(choices) == 1:
             choice, = choices
             argrefs = [VirtualReference(v) for v in choice]
-            res = await inf(self.specializer.track, None, argrefs)
+            res = await inf(self.specializer.engine, None, argrefs)
             self.specializer.infcaches[inf] = {choice: res}
             return choice, res
         else:
@@ -233,7 +232,7 @@ class _GraphSpecializer:
 
     async def _build_inferrer_x(self, a, inf, argvals):
         argvals, _ = await self._find_unique_argvals(a, inf, argvals)
-        ctx = inf.make_context(self.specializer.track, argvals)
+        ctx = inf.make_context(self.specializer.engine, argvals)
         v = await self.specializer._specialize(ctx.graph, ctx, None)
         return _const(v, a)
 

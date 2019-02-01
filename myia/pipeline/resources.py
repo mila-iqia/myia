@@ -354,7 +354,6 @@ class InferenceResource(PipelineResource):
             max_depth=self.max_depth,
             context_class=self.context_class,
         )
-        self.track = self.engine.track
 
     def infer(self, graph, argspec, outspec=None, clear=False):
         """Perform inference."""

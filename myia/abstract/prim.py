@@ -204,7 +204,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
     """
     from ..abstract import Reference
 
-    resources = track.engine.pipeline.resources
+    resources = track.pipeline.resources
 
     data_t = data.build(TYPE)
     item_v = item.build(VALUE, default=ANYTHING)
@@ -1079,7 +1079,7 @@ async def _inf_Jinv(track, x):
                     g = f
                 primal = g and g.transforms.get('primal', None)
                 if primal:
-                    primal = track.engine.pipeline.resources.convert(primal)
+                    primal = track.pipeline.resources.convert(primal)
                     if isinstance(primal, Graph) and primal.parent:
                         # The primal for a closure can't be used because it points to
                         # the original nodes of its parent, whereas we would like to

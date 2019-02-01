@@ -43,13 +43,11 @@ class InferenceEngine:
         self.loop = InferenceLoop(InferenceError)
         self.pipeline = pipeline
         self.mng = self.pipeline.resources.manager
-        self.engine = self
         self.constructors = {
             prim: cons()
             for prim, cons in constructors.items()
         }
         self.max_depth = max_depth
-        self.track = self
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
         self.context_class = context_class
@@ -75,7 +73,7 @@ class InferenceEngine:
         async def _run():
             inf = GraphInferrer(graph, empty_context)
             self.loop.schedule(
-                inf(self.track, None, argrefs)
+                inf(self, None, argrefs)
             )
 
         async def _check():
@@ -96,8 +94,6 @@ class InferenceEngine:
 
     async def compute_ref(self, ref):
         """Compute the value of the Reference on the given track."""
-        assert isinstance(ref, Reference)
-        track = self.track
 
         node = ref.node
         inferred = ref.node.abstract
@@ -106,10 +102,10 @@ class InferenceEngine:
             return inferred
 
         elif node.is_constant():
-            return await track.infer_constant(ref)
+            return await self.infer_constant(ref)
 
         elif node.is_apply():
-            return await track.infer_apply(ref)
+            return await self.infer_apply(ref)
 
         else:
             raise AssertionError(f'Missing information for {ref}', ref)
@@ -214,9 +210,9 @@ class InferenceEngine:
         ctx = ref.context
         n_fn, *n_args = ref.node.inputs
         # We await on the function node to get the inferrer
-        fn_ref = self.engine.ref(n_fn, ctx)
+        fn_ref = self.ref(n_fn, ctx)
         fn = await fn_ref.get()
-        argrefs = [self.engine.ref(node, ctx) for node in n_args]
+        argrefs = [self.ref(node, ctx) for node in n_args]
 
         args = [await ref.get() for ref in argrefs]
 
@@ -226,7 +222,7 @@ class InferenceEngine:
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]
 
-        return await self.engine.loop.schedule(
+        return await self.loop.schedule(
             execute_inferrers(self, infs, ref, argrefs),
             context_map={
                 infer_trace: {**infer_trace.get(), ctx: ref}
@@ -235,12 +231,12 @@ class InferenceEngine:
 
     async def infer_constant(self, ctref):
         """Get the property for a ref of a Constant node."""
-        v = self.engine.pipeline.resources.convert(ctref.node.value)
+        v = self.pipeline.resources.convert(ctref.node.value)
         res = from_value(v, ctref.context, ref=ctref)
         t = res.build(TYPE)
         if dtype.ismyiatype(t, dtype.Number):
             prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
-            res.values[TYPE] = self.engine.loop.create_pending_from_list(
+            res.values[TYPE] = self.loop.create_pending_from_list(
                 _number_types, t, lambda: prio
             )
         return res
@@ -249,7 +245,7 @@ class InferenceEngine:
         return reduce(self._merge, values)
 
     def _merge(self, x1, x2):
-        return amerge(x1, x2, loop=self.engine.loop, forced=False)
+        return amerge(x1, x2, loop=self.loop, forced=False)
 
     def check_predicate(self, predicate, res):
         if isinstance(predicate, tuple):
@@ -404,7 +400,7 @@ class BaseGraphInferrer(Inferrer):
         return argkey, self.context.add(g, argkey)
 
     async def infer(self, track, *args):
-        engine = track.engine
+        engine = track
         g = self.get_graph(track, args)
         nargs = len(g.parameters)
 
@@ -452,7 +448,7 @@ class MetaGraphInferrer(BaseGraphInferrer):
                 g = self.metagraph.specialize_from_abstract(argvals)
             except GraphGenerationError as err:
                 raise MyiaTypeError(f'Graph gen error: {err}')
-            g = track.engine.pipeline.resources.convert(g)
+            g = track.pipeline.resources.convert(g)
             self.graph_cache[argvals] = g
         return self.graph_cache[argvals]
 
@@ -547,13 +543,13 @@ async def execute_inferrers(track, inferrers, outref, argrefs):
     else:
         pending = []
         for inf in inferrers:
-            p = track.engine.loop.create_pending(
+            p = track.loop.create_pending(
                 resolve=None,
                 priority=lambda: None
             )
             pending.append(p)
-            track.engine.loop.schedule(
+            track.loop.schedule(
                 _xinf_helper(track, inf, outref, argrefs, p)
             )
 
-        return bind(track.engine.loop, None, [], pending)
+        return bind(track.loop, None, [], pending)
