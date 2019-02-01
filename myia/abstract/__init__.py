@@ -71,7 +71,7 @@ from .ref import (  # noqa
 )
 
 
-from .inf import (  # noqa
+from .infer import (  # noqa
     Inferrer,
     GraphInferrer,
     from_value,

@@ -29,7 +29,7 @@ from .data import (
 
 from .utils import  sensitivity_transform
 
-from .inf import (
+from .infer import (
     Inferrer,
     GraphInferrer,
     from_value,
