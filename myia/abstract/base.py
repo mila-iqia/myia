@@ -13,7 +13,7 @@ from ..debug.utils import mixin
 from ..utils import overload, UNKNOWN, Named
 
 from .loop import Pending, is_simple, PendingTentative
-from .graph_infer import Reference, Context
+from .ref import Reference, Context
 
 from .data import (  # noqa
     ABSENT,

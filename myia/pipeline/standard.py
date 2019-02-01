@@ -6,7 +6,7 @@ from ..compile import step_wrap_primitives, step_compile, step_link, \
 from ..abstract import Context
 from ..ir import GraphManager
 from ..prim import py_implementations
-from ..abstract import AbstractTrack, abstract_inferrer_constructors
+from ..abstract import abstract_inferrer_constructors
 from ..pipeline.resources import scalar_object_map, standard_object_map, \
     standard_method_map, default_convert, ConverterResource, \
     InferenceResource

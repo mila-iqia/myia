@@ -1,4 +1,5 @@
 
+import asyncio
 import numpy as np
 from functools import reduce
 from dataclasses import is_dataclass
@@ -8,112 +9,144 @@ from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
 from ..prim.py_implementations import typeof
 from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
-    is_dataclass_type
+    is_dataclass_type, Partializable
 
-from .loop import Pending, force_pending
-from .graph_infer import Track, type_error_nargs, VirtualReference, \
-    Context
+from .loop import Pending, force_pending, InferenceLoop
+from .ref import VirtualReference, Context, EvaluationCache, Reference
 from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     ABSENT, GraphAndContext, AbstractBase, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, \
     VALUE, TYPE, SHAPE, DummyFunction, TrackableFunction, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractList, Possibilities
+    AbstractList, Possibilities, type_error_nargs, AbstractBase, \
+    InferenceError
 from .base import broaden as _broaden, sensitivity_transform, amerge, \
     bind
 
 
-_number_types = [
-    dtype.Int[8], dtype.Int[16], dtype.Int[32], dtype.Int[64],
-    dtype.UInt[8], dtype.UInt[16], dtype.UInt[32], dtype.UInt[64],
-    dtype.Float[16], dtype.Float[32], dtype.Float[64],
-]
+class InferenceEngine:
+    """Infer various properties about nodes in graphs.
 
+    Arguments:
+        tracks: Map each track (property name) to a Track object.
 
-def from_value(v, context=None, ref=None, broaden=False):
-    a = to_abstract(v, context, ref)
-    if broaden:
-        a = _broaden(a, None)
-    return a
+    """
 
-
-def to_abstract(v, context=None, ref=None):
-    """Translate the value to an abstract value."""
-    if isinstance(v, (Primitive, Graph, MetaGraph)):
-        if isinstance(v, Graph) and v.parent:
-            v = GraphAndContext(v, context or Context.empty())
-        if ref is not None:
-            v = TrackableFunction(v, id=ref.node)
-        return AbstractFunction(v)
-
-    elif is_dataclass_type(v):
-        typ = dtype.pytype_to_myiatype(v)
-        typarg = AbstractScalar({
-            VALUE: typ,
-            TYPE: dtype.TypeType,
-        })
-        return AbstractFunction(
-            PartialApplication(
-                P.make_record,
-                (typarg,)
-            )
-        )
-
-    elif is_dataclass(v):
-        typ = dtype.pytype_to_myiatype(type(v), v)
-        new_args = {}
-        for name, field in v.__dataclass_fields__.items():
-            new_args[name] = to_abstract(getattr(v, name), context)
-        return AbstractClass(typ.tag, new_args, typ.methods)
-
-    elif isinstance(v, (int, float, str)):
-        return AbstractScalar({
-            VALUE: v,
-            TYPE: dtype.pytype_to_myiatype(type(v), v),
-        })
-
-    elif isinstance(v, tuple):
-        return AbstractTuple([to_abstract(elem, context) for elem in v])
-
-    elif isinstance(v, np.ndarray):
-        return AbstractArray(
-            AbstractScalar({
-                VALUE: ANYTHING,
-                TYPE: dtype.np_dtype_to_type(str(v.dtype)),
-            }),
-            {SHAPE: v.shape}
-        )
-
-    elif isinstance(v, list):
-        if len(v) == 0:
-            raise Exception('No support for empty lists yet.')
-        return AbstractList(to_abstract(v[0], context))
-
-    elif dtype.ismyiatype(v):
-        return AbstractType(v)
-
-    else:
-        typ = dtype.pytype_to_myiatype(type(v), v)
-        assert dtype.ismyiatype(typ, (dtype.External, dtype.EnvType))
-        return AbstractScalar({
-            VALUE: v,
-            TYPE: typ,
-        })
-
-
-class AbstractTrack(Track):
     def __init__(self,
-                 engine,
+                 pipeline,
                  *,
                  constructors,
-                 max_depth=1):
-        super().__init__(engine)
+                 max_depth=1,
+                 context_class=Context):
+        """Initialize the InferenceEngine."""
+        self.loop = InferenceLoop(InferenceError)
+        self.pipeline = pipeline
+        self.mng = self.pipeline.resources.manager
+        self.engine = self
         self.constructors = {
             prim: cons()
             for prim, cons in constructors.items()
         }
         self.max_depth = max_depth
+        self.track = self
+        self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
+        self.errors = []
+        self.context_class = context_class
+        self.reference_map = {}
+
+    def run(self, graph, *, argspec, outspec=None):
+        """Run the inferrer on a graph given initial values.
+
+        Arguments:
+            graph: The graph to analyze.
+            argspec: The arguments. Must be a tuple of AbstractBase.
+            outspec (optional): Expected inference result. If provided,
+                inference result will be checked against it.
+        """
+        assert not isinstance(outspec, dict)
+        argrefs = [VirtualReference(arg) for arg in argspec]
+
+        self.mng.add_graph(graph)
+        empty_context = self.context_class.empty()
+        root_context = empty_context.add(graph, argspec)
+        output_ref = self.ref(graph.return_, root_context)
+
+        async def _run():
+            inf = GraphInferrer(graph, empty_context)
+            self.loop.schedule(
+                inf(self.track, None, argrefs)
+            )
+
+        async def _check():
+            amerge(await output_ref.get(),
+                   outspec,
+                   loop=self.loop,
+                   forced=False)
+
+        self.run_coroutine(_run())
+        if outspec is not None:
+            self.run_coroutine(_check())
+
+        return output_ref.get_sync(), root_context
+
+    def ref(self, node, context):
+        """Return a Reference to the node in the given context."""
+        return Reference(self, node, context)
+
+    async def compute_ref(self, ref):
+        """Compute the value of the Reference on the given track."""
+        assert isinstance(ref, Reference)
+        track = self.track
+
+        node = ref.node
+        inferred = ref.node.abstract
+
+        if inferred is not None:
+            return inferred
+
+        elif node.is_constant():
+            return await track.infer_constant(ref)
+
+        elif node.is_apply():
+            return await track.infer_apply(ref)
+
+        else:
+            raise AssertionError(f'Missing information for {ref}', ref)
+
+    def get_inferred(self, ref):
+        """Get a Future for the value of the Reference on the given track.
+
+        Results are cached.
+        """
+        return self.cache.get(ref)
+
+    async def forward_reference(self, orig, new):
+        self.reference_map[orig] = new
+        return await self.get_inferred(new)
+
+    def run_coroutine(self, coro, throw=True):
+        """Run an async function using this inferrer's loop."""
+        errs_before = len(self.errors)
+        try:
+            fut = self.loop.schedule(coro)
+            self.loop.run_forever()
+            self.errors.extend(self.loop.collect_errors())
+            for err in self.errors[errs_before:]:
+                err.engine = self
+            if errs_before < len(self.errors):
+                if throw:  # pragma: no cover
+                    for err in self.errors:
+                        if isinstance(err, InferenceError):
+                            raise err
+                    else:
+                        raise err
+                else:
+                    return None  # pragma: no cover
+            return fut.result()
+        finally:
+            for task in asyncio.all_tasks(self.loop):
+                task._log_destroy_pending = False
 
     get_inferrer_for = Overload()
 
@@ -249,6 +282,84 @@ class AbstractTrack(Track):
 
     async def chkimm(self, predicate, *values):
         return await force_pending(self.chk(predicate, *values))
+
+
+_number_types = [
+    dtype.Int[8], dtype.Int[16], dtype.Int[32], dtype.Int[64],
+    dtype.UInt[8], dtype.UInt[16], dtype.UInt[32], dtype.UInt[64],
+    dtype.Float[16], dtype.Float[32], dtype.Float[64],
+]
+
+
+def from_value(v, context=None, ref=None, broaden=False):
+    a = to_abstract(v, context, ref)
+    if broaden:
+        a = _broaden(a, None)
+    return a
+
+
+def to_abstract(v, context=None, ref=None):
+    """Translate the value to an abstract value."""
+    if isinstance(v, (Primitive, Graph, MetaGraph)):
+        if isinstance(v, Graph) and v.parent:
+            v = GraphAndContext(v, context or Context.empty())
+        if ref is not None:
+            v = TrackableFunction(v, id=ref.node)
+        return AbstractFunction(v)
+
+    elif is_dataclass_type(v):
+        typ = dtype.pytype_to_myiatype(v)
+        typarg = AbstractScalar({
+            VALUE: typ,
+            TYPE: dtype.TypeType,
+        })
+        return AbstractFunction(
+            PartialApplication(
+                P.make_record,
+                (typarg,)
+            )
+        )
+
+    elif is_dataclass(v):
+        typ = dtype.pytype_to_myiatype(type(v), v)
+        new_args = {}
+        for name, field in v.__dataclass_fields__.items():
+            new_args[name] = to_abstract(getattr(v, name), context)
+        return AbstractClass(typ.tag, new_args, typ.methods)
+
+    elif isinstance(v, (int, float, str)):
+        return AbstractScalar({
+            VALUE: v,
+            TYPE: dtype.pytype_to_myiatype(type(v), v),
+        })
+
+    elif isinstance(v, tuple):
+        return AbstractTuple([to_abstract(elem, context) for elem in v])
+
+    elif isinstance(v, np.ndarray):
+        return AbstractArray(
+            AbstractScalar({
+                VALUE: ANYTHING,
+                TYPE: dtype.np_dtype_to_type(str(v.dtype)),
+            }),
+            {SHAPE: v.shape}
+        )
+
+    elif isinstance(v, list):
+        if len(v) == 0:
+            raise Exception('No support for empty lists yet.')
+        return AbstractList(to_abstract(v[0], context))
+
+    elif dtype.ismyiatype(v):
+        return AbstractType(v)
+
+    else:
+        typ = dtype.pytype_to_myiatype(type(v), v)
+        assert dtype.ismyiatype(typ, (dtype.External, dtype.EnvType))
+        return AbstractScalar({
+            VALUE: v,
+            TYPE: typ,
+        })
 
 
 class Inferrer(Partializable):

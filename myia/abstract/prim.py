@@ -29,7 +29,6 @@ from .base import (
 )
 
 from .inf import (
-    AbstractTrack,
     Inferrer,
     GraphInferrer,
     from_value,
@@ -44,7 +43,7 @@ from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
 from .loop import Pending, find_coherent_result, force_pending
 from .data import ANYTHING, MyiaTypeError, \
     InferenceError, MyiaShapeError, VOID
-from .graph_infer import Context
+from .ref import Context
 
 
 abstract_inferrer_constructors = {}
