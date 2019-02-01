@@ -135,13 +135,14 @@ class PatternSubstitutionOptimization:
             return None
 
 
-def pattern_replacer(*pattern):
+def pattern_replacer(*pattern, interest=False):
     """Create a PatternSubstitutionOptimization using this function."""
     if len(pattern) == 2 and pattern[0] == 'just':
         pattern = pattern[1]
 
     def deco(f):
-        return PatternSubstitutionOptimization(pattern, f, name=f.__name__)
+        return PatternSubstitutionOptimization(pattern, f, name=f.__name__,
+                                               interest=interest)
     return deco
 
 
@@ -172,7 +173,8 @@ class NodeMap:
             if not isinstance(ints, tuple):
                 ints = (ints,)
             for interest in ints:
-                assert isinstance(interest, Primitive)
+                assert (isinstance(interest, Primitive) or
+                        (interest in (Graph, Apply)))
                 self._d.setdefault(interest, []).append(opt)
 
         # There could be the option to return do_register also.
@@ -182,8 +184,13 @@ class NodeMap:
         """Get a list of optimizers that could apply for a node."""
         res = []
         res.extend(self._d.get(None, []))
-        if node.is_apply() and node.inputs[0].is_constant():
-            res.extend(self._d.get(node.inputs[0].value, []))
+        if node.is_apply():
+            if node.inputs[0].is_constant():
+                res.extend(self._d.get(node.inputs[0].value, []))
+            if node.inputs[0].is_constant_graph():
+                res.extend(self._d.get(Graph, []))
+            if node.inputs[0].is_apply():
+                res.extend(self._d.get(Apply, []))
         return res
 
 
@@ -196,70 +203,48 @@ class LocalPassOptimizer:
         self.optimizer = optimizer
 
     def __call__(self, graph):
-        """Apply optimizations on given graphs in node order."""
+        """Apply optimizations on given graphs in node order.
+
+        This will visit the nodes from the output to the inputs in a
+        bfs manner while avoiding parts of the graph that are dropped
+        due to optimizations.
+        """
         if self.optimizer is not None:
             mng = self.optimizer.resources.manager
             mng.add_graph(graph)
         else:
             mng = manage(graph)
 
-        changes = False
-        again = True
-        while again:
-            topo, seen, chg = self.backwards(mng, graph)
-            again = self.forward(mng, topo)
-            changes |= (chg | again)
-
-        return changes
-
-    def backwards(self, mng, graph):
-        """Do a backwards pass over the graph.
-
-        This will visit the nodes from the output to the inputs in a
-        bfs manner while avoiding parts of the graph that are dropped
-        due to optimizations.
-
-        It returns a visitation order for a forward pass.
-
-        """
         seen = set([graph])
         todo = deque()
-        fwd = list()
         changes = False
-        todo.appendleft(graph.output)
+        todo.append(graph.output)
 
         while len(todo) > 0:
-            n = todo.pop()
+            n = todo.popleft()
             if n in seen or n not in mng.all_nodes:
                 continue
             seen.add(n)
 
             new, chg = self.apply_opt(mng, n)
+
             changes |= chg
 
-            fwd.append(new)
             if new.is_constant(Graph):
                 if new.value not in seen:
-                    todo.append(new.value.output)
+                    todo.appendleft(new.value.output)
                     seen.add(new.value)
             else:
-                todo.extendleft(new.inputs)
+                todo.extendleft(reversed(new.inputs))
 
-        return fwd, seen, changes
+            if chg:
+                # If changes, re-do the parent node(s)
+                uses = set(u[0] for u in mng.uses[new])
+                # TODO: grab all constants for a graph
+                seen.difference_update(uses)
+                todo.extendleft(uses)
 
-    def forward(self, mng, topo):
-        """Do a pass over the nodes.
-
-        This will visit nodes in the passed-in order, skipping those
-        that are no longer part of the manager.  It doesn't attempt to
-        visit new subgraphs.
-
-        """
-        change = False
-        for node in reversed(topo):
-            if node in mng.all_nodes:
-                change |= self.apply_opt(mng, node) is True
-        return change
+        return changes
 
     def apply_opt(self, mng, n):
         """Apply optimizations passes according to the node map."""
@@ -270,9 +255,8 @@ class LocalPassOptimizer:
             for transformer in self.node_map.get(n):
                 new = transformer(self.optimizer, n)
                 if new is True:
-                    loop = True
                     changes = True
-                    break
+                    continue
                 if new and new is not n:
                     new.expect_inferred.update(n.inferred)
                     mng.replace(n, new)
