@@ -3,7 +3,7 @@ import numpy
 from dataclasses import dataclass
 from numpy import ones as _ones, zeros as _zeros, asscalar
 from myia.dtype import Array, Tuple, pytype_to_myiatype
-from myia.infer import InferenceError
+from myia.abstract import InferenceError
 from myia.composite import grad
 from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import array_reduce, scalar_add

@@ -4,7 +4,7 @@ import pytest
 from myia.api import myia
 from myia.cconv import closure_convert
 from myia.dtype import List, Array, Tuple, Bool
-from myia.infer import InferenceError
+from myia.abstract import InferenceError
 from myia.ir import clone
 from myia.pipeline import \
     scalar_parse as parse, scalar_debug_compile as compile

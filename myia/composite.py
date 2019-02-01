@@ -7,7 +7,7 @@ from functools import reduce
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType, ismyiatype, Function
 from .hypermap import HyperMap
-from .infer import MyiaTypeError
+from .abstract import MyiaTypeError
 from .info import About
 from .ir import Graph, MetaGraph, MultitypeGraph, Constant
 from .prim import ops as P

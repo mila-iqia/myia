@@ -10,10 +10,11 @@ from .. import dtype
 from ..ir import Graph
 from ..prim import Primitive
 from ..debug.utils import mixin
-from ..infer import ANYTHING, InferenceError, MyiaTypeError, \
-    Reference, Context
-from ..infer.core import Pending, is_simple, PendingTentative
 from ..utils import overload, UNKNOWN, Named
+
+from .core import Pending, is_simple, PendingTentative
+from .utils import ANYTHING, InferenceError, MyiaTypeError
+from .graph_infer import Reference, Context
 
 
 ABSENT = Named('ABSENT')

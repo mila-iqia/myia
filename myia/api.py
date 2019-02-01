@@ -2,7 +2,7 @@
 
 import inspect
 
-from .infer import MyiaTypeError
+from .abstract import MyiaTypeError
 from .pipeline import standard_pipeline
 from .utils import as_frozen
 

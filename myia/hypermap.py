@@ -2,7 +2,7 @@
 
 
 from . import operations, composite as C
-from .infer import InferenceError
+from .abstract import InferenceError
 from .ir import MetaGraph, Graph
 from .dtype import Array, List, Tuple, Class, tag_to_dataclass, \
     pytype_to_myiatype, ismyiatype

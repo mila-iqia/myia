@@ -4,7 +4,7 @@ import ast
 import sys
 from colorama import Fore, Style
 
-from ..infer import InferenceError
+from ..abstract import InferenceError
 from ..utils import eprint
 
 from .label import label

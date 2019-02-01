@@ -215,7 +215,7 @@ class EvaluationCache:
 
 
 def is_simple(x):
-    from ..abstract.base import AbstractScalar, TYPE
+    from .base import AbstractScalar, TYPE
     if isinstance(x, Pending):
         return x.is_simple()
     if isinstance(x, AbstractScalar):

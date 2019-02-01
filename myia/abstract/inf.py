@@ -4,15 +4,16 @@ from functools import reduce
 from dataclasses import is_dataclass
 
 from .. import dtype
-from ..infer import Track, MyiaTypeError, Context, ANYTHING
-from ..infer.core import Pending, reify
-from ..infer.graph_infer import type_error_nargs, VirtualReference
-from ..infer.utils import infer_trace
 from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
 from ..prim.py_implementations import typeof
 from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
     is_dataclass_type
+
+from .core import Pending, reify
+from .graph_infer import Track, type_error_nargs, VirtualReference, \
+    Context
+from .utils import infer_trace, MyiaTypeError, ANYTHING
 
 from .base import AbstractScalar, Possibilities, \
     ABSENT, GraphAndContext, AbstractBase, amerge, bind, PartialApplication, \

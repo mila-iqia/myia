@@ -17,7 +17,7 @@ from myia.dtype import Array as A, Int, Float, TypeType, External, \
     Number, Class, Problem, EnvType as Env, JTagged as JT, ismyiatype, \
     Array, Tuple, List
 from myia.hypermap import HyperMap
-from myia.infer import ANYTHING, VOID, InferenceError, \
+from myia.abstract import ANYTHING, VOID, InferenceError, \
     Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
 from myia.pipeline import pipeline_function

@@ -2,7 +2,7 @@
 import pytest
 
 from myia import dtype as ty
-from myia.infer import ANYTHING, MyiaTypeError
+from myia.abstract import ANYTHING, MyiaTypeError
 from myia.prim.py_implementations import typeof
 from myia.abstract.base import (
     AbstractScalar as _S, AbstractTuple as T, AbstractArray as A,

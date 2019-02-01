@@ -38,11 +38,13 @@ from .inf import (
 from .. import dtype
 from ..ir import Graph
 from ..dtype import Number, Float, Bool
-from ..infer import ANYTHING, Context, MyiaTypeError, \
-    InferenceError, reify, MyiaShapeError, VOID
-from ..infer.core import Pending, find_coherent_result
 from ..prim import ops as P
 from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
+
+from .core import Pending, find_coherent_result, reify
+from .graph_infer import Context
+from .utils import ANYTHING, MyiaTypeError, \
+    InferenceError, MyiaShapeError, VOID
 
 
 abstract_inferrer_constructors = {}
@@ -200,7 +202,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
         chk: A function to check the values inferred for the
             data and item.
     """
-    from ..infer import Reference
+    from ..abstract import Reference
 
     resources = track.engine.pipeline.resources
 

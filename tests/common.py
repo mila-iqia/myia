@@ -8,7 +8,7 @@ from myia.abstract.base import VALUE, TYPE, SHAPE, \
     AbstractJTagged
 from myia.dtype import Bool, Int, UInt, Float, List, Array, Tuple, Function, \
     Object, pytype_to_myiatype, TypeType
-from myia.infer import ANYTHING
+from myia.abstract import ANYTHING
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance
 

@@ -9,7 +9,7 @@ from .abstract.base import GraphAndContext, concretize_abstract, \
     AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, \
     AbstractError, AbstractValue, TrackableFunction, to_value, TypedPrimitive
 from .dtype import Function, TypeMeta
-from .infer import ANYTHING, Context, Unspecializable, \
+from .abstract import ANYTHING, Context, Unspecializable, \
     DEAD, INACCESSIBLE, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
 from .prim import ops as P, Primitive
