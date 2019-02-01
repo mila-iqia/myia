@@ -26,12 +26,7 @@ from .utils import broaden as _broaden, sensitivity_transform, amerge, \
 
 
 class InferenceEngine:
-    """Infer various properties about nodes in graphs.
-
-    Arguments:
-        tracks: Map each track (property name) to a Track object.
-
-    """
+    """Infer various properties about nodes in graphs."""
 
     def __init__(self,
                  pipeline,
@@ -93,7 +88,7 @@ class InferenceEngine:
         return Reference(self, node, context)
 
     async def compute_ref(self, ref):
-        """Compute the value of the Reference on the given track."""
+        """Compute the value associated to the Reference."""
 
         node = ref.node
         inferred = ref.node.abstract
@@ -111,7 +106,7 @@ class InferenceEngine:
             raise AssertionError(f'Missing information for {ref}', ref)
 
     def get_inferred(self, ref):
-        """Get a Future for the value of the Reference on the given track.
+        """Get a Future for the value associated to the Reference.
 
         Results are cached.
         """
@@ -362,13 +357,13 @@ class Inferrer(Partializable):
     def __init__(self):
         self.cache = {}
 
-    async def __call__(self, track, outref, argrefs):
+    async def __call__(self, engine, outref, argrefs):
         args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
-            self.cache[args] = await self.infer(track, *args)
+            self.cache[args] = await self.infer(engine, *args)
         return self.cache[args]
 
-    async def infer(self, track, *args):
+    async def infer(self, engine, *args):
         raise NotImplementedError()
 
     def __repr__(self):
@@ -380,34 +375,33 @@ class TrackableInferrer(Inferrer):
         super().__init__()
         self.subinf = subinf
 
-    async def __call__(self, track, outref, argrefs):
+    async def __call__(self, engine, outref, argrefs):
         args = tuple([await ref.get() for ref in argrefs])
-        self.cache[args] = await self.subinf(track, outref, argrefs)
+        self.cache[args] = await self.subinf(engine, outref, argrefs)
         return self.cache[args]
 
 
 class BaseGraphInferrer(Inferrer):
 
-    def make_context(self, track, args):
-        _, ctx = self._make_argkey_and_context(track, args)
+    def make_context(self, engine, args):
+        _, ctx = self._make_argkey_and_context(engine, args)
         return ctx
 
-    def _make_argkey_and_context(self, track, argvals):
+    def _make_argkey_and_context(self, engine, argvals):
         assert argvals is not None
-        g = self.get_graph(track, argvals)
+        g = self.get_graph(engine, argvals)
         argkey = tuple(argvals)
         # Update current context using the fetched properties.
         return argkey, self.context.add(g, argkey)
 
-    async def infer(self, track, *args):
-        engine = track
-        g = self.get_graph(track, args)
+    async def infer(self, engine, *args):
+        g = self.get_graph(engine, args)
         nargs = len(g.parameters)
 
         if len(args) != nargs:
             raise type_error_nargs(self, nargs, len(args))
 
-        argkey, context = self._make_argkey_and_context(track, args)
+        argkey, context = self._make_argkey_and_context(engine, args)
 
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
@@ -430,7 +424,7 @@ class GraphInferrer(BaseGraphInferrer):
             self.context = context.filter(graph)
         assert self.context is not None
 
-    def get_graph(self, track, args):
+    def get_graph(self, engine, args):
         return self._graph
 
 
@@ -442,13 +436,13 @@ class MetaGraphInferrer(BaseGraphInferrer):
         self.context = Context.empty()
         self.graph_cache = {}
 
-    def get_graph(self, track, argvals):
+    def get_graph(self, engine, argvals):
         if argvals not in self.graph_cache:
             try:
                 g = self.metagraph.specialize_from_abstract(argvals)
             except GraphGenerationError as err:
                 raise MyiaTypeError(f'Graph gen error: {err}')
-            g = track.pipeline.resources.convert(g)
+            g = engine.pipeline.resources.convert(g)
             self.graph_cache[argvals] = g
         return self.graph_cache[argvals]
 
@@ -460,12 +454,12 @@ class PartialInferrer(Inferrer):
         self.fn = fn
         self.args = args
 
-    async def __call__(self, track, outref, argrefs):
+    async def __call__(self, engine, outref, argrefs):
         argvals = tuple([await ref.get() for ref in argrefs])
         if argvals not in self.cache:
             args = tuple(VirtualReference(arg)
                          for arg in self.args + argvals)
-            self.cache[argvals] = await self.fn(track, outref, args)
+            self.cache[argvals] = await self.fn(engine, outref, args)
         return self.cache[argvals]
 
 
@@ -476,11 +470,11 @@ class VirtualInferrer(Inferrer):
         self.args = args
         self.output = output
 
-    async def infer(self, track, *args):
+    async def infer(self, engine, *args):
         if len(args) != len(self.args):
             raise MyiaTypeError('Wrong number of arguments')
         for given, expected in zip(args, self.args):
-            track.abstract_merge(given, expected)
+            engine.abstract_merge(given, expected)
         return self.output
 
 
@@ -507,13 +501,13 @@ class JInferrer(Inferrer):
         self.fn = fn
         self.orig_fn = orig_fn
 
-    async def __call__(self, track, outref, argrefs):
+    async def __call__(self, engine, outref, argrefs):
         args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
             jinv_args = tuple(_jinv(a) for a in args)
             jinv_argrefs = tuple(VirtualReference(arg)
                                  for arg in jinv_args)
-            res = await self.fn(track, None, jinv_argrefs)
+            res = await self.fn(engine, None, jinv_argrefs)
             res_wrapped = _jtag(res)
             orig_fn = AbstractFunction(self.orig_fn)
             # bparams = [sensitivity_transform(self.orig_fn)]
@@ -530,26 +524,26 @@ class JInferrer(Inferrer):
         return self.cache[args]
 
 
-async def _xinf_helper(track, inf, outref, argrefs, p):
-    result = await inf(track, outref, argrefs)
+async def _xinf_helper(engine, inf, outref, argrefs, p):
+    result = await inf(engine, outref, argrefs)
     p.resolve_to(result)
 
 
-async def execute_inferrers(track, inferrers, outref, argrefs):
+async def execute_inferrers(engine, inferrers, outref, argrefs):
     if len(inferrers) == 1:
         inf, = inferrers
-        return await inf(track, outref, argrefs)
+        return await inf(engine, outref, argrefs)
 
     else:
         pending = []
         for inf in inferrers:
-            p = track.loop.create_pending(
+            p = engine.loop.create_pending(
                 resolve=None,
                 priority=lambda: None
             )
             pending.append(p)
-            track.loop.schedule(
-                _xinf_helper(track, inf, outref, argrefs, p)
+            engine.loop.schedule(
+                _xinf_helper(engine, inf, outref, argrefs, p)
             )
 
-        return bind(track.loop, None, [], pending)
+        return bind(engine.loop, None, [], pending)

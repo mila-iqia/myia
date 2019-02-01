@@ -72,7 +72,7 @@ class StandardInferrer(Inferrer):
         for name, ann in data.annotations.items():
             self.typemap[data.args.index(name) - 1] = ann
 
-    async def infer(self, track, *args):
+    async def infer(self, engine, *args):
         if self.nargs is not None and len(args) != self.nargs:
             raise MyiaTypeError('Wrong number of arguments.')
         for i, arg in enumerate(args):
@@ -80,15 +80,15 @@ class StandardInferrer(Inferrer):
             if typ is None:
                 pass
             elif dtype.ismyiatype(typ):
-                await force_pending(track.chk(typ, arg.values.get(TYPE, ABSENT)))
+                await force_pending(engine.chk(typ, arg.values.get(TYPE, ABSENT)))
             elif isinstance(typ, type) and issubclass(typ, AbstractBase):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
                         f'Wrong type {arg} != {typ} for {self._infer}'
                     )
             elif callable(typ):
-                await force_pending(track.chk(typ, arg))
-        return await self._infer(track, *args)
+                await force_pending(engine.chk(typ, arg))
+        return await self._infer(engine, *args)
 
 
 def standard_prim(*prims):
@@ -113,9 +113,9 @@ class WithImplInferrer(Inferrer):
         self.nargs = len(data.args)
         self.impl_data = data
 
-    def run_impl(self, track, args, outtype):
+    def run_impl(self, engine, args, outtype):
         depth = max((arg.count for arg in args), default=0)
-        if not self.nolimit and depth >= track.max_depth:
+        if not self.nolimit and depth >= engine.max_depth:
             outval = ANYTHING
         else:
             values = [arg.values[VALUE] for arg in args]
@@ -125,12 +125,12 @@ class WithImplInferrer(Inferrer):
                 outval = self.impl(*values)
 
         if outval is ANYTHING:
-            depth = track.max_depth
+            depth = engine.max_depth
         rval = AbstractScalar({
             VALUE: outval,
             TYPE: outtype,
         })
-        rval.count = min(depth + 1, track.max_depth)
+        rval.count = min(depth + 1, engine.max_depth)
         return rval
 
 
@@ -144,7 +144,7 @@ class UniformPrimitiveInferrer(WithImplInferrer):
         self.outtype = data.annotations['return']
         self.nolimit = nolimit
 
-    async def infer(self, track, *args):
+    async def infer(self, engine, *args):
         if len(args) != self.nargs:
             raise MyiaTypeError('Wrong number of arguments.')
 
@@ -154,12 +154,11 @@ class UniformPrimitiveInferrer(WithImplInferrer):
         ts = [arg.values[TYPE] for arg in args]
         for typ, indexes in self.typemap.items():
             selection = [ts[i] for i in indexes]
-            # res = await track.will_check(typ, *selection)
-            res = track.chk(typ, *selection)
+            res = engine.chk(typ, *selection)
             if typ == self.outtype:
                 outtype = res
 
-        return self.run_impl(track, args, outtype)
+        return self.run_impl(engine, args, outtype)
 
 
 def uniform_prim(prim, nolimit=False):
@@ -190,12 +189,12 @@ def _prim_or_graph(afn):
     return fn
 
 
-async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
+async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
                         dataref=None, outref=None):
     """Return an inferrer for resolve or getattr.
 
     Arguments:
-        track: The track on which the inference operates.
+        engine: The engine on which the inference operates.
         data: A ref to the data.
         item: A ref to the item/attribute.
         fetch: A function to resolve the item on the data.
@@ -204,7 +203,7 @@ async def static_getter(track, data, item, fetch, on_dcattr, chk=None,
     """
     from ..abstract import Reference
 
-    resources = track.pipeline.resources
+    resources = engine.pipeline.resources
 
     data_t = data.build(TYPE)
     item_v = item.build(VALUE, default=ANYTHING)
@@ -312,11 +311,10 @@ async def _resolve_case(resources, data_t, item_v, chk):
     return ('static',)
 
 
-def _shape_type(track, shp):
-    shp_t = track.chk(AbstractTuple, shp)
+def _shape_type(engine, shp):
+    shp_t = engine.chk(AbstractTuple, shp)
     for elem_t in shp_t.elements:
-        # track.chk(dtype.UInt[64], elem_t.values[TYPE])
-        track.abstract_merge(dtype.UInt[64], elem_t.values[TYPE])
+        engine.abstract_merge(dtype.UInt[64], elem_t.values[TYPE])
     return shp_t
 
 
@@ -512,13 +510,13 @@ def _inf_bool_eq(x: Bool, y: Bool) -> Bool:
 
 
 @standard_prim(P.typeof)
-async def _inf_typeof(track, value):
+async def _inf_typeof(engine, value):
     t = value.build(TYPE)
     return AbstractType(t)
 
 
 @standard_prim(P.hastype)
-async def _inf_hastype(track, value, model: dtype.TypeType):
+async def _inf_hastype(engine, value, model: dtype.TypeType):
     model_t = model.values[VALUE]
     if model_t is ANYTHING:
         raise MyiaTypeError('hastype must be resolvable statically')
@@ -536,12 +534,12 @@ async def _inf_hastype(track, value, model: dtype.TypeType):
 
 
 @standard_prim(P.make_tuple)
-async def _inf_make_tuple(track, *args):
+async def _inf_make_tuple(engine, *args):
     return AbstractTuple(args)
 
 
 @standard_prim(P.make_list)
-async def _inf_make_list(track, *args):
+async def _inf_make_list(engine, *args):
     if len(args) == 0:
         assert False
         # dflt = AbstractScalar({
@@ -549,12 +547,12 @@ async def _inf_make_list(track, *args):
         #     TYPE: dtype.Problem[VOID],
         # })
     else:
-        res = track.abstract_merge(*args)
+        res = engine.abstract_merge(*args)
     return AbstractList(res)
 
 
 @standard_prim(P.make_record)
-async def infer_type_make_record(track, _cls: dtype.TypeType, *elems):
+async def infer_type_make_record(engine, _cls: dtype.TypeType, *elems):
     """Infer the return type of make_record."""
     cls = _cls.values[VALUE]
     if cls is ANYTHING:
@@ -577,7 +575,7 @@ async def infer_type_make_record(track, _cls: dtype.TypeType, *elems):
 
 
 @standard_prim(P.tuple_getitem)
-async def _inf_tuple_getitem(track, arg: AbstractTuple, idx: dtype.Int[64]):
+async def _inf_tuple_getitem(engine, arg: AbstractTuple, idx: dtype.Int[64]):
     idx_v = idx.values[VALUE]
     if idx_v is ANYTHING:
         raise MyiaTypeError(
@@ -592,17 +590,17 @@ async def _inf_tuple_getitem(track, arg: AbstractTuple, idx: dtype.Int[64]):
 
 
 @standard_prim(P.list_getitem)
-async def _inf_list_getitem(track, arg: AbstractList, idx: dtype.Int[64]):
+async def _inf_list_getitem(engine, arg: AbstractList, idx: dtype.Int[64]):
     return arg.element
 
 
 @standard_prim(P.array_getitem)
-async def _inf_array_getitem(track, arg: AbstractArray, idx: dtype.Int[64]):
+async def _inf_array_getitem(engine, arg: AbstractArray, idx: dtype.Int[64]):
     return arg.element
 
 
 @standard_prim(P.tuple_setitem)
-async def _inf_tuple_setitem(track,
+async def _inf_tuple_setitem(engine,
                              arg: AbstractTuple,
                              idx: dtype.Int[64],
                              value: AbstractBase):
@@ -622,33 +620,33 @@ async def _inf_tuple_setitem(track,
 
 
 @standard_prim(P.list_setitem)
-async def _inf_list_setitem(track,
+async def _inf_list_setitem(engine,
                             arg: AbstractList,
                             idx: dtype.Int[64],
                             value: AbstractBase):
-    track.abstract_merge(arg.element, value)
+    engine.abstract_merge(arg.element, value)
     return arg
 
 
 @standard_prim(P.array_setitem)
-async def _inf_array_setitem(track,
+async def _inf_array_setitem(engine,
                              arg: AbstractArray,
                              idx: dtype.Int[64],
                              value: AbstractBase):
-    track.abstract_merge(arg.element, value)
+    engine.abstract_merge(arg.element, value)
     return arg
 
 
 @standard_prim(P.list_append)
-async def _inf_list_append(track,
+async def _inf_list_append(engine,
                            arg: AbstractList,
                            value: AbstractBase):
-    track.abstract_merge(arg.element, value)
+    engine.abstract_merge(arg.element, value)
     return arg
 
 
 class _GetAttrInferrer(Inferrer):
-    async def __call__(self, track, outref, argrefs):
+    async def __call__(self, engine, outref, argrefs):
         if len(argrefs) != 2:
             raise MyiaTypeError('Wrong number of arguments')
         r_data, r_item = argrefs
@@ -665,7 +663,7 @@ class _GetAttrInferrer(Inferrer):
             return data.attributes[item_v]
 
         rval = await static_getter(
-            track, data, item,
+            engine, data, item,
             fetch=getattr,
             on_dcattr=on_dcattr,
             chk=chk,
@@ -683,7 +681,7 @@ abstract_inferrer_constructors[P.getattr] = _GetAttrInferrer.partial()
 
 
 @standard_prim(P.tuple_len)
-async def _inf_tuple_len(track, xs: AbstractTuple):
+async def _inf_tuple_len(engine, xs: AbstractTuple):
     return AbstractScalar({
         VALUE: len(xs.elements),
         TYPE: dtype.Int[64],
@@ -691,7 +689,7 @@ async def _inf_tuple_len(track, xs: AbstractTuple):
 
 
 @standard_prim(P.list_len)
-async def _inf_list_len(track, xs: AbstractList):
+async def _inf_list_len(engine, xs: AbstractList):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.Int[64],
@@ -699,7 +697,7 @@ async def _inf_list_len(track, xs: AbstractList):
 
 
 @standard_prim(P.array_len)
-async def _inf_array_len(track, xs: AbstractArray):
+async def _inf_array_len(engine, xs: AbstractArray):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.Int[64],
@@ -707,20 +705,20 @@ async def _inf_array_len(track, xs: AbstractArray):
 
 
 @standard_prim(P.list_map)
-async def _inf_list_map(track, fn, *lists):
+async def _inf_list_map(engine, fn, *lists):
     if len(lists) < 1:
         raise MyiaTypeError('list_map requires at least one list')
-    await track.chkimm(AbstractList, *lists)
+    await engine.chkimm(AbstractList, *lists)
     subargs = [l.element for l in lists]
-    result = await track.execute(fn, *subargs)
+    result = await engine.execute(fn, *subargs)
     return AbstractList(result)
 
 
 @standard_prim(P.list_reduce)
-async def _inf_list_reduce(track, fn, lst: AbstractList, dflt):
-    result1 = await track.execute(fn, lst.element, lst.element)
-    result2 = await track.execute(fn, dflt, lst.element)
-    result = track.abstract_merge(result1, result2)
+async def _inf_list_reduce(engine, fn, lst: AbstractList, dflt):
+    result1 = await engine.execute(fn, lst.element, lst.element)
+    result2 = await engine.execute(fn, dflt, lst.element)
+    result = engine.abstract_merge(result1, result2)
     return result
 
 
@@ -730,12 +728,12 @@ async def _inf_list_reduce(track, fn, lst: AbstractList, dflt):
 
 
 @standard_prim(P.scalar_to_array)
-async def _inf_scalar_to_array(track, a: AbstractScalar):
+async def _inf_scalar_to_array(engine, a: AbstractScalar):
     return AbstractArray(a, {SHAPE: ()})
 
 
 @standard_prim(P.array_to_scalar)
-async def _inf_array_to_scalar(track, a: AbstractArray):
+async def _inf_array_to_scalar(engine, a: AbstractArray):
     a_shp = a.values[SHAPE]
     if len(a_shp) != 0:
         raise MyiaShapeError("array_to_scalar requires shape ()")
@@ -743,7 +741,7 @@ async def _inf_array_to_scalar(track, a: AbstractArray):
 
 
 @standard_prim(P.broadcast_shape)
-async def _inf_broadcast_shape(track, xs: _shape_type, ys: _shape_type):
+async def _inf_broadcast_shape(engine, xs: _shape_type, ys: _shape_type):
     shp_xs_n = len(xs.elements)
     shp_ys_n = len(ys.elements)
 
@@ -771,7 +769,7 @@ async def _inf_broadcast_shape(track, xs: _shape_type, ys: _shape_type):
 
 
 @standard_prim(P.invert_permutation)
-async def _inf_invert_permutation(track, perm: _shape_type):
+async def _inf_invert_permutation(engine, perm: _shape_type):
     v = [x.values[VALUE] for x in perm.elements]
     return AbstractTuple(
         [perm.elements[i] if i in v else AbstractScalar({
@@ -783,7 +781,7 @@ async def _inf_invert_permutation(track, perm: _shape_type):
 
 
 @standard_prim(P.shape)
-async def _inf_shape(track, a: AbstractArray):
+async def _inf_shape(engine, a: AbstractArray):
     shp = await force_pending(a.values[SHAPE])
     values = [
         AbstractScalar({
@@ -796,12 +794,12 @@ async def _inf_shape(track, a: AbstractArray):
 
 
 @standard_prim(P.array_map)
-async def _inf_array_map(track, fn: AbstractFunction, *arrays):
+async def _inf_array_map(engine, fn: AbstractFunction, *arrays):
     if len(arrays) < 1:
         raise MyiaTypeError('array_map requires at least one array')
-    await track.chkimm(AbstractArray, *arrays)
+    await engine.chkimm(AbstractArray, *arrays)
     subargs = [a.element for a in arrays]
-    result = await track.execute(fn, *subargs)
+    result = await engine.execute(fn, *subargs)
 
     shapes = [a.values[SHAPE] for a in arrays]
     shape0, *rest = shapes
@@ -827,7 +825,7 @@ async def _inf_array_map(track, fn: AbstractFunction, *arrays):
 
 
 @standard_prim(P.array_reduce)
-async def _inf_array_reduce(track,
+async def _inf_array_reduce(engine,
                             fn: AbstractFunction,
                             a: AbstractArray,
                             shp: _shape_type):
@@ -848,12 +846,12 @@ async def _inf_array_reduce(track,
                 f'Incompatible dims for reduce: {shp_i}, {shp_v}'
             )
 
-    res = await track.execute(fn, a.element, a.element)
+    res = await engine.execute(fn, a.element, a.element)
     return AbstractArray(res, {SHAPE: shp_v})
 
 
 @standard_prim(P.distribute)
-async def _inf_distribute(track, a: AbstractArray, _shp: _shape_type):
+async def _inf_distribute(engine, a: AbstractArray, _shp: _shape_type):
     shp = _shp.build(VALUE, default=ANYTHING)
     if shp == ANYTHING:
         shp = (ANYTHING,) * len(_shp.elements)
@@ -870,7 +868,7 @@ async def _inf_distribute(track, a: AbstractArray, _shp: _shape_type):
 
 
 @standard_prim(P.reshape)
-async def _inf_reshape(track, a: AbstractArray, _shp: _shape_type):
+async def _inf_reshape(engine, a: AbstractArray, _shp: _shape_type):
     shp = _shp.build(VALUE, default=ANYTHING)
     if shp == ANYTHING:
         shp = (ANYTHING,) * len(_shp.elements)
@@ -884,7 +882,7 @@ async def _inf_reshape(track, a: AbstractArray, _shp: _shape_type):
 
 
 @standard_prim(P.transpose)
-async def _inf_transpose(track, a: AbstractArray, permutation: _shape_type):
+async def _inf_transpose(engine, a: AbstractArray, permutation: _shape_type):
     perm = permutation.build(VALUE, default=ANYTHING)
     if perm == ANYTHING:
         shp = (ANYTHING,) * len(permutation.elements)
@@ -902,7 +900,7 @@ async def _inf_transpose(track, a: AbstractArray, permutation: _shape_type):
 
 
 @standard_prim(P.dot)
-async def _inf_dot(track, a: AbstractArray, b: AbstractArray):
+async def _inf_dot(engine, a: AbstractArray, b: AbstractArray):
     a_shp = a.values[SHAPE]
     b_shp = b.values[SHAPE]
     if len(a_shp) != 2 or len(b_shp) != 2:
@@ -912,7 +910,7 @@ async def _inf_dot(track, a: AbstractArray, b: AbstractArray):
         raise MyiaShapeError(
             f"Incompatible shapes in dot: {a_shp} and {b_shp}"
         )
-    track.abstract_merge(a.element, b.element)
+    engine.abstract_merge(a.element, b.element)
     c_shp = (a_shp[0], b_shp[1])
     return AbstractArray(a.element, {SHAPE: c_shp})
 
@@ -923,14 +921,14 @@ async def _inf_dot(track, a: AbstractArray, b: AbstractArray):
 
 
 @standard_prim(P.switch)
-async def _inf_switch(track, cond: Bool, tb, fb):
+async def _inf_switch(engine, cond: Bool, tb, fb):
     v = cond.values[VALUE]
     if v is True:
         return tb
     elif v is False:
         return fb
     elif v is ANYTHING:
-        return track.abstract_merge(tb, fb)
+        return engine.abstract_merge(tb, fb)
     else:
         raise AssertionError(f"Invalid condition value for switch: {v}")
 
@@ -941,24 +939,24 @@ async def _inf_switch(track, cond: Bool, tb, fb):
 
 
 @standard_prim(P.scalar_cast)
-async def _inf_scalar_cast(track,
+async def _inf_scalar_cast(engine,
                            scalar: Number,
                            typ: AbstractType):
     t = typ.values[VALUE]
     if t is ANYTHING:
         raise MyiaTypeError('Must have concrete type for scalar_cast')
-    track.chk(Number, t)
+    engine.chk(Number, t)
     values = {**scalar.values, TYPE: t}
     return AbstractScalar(values)
 
 
 @standard_prim(P.identity, P.return_)
-async def _inf_identity(track, x):
+async def _inf_identity(engine, x):
     return x
 
 
 class _ResolveInferrer(Inferrer):
-    async def __call__(self, track, outref, argrefs):
+    async def __call__(self, engine, outref, argrefs):
         if len(argrefs) != 2:
             raise MyiaTypeError('Wrong number of arguments')
         r_data, r_item = argrefs
@@ -981,7 +979,7 @@ class _ResolveInferrer(Inferrer):
             raise MyiaTypeError('Cannot resolve on Class.')
 
         rval = await static_getter(
-            track, data, item,
+            engine, data, item,
             fetch=getitem,
             on_dcattr=on_dcattr,
             chk=chk,
@@ -996,7 +994,7 @@ abstract_inferrer_constructors[P.resolve] = _ResolveInferrer.partial()
 
 
 @standard_prim(P.partial)
-async def _inf_partial(track, fn, *args):
+async def _inf_partial(engine, fn, *args):
     fns = fn.values[VALUE]
     assert isinstance(fns, Possibilities)
     return AbstractFunction(*[
@@ -1005,7 +1003,7 @@ async def _inf_partial(track, fn, *args):
 
 
 class _EmbedInferrer(Inferrer):
-    async def __call__(self, track, outref, argrefs):
+    async def __call__(self, engine, outref, argrefs):
         if len(argrefs) != 1:
             raise MyiaTypeError('Wrong number of arguments')
         xref, = argrefs
@@ -1021,22 +1019,22 @@ abstract_inferrer_constructors[P.embed] = _EmbedInferrer.partial()
 
 
 @standard_prim(P.env_getitem)
-async def _inf_env_getitem(track,
+async def _inf_env_getitem(engine,
                            env: dtype.EnvType,
                            key: dtype.SymbolicKeyType,
                            dflt):
     expected = key.values[VALUE].abstract
-    track.abstract_merge(expected, dflt)
+    engine.abstract_merge(expected, dflt)
     return expected
 
 
 @standard_prim(P.env_setitem)
-async def _inf_env_setitem(track,
+async def _inf_env_setitem(engine,
                            env: dtype.EnvType,
                            key: dtype.SymbolicKeyType,
                            value):
     expected = key.values[VALUE].abstract
-    track.abstract_merge(expected, value)
+    engine.abstract_merge(expected, value)
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.EnvType,
@@ -1044,7 +1042,7 @@ async def _inf_env_setitem(track,
 
 
 @standard_prim(P.env_add)
-async def _inf_env_add(track, env1, env2):
+async def _inf_env_add(engine, env1, env2):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.EnvType,
@@ -1052,7 +1050,7 @@ async def _inf_env_add(track, env1, env2):
 
 
 @standard_prim(P.J)
-async def _inf_J(track, x):
+async def _inf_J(engine, x):
     if isinstance(x, AbstractFunction):
         v = await x.get()
         return AbstractFunction(*[JTransformedFunction(poss)
@@ -1061,7 +1059,7 @@ async def _inf_J(track, x):
 
 
 @standard_prim(P.Jinv)
-async def _inf_Jinv(track, x):
+async def _inf_Jinv(engine, x):
     if isinstance(x, AbstractFunction):
         v = await x.get()
         results = []
@@ -1079,7 +1077,7 @@ async def _inf_Jinv(track, x):
                     g = f
                 primal = g and g.transforms.get('primal', None)
                 if primal:
-                    primal = track.pipeline.resources.convert(primal)
+                    primal = engine.pipeline.resources.convert(primal)
                     if isinstance(primal, Graph) and primal.parent:
                         # The primal for a closure can't be used because it points to
                         # the original nodes of its parent, whereas we would like to

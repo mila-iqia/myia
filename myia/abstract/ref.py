@@ -105,12 +105,12 @@ class Reference(AbstractReference):
         self._hash = hash((self.node, self.context))
 
     async def get(self):
-        """Get the value for the track (asynchronous)."""
+        """Get the value (asynchronous)."""
         raw = self.engine.get_inferred(self)
         return await force_pending(await raw)
 
     def get_sync(self):
-        """Get the value for the track (synchronous)."""
+        """Get the value (synchronous)."""
         return self.engine.run_coroutine(self.get(), throw=True)
 
     def __hash__(self):
@@ -125,11 +125,8 @@ class Reference(AbstractReference):
 class VirtualReference(AbstractReference):
     """Synthetic reference that can be given to an inferrer.
 
-    A VirtualReference contains the values it is supposed to take on
-    every track, so `engine.get(track, vr)` returns `vr.values[track]`.
-
     Attributes:
-        values: The values for that reference on each track.
+        abstract: The inferred value.
 
     """
 
@@ -138,11 +135,11 @@ class VirtualReference(AbstractReference):
         self.abstract = abstract
 
     async def get(self):
-        """Get the value for the track (asynchronous)."""
+        """Get the value (asynchronous)."""
         return self.abstract
 
     def get_sync(self):
-        """Get the value for the track (synchronous)."""
+        """Get the value (synchronous)."""
         return self.abstract
 
     def __hash__(self):
