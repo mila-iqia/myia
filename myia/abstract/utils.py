@@ -312,8 +312,6 @@ def _amerge(self, x1: (dict, TrackDict), x2, loop, forced):
     changes = False
     rval = type(x1)()
     for k, v in x1.items():
-        if isinstance(k, Subtrack) and not k.eq_relevant():
-            continue
         res = amerge(v, x2[k], loop, forced)
         if res is not v:
             changes = True

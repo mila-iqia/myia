@@ -135,8 +135,7 @@ class AbstractValue(AbstractBase):
         return self
 
     def make_key(self):
-        return tuple(sorted((k, v) for k, v in self.values.items()
-                            if k.eq_relevant()))
+        return tuple(sorted(self.values.items()))
 
     def __repr__(self):
         contents = [f'{k}={v}' for k, v in self.values.items()]
@@ -308,9 +307,6 @@ class Subtrack:
 
     def broaden(self, v, recurse, loop):
         return recurse(v, loop)
-
-    def eq_relevant(self):
-        return True
 
 
 class _ValueSubtrack(Subtrack):
