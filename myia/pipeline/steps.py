@@ -416,129 +416,8 @@ def step_cconv(self, graph):
 ############################
 
 
-@overload
-def _convert_arg(arg, orig_t: dtype.Tuple):
-    if not isinstance(arg, tuple):
-        raise TypeError('Expected tuple')
-    oe = orig_t.elements
-    if len(arg) != len(oe):
-        raise TypeError(f'Expected {len(oe)} elements')
-    return list(flatten(convert_arg(x, o)
-                        for x, o in zip(arg, oe)))
-
-
-@overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.List):
-    if not isinstance(arg, list):
-        raise TypeError('Expected list')
-    ot = orig_t.element_type
-    return [list(flatten(convert_arg(x, ot) for x in arg))]
-
-
-@overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.Class):
-    dc = dtype.tag_to_dataclass[orig_t.tag]
-    if not isinstance(arg, dc):
-        raise TypeError(f'Expected {dc.__qualname__}')
-    arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
-    oe = list(orig_t.attributes.values())
-    return list(flatten(convert_arg(x, o)
-                        for x, o in zip(arg, oe)))
-
-
-@overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.Array):
-    if not isinstance(arg, np.ndarray):
-        raise TypeError('Expected ndarray')
-    et = orig_t.elements
-    assert dtype.ismyiatype(et, dtype.Number)
-    dt = dtype.type_to_np_dtype(et)
-    if arg.dtype != dt:
-        raise TypeError('Wrong dtype')
-    return [arg]
-
-
-@overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.Int):
-    if not isinstance(arg, int):
-        raise TypeError(f'Expected int')
-    return [arg]
-
-
-@overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.Float):
-    if not isinstance(arg, float):
-        raise TypeError(f'Expected float')
-    return [arg]
-
-
-@overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.Bool):
-    if not isinstance(arg, bool):
-        raise TypeError(f'Expected bool')
-    return [arg]
-
-
-def convert_arg(arg, orig_t):
-    """Check that arg matches orig_t, and convert to vm_t."""
-    return _convert_arg[orig_t](arg, orig_t)
-
-
-@overload
-def _convert_result(res, orig_t, vm_t: dtype.Class):
-    dc = dtype.tag_to_dataclass[orig_t.tag]
-    oe = orig_t.attributes.values()
-    ve = vm_t.attributes.values()
-    tup = tuple(convert_result(getattr(res, attr), o, v)
-                for attr, o, v in zip(orig_t.attributes, oe, ve))
-    return dc(*tup)
-
-
-@overload  # noqa: F811
-def _convert_result(res, orig_t, vm_t: dtype.List):
-    ot = orig_t.element_type
-    vt = vm_t.element_type
-    return [convert_result(x, ot, vt) for x in res]
-
-
-@overload  # noqa: F811
-def _convert_result(res, orig_t, vm_t: dtype.Tuple):
-    # If the EraseClass opt was applied, orig_t may be Class
-    orig_is_class = dtype.ismyiatype(orig_t, dtype.Class)
-    if orig_is_class:
-        oe = orig_t.attributes.values()
-    else:
-        oe = orig_t.elements
-    ve = vm_t.elements
-    tup = tuple(convert_result(x, o, v)
-                for x, o, v in zip(res, oe, ve))
-    if orig_is_class:
-        dc = dtype.tag_to_dataclass[orig_t.tag]
-        return dc(*tup)
-    else:
-        return tup
-
-
-@overload  # noqa: F811
-def _convert_result(arg, orig_t, vm_t: (dtype.Int, dtype.Float)):
-    if isinstance(arg, np.ndarray):
-        return arg.item()
-    else:
-        return arg
-
-
-@overload  # noqa: F811
-def _convert_result(arg, orig_t, vm_t: (dtype.Bool, dtype.Array)):
-    return arg
-
-
-def convert_result(res, orig_t, vm_t):
-    """Convert result from vm_t to orig_t."""
-    return _convert_result[vm_t](res, orig_t, vm_t)
-
-
 @overload(bootstrap=True)
-def convert_arg2(self, arg, orig_t: AbstractTuple):
+def convert_arg(self, arg, orig_t: AbstractTuple):
     if not isinstance(arg, tuple):
         raise TypeError('Expected tuple')
     oe = orig_t.elements
@@ -549,7 +428,7 @@ def convert_arg2(self, arg, orig_t: AbstractTuple):
 
 
 @overload  # noqa: F811
-def convert_arg2(self, arg, orig_t: AbstractList):
+def convert_arg(self, arg, orig_t: AbstractList):
     if not isinstance(arg, list):
         raise TypeError('Expected list')
     ot = orig_t.element
@@ -557,7 +436,7 @@ def convert_arg2(self, arg, orig_t: AbstractList):
 
 
 @overload  # noqa: F811
-def convert_arg2(self, arg, orig_t: AbstractClass):
+def convert_arg(self, arg, orig_t: AbstractClass):
     dc = dtype.tag_to_dataclass[orig_t.tag]
     if not isinstance(arg, dc):
         raise TypeError(f'Expected {dc.__qualname__}')
@@ -568,7 +447,7 @@ def convert_arg2(self, arg, orig_t: AbstractClass):
 
 
 @overload  # noqa: F811
-def convert_arg2(self, arg, orig_t: AbstractArray):
+def convert_arg(self, arg, orig_t: AbstractArray):
     if not isinstance(arg, np.ndarray):
         raise TypeError('Expected ndarray')
     et = orig_t.element
@@ -582,7 +461,7 @@ def convert_arg2(self, arg, orig_t: AbstractArray):
 
 
 @overload  # noqa: F811
-def convert_arg2(self, arg, orig_t: AbstractScalar):
+def convert_arg(self, arg, orig_t: AbstractScalar):
     t = orig_t.values[TYPE]
     if dtype.ismyiatype(t, dtype.Int):
         if not isinstance(arg, int):
@@ -599,7 +478,7 @@ def convert_arg2(self, arg, orig_t: AbstractScalar):
 
 
 @overload(bootstrap=True)
-def convert_result2(self, res, orig_t, vm_t: AbstractClass):
+def convert_result(self, res, orig_t, vm_t: AbstractClass):
     dc = dtype.tag_to_dataclass[orig_t.tag]
     oe = orig_t.attributes.values()
     ve = vm_t.attributes.values()
@@ -609,14 +488,14 @@ def convert_result2(self, res, orig_t, vm_t: AbstractClass):
 
 
 @overload  # noqa: F811
-def convert_result2(self, res, orig_t, vm_t: AbstractList):
+def convert_result(self, res, orig_t, vm_t: AbstractList):
     ot = orig_t.element
     vt = vm_t.element
     return [self(x, ot, vt) for x in res]
 
 
 @overload  # noqa: F811
-def convert_result2(self, res, orig_t, vm_t: AbstractTuple):
+def convert_result(self, res, orig_t, vm_t: AbstractTuple):
     # If the EraseClass opt was applied, orig_t may be Class
     orig_is_class = isinstance(orig_t, AbstractClass)
     if orig_is_class:
@@ -634,7 +513,7 @@ def convert_result2(self, res, orig_t, vm_t: AbstractTuple):
 
 
 @overload  # noqa: F811
-def convert_result2(self, arg, orig_t, vm_t: AbstractScalar):
+def convert_result(self, arg, orig_t, vm_t: AbstractScalar):
     if isinstance(arg, np.ndarray):
         return arg.item()
     else:
@@ -642,7 +521,7 @@ def convert_result2(self, arg, orig_t, vm_t: AbstractScalar):
 
 
 @overload  # noqa: F811
-def convert_result2(self, arg, orig_t, vm_t: AbstractArray):
+def convert_result(self, arg, orig_t, vm_t: AbstractArray):
     return arg
 
 
@@ -667,10 +546,10 @@ def step_wrap(self,
         vm_out_t = graph.return_.abstract
 
         def wrapped(*args):
-            args = tuple(flatten(convert_arg2(arg, ot) for arg, ot in
+            args = tuple(flatten(convert_arg(arg, ot) for arg, ot in
                                     zip(args, orig_arg_t)))
             res = fn(*args)
-            res = convert_result2(res, orig_out_t, vm_out_t)
+            res = convert_result(res, orig_out_t, vm_out_t)
             return res
 
         return {'output': wrapped}
