@@ -38,7 +38,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         return False
 
     def _resolve_var(self):
-        varlist = [fut for fut in self._vars if not fut.resolved()]
+        varlist = [fut for fut in self._vars if not fut.done()]
         later = [fut for fut in varlist if fut.priority() is None]
         varlist = [fut for fut in varlist if fut.priority() is not None]
         self._vars = later
@@ -75,7 +75,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         if 'exception' in ctx:
             raise ctx['exception']
         else:
-            raise Exception('????')
+            raise AssertionError('call_exception_handler', ctx)
 
     def schedule(self, x, context_map=None):
         """Schedule a task."""
@@ -171,25 +171,14 @@ class Pending(asyncio.Future):
 
     def force_resolve(self):
         """Resolve to the default value."""
-        self.resolve_to(self._resolve())
-
-    def resolve_to(self, value):
-        self.set_result(value)
-        # TODO: check whether this makes _resolve_from_equiv unneeded
-        # if is_simple(self):
-        #     for e in self.equiv:
-        #         if isinstance(e, Pending) and not e.done():
-        #             e.set_result(value)
-
-    def resolved(self):
-        return self.done()
+        self.set_result(self._resolve())
 
     def tie(self, other):
-        if isinstance(other, Pending):
-            self.equiv |= other.equiv
-            e = self.equiv
-            for p in self.equiv:
-                p.equiv = e
+        assert isinstance(other, Pending)
+        self.equiv |= other.equiv
+        e = self.equiv
+        for p in self.equiv:
+            p.equiv = e
 
 
 class PendingFromList(Pending):
@@ -205,24 +194,14 @@ class PendingFromList(Pending):
     def is_simple(self):
         return all(is_simple(p) for p in self.possibilities)
 
-    def _resolve_from_equiv(self):
+    def _resolve(self):
         for e in self.equiv:
             if isinstance(e, Pending):
                 if e.done():
                     return e.result()
             else:
                 return e
-        return None
-
-    def _resolve(self):
-        x = self._resolve_from_equiv()
-        return self.default if x is None else x
-
-    def tie(self, other):
-        super().tie(other)
-        x = self._resolve_from_equiv()
-        if x is not None:
-            self.resolve_to(x)
+        return self.default
 
 
 class PendingTentative(Pending):
@@ -243,7 +222,7 @@ class PendingTentative(Pending):
 
     def force_resolve(self):
         """Resolve to the tentative value."""
-        self.resolve_to(self.tentative)
+        self.set_result(self.tentative)
 
 
 async def find_coherent_result(v, fn):

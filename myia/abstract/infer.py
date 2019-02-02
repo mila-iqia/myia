@@ -524,9 +524,9 @@ class JInferrer(Inferrer):
         return self.cache[args]
 
 
-async def _xinf_helper(engine, inf, outref, argrefs, p):
+async def _inf_helper(engine, inf, outref, argrefs, p):
     result = await inf(engine, outref, argrefs)
-    p.resolve_to(result)
+    p.set_result(result)
 
 
 async def execute_inferrers(engine, inferrers, outref, argrefs):
@@ -543,7 +543,7 @@ async def execute_inferrers(engine, inferrers, outref, argrefs):
             )
             pending.append(p)
             engine.loop.schedule(
-                _xinf_helper(engine, inf, outref, argrefs, p)
+                _inf_helper(engine, inf, outref, argrefs, p)
             )
 
         return bind(engine.loop, None, [], pending)

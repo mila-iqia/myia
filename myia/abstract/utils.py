@@ -500,7 +500,7 @@ def bind(loop, committed, resolved, pending):
         if not pending:
             v = amergeall()
             if rval is not None and not rval.done():
-                rval.resolve_to(v)
+                rval.set_result(v)
 
     for p in pending:
         p.add_done_callback(resolve)

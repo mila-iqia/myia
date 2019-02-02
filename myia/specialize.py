@@ -93,11 +93,8 @@ _legal = (int, float, numpy.number, numpy.ndarray,
           str, Namespace, SymbolicKeyInstance, TypeMeta)
 
 
-def _visible(g, node):
-    if isinstance(node, Graph):
-        g2 = node.parent
-    else:
-        g2 = node.graph
+def _visible(g, currg):
+    g2 = currg.parent
     while g and g2 is not g:
         g = g.parent
     return g2 is g
