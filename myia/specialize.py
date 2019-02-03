@@ -93,11 +93,10 @@ _legal = (int, float, numpy.number, numpy.ndarray,
           str, Namespace, SymbolicKeyInstance, TypeMeta)
 
 
-def _visible(g, currg):
-    g2 = currg.parent
-    while g and g2 is not g:
+def _visible(g, parentg):
+    while g and parentg is not g:
         g = g.parent
-    return g2 is g
+    return parentg is g
 
 
 class _GraphSpecializer:
@@ -153,20 +152,11 @@ class _GraphSpecializer:
         return _const(fn, a)
 
     @build_inferrer.register
-    async def build_inferrer(self, a, fn: Graph, argvals):
-        return await self.build_inferrer(
-            a, GraphAndContext(fn, Context.empty()), argvals
-        )
-
-    @build_inferrer.register
-    async def build_inferrer(self, a, fn: GraphAndContext, argvals):
-        if not _visible(self.graph, fn.graph):
+    async def build_inferrer(self, a,
+                             fn: (GraphAndContext, MetaGraph), argvals):
+        if isinstance(fn, GraphAndContext) \
+                and not _visible(self.graph, fn.context.graph):
             raise Unspecializable('xx5')
-        inf = self.specializer.engine.get_inferrer_for(fn)
-        return await self._build_inferrer_x(a, inf, argvals)
-
-    @build_inferrer.register
-    async def build_inferrer(self, a, fn: MetaGraph, argvals):
         inf = self.specializer.engine.get_inferrer_for(fn)
         return await self._build_inferrer_x(a, inf, argvals)
 
@@ -277,7 +267,7 @@ class _GraphSpecializer:
             if not isinstance(g, Graph) \
                     or g.parent is None \
                     or (ref.node.is_constant_graph()
-                        and _visible(self.graph, g)):
+                        and _visible(self.graph, g.parent)):
                 return _const(g, a)
             else:
                 return None

@@ -1,5 +1,6 @@
 
 import asyncio
+from dataclasses import dataclass
 from .loop import force_pending
 
 
@@ -122,6 +123,7 @@ class Reference(AbstractReference):
             and self.context == other.context
 
 
+@dataclass
 class VirtualReference(AbstractReference):
     """Synthetic reference that can be given to an inferrer.
 
@@ -129,10 +131,7 @@ class VirtualReference(AbstractReference):
         abstract: The inferred value.
 
     """
-
-    def __init__(self, abstract):
-        """Initialize the VirtualReference."""
-        self.abstract = abstract
+    abstract: 'AbstractBase'
 
     async def get(self):
         """Get the value (asynchronous)."""
@@ -141,13 +140,6 @@ class VirtualReference(AbstractReference):
     def get_sync(self):
         """Get the value (synchronous)."""
         return self.abstract
-
-    def __hash__(self):
-        return hash(self.abstract)
-
-    def __eq__(self, other):
-        return isinstance(other, VirtualReference) \
-            and self.abstract == other.abstract
 
 
 ###################

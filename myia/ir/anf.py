@@ -61,7 +61,7 @@ class Graph:
         """Return the graph's type based on parameter/output types."""
         from ..abstract import VirtualFunction, AbstractFunction
         if any(p.abstract is None for p in self.parameters):
-            return None
+            return None  # pragma: no cover
         vf = VirtualFunction(tuple(p.abstract for p in self.parameters),
                              self.output.abstract)
         return AbstractFunction(vf)
@@ -81,7 +81,7 @@ class Graph:
     @output.setter
     def output(self, value: 'ANFNode') -> None:
         """Set the graph's output."""
-        from ..abstract import AbstractFunction
+        from ..abstract import AbstractFunction, TrackableFunction
         if self.return_:
             if self._manager:
                 self._manager.set_edge(self.return_, 1, value)
@@ -90,7 +90,8 @@ class Graph:
         else:
             self.return_ = Apply([Constant(primops.return_), value], self)
         self.return_.abstract = value.abstract
-        self.return_.inputs[0].abstract = AbstractFunction(primops.return_)
+        f = TrackableFunction(primops.return_, self.return_.inputs[0])
+        self.return_.inputs[0].abstract = AbstractFunction(f)
 
     def add_parameter(self) -> 'Parameter':
         """Add a new parameter to this graph (appended to the end)."""

@@ -29,6 +29,8 @@ from .data import (
 
 from .utils import  sensitivity_transform
 
+from .ref import Context
+
 from .infer import (
     Inferrer,
     GraphInferrer,
@@ -48,14 +50,6 @@ from .ref import Context
 
 
 abstract_inferrer_constructors = {}
-
-
-def reg(*prims):
-    def deco(cls):
-        for prim in prims:
-            abstract_inferrer_constructors[prim] = cls
-        return cls
-    return deco
 
 
 class StandardInferrer(Inferrer):
@@ -185,6 +179,9 @@ def _prim_or_graph(afn):
     fn, = fns
     if isinstance(fn, TrackableFunction):
         fn = fn.fn
+    if isinstance(fn, GraphAndContext):
+        assert fn.context == Context.empty()
+        fn = fn.graph
     assert isinstance(fn, (Primitive, Graph))
     return fn
 
@@ -1078,13 +1075,16 @@ async def _inf_Jinv(engine, x):
                 primal = g and g.transforms.get('primal', None)
                 if primal:
                     primal = engine.pipeline.resources.convert(primal)
-                    if isinstance(primal, Graph) and primal.parent:
-                        # The primal for a closure can't be used because it points to
-                        # the original nodes of its parent, whereas we would like to
-                        # point to the transformed nodes of the parent. This is
-                        # fixable, and will need to be fixed to support a few edge
-                        # cases.
-                        res = DummyFunction()
+                    if isinstance(primal, Graph):
+                        if primal.parent:
+                            # The primal for a closure can't be used because it points to
+                            # the original nodes of its parent, whereas we would like to
+                            # point to the transformed nodes of the parent. This is
+                            # fixable, and will need to be fixed to support a few edge
+                            # cases.
+                            res = DummyFunction()
+                        else:
+                            res = GraphAndContext(primal, Context.empty())
                     else:
                         res = primal
                 else:

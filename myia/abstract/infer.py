@@ -146,10 +146,6 @@ class InferenceEngine:
         return self.constructors[prim]
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, g: Graph):
-        return self.get_inferrer_for(GraphAndContext(g, Context.empty()))
-
-    @get_inferrer_for.register
     def get_inferrer_for(self, g: GraphAndContext):
         if g not in self.constructors:
             self.constructors[g] = GraphInferrer(g.graph, g.context)
@@ -292,7 +288,7 @@ def from_value(v, context=None, ref=None, broaden=False):
 def to_abstract(v, context=None, ref=None):
     """Translate the value to an abstract value."""
     if isinstance(v, (Primitive, Graph, MetaGraph)):
-        if isinstance(v, Graph) and v.parent:
+        if isinstance(v, Graph):
             v = GraphAndContext(v, context or Context.empty())
         if ref is not None:
             v = TrackableFunction(v, id=ref.node)

@@ -142,7 +142,7 @@ class GraphCloner:
         if node in self.repl:
             return False
         if node.is_parameter():
-            # This should not happend for valid graphs, but clone
+            # This should not happen for valid graphs, but clone
             # is also used for debugging to if we can avoid failing
             # that is good.
             with About(node.debug, self.relation):
@@ -157,8 +157,6 @@ class GraphCloner:
                 self.nodes.append((node, new))
         elif node.is_constant():
             return False
-        else:
-            assert False
         return True
 
     def run(self):

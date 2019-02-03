@@ -308,7 +308,8 @@ def _amerge(self, x1: dtype.TypeMeta, x2, loop, forced):
 @overload
 def _amerge(self, x1: (dict, TrackDict), x2, loop, forced):
     if set(x1.keys()) != set(x2.keys()):
-        raise MyiaTypeError(f'Keys mismatch')
+        # This shouldn't be possible at the moment
+        raise AssertionError(f'Keys mismatch')
     changes = False
     rval = type(x1)()
     for k, v in x1.items():
@@ -401,33 +402,13 @@ def _amerge(self, x1: AbstractJTagged, x2, loop, forced):
 
 @overload
 def _amerge(self, x1: (int, float, bool), x2, loop, forced):
-    if x1 is ANYTHING:
-        return x1
-    if forced:
-        if x1 != x2:
-            raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
-    elif x2 is ANYTHING or x1 != x2:
-        return ANYTHING
-    return x1
-
-
-@overload
-def _amerge(self, x1: Named, x2, loop, forced):
-    if x1 is ANYTHING:
-        if x2 is ANYTHING:
-            return x1
-        return self[type(x2)](x1, x2, loop, forced)
-    if x1 != x2:
+    if forced and x1 != x2:
         raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
-    return x1
+    return x1 if x1 == x2 else ANYTHING
 
 
 @overload
 def _amerge(self, x1: object, x2, loop, forced):
-    if x1 is ANYTHING:
-        return ANYTHING
-    elif x2 is ANYTHING and not forced:
-        return ANYTHING
     if x1 != x2:
         raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
     return x1
@@ -456,10 +437,12 @@ def amerge(x1, x2, loop, forced, accept_pending=True):
     elif isp2:
         return bind(loop, x1 if forced else None, [x1], [x2])
     elif x1 is ANYTHING:
-        if x2 is ANYTHING:
-            return x1
-        return _amerge[type(x2)](x1, x2, loop, forced)
-    elif x2 is not ANYTHING and type(x1) is not type(x2):
+        return x1
+    elif x2 is ANYTHING:
+        if forced:
+            raise MyiaTypeError(f'Cannot merge {x1} with {x2}')
+        return x2
+    elif type(x1) is not type(x2):
         raise MyiaTypeError(
             f'Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}'
         )

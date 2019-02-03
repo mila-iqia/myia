@@ -5,7 +5,7 @@ the (augmented) original primitive's output and a backpropagator function.
 """
 
 from ..abstract import AbstractFunction, Possibilities, TrackableFunction, \
-    VALUE
+    VALUE, GraphAndContext
 from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import NamedDebugInfo, About
@@ -402,8 +402,8 @@ class ArrayReduceGradient(MetaGraph):
         fn, = fns
         if isinstance(fn, TrackableFunction):
             fn = fn.fn
-        assert isinstance(fn, Graph)
-        assert fn.transforms['primal'] is primops.scalar_add
+        assert isinstance(fn, GraphAndContext) and fn.graph.parent is None
+        assert fn.graph.transforms['primal'] is primops.scalar_add
         return bprop_to_augm(primops.array_reduce, bprop_sum)
 
 
