@@ -20,7 +20,7 @@ from .data import (  # noqa
     VOID,
     DEAD,
     POLY,
-    INACCESSIBLE,
+    NOTVISIBLE,
     Possibilities,
     TrackableFunction,
     GraphAndContext,

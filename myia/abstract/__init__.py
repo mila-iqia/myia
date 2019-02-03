@@ -27,7 +27,7 @@ from .data import (  # noqa
     VOID,
     DEAD,
     POLY,
-    INACCESSIBLE,
+    NOTVISIBLE,
     Possibilities,
     TrackableFunction,
     GraphAndContext,
@@ -73,7 +73,9 @@ from .ref import (  # noqa
 
 from .infer import (  # noqa
     Inferrer,
+    BaseGraphInferrer,
     GraphInferrer,
+    MetaGraphInferrer,
     from_value,
     to_abstract,
     InferenceEngine,

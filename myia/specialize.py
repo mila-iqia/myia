@@ -7,10 +7,10 @@ from .abstract import GraphAndContext, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
     AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, \
     AbstractError, AbstractValue, TrackableFunction, to_value, \
-    TypedPrimitive, GraphInferrer, broaden
+    TypedPrimitive, GraphInferrer, BaseGraphInferrer, broaden
 from .dtype import Function, TypeMeta
 from .abstract import ANYTHING, Context, Unspecializable, \
-    DEAD, INACCESSIBLE, POLY, VirtualReference
+    DEAD, NOTVISIBLE, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
 from .prim import ops as P, Primitive
 from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
@@ -138,37 +138,30 @@ class _GraphSpecializer:
     # Build #
     #########
 
-    build_inferrer = Overload()
+    async def build_inferrer(self, a, fn, argvals):
+        if isinstance(fn, TypedPrimitive):
+            return _const(fn.prim, a)
 
-    @build_inferrer.register
-    async def build_inferrer(self, a, fn: TypedPrimitive, argvals):
-        return _const(fn.prim, a)
-
-    @build_inferrer.register
-    async def build_inferrer(self, a, fn: Primitive, argvals):
         inf = self.specializer.engine.get_inferrer_for(fn)
         argvals, outval = await self._find_unique_argvals(a, inf, argvals)
-        a = AbstractFunction(TypedPrimitive(fn, argvals, outval))
-        return _const(fn, a)
 
-    @build_inferrer.register
-    async def build_inferrer(self, a,
-                             fn: (GraphAndContext, MetaGraph), argvals):
+        if isinstance(fn, TrackableFunction):
+            fn = fn.fn
+            inf = self.specializer.engine.get_inferrer_for(fn)
+
+        if isinstance(fn, Primitive):
+            a = AbstractFunction(TypedPrimitive(fn, argvals, outval))
+            return _const(fn, a)
+
+        assert isinstance(inf, BaseGraphInferrer)
+
         if isinstance(fn, GraphAndContext) \
                 and not _visible(self.graph, fn.context.graph):
-            raise Unspecializable('xx5')
-        inf = self.specializer.engine.get_inferrer_for(fn)
-        return await self._build_inferrer_x(a, inf, argvals)
+            raise Unspecializable(NOTVISIBLE)
 
-    @build_inferrer.register
-    async def build_inferrer(self, a, fn: TrackableFunction, argvals):
-        inf = self.specializer.engine.get_inferrer_for(fn)
-        argvals, _ = await self._find_unique_argvals(a, inf, argvals)
-        return await self.build_inferrer(a, fn.fn, argvals)
-
-    @build_inferrer.register
-    async def build_inferrer(self, a, fn: object, argvals):
-        raise Exception(f'Unrecognized: {fn}')
+        ctx = inf.make_context(self.specializer.engine, argvals)
+        v = await self.specializer._specialize(ctx.graph, ctx, None)
+        return _const(v, a)
 
     async def _find_choices(self, inf):
         if inf not in self.specializer.infcaches:
@@ -216,12 +209,6 @@ class _GraphSpecializer:
             if generalized is not None:
                 return generalized, outval
             raise Unspecializable(POLY)
-
-    async def _build_inferrer_x(self, a, inf, argvals):
-        argvals, _ = await self._find_unique_argvals(a, inf, argvals)
-        ctx = inf.make_context(self.specializer.engine, argvals)
-        v = await self.specializer._specialize(ctx.graph, ctx, None)
-        return _const(v, a)
 
     ###########
     # Process #
