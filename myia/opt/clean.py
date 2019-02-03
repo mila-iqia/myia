@@ -1,6 +1,6 @@
 """Clean up Class types."""
 
-from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner, JTagged
+from ..dtype import Int, Tuple, Class, ismyiatype, JTagged
 from ..ir import Constant, Parameter
 from ..prim import ops as P, Primitive
 from ..utils import UNKNOWN

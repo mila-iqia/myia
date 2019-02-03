@@ -774,17 +774,15 @@ class GradOperation(MetaGraph):
     def specialize_from_abstract(self, args):
         """Generate the graph."""
         ft, = args
-        if isinstance(ft, AbstractFunction):
-            poss = ft.values[VALUE]
-            assert isinstance(poss, Possibilities)
-            assert len(poss) == 1
-            for g in poss:
-                if isinstance(g, TrackableFunction):
-                    g = g.fn
-                if isinstance(g, GraphAndContext):
-                    g = g.graph
-        else:
-            raise MyiaTypeError(f'Wrong argument for grad: {ft}')
+        assert isinstance(ft, AbstractFunction)
+        poss = ft.values[VALUE]
+        assert isinstance(poss, Possibilities)
+        assert len(poss) == 1
+        for g in poss:
+            if isinstance(g, TrackableFunction):
+                g = g.fn
+            if isinstance(g, GraphAndContext):
+                g = g.graph
 
         assert isinstance(g, Graph)
 
