@@ -131,20 +131,14 @@ class AbstractValue(AbstractBase):
     def _build_type(self):
         raise NotImplementedError()
 
-    def broaden(self):
-        return self
-
     def make_key(self):
         return tuple(sorted(self.values.items()))
-
-    def __repr__(self):
-        contents = [f'{k}={v}' for k, v in self.values.items()]
-        return f'V({", ".join(contents)})'
 
 
 class AbstractScalar(AbstractValue):
     def __repr__(self):
-        contents = [f'{k}={v}' for k, v in self.values.items()]
+        contents = [f'{k}={v}' for k, v in self.values.items()
+                    if v not in (ABSENT, ANYTHING)]
         return f'S({", ".join(contents)})'
 
 
@@ -217,7 +211,7 @@ class AbstractArray(AbstractValue):
         return (super().make_key(), self.element.make_key())
 
     def __repr__(self):
-        return f'A({self.element}, shape={self.values[SHAPE]})'
+        return f'A({self.element}, SHAPE={self.values[SHAPE]})'
 
 
 class AbstractList(AbstractValue):
