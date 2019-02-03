@@ -127,8 +127,6 @@ class HyperMap(MetaGraph):
                     raise InferenceError(
                         f'HyperMap cannot match up types {t} and {t2}'
                     )
-        if not ismyiatype(t):
-            t = type(t)
         return self.make_map[t](self, t, g, fnarg, argmap)
 
     def _harmonize(self, g, args):

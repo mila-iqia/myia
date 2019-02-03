@@ -1588,6 +1588,7 @@ hyper_map_nobroadcast = HyperMap(broadcast=False)
     ((i64, f64), (i64, f64), (i64, f64)),
     (Point(i64, i64), Point(i64, i64), Point(i64, i64)),
     (ai64_of(2, 5), ai64_of(2, 5), ai64_of(2, 5)),
+    (ai64_of(2, 5), i64, ai64_of(2, 5)),
     (ai64_of(1, 5), ai64_of(2, 1), ai64_of(2, 5)),
     (i64, f64, InferenceError),
     ([f64], f64, InferenceError),
