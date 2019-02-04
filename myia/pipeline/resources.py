@@ -2,15 +2,14 @@
 
 import math
 import numpy as np
-from collections import defaultdict
 from types import FunctionType
 
 from .. import dtype, operations, parser, composite as C
 from ..specialize import TypeSpecializer
-from ..abstract import AbstractFunction, from_value, InferenceEngine, ANYTHING
+from ..abstract import AbstractFunction, InferenceEngine
 from ..ir import Graph, clone
 from ..prim import ops as P
-from ..utils import overload, TypeMap, UNKNOWN
+from ..utils import overload, TypeMap
 
 from .pipeline import PipelineResource
 

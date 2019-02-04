@@ -547,7 +547,7 @@ def step_wrap(self,
 
         def wrapped(*args):
             args = tuple(flatten(convert_arg(arg, ot) for arg, ot in
-                                    zip(args, orig_arg_t)))
+                                 zip(args, orig_arg_t)))
             res = fn(*args)
             res = convert_result(res, orig_out_t, vm_out_t)
             return res

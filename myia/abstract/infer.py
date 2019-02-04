@@ -7,19 +7,17 @@ from dataclasses import is_dataclass, replace as dc_replace
 from .. import dtype
 from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
-from ..prim.py_implementations import typeof
-from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
-    is_dataclass_type, Partializable
+from ..utils import Overload, Partializable, is_dataclass_type
 
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
 from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
-    ABSENT, GraphFunction, AbstractBase, PartialApplication, \
+    GraphFunction, AbstractBase, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, \
     VALUE, TYPE, SHAPE, DummyFunction, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractList, Possibilities, type_error_nargs, AbstractBase, \
+    AbstractList, Possibilities, type_error_nargs, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind, build_type
@@ -216,8 +214,6 @@ class InferenceEngine:
         fn_ref = self.ref(n_fn, ctx)
         fn = await fn_ref.get()
         argrefs = [self.ref(node, ctx) for node in n_args]
-
-        args = [await ref.get() for ref in argrefs]
 
         if not isinstance(fn, AbstractFunction):
             raise Exception(f'Not a function: {fn}')

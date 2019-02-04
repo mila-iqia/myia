@@ -4,7 +4,7 @@
 import numpy
 from types import FunctionType
 from typing import Tuple as TupleT, Dict as DictT, Any
-from .utils import Named, is_dataclass_type, as_frozen, overload, \
+from .utils import Named, is_dataclass_type, as_frozen, \
     SymbolicKeyInstance, EnvInstance
 
 

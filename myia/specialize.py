@@ -1,22 +1,16 @@
 """Specialize graphs according to the types of their arguments."""
 
-import numpy
 from itertools import count
 from dataclasses import replace as dc_replace
 
 from .abstract import GraphFunction, concretize_abstract, \
-    AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
-    AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, \
-    AbstractError, AbstractValue, build_value, MyiaTypeError, \
-    TypedPrimitive, GraphInferrer, BaseGraphInferrer, broaden, \
+    AbstractFunction, AbstractError, build_value, MyiaTypeError, \
+    TypedPrimitive, BaseGraphInferrer, broaden, \
     TrackedInferrer, PrimitiveFunction, MetaGraphFunction
-from .dtype import Function, TypeMeta
-from .abstract import ANYTHING, Context, Unspecializable, \
+from .abstract import Context, Unspecializable, \
     DEAD, NOTVISIBLE, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
 from .prim import ops as P, Primitive
-from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
-    EnvInstance
 
 
 _count = count(1)
@@ -75,10 +69,6 @@ class TypeSpecializer:
         self.specializations[ctxkey] = gspec
         await gspec.run()
         return g2
-
-
-_legal = (int, float, numpy.number, numpy.ndarray,
-          str, Namespace, SymbolicKeyInstance, TypeMeta)
 
 
 def _visible(g, parentg):
@@ -214,7 +204,7 @@ class _GraphSpecializer:
             if node in self.marked:
                 continue
             self.marked.add(node)
-            await self.process_node2(node)
+            await self.process_node(node)
 
     async def second_pass(self):
         # Specialize constant graphs
@@ -224,53 +214,36 @@ class _GraphSpecializer:
             if node.is_apply():
                 await self.process_apply(node)
 
-    build = Overload()
-
-    @build.register
     async def build(self, ref, a: AbstractFunction):
-        try:
-            fn = a.get_unique()
-            if isinstance(fn, PrimitiveFunction):
-                g = fn.prim
-            elif isinstance(fn, MetaGraphFunction):
-                g = fn.metagraph
-            elif isinstance(fn, GraphFunction):
-                g = fn.graph
-            else:
+        if isinstance(a, AbstractFunction):
+            try:
+                fn = a.get_unique()
+                if isinstance(fn, PrimitiveFunction):
+                    g = fn.prim
+                elif isinstance(fn, MetaGraphFunction):
+                    g = fn.metagraph
+                elif isinstance(fn, GraphFunction):
+                    g = fn.graph
+                else:
+                    return None
+                if not isinstance(g, Graph) \
+                        or g.parent is None \
+                        or (ref.node.is_constant_graph()
+                            and _visible(self.graph, g.parent)):
+                    return _const(g, a)
+                else:
+                    return None
+            except MyiaTypeError:
                 return None
-            if not isinstance(g, Graph) \
-                    or g.parent is None \
-                    or (ref.node.is_constant_graph()
-                        and _visible(self.graph, g.parent)):
-                return _const(g, a)
-            else:
+        else:
+            try:
+                v = build_value(a)
+            except ValueError:
                 return None
-        except MyiaTypeError:
-            return None
+            else:
+                return _const(v, a)
 
-    @build.register
-    async def build(self, ref, a: AbstractScalar):
-        v = a.values[VALUE]
-        if v is ANYTHING:
-            return None
-        else:
-            return _const(v, a)
-
-    @build.register
-    async def build(self, ref, a: AbstractTuple):
-        try:
-            v = build_value(a)
-        except ValueError:
-            return None
-        else:
-            return _const(v, a)
-
-    @build.register
-    async def build(self, ref, a: AbstractValue):
-        # Default case
-        return None
-
-    async def process_node2(self, node):
+    async def process_node(self, node):
         ref = self.ref(node)
         new_node = self.get(node)
         if new_node.graph is not self.new_graph:

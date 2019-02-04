@@ -5,7 +5,7 @@ from contextvars import ContextVar
 
 from .. import dtype
 from ..debug.label import label
-from ..utils import Named, Event, Partializable, eprint
+from ..utils import Named, Partializable, eprint
 
 from .loop import Pending
 

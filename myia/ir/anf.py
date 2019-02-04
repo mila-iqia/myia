@@ -10,13 +10,11 @@ returning a nested function creates a closure.
 
 """
 
-from collections import defaultdict
 from typing import Any, Iterable, List, Union, Dict
 
-from ..dtype import Function
 from ..info import NamedDebugInfo
 from ..prim import ops as primops, Primitive
-from ..utils import Named, list_str, repr_, UNKNOWN
+from ..utils import Named, list_str, repr_
 from ..utils.unify import expandlist, noseq
 
 from .abstract import Node

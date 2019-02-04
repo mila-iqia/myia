@@ -4,7 +4,7 @@ Each primitive is associated to an augmented function, which returns a pair of
 the (augmented) original primitive's output and a backpropagator function.
 """
 
-from ..abstract import AbstractFunction, Possibilities, VALUE, GraphFunction
+from ..abstract import AbstractFunction, GraphFunction
 from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import NamedDebugInfo, About

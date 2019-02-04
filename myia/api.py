@@ -4,7 +4,6 @@ import inspect
 
 from .abstract import MyiaTypeError, from_value, broaden
 from .pipeline import standard_pipeline
-from .utils import as_frozen
 
 
 #################
@@ -40,7 +39,6 @@ class MyiaFunction:
         cached version.
         """
         self.pip = standard_pipeline.make()
-        inf = self.pip.resources.inferrer
 
         argnames = inspect.getfullargspec(self.fn).args
         n1 = len(argnames)
@@ -52,8 +50,8 @@ class MyiaFunction:
 
         argspec = tuple(from_value(arg) for arg in args)
         argspec = tuple(broaden(arg, None)
-                         if name not in self.specialize_values else arg
-                         for arg, name in zip(argspec, argnames))
+                        if name not in self.specialize_values else arg
+                        for arg, name in zip(argspec, argnames))
 
         if argspec not in self._cache:
             self._cache[argspec] = self.pip(

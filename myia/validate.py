@@ -1,14 +1,11 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
-from .dtype import Array, Tuple, List, Function, Number, Bool, Problem, \
-    TypeMeta, TypeType, Class, External, EnvType, SymbolicKeyType, \
-    JTagged, ismyiatype
+from .dtype import Problem, External, ismyiatype
 from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
-from .abstract import abstract_clone, \
-    AbstractClass, AbstractJTagged, AbstractFunction, AbstractScalar, \
-    TYPE, VALUE, AbstractType, DEAD
+from .abstract import abstract_clone, AbstractClass, AbstractJTagged, \
+    AbstractScalar, TYPE, VALUE, AbstractType, DEAD
 
 
 class ValidationError(Exception):
@@ -20,14 +17,14 @@ def validate_abstract(self, a: (AbstractClass, AbstractJTagged)):
     raise ValidationError(f'Illegal type in the graph: {a}')
 
 
-@overload
+@overload  # noqa: F811
 def validate_abstract(self, a: AbstractScalar):
     t = a.values[TYPE]
     if ismyiatype(t, (Problem, External)):
         raise ValidationError(f'Illegal type in the graph: {a}')
 
 
-@overload
+@overload  # noqa: F811
 def validate_abstract(self, a: AbstractType):
     t = a.values[VALUE]
     if ismyiatype(t, Problem):
@@ -35,7 +32,7 @@ def validate_abstract(self, a: AbstractType):
             raise ValidationError(f'Illegal type in the graph: {a}')
 
 
-@overload
+@overload  # noqa: F811
 def validate_abstract(self, a: type(None)):
     raise ValidationError(f'Illegal type in the graph: {a}')
 

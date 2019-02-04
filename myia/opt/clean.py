@@ -1,11 +1,10 @@
 """Clean up Class types."""
 
-from ..dtype import Int, Tuple, Class, ismyiatype, JTagged
+from ..dtype import Int
 from ..ir import Constant, Parameter
 from ..prim import ops as P, Primitive
-from ..utils import UNKNOWN
 from ..abstract import abstract_clone, AbstractClass, AbstractTuple, \
-    AbstractScalar, VALUE, TYPE, SHAPE, ANYTHING, AbstractJTagged
+    AbstractScalar, VALUE, TYPE, AbstractJTagged
 
 
 @abstract_clone.variant

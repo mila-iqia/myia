@@ -10,7 +10,6 @@ from typing import Iterable, Mapping, Any, List
 from .abstract import to_abstract
 from .ir import Graph, Apply, Constant, Parameter, ANFNode, MetaGraph
 from .prim import Primitive
-from .prim.py_implementations import typeof
 from .prim.ops import return_, partial, embed
 from .graph_utils import toposort
 from .utils import TypeMap, is_dataclass_type, SymbolicKeyInstance

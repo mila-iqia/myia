@@ -4,9 +4,7 @@ import asyncio
 from contextvars import copy_context
 from collections import deque
 
-from ..dtype import Function, ismyiatype
-from ..utils import Unification, Var, RestrictedVar, eprint, overload, \
-    Overload
+from ..dtype import ismyiatype
 
 
 class InferenceTask(asyncio.Task):

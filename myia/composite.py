@@ -8,7 +8,7 @@ from .abstract import \
     AbstractFunction, Possibilities, GraphFunction, VALUE, \
     AbstractList, AbstractTuple
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
-    List, Class, EnvType, ismyiatype, Function
+    List, Class, EnvType, Function
 from .hypermap import HyperMap
 from .abstract import MyiaTypeError
 from .info import About

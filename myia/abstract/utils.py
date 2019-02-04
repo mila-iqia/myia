@@ -1,15 +1,9 @@
 
-import math
-import numpy
-from dataclasses import dataclass, is_dataclass
 from functools import reduce
 from itertools import chain
-from typing import Tuple
 
 from .. import dtype
-from ..prim import Primitive
-from ..debug.utils import mixin
-from ..utils import overload, UNKNOWN, Named
+from ..utils import overload
 
 from .loop import Pending, is_simple, PendingTentative
 from .ref import Reference, Context
@@ -87,12 +81,12 @@ def _build_value(x: AbstractBase):
     raise ValueError(x)
 
 
-@overload
+@overload  # noqa: F811
 def _build_value(x: AbstractTuple):
     return tuple(build_value(y) for y in x.elements)
 
 
-@overload
+@overload  # noqa: F811
 def _build_value(ac: AbstractClass):
     kls = dtype.tag_to_dataclass[ac.tag]
     args = {k: build_value(v) for k, v in ac.attributes.items()}
@@ -107,32 +101,32 @@ def build_type(self, x: AbstractScalar):
     return t
 
 
-@overload
+@overload  # noqa: F811
 def build_type(self, x: AbstractFunction):
     return dtype.Function
 
 
-@overload
+@overload  # noqa: F811
 def build_type(self, x: AbstractTuple):
     return dtype.Tuple[[self(e) for e in x.elements]]
 
 
-@overload
+@overload  # noqa: F811
 def build_type(self, x: AbstractError):
     return dtype.Problem[x.values[VALUE]]
 
 
-@overload
+@overload  # noqa: F811
 def build_type(self, x: AbstractList):
     return dtype.List[self(x.element)]
 
 
-@overload
+@overload  # noqa: F811
 def build_type(self, x: AbstractArray):
     return dtype.Array[self(x.element)]
 
 
-@overload
+@overload  # noqa: F811
 def build_type(self, x: AbstractClass):
     return dtype.Class[
         x.tag,
@@ -141,12 +135,12 @@ def build_type(self, x: AbstractClass):
     ]
 
 
-@overload
+@overload  # noqa: F811
 def build_type(self, x: AbstractJTagged):
     return dtype.JTagged[self(x.element)]
 
 
-@overload
+@overload  # noqa: F811
 def build_type(self, x: AbstractType):
     return dtype.TypeType
 
@@ -161,17 +155,17 @@ def abstract_clone(self, x: AbstractScalar, *args):
     return AbstractScalar(self(x.values, *args))
 
 
-@overload
+@overload  # noqa: F811
 def abstract_clone(self, x: AbstractFunction, *args):
     return AbstractFunction(value=self(x.values[VALUE], *args))
 
 
-@overload
+@overload  # noqa: F811
 def abstract_clone(self, d: TrackDict, *args):
     return {k: k.clone(v, self) for k, v in d.items()}
 
 
-@overload
+@overload  # noqa: F811
 def abstract_clone(self, x: AbstractTuple, *args):
     return AbstractTuple(
         [self(y, *args) for y in x.elements],
@@ -179,17 +173,17 @@ def abstract_clone(self, x: AbstractTuple, *args):
     )
 
 
-@overload
+@overload  # noqa: F811
 def abstract_clone(self, x: AbstractList, *args):
     return AbstractList(self(x.element, *args), self(x.values, *args))
 
 
-@overload
+@overload  # noqa: F811
 def abstract_clone(self, x: AbstractArray, *args):
     return AbstractArray(self(x.element, *args), self(x.values, *args))
 
 
-@overload
+@overload  # noqa: F811
 def abstract_clone(self, x: AbstractClass, *args):
     return AbstractClass(
         x.tag,
@@ -199,12 +193,12 @@ def abstract_clone(self, x: AbstractClass, *args):
     )
 
 
-@overload
+@overload  # noqa: F811
 def abstract_clone(self, x: AbstractJTagged, *args):
     return AbstractJTagged(self(x.element, *args))
 
 
-@overload
+@overload  # noqa: F811
 def abstract_clone(self, x: object, *args):
     return x
 
@@ -219,18 +213,18 @@ async def abstract_clone_async(self, x: AbstractScalar):
     return AbstractScalar(await self(x.values))
 
 
-@overload
+@overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractFunction):
     return AbstractFunction(*(await self(x.values[VALUE])))
 
 
-@overload
+@overload  # noqa: F811
 async def abstract_clone_async(self, d: TrackDict):
     return {k: (await k.async_clone(v, self))
             for k, v in d.items()}
 
 
-@overload
+@overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractTuple):
     return AbstractTuple(
         [(await self(y)) for y in x.elements],
@@ -238,17 +232,17 @@ async def abstract_clone_async(self, x: AbstractTuple):
     )
 
 
-@overload
+@overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractList):
     return AbstractList(await self(x.element), await self(x.values))
 
 
-@overload
+@overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractArray):
     return AbstractArray(await self(x.element), await self(x.values))
 
 
-@overload
+@overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractClass):
     return AbstractClass(
         x.tag,
@@ -258,7 +252,7 @@ async def abstract_clone_async(self, x: AbstractClass):
     )
 
 
-@overload
+@overload  # noqa: F811
 async def abstract_clone_async(self, x: object):
     return x
 
@@ -273,7 +267,7 @@ async def concretize_abstract(self, x: Pending):
     return await self(await x)
 
 
-@overload
+@overload  # noqa: F811
 async def concretize_abstract(self, r: Reference):
     return Reference(
         r.engine,
@@ -282,7 +276,7 @@ async def concretize_abstract(self, r: Reference):
     )
 
 
-@overload
+@overload  # noqa: F811
 async def concretize_abstract(self, ctx: Context):
     c_argkey = [await self(x) for x in ctx.argkey]
     return Context(
@@ -302,12 +296,12 @@ def broaden(self, d: TrackDict, loop):
     return {k: k.broaden(v, self, loop) for k, v in d.items()}
 
 
-@overload
+@overload  # noqa: F811
 def broaden(self, p: Pending, loop):
     return p
 
 
-@overload
+@overload  # noqa: F811
 def broaden(self, p: Possibilities, loop):
     if loop is None:
         return p
@@ -322,14 +316,13 @@ def broaden(self, p: Possibilities, loop):
 
 @abstract_clone.variant
 def sensitivity_transform(self, x: AbstractFunction):
-    v = x.values[VALUE]
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.EnvType,
     })
 
 
-@overload
+@overload  # noqa: F811
 def sensitivity_transform(self, x: AbstractJTagged):
     return self(x.element)
 
@@ -349,14 +342,14 @@ def _amerge(x1: Possibilities, x2, loop, forced):
         return Possibilities(x1 | x2)
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: dtype.TypeMeta, x2, loop, forced):
     if x1 != x2:
         raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
     return x1
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: (dict, TrackDict), x2, loop, forced):
     if set(x1.keys()) != set(x2.keys()):
         # This shouldn't be possible at the moment
@@ -371,7 +364,7 @@ def _amerge(x1: (dict, TrackDict), x2, loop, forced):
     return x1 if forced or not changes else rval
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: tuple, x2, loop, forced):
     if len(x1) != len(x2):
         raise MyiaTypeError(f'Tuple length mismatch')
@@ -385,7 +378,7 @@ def _amerge(x1: tuple, x2, loop, forced):
     return x1 if forced or not changes else tuple(rval)
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: AbstractScalar, x2, loop, forced):
     values = amerge(x1.values, x2.values, loop, forced)
     if forced or values is x1.values:
@@ -393,7 +386,7 @@ def _amerge(x1: AbstractScalar, x2, loop, forced):
     return AbstractScalar(values)
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: AbstractFunction, x2, loop, forced):
     values = amerge(x1.values[VALUE], x2.values[VALUE], loop, forced)
     if forced or values is x1.values:
@@ -401,7 +394,7 @@ def _amerge(x1: AbstractFunction, x2, loop, forced):
     return AbstractFunction(*values)
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: AbstractTuple, x2, loop, forced):
     args1 = (x1.elements, x1.values)
     args2 = (x2.elements, x2.values)
@@ -411,7 +404,7 @@ def _amerge(x1: AbstractTuple, x2, loop, forced):
     return AbstractTuple(*merged)
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: AbstractArray, x2, loop, forced):
     args1 = (x1.element, x1.values)
     args2 = (x2.element, x2.values)
@@ -421,7 +414,7 @@ def _amerge(x1: AbstractArray, x2, loop, forced):
     return AbstractArray(*merged)
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: AbstractList, x2, loop, forced):
     args1 = (x1.element, x1.values)
     args2 = (x2.element, x2.values)
@@ -431,7 +424,7 @@ def _amerge(x1: AbstractList, x2, loop, forced):
     return AbstractList(*merged)
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: AbstractClass, x2, loop, forced):
     args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
     args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
@@ -441,7 +434,7 @@ def _amerge(x1: AbstractClass, x2, loop, forced):
     return AbstractClass(*merged)
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: AbstractJTagged, x2, loop, forced):
     args1 = x1.element
     args2 = x2.element
@@ -451,14 +444,14 @@ def _amerge(x1: AbstractJTagged, x2, loop, forced):
     return AbstractJTagged(merged)
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: (int, float, bool), x2, loop, forced):
     if forced and x1 != x2:
         raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
     return x1 if x1 == x2 else ANYTHING
 
 
-@overload
+@overload  # noqa: F811
 def _amerge(x1: object, x2, loop, forced):
     if x1 != x2:
         raise MyiaTypeError(f'Cannot merge {x1} and {x2}')

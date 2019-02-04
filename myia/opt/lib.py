@@ -2,9 +2,9 @@
 
 from ..abstract import \
     abstract_clone, AbstractFunction, AbstractJTagged, AbstractTuple, \
-    AbstractScalar, VALUE, TYPE, SHAPE
+    AbstractScalar, VALUE, TYPE
 from ..composite import hyper_add
-from ..dtype import Function, JTagged, Number, ismyiatype, Tuple, UInt
+from ..dtype import Number, ismyiatype, UInt
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable
@@ -852,4 +852,3 @@ class JElim(Partializable):
             node.abstract = newtype
 
         return len(nodes) > 0
-

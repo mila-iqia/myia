@@ -1,4 +1,5 @@
 
+import math
 import numpy as np
 import operator
 import inspect
@@ -6,10 +7,16 @@ from functools import reduce
 from collections import defaultdict
 from operator import getitem
 
+from .. import dtype
+from ..ir import Graph
+from ..dtype import Number, Float, Bool
+from ..prim import ops as P, Primitive
+from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
+
+
 from .data import (
-    ABSENT,
+    ANYTHING,
     AbstractBase,
-    AbstractValue,
     AbstractScalar,
     AbstractType,
     AbstractFunction,
@@ -25,26 +32,12 @@ from .data import (
     GraphFunction,
     DummyFunction,
     VALUE, TYPE, SHAPE,
+    MyiaTypeError, InferenceError, MyiaShapeError
 )
-
-from .utils import  sensitivity_transform, build_value, build_type
-
-from .infer import (
-    Inferrer,
-    GraphInferrer,
-    from_value,
-)
-
-from .. import dtype
-from ..ir import Graph
-from ..dtype import Number, Float, Bool
-from ..prim import ops as P, Primitive
-from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
-
 from .loop import Pending, find_coherent_result, force_pending
-from .data import ANYTHING, MyiaTypeError, \
-    InferenceError, MyiaShapeError, VOID
 from .ref import Context
+from .utils import sensitivity_transform, build_value, build_type
+from .infer import Inferrer, from_value
 
 
 abstract_inferrer_constructors = {}
@@ -957,12 +950,14 @@ class _ResolveInferrer(Inferrer):
         def chk(data_v, item_v):
             if not isinstance(data_v, Namespace):  # pragma: no cover
                 raise MyiaTypeError(
-                    f'data argument to resolve must be Namespace, not {data_v}',
+                    f'data argument to resolve must be Namespace,'
+                    f' not {data_v}',
                     refs=[data]
                 )
             if not isinstance(item_v, str):  # pragma: no cover
                 raise MyiaTypeError(
-                    f'item argument to resolve must be a string, not {item_v}.',
+                    f'item argument to resolve must be a string,'
+                    f' not {item_v}.',
                     refs=[item]
                 )
 
@@ -1055,7 +1050,6 @@ async def _inf_Jinv(engine, x):
         v = await x.get()
         results = []
         for f in v:
-            ref = None
             if isinstance(f, JTransformedFunction):
                 res = f.fn
             elif isinstance(f, GraphFunction):
@@ -1065,11 +1059,12 @@ async def _inf_Jinv(engine, x):
                     primal = engine.pipeline.resources.convert(primal)
                     if isinstance(primal, Graph):
                         if primal.parent:
-                            # The primal for a closure can't be used because it points to
-                            # the original nodes of its parent, whereas we would like to
-                            # point to the transformed nodes of the parent. This is
-                            # fixable, and will need to be fixed to support a few edge
-                            # cases.
+                            # The primal for a closure can't be used
+                            # because it points to the original nodes
+                            # of its parent, whereas we would like to
+                            # point to the transformed nodes of the
+                            # parent. This is fixable, and will need
+                            # to be fixed to support a few edge cases.
                             res = DummyFunction()
                         else:
                             res = GraphFunction(primal, Context.empty())
