@@ -79,7 +79,7 @@ def test_repr():
     assert repr(a1) == f'A({s2}, SHAPE=(4, 5))'
 
     p1 = to_abstract(Point(1, f32))
-    assert repr(p1) == f'Point(x={s1}, y={s2})'
+    assert repr(p1) == f'*Point(x={s1}, y={s2})'
 
     j1 = AbstractJTagged(to_abstract(1))
     assert repr(j1) == f'J({s1})'

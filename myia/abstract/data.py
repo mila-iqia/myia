@@ -256,7 +256,7 @@ class AbstractClass(AbstractValue):
 
     def __repr__(self):
         elems = [f'{k}={v}' for k, v in self.attributes.items()]
-        return f'{self.tag}({", ".join(elems)})'
+        return f'*{self.tag}({", ".join(elems)})'
 
 
 class AbstractJTagged(AbstractValue):
