@@ -14,6 +14,7 @@ class ValidationError(Exception):
 
 @abstract_clone.variant
 def validate_abstract(self, a: (AbstractClass, AbstractJTagged)):
+    """Validate a type."""
     raise ValidationError(f'Illegal type in the graph: {a}')
 
 

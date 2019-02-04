@@ -9,7 +9,14 @@ from ..ir import succ_incoming
 from ..utils import Partializable
 
 
-def absof(node):
+def _absof(node):
+    # We use .abstract to differentiate identical values with different
+    # types, e.g. 1.0::f32 and 1.0::f64, but we will ignore the types of
+    # functions.
+    # TODO: This could be bad, actually, fix this when we have the time.
+    #       One adjustment that needs to be done is that the tracking_id
+    #       info should be forced to None, otherwise all functions would
+    #       be considered different and nothing can be merged.
     if isinstance(node.abstract, AbstractFunction):
         return None
     else:
@@ -29,7 +36,7 @@ def cse(root, manager):
                 continue
 
             if node.is_constant():
-                h = hash((node.value, absof(node)))
+                h = hash((node.value, _absof(node)))
             elif node.is_apply():
                 h = hash(tuple(hashes[inp] for inp in node.inputs))
             elif node.is_parameter():
@@ -52,7 +59,7 @@ def cse(root, manager):
                 continue  # pragma: no cover
 
             elif main.is_constant() and other.is_constant():
-                repl = absof(main) == absof(other) \
+                repl = _absof(main) == _absof(other) \
                     and main.value == other.value
 
             elif main.is_apply() and other.is_apply():

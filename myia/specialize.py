@@ -23,6 +23,12 @@ def _const(v, t):
 
 
 async def concretize_cache(cache):
+    """Complete a cache with concretized versions of its keys.
+
+    If an entry in the cache has a key that contains a Pending, a new key
+    is created where the Pending is resolved, and it is entered in the cache
+    so that it can be found more easily.
+    """
     for k, v in list(cache.items()):
         kc = await concretize_abstract(k)
         cache[kc] = v

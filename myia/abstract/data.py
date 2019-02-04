@@ -31,16 +31,25 @@ NOTVISIBLE = Named('NOTVISIBLE')
 
 
 class Possibilities(frozenset):
-    pass
+    """Represents a set of possible values."""
 
 
 @dataclass(frozen=True)
 class Function:
-    pass
+    """Represents a possible function in an AbstractFunction."""
 
 
 @dataclass(frozen=True)
 class GraphFunction(Function):
+    """Represents a Graph in a certain Context.
+
+    Attributes:
+        graph: The graph
+        context: The context, or Context.empty()
+        tracking_id: Identifies different uses of the same graph/context pair.
+
+    """
+
     graph: 'Graph'
     context: 'Context'
     tracking_id: object = None
@@ -48,12 +57,29 @@ class GraphFunction(Function):
 
 @dataclass(frozen=True)
 class PrimitiveFunction(Function):
+    """Represents a Primitive.
+
+    Attributes:
+        prim: The primitive
+        tracking_id: Identifies different uses of the same primitive.
+
+    """
+
     prim: 'Primitive'
     tracking_id: object = None
 
 
 @dataclass(frozen=True)
 class MetaGraphFunction(Function):
+    """Represents a MetaGraph in a certain Context.
+
+    Attributes:
+        metagraph: The metagraph
+        context: The context, or Context.empty()
+        tracking_id: Identifies different uses of the same metagraph.
+
+    """
+
     metagraph: 'MetaGraph'
     context: 'Context'
     tracking_id: object = None
@@ -61,30 +87,62 @@ class MetaGraphFunction(Function):
 
 @dataclass(frozen=True)
 class PartialApplication(Function):
-    fn: object
-    args: object
+    """Represents a partial application.
+
+    Attributes:
+        fn: A Function
+        args: The first few arguments of that function
+
+    """
+
+    fn: Function
+    args: Tuple['AbstractBase']
 
 
 @dataclass(frozen=True)
 class JTransformedFunction(Function):
+    """Represents a Function transformed through the application of J.
+
+    Attributes:
+        fn: A Function
+
+    """
+
     fn: object
 
 
 @dataclass(frozen=True)
 class VirtualFunction(Function):
+    """Represents some function with an explicitly given type signature.
+
+    Attributes:
+        args: The abstract arguments given to the function
+        output: The abstract output
+
+    """
+
     args: Tuple['AbstractBase']
     output: 'AbstractBase'
 
 
 @dataclass(frozen=True)
 class TypedPrimitive(Function):
+    """Represents a Primitive with an explicitly given type signature.
+
+    Attributes:
+        prim: The Primitive
+        args: The abstract arguments given to the Primitive
+        output: The abstract output
+
+    """
+
     prim: 'Primitive'
     args: Tuple['AbstractBase']
     output: 'AbstractBase'
 
 
 class DummyFunction(Function):
-    pass
+    """Represents a function that can't be called."""
 
 
 #################
@@ -94,12 +152,12 @@ class DummyFunction(Function):
 
 class AbstractBase:
 
-    def make_key(self):
+    def _make_key(self):
         raise NotImplementedError()
 
     def key(self):
         if not hasattr(self, '_key'):
-            self._key = self.make_key()
+            self._key = self._make_key()
         return self._key
 
     def __eq__(self, other):
@@ -112,10 +170,11 @@ class AbstractBase:
 
 class AbstractValue(AbstractBase):
     def __init__(self, values, count=0):
+        """Initialize an AbstractValue."""
         self.values = TrackDict(values)
         self.count = count
 
-    def make_key(self):
+    def _make_key(self):
         return tuple(sorted(self.values.items()))
 
 
@@ -128,6 +187,7 @@ class AbstractScalar(AbstractValue):
 
 class AbstractType(AbstractValue):
     def __init__(self, typ):
+        """Initialize an AbstractType."""
         super().__init__({VALUE: typ})
 
     def __repr__(self):
@@ -136,6 +196,7 @@ class AbstractType(AbstractValue):
 
 class AbstractError(AbstractValue):
     def __init__(self, err):
+        """Initialize an AbstractError."""
         super().__init__({VALUE: err})
 
     def __repr__(self):
@@ -144,6 +205,7 @@ class AbstractError(AbstractValue):
 
 class AbstractFunction(AbstractValue):
     def __init__(self, *poss, value=None):
+        """Initialize an AbstractFunction."""
         v = Possibilities(poss) if value is None else value
         super().__init__({VALUE: v})
 
@@ -169,12 +231,13 @@ class AbstractFunction(AbstractValue):
 
 class AbstractTuple(AbstractValue):
     def __init__(self, elements, values=None):
+        """Initialize an AbstractTuple."""
         super().__init__(values or {})
         self.elements = tuple(elements)
 
-    def make_key(self):
-        elms = tuple(e.make_key() for e in self.elements)
-        return (super().make_key(), elms)
+    def _make_key(self):
+        elms = tuple(e._make_key() for e in self.elements)
+        return (super()._make_key(), elms)
 
     def __repr__(self):
         return f'T({", ".join(map(repr, self.elements))})'
@@ -182,11 +245,12 @@ class AbstractTuple(AbstractValue):
 
 class AbstractArray(AbstractValue):
     def __init__(self, element, values):
+        """Initialize an AbstractArray."""
         super().__init__(values)
         self.element = element
 
-    def make_key(self):
-        return (super().make_key(), self.element.make_key())
+    def _make_key(self):
+        return (super()._make_key(), self.element._make_key())
 
     def __repr__(self):
         return f'A({self.element}, SHAPE={self.values[SHAPE]})'
@@ -194,11 +258,12 @@ class AbstractArray(AbstractValue):
 
 class AbstractList(AbstractValue):
     def __init__(self, element, values=None):
+        """Initialize an AbstractList."""
         super().__init__(values or {})
         self.element = element
 
-    def make_key(self):
-        return (super().make_key(), self.element.make_key())
+    def _make_key(self):
+        return (super()._make_key(), self.element._make_key())
 
     def __repr__(self):
         return f'L({self.element})'
@@ -206,14 +271,15 @@ class AbstractList(AbstractValue):
 
 class AbstractClass(AbstractValue):
     def __init__(self, tag, attributes, methods, values={}):
+        """Initialize an AbstractClass."""
         super().__init__(values)
         self.tag = tag
         self.attributes = attributes
         self.methods = methods
 
-    def make_key(self):
-        attrs = tuple((k, v.make_key()) for k, v in self.attributes.items())
-        return (super().make_key(), self.tag, attrs)
+    def _make_key(self):
+        attrs = tuple((k, v._make_key()) for k, v in self.attributes.items())
+        return (super()._make_key(), self.tag, attrs)
 
     def __repr__(self):
         elems = [f'{k}={v}' for k, v in self.attributes.items()]
@@ -222,11 +288,12 @@ class AbstractClass(AbstractValue):
 
 class AbstractJTagged(AbstractValue):
     def __init__(self, element):
+        """Initialize an AbstractJTagged."""
         super().__init__({})
         self.element = element
 
-    def make_key(self):
-        return (super().make_key(), self.element.make_key())
+    def _make_key(self):
+        return (super()._make_key(), self.element._make_key())
 
     def __repr__(self):
         return f'J({self.element})'
@@ -238,11 +305,14 @@ class AbstractJTagged(AbstractValue):
 
 
 class TrackDict(dict):
-    pass
+    """Mapping from a Subtrack to a value."""
 
 
 class Subtrack:
+    """Represents a type of property of an abstract value."""
+
     def __init__(self, name):
+        """Initialize the Subtrack."""
         self.name = name
 
     def __str__(self):
@@ -252,26 +322,38 @@ class Subtrack:
         return self.name < other.name
 
     def clone(self, v, recurse):
+        """Clone the value associated to this Subtrack in a TrackDict."""
         return recurse(v)
 
     async def async_clone(self, v, recurse):
+        """Clone the value associated to this Subtrack in a TrackDict.
+
+        This is an asynchronous version of clone.
+        """
         return await recurse(v)
 
     def broaden(self, v, recurse, loop):
+        """Make a value more generic.
+
+        By default, this amounts to a straight copy.
+        """
         return recurse(v, loop)
 
 
 class _ValueSubtrack(Subtrack):
+    """Represents the VALUE track."""
+
     def broaden(self, v, recurse, loop):
+        """Values are broadened to ANYTHING."""
         return ANYTHING
 
 
 class _TypeSubtrack(Subtrack):
-    pass
+    """Represents the TYPE track, for scalars."""
 
 
 class _ShapeSubtrack(Subtrack):
-    pass
+    """Represents the SHAPE track, for arrays."""
 
 
 VALUE = _ValueSubtrack('VALUE')

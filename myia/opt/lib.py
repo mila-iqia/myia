@@ -60,6 +60,7 @@ def primset_var(*prims):
 
 
 def shptup(values):
+    """Create the type of a shape, i.e. a tuple of u64."""
     return AbstractTuple([
         AbstractScalar({
             VALUE: v,

@@ -22,6 +22,7 @@ class MetaGraph:
         self.cache = {}
 
     def specialize_from_abstract(self, args):
+        """Generate a Graph for the given abstract arguments."""
         from ..abstract.utils import build_type
         types = tuple([build_type(arg) for arg in args])
         if types not in self.cache:
