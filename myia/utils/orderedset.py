@@ -135,3 +135,6 @@ class OrderedSet:
                 self.remove(e)
             else:
                 self.add(e)
+
+    def __contains__(self, x):
+        return x in self._d
