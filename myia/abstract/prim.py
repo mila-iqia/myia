@@ -169,12 +169,8 @@ class MyiaAttributeError(InferenceError):
 
 
 def _prim_or_graph(afn):
-    from ..prim import Primitive
-    from ..ir import Graph
-    fns = afn.values[VALUE]
-    assert isinstance(fns, Possibilities)
-    assert len(fns) == 1
-    fn, = fns
+    assert isinstance(afn, AbstractFunction)
+    fn = afn.get_unique()
     if isinstance(fn, PrimitiveFunction):
         fn = fn.prim
     if isinstance(fn, GraphFunction):

@@ -396,9 +396,7 @@ class ArrayReduceGradient(MetaGraph):
         """Generate the gradient graph."""
         jf, jarr, jshp = args
         assert isinstance(jf, AbstractFunction)
-        fns = jf.values[VALUE]
-        assert isinstance(fns, Possibilities) and len(fns) == 1
-        fn, = fns
+        fn = jf.get_unique()
         assert isinstance(fn, GraphFunction) and fn.graph.parent is None
         assert fn.graph.transforms['primal'] is primops.scalar_add
         return bprop_to_augm(primops.array_reduce, bprop_sum)

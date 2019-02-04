@@ -151,6 +151,18 @@ class AbstractFunction(AbstractValue):
         v = self.values[VALUE]
         return (await v if isinstance(v, Pending) else v)
 
+    def get_sync(self):
+        return self.values[VALUE]
+
+    def get_unique(self):
+        poss = self.values[VALUE]
+        if isinstance(poss, Pending):
+            raise MyiaTypeError('get_unique invalid because Pending')
+        if len(poss) != 1:
+            raise MyiaTypeError(f'Expected unique function, not {poss}')
+        fn, = poss
+        return fn
+
     def __repr__(self):
         return f'Fn({self.values[VALUE]})'
 

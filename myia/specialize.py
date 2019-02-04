@@ -7,7 +7,7 @@ from dataclasses import replace as dc_replace
 from .abstract import GraphFunction, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
     AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, \
-    AbstractError, AbstractValue, build_value, \
+    AbstractError, AbstractValue, build_value, MyiaTypeError, \
     TypedPrimitive, GraphInferrer, BaseGraphInferrer, broaden, \
     TrackedInferrer, PrimitiveFunction, MetaGraphFunction
 from .dtype import Function, TypeMeta
@@ -228,9 +228,8 @@ class _GraphSpecializer:
 
     @build.register
     async def build(self, ref, a: AbstractFunction):
-        fns = a.values[VALUE]
-        if len(fns) == 1:
-            fn, = fns
+        try:
+            fn = a.get_unique()
             if isinstance(fn, PrimitiveFunction):
                 g = fn.prim
             elif isinstance(fn, MetaGraphFunction):
@@ -246,7 +245,7 @@ class _GraphSpecializer:
                 return _const(g, a)
             else:
                 return None
-        else:
+        except MyiaTypeError:
             return None
 
     @build.register
@@ -306,7 +305,7 @@ class _GraphSpecializer:
             if node.is_constant_graph() \
                     or node.is_constant(MetaGraph) \
                     or node.is_constant(Primitive):
-                fns = a.values[VALUE]
+                fns = a.get_sync()
                 try:
                     if len(fns) != 1:
                         raise Unspecializable('xxx')
