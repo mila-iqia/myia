@@ -81,7 +81,7 @@ class Graph:
     @output.setter
     def output(self, value: 'ANFNode') -> None:
         """Set the graph's output."""
-        from ..abstract import AbstractFunction, TrackableFunction
+        from ..abstract import AbstractFunction, PrimitiveFunction
         if self.return_:
             if self._manager:
                 self._manager.set_edge(self.return_, 1, value)
@@ -90,7 +90,8 @@ class Graph:
         else:
             self.return_ = Apply([Constant(primops.return_), value], self)
         self.return_.abstract = value.abstract
-        f = TrackableFunction(primops.return_, self.return_.inputs[0])
+        f = PrimitiveFunction(primops.return_,
+                              tracking_id=self.return_.inputs[0])
         self.return_.inputs[0].abstract = AbstractFunction(f)
 
     def add_parameter(self) -> 'Parameter':

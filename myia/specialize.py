@@ -2,12 +2,14 @@
 
 import numpy
 from itertools import count
+from dataclasses import replace as dc_replace
 
-from .abstract import GraphAndContext, concretize_abstract, \
+from .abstract import GraphFunction, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
     AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, \
-    AbstractError, AbstractValue, TrackableFunction, to_value, \
-    TypedPrimitive, GraphInferrer, BaseGraphInferrer, broaden
+    AbstractError, AbstractValue, to_value, \
+    TypedPrimitive, GraphInferrer, BaseGraphInferrer, broaden, \
+    TrackedInferrer, PrimitiveFunction, MetaGraphFunction
 from .dtype import Function, TypeMeta
 from .abstract import ANYTHING, Context, Unspecializable, \
     DEAD, NOTVISIBLE, POLY, VirtualReference
@@ -59,7 +61,7 @@ class TypeSpecializer:
 
     def run(self, graph, context):
         """Run the specializer on the given graph in the given context."""
-        ginf = self.engine.get_inferrer_for(GraphAndContext(graph, context))
+        ginf = self.engine.get_inferrer_for(GraphFunction(graph, context))
 
         argrefs = [self.engine.ref(p, context)
                    for p in graph.parameters]
@@ -145,17 +147,17 @@ class _GraphSpecializer:
         inf = self.specializer.engine.get_inferrer_for(fn)
         argvals, outval = await self._find_unique_argvals(a, inf, argvals)
 
-        if isinstance(fn, TrackableFunction):
-            fn = fn.fn
+        if isinstance(inf, TrackedInferrer):
+            fn = dc_replace(fn, tracking_id=None)
             inf = self.specializer.engine.get_inferrer_for(fn)
 
-        if isinstance(fn, Primitive):
-            a = AbstractFunction(TypedPrimitive(fn, argvals, outval))
-            return _const(fn, a)
+        if isinstance(fn, PrimitiveFunction):
+            a = AbstractFunction(TypedPrimitive(fn.prim, argvals, outval))
+            return _const(fn.prim, a)
 
         assert isinstance(inf, BaseGraphInferrer)
 
-        if isinstance(fn, GraphAndContext) \
+        if isinstance(fn, GraphFunction) \
                 and not _visible(self.graph, fn.context.graph):
             raise Unspecializable(NOTVISIBLE)
 
@@ -243,11 +245,11 @@ class _GraphSpecializer:
         fns = a.values[VALUE]
         if len(fns) == 1:
             fn, = fns
-            if isinstance(fn, TrackableFunction):
-                fn = fn.fn
-            if isinstance(fn, (Primitive, Graph, MetaGraph)):
-                g = fn
-            elif isinstance(fn, GraphAndContext):
+            if isinstance(fn, PrimitiveFunction):
+                g = fn.prim
+            elif isinstance(fn, MetaGraphFunction):
+                g = fn.metagraph
+            elif isinstance(fn, GraphFunction):
                 g = fn.graph
             else:
                 return None

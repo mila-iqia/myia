@@ -20,9 +20,9 @@ from .data import (
     AbstractJTagged,
     PartialApplication,
     JTransformedFunction,
-    TrackableFunction,
+    PrimitiveFunction,
     Possibilities,
-    GraphAndContext,
+    GraphFunction,
     DummyFunction,
     VALUE, TYPE, SHAPE,
 )
@@ -40,7 +40,7 @@ from .infer import (
 from .. import dtype
 from ..ir import Graph
 from ..dtype import Number, Float, Bool
-from ..prim import ops as P
+from ..prim import ops as P, Primitive
 from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
 
 from .loop import Pending, find_coherent_result, force_pending
@@ -177,9 +177,9 @@ def _prim_or_graph(afn):
     assert isinstance(fns, Possibilities)
     assert len(fns) == 1
     fn, = fns
-    if isinstance(fn, TrackableFunction):
-        fn = fn.fn
-    if isinstance(fn, GraphAndContext):
+    if isinstance(fn, PrimitiveFunction):
+        fn = fn.prim
+    if isinstance(fn, GraphFunction):
         assert fn.context == Context.empty()
         fn = fn.graph
     assert isinstance(fn, (Primitive, Graph))
@@ -1062,16 +1062,10 @@ async def _inf_Jinv(engine, x):
         results = []
         for f in v:
             ref = None
-            if isinstance(f, TrackableFunction):
-                ref = f.id
-                f = f.fn
             if isinstance(f, JTransformedFunction):
                 res = f.fn
-            elif isinstance(f, (Graph, GraphAndContext)):
-                if isinstance(f, GraphAndContext):
-                    g = f.graph
-                else:
-                    g = f
+            elif isinstance(f, GraphFunction):
+                g = f.graph
                 primal = g and g.transforms.get('primal', None)
                 if primal:
                     primal = engine.pipeline.resources.convert(primal)
@@ -1084,17 +1078,18 @@ async def _inf_Jinv(engine, x):
                             # cases.
                             res = DummyFunction()
                         else:
-                            res = GraphAndContext(primal, Context.empty())
+                            res = GraphFunction(primal, Context.empty())
                     else:
                         res = primal
+                        if isinstance(res, Primitive):
+                            tid = getattr(f, 'tracking_id', None)
+                            res = PrimitiveFunction(res, tracking_id=tid)
                 else:
                     raise MyiaTypeError(f'Bad input type for Jinv: {f}')
             else:
                 raise MyiaTypeError(
                     f'Expected JTransformedFunction, not {f}'
                 )
-            if ref:
-                res = TrackableFunction(res, ref)
             results.append(res)
         return AbstractFunction(*results)
     if isinstance(x, AbstractJTagged):

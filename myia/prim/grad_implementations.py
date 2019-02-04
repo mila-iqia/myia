@@ -4,8 +4,7 @@ Each primitive is associated to an augmented function, which returns a pair of
 the (augmented) original primitive's output and a backpropagator function.
 """
 
-from ..abstract import AbstractFunction, Possibilities, TrackableFunction, \
-    VALUE, GraphAndContext
+from ..abstract import AbstractFunction, Possibilities, VALUE, GraphFunction
 from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import NamedDebugInfo, About
@@ -400,9 +399,7 @@ class ArrayReduceGradient(MetaGraph):
         fns = jf.values[VALUE]
         assert isinstance(fns, Possibilities) and len(fns) == 1
         fn, = fns
-        if isinstance(fn, TrackableFunction):
-            fn = fn.fn
-        assert isinstance(fn, GraphAndContext) and fn.graph.parent is None
+        assert isinstance(fn, GraphFunction) and fn.graph.parent is None
         assert fn.graph.transforms['primal'] is primops.scalar_add
         return bprop_to_augm(primops.array_reduce, bprop_sum)
 

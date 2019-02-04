@@ -2,7 +2,7 @@
 import asyncio
 import numpy as np
 from functools import reduce
-from dataclasses import is_dataclass
+from dataclasses import is_dataclass, replace as dc_replace
 
 from .. import dtype
 from ..ir import Graph, MetaGraph, GraphGenerationError
@@ -14,13 +14,13 @@ from ..utils import as_frozen, Var, RestrictedVar, Overload, Partializable, \
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
 from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
-    ABSENT, GraphAndContext, AbstractBase, PartialApplication, \
+    ABSENT, GraphFunction, AbstractBase, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, \
-    VALUE, TYPE, SHAPE, DummyFunction, TrackableFunction, \
+    VALUE, TYPE, SHAPE, DummyFunction, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
     AbstractList, Possibilities, type_error_nargs, AbstractBase, \
-    InferenceError
+    InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind
 
@@ -139,56 +139,68 @@ class InferenceEngine:
             for task in asyncio.all_tasks(self.loop):
                 task._log_destroy_pending = False
 
-    get_inferrer_for = Overload()
+    _get_inferrer_for = Overload()
 
-    @get_inferrer_for.register
-    def get_inferrer_for(self, prim: Primitive):
+    @_get_inferrer_for.register
+    def _get_inferrer_for(self, pf: PrimitiveFunction):
+        return self.constructors[pf.prim]
+
+    @_get_inferrer_for.register
+    def _get_inferrer_for(self, prim: Primitive):
         return self.constructors[prim]
 
-    @get_inferrer_for.register
-    def get_inferrer_for(self, g: GraphAndContext):
+    @_get_inferrer_for.register
+    def _get_inferrer_for(self, g: GraphFunction):
         if g not in self.constructors:
             self.constructors[g] = GraphInferrer(g.graph, g.context)
         return self.constructors[g]
 
-    @get_inferrer_for.register
-    def get_inferrer_for(self, tf: TrackableFunction):
-        if tf not in self.constructors:
-            self.constructors[tf] = TrackableInferrer(
-                self.get_inferrer_for(tf.fn)
-            )
-        return self.constructors[tf]
-
-    @get_inferrer_for.register
-    def get_inferrer_for(self, part: PartialApplication):
+    @_get_inferrer_for.register
+    def _get_inferrer_for(self, part: PartialApplication):
         return PartialInferrer(
             self.get_inferrer_for(part.fn),
             part.args
         )
 
-    @get_inferrer_for.register
-    def get_inferrer_for(self, j: JTransformedFunction):
+    @_get_inferrer_for.register
+    def _get_inferrer_for(self, j: JTransformedFunction):
         return JInferrer(
             self.get_inferrer_for(j.fn),
             j.fn
         )
 
-    @get_inferrer_for.register
-    def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive)):
+    @_get_inferrer_for.register
+    def _get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive)):
         return VirtualInferrer(
             vf.args,
             vf.output
         )
 
-    @get_inferrer_for.register
-    def get_inferrer_for(self, df: DummyFunction):
+    @_get_inferrer_for.register
+    def _get_inferrer_for(self, df: DummyFunction):
         raise MyiaTypeError(f'Trying to call dummy')
 
-    @get_inferrer_for.register
-    def get_inferrer_for(self, mg: MetaGraph):
+    @_get_inferrer_for.register
+    def _get_inferrer_for(self, mg: MetaGraphFunction):
+        if mg not in self.constructors:
+            self.constructors[mg] = MetaGraphInferrer(mg.metagraph)
+        return self.constructors[mg]
+
+    @_get_inferrer_for.register
+    def _get_inferrer_for(self, mg: MetaGraph):
         if mg not in self.constructors:
             self.constructors[mg] = MetaGraphInferrer(mg)
         return self.constructors[mg]
+
+    def get_inferrer_for(self, fn):
+        tracking = getattr(fn, 'tracking_id', None)
+        if tracking is None:
+            return self._get_inferrer_for(fn)
+        if fn not in self.constructors:
+            fn_generic = dc_replace(fn, tracking_id=None)
+            inf = self._get_inferrer_for(fn_generic)
+            self.constructors[fn] = TrackedInferrer(inf)
+        return self.constructors[fn]
 
     async def execute(self, fn, *args):
         infs = [self.get_inferrer_for(poss)
@@ -287,12 +299,21 @@ def from_value(v, context=None, ref=None, broaden=False):
 
 def to_abstract(v, context=None, ref=None):
     """Translate the value to an abstract value."""
-    if isinstance(v, (Primitive, Graph, MetaGraph)):
-        if isinstance(v, Graph):
-            v = GraphAndContext(v, context or Context.empty())
-        if ref is not None:
-            v = TrackableFunction(v, id=ref.node)
-        return AbstractFunction(v)
+    ref = ref and ref.node
+
+    if isinstance(v, Graph):
+        ctx = context or Context.empty()
+        return AbstractFunction(
+            GraphFunction(v, ctx, tracking_id=ref)
+        )
+
+    elif isinstance(v, MetaGraph):
+        return AbstractFunction(
+            MetaGraphFunction(v, Context.empty(), tracking_id=ref)
+        )
+
+    elif isinstance(v, Primitive):
+        return AbstractFunction(PrimitiveFunction(v, tracking_id=ref))
 
     elif is_dataclass_type(v):
         typ = dtype.pytype_to_myiatype(v)
@@ -308,6 +329,7 @@ def to_abstract(v, context=None, ref=None):
         )
 
     elif is_dataclass(v):
+        assert not isinstance(v, Function)
         typ = dtype.pytype_to_myiatype(type(v), v)
         new_args = {}
         for name, field in v.__dataclass_fields__.items():
@@ -366,7 +388,7 @@ class Inferrer(Partializable):
         return f'{type(self)}'
 
 
-class TrackableInferrer(Inferrer):
+class TrackedInferrer(Inferrer):
     def __init__(self, subinf):
         super().__init__()
         self.subinf = subinf

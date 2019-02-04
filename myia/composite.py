@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from functools import reduce
 
 from .abstract import \
-    AbstractFunction, Possibilities, GraphAndContext, VALUE, \
-    TrackableFunction, AbstractList, AbstractTuple
+    AbstractFunction, Possibilities, GraphFunction, VALUE, \
+    AbstractList, AbstractTuple
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType, ismyiatype, Function
 from .hypermap import HyperMap
@@ -779,12 +779,8 @@ class GradOperation(MetaGraph):
         assert isinstance(poss, Possibilities)
         assert len(poss) == 1
         for g in poss:
-            if isinstance(g, TrackableFunction):
-                g = g.fn
-            if isinstance(g, GraphAndContext):
-                g = g.graph
-
-        assert isinstance(g, Graph)
+            assert isinstance(g, GraphFunction)
+            g = g.graph
 
         dfbuilder = Graph()
         dfbuilder.debug.name = f"grad{len(g.parameters)}"

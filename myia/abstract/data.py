@@ -35,42 +35,55 @@ class Possibilities(frozenset):
 
 
 @dataclass(frozen=True)
-class TrackableFunction:
-    fn: object
-    id: object
+class Function:
+    pass
 
 
 @dataclass(frozen=True)
-class GraphAndContext:
+class GraphFunction(Function):
     graph: 'Graph'
     context: 'Context'
+    tracking_id: object = None
 
 
 @dataclass(frozen=True)
-class PartialApplication:
+class PrimitiveFunction(Function):
+    prim: 'Primitive'
+    tracking_id: object = None
+
+
+@dataclass(frozen=True)
+class MetaGraphFunction(Function):
+    metagraph: 'MetaGraph'
+    context: 'Context'
+    tracking_id: object = None
+
+
+@dataclass(frozen=True)
+class PartialApplication(Function):
     fn: object
     args: object
 
 
 @dataclass(frozen=True)
-class JTransformedFunction:
+class JTransformedFunction(Function):
     fn: object
 
 
 @dataclass(frozen=True)
-class VirtualFunction:
+class VirtualFunction(Function):
     args: Tuple['AbstractBase']
     output: 'AbstractBase'
 
 
 @dataclass(frozen=True)
-class TypedPrimitive:
+class TypedPrimitive(Function):
     prim: 'Primitive'
     args: Tuple['AbstractBase']
     output: 'AbstractBase'
 
 
-class DummyFunction:
+class DummyFunction(Function):
     pass
 
 
