@@ -115,35 +115,6 @@ class AbstractValue(AbstractBase):
         self.values = TrackDict(values)
         self.count = count
 
-    def build(self, name, default=None):
-        try:
-            return self._build(name)
-        except ValueError:
-            if default is None:
-                raise
-            return default
-
-    def _build(self, subtrack):
-        assert not isinstance(subtrack, str)
-        v = self.values.get(subtrack, ABSENT)
-        if v is ANYTHING:
-            raise ValueError('ANYTHING')
-        elif v is not ABSENT:
-            if isinstance(v, Pending) and v.done():
-                return v.result()
-            else:
-                return v
-        else:
-            name = str(subtrack).lower()
-            method = getattr(self, f'_build_{name}')
-            return method()
-
-    def _build_value(self):
-        raise NotImplementedError()
-
-    def _build_type(self):
-        raise NotImplementedError()
-
     def make_key(self):
         return tuple(sorted(self.values.items()))
 
@@ -157,10 +128,7 @@ class AbstractScalar(AbstractValue):
 
 class AbstractType(AbstractValue):
     def __init__(self, typ):
-        super().__init__({
-            VALUE: typ,
-            TYPE: dtype.TypeType,
-        })
+        super().__init__({VALUE: typ})
 
     def __repr__(self):
         return f'Ty({self.values[VALUE]})'
@@ -168,10 +136,7 @@ class AbstractType(AbstractValue):
 
 class AbstractError(AbstractValue):
     def __init__(self, err):
-        super().__init__({
-            VALUE: err,
-            TYPE: dtype.Problem[err],
-        })
+        super().__init__({VALUE: err})
 
     def __repr__(self):
         return f'E({self.values[VALUE]})'
@@ -180,10 +145,7 @@ class AbstractError(AbstractValue):
 class AbstractFunction(AbstractValue):
     def __init__(self, *poss, value=None):
         v = Possibilities(poss) if value is None else value
-        super().__init__({
-            VALUE: v,
-            TYPE: dtype.Function,
-        })
+        super().__init__({VALUE: v})
 
     async def get(self):
         v = self.values[VALUE]
@@ -198,12 +160,6 @@ class AbstractTuple(AbstractValue):
         super().__init__(values or {})
         self.elements = tuple(elements)
 
-    def _build_value(self):
-        return tuple(e.build(VALUE) for e in self.elements)
-
-    def _build_type(self):
-        return dtype.Tuple[[e.build(TYPE) for e in self.elements]]
-
     def make_key(self):
         elms = tuple(e.make_key() for e in self.elements)
         return (super().make_key(), elms)
@@ -217,9 +173,6 @@ class AbstractArray(AbstractValue):
         super().__init__(values)
         self.element = element
 
-    def _build_type(self):
-        return dtype.Array[self.element.build(TYPE)]
-
     def make_key(self):
         return (super().make_key(), self.element.make_key())
 
@@ -231,9 +184,6 @@ class AbstractList(AbstractValue):
     def __init__(self, element, values=None):
         super().__init__(values or {})
         self.element = element
-
-    def _build_type(self):
-        return dtype.List[self.element.build(TYPE)]
 
     def make_key(self):
         return (super().make_key(), self.element.make_key())
@@ -249,20 +199,6 @@ class AbstractClass(AbstractValue):
         self.attributes = attributes
         self.methods = methods
 
-    def _build_value(self):
-        kls = dtype.tag_to_dataclass[self.tag]
-        args = {k: v.build(VALUE)
-                for k, v in self.attributes.items()}
-        return kls(**args)
-
-    def _build_type(self):
-        return dtype.Class[
-            self.tag,
-            {name: x.build(TYPE)
-             for name, x in self.attributes.items()},
-            self.methods
-        ]
-
     def make_key(self):
         attrs = tuple((k, v.make_key()) for k, v in self.attributes.items())
         return (super().make_key(), self.tag, attrs)
@@ -276,9 +212,6 @@ class AbstractJTagged(AbstractValue):
     def __init__(self, element):
         super().__init__({})
         self.element = element
-
-    def _build_type(self):
-        return dtype.JTagged[self.element.build(TYPE)]
 
     def make_key(self):
         return (super().make_key(), self.element.make_key())

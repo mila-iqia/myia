@@ -7,7 +7,7 @@ from dataclasses import replace as dc_replace
 from .abstract import GraphFunction, concretize_abstract, \
     AbstractTuple, AbstractList, AbstractArray, AbstractScalar, \
     AbstractFunction, PartialApplication, TYPE, VALUE, SHAPE, \
-    AbstractError, AbstractValue, to_value, \
+    AbstractError, AbstractValue, build_value, \
     TypedPrimitive, GraphInferrer, BaseGraphInferrer, broaden, \
     TrackedInferrer, PrimitiveFunction, MetaGraphFunction
 from .dtype import Function, TypeMeta
@@ -32,20 +32,6 @@ async def concretize_cache(cache):
     for k, v in list(cache.items()):
         kc = await concretize_abstract(k)
         cache[kc] = v
-
-
-@to_value.variant
-def to_value_nofunc(self, x: AbstractFunction):
-    raise ValueError('Cannot build function')
-
-
-@overload
-def to_value_nofunc(self, x: AbstractScalar):
-    v = x.values[VALUE]
-    if v is ANYTHING:
-        raise ValueError('Cannot build ANYTHING')
-    else:
-        return v
 
 
 class TypeSpecializer:
@@ -274,7 +260,7 @@ class _GraphSpecializer:
     @build.register
     async def build(self, ref, a: AbstractTuple):
         try:
-            v = to_value_nofunc(a)
+            v = build_value(a)
         except ValueError:
             return None
         else:

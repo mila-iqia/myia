@@ -54,49 +54,101 @@ from .data import (  # noqa
 ############
 
 
+def build_value(a, default=ABSENT):
+    def return_default(err):
+        if default is ABSENT:
+            raise err
+        else:
+            return default
+
+    v = a.values.get(VALUE, ABSENT)
+
+    if v is ANYTHING or isinstance(v, Possibilities):
+        return return_default(ValueError(v))
+
+    elif v is ABSENT:
+        try:
+            return _build_value(a)
+        except ValueError as e:
+            return return_default(e)
+
+    elif isinstance(v, Pending):
+        if v.done():
+            return v.result()
+        else:
+            return return_default(ValueError(v))
+
+    else:
+        return v
+
+
+@overload
+def _build_value(x: AbstractBase):
+    raise ValueError(x)
+
+
+@overload
+def _build_value(x: AbstractTuple):
+    return tuple(build_value(y) for y in x.elements)
+
+
+@overload
+def _build_value(ac: AbstractClass):
+    kls = dtype.tag_to_dataclass[ac.tag]
+    args = {k: build_value(v) for k, v in ac.attributes.items()}
+    return kls(**args)
+
+
 @overload(bootstrap=True)
-def to_value(self, x: AbstractScalar, *args):
-    return x.values[VALUE]
+def build_type(self, x: AbstractScalar):
+    t = x.values[TYPE]
+    if isinstance(t, Pending) and t.done():
+        t = t.result()
+    return t
 
 
 @overload
-def to_value(self, x: AbstractFunction, *args):
-    return x.values[VALUE]
+def build_type(self, x: AbstractFunction):
+    return dtype.Function
 
 
 @overload
-def to_value(self, x: AbstractTuple, *args):
-    return tuple(self(y, *args) for y in x.elements)
+def build_type(self, x: AbstractTuple):
+    return dtype.Tuple[[self(e) for e in x.elements]]
 
 
 @overload
-def to_value(self, x: AbstractError, *args):
-    raise ValueError('Cannot build error.')
+def build_type(self, x: AbstractError):
+    return dtype.Problem[x.values[VALUE]]
 
 
 @overload
-def to_value(self, x: AbstractList, *args):
-    raise ValueError('Cannot build list.')
+def build_type(self, x: AbstractList):
+    return dtype.List[self(x.element)]
 
 
 @overload
-def to_value(self, x: AbstractArray, *args):
-    raise ValueError('Cannot build array.')
+def build_type(self, x: AbstractArray):
+    return dtype.Array[self(x.element)]
 
 
 @overload
-def to_value(self, x: AbstractClass, *args):
-    raise ValueError('Cannot build struct.')
+def build_type(self, x: AbstractClass):
+    return dtype.Class[
+        x.tag,
+        {name: self(x2) for name, x2 in x.attributes.items()},
+        x.methods
+    ]
 
 
 @overload
-def to_value(self, x: AbstractJTagged, *args):
-    raise ValueError('Cannot build jtagged.')
+def build_type(self, x: AbstractJTagged):
+    return dtype.JTagged[self(x.element)]
 
 
 @overload
-def to_value(self, x: AbstractType, *args):
-    raise ValueError('Cannot build type.')
+def build_type(self, x: AbstractType):
+    return dtype.TypeType
 
 
 ###########

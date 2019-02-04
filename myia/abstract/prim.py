@@ -27,9 +27,7 @@ from .data import (
     VALUE, TYPE, SHAPE,
 )
 
-from .utils import  sensitivity_transform
-
-from .ref import Context
+from .utils import  sensitivity_transform, build_value, build_type
 
 from .infer import (
     Inferrer,
@@ -74,7 +72,7 @@ class StandardInferrer(Inferrer):
             if typ is None:
                 pass
             elif dtype.ismyiatype(typ):
-                await force_pending(engine.chk(typ, arg.values.get(TYPE, ABSENT)))
+                await force_pending(engine.chk(typ, build_type(arg)))
             elif isinstance(typ, type) and issubclass(typ, AbstractBase):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
@@ -202,8 +200,8 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
 
     resources = engine.pipeline.resources
 
-    data_t = data.build(TYPE)
-    item_v = item.build(VALUE, default=ANYTHING)
+    data_t = build_type(data)
+    item_v = build_value(item, default=ANYTHING)
 
     if item_v is ANYTHING:
         raise InferenceError(
@@ -254,7 +252,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
 
     else:
         # Module or static namespace
-        data_v = data.build(VALUE, default=ANYTHING)
+        data_v = build_value(data, default=ANYTHING)
         if data_v is ANYTHING:
             raise InferenceError(
                 'Could not infer the type or the value of the object'
@@ -508,7 +506,7 @@ def _inf_bool_eq(x: Bool, y: Bool) -> Bool:
 
 @standard_prim(P.typeof)
 async def _inf_typeof(engine, value):
-    t = value.build(TYPE)
+    t = build_type(value)
     return AbstractType(t)
 
 
@@ -743,8 +741,8 @@ async def _inf_broadcast_shape(engine, xs: _shape_type, ys: _shape_type):
     shp_ys_n = len(ys.elements)
 
     from ..prim.py_implementations import broadcast_shape
-    shp_x = xs.build(VALUE, default=ANYTHING)
-    shp_y = ys.build(VALUE, default=ANYTHING)
+    shp_x = build_value(xs, default=ANYTHING)
+    shp_y = build_value(ys, default=ANYTHING)
     elems = []
     if shp_x is ANYTHING or shp_y is ANYTHING:
         for i in range(max(shp_xs_n, shp_ys_n)):
@@ -828,7 +826,7 @@ async def _inf_array_reduce(engine,
                             shp: _shape_type):
 
     shp_i = await force_pending(a.values[SHAPE])
-    shp_v = shp.build(VALUE, default=ANYTHING)
+    shp_v = build_value(shp, default=ANYTHING)
     if shp_v == ANYTHING:
         raise AssertionError(
             'We currently require knowing the shape for reduce.'
@@ -849,7 +847,7 @@ async def _inf_array_reduce(engine,
 
 @standard_prim(P.distribute)
 async def _inf_distribute(engine, a: AbstractArray, _shp: _shape_type):
-    shp = _shp.build(VALUE, default=ANYTHING)
+    shp = build_value(_shp, default=ANYTHING)
     if shp == ANYTHING:
         shp = (ANYTHING,) * len(_shp.elements)
     a_shp = await force_pending(a.values[SHAPE])
@@ -866,7 +864,7 @@ async def _inf_distribute(engine, a: AbstractArray, _shp: _shape_type):
 
 @standard_prim(P.reshape)
 async def _inf_reshape(engine, a: AbstractArray, _shp: _shape_type):
-    shp = _shp.build(VALUE, default=ANYTHING)
+    shp = build_value(_shp, default=ANYTHING)
     if shp == ANYTHING:
         shp = (ANYTHING,) * len(_shp.elements)
     a_shp = await force_pending(a.values[SHAPE])
@@ -880,7 +878,7 @@ async def _inf_reshape(engine, a: AbstractArray, _shp: _shape_type):
 
 @standard_prim(P.transpose)
 async def _inf_transpose(engine, a: AbstractArray, permutation: _shape_type):
-    perm = permutation.build(VALUE, default=ANYTHING)
+    perm = build_value(permutation, default=ANYTHING)
     if perm == ANYTHING:
         shp = (ANYTHING,) * len(permutation.elements)
     else:

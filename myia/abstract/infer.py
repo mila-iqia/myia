@@ -22,7 +22,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractList, Possibilities, type_error_nargs, AbstractBase, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
-    bind
+    bind, build_type
 
 
 class InferenceEngine:
@@ -236,7 +236,7 @@ class InferenceEngine:
         """Get the property for a ref of a Constant node."""
         v = self.pipeline.resources.convert(ctref.node.value)
         res = from_value(v, ctref.context, ref=ctref)
-        t = res.build(TYPE)
+        t = build_type(res)
         if dtype.ismyiatype(t, dtype.Number):
             prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
             res.values[TYPE] = self.loop.create_pending_from_list(
