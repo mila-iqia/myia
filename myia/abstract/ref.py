@@ -131,6 +131,7 @@ class VirtualReference(AbstractReference):
         abstract: The inferred value.
 
     """
+
     abstract: 'AbstractBase'
 
     async def get(self):

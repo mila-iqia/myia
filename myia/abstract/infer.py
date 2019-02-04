@@ -184,12 +184,6 @@ class InferenceEngine:
             self.constructors[mg] = MetaGraphInferrer(mg.metagraph)
         return self.constructors[mg]
 
-    @_get_inferrer_for.register
-    def _get_inferrer_for(self, mg: MetaGraph):
-        if mg not in self.constructors:
-            self.constructors[mg] = MetaGraphInferrer(mg)
-        return self.constructors[mg]
-
     def get_inferrer_for(self, fn):
         tracking = getattr(fn, 'tracking_id', None)
         if tracking is None:
@@ -432,11 +426,8 @@ class GraphInferrer(BaseGraphInferrer):
     def __init__(self, graph, context):
         super().__init__()
         self._graph = graph
-        if context is None:
-            self.context = Context.empty()
-        else:
-            self.context = context.filter(graph)
-        assert self.context is not None
+        assert context is not None
+        self.context = context.filter(graph)
 
     def get_graph(self, engine, args):
         return self._graph
@@ -493,10 +484,8 @@ class VirtualInferrer(Inferrer):
 
 
 def _jinv(x):
-    if isinstance(x, AbstractJTagged):
-        return x.element
-    else:
-        raise MyiaTypeError('Expected JTagged')
+    assert isinstance(x, AbstractJTagged)
+    return x.element
 
 
 def _jtag(x):
