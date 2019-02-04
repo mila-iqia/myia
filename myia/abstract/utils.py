@@ -287,8 +287,8 @@ def sensitivity_transform(self, x: AbstractJTagged):
 #########
 
 
-@overload(bootstrap=True)
-def _amerge(self, x1: Possibilities, x2, loop, forced):
+@overload
+def _amerge(x1: Possibilities, x2, loop, forced):
     if x1.issuperset(x2):
         return x1
     if forced:
@@ -298,14 +298,14 @@ def _amerge(self, x1: Possibilities, x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: dtype.TypeMeta, x2, loop, forced):
+def _amerge(x1: dtype.TypeMeta, x2, loop, forced):
     if x1 != x2:
         raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
     return x1
 
 
 @overload
-def _amerge(self, x1: (dict, TrackDict), x2, loop, forced):
+def _amerge(x1: (dict, TrackDict), x2, loop, forced):
     if set(x1.keys()) != set(x2.keys()):
         # This shouldn't be possible at the moment
         raise AssertionError(f'Keys mismatch')
@@ -320,7 +320,7 @@ def _amerge(self, x1: (dict, TrackDict), x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: tuple, x2, loop, forced):
+def _amerge(x1: tuple, x2, loop, forced):
     if len(x1) != len(x2):
         raise MyiaTypeError(f'Tuple length mismatch')
     changes = False
@@ -334,7 +334,7 @@ def _amerge(self, x1: tuple, x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: AbstractScalar, x2, loop, forced):
+def _amerge(x1: AbstractScalar, x2, loop, forced):
     values = amerge(x1.values, x2.values, loop, forced)
     if forced or values is x1.values:
         return x1
@@ -342,7 +342,7 @@ def _amerge(self, x1: AbstractScalar, x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: AbstractFunction, x2, loop, forced):
+def _amerge(x1: AbstractFunction, x2, loop, forced):
     values = amerge(x1.values[VALUE], x2.values[VALUE], loop, forced)
     if forced or values is x1.values:
         return x1
@@ -350,7 +350,7 @@ def _amerge(self, x1: AbstractFunction, x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: AbstractTuple, x2, loop, forced):
+def _amerge(x1: AbstractTuple, x2, loop, forced):
     args1 = (x1.elements, x1.values)
     args2 = (x2.elements, x2.values)
     merged = amerge(args1, args2, loop, forced)
@@ -360,7 +360,7 @@ def _amerge(self, x1: AbstractTuple, x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: AbstractArray, x2, loop, forced):
+def _amerge(x1: AbstractArray, x2, loop, forced):
     args1 = (x1.element, x1.values)
     args2 = (x2.element, x2.values)
     merged = amerge(args1, args2, loop, forced)
@@ -370,7 +370,7 @@ def _amerge(self, x1: AbstractArray, x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: AbstractList, x2, loop, forced):
+def _amerge(x1: AbstractList, x2, loop, forced):
     args1 = (x1.element, x1.values)
     args2 = (x2.element, x2.values)
     merged = amerge(args1, args2, loop, forced)
@@ -380,7 +380,7 @@ def _amerge(self, x1: AbstractList, x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: AbstractClass, x2, loop, forced):
+def _amerge(x1: AbstractClass, x2, loop, forced):
     args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
     args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
     merged = amerge(args1, args2, loop, forced)
@@ -390,7 +390,7 @@ def _amerge(self, x1: AbstractClass, x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: AbstractJTagged, x2, loop, forced):
+def _amerge(x1: AbstractJTagged, x2, loop, forced):
     args1 = x1.element
     args2 = x2.element
     merged = amerge(args1, args2, loop, forced)
@@ -400,14 +400,14 @@ def _amerge(self, x1: AbstractJTagged, x2, loop, forced):
 
 
 @overload
-def _amerge(self, x1: (int, float, bool), x2, loop, forced):
+def _amerge(x1: (int, float, bool), x2, loop, forced):
     if forced and x1 != x2:
         raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
     return x1 if x1 == x2 else ANYTHING
 
 
 @overload
-def _amerge(self, x1: object, x2, loop, forced):
+def _amerge(x1: object, x2, loop, forced):
     if x1 != x2:
         raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
     return x1
