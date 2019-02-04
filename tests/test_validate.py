@@ -3,12 +3,11 @@ import pytest
 
 from myia.pipeline import scalar_pipeline, scalar_parse
 from myia.composite import list_map
-from myia.dtype import Array, Tuple, List, Int
 from myia.prim import ops as P
 from myia.prim.py_implementations import make_record, partial
 from myia.validate import validate as _validate, ValidationError
 
-from .common import L, i64, Point, Point_t, to_abstract
+from .common import i64, Point, Point_t, to_abstract
 
 
 Point_a = Point(i64, i64)

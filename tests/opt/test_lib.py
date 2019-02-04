@@ -1,6 +1,4 @@
 
-from .test_opt import _check_opt
-from myia import dtype
 from myia.composite import hyper_add
 from myia.opt import lib
 from myia.prim.py_implementations import \
@@ -9,8 +7,9 @@ from myia.prim.py_implementations import \
     scalar_usub, array_map, scalar_to_array, transpose
 from myia.utils import newenv
 
-
 from ..common import to_abstract, i64, f64, af64_of
+
+from .test_opt import _check_opt
 
 
 #######################

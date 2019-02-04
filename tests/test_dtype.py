@@ -1,11 +1,10 @@
-import asyncio
 import pytest
 import numpy
 from dataclasses import dataclass
 
 from myia.dtype import ismyiatype, Bool, Float, Function, Int, List, Number, \
     Tuple, UInt, SymbolicKeyType, np_dtype_to_type, type_to_np_dtype, Object, \
-    pytype_to_myiatype as ptm, Array, Class, External, JTagged, get_generic
+    pytype_to_myiatype as ptm, Array, Class, External, get_generic
 from myia.utils import SymbolicKeyInstance
 
 

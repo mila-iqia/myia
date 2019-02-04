@@ -3,11 +3,11 @@ import numpy as np
 from dataclasses import dataclass, is_dataclass
 from myia import dtype
 from myia.abstract import VALUE, TYPE, SHAPE, \
-    AbstractBase, AbstractScalar, AbstractArray, concretize_abstract, \
+    AbstractBase, AbstractScalar, AbstractArray, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged, ANYTHING
 from myia.dtype import Bool, Int, UInt, Float, List, Array, Tuple, Function, \
-    Object, pytype_to_myiatype, TypeType
+    Object, pytype_to_myiatype
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance
 

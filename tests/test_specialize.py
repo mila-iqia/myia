@@ -41,12 +41,12 @@ def _eq(t1: tuple, t2):
             and all(_eq(x1, x2) for x1, x2 in zip(t1, t2)))
 
 
-@overload
+@overload  # noqa: F811
 def _eq(a1: numpy.ndarray, a2):
     return (a1 == a2).all()
 
 
-@overload
+@overload  # noqa: F811
 def _eq(x: object, y):
     return x == y
 
@@ -367,6 +367,7 @@ def test_return_closure(x):
     def f(z):
         def g():
             return z
+
         def h():
             return f(z - 1)[0]()
         return (g, h)

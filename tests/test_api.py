@@ -3,7 +3,7 @@ import pytest
 
 from myia.api import myia
 from myia.cconv import closure_convert
-from myia.dtype import List, Array, Tuple, Bool
+from myia.dtype import Bool
 from myia.abstract import InferenceError
 from myia.ir import clone
 from myia.pipeline import \
@@ -11,8 +11,8 @@ from myia.pipeline import \
 from myia.pipeline.steps import convert_arg, convert_result
 from myia.prim.py_implementations import getitem
 
-from .common import Point, Point_t, Point3D, i64, f64, i16, to_abstract, \
-    ai64_of, ai32_of, af64_of
+from .common import Point, Point3D, i64, f64, to_abstract, ai64_of, \
+    ai32_of, af64_of
 
 
 def test_myia():

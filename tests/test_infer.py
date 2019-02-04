@@ -4,23 +4,17 @@ import operator
 import numpy as np
 
 from types import SimpleNamespace
-from dataclasses import is_dataclass
 
-from myia.abstract import VALUE, TYPE, SHAPE, \
-    AbstractBase, AbstractScalar, AbstractArray, concretize_abstract, \
-    AbstractList, AbstractTuple, AbstractType, AbstractClass, \
-    AbstractJTagged
+from myia.abstract import concretize_abstract
+from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
-from myia.dtype import Array as A, Int, Float, TypeType, External, \
-    Number, Class, Problem, EnvType as Env, JTagged as JT, ismyiatype, \
-    Array, Tuple, List
+from myia.dtype import Array as A, Int, External, \
+    Number, Class, EnvType as Env
 from myia.hypermap import HyperMap
-from myia.abstract import ANYTHING, VOID, InferenceError, \
-    Contextless, CONTEXTLESS
+from myia.abstract import ANYTHING, InferenceError, Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
-from myia.pipeline import pipeline_function
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, list_map as list_map_prim, \
@@ -30,12 +24,10 @@ from myia.prim.py_implementations import \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
     transpose
-from myia.utils import RestrictedVar, newenv, overload, EnvInstance
-from myia import dtype
+from myia.utils import newenv
 
-from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
-    li32, li64, lf64, ai16, ai32, ai64, af16, af32, af64, Nil, \
-    Point, Point_t, Point3D, Point3D_t, Thing, Thing_f, Thing_ftup, mysum, \
+from .common import B, T, L, i16, i32, i64, u64, f16, f32, f64, \
+    ai64, af64, Nil, Point, Point_t, Point3D, Thing, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, to_abstract
 
 
@@ -46,9 +38,6 @@ from .common import B, T, L, F, i16, i32, i64, u64, f16, f32, f64, \
 
 pyimpl_test = {}
 abstract_inferrer_cons_test = {}
-
-
-from myia.abstract.prim import UniformPrimitiveInferrer
 
 
 def _test_op(fn):
@@ -340,18 +329,18 @@ def test_tup(x, y):
 
 
 @infer((i64, i64, [i64]),
-        (i64, f64, InferenceError),
-        ([ai64_of(8, 3)], [ai64_of(4, 3)], [[ai64_of(ANYTHING, 3)]]),
-        (ai64_of(4, 7), ai64_of(4, 7), [ai64_of(4, 7)]),
-        (ai64_of(4, 7), ai64_of(9, 7), [ai64_of(ANYTHING, 7)]))
+       (i64, f64, InferenceError),
+       ([ai64_of(8, 3)], [ai64_of(4, 3)], [[ai64_of(ANYTHING, 3)]]),
+       (ai64_of(4, 7), ai64_of(4, 7), [ai64_of(4, 7)]),
+       (ai64_of(4, 7), ai64_of(9, 7), [ai64_of(ANYTHING, 7)]))
 def test_list(x, y):
     return [x, y]
 
 
 @infer((i64, i64, [i64]),
-        (f64, f64, [f64]),
-        ([f64], [f64], InferenceError),
-        (i64, f64, InferenceError))
+       (f64, f64, [f64]),
+       ([f64], [f64], InferenceError),
+       (i64, f64, InferenceError))
 def test_list_and_scalar(x, y):
     return [x, y, 3]
 
@@ -1061,16 +1050,6 @@ def test_infinite_mutual_recursion(x):
 )
 def test_shape(ary):
     return shape(ary)
-
-
-# TODO: keep or throw away?
-# @infer(shape=[
-#     ({'value': Point(2, 3)}, ClassShape({'x': NOSHAPE, 'y': NOSHAPE})),
-#     ({'value': [np.ones((2, 3)), np.ones((2, 3))]}, ListShape((2, 3))),
-#     ({'value': [np.ones((2, 2)), np.ones((2, 3))]}, ListShape((2, ANYTHING))),
-# ])
-# def test_shape2(val):
-#     return val
 
 
 @infer(

@@ -6,15 +6,14 @@ from myia.prim import ops as P
 from myia.prim.py_implementations import typeof
 from myia.abstract import (
     ANYTHING, MyiaTypeError,
-    AbstractScalar as _S, AbstractTuple as T, AbstractArray as A,
-    AbstractList as L, AbstractClass as C,
+    AbstractScalar as _S, AbstractTuple as T,
     AbstractJTagged, AbstractError, AbstractFunction,
     amerge,
     Possibilities as _Poss,
     VALUE, TYPE, DEAD
 )
 
-from .common import Point, to_abstract, i64, f32, Ty, af32_of
+from .common import Point, to_abstract, f32, Ty, af32_of
 
 
 def S(v=ANYTHING, t=None, s=None):

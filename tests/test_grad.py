@@ -9,7 +9,6 @@ from myia.abstract import from_value, AbstractJTagged
 from myia.pipeline import standard_resources, standard_pipeline
 from myia.composite import grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
-from myia.dtype import JTagged
 from myia.grad import J as realJ
 from myia.pipeline import pipeline_function, PipelineDefinition, steps
 from myia.pipeline.steps import Validator

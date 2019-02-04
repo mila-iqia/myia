@@ -1,10 +1,8 @@
 
 import pytest
 
-from myia.dtype import Int, Float, Function
 from myia.ir.anf import PARAMETER, Apply, Constant, Graph, Parameter
 from myia.prim import ops as primops
-from myia.utils import UNKNOWN
 
 
 def test_incoming():

@@ -11,7 +11,7 @@ from myia.prim.py_implementations import array_reduce, scalar_add
 from .test_compile import parse_compare
 from .test_grad import grad_test
 from .test_infer import infer_std, af64_of, af32_of
-from .common import af32, af64, MA, MB, MC, MD
+from .common import MA, MB, MC, MD
 
 
 MA = MA * 0.1
