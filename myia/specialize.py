@@ -165,7 +165,7 @@ class _GraphSpecializer:
         if len(choices) == 1:
             choice, = choices
             argrefs = [VirtualReference(v) for v in choice]
-            res = await inf(self.specializer.engine, None, argrefs)
+            res = await inf.run(self.specializer.engine, None, argrefs)
             self.specializer.infcaches[inf] = {choice: res}
             return choice, res
         else:

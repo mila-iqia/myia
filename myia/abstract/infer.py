@@ -13,7 +13,7 @@ from ..utils import Overload, Partializable, is_dataclass_type
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
 from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
-    GraphFunction, AbstractBase, PartialApplication, \
+    GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, \
     VALUE, TYPE, SHAPE, DummyFunction, \
@@ -77,7 +77,7 @@ class InferenceEngine:
         async def _run():
             inf = GraphInferrer(graph, empty_context)
             self.loop.schedule(
-                inf(self, None, argrefs)
+                inf.run(self, None, argrefs)
             )
 
         async def _check():
@@ -419,13 +419,25 @@ class Inferrer(Partializable):
         """Initialize the Inferrer."""
         self.cache = {}
 
-    async def __call__(self, engine, outref, argrefs):
+    async def run(self, engine, outref, argrefs):
+        """Run inference.
+
+        This typically calls the infer method on the abstract values
+        and caches the result. Some specific operations may work with
+        the References directly.
+
+        Arguments:
+            engine: The InferenceEngine
+            outref: A Reference to the output (could be None)
+            argrefs: A tuple of References to the arguments
+        """
         args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
             self.cache[args] = await self.infer(engine, *args)
         return self.cache[args]
 
     async def infer(self, engine, *args):
+        """Run inference on a tuple of abstract arguments."""
         raise NotImplementedError()
 
     def __repr__(self):
@@ -449,9 +461,10 @@ class TrackedInferrer(Inferrer):
         super().__init__()
         self.subinf = subinf
 
-    async def __call__(self, engine, outref, argrefs):
+    async def run(self, engine, outref, argrefs):
+        """Run the inference."""
         args = tuple([await ref.get() for ref in argrefs])
-        self.cache[args] = await self.subinf(engine, outref, argrefs)
+        self.cache[args] = await self.subinf.run(engine, outref, argrefs)
         return self.cache[args]
 
 
@@ -485,7 +498,7 @@ class BaseGraphInferrer(Inferrer):
         return argkey, self.context.add(g, argkey)
 
     async def infer(self, engine, *args):
-        """Infer the graph's output given the args."""
+        """Infer the abstract result given the abstract arguments."""
         g = self.get_graph(engine, args)
         nargs = len(g.parameters)
 
@@ -557,12 +570,13 @@ class PartialInferrer(Inferrer):
         self.fn = fn
         self.args = args
 
-    async def __call__(self, engine, outref, argrefs):
+    async def run(self, engine, outref, argrefs):
+        """Run the inference."""
         argvals = tuple([await ref.get() for ref in argrefs])
         if argvals not in self.cache:
             args = tuple(VirtualReference(arg)
                          for arg in self.args + argvals)
-            self.cache[argvals] = await self.fn(engine, outref, args)
+            self.cache[argvals] = await self.fn.run(engine, outref, args)
         return self.cache[argvals]
 
 
@@ -582,6 +596,7 @@ class VirtualInferrer(Inferrer):
         self.output = output
 
     async def infer(self, engine, *args):
+        """Check args against self.args and return self.output."""
         if len(args) != len(self.args):
             raise MyiaTypeError('Wrong number of arguments')
         for given, expected in zip(args, self.args):
@@ -610,13 +625,14 @@ class JInferrer(Inferrer):
                                         for poss in v])
         return AbstractJTagged(x)
 
-    async def __call__(self, engine, outref, argrefs):
+    async def run(self, engine, outref, argrefs):
+        """Run the inference."""
         args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
             jinv_args = tuple(self._jinv(a) for a in args)
             jinv_argrefs = tuple(VirtualReference(arg)
                                  for arg in jinv_args)
-            res = await self.fn(engine, None, jinv_argrefs)
+            res = await self.fn.run(engine, None, jinv_argrefs)
             res_wrapped = self._jtag(res)
             orig_fn = AbstractFunction(self.orig_fn)
             bparams = [sensitivity_transform(orig_fn)]
@@ -633,14 +649,19 @@ class JInferrer(Inferrer):
 
 
 async def _inf_helper(engine, inf, outref, argrefs, p):
-    result = await inf(engine, outref, argrefs)
+    result = await inf.run(engine, outref, argrefs)
     p.set_result(result)
 
 
 async def execute_inferrers(engine, inferrers, outref, argrefs):
+    """Execute a set of inferrers on a tuple of References.
+
+    The results of the inferrers will be bound together and an error will
+    be raised eventually if they cannot be merged.
+    """
     if len(inferrers) == 1:
         inf, = inferrers
-        return await inf(engine, outref, argrefs)
+        return await inf.run(engine, outref, argrefs)
 
     else:
         pending = []

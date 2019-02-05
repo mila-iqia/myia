@@ -630,7 +630,7 @@ async def _inf_list_append(engine,
 
 
 class _GetAttrInferrer(Inferrer):
-    async def __call__(self, engine, outref, argrefs):
+    async def run(self, engine, outref, argrefs):
         if len(argrefs) != 2:
             raise MyiaTypeError('Wrong number of arguments')
         r_data, r_item = argrefs
@@ -940,7 +940,7 @@ async def _inf_identity(engine, x):
 
 
 class _ResolveInferrer(Inferrer):
-    async def __call__(self, engine, outref, argrefs):
+    async def run(self, engine, outref, argrefs):
         if len(argrefs) != 2:
             raise MyiaTypeError('Wrong number of arguments')
         r_data, r_item = argrefs
@@ -989,7 +989,7 @@ async def _inf_partial(engine, fn, *args):
 
 
 class _EmbedInferrer(Inferrer):
-    async def __call__(self, engine, outref, argrefs):
+    async def run(self, engine, outref, argrefs):
         if len(argrefs) != 1:
             raise MyiaTypeError('Wrong number of arguments')
         xref, = argrefs
