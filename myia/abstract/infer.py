@@ -1,3 +1,4 @@
+"""Algorithms for inference."""
 
 import asyncio
 import numpy as np
@@ -24,7 +25,17 @@ from .utils import broaden as _broaden, sensitivity_transform, amerge, \
 
 
 class InferenceEngine:
-    """Infer various properties about nodes in graphs."""
+    """Infer various properties about nodes in graphs.
+
+    Attributes:
+        pipeline: The Pipeline we are running.
+        constructors: As an argument to __init__, a map from primitives
+            to inferrer classes, which will be instantiated automatically
+            by the InferenceEngine.
+        max_depth: Depth for constant propagation.
+        context_class: The class to use to instantiate contexts.
+
+    """
 
     def __init__(self,
                  pipeline,
@@ -87,7 +98,6 @@ class InferenceEngine:
 
     async def compute_ref(self, ref):
         """Compute the value associated to the Reference."""
-
         node = ref.node
         inferred = ref.node.abstract
 
@@ -111,6 +121,10 @@ class InferenceEngine:
         return self.cache.get(ref)
 
     async def forward_reference(self, orig, new):
+        """Set the inference result for orig to the result for new.
+
+        This sets an entry in reference_map from orig to new.
+        """
         self.reference_map[orig] = new
         return await self.get_inferred(new)
 
@@ -185,6 +199,7 @@ class InferenceEngine:
         return self.constructors[mg]
 
     def get_inferrer_for(self, fn):
+        """Return the Inferrer for the given function."""
         tracking = getattr(fn, 'tracking_id', None)
         if tracking is None:
             return self._get_inferrer_for(fn)
@@ -195,13 +210,14 @@ class InferenceEngine:
         return self.constructors[fn]
 
     async def execute(self, fn, *args):
+        """Infer the result of fn(*args)."""
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]
         argrefs = [VirtualReference(a) for a in args]
         return await execute_inferrers(self, infs, None, argrefs)
 
     async def infer_apply(self, ref):
-        """Get the property for a ref of an Apply node."""
+        """Infer the type of a ref of an Apply node."""
         ctx = ref.context
         n_fn, *n_args = ref.node.inputs
         # We await on the function node to get the inferrer
@@ -223,9 +239,9 @@ class InferenceEngine:
         )
 
     async def infer_constant(self, ctref):
-        """Get the property for a ref of a Constant node."""
+        """Infer the type of a ref of a Constant node."""
         v = self.pipeline.resources.convert(ctref.node.value)
-        res = from_value(v, ctref.context, ref=ctref)
+        res = to_abstract(v, ctref.context, ref=ctref)
         t = build_type(res)
         if dtype.ismyiatype(t, dtype.Number):
             prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
@@ -235,29 +251,40 @@ class InferenceEngine:
         return res
 
     def abstract_merge(self, *values):
+        """Merge a list of AbstractValues together."""
         return reduce(self._merge, values)
 
     def _merge(self, x1, x2):
         return amerge(x1, x2, loop=self.loop, forced=False)
 
-    def check_predicate(self, predicate, res):
-        if isinstance(predicate, tuple):
-            return any(self.check_predicate(p, res) for p in predicate)
-        elif dtype.ismyiatype(predicate):
-            return dtype.ismyiatype(res, predicate)
-        elif isinstance(predicate, type) \
-                and issubclass(predicate, AbstractBase):
-            return isinstance(res, predicate)
+    def check_predicate(self, predicate, x):
+        """Returns whether the predicate applies on x.
+
+        A predicate can be:
+            * A Myia type (dtype.Int[64] etc.)
+            * A Python class
+            * A callable that returns a boolean
+        """
+        if dtype.ismyiatype(predicate):
+            return dtype.ismyiatype(x, predicate)
+        elif isinstance(predicate, type):
+            return isinstance(x, predicate)
         elif callable(predicate):
-            return predicate(self, res)
+            return predicate(self, x)
         else:
             raise ValueError(predicate)  # pragma: no cover
 
-    def assert_predicate(self, predicate, res):
-        if not self.check_predicate(predicate, res):
-            raise MyiaTypeError(f'Expected {predicate}, not {res}')
+    def assert_predicate(self, predicate, x):
+        """Check that the predicate applies, raise error if not."""
+        if not self.check_predicate(predicate, x):
+            raise MyiaTypeError(f'Expected {predicate}, not {x}')
 
     def chk(self, predicate, *values):
+        """Merge all values and check that the predicate applies.
+
+        Some values may be Pending, in which case a check will be
+        scheduled when they are finally resolved.
+        """
         for value in values:
             if isinstance(value, Pending):
                 value.add_done_callback(
@@ -270,6 +297,10 @@ class InferenceEngine:
         return self.abstract_merge(*values)
 
     async def chkimm(self, predicate, *values):
+        """Merge values, check predicate, and return result.
+
+        Unlike chk, if the result is Pending, it will be resolved immediately.
+        """
         return await force_pending(self.chk(predicate, *values))
 
 
@@ -280,15 +311,30 @@ _number_types = [
 ]
 
 
-def from_value(v, context=None, ref=None, broaden=False):
-    a = to_abstract(v, context, ref)
+def from_value(v, broaden=False):
+    """Convert a value to an abstract value.
+
+    Arguments:
+        v: The value to convert.
+        broaden: If True, concrete values will be made more abstract, so e.g.
+            the value 1234 would become ANYTHING.
+    """
+    a = to_abstract(v, None, None)
     if broaden:
         a = _broaden(a, None)
     return a
 
 
 def to_abstract(v, context=None, ref=None):
-    """Translate the value to an abstract value."""
+    """Translate the value to an abstract value.
+
+    Arguments:
+        v: The value to convert.
+        context: The context in which the value was found, used if the value
+            is a Graph.
+        ref: The reference to the Constant we are converting, if there is one,
+            so that we can generate a tracking_id.
+    """
     ref = ref and ref.node
 
     if isinstance(v, Graph):
@@ -362,7 +408,15 @@ def to_abstract(v, context=None, ref=None):
 
 
 class Inferrer(Partializable):
+    """Infer the result of a function.
+
+    Attributes:
+        cache: Map tuples of abstract values to an abstract result.
+
+    """
+
     def __init__(self):
+        """Initialize the Inferrer."""
         self.cache = {}
 
     async def __call__(self, engine, outref, argrefs):
@@ -379,7 +433,19 @@ class Inferrer(Partializable):
 
 
 class TrackedInferrer(Inferrer):
+    """Wrap another inferrer to track a subset of uses.
+
+    A TrackedInferrer has its own cache that maps possible calls to
+    their results, but is ultimately backed by a different inferrer.
+    Multiple TrackedInferrers can be backed by the same Inferrer.
+
+    Attributes:
+        subinf: Inferrer to use.
+
+    """
+
     def __init__(self, subinf):
+        """Initialize the TrackedInferrer."""
         super().__init__()
         self.subinf = subinf
 
@@ -390,8 +456,24 @@ class TrackedInferrer(Inferrer):
 
 
 class BaseGraphInferrer(Inferrer):
+    """Base Inferrer for Graph and MetaGraph.
+
+    Attributes:
+        context: The context in which the Graph/MetaGraph is.
+
+    """
+
+    def __init__(self, context):
+        """Initialize a BaseGraphInferrer."""
+        super().__init__()
+        self.context = context
+
+    def get_graph(self, engine, args):
+        """Return the graph to use with the given args."""
+        raise NotImplementedError("Override in subclass")
 
     def make_context(self, engine, args):
+        """Create a Context object using the given args."""
         _, ctx = self._make_argkey_and_context(engine, args)
         return ctx
 
@@ -403,6 +485,7 @@ class BaseGraphInferrer(Inferrer):
         return argkey, self.context.add(g, argkey)
 
     async def infer(self, engine, *args):
+        """Infer the graph's output given the args."""
         g = self.get_graph(engine, args)
         nargs = len(g.parameters)
 
@@ -422,39 +505,54 @@ class BaseGraphInferrer(Inferrer):
 
 
 class GraphInferrer(BaseGraphInferrer):
+    """Inferrer for Graphs."""
 
     def __init__(self, graph, context):
-        super().__init__()
+        """Initialize a GraphInferrer."""
         self._graph = graph
         assert context is not None
-        self.context = context.filter(graph)
+        super().__init__(context.filter(graph))
 
     def get_graph(self, engine, args):
+        """Return the graph."""
         return self._graph
 
 
 class MetaGraphInferrer(BaseGraphInferrer):
+    """Inferrer for MetaGraphs.
+
+    MetaGraphInferrer caches generated graphs.
+    """
 
     def __init__(self, metagraph):
-        super().__init__()
+        """Initialize a MetaGraphInferrer."""
+        super().__init__(Context.empty())
         self.metagraph = metagraph
-        self.context = Context.empty()
         self.graph_cache = {}
 
-    def get_graph(self, engine, argvals):
-        if argvals not in self.graph_cache:
+    def get_graph(self, engine, args):
+        """Generate the graph for the given args."""
+        if args not in self.graph_cache:
             try:
-                g = self.metagraph.specialize_from_abstract(argvals)
+                g = self.metagraph.specialize_from_abstract(args)
             except GraphGenerationError as err:
                 raise MyiaTypeError(f'Graph gen error: {err}')
             g = engine.pipeline.resources.convert(g)
-            self.graph_cache[argvals] = g
-        return self.graph_cache[argvals]
+            self.graph_cache[args] = g
+        return self.graph_cache[args]
 
 
 class PartialInferrer(Inferrer):
+    """Inferrer for partial application.
+
+    Attributes:
+        fn: The Inferrer to use for the full list of arguments.
+        args: The partial arguments.
+
+    """
 
     def __init__(self, fn, args):
+        """Initialize a PartialInferrer."""
         super().__init__()
         self.fn = fn
         self.args = args
@@ -469,8 +567,16 @@ class PartialInferrer(Inferrer):
 
 
 class VirtualInferrer(Inferrer):
+    """Inferrer for a specific args/output pair.
+
+    Attributes:
+        args: The one set of legal abstract values.
+        output: The abstract result.
+
+    """
 
     def __init__(self, args, output):
+        """Initialize a VirtualInferrer."""
         super().__init__()
         self.args = args
         self.output = output
@@ -483,37 +589,36 @@ class VirtualInferrer(Inferrer):
         return self.output
 
 
-def _jinv(x):
-    assert isinstance(x, AbstractJTagged)
-    return x.element
-
-
-def _jtag(x):
-    if isinstance(x, AbstractFunction):
-        v = x.values[VALUE]
-        if isinstance(v, Possibilities):
-            return AbstractFunction(*[JTransformedFunction(poss)
-                                      for poss in v])
-    return AbstractJTagged(x)
-
-
 class JInferrer(Inferrer):
+    """Inferrer for a function transformed through J."""
 
     def __init__(self, fn, orig_fn):
+        """Initialize a JInferrer."""
         super().__init__()
         self.fn = fn
         self.orig_fn = orig_fn
 
+    def _jinv(self, x):
+        assert isinstance(x, AbstractJTagged)
+        return x.element
+
+    def _jtag(self, x):
+        if isinstance(x, AbstractFunction):
+            v = x.values[VALUE]
+            if isinstance(v, Possibilities):
+                return AbstractFunction(*[JTransformedFunction(poss)
+                                        for poss in v])
+        return AbstractJTagged(x)
+
     async def __call__(self, engine, outref, argrefs):
         args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
-            jinv_args = tuple(_jinv(a) for a in args)
+            jinv_args = tuple(self._jinv(a) for a in args)
             jinv_argrefs = tuple(VirtualReference(arg)
                                  for arg in jinv_args)
             res = await self.fn(engine, None, jinv_argrefs)
-            res_wrapped = _jtag(res)
+            res_wrapped = self._jtag(res)
             orig_fn = AbstractFunction(self.orig_fn)
-            # bparams = [sensitivity_transform(self.orig_fn)]
             bparams = [sensitivity_transform(orig_fn)]
             bparams += [sensitivity_transform(a) for a in args]
             bparams_final = AbstractTuple(bparams)

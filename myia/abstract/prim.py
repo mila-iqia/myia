@@ -37,7 +37,7 @@ from .data import (
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context
 from .utils import sensitivity_transform, build_value, build_type
-from .infer import Inferrer, from_value
+from .infer import Inferrer, to_abstract
 
 
 abstract_inferrer_constructors = {}
@@ -212,7 +212,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         elif item_v in data_t.methods:
             method = data_t.methods[item_v]
             method = resources.convert(method)
-            inferrer = from_value(method, Context.empty(), ref=outref)
+            inferrer = to_abstract(method, Context.empty(), ref=outref)
             fn = _prim_or_graph(inferrer)
             g = outref.node.graph
             eng = outref.engine
@@ -226,7 +226,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
     elif case == 'method':
         method, = args
         method = resources.convert(method)
-        inferrer = from_value(method, Context.empty(), ref=outref)
+        inferrer = to_abstract(method, Context.empty(), ref=outref)
         fn = _prim_or_graph(inferrer)
         g = outref.node.graph
         eng = outref.engine
@@ -267,7 +267,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
                             outref.context)
             return await eng.forward_reference(outref, ref)
         else:
-            return from_value(value, Context.empty(), ref=outref)
+            return to_abstract(value, Context.empty(), ref=outref)
 
 
 async def _resolve_case(resources, data_t, item_v, chk):

@@ -1,3 +1,5 @@
+"""Data structures to represent data in an abstract way, for inference."""
+
 
 from typing import Tuple
 from dataclasses import dataclass
@@ -151,14 +153,16 @@ class DummyFunction(Function):
 
 
 class AbstractBase:
-
-    def _make_key(self):
-        raise NotImplementedError()
+    """Base class for abstract data."""
 
     def key(self):
+        """Return a key for hash/equality purposes."""
         if not hasattr(self, '_key'):
             self._key = self._make_key()
         return self._key
+
+    def _make_key(self):
+        raise NotImplementedError()
 
     def __eq__(self, other):
         return type(self) is type(other) \
@@ -169,6 +173,19 @@ class AbstractBase:
 
 
 class AbstractValue(AbstractBase):
+    """Base class for all abstract values.
+
+    Attributes:
+        values: A dictionary mapping a Subtrack like VALUE or TYPE
+            to a value for that track. Different abstract structures
+            may have different tracks, e.g. SHAPE for arrays.
+        count: A "depth" count tracking the constant propagation
+            depth. The inference engine can be configured to broaden
+            an abstract value past a certain depth. Note that the count
+            is ignored for equality purposes.
+
+    """
+
     def __init__(self, values, count=0):
         """Initialize an AbstractValue."""
         self.values = TrackDict(values)
@@ -179,6 +196,8 @@ class AbstractValue(AbstractBase):
 
 
 class AbstractScalar(AbstractValue):
+    """Represents a scalar (integer, float, bool, etc.)."""
+
     def __repr__(self):
         contents = [f'{k}={v}' for k, v in self.values.items()
                     if v not in (ABSENT, ANYTHING)]
@@ -186,6 +205,8 @@ class AbstractScalar(AbstractValue):
 
 
 class AbstractType(AbstractValue):
+    """Represents a type as a first class value."""
+
     def __init__(self, typ):
         """Initialize an AbstractType."""
         super().__init__({VALUE: typ})
@@ -195,6 +216,8 @@ class AbstractType(AbstractValue):
 
 
 class AbstractError(AbstractValue):
+    """Represents some kind of error in the computation."""
+
     def __init__(self, err):
         """Initialize an AbstractError."""
         super().__init__({VALUE: err})
@@ -204,19 +227,42 @@ class AbstractError(AbstractValue):
 
 
 class AbstractFunction(AbstractValue):
+    """Represents a function or set of functions.
+
+    The VALUE track for an AbstractFunction contains a Possibilities object
+    which is a set of Functions that might be called at this point. These
+    functions must all return the same type of abstract data when called with
+    the same arguments.
+
+    Instead of a set of Possibilities, the VALUE can also be Pending.
+    """
+
     def __init__(self, *poss, value=None):
-        """Initialize an AbstractFunction."""
+        """Initialize an AbstractFunction.
+
+        Provide either *poss or value, not both.
+
+        Arguments:
+            poss: Possible Functions that could be called here.
+            value: Either Possibilities or Pending.
+        """
         v = Possibilities(poss) if value is None else value
         super().__init__({VALUE: v})
 
     async def get(self):
+        """Return a set of all possible Functions (asynchronous)."""
         v = self.values[VALUE]
         return (await v if isinstance(v, Pending) else v)
 
     def get_sync(self):
+        """Return a set of all possible Functions (synchronous)."""
         return self.values[VALUE]
 
     def get_unique(self):
+        """If there is exactly one possible function, return it.
+
+        Otherwise, raise a MyiaTypeError.
+        """
         poss = self.values[VALUE]
         if isinstance(poss, Pending):
             raise MyiaTypeError('get_unique invalid because Pending')
@@ -230,6 +276,8 @@ class AbstractFunction(AbstractValue):
 
 
 class AbstractTuple(AbstractValue):
+    """Represents a tuple of elements."""
+
     def __init__(self, elements, values=None):
         """Initialize an AbstractTuple."""
         super().__init__(values or {})
@@ -244,6 +292,18 @@ class AbstractTuple(AbstractValue):
 
 
 class AbstractArray(AbstractValue):
+    """Represents an array.
+
+    The SHAPE track on an array contains the array's shape.
+
+    Arrays must be homogeneous, hence a single AbstractValue is used to
+    represent every element.
+
+    Attributes:
+        element: AbstractValue representing each element of the array.
+
+    """
+
     def __init__(self, element, values):
         """Initialize an AbstractArray."""
         super().__init__(values)
@@ -257,6 +317,16 @@ class AbstractArray(AbstractValue):
 
 
 class AbstractList(AbstractValue):
+    """Represents a list.
+
+    Lists must be homogeneous, hence a single AbstractValue is used to
+    represent every element.
+
+    Attributes:
+        element: AbstractValue representing each element of the list.
+
+    """
+
     def __init__(self, element, values=None):
         """Initialize an AbstractList."""
         super().__init__(values or {})
@@ -270,6 +340,17 @@ class AbstractList(AbstractValue):
 
 
 class AbstractClass(AbstractValue):
+    """Represents a class, typically those defined using @dataclass.
+
+    Attributes:
+        tag: The class's name (a Named instance).
+        attributes: Maps each field name to a corresponding AbstractValue.
+        methods: Maps method names to corresponding functions, which will
+            be parsed and converted by the engine when necessary, with the
+            instance as the first argument.
+
+    """
+
     def __init__(self, tag, attributes, methods, values={}):
         """Initialize an AbstractClass."""
         super().__init__(values)
@@ -287,6 +368,8 @@ class AbstractClass(AbstractValue):
 
 
 class AbstractJTagged(AbstractValue):
+    """Represents a value (non-function) transformed through J."""
+
     def __init__(self, element):
         """Initialize an AbstractJTagged."""
         super().__init__({})
