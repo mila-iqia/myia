@@ -1,3 +1,4 @@
+"""Abstract data and type/shape inference."""
 
 from .loop import (  # noqa
     InferenceLoop,
@@ -7,6 +8,7 @@ from .loop import (  # noqa
     find_coherent_result,
     force_pending,
 )
+
 
 from .utils import (  # noqa
     build_value,

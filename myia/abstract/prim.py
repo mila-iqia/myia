@@ -1,3 +1,4 @@
+"""Inferrers for primitives."""
 
 import math
 import numpy as np
@@ -44,7 +45,15 @@ abstract_inferrer_constructors = {}
 
 
 class StandardInferrer(Inferrer):
+    """Generic inferrer for primitives.
+
+    Arguments:
+        infer: The inference function. Its arguments and type annotations
+            will be inspected and checked automatically.
+    """
+
     def __init__(self, infer):
+        """Initialize a StandardInferrer."""
         super().__init__()
         self._infer = infer
         data = inspect.getfullargspec(infer)
@@ -58,6 +67,7 @@ class StandardInferrer(Inferrer):
             self.typemap[data.args.index(name) - 1] = ann
 
     async def infer(self, engine, *args):
+        """Infer the abstract result given the abstract arguments."""
         if self.nargs is not None and len(args) != self.nargs:
             raise MyiaTypeError('Wrong number of arguments.')
         for i, arg in enumerate(args):
@@ -77,6 +87,7 @@ class StandardInferrer(Inferrer):
 
 
 def standard_prim(*prims):
+    """Decorator to define and register a StandardInferrer."""
     def deco(fn):
         xinf = StandardInferrer.partial(infer=fn)
         for prim in prims:
@@ -85,7 +96,17 @@ def standard_prim(*prims):
 
 
 class WithImplInferrer(Inferrer):
+    """Inferrer derived from an implementation.
+
+    Arguments:
+        impl: The implementation.
+        nolimit: Whether constant propagation through this implementation
+            should be limited by the max_depth parameter to an
+            InferenceEngine.
+    """
+
     def __init__(self, impl, nolimit=False):
+        """Initialize a WithImplInferrer."""
         super().__init__()
         self.impl = impl
         self.nolimit = nolimit
@@ -99,6 +120,15 @@ class WithImplInferrer(Inferrer):
         self.impl_data = data
 
     def run_impl(self, engine, args, outtype):
+        """Run the implementation on abstract data.
+
+        If nolimit is False, this takes into account engine.max_depth.
+
+        Arguments:
+            engine: The InferenceEngine
+            args: The abstract arguments
+            outtype: The output type to give to the result
+        """
         depth = max((arg.count for arg in args), default=0)
         if not self.nolimit and depth >= engine.max_depth:
             outval = ANYTHING
@@ -120,16 +150,31 @@ class WithImplInferrer(Inferrer):
 
 
 class UniformPrimitiveInferrer(WithImplInferrer):
+    """Inferrer derived from an implementation, requiring uniform types.
+
+    If multiple arguments are AbstractScalars, they will all be required
+    to have the same type, e.g. all Int[64] or all Float[32].
+
+    Arguments:
+        impl: The implementation.
+        nolimit: Whether constant propagation through this implementation
+            should be limited by the max_depth parameter to an
+            InferenceEngine.
+    """
+
     def __init__(self, impl, nolimit=False):
+        """Initialize a UniformPrimitiveInferrer."""
         super().__init__(impl, nolimit)
         data = self.impl_data
         self.typemap = defaultdict(list)
+        # We group the arguments with the same types together.
         for i, arg in enumerate(data.args):
             self.typemap[data.annotations[arg]].append(i)
         self.outtype = data.annotations['return']
         self.nolimit = nolimit
 
     async def infer(self, engine, *args):
+        """Infer the abstract result given the abstract arguments."""
         if len(args) != self.nargs:
             raise MyiaTypeError('Wrong number of arguments.')
 
@@ -138,6 +183,7 @@ class UniformPrimitiveInferrer(WithImplInferrer):
             raise MyiaTypeError('Expected scalar')
         ts = [arg.values[TYPE] for arg in args]
         for typ, indexes in self.typemap.items():
+            # Each group is merged using chk
             selection = [ts[i] for i in indexes]
             res = engine.chk(typ, *selection)
             if typ == self.outtype:
@@ -147,6 +193,13 @@ class UniformPrimitiveInferrer(WithImplInferrer):
 
 
 def uniform_prim(prim, nolimit=False):
+    """Decorator to define and register a UniformPrimitiveInferrer.
+
+    Arguments:
+        prim: The primitive for which the inferrer is defined.
+        nolimit: Whether to limit constant propagation through this
+            operation or not.
+    """
     def deco(fn):
         xinf = UniformPrimitiveInferrer.partial(impl=fn, nolimit=nolimit)
         abstract_inferrer_constructors[prim] = xinf
@@ -162,6 +215,7 @@ class MyiaAttributeError(InferenceError):
 
 
 def _prim_or_graph(afn):
+    # Check that afn represents a single Primitive/Graph and return it.
     assert isinstance(afn, AbstractFunction)
     fn = afn.get_unique()
     if isinstance(fn, PrimitiveFunction):
@@ -182,8 +236,11 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         data: A ref to the data.
         item: A ref to the item/attribute.
         fetch: A function to resolve the item on the data.
+        on_dcattr: A function to resolve an attribute on a dataclass.
         chk: A function to check the values inferred for the
             data and item.
+        dataref: The Reference to the data.
+        outref: The Reference to the output.
     """
     from ..abstract import Reference
 
@@ -308,6 +365,7 @@ def prod(iterable):
 
 
 async def issubtype(x, model):
+    """Check whether type x is a subtype of model."""
     if model is dtype.Object:
         return True
     elif model is dtype.Tuple:
