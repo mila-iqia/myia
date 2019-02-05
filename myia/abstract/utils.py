@@ -1,3 +1,4 @@
+"""Utilities for abstract values and inference."""
 
 from functools import reduce
 from itertools import chain
@@ -8,22 +9,11 @@ from ..utils import overload
 from .loop import Pending, is_simple, PendingTentative
 from .ref import Reference, Context
 
-from .data import (  # noqa
+from .data import (
     ABSENT,
     ANYTHING,
-    VOID,
-    DEAD,
-    POLY,
-    NOTVISIBLE,
     Possibilities,
-    GraphFunction,
-    PartialApplication,
-    JTransformedFunction,
-    VirtualFunction,
-    TypedPrimitive,
-    DummyFunction,
     AbstractBase,
-    AbstractValue,
     AbstractScalar,
     AbstractType,
     AbstractError,
@@ -34,11 +24,8 @@ from .data import (  # noqa
     AbstractClass,
     AbstractJTagged,
     TrackDict,
-    Subtrack,
     VALUE,
     TYPE,
-    SHAPE,
-    InferenceError,
     MyiaTypeError,
 )
 
@@ -49,6 +36,17 @@ from .data import (  # noqa
 
 
 def build_value(a, default=ABSENT):
+    """Build a concrete value out of an abstract one.
+
+    A concrete value cannot be built if, for some abstract data, the inferred
+    value is ANYTHING. Some types such as AbstractArray cannot be built
+    either.
+
+    Arguments:
+        a: The abstract value.
+        default: A default value to return if the value cannot be built.
+            If not provided, a ValueError will be raised in those cases.
+    """
     def return_default(err):
         if default is ABSENT:
             raise err
@@ -95,6 +93,7 @@ def _build_value(ac: AbstractClass):
 
 @overload(bootstrap=True)
 def build_type(self, x: AbstractScalar):
+    """Build a type from an abstract value."""
     t = x.values[TYPE]
     if isinstance(t, Pending) and t.done():
         t = t.result()
@@ -152,6 +151,7 @@ def build_type(self, x: AbstractType):
 
 @overload(bootstrap=True)
 def abstract_clone(self, x: AbstractScalar, *args):
+    """Clone an abstract value."""
     return AbstractScalar(self(x.values, *args))
 
 
@@ -210,6 +210,7 @@ def abstract_clone(self, x: object, *args):
 
 @overload(bootstrap=True)
 async def abstract_clone_async(self, x: AbstractScalar):
+    """Clone an abstract value (asynchronous)."""
     return AbstractScalar(await self(x.values))
 
 
@@ -264,6 +265,7 @@ async def abstract_clone_async(self, x: object):
 
 @abstract_clone_async.variant
 async def concretize_abstract(self, x: Pending):
+    """Clone an abstract value while resolving all Pending (asynchronous)."""
     return await self(await x)
 
 
@@ -293,6 +295,15 @@ async def concretize_abstract(self, ctx: Context):
 
 @abstract_clone.variant
 def broaden(self, d: TrackDict, loop):
+    """Broaden an abstract value.
+
+    * Concrete values such as 1 or True will be broadened to ANYTHING.
+    * Possibilities will be broadened to PendingTentative.
+
+    Arguments:
+        d: The abstract data to clone.
+        loop: The InferenceLoop, used to broaden Possibilities.
+    """
     return {k: k.broaden(v, self, loop) for k, v in d.items()}
 
 
@@ -306,6 +317,8 @@ def broaden(self, p: Possibilities, loop):
     if loop is None:
         return p
     else:
+        # Broadening Possibilities creates a PendingTentative. This allows
+        # us to avoid resolving them earlier than we would like.
         return loop.create_pending_tentative(tentative=p)
 
 
@@ -316,6 +329,11 @@ def broaden(self, p: Possibilities, loop):
 
 @abstract_clone.variant
 def sensitivity_transform(self, x: AbstractFunction):
+    """Return an abstract value for the sensitivity of x.
+
+    * The sensitivity of a function is an Env
+    * The sensitivity of J(x) is x
+    """
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.EnvType,
@@ -459,17 +477,38 @@ def _amerge(x1: object, x2, loop, forced):
 
 
 def amerge(x1, x2, loop, forced, accept_pending=True):
+    """Merge two values.
+
+    If forced is False, amerge will return a superset of x1 and x2, if it
+    exists.
+
+    If the forced argument is True, amerge will either return x1 or fail.
+    This makes a difference in some situations:
+
+        * amerge(1, 2, forced=False) => ANYTHING
+        * amerge(1, 2, forced=True) => Error
+        * amerge(ANYTHING, 1234, forced=True) => ANYTHING
+        * amerge(1234, ANYTHING, forced=True) => Error
+
+    Arguments:
+        x1: The first value to merge
+        x2: The second value to merge
+        loop: The InferenceLoop
+        forced: Whether we are already committed to returning x1 or not.
+        accept_pending: Whether we accept to merge two Pending, unresolved
+            values.
+    """
     isp1 = isinstance(x1, Pending)
     isp2 = isinstance(x2, Pending)
     if isp1 and x1.done():
-        assert forced is False  # TODO: fix this?
+        assert forced is False  # TODO: handle this case?
         x1 = x1.result()
         isp1 = False
     if isp2 and x2.done():
         x2 = x2.result()
         isp2 = False
     if isinstance(x1, PendingTentative):
-        assert not x1.done()  # TODO: fix this?
+        assert not x1.done()  # TODO: handle this case?
         x1.tentative = amerge(x1.tentative, x2, loop, False, True)
         return x1
     if (isp1 or isp2) and not accept_pending:
@@ -495,7 +534,15 @@ def amerge(x1, x2, loop, forced, accept_pending=True):
 
 
 def bind(loop, committed, resolved, pending):
+    """Bind Pendings together.
 
+    Arguments:
+        loop: The InferenceLoop.
+        committed: Either None, or an abstract value that we are already
+            committed to, which will force the merge to return that value.
+        resolved: A set of Pendings that have already been resolved.
+        pending: A set of unresolved Pendings.
+    """
     def amergeall():
         if committed is None:
             v = reduce(lambda x1, x2: amerge(x1, x2,
@@ -531,20 +578,26 @@ def bind(loop, committed, resolved, pending):
         p.add_done_callback(resolve)
 
     def premature_resolve():
+        # This is what force_resolve() on the result will do
         nonlocal committed
+        # We merge what we have so far
         committed = amergeall()
+        # We broaden the result so that the as-of-yet unresolved stuff
+        # can be merged more easily.
         committed = broaden(committed, loop)
         resolved.clear()
         return committed
 
     def priority():
+        # Cannot force resolve unless we have at least one resolved Pending
         if not resolved and committed is None:
             return None
         if any(is_simple(x) for x in chain([committed], resolved, pending)):
             return 1000
-        return prio
+        return -1000
 
     if any(is_simple(x) for x in chain(resolved, pending)):
+        # rval = None because we will not make a new Pending
         rval = None
 
         if pending:
@@ -562,9 +615,6 @@ def bind(loop, committed, resolved, pending):
             return p
 
     else:
-        prio = (-1000
-                if any(p.priority() is None for p in pending)
-                else min(p.priority() for p in pending) - 1)
         rval = loop.create_pending(
             resolve=premature_resolve,
             priority=priority,

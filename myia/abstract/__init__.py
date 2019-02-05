@@ -1,7 +1,6 @@
 
 from .loop import (  # noqa
     InferenceLoop,
-    InferenceTask,
     Pending,
     PendingFromList,
     PendingTentative,

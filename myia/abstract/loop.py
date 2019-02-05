@@ -1,16 +1,10 @@
-"""Core of the inference engine (not Myia-specific)."""
+"""Asyncio-related code for inference."""
 
 import asyncio
 from contextvars import copy_context
 from collections import deque
 
 from ..dtype import ismyiatype
-
-
-class InferenceTask(asyncio.Task):
-    def __init__(self, coro, loop, key=None):
-        super().__init__(coro, loop=loop)
-        self.key = key
 
 
 class InferenceLoop(asyncio.AbstractEventLoop):
@@ -36,7 +30,15 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         return False
 
     def _resolve_var(self):
+        """Try to forcefully resolve one variable to resume execution.
+
+        For example, if the code contains the literal 1.0, we let its type
+        be determined by variables it interacts with, but if there is nothing
+        else to do, we may force it to Float[64].
+        """
+        # Filter out all done tasks
         varlist = [fut for fut in self._vars if not fut.done()]
+        # Filter out priority-less tasks, which cannot be forced
         later = [fut for fut in varlist if fut.priority() is None]
         varlist = [fut for fut in varlist if fut.priority() is not None]
         self._vars = later
@@ -83,8 +85,6 @@ class InferenceLoop(asyncio.AbstractEventLoop):
             fut = ctx.run(asyncio.ensure_future, x, loop=self)
         else:
             fut = asyncio.ensure_future(x, loop=self)
-        if isinstance(fut, InferenceTask):
-            fut.key = context_map
         self._tasks.append(fut)
         return fut
 
@@ -126,25 +126,37 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
     def create_task(self, coro):
         """Create a task from the given coroutine."""
-        return InferenceTask(coro, loop=self)
+        return asyncio.Task(coro, loop=self)
 
-    def create_pending(self, resolve, priority, parents=()):
+    def create_pending(self, resolve, priority):
+        """Create a Pending associated to this loop."""
         pending = Pending(resolve=resolve, priority=priority, loop=self)
         self._vars.append(pending)
         return pending
 
     def create_pending_from_list(self, poss, dflt, priority):
+        """Create a PendingFromList associated to this loop."""
         pending = PendingFromList(poss, dflt, priority, loop=self)
         self._vars.append(pending)
         return pending
 
     def create_pending_tentative(self, tentative):
+        """Create a PendingTentative associated to this loop."""
         pending = PendingTentative(tentative=tentative, loop=self)
         self._vars.append(pending)
         return pending
 
 
 def is_simple(x):
+    """Returns whether data or a Pending is considered "simple".
+
+    "Simple" data is merged by identity, whereas this may not be the case
+    for non-simple data, e.g. Possibilities are merged using set union, and
+    distinct numbers e.g. 2 and 3 are merged into ANYTHING.
+
+    Simple data can be forced more easily because it won't cause problems
+    if we find more values to merge along.
+    """
     from .data import AbstractScalar, TYPE
     if isinstance(x, Pending):
         return x.is_simple()
@@ -157,7 +169,21 @@ def is_simple(x):
 
 
 class Pending(asyncio.Future):
+    """Represents pending data.
+
+    Attributes:
+        resolve: A function to call to resolve this Pending.
+        priority: A nullary function that returns either None (if
+            this Pending cannot be forced) or an integer. Pendings
+            with higher priority will be merged first.
+        loop: The InferenceLoop this Pending is attached to.
+        equiv: A set of Pendings that this Pending is being merged
+            with.
+
+    """
+
     def __init__(self, resolve, priority, loop):
+        """Initialize the Pending."""
         super().__init__(loop=loop)
         self.priority = priority
         if resolve is not None:
@@ -165,13 +191,18 @@ class Pending(asyncio.Future):
         self.equiv = {self}
 
     def is_simple(self):
+        """Return whether this Pending is simple or not.
+
+        By default, this returns False.
+        """
         return False
 
     def force_resolve(self):
-        """Resolve to the default value."""
+        """Force a resolution."""
         self.set_result(self._resolve())
 
     def tie(self, other):
+        """Tie to another Pending."""
         assert isinstance(other, Pending)
         self.equiv |= other.equiv
         e = self.equiv
@@ -180,7 +211,20 @@ class Pending(asyncio.Future):
 
 
 class PendingFromList(Pending):
+    """Represents a Pending that can take a value from a set.
+
+    Attributes:
+        possibilities: The set of values the Pending can take.
+        default: The default value if we are forcing resolution.
+        priority: A nullary function that returns either None (if
+            this Pending cannot be forced) or an integer. Pendings
+            with higher priority will be merged first.
+        loop: The InferenceLoop this Pending is attached to.
+
+    """
+
     def __init__(self, possibilities, default, priority, loop):
+        """Initialize the PendingFromList."""
         super().__init__(
             resolve=None,
             priority=priority,
@@ -190,6 +234,7 @@ class PendingFromList(Pending):
         self.possibilities = possibilities
 
     def is_simple(self):
+        """Returns whether all possibilities are simple."""
         return all(is_simple(p) for p in self.possibilities)
 
     def _resolve(self):
@@ -203,7 +248,13 @@ class PendingFromList(Pending):
 
 
 class PendingTentative(Pending):
+    """Represents a Pending with a tentative resolution.
+
+    The tentative result may be updated until the Pending is done.
+    """
+
     def __init__(self, tentative, loop):
+        """Initialize the PendingTentative."""
         super().__init__(
             resolve=None,
             priority=self._priority,
@@ -213,8 +264,7 @@ class PendingTentative(Pending):
 
     def _priority(self):
         if isinstance(self.tentative, Pending):
-            assert False  # TODO
-            return None
+            raise NotImplementedError()
         else:
             return -1001
 
@@ -224,6 +274,12 @@ class PendingTentative(Pending):
 
 
 async def find_coherent_result(v, fn):
+    """Return fn(v) without fully resolving v, if possible.
+
+    If v is a PendingFromList and fn(x) is the same for every x in v,
+    this will return that result without resolving which possibility
+    v is. Otherwise, v will be resolved.
+    """
     if isinstance(v, PendingFromList):
         results = set()
         for option in v.possibilities:
@@ -235,6 +291,7 @@ async def find_coherent_result(v, fn):
 
 
 async def force_pending(v):
+    """Resolve v if v is Pending, otherwise return v directly."""
     if isinstance(v, Pending):
         return await v
     else:
