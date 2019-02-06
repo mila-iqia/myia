@@ -8,7 +8,7 @@ from myia.abstract import (
     ANYTHING, MyiaTypeError,
     AbstractScalar as _S, AbstractTuple as T,
     AbstractJTagged, AbstractError, AbstractFunction,
-    amerge,
+    InferenceLoop, build_value, amerge,
     Possibilities as _Poss,
     VALUE, TYPE, DEAD
 )
@@ -30,6 +30,26 @@ def Poss(*things):
     })
 
 
+def test_build_value():
+    assert build_value(S(1)) == 1
+    with pytest.raises(ValueError):
+        build_value(S(t=ty.Int[64]))
+    assert build_value(S(t=ty.Int[64]), default=ANYTHING) is ANYTHING
+
+    assert build_value(T([S(1), S(2)])) == (1, 2)
+
+    loop = InferenceLoop(errtype=Exception)
+    p = loop.create_pending(resolve=(lambda: None), priority=(lambda: None))
+    with pytest.raises(ValueError):
+        assert build_value(S(p)) is p
+    assert build_value(S(p), default=ANYTHING) is ANYTHING
+    p.set_result(1234)
+    assert build_value(S(p)) == 1234
+
+    pt = Point(1, 2)
+    assert build_value(to_abstract(pt)) == pt
+
+
 def test_merge():
     a = T([S(1), S(t=ty.Int[64])])
     b = T([S(1), S(t=ty.Int[64])])
@@ -41,6 +61,13 @@ def test_merge():
 
     with pytest.raises(MyiaTypeError):
         amerge(a, c, loop=None, forced=True)
+
+    assert amerge(1, 2, loop=None, forced=False) is ANYTHING
+    with pytest.raises(MyiaTypeError):
+        assert amerge(1, 2, loop=None, forced=True)
+
+    with pytest.raises(MyiaTypeError):
+        assert amerge("hello", "world", loop=None, forced=False)
 
 
 def test_merge_possibilities():
