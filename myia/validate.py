@@ -5,7 +5,7 @@ from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
 from .abstract import abstract_clone, AbstractClass, AbstractJTagged, \
-    AbstractScalar, TYPE, VALUE, AbstractType, DEAD
+    AbstractScalar, TYPE, VALUE, AbstractType, DEAD, AbstractError
 
 
 class ValidationError(Exception):
@@ -26,11 +26,10 @@ def validate_abstract(self, a: AbstractScalar):
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: AbstractType):
-    t = a.values[VALUE]
-    if ismyiatype(t, Problem):
-        if t.kind is not DEAD:
-            raise ValidationError(f'Illegal type in the graph: {a}')
+def validate_abstract(self, a: AbstractError):
+    kind = a.values[VALUE]
+    if kind is not Problem[DEAD]:
+        raise ValidationError(f'Illegal type in the graph: {a}')
 
 
 @overload  # noqa: F811

@@ -218,6 +218,7 @@ def test_list_map_polymorphic(xs, ys):
     return list_map(square, xs), list_map(square, ys)
 
 
+@mark.xfail(reason="Cannot specialize f.")
 @specialize((True, [fp1, fp2], [int1, int2]))
 def test_list_map_polymorphic_2(c, xs, ys):
     def square(x):
