@@ -1752,6 +1752,31 @@ def test_J_array(xs):
 
 
 @infer_std(
+    (f64, InferenceError)
+)
+def test_J_bprop_invalid(x):
+    def f(x):
+        return x * x
+    _, bprop = J(f)(J(x))
+    return bprop(1.0, 1.0)
+
+
+@infer_std(
+    (f64, (f64, f64))
+)
+def test_J_return_function(x):
+    def f(y):
+        return y * y
+    def g():
+        return f
+
+    jg, _ = J(g)()
+    jy, bprop = jg(J(x))
+    _, dy = bprop(1.0)
+    return Jinv(jy), dy
+
+
+@infer_std(
     (f32, f32, f32),
     (i16, i16, i16),
 )

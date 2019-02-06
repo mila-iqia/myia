@@ -392,7 +392,7 @@ def to_abstract(v, context=None, ref=None):
 
     elif isinstance(v, list):
         if len(v) == 0:
-            raise Exception('No support for empty lists yet.')
+            raise NotImplementedError('No support for empty lists yet.')
         return AbstractList(to_abstract(v[0], context))
 
     elif dtype.ismyiatype(v):
@@ -617,12 +617,11 @@ class JInferrer(Inferrer):
         assert isinstance(x, AbstractJTagged)
         return x.element
 
-    def _jtag(self, x):
+    async def _jtag(self, x):
         if isinstance(x, AbstractFunction):
-            v = x.values[VALUE]
-            if isinstance(v, Possibilities):
-                return AbstractFunction(*[JTransformedFunction(poss)
-                                        for poss in v])
+            v = await x.get()
+            return AbstractFunction(*[JTransformedFunction(poss)
+                                      for poss in v])
         return AbstractJTagged(x)
 
     async def run(self, engine, outref, argrefs):
@@ -633,7 +632,7 @@ class JInferrer(Inferrer):
             jinv_argrefs = tuple(VirtualReference(arg)
                                  for arg in jinv_args)
             res = await self.fn.run(engine, None, jinv_argrefs)
-            res_wrapped = self._jtag(res)
+            res_wrapped = await self._jtag(res)
             orig_fn = AbstractFunction(self.orig_fn)
             bparams = [sensitivity_transform(orig_fn)]
             bparams += [sensitivity_transform(a) for a in args]

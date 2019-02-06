@@ -264,7 +264,8 @@ class AbstractFunction(AbstractValue):
         Otherwise, raise a MyiaTypeError.
         """
         poss = self.values[VALUE]
-        if isinstance(poss, Pending):
+        if isinstance(poss, Pending):  # pragma: no cover
+            # This is a bit circumstantial and difficult to test explicitly
             raise MyiaTypeError('get_unique invalid because Pending')
         if len(poss) != 1:
             raise MyiaTypeError(f'Expected unique function, not {poss}')

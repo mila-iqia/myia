@@ -612,7 +612,7 @@ def bind(loop, committed, resolved, pending):
             for p in pending:
                 if is_simple(p):
                     return p
-            assert False  # unreachable
+            raise AssertionError('unreachable')
 
     else:
         rval = loop.create_pending(
