@@ -800,8 +800,8 @@ async def _inf_broadcast_shape(engine, xs: _shape_type, ys: _shape_type):
     else:
         try:
             res = broadcast_shape(shp_x, shp_y)
-        except ValueError:
-            raise MyiaTypeError('Cannot broadcast')
+        except ValueError as e:
+            raise MyiaShapeError(e.args[0])
         for n in res:
             elems.append(AbstractScalar({
                 VALUE: n,

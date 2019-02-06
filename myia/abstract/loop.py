@@ -73,7 +73,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
     def call_exception_handler(self, ctx):
         if 'exception' in ctx:
-            raise ctx['exception']
+            self._errors.append(ctx['exception'])
         else:
             raise AssertionError('call_exception_handler', ctx)
 

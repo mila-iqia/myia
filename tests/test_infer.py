@@ -110,11 +110,10 @@ def inferrer_decorator(pipeline):
                     try:
                         out()
                     except expected_out as e:
-                        # if issubclass(expected_out, InferenceError):
-                        #     print_inference_error(e)
-                        # else:
-                        #     pass
-                        pass
+                        if issubclass(expected_out, InferenceError):
+                            print_inference_error(e)
+                        else:
+                            pass
                     else:
                         raise Exception(
                             f'Expected {expected_out}, got: (see stdout).'

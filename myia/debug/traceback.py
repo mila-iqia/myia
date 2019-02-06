@@ -4,7 +4,7 @@ import ast
 import sys
 from colorama import Fore, Style
 
-from ..abstract import InferenceError, Inferrer
+from ..abstract import InferenceError, Inferrer, Reference
 from ..utils import eprint
 
 from .label import label
@@ -54,20 +54,10 @@ def _show_location(loc, ctx, label):
 
 
 def _format_context(ctx):
-
-    def fromsig(sig):
-        sig = dict(sig)
-        t = sig['type']
-        shp = sig['shape']
-        if shp:
-            return f'{t}:{shp}'
-        else:
-            return t
-
     g = ctx.graph
     if g is None:
         return '<unknown>'
-    args = [f'{label(p)}: {fromsig(t)}'
+    args = [f'{label(p)}: {t}'
             for (p, t) in zip(g.parameters, ctx.argkey)]
     return label(g), f'({", ".join(args)})'
 
@@ -100,7 +90,8 @@ def _get_main(ref):
     return g, ctx
 
 
-async def _myia_traceback(engine, error):
+def print_inference_error(error):
+    """Print an InferenceError's traceback."""
     refs = [*error.traceback_refs.values()]
     ref = None
     for i, ref in enumerate(refs):
@@ -121,10 +112,11 @@ async def _myia_traceback(engine, error):
         fstr, argstr = None, None
         if ref is not None and ref.node.is_apply():
             ctx = ref.context
-            irefs = [engine.ref(node, ctx) for node in ref.node.inputs]
+            irefs = [Reference(ref.engine, node, ctx)
+                     for node in ref.node.inputs]
             fn_ref, *_ = irefs
             try:
-                fn_type, *arg_types = [await iref['type'] for iref in irefs]
+                fn_type, *arg_types = [iref.get_sync() for iref in irefs]
                 fstr = _label(fn_ref.node, fn_type) or '<function>'
                 argstr = "(" + ", ".join(map(str, arg_types)) + ")"
             except InferenceError:
@@ -136,15 +128,9 @@ async def _myia_traceback(engine, error):
 _previous_excepthook = sys.excepthook
 
 
-def print_inference_error(err):
-    """Print an InferenceError's traceback."""
-    eng = err.engine
-    eng.run_coroutine(_myia_traceback(eng, err), throw=True)
-
-
 def myia_excepthook(exc_type, exc_value, tb):
     """Print out InferenceError specially."""
-    if isinstance(exc_value, InferenceError) and hasattr(exc_value, 'engine'):
+    if isinstance(exc_value, InferenceError):
         print_inference_error(exc_value)
     else:
         _previous_excepthook(exc_type, exc_value, tb)

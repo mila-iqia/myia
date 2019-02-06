@@ -199,6 +199,14 @@ def abstract_clone(self, x: AbstractJTagged, *args):
 
 
 @overload  # noqa: F811
+def abstract_clone(self, x: Pending, *args):
+    if x.done():
+        return self(x.result(), *args)
+    else:
+        return x
+
+
+@overload  # noqa: F811
 def abstract_clone(self, x: object, *args):
     return x
 
