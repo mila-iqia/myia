@@ -1039,7 +1039,7 @@ abstract_inferrer_constructors[P.resolve] = _ResolveInferrer.partial()
 
 @standard_prim(P.partial)
 async def _inf_partial(engine, fn, *args):
-    fns = fn.values[VALUE]
+    fns = await fn.get()
     assert isinstance(fns, Possibilities)
     return AbstractFunction(*[
         PartialApplication(fn, args) for fn in fns

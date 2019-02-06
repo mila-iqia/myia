@@ -775,12 +775,9 @@ class GradOperation(MetaGraph):
         """Generate the graph."""
         ft, = args
         assert isinstance(ft, AbstractFunction)
-        poss = ft.values[VALUE]
-        assert isinstance(poss, Possibilities)
-        assert len(poss) == 1
-        for g in poss:
-            assert isinstance(g, GraphFunction)
-            g = g.graph
+        gf = ft.get_unique()
+        assert isinstance(gf, GraphFunction)
+        g = gf.graph
 
         dfbuilder = Graph()
         dfbuilder.debug.name = f"grad{len(g.parameters)}"

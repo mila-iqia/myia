@@ -157,7 +157,7 @@ def abstract_clone(self, x: AbstractScalar, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractFunction, *args):
-    return AbstractFunction(value=self(x.values[VALUE], *args))
+    return AbstractFunction(value=self(x.get_sync(), *args))
 
 
 @overload  # noqa: F811
@@ -216,7 +216,7 @@ async def abstract_clone_async(self, x: AbstractScalar):
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractFunction):
-    return AbstractFunction(*(await self(x.values[VALUE])))
+    return AbstractFunction(*(await self(x.get_sync())))
 
 
 @overload  # noqa: F811
@@ -406,7 +406,7 @@ def _amerge(x1: AbstractScalar, x2, loop, forced):
 
 @overload  # noqa: F811
 def _amerge(x1: AbstractFunction, x2, loop, forced):
-    values = amerge(x1.values[VALUE], x2.values[VALUE], loop, forced)
+    values = amerge(x1.get_sync(), x2.get_sync(), loop, forced)
     if forced or values is x1.values:
         return x1
     return AbstractFunction(*values)
@@ -612,7 +612,7 @@ def bind(loop, committed, resolved, pending):
             for p in pending:
                 if is_simple(p):
                     return p
-            return p
+            assert False  # unreachable
 
     else:
         rval = loop.create_pending(
