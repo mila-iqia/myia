@@ -139,7 +139,7 @@ class VirtualReference(AbstractReference):
         """Get the value (asynchronous)."""
         return self.abstract
 
-    def get_sync(self):
+    def get_sync(self):  # pragma: no cover
         """Get the value (synchronous)."""
         return self.abstract
 

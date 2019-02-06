@@ -478,14 +478,12 @@ class InferenceError(Exception, Partializable):
 
     """
 
-    def __init__(self, message, refs=[], app=None):
+    def __init__(self, message, refs=[]):
         """Initialize an InferenceError."""
         super().__init__(message, refs)
         self.message = message
         self.refs = refs
         self.traceback_refs = infer_trace.get()
-        if app is not None:
-            self.traceback_refs[app.context] = app
 
     def print_tb_end(self, fn_ctx, args_ctx, is_prim):
         """Print the error message at the end of a traceback."""
@@ -522,10 +520,10 @@ def type_error_nargs(ident, expected, got):
 class TypeDispatchError(MyiaTypeError):
     """Represents an error in type dispatch for a MetaGraph."""
 
-    def __init__(self, metagraph, types, refs=[], app=None):
+    def __init__(self, metagraph, types, refs=[]):
         """Initialize a TypeDispatchError."""
         message = f'`{metagraph}` is not defined for argument types {types}'
-        super().__init__(message, refs=refs, app=app)
+        super().__init__(message, refs=refs)
         self.metagraph = metagraph
         self.types = types
 

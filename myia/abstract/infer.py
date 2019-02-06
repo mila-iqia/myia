@@ -18,7 +18,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     VirtualFunction, AbstractFunction, \
     VALUE, TYPE, SHAPE, DummyFunction, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractList, Possibilities, type_error_nargs, \
+    AbstractList, Possibilities, type_error_nargs, TypeDispatchError, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind, build_type
@@ -549,7 +549,8 @@ class MetaGraphInferrer(BaseGraphInferrer):
             try:
                 g = self.metagraph.specialize_from_abstract(args)
             except GraphGenerationError as err:
-                raise MyiaTypeError(f'Graph gen error: {err}')
+                types = err.args[0]
+                raise TypeDispatchError(self.metagraph, types)
             g = engine.pipeline.resources.convert(g)
             self.graph_cache[args] = g
         return self.graph_cache[args]

@@ -138,3 +138,15 @@ def test_clean():
         def f(pt):
             return pt.x + pt.y
         return list_map(f, xs)
+
+    @valid_after_ec(i64, i64)
+    def f4(x, y):
+        def f():
+            return partial(make_record, Point_t)
+        return f()(x, y)
+
+    @valid_after_ec(i64, i64)
+    def f5(x, y):
+        def f(x):
+            return partial(make_record, Point_t, x)
+        return f(x)(y)
