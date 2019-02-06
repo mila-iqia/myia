@@ -339,18 +339,17 @@ def test_while_2(x, y, z):
     return rval
 
 
-# TODO: fix slowness
-# @grad_test(2.0,)
-# def test_pow10(x):
-#     v = x
-#     j = 0
-#     while j < 3:
-#         i = 0
-#         while i < 3:
-#             v = v * x
-#             i = i + 1
-#         j = j + 1
-#     return v
+@grad_test(2.0,)
+def test_pow10(x):
+    v = x
+    j = 0
+    while j < 3:
+        i = 0
+        while i < 3:
+            v = v * x
+            i = i + 1
+        j = j + 1
+    return v
 
 
 @grad_test(4.5,)

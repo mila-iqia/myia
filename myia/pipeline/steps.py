@@ -222,6 +222,7 @@ step_debug_opt = Optimizer.partial(
             # Safe inlining
             optlib.inline_core,
             optlib.simplify_partial,
+            optlib.elim_identity,
 
             # Miscellaneous
             optlib.elim_j_jinv,
