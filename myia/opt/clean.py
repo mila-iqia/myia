@@ -141,7 +141,9 @@ def erase_tuple(root, manager):
               not node.inputs[1].is_constant(Primitive)):
             new_inputs = expand_tuples_c(node.graph,
                                          node.inputs[2:])
-            if new_inputs != node.inputs[2:]:
+            if new_inputs != node.inputs[2:]:  # pragma: no cover
+                # This used to be covered, but the inferrer/specializer
+                # changed.
                 new_node = node.graph.apply(*node.inputs[:2],
                                             *new_inputs)
                 new_node.abstract = node.abstract

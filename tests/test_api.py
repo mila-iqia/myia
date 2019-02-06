@@ -110,6 +110,8 @@ def test_convert_arg():
     with pytest.raises(TypeError):
         _convert(10, f64)
     with pytest.raises(TypeError):
+        _convert("blah", f64)
+    with pytest.raises(TypeError):
         _convert(1.5, i64)
     with pytest.raises(TypeError):
         _convert(10, (i64, i64))

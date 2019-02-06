@@ -139,9 +139,7 @@ class _GraphSpecializer:
 
         assert isinstance(inf, BaseGraphInferrer)
 
-        if isinstance(fn, GraphFunction) \
-                and not _visible(self.graph, fn.context.graph):
-            raise Unspecializable(NOTVISIBLE)
+        assert _visible(self.graph, fn.context.graph)
 
         ctx = inf.make_context(self.specializer.engine, argvals)
         v = await self.specializer._specialize(ctx.graph, ctx, None)
@@ -284,11 +282,9 @@ class _GraphSpecializer:
             if node.is_constant_graph() \
                     or node.is_constant(MetaGraph) \
                     or node.is_constant(Primitive):
-                fns = a.get_sync()
+                # There should only be one possibility here
+                fn = a.get_unique()
                 try:
-                    if len(fns) != 1:
-                        raise Unspecializable('xxx')
-                    fn, = fns
                     repl = await self.build_inferrer(a, fn, argvals)
                 except Unspecializable as e:
                     repl = _const(e.problem, AbstractError(e.problem))

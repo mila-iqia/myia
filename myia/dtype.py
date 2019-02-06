@@ -224,10 +224,8 @@ class Tuple(Object):
 
     @classmethod
     def __type_repr__(cls):
-        if hasattr(cls, 'elements'):
-            elems = ', '.join(map(repr, cls.elements))
-        else:
-            elems = ''
+        elems = getattr(cls, 'elements', [])
+        elems = ', '.join(map(repr, elems))
         return f'Tuple[{elems}]'
 
 
@@ -379,7 +377,7 @@ def pytype_to_myiatype(pytype, instance=None):
     elif pytype is list:
         if instance is None:
             return List
-        elif len(instance) == 0:
+        elif len(instance) == 0:  # pragma: no cover
             raise TypeError('Cannot acquire the type of []')
         else:
             type0, *rest = [pytype_to_myiatype(type(x), x) for x in instance]
