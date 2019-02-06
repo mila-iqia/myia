@@ -75,14 +75,14 @@ class StandardInferrer(Inferrer):
             if typ is None:
                 pass
             elif dtype.ismyiatype(typ):
-                await force_pending(engine.chk(typ, build_type(arg)))
+                await force_pending(engine.check(typ, build_type(arg)))
             elif isinstance(typ, type) and issubclass(typ, AbstractBase):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
                         f'Wrong type {arg} != {typ} for {self._infer}'
                     )
             elif callable(typ):
-                await force_pending(engine.chk(typ, arg))
+                await force_pending(engine.check(typ, arg))
         return await self._infer(engine, *args)
 
 
@@ -183,9 +183,9 @@ class UniformPrimitiveInferrer(WithImplInferrer):
             raise MyiaTypeError('Expected scalar')
         ts = [arg.values[TYPE] for arg in args]
         for typ, indexes in self.typemap.items():
-            # Each group is merged using chk
+            # Each group is merged using check
             selection = [ts[i] for i in indexes]
-            res = engine.chk(typ, *selection)
+            res = engine.check(typ, *selection)
             if typ == self.outtype:
                 outtype = res
 
@@ -353,7 +353,7 @@ async def _resolve_case(resources, data_t, item_v, chk):
 
 
 def _shape_type(engine, shp):
-    shp_t = engine.chk(AbstractTuple, shp)
+    shp_t = engine.check(AbstractTuple, shp)
     for elem_t in shp_t.elements:
         engine.abstract_merge(dtype.UInt[64], elem_t.values[TYPE])
     return shp_t
@@ -750,7 +750,7 @@ async def _inf_array_len(engine, xs: AbstractArray):
 async def _inf_list_map(engine, fn, *lists):
     if len(lists) < 1:
         raise MyiaTypeError('list_map requires at least one list')
-    await engine.chkimm(AbstractList, *lists)
+    await engine.check_immediate(AbstractList, *lists)
     subargs = [l.element for l in lists]
     result = await engine.execute(fn, *subargs)
     return AbstractList(result)
@@ -839,7 +839,7 @@ async def _inf_shape(engine, a: AbstractArray):
 async def _inf_array_map(engine, fn: AbstractFunction, *arrays):
     if len(arrays) < 1:
         raise MyiaTypeError('array_map requires at least one array')
-    await engine.chkimm(AbstractArray, *arrays)
+    await engine.check_immediate(AbstractArray, *arrays)
     subargs = [a.element for a in arrays]
     result = await engine.execute(fn, *subargs)
 
@@ -987,7 +987,7 @@ async def _inf_scalar_cast(engine,
     t = typ.values[VALUE]
     if t is ANYTHING:
         raise MyiaTypeError('Must have concrete type for scalar_cast')
-    engine.chk(Number, t)
+    engine.check(Number, t)
     values = {**scalar.values, TYPE: t}
     return AbstractScalar(values)
 

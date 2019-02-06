@@ -279,7 +279,7 @@ class InferenceEngine:
         if not self.check_predicate(predicate, x):
             raise MyiaTypeError(f'Expected {predicate}, not {x}')
 
-    def chk(self, predicate, *values):
+    def check(self, predicate, *values):
         """Merge all values and check that the predicate applies.
 
         Some values may be Pending, in which case a check will be
@@ -296,12 +296,12 @@ class InferenceEngine:
                 self.assert_predicate(predicate, value)
         return self.abstract_merge(*values)
 
-    async def chkimm(self, predicate, *values):
+    async def check_immediate(self, predicate, *values):
         """Merge values, check predicate, and return result.
 
-        Unlike chk, if the result is Pending, it will be resolved immediately.
+        Unlike check, if the result is Pending, it will be resolved immediately.
         """
-        return await force_pending(self.chk(predicate, *values))
+        return await force_pending(self.check(predicate, *values))
 
 
 _number_types = [
