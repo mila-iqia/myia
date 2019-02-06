@@ -176,7 +176,7 @@ class AbstractValue(AbstractBase):
     """Base class for all abstract values.
 
     Attributes:
-        values: A dictionary mapping a Subtrack like VALUE or TYPE
+        values: A dictionary mapping a Track like VALUE or TYPE
             to a value for that track. Different abstract structures
             may have different tracks, e.g. SHAPE for arrays.
         count: A "depth" count tracking the constant propagation
@@ -388,14 +388,14 @@ class AbstractJTagged(AbstractValue):
 
 
 class TrackDict(dict):
-    """Mapping from a Subtrack to a value."""
+    """Mapping from a Track to a value."""
 
 
-class Subtrack:
+class Track:
     """Represents a type of property of an abstract value."""
 
     def __init__(self, name):
-        """Initialize the Subtrack."""
+        """Initialize the Track."""
         self.name = name
 
     def __str__(self):
@@ -405,11 +405,11 @@ class Subtrack:
         return self.name < other.name
 
     def clone(self, v, recurse):
-        """Clone the value associated to this Subtrack in a TrackDict."""
+        """Clone the value associated to this Track in a TrackDict."""
         return recurse(v)
 
     async def async_clone(self, v, recurse):
-        """Clone the value associated to this Subtrack in a TrackDict.
+        """Clone the value associated to this Track in a TrackDict.
 
         This is an asynchronous version of clone.
         """
@@ -423,7 +423,7 @@ class Subtrack:
         return recurse(v, loop)
 
 
-class _ValueSubtrack(Subtrack):
+class _ValueTrack(Track):
     """Represents the VALUE track."""
 
     def broaden(self, v, recurse, loop):
@@ -431,17 +431,17 @@ class _ValueSubtrack(Subtrack):
         return ANYTHING
 
 
-class _TypeSubtrack(Subtrack):
+class _TypeTrack(Track):
     """Represents the TYPE track, for scalars."""
 
 
-class _ShapeSubtrack(Subtrack):
+class _ShapeTrack(Track):
     """Represents the SHAPE track, for arrays."""
 
 
-VALUE = _ValueSubtrack('VALUE')
-TYPE = _TypeSubtrack('TYPE')
-SHAPE = _ShapeSubtrack('SHAPE')
+VALUE = _ValueTrack('VALUE')
+TYPE = _TypeTrack('TYPE')
+SHAPE = _ShapeTrack('SHAPE')
 
 
 ##########
