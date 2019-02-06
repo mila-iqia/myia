@@ -226,7 +226,7 @@ class InferenceEngine:
         argrefs = [self.ref(node, ctx) for node in n_args]
 
         if not isinstance(fn, AbstractFunction):
-            raise Exception(f'Not a function: {fn}')
+            raise MyiaTypeError(f'Not a function: {fn}')
 
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]

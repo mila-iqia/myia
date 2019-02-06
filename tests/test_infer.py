@@ -1320,6 +1320,13 @@ def test_broadcast_shape(xs, ys):
     return broadcast_shape(xs, ys)
 
 
+@infer(
+    (i64, i64, InferenceError)
+)
+def test_call_nonfunc(x, y):
+    return x(y)
+
+
 # @infer(type=[
 #     (i64, i64, InferenceError),
 #     (F[[i64], f64], i64, f64),
