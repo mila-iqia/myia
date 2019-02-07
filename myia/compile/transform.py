@@ -180,7 +180,8 @@ class CompileGraph(PipelineStep):
     def dup(self, node):
         """Ensures that the value for node is at the top of the stack."""
         if node not in self.slots:
-            return self.ref(node)
+            # This used to be covered by test_compile::test_tailcall
+            return self.ref(node)  # pragma: no cover
         self.add_instr('dup', self.ref(node))
         self.height += 1
         return -1
