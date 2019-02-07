@@ -5,18 +5,19 @@ import numpy as np
 import math
 
 from myia.pipeline import scalar_debug_pipeline
-from myia.dtype import Int, Float, List, Tuple, Class, Number, External
+from myia.dtype import Int, Float, List, Tuple, Class, Number, External, \
+    TypeType, pytype_to_myiatype
 from myia.prim.py_implementations import setattr as myia_setattr, \
     tuple_setitem, list_setitem, hastype, typeof, \
     shape, reshape, array_map, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
     issubtype, list_map, env_getitem, env_setitem, env_add, embed, \
-    array_to_scalar, transpose
+    array_to_scalar, transpose, return_, make_record
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
-from ..common import i64, f64, to_abstract
+from ..common import i64, f64, to_abstract, Point
 
 
 @parse_compare((2, 7), (4, -6))
@@ -171,6 +172,8 @@ def test_prim_typeof():
     with pytest.raises(TypeError):
         typeof([1, 2, 3.4])
     assert typeof(object()) == External[object]
+    assert typeof(i64) == TypeType
+    assert typeof(int) == TypeType
 
 
 def test_issubtype():
@@ -337,6 +340,12 @@ def test_assert_scalar():
 def test_prim_identity():
     for x in (1, 1.7, True, False, [1, 2, 3], (4, 5)):
         assert identity(x) is x
+        assert return_(x) is x
+
+
+def test_prim_make_record():
+    t = pytype_to_myiatype(Point)
+    assert make_record(t, 1, 2) == Point(1, 2)
 
 
 def test_prim_switch():

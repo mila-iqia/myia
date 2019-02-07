@@ -11,7 +11,7 @@ from operator import getitem
 from .. import dtype
 from ..ir import Graph
 from ..dtype import Number, Float, Bool
-from ..prim import ops as P, Primitive
+from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
 
 
@@ -410,82 +410,21 @@ async def issubtype(x, model):
 ##############
 
 
-@uniform_prim(P.scalar_add)
-def _inf_scalar_add(x: Number, y: Number) -> Number:
-    return x + y
-
-
-@uniform_prim(P.scalar_sub)
-def _inf_scalar_sub(x: Number, y: Number) -> Number:
-    return x - y
-
-
-@uniform_prim(P.scalar_mul)
-def _inf_scalar_mul(x: Number, y: Number) -> Number:
-    return x * y
-
-
-@uniform_prim(P.scalar_div)
-def _inf_scalar_div(x: Number, y: Number) -> Number:
-    if isinstance(x, (float, np.floating)):
-        return x / y
-    else:
-        return int(x / y)
-
-
-@uniform_prim(P.scalar_mod)
-def _inf_scalar_mod(x: Number, y: Number) -> Number:
-    return x % y
-
-
-@uniform_prim(P.scalar_pow)
-def _inf_scalar_pow(x: Number, y: Number) -> Number:
-    return x ** y
-
-
-@uniform_prim(P.scalar_trunc)
-def _inf_scalar_trunc(x: Number) -> Number:
-    return np.trunc(x)
-
-
-@uniform_prim(P.scalar_floor)
-def _inf_scalar_floor(x: Number) -> Number:
-    return np.floor(x)
-
-
-@uniform_prim(P.scalar_uadd)
-def _inf_scalar_uadd(x: Number) -> Number:
-    return x
-
-
-@uniform_prim(P.scalar_usub)
-def _inf_scalar_usub(x: Number) -> Number:
-    return -x
-
-
-@uniform_prim(P.scalar_exp)
-def _inf_scalar_exp(x: Number) -> Number:
-    return math.exp(x)
-
-
-@uniform_prim(P.scalar_log)
-def _inf_scalar_log(x: Float) -> Float:
-    return math.log(x)
-
-
-@uniform_prim(P.scalar_sin)
-def _inf_scalar_sin(x: Number) -> Number:
-    return math.sin(x)
-
-
-@uniform_prim(P.scalar_cos)
-def _inf_scalar_cos(x: Number) -> Number:
-    return math.cos(x)
-
-
-@uniform_prim(P.scalar_tan)
-def _inf_scalar_tan(x: Number) -> Number:
-    return math.tan(x)
+uniform_prim(P.scalar_add)(py.scalar_add)
+uniform_prim(P.scalar_sub)(py.scalar_sub)
+uniform_prim(P.scalar_mul)(py.scalar_mul)
+uniform_prim(P.scalar_div)(py.scalar_div)
+uniform_prim(P.scalar_mod)(py.scalar_mod)
+uniform_prim(P.scalar_pow)(py.scalar_pow)
+uniform_prim(P.scalar_trunc)(py.scalar_trunc)
+uniform_prim(P.scalar_floor)(py.scalar_floor)
+uniform_prim(P.scalar_uadd)(py.scalar_uadd)
+uniform_prim(P.scalar_usub)(py.scalar_usub)
+uniform_prim(P.scalar_exp)(py.scalar_exp)
+uniform_prim(P.scalar_log)(py.scalar_log)
+uniform_prim(P.scalar_sin)(py.scalar_sin)
+uniform_prim(P.scalar_cos)(py.scalar_cos)
+uniform_prim(P.scalar_tan)(py.scalar_tan)
 
 
 ###############
@@ -493,54 +432,16 @@ def _inf_scalar_tan(x: Number) -> Number:
 ###############
 
 
-@uniform_prim(P.scalar_eq)
-def _inf_scalar_eq(x: Number, y: Number) -> Bool:
-    return x == y
-
-
-@uniform_prim(P.scalar_lt)
-def _inf_scalar_lt(x: Number, y: Number) -> Bool:
-    return x < y
-
-
-@uniform_prim(P.scalar_gt)
-def _inf_scalar_gt(x: Number, y: Number) -> Bool:
-    return x > y
-
-
-@uniform_prim(P.scalar_ne)
-def _inf_scalar_ne(x: Number, y: Number) -> Bool:
-    return x != y
-
-
-@uniform_prim(P.scalar_le)
-def _inf_scalar_le(x: Number, y: Number) -> Bool:
-    return x <= y
-
-
-@uniform_prim(P.scalar_ge)
-def _inf_scalar_ge(x: Number, y: Number) -> Bool:
-    return x >= y
-
-
-@uniform_prim(P.bool_not, nolimit=True)
-def _inf_bool_not(x: Bool) -> Bool:
-    return not x
-
-
-@uniform_prim(P.bool_and, nolimit=True)
-def _inf_bool_and(x: Bool, y: Bool) -> Bool:
-    return x and y
-
-
-@uniform_prim(P.bool_or, nolimit=True)
-def _inf_bool_or(x: Bool, y: Bool) -> Bool:
-    return x or y
-
-
-@uniform_prim(P.bool_eq, nolimit=True)
-def _inf_bool_eq(x: Bool, y: Bool) -> Bool:
-    return x == y
+uniform_prim(P.scalar_eq)(py.scalar_eq)
+uniform_prim(P.scalar_lt)(py.scalar_lt)
+uniform_prim(P.scalar_gt)(py.scalar_gt)
+uniform_prim(P.scalar_ne)(py.scalar_ne)
+uniform_prim(P.scalar_le)(py.scalar_le)
+uniform_prim(P.scalar_ge)(py.scalar_ge)
+uniform_prim(P.bool_not, nolimit=True)(py.bool_not)
+uniform_prim(P.bool_and, nolimit=True)(py.bool_and)
+uniform_prim(P.bool_or, nolimit=True)(py.bool_or)
+uniform_prim(P.bool_eq, nolimit=True)(py.bool_eq)
 
 
 ######################
@@ -580,11 +481,7 @@ async def _inf_make_tuple(engine, *args):
 @standard_prim(P.make_list)
 async def _inf_make_list(engine, *args):
     if len(args) == 0:
-        assert False
-        # dflt = AbstractScalar({
-        #     VALUE: ANYTHING,
-        #     TYPE: dtype.Problem[VOID],
-        # })
+        raise NotImplementedError('Cannot make empty lists.')
     else:
         res = engine.abstract_merge(*args)
     return AbstractList(res)

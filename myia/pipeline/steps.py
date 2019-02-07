@@ -14,7 +14,7 @@ from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
     LocalPassOptimizer
-from ..prim import vm_implementations
+from ..prim import vm_registry
 from ..utils import overload, flatten, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
@@ -585,5 +585,5 @@ class DebugVMExporter(PipelineStep):
 
 
 step_debug_export = DebugVMExporter.partial(
-    implementations=vm_implementations
+    implementations=vm_registry
 )

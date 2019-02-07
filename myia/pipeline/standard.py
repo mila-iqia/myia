@@ -5,7 +5,7 @@ from ..compile import step_wrap_primitives, step_compile, step_link, \
     step_export
 from ..abstract import Context
 from ..ir import GraphManager
-from ..prim import py_implementations
+from ..prim import py_registry
 from ..abstract import abstract_inferrer_constructors
 from ..pipeline.resources import scalar_object_map, standard_object_map, \
     standard_method_map, default_convert, ConverterResource, \
@@ -17,7 +17,7 @@ from .pipeline import PipelineDefinition
 
 standard_resources = dict(
     manager=GraphManager.partial(),
-    py_implementations=py_implementations,
+    py_implementations=py_registry,
     method_map=standard_method_map,
     convert=ConverterResource.partial(
         object_map=standard_object_map,

@@ -16,7 +16,7 @@ from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
     array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
     distribute, dot, reshape, transpose, scalar_cast
-from myia.prim.py_implementations import py_implementations as pyi
+from myia.prim.py_implementations import py_registry as pyi
 from myia.validate import whitelist, validate_abstract
 
 from .common import f64, u64, MA, MB, to_abstract

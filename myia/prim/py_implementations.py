@@ -7,15 +7,16 @@ import numpy as np
 import math
 
 from .. import dtype as types
+from ..dtype import Number, Float, Bool
 from ..utils import Registry, overload
 
 from . import ops as primops
 
 
-py_implementations: Registry[primops.Primitive, Callable] = Registry()
-vm_implementations: Registry[primops.Primitive, Callable] = Registry()
-py_register = py_implementations.register
-vm_register = vm_implementations.register
+py_registry: Registry[primops.Primitive, Callable] = Registry()
+vm_registry: Registry[primops.Primitive, Callable] = Registry()
+py_register = py_registry.register
+vm_register = vm_registry.register
 
 
 def register(prim):
@@ -44,28 +45,28 @@ def _assert_scalar(*args):
 
 
 @register(primops.scalar_add)
-def scalar_add(x, y):
+def scalar_add(x: Number, y: Number) -> Number:
     """Implement `scalar_add`."""
     _assert_scalar(x, y)
     return x + y
 
 
 @register(primops.scalar_sub)
-def scalar_sub(x, y):
+def scalar_sub(x: Number, y: Number) -> Number:
     """Implement `scalar_sub`."""
     _assert_scalar(x, y)
     return x - y
 
 
 @register(primops.scalar_mul)
-def scalar_mul(x, y):
+def scalar_mul(x: Number, y: Number) -> Number:
     """Implement `scalar_mul`."""
     _assert_scalar(x, y)
     return x * y
 
 
 @register(primops.scalar_div)
-def scalar_div(x, y):
+def scalar_div(x: Number, y: Number) -> Number:
     """Implement `scalar_div`."""
     _assert_scalar(x, y)
     if isinstance(x, (float, np.floating)):
@@ -75,133 +76,133 @@ def scalar_div(x, y):
 
 
 @register(primops.scalar_mod)
-def scalar_mod(x, y):
+def scalar_mod(x: Number, y: Number) -> Number:
     """Implement `scalar_mod`."""
     _assert_scalar(x, y)
     return x % y
 
 
 @register(primops.scalar_pow)
-def scalar_pow(x, y):
+def scalar_pow(x: Number, y: Number) -> Number:
     """Implement `scalar_pow`."""
     _assert_scalar(x, y)
     return x ** y
 
 
 @register(primops.scalar_trunc)
-def scalar_trunc(x):
+def scalar_trunc(x: Number) -> Number:
     """Implement `scalar_trunc`."""
     _assert_scalar(x)
     return np.trunc(x)
 
 
 @register(primops.scalar_floor)
-def scalar_floor(x):
+def scalar_floor(x: Number) -> Number:
     """Implement `scalar_floor`."""
     _assert_scalar(x)
     return np.floor(x)
 
 
 @register(primops.scalar_uadd)
-def scalar_uadd(x):
+def scalar_uadd(x: Number) -> Number:
     """Implement `scalar_uadd`."""
     _assert_scalar(x)
     return x
 
 
 @register(primops.scalar_usub)
-def scalar_usub(x):
+def scalar_usub(x: Number) -> Number:
     """Implement `scalar_usub`."""
     _assert_scalar(x)
     return -x
 
 
 @register(primops.scalar_exp)
-def scalar_exp(x):
+def scalar_exp(x: Number) -> Number:
     """Implement `scalar_exp`."""
     _assert_scalar(x)
     return math.exp(x)
 
 
 @register(primops.scalar_log)
-def scalar_log(x):
+def scalar_log(x: Float) -> Float:
     """Implement `scalar_log`."""
     _assert_scalar(x)
     return math.log(x)
 
 
 @register(primops.scalar_sin)
-def scalar_sin(x):
+def scalar_sin(x: Number) -> Number:
     """Implement `scalar_sin`."""
     _assert_scalar(x)
     return math.sin(x)
 
 
 @register(primops.scalar_cos)
-def scalar_cos(x):
+def scalar_cos(x: Number) -> Number:
     """Implement `scalar_cos`."""
     _assert_scalar(x)
     return math.cos(x)
 
 
 @register(primops.scalar_tan)
-def scalar_tan(x):
+def scalar_tan(x: Number) -> Number:
     """Implement `scalar_tan`."""
     _assert_scalar(x)
     return math.tan(x)
 
 
 @register(primops.scalar_eq)
-def scalar_eq(x, y):
+def scalar_eq(x: Number, y: Number) -> Bool:
     """Implement `scalar_eq`."""
     _assert_scalar(x, y)
     return x == y
 
 
 @register(primops.scalar_lt)
-def scalar_lt(x, y):
+def scalar_lt(x: Number, y: Number) -> Bool:
     """Implement `scalar_lt`."""
     _assert_scalar(x, y)
     return x < y
 
 
 @register(primops.scalar_gt)
-def scalar_gt(x, y):
+def scalar_gt(x: Number, y: Number) -> Bool:
     """Implement `scalar_gt`."""
     _assert_scalar(x, y)
     return x > y
 
 
 @register(primops.scalar_ne)
-def scalar_ne(x, y):
+def scalar_ne(x: Number, y: Number) -> Bool:
     """Implement `scalar_ne`."""
     _assert_scalar(x, y)
     return x != y
 
 
 @register(primops.scalar_le)
-def scalar_le(x, y):
+def scalar_le(x: Number, y: Number) -> Bool:
     """Implement `scalar_le`."""
     _assert_scalar(x, y)
     return x <= y
 
 
 @register(primops.scalar_ge)
-def scalar_ge(x, y):
+def scalar_ge(x: Number, y: Number) -> Bool:
     """Implement `scalar_ge`."""
     _assert_scalar(x, y)
     return x >= y
 
 
 @register(primops.bool_not)
-def bool_not(x):
+def bool_not(x: Bool) -> Bool:
     """Implement `bool_not`."""
     assert x is True or x is False
     return not x
 
 
 @register(primops.bool_and)
-def bool_and(x, y):
+def bool_and(x: Bool, y: Bool) -> Bool:
     """Implement `bool_and`."""
     assert x is True or x is False
     assert y is True or y is False
@@ -209,7 +210,7 @@ def bool_and(x, y):
 
 
 @register(primops.bool_or)
-def bool_or(x, y):
+def bool_or(x: Bool, y: Bool) -> Bool:
     """Implement `bool_or`."""
     assert x is True or x is False
     assert y is True or y is False
@@ -217,7 +218,7 @@ def bool_or(x, y):
 
 
 @register(primops.bool_eq)
-def bool_eq(x, y):
+def bool_eq(x: Bool, y: Bool) -> Bool:
     """Implement `bool_eq`."""
     assert x is True or x is False
     assert y is True or y is False
@@ -629,31 +630,6 @@ def J(x):
 def Jinv(x):
     """Implement `Jinv`."""
     raise NotImplementedError()
-
-
-@vm_register(primops.J)
-def _J_vm(vm, x):
-    """Implement `J`."""
-    from ..grad import J as _J
-    from ..prim import Primitive
-    from ..ir import Graph
-    if isinstance(x, (Primitive, Graph)):
-        return _J(x, vm.manager)
-    else:
-        return x
-
-
-@vm_register(primops.Jinv)
-def _Jinv_vm(vm, x):
-    """Implement `Jinv`."""
-    from ..prim import Primitive
-    from ..ir import Graph
-    if isinstance(x, Primitive):
-        raise AssertionError("Jinv on a primitive should never happen.")
-    elif isinstance(x, Graph):
-        raise NotImplementedError()
-    else:
-        return x
 
 
 @register(primops.embed)

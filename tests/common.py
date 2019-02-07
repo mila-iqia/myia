@@ -95,7 +95,6 @@ def Shp(*vals):
 
 
 def Ty(t):
-    # TODO: fix interface
     return AbstractType(t)
 
 
