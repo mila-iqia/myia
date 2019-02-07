@@ -517,6 +517,13 @@ def type_error_nargs(ident, expected, got):
     )
 
 
+def check_nargs(ident, expected, args):
+    """Return a MyiaTypeError for number of arguments mismatch."""
+    got = len(args)
+    if expected is not None and got != expected:
+        raise type_error_nargs(ident, expected, got)
+
+
 class TypeDispatchError(MyiaTypeError):
     """Represents an error in type dispatch for a MetaGraph."""
 

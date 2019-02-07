@@ -201,9 +201,12 @@ class Class(Object):
 
     @classmethod
     def __type_repr__(cls):
-        args = ', '.join(f'{name}: {repr(attr)}'
-                         for name, attr in cls.attributes.items())
-        return f"{cls.tag}[{args}]"
+        if cls is Class:
+            return "Class"
+        else:
+            args = ', '.join(f'{name}: {repr(attr)}'
+                            for name, attr in cls.attributes.items())
+            return f"{cls.tag}[{args}]"
 
 
 class Tuple(Object):

@@ -33,7 +33,7 @@ from .data import (
     GraphFunction,
     DummyFunction,
     VALUE, TYPE, SHAPE,
-    MyiaTypeError, InferenceError, MyiaShapeError
+    MyiaTypeError, InferenceError, MyiaShapeError, check_nargs
 )
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context
@@ -68,8 +68,7 @@ class StandardInferrer(Inferrer):
 
     async def infer(self, engine, *args):
         """Infer the abstract result given the abstract arguments."""
-        if self.nargs is not None and len(args) != self.nargs:
-            raise MyiaTypeError('Wrong number of arguments.')
+        check_nargs("primitive", self.nargs, args)
         for i, arg in enumerate(args):
             typ = self.typemap.get(i)
             if typ is None:
@@ -175,9 +174,7 @@ class UniformPrimitiveInferrer(WithImplInferrer):
 
     async def infer(self, engine, *args):
         """Infer the abstract result given the abstract arguments."""
-        if len(args) != self.nargs:
-            raise MyiaTypeError('Wrong number of arguments.')
-
+        check_nargs("primitive", self.nargs, args)
         outtype = self.outtype
         if any(not isinstance(arg, AbstractScalar) for arg in args):
             raise MyiaTypeError('Expected scalar')
@@ -387,7 +384,7 @@ async def issubtype(x, model):
             and await issubtype(x.element, model.elements)
     elif dtype.ismyiatype(model, dtype.List):
         return isinstance(x, AbstractList) \
-            and await issubtype(x.element, model.elements)
+            and await issubtype(x.element, model.element_type)
     elif dtype.ismyiatype(model, dtype.Class):
         return isinstance(x, AbstractClass) \
             and x.tag == model.tag \
@@ -405,7 +402,7 @@ async def issubtype(x, model):
         else:
             return dtype.ismyiatype(t, model)
     else:
-        return False
+        raise AssertionError(f'Invalid model: {model}')
 
 
 ##############
@@ -636,11 +633,6 @@ async def _inf_list_getitem(engine, arg: AbstractList, idx: dtype.Int[64]):
     return arg.element
 
 
-@standard_prim(P.array_getitem)
-async def _inf_array_getitem(engine, arg: AbstractArray, idx: dtype.Int[64]):
-    return arg.element
-
-
 @standard_prim(P.tuple_setitem)
 async def _inf_tuple_setitem(engine,
                              arg: AbstractTuple,
@@ -670,15 +662,6 @@ async def _inf_list_setitem(engine,
     return arg
 
 
-@standard_prim(P.array_setitem)
-async def _inf_array_setitem(engine,
-                             arg: AbstractArray,
-                             idx: dtype.Int[64],
-                             value: AbstractBase):
-    engine.abstract_merge(arg.element, value)
-    return arg
-
-
 @standard_prim(P.list_append)
 async def _inf_list_append(engine,
                            arg: AbstractList,
@@ -689,8 +672,7 @@ async def _inf_list_append(engine,
 
 class _GetAttrInferrer(Inferrer):
     async def run(self, engine, outref, argrefs):
-        if len(argrefs) != 2:
-            raise MyiaTypeError('Wrong number of arguments')
+        check_nargs(P.getattr, 2, argrefs)
         r_data, r_item = argrefs
         data = await r_data.get()
         item = await r_item.get()
@@ -748,7 +730,7 @@ async def _inf_array_len(engine, xs: AbstractArray):
 
 @standard_prim(P.list_map)
 async def _inf_list_map(engine, fn, *lists):
-    if len(lists) < 1:
+    if len(lists) < 1:  # pragma: no cover
         raise MyiaTypeError('list_map requires at least one list')
     await engine.check_immediate(AbstractList, *lists)
     subargs = [l.element for l in lists]
@@ -845,7 +827,9 @@ async def _inf_array_map(engine, fn: AbstractFunction, *arrays):
 
     shapes = [a.values[SHAPE] for a in arrays]
     shape0, *rest = shapes
-    if any(len(s) != len(shape0) for s in rest):
+    if any(len(s) != len(shape0) for s in rest):  # pragma: no cover
+        # check_immediate above is checking this for us, although
+        # the error message is poor
         raise MyiaShapeError("Expect same shapes for array_map")
     rshape = []
     for entries in zip(*shapes):
@@ -999,8 +983,7 @@ async def _inf_identity(engine, x):
 
 class _ResolveInferrer(Inferrer):
     async def run(self, engine, outref, argrefs):
-        if len(argrefs) != 2:
-            raise MyiaTypeError('Wrong number of arguments')
+        check_nargs(P.resolve, 2, argrefs)
         r_data, r_item = argrefs
         data = await r_data.get()
         item = await r_item.get()
@@ -1048,8 +1031,7 @@ async def _inf_partial(engine, fn, *args):
 
 class _EmbedInferrer(Inferrer):
     async def run(self, engine, outref, argrefs):
-        if len(argrefs) != 1:
-            raise MyiaTypeError('Wrong number of arguments')
+        check_nargs(P.embed, 1, argrefs)
         xref, = argrefs
         x = await xref.get()
         key = SymbolicKeyInstance(xref.node, sensitivity_transform(x))

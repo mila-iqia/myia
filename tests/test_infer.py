@@ -10,7 +10,7 @@ from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
-from myia.dtype import Array as A, Int, External, \
+from myia.dtype import Array as A, Int, External, List, \
     Number, Class, EnvType as Env
 from myia.hypermap import HyperMap
 from myia.abstract import ANYTHING, InferenceError, Contextless, CONTEXTLESS
@@ -23,7 +23,7 @@ from myia.prim.py_implementations import \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
-    transpose
+    transpose, make_record
 from myia.utils import newenv
 
 from .common import B, T, L, i16, i32, i64, u64, f16, f32, f64, \
@@ -122,7 +122,7 @@ def inferrer_decorator(pipeline):
                     try:
                         assert out() == expected_out
                     except InferenceError as e:
-                        # print_inference_error(e)
+                        print_inference_error(e)
                         raise
 
             m = pytest.mark.parametrize('spec', list(tests))(run_test)
@@ -839,6 +839,9 @@ def test_hastype_simple(x):
     (f64, Ty(i64), False),
     ((i64, i64), Ty(T[i64, i64]), True),
     ((i64, i64), Ty(T[Number, Number]), True),
+    (Point(1, 2), Ty(Class), True),
+    ([i64], Ty(List[i64]), True),
+    ((i64, i64), Ty(ANYTHING), InferenceError),
 )
 def test_hastype(x, y):
     return hastype(x, y)
@@ -1100,8 +1103,8 @@ def test_reshape(v, shp):
     (af16_of(3, 4, 5), Shp(2, 0, 1), af16_of(5, 3, 4)),
     (af16_of(3, 4, 5), (u64, u64, u64), af16_of(ANYTHING, ANYTHING, ANYTHING)),
     (af16_of(3, 4, 5), (i64, i64, i64), InferenceError),
-    (af16_of(3, 4, 5), (1, 0), InferenceError),
-    (af16_of(3, 4, 5), (1, 2, 9), InferenceError),
+    (af16_of(3, 4, 5), Shp(1, 0), InferenceError),
+    (af16_of(3, 4, 5), Shp(1, 2, 9), InferenceError),
 )
 def test_transpose(v, perm):
     return transpose(v, perm)
@@ -1280,6 +1283,7 @@ def test_closure_in_data(c, x):
     (i64, Ty(i16), i16),
     (f64, Ty(i16), i16),
     (f16, Ty(f32), f32),
+    (f16, Ty(ANYTHING), InferenceError),
     (f16, Ty(B), InferenceError),
     (B, Ty(f32), InferenceError),
 )
@@ -1553,6 +1557,16 @@ def test_dataclass_inst(x1, y1, x2, y2):
     return Point(pt1.x + pt2.x, pt1.y + pt2.y)
 
 
+@infer((i64, i64, i64, InferenceError))
+def test_dataclass_bad_inst(x, y, z):
+    return Point(x, y, z)
+
+
+@infer((Ty(ANYTHING), i64, i64, InferenceError))
+def test_dataclass_bad_inst2(cls, x, y):
+    return make_record(cls, x, y)
+
+
 @infer((Point(i64, i64), InferenceError))
 def test_dataclass_wrong_field(pt):
     return pt.z
@@ -1586,7 +1600,6 @@ def test_hyper_map(x, y):
     return hyper_map(scalar_add, x, y)
 
 
-# TODO: Something fishy happened here once
 @infer(((i64, f64), (i64, f64), InferenceError))
 def test_hyper_map_notuple(x, y):
     return hyper_map_notuple(scalar_add, x, y)
@@ -1731,12 +1744,16 @@ def test_Jinv2(x):
     return ff(x)
 
 
-# TODO: something fishy here
 @infer((i32, InferenceError))
 def test_Jinv3(x):
     def f(x):
         return x * x
     return Jinv(f)(x)
+
+
+@infer((i32, InferenceError))
+def test_Jinv4(x):
+    return Jinv(scalar_add)(x)
 
 
 @infer_std(
