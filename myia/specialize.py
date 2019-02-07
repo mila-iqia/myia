@@ -8,7 +8,7 @@ from .abstract import GraphFunction, concretize_abstract, \
     TypedPrimitive, BaseGraphInferrer, broaden, \
     TrackedInferrer, PrimitiveFunction, MetaGraphFunction
 from .abstract import Context, Unspecializable, \
-    DEAD, NOTVISIBLE, POLY, VirtualReference
+    DEAD, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
 from .prim import ops as P, Primitive
 

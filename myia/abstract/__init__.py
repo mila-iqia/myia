@@ -29,7 +29,6 @@ from .data import (  # noqa
     VOID,
     DEAD,
     POLY,
-    NOTVISIBLE,
     Possibilities,
     PrimitiveFunction,
     GraphFunction,

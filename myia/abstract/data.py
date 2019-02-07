@@ -24,7 +24,6 @@ VOID = Named('VOID')
 # Represents specialization problems
 DEAD = Named('DEAD')
 POLY = Named('POLY')
-NOTVISIBLE = Named('NOTVISIBLE')
 
 
 #####################

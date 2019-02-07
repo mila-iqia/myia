@@ -1,7 +1,5 @@
 """Inferrers for primitives."""
 
-import math
-import numpy as np
 import operator
 import inspect
 from functools import reduce
@@ -10,7 +8,7 @@ from operator import getitem
 
 from .. import dtype
 from ..ir import Graph
-from ..dtype import Number, Float, Bool
+from ..dtype import Number, Bool
 from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
 

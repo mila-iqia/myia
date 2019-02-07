@@ -205,7 +205,7 @@ class Class(Object):
             return "Class"
         else:
             args = ', '.join(f'{name}: {repr(attr)}'
-                            for name, attr in cls.attributes.items())
+                             for name, attr in cls.attributes.items())
             return f"{cls.tag}[{args}]"
 
 

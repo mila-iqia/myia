@@ -5,7 +5,7 @@ from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
 from .abstract import abstract_clone, AbstractClass, AbstractJTagged, \
-    AbstractScalar, TYPE, VALUE, AbstractType, DEAD, AbstractError
+    AbstractScalar, TYPE, VALUE, DEAD, AbstractError
 
 
 class ValidationError(Exception):

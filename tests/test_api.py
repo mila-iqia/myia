@@ -134,8 +134,9 @@ def test_convert_arg():
 def test_convert_result():
 
     def _convert(data, typ1, typ2):
-        return convert_result(data, to_abstract_test(typ1),
-                                    to_abstract_test(typ2))
+        return convert_result(data,
+                              to_abstract_test(typ1),
+                              to_abstract_test(typ2))
 
     # Leaves
 

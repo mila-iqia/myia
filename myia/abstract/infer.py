@@ -18,7 +18,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     VirtualFunction, AbstractFunction, \
     VALUE, TYPE, SHAPE, DummyFunction, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractList, Possibilities, type_error_nargs, TypeDispatchError, \
+    AbstractList, type_error_nargs, TypeDispatchError, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind, build_type
@@ -299,7 +299,8 @@ class InferenceEngine:
     async def check_immediate(self, predicate, *values):
         """Merge values, check predicate, and return result.
 
-        Unlike check, if the result is Pending, it will be resolved immediately.
+        Unlike check, if the result is Pending, it will be resolved
+        immediately.
         """
         return await force_pending(self.check(predicate, *values))
 

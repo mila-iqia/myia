@@ -19,7 +19,7 @@ from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, scalar_lt, list_map as list_map_prim, \
     hastype, typeof, scalar_usub, dot, distribute, shape, array_map, \
-    array_scan, array_reduce, reshape, partial as myia_partial, identity, \
+    array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
@@ -1165,20 +1165,6 @@ def test_array_map3(ary1, ary2, ary3):
     return array_map(f, ary1, ary2, ary3)
 
 
-# @infer(shape=[(ai64_of(3, 4), {'value': 1, 'type': u64}, (3, 4))],
-#        type=[
-#            (ai64_of(3, 4), {'value': 1, 'type': u64}, ai64),
-#            ({'type': i64}, {'value': 1, 'type': u64}, InferenceError),
-#            (af32_of(3, 4), {'value': 1, 'type': u64},
-#             InferenceError),
-#            (ai64_of(3, 4), {'value': 1}, InferenceError)
-#        ])
-# def test_array_scan(ary, ax):
-#     def f(a, b):
-#         return a + b
-#     return array_scan(f, 0, ary, ax)
-
-
 @infer(
     (ai64_of(3, 4), Shp(3, 4), ai64_of(3, 4)),
     # (ai64_of(3, 4), Shp(3, ANYTHING), ai64_of(3, ANYTHING)),
@@ -1784,6 +1770,7 @@ def test_J_bprop_invalid(x):
 def test_J_return_function(x):
     def f(y):
         return y * y
+
     def g():
         return f
 

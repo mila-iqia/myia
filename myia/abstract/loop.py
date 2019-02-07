@@ -72,6 +72,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
                 break
 
     def call_exception_handler(self, ctx):
+        """Log an exception in the list of errors."""
         if 'exception' in ctx:
             self._errors.append(ctx['exception'])
         else:
