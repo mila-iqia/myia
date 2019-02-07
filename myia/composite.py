@@ -393,7 +393,7 @@ def tuple_hasnext(xs):
 class Tail(MetaGraph):
     """Implementation of tail."""
 
-    def specialize_from_abstract(self, args):
+    def generate_graph(self, args):
         """Generate tail specialized for the given Tuple type.
 
         tail(x) generates make_tuple(x[1], x[2], ...)
@@ -651,7 +651,7 @@ def list_reduce(fn, lst, dftl):
 class ListMap(MetaGraph):
     """Implementation of list_map."""
 
-    def specialize_from_abstract(self, args):
+    def generate_graph(self, args):
         """Return a graph for the number of lists."""
         if len(args) < 2:
             raise MyiaTypeError('list_map takes at least two arguments')
@@ -770,7 +770,7 @@ class GradOperation(MetaGraph):
             df.output = df.apply(P.tuple_getitem, bapp, 1)
         return df
 
-    def specialize_from_abstract(self, args):
+    def generate_graph(self, args):
         """Generate the graph."""
         ft, = args
         assert isinstance(ft, AbstractFunction)

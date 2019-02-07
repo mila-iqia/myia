@@ -21,18 +21,18 @@ class MetaGraph:
         self.name = name
         self.cache = {}
 
-    def specialize_from_abstract(self, args):
+    def generate_graph(self, args):
         """Generate a Graph for the given abstract arguments."""
         from ..abstract.utils import build_type
         types = tuple([build_type(arg) for arg in args])
         if types not in self.cache:
-            self.cache[types] = self.specialize_from_types(types)
+            self.cache[types] = self.generate_from_types(types)
         return self.cache[types]
 
-    def specialize_from_types(self, types):
+    def generate_from_types(self, types):
         """Generate a Graph for this type signature."""
         raise NotImplementedError(
-            'Override specialize_from_types in subclass.'
+            'Override generate_from_types in subclass.'
         )
 
     def __str__(self):
@@ -64,7 +64,7 @@ class MultitypeGraph(MetaGraph):
         else:
             raise GraphGenerationError(types)
 
-    def specialize_from_types(self, types):
+    def generate_from_types(self, types):
         """Generate a Graph for this type signature."""
         from ..parser import parse
         return parse(self._getfn(types))

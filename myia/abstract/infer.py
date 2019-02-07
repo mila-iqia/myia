@@ -548,7 +548,7 @@ class MetaGraphInferrer(BaseGraphInferrer):
         """Generate the graph for the given args."""
         if args not in self.graph_cache:
             try:
-                g = self.metagraph.specialize_from_abstract(args)
+                g = self.metagraph.generate_graph(args)
             except GraphGenerationError as err:
                 types = err.args[0]
                 raise TypeDispatchError(self.metagraph, types)
