@@ -264,6 +264,7 @@ class VM:
         elif isinstance(fn, MetaGraph):
             absargs = [to_abstract(arg) for arg in args]
             g = fn.generate_graph(absargs)
+            g = self.convert(g)
             self._dispatch_call(node, frame, g, args)
         elif is_dataclass_type(fn):
             frame.values[node] = fn(*args)

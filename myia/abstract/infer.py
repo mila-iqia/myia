@@ -111,7 +111,7 @@ class InferenceEngine:
             return await self.infer_apply(ref)
 
         else:
-            raise AssertionError(f'Missing information for {ref}', ref)
+            raise AssertionError(f'Missing information for {ref}', ref.node)
 
     def get_inferred(self, ref):
         """Get a Future for the value associated to the Reference.

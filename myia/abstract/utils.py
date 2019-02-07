@@ -632,3 +632,14 @@ def bind(loop, committed, resolved, pending):
             rval.tie(p)
 
         return rval
+
+
+def abstract_shape(values):
+    """Create the type of a shape, i.e. a tuple of u64."""
+    return AbstractTuple([
+        AbstractScalar({
+            VALUE: v,
+            TYPE: dtype.UInt[64],
+        })
+        for v in values
+    ])
