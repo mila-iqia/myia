@@ -19,7 +19,7 @@ from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
 from myia.prim.py_implementations import py_registry as pyi
 from myia.validate import whitelist, validate_abstract
 
-from .common import f64, u64, MA, MB, to_abstract
+from .common import f64, u64, MA, MB, to_abstract_test
 
 
 @dataclass
@@ -143,7 +143,7 @@ def _grad_test(fn, obj, args,
     pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
     argspec = tuple(from_value(arg, broaden=True)
                     for arg in clean_args(args))
-    sens_type = to_abstract(sens_type)
+    sens_type = to_abstract_test(sens_type)
     if isinstance(obj, FunctionType):
         res = pipeline.run(input=obj, argspec=[*argspec, sens_type])
     else:

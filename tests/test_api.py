@@ -11,7 +11,7 @@ from myia.pipeline import \
 from myia.pipeline.steps import convert_arg, convert_result
 from myia.prim.py_implementations import getitem
 
-from .common import Point, Point3D, i64, f64, to_abstract, ai64_of, \
+from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
     ai32_of, af64_of
 
 
@@ -72,7 +72,7 @@ def test_myia_return_struct():
 def test_convert_arg():
 
     def _convert(data, typ):
-        return convert_arg(data, to_abstract(typ))
+        return convert_arg(data, to_abstract_test(typ))
 
     # Leaves
 
@@ -110,7 +110,7 @@ def test_convert_arg():
     with pytest.raises(TypeError):
         _convert(10, f64)
     with pytest.raises(TypeError):
-        _convert("blah", to_abstract("blah"))
+        _convert("blah", to_abstract_test("blah"))
     with pytest.raises(TypeError):
         _convert(1.5, i64)
     with pytest.raises(TypeError):
@@ -134,7 +134,8 @@ def test_convert_arg():
 def test_convert_result():
 
     def _convert(data, typ1, typ2):
-        return convert_result(data, to_abstract(typ1), to_abstract(typ2))
+        return convert_result(data, to_abstract_test(typ1),
+                                    to_abstract_test(typ2))
 
     # Leaves
 

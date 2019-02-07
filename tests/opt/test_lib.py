@@ -7,7 +7,7 @@ from myia.prim.py_implementations import \
     scalar_usub, array_map, scalar_to_array, transpose
 from myia.utils import newenv
 
-from ..common import to_abstract, i64, f64, af64_of
+from ..common import to_abstract_test, i64, f64, af64_of
 
 from .test_opt import _check_opt
 
@@ -118,7 +118,7 @@ def test_getitem_newenv():
 
     _check_opt(before, after,
                lib.getitem_newenv,
-               argspec=[to_abstract(f64)])
+               argspec=[to_abstract_test(f64)])
 
 
 def test_env_get_set():
@@ -134,7 +134,7 @@ def test_env_get_set():
 
     _check_opt(before, after,
                lib.cancel_env_set_get,
-               argspec=[to_abstract(f64), to_abstract(f64)])
+               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
 
 
 def test_env_get_add():
@@ -154,7 +154,7 @@ def test_env_get_add():
     _check_opt(before, after,
                lib.getitem_env_add,
                lib.cancel_env_set_get,
-               argspec=[to_abstract(i64), to_abstract(i64)],
+               argspec=[to_abstract_test(i64), to_abstract_test(i64)],
                argspec_after=False)
 
 
@@ -987,7 +987,7 @@ def test_incorporate_env_getitem():
     _check_opt(before, after,
                lib.incorporate_env_getitem,
                lib.cancel_env_set_get,
-               argspec=[to_abstract(f64), to_abstract(f64)])
+               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
 
 
 def test_incorporate_env_getitem_2():
@@ -1032,7 +1032,7 @@ def test_incorporate_env_getitem_through_switch():
     _check_opt(before, after,
                lib.incorporate_env_getitem_through_switch,
                lib.cancel_env_set_get,
-               argspec=[to_abstract(f64), to_abstract(f64)])
+               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
 
 
 def test_incorporate_call():

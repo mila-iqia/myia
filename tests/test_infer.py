@@ -28,7 +28,8 @@ from myia.utils import newenv
 
 from .common import B, T, L, i16, i32, i64, u64, f16, f32, f64, \
     ai64, af64, Nil, Point, Point_t, Point3D, Thing, Thing_ftup, mysum, \
-    ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, to_abstract
+    ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
+    to_abstract_test
 
 
 ########################
@@ -82,7 +83,7 @@ def _is_exc_type(cls):
 def inferrer_decorator(pipeline):
     def infer(*tests):
 
-        tests = [[to_abstract(x) for x in test] for test in tests]
+        tests = [[to_abstract_test(x) for x in test] for test in tests]
 
         def decorate(fn):
             def run_test(spec):

@@ -80,7 +80,7 @@ def af16_of(*shp, value=ANYTHING):
 
 
 def JT(a):
-    return AbstractJTagged(to_abstract(a))
+    return AbstractJTagged(to_abstract_test(a))
 
 
 def S(x, t=None):
@@ -91,7 +91,7 @@ def S(x, t=None):
 
 
 def Shp(*vals):
-    return to_abstract(tuple(S(v, u64) for v in vals))
+    return to_abstract_test(tuple(S(v, u64) for v in vals))
 
 
 def Ty(t):
@@ -99,7 +99,7 @@ def Ty(t):
 
 
 @overload(bootstrap=True)
-def to_abstract(self, x: (bool, int, float, str, EnvInstance)):
+def to_abstract_test(self, x: (bool, int, float, str, EnvInstance)):
     return AbstractScalar({
         VALUE: x,
         TYPE: dtype.pytype_to_myiatype(type(x)),
@@ -107,13 +107,13 @@ def to_abstract(self, x: (bool, int, float, str, EnvInstance)):
 
 
 @overload  # noqa: F811
-def to_abstract(self, x: (dtype.Number, dtype.Bool,
+def to_abstract_test(self, x: (dtype.Number, dtype.Bool,
                           dtype.External, dtype.EnvType)):
     return AbstractScalar({VALUE: ANYTHING, TYPE: x})
 
 
 @overload  # noqa: F811
-def to_abstract(self, x: np.ndarray):
+def to_abstract_test(self, x: np.ndarray):
     return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,
@@ -124,33 +124,33 @@ def to_abstract(self, x: np.ndarray):
 
 
 @overload  # noqa: F811
-def to_abstract(self, x: AbstractBase):
+def to_abstract_test(self, x: AbstractBase):
     return x
 
 
 @overload  # noqa: F811
-def to_abstract(self, tup: tuple):
+def to_abstract_test(self, tup: tuple):
     return AbstractTuple([self(x) for x in tup])
 
 
 @overload  # noqa: F811
-def to_abstract(self, l: list):
+def to_abstract_test(self, l: list):
     assert len(l) == 1
     return AbstractList(self(l[0]))
 
 
 @overload  # noqa: F811
-def to_abstract(self, x: Exception):
+def to_abstract_test(self, x: Exception):
     return x
 
 
 @overload  # noqa: F811
-def to_abstract(self, t: type):
+def to_abstract_test(self, t: type):
     return self[t](t)
 
 
 @overload  # noqa: F811
-def to_abstract(self, x: object):
+def to_abstract_test(self, x: object):
     if is_dataclass(x):
         typ = dtype.pytype_to_myiatype(type(x), x)
         new_args = {}

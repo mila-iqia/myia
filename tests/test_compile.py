@@ -11,7 +11,7 @@ from myia.prim.py_implementations import \
 from myia.utils import no_prof, Profile
 
 
-from .common import to_abstract
+from .common import to_abstract_test
 
 
 compile_pipeline = standard_pipeline
@@ -153,7 +153,7 @@ def test_switch_nontail():
         return a * a
 
     i64 = typeof(1)
-    argspec = (to_abstract(i64), to_abstract(i64))
+    argspec = (to_abstract_test(i64), to_abstract_test(i64))
     myia_fn = compile_pipeline.run(input=fn,
                                    argspec=argspec)['output']
 

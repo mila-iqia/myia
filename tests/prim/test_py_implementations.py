@@ -17,7 +17,7 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
-from ..common import i64, f64, to_abstract, Point
+from ..common import i64, f64, to_abstract_test, Point
 
 
 @parse_compare((2, 7), (4, -6))
@@ -423,6 +423,6 @@ def test_env():
     assert res == (110, 20, 0)
 
     res = pip2.run(input=f,
-                   argspec=(to_abstract(i64),
-                            to_abstract(i64)))['output'](3, 4)
+                   argspec=(to_abstract_test(i64),
+                            to_abstract_test(i64)))['output'](3, 4)
     assert res == (110, 20, 0)

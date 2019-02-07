@@ -13,7 +13,7 @@ from myia.abstract import (
     VALUE, TYPE, DEAD
 )
 
-from .common import Point, to_abstract, f32, Ty, af32_of
+from .common import Point, to_abstract_test, f32, Ty, af32_of
 
 
 def S(v=ANYTHING, t=None, s=None):
@@ -47,7 +47,7 @@ def test_build_value():
     assert build_value(S(p)) == 1234
 
     pt = Point(1, 2)
-    assert build_value(to_abstract(pt)) == pt
+    assert build_value(to_abstract_test(pt)) == pt
 
 
 def test_merge():
@@ -89,25 +89,25 @@ def test_merge_possibilities():
 
 def test_repr():
 
-    s1 = to_abstract(1)
+    s1 = to_abstract_test(1)
     assert repr(s1) == 'S(VALUE=1, TYPE=Int[64])'
 
-    s2 = to_abstract(f32)
+    s2 = to_abstract_test(f32)
     assert repr(s2) == 'S(TYPE=Float[32])'
 
-    t1 = to_abstract((1, f32))
+    t1 = to_abstract_test((1, f32))
     assert repr(t1) == f'T({s1}, {s2})'
 
-    l1 = to_abstract([f32])
+    l1 = to_abstract_test([f32])
     assert repr(l1) == f'L({s2})'
 
-    a1 = to_abstract(af32_of(4, 5))
+    a1 = to_abstract_test(af32_of(4, 5))
     assert repr(a1) == f'A({s2}, SHAPE=(4, 5))'
 
-    p1 = to_abstract(Point(1, f32))
+    p1 = to_abstract_test(Point(1, f32))
     assert repr(p1) == f'*Point(x={s1}, y={s2})'
 
-    j1 = AbstractJTagged(to_abstract(1))
+    j1 = AbstractJTagged(to_abstract_test(1))
     assert repr(j1) == f'J({s1})'
 
     ty1 = Ty(f32)

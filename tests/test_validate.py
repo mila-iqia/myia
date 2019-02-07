@@ -7,7 +7,7 @@ from myia.prim import ops as P
 from myia.prim.py_implementations import make_record, partial
 from myia.validate import validate as _validate, ValidationError
 
-from .common import i64, Point, Point_t, to_abstract
+from .common import i64, Point, Point_t, to_abstract_test
 
 
 Point_a = Point(i64, i64)
@@ -50,7 +50,7 @@ pip_ec = scalar_pipeline \
 
 def run(pip, fn, types):
     res = pip.run(input=fn,
-                  argspec=[to_abstract(t) for t in types])
+                  argspec=[to_abstract_test(t) for t in types])
     return res['graph']
 
 
