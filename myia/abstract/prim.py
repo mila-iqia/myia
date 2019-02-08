@@ -596,7 +596,7 @@ class _GetAttrInferrer(Inferrer):
 abstract_inferrer_constructors[P.getattr] = _GetAttrInferrer.partial()
 
 
-# setattr = Primitive('setattr')
+# TODO: setattr
 
 
 @standard_prim(P.tuple_len)
@@ -742,7 +742,7 @@ async def _inf_array_map(engine, fn: AbstractFunction, *arrays):
     return AbstractArray(result, {SHAPE: tuple(rshape)})
 
 
-# array_scan = Primitive('array_scan')
+# TODO: array_scan
 
 
 @standard_prim(P.array_reduce)
