@@ -52,7 +52,7 @@ from functools import reduce
 
 from .composite import zeros_like, hyper_add
 from .info import About
-from .ir import Constant, Graph, clone
+from .ir import Constant, Graph
 from .opt import sexp_to_node
 from .prim import ops as primops, Primitive
 from .prim.grad_implementations import augmented_graphs
@@ -634,24 +634,21 @@ def _grad(mng, root):
 def J(prim: Primitive, resources):
     """Implement J on a Primitive."""
     g = augmented_graphs[prim]
-    if isinstance(g, Graph):
-        return clone(g)
-    else:
-        return g
+    return resources.convert(g)
 
 
 @overload  # noqa: F811
-def J(graph: Graph, manager):
+def J(graph: Graph, resources):
     """Implement J on a Graph."""
     if graph.transforms.get('grad', None):
         return graph.transforms['grad']
+    manager = resources.manager
     manager.add_graph(graph)
-    res = _grad(manager, graph)
-    return clone(res)
+    return _grad(manager, graph)
 
 
 @overload  # noqa: F811
-def J(other: object, manager):
+def J(other: object, resources):
     """We do not implement J on non-functions here."""
     name = type(other).__qualname__
     raise NotImplementedError(f'J(::{name}) not implemented')

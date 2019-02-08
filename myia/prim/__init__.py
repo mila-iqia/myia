@@ -2,5 +2,5 @@
 
 from .ops import Primitive  # noqa
 from .py_implementations import (  # noqa
-    py_implementations, vm_implementations
+    py_registry, vm_registry
 )

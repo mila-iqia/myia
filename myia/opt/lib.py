@@ -1,9 +1,10 @@
 """Library of optimizations."""
 
+from ..abstract import \
+    abstract_clone, AbstractFunction, AbstractJTagged, AbstractTuple, \
+    AbstractScalar, VALUE, TYPE
 from ..composite import hyper_add
-from ..dtype import type_cloner, Function, JTagged, Number, ismyiatype, \
-    Tuple, UInt
-from ..infer import Inferrer
+from ..dtype import Number, ismyiatype, UInt
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable
@@ -56,6 +57,17 @@ Cs = SVar(var(_is_c))
 def primset_var(*prims):
     """Create a variable that matches a Primitive node."""
     return var(lambda node: node.is_constant() and node.value in prims)
+
+
+def shptup(values):
+    """Create the type of a shape, i.e. a tuple of u64."""
+    return AbstractTuple([
+        AbstractScalar({
+            VALUE: v,
+            TYPE: UInt[64],
+        })
+        for v in values
+    ])
 
 
 ###############################
@@ -216,7 +228,7 @@ def merge_transposes(optimizer, node, equiv):
     assert len(axes1) == len(axes2)
     axes_final = tuple(axes1.index(x) for x in axes2)
     axes_ct = Constant(axes_final)
-    axes_ct.type = Tuple[[UInt[64] for _ in axes_ct.value]]
+    axes_ct.abstract = shptup(axes_ct.value)
     return node.graph.apply(P.transpose, equiv[X], axes_ct)
 
 
@@ -237,7 +249,7 @@ def unfuse_composite(optimizer, node, equiv):
         def asarray(self, ng, i):
             if i.is_constant():
                 shp = Constant(self.shape)
-                shp.type = Tuple[[UInt[64] for _ in shp.value]]
+                shp.abstract = shptup(shp.value)
                 return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i),
                                 shp)
             else:
@@ -292,7 +304,7 @@ def simplify_array_map(optimizer, node, equiv):
             return xs[idx]
         elif x.is_constant() and ismyiatype(x.type, Number):
             shp = Constant(xs[0].shape)
-            shp.type = Tuple[[UInt[64] for _ in shp.value]]
+            shp.abstract = shptup(shp.value)
             sexp = (P.distribute, (P.scalar_to_array, x), shp)
             return sexp_to_node(sexp, node.graph)
         else:
@@ -794,14 +806,19 @@ def expand_J(optimizer, node, equiv):
     from ..grad import J as Jimpl
     arg = equiv[C].value
     try:
-        newg = Jimpl(arg, optimizer.resources.manager)
+        newg = Jimpl(arg, optimizer.resources)
     except NotImplementedError:
         return None
     return Constant(newg)
 
 
-@type_cloner.variant
-def _nofunction(self, f: (Function, Inferrer)):
+@abstract_clone.variant
+def _jelim_retype(self, j: AbstractJTagged):
+    return _jelim_retype_helper(j.element)
+
+
+@abstract_clone.variant
+def _jelim_retype_helper(self, f: AbstractFunction):
     raise TypeError('Function found')
 
 
@@ -819,21 +836,20 @@ class JElim(Partializable):
         nodes = []
         typesubs = []
         for node in mng.all_nodes:
+            try:
+                newtype = _jelim_retype(node.abstract)
+            except TypeError as e:
+                return False
             if node.is_apply(P.J) or node.is_apply(P.Jinv):
                 _, x = node.inputs
-                try:
-                    _nofunction(x.type)
-                except TypeError:
-                    return False
                 nodes.append((node, x))
-            elif node.is_constant() and ismyiatype(node.type, JTagged):
-                typesubs.append((node, node.type.subtype))
+            typesubs.append((node, newtype))
 
         with mng.transact() as tr:
             for node, repl in nodes:
                 tr.replace(node, repl)
 
         for node, newtype in typesubs:
-            node.type = newtype
+            node.abstract = newtype
 
         return len(nodes) > 0

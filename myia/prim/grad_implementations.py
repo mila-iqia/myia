@@ -4,6 +4,7 @@ Each primitive is associated to an augmented function, which returns a pair of
 the (augmented) original primitive's output and a backpropagator function.
 """
 
+from ..abstract import AbstractFunction, GraphFunction
 from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import NamedDebugInfo, About
@@ -242,6 +243,18 @@ def bprop_distribute(arr, shp, out, dout):
             zeros_like(shp))
 
 
+@register_bprop(primops.shape)
+def bprop_shape(arr, out, dout):
+    """Backpropagator for primitive `shape`."""
+    return (zeros_like(arr),)
+
+
+@register_bprop(primops.broadcast_shape)
+def bprop_broadcast_shape(shp1, shp2, out, dout):
+    """Backpropagator for primitive `broadcast_shape`."""
+    return (zeros_like(shp1), zeros_like(shp2))
+
+
 @register_bprop(primops.J)
 def bprop_J(x, out, dout):
     """Backpropagator for primitive `J`."""
@@ -273,16 +286,18 @@ def __fprop__switch(jcond, jtb, jfb):
 class MakeTupleGradient(MetaGraph):
     """Generate the gradient graph for make_tuple."""
 
-    def specialize_from_types(self, types):
+    def specialize_from_abstract(self, args):
         """Generate the gradient graph."""
         g = Graph()
+        g.debug.name = f'{syms["grad_fprop"]}make_tuple_{len(args)}'
 
-        params = [g.add_parameter() for t in types]
+        params = [g.add_parameter() for t in args]
         jinv_params = [g.apply(primops.Jinv, p) for p in params]
         tup = g.apply(primops.make_tuple, *jinv_params)
         out = g.apply(primops.J, tup)
 
         b = Graph()
+        b.debug.name = f'{syms["grad_bprop"]}make_tuple_{len(args)}'
         dout = b.add_parameter()
         grads = [b.apply(primops.tuple_getitem, dout, i)
                  for i, p in enumerate(params)]
@@ -323,10 +338,10 @@ class ArrayMapGradient(MetaGraph):
             return ret, bprop_array_map
     """
 
-    def specialize_from_types(self, types):
+    def specialize_from_abstract(self, absargs):
         """Generate the gradient graph."""
         g = Graph()
-        nargs = len(types) - 1
+        nargs = len(absargs) - 1
         params = [g.add_parameter() for _ in range(nargs + 1)]
         jf, *jargs = params
         f, *args = [g.apply(primops.Jinv, p) for p in params]
@@ -377,10 +392,13 @@ class ArrayReduceGradient(MetaGraph):
     over the `scalar_add` operation (sum, basically).
     """
 
-    def specialize_from_types(self, types):
+    def specialize_from_abstract(self, args):
         """Generate the gradient graph."""
-        jf, jarr, jshp = types
-        assert jf._graph.transforms['primal'] is primops.scalar_add
+        jf, jarr, jshp = args
+        assert isinstance(jf, AbstractFunction)
+        fn = jf.get_unique()
+        assert isinstance(fn, GraphFunction) and fn.graph.parent is None
+        assert fn.graph.transforms['primal'] is primops.scalar_add
         return bprop_to_augm(primops.array_reduce, bprop_sum)
 
 

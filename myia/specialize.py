@@ -1,16 +1,16 @@
 """Specialize graphs according to the types of their arguments."""
 
-import numpy
 from itertools import count
+from dataclasses import replace as dc_replace
 
-from .dtype import Function, TypeMeta
-from .infer import ANYTHING, Context, concretize_type, \
-    GraphInferrer, PartialInferrer, Inferrer, Unspecializable, \
-    DEAD, INACCESSIBLE
-from .ir import GraphCloner, Constant, Graph
+from .abstract import GraphFunction, concretize_abstract, \
+    AbstractFunction, AbstractError, build_value, MyiaTypeError, \
+    TypedPrimitive, BaseGraphInferrer, broaden, \
+    TrackedInferrer, PrimitiveFunction, MetaGraphFunction
+from .abstract import Context, Unspecializable, \
+    DEAD, POLY, VirtualReference
+from .ir import GraphCloner, Constant, Graph, MetaGraph
 from .prim import ops as P, Primitive
-from .utils import Overload, overload, Namespace, SymbolicKeyInstance, \
-    EnvInstance
 
 
 _count = count(1)
@@ -18,8 +18,20 @@ _count = count(1)
 
 def _const(v, t):
     ct = Constant(v)
-    ct.type = t
+    ct.abstract = t
     return ct
+
+
+async def concretize_cache(cache):
+    """Complete a cache with concretized versions of its keys.
+
+    If an entry in the cache has a key that contains a Pending, a new key
+    is created where the Pending is resolved, and it is entered in the cache
+    so that it can be found more easily.
+    """
+    for k, v in list(cache.items()):
+        kc = await concretize_abstract(k)
+        cache[kc] = v
 
 
 class TypeSpecializer:
@@ -28,69 +40,47 @@ class TypeSpecializer:
     def __init__(self, engine):
         """Initialize a TypeSpecializer."""
         self.engine = engine
+        self.seen = set()
         self.mng = self.engine.mng
         self.specializations = {Context.empty(): None}
+        self.infcaches = {}
 
     def run(self, graph, context):
         """Run the specializer on the given graph in the given context."""
-        ginf = GraphInferrer(self.engine.tracks['type'],
-                             graph, Context.empty(),
-                             broaden=False)
+        ginf = self.engine.get_inferrer_for(GraphFunction(graph, context))
 
         argrefs = [self.engine.ref(p, context)
                    for p in graph.parameters]
 
         return self.engine.run_coroutine(
-            self._specialize(ginf, argrefs)
+            self._specialize_helper(ginf, argrefs)
         )
 
-    async def _specialize(self, ginf, argrefs):
-        g = await ginf.make_graph(argrefs)
-        ctx = await ginf.make_context(argrefs)
+    async def _specialize_helper(self, ginf, argrefs):
+        await concretize_cache(self.engine.cache.cache)
+        await concretize_cache(self.engine.reference_map)
+        g = ginf._graph
+        argvals = [await self.engine.get_inferred(ref)
+                   for ref in argrefs]
+        ctx = ginf.make_context(self.engine, argvals)
+        return await self._specialize(g, ctx, argrefs)
 
+    async def _specialize(self, g, ctx, argrefs):
         ctxkey = ctx  # TODO: Reify ctx to collapse multiple ctx into one
         if ctxkey in self.specializations:
             return self.specializations[ctxkey].new_graph
 
-        gspec = _GraphSpecializer(self, g, ctx)
+        gspec = _GraphSpecializer(self, g, await concretize_abstract(ctx))
         g2 = gspec.new_graph
         self.specializations[ctxkey] = gspec
         await gspec.run()
         return g2
 
 
-_legal = (int, float, numpy.number, numpy.ndarray,
-          str, Namespace, SymbolicKeyInstance, TypeMeta)
-
-
-def _visible(g, node):
-    if isinstance(node, Graph):
-        g2 = node.parent
-    else:
-        g2 = node.graph
-    while g and g2 is not g:
+def _visible(g, parentg):
+    while g and parentg is not g:
         g = g.parent
-    return g2 is g
-
-
-@overload
-def _is_concrete_value(v: (tuple, list)):
-    return all(_is_concrete_value(x) for x in v)
-
-
-@overload  # noqa: F811
-def _is_concrete_value(v: EnvInstance):
-    return all(_is_concrete_value(x) for x in v._contents.values())
-
-
-@overload  # noqa: F811
-def _is_concrete_value(v: _legal):
-    return True
-
-
-@overload  # noqa: F811
-def _is_concrete_value(v: object):
-    return False
+    return parentg is g
 
 
 class _GraphSpecializer:
@@ -102,14 +92,14 @@ class _GraphSpecializer:
         self.engine = specializer.engine
         self.graph = graph
         self.context = context
-        cl = GraphCloner(
+        self.cl = GraphCloner(
             self.graph,
             total=False,
             clone_children=False,
             graph_relation=next(_count)
         )
-        cl.run()
-        self.repl = cl.repl
+        self.cl.run()
+        self.repl = self.cl.repl
         self.new_graph = self.repl[self.graph]
         self.todo = [self.graph.return_] + list(self.graph.parameters)
         self.marked = set()
@@ -122,6 +112,91 @@ class _GraphSpecializer:
         return sp.repl.get(node, node)
 
     async def run(self):
+        await self.first_pass()
+        await self.second_pass()
+
+    def ref(self, node):
+        return self.engine.ref(node, self.context)
+
+    #########
+    # Build #
+    #########
+
+    async def build_inferrer(self, a, fn, argvals):
+        if isinstance(fn, TypedPrimitive):
+            return _const(fn.prim, a)
+
+        inf = self.specializer.engine.get_inferrer_for(fn)
+        argvals, outval = await self._find_unique_argvals(a, inf, argvals)
+
+        if isinstance(inf, TrackedInferrer):
+            fn = dc_replace(fn, tracking_id=None)
+            inf = self.specializer.engine.get_inferrer_for(fn)
+
+        if isinstance(fn, PrimitiveFunction):
+            a = AbstractFunction(TypedPrimitive(fn.prim, argvals, outval))
+            return _const(fn.prim, a)
+
+        assert isinstance(inf, BaseGraphInferrer)
+
+        assert _visible(self.graph, fn.context.graph)
+
+        ctx = inf.make_context(self.specializer.engine, argvals)
+        v = await self.specializer._specialize(ctx.graph, ctx, None)
+        return _const(v, a)
+
+    async def _find_choices(self, inf):
+        if inf not in self.specializer.infcaches:
+            rcache = {}
+            for k, v in list(inf.cache.items()):
+                kc = tuple([await concretize_abstract(x) for x in k])
+                inf.cache[kc] = v
+                rcache[kc] = v
+            self.specializer.infcaches[inf] = rcache
+        return self.specializer.infcaches[inf]
+
+    async def _find_generalized(self, inf):
+        choices = set()
+        for argvals in self.specializer.infcaches[inf]:
+            argvals = tuple([broaden(v, None) for v in argvals])
+            choices.add(argvals)
+        if len(choices) == 1:
+            choice, = choices
+            argrefs = [VirtualReference(v) for v in choice]
+            res = await inf.run(self.specializer.engine, None, argrefs)
+            self.specializer.infcaches[inf] = {choice: res}
+            return choice, res
+        else:
+            return None, None
+
+    async def _find_unique_argvals(self, a, inf, argvals):
+        if argvals is not None:
+            argvals = tuple(argvals)
+        if argvals in inf.cache:
+            # We do this first because it's inexpensive
+            return argvals, inf.cache[argvals]
+        choices = await self._find_choices(inf)
+        if argvals in inf.cache:
+            # We do this a second time because _find_choices may have
+            # added what we are looking for.
+            return argvals, inf.cache[argvals]
+        elif len(choices) == 1:
+            for choice in choices.items():
+                # Return the only element
+                return choice
+        elif len(choices) == 0:
+            raise Unspecializable(DEAD)
+        else:
+            generalized, outval = await self._find_generalized(inf)
+            if generalized is not None:
+                return generalized, outval
+            raise Unspecializable(POLY)
+
+    ###########
+    # Process #
+    ###########
+
+    async def first_pass(self):
         while self.todo:
             node = self.todo.pop()
             if node.graph is None:
@@ -135,80 +210,42 @@ class _GraphSpecializer:
             self.marked.add(node)
             await self.process_node(node)
 
-    def ref(self, node):
-        return self.engine.ref(node, self.context)
+    async def second_pass(self):
+        # Specialize constant graphs
+        from .graph_utils import dfs
+        from .ir.utils import succ_incoming
+        for node in dfs(self.new_graph.return_, succ=succ_incoming):
+            if node.is_apply():
+                await self.process_apply(node)
 
-    #########
-    # Build #
-    #########
-
-    async def build(self, ref, argrefs=None):
-        t = await ref['type']
-        v = await ref['value']
-        if isinstance(t, Inferrer) and v is not ANYTHING:
-            if argrefs is None:
-                argrefs = await t.get_unique_argrefs()
-            return await self._build_inferrer(t, argrefs)
-        elif _is_concrete_value(v):
-            return _const(v, await concretize_type(t))
-        elif not _visible(self.graph, ref.node):
-            raise Unspecializable(INACCESSIBLE)
+    async def build(self, ref, a: AbstractFunction):
+        if isinstance(a, AbstractFunction):
+            try:
+                fn = a.get_unique()
+                if isinstance(fn, PrimitiveFunction):
+                    g = fn.prim
+                elif isinstance(fn, MetaGraphFunction):
+                    g = fn.metagraph
+                elif isinstance(fn, GraphFunction):
+                    g = fn.graph
+                else:
+                    return None
+                if not isinstance(g, Graph) \
+                        or g.parent is None \
+                        or (ref.node.is_constant_graph()
+                            and _visible(self.graph, g.parent)):
+                    return _const(g, a)
+                else:
+                    return None
+            except MyiaTypeError:
+                return None
         else:
-            self.todo.append(ref.node)
-            new_node = self.get(ref.node)
-            new_node.type = await concretize_type(t)
-            return new_node
-
-    _build_inferrer = Overload()
-
-    @_build_inferrer.register
-    async def _build_inferrer(self, inf: GraphInferrer, argrefs):
-        g = await inf.make_graph(argrefs)
-        if _visible(self.graph, g):
-            v = await self.specializer._specialize(inf, argrefs)
-            return _const(v, await inf.as_function_type(argrefs))
-        else:
-            raise Unspecializable(INACCESSIBLE)
-
-    @_build_inferrer.register  # noqa: F811
-    async def _build_inferrer(self, inf: PartialInferrer, argrefs):
-        all_argrefs = None if argrefs is None else [*inf.args, *argrefs]
-        sub_build = await self._build_inferrer(inf.fn, all_argrefs)
-        ptl_args = [await self.build(ref) for ref in inf.args]
-        res_t = await inf.as_function_type(argrefs)
-        ptl = _const(P.partial, Function[
-            [sub_build.type, *[a.type for a in ptl_args]],
-            res_t
-        ])
-        res = self.new_graph.apply(
-            ptl,
-            sub_build,
-            *ptl_args
-        )
-        res.type = res_t
-        return res
-
-    @_build_inferrer.register  # noqa: F811
-    async def _build_inferrer(self, inf: Inferrer, argrefs):
-        v = inf.identifier
-        if isinstance(v, Primitive):
-            return _const(v, await inf.as_function_type(argrefs))
-        else:
-            raise Unspecializable(DEAD)
-
-    ###########
-    # Process #
-    ###########
-
-    async def fill_inferred(self, new_node, ref):
-        # Fill in inferred properties like shape, etc.
-        # Inference for 'type' and 'value' is ignored here because
-        # they are processed specifically by the rest of the code.
-        for name, track in self.engine.tracks.items():
-            if name not in ('type', 'value'):
-                res = await ref[name]
-                if not isinstance(res, Inferrer):
-                    new_node.inferred[name] = res
+            try:
+                v = build_value(a)
+            except ValueError:
+                return None
+            else:
+                return _const(v, a)
 
     async def process_node(self, node):
         ref = self.ref(node)
@@ -216,30 +253,52 @@ class _GraphSpecializer:
         if new_node.graph is not self.new_graph:
             raise AssertionError('Error in specializer [A]')
 
-        new_node.type = await concretize_type(await ref['type'])
-
-        await self.fill_inferred(new_node, ref)
+        new_node.abstract = await concretize_abstract(await ref.get())
 
         if node.is_apply():
             new_inputs = new_node.inputs
             irefs = list(map(self.ref, node.inputs))
-            for i, iref in enumerate(irefs):
-                argrefs = irefs[1:] if i == 0 else None
-                try:
-                    repl = await self.build(ref=iref, argrefs=argrefs)
-                except Unspecializable as e:
-                    if new_inputs[i].is_constant_graph():
-                        # Graphs that cannot be specialized are replaced
-                        # by a constant with the associated Problem type.
-                        # We can't keep references to unspecialized graphs.
-                        repl = _const(e.problem.kind, e.problem)
-                    else:
-                        self.todo.append(node.inputs[i])
-                        it = await iref['type']
-                        repl = self.get(node.inputs[i])
-                        repl.type = await concretize_type(it)
+            ivals = [await concretize_abstract(await iref.get())
+                     for iref in irefs]
+            for i, ival in enumerate(ivals):
+                iref = irefs[i]
+                repl = await self.build(iref, ival)
+                if repl is None:
+                    while iref in self.specializer.engine.reference_map:
+                        iref = self.specializer.engine.reference_map[iref]
+                        self.cl.clone_disconnected(iref.node)
+                    self.todo.append(iref.node)
+                    repl = self.get(iref.node)
+                    repl.abstract = await concretize_abstract(ival)
                 if repl is not new_inputs[i]:
-                    await self.fill_inferred(repl, iref)
                     new_inputs[i] = repl
-                else:
-                    self.todo.append(node.inputs[i])
+
+    async def process_apply(self, new_node):
+        if new_node in self.specializer.seen:
+            return
+        self.specializer.seen.add(new_node)
+
+        async def _helper(i, node, a, argvals):
+            if node.is_constant_graph() \
+                    or node.is_constant(MetaGraph) \
+                    or node.is_constant(Primitive):
+                # There should only be one possibility here
+                fn = a.get_unique()
+                try:
+                    repl = await self.build_inferrer(a, fn, argvals)
+                except Unspecializable as e:
+                    repl = _const(e.problem, AbstractError(e.problem))
+                new_inputs[i] = repl
+
+        new_inputs = new_node.inputs
+        fn, *args = new_inputs
+        while fn.is_apply(P.partial):
+            args = fn.inputs[2:] + args
+            fn = fn.inputs[1]
+            new_inputs = [fn, *args]
+        fnval, *argvals = [x.abstract for x in new_inputs]
+        await _helper(0, fn, fnval, argvals)
+        for i, val in enumerate(argvals):
+            await _helper(i + 1, args[i], val, None)
+
+        new_node.inputs = new_inputs

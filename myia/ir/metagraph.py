@@ -21,10 +21,10 @@ class MetaGraph:
         self.name = name
         self.cache = {}
 
-    async def specialize(self, argrefs):
-        """Generate a Graph for the given references."""
-        types = tuple([await arg['type'] for arg in argrefs])
-
+    def specialize_from_abstract(self, args):
+        """Generate a Graph for the given abstract arguments."""
+        from ..abstract.utils import build_type
+        types = tuple([build_type(arg) for arg in args])
         if types not in self.cache:
             self.cache[types] = self.specialize_from_types(types)
         return self.cache[types]
@@ -36,9 +36,6 @@ class MetaGraph:
         )
 
     def __str__(self):
-        return self.name
-
-    def __repr__(self):
         return self.name
 
 

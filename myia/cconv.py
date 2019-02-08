@@ -28,10 +28,7 @@ def closure_convert(root):
             for node in fvs.get(g, []):
                 with About(node.debug, 'fv'):
                     param = Parameter(g)
-                    if isinstance(node, Graph):
-                        param.type = node.type
-                    else:
-                        param.inferred.update(node.inferred)
+                    param.abstract = node.abstract
                     new_params.append(param)
                 tr.set_parameters(g, new_params + g.parameters)
                 repl[g][node] = param

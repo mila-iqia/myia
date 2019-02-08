@@ -10,13 +10,11 @@ returning a nested function creates a closure.
 
 """
 
-from collections import defaultdict
 from typing import Any, Iterable, List, Union, Dict
 
-from ..dtype import Function
 from ..info import NamedDebugInfo
 from ..prim import ops as primops, Primitive
-from ..utils import Named, list_str, repr_, UNKNOWN
+from ..utils import Named, list_str, repr_
 from ..utils.unify import expandlist, noseq
 
 from .abstract import Node
@@ -57,12 +55,14 @@ class Graph:
         self._manager = None
 
     @property
-    def type(self):
+    def abstract(self):
         """Return the graph's type based on parameter/output types."""
-        if any(p.type is UNKNOWN for p in self.parameters):
-            return UNKNOWN
-        return Function[tuple(p.type for p in self.parameters),
-                        self.output.type]
+        from ..abstract import VirtualFunction, AbstractFunction
+        if any(p.abstract is None for p in self.parameters):
+            return None  # pragma: no cover
+        vf = VirtualFunction(tuple(p.abstract for p in self.parameters),
+                             self.output.abstract)
+        return AbstractFunction(vf)
 
     @property
     def output(self) -> 'ANFNode':
@@ -79,6 +79,7 @@ class Graph:
     @output.setter
     def output(self, value: 'ANFNode') -> None:
         """Set the graph's output."""
+        from ..abstract import AbstractFunction, PrimitiveFunction
         if self.return_:
             if self._manager:
                 self._manager.set_edge(self.return_, 1, value)
@@ -86,9 +87,10 @@ class Graph:
                 self.return_.inputs[1] = value
         else:
             self.return_ = Apply([Constant(primops.return_), value], self)
-        self.return_.type = value.type
-        if value.type is not UNKNOWN:
-            self.return_.inputs[0].type = Function[(value.type,), value.type]
+        self.return_.abstract = value.abstract
+        f = PrimitiveFunction(primops.return_,
+                              tracking_id=self.return_.inputs[0])
+        self.return_.inputs[0].abstract = AbstractFunction(f)
 
     def add_parameter(self) -> 'Parameter':
         """Add a new parameter to this graph (appended to the end)."""
@@ -243,28 +245,23 @@ class ANFNode(Node):
         self.value = value
         self.graph = graph
         self.debug = NamedDebugInfo(self)
-        self.inferred = defaultdict(lambda: UNKNOWN)
-        self.expect_inferred = defaultdict(lambda: UNKNOWN)
+        self.abstract = None
 
     @property
     def type(self):
         """Return the node's type."""
-        return self.inferred['type']
-
-    @type.setter
-    def type(self, value):
-        """Set the node's type."""
-        self.inferred['type'] = value
+        from ..abstract import build_type
+        return self.abstract and build_type(self.abstract)
 
     @property
     def shape(self):
         """Return the node's shape."""
-        return self.inferred['shape']
-
-    @shape.setter
-    def shape(self, value):
-        """Set the node's shape."""
-        self.inferred['shape'] = value
+        from ..abstract import AbstractArray, SHAPE
+        a = self.abstract
+        if a is not None and isinstance(a, AbstractArray):
+            return a.values[SHAPE]
+        else:
+            return None
 
     @property
     def incoming(self) -> Iterable['ANFNode']:
@@ -323,7 +320,7 @@ class Apply(ANFNode):
         new_inputs = expandlist(map(fn, self.inputs))
         g = noseq(fn, self.graph)
         app = Apply(new_inputs, g)
-        app.type = self.type
+        app.abstract = self.abstract
         return app
 
     def __repr__(self) -> str:
@@ -380,7 +377,7 @@ class Constant(ANFNode):
 
     def __visit__(self, fn):
         ct = Constant(noseq(fn, self.value))
-        ct.type = self.type
+        ct.abstract = self.abstract
         return ct
 
     def __str__(self) -> str:

@@ -2,10 +2,10 @@
 
 
 from . import operations, composite as C
-from .infer import InferenceError
+from .abstract import InferenceError
 from .ir import MetaGraph, Graph
 from .dtype import Array, List, Tuple, Class, tag_to_dataclass, \
-    pytype_to_myiatype, ismyiatype
+    pytype_to_myiatype
 from .utils import TypeMap, Overload
 from .prim import ops as P
 from .prim.py_implementations import issubtype
@@ -127,8 +127,6 @@ class HyperMap(MetaGraph):
                     raise InferenceError(
                         f'HyperMap cannot match up types {t} and {t2}'
                     )
-        if not ismyiatype(t):
-            t = type(t)
         return self.make_map[t](self, t, g, fnarg, argmap)
 
     def _harmonize(self, g, args):

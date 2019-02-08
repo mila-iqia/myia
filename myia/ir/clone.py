@@ -106,42 +106,26 @@ class GraphCloner:
             for p in graph.parameters:
                 with About(p.debug, self.relation):
                     p2 = target_graph.add_parameter()
-                    p2.inferred = copy(p.inferred)
+                    p2.abstract = p.abstract
                     self.repl[p] = p2
             self.repl[graph] = target_graph
 
         for node in mng.nodes[graph]:
-            if node in self.repl:
-                continue
-            if node.is_parameter():
-                # This should not happend for valid graphs, but clone
-                # is also used for debugging to if we can avoid failing
-                # that is good.
-                with About(node.debug, self.relation):
-                    p2 = Parameter(target_graph)
-                    p2.inferred = copy(node.inferred)
-                    self.repl[node] = p2
-            else:
-                assert node.is_apply()
-                with About(node.debug, self.relation):
-                    new = Apply([], target_graph)
-                    new.inferred = copy(node.inferred)
-                    self.repl[node] = new
-                    self.nodes.append((node, new))
+            self._clone_node(node, target_graph)
 
         if not inline:
             target_graph.return_ = self.repl[graph.return_]
             for ct in mng.graph_constants[graph]:
                 with About(ct.debug, self.relation):
                     new = Constant(target_graph)
-                    new.inferred = copy(ct.inferred)
+                    new.abstract = ct.abstract
                     self.repl[ct] = new
 
         if self.clone_constants:
             for ct in mng.constants[graph]:
                 if ct not in self.repl:
                     new = Constant(ct.value)
-                    new.inferred = copy(ct.inferred)
+                    new.abstract = ct.abstract
                     self.repl[ct] = new
 
         self.status[graph] = inline
@@ -153,6 +137,27 @@ class GraphCloner:
         if self.total:
             self.todo += [(g, None, None)
                           for g in mng.graphs_used[graph]]
+
+    def _clone_node(self, node, target_graph):
+        if node in self.repl:
+            return False
+        if node.is_parameter():
+            # This should not happen for valid graphs, but clone
+            # is also used for debugging to if we can avoid failing
+            # that is good.
+            with About(node.debug, self.relation):
+                p2 = Parameter(target_graph)
+                p2.abstract = node.abstract
+                self.repl[node] = p2
+        elif node.is_apply():
+            with About(node.debug, self.relation):
+                new = Apply([], target_graph)
+                new.abstract = node.abstract
+                self.repl[node] = new
+                self.nodes.append((node, new))
+        elif node.is_constant():
+            return False
+        return True
 
     def run(self):
         """Clone everything still to be cloned.
@@ -175,6 +180,17 @@ class GraphCloner:
             for inp in old_node.inputs:
                 repl = self.repl.get(inp, inp)
                 new_node.inputs.append(repl)
+
+    def clone_disconnected(self, droot):
+        """Clone a subgraph that's not (yet) connected to its graph/manager."""
+        if self._clone_node(droot, self.repl[droot.graph]):
+            new = self.repl[droot]
+            if droot.is_apply():
+                new_inputs = []
+                for inp in droot.inputs:
+                    new_inputs.append(self.clone_disconnected(inp))
+                new.inputs = new_inputs
+        return self.repl.get(droot, droot)
 
     def __getitem__(self, x):
         """Get the clone of the given graph or node."""

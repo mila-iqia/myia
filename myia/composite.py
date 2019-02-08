@@ -4,10 +4,12 @@
 from dataclasses import dataclass
 from functools import reduce
 
+from .abstract import \
+    AbstractFunction, GraphFunction, AbstractList, AbstractTuple
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
-    List, Class, EnvType, ismyiatype
+    List, Class, EnvType, Function
 from .hypermap import HyperMap
-from .infer import Inferrer, GraphInferrer, MyiaTypeError
+from .abstract import MyiaTypeError
 from .info import About
 from .ir import Graph, MetaGraph, MultitypeGraph, Constant
 from .prim import ops as P
@@ -391,17 +393,17 @@ def tuple_hasnext(xs):
 class Tail(MetaGraph):
     """Implementation of tail."""
 
-    def specialize_from_types(self, types):
+    def specialize_from_abstract(self, args):
         """Generate tail specialized for the given Tuple type.
 
         tail(x) generates make_tuple(x[1], x[2], ...)
         """
-        if len(types) != 1:
+        if len(args) != 1:
             raise MyiaTypeError('tail takes one argument')
-        t, = types
-        if not ismyiatype(t, Tuple):
+        a, = args
+        if not isinstance(a, AbstractTuple):
             raise MyiaTypeError('tail requires a Tuple')
-        if len(t.elements) == 0:
+        if len(a.elements) == 0:
             raise MyiaTypeError('tail requires a non-empty Tuple')
         g = Graph()
         g.flags['core'] = True
@@ -409,7 +411,7 @@ class Tail(MetaGraph):
         tup = g.add_parameter()
         tup.debug.name = "tup"
         elems = [g.apply(P.tuple_getitem, tup, i)
-                 for i in range(1, len(t.elements))]
+                 for i in range(1, len(a.elements))]
         g.output = g.apply(P.make_tuple, *elems)
         return g
 
@@ -604,9 +606,9 @@ hyper_add = HyperMap(fn_leaf=_leaf_add)
 _leaf_zeros_like = MultitypeGraph('zeros_like')
 
 
-@_leaf_zeros_like.register(Inferrer)
+@_leaf_zeros_like.register(Function)
 @core
-def _inferrer_zero(_):
+def _function_zero(_):
     return newenv
 
 
@@ -649,17 +651,20 @@ def list_reduce(fn, lst, dftl):
 class ListMap(MetaGraph):
     """Implementation of list_map."""
 
-    def specialize_from_types(self, types):
+    def specialize_from_abstract(self, args):
         """Return a graph for the number of lists."""
-        if len(types) < 2:
+        if len(args) < 2:
             raise MyiaTypeError('list_map takes at least two arguments')
+        for t in args[1:]:
+            if not isinstance(t, AbstractList):
+                raise MyiaTypeError(f'list_map requires lists, not {t}')
 
         g = Graph()
         g.flags['core'] = True
         g.flags['flatten_inference'] = True
         g.debug.name = 'list_map'
         fn = g.add_parameter()
-        lists = [g.add_parameter() for _ in types[1:]]
+        lists = [g.add_parameter() for _ in args[1:]]
         iters = [g.apply(list_iter, l) for l in lists]
         nexts = [g.apply(next, it) for it in iters]
         values = [g.apply(P.tuple_getitem, n, 0) for n in nexts]
@@ -765,12 +770,13 @@ class GradOperation(MetaGraph):
             df.output = df.apply(P.tuple_getitem, bapp, 1)
         return df
 
-    def specialize_from_types(self, types):
+    def specialize_from_abstract(self, args):
         """Generate the graph."""
-        ft, = types
-        assert isinstance(ft, GraphInferrer)
-        g = ft._graph
-        assert isinstance(g, Graph)
+        ft, = args
+        assert isinstance(ft, AbstractFunction)
+        gf = ft.get_unique()
+        assert isinstance(gf, GraphFunction)
+        g = gf.graph
 
         dfbuilder = Graph()
         dfbuilder.debug.name = f"grad{len(g.parameters)}"

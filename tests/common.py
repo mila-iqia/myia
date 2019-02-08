@@ -1,9 +1,15 @@
 
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, is_dataclass
+from myia import dtype
+from myia.abstract import VALUE, TYPE, SHAPE, \
+    AbstractBase, AbstractScalar, AbstractArray, \
+    AbstractList, AbstractTuple, AbstractType, AbstractClass, \
+    AbstractJTagged, ANYTHING
 from myia.dtype import Bool, Int, UInt, Float, List, Array, Tuple, Function, \
     Object, pytype_to_myiatype
 from myia.ir import MultitypeGraph
+from myia.utils import overload, EnvInstance
 
 
 B = Bool
@@ -39,6 +45,125 @@ af32 = A[f32]
 af64 = A[f64]
 
 Nil = T[()]
+
+
+###########################
+# Abstract value builders #
+###########################
+
+
+def arr_of(t, shp, value):
+    return AbstractArray(AbstractScalar({
+        VALUE: value,
+        TYPE: t,
+    }), {SHAPE: shp})
+
+
+def ai64_of(*shp, value=ANYTHING):
+    return arr_of(i64, shp, value)
+
+
+def ai32_of(*shp, value=ANYTHING):
+    return arr_of(i32, shp, value)
+
+
+def af64_of(*shp, value=ANYTHING):
+    return arr_of(f64, shp, value)
+
+
+def af32_of(*shp, value=ANYTHING):
+    return arr_of(f32, shp, value)
+
+
+def af16_of(*shp, value=ANYTHING):
+    return arr_of(f16, shp, value)
+
+
+def JT(a):
+    return AbstractJTagged(to_abstract_test(a))
+
+
+def S(x, t=None):
+    return AbstractScalar({
+        VALUE: x,
+        TYPE: t or dtype.pytype_to_myiatype(type(x)),
+    })
+
+
+def Shp(*vals):
+    return to_abstract_test(tuple(S(v, u64) for v in vals))
+
+
+def Ty(t):
+    return AbstractType(t)
+
+
+@overload(bootstrap=True)
+def to_abstract_test(self, x: (bool, int, float, str, EnvInstance)):
+    return AbstractScalar({
+        VALUE: x,
+        TYPE: dtype.pytype_to_myiatype(type(x)),
+    })
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, x: (dtype.Number, dtype.Bool,
+                               dtype.External, dtype.EnvType)):
+    return AbstractScalar({VALUE: ANYTHING, TYPE: x})
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, x: np.ndarray):
+    return AbstractArray(
+        AbstractScalar({
+            VALUE: ANYTHING,
+            TYPE: dtype.np_dtype_to_type(str(x.dtype)),
+        }),
+        {SHAPE: x.shape}
+    )
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, x: AbstractBase):
+    return x
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, tup: tuple):
+    return AbstractTuple([self(x) for x in tup])
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, l: list):
+    assert len(l) == 1
+    return AbstractList(self(l[0]))
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, x: Exception):
+    return x
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, t: type):
+    return self[t](t)
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, x: object):
+    if is_dataclass(x):
+        typ = dtype.pytype_to_myiatype(type(x), x)
+        new_args = {}
+        for name, field in x.__dataclass_fields__.items():
+            new_args[name] = self(getattr(x, name))
+        return AbstractClass(typ.tag, new_args, typ.methods)
+    else:
+        raise Exception(f'Cannot convert: {x}')
+
+
+###############
+# Dataclasses #
+###############
 
 
 @dataclass(frozen=True)

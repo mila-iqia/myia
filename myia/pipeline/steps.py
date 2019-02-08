@@ -8,14 +8,16 @@ import numpy as np
 from itertools import count
 
 from .. import dtype
+from ..abstract import AbstractTuple, AbstractList, AbstractClass, \
+    AbstractArray, TYPE, AbstractScalar
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
     LocalPassOptimizer
-from ..prim import vm_implementations
+from ..prim import vm_registry
 from ..utils import overload, flatten, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
-    validate_type as default_validate_type
+    validate_abstract as default_validate_abstract
 from ..vm import VM
 
 from .pipeline import pipeline_function, PipelineStep
@@ -143,6 +145,7 @@ def step_infer(self, graph, argspec):
     try:
         res, context = self.resources.inferrer.infer(graph, argspec)
         return {'outspec': res,
+                'argspec': argspec,
                 'inference_context': context}
     except Exception as exc:
         # We still want to keep the inferrer around even
@@ -192,9 +195,9 @@ def step_erase_class(self, graph, argspec, outspec):
     """
     mng = self.resources.manager
     erase_class(graph, mng)
-    new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+    new_argspec = tuple(p.abstract for p in graph.parameters)
     graph = self.resources.inferrer.renormalize(graph, new_argspec)
-    new_outspec = dict(graph.output.inferred)
+    new_outspec = graph.output.abstract
     return {'graph': graph,
             'orig_argspec': argspec,
             'argspec': new_argspec,
@@ -219,6 +222,7 @@ step_debug_opt = Optimizer.partial(
             # Safe inlining
             optlib.inline_core,
             optlib.simplify_partial,
+            optlib.elim_identity,
 
             # Miscellaneous
             optlib.elim_j_jinv,
@@ -342,9 +346,9 @@ def step_erase_tuple(self, graph, argspec, outspec, erase_class=False):
     assert erase_class
     mng = self.resources.manager
     erase_tuple(graph, mng)
-    new_argspec = tuple(dict(p.inferred) for p in graph.parameters)
+    new_argspec = tuple(p.abstract for p in graph.parameters)
     graph = self.resources.inferrer.renormalize(graph, new_argspec)
-    new_outspec = dict(graph.output.inferred)
+    new_outspec = graph.output.abstract
     return {'graph': graph,
             'argspec': new_argspec,
             'outspec': new_outspec,
@@ -369,11 +373,11 @@ class Validator(PipelineStep):
     def __init__(self,
                  pipeline_init,
                  whitelist=default_whitelist,
-                 validate_type=default_validate_type):
+                 validate_abstract=default_validate_abstract):
         """Initialize a Validator."""
         super().__init__(pipeline_init)
         self.whitelist = whitelist
-        self.validate_type = validate_type
+        self.validate_abstract = validate_abstract
 
     def step(self, graph, argspec=None, outspec=None):
         """Validate the graph."""
@@ -382,7 +386,7 @@ class Validator(PipelineStep):
         )
         validate(graph,
                  whitelist=self.whitelist,
-                 validate_type=self.validate_type)
+                 validate_abstract=self.validate_abstract)
         return {'graph': graph}
 
 
@@ -413,41 +417,43 @@ def step_cconv(self, graph):
 ############################
 
 
-@overload
-def _convert_arg(arg, orig_t: dtype.Tuple):
+@overload(bootstrap=True)
+def convert_arg(self, arg, orig_t: AbstractTuple):
     if not isinstance(arg, tuple):
         raise TypeError('Expected tuple')
     oe = orig_t.elements
     if len(arg) != len(oe):
         raise TypeError(f'Expected {len(oe)} elements')
-    return list(flatten(convert_arg(x, o)
+    return list(flatten(self(x, o)
                         for x, o in zip(arg, oe)))
 
 
 @overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.List):
+def convert_arg(self, arg, orig_t: AbstractList):
     if not isinstance(arg, list):
         raise TypeError('Expected list')
-    ot = orig_t.element_type
-    return [list(flatten(convert_arg(x, ot) for x in arg))]
+    ot = orig_t.element
+    return [list(flatten(self(x, ot) for x in arg))]
 
 
 @overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.Class):
+def convert_arg(self, arg, orig_t: AbstractClass):
     dc = dtype.tag_to_dataclass[orig_t.tag]
     if not isinstance(arg, dc):
         raise TypeError(f'Expected {dc.__qualname__}')
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
-    return list(flatten(convert_arg(x, o)
+    return list(flatten(self(x, o)
                         for x, o in zip(arg, oe)))
 
 
 @overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.Array):
+def convert_arg(self, arg, orig_t: AbstractArray):
     if not isinstance(arg, np.ndarray):
         raise TypeError('Expected ndarray')
-    et = orig_t.elements
+    et = orig_t.element
+    assert isinstance(et, AbstractScalar)
+    et = et.values[TYPE]
     assert dtype.ismyiatype(et, dtype.Number)
     dt = dtype.type_to_np_dtype(et)
     if arg.dtype != dt:
@@ -456,58 +462,49 @@ def _convert_arg(arg, orig_t: dtype.Array):
 
 
 @overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.Int):
-    if not isinstance(arg, int):
-        raise TypeError(f'Expected int')
+def convert_arg(self, arg, orig_t: AbstractScalar):
+    t = orig_t.values[TYPE]
+    if dtype.ismyiatype(t, dtype.Int):
+        if not isinstance(arg, int):
+            raise TypeError(f'Expected int')
+    elif dtype.ismyiatype(t, dtype.Float):
+        if not isinstance(arg, float):
+            raise TypeError(f'Expected float')
+    elif dtype.ismyiatype(t, dtype.Bool):
+        if not isinstance(arg, bool):
+            raise TypeError(f'Expected bool')
+    else:
+        raise TypeError(f'Invalid type: {t}')
     return [arg]
 
 
-@overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.Float):
-    if not isinstance(arg, float):
-        raise TypeError(f'Expected float')
-    return [arg]
-
-
-@overload  # noqa: F811
-def _convert_arg(arg, orig_t: dtype.Bool):
-    if not isinstance(arg, bool):
-        raise TypeError(f'Expected bool')
-    return [arg]
-
-
-def convert_arg(arg, orig_t):
-    """Check that arg matches orig_t, and convert to vm_t."""
-    return _convert_arg[orig_t](arg, orig_t)
-
-
-@overload
-def _convert_result(res, orig_t, vm_t: dtype.Class):
+@overload(bootstrap=True)
+def convert_result(self, res, orig_t, vm_t: AbstractClass):
     dc = dtype.tag_to_dataclass[orig_t.tag]
     oe = orig_t.attributes.values()
     ve = vm_t.attributes.values()
-    tup = tuple(convert_result(getattr(res, attr), o, v)
+    tup = tuple(self(getattr(res, attr), o, v)
                 for attr, o, v in zip(orig_t.attributes, oe, ve))
     return dc(*tup)
 
 
 @overload  # noqa: F811
-def _convert_result(res, orig_t, vm_t: dtype.List):
-    ot = orig_t.element_type
-    vt = vm_t.element_type
-    return [convert_result(x, ot, vt) for x in res]
+def convert_result(self, res, orig_t, vm_t: AbstractList):
+    ot = orig_t.element
+    vt = vm_t.element
+    return [self(x, ot, vt) for x in res]
 
 
 @overload  # noqa: F811
-def _convert_result(res, orig_t, vm_t: dtype.Tuple):
+def convert_result(self, res, orig_t, vm_t: AbstractTuple):
     # If the EraseClass opt was applied, orig_t may be Class
-    orig_is_class = dtype.ismyiatype(orig_t, dtype.Class)
+    orig_is_class = isinstance(orig_t, AbstractClass)
     if orig_is_class:
         oe = orig_t.attributes.values()
     else:
         oe = orig_t.elements
     ve = vm_t.elements
-    tup = tuple(convert_result(x, o, v)
+    tup = tuple(self(x, o, v)
                 for x, o, v in zip(res, oe, ve))
     if orig_is_class:
         dc = dtype.tag_to_dataclass[orig_t.tag]
@@ -517,7 +514,7 @@ def _convert_result(res, orig_t, vm_t: dtype.Tuple):
 
 
 @overload  # noqa: F811
-def _convert_result(arg, orig_t, vm_t: (dtype.Int, dtype.Float)):
+def convert_result(self, arg, orig_t, vm_t: AbstractScalar):
     if isinstance(arg, np.ndarray):
         return arg.item()
     else:
@@ -525,13 +522,8 @@ def _convert_result(arg, orig_t, vm_t: (dtype.Int, dtype.Float)):
 
 
 @overload  # noqa: F811
-def _convert_result(arg, orig_t, vm_t: (dtype.Bool, dtype.Array)):
+def convert_result(self, arg, orig_t, vm_t: AbstractArray):
     return arg
-
-
-def convert_result(res, orig_t, vm_t):
-    """Convert result from vm_t to orig_t."""
-    return _convert_result[vm_t](res, orig_t, vm_t)
 
 
 @pipeline_function
@@ -550,9 +542,9 @@ def step_wrap(self,
                 'OutputWrapper step requires the erase_class/tuple steps'
             )
         fn = output
-        orig_arg_t = [arg['type'] for arg in orig_argspec or argspec]
-        orig_out_t = (orig_outspec or outspec)['type']
-        vm_out_t = graph.type.retval
+        orig_arg_t = orig_argspec or argspec
+        orig_out_t = orig_outspec or outspec
+        vm_out_t = graph.return_.abstract
 
         def wrapped(*args):
             args = tuple(flatten(convert_arg(arg, ot) for arg, ot in
@@ -560,6 +552,7 @@ def step_wrap(self,
             res = fn(*args)
             res = convert_result(res, orig_out_t, vm_out_t)
             return res
+
         return {'output': wrapped}
 
 
@@ -592,5 +585,5 @@ class DebugVMExporter(PipelineStep):
 
 
 step_debug_export = DebugVMExporter.partial(
-    implementations=vm_implementations
+    implementations=vm_registry
 )

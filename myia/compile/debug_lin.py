@@ -3,7 +3,7 @@
 from .utils import get_outputs
 
 from ..ir import Graph, manage, clone
-from ..prim import Primitive, vm_implementations, ops as P
+from ..prim import Primitive, vm_registry, ops as P
 from ..vm import VM
 
 
@@ -59,7 +59,7 @@ def debug_convert(lst, *, target='cpu', dev_id=0):
     mng = manage(g)
 
     vm = VM(convert=lambda x: x, manager=mng, py_implementations={},
-            implementations=vm_implementations)
+            implementations=vm_registry)
 
     fn = vm.export(g)
 

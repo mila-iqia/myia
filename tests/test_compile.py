@@ -3,11 +3,16 @@ from copy import copy
 import numpy as np
 
 
+from myia.abstract import from_value
 from myia.pipeline import standard_pipeline, standard_debug_pipeline
 from myia.prim import ops as P
 from myia.prim.py_implementations import \
     typeof, scalar_add, partial
 from myia.utils import no_prof, Profile
+
+
+from .common import to_abstract_test
+
 
 compile_pipeline = standard_pipeline
 
@@ -39,7 +44,7 @@ def parse_compare(*tests, optimize=True, array=False, python=True,
                 args = (args,)
             if python:
                 ref_result = fn(*map(copy, args))
-            argspec = tuple({'value': a} for a in args)
+            argspec = tuple(from_value(arg, broaden=True) for arg in args)
             if profile is True:
                 profile = Profile()
             res = pipeline.run(input=fn, argspec=argspec, profile=profile)
@@ -148,7 +153,7 @@ def test_switch_nontail():
         return a * a
 
     i64 = typeof(1)
-    argspec = ({'type': i64}, {'type': i64})
+    argspec = (to_abstract_test(i64), to_abstract_test(i64))
     myia_fn = compile_pipeline.run(input=fn,
                                    argspec=argspec)['output']
 

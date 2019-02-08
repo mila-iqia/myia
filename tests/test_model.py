@@ -3,16 +3,15 @@ import numpy
 from dataclasses import dataclass
 from numpy import ones as _ones, zeros as _zeros, asscalar
 from myia.dtype import Array, Tuple, pytype_to_myiatype
-from myia.infer import InferenceError
+from myia.abstract import InferenceError
 from myia.composite import grad
 from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import array_reduce, scalar_add
-from myia.prim.shape_inferrers import ClassShape, TupleShape
 
 from .test_compile import parse_compare
 from .test_grad import grad_test
-from .test_infer import infer_std
-from .common import af32, af64, MA, MB, MC, MD
+from .test_infer import infer_std, af64_of, af32_of
+from .common import MA, MB, MC, MD
 
 
 MA = MA * 0.1
@@ -88,25 +87,10 @@ def cost(model, x, y):
 
 
 @infer_std(
-    type=[
-        ({'value': make_model()},
-         {'value': MC(3, 6)},
-         af64),
-        ({'value': make_model('float32')},
-         {'value': MC(3, 6)},
-         InferenceError),
-        ({'value': make_model('float32')},
-         {'value': MC(3, 6, dtype='float32')},
-         af32),
-    ],
-    shape=[
-        ({'value': make_model()},
-         {'value': MC(3, 6)},
-         (3, 8)),
-        ({'value': make_model()},
-         {'value': MC(3, 9)},
-         InferenceError),
-    ]
+    (make_model(), MC(3, 6), af64_of(3, 8)),
+    (make_model('float32'), MC(3, 6), InferenceError),
+    (make_model('float32'), MC(3, 6, dtype='float32'), af32_of(3, 8)),
+    (make_model(), MC(3, 9), InferenceError),
 )
 def test_forward_infer(model, x):
     return model.apply(x)
@@ -123,33 +107,13 @@ def test_forward_profile(model, x):
 
 
 @infer_std(
-    type=[
-        ({'value': make_model()},
-         {'value': MC(3, 6)},
-         {'value': MD(3, 8)},
-         Model_t),
-        ({'value': make_model('float32')},
-         {'value': MC(3, 6)},
-         {'value': MD(3, 8)},
-         InferenceError),
-        ({'value': make_model('float32')},
-         {'value': MC(3, 6, dtype='float32')},
-         {'value': MD(3, 8, dtype='float32')},
-         Model_t_f32),
-    ],
-    shape=[
-        ({'value': make_model()},
-         {'value': MC(3, 6)},
-         {'value': MD(3, 8)},
-         ClassShape({
-             'layers': TupleShape((ClassShape({'W': (6, 10), 'b': (1, 10)}),
-                                   ClassShape({'W': (10, 8), 'b': (1, 8)})))})
-         ),
-        ({'value': make_model()},
-         {'value': MC(3, 9)},
-         {'value': MC(3, 8)},
-         InferenceError),
-    ]
+    (make_model(), MC(3, 6), MC(3, 8), make_model()),
+    (make_model(), MC(3, 6), MC(3, 9), InferenceError),
+    (make_model('float32'), MC(3, 6), MC(3, 8), InferenceError),
+    (make_model('float32'),
+     MC(3, 6, dtype='float32'),
+     MC(3, 8, dtype='float32'),
+     make_model('float32')),
 )
 def test_backward_infer(model, x, y):
     return grad(cost)(model, x, y)

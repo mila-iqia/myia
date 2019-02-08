@@ -1,5 +1,6 @@
 """Transforms a graph into lower-level code."""
 
+from ..abstract import VALUE
 from ..ir import Apply, toposort, Graph, Constant
 from ..pipeline import PipelineDefinition, PipelineStep
 from ..prim import Primitive, ops as P
@@ -36,14 +37,15 @@ class WrapPrimitives(PipelineStep):
             if (prim, typ) not in prim_graphs:
                 g = Graph()
                 args = []
-                for t in typ.arguments:
+                tp = list(typ.values[VALUE])[0]
+                for t in tp.args:
                     p = g.add_parameter()
-                    p.type = t
+                    p.abstract = t
                     args.append(p)
                 primct = Constant(prim)
-                primct.type = typ
+                primct.abstract = typ
                 out = g.apply(primct, *args)
-                out.type = typ.retval
+                out.abstract = tp.output
                 g.output = out
                 prim_graphs[(prim, typ)] = g
             return prim_graphs[(prim, typ)]
@@ -58,7 +60,7 @@ class WrapPrimitives(PipelineStep):
                                 if node.inputs[0].value in (P.array_map,
                                                             P.array_reduce):
                                     continue
-                            g = get_prim_graph(ct.value, ct.type)
+                            g = get_prim_graph(ct.value, ct.abstract)
                             tr.set_edge(node, key, Constant(g))
 
         return {'graph': graph}
@@ -178,7 +180,8 @@ class CompileGraph(PipelineStep):
     def dup(self, node):
         """Ensures that the value for node is at the top of the stack."""
         if node not in self.slots:
-            return self.ref(node)
+            # This used to be covered by test_compile::test_tailcall
+            return self.ref(node)  # pragma: no cover
         self.add_instr('dup', self.ref(node))
         self.height += 1
         return -1

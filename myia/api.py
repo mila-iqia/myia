@@ -2,9 +2,8 @@
 
 import inspect
 
-from .infer import MyiaTypeError
+from .abstract import MyiaTypeError, from_value, broaden
 from .pipeline import standard_pipeline
-from .utils import as_frozen
 
 
 #################
@@ -31,7 +30,7 @@ class MyiaFunction:
         self.fn = fn
         self.specialize_values = set(specialize_values)
         self._cache = {}
-        self.pip = standard_pipeline.make()
+        # self.pip = standard_pipeline.make()
 
     def specialize(self, args):
         """Specialize on the types of the given arguments.
@@ -39,7 +38,7 @@ class MyiaFunction:
         Returns a Pipeline. If the argument types were seen before, returns a
         cached version.
         """
-        inf = self.pip.resources.inferrer
+        self.pip = standard_pipeline.make()
 
         argnames = inspect.getfullargspec(self.fn).args
         n1 = len(argnames)
@@ -49,17 +48,17 @@ class MyiaFunction:
                 f'Wrong number of arguments: expected {n1}, got {n2}'
             )
 
-        argspec = tuple({'value': arg,
-                         '_erase_value': name not in self.specialize_values}
-                        for arg, name in zip(args, argnames))
-        inf.fill_in(argspec)
-        key = as_frozen(argspec)
-        if key not in self._cache:
-            self._cache[key] = self.pip(
+        argspec = tuple(from_value(arg) for arg in args)
+        argspec = tuple(broaden(arg, None)
+                        if name not in self.specialize_values else arg
+                        for arg, name in zip(argspec, argnames))
+
+        if argspec not in self._cache:
+            self._cache[argspec] = self.pip(
                 input=self.fn,
                 argspec=argspec
             )
-        return self._cache[key]
+        return self._cache[argspec]
 
     def compile(self, args):
         """Returns a function specialized for the given args."""

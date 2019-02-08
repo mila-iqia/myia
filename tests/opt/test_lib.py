@@ -1,6 +1,4 @@
 
-from .test_opt import _check_opt
-from myia import dtype
 from myia.composite import hyper_add
 from myia.opt import lib
 from myia.prim.py_implementations import \
@@ -8,6 +6,10 @@ from myia.prim.py_implementations import \
     distribute, array_reduce, env_getitem, env_setitem, embed, env_add, \
     scalar_usub, array_map, scalar_to_array, transpose
 from myia.utils import newenv
+
+from ..common import to_abstract_test, i64, f64, af64_of
+
+from .test_opt import _check_opt
 
 
 #######################
@@ -116,7 +118,7 @@ def test_getitem_newenv():
 
     _check_opt(before, after,
                lib.getitem_newenv,
-               argspec=[{'type': dtype.Float[64]}])
+               argspec=[to_abstract_test(f64)])
 
 
 def test_env_get_set():
@@ -132,8 +134,7 @@ def test_env_get_set():
 
     _check_opt(before, after,
                lib.cancel_env_set_get,
-               argspec=[{'type': dtype.Float[64]},
-                        {'type': dtype.Float[64]}])
+               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
 
 
 def test_env_get_add():
@@ -153,8 +154,7 @@ def test_env_get_add():
     _check_opt(before, after,
                lib.getitem_env_add,
                lib.cancel_env_set_get,
-               argspec=[{'type': dtype.Int[64]},
-                        {'type': dtype.Int[64]}],
+               argspec=[to_abstract_test(i64), to_abstract_test(i64)],
                argspec_after=False)
 
 
@@ -249,13 +249,11 @@ def test_elim_distribute():
 
     _check_opt(before, after,
                lib.elim_distribute,
-               argspec=[{'type': dtype.Array[dtype.Float[64]],
-                         'shape': (3, 5)}])
+               argspec=[af64_of(3, 5)])
 
     _check_opt(before, before,
                lib.elim_distribute,
-               argspec=[{'type': dtype.Array[dtype.Float[64]],
-                         'shape': (3, 1)}])
+               argspec=[af64_of(3, 1)])
 
 
 def test_elim_transpose():
@@ -276,20 +274,17 @@ def test_elim_transpose():
 
     _check_opt(before1, after,
                lib.elim_transpose,
-               argspec=[{'type': dtype.Array[dtype.Float[64]],
-                         'shape': (3, 5)}])
+               argspec=[af64_of(3, 5)])
 
     _check_opt(before2, after,
                lib.merge_transposes,
                lib.elim_transpose,
-               argspec=[{'type': dtype.Array[dtype.Float[64]],
-                         'shape': (3, 5)}])
+               argspec=[af64_of(3, 5)])
 
     _check_opt(before3, before3,
                lib.merge_transposes,
                lib.elim_transpose,
-               argspec=[{'type': dtype.Array[dtype.Float[64]],
-                         'shape': (3, 5)}])
+               argspec=[af64_of(3, 5)])
 
 
 def test_elim_array_reduce():
@@ -302,13 +297,11 @@ def test_elim_array_reduce():
 
     _check_opt(before, after,
                lib.elim_array_reduce,
-               argspec=[{'type': dtype.Array[dtype.Float[64]],
-                         'shape': (3, 1)}])
+               argspec=[af64_of(3, 1)])
 
     _check_opt(before, before,
                lib.elim_array_reduce,
-               argspec=[{'type': dtype.Array[dtype.Float[64]],
-                         'shape': (3, 5)}])
+               argspec=[af64_of(3, 5)])
 
 
 def test_simplify_array_map():
@@ -362,8 +355,7 @@ def test_simplify_array_map_4():
 
     _check_opt(before, after,
                lib.simplify_array_map,
-               argspec=[{'type': dtype.Array[dtype.Float[64]],
-                         'shape': (3, 5)}])
+               argspec=[af64_of(3, 5)])
 
 
 def test_simplify_array_map_5():
@@ -417,8 +409,7 @@ def test_unfuse_composite_constant():
 
     _check_opt(before, after,
                lib.unfuse_composite,
-               argspec=[{'type': dtype.Array[dtype.Float[64]],
-                         'shape': (2, 3)}])
+               argspec=[af64_of(2, 3)])
 
 
 ######################
@@ -996,8 +987,7 @@ def test_incorporate_env_getitem():
     _check_opt(before, after,
                lib.incorporate_env_getitem,
                lib.cancel_env_set_get,
-               argspec=[{'type': dtype.Float[64]},
-                        {'type': dtype.Float[64]}])
+               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
 
 
 def test_incorporate_env_getitem_2():
@@ -1042,8 +1032,7 @@ def test_incorporate_env_getitem_through_switch():
     _check_opt(before, after,
                lib.incorporate_env_getitem_through_switch,
                lib.cancel_env_set_get,
-               argspec=[{'type': dtype.Float[64]},
-                        {'type': dtype.Float[64]}])
+               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
 
 
 def test_incorporate_call():

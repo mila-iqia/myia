@@ -241,11 +241,11 @@ def test_NS():
 
 
 def test_env():
-    sk1 = SymbolicKeyInstance('x', {})
-    sk1b = SymbolicKeyInstance('x', {})
+    sk1 = SymbolicKeyInstance('x', 1234)
+    sk1b = SymbolicKeyInstance('x', 1234)
     assert sk1 == sk1b
 
-    sk2 = SymbolicKeyInstance('y', {})
+    sk2 = SymbolicKeyInstance('y', 1234)
 
     e = newenv.set(sk1, 100)
     assert e is not newenv

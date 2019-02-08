@@ -1,20 +1,15 @@
 """Clean up Class types."""
 
-from ..dtype import Int, Tuple, Class, ismyiatype, type_cloner, JTagged
+from ..dtype import Int
 from ..ir import Constant, Parameter
 from ..prim import ops as P, Primitive
-from ..dshape import TupleShape, ClassShape, shape_cloner, NOSHAPE
-from ..utils import UNKNOWN
+from ..abstract import abstract_clone, AbstractClass, AbstractTuple, \
+    AbstractScalar, VALUE, TYPE, AbstractJTagged
 
 
-@type_cloner.variant
-def _retype(self, t: Class):
-    return Tuple[[self(t2) for t2 in t.attributes.values()]]
-
-
-@shape_cloner.variant
-def _reshape(self, s: ClassShape):
-    return TupleShape(self(s2) for s2 in s.shape.values())
+@abstract_clone.variant
+def _reabs(self, a: AbstractClass):
+    return AbstractTuple(self(x) for x in a.attributes.values())
 
 
 def erase_class(root, manager):
@@ -24,6 +19,9 @@ def erase_class(root, manager):
     * getattr(data, attr) => getitem(data, idx)
     * make_record(cls, *args) => make_tuple(*args)
     """
+    from ..abstract import AbstractClass
+    from ..utils import is_dataclass_type
+
     manager.add_graph(root)
 
     for node in list(manager.all_nodes):
@@ -31,12 +29,15 @@ def erase_class(root, manager):
 
         if node.is_apply(P.getattr):
             _, data, item = node.inputs
-            dt = data.type
-            assert ismyiatype(dt, Class)
+            dt = data.abstract
+            assert isinstance(dt, AbstractClass)
             idx = list(dt.attributes.keys()).index(item.value)
-            idx = Constant(idx)
-            idx.type = Int[64]
-            new_node = node.graph.apply(P.tuple_getitem, data, idx)
+            idx_c = Constant(idx)
+            idx_c.abstract = AbstractScalar({
+                VALUE: idx,
+                TYPE: Int[64],
+            })
+            new_node = node.graph.apply(P.tuple_getitem, data, idx_c)
 
         elif node.is_apply(P.make_record):
             mkr, typ, *args = node.inputs
@@ -52,15 +53,15 @@ def erase_class(root, manager):
                         P.partial, P.make_tuple, *args[1:]
                     )
 
+        elif node.is_constant() and is_dataclass_type(node.value):
+            new_node = Constant(P.make_tuple)
+
         if new_node is not None:
+            new_node.abstract = node.abstract
             manager.replace(node, new_node)
 
     for node in manager.all_nodes:
-        node.expect_inferred.clear()
-        if node.type is not UNKNOWN:
-            node.type = _retype(node.type)
-        if node.shape is not UNKNOWN:
-            node.shape = _reshape(node.shape)
+        node.abstract = _reabs(node.abstract)
 
 
 def expand_tuples_p(mng, graph, params):
@@ -68,19 +69,17 @@ def expand_tuples_p(mng, graph, params):
     new_params = []
 
     for param in params:
-        ttype = param.type
-        tshape = param.shape
-        if not ismyiatype(ttype, Tuple):
-            if ismyiatype(ttype, JTagged):
+        a = param.abstract
+        if not isinstance(a, AbstractTuple):
+            if isinstance(a, AbstractJTagged):
                 raise NotImplementedError()
             new_params.append(param)
             continue
 
         new_param = []
-        for te, ts in zip(ttype.elements, tshape.shape):
+        for elem in a.elements:
             np = Parameter(graph)
-            np.type = te
-            np.shape = ts
+            np.abstract = elem
             new_param.append(np)
 
         new_tuple = graph.apply(P.make_tuple, *new_param)
@@ -95,11 +94,10 @@ def expand_tuples_c(graph, inputs):
     """Expand tuples in graph applies."""
     new_inputs = []
     for i in inputs:
-        itype = i.type
-        ishape = i.shape
-        if not ismyiatype(itype, Tuple):
-            if (ismyiatype(itype, JTagged) and
-                    ismyiatype(itype.subtype, Tuple)):
+        a = i.abstract
+        if not isinstance(a, AbstractTuple):
+            if (isinstance(a, AbstractJTagged) and
+                    isinstance(a.element, AbstractTuple)):
                 raise NotImplementedError("JTagged")
             else:
                 new_inputs.append(i)
@@ -107,13 +105,13 @@ def expand_tuples_c(graph, inputs):
 
         new_input = []
 
-        for pos, ie, ish in zip(range(len(itype.elements)),
-                                itype.elements, ishape.shape):
+        for pos, elem in enumerate(a.elements):
             ni = graph.apply(P.tuple_getitem, i, pos)
-            ni.inputs[2].type = Int[64]
-            ni.inputs[2].shape = NOSHAPE
-            ni.type = ie
-            ni.shape = ish
+            ni.inputs[2].abstract = AbstractScalar({
+                VALUE: pos,
+                TYPE: Int[64],
+            })
+            ni.abstract = elem
             new_input.append(ni)
 
         new_inputs.extend(expand_tuples_c(graph, new_input))
@@ -137,18 +135,18 @@ def erase_tuple(root, manager):
             if new_inputs != node.inputs[1:]:
                 new_node = node.graph.apply(node.inputs[0],
                                             *new_inputs)
-                new_node.type = node.type
-                new_node.shape = node.shape
+                new_node.abstract = node.abstract
                 manager.replace(node, new_node)
         elif (node.is_apply(P.partial) and
               not node.inputs[1].is_constant(Primitive)):
             new_inputs = expand_tuples_c(node.graph,
                                          node.inputs[2:])
-            if new_inputs != node.inputs[2:]:
+            if new_inputs != node.inputs[2:]:  # pragma: no cover
+                # This used to be covered, but the inferrer/specializer
+                # changed.
                 new_node = node.graph.apply(*node.inputs[:2],
                                             *new_inputs)
-                new_node.type = node.type
-                new_node.shape = node.shape
+                new_node.abstract = node.abstract
                 manager.replace(node, new_node)
     # Modify all graph parameters
     for graph in list(manager.graphs):

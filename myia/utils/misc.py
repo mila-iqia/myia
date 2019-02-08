@@ -7,6 +7,7 @@ import sys
 import numpy as np
 from typing import Any, Dict, List, TypeVar
 from colorama import AnsiToWin32
+from dataclasses import dataclass
 
 
 builtins_d = vars(builtins)
@@ -577,21 +578,12 @@ class ErrorPool:
             raise exc
 
 
+@dataclass(frozen=True)
 class SymbolicKeyInstance:
     """Stores information that corresponds to a node in the graph."""
 
-    def __init__(self, node, inferred):
-        """Initialize a SymbolicKeyInstance."""
-        self.node = node
-        self.inferred = inferred
-
-    def __eq__(self, other):
-        return (isinstance(other, SymbolicKeyInstance)
-                and self.node is other.node
-                and self.inferred == other.inferred)
-
-    def __hash__(self):
-        return hash((self.node, tuple(sorted(self.inferred.items()))))
+    node: "ANFNode"
+    abstract: object
 
 
 @smap.variant

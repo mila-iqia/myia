@@ -3,12 +3,10 @@
 
 from ..compile import step_wrap_primitives, step_compile, step_link, \
     step_export
-from ..infer import Context
+from ..abstract import Context
 from ..ir import GraphManager
-from ..prim import py_implementations
-from ..prim.value_inferrers import ValueTrack, value_inferrer_constructors
-from ..prim.type_inferrers import TypeTrack, type_inferrer_constructors
-from ..prim.shape_inferrers import ShapeTrack, shape_inferrer_constructors
+from ..prim import py_registry
+from ..abstract import abstract_inferrer_constructors
 from ..pipeline.resources import scalar_object_map, standard_object_map, \
     standard_method_map, default_convert, ConverterResource, \
     InferenceResource
@@ -19,29 +17,16 @@ from .pipeline import PipelineDefinition
 
 standard_resources = dict(
     manager=GraphManager.partial(),
-    py_implementations=py_implementations,
+    py_implementations=py_registry,
     method_map=standard_method_map,
     convert=ConverterResource.partial(
         object_map=standard_object_map,
         converter=default_convert
     ),
     inferrer=InferenceResource.partial(
-        tracks=dict(
-            value=ValueTrack.partial(
-                constructors=value_inferrer_constructors,
-                max_depth=1
-            ),
-            type=TypeTrack.partial(
-                constructors=type_inferrer_constructors
-            ),
-            shape=ShapeTrack.partial(
-                constructors=shape_inferrer_constructors
-            )
-        ),
-        required_tracks=['type'],
-        tied_tracks={},
+        constructors=abstract_inferrer_constructors,
+        max_depth=1,
         context_class=Context,
-        erase_value=True,
     )
 )
 
@@ -73,6 +58,11 @@ standard_pipeline = PipelineDefinition(
 )
 
 
+scalar_pipeline = standard_pipeline.configure({
+    'convert.object_map': scalar_object_map
+})
+
+
 standard_debug_pipeline = PipelineDefinition(
     resources=standard_resources,
     steps=dict(
@@ -81,7 +71,7 @@ standard_debug_pipeline = PipelineDefinition(
         infer=steps.step_infer,
         specialize=steps.step_specialize,
         erase_class=steps.step_erase_class,
-        opt=steps.step_debug_opt,
+        opt=steps.step_opt,
         erase_tuple=steps.step_erase_tuple,
         cconv=steps.step_cconv,
         validate=steps.step_validate,
@@ -89,11 +79,6 @@ standard_debug_pipeline = PipelineDefinition(
         wrap=steps.step_wrap,
     )
 )
-
-
-scalar_pipeline = standard_pipeline.configure({
-    'convert.object_map': scalar_object_map
-})
 
 
 scalar_debug_pipeline = standard_debug_pipeline.configure({

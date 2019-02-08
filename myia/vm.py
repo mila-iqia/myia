@@ -7,9 +7,9 @@ implementation.
 
 from typing import Iterable, Mapping, Any, List
 
+from .abstract import to_abstract
 from .ir import Graph, Apply, Constant, Parameter, ANFNode, MetaGraph
 from .prim import Primitive
-from .prim.py_implementations import typeof
 from .prim.ops import return_, partial, embed
 from .graph_utils import toposort
 from .utils import TypeMap, is_dataclass_type, SymbolicKeyInstance
@@ -254,7 +254,7 @@ class VM:
                 frame.values[node] = res
             elif fn == embed:
                 _, x = node.inputs
-                frame.values[node] = SymbolicKeyInstance(x, {})
+                frame.values[node] = SymbolicKeyInstance(x, node.abstract)
             else:
                 frame.values[node] = self.implementations[fn](self, *args)
         elif isinstance(fn, Partial):
@@ -262,8 +262,8 @@ class VM:
         elif isinstance(fn, (Graph, Closure)):
             self._call(fn, args)
         elif isinstance(fn, MetaGraph):
-            types = [typeof(arg) for arg in args]
-            g = fn.specialize_from_types(types)
+            absargs = [to_abstract(arg) for arg in args]
+            g = fn.specialize_from_abstract(absargs)
             self._dispatch_call(node, frame, g, args)
         elif is_dataclass_type(fn):
             frame.values[node] = fn(*args)
