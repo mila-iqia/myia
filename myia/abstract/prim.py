@@ -661,29 +661,19 @@ async def _inf_array_to_scalar(engine, a: AbstractArray):
 
 @standard_prim(P.broadcast_shape)
 async def _inf_broadcast_shape(engine, xs: _shape_type, ys: _shape_type):
-    shp_xs_n = len(xs.elements)
-    shp_ys_n = len(ys.elements)
-
     from ..prim.py_implementations import broadcast_shape
-    shp_x = build_value(xs, default=ANYTHING)
-    shp_y = build_value(ys, default=ANYTHING)
+    shp_x = tuple(x.values[VALUE] for x in xs.elements)
+    shp_y = tuple(y.values[VALUE] for y in ys.elements)
     elems = []
-    if shp_x is ANYTHING or shp_y is ANYTHING:
-        for i in range(max(shp_xs_n, shp_ys_n)):
-            elems.append(AbstractScalar({
-                VALUE: ANYTHING,
-                TYPE: dtype.UInt[64],
-            }))
-    else:
-        try:
-            res = broadcast_shape(shp_x, shp_y)
-        except ValueError as e:
-            raise MyiaShapeError(e.args[0])
-        for n in res:
-            elems.append(AbstractScalar({
-                VALUE: n,
-                TYPE: dtype.UInt[64],
-            }))
+    try:
+        res = broadcast_shape(shp_x, shp_y)
+    except ValueError as e:
+        raise MyiaShapeError(e.args[0])
+    for n in res:
+        elems.append(AbstractScalar({
+            VALUE: n,
+            TYPE: dtype.UInt[64],
+        }))
     return AbstractTuple(elems)
 
 
@@ -773,9 +763,7 @@ async def _inf_array_reduce(engine,
 
 @standard_prim(P.distribute)
 async def _inf_distribute(engine, a: AbstractArray, _shp: _shape_type):
-    shp = build_value(_shp, default=ANYTHING)
-    if shp == ANYTHING:
-        shp = (ANYTHING,) * len(_shp.elements)
+    shp = tuple(x.values[VALUE] for x in _shp.elements)
     a_shp = await force_pending(a.values[SHAPE])
     delta = len(shp) - len(a_shp)
     if delta < 0:
