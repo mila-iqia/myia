@@ -49,10 +49,11 @@ class Elemwise(MetaGraph):
     * Otherwise, we return getattr(arg1, mname)(arg2, ...)
     """
 
-    def __init__(self, mname):
+    def __init__(self, mname, scalar_op=None):
         """Initialize Elemwise."""
         super().__init__(mname)
         self.mname = mname
+        self.scalar_op = scalar_op
         self.cache = {}
 
     def generate_graph(self, args):
@@ -100,7 +101,8 @@ class Elemwise(MetaGraph):
                 transformed.append(p)
 
             if is_array_op:
-                g.output = g.apply(array_map, self, *transformed)
+                fn = self.scalar_op or self
+                g.output = g.apply(array_map, fn, *transformed)
             else:
                 first, *rest = transformed
                 fn = g.apply(P.getattr, first, self.mname)
@@ -109,13 +111,13 @@ class Elemwise(MetaGraph):
         return self.cache[sig]
 
 
-add = Elemwise('__add__')
-sub = Elemwise('__sub__')
-mul = Elemwise('__mul__')
+add = Elemwise('__add__', P.scalar_add)
+sub = Elemwise('__sub__', P.scalar_sub)
+mul = Elemwise('__mul__', P.scalar_mul)
 truediv = Elemwise('__truediv__')
 floordiv = Elemwise('__floordiv__')
-mod = Elemwise('__mod__')
-pow = Elemwise('__pow__')
+mod = Elemwise('__mod__', P.scalar_mod)
+pow = Elemwise('__pow__', P.scalar_pow)
 
 
 @core
@@ -197,12 +199,12 @@ def _tan(x):
     return scalar_tan(x)
 
 
-eq = Elemwise('__eq__')
-lt = Elemwise('__lt__')
-gt = Elemwise('__gt__')
-ne = Elemwise('__ne__')
-le = Elemwise('__le__')
-ge = Elemwise('__ge__')
+eq = Elemwise('__eq__', P.scalar_eq)
+lt = Elemwise('__lt__', P.scalar_lt)
+gt = Elemwise('__gt__', P.scalar_gt)
+ne = Elemwise('__ne__', P.scalar_ne)
+le = Elemwise('__le__', P.scalar_le)
+ge = Elemwise('__ge__', P.scalar_ge)
 
 
 @core
