@@ -16,9 +16,9 @@ from .ir import Graph, MetaGraph, MultitypeGraph, Constant
 from .prim import ops as P
 from .prim.py_implementations import \
     array_map, bool_not, bool_eq, hastype, distribute, shape, \
-    broadcast_shape, switch, identity, bool_and, typeof, scalar_cast, \
-    scalar_add, scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, \
-    scalar_div, scalar_to_array, env_add
+    broadcast_shape, typeof, scalar_cast, scalar_add, scalar_exp, \
+    scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div, \
+    scalar_to_array, env_add
 from .utils import newenv
 
 
@@ -41,43 +41,62 @@ def core(fn):
 
 
 class Elemwise(MetaGraph):
+    """Generate a graph for an elemwise operation.
+
+    * If any argument is an array:
+      * All scalar arguments are converted to arrays using scalar_to_array.
+      * The arguments are all broadcasted and array_map is called on them.
+    * Otherwise, we return getattr(arg1, mname)(arg2, ...)
+    """
 
     def __init__(self, mname):
+        """Initialize Elemwise."""
         super().__init__(mname)
         self.mname = mname
         self.cache = {}
 
     def generate_graph(self, args):
+        """Generate the graph."""
         sig = tuple(arg.values[SHAPE]
                     if isinstance(arg, AbstractArray) else False
                     for arg in args)
         if sig not in self.cache:
             g = Graph()
-            transformed = []
+            g.debug.name = self.mname
             shapes = [x for x in sig if x is not False]
 
             is_array_op = len(shapes) > 0
+            params = []
+            for i, arg in enumerate(args):
+                p = g.add_parameter()
+                p.debug.name = f'x{i + 1}'
+                if is_array_op and not isinstance(arg, AbstractArray):
+                    p = g.apply(to_array, p)
+                params.append(p)
+
             if is_array_op:
                 try:
                     final_shape = reduce(broadcast_shape, shapes)
                 except ValueError as e:
                     raise MyiaShapeError(e.args[0])
                 if any(dim is ANYTHING for dim in final_shape):
+                    # We will need to get the shapes dynamically
                     def _build(a, b):
                         return g.apply(broadcast_shape, a, b)
-                    argshapes = [g.apply(shape, a) for a in args]
+                    argshapes = [g.apply(shape, p) for p in params]
                     final_shape = reduce(_build, argshapes)
 
-            for arg in args:
-                p = g.add_parameter()
+            transformed = []
+            for arg, p in zip(args, params):
                 if is_array_op:
-                    if not isinstance(arg, AbstractArray):
-                        p = g.apply(to_array, p)
                     sh = arg.values.get(SHAPE, ())
                     if final_shape != sh:
-                        ct = Constant(final_shape)
-                        ct.abstract = abstract_shape(final_shape)
-                        p = g.apply(distribute, p, ct)
+                        if isinstance(final_shape, tuple):
+                            ct = Constant(final_shape)
+                            ct.abstract = abstract_shape(final_shape)
+                            p = g.apply(distribute, p, ct)
+                        else:
+                            p = g.apply(distribute, p, final_shape)
                 transformed.append(p)
 
             if is_array_op:

@@ -1,10 +1,9 @@
 """Library of optimizations."""
 
 from ..abstract import \
-    abstract_clone, AbstractFunction, AbstractJTagged, AbstractTuple, \
-    AbstractScalar, VALUE, TYPE, abstract_shape
+    abstract_clone, AbstractFunction, AbstractJTagged, abstract_shape
 from ..composite import hyper_add
-from ..dtype import Number, ismyiatype, UInt
+from ..dtype import Number, ismyiatype
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable
