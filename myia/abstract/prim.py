@@ -35,7 +35,7 @@ from .data import (
 )
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context
-from .utils import sensitivity_transform, build_value, build_type
+from .utils import sensitivity_transform, build_value, build_type, broaden
 from .infer import Inferrer, to_abstract
 
 
@@ -169,6 +169,12 @@ class UniformPrimitiveInferrer(WithImplInferrer):
             self.typemap[data.annotations[arg]].append(i)
         self.outtype = data.annotations['return']
         self.nolimit = nolimit
+
+    def normalize_args(self, args):
+        """If nolimit is False, return broadened arguments."""
+        if not self.nolimit:
+            args = tuple(broaden(a, None) for a in args)
+        return args
 
     async def infer(self, engine, *args):
         """Infer the abstract result given the abstract arguments."""
@@ -416,8 +422,8 @@ uniform_prim(P.scalar_mod)(py.scalar_mod)
 uniform_prim(P.scalar_pow)(py.scalar_pow)
 uniform_prim(P.scalar_trunc)(py.scalar_trunc)
 uniform_prim(P.scalar_floor)(py.scalar_floor)
-uniform_prim(P.scalar_uadd)(py.scalar_uadd)
-uniform_prim(P.scalar_usub)(py.scalar_usub)
+uniform_prim(P.scalar_uadd, nolimit=True)(py.scalar_uadd)
+uniform_prim(P.scalar_usub, nolimit=True)(py.scalar_usub)
 uniform_prim(P.scalar_exp)(py.scalar_exp)
 uniform_prim(P.scalar_log)(py.scalar_log)
 uniform_prim(P.scalar_sin)(py.scalar_sin)
@@ -430,12 +436,12 @@ uniform_prim(P.scalar_tan)(py.scalar_tan)
 ###############
 
 
-uniform_prim(P.scalar_eq)(py.scalar_eq)
-uniform_prim(P.scalar_lt)(py.scalar_lt)
-uniform_prim(P.scalar_gt)(py.scalar_gt)
-uniform_prim(P.scalar_ne)(py.scalar_ne)
-uniform_prim(P.scalar_le)(py.scalar_le)
-uniform_prim(P.scalar_ge)(py.scalar_ge)
+uniform_prim(P.scalar_eq, nolimit=True)(py.scalar_eq)
+uniform_prim(P.scalar_lt, nolimit=True)(py.scalar_lt)
+uniform_prim(P.scalar_gt, nolimit=True)(py.scalar_gt)
+uniform_prim(P.scalar_ne, nolimit=True)(py.scalar_ne)
+uniform_prim(P.scalar_le, nolimit=True)(py.scalar_le)
+uniform_prim(P.scalar_ge, nolimit=True)(py.scalar_ge)
 uniform_prim(P.bool_not, nolimit=True)(py.bool_not)
 uniform_prim(P.bool_and, nolimit=True)(py.bool_and)
 uniform_prim(P.bool_or, nolimit=True)(py.bool_or)

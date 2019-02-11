@@ -423,6 +423,13 @@ class Inferrer(Partializable):
         """Initialize the Inferrer."""
         self.cache = {}
 
+    def normalize_args(self, args):
+        """Return normalized versions of the arguments.
+
+        By default, this returns args unchanged.
+        """
+        return args
+
     async def run(self, engine, outref, argrefs):
         """Run inference.
 
@@ -436,6 +443,7 @@ class Inferrer(Partializable):
             argrefs: A tuple of References to the arguments
         """
         args = tuple([await ref.get() for ref in argrefs])
+        args = self.normalize_args(args)
         if args not in self.cache:
             self.cache[args] = await self.infer(engine, *args)
         return self.cache[args]
@@ -491,6 +499,7 @@ class BaseGraphInferrer(Inferrer):
 
     def make_context(self, engine, args):
         """Create a Context object using the given args."""
+        args = self.normalize_args(args)
         _, ctx = self._make_argkey_and_context(engine, args)
         return ctx
 
@@ -546,6 +555,10 @@ class MetaGraphInferrer(BaseGraphInferrer):
         super().__init__(Context.empty())
         self.metagraph = metagraph
         self.graph_cache = {}
+
+    def normalize_args(self, args):
+        """Return normalized versions of the arguments."""
+        return self.metagraph.normalize_args(args)
 
     def get_graph(self, engine, args):
         """Generate the graph for the given args."""
