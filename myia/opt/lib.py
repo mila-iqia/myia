@@ -215,9 +215,7 @@ def merge_transposes(optimizer, node, equiv):
     axes2 = equiv[C2].value
     assert len(axes1) == len(axes2)
     axes_final = tuple(axes1.index(x) for x in axes2)
-    axes_ct = Constant(axes_final)
-    axes_ct.abstract = abstract_shape(axes_ct.value)
-    return node.graph.apply(P.transpose, equiv[X], axes_ct)
+    return node.graph.apply(P.transpose, equiv[X], axes_final)
 
 
 @pattern_replacer(P.array_map, G, Xs)
@@ -236,10 +234,8 @@ def unfuse_composite(optimizer, node, equiv):
 
         def asarray(self, ng, i):
             if i.is_constant():
-                shp = Constant(self.shape)
-                shp.abstract = abstract_shape(shp.value)
                 return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i),
-                                shp)
+                                self.shape)
             else:
                 return i
 
@@ -292,7 +288,6 @@ def simplify_array_map(optimizer, node, equiv):
             return xs[idx]
         elif x.is_constant() and ismyiatype(x.type, Number):
             shp = Constant(xs[0].shape)
-            shp.abstract = abstract_shape(shp.value)
             sexp = (P.distribute, (P.scalar_to_array, x), shp)
             return sexp_to_node(sexp, node.graph)
         else:

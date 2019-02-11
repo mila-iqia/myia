@@ -92,12 +92,7 @@ class Elemwise(MetaGraph):
                 if is_array_op:
                     sh = arg.values.get(SHAPE, ())
                     if final_shape != sh:
-                        if isinstance(final_shape, tuple):
-                            ct = Constant(final_shape)
-                            ct.abstract = abstract_shape(final_shape)
-                            p = g.apply(distribute, p, ct)
-                        else:
-                            p = g.apply(distribute, p, final_shape)
+                        p = g.apply(distribute, p, final_shape)
                 transformed.append(p)
 
             if is_array_op:
