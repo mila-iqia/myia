@@ -1,10 +1,8 @@
 """Library of optimizations."""
 
-from ..abstract import \
-    abstract_clone, AbstractFunction, AbstractJTagged, AbstractTuple, \
-    AbstractScalar, VALUE, TYPE
+from ..abstract import abstract_clone, AbstractFunction, AbstractJTagged
 from ..composite import hyper_add
-from ..dtype import Number, ismyiatype, UInt
+from ..dtype import Number, ismyiatype
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable
@@ -57,17 +55,6 @@ Cs = SVar(var(_is_c))
 def primset_var(*prims):
     """Create a variable that matches a Primitive node."""
     return var(lambda node: node.is_constant() and node.value in prims)
-
-
-def shptup(values):
-    """Create the type of a shape, i.e. a tuple of u64."""
-    return AbstractTuple([
-        AbstractScalar({
-            VALUE: v,
-            TYPE: UInt[64],
-        })
-        for v in values
-    ])
 
 
 ###############################
@@ -227,9 +214,7 @@ def merge_transposes(optimizer, node, equiv):
     axes2 = equiv[C2].value
     assert len(axes1) == len(axes2)
     axes_final = tuple(axes1.index(x) for x in axes2)
-    axes_ct = Constant(axes_final)
-    axes_ct.abstract = shptup(axes_ct.value)
-    return node.graph.apply(P.transpose, equiv[X], axes_ct)
+    return node.graph.apply(P.transpose, equiv[X], axes_final)
 
 
 @pattern_replacer(P.array_map, G, Xs)
@@ -248,10 +233,8 @@ def unfuse_composite(optimizer, node, equiv):
 
         def asarray(self, ng, i):
             if i.is_constant():
-                shp = Constant(self.shape)
-                shp.abstract = shptup(shp.value)
                 return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i),
-                                shp)
+                                self.shape)
             else:
                 return i
 
@@ -304,7 +287,6 @@ def simplify_array_map(optimizer, node, equiv):
             return xs[idx]
         elif x.is_constant() and ismyiatype(x.type, Number):
             shp = Constant(xs[0].shape)
-            shp.abstract = shptup(shp.value)
             sexp = (P.distribute, (P.scalar_to_array, x), shp)
             return sexp_to_node(sexp, node.graph)
         else:

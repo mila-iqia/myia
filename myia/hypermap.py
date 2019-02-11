@@ -142,7 +142,7 @@ class HyperMap(MetaGraph):
         else:
             return args
 
-    def specialize_from_types(self, types):
+    def generate_from_types(self, types):
         """Create a graph for mapping over the given types."""
         g = Graph()
         g.debug.name = 'hyper_map'

@@ -557,6 +557,7 @@ def array_to_scalar(x):
 @register(primops.broadcast_shape)
 def broadcast_shape(shpx, shpy):
     """Implement `broadcast_shape`."""
+    from ..abstract.data import ANYTHING
     orig_shpx = shpx
     orig_shpy = shpy
     dlen = len(shpx) - len(shpy)
@@ -570,6 +571,10 @@ def broadcast_shape(shpx, shpy):
         if a == 1:
             shp.append(b)
         elif b == 1:
+            shp.append(a)
+        elif a == ANYTHING:
+            shp.append(b)
+        elif b == ANYTHING:
             shp.append(a)
         elif a == b:
             shp.append(a)

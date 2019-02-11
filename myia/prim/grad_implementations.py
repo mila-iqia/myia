@@ -286,7 +286,7 @@ def __fprop__switch(jcond, jtb, jfb):
 class MakeTupleGradient(MetaGraph):
     """Generate the gradient graph for make_tuple."""
 
-    def specialize_from_abstract(self, args):
+    def generate_graph(self, args):
         """Generate the gradient graph."""
         g = Graph()
         g.debug.name = f'{syms["grad_fprop"]}make_tuple_{len(args)}'
@@ -338,7 +338,7 @@ class ArrayMapGradient(MetaGraph):
             return ret, bprop_array_map
     """
 
-    def specialize_from_abstract(self, absargs):
+    def generate_graph(self, absargs):
         """Generate the gradient graph."""
         g = Graph()
         nargs = len(absargs) - 1
@@ -392,7 +392,7 @@ class ArrayReduceGradient(MetaGraph):
     over the `scalar_add` operation (sum, basically).
     """
 
-    def specialize_from_abstract(self, args):
+    def generate_graph(self, args):
         """Generate the gradient graph."""
         jf, jarr, jshp = args
         assert isinstance(jf, AbstractFunction)

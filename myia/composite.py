@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from functools import reduce
 
-from .abstract import \
+from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType, Function
@@ -15,9 +15,9 @@ from .ir import Graph, MetaGraph, MultitypeGraph, Constant
 from .prim import ops as P
 from .prim.py_implementations import \
     array_map, bool_not, bool_eq, hastype, distribute, shape, \
-    broadcast_shape, switch, identity, bool_and, typeof, scalar_cast, \
-    scalar_add, scalar_exp, scalar_log, scalar_sin, scalar_cos, scalar_tan, \
-    scalar_div, scalar_to_array, env_add
+    broadcast_shape, typeof, scalar_cast, scalar_add, scalar_exp, \
+    scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div, \
+    scalar_to_array, env_add
 from .utils import newenv
 
 
@@ -39,73 +39,79 @@ def core(fn):
     return fn
 
 
-@core
-def arrayable_binary(mname, x, y):
-    """Define a binary function that upcasts its arguments to Array.
+class Elemwise(MetaGraph):
+    """Generate a graph for an elemwise operation.
 
-    If either x or y is an Array, the other is converted to an array using
-    the `to_array` core function.
-
-    Arguments:
-        mname: The method name to call on x, e.g. `__add__`
-        x: The first argument.
-        y: The second argument.
+    * If any argument is an array:
+      * All scalar arguments are converted to arrays using scalar_to_array.
+      * The arguments are all broadcasted and array_map is called on them.
+    * Otherwise, we return getattr(arg1, mname)(arg2, ...)
     """
-    x_isarr = hastype(x, Array)
-    y_isarr = hastype(y, Array)
 
-    x_cvt = bool_and(y_isarr, bool_not(x_isarr))
-    y_cvt = bool_and(x_isarr, bool_not(y_isarr))
+    def __init__(self, mname, scalar_op=None):
+        """Initialize Elemwise."""
+        super().__init__(mname)
+        self.mname = mname
+        self.scalar_op = scalar_op
+        self.cache = {}
 
-    x_tfm = switch(x_cvt, to_array, identity)
-    y_tfm = switch(y_cvt, to_array, identity)
+    def generate_graph(self, args):
+        """Generate the graph."""
+        sig = tuple(arg.values[SHAPE]
+                    if isinstance(arg, AbstractArray) else False
+                    for arg in args)
+        if sig not in self.cache:
+            g = Graph()
+            g.debug.name = self.mname
+            shapes = [x for x in sig if x is not False]
 
-    x = x_tfm(x)
-    y = y_tfm(y)
+            is_array_op = len(shapes) > 0
+            params = []
+            for i, arg in enumerate(args):
+                p = g.add_parameter()
+                p.debug.name = f'x{i + 1}'
+                if is_array_op and not isinstance(arg, AbstractArray):
+                    p = g.apply(to_array, p)
+                params.append(p)
 
-    return getattr(x, mname)(y)
+            if is_array_op:
+                try:
+                    final_shape = reduce(broadcast_shape, shapes)
+                except ValueError as e:
+                    raise MyiaShapeError(e.args[0])
+                if any(dim is ANYTHING for dim in final_shape):
+                    # We will need to get the shapes dynamically
+                    def _build(a, b):
+                        return g.apply(broadcast_shape, a, b)
+                    argshapes = [g.apply(shape, p) for p in params]
+                    final_shape = reduce(_build, argshapes)
 
+            transformed = []
+            for arg, p in zip(args, params):
+                if is_array_op:
+                    sh = arg.values.get(SHAPE, ())
+                    if final_shape != sh:
+                        p = g.apply(distribute, p, final_shape)
+                transformed.append(p)
 
-@core
-def add(x, y):
-    """Implementation of `add`."""
-    return arrayable_binary('__add__', x, y)
-
-
-@core
-def sub(x, y):
-    """Implementation of `sub`."""
-    return arrayable_binary('__sub__', x, y)
-
-
-@core
-def mul(x, y):
-    """Implementation of `mul`."""
-    return arrayable_binary('__mul__', x, y)
-
-
-@core
-def truediv(x, y):
-    """Implementation of `truediv`."""
-    return arrayable_binary('__truediv__', x, y)
-
-
-@core
-def floordiv(x, y):
-    """Implementation of `floordiv`."""
-    return arrayable_binary('__floordiv__', x, y)
-
-
-@core
-def mod(x, y):
-    """Implementation of `mod`."""
-    return arrayable_binary('__mod__', x, y)
+            if is_array_op:
+                fn = self.scalar_op or self
+                g.output = g.apply(array_map, fn, *transformed)
+            else:
+                first, *rest = transformed
+                fn = g.apply(P.getattr, first, self.mname)
+                g.output = g.apply(fn, *rest)
+            self.cache[sig] = g
+        return self.cache[sig]
 
 
-@core
-def pow(x, y):
-    """Implementation of `pow`."""
-    return arrayable_binary('__pow__', x, y)
+add = Elemwise('__add__', P.scalar_add)
+sub = Elemwise('__sub__', P.scalar_sub)
+mul = Elemwise('__mul__', P.scalar_mul)
+truediv = Elemwise('__truediv__')
+floordiv = Elemwise('__floordiv__')
+mod = Elemwise('__mod__', P.scalar_mod)
+pow = Elemwise('__pow__', P.scalar_pow)
 
 
 @core
@@ -187,40 +193,12 @@ def _tan(x):
     return scalar_tan(x)
 
 
-@core
-def eq(x, y):
-    """Implementation of `eq`."""
-    return arrayable_binary('__eq__', x, y)
-
-
-@core
-def lt(x, y):
-    """Implementation of `lt`."""
-    return arrayable_binary('__lt__', x, y)
-
-
-@core
-def gt(x, y):
-    """Implementation of `gt`."""
-    return arrayable_binary('__gt__', x, y)
-
-
-@core
-def ne(x, y):
-    """Implementation of `ne`."""
-    return arrayable_binary('__ne__', x, y)
-
-
-@core
-def le(x, y):
-    """Implementation of `le`."""
-    return arrayable_binary('__le__', x, y)
-
-
-@core
-def ge(x, y):
-    """Implementation of `ge`."""
-    return arrayable_binary('__ge__', x, y)
+eq = Elemwise('__eq__', P.scalar_eq)
+lt = Elemwise('__lt__', P.scalar_lt)
+gt = Elemwise('__gt__', P.scalar_gt)
+ne = Elemwise('__ne__', P.scalar_ne)
+le = Elemwise('__le__', P.scalar_le)
+ge = Elemwise('__ge__', P.scalar_ge)
 
 
 @core
@@ -393,7 +371,7 @@ def tuple_hasnext(xs):
 class Tail(MetaGraph):
     """Implementation of tail."""
 
-    def specialize_from_abstract(self, args):
+    def generate_graph(self, args):
         """Generate tail specialized for the given Tuple type.
 
         tail(x) generates make_tuple(x[1], x[2], ...)
@@ -425,69 +403,9 @@ tail = Tail('tail')
 
 
 @core
-def broadcastable_binary(op, xs, ys):
-    """Define a binary elementwise function that broadcasts its arguments.
-
-    This operation broadcasts xs and ys to the minimal compatible shape.
-
-    Arguments:
-        op: The operation to apply pairwise to every element of xs and ys.
-        xs: The first Array.
-        ys: The second Array.
-    """
-    shp = broadcast_shape(shape(xs), shape(ys))
-    xs = distribute(xs, shp)
-    ys = distribute(ys, shp)
-    res = array_map(op, xs, ys)
-    return res
-
-
-@core
 def to_array(x):
     """Implementation of `to_array`."""
     return x.__myia_to_array__()
-
-
-@core
-def array_add(xs, ys):
-    """Implementation of `array_add`."""
-    return broadcastable_binary(add, xs, ys)
-
-
-@core
-def array_sub(xs, ys):
-    """Implementation of `array_sub`."""
-    return broadcastable_binary(sub, xs, ys)
-
-
-@core
-def array_mul(xs, ys):
-    """Implementation of `array_mul`."""
-    return broadcastable_binary(mul, xs, ys)
-
-
-@core
-def array_truediv(xs, ys):
-    """Implementation of `array_truediv`."""
-    return broadcastable_binary(truediv, xs, ys)
-
-
-@core
-def array_floordiv(xs, ys):
-    """Implementation of `array_floordiv`."""
-    return broadcastable_binary(floordiv, xs, ys)
-
-
-@core
-def array_mod(xs, ys):
-    """Implementation of `array_mod`."""
-    return broadcastable_binary(mod, xs, ys)
-
-
-@core
-def array_pow(xs, ys):
-    """Implementation of `array_pow`."""
-    return broadcastable_binary(pow, xs, ys)
 
 
 @core
@@ -547,42 +465,6 @@ def array_cos(xs):
 def array_tan(xs):
     """Implementation of `array_tan`."""
     return array_map(scalar_tan, xs)
-
-
-@core
-def array_eq(xs, ys):
-    """Implementation of `array_eq`."""
-    return broadcastable_binary(eq, xs, ys)
-
-
-@core
-def array_lt(xs, ys):
-    """Implementation of `array_lt`."""
-    return broadcastable_binary(lt, xs, ys)
-
-
-@core
-def array_gt(xs, ys):
-    """Implementation of `array_gt`."""
-    return broadcastable_binary(gt, xs, ys)
-
-
-@core
-def array_ne(xs, ys):
-    """Implementation of `array_ne`."""
-    return broadcastable_binary(ne, xs, ys)
-
-
-@core
-def array_le(xs, ys):
-    """Implementation of `array_le`."""
-    return broadcastable_binary(le, xs, ys)
-
-
-@core
-def array_ge(xs, ys):
-    """Implementation of `array_ge`."""
-    return broadcastable_binary(ge, xs, ys)
 
 
 _leaf_add = MultitypeGraph('hyper_add')
@@ -651,7 +533,7 @@ def list_reduce(fn, lst, dftl):
 class ListMap(MetaGraph):
     """Implementation of list_map."""
 
-    def specialize_from_abstract(self, args):
+    def generate_graph(self, args):
         """Return a graph for the number of lists."""
         if len(args) < 2:
             raise MyiaTypeError('list_map takes at least two arguments')
@@ -770,7 +652,7 @@ class GradOperation(MetaGraph):
             df.output = df.apply(P.tuple_getitem, bapp, 1)
         return df
 
-    def specialize_from_abstract(self, args):
+    def generate_graph(self, args):
         """Generate the graph."""
         ft, = args
         assert isinstance(ft, AbstractFunction)

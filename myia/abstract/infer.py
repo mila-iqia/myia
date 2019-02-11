@@ -21,7 +21,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractList, type_error_nargs, TypeDispatchError, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
-    bind, build_type
+    bind
 
 
 class InferenceEngine:
@@ -111,7 +111,7 @@ class InferenceEngine:
             return await self.infer_apply(ref)
 
         else:
-            raise AssertionError(f'Missing information for {ref}', ref)
+            raise AssertionError(f'Missing information for {ref}', ref.node)
 
     def get_inferred(self, ref):
         """Get a Future for the value associated to the Reference.
@@ -241,14 +241,7 @@ class InferenceEngine:
     async def infer_constant(self, ctref):
         """Infer the type of a ref of a Constant node."""
         v = self.pipeline.resources.convert(ctref.node.value)
-        res = to_abstract(v, ctref.context, ref=ctref)
-        t = build_type(res)
-        if dtype.ismyiatype(t, dtype.Number):
-            prio = 1 if dtype.ismyiatype(t, dtype.Float) else 0
-            res.values[TYPE] = self.loop.create_pending_from_list(
-                _number_types, t, lambda: prio
-            )
-        return res
+        return to_abstract(v, ctref.context, ref=ctref, loop=self.loop)
 
     def abstract_merge(self, *values):
         """Merge a list of AbstractValues together."""
@@ -326,7 +319,7 @@ def from_value(v, broaden=False):
     return a
 
 
-def to_abstract(v, context=None, ref=None):
+def to_abstract(v, context=None, ref=None, loop=None):
     """Translate the value to an abstract value.
 
     Arguments:
@@ -335,6 +328,9 @@ def to_abstract(v, context=None, ref=None):
             is a Graph.
         ref: The reference to the Constant we are converting, if there is one,
             so that we can generate a tracking_id.
+        loop: The InferenceLoop, or None. If not None, scalars ints or floats
+            will be given a Pending type so that it can adapt to the types of
+            the variables they interact with.
     """
     ref = ref and ref.node
 
@@ -370,17 +366,24 @@ def to_abstract(v, context=None, ref=None):
         typ = dtype.pytype_to_myiatype(type(v), v)
         new_args = {}
         for name, field in v.__dataclass_fields__.items():
-            new_args[name] = to_abstract(getattr(v, name), context)
+            new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
         return AbstractClass(typ.tag, new_args, typ.methods)
 
-    elif isinstance(v, (int, float, str)):
+    elif isinstance(v, (int, float)):
+        typ = dtype.pytype_to_myiatype(type(v), v)
+        if loop is not None:
+            prio = 1 if dtype.ismyiatype(typ, dtype.Float) else 0
+            typ = loop.create_pending_from_list(
+                _number_types, typ, lambda: prio
+            )
         return AbstractScalar({
             VALUE: v,
-            TYPE: dtype.pytype_to_myiatype(type(v), v),
+            TYPE: typ,
         })
 
     elif isinstance(v, tuple):
-        return AbstractTuple([to_abstract(elem, context) for elem in v])
+        return AbstractTuple([to_abstract(elem, context, loop=loop)
+                              for elem in v])
 
     elif isinstance(v, np.ndarray):
         return AbstractArray(
@@ -394,7 +397,7 @@ def to_abstract(v, context=None, ref=None):
     elif isinstance(v, list):
         if len(v) == 0:
             raise NotImplementedError('No support for empty lists yet.')
-        return AbstractList(to_abstract(v[0], context))
+        return AbstractList(to_abstract(v[0], context, loop=loop))
 
     elif dtype.ismyiatype(v):
         return AbstractType(v)
@@ -548,7 +551,7 @@ class MetaGraphInferrer(BaseGraphInferrer):
         """Generate the graph for the given args."""
         if args not in self.graph_cache:
             try:
-                g = self.metagraph.specialize_from_abstract(args)
+                g = self.metagraph.generate_graph(args)
             except GraphGenerationError as err:
                 types = err.args[0]
                 raise TypeDispatchError(self.metagraph, types)
