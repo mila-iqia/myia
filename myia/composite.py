@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from functools import reduce
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
-    AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
-    abstract_shape
+    AbstractFunction, GraphFunction, AbstractList, AbstractTuple
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType, Function
 from .hypermap import HyperMap

@@ -20,7 +20,6 @@ from .utils import (  # noqa
     sensitivity_transform,
     amerge,
     bind,
-    abstract_shape,
 )
 
 

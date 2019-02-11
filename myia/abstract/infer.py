@@ -21,7 +21,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractList, type_error_nargs, TypeDispatchError, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
-    bind, build_type
+    bind
 
 
 class InferenceEngine:
