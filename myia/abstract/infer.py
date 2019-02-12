@@ -8,7 +8,8 @@ from dataclasses import is_dataclass, replace as dc_replace
 from .. import dtype
 from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
-from ..utils import Overload, Partializable, is_dataclass_type
+from ..utils import Overload, Partializable, is_dataclass_type, \
+    SymbolicKeyInstance
 
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
@@ -347,6 +348,9 @@ def to_abstract(v, context=None, ref=None, loop=None):
 
     elif isinstance(v, Primitive):
         return AbstractFunction(PrimitiveFunction(v, tracking_id=ref))
+
+    elif isinstance(v, SymbolicKeyInstance):
+        return AbstractScalar({VALUE: v, TYPE: dtype.SymbolicKeyType})
 
     elif is_dataclass_type(v):
         typ = dtype.pytype_to_myiatype(v)
