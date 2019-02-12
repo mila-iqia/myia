@@ -70,8 +70,9 @@ class Model:
 def make_model(dtype='float64'):
     return Model(
         layers=(
-            TanhLayer(MA(6, 10, dtype=dtype), zeros(1, 10, dtype=dtype)),
-            TanhLayer(MB(10, 8, dtype=dtype), zeros(1, 8, dtype=dtype)),
+            TanhLayer(MA(6, 9, dtype=dtype), zeros(1, 9, dtype=dtype)),
+            TanhLayer(MB(9, 10, dtype=dtype), zeros(1, 10, dtype=dtype)),
+            TanhLayer(MC(10, 8, dtype=dtype), zeros(1, 8, dtype=dtype)),
         )
     )
 
