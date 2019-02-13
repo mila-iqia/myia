@@ -540,6 +540,13 @@ class GraphInferrer(BaseGraphInferrer):
         assert context is not None
         super().__init__(context.filter(graph))
 
+    def normalize_args(self, args):
+        """Broaden args if flag ignore_values is True."""
+        if self._graph.flags.get('ignore_values', False):
+            return tuple(_broaden(a, None) for a in args)
+        else:
+            return args
+
     def get_graph(self, engine, args):
         """Return the graph."""
         return self._graph

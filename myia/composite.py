@@ -21,22 +21,34 @@ from .prim.py_implementations import \
 from .utils import newenv
 
 
-def core(fn):
+def core(fn=None, **flags):
     """Wrap a graph that defines a core Myia function.
 
-    The resulting graph is given the following flags:
-        core: Indicates that this is a core function (only informative at
-            the moment).
-        flatten_inference: Tells the InferenceEngine to infer through this
-            function as if it was inlined, disregarding depth limitations.
+    The following flags can be set:
+        core: (default: True) Indicates that this is a core function
+            (only informative at the moment).
+        flatten_inference: (default: True) Tells the InferenceEngine to
+            infer through this function as if it was inlined, disregarding
+            depth limitations.
+        ignore_values: (default: False) Make the inferrer ignore argument
+            values for the parameters (leads to less specialization).
     """
-    fn._myia_flags = {
+    flags = {
         # This is a function defined in Myia's core
         'core': True,
         # Inference should not broaden context when entering this function
         'flatten_inference': True,
+        **flags,
     }
-    return fn
+
+    def deco(fn):
+        fn._myia_flags = flags
+        return fn
+
+    if fn is None:
+        return deco
+    else:
+        return deco(fn)
 
 
 class Elemwise(MetaGraph):
@@ -340,12 +352,12 @@ class SequenceIterator:
     idx: Int
     seq: Object
 
-    @core
+    @core(ignore_values=True)
     def __myia_hasnext__(self):
         """Whether the index is past the length of the sequence."""
         return self.idx < len(self.seq)
 
-    @core
+    @core(ignore_values=True)
     def __myia_next__(self):
         """Return the next element and a new iterator."""
         return self.seq[self.idx], SequenceIterator(self.idx + 1, self.seq)
