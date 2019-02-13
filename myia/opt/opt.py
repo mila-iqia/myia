@@ -6,6 +6,7 @@ from collections import deque
 from ..ir import ANFNode, Apply, Constant, Graph, Special, manage
 from ..prim import Primitive
 from ..utils.unify import Unification, Var
+from ..utils import OrderedSet
 
 
 class VarNode(Special):
@@ -238,11 +239,18 @@ class LocalPassOptimizer:
                 todo.extendleft(reversed(new.inputs))
 
             if chg:
-                # If changes, re-do the parent node(s)
-                uses = set(u[0] for u in mng.uses[new])
-                # TODO: grab all constants for a graph
-                seen.difference_update(uses)
-                todo.extendleft(uses)
+                if new.is_constant(Graph):
+                    # make sure to have all uses for graphs
+                    nns = mng.graph_constants[new.value]
+                else:
+                    nns = [new]
+                uses = OrderedSet()
+                for nn in nns:
+                    uses |= OrderedSet(u[0] for u in mng.uses[nn])
+                # Since there was changes, re-schedule the parent node(s)
+                redo = uses & seen
+                seen.difference_update(redo)
+                todo.extendleft(redo)
 
         return changes
 
