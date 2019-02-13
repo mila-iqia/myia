@@ -20,19 +20,13 @@ from .common import mysum, i64, f64, Point
 specialize_pipeline = scalar_debug_pipeline \
     .select('parse', 'infer', 'specialize',
             'erase_class', 'erase_tuple',
-            'validate', 'export', 'wrap') \
-    .configure(
-        {'inferrer.max_depth': 1}
-    )
+            'validate', 'export', 'wrap')
 
 
 specialize_pipeline_std = standard_debug_pipeline \
     .select('parse', 'infer', 'specialize',
             'erase_class', 'opt', 'erase_tuple',
-            'validate', 'export', 'wrap') \
-    .configure(
-        {'inferrer.max_depth': 1}
-    )
+            'validate', 'export', 'wrap')
 
 
 @overload

@@ -97,16 +97,15 @@ class WithImplInferrer(Inferrer):
 
     Arguments:
         impl: The implementation.
-        nolimit: Whether constant propagation through this implementation
-            should be limited by the max_depth parameter to an
-            InferenceEngine.
+        infer_value: Whether to do constant propagation through this
+            implementation.
     """
 
-    def __init__(self, impl, nolimit=False):
+    def __init__(self, impl, infer_value=False):
         """Initialize a WithImplInferrer."""
         super().__init__()
         self.impl = impl
-        self.nolimit = nolimit
+        self.infer_value = infer_value
         data = inspect.getfullargspec(impl)
         assert data.varargs is None
         assert data.varkw is None
@@ -119,15 +118,13 @@ class WithImplInferrer(Inferrer):
     def run_impl(self, engine, args, outtype):
         """Run the implementation on abstract data.
 
-        If nolimit is False, this takes into account engine.max_depth.
+        If infer_value is False, this returns an AbstractScalar with value
+        ANYTHING.
 
-        Arguments:
-            engine: The InferenceEngine
-            args: The abstract arguments
+        Arguments: engine: The InferenceEngine args: The abstract arguments
             outtype: The output type to give to the result
         """
-        depth = max((arg.count for arg in args), default=0)
-        if not self.nolimit and depth >= engine.max_depth:
+        if not self.infer_value:
             outval = ANYTHING
         else:
             values = [arg.values[VALUE] for arg in args]
@@ -136,14 +133,10 @@ class WithImplInferrer(Inferrer):
             else:
                 outval = self.impl(*values)
 
-        if outval is ANYTHING:
-            depth = engine.max_depth
-        rval = AbstractScalar({
+        return AbstractScalar({
             VALUE: outval,
             TYPE: outtype,
         })
-        rval.count = min(depth + 1, engine.max_depth)
-        return rval
 
 
 class UniformPrimitiveInferrer(WithImplInferrer):
@@ -154,25 +147,24 @@ class UniformPrimitiveInferrer(WithImplInferrer):
 
     Arguments:
         impl: The implementation.
-        nolimit: Whether constant propagation through this implementation
-            should be limited by the max_depth parameter to an
-            InferenceEngine.
+        infer_value: Whether to do constant propagation through this
+            implementation.
     """
 
-    def __init__(self, impl, nolimit=False):
+    def __init__(self, impl, infer_value=False):
         """Initialize a UniformPrimitiveInferrer."""
-        super().__init__(impl, nolimit)
+        super().__init__(impl, infer_value)
         data = self.impl_data
         self.typemap = defaultdict(list)
         # We group the arguments with the same types together.
         for i, arg in enumerate(data.args):
             self.typemap[data.annotations[arg]].append(i)
         self.outtype = data.annotations['return']
-        self.nolimit = nolimit
+        self.infer_value = infer_value
 
     def normalize_args(self, args):
-        """If nolimit is False, return broadened arguments."""
-        if not self.nolimit:
+        """If infer_value is False, return broadened arguments."""
+        if not self.infer_value:
             args = tuple(broaden(a, None) for a in args)
         return args
 
@@ -193,16 +185,19 @@ class UniformPrimitiveInferrer(WithImplInferrer):
         return self.run_impl(engine, args, outtype)
 
 
-def uniform_prim(prim, nolimit=False):
+def uniform_prim(prim, infer_value=False):
     """Decorator to define and register a UniformPrimitiveInferrer.
 
     Arguments:
         prim: The primitive for which the inferrer is defined.
-        nolimit: Whether to limit constant propagation through this
+        infer_value: Whether to limit constant propagation through this
             operation or not.
     """
     def deco(fn):
-        xinf = UniformPrimitiveInferrer.partial(impl=fn, nolimit=nolimit)
+        xinf = UniformPrimitiveInferrer.partial(
+            impl=fn,
+            infer_value=infer_value
+        )
         abstract_inferrer_constructors[prim] = xinf
     return deco
 
@@ -422,8 +417,8 @@ uniform_prim(P.scalar_mod)(py.scalar_mod)
 uniform_prim(P.scalar_pow)(py.scalar_pow)
 uniform_prim(P.scalar_trunc)(py.scalar_trunc)
 uniform_prim(P.scalar_floor)(py.scalar_floor)
-uniform_prim(P.scalar_uadd, nolimit=True)(py.scalar_uadd)
-uniform_prim(P.scalar_usub, nolimit=True)(py.scalar_usub)
+uniform_prim(P.scalar_uadd, infer_value=True)(py.scalar_uadd)
+uniform_prim(P.scalar_usub, infer_value=True)(py.scalar_usub)
 uniform_prim(P.scalar_exp)(py.scalar_exp)
 uniform_prim(P.scalar_log)(py.scalar_log)
 uniform_prim(P.scalar_sin)(py.scalar_sin)
@@ -436,16 +431,16 @@ uniform_prim(P.scalar_tan)(py.scalar_tan)
 ###############
 
 
-uniform_prim(P.scalar_eq, nolimit=True)(py.scalar_eq)
-uniform_prim(P.scalar_lt, nolimit=True)(py.scalar_lt)
-uniform_prim(P.scalar_gt, nolimit=True)(py.scalar_gt)
-uniform_prim(P.scalar_ne, nolimit=True)(py.scalar_ne)
-uniform_prim(P.scalar_le, nolimit=True)(py.scalar_le)
-uniform_prim(P.scalar_ge, nolimit=True)(py.scalar_ge)
-uniform_prim(P.bool_not, nolimit=True)(py.bool_not)
-uniform_prim(P.bool_and, nolimit=True)(py.bool_and)
-uniform_prim(P.bool_or, nolimit=True)(py.bool_or)
-uniform_prim(P.bool_eq, nolimit=True)(py.bool_eq)
+uniform_prim(P.scalar_eq, infer_value=True)(py.scalar_eq)
+uniform_prim(P.scalar_lt, infer_value=True)(py.scalar_lt)
+uniform_prim(P.scalar_gt, infer_value=True)(py.scalar_gt)
+uniform_prim(P.scalar_ne, infer_value=True)(py.scalar_ne)
+uniform_prim(P.scalar_le, infer_value=True)(py.scalar_le)
+uniform_prim(P.scalar_ge, infer_value=True)(py.scalar_ge)
+uniform_prim(P.bool_not, infer_value=True)(py.bool_not)
+uniform_prim(P.bool_and, infer_value=True)(py.bool_and)
+uniform_prim(P.bool_or, infer_value=True)(py.bool_or)
+uniform_prim(P.bool_eq, infer_value=True)(py.bool_eq)
 
 
 ######################

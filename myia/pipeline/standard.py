@@ -25,7 +25,6 @@ standard_resources = dict(
     ),
     inferrer=InferenceResource.partial(
         constructors=abstract_inferrer_constructors,
-        max_depth=1,
         context_class=Context,
     )
 )

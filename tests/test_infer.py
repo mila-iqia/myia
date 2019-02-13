@@ -63,7 +63,6 @@ infer_pipeline = scalar_pipeline.select(
 ).configure({
     'py_implementations': pyimpl_test,
     'inferrer.constructors': abstract_inferrer_cons_test,
-    'inferrer.max_depth': 10,
 })
 
 
@@ -72,7 +71,6 @@ infer_pipeline_std = standard_pipeline.select(
 ).configure({
     'py_implementations': pyimpl_test,
     'inferrer.constructors': abstract_inferrer_cons_test,
-    'inferrer.max_depth': 10,
 })
 
 

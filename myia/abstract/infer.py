@@ -33,7 +33,6 @@ class InferenceEngine:
         constructors: As an argument to __init__, a map from primitives
             to inferrer classes, which will be instantiated automatically
             by the InferenceEngine.
-        max_depth: Depth for constant propagation.
         context_class: The class to use to instantiate contexts.
 
     """
@@ -42,7 +41,6 @@ class InferenceEngine:
                  pipeline,
                  *,
                  constructors,
-                 max_depth=1,
                  context_class=Context):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop(InferenceError)
@@ -52,7 +50,6 @@ class InferenceEngine:
             prim: cons()
             for prim, cons in constructors.items()
         }
-        self.max_depth = max_depth
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
         self.context_class = context_class
