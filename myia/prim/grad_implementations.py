@@ -26,9 +26,7 @@ parse = standard_pipeline \
     .make_transformer('input', 'graph')
 
 
-_flags = {
-    'flatten_inference': True,
-}
+_flags = {}
 
 
 def bprop_to_augm(prim, fn):

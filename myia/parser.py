@@ -193,12 +193,12 @@ class Parser:
     def make_condition_blocks(self, block):
         """Make two blocks for an if statement or expression."""
         with About(block.graph.debug, 'if_true'):
-            true_block = Block(self, auxiliary=True, flatten_inference=True)
+            true_block = Block(self, auxiliary=True)
         true_block.preds.append(block)
         true_block.mature()
 
         with About(block.graph.debug, 'if_false'):
-            false_block = Block(self, auxiliary=True, flatten_inference=True)
+            false_block = Block(self, auxiliary=True)
         false_block.preds.append(block)
         false_block.mature()
 
@@ -509,7 +509,7 @@ class Parser:
 
         # Create the continuation
         with About(block.graph.debug, 'if_after'):
-            after_block = Block(self, auxiliary=True, flatten_inference=True)
+            after_block = Block(self, auxiliary=True)
 
         # Process the first branch
         true_end = self.process_statements(true_block, node.body)

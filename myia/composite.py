@@ -27,17 +27,12 @@ def core(fn=None, **flags):
     The following flags can be set:
         core: (default: True) Indicates that this is a core function
             (only informative at the moment).
-        flatten_inference: (default: True) Tells the InferenceEngine to
-            infer through this function as if it was inlined, disregarding
-            depth limitations.
         ignore_values: (default: False) Make the inferrer ignore argument
             values for the parameters (leads to less specialization).
     """
     flags = {
         # This is a function defined in Myia's core
         'core': True,
-        # Inference should not broaden context when entering this function
-        'flatten_inference': True,
         **flags,
     }
 
@@ -404,7 +399,6 @@ class Tail(MetaGraph):
             raise MyiaTypeError('tail requires a non-empty Tuple')
         g = Graph()
         g.flags['core'] = True
-        g.flags['flatten_inference'] = True
         tup = g.add_parameter()
         tup.debug.name = "tup"
         elems = [g.apply(P.tuple_getitem, tup, i)
@@ -562,7 +556,6 @@ class ListMap(MetaGraph):
 
         g = Graph()
         g.flags['core'] = True
-        g.flags['flatten_inference'] = True
         g.debug.name = 'list_map'
         fn = g.add_parameter()
         lists = [g.add_parameter() for _ in args[1:]]
@@ -586,12 +579,10 @@ class ListMap(MetaGraph):
             gtrue = Graph()
             gtrue.debug.name = 'ftrue'
             gtrue.flags['core'] = True
-            gtrue.flags['flatten_inference'] = True
             gtrue.output = gtrue.apply(gnext, fn, resl, *iters)
             gfalse = Graph()
             gfalse.debug.name = 'ffalse'
             gfalse.flags['core'] = True
-            gfalse.flags['flatten_inference'] = True
             gfalse.output = resl
             g.output = g.apply(g.apply(P.switch, cond, gtrue, gfalse))
 
