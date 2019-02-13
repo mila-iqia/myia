@@ -239,18 +239,10 @@ class LocalPassOptimizer:
                 todo.extendleft(reversed(new.inputs))
 
             if chg:
-                if new.is_constant(Graph):
-                    # make sure to have all uses for graphs
-                    nns = mng.graph_constants[new.value]
-                else:
-                    nns = [new]
-                uses = OrderedSet()
-                for nn in nns:
-                    uses |= OrderedSet(u[0] for u in mng.uses[nn])
                 # Since there was changes, re-schedule the parent node(s)
-                redo = uses & seen
-                seen.difference_update(redo)
-                todo.extendleft(redo)
+                uses = OrderedSet(u[0] for u in mng.uses[new])
+                seen.difference_update(uses)
+                todo.extendleft(uses)
 
         return changes
 
