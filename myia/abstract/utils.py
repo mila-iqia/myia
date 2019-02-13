@@ -152,7 +152,7 @@ def build_type(self, x: AbstractType):
 @overload(bootstrap=True)
 def abstract_clone(self, x: AbstractScalar, *args):
     """Clone an abstract value."""
-    return AbstractScalar(self(x.values, *args), count=x.count)
+    return AbstractScalar(self(x.values, *args))
 
 
 @overload  # noqa: F811
@@ -219,7 +219,7 @@ def abstract_clone(self, x: object, *args):
 @overload(bootstrap=True)
 async def abstract_clone_async(self, x: AbstractScalar):
     """Clone an abstract value (asynchronous)."""
-    return AbstractScalar(await self(x.values), count=x.count)
+    return AbstractScalar(await self(x.values))
 
 
 @overload  # noqa: F811
@@ -409,7 +409,7 @@ def _amerge(x1: AbstractScalar, x2, loop, forced):
     values = amerge(x1.values, x2.values, loop, forced)
     if forced or values is x1.values:
         return x1
-    return AbstractScalar(values, count=max(x1.count, x2.count))
+    return AbstractScalar(values)
 
 
 @overload  # noqa: F811
