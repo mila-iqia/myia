@@ -178,17 +178,12 @@ class AbstractValue(AbstractBase):
         values: A dictionary mapping a Track like VALUE or TYPE
             to a value for that track. Different abstract structures
             may have different tracks, e.g. SHAPE for arrays.
-        count: A "depth" count tracking the constant propagation
-            depth. The inference engine can be configured to broaden
-            an abstract value past a certain depth. Note that the count
-            is ignored for equality purposes.
 
     """
 
-    def __init__(self, values, count=0):
+    def __init__(self, values):
         """Initialize an AbstractValue."""
         self.values = TrackDict(values)
-        self.count = count
 
     def _make_key(self):
         return tuple(sorted(self.values.items()))

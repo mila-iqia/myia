@@ -9,7 +9,7 @@ from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
     List, Class, EnvType, Function
 from .hypermap import HyperMap
-from .abstract import MyiaTypeError
+from .abstract import MyiaTypeError, broaden
 from .info import About
 from .ir import Graph, MetaGraph, MultitypeGraph, Constant
 from .prim import ops as P
@@ -21,22 +21,29 @@ from .prim.py_implementations import \
 from .utils import newenv
 
 
-def core(fn):
+def core(fn=None, **flags):
     """Wrap a graph that defines a core Myia function.
 
-    The resulting graph is given the following flags:
-        core: Indicates that this is a core function (only informative at
-            the moment).
-        flatten_inference: Tells the InferenceEngine to infer through this
-            function as if it was inlined, disregarding depth limitations.
+    The following flags can be set:
+        core: (default: True) Indicates that this is a core function
+            (only informative at the moment).
+        ignore_values: (default: False) Make the inferrer ignore argument
+            values for the parameters (leads to less specialization).
     """
-    fn._myia_flags = {
+    flags = {
         # This is a function defined in Myia's core
         'core': True,
-        # Inference should not broaden context when entering this function
-        'flatten_inference': True,
+        **flags,
     }
-    return fn
+
+    def deco(fn):
+        fn._myia_flags = flags
+        return fn
+
+    if fn is None:
+        return deco
+    else:
+        return deco(fn)
 
 
 class Elemwise(MetaGraph):
@@ -48,12 +55,19 @@ class Elemwise(MetaGraph):
     * Otherwise, we return getattr(arg1, mname)(arg2, ...)
     """
 
-    def __init__(self, mname, scalar_op=None):
+    def __init__(self, mname, scalar_op=None, infer_value=False):
         """Initialize Elemwise."""
         super().__init__(mname)
         self.mname = mname
         self.scalar_op = scalar_op
+        self.infer_value = infer_value
         self.cache = {}
+
+    def normalize_args(self, args):
+        """If infer_value is False, return broadened arguments."""
+        if not self.infer_value:
+            args = tuple(broaden(a, None) for a in args)
+        return args
 
     def generate_graph(self, args):
         """Generate the graph."""
@@ -193,12 +207,12 @@ def _tan(x):
     return scalar_tan(x)
 
 
-eq = Elemwise('__eq__', P.scalar_eq)
-lt = Elemwise('__lt__', P.scalar_lt)
-gt = Elemwise('__gt__', P.scalar_gt)
-ne = Elemwise('__ne__', P.scalar_ne)
-le = Elemwise('__le__', P.scalar_le)
-ge = Elemwise('__ge__', P.scalar_ge)
+eq = Elemwise('__eq__', P.scalar_eq, infer_value=True)
+lt = Elemwise('__lt__', P.scalar_lt, infer_value=True)
+gt = Elemwise('__gt__', P.scalar_gt, infer_value=True)
+ne = Elemwise('__ne__', P.scalar_ne, infer_value=True)
+le = Elemwise('__le__', P.scalar_le, infer_value=True)
+ge = Elemwise('__ge__', P.scalar_ge, infer_value=True)
 
 
 @core
@@ -333,12 +347,12 @@ class SequenceIterator:
     idx: Int
     seq: Object
 
-    @core
+    @core(ignore_values=True)
     def __myia_hasnext__(self):
         """Whether the index is past the length of the sequence."""
         return self.idx < len(self.seq)
 
-    @core
+    @core(ignore_values=True)
     def __myia_next__(self):
         """Return the next element and a new iterator."""
         return self.seq[self.idx], SequenceIterator(self.idx + 1, self.seq)
@@ -385,7 +399,6 @@ class Tail(MetaGraph):
             raise MyiaTypeError('tail requires a non-empty Tuple')
         g = Graph()
         g.flags['core'] = True
-        g.flags['flatten_inference'] = True
         tup = g.add_parameter()
         tup.debug.name = "tup"
         elems = [g.apply(P.tuple_getitem, tup, i)
@@ -543,7 +556,6 @@ class ListMap(MetaGraph):
 
         g = Graph()
         g.flags['core'] = True
-        g.flags['flatten_inference'] = True
         g.debug.name = 'list_map'
         fn = g.add_parameter()
         lists = [g.add_parameter() for _ in args[1:]]
@@ -567,12 +579,10 @@ class ListMap(MetaGraph):
             gtrue = Graph()
             gtrue.debug.name = 'ftrue'
             gtrue.flags['core'] = True
-            gtrue.flags['flatten_inference'] = True
             gtrue.output = gtrue.apply(gnext, fn, resl, *iters)
             gfalse = Graph()
             gfalse.debug.name = 'ffalse'
             gfalse.flags['core'] = True
-            gfalse.flags['flatten_inference'] = True
             gfalse.output = resl
             g.output = g.apply(g.apply(P.switch, cond, gtrue, gfalse))
 

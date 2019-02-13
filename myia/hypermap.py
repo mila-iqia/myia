@@ -2,7 +2,7 @@
 
 
 from . import operations, composite as C
-from .abstract import InferenceError
+from .abstract import InferenceError, broaden
 from .ir import MetaGraph, Graph
 from .dtype import Array, List, Tuple, Class, tag_to_dataclass, \
     pytype_to_myiatype
@@ -47,6 +47,10 @@ class HyperMap(MetaGraph):
         for t in (*nonleaf, object):
             self.make_map[t] = self._full_make.map[t]
         self.nonleaf = nonleaf
+
+    def normalize_args(self, args):
+        """Return broadened arguments."""
+        return tuple(broaden(a, None) for a in args)
 
     _full_make = Overload()
 

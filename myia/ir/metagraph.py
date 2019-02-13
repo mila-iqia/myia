@@ -21,6 +21,13 @@ class MetaGraph:
         self.name = name
         self.cache = {}
 
+    def normalize_args(self, args):
+        """Return normalized versions of the arguments.
+
+        By default, this returns args unchanged.
+        """
+        return args
+
     def generate_graph(self, args):
         """Generate a Graph for the given abstract arguments."""
         from ..abstract.utils import build_type

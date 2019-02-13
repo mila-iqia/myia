@@ -26,12 +26,10 @@ parse = standard_pipeline \
     .make_transformer('input', 'graph')
 
 
-_flags = {
-    'flatten_inference': True,
-}
+_flags = {'ignore_values': True}
 
 
-def bprop_to_augm(prim, fn):
+def bprop_to_augm(prim, fn, flags):
     """Given a function for the bprop, make the augmented function."""
     info = NamedDebugInfo(prim=prim, name=prim.name)
 
@@ -50,6 +48,7 @@ def bprop_to_augm(prim, fn):
     with About(info, 'grad_fprop'):
         outer = Graph()
         outer.flags.update(_flags)
+        outer.flags.update(flags)
         outer.transforms['primal'] = prim
         outer.output = Constant(None)
 
@@ -88,10 +87,10 @@ augmented_graphs = Registry()
 register = augmented_graphs.register
 
 
-def register_bprop(prim):
+def register_bprop(prim, **flags):
     """Register an augmented function for prim, given a backpropagator."""
     def deco(fn):
-        g = bprop_to_augm(prim, fn)
+        g = bprop_to_augm(prim, fn, flags)
         return register(prim)(g)
     return deco
 
@@ -190,7 +189,7 @@ def bprop_scalar_cast(x, t, out, dout):
     return (scalar_cast(dout, typeof(x)), t)
 
 
-@register_bprop(primops.tuple_getitem)
+@register_bprop(primops.tuple_getitem, ignore_values=False)
 def bprop_tuple_getitem(data, idx, out, dout):
     """Backpropagator for primitive `tuple_getitem`."""
     return (tuple_setitem(zeros_like(data), idx, dout),
@@ -399,7 +398,7 @@ class ArrayReduceGradient(MetaGraph):
         fn = jf.get_unique()
         assert isinstance(fn, GraphFunction) and fn.graph.parent is None
         assert fn.graph.transforms['primal'] is primops.scalar_add
-        return bprop_to_augm(primops.array_reduce, bprop_sum)
+        return bprop_to_augm(primops.array_reduce, bprop_sum, {})
 
 
 register(primops.array_reduce)(

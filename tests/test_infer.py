@@ -63,7 +63,6 @@ infer_pipeline = scalar_pipeline.select(
 ).configure({
     'py_implementations': pyimpl_test,
     'inferrer.constructors': abstract_inferrer_cons_test,
-    'inferrer.max_depth': 10,
 })
 
 
@@ -72,7 +71,6 @@ infer_pipeline_std = standard_pipeline.select(
 ).configure({
     'py_implementations': pyimpl_test,
     'inferrer.constructors': abstract_inferrer_cons_test,
-    'inferrer.max_depth': 10,
 })
 
 
@@ -160,27 +158,27 @@ def test_identity(x):
     return x
 
 
-@infer((16,))
+@infer((i64,))
 def test_constants_int():
     return 2 * 8
 
 
-@infer((12.0,))
+@infer((f64,))
 def test_constants_float():
     return 1.5 * 8.0
 
 
-@infer((12.0,))
+@infer((f64,))
 def test_constants_intxfloat():
     return 8 * 1.5
 
 
-@infer((12.0,))
+@infer((f64,))
 def test_constants_floatxint():
     return 1.5 * 8
 
 
-@infer((60.0,))
+@infer((f64,))
 def test_constants_floatxint2():
     return (8 * 7) + 4.0
 
@@ -230,8 +228,8 @@ def test_prim_log(x):
     # so the following is an InferenceError even though it
     # will work with the standard_pipeline
     (i64, f64, f64, InferenceError),
-    (True, 7, 4, 49),
-    (False, 7, 4, 16),
+    (True, 7, 4, i64),
+    (False, 7, 4, i64),
     (B, 7, 4, i64),
 )
 def test_if(c, x, y):
@@ -253,8 +251,6 @@ def test_if2(x, y):
     (i64, i64, i64),
     (i64, f64, f64),
     (f64, f64, f64),
-    (1_000_000, i64, i64),
-    (2, 3, 27),
     (1_000_000, 3, i64)
 )
 def test_while(x, y):
@@ -616,8 +612,6 @@ def test_hof(x):
 @infer(
     (i64, i64, i64),
     (i64, f64, InferenceError),
-    (-1, 3, 36),
-    (1, 3, 6),
     (i64, 3, i64),
 )
 def test_hof_2(c, x):
@@ -762,7 +756,7 @@ def test_func_arg4(x):
     return g(t, x)
 
 
-@infer((4,))
+@infer((i64,))
 def test_closure_deep():
     def g(x):
         def h():
@@ -773,7 +767,6 @@ def test_closure_deep():
 
 @infer(
     (i64, i64, i64),
-    (5, 7, 15),
 )
 def test_closure_passing(x, y):
     def adder(x):
@@ -790,16 +783,6 @@ def test_closure_passing(x, y):
 @infer((B, B), (i64, InferenceError))
 def test_not(x):
     return not x
-
-
-# TODO: does this matter?
-@infer((2, 2, 8), (2, 3, 13))
-def test_cover_limitedvalue_eq(x, y):
-
-    def square(x):
-        return x * x
-
-    return square(x) + square(y)
 
 
 @infer(
@@ -877,9 +860,6 @@ Tf4 = T[f64, f64, f64, f64]
     # (Thing_f, i64),
 
     (5, 5),
-    (6.0, 6),
-    ((5, 7, (3.2, 1.8)), 16),
-    (Point(5, 7), 35),
     (Point3D(5, 7, 9), 0),
 )
 def test_hastype_2(x):
@@ -957,7 +937,6 @@ class data:
 @infer(
     (i64, i64, (i64, i64)),
     (i64, f64, InferenceError),
-    (2, 3, (5, 36)),
 )
 def test_getattr(x, y):
     a = helpers.add(x, y)
@@ -1195,7 +1174,7 @@ def test_list_reduce(lst, dflt):
     return list_reduce(f, lst, dflt)
 
 
-@infer((i64, i64), (40, 42))
+@infer((i64, i64))
 def test_partial_1(x):
     def f(a, b):
         return a + b
@@ -1341,7 +1320,6 @@ def test_call_nonfunc(x, y):
 
 
 @infer(
-    (2, 3, 4, 90),
     (i64, i64, i64, i64),
     (f64, f64, f64, InferenceError),
 )
@@ -1525,7 +1503,6 @@ def test_hastype_interference(x, y, z):
 @infer(
     (Point(i64, i64), i64),
     (Point(f64, f64), f64),
-    (Point(3, 4), 7),
 )
 def test_class(pt):
     return pt.x + pt.y
@@ -1534,7 +1511,6 @@ def test_class(pt):
 @infer(
     (Point(i64, i64), i64),
     (Point(f64, f64), f64),
-    (Point(3, 4), 5),
 )
 def test_dataclass_method(pt):
     return pt.abs()
@@ -1543,7 +1519,6 @@ def test_dataclass_method(pt):
 @infer(
     (i64, i64, i64, i64, Point(i64, i64)),
     (f64, f64, f64, f64, InferenceError),
-    (1, 2, 3, 4, Point(4, 6)),
 )
 def test_dataclass_inst(x1, y1, x2, y2):
     pt1 = Point(x1, y1)
@@ -1586,9 +1561,6 @@ hyper_map_nobroadcast = HyperMap(broadcast=False)
     (i64, f64, InferenceError),
     ([f64], f64, InferenceError),
     (ai64_of(2, 5), af64_of(2, 5), InferenceError),
-    (1, 2, 3),
-    (4.5, 7.5, 12.0),
-    (Point(1, 2), Point(3, 4), Point(4, 6)),
 )
 def test_hyper_map(x, y):
     return hyper_map(scalar_add, x, y)
@@ -1617,9 +1589,6 @@ def test_hyper_map_nobroadcast(x, y):
     (ai64_of(2, 5), ai64_of(2, 5), ai64_of(2, 5)),
     (ai64_of(2, 1), ai64_of(1, 5), ai64_of(2, 5)),
     (Env, Env, Env),
-    (1, 2, 3),
-    (4.5, 7.5, 12.0),
-    (Point(1, 2), Point(3, 4), Point(4, 6)),
 )
 def test_hyper_add(x, y):
     return hyper_add(x, y)

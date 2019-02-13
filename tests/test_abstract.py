@@ -8,10 +8,12 @@ from myia.abstract import (
     ANYTHING, MyiaTypeError,
     AbstractScalar as _S, AbstractTuple as T,
     AbstractJTagged, AbstractError, AbstractFunction,
-    InferenceLoop, build_value, amerge,
+    InferenceLoop, to_abstract, build_value, amerge,
     Possibilities as _Poss,
     VALUE, TYPE, DEAD
 )
+from myia.utils import SymbolicKeyInstance
+from myia.ir import Constant
 
 from .common import Point, to_abstract_test, f32, Ty, af32_of
 
@@ -28,6 +30,11 @@ def Poss(*things):
         VALUE: _Poss(things),
         TYPE: typeof(things[0]),
     })
+
+
+def test_to_abstract():
+    inst = SymbolicKeyInstance(Constant(123), 456)
+    assert to_abstract(inst) == _S({VALUE: inst, TYPE: ty.SymbolicKeyType})
 
 
 def test_build_value():

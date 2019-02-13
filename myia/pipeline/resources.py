@@ -339,18 +339,15 @@ class InferenceResource(PipelineResource):
     def __init__(self,
                  pipeline_init,
                  constructors,
-                 max_depth,
                  context_class):
         """Initialize an InferenceResource."""
         super().__init__(pipeline_init)
         self.manager = self.resources.manager
         self.context_class = context_class
         self.constructors = constructors
-        self.max_depth = max_depth
         self.engine = InferenceEngine(
             self.pipeline,
             constructors=self.constructors,
-            max_depth=self.max_depth,
             context_class=self.context_class,
         )
 

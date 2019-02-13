@@ -8,7 +8,8 @@ from dataclasses import is_dataclass, replace as dc_replace
 from .. import dtype
 from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
-from ..utils import Overload, Partializable, is_dataclass_type
+from ..utils import Overload, Partializable, is_dataclass_type, \
+    SymbolicKeyInstance
 
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
@@ -32,7 +33,6 @@ class InferenceEngine:
         constructors: As an argument to __init__, a map from primitives
             to inferrer classes, which will be instantiated automatically
             by the InferenceEngine.
-        max_depth: Depth for constant propagation.
         context_class: The class to use to instantiate contexts.
 
     """
@@ -41,7 +41,6 @@ class InferenceEngine:
                  pipeline,
                  *,
                  constructors,
-                 max_depth=1,
                  context_class=Context):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop(InferenceError)
@@ -51,7 +50,6 @@ class InferenceEngine:
             prim: cons()
             for prim, cons in constructors.items()
         }
-        self.max_depth = max_depth
         self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
         self.errors = []
         self.context_class = context_class
@@ -348,6 +346,9 @@ def to_abstract(v, context=None, ref=None, loop=None):
     elif isinstance(v, Primitive):
         return AbstractFunction(PrimitiveFunction(v, tracking_id=ref))
 
+    elif isinstance(v, SymbolicKeyInstance):
+        return AbstractScalar({VALUE: v, TYPE: dtype.SymbolicKeyType})
+
     elif is_dataclass_type(v):
         typ = dtype.pytype_to_myiatype(v)
         typarg = AbstractScalar({
@@ -423,6 +424,13 @@ class Inferrer(Partializable):
         """Initialize the Inferrer."""
         self.cache = {}
 
+    def normalize_args(self, args):
+        """Return normalized versions of the arguments.
+
+        By default, this returns args unchanged.
+        """
+        return args
+
     async def run(self, engine, outref, argrefs):
         """Run inference.
 
@@ -436,6 +444,7 @@ class Inferrer(Partializable):
             argrefs: A tuple of References to the arguments
         """
         args = tuple([await ref.get() for ref in argrefs])
+        args = self.normalize_args(args)
         if args not in self.cache:
             self.cache[args] = await self.infer(engine, *args)
         return self.cache[args]
@@ -491,6 +500,7 @@ class BaseGraphInferrer(Inferrer):
 
     def make_context(self, engine, args):
         """Create a Context object using the given args."""
+        args = self.normalize_args(args)
         _, ctx = self._make_argkey_and_context(engine, args)
         return ctx
 
@@ -530,6 +540,13 @@ class GraphInferrer(BaseGraphInferrer):
         assert context is not None
         super().__init__(context.filter(graph))
 
+    def normalize_args(self, args):
+        """Broaden args if flag ignore_values is True."""
+        if self._graph.flags.get('ignore_values', False):
+            return tuple(_broaden(a, None) for a in args)
+        else:
+            return args
+
     def get_graph(self, engine, args):
         """Return the graph."""
         return self._graph
@@ -546,6 +563,10 @@ class MetaGraphInferrer(BaseGraphInferrer):
         super().__init__(Context.empty())
         self.metagraph = metagraph
         self.graph_cache = {}
+
+    def normalize_args(self, args):
+        """Return normalized versions of the arguments."""
+        return self.metagraph.normalize_args(args)
 
     def get_graph(self, engine, args):
         """Generate the graph for the given args."""

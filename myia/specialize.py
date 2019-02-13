@@ -66,13 +66,12 @@ class TypeSpecializer:
         return await self._specialize(g, ctx, argrefs)
 
     async def _specialize(self, g, ctx, argrefs):
-        ctxkey = ctx  # TODO: Reify ctx to collapse multiple ctx into one
-        if ctxkey in self.specializations:
-            return self.specializations[ctxkey].new_graph
+        if ctx in self.specializations:
+            return self.specializations[ctx].new_graph
 
         gspec = _GraphSpecializer(self, g, await concretize_abstract(ctx))
         g2 = gspec.new_graph
-        self.specializations[ctxkey] = gspec
+        self.specializations[ctx] = gspec
         await gspec.run()
         return g2
 
@@ -127,6 +126,7 @@ class _GraphSpecializer:
             return _const(fn.prim, a)
 
         inf = self.specializer.engine.get_inferrer_for(fn)
+        argvals = argvals and inf.normalize_args(argvals)
         argvals, outval = await self._find_unique_argvals(a, inf, argvals)
 
         if isinstance(inf, TrackedInferrer):
