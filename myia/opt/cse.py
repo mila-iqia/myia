@@ -3,7 +3,7 @@
 
 from collections import defaultdict
 
-from ..abstract import AbstractFunction
+from ..abstract import AbstractFunction, TypedPrimitive
 from ..graph_utils import toposort
 from ..ir import succ_incoming
 from ..utils import Partializable
@@ -11,14 +11,17 @@ from ..utils import Partializable
 
 def _absof(node):
     # We use .abstract to differentiate identical values with different
-    # types, e.g. 1.0::f32 and 1.0::f64, but we will ignore the types of
-    # functions.
-    # TODO: This could be bad, actually, fix this when we have the time.
-    #       One adjustment that needs to be done is that the tracking_id
-    #       info should be forced to None, otherwise all functions would
-    #       be considered different and nothing can be merged.
+    # types, e.g. 1.0::f32 and 1.0::f64.
     if isinstance(node.abstract, AbstractFunction):
-        return None
+        fn = node.abstract.get_unique()
+        if isinstance(fn, TypedPrimitive):
+            return fn
+        else:
+            # test_model::test_backward_specialize behaves differently if we
+            # do not return fn here (it keeps an extra tuple_setitem operation
+            # through the optimization)
+            # TODO: Figure out why.
+            return None
     else:
         return node.abstract
 
