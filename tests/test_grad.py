@@ -319,6 +319,16 @@ def test_fact(x):
     return fact(x)
 
 
+@grad_test((4.1,), pipeline=standard_pipeline)
+def test_fact_opt(x):
+    def fact(n):
+        if n <= 1:
+            return 1
+        else:
+            return n * fact(n - 1)
+    return fact(x)
+
+
 @grad_test((4.0,))
 def test_while(x):
     rval = x
