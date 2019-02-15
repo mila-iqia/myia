@@ -189,3 +189,35 @@ def isomorphic(g1, g2, equiv=None):
     equiv[(g1, g2)] = rval
 
     return rval
+
+
+def print_graph(g):
+    node_map = {}
+
+    print(f"graph {g.debug.debug_name}(" +
+          ", ".join(f"%{p.debug.debug_name}" for p in g.parameters) +
+          ") {")
+
+    def repr_node(node):
+        if node.is_constant_graph():
+            return f"@{node.value.debug.debug_name}"
+        elif node.is_constant():
+            return str(node.value)
+        else:
+            return f"%{node.debug.debug_name}"
+
+    for node in toposort(g.output):
+        if node.is_apply():
+            print(f"  %{node.debug.debug_name} = ", end="")
+            print(f"{repr_node(node.inputs[0])}(", end="")
+            print(", ".join(repr_node(a) for a in node.inputs[1:]), end="")
+            print(")")
+        elif node.is_constant():
+            pass
+        elif node.is_parameter():
+            pass
+        else:
+            print(f"UNK: {node}")
+
+    print(f"  return %{g.output.debug.debug_name}")
+    print("}")
