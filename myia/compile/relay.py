@@ -69,11 +69,12 @@ class RelayMapper:
 
 MAP = RelayMapper(simple_map=SIMPLE_MAP)
 
-def ashape(a):
-    """Get an array shape."""
-    shp = a.shape
+
+def ashape(node):
+    """Make sure shape isn't None, that makes relay crash later."""
+    shp = node.shape
     if shp is None:
-        shp == ()
+        shp = ()
     return shp
 
 
@@ -133,11 +134,10 @@ class CompileGraph(PipelineStep):
 
     def on_parameter(self, node):
         tt = to_relay_type(node.type)
-        print("TYPE:", tt, type(tt))
         return relay.var(
             node.debug.debug_name,
-            dtype=to_relay_type(node.type),
-            shape=ashape(node))
+            shape=ashape(node),
+            dtype=to_relay_type(node.type))
 
     def on_apply(self, node):
         if node.inputs[0].is_constant(Primitive):
