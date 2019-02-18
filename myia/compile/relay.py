@@ -152,10 +152,10 @@ class CompileGraph(PipelineStep):
             conv = MAP.get(fn)
             if conv is not None:
                 return conv(self, *node.inputs[1:])
-            import pdb; pdb.set_trace()
+            raise TypeError("Unsupported node", node)
 
     def on_constant(self, node):
-        import pdb; pdb.set_trace()
+        return relay.const(node.value, dtype=to_relay_type(node.type))
 
     def ref(self, node):
         return self.node_map[node]
