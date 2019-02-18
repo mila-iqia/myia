@@ -38,6 +38,8 @@ SIMPLE_MAP = {
     # P.bool_and: sym.logical_and,
     # P.bool_or: sym.logical_or
     P.bool_eq: relay.op.equal,
+
+    P.make_tuple: lambda *args: relay.Tuple(args)
 }
 
 
@@ -83,10 +85,15 @@ class RelayRunner:
         self.fn = fn
         self.dtypes = dtypes
 
+    def tonumpy(self, v):
+        if isinstance(v, relay.backend.interpreter.TupleValue):
+            return tuple(self.tonumpy(f) for f in v.fields)
+        return v.asnumpy()
+
     def __call__(self, *args):
         assert len(args) == len(self.dtypes)
         args = [relay.const(a, dt) for a, dt in zip(args, self.dtypes)]
-        return self.fn(*args).asnumpy()
+        return self.tonumpy(self.fn(*args))
 
 
 class CompileGraph(PipelineStep):
