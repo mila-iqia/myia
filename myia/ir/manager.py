@@ -274,6 +274,8 @@ class GDepTotalStatistic(NestingStatistic):
         all_deps = self.manager.graph_dependencies_prox
 
         def seek_parents(g, path=None):
+            if g in self:
+                return self[g]
             if path is None:
                 path = set()
             if g in path:
@@ -285,10 +287,12 @@ class GDepTotalStatistic(NestingStatistic):
                     parents |= seek_parents(dep.graph, path | {g})
                 else:
                     parents.add(dep)
-            return parents - {g}
+            parents.discard(g)
+            self[g] = parents
+            return parents
 
         for g in list(all_deps.keys()):
-            self[g] = seek_parents(g)
+            seek_parents(g)
 
 
 class ParentStatistic(NestingStatistic):
