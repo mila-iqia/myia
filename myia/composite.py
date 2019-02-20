@@ -556,49 +556,53 @@ class ListMap(MetaGraph):
 
         g = Graph()
         g.flags['core'] = True
+        g.flags['ignore_values'] = True
         g.debug.name = 'list_map'
         fn = g.add_parameter()
         lists = [g.add_parameter() for _ in args[1:]]
-        iters = [g.apply(list_iter, l) for l in lists]
-        nexts = [g.apply(next, it) for it in iters]
-        values = [g.apply(P.tuple_getitem, n, 0) for n in nexts]
-        iters = [g.apply(P.tuple_getitem, n, 1) for n in nexts]
+        values = [g.apply(P.list_getitem, l, 0) for l in lists]
         resl = g.apply(P.make_list, g.apply(fn, *values))
 
         gnext = Graph()
         gnext.debug.name = 'body'
+        gnext.flags['ignore_values'] = True
         gcond = Graph()
         gcond.debug.name = 'cond'
+        gcond.flags['ignore_values'] = True
 
         def make_cond(g):
             fn = g.add_parameter()
+            curri = g.add_parameter()
             resl = g.add_parameter()
-            iters = [g.add_parameter() for _ in lists]
-            hasnexts = [g.apply(hasnext, it) for it in iters]
+            lists2 = [g.add_parameter() for _ in lists]
+            hasnexts = [g.apply(P.scalar_lt, curri, g.apply(P.list_len, l))
+                        for l in lists2]
             cond = reduce(lambda a, b: g.apply(P.bool_and, a, b), hasnexts)
             gtrue = Graph()
             gtrue.debug.name = 'ftrue'
             gtrue.flags['core'] = True
-            gtrue.output = gtrue.apply(gnext, fn, resl, *iters)
+            gtrue.flags['ignore_values'] = True
+            gtrue.output = gtrue.apply(gnext, fn, curri, resl, *lists2)
             gfalse = Graph()
             gfalse.debug.name = 'ffalse'
             gfalse.flags['core'] = True
+            gfalse.flags['ignore_values'] = True
             gfalse.output = resl
             g.output = g.apply(g.apply(P.switch, cond, gtrue, gfalse))
 
         def make_next(g):
             fn = g.add_parameter()
+            curri = g.add_parameter()
             resl = g.add_parameter()
-            iters = [g.add_parameter() for _ in lists]
-            nexts = [g.apply(next, it) for it in iters]
-            values = [g.apply(P.tuple_getitem, n, 0) for n in nexts]
-            iters = [g.apply(P.tuple_getitem, n, 1) for n in nexts]
+            lists2 = [g.add_parameter() for _ in lists]
+            values = [g.apply(P.list_getitem, l, curri) for l in lists2]
             resl = g.apply(P.list_append, resl, g.apply(fn, *values))
-            g.output = g.apply(gcond, fn, resl, *iters)
+            nexti = g.apply(P.scalar_add, curri, 1)
+            g.output = g.apply(gcond, fn, nexti, resl, *lists2)
 
         make_cond(gcond)
         make_next(gnext)
-        g.output = g.apply(gcond, fn, resl, *iters)
+        g.output = g.apply(gcond, fn, 1, resl, *lists)
 
         return g
 
