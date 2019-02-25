@@ -28,6 +28,7 @@ from .data import (
     GraphFunction,
     DummyFunction,
     PartialApplication,
+    TypedPrimitive,
     Function,
     VALUE,
     TYPE,
@@ -125,6 +126,11 @@ def build_type(self, x: PartialApplication):
 @overload  # noqa: F811
 def build_type(self, x: GraphFunction):
     return self(x.graph.abstract)
+
+
+@overload  # noqa: F811
+def build_type(self, x: TypedPrimitive):
+    return dtype.Function([self(a) for a in x.args], self(x.output))
 
 
 @overload  # noqa: F811
