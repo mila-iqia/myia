@@ -204,11 +204,26 @@ class GDepProxStatistic(CounterStatistic):
             ig = inp.value
             if self.mod(g1, ParentProxy(ig), direction):
                 self.manager.events.invalidate_nesting()
+        else:
+            g2 = inp.graph
+            if g1 and g2 and g1 is not g2:
+                if self.mod(g1, g2, direction):
+                    self.manager.events.invalidate_nesting()
 
-        g2 = inp.graph
-        if g1 and g2 and g1 is not g2:
-            if self.mod(g1, g2, direction):
-                self.manager.events.invalidate_nesting()
+
+class GDepProxInvStatistic(CounterStatistic):
+    """Implements `GraphManager.graph_dependencies_prox_inv`."""
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        g1 = node.graph
+
+        if inp.is_constant_graph():
+            ig = inp.value
+            self.mod(ig, ParentProxy(g1), direction)
+        else:
+            g2 = inp.graph
+            if g1 and g2 and g1 is not g2:
+                self.mod(g2, g1, direction)
 
 
 class GraphsUsedStatistic(CounterStatistic):
@@ -242,14 +257,6 @@ class NestingStatistic(PerGraphStatistic):
         evts.invalidate_nesting.register(self._on_invalidate_nesting)
         self.valid = False
 
-    def reset(self):
-        """Reset this graph's information.
-
-        This makes the statistic invalid, so it must be recomputed.
-        """
-        super().reset()
-        self.valid = False
-
     def _on_invalidate_nesting(self, event):
         self.reset()
 
@@ -259,6 +266,23 @@ class NestingStatistic(PerGraphStatistic):
     def _on_drop_graph(self, event, graph):
         self.reset()
 
+
+class NestingStatisticWholesale(NestingStatistic):
+    """Statistic about nesting, computed for all graphs at once."""
+
+    def __init__(self, manager):
+        """Initialize a NestingStatistic."""
+        super().__init__(manager)
+        self.valid = False
+
+    def reset(self):
+        """Reset this graph's information.
+
+        This makes the statistic invalid, so it must be recomputed.
+        """
+        super().reset()
+        self.valid = False
+
     def recompute(self):
         """Recompute the information from scratch."""
         self._recompute()
@@ -266,6 +290,18 @@ class NestingStatistic(PerGraphStatistic):
 
     def _recompute(self):
         raise NotImplementedError()
+
+
+class NestingStatisticGraphWise(NestingStatistic):
+    """Statistic about nesting, computed on demand."""
+
+    def __getitem__(self, g):
+        if g in self:
+            return super().__getitem__(g)
+        else:
+            res = self._compute(g)
+            self[g] = res
+            return res
 
 
 class UsesStatistic(PerGraphStatistic):
@@ -299,91 +335,77 @@ class UsesStatistic(PerGraphStatistic):
             return res
 
 
-class GDepTotalStatistic(NestingStatistic):
+class GDepTotalStatistic(NestingStatisticGraphWise):
     """Implements `GraphManager.graph_dependencies_total`."""
 
-    def _recompute(self):
+    def _compute(self, g, path=None):
+        if g in self:
+            return self.get(g)
+        if path is None:
+            path = set()
+        if g in path:
+            return set()
         all_deps = self.manager.graph_dependencies_prox
-
-        def seek_parents(g, path):
-            if g in self:
-                return self[g]
-            if g in path:
-                return set()
-            deps = all_deps[g]
-            parents = set()
-            for dep in deps:
-                if isinstance(dep, ParentProxy):
-                    parents |= seek_parents(dep.graph, path | {g})
-                else:
-                    parents.add(dep)
-            parents.discard(g)
-            self[g] = parents
-            return parents
-
-        for g in list(all_deps.keys()):
-            seek_parents(g, set())
+        deps = all_deps[g]
+        parents = set()
+        for dep in deps:
+            if isinstance(dep, ParentProxy):
+                parents |= self._compute(dep.graph, path | {g})
+            else:
+                parents.add(dep)
+        parents.discard(g)
+        self[g] = parents
+        return parents
 
 
-class ParentStatistic(NestingStatistic):
+class ParentStatistic(NestingStatisticGraphWise):
     """Implements `GraphManager.parents`."""
 
-    def _recompute(self):
+    def _compute(self, g):
+        if g in self:
+            return self.get(g)
         all_deps = self.manager.graph_dependencies_total
-
-        def find_parent(g):
-            if g in self:
-                return self[g]
-            todo = set(all_deps[g])
-            deps = set(all_deps[g])
-            while todo:
-                # We eliminate all grandparents
-                g2 = todo.pop()
-                p = find_parent(g2)
-                while p is not None:
-                    deps.discard(p)
-                    todo.discard(p)
-                    p = self[p]
-            if len(deps) == 0:
-                self[g] = None
-            elif len(deps) == 1:
-                self[g], = deps
-            else:
-                # The way code is structured, this should never happen
-                raise AssertionError('Too many parents')
-            return self[g]
-
-        for g in self.manager.graphs:
-            find_parent(g)
+        todo = set(all_deps[g])
+        deps = set(all_deps[g])
+        while todo:
+            # We eliminate all grandparents
+            g2 = todo.pop()
+            p = self._compute(g2)
+            while p is not None:
+                deps.discard(p)
+                todo.discard(p)
+                p = self.get(p)
+        if len(deps) == 0:
+            self[g] = None
+        elif len(deps) == 1:
+            self[g], = deps
+        else:
+            # The way code is structured, this should never happen
+            raise AssertionError('Too many parents')
+        return self.get(g)
 
 
-class ChildrenStatistic(NestingStatistic):
+class ChildrenStatistic(NestingStatisticGraphWise):
     """Implements `GraphManager.children`."""
 
-    def _recompute(self):
+    def _compute(self, g):
         parents = self.manager.parents
-        for g in self.manager.graphs:
-            self[g] = set()
-        for g, parent in parents.items():
-            if parent is not None:
-                self[parent].add(g)
+        reach = self.manager.graphs_reachable
+        return {g2 for g2 in reach[g] if parents[g2] is g}
 
 
-class ScopeStatistic(NestingStatistic):
+class ScopeStatistic(NestingStatisticGraphWise):
     """Implements `GraphManager.scopes`."""
 
-    def _recompute(self):
-        parents = self.manager.parents
-        for g in self.manager.graphs:
-            self[g] = set()
-        for g in self.manager.graphs:
-            p = g
-            while p:
-                self[p].add(g)
-                p = parents[p]
+    def _compute(self, g):
+        children = self.manager.children
+        scope = {g}
+        for child in children[g]:
+            scope.update(self._compute(child))
+        return scope
 
 
-class FVTotalStatistic(NestingStatistic, CounterStatistic):
+class FVTotalStatistic(NestingStatisticWholesale, CounterStatistic):
     """Implements `GraphManager.free_variables_total`."""
 
     def _recompute(self):
@@ -424,10 +446,9 @@ class FVTotalStatistic(NestingStatistic, CounterStatistic):
 
         if inp.is_constant_graph():
             ig = inp.value
-            if self.manager._parents.valid:
-                p = self.manager._parents[ig]
-                if p:
-                    _update(p, ig)
+            p = self.manager.parents[ig]
+            if p:
+                _update(p, ig)
 
         g2 = inp.graph
         if g1 and g2 and g1 is not g2:
@@ -504,6 +525,23 @@ class GraphManager(Partializable):
             Map each graph to the set of Constant nodes that have this
             graph as a value.
 
+        graph_dependencies_total:
+            Map each graph to the set of graphs it depends on. This is a
+            superset of `graph_dependencies_direct` which also includes the
+            graphs from which nested graphs need free variables.
+
+        parents:
+            Map each graph to its parent graph. Top-level graphs are
+            associated to `None` in the returned dictionary.
+
+        children:
+            Map each graph to the graphs immediately nested in it. This is the
+            inverse map of `parents`.
+
+        scopes:
+            Map each graph to the complete set of graphs nested in it. The set
+            associated to a graph includes the graph itself.
+
         graphs_reachable:
             Map each graph to the set of graphs that may be called from there.
             For a given graph, this is the set of graphs it directly refers
@@ -551,11 +589,12 @@ class GraphManager(Partializable):
         self.graph_users = GraphUsersStatistic(self)
         self.graph_dependencies_direct = GDepDirectStatistic(self)
         self.graph_dependencies_prox = GDepProxStatistic(self)
+        self.graph_dependencies_prox_inv = GDepProxInvStatistic(self)
 
-        self._graph_dependencies_total = GDepTotalStatistic(self)
-        self._parents = ParentStatistic(self)
-        self._children = ChildrenStatistic(self)
-        self._scopes = ScopeStatistic(self)
+        self.graph_dependencies_total = GDepTotalStatistic(self)
+        self.parents = ParentStatistic(self)
+        self.children = ChildrenStatistic(self)
+        self.scopes = ScopeStatistic(self)
         self._free_variables_total = FVTotalStatistic(self)
         self.graphs_reachable = GraphsReachableStatistic(self)
         self.recursive = RecursiveStatistic(self)
@@ -710,41 +749,6 @@ class GraphManager(Partializable):
         if not stat.valid:
             stat.recompute()
         return stat
-
-    @property
-    def graph_dependencies_total(self):
-        """Map each graph to the set of graphs it depends on.
-
-        This is a superset of `graph_dependencies_direct` which also
-        includes the graphs from which nested graphs need free
-        variables.
-        """
-        return self._ensure_statistic(self._graph_dependencies_total)
-
-    @property
-    def parents(self):
-        """Map each graph to its parent graph.
-
-        Top-level graphs are associated to `None` in the returned
-        dictionary.
-        """
-        return self._ensure_statistic(self._parents)
-
-    @property
-    def children(self):
-        """Map each graph to the graphs immediately nested in it.
-
-        This is the inverse map of `parents`.
-        """
-        return self._ensure_statistic(self._children)
-
-    @property
-    def scopes(self):
-        """Map each graph to the complete set of graphs nested in it.
-
-        The set associated to a graph includes the graph.
-        """
-        return self._ensure_statistic(self._scopes)
 
     @property
     def free_variables_total(self):
