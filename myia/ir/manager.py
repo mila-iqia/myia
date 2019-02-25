@@ -329,35 +329,32 @@ class ParentStatistic(NestingStatistic):
     """Implements `GraphManager.parents`."""
 
     def _recompute(self):
-        for g in self.manager.graphs:
-            self[g] = None
-
         all_deps = self.manager.graph_dependencies_total
-        todo = [(g, set(deps)) for g, deps in all_deps.items()]
-        todo.sort(key=lambda xy: len(xy[1]))
 
-        while todo:
-            next_todo = []
-            for g, deps in todo:
-                if len(deps) > 1:
-                    rm = set()
-                    for dep in deps:
-                        parent = self[dep]
-                        while parent:
-                            rm.add(parent)
-                            parent = self[parent]
-                    deps -= rm
-                if len(deps) == 0:
-                    self[g] = None
-                elif len(deps) == 1:
-                    self[g] = deps.pop()
-                else:
-                    next_todo.append((g, deps))
-            if todo == next_todo:
-                # Likely a graph with two deps, neither of which have deps.
-                # It's not entirely clear as of yet what makes that happen.
-                raise AssertionError('Problematic graph dependencies')
-            todo = next_todo
+        def find_parent(g):
+            if g in self:
+                return self[g]
+            todo = set(all_deps[g])
+            deps = set(all_deps[g])
+            while todo:
+                # We eliminate all grandparents
+                g2 = todo.pop()
+                p = find_parent(g2)
+                while p is not None:
+                    deps.discard(p)
+                    todo.discard(p)
+                    p = self[p]
+            if len(deps) == 0:
+                self[g] = None
+            elif len(deps) == 1:
+                self[g], = deps
+            else:
+                # The way code is structured, this should never happen
+                raise AssertionError('Too many parents')
+            return self[g]
+
+        for g in self.manager.graphs:
+            find_parent(g)
 
 
 class ChildrenStatistic(NestingStatistic):
