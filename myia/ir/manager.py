@@ -216,7 +216,8 @@ class GraphsUsedStatistic(CounterStatistic):
 
     def _on_mod_edge(self, event, node, key, inp, direction):
         if inp.is_constant_graph():
-            self.mod(node.graph, inp.value, direction)
+            if self.mod(node.graph, inp.value, direction):
+                self.manager.events.invalidate_uses()
 
 
 class GraphUsersStatistic(CounterStatistic):
@@ -267,17 +268,46 @@ class NestingStatistic(PerGraphStatistic):
         raise NotImplementedError()
 
 
+class UsesStatistic(PerGraphStatistic):
+    """Represents a statistic about uses.
+
+    These statistics become invalid when the `invalidate_uses` event
+    is fired.
+    """
+
+    def __init__(self, manager):
+        """Initialize a NestingStatistic."""
+        super().__init__(manager)
+        evts = self.manager.events
+        evts.invalidate_uses.register(self._on_invalidate_uses)
+
+    def _on_invalidate_uses(self, event):
+        self.reset()
+
+    def _on_add_graph(self, event, graph):
+        self.reset()
+
+    def _on_drop_graph(self, event, graph):
+        self.reset()
+
+    def __getitem__(self, g):
+        if g in self:
+            return super().__getitem__(g)
+        else:
+            res = self._compute(g)
+            self[g] = res
+            return res
+
+
 class GDepTotalStatistic(NestingStatistic):
     """Implements `GraphManager.graph_dependencies_total`."""
 
     def _recompute(self):
         all_deps = self.manager.graph_dependencies_prox
 
-        def seek_parents(g, path=None):
+        def seek_parents(g, path):
             if g in self:
                 return self[g]
-            if path is None:
-                path = set()
             if g in path:
                 return set()
             deps = all_deps[g]
@@ -292,7 +322,7 @@ class GDepTotalStatistic(NestingStatistic):
             return parents
 
         for g in list(all_deps.keys()):
-            seek_parents(g)
+            seek_parents(g, set())
 
 
 class ParentStatistic(NestingStatistic):
@@ -407,33 +437,30 @@ class FVTotalStatistic(NestingStatistic, CounterStatistic):
             _update(g2, inp)
 
 
-class GraphsReachableStatistic(NestingStatistic):
+class GraphsReachableStatistic(UsesStatistic):
     """Implements `GraphManager.graphs_reachable`."""
 
-    def _recompute(self):
+    def _compute(self, g):
         used = self.manager.graphs_used
-        for g, gs in used.items():
-            self[g] = set(gs)
-        changes = True
-        while changes:
-            changes = False
-            for g, gs in self.items():
-                prev = len(gs)
-                accum = set()
-                for g2 in gs:
-                    accum |= self[g2]
-                gs |= accum
-                if len(gs) > prev:
-                    changes = True
+        todo = {g}
+        seen = set()
+        reach = set()
+        while todo:
+            g2 = todo.pop()
+            if g2 in seen:
+                continue
+            todo.update(used[g2])
+            reach.update(used[g2])
+            seen.add(g2)
+        return reach
 
 
-class RecursiveStatistic(NestingStatistic):
+class RecursiveStatistic(UsesStatistic):
     """Implements `GraphManager.recursive`."""
 
-    def _recompute(self):
+    def __getitem__(self, g):
         reach = self.manager.graphs_reachable
-        for g, gs in reach.items():
-            self[g] = g in gs
+        return g in reach[g]
 
 
 class GraphManager(Partializable):
@@ -480,6 +507,16 @@ class GraphManager(Partializable):
             Map each graph to the set of Constant nodes that have this
             graph as a value.
 
+        graphs_reachable:
+            Map each graph to the set of graphs that may be called from there.
+            For a given graph, this is the set of graphs it directly refers
+            to plus the set of graphs that these graphs refer to, and so on.
+
+        recursive:
+            Map each graph to whether it is recursive of not. This amounts to
+            whether the graph is reachable from itself, so if f calls g and
+            g calls f, both f and g are recursive.
+
     """
 
     def __init__(self, *roots, manage=True):
@@ -501,6 +538,7 @@ class GraphManager(Partializable):
             add_edge=None,
             drop_edge=None,
             invalidate_nesting=None,
+            invalidate_uses=None,
         )
         roots = OrderedSet(self.roots) if self.roots else OrderedSet()
         self.roots = OrderedSet()
@@ -522,8 +560,8 @@ class GraphManager(Partializable):
         self._children = ChildrenStatistic(self)
         self._scopes = ScopeStatistic(self)
         self._free_variables_total = FVTotalStatistic(self)
-        self._graphs_reachable = GraphsReachableStatistic(self)
-        self._recursive = RecursiveStatistic(self)
+        self.graphs_reachable = GraphsReachableStatistic(self)
+        self.recursive = RecursiveStatistic(self)
 
         for root in roots:
             self.add_graph(root, root=True)
@@ -720,23 +758,6 @@ class GraphManager(Partializable):
         figure as free variables.
         """
         return self._ensure_statistic(self._free_variables_total)
-
-    @property
-    def graphs_reachable(self):
-        """Map each graph to the set of graphs that may be called from there.
-
-        For each graph, this is the set of graphs that it refers to
-        directly *plus* the set of graphs it refers to indirectly.
-        """
-        return self._ensure_statistic(self._graphs_reachable)
-
-    @property
-    def recursive(self):
-        """Map each graph to whether it is recursive or not.
-
-        A graph is considered recursive if it is reachable from itself.
-        """
-        return self._ensure_statistic(self._recursive)
 
     def set_parameters(self, graph, parameters):
         """Replace a graph's parameters."""
