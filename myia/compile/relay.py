@@ -8,11 +8,27 @@ from ..graph_utils import toposort
 from ..pipeline import PipelineDefinition, PipelineStep
 from ..prim import Primitive, ops as P
 from ..prim.ops import partial, return_, switch, make_tuple
-from ..dtype import type_to_np_dtype
+from ..dtype import type_to_np_dtype, ismyiatype, Array, Bool, Function, \
+    Number, Tuple
 
-from .relay_helpers import optimize
+from .relay_helpers import optimize, build_module
 
-to_relay_type = type_to_np_dtype
+
+def to_relay_type(tp, shape=None):
+    if ismyiatype(tp, Bool):
+        return relay.ty.TensorType((), 'bool')
+    elif ismyiatype(tp, Number):
+        return relay.ty.TensorType((), type_to_np_dtype(tp))
+    elif ismyiatype(tp, Tuple):
+        return relay.ty.TupleType([to_relay_type(e) for e in tp.elements])
+    elif ismyiatype(tp, Array):
+        return relay.ty.TensorType(shape, type_to_np_dtype(tp))
+    elif ismyiatype(tp, Function):
+        return relay.ty.FuncType([to_relay_type(a) for a in tp.arguments],
+                                 to_relay_type(tp.retval))
+    else:
+        raise ValueError("Unknown type:", tp)
+
 
 SIMPLE_MAP = {
     P.scalar_add: relay.op.add,
@@ -39,7 +55,23 @@ SIMPLE_MAP = {
     # P.bool_or: sym.logical_or
     P.bool_eq: relay.op.equal,
 
-    P.make_tuple: lambda *args: relay.Tuple(args)
+    P.make_tuple: lambda *args: relay.Tuple(args),
+    P.switch: relay.If,
+}
+
+def relay_partial(c, fn, *args):
+    ty = fn.type
+    rargs = [relay.var("") for a in ty.arguments]
+    fn = relay.Function(rargs, relay.Call(c.ref(fn), rargs))
+    binds = {}
+    for ra, a in zip(rargs, args):
+        binds[ra] = c.ref(a)
+    res = relay.bind(fn, binds)
+    return res
+
+
+COMPLEX_MAP = {
+    P.partial: relay_partial
 }
 
 
@@ -65,11 +97,16 @@ class RelayMapper:
             self.register(k, lambda c, *args, v=v: v(*[c.ref(a)
                                                        for a in args]))
 
+    def register_complex(self, map):
+        """Register complex conversions."""
+        for k, v in map.items():
+            self.register(k, v)
+
     def get(self, fn):
         return self.mapping.get(fn, None)
 
 
-MAP = RelayMapper(simple_map=SIMPLE_MAP)
+MAP = RelayMapper(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 
 
 def ashape(node):
@@ -112,17 +149,21 @@ class CompileGraph(PipelineStep):
 
         function_map = {}
         self.node_map = {}
+        self.graph_map = {}
 
         print()
 
         for g in mng.graphs:
-            function_map[g.debug.debug_name] = self.convert_func(g)
+            self.graph_map[g] = relay.GlobalVar(g.debug.debug_name)
+
+        for g in mng.graphs:
+            function_map[self.graph_map[g]] = self.convert_func(g)
             print(f"FN: {g.debug.debug_name}")
             print_graph(g)
             print("=======================================")
-            print(function_map[g.debug.debug_name].astext())
+            print(function_map[self.graph_map[g]].astext())
 
-        module = relay.Module(function_map)
+        module = build_module(function_map)
         print(module.astext())
 
         module.entry_func = module.global_var_map_[graph.debug.debug_name]
@@ -135,16 +176,14 @@ class CompileGraph(PipelineStep):
         fn = exec.evaluate(module.entry_func)
 
         output = RelayRunner(
-            fn, [to_relay_type(p.type) for p in graph.parameters])
+            fn, [type_to_np_dtype(p.type) for p in graph.parameters])
 
         return {'output': output}
 
     def on_parameter(self, node):
-        tt = to_relay_type(node.type)
         return relay.var(
             node.debug.debug_name,
-            shape=ashape(node),
-            dtype=to_relay_type(node.type))
+            type_annotation=to_relay_type(node.type, node.shape))
 
     def on_apply(self, node):
         if node.inputs[0].is_constant(Primitive):
@@ -152,10 +191,15 @@ class CompileGraph(PipelineStep):
             conv = MAP.get(fn)
             if conv is not None:
                 return conv(self, *node.inputs[1:])
-            raise TypeError("Unsupported node", node)
+        return relay.Call(self.ref(node.inputs[0]),
+                          [self.ref(i) for i in node.inputs[1:]])
 
     def on_constant(self, node):
-        return relay.const(node.value, dtype=to_relay_type(node.type))
+        return relay.const(node.value,
+                           dtype=type_to_np_dtype(node.type))
+
+    def on_graph(self, node):
+        return self.graph_map[node.value]
 
     def ref(self, node):
         return self.node_map[node]
@@ -166,14 +210,27 @@ class CompileGraph(PipelineStep):
 
         params = [self.ref(p) for p in graph.parameters]
 
-        # Don't visit functions (inputs[0])
-        for node in toposort(graph.output, lambda n: n.inputs[1:]):
+        def visit_noprimfunc(node):
+            """Don't visit called primitives."""
+            if node.inputs:
+                if node.inputs[0].is_constant(Primitive):
+                    return node.inputs[1:]
+                else:
+                    return node.inputs
+            return []
+
+        for node in toposort(graph.output, visit_noprimfunc):
             if node.is_apply():
                 self.node_map[node] = self.on_apply(node)
+            elif node.is_constant_graph():
+                self.node_map[node] = self.on_graph(node)
             elif node.is_constant():
                 self.node_map[node] = self.on_constant(node)
 
-        return relay.Function(params, self.ref(graph.output))
+
+        return relay.Function(params, self.ref(graph.output),
+                              ret_type=to_relay_type(graph.output.type,
+                                                     graph.output.shape))
 
 
 step_compile = CompileGraph.partial()
