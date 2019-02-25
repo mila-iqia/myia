@@ -218,7 +218,7 @@ class _GraphSpecializer:
             if node.is_apply():
                 await self.process_apply(node)
 
-    async def build(self, ref, a: AbstractFunction):
+    async def build(self, ref, a):
         if isinstance(a, AbstractFunction):
             try:
                 fn = a.get_unique()
