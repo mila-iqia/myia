@@ -24,6 +24,11 @@ from .data import (
     AbstractClass,
     AbstractJTagged,
     TrackDict,
+    VirtualFunction,
+    GraphFunction,
+    DummyFunction,
+    PartialApplication,
+    Function,
     VALUE,
     TYPE,
     MyiaTypeError,
@@ -103,6 +108,27 @@ def build_type(self, x: AbstractScalar):
 
 @overload  # noqa: F811
 def build_type(self, x: AbstractFunction):
+    return self(x.get_unique())
+
+
+@overload  # noqa: F811
+def build_type(self, x: VirtualFunction):
+    return dtype.Function[tuple(self(a) for a in x.args), self(x.output)]
+
+
+@overload  # noqa: F811
+def build_type(self, x: PartialApplication):
+    tp = self(x.fn)
+    return dtype.Function[tp.arguments[len(x.args):], tp.retval]
+
+
+@overload  # noqa: F811
+def build_type(self, x: GraphFunction):
+    return self(x.graph.abstract)
+
+
+@overload  # noqa: F811
+def build_type(self, x: DummyFunction):
     return dtype.Function
 
 
