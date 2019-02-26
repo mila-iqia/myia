@@ -81,6 +81,33 @@ def test_setitem_tuple_elem3():
                lib.setitem_tuple)
 
 
+def test_getitem_setitem_tuple():
+
+    def before(x, y):
+        tup = (x + 1, x + 2, x + 3, x + 4)
+        return tuple_setitem(tup, 0, y)[0]
+
+    def after(x, y):
+        return y
+
+    _check_opt(before, after,
+               lib.getitem_setitem_tuple)
+
+
+def test_getitem_setitem_tuple_2():
+
+    def before(x, y):
+        tup = (x + 1, x + 2, x + 3, x + 4)
+        return tuple_setitem(tup, 0, y)[1]
+
+    def after(x, y):
+        tup = (x + 1, x + 2, x + 3, x + 4)
+        return tup[1]
+
+    _check_opt(before, after,
+               lib.getitem_setitem_tuple)
+
+
 def test_setitem_tuple_noopt():
 
     def before(x, y, z):
