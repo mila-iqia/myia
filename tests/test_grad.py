@@ -6,7 +6,8 @@ from types import FunctionType
 from dataclasses import dataclass
 
 from myia.abstract import from_value, AbstractJTagged
-from myia.pipeline import standard_resources, standard_pipeline
+from myia.pipeline import standard_resources, standard_pipeline, \
+    standard_debug_pipeline
 from myia.composite import grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.grad import J as realJ
@@ -358,6 +359,24 @@ def test_pow10(x):
             i = i + 1
         j = j + 1
     return v
+
+
+@grad_test(([1.0, 2.0, 3.0, 4.0],),)
+def test_list_while(xs):
+    y = 1.0
+    index = 0
+    while index < len(xs):
+        y = y * xs[index]
+        index = index + 1
+    return y
+
+
+@grad_test(([1.0, 2.0, 3.0, 4.0],), pipeline=standard_debug_pipeline)
+def test_list_for(xs):
+    y = 1
+    for x in xs:
+        y = y * x
+    return y
 
 
 @grad_test(4.5,)

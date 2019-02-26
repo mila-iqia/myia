@@ -7,7 +7,7 @@ from functools import reduce
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
-    List, Class, EnvType, Function
+    List, Class, EnvType, Function, Problem
 from .hypermap import HyperMap
 from .abstract import MyiaTypeError, broaden
 from .info import About
@@ -505,6 +505,12 @@ _leaf_zeros_like = MultitypeGraph('zeros_like')
 @core
 def _function_zero(_):
     return newenv
+
+
+@_leaf_zeros_like.register(Problem)
+@core
+def _dead_zero(x):
+    return x
 
 
 @_leaf_zeros_like.register(Bool)

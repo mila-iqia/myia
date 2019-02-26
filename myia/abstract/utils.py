@@ -508,8 +508,8 @@ def amerge(x1, x2, loop, forced, accept_pending=True):
     """
     isp1 = isinstance(x1, Pending)
     isp2 = isinstance(x2, Pending)
-    if isp1 and x1.done():
-        assert forced is False  # TODO: handle this case?
+    if isp1 and x1.done() and not forced:
+        # TODO: Check if the case when forced is True is sound
         x1 = x1.result()
         isp1 = False
     if isp2 and x2.done():
