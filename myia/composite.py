@@ -546,11 +546,21 @@ def list_reduce(fn, lst, dftl):
 class ListMap(MetaGraph):
     """Implementation of list_map."""
 
+    def __init__(self, fn_rec=None):
+        if fn_rec is None:
+            name = 'list_map'
+        else:
+            name = f'list_map[{fn_rec}]'
+        super().__init__(name)
+        self.fn_rec = fn_rec
+
     def generate_graph(self, args):
         """Return a graph for the number of lists."""
-        if len(args) < 2:
-            raise MyiaTypeError('list_map takes at least two arguments')
-        for t in args[1:]:
+        nfn = 1 if self.fn_rec is None else 0
+        nmin = 1 + nfn
+        if len(args) < nmin:
+            raise MyiaTypeError(f'{self} takes at least {nmin} arguments')
+        for t in args[nfn:]:
             if not isinstance(t, AbstractList):
                 raise MyiaTypeError(f'list_map requires lists, not {t}')
 
@@ -558,8 +568,9 @@ class ListMap(MetaGraph):
         g.flags['core'] = True
         g.flags['ignore_values'] = True
         g.debug.name = 'list_map'
-        fn = g.add_parameter()
-        lists = [g.add_parameter() for _ in args[1:]]
+        fn = self.fn_rec or g.add_parameter()
+        lists = [g.add_parameter() for _ in args[nfn:]]
+
         values = [g.apply(P.list_getitem, l, 0) for l in lists]
         resl = g.apply(P.make_list, g.apply(fn, *values))
 
@@ -571,7 +582,7 @@ class ListMap(MetaGraph):
         gcond.flags['ignore_values'] = True
 
         def make_cond(g):
-            fn = g.add_parameter()
+            fn = self.fn_rec or g.add_parameter()
             curri = g.add_parameter()
             resl = g.add_parameter()
             lists2 = [g.add_parameter() for _ in lists]
@@ -582,7 +593,10 @@ class ListMap(MetaGraph):
             gtrue.debug.name = 'ftrue'
             gtrue.flags['core'] = True
             gtrue.flags['ignore_values'] = True
-            gtrue.output = gtrue.apply(gnext, fn, curri, resl, *lists2)
+            if self.fn_rec is None:
+                gtrue.output = gtrue.apply(gnext, fn, curri, resl, *lists2)
+            else:
+                gtrue.output = gtrue.apply(gnext, curri, resl, *lists2)
             gfalse = Graph()
             gfalse.debug.name = 'ffalse'
             gfalse.flags['core'] = True
@@ -591,28 +605,35 @@ class ListMap(MetaGraph):
             g.output = g.apply(g.apply(P.switch, cond, gtrue, gfalse))
 
         def make_next(g):
-            fn = g.add_parameter()
+            fn = self.fn_rec or g.add_parameter()
             curri = g.add_parameter()
             resl = g.add_parameter()
             lists2 = [g.add_parameter() for _ in lists]
             values = [g.apply(P.list_getitem, l, curri) for l in lists2]
             resl = g.apply(P.list_append, resl, g.apply(fn, *values))
             nexti = g.apply(P.scalar_add, curri, 1)
-            g.output = g.apply(gcond, fn, nexti, resl, *lists2)
+            if self.fn_rec is None:
+                g.output = g.apply(gcond, fn, nexti, resl, *lists2)
+            else:
+                g.output = g.apply(gcond, nexti, resl, *lists2)
 
         make_cond(gcond)
         make_next(gnext)
-        g.output = g.apply(gcond, fn, 1, resl, *lists)
+        if self.fn_rec is None:
+            g.output = g.apply(gcond, fn, 1, resl, *lists)
+        else:
+            g.output = g.apply(gcond, 1, resl, *lists)
 
         return g
 
     def __call__(self, fn, *lists):
         """Python implementation of list_map."""
+        assert self.fn_rec is None
         from .prim.py_implementations import list_map
         return list_map(fn, *lists)
 
 
-list_map = ListMap('list_map')
+list_map = ListMap()
 
 
 @core

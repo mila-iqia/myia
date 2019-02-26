@@ -58,10 +58,10 @@ class HyperMap(MetaGraph):
     def _full_make(self, t: List, g, fnarg, argmap):
         args = list(argmap.keys())
         if fnarg is None:
-            fn_rec = self.fn_rec
+            return g.apply(C.ListMap(self.fn_rec), *args)
         else:
             fn_rec = g.apply(P.partial, self.fn_rec, fnarg)
-        return g.apply(C.list_map, fn_rec, *args)
+            return g.apply(C.list_map, fn_rec, *args)
 
     @_full_make.register
     def _full_make(self, t: Array, g, fnarg, argmap):
