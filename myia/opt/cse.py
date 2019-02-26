@@ -26,12 +26,14 @@ def _absof(node):
         return node.abstract
 
 
-def cse(root, manager):
-    """Apply CSE on root."""
+def group_nodes(root, manager):
+    """Group together all nodes that could be merged.
+
+    Some nodes in some groups may end up being unmergeable.
+    """
     hashes = {}
     groups = defaultdict(list)
     manager.add_graph(root)
-    changes = False
 
     for g in manager.graphs:
         for node in toposort(g.return_, succ_incoming):
@@ -49,19 +51,24 @@ def cse(root, manager):
                     # pragma: no cover
 
             hashes[node] = h
-            groups[h].append(node)
+            groups[h, node.graph].append(node)
+    return groups
+
+
+def cse(root, manager):
+    """Apply CSE on root."""
+    groups = group_nodes(root, manager)
+    changes = False
 
     # Note: this relies on dict keeping insertion order, so that the groups
     # dict is basically topologically ordered.
 
-    for h, group in groups.items():
+    for _, group in groups.items():
         main, *others = group
         for other in others:
-            if main.graph is not other.graph:
-                # This could happen because of a hash collision
-                continue  # pragma: no cover
+            assert main.graph is other.graph
 
-            elif main.is_constant() and other.is_constant():
+            if main.is_constant() and other.is_constant():
                 repl = _absof(main) == _absof(other) \
                     and main.value == other.value
 
