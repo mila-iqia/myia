@@ -1,5 +1,8 @@
 """Implementation of a prototype optimized VM in python."""
 
+import numpy as np
+from copy import copy
+
 
 class struct_partial:
     """Representation for the result of a partial()."""
@@ -254,6 +257,30 @@ class FinalVM:
         lst = copy(self._ref(l))
         lst[i] = self._ref(v)
         self._push(lst)
+
+    def inst_list_append(self, l, v):
+        """Push the idx-th element from the list.
+
+        Arguments:
+           l: a list
+           v: a value
+
+        """
+        lst = copy(self._ref(l))
+        lst.append(self._ref(v))
+        self._push(lst)
+
+    def inst_bool_and(self, a, b):
+        """Push the idx-th element from the list.
+
+        Arguments:
+           a: a boolean
+           b: a boolean
+
+        """
+        a = self._ref(a)
+        b = self._ref(b)
+        self._push(a and b)
 
     def inst_push(self, v):
         """Push a value on the stack.

@@ -103,7 +103,9 @@ class SplitGraph(PipelineStep):
             fn = node.inputs[0]
             if not fn.is_constant(Primitive):
                 return True
-            elif fn.value in (return_, partial, switch, make_tuple):
+            elif fn.value in (P.return_, P.partial, P.switch, P.make_tuple,
+                              P.make_list, P.list_len, P.list_getitem,
+                              P.list_setitem, P.list_append, P.bool_and):
                 return True
         return False
 
@@ -258,6 +260,14 @@ class CompileGraph(PipelineStep):
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]),
                                        self.ref(split.inputs[3]))
+                    elif fn.value == P.list_append:
+                        self.add_instr('list_append',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]))
+                    elif fn.value == P.bool_and:
+                        self.add_instr('bool_and',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]))
                     else:
                         raise AssertionError(f"Unknown special function "
                                              "{fn.value}")
