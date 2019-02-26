@@ -495,7 +495,7 @@ def _sm_add(x, y):
     return env_add(x, y)
 
 
-hyper_add = HyperMap(fn_leaf=_leaf_add)
+hyper_add = HyperMap(name='hyper_add', fn_leaf=_leaf_add)
 
 
 _leaf_zeros_like = MultitypeGraph('zeros_like')
@@ -527,6 +527,7 @@ def _array_zero(xs):
 
 
 zeros_like = HyperMap(
+    name='zeros_like',
     nonleaf=(Tuple, List, Class),
     fn_leaf=_leaf_zeros_like
 )
@@ -547,12 +548,21 @@ class ListMap(MetaGraph):
     """Implementation of list_map."""
 
     def __init__(self, fn_rec=None):
-        if fn_rec is None:
-            name = 'list_map'
-        else:
-            name = f'list_map[{fn_rec}]'
-        super().__init__(name)
+        """Initialize the list_map.
+
+        Arguments:
+            fn_rec: The function to map over, or None if the function to
+                map over must be provided as the first argument.
+
+        """
         self.fn_rec = fn_rec
+        super().__init__(self._decorate_name('list_map'))
+
+    def _decorate_name(self, name):
+        if self.fn_rec is None:
+            return name
+        else:
+            return f'{name}[{self.fn_rec}]'
 
     def generate_graph(self, args):
         """Return a graph for the number of lists."""
@@ -575,10 +585,10 @@ class ListMap(MetaGraph):
         resl = g.apply(P.make_list, g.apply(fn, *values))
 
         gnext = Graph()
-        gnext.debug.name = 'body'
+        gnext.debug.name = self._decorate_name('lm_body')
         gnext.flags['ignore_values'] = True
         gcond = Graph()
-        gcond.debug.name = 'cond'
+        gcond.debug.name = self._decorate_name('lm_cond')
         gcond.flags['ignore_values'] = True
 
         def make_cond(g):
@@ -590,7 +600,7 @@ class ListMap(MetaGraph):
                         for l in lists2]
             cond = reduce(lambda a, b: g.apply(P.bool_and, a, b), hasnexts)
             gtrue = Graph()
-            gtrue.debug.name = 'ftrue'
+            gtrue.debug.name = self._decorate_name('lm_ftrue')
             gtrue.flags['core'] = True
             gtrue.flags['ignore_values'] = True
             if self.fn_rec is None:
@@ -598,7 +608,7 @@ class ListMap(MetaGraph):
             else:
                 gtrue.output = gtrue.apply(gnext, curri, resl, *lists2)
             gfalse = Graph()
-            gfalse.debug.name = 'ffalse'
+            gfalse.debug.name = self._decorate_name('lm_ffalse')
             gfalse.flags['core'] = True
             gfalse.flags['ignore_values'] = True
             gfalse.output = resl

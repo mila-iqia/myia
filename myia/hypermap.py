@@ -32,12 +32,14 @@ class HyperMap(MetaGraph):
                  fn_leaf=None,
                  fn_rec=None,
                  broadcast=True,
-                 nonleaf=(Array, List, Tuple, Class)):
+                 nonleaf=(Array, List, Tuple, Class),
+                 name=None):
         """Initialize a HyperMap."""
-        if fn_leaf is None:
-            name = 'hyper_map'
-        else:
-            name = f'hyper_map[{fn_leaf}]'
+        if name is None:
+            if fn_leaf is None:
+                name = 'hyper_map'
+            else:
+                name = f'hyper_map[{fn_leaf}]'  # pragma: no cover
         super().__init__(name)
         self.fn_leaf = fn_leaf
         self.fn_rec = fn_rec or self
