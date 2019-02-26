@@ -4,7 +4,8 @@ from myia.opt import lib
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, tuple_setitem, identity, partial, switch, \
     distribute, array_reduce, env_getitem, env_setitem, embed, env_add, \
-    scalar_usub, array_map, scalar_to_array, transpose
+    scalar_usub, array_map, scalar_to_array, transpose, list_getitem, \
+    list_setitem
 from myia.utils import newenv
 
 from ..common import to_abstract_test, i64, f64, af64_of
@@ -106,6 +107,33 @@ def test_getitem_setitem_tuple_2():
 
     _check_opt(before, after,
                lib.getitem_setitem_tuple)
+
+
+def test_getitem_setitem_list():
+
+    def before(x, y):
+        lst = [x + 1, x + 2, x + 3, x + 4]
+        return list_getitem(list_setitem(lst, 0, y), 0)
+
+    def after(x, y):
+        return y
+
+    _check_opt(before, after,
+               lib.getitem_setitem_list)
+
+
+def test_getitem_setitem_list_2():
+
+    def before(x, y):
+        lst = [x + 1, x + 2, x + 3, x + 4]
+        return list_getitem(list_setitem(lst, 0, y), 1)
+
+    def after(x, y):
+        lst = [x + 1, x + 2, x + 3, x + 4]
+        return list_getitem(lst, 1)
+
+    _check_opt(before, after,
+               lib.getitem_setitem_list)
 
 
 def test_setitem_tuple_noopt():

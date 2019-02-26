@@ -122,6 +122,21 @@ def setitem_tuple_ct(optimizer, node, equiv):
     return sexp_to_node((P.make_tuple, *elems), node.graph)
 
 
+@pattern_replacer(P.list_getitem, (P.list_setitem, X, C1, Y), C2)
+def getitem_setitem_list(optimizer, node, equiv):
+    """Simplify getitem over setitem.
+
+    setitem(xs, 0, v)[0] => v
+    setitem(xs, 0, v)[1] => xs[1]
+    """
+    i1 = equiv[C1].value
+    i2 = equiv[C2].value
+    if i1 == i2:
+        return equiv[Y]
+    else:
+        return node.graph.apply(P.list_getitem, equiv[X], i2)
+
+
 # f((a, b, ...), (p, q, ...)) => (f(a, p), f(b, q), ...)
 # For f in the following list:
 _BubbleBinary = primset_var(P.scalar_add)

@@ -6,8 +6,7 @@ from types import FunctionType
 from dataclasses import dataclass
 
 from myia.abstract import from_value, AbstractJTagged
-from myia.pipeline import standard_resources, standard_pipeline, \
-    standard_debug_pipeline
+from myia.pipeline import standard_resources, standard_pipeline
 from myia.composite import grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.grad import J as realJ

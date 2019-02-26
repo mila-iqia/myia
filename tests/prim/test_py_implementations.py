@@ -13,7 +13,8 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
     issubtype, list_map, env_getitem, env_setitem, env_add, embed, \
-    array_to_scalar, transpose, return_, make_record
+    array_to_scalar, transpose, return_, make_record, list_getitem, \
+    array_getitem, array_setitem
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
@@ -141,8 +142,18 @@ def test_prim_tuple(x, y):
 
 
 @parse_compare(((1, 2, 3), 0), ((4, -6, 7), 2))
-def test_prim_getitem(data, item):
+def test_prim_tuple_getitem(data, item):
     return data[item]
+
+
+@parse_compare(([1, 2, 3], 0), ([4, -6, 7], 2))
+def test_prim_list_getitem(data, item):
+    return list_getitem(data, item)
+
+
+@parse_compare((np.array([1, 2, 3]), 0), (np.array([4, -6, 7]), 2))
+def test_prim_array_getitem(data, item):
+    return array_getitem(data, item)
 
 
 def test_prim_tuple_setitem():
@@ -155,6 +166,13 @@ def test_prim_list_setitem():
     L2 = [1, 22, 3, 4]
     assert list_setitem(L, 1, 22) == L2
     assert L != L2  # test that this is not inplace
+
+
+def test_prim_array_setitem():
+    L = np.array([1, 2, 3, 4])
+    L2 = np.array([1, 22, 3, 4])
+    assert np.all(array_setitem(L, 1, 22) == L2)
+    assert not np.all(L == L2)  # test that this is not inplace
 
 
 def test_prim_setattr():
