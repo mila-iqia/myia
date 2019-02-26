@@ -4,7 +4,6 @@ from ..abstract import VALUE
 from ..ir import Apply, toposort, Graph, Constant
 from ..pipeline import PipelineDefinition, PipelineStep
 from ..prim import Primitive, ops as P
-from ..prim.ops import partial, return_, switch, make_tuple
 from .debug_lin import debug_convert
 from .nnvm import nnvm_convert
 from .vm import FinalVM
@@ -229,23 +228,36 @@ class CompileGraph(PipelineStep):
                     # previously returned references if a new one is not ready
                     for i in split.inputs[1:]:
                         self.ref(i)
-                    if fn.value == return_:
+                    if fn.value == P.return_:
                         self.add_instr('return', self.ref(split.inputs[1]),
                                        self.height)
                         # execution stops here
                         break
-                    elif fn.value == partial:
+                    elif fn.value == P.partial:
                         self.add_instr(
                             'partial', self.ref(split.inputs[1]),
                             *tuple(self.ref(inp) for inp in split.inputs[2:]))
-                    elif fn.value == switch:  # pragma: no cover
+                    elif fn.value == P.switch:  # pragma: no cover
                         self.add_instr('switch', self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]),
                                        self.ref(split.inputs[3]))
-
-                    elif fn.value == make_tuple:
+                    elif fn.value == P.make_tuple:
                         self.add_instr('tuple', *[self.ref(i)
                                                   for i in split.inputs[1:]])
+                    elif fn.value == P.make_list:
+                        self.add_instr('list', *[self.ref(i)
+                                                 for i in split.inputs[1:]])
+                    elif fn.value == P.list_len:
+                        self.add_instr('list_len', self.ref(split.inputs[1]))
+                    elif fn.value == P.list_getitem:
+                        self.add_instr('list_getitem',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]))
+                    elif fn.value == P.list_setitem:
+                        self.add_instr('list_setitem',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]),
+                                       self.ref(split.inputs[3]))
                     else:
                         raise AssertionError(f"Unknown special function "
                                              "{fn.value}")

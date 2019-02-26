@@ -371,7 +371,7 @@ def test_list_while(xs):
     return y
 
 
-@grad_test(([1.0, 2.0, 3.0, 4.0],), pipeline=standard_debug_pipeline)
+@grad_test(([1.0, 2.0, 3.0, 4.0],), pipeline=standard_pipeline)
 def test_list_for(xs):
     y = 1
     for x in xs:

@@ -208,6 +208,53 @@ class FinalVM:
         """
         self._push(tuple(self._ref(a) for a in args))
 
+    def inst_list(self, *args):
+        """Create a list from the given arguments and push it on the stack.
+
+        Arguments:
+           *args: list elements
+
+        """
+        self._push(list(self._ref(a) for a in args))
+
+    def inst_list_len(self, l):
+        """Push the length of the list argument.
+
+        Arguments:
+          l: a list
+
+        """
+        self._push(len(self._ref(l)))
+
+    def inst_list_getitem(self, l, idx):
+        """Push the idx-th element from the list.
+
+        Arguments:
+           l: a list
+           idx: an index
+
+        """
+        i = self._ref(idx)
+        if isinstance(i, np.ndarray):
+            i = i.item()
+        self._push(self._ref(l)[i])
+
+    def inst_list_setitem(self, l, idx, v):
+        """Push the idx-th element from the list.
+
+        Arguments:
+           l: a list
+           idx: an index
+           v: a value
+
+        """
+        i = self._ref(idx)
+        if isinstance(i, np.ndarray):
+            i = i.item()
+        lst = copy(self._ref(l))
+        lst[i] = self._ref(v)
+        self._push(lst)
+
     def inst_push(self, v):
         """Push a value on the stack.
 
