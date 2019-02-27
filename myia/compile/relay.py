@@ -22,7 +22,7 @@ def to_relay_type(tp, shape=None):
     elif ismyiatype(tp, Tuple):
         return relay.ty.TupleType([to_relay_type(e) for e in tp.elements])
     elif ismyiatype(tp, Array):
-        return relay.ty.TensorType(shape, type_to_np_dtype(tp))
+        return relay.ty.TensorType(shape, type_to_np_dtype(tp.elements))
     elif ismyiatype(tp, Function):
         return relay.ty.FuncType([to_relay_type(a) for a in tp.arguments],
                                  to_relay_type(tp.retval))
@@ -195,8 +195,14 @@ class CompileGraph(PipelineStep):
                           [self.ref(i) for i in node.inputs[1:]])
 
     def on_constant(self, node):
-        return relay.const(node.value,
-                           dtype=type_to_np_dtype(node.type))
+        def _helper(value, type):
+            if ismyiatype(type, Tuple):
+                return relay.Tuple([_helper(e, et) for e, et in
+                                    zip(value, type.elements)])
+            else:
+                return relay.const(value,
+                                   dtype=type_to_np_dtype(type))
+        return _helper(node.value, node.type)
 
     def on_graph(self, node):
         return self.graph_map[node.value]
