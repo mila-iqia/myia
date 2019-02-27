@@ -114,6 +114,9 @@ class OrderedSet:
         for other in others:
             for e in other:
                 self.add(e)
+        return self
+
+    __ior__ = update
 
     def intersection_update(self, *others):
         """Update the set, keeping only elements found in it and all others."""
@@ -121,12 +124,18 @@ class OrderedSet:
             for e in list(self):
                 if e not in other:
                     self.discard(e)
+        return self
+
+    __iand__ = intersection_update
 
     def difference_update(self, *others):
         """Update the set, removing elements found in others."""
         for other in others:
             for e in other:
                 self.discard(e)
+        return self
+
+    __isub__ = difference_update
 
     def symmetric_difference_update(self, other):
         """Update the set, keeping only the difference from both sets."""
