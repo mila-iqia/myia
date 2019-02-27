@@ -9,7 +9,8 @@ from itertools import count
 
 from .. import dtype
 from ..abstract import AbstractTuple, AbstractList, AbstractClass, \
-    AbstractArray, TYPE, AbstractScalar
+    AbstractArray, TYPE, AbstractScalar, AbstractFunction, VirtualFunction, \
+    Pending
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
@@ -373,6 +374,30 @@ def step_erase_tuple(self, graph, argspec, outspec, erase_class=False):
             'argspec': new_argspec,
             'outspec': new_outspec,
             'erase_tuple': True}
+
+
+@pipeline_function
+def step_set_types(self, graph, argspec, outspec):
+    """Pipeline step to fix types before lowering.
+
+    Inputs:
+        graph: graph to finalize
+        argspec
+        outspec
+
+    Outputs:
+        graph: the finalized graph.
+
+    """
+    self.resources.inferrer.infer(graph, argspec, outspec, clear=True)
+
+    for ref, fut in self.resources.inferrer.engine.cache.cache.items():
+        v = fut.result()
+        if isinstance(v, Pending):
+            v = v.result()
+        ref.node.abstract = v
+
+    return {'graph': graph}
 
 
 ############
