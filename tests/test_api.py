@@ -9,7 +9,7 @@ from myia.ir import clone
 from myia.pipeline import \
     scalar_parse as parse, scalar_debug_compile as compile
 from myia.pipeline.steps import convert_arg, convert_result
-from myia.prim.py_implementations import getitem
+from myia.prim.py_implementations import tuple_getitem
 
 from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
     ai32_of, af64_of
@@ -253,7 +253,7 @@ def test_return_primitive():
     """Return a primitive."""
     @compile
     def f():
-        return getitem
+        return tuple_getitem
 
     g = f()
     assert g((1, 2, 3), 0) == 1

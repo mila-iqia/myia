@@ -87,7 +87,9 @@ class Stage:
     def check(self, manager):
         for key, specs in self.specs.items():
             print(f'Verifying field: {key}')
-            specs.check(getattr(manager, key))
+            results = getattr(manager, key)
+            results = {g: results[g] for g in manager.graphs}
+            specs.check(results)
             print(f'OK for: {key}')
 
 

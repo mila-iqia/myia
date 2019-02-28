@@ -178,7 +178,7 @@ class Graph:
     @property
     def parent(self):
         """Return the parent of this graph."""
-        return self.manager.parents.get(self, None)
+        return self.manager.parents[self]
 
     @property
     def children(self):

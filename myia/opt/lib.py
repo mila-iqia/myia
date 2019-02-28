@@ -62,6 +62,21 @@ def primset_var(*prims):
 ###############################
 
 
+@pattern_replacer(P.tuple_getitem, (P.tuple_setitem, X, C1, Y), C2)
+def getitem_setitem_tuple(optimizer, node, equiv):
+    """Simplify getitem over setitem.
+
+    setitem(xs, 0, v)[0] => v
+    setitem(xs, 0, v)[1] => xs[1]
+    """
+    i1 = equiv[C1].value
+    i2 = equiv[C2].value
+    if i1 == i2:
+        return equiv[Y]
+    else:
+        return node.graph.apply(P.tuple_getitem, equiv[X], i2)
+
+
 @pattern_replacer(P.tuple_getitem, (P.make_tuple, Xs), C)
 def getitem_tuple(optimizer, node, equiv):
     """Match a constant index in an explicit tuple.
@@ -105,6 +120,21 @@ def setitem_tuple_ct(optimizer, node, equiv):
     elems = list(tup)
     elems[i] = equiv[Z]
     return sexp_to_node((P.make_tuple, *elems), node.graph)
+
+
+@pattern_replacer(P.list_getitem, (P.list_setitem, X, C1, Y), C2)
+def getitem_setitem_list(optimizer, node, equiv):
+    """Simplify getitem over setitem.
+
+    setitem(xs, 0, v)[0] => v
+    setitem(xs, 0, v)[1] => xs[1]
+    """
+    i1 = equiv[C1].value
+    i2 = equiv[C2].value
+    if i1 == i2:
+        return equiv[Y]
+    else:
+        return node.graph.apply(P.list_getitem, equiv[X], i2)
 
 
 # f((a, b, ...), (p, q, ...)) => (f(a, p), f(b, q), ...)

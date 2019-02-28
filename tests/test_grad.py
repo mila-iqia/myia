@@ -360,6 +360,24 @@ def test_pow10(x):
     return v
 
 
+@grad_test(([1.0, 2.0, 3.0, 4.0],),)
+def test_list_while(xs):
+    y = 1.0
+    index = 0
+    while index < len(xs):
+        y = y * xs[index]
+        index = index + 1
+    return y
+
+
+@grad_test(([1.0, 2.0, 3.0, 4.0],), pipeline=standard_pipeline)
+def test_list_for(xs):
+    y = 1
+    for x in xs:
+        y = y * x
+    return y
+
+
 @grad_test(4.5,)
 def test_nested_closure(x):
     a = x * x

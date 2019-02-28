@@ -290,9 +290,19 @@ def make_tuple(*args):
 
 
 @py_register(primops.tuple_getitem)
+def tuple_getitem(data, item):
+    """Implement `getitem`."""
+    return data[item]
+
+
 @py_register(primops.list_getitem)
+def list_getitem(data, item):
+    """Implement `getitem`."""
+    return data[item]
+
+
 @py_register(primops.array_getitem)
-def getitem(data, item):
+def array_getitem(data, item):
     """Implement `getitem`."""
     return data[item]
 
@@ -313,8 +323,15 @@ def tuple_setitem(data, item, value):
 
 
 @register(primops.list_setitem)
-@register(primops.array_setitem)
 def list_setitem(data, item, value):
+    """Implement `list/array_setitem`."""
+    data2 = copy(data)
+    data2[item] = value
+    return data2
+
+
+@register(primops.array_setitem)
+def array_setitem(data, item, value):
     """Implement `list/array_setitem`."""
     data2 = copy(data)
     data2[item] = value
