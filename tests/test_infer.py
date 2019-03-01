@@ -43,7 +43,7 @@ abstract_inferrer_cons_test = {}
 
 def _test_op(fn):
     prim = Primitive(fn.__name__)
-    xinf = UniformPrimitiveInferrer.partial(impl=fn)
+    xinf = UniformPrimitiveInferrer.partial(prim=prim, impl=fn)
     abstract_inferrer_cons_test[prim] = xinf
     return prim
 

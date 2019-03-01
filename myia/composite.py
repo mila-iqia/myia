@@ -76,6 +76,7 @@ class Elemwise(MetaGraph):
                     for arg in args)
         if sig not in self.cache:
             g = Graph()
+            g.flags['core'] = True
             g.debug.name = self.mname
             shapes = [x for x in sig if x is not False]
 
@@ -677,6 +678,7 @@ class GradOperation(MetaGraph):
         """Make the graph for the grad."""
         with About(dbg, 'grad'):
             df = Graph()
+            df.flags['core'] = True
 
         if apply_j:
             jf = df.apply(P.J, jf)
@@ -712,6 +714,7 @@ class GradOperation(MetaGraph):
         g = gf.graph
 
         dfbuilder = Graph()
+        dfbuilder.flags['core'] = True
         dfbuilder.debug.name = f"grad{len(g.parameters)}"
 
         with About(g.debug, 'copy'):

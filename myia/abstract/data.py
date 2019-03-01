@@ -480,24 +480,9 @@ class InferenceError(Exception, Partializable):
         self.refs = refs
         self.traceback_refs = infer_trace.get()
 
-    def print_tb_end(self, fn_ctx, args_ctx, is_prim):
-        """Print the error message at the end of a traceback."""
-        eprint(f'{type(self).__qualname__}: {self.message}')
-
 
 class MyiaTypeError(InferenceError):
     """Type error in a Myia program."""
-
-    def print_tb_end(self, fn_ctx, args_ctx, is_prim):
-        """Print the error message at the end of a traceback."""
-        if fn_ctx is None:
-            super().print_tb_end(fn_ctx, args_ctx, is_prim)
-            return
-        s = f'{type(self).__qualname__}: `{fn_ctx}` cannot be called with' \
-            f' argument types {args_ctx}.'
-        if is_prim:
-            s += f' Reason: {self.message}'
-        eprint(s)
 
 
 class MyiaShapeError(InferenceError):
@@ -528,7 +513,3 @@ class TypeDispatchError(MyiaTypeError):
         super().__init__(message, refs=refs)
         self.metagraph = metagraph
         self.types = types
-
-    def print_tb_end(self, fn_ctx, args_ctx, is_prim):
-        """Print the error message at the end of a traceback."""
-        eprint(f'{type(self).__qualname__}: {self.message}')

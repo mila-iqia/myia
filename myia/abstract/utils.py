@@ -392,7 +392,7 @@ def _amerge(x1: (dict, TrackDict), x2, loop, forced):
 
 @overload  # noqa: F811
 def _amerge(x1: tuple, x2, loop, forced):
-    if len(x1) != len(x2):
+    if len(x1) != len(x2):  # pragma: no cover
         raise MyiaTypeError(f'Tuple length mismatch')
     changes = False
     rval = []
