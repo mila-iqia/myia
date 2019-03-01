@@ -30,6 +30,14 @@ def to_relay_type(tp, shape=None):
         raise ValueError("Unknown type:", tp)
 
 
+def ashape(node):
+    """Make sure shape isn't None, that makes relay crash later."""
+    shp = node.shape
+    if shp is None:
+        shp = ()
+    return shp
+
+
 SIMPLE_MAP = {
     P.scalar_add: relay.op.add,
     P.scalar_sub: relay.op.subtract,
@@ -55,9 +63,13 @@ SIMPLE_MAP = {
     # P.bool_or: sym.logical_or
     P.bool_eq: relay.op.equal,
 
+    P.scalar_to_array: lambda x: x,
+    P.dot: lambda x, y: relay.op.nn.dense(x, relay.op.transpose(y)),
+
     P.make_tuple: lambda *args: relay.Tuple(args),
     P.switch: relay.If,
 }
+
 
 def relay_partial(c, fn, *args):
     ty = fn.type
@@ -70,8 +82,49 @@ def relay_partial(c, fn, *args):
     return res
 
 
+def relay_distribute(c, array, shape):
+    assert shape.is_constant(tuple)
+    return relay.op.broadcast_to(c.ref(array), shape.value)
+
+
+def relay_transpose(c, a, ax):
+    na = c.ref(a)
+    assert ax.is_constant(tuple)
+    return relay.op.transpose(na, axes=ax.value)
+
+def relay_array_map(c, fn, *array):
+    assert fn.is_constant(Primitive)
+    fn = fn.value
+    return SIMPLE_MAP[fn](*[c.ref(a) for a in array])
+
+
+def relay_array_reduce(c, fn, array, shape):
+    assert fn.is_constant(Primitive)
+    assert shape.is_constant(tuple)
+    fn = fn.value
+    tshp = shape.value
+    ary = c.ref(array)
+    if fn == P.scalar_add:
+        ashp = ashape(array)
+        if len(tshp) < len(ashp):
+            ts = (1,) * (len(ashp) - len(tshp)) + tshp
+        else:
+            ts = tshp
+        axis = tuple(i for i, t in enumerate(ts) if t == 1)
+        res = relay.op.sum(ary, axis=axis, keepdims=True)
+        if len(tshp) < len(ashp):
+            res = relay.op.reshape(res, newshape=tshp)
+        return res
+    else:
+        raise NotImplementedError(f"reduce with {fn}")
+
+
 COMPLEX_MAP = {
-    P.partial: relay_partial
+    P.partial: relay_partial,
+    P.distribute: relay_distribute,
+    P.transpose: relay_transpose,
+    P.array_map: relay_array_map,
+    P.array_reduce: relay_array_reduce
 }
 
 
@@ -107,14 +160,6 @@ class RelayMapper:
 
 
 MAP = RelayMapper(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
-
-
-def ashape(node):
-    """Make sure shape isn't None, that makes relay crash later."""
-    shp = node.shape
-    if shp is None:
-        shp = ()
-    return shp
 
 
 class RelayRunner:
@@ -176,7 +221,7 @@ class CompileGraph(PipelineStep):
         fn = exec.evaluate(module.entry_func)
 
         output = RelayRunner(
-            fn, [type_to_np_dtype(p.type) for p in graph.parameters])
+            fn, [to_relay_type(p.type) for p in graph.parameters])
 
         return {'output': output}
 
@@ -202,6 +247,9 @@ class CompileGraph(PipelineStep):
             else:
                 return relay.const(value,
                                    dtype=type_to_np_dtype(type))
+        if isinstance(node.value, Primitive):
+            # This is a hack for list_map and friends
+            return None
         return _helper(node.value, node.type)
 
     def on_graph(self, node):
