@@ -45,10 +45,10 @@ class MyiaFunction:
                 f'Wrong number of arguments: expected {n1}, got {n2}'
             )
 
-        argspec = tuple(from_value(arg) for arg in args)
-        argspec = tuple(broaden(arg, None)
-                        if name not in self.specialize_values else arg
-                        for arg, name in zip(argspec, argnames))
+        argspec = tuple(
+            from_value(arg, broaden=name not in self.specialize_values)
+            for arg, name in zip(args, argnames)
+        )
 
         if argspec not in self._cache:
             pip = standard_pipeline.make()
