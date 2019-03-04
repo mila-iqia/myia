@@ -4,6 +4,7 @@
 from types import FunctionType
 from ..info import DebugInfo
 from ..ir.anf import ANFNode, Graph
+from ..ir import MetaGraph
 from ..prim import Primitive
 from ..utils import Named, Namespace, EnvInstance, SymbolicKeyInstance
 
@@ -107,7 +108,7 @@ class NodeLabeler:
                 return repr(v)
             elif isinstance(v, FunctionType):
                 return f'{v.__name__}::function'
-            elif isinstance(v, Primitive):
+            elif isinstance(v, (Primitive, MetaGraph)):
                 return v.name
             elif isinstance(v, CosmeticPrimitive):
                 return v.label

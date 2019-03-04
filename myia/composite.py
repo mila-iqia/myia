@@ -55,9 +55,9 @@ class Elemwise(MetaGraph):
     * Otherwise, we return getattr(arg1, mname)(arg2, ...)
     """
 
-    def __init__(self, mname, scalar_op=None, infer_value=False):
+    def __init__(self, mname, scalar_op=None, infer_value=False, name=None):
         """Initialize Elemwise."""
-        super().__init__(mname)
+        super().__init__(name or mname)
         self.mname = mname
         self.scalar_op = scalar_op
         self.infer_value = infer_value
@@ -120,13 +120,13 @@ class Elemwise(MetaGraph):
         return self.cache[sig]
 
 
-add = Elemwise('__add__', P.scalar_add)
-sub = Elemwise('__sub__', P.scalar_sub)
-mul = Elemwise('__mul__', P.scalar_mul)
-truediv = Elemwise('__truediv__')
-floordiv = Elemwise('__floordiv__')
-mod = Elemwise('__mod__', P.scalar_mod)
-pow = Elemwise('__pow__', P.scalar_pow)
+add = Elemwise('__add__', P.scalar_add, name='add')
+sub = Elemwise('__sub__', P.scalar_sub, name='sub')
+mul = Elemwise('__mul__', P.scalar_mul, name='mul')
+truediv = Elemwise('__truediv__', name='truediv')
+floordiv = Elemwise('__floordiv__', name='floordiv')
+mod = Elemwise('__mod__', P.scalar_mod, name='mod')
+pow = Elemwise('__pow__', P.scalar_pow, name='pow')
 
 
 @core
@@ -208,12 +208,12 @@ def _tan(x):
     return scalar_tan(x)
 
 
-eq = Elemwise('__eq__', P.scalar_eq, infer_value=True)
-lt = Elemwise('__lt__', P.scalar_lt, infer_value=True)
-gt = Elemwise('__gt__', P.scalar_gt, infer_value=True)
-ne = Elemwise('__ne__', P.scalar_ne, infer_value=True)
-le = Elemwise('__le__', P.scalar_le, infer_value=True)
-ge = Elemwise('__ge__', P.scalar_ge, infer_value=True)
+eq = Elemwise('__eq__', P.scalar_eq, infer_value=True, name='eq')
+lt = Elemwise('__lt__', P.scalar_lt, infer_value=True, name='lt')
+gt = Elemwise('__gt__', P.scalar_gt, infer_value=True, name='gt')
+ne = Elemwise('__ne__', P.scalar_ne, infer_value=True, name='ne')
+le = Elemwise('__le__', P.scalar_le, infer_value=True, name='le')
+ge = Elemwise('__ge__', P.scalar_ge, infer_value=True, name='ge')
 
 
 @core
