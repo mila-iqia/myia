@@ -430,6 +430,7 @@ uniform_prim(P.scalar_log)(py.scalar_log)
 uniform_prim(P.scalar_sin)(py.scalar_sin)
 uniform_prim(P.scalar_cos)(py.scalar_cos)
 uniform_prim(P.scalar_tan)(py.scalar_tan)
+uniform_prim(P.scalar_tanh)(py.scalar_tanh)
 
 
 ###############

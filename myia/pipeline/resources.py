@@ -107,6 +107,7 @@ standard_object_map = {
     math.sin: P.scalar_sin,
     math.cos: P.scalar_cos,
     math.tan: P.scalar_tan,
+    math.tanh: P.scalar_tanh,
     np.floor: C.floor,
     np.trunc: C.trunc,
     np.add: C.add,
@@ -120,6 +121,7 @@ standard_object_map = {
     np.sin: C.sin,
     np.cos: C.cos,
     np.tan: C.tan,
+    np.tanh: C.tanh,
 }
 
 

@@ -34,6 +34,7 @@ scalar_log = Primitive('scalar_log')
 scalar_sin = Primitive('scalar_sin')
 scalar_cos = Primitive('scalar_cos')
 scalar_tan = Primitive('scalar_tan')
+scalar_tanh = Primitive('scalar_tanh')
 
 
 ###############

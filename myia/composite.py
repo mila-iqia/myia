@@ -17,7 +17,7 @@ from .prim.py_implementations import \
     array_map, bool_not, bool_eq, hastype, distribute, shape, \
     broadcast_shape, typeof, scalar_cast, scalar_add, scalar_exp, \
     scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div, \
-    scalar_to_array, env_add
+    scalar_to_array, env_add, scalar_tanh
 from .utils import newenv
 
 
@@ -176,6 +176,7 @@ log = MultitypeGraph('log')
 sin = MultitypeGraph('sin')
 cos = MultitypeGraph('cos')
 tan = MultitypeGraph('tan')
+tanh = MultitypeGraph('tanh')
 
 
 @exp.register(Number)
@@ -206,6 +207,12 @@ def _cos(x):
 @core
 def _tan(x):
     return scalar_tan(x)
+
+
+@tanh.register(Number)
+@core
+def _tanh(x):
+    return scalar_tanh(x)
 
 
 eq = Elemwise('__eq__', P.scalar_eq, infer_value=True, name='eq')
@@ -479,6 +486,13 @@ def array_cos(xs):
 def array_tan(xs):
     """Implementation of `array_tan`."""
     return array_map(scalar_tan, xs)
+
+
+@tanh.register(Array)
+@core
+def array_tanh(xs):
+    """Implementation of `array_tanh`."""
+    return array_map(scalar_tanh, xs)
 
 
 _leaf_add = MultitypeGraph('hyper_add')

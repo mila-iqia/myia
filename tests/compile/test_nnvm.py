@@ -72,6 +72,11 @@ def test_tan(x):
     return math.tan(x)
 
 
+@parse_compare((0.3,))
+def test_tanh(x):
+    return math.tanh(x)
+
+
 @parse_compare((2, 3))
 def test_eq(x, y):
     return x == y

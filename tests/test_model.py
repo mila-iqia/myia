@@ -49,7 +49,7 @@ class TanhLayer:
     b: Array
 
     def apply(self, input):
-        return tanh(input @ self.W + self.b)
+        return numpy.tanh(input @ self.W + self.b)
 
 
 @dataclass(frozen=True)

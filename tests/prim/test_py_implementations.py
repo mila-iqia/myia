@@ -101,6 +101,11 @@ def test_prim_tan(x):
     return math.tan(x)
 
 
+@parse_compare(-0.1, 0.3)
+def test_prim_tanh(x):
+    return math.tanh(x)
+
+
 @parse_compare((2, 7), (4, -6))
 def test_prim_eq(x, y):
     return x == y

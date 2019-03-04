@@ -53,6 +53,7 @@ whitelist = frozenset({
     P.scalar_sin,
     P.scalar_cos,
     P.scalar_tan,
+    P.scalar_tanh,
     P.scalar_eq,
     P.scalar_lt,
     P.scalar_gt,
