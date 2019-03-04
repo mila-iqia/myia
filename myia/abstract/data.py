@@ -7,7 +7,7 @@ from contextvars import ContextVar
 
 from .. import dtype
 from ..debug.label import label
-from ..utils import Named, Partializable, eprint
+from ..utils import Named, Partializable
 
 from .loop import Pending
 

@@ -2,7 +2,7 @@
 
 import inspect
 
-from .abstract import MyiaTypeError, from_value, broaden
+from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
 
 

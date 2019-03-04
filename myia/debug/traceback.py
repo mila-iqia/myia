@@ -7,9 +7,9 @@ from colorama import Fore, Style
 import prettyprinter as pp
 
 from .. import dtype
-from ..abstract import InferenceError, Inferrer, Reference, data, ANYTHING, \
+from ..abstract import InferenceError, Reference, data, ANYTHING, \
     TYPE, SHAPE, VALUE
-from ..utils import eprint, overload
+from ..utils import eprint
 from ..ir import Graph
 
 from .label import label
@@ -37,7 +37,7 @@ def _get_loc(ref):
     return node.debug.find('location')
 
 
-def get_stack(error):
+def _get_stack(error):
     refs = [*error.traceback_refs.values()]
     stack = []
     for ref in refs:
@@ -72,22 +72,22 @@ def _pretty(ctx, title, args, kwargs, sep=' :: '):
 
 
 @pp.register_pretty(_PBlock)
-def pretty_pblock(pb, ctx):
+def _pretty_pblock(pb, ctx):
     return _pretty(ctx, pb.title, pb.args, pb.kwargs)
 
 
 @pp.register_pretty(data.AbstractClass)
-def pretty_aclass(a, ctx):
+def _pretty_aclass(a, ctx):
     return _pretty(ctx, a.tag, [], a.attributes)
 
 
 @pp.register_pretty(data.AbstractTuple)
-def pretty_atuple(a, ctx):
+def _pretty_atuple(a, ctx):
     return pp.pretty_call_alt(ctx, "", a.elements, {})
 
 
 @pp.register_pretty(data.AbstractScalar)
-def pretty_atuple(a, ctx):
+def _pretty_ascalar(a, ctx):
     t = a.values[TYPE]
     if dtype.ismyiatype(t, dtype.Float):
         rval = f'f{t.bits}'
@@ -104,25 +104,25 @@ def pretty_atuple(a, ctx):
 
 
 @pp.register_pretty(data.AbstractArray)
-def pretty_aarray(a, ctx):
+def _pretty_aarray(a, ctx):
     elem = pp.pformat(a.element)
     shp = ' x '.join('?' if s is ANYTHING else str(s)
-                   for s in a.values[SHAPE])
+                     for s in a.values[SHAPE])
     return f'{elem} x {shp}'
 
 
 @pp.register_pretty(data.AbstractFunction)
-def pretty_afunc(a, ctx):
+def _pretty_afunc(a, ctx):
     return '|'.join([pp.pformat(fn) for fn in a.get_sync()])
 
 
 @pp.register_pretty(data.PrimitiveFunction)
-def pretty_primfunc(x, ctx):
+def _pretty_primfunc(x, ctx):
     return label(x.prim)
 
 
 @pp.register_pretty(data.GraphFunction)
-def pretty_primfunc(x, ctx):
+def _pretty_graphfunc(x, ctx):
     return label(x.graph)
 
 
@@ -175,7 +175,7 @@ def _print_lines(lines, l1, c1, l2, c2, label='', mode='color'):
 
 def print_inference_error(error):
     """Print an InferenceError's traceback."""
-    stack = get_stack(error)
+    stack = _get_stack(error)
     for fn, args, loctype, loc in stack:
         eprint('=' * 80)
         if loc is not None:
