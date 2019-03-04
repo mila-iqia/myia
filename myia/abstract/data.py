@@ -513,3 +513,14 @@ class TypeDispatchError(MyiaTypeError):
         super().__init__(message, refs=refs)
         self.metagraph = metagraph
         self.types = types
+
+
+class TypeMismatchError(MyiaTypeError):
+    """Error to generate when expecting a type and getting another."""
+
+    def __init__(self, expected, got):
+        """Initialize a TypeMismatchError."""
+        message = f'Expected {expected}, but got {got}'
+        super().__init__(message)
+        self.expected = expected
+        self.got = got
