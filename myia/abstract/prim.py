@@ -278,7 +278,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             ref = Reference(outref.engine,
                             g.apply(P.partial, fn, dataref.node),
                             outref.context)
-            return await eng.forward_reference(outref, ref)
+            return await eng.reroute(outref, ref)
         else:
             raise InferenceError(f'Unknown field in {data_t}: {item_v}')
 
@@ -292,7 +292,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         ref = Reference(outref.engine,
                         g.apply(P.partial, fn, dataref.node),
                         outref.context)
-        return await eng.forward_reference(outref, ref)
+        return await eng.reroute(outref, ref)
 
     elif case == 'no_method':
         msg = f"object of type {data_t} has no attribute '{item_v}'"
@@ -324,7 +324,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             ref = Reference(outref.engine,
                             g.apply(P.partial, P.make_record, typ),
                             outref.context)
-            return await eng.forward_reference(outref, ref)
+            return await eng.reroute(outref, ref)
         else:
             return to_abstract(value, Context.empty(), ref=outref)
 

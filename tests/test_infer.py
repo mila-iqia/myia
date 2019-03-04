@@ -1541,6 +1541,11 @@ def test_dataclass_wrong_field(pt):
     return pt.z
 
 
+@infer((Thing(i64), i64))
+def test_dataclass_call(thing):
+    return thing()
+
+
 hyper_map = HyperMap()
 hyper_map_notuple = HyperMap(nonleaf=(A, Class))
 hyper_map_nobroadcast = HyperMap(broadcast=False)

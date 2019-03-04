@@ -118,7 +118,7 @@ class InferenceEngine:
         """
         return self.cache.get(ref)
 
-    async def forward_reference(self, orig, new):
+    async def reroute(self, orig, new):
         """Set the inference result for orig to the result for new.
 
         This sets an entry in reference_map from orig to new.
@@ -224,7 +224,10 @@ class InferenceEngine:
         argrefs = [self.ref(node, ctx) for node in n_args]
 
         if not isinstance(fn, AbstractFunction):
-            raise MyiaTypeError(f'Not a function: {fn}', refs=[fn_ref])
+            g = ref.node.graph
+            newfn = g.apply(P.getattr, fn_ref.node, '__call__')
+            newcall = g.apply(newfn, *n_args)
+            return await self.reroute(ref, self.ref(newcall, ctx))
 
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]
