@@ -1,6 +1,5 @@
 python=3.7
 colorama
-prettyprinter
 numpy
 nnvm=0.5.dev
 pytest
