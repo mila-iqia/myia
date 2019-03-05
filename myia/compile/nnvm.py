@@ -290,7 +290,7 @@ class NNVMConverter:
 
         if target == 'cpu':
             nnvm_target = 'llvm'
-        if target == 'cuda':
+        if target == 'cuda':  # pragma: no cover
             nnvm_target = 'cuda -libs=cublas'
 
         g = nnvm.graph.create(sym.Group(list(self.eqv[o] for o in outputs)))
