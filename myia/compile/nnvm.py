@@ -288,11 +288,13 @@ class NNVMConverter:
             return None, [inmap[self.eqv[o]] for o in outputs], outputs
 
         if target == 'cpu':
-            target = 'llvm'
+            nnvm_target = 'llvm'
+        if target == 'cuda':  # pragma: no cover
+            nnvm_target = 'cuda -libs=cublas'
 
         g = nnvm.graph.create(sym.Group(list(self.eqv[o] for o in outputs)))
         dg, lib, params = nnvm.compiler.build(
-            g, target=target, shape=self.shapes, dtype=self.types,
+            g, target=nnvm_target, shape=self.shapes, dtype=self.types,
             params=self.constants)
 
         shape = dg.json_attr('shape')
@@ -306,7 +308,7 @@ class NNVMConverter:
         output_specs = [spec(index.entry_id(x)) for x in index.output_entries]
         assert len(output_specs) == len(outputs)
 
-        if target == 'llvm':
+        if target == 'cpu':
             context = tvm.cpu(dev_id)
         elif target == 'cuda':  # pragma: no cover
             context = tvm.gpu(dev_id)
