@@ -86,12 +86,11 @@ class StandardInferrer(Inferrer):
         return await self._infer(engine, *args)
 
 
-def standard_prim(*prims):
+def standard_prim(prim):
     """Decorator to define and register a StandardInferrer."""
     def deco(fn):
-        xinf = StandardInferrer.partial(prim=prims[0], infer=fn)
-        for prim in prims:
-            abstract_inferrer_constructors[prim] = xinf
+        xinf = StandardInferrer.partial(prim=prim, infer=fn)
+        abstract_inferrer_constructors[prim] = xinf
     return deco
 
 
@@ -869,8 +868,13 @@ async def _inf_scalar_cast(engine,
     return AbstractScalar(values)
 
 
-@standard_prim(P.identity, P.return_)
+@standard_prim(P.identity)
 async def _inf_identity(engine, x):
+    return x
+
+
+@standard_prim(P.return_)
+async def _inf_return(engine, x):
     return x
 
 
