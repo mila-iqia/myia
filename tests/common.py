@@ -170,6 +170,9 @@ def to_abstract_test(self, x: object):
 class Thing:
     contents: Object
 
+    def __call__(self):
+        return self.contents * 2
+
 
 @dataclass(frozen=True)
 class Point:

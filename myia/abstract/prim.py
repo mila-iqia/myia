@@ -31,7 +31,8 @@ from .data import (
     GraphFunction,
     DummyFunction,
     VALUE, TYPE, SHAPE,
-    MyiaTypeError, InferenceError, MyiaShapeError, check_nargs
+    MyiaTypeError, InferenceError, MyiaShapeError, check_nargs,
+    infer_trace
 )
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context
@@ -50,9 +51,10 @@ class StandardInferrer(Inferrer):
             will be inspected and checked automatically.
     """
 
-    def __init__(self, infer):
+    def __init__(self, prim, infer):
         """Initialize a StandardInferrer."""
         super().__init__()
+        self.prim = prim
         self._infer = infer
         data = inspect.getfullargspec(infer)
         assert data.varkw is None
@@ -66,7 +68,8 @@ class StandardInferrer(Inferrer):
 
     async def infer(self, engine, *args):
         """Infer the abstract result given the abstract arguments."""
-        check_nargs("primitive", self.nargs, args)
+        check_nargs(self.prim, self.nargs, args)
+        infer_trace.set({**infer_trace.get(), self.prim: (self.prim, args)})
         for i, arg in enumerate(args):
             typ = self.typemap.get(i)
             if typ is None:
@@ -83,12 +86,11 @@ class StandardInferrer(Inferrer):
         return await self._infer(engine, *args)
 
 
-def standard_prim(*prims):
+def standard_prim(prim):
     """Decorator to define and register a StandardInferrer."""
     def deco(fn):
-        xinf = StandardInferrer.partial(infer=fn)
-        for prim in prims:
-            abstract_inferrer_constructors[prim] = xinf
+        xinf = StandardInferrer.partial(prim=prim, infer=fn)
+        abstract_inferrer_constructors[prim] = xinf
     return deco
 
 
@@ -101,9 +103,10 @@ class WithImplInferrer(Inferrer):
             implementation.
     """
 
-    def __init__(self, impl, infer_value=False):
+    def __init__(self, prim, impl, infer_value=False):
         """Initialize a WithImplInferrer."""
         super().__init__()
+        self.prim = prim
         self.impl = impl
         self.infer_value = infer_value
         data = inspect.getfullargspec(impl)
@@ -151,9 +154,9 @@ class UniformPrimitiveInferrer(WithImplInferrer):
             implementation.
     """
 
-    def __init__(self, impl, infer_value=False):
+    def __init__(self, prim, impl, infer_value=False):
         """Initialize a UniformPrimitiveInferrer."""
-        super().__init__(impl, infer_value)
+        super().__init__(prim, impl, infer_value)
         data = self.impl_data
         self.typemap = defaultdict(list)
         # We group the arguments with the same types together.
@@ -170,7 +173,8 @@ class UniformPrimitiveInferrer(WithImplInferrer):
 
     async def infer(self, engine, *args):
         """Infer the abstract result given the abstract arguments."""
-        check_nargs("primitive", self.nargs, args)
+        check_nargs(self.prim, self.nargs, args)
+        infer_trace.set({**infer_trace.get(), self.prim: (self.prim, args)})
         outtype = self.outtype
         if any(not isinstance(arg, AbstractScalar) for arg in args):
             raise MyiaTypeError('Expected scalar')
@@ -195,6 +199,7 @@ def uniform_prim(prim, infer_value=False):
     """
     def deco(fn):
         xinf = UniformPrimitiveInferrer.partial(
+            prim=prim,
             impl=fn,
             infer_value=infer_value
         )
@@ -272,7 +277,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             ref = Reference(outref.engine,
                             g.apply(P.partial, fn, dataref.node),
                             outref.context)
-            return await eng.forward_reference(outref, ref)
+            return await eng.reroute(outref, ref)
         else:
             raise InferenceError(f'Unknown field in {data_t}: {item_v}')
 
@@ -286,7 +291,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         ref = Reference(outref.engine,
                         g.apply(P.partial, fn, dataref.node),
                         outref.context)
-        return await eng.forward_reference(outref, ref)
+        return await eng.reroute(outref, ref)
 
     elif case == 'no_method':
         msg = f"object of type {data_t} has no attribute '{item_v}'"
@@ -318,7 +323,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             ref = Reference(outref.engine,
                             g.apply(P.partial, P.make_record, typ),
                             outref.context)
-            return await eng.forward_reference(outref, ref)
+            return await eng.reroute(outref, ref)
         else:
             return to_abstract(value, Context.empty(), ref=outref)
 
@@ -424,6 +429,7 @@ uniform_prim(P.scalar_log)(py.scalar_log)
 uniform_prim(P.scalar_sin)(py.scalar_sin)
 uniform_prim(P.scalar_cos)(py.scalar_cos)
 uniform_prim(P.scalar_tan)(py.scalar_tan)
+uniform_prim(P.scalar_tanh)(py.scalar_tanh)
 
 
 ###############
@@ -707,7 +713,9 @@ async def _inf_shape(engine, a: AbstractArray):
 async def _inf_array_map(engine, fn: AbstractFunction, *arrays):
     if len(arrays) < 1:
         raise MyiaTypeError('array_map requires at least one array')
-    await engine.check_immediate(AbstractArray, *arrays)
+    for arr in arrays:
+        await engine.check_immediate(AbstractArray, arr)
+
     subargs = [a.element for a in arrays]
     result = await engine.execute(fn, *subargs)
 
@@ -860,8 +868,13 @@ async def _inf_scalar_cast(engine,
     return AbstractScalar(values)
 
 
-@standard_prim(P.identity, P.return_)
+@standard_prim(P.identity)
 async def _inf_identity(engine, x):
+    return x
+
+
+@standard_prim(P.return_)
+async def _inf_return(engine, x):
     return x
 
 

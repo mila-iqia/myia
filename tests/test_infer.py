@@ -43,7 +43,7 @@ abstract_inferrer_cons_test = {}
 
 def _test_op(fn):
     prim = Primitive(fn.__name__)
-    xinf = UniformPrimitiveInferrer.partial(impl=fn)
+    xinf = UniformPrimitiveInferrer.partial(prim=prim, impl=fn)
     abstract_inferrer_cons_test[prim] = xinf
     return prim
 
@@ -1539,6 +1539,11 @@ def test_dataclass_bad_inst2(cls, x, y):
 @infer((Point(i64, i64), InferenceError))
 def test_dataclass_wrong_field(pt):
     return pt.z
+
+
+@infer((Thing(i64), i64))
+def test_dataclass_call(thing):
+    return thing()
 
 
 hyper_map = HyperMap()

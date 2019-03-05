@@ -27,6 +27,7 @@ from .data import (
     VALUE,
     TYPE,
     MyiaTypeError,
+    TypeMismatchError,
 )
 
 
@@ -363,7 +364,9 @@ def _amerge(x1: Possibilities, x2, loop, forced):
     if x1.issuperset(x2):
         return x1
     if forced:
-        raise MyiaTypeError('Cannot merge Possibilities')
+        raise MyiaTypeError(
+            'Additional possibilities cannot be merged.'
+        )
     else:
         return Possibilities(x1 | x2)
 
@@ -371,7 +374,7 @@ def _amerge(x1: Possibilities, x2, loop, forced):
 @overload  # noqa: F811
 def _amerge(x1: dtype.TypeMeta, x2, loop, forced):
     if x1 != x2:
-        raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
+        raise TypeMismatchError(x1, x2)
     return x1
 
 
@@ -392,7 +395,7 @@ def _amerge(x1: (dict, TrackDict), x2, loop, forced):
 
 @overload  # noqa: F811
 def _amerge(x1: tuple, x2, loop, forced):
-    if len(x1) != len(x2):
+    if len(x1) != len(x2):  # pragma: no cover
         raise MyiaTypeError(f'Tuple length mismatch')
     changes = False
     rval = []
@@ -473,14 +476,14 @@ def _amerge(x1: AbstractJTagged, x2, loop, forced):
 @overload  # noqa: F811
 def _amerge(x1: (int, float, bool), x2, loop, forced):
     if forced and x1 != x2:
-        raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
+        raise TypeMismatchError(x1, x2)
     return x1 if x1 == x2 else ANYTHING
 
 
 @overload  # noqa: F811
 def _amerge(x1: object, x2, loop, forced):
     if x1 != x2:
-        raise MyiaTypeError(f'Cannot merge {x1} and {x2}')
+        raise TypeMismatchError(x1, x2)
     return x1
 
 
@@ -531,7 +534,7 @@ def amerge(x1, x2, loop, forced, accept_pending=True):
         return x1
     elif x2 is ANYTHING:
         if forced:
-            raise MyiaTypeError(f'Cannot merge {x1} with {x2}')
+            raise TypeMismatchError(x1, x2)
         return x2
     elif type(x1) is not type(x2):
         raise MyiaTypeError(

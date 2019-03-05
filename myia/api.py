@@ -2,7 +2,7 @@
 
 import inspect
 
-from .abstract import MyiaTypeError, from_value, broaden
+from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
 
 
@@ -30,7 +30,6 @@ class MyiaFunction:
         self.fn = fn
         self.specialize_values = set(specialize_values)
         self._cache = {}
-        # self.pip = standard_pipeline.make()
 
     def specialize(self, args):
         """Specialize on the types of the given arguments.
@@ -38,8 +37,6 @@ class MyiaFunction:
         Returns a Pipeline. If the argument types were seen before, returns a
         cached version.
         """
-        self.pip = standard_pipeline.make()
-
         argnames = inspect.getfullargspec(self.fn).args
         n1 = len(argnames)
         n2 = len(args)
@@ -48,13 +45,14 @@ class MyiaFunction:
                 f'Wrong number of arguments: expected {n1}, got {n2}'
             )
 
-        argspec = tuple(from_value(arg) for arg in args)
-        argspec = tuple(broaden(arg, None)
-                        if name not in self.specialize_values else arg
-                        for arg, name in zip(argspec, argnames))
+        argspec = tuple(
+            from_value(arg, broaden=name not in self.specialize_values)
+            for arg, name in zip(args, argnames)
+        )
 
         if argspec not in self._cache:
-            self._cache[argspec] = self.pip(
+            pip = standard_pipeline.make()
+            self._cache[argspec] = pip(
                 input=self.fn,
                 argspec=argspec
             )

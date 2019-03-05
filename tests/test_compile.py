@@ -52,10 +52,7 @@ def parse_compare(*tests, optimize=True, array=False, python=True,
             myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))
             if python:
-                if array:
-                    np.testing.assert_allclose(ref_result, myia_result)
-                else:
-                    assert ref_result == myia_result
+                np.testing.assert_allclose(ref_result, myia_result)
 
         m = mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn

@@ -260,7 +260,7 @@ class ANFNode(Node):
         a = self.abstract
         if a is not None and isinstance(a, AbstractArray):
             return a.values[SHAPE]
-        else:
+        else:  # pragma: no cover
             return None
 
     @property

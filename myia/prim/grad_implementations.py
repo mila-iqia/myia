@@ -147,6 +147,12 @@ def bprop_scalar_exp(x, out, dout):
     return (dout * out,)
 
 
+@register_bprop(primops.scalar_tanh)
+def bprop_scalar_tanh(x, out, dout):
+    """Backpropagator for primitive `scalar_tanh`."""
+    return (dout - dout * out * out,)
+
+
 @register_bprop(primops.scalar_uadd)
 def bprop_scalar_uadd(x, out, dout):
     """Backpropagator for primitive `scalar_uadd`."""

@@ -152,6 +152,13 @@ def scalar_tan(x: Number) -> Number:
     return math.tan(x)
 
 
+@register(primops.scalar_tanh)
+def scalar_tanh(x: Number) -> Number:
+    """Implement `scalar_tanh`."""
+    _assert_scalar(x)
+    return math.tanh(x)
+
+
 @register(primops.scalar_eq)
 def scalar_eq(x: Number, y: Number) -> Bool:
     """Implement `scalar_eq`."""

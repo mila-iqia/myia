@@ -27,8 +27,7 @@ SIMPLE_MAP = {
     P.scalar_usub: sym.negative,
     P.scalar_exp: sym.exp,
     P.scalar_log: sym.log,
-    # This is not right tangent vs hyperbolic tangent
-    # P.scalar_tan: sym.tanh,
+    P.scalar_tanh: sym.tanh,
 
     P.scalar_eq: sym.broadcast_equal,
     P.scalar_lt: sym.broadcast_less,
