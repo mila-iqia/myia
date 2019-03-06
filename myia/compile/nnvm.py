@@ -129,16 +129,12 @@ def nnvm_type_map(type):
 
 def nnvm_val(val, dtype, ctx):
     """Build an NNVM value on-device."""
-    if not isinstance(val, tvm.ndarray.NDArray):
-        vv = np.array(val, dtype=dtype,
-                      copy=False, ndmin=1)
-        v = tvm.ndarray.empty(shape=vv.shape, dtype=vv.dtype,
-                              ctx=ctx)
-        v.copyfrom(vv)
-        return v
-    else:
-        # We implicitly trust that tvm array will have the right type/shape/etc
-        return val
+    vv = np.array(val, dtype=dtype,
+                  copy=False, ndmin=1)
+    v = tvm.ndarray.empty(shape=vv.shape, dtype=vv.dtype,
+                          ctx=ctx)
+    v.copyfrom(vv)
+    return v
 
 
 class NNVMRunner:
