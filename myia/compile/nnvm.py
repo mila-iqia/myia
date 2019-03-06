@@ -127,6 +127,19 @@ def nnvm_type_map(type):
     return dt
 
 
+def nnvm_val(val, dtype, ctx):
+    if not isinstance(val, tvm.ndarray.NDArray):
+        vv = np.array(val, dtype=dtype,
+                      copy=False, ndmin=1)
+        v = tvm.ndarray.empty(shape=vv.shape, dtype=vv.dtype,
+                              ctx=ctx)
+        v.copyfrom(vv)
+        return v
+    else:
+        # We implicitly trust that tvm array will have the right type/shape/etc
+        return val
+
+
 class NNVMRunner:
     """Adapter to run an NNVM module."""
 
@@ -204,8 +217,8 @@ class NNVMConverter:
         key = (val, type)
         if key not in self.constant_vars:
             name = f"_cst{val}{type}"
-            self.constants[name] = np.array([val], dtype=nnvm_type,
-                                            copy=False, ndmin=1)
+            self.constants[name] = nnvm_val([val], dtype=nnvm_type,
+                                            ctx=self.context)
             self.constant_vars[key] = sym.Variable(name)
             self.types[name] = nnvm_type
             self.shapes[name] = (1,)
@@ -229,9 +242,10 @@ class NNVMConverter:
 
         if n.is_constant() and not n.is_constant_graph():
             name = f"cst{next(self.c)}"
-            self.constants[name] = np.array([n.value],
+            self.constants[name] = nnvm_val([n.value],
                                             dtype=type_to_np_dtype(n.type),
-                                            copy=False, ndmin=1)
+                                            ctx=self.context)
+
             setn(name, n)
         elif n not in self.eqv:
             name = f"i{next(self.c)}"
@@ -267,6 +281,13 @@ class NNVMConverter:
         self.constant_vars = {}
         self.shapes = {}
         self.types = {}
+
+        if target == 'cpu':
+            self.context = tvm.cpu(dev_id)
+        elif target == 'cuda':  # pragma: no cover
+            self.context = tvm.gpu(dev_id)
+        else:  # pragma: no cover
+            raise Exception(f"Unsupported target: {target}")
 
         for n in lst:
             assert n.is_apply()
@@ -308,21 +329,14 @@ class NNVMConverter:
         output_specs = [spec(index.entry_id(x)) for x in index.output_entries]
         assert len(output_specs) == len(outputs)
 
-        if target == 'cpu':
-            context = tvm.cpu(dev_id)
-        elif target == 'cuda':  # pragma: no cover
-            context = tvm.gpu(dev_id)
-        else:  # pragma: no cover
-            raise Exception(f"Unsupported target: {target}")
-
-        module = graph_runtime.create(dg, lib, context)
+        module = graph_runtime.create(dg, lib, self.context)
 
         for n, p in params.items():
             module.set_input(n, p)
 
         input_types = [self.types[i] for i in self.input_names]
         return (NNVMRunner(module, self.input_names,
-                           input_types, output_specs, context),
+                           input_types, output_specs, self.context),
                 self.inputs, outputs)
 
 
