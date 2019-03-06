@@ -128,6 +128,7 @@ def nnvm_type_map(type):
 
 
 def nnvm_val(val, dtype, ctx):
+    """Build an NNVM value on-device."""
     if not isinstance(val, tvm.ndarray.NDArray):
         vv = np.array(val, dtype=dtype,
                       copy=False, ndmin=1)
