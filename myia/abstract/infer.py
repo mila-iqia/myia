@@ -551,7 +551,7 @@ class GraphInferrer(BaseGraphInferrer):
         """Initialize a GraphInferrer."""
         self._graph = graph
         assert context is not None
-        super().__init__(context.filter(graph))
+        super().__init__(context.filter(graph and graph.parent))
 
     def normalize_args(self, args):
         """Broaden args if flag ignore_values is True."""
