@@ -23,7 +23,7 @@ from myia.prim.py_implementations import \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
-    transpose, make_record
+    transpose, make_record, unsafe_static_cast
 from myia.utils import newenv
 
 from .common import B, T, L, i16, i32, i64, u64, f16, f32, f64, \
@@ -1673,6 +1673,20 @@ def test_env_onfn():
     e = newenv
     e = env_setitem(e, embed(f), newenv)
     return env_getitem(e, embed(f), newenv)
+
+
+_i64 = to_abstract_test(i64)
+
+
+@infer((i32, i64), (f64, i64), ((i32, i64), i64))
+def test_unsafe_static_cast(x):
+    return unsafe_static_cast(x, _i64)
+
+
+@infer((i32, i32, InferenceError),
+       (i32, (i32, i32), InferenceError))
+def test_unsafe_static_cast_error(x, y):
+    return unsafe_static_cast(x, y)
 
 
 @infer(

@@ -972,6 +972,14 @@ async def _inf_env_add(engine, env1, env2):
     })
 
 
+@standard_prim(P.unsafe_static_cast)
+async def _inf_unsafe_static_cast(engine, x, typ: AbstractScalar):
+    v = typ.values[VALUE]
+    if not isinstance(v, AbstractBase):
+        raise MyiaTypeError('unsafe_static_cast expects a type constant')
+    return v
+
+
 @standard_prim(P.J)
 async def _inf_J(engine, x):
     if isinstance(x, AbstractFunction):

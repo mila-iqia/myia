@@ -683,3 +683,9 @@ def env_getitem(env, key, default):
 def env_add(env1, env2):
     """Implement `env_add`."""
     return env1.add(env2)
+
+
+@register(primops.unsafe_static_cast)
+def unsafe_static_cast(x, t):  # pragma: no cover
+    """Implement `unsafe_static_cast`."""
+    return x
