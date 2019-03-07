@@ -160,14 +160,16 @@ class EvaluationCache:
 
     """
 
-    def __init__(self, loop, keycalc):
+    def __init__(self, loop, keycalc, keytransform):
         """Initialize an EvaluationCache."""
         self.cache = {}
         self.loop = loop
+        self.keytransform = keytransform
         self.keycalc = keycalc
 
     def get(self, key):
         """Get the future associated to the key."""
+        key = self.keytransform(key)
         if key not in self.cache:
             self.set(key, self.keycalc(key))
         return self.cache[key]

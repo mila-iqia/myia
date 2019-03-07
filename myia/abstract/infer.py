@@ -50,7 +50,11 @@ class InferenceEngine:
             prim: cons()
             for prim, cons in constructors.items()
         }
-        self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
+        self.cache = EvaluationCache(
+            loop=self.loop,
+            keycalc=self.compute_ref,
+            keytransform=self.get_actual_ref
+        )
         self.errors = []
         self.context_class = context_class
         self.reference_map = {}
@@ -125,6 +129,12 @@ class InferenceEngine:
         """
         self.reference_map[orig] = new
         return await self.get_inferred(new)
+
+    def get_actual_ref(self, ref):
+        """Return the replacement reference for ref, or ref itself."""
+        while ref in self.reference_map:
+            ref = self.reference_map[ref]
+        return ref
 
     def run_coroutine(self, coro, throw=True):
         """Run an async function using this inferrer's loop."""
