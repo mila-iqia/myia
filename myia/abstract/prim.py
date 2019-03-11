@@ -395,7 +395,9 @@ async def issubtype(x, model):
             and all([await issubtype(x.attributes[name], attr_t)
                      for name, attr_t in model.attributes.items()])
 
-    elif dtype.ismyiatype(model, dtype.Number):
+    elif dtype.ismyiatype(model, dtype.Number) \
+            or dtype.ismyiatype(model, dtype.Bool) \
+            or dtype.ismyiatype(model, dtype.Nil):
         if not isinstance(x, AbstractScalar):
             return False
         t = x.values[TYPE]

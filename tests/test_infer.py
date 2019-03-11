@@ -11,7 +11,7 @@ from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Array as A, Int, External, List, \
-    Number, Class, EnvType as Env
+    Number, Class, EnvType as Env, Nil
 from myia.hypermap import HyperMap
 from myia.abstract import ANYTHING, InferenceError, Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
@@ -27,9 +27,9 @@ from myia.prim.py_implementations import \
 from myia.utils import newenv
 
 from .common import B, T, L, i16, i32, i64, u64, f16, f32, f64, \
-    ai64, af64, Nil, Point, Point_t, Point3D, Thing, Thing_ftup, mysum, \
+    ai64, af64, Point, Point_t, Point3D, Thing, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
-    to_abstract_test
+    to_abstract_test, EmptyTuple
 
 
 ########################
@@ -825,6 +825,7 @@ def test_hastype_simple(x):
     ((i64, i64), Ty(T[Number, Number]), True),
     (Point(1, 2), Ty(Class), True),
     ([i64], Ty(List[i64]), True),
+    (None, Ty(Nil), True),
     ((i64, i64), Ty(ANYTHING), InferenceError),
 )
 def test_hastype(x, y):
@@ -873,7 +874,7 @@ def test_hastype_2(x):
             return 0.0
         elif hastype(x, Point_t):
             return f(x.x) * f(x.y)
-        elif hastype(x, Nil):
+        elif hastype(x, EmptyTuple):
             return 0
         elif hastype(x, Tf4):
             return x
@@ -888,17 +889,6 @@ def test_hastype_2(x):
 
     return f(x)
 
-
-# @infer_std(
-#     type=[
-#         (li64, i64, li64),
-#         (lf64, i64, InferenceError),
-#         ({'type': L[ai64], 'shape': ListShape((2, 3))}, i64, L[ai64]),
-#     ],
-#     shape=[(t(li64), t(i64), ListShape(NOSHAPE)),
-#            ({'type': L[ai64], 'shape': ListShape((2, 3))}, ai64_of(2, 3),
-#             ListShape((2, 3)))]
-# )
 
 @infer_std(
     ([i64], i64, [i64]),

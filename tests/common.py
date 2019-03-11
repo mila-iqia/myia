@@ -44,7 +44,7 @@ af16 = A[f16]
 af32 = A[f32]
 af64 = A[f64]
 
-Nil = T[()]
+EmptyTuple = T[()]
 
 
 ###########################
@@ -99,7 +99,8 @@ def Ty(t):
 
 
 @overload(bootstrap=True)
-def to_abstract_test(self, x: (bool, int, float, str, EnvInstance)):
+def to_abstract_test(self, x: (bool, int, float, str,
+                               type(None), EnvInstance)):
     return AbstractScalar({
         VALUE: x,
         TYPE: dtype.pytype_to_myiatype(type(x)),

@@ -383,6 +383,13 @@ def to_abstract(v, context=None, ref=None, loop=None):
             new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
         return AbstractClass(typ.tag, new_args, typ.methods)
 
+    elif isinstance(v, bool) or v is None:
+        typ = dtype.pytype_to_myiatype(type(v), v)
+        return AbstractScalar({
+            VALUE: v,
+            TYPE: typ,
+        })
+
     elif isinstance(v, (int, float)):
         typ = dtype.pytype_to_myiatype(type(v), v)
         if loop is not None:
