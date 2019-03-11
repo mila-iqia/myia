@@ -93,9 +93,10 @@ SIMPLE_MAP = {
     P.scalar_ne: relay.op.not_equal,
     P.scalar_le: relay.op.less_equal,
     P.scalar_ge: relay.op.greater_equal,
-    # P.bool_and: sym.logical_and,
-    # P.bool_or: sym.logical_or
+    P.bool_and: relay.op.logical_and,
+    P.bool_or: relay.op.logical_or,
     P.bool_eq: relay.op.equal,
+    P.bool_not: relay.op.logical_not,
 
     P.scalar_to_array: lambda x: x,
     P.dot: lambda x, y: relay.op.nn.dense(x, relay.op.transpose(y)),
