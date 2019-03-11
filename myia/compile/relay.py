@@ -2,7 +2,9 @@
 
 from tvm import relay
 
-from ..abstract import VALUE
+from ..abstract import AbstractArray, AbstractTuple, AbstractScalar, \
+    AbstractFunction, VirtualFunction, GraphFunction, TypedPrimitive, \
+    PartialApplication, SHAPE, build_type
 from ..ir import Apply, Graph, Constant, manage, print_graph
 from ..graph_utils import toposort
 from ..pipeline import PipelineDefinition, PipelineStep
@@ -10,24 +12,56 @@ from ..prim import Primitive, ops as P
 from ..prim.ops import partial, return_, switch, make_tuple
 from ..dtype import type_to_np_dtype, ismyiatype, Array, Bool, Function, \
     Number, Tuple
+from ..utils import overload
 
 from .relay_helpers import optimize, build_module
 
 
-def to_relay_type(tp, shape=None):
+@overload(bootstrap=True)
+def to_relay_type(self, a: AbstractScalar):
+    tp = build_type(a)
     if ismyiatype(tp, Bool):
         return relay.ty.TensorType((), 'bool')
-    elif ismyiatype(tp, Number):
-        return relay.ty.TensorType((), type_to_np_dtype(tp))
-    elif ismyiatype(tp, Tuple):
-        return relay.ty.TupleType([to_relay_type(e) for e in tp.elements])
-    elif ismyiatype(tp, Array):
-        return relay.ty.TensorType(shape, type_to_np_dtype(tp.elements))
-    elif ismyiatype(tp, Function):
-        return relay.ty.FuncType([to_relay_type(a) for a in tp.arguments],
-                                 to_relay_type(tp.retval))
     else:
-        raise ValueError("Unknown type:", tp)
+        return relay.ty.TensorType((), type_to_np_dtype(tp))
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: AbstractTuple):
+    return relay.ty.TupleType([self(e) for e in a.elements])
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: AbstractArray):
+    tp = build_type(a.element)
+    return relay.ty.TensorType(a.values[SHAPE], type_to_np_dtype(tp))
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: AbstractFunction):
+    return self(a.get_unique())
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: (VirtualFunction, TypedPrimitive)):
+    return relay.ty.FuncType([self(aa) for aa in a.args],
+                             self(a.output))
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: PartialApplication):
+    tp = self(a.fn)
+    return relay.ty.FuncType(tp.arg_types[len(a.args):], tp.ret_type)
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: GraphFunction):
+    return self(a.graph.abstract)
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: object):
+    raise ValueError("Unknown type:", build_type(a))
 
 
 def ashape(node):
@@ -221,14 +255,14 @@ class CompileGraph(PipelineStep):
         fn = exec.evaluate(module.entry_func)
 
         output = RelayRunner(
-            fn, [to_relay_type(p.type) for p in graph.parameters])
+            fn, [to_relay_type(p.abstract) for p in graph.parameters])
 
         return {'output': output}
 
     def on_parameter(self, node):
         return relay.var(
             node.debug.debug_name,
-            type_annotation=to_relay_type(node.type, node.shape))
+            type_annotation=to_relay_type(node.abstract))
 
     def on_apply(self, node):
         if node.inputs[0].is_constant(Primitive):
@@ -283,8 +317,7 @@ class CompileGraph(PipelineStep):
 
 
         return relay.Function(params, self.ref(graph.output),
-                              ret_type=to_relay_type(graph.output.type,
-                                                     graph.output.shape))
+                              ret_type=to_relay_type(graph.output.abstract))
 
 
 step_compile = CompileGraph.partial()
