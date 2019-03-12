@@ -86,9 +86,7 @@ def test_Overload_mixins():
 
 def test_Overload_bootstrap():
 
-    f = Overload().bootstrap()
-
-    assert f.bootstrap() is f
+    f = Overload(bind_to=True)
 
     @f.register
     def f(self, xs: list):

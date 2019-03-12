@@ -146,9 +146,14 @@ class Overload:
                  mixins=[],
                  _parent=None):
         """Initialize an Overload."""
+        if bind_to is True:
+            bind_to = self
+        elif bind_to is False:
+            bind_to = None
         self.__self__ = bind_to
         self._parent = _parent
         if _parent:
+            assert _parent.which is not None
             self.map = _parent.map
             self._uncached_map = _parent._uncached_map
             self.which = _parent.which
@@ -166,9 +171,8 @@ class Overload:
 
     def register(self, fn):
         """Register a function."""
-        if self._parent:
-            self._parent.register(fn)
-            return self
+        if self._parent:  # pragma: no cover
+            raise Exception('Cannot register a function on derived Overload')
         ann = fn.__annotations__
         if len(ann) != 1:
             raise Exception('Only one parameter may be annotated.')
@@ -194,24 +198,14 @@ class Overload:
 
         return self
 
-    def bootstrap(self):
-        """Bootstrap this function to receive itself as its first argument."""
-        if self.__self__ is self:
-            return self
-        assert self.__self__ is None
-        ov = Overload(bind_to=None, _parent=self)
-        ov.__self__ = ov
-        return ov
-
     def variant(self, fn=None):
         """Create a variant of this Overload.
 
         New functions can be registered to the variant without affecting the
         original.
         """
-        if self.__self__ is self:
-            return self._parent.variant(fn).bootstrap()
-        ov = Overload(mixins=[self])
+        is_bootstrapped = self.__self__ is self
+        ov = Overload(bind_to=is_bootstrapped, mixins=[self])
         if fn is not None:
             ov.register(fn)
         return ov
@@ -227,11 +221,10 @@ class Overload:
 
     def __call__(self, *args):
         """Call the overloaded function."""
-        if self.which is None:
-            self.which = self._parent.which
-        if self.__self__ is not None:
+        fself = self.__self__
+        if fself is not None:
             main = args[self.which - 1]
-            return self.map[type(main)](self.__self__, *args)
+            return self.map[type(main)](fself, *args)
         else:
             main = args[self.which]
             return self.map[type(main)](*args)
@@ -263,13 +256,12 @@ def overload(fn=None, *, bootstrap=False):
     mod = __import__(fn.__module__, fromlist='_')
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
-        dispatch = Overload()
+        dispatch = Overload(bind_to=bootstrap)
+    else:  # pragma: no cover
+        assert bootstrap is False
     if not isinstance(dispatch, Overload):  # pragma: no cover
         raise TypeError('@overload requires Overload instance')
-    ov = dispatch.register(fn)
-    if bootstrap:
-        ov = ov.bootstrap()
-    return ov
+    return dispatch.register(fn)
 
 
 def require_same(fns, objs):
