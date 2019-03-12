@@ -100,17 +100,7 @@ class TypeMap(dict):
 
     TypeMap should ideally not be updated after it is used, because updates may
     make some cached associations invalid.
-
-    Attributes:
-        discover: A function that takes a class and generates/returns a handler
-            for it, if none is found.
-
     """
-
-    def __init__(self, *args, discover=None):
-        """Initialize a TypeMap."""
-        super().__init__(*args)
-        self.discover = discover
 
     def register(self, *obj_ts):
         """Decorator to register a handler to the given types."""
@@ -127,8 +117,6 @@ class TypeMap(dict):
 
         for cls in type.mro(obj_t):
             handler = super().get(cls, None)
-            if handler is None and self.discover:
-                handler = self.discover(cls)
             if handler is not None:
                 for cls2 in to_set:
                     self[cls2] = handler
@@ -149,19 +137,15 @@ class Overload:
     function should annotate the same parameter.
 
     Arguments:
-        fallback_method: If no function is registered for a type, we will try
-            to call this method on it.
         bind_to: Binds the first argument to the given object.
     """
 
     def __init__(self,
                  *,
-                 fallback_method=None,
                  bind_to=None,
                  mixins=[],
                  _parent=None):
         """Initialize an Overload."""
-        self.fallback_method = fallback_method
         self.__self__ = bind_to
         self._parent = _parent
         if _parent:
@@ -176,15 +160,8 @@ class Overload:
                 self.which = mixin.which
             else:
                 assert mixin.which == self.which
-            assert mixin.fallback_method is self.fallback_method
             _map.update(mixin._uncached_map)
-        if fallback_method:
-            self.map = TypeMap(
-                _map,
-                discover=lambda cls: getattr(cls, fallback_method, None)
-            )
-        else:
-            self.map = TypeMap(_map)
+        self.map = TypeMap(_map)
         self._uncached_map = _map
 
     def register(self, fn):
@@ -234,7 +211,7 @@ class Overload:
         """
         if self.__self__ is self:
             return self._parent.variant(fn).bootstrap()
-        ov = Overload(fallback_method=self.fallback_method, mixins=[self])
+        ov = Overload(mixins=[self])
         if fn is not None:
             ov.register(fn)
         return ov
@@ -260,7 +237,7 @@ class Overload:
             return self.map[type(main)](*args)
 
 
-def overload(fn=None, *, fallback_method=None, bootstrap=False):
+def overload(fn=None, *, bootstrap=False):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -273,8 +250,6 @@ def overload(fn=None, *, fallback_method=None, bootstrap=False):
     use.
 
     Arguments:
-        fallback_method: If no function is registered for a type, we will
-            try to call this method on it.
         bootstrap: Whether to bootstrap this function so that it receives
             itself as its first argument. Useful for recursive functions.
     """
@@ -282,18 +257,13 @@ def overload(fn=None, *, fallback_method=None, bootstrap=False):
         def deco(fn):
             return overload(
                 fn,
-                fallback_method=fallback_method,
                 bootstrap=bootstrap
             )
         return deco
     mod = __import__(fn.__module__, fromlist='_')
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
-        dispatch = Overload(fallback_method=fallback_method)
-    elif fallback_method is not None:  # pragma: no cover
-        raise ValueError(
-            'Only the first use of @overload can take keyword arguments.'
-        )
+        dispatch = Overload()
     if not isinstance(dispatch, Overload):  # pragma: no cover
         raise TypeError('@overload requires Overload instance')
     ov = dispatch.register(fn)

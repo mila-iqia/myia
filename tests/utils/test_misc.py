@@ -23,15 +23,6 @@ def test_typemap():
     assert tmap[str] == 'obj'
 
 
-def test_typemap_discover():
-    def discover(cls):
-        return cls.__name__
-    tmap = TypeMap({object: '???'}, discover=discover)
-    assert tmap[int] == 'int'
-    assert tmap[str] == 'str'
-    assert tmap[object] == '???'
-
-
 def test_Overload():
     o = Overload()
 

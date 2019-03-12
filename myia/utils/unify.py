@@ -281,7 +281,7 @@ def noseq(fn: Callable[[T], T], u: T) -> T:
     return um
 
 
-@overload(fallback_method='__visit__')
+@overload
 def default_visit(value: (list, tuple), fn):
     xs = expandlist(fn(x) for x in value)
     return type(value)(xs)
@@ -290,6 +290,14 @@ def default_visit(value: (list, tuple), fn):
 @overload  # noqa: F811
 def default_visit(value: dict, fn):
     return {fn(k): fn(v) for k, v in sorted(value.items())}
+
+
+@overload  # noqa: F811
+def default_visit(value: object, fn):
+    visit = getattr(value, '__visit__', None)
+    if visit is None:
+        raise VisitError
+    return visit(fn)
 
 
 class VisitError(Exception):
@@ -310,11 +318,7 @@ class Unification:
 
     def visit(self, fn: Callable[[T], T], value: T) -> T:
         """Apply `fn` to each element of `value` and return the result."""
-        try:
-            visit = self.visitors.map[type(value)]
-        except KeyError:
-            raise VisitError
-        return visit(value, fn)
+        return self.visitors(value, fn)
 
     def clone(self, v: T, copy_map: Dict = None) -> T:
         """Return a copy of a templated type structure.
