@@ -1,7 +1,7 @@
 
 import numpy
 from dataclasses import dataclass
-from numpy import ones as _ones, zeros as _zeros, asscalar
+from numpy import ones as _ones, zeros as _zeros
 from myia.dtype import Array, Tuple, pytype_to_myiatype
 from myia.abstract import InferenceError
 from myia.composite import grad
@@ -84,7 +84,7 @@ Model_t_f32 = pytype_to_myiatype(Model, make_model('float32'))
 def cost(model, x, y):
     yy = model.apply(x)
     diff = (yy - y)
-    return asscalar(array_reduce(scalar_add, diff ** 2, ()))
+    return (array_reduce(scalar_add, diff ** 2, ())).item()
 
 
 @infer_std(
