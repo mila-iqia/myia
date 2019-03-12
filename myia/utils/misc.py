@@ -143,6 +143,7 @@ class Overload:
     def __init__(self,
                  *,
                  bind_to=None,
+                 wrapper=None,
                  mixins=[],
                  _parent=None):
         """Initialize an Overload."""
@@ -152,11 +153,14 @@ class Overload:
             bind_to = None
         self.__self__ = bind_to
         self._parent = _parent
+        self.wrapper = wrapper
+        self.state = None
         if _parent:
             assert _parent.which is not None
             self.map = _parent.map
             self._uncached_map = _parent._uncached_map
             self.which = _parent.which
+            self.wrapper = _parent.wrapper
             return
         _map = {}
         self.which = None
@@ -204,8 +208,13 @@ class Overload:
         New functions can be registered to the variant without affecting the
         original.
         """
-        is_bootstrapped = self.__self__ is self
-        ov = Overload(bind_to=is_bootstrapped, mixins=[self])
+        fself = self.__self__
+        bootstrap = True if fself is self else fself
+        ov = Overload(
+            bind_to=bootstrap,
+            wrapper=self.wrapper,
+            mixins=[self]
+        )
         if fn is not None:
             ov.register(fn)
         return ov
@@ -222,15 +231,24 @@ class Overload:
     def __call__(self, *args):
         """Call the overloaded function."""
         fself = self.__self__
-        if fself is not None:
+        if fself == 'stateful':
+            ov = Overload(bind_to=True, _parent=self)
+            return ov(*args)
+        elif fself is not None:
             main = args[self.which - 1]
-            return self.map[type(main)](fself, *args)
+            if self.wrapper is None:
+                return self.map[type(main)](fself, *args)
+            else:
+                return self.wrapper(self.map[type(main)], fself, *args)
         else:
             main = args[self.which]
-            return self.map[type(main)](*args)
+            if self.wrapper is None:
+                return self.map[type(main)](*args)
+            else:
+                return self.wrapper(self.map[type(main)], *args)
 
 
-def overload(fn=None, *, bootstrap=False):
+def overload(fn=None, *, bootstrap=False, wrapper=None):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -245,20 +263,23 @@ def overload(fn=None, *, bootstrap=False):
     Arguments:
         bootstrap: Whether to bootstrap this function so that it receives
             itself as its first argument. Useful for recursive functions.
+        wrapper: A function wrapping every call.
     """
     if fn is None:
         def deco(fn):
             return overload(
                 fn,
-                bootstrap=bootstrap
+                bootstrap=bootstrap,
+                wrapper=wrapper
             )
         return deco
     mod = __import__(fn.__module__, fromlist='_')
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
-        dispatch = Overload(bind_to=bootstrap)
+        dispatch = Overload(bind_to=bootstrap, wrapper=wrapper)
     else:  # pragma: no cover
         assert bootstrap is False
+        assert wrapper is None
     if not isinstance(dispatch, Overload):  # pragma: no cover
         raise TypeError('@overload requires Overload instance')
     return dispatch.register(fn)

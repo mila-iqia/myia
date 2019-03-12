@@ -113,6 +113,58 @@ def test_Overload_bootstrap():
     assert g([1, 2, "xxx", [3, 4]]) == [2, 3, "B", [4, 5]]
 
 
+def test_Overload_wrapper():
+
+    def wrapper(fn, x):
+        print(fn)
+        return [fn(x)]
+
+    f = Overload(wrapper=wrapper)
+
+    @f.register
+    def f(x: int):
+        return x + 1
+
+    @f.register
+    def f(xs: tuple):
+        return tuple(f(x) for x in xs)
+
+    assert f(1) == [2]
+    assert f((1, 2, (3, 4))) == [([2], [3], [([4], [5])])]
+
+
+def test_Overload_stateful():
+
+    def counter(fn, self, x):
+        if self.state is None:
+            self.state = 0
+        else:
+            self.state += 1
+        return fn(self, x)
+
+    f = Overload(bind_to='stateful', wrapper=counter)
+
+    @f.register
+    def f(self, x: type(None)):
+        return self.state
+
+    @f.register
+    def f(self, xs: tuple):
+        return tuple(self(x) for x in xs)
+
+    assert f((None, None)) == (1, 2)
+    assert f((None, (None, None))) == (1, (3, 4))
+    assert f((None, (None, None))) == (1, (3, 4))
+
+    @f.variant
+    def g(self, x: type(None)):
+        return self.state * 10
+
+    assert g((None, None)) == (10, 20)
+    assert g((None, (None, None))) == (10, (30, 40))
+    assert g((None, (None, None))) == (10, (30, 40))
+
+
 def test_smap():
     assert _sum(10, 20) == 30
     assert _sum(10, 20, 30, 40) == 100
