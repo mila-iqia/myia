@@ -167,21 +167,31 @@ def _transform(pattern: tuple):
     return (P.array_map, f, *tuple(_transform(arg) for arg in args))
 
 
-@overload
+@overload  # noqa: F811
 def _transform(pattern: Var):
     return pattern
 
 
-@overload
+@overload  # noqa: F811
 def _transform(pattern: (int, float)):
     return (P.distribute, (P.scalar_to_array, pattern), var(_is_c))
 
 
 def on_array_map(orig):
+    """Create an optimization on array_map from a scalar optimization.
+
+    Original pattern: (f, x, y)
+    New pattern:      (array_map, f, x, y)
+
+    Original pattern: (f, x, 1)
+    New pattern:      (array_map, f, x, distribute(scalar_to_array(1)))
+
+    Etc.
+    """
     return psub(
-	pattern=_transform(orig.sexp),
-	replacement=_transform(orig.sexp_replacement),
-	name=f'{orig.name}_map',
+        pattern=_transform(orig.sexp),
+        replacement=_transform(orig.sexp_replacement),
+        name=f'{orig.name}_map',
     )
 
 
@@ -222,10 +232,10 @@ add_zero_r = psub(
 )
 
 usub_cancel = psub(
-	    pattern=(P.scalar_usub, (P.scalar_usub, X)),
-	    replacement=X,
-	    name='usub_cancel'
-	)
+    pattern=(P.scalar_usub, (P.scalar_usub, X)),
+    replacement=X,
+    name='usub_cancel'
+)
 
 usub_sink_mul_l = psub(
     pattern=(P.scalar_mul, (P.scalar_usub, X), Y),
