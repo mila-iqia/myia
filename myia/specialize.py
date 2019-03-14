@@ -290,12 +290,21 @@ class _GraphSpecializer:
                      for iref in irefs]
             for i, ival in enumerate(ivals):
                 iref = irefs[i]
+                _iref = self.specializer.engine.get_actual_ref(iref)
+                if _iref is not iref:
+                    curr = self
+                    if _iref.node.is_constant_graph():
+                        _g = _iref.node.value.parent
+                    else:
+                        _g = _iref.node.graph
+                    while curr and _g is not curr.graph:
+                        curr = curr.parent
+                    assert curr is not None
+                    curr.cl.remapper.clone_disconnected(_iref.node)
+                    iref = _iref
+                    ival = await iref.get()
                 repl = await self.build(iref, ival)
                 if repl is None:
-                    _iref = self.specializer.engine.get_actual_ref(iref)
-                    if _iref is not iref:
-                        self.cl.remapper.clone_disconnected(_iref.node)
-                        iref = _iref
                     self.todo.append(iref.node)
                     repl = self.get(iref.node)
                     repl.abstract = await concretize_abstract(ival)
