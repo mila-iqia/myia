@@ -5,7 +5,7 @@ from ..composite import hyper_add
 from ..dtype import Number, ismyiatype
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone
 from ..prim import Primitive, ops as P
-from ..utils import Namespace, Partializable
+from ..utils import Namespace, Partializable, overload
 from ..utils.unify import Var, var, SVar
 
 from .opt import \
@@ -161,6 +161,40 @@ def bubble_op_tuple_binary(optimizer, node, equiv):
 ##############################
 
 
+@overload
+def _transform(pattern: tuple):
+    f, *args = pattern
+    return (P.array_map, f, *tuple(_transform(arg) for arg in args))
+
+
+@overload  # noqa: F811
+def _transform(pattern: Var):
+    return pattern
+
+
+@overload  # noqa: F811
+def _transform(pattern: (int, float)):
+    return (P.distribute, (P.scalar_to_array, pattern), var(_is_c))
+
+
+def on_array_map(orig):
+    """Create an optimization on array_map from a scalar optimization.
+
+    Original pattern: (f, x, y)
+    New pattern:      (array_map, f, x, y)
+
+    Original pattern: (f, x, 1)
+    New pattern:      (array_map, f, x, distribute(scalar_to_array(1)))
+
+    Etc.
+    """
+    return psub(
+        pattern=_transform(orig.sexp),
+        replacement=_transform(orig.sexp_replacement),
+        name=f'{orig.name}_map',
+    )
+
+
 multiply_by_zero_l = psub(
     pattern=(P.scalar_mul, 0, X),
     replacement=0,
@@ -197,11 +231,74 @@ add_zero_r = psub(
     name='add_zero_r'
 )
 
+usub_cancel = psub(
+    pattern=(P.scalar_usub, (P.scalar_usub, X)),
+    replacement=X,
+    name='usub_cancel'
+)
+
+usub_sink_mul_l = psub(
+    pattern=(P.scalar_mul, (P.scalar_usub, X), Y),
+    replacement=(P.scalar_usub, (P.scalar_mul, X, Y)),
+    name='usub_sink_mul_l'
+)
+
+usub_sink_mul_r = psub(
+    pattern=(P.scalar_mul, X, (P.scalar_usub, Y)),
+    replacement=(P.scalar_usub, (P.scalar_mul, X, Y)),
+    name='usub_sink_mul_r'
+)
+
+usub_sink_div_l = psub(
+    pattern=(P.scalar_div, (P.scalar_usub, X), Y),
+    replacement=(P.scalar_usub, (P.scalar_div, X, Y)),
+    name='usub_sink_div_l'
+)
+
+usub_sink_div_r = psub(
+    pattern=(P.scalar_div, X, (P.scalar_usub, Y)),
+    replacement=(P.scalar_usub, (P.scalar_div, X, Y)),
+    name='usub_sink_div_r'
+)
+
+divdiv_to_mul = psub(
+    pattern=(P.scalar_div, (P.scalar_div, X, Y), Z),
+    replacement=(P.scalar_div, X, (P.scalar_mul, Y, Z)),
+    name='divdiv_to_mul'
+)
+
+add_usub = psub(
+    pattern=(P.scalar_add, X, (P.scalar_usub, Y)),
+    replacement=(P.scalar_sub, X, Y),
+    name='add_usub'
+)
+
+sub_usub = psub(
+    pattern=(P.scalar_sub, X, (P.scalar_usub, Y)),
+    replacement=(P.scalar_add, X, Y),
+    name='sub_usub'
+)
+
 elim_identity = psub(
     pattern=(P.identity, X),
     replacement=X,
     name='elim_identity'
 )
+
+multiply_by_zero_l_map = on_array_map(multiply_by_zero_l)
+multiply_by_zero_r_map = on_array_map(multiply_by_zero_r)
+multiply_by_one_l_map = on_array_map(multiply_by_one_l)
+multiply_by_one_r_map = on_array_map(multiply_by_one_r)
+add_zero_l_map = on_array_map(add_zero_l)
+add_zero_r_map = on_array_map(add_zero_r)
+usub_cancel_map = on_array_map(usub_cancel)
+usub_sink_mul_l_map = on_array_map(usub_sink_mul_l)
+usub_sink_mul_r_map = on_array_map(usub_sink_mul_r)
+usub_sink_div_l_map = on_array_map(usub_sink_div_l)
+usub_sink_div_r_map = on_array_map(usub_sink_div_r)
+divdiv_to_mul_map = on_array_map(divdiv_to_mul)
+add_usub_map = on_array_map(add_usub)
+sub_usub_map = on_array_map(sub_usub)
 
 
 #########################

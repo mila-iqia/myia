@@ -96,10 +96,12 @@ class PatternSubstitutionOptimization:
                  interest=False):
         """Initialize va PatternSubstitutionOptimization."""
         g: Var = Var('RootG')
+        self.sexp = pattern
         self.pattern = sexp_to_node(pattern, g, multigraph)
         if callable(replacement):
             self.replacement = replacement
         else:
+            self.sexp_replacement = replacement
             self.replacement = sexp_to_node(replacement, g)
         self.unif = Unification()
         self.condition = condition
