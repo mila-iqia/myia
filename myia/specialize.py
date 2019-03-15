@@ -264,9 +264,10 @@ class _GraphSpecializer:
                 iref = irefs[i]
                 repl = await self.build(iref, ival)
                 if repl is None:
-                    while iref in self.specializer.engine.reference_map:
-                        iref = self.specializer.engine.reference_map[iref]
-                        self.cl.clone_disconnected(iref.node)
+                    _iref = self.specializer.engine.get_actual_ref(iref)
+                    if _iref is not iref:
+                        self.cl.clone_disconnected(_iref.node)
+                        iref = _iref
                     self.todo.append(iref.node)
                     repl = self.get(iref.node)
                     repl.abstract = await concretize_abstract(ival)

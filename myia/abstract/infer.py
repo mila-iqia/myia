@@ -50,7 +50,11 @@ class InferenceEngine:
             prim: cons()
             for prim, cons in constructors.items()
         }
-        self.cache = EvaluationCache(loop=self.loop, keycalc=self.compute_ref)
+        self.cache = EvaluationCache(
+            loop=self.loop,
+            keycalc=self.compute_ref,
+            keytransform=self.get_actual_ref
+        )
         self.errors = []
         self.context_class = context_class
         self.reference_map = {}
@@ -125,6 +129,12 @@ class InferenceEngine:
         """
         self.reference_map[orig] = new
         return await self.get_inferred(new)
+
+    def get_actual_ref(self, ref):
+        """Return the replacement reference for ref, or ref itself."""
+        while ref in self.reference_map:
+            ref = self.reference_map[ref]
+        return ref
 
     def run_coroutine(self, coro, throw=True):
         """Run an async function using this inferrer's loop."""
@@ -373,6 +383,13 @@ def to_abstract(v, context=None, ref=None, loop=None):
             new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
         return AbstractClass(typ.tag, new_args, typ.methods)
 
+    elif isinstance(v, bool) or v is None:
+        typ = dtype.pytype_to_myiatype(type(v), v)
+        return AbstractScalar({
+            VALUE: v,
+            TYPE: typ,
+        })
+
     elif isinstance(v, (int, float)):
         typ = dtype.pytype_to_myiatype(type(v), v)
         if loop is not None:
@@ -541,7 +558,7 @@ class GraphInferrer(BaseGraphInferrer):
         """Initialize a GraphInferrer."""
         self._graph = graph
         assert context is not None
-        super().__init__(context.filter(graph))
+        super().__init__(context.filter(graph and graph.parent))
 
     def normalize_args(self, args):
         """Broaden args if flag ignore_values is True."""

@@ -395,7 +395,9 @@ async def issubtype(x, model):
             and all([await issubtype(x.attributes[name], attr_t)
                      for name, attr_t in model.attributes.items()])
 
-    elif dtype.ismyiatype(model, dtype.Number):
+    elif dtype.ismyiatype(model, dtype.Number) \
+            or dtype.ismyiatype(model, dtype.Bool) \
+            or dtype.ismyiatype(model, dtype.Nil):
         if not isinstance(x, AbstractScalar):
             return False
         t = x.values[TYPE]
@@ -970,6 +972,14 @@ async def _inf_env_add(engine, env1, env2):
         VALUE: ANYTHING,
         TYPE: dtype.EnvType,
     })
+
+
+@standard_prim(P.unsafe_static_cast)
+async def _inf_unsafe_static_cast(engine, x, typ: AbstractScalar):
+    v = typ.values[VALUE]
+    if not isinstance(v, AbstractBase):
+        raise MyiaTypeError('unsafe_static_cast expects a type constant')
+    return v
 
 
 @standard_prim(P.J)

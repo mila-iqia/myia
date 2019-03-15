@@ -19,8 +19,8 @@ class Context:
 
     @classmethod
     def empty(cls):
-        """Create an empty context."""
-        return Context(None, None, ())
+        """Return an empty context."""
+        return _empty_context
 
     def __init__(self, parent, g, argkey):
         """Initialize the Context."""
@@ -34,15 +34,11 @@ class Context:
 
     def filter(self, graph):
         """Return a context restricted to a graph's dependencies."""
-        rval = self.parent_cache.get(graph, None)
-        if rval is None:
-            rval = self.parent_cache.get(graph.parent, None)
-        return rval
+        return self.parent_cache.get(graph, _empty_context)
 
     def add(self, graph, argkey):
         """Extend this context with values for another graph."""
-        parent = self.parent_cache.get(graph.parent, None)
-        return Context(parent, graph, argkey)
+        return Context(self.filter(graph.parent), graph, argkey)
 
     def __hash__(self):
         return self._hash
@@ -52,6 +48,9 @@ class Context:
             and self.parent == other.parent \
             and self.graph == other.graph \
             and self.argkey == other.argkey
+
+
+_empty_context = Context(None, None, ())
 
 
 class Contextless:
@@ -100,10 +99,13 @@ class Reference(AbstractReference):
 
     def __init__(self, engine, node, context):
         """Initialize the Reference."""
+        assert context is not None
         self.node = node
         self.engine = engine
-        g = node.value if node.is_constant_graph() else node.graph
-        self.context = context and context.filter(g)
+        if node.is_constant_graph():
+            self.context = context.filter(node.value.parent)
+        else:
+            self.context = context.filter(node.graph)
         self._hash = hash((self.node, self.context))
 
     async def get(self):
@@ -160,14 +162,16 @@ class EvaluationCache:
 
     """
 
-    def __init__(self, loop, keycalc):
+    def __init__(self, loop, keycalc, keytransform):
         """Initialize an EvaluationCache."""
         self.cache = {}
         self.loop = loop
+        self.keytransform = keytransform
         self.keycalc = keycalc
 
     def get(self, key):
         """Get the future associated to the key."""
+        key = self.keytransform(key)
         if key not in self.cache:
             self.set(key, self.keycalc(key))
         return self.cache[key]

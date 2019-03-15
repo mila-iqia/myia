@@ -120,6 +120,10 @@ class Object(Type):
     """Some object."""
 
 
+class Nil(Object):
+    """Type of None."""
+
+
 class Bool(Object):
     """Boolean values."""
 
@@ -338,6 +342,7 @@ tag_to_dataclass = {}
 
 
 _simple_types = {
+    type(None): Nil,
     bool: Bool,
     int: Int[64],
     float: Float[64],
