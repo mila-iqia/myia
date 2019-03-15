@@ -1,8 +1,7 @@
 """Pre-made pipelines."""
 
 
-from ..compile import step_wrap_primitives, step_compile, step_link, \
-    step_export
+from ..compile import step_compile
 from ..abstract import Context
 from ..ir import GraphManager
 from ..prim import py_registry
@@ -48,10 +47,7 @@ standard_pipeline = PipelineDefinition(
         opt2=steps.step_opt2,
         cconv=steps.step_cconv,
         validate=steps.step_validate,
-        wrap_primitives=step_wrap_primitives,
         compile=step_compile,
-        link=step_link,
-        export=step_export,
         wrap=steps.step_wrap,
     )
 )

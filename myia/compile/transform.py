@@ -14,100 +14,78 @@ LIN_IMPLS = dict(
 )
 
 
-class WrapPrimitives(PipelineStep):
-    """Pipeline step to wrap primitives in non-call positions into graphs.
+def wrap_primitives(graph):
+    """Helper function to wrap primitives.
 
-    Inputs:
-        graph: A graph
-
-    Outputs:
-        graph: The transformed graph
-
+    This wraps all primitves used in non-call positions in a graph.
     """
+    mng = graph.manager
 
-    def step(self, graph):
-        """Wrap primitives in non-call positions into graphs."""
-        mng = self.resources.manager
-        mng.add_graph(graph)
+    prim_graphs = {}
 
-        prim_graphs = {}
+    def get_prim_graph(prim, typ):
+        if (prim, typ) not in prim_graphs:
+            g = Graph()
+            args = []
+            tp = list(typ.values[VALUE])[0]
+            for t in tp.args:
+                p = g.add_parameter()
+                p.abstract = t
+                args.append(p)
+            primct = Constant(prim)
+            primct.abstract = typ
+            out = g.apply(primct, *args)
+            out.abstract = tp.output
+            g.output = out
+            prim_graphs[(prim, typ)] = g
+        return prim_graphs[(prim, typ)]
 
-        def get_prim_graph(prim, typ):
-            if (prim, typ) not in prim_graphs:
-                g = Graph()
-                args = []
-                tp = list(typ.values[VALUE])[0]
-                for t in tp.args:
-                    p = g.add_parameter()
-                    p.abstract = t
-                    args.append(p)
-                primct = Constant(prim)
-                primct.abstract = typ
-                out = g.apply(primct, *args)
-                out.abstract = tp.output
-                g.output = out
-                prim_graphs[(prim, typ)] = g
-            return prim_graphs[(prim, typ)]
+    with mng.transact() as tr:
+        cts = {ct for cts in mng.constants.values() for ct in cts}
+        for ct in cts:
+            if ct.is_constant(Primitive):
+                for node, key in mng.uses[ct]:
+                    if key != 0:
+                        if node.inputs[0].is_constant():
+                            if node.inputs[0].value in (P.array_map,
+                                                        P.array_reduce):
+                                continue
+                        g = get_prim_graph(ct.value, ct.abstract)
+                        tr.set_edge(node, key, Constant(g))
 
-        with mng.transact() as tr:
-            cts = {ct for cts in mng.constants.values() for ct in cts}
-            for ct in cts:
-                if ct.is_constant(Primitive):
-                    for node, key in mng.uses[ct]:
-                        if key != 0:
-                            if node.inputs[0].is_constant():
-                                if node.inputs[0].value in (P.array_map,
-                                                            P.array_reduce):
-                                    continue
-                            g = get_prim_graph(ct.value, ct.abstract)
-                            tr.set_edge(node, key, Constant(g))
-
-        return {'graph': graph}
+    return graph
 
 
-class SplitGraph(PipelineStep):
-    """Pipeline step to cut the graph into linear portions and control flow.
+nonlinear_ops = (
+    P.return_, P.partial, P.switch, P.make_tuple, P.make_list,
+    P.list_len, P.list_getitem, P.list_setitem, P.list_append, P.bool_and
+)
 
-    Inputs:
-        graph: A graph
 
-    Outputs:
-        splits: list of graph portions
+def step(graph, cut_list=nonlinear_ops):
+    """Split the graph into portions."""
+    splits = []
+    split = []
 
-    """
-
-    def step(self, graph):
-        """Split the graph into portions."""
-        splits = []
-        split = []
-
-        for node in toposort(graph.return_):
-            if self.is_cut(node):
-                if len(split) != 0:
-                    splits.append(split)
-                splits.append(node)
-                split = []
-            elif not (node.is_constant() or node.is_parameter()):
-                split.append(node)
-
-        return {'splits': splits}
-
-    def is_cut(self, node):
-        """Returns whether there should be a cut for this node.
-
-        Cuts are done for all "non-linear" nodes: function calls,
-        branches, ...
-
-        """
+    def is_cut(node):
         if node.is_apply():
             fn = node.inputs[0]
             if not fn.is_constant(Primitive):
                 return True
-            elif fn.value in (P.return_, P.partial, P.switch, P.make_tuple,
-                              P.make_list, P.list_len, P.list_getitem,
-                              P.list_setitem, P.list_append, P.bool_and):
+            elif fn.value in cut_list:
                 return True
         return False
+
+    for node in toposort(graph.return_):
+        if is_cut(node):
+            if len(split) != 0:
+                splits.append(split)
+            splits.append(node)
+            split = []
+        elif not (node.is_constant() or node.is_parameter()):
+            split.append(node)
+
+    return splits
 
 
 class CompileGraph(PipelineStep):
@@ -295,35 +273,6 @@ class CompileGraph(PipelineStep):
         res = {'uinstrs': self.instrs}
         self._reset()
         return res
-
-
-class OptimizeInstrs(PipelineStep):
-    """Run peephole optimizations.
-
-    Inputs:
-        uinstrs: List of unlinked instructions
-
-    Outputs:
-        uinstrs: List of unlinked instructions
-    """
-
-    def step(self, uinstrs):
-        """Apply optimizations (currently none)."""
-        return {'uinstrs': uinstrs}
-
-
-graph_transform = PipelineDefinition(
-    resources=dict(
-        lin_convert=nnvm_convert,
-        target='cpu',
-        dev_id=0,
-    ),
-    steps=dict(
-        split=SplitGraph.partial(),
-        compile=CompileGraph.partial(),
-        optimize=OptimizeInstrs.partial(),
-    )
-)
 
 
 class CompileGraphs(PipelineStep):
