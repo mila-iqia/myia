@@ -34,16 +34,16 @@ class DLDataType(Structure):
 
 class DLTensor(Structure):
     _fields_ = [('data', c_void_p),
-		('ctx', DLContext),
-		('ndim', c_int),
+                ('ctx', DLContext),
+                ('ndim', c_int),
                 ('dtype', DLDataType),
                 ('shape', c_int64_p),
-		('strides', c_int64_p),
-		('byte_offset', c_uint64)]
+                ('strides', c_int64_p),
+                ('byte_offset', c_uint64)]
 
 
 class DLManagedTensor(Structure):
-    pass
+    _anonymous_ = ('dl_tensor',)
 
 
 DLManagedTensor._fields_ = [

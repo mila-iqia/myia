@@ -1,13 +1,17 @@
 """Linear implementation using the debug VM."""
 
-from .utils import get_outputs
+from . import Backend
 
-from ..ir import Graph, manage, clone
-from ..prim import Primitive, vm_registry, ops as P
-from ..vm import VM
+from ..utils import get_outputs
+from ..transform import CompileGraphs, nonlinear_ops
+from .. import dlpack
+
+from ...ir import Graph, manage, clone
+from ...prim import Primitive, vm_registry, ops as P
+from ...vm import VM
 
 
-def debug_convert(lst, *, target='cpu', dev_id=0):
+def debug_convert(lst):
     """Converts the list of nodes to a runnable form.
 
     All the nodes in the list must represent linear flow (no calls,
@@ -32,8 +36,6 @@ def debug_convert(lst, *, target='cpu', dev_id=0):
     outputs = []
 
     g = Graph()
-
-    assert target == 'cpu'
 
     def ref(n):
         if n.is_constant() and not n.is_constant_graph():
@@ -64,3 +66,19 @@ def debug_convert(lst, *, target='cpu', dev_id=0):
     fn = vm.export(g)
 
     return fn, inputs, outputs
+
+
+debug_compile = CompileGraphs(debug_convert, nonlinear_ops)
+
+
+class DebugBackend(Backend):
+    """Debugging backend."""
+
+    def compile(self, graph):
+        return debug_compile.compile(graph)
+
+    def from_dlpack(self, v):
+        pass
+
+    def to_dlpack(self, v):
+        pass

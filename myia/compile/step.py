@@ -22,9 +22,9 @@ class CompileStep(PipelineStep):
 
         """
         super().__init__(pipeline_init)
-        self.backend = load_backend(backend)
-        self.backend.init(**backend_options)
-    
+        backend_class = load_backend(backend)
+        self.backend = backend_class(**backend_options)
+
     def step(self, graph):
         """Compile the set of graphs."""
         out = self.backend.compile(graph)
