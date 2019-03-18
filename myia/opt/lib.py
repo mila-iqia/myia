@@ -947,7 +947,7 @@ class JElim(Partializable):
         for node in mng.all_nodes:
             try:
                 newtype = _jelim_retype(node.abstract)
-            except TypeError as e:
+            except TypeError:
                 return False
             if node.is_apply(P.J) or node.is_apply(P.Jinv):
                 _, x = node.inputs
