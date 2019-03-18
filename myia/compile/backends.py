@@ -48,12 +48,3 @@ class Backend:
         Convert a backend-specific tensor to a DLpack PyCapsule.
         """
         pass
-
-
-
-def _np_to_dlpack(a):
-    pass
-
-
-def _dlpack_to_np(d):
-    pass
