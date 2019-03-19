@@ -27,7 +27,7 @@ def import_load(pkg, name):
 
 
 _backends = {
-    'debug': import_load('myia.compile.backends.debug', 'DebugBackend'),
+    'nnvm': import_load('myia.compile.backends.nnvm', 'NNVMBackend'),
 }
 
 
