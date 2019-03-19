@@ -9,10 +9,11 @@ import tvm
 from nnvm.compiler import graph_attr
 from tvm.contrib import graph_runtime
 
-from .utils import get_outputs
+from ..utils import get_outputs
+from ..transform import CompileGraphs, nonlinear_ops
 
-from ..dtype import type_to_np_dtype, ismyiatype, Array
-from ..prim import Primitive, ops as P
+from ...dtype import type_to_np_dtype, ismyiatype, Array
+from ...prim import Primitive, ops as P
 
 
 SIMPLE_MAP = {
@@ -339,3 +340,25 @@ class NNVMConverter:
 
 converter = NNVMConverter(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 nnvm_convert = converter.convert
+
+class NNVMBackend(Backend):
+    """Backend to compile for NNVM.
+
+    Backend options:
+        target: the target device class ('cpu', 'cuda')
+        device_id: the target device identifier (an int)
+
+    """
+    def __init__(self, target='cpu', device_id=0):
+        self.compiler = CompileGraphs(
+            lambda l: converter.convert(l, target=target, dev_id=device),
+            nonlinear_ops)
+
+    def compile(self, graph):
+        return self.compiler.compile(graph)
+
+    def to_dlpack(self, v):
+        return v.to_dlpack()
+
+    def from_dlpack(self, v):
+        return tvm.ndarray.from_dlpack(v)
