@@ -354,7 +354,7 @@ class NNVMBackend(Backend):
             nonlinear_ops)
 
     def compile(self, graph):
-        return self.compiler.compile(graph)
+        return self.compiler.compile_and_link(graph)
 
     def to_numpy(self, v):
         return v.asnumpy()

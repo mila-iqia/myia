@@ -19,7 +19,7 @@ from ..utils import overload, flatten, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
 from ..vm import VM
-from .compile.backends import load_backend
+from ..compile import load_backend
 
 from .pipeline import pipeline_function, PipelineStep
 
@@ -465,7 +465,10 @@ class CompileStep(PipelineStep):
         return {'output': out}
 
 
-step_compile = CompileStep.partial()
+step_compile = CompileStep.partial(
+    backend='nnvm',
+    backend_options={'target': 'cpu', 'device_id': 0}
+)
 
 
 ############################

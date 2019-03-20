@@ -54,8 +54,6 @@ standard_pipeline = PipelineDefinition(
 
 scalar_pipeline = standard_pipeline.configure({
     'convert.object_map': scalar_object_map,
-    'compile.backend': 'nnvm',
-    'compile.backend_options': {'target': 'cpu', 'device_id': 0},
 })
 
 

@@ -277,6 +277,7 @@ class CompileGraphs:
     """
     def __init__(self, lin_convert, cut_list):
         self.transform = CompileGraph(lin_convert, cut_list)
+        self._reset()
 
     def _reset(self):
         self.mapping = {}
@@ -285,7 +286,7 @@ class CompileGraphs:
     def compile(self, graph):
         """Convert a single graph to unlinked instructions and map it."""
         self.mapping[graph] = len(self.instrs)
-        self.instrs.extend(self.transform(graph=graph))
+        self.instrs.extend(self.transform.run(graph=graph))
 
     def link(self):
         for i in range(len(self.instrs)):
@@ -296,6 +297,8 @@ class CompileGraphs:
     def compile_and_link(self, graph):
         """Convert all graphs to unlinked instructions and map them."""
         self._reset()
+
+        graph = wrap_primitives(graph)
 
         self.compile(graph)
 
