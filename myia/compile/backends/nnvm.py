@@ -9,6 +9,8 @@ import tvm
 from nnvm.compiler import graph_attr
 from tvm.contrib import graph_runtime
 
+from . import Backend
+
 from ..utils import get_outputs
 from ..transform import CompileGraphs, nonlinear_ops
 
@@ -300,9 +302,10 @@ class NNVMConverter:
         if all(self.eqv[o] in inmap for o in outputs):
             return None, [inmap[self.eqv[o]] for o in outputs], outputs
 
+        target = context.MASK2STR[context.device_type]
         if target == 'cpu':
             nnvm_target = 'llvm'
-        if target == 'cuda':  # pragma: no cover
+        elif target == 'cuda':  # pragma: no cover
             nnvm_target = 'cuda -libs=cublas'
 
         g = nnvm.graph.create(sym.Group(list(self.eqv[o] for o in outputs)))
@@ -334,6 +337,7 @@ class NNVMConverter:
 
 converter = NNVMConverter(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 nnvm_convert = converter.convert
+
 
 class NNVMBackend(Backend):
     """Backend to compile for NNVM.
