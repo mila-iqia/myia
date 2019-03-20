@@ -71,6 +71,18 @@ class Backend:
         """
         raise NotImplementedError('compile')
 
+    def from_numpy(self, a):
+        """
+        Convert a numpy ndarray to a backend-appropriate value.
+        """
+        raise NotImplementedError("from_numpy")
+
+    def to_numpy(self, v):
+        """
+        Convert a backlend value to a numpy.ndarray.
+        """
+        raise NotImplementedError("to_numpy")
+
     def from_dlpack(self, dlp):
         """
         Convert a value from a DLpack PyCapsule to a backend-appropriate value.

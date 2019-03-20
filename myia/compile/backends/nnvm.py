@@ -252,7 +252,7 @@ class NNVMConverter:
             setn(name, n)
         return self.eqv[n]
 
-    def convert(self, lst, *, target='cpu', dev_id=0):
+    def convert(self, lst, context):
         """Converts the list of nodes to a runnable form.
 
         All the nodes in the list must represent linear flow (no calls,
@@ -279,13 +279,7 @@ class NNVMConverter:
         self.constant_vars = {}
         self.shapes = {}
         self.types = {}
-
-        if target == 'cpu':
-            self.context = tvm.cpu(dev_id)
-        elif target == 'cuda':  # pragma: no cover
-            self.context = tvm.gpu(dev_id)
-        else:  # pragma: no cover
-            raise Exception(f"Unsupported target: {target}")
+        self.context = context
 
         for n in lst:
             assert n.is_apply()
@@ -350,15 +344,26 @@ class NNVMBackend(Backend):
 
     """
     def __init__(self, target='cpu', device_id=0):
+        self.context = tvm.ndarray.context(target, device_id)
         self.compiler = CompileGraphs(
-            lambda l: converter.convert(l, target=target, dev_id=device),
+            lambda l: converter.convert(l, context=self.context),
             nonlinear_ops)
 
     def compile(self, graph):
         return self.compiler.compile(graph)
 
+    def to_numpy(self, v):
+        return v.asnumpy()
+
+    def from_numpy(self, a):
+        return tvm.ndarray.array(a, self.context)
+
     def to_dlpack(self, v):
         return v.to_dlpack()
 
     def from_dlpack(self, v):
-        return tvm.ndarray.from_dlpack(v)
+        t = tvm.ndarray.from_dlpack(v)
+        if t.context != self.context:
+            # This may do a copy but we will need it
+            t = tvm.ndarray.array(t, self.context)
+        return t
