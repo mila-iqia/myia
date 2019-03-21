@@ -25,10 +25,16 @@ class MyiaFunction:
 
     """
 
-    def __init__(self, fn, specialize_values=[]):
+    def __init__(self, fn, specialize_values=[],
+                 backend=None, backend_options=None):
         """Initialize a MyiaFunction."""
         self.fn = fn
         self.specialize_values = set(specialize_values)
+        pp = standard_pipeline.configure({
+            'compile.backend': backend,
+            'compile.backend_options': backend_options
+        })
+        self.pip = pp.make()
         self._cache = {}
 
     def specialize(self, args):
@@ -51,8 +57,7 @@ class MyiaFunction:
         )
 
         if argspec not in self._cache:
-            pip = standard_pipeline.make()
-            self._cache[argspec] = pip(
+            self._cache[argspec] = self.pip(
                 input=self.fn,
                 argspec=argspec
             )
@@ -66,8 +71,20 @@ class MyiaFunction:
         """Call the function on the given args."""
         return self.compile(args)(*args)
 
+    def convert_array(self, v):
+        """Convert an array to an appropriate backend value.
 
-def myia(fn=None, *, specialize_values=[]):
+        This can take either a numpy.ndarray or a dlpack capsule.
+        """
+        backend = self.pip.steps.compile.backend
+        if isinstance(v, numpy.ndarray):
+            return backend.from_numpy(v)
+        else:
+            # We assume it is a dlpack value
+            return backend.from_dlpack(v)
+
+
+def myia(fn=None, *, specialize_values=[], backend=None, backend_options=None):
     """Create a function using Myia's runtime.
 
     `@myia` can be used as a simple decorator. If custom options are needed,
@@ -85,10 +102,14 @@ def myia(fn=None, *, specialize_values=[]):
         fn: The Python function to convert.
         specialize_values: Set of arguments for which we should specialize the
             function based on their values (list of argument names).
+        backend: the backend to use for compilation
+        backend_options: backend-specific options.
     """
     if fn is None:
         def deco(fn):
-            return MyiaFunction(fn, specialize_values)
+            return MyiaFunction(fn, specialize_values, backend=backend,
+                                backend_options=backend_options)
         return deco
     else:
-        return MyiaFunction(fn, specialize_values)
+        return MyiaFunction(fn, specialize_values, backend=backend,
+                            backend_options=backend_options)
