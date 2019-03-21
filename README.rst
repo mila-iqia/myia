@@ -13,7 +13,7 @@ Myia is a new differentiable programming language. It aims to support large scal
 Status
 ------
 
-Myia is currently under development and is not yet ready for use. As of 2018/11/05 we anticipate we may be able to offer a beta for 2018/12/01. We will update that estimate regularly.
+Myia is currently under development and is not yet ready for use. As of 2019/03/19 we anticipate we may be able to offer a beta for 2019/09/01. We will update that estimate regularly.
 
 See `Roadmap`_.
 
@@ -47,14 +47,15 @@ Current
 * **Primitives**: Scalar primitives work, as well as map, reduce and broadcasting.
 * **Type system**: Types are inferred without the need for annotations. Shapes can also be inferred.
 * **Optimization**: Pattern-based optimizations, inlining, constant propagation, common subexpression elimination, closure conversion.
-* **Automatic differentiation**: Supported for scalar optimizations. Second order differentiation is not yet in working order.
+* **Automatic differentiation**: Second order differentiation is not yet in working order.
+* **GPU support**: Using NNVM.
 
 In development
 ~~~~~~~~~~~~~~
 
-* **Automatic differentiation**: We are currently working on supporting all array operations and optimizing the result.
+* **Algebraic data types**: Support for recursive ADTs (e.g. tree data structures) is being added to the system.
+* **Compiler optimization**: The compiler currently needs to be optimized to reduce compile times.
 * **Optimization**: Graphs produced by AD need further optimization to eliminate operations on special data structures.
-* **GPU support**: NNVM is supported but only tested on CPU, so this should be a formality.
 
 Next steps
 ~~~~~~~~~~
