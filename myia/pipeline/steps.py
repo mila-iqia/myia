@@ -457,6 +457,8 @@ class CompileStep(PipelineStep):
         """
         super().__init__(pipeline_init)
         backend_class = load_backend(backend)
+        if backend_options is None:
+            backend_options = {}
         self.backend = backend_class(**backend_options)
 
     def step(self, graph):
@@ -465,10 +467,7 @@ class CompileStep(PipelineStep):
         return {'output': out}
 
 
-step_compile = CompileStep.partial(
-    backend='nnvm',
-    backend_options={'target': 'cpu', 'device_id': 0}
-)
+step_compile = CompileStep.partial()
 
 
 ############################

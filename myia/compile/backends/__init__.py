@@ -30,6 +30,9 @@ _backends = {
     'nnvm': import_load('myia.compile.backends.nnvm', 'NNVMBackend'),
 }
 
+# This is used as the default backend and options if None is provided
+default_name = 'nnvm'
+
 
 def load_backend(name):
     """Load the named backend.
@@ -38,6 +41,8 @@ def load_backend(name):
         UnknownBackend: The name is not recognized.
         LoadingError: There was an error loading the backend.
     """
+    if name is None:
+        name = default_name
     if name not in _backends:
         raise UnknownBackend(name)
     try:
