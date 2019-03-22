@@ -347,25 +347,32 @@ class NNVMBackend(Backend):
         device_id: the target device identifier (an int)
 
     """
+
     def __init__(self, target='cpu', device_id=0):
+        """Create a NNVM backend for the given device."""
         self.context = tvm.ndarray.context(target, device_id)
         self.compiler = CompileGraphs(
             lambda l: converter.convert(l, context=self.context),
             nonlinear_ops)
 
     def compile(self, graph):
+        """Compile a graph."""
         return self.compiler.compile_and_link(graph)
 
     def to_numpy(self, v):
+        """Make a numpy array from a NNVM array."""
         return v.asnumpy()
 
     def from_numpy(self, a):
+        """Make an NNVM array from a numpy array."""
         return tvm.ndarray.array(a, self.context)
 
     def to_dlpack(self, v):
+        """Make a dlpack capsule from an NNVM array."""
         return v.to_dlpack()
 
     def from_dlpack(self, v):
+        """Make an NNVM array from a dlpack capsule."""
         t = tvm.ndarray.from_dlpack(v)
         if t.context != self.context:
             # This may do a copy but we will need it

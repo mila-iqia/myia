@@ -275,7 +275,14 @@ class CompileGraphs:
         output: A callable
 
     """
+
     def __init__(self, lin_convert, cut_list):
+        """Create a compiler.
+
+        This use the specifed implementation for linear parts and a
+        list of excluded ops that will be covered by the built-in VM.
+
+        """
         self.transform = CompileGraph(lin_convert, cut_list)
         self._reset()
 
@@ -289,6 +296,7 @@ class CompileGraphs:
         self.instrs.extend(self.transform.run(graph=graph))
 
     def link(self):
+        """Link instructions from multiple graphs together."""
         for i in range(len(self.instrs)):
             instr = self.instrs[i]
             if instr[0] == 'push_graph':

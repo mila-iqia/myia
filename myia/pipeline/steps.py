@@ -447,6 +447,7 @@ class CompileStep(PipelineStep):
         output: a callable
 
     """
+
     def __init__(self, pipeline_init, backend=None, backend_options=None):
         """Initialize a CompileStep.
 

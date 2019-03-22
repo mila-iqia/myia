@@ -1,3 +1,5 @@
+"""Compilation backends."""
+
 import importlib
 
 
@@ -37,9 +39,12 @@ default_name = 'nnvm'
 def load_backend(name):
     """Load the named backend.
 
+    Returns the backend class registered for the name.
+
     Raises:
         UnknownBackend: The name is not recognized.
         LoadingError: There was an error loading the backend.
+
     """
     if name is None:
         name = default_name
@@ -77,25 +82,17 @@ class Backend:
         raise NotImplementedError('compile')
 
     def from_numpy(self, a):
-        """
-        Convert a numpy ndarray to a backend-appropriate value.
-        """
+        """Convert a numpy ndarray to a backend value."""
         raise NotImplementedError("from_numpy")
 
     def to_numpy(self, v):
-        """
-        Convert a backlend value to a numpy.ndarray.
-        """
+        """Convert a backlend value to a numpy.ndarray."""
         raise NotImplementedError("to_numpy")
 
     def from_dlpack(self, dlp):
-        """
-        Convert a value from a DLpack PyCapsule to a backend-appropriate value.
-        """
+        """Convert a value from a DLpack PyCapsule to a backend value."""
         raise NotImplementedError('from_dlpack')
 
     def to_dlpack(self, v):
-        """
-        Convert a backend-specific tensor to a DLpack PyCapsule.
-        """
+        """Convert a backend-specific tensor to a DLpack PyCapsule."""
         raise NotImplementedError('to_dlpack')
