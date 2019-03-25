@@ -89,10 +89,12 @@ class Backend:
         """Convert a backlend value to a numpy.ndarray."""
         raise NotImplementedError("to_numpy")
 
-    def from_scalar(self, s, dt):
+    def from_scalar(self, s, t):
+        """Convert the python scalar to a backend value with explicit type."""
         raise NotImplementedError('from_scalar')
 
     def to_scalar(self, v):
+        """Convert the backend value to a python scalar."""
         raise NotImplementedError('to_scalar')
 
     def from_dlpack(self, dlp):
@@ -104,7 +106,8 @@ class Backend:
         raise NotImplementedError('to_dlpack')
 
     def check_array(self, v, dt):
-        """
-        Return True iff the passed-in value is an array of the given dtype.
+        """Check array value for type and element dtype.
+
+        This must raise exceptions describing the problem encountered.
         """
         raise NotImplementedError('check_array')

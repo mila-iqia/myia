@@ -476,25 +476,32 @@ step_compile = CompileStep.partial()
 ############################
 
 class NumpyChecker:
+    """Dummy backend used for debug mode."""
+
     def from_numpy(self, n):
+        """Returns n."""
         return n
 
     def to_numpy(self, n):
+        """Returns n."""
         return n
 
     def from_scalar(self, s, dt):
+        """Returns s."""
         return s
 
     def to_scalar(self, s):
+        """Returns s (or s.item())."""
         if isinstance(s, np.ndarray):
             return s.item()
         else:
             return s
 
-    def check_array(self, arg, dt):
+    def check_array(self, arg, t):
+        """Checks that arg has elements of the right dtype."""
         if not isinstance(arg, np.ndarray):
             raise TypeError('Expected ndarray')
-        if arg.dtype != dtype.type_to_np_dtype(dt):
+        if arg.dtype != dtype.type_to_np_dtype(t):
             raise TypeError('Wrong dtype')
         return arg
 
