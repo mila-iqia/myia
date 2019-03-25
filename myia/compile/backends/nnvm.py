@@ -352,6 +352,8 @@ class NNVMBackend(Backend):
     def __init__(self, target='cpu', device_id=0):
         """Create a NNVM backend for the given device."""
         self.context = tvm.ndarray.context(target, device_id)
+        if not self.context.exist:  # pragma: no cover
+            raise RuntimeError("No hardware to support selected target/device")
         self.compiler = CompileGraphs(
             lambda l: converter.convert(l, context=self.context),
             nonlinear_ops, self)
@@ -384,7 +386,7 @@ class NNVMBackend(Backend):
     def from_dlpack(self, v):
         """Make an NNVM array from a dlpack capsule."""
         t = tvm.ndarray.from_dlpack(v)
-        if t.context != self.context:
+        if t.context != self.context:  # pragma: no cover
             # This may do a copy but we will need it
             t = tvm.ndarray.array(t, self.context)
         return t
@@ -393,7 +395,7 @@ class NNVMBackend(Backend):
         """Check if value is an NNVM array for this context."""
         if not isinstance(v, tvm.ndarray.NDArray):
             raise TypeError("Expected NNVM array")
-        if v.context != self.context:
+        if v.context != self.context:  # pragma: no cover
             raise RuntimeError("Array on wrong context.")
         if v.dtype != type_to_np_dtype(dt):
             raise TypeError("Wrong dtype")

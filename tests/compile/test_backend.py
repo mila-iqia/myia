@@ -4,16 +4,17 @@ from copy import copy
 import numpy as np
 
 from myia.abstract import from_value
-from myia.compile.backends import load_backend, LoadingError
+from myia.compile.backends import load_backend, LoadingError, UnknownBackend
 from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import distribute, scalar_to_array, dot, \
     scalar_add, array_reduce, transpose
+from myia import dtype
 
 from ..common import MA, MB
 
 
 @pytest.fixture(params=[('nnvm', {'target': 'cpu', 'device_id': 0})])
-def backend(request):
+def backend_opt(request):
     name, options = request.param
     return BackendOption(name, options)
 
@@ -23,7 +24,7 @@ class BackendOption:
         try:
             load_backend(backend)
         except LoadingError as e:
-            pytest.skip(f"Can't load {backend}: {e.message}")
+            pytest.skip(f"Can't load {backend}: {e.__cause__}")
         self.pip = standard_pipeline.configure({
             'compile.backend': backend,
             'compile.backend_options': backend_options
@@ -52,14 +53,14 @@ def parse_compare(*tests):
     This will run and compare the function using all available backends.
     """
     def decorate(fn):
-        def test(backend, args):
+        def test(backend_opt, args):
             if not isinstance(args, tuple):
                 args = (args,)
             ref_result = fn(*map(copy, args))
             argspec = tuple(from_value(arg, broaden=True) for arg in args)
-            res = backend.pip(input=fn, argspec=argspec)
+            res = backend_opt.pip(input=fn, argspec=argspec)
             myia_fn = res['output']
-            myia_args = backend.convert_args(args)
+            myia_args = backend_opt.convert_args(args)
             myia_result = myia_fn(*myia_args)
             np.testing.assert_allclose(ref_result, myia_result)
 
@@ -67,6 +68,46 @@ def parse_compare(*tests):
         m.__orig__ = fn
         return m
     return decorate
+
+
+def test_load_backend_unknown():
+    with pytest.raises(UnknownBackend):
+        load_backend('_fake_name_')
+
+
+def test_backend_error():
+    from myia.compile.backends import _backends, register_backend
+    name = '__testing_name000_'
+
+    def f():
+        raise ValueError('test')
+
+    register_backend(name, f)
+
+    with pytest.raises(LoadingError):
+        load_backend(name)
+
+    del _backends[name]
+
+
+def test_dlpack(backend_opt):
+    backend = backend_opt.pip.steps.compile.backend
+    v = MA(4, 3)
+    nv = backend.from_numpy(v)
+    dv = backend.to_dlpack(nv)
+    nv2 = backend.from_dlpack(dv)
+    v2 = backend.to_numpy(nv2)
+    assert (v == v2).all()
+
+
+def test_check_array_errors(backend_opt):
+    backend = backend_opt.pip.steps.compile.backend
+    with pytest.raises(Exception):
+        backend.check_array(MA(1, 2), dtype.Float[64])
+
+    bv = backend.from_numpy(MA(1, 2))
+    with pytest.raises(Exception):
+        backend.check_array(bv, dtype.Float[32])
 
 
 @parse_compare((2, 3))
@@ -186,13 +227,18 @@ def test_distribute(x):
     return distribute(scalar_to_array(x), (2, 3))
 
 
-@parse_compare(np.ones((1, 3)), np.ones((3,)))
+@parse_compare((2,))
 def test_distribute2(x):
+    return distribute(scalar_to_array(x), (1,))
+
+
+@parse_compare(np.ones((1, 3)), np.ones((3,)))
+def test_distribute3(x):
     return distribute(x, (2, 3))
 
 
 @parse_compare(MA(2, 3))
-def test_distribute3(x):
+def test_distribute4(x):
     return distribute(x, (2, 3))
 
 

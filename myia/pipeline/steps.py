@@ -491,11 +491,8 @@ class NumpyChecker:
         return s
 
     def to_scalar(self, s):
-        """Returns s (or s.item())."""
-        if isinstance(s, np.ndarray):
-            return s.item()
-        else:
-            return s
+        """Returns s."""
+        return s
 
     def check_array(self, arg, t):
         """Checks that arg has elements of the right dtype."""
@@ -638,11 +635,7 @@ def step_wrap(self,
         def wrapped(*args):
             steps = self.pipeline.steps
             if hasattr(steps, 'compile'):
-                comp_step = steps.compile
-                if hasattr(comp_step, 'backend'):
-                    backend = comp_step.backend
-                else:
-                    backend = NumpyChecker()
+                backend = steps.compile.backend
             else:
                 backend = NumpyChecker()
             args = tuple(flatten(convert_arg(arg, ot, backend) for arg, ot in
