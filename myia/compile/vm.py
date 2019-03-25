@@ -1,7 +1,8 @@
 """Implementation of a prototype optimized VM in python."""
 
-import numpy as np
 from copy import copy
+
+from myia import dtype
 
 
 class struct_partial:
@@ -23,13 +24,14 @@ class FinalVM:
     recursion between them.
     """
 
-    def __init__(self, code):
+    def __init__(self, code, backend):
         """Create a VM with the specified instructions."""
         self.code = tuple(code)
         self.stack = [None]  # The value stack
         self.retp = [-1]  # The call stack
         self.pc = 0  # program counter (next instruction)
         self.sp = 0  # stack pointer (for the value stack)
+        self.backend = backend
 
     def _push(self, v):
         """Push a value to the stack."""
@@ -197,7 +199,7 @@ class FinalVM:
             vfalse: reference
 
         """
-        if self._ref(cond):
+        if self.backend.to_scalar(self._ref(cond)):
             self._push(self._ref(vtrue))
         else:
             self._push(self._ref(vfalse))
@@ -227,7 +229,7 @@ class FinalVM:
           l: a list
 
         """
-        self._push(len(self._ref(l)))
+        self._push(self.backend.from_scalar(len(self._ref(l)), dtype.Int[64]))
 
     def inst_list_getitem(self, l, idx):
         """Push the idx-th element from the list.
@@ -237,9 +239,7 @@ class FinalVM:
            idx: an index
 
         """
-        i = self._ref(idx)
-        if isinstance(i, np.ndarray):
-            i = i.item()
+        i = self.backend.to_scalar(self._ref(idx))
         self._push(self._ref(l)[i])
 
     def inst_list_setitem(self, l, idx, v):
@@ -251,9 +251,7 @@ class FinalVM:
            v: a value
 
         """
-        i = self._ref(idx)
-        if isinstance(i, np.ndarray):
-            i = i.item()
+        i = self.backend.to_scalar(self._ref(idx))
         lst = copy(self._ref(l))
         lst[i] = self._ref(v)
         self._push(lst)
@@ -278,9 +276,9 @@ class FinalVM:
            b: a boolean
 
         """
-        a = self._ref(a)
-        b = self._ref(b)
-        self._push(a and b)
+        a = self.backend.to_scalar(self._ref(a))
+        b = self.backend.to_scalar(self._ref(b))
+        self._push(self.backend.from_scalar(a and b, dtype.Bool))
 
     def inst_push(self, v):
         """Push a value on the stack.

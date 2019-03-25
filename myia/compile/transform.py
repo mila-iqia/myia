@@ -4,6 +4,8 @@ from ..abstract import VALUE
 from ..ir import Apply, toposort, Graph, Constant
 from ..prim import Primitive, ops as P
 from .vm import FinalVM
+from ..dtype import ismyiatype
+from .. import dtype
 
 
 def wrap_primitives(graph):
@@ -66,10 +68,11 @@ class CompileGraph:
 
     """
 
-    def __init__(self, lin_convert, cut_list):
+    def __init__(self, lin_convert, cut_list, backend):
         """Create a CompileGraph with the specified linear backend."""
         self.lin_convert = lin_convert
         self.cut_list = cut_list
+        self.backend = backend
 
     def _reset(self):
         """Set/clear shared values."""
@@ -144,7 +147,11 @@ class CompileGraph:
                 self.add_instr('push_graph', node.value)
             else:
                 assert not isinstance(node.value, Primitive)
-                self.add_instr('push', node.value)
+                if ismyiatype(node.type, dtype.Number):
+                    v = self.backend.from_scalar(node.value, node.type)
+                elif ismyiatype(node.type, dtype.Array):
+                    v = self.backend.from_numpy(node.value, node.type.elements)
+                self.add_instr('push', v)
             self.push(node)
         return self.slots[node] - self.height
 
@@ -276,14 +283,14 @@ class CompileGraphs:
 
     """
 
-    def __init__(self, lin_convert, cut_list):
+    def __init__(self, lin_convert, cut_list, backend):
         """Create a compiler.
 
         This use the specifed implementation for linear parts and a
         list of excluded ops that will be covered by the built-in VM.
 
         """
-        self.transform = CompileGraph(lin_convert, cut_list)
+        self.transform = CompileGraph(lin_convert, cut_list, backend)
         self._reset()
 
     def _reset(self):
@@ -316,6 +323,6 @@ class CompileGraphs:
 
         self.link()
 
-        res = FinalVM(self.instrs)
+        res = FinalVM(self.instrs, self.transform.backend)
         self._reset()
         return res

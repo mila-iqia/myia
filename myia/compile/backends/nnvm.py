@@ -354,7 +354,7 @@ class NNVMBackend(Backend):
         self.context = tvm.ndarray.context(target, device_id)
         self.compiler = CompileGraphs(
             lambda l: converter.convert(l, context=self.context),
-            nonlinear_ops)
+            nonlinear_ops, self)
 
     def compile(self, graph):
         """Compile a graph."""
