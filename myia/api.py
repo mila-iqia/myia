@@ -71,18 +71,6 @@ class MyiaFunction:
         """Call the function on the given args."""
         return self.compile(args)(*args)
 
-    def convert_array(self, v):
-        """Convert an array to an appropriate backend value.
-
-        This can take either a numpy.ndarray or a dlpack capsule.
-        """
-        backend = self.pip.steps.compile.backend
-        if isinstance(v, numpy.ndarray):
-            return backend.from_numpy(v)
-        else:
-            # We assume it is a dlpack value
-            return backend.from_dlpack(v)
-
 
 def myia(fn=None, *, specialize_values=[], backend=None, backend_options=None):
     """Create a function using Myia's runtime.

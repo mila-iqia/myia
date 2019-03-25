@@ -89,6 +89,12 @@ class Backend:
         """Convert a backlend value to a numpy.ndarray."""
         raise NotImplementedError("to_numpy")
 
+    def from_scalar(self, s, dt):
+        raise NotImplementedError('from_scalar')
+
+    def to_scalar(self, v):
+        raise NotImplementedError('to_scalar')
+
     def from_dlpack(self, dlp):
         """Convert a value from a DLpack PyCapsule to a backend value."""
         raise NotImplementedError('from_dlpack')
@@ -96,3 +102,9 @@ class Backend:
     def to_dlpack(self, v):
         """Convert a backend-specific tensor to a DLpack PyCapsule."""
         raise NotImplementedError('to_dlpack')
+
+    def check_array(self, v, dt):
+        """
+        Return True iff the passed-in value is an array of the given dtype.
+        """
+        raise NotImplementedError('check_array')

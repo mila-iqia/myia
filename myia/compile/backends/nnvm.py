@@ -158,20 +158,21 @@ class NNVMRunner:
         self.input_names = input_names
         self.input_types = input_types
         self.output_specs = output_specs
-        self._outs = [tvm.nd.empty(spec[0], dtype=spec[1], ctx=context)
-                      for spec in self.output_specs]
+        self.context = context
 
     def __call__(self, *args):
         """Run the module on the arguments."""
         assert len(args) == len(self.input_names)
         nnvm_args = dict()
         for n, tp, v in zip(self.input_names, self.input_types, args):
-            nnvm_args[n] = np.array(v, dtype=tp, copy=False, ndmin=1)
+            nnvm_args[n] = v
         self.mod.set_input(**nnvm_args)
         self.mod.run()
-        for i, out in enumerate(self._outs):
+        outs = [tvm.nd.empty(spec[0], dtype=spec[1], ctx=self.context)
+                for spec in self.output_specs]
+        for i, out in enumerate(outs):
             out = self.mod.get_output(i, out)
-        return [o.asnumpy() for o in self._outs]
+        return outs
 
 
 def ashape(a):
@@ -367,6 +368,13 @@ class NNVMBackend(Backend):
         """Make an NNVM array from a numpy array."""
         return tvm.ndarray.array(a, self.context)
 
+    def to_scalar(self, v):
+        return v.asnumpy().item()
+
+    def from_scalar(self, s, t):
+        dt = type_to_np_dtype(t)
+        return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
+
     def to_dlpack(self, v):
         """Make a dlpack capsule from an NNVM array."""
         return v.to_dlpack()
@@ -378,3 +386,12 @@ class NNVMBackend(Backend):
             # This may do a copy but we will need it
             t = tvm.ndarray.array(t, self.context)
         return t
+
+    def check_array(self, v, dt):
+        """Check if value is an NNVM array for this context."""
+        if not isinstance(v, tvm.ndarray.NDArray):
+            raise TypeError("Expected NNVM array")
+        if v.context != self.context:
+            raise RuntimeError("Array on wrong context.")
+        if v.dtype != type_to_np_dtype(dt):
+            raise TypeError("Wrong dtype")

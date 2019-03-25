@@ -97,12 +97,12 @@ def test_forward_infer(model, x):
     return model.apply(x)
 
 
-@parse_compare((make_model(), MC(3, 6)), array=True)
+@parse_compare((make_model(), MC(3, 6)))
 def test_forward_specialize(model, x):
     return model.apply(x)
 
 
-@parse_compare((make_model(), MC(3, 6)), array=True, profile=True)
+@parse_compare((make_model(), MC(3, 6)), profile=True)
 def test_forward_profile(model, x):
     return model.apply(x)
 

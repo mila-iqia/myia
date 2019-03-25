@@ -20,8 +20,7 @@ debug_fn = standard_debug_pipeline \
     .select('parse', 'resolve', 'infer', 'specialize', 'export')
 
 
-def parse_compare(*tests, optimize=True, array=False, python=True,
-                  profile=no_prof):
+def parse_compare(*tests, optimize=True, python=True, profile=no_prof):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
