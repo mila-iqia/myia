@@ -25,10 +25,15 @@ class MyiaFunction:
 
     """
 
-    def __init__(self, fn, specialize_values=[]):
+    def __init__(self, fn, specialize_values=[],
+                 backend=None, backend_options=None):
         """Initialize a MyiaFunction."""
         self.fn = fn
         self.specialize_values = set(specialize_values)
+        self.pip = standard_pipeline.configure({
+            'compile.backend': backend,
+            'compile.backend_options': backend_options
+        })
         self._cache = {}
 
     def specialize(self, args):
@@ -51,8 +56,7 @@ class MyiaFunction:
         )
 
         if argspec not in self._cache:
-            pip = standard_pipeline.make()
-            self._cache[argspec] = pip(
+            self._cache[argspec] = self.pip.run(
                 input=self.fn,
                 argspec=argspec
             )
@@ -67,7 +71,7 @@ class MyiaFunction:
         return self.compile(args)(*args)
 
 
-def myia(fn=None, *, specialize_values=[]):
+def myia(fn=None, *, specialize_values=[], backend=None, backend_options=None):
     """Create a function using Myia's runtime.
 
     `@myia` can be used as a simple decorator. If custom options are needed,
@@ -85,10 +89,14 @@ def myia(fn=None, *, specialize_values=[]):
         fn: The Python function to convert.
         specialize_values: Set of arguments for which we should specialize the
             function based on their values (list of argument names).
+        backend: the backend to use for compilation
+        backend_options: backend-specific options.
     """
     if fn is None:
         def deco(fn):
-            return MyiaFunction(fn, specialize_values)
+            return MyiaFunction(fn, specialize_values, backend=backend,
+                                backend_options=backend_options)
         return deco
     else:
-        return MyiaFunction(fn, specialize_values)
+        return MyiaFunction(fn, specialize_values, backend=backend,
+                            backend_options=backend_options)

@@ -14,7 +14,7 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
     issubtype, list_map, env_getitem, env_setitem, env_add, embed, \
     array_to_scalar, transpose, return_, make_record, list_getitem, \
-    array_getitem, array_setitem
+    array_getitem, array_setitem, bool_eq
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
@@ -159,6 +159,11 @@ def test_prim_list_getitem(data, item):
 @parse_compare((np.array([1, 2, 3]), 0), (np.array([4, -6, 7]), 2))
 def test_prim_array_getitem(data, item):
     return array_getitem(data, item)
+
+
+def test_prim_bool_eq():
+    assert bool_eq(False, False)
+    assert not bool_eq(False, True)
 
 
 def test_prim_tuple_setitem():

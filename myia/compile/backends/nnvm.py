@@ -9,10 +9,13 @@ import tvm
 from nnvm.compiler import graph_attr
 from tvm.contrib import graph_runtime
 
-from .utils import get_outputs
+from . import Backend
 
-from ..dtype import type_to_np_dtype, ismyiatype, Array
-from ..prim import Primitive, ops as P
+from ..utils import get_outputs
+from ..transform import CompileGraphs, nonlinear_ops
+
+from ...dtype import type_to_np_dtype, ismyiatype, Array
+from ...prim import Primitive, ops as P
 
 
 SIMPLE_MAP = {
@@ -155,20 +158,21 @@ class NNVMRunner:
         self.input_names = input_names
         self.input_types = input_types
         self.output_specs = output_specs
-        self._outs = [tvm.nd.empty(spec[0], dtype=spec[1], ctx=context)
-                      for spec in self.output_specs]
+        self.context = context
 
     def __call__(self, *args):
         """Run the module on the arguments."""
         assert len(args) == len(self.input_names)
         nnvm_args = dict()
         for n, tp, v in zip(self.input_names, self.input_types, args):
-            nnvm_args[n] = np.array(v, dtype=tp, copy=False, ndmin=1)
+            nnvm_args[n] = v
         self.mod.set_input(**nnvm_args)
         self.mod.run()
-        for i, out in enumerate(self._outs):
+        outs = [tvm.nd.empty(spec[0], dtype=spec[1], ctx=self.context)
+                for spec in self.output_specs]
+        for i, out in enumerate(outs):
             out = self.mod.get_output(i, out)
-        return [o.asnumpy() for o in self._outs]
+        return outs
 
 
 def ashape(a):
@@ -251,7 +255,7 @@ class NNVMConverter:
             setn(name, n)
         return self.eqv[n]
 
-    def convert(self, lst, *, target='cpu', dev_id=0):
+    def convert(self, lst, context):
         """Converts the list of nodes to a runnable form.
 
         All the nodes in the list must represent linear flow (no calls,
@@ -278,13 +282,7 @@ class NNVMConverter:
         self.constant_vars = {}
         self.shapes = {}
         self.types = {}
-
-        if target == 'cpu':
-            self.context = tvm.cpu(dev_id)
-        elif target == 'cuda':  # pragma: no cover
-            self.context = tvm.gpu(dev_id)
-        else:  # pragma: no cover
-            raise Exception(f"Unsupported target: {target}")
+        self.context = context
 
         for n in lst:
             assert n.is_apply()
@@ -305,9 +303,10 @@ class NNVMConverter:
         if all(self.eqv[o] in inmap for o in outputs):
             return None, [inmap[self.eqv[o]] for o in outputs], outputs
 
+        target = context.MASK2STR[context.device_type]
         if target == 'cpu':
             nnvm_target = 'llvm'
-        if target == 'cuda':  # pragma: no cover
+        elif target == 'cuda':  # pragma: no cover
             nnvm_target = 'cuda -libs=cublas'
 
         g = nnvm.graph.create(sym.Group(list(self.eqv[o] for o in outputs)))
@@ -339,3 +338,64 @@ class NNVMConverter:
 
 converter = NNVMConverter(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 nnvm_convert = converter.convert
+
+
+class NNVMBackend(Backend):
+    """Backend to compile for NNVM.
+
+    Backend options:
+        target: the target device class ('cpu', 'cuda')
+        device_id: the target device identifier (an int)
+
+    """
+
+    def __init__(self, target='cpu', device_id=0):
+        """Create a NNVM backend for the given device."""
+        self.context = tvm.ndarray.context(target, device_id)
+        if not self.context.exist:  # pragma: no cover
+            raise RuntimeError("No hardware to support selected target/device")
+        self.compiler = CompileGraphs(
+            lambda l: converter.convert(l, context=self.context),
+            nonlinear_ops, self)
+
+    def compile(self, graph):
+        """Compile a graph."""
+        return self.compiler.compile_and_link(graph)
+
+    def to_numpy(self, v):
+        """Make a numpy array from a NNVM array."""
+        return v.asnumpy()
+
+    def from_numpy(self, a):
+        """Make an NNVM array from a numpy array."""
+        return tvm.ndarray.array(a, self.context)
+
+    def to_scalar(self, v):
+        """Convert the NNVM array to a scalar."""
+        return v.asnumpy().item()
+
+    def from_scalar(self, s, t):
+        """Convert the scalar to an NNVM array."""
+        dt = type_to_np_dtype(t)
+        return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
+
+    def to_dlpack(self, v):
+        """Make a dlpack capsule from an NNVM array."""
+        return v.to_dlpack()
+
+    def from_dlpack(self, v):
+        """Make an NNVM array from a dlpack capsule."""
+        t = tvm.ndarray.from_dlpack(v)
+        if t.context != self.context:  # pragma: no cover
+            # This may do a copy but we will need it
+            t = tvm.ndarray.array(t, self.context)
+        return t
+
+    def check_array(self, v, dt):
+        """Check if value is an NNVM array for this context."""
+        if not isinstance(v, tvm.ndarray.NDArray):
+            raise TypeError("Expected NNVM array")
+        if v.context != self.context:  # pragma: no cover
+            raise RuntimeError("Array on wrong context.")
+        if v.dtype != type_to_np_dtype(dt):
+            raise TypeError("Wrong dtype")

@@ -1,8 +1,6 @@
 """Pre-made pipelines."""
 
 
-from ..compile import step_wrap_primitives, step_compile, step_link, \
-    step_export
 from ..abstract import Context
 from ..ir import GraphManager
 from ..prim import py_registry
@@ -48,17 +46,14 @@ standard_pipeline = PipelineDefinition(
         opt2=steps.step_opt2,
         cconv=steps.step_cconv,
         validate=steps.step_validate,
-        wrap_primitives=step_wrap_primitives,
-        compile=step_compile,
-        link=step_link,
-        export=step_export,
+        compile=steps.step_compile,
         wrap=steps.step_wrap,
     )
 )
 
 
 scalar_pipeline = standard_pipeline.configure({
-    'convert.object_map': scalar_object_map
+    'convert.object_map': scalar_object_map,
 })
 
 

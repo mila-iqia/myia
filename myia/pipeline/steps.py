@@ -19,6 +19,7 @@ from ..utils import overload, flatten, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
 from ..vm import VM
+from ..compile import load_backend
 
 from .pipeline import pipeline_function, PipelineStep
 
@@ -431,57 +432,125 @@ def step_cconv(self, graph):
     return {'graph': graph}
 
 
+###############
+# Compilation #
+###############
+
+
+class CompileStep(PipelineStep):
+    """Step to compile a graph to a configurable backend.
+
+    Inputs:
+        graph: a graph (must be typed)
+
+    Outputs:
+        output: a callable
+
+    """
+
+    def __init__(self, pipeline_init, backend=None, backend_options=None):
+        """Initialize a CompileStep.
+
+        Arguments:
+            backend: (str) the name of the backend to use
+            backend_options: (dict) options for the backend
+
+        """
+        super().__init__(pipeline_init)
+        backend_class = load_backend(backend)
+        if backend_options is None:
+            backend_options = {}
+        self.backend = backend_class(**backend_options)
+
+    def step(self, graph):
+        """Compile the set of graphs."""
+        out = self.backend.compile(graph)
+        return {'output': out}
+
+
+step_compile = CompileStep.partial()
+
+
 ############################
 # Wrap the output function #
 ############################
 
+class NumpyChecker:
+    """Dummy backend used for debug mode."""
+
+    def from_numpy(self, n):
+        """Returns n."""
+        return n
+
+    def to_numpy(self, n):
+        """Returns n."""
+        return n
+
+    def from_scalar(self, s, dt):
+        """Returns s."""
+        return s
+
+    def to_scalar(self, s):
+        """Returns s."""
+        return s
+
+    def check_array(self, arg, t):
+        """Checks that arg has elements of the right dtype."""
+        if not isinstance(arg, np.ndarray):
+            raise TypeError('Expected ndarray')
+        if arg.dtype != dtype.type_to_np_dtype(t):
+            raise TypeError('Wrong dtype')
+        return arg
+
+
+class SlowdownWarning(UserWarning):
+    """Used to indicate a potential slowdown source."""
+
 
 @overload(bootstrap=True)
-def convert_arg(self, arg, orig_t: AbstractTuple):
+def convert_arg(self, arg, orig_t: AbstractTuple, backend):
     if not isinstance(arg, tuple):
         raise TypeError('Expected tuple')
     oe = orig_t.elements
     if len(arg) != len(oe):
         raise TypeError(f'Expected {len(oe)} elements')
-    return list(flatten(self(x, o)
+    return list(flatten(self(x, o, backend)
                         for x, o in zip(arg, oe)))
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractList):
+def convert_arg(self, arg, orig_t: AbstractList, backend):
     if not isinstance(arg, list):
         raise TypeError('Expected list')
     ot = orig_t.element
-    return [list(flatten(self(x, ot) for x in arg))]
+    return [list(flatten(self(x, ot, backend) for x in arg))]
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractClass):
+def convert_arg(self, arg, orig_t: AbstractClass, backend):
     dc = dtype.tag_to_dataclass[orig_t.tag]
     if not isinstance(arg, dc):
         raise TypeError(f'Expected {dc.__qualname__}')
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
-    return list(flatten(self(x, o)
+    return list(flatten(self(x, o, backend)
                         for x, o in zip(arg, oe)))
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractArray):
-    if not isinstance(arg, np.ndarray):
-        raise TypeError('Expected ndarray')
+def convert_arg(self, arg, orig_t: AbstractArray, backend):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
     et = et.values[TYPE]
     assert dtype.ismyiatype(et, dtype.Number)
-    dt = dtype.type_to_np_dtype(et)
-    if arg.dtype != dt:
-        raise TypeError('Wrong dtype')
+    if isinstance(arg, np.ndarray):
+        arg = backend.from_numpy(arg)
+    backend.check_array(arg, et)
     return [arg]
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractScalar):
+def convert_arg(self, arg, orig_t: AbstractScalar, backend):
     t = orig_t.values[TYPE]
     if dtype.ismyiatype(t, dtype.Int):
         if not isinstance(arg, int):
@@ -494,28 +563,29 @@ def convert_arg(self, arg, orig_t: AbstractScalar):
             raise TypeError(f'Expected bool')
     else:
         raise TypeError(f'Invalid type: {t}')
+    arg = backend.from_scalar(arg, t)
     return [arg]
 
 
 @overload(bootstrap=True)
-def convert_result(self, res, orig_t, vm_t: AbstractClass):
+def convert_result(self, res, orig_t, vm_t: AbstractClass, backend):
     dc = dtype.tag_to_dataclass[orig_t.tag]
     oe = orig_t.attributes.values()
     ve = vm_t.attributes.values()
-    tup = tuple(self(getattr(res, attr), o, v)
+    tup = tuple(self(getattr(res, attr), o, v, backend)
                 for attr, o, v in zip(orig_t.attributes, oe, ve))
     return dc(*tup)
 
 
 @overload  # noqa: F811
-def convert_result(self, res, orig_t, vm_t: AbstractList):
+def convert_result(self, res, orig_t, vm_t: AbstractList, backend):
     ot = orig_t.element
     vt = vm_t.element
-    return [self(x, ot, vt) for x in res]
+    return [self(x, ot, vt, backend) for x in res]
 
 
 @overload  # noqa: F811
-def convert_result(self, res, orig_t, vm_t: AbstractTuple):
+def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend):
     # If the EraseClass opt was applied, orig_t may be Class
     orig_is_class = isinstance(orig_t, AbstractClass)
     if orig_is_class:
@@ -523,7 +593,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple):
     else:
         oe = orig_t.elements
     ve = vm_t.elements
-    tup = tuple(self(x, o, v)
+    tup = tuple(self(x, o, v, backend)
                 for x, o, v in zip(res, oe, ve))
     if orig_is_class:
         dc = dtype.tag_to_dataclass[orig_t.tag]
@@ -533,16 +603,13 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple):
 
 
 @overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractScalar):
-    if isinstance(arg, np.ndarray):
-        return arg.item()
-    else:
-        return arg
+def convert_result(self, arg, orig_t, vm_t: AbstractScalar, backend):
+    return backend.to_scalar(arg)
 
 
 @overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractArray):
-    return arg
+def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend):
+    return backend.to_numpy(arg)
 
 
 @pipeline_function
@@ -566,10 +633,15 @@ def step_wrap(self,
         vm_out_t = graph.return_.abstract
 
         def wrapped(*args):
-            args = tuple(flatten(convert_arg(arg, ot) for arg, ot in
+            steps = self.pipeline.steps
+            if hasattr(steps, 'compile'):
+                backend = steps.compile.backend
+            else:
+                backend = NumpyChecker()
+            args = tuple(flatten(convert_arg(arg, ot, backend) for arg, ot in
                                  zip(args, orig_arg_t)))
             res = fn(*args)
-            res = convert_result(res, orig_out_t, vm_out_t)
+            res = convert_result(res, orig_out_t, vm_out_t, backend)
             return res
 
         return {'output': wrapped}
