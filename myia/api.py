@@ -30,11 +30,10 @@ class MyiaFunction:
         """Initialize a MyiaFunction."""
         self.fn = fn
         self.specialize_values = set(specialize_values)
-        pp = standard_pipeline.configure({
+        self.pip = standard_pipeline.configure({
             'compile.backend': backend,
             'compile.backend_options': backend_options
         })
-        self.pip = pp.make()
         self._cache = {}
 
     def specialize(self, args):
@@ -57,7 +56,7 @@ class MyiaFunction:
         )
 
         if argspec not in self._cache:
-            self._cache[argspec] = self.pip(
+            self._cache[argspec] = self.pip.run(
                 input=self.fn,
                 argspec=argspec
             )
