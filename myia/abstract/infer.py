@@ -9,7 +9,7 @@ from .. import dtype
 from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
 from ..utils import Overload, Partializable, is_dataclass_type, \
-    SymbolicKeyInstance
+    SymbolicKeyInstance, TypeMap
 
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
@@ -330,6 +330,81 @@ def from_value(v, broaden=False):
     return a
 
 
+_abstract_type_map = TypeMap()
+
+
+@_abstract_type_map.register(Graph)
+def _handle_graph(v, context, ref, loop):
+    ctx = context or Context.empty()
+    return AbstractFunction(
+        GraphFunction(v, ctx, tracking_id=ref)
+    )
+
+
+@_abstract_type_map.register(MetaGraph)
+def _handle_metagraph(v, context, ref, loop):
+    return AbstractFunction(
+        MetaGraphFunction(v, Context.empty(), tracking_id=ref)
+    )
+
+
+@_abstract_type_map.register(Primitive)
+def _handle_primitive(v, context, ref, loop):
+    return AbstractFunction(PrimitiveFunction(v, tracking_id=ref))
+
+
+@_abstract_type_map.register(SymbolicKeyInstance)
+def _handle_symbolic_key(v, context, ref, loop):
+    return AbstractScalar({VALUE: v, TYPE: dtype.SymbolicKeyType})
+
+
+@_abstract_type_map.register(bool, type(None))
+def _handle_scalar1(v, context, ref, loop):
+    typ = dtype.pytype_to_myiatype(type(v), v)
+    return AbstractScalar({
+        VALUE: v,
+        TYPE: typ,
+    })
+
+
+@_abstract_type_map.register(int, float)
+def _handle_scalar2(v, context, ref, loop):
+    typ = dtype.pytype_to_myiatype(type(v), v)
+    if loop is not None:
+        prio = 1 if dtype.ismyiatype(typ, dtype.Float) else 0
+        typ = loop.create_pending_from_list(
+            _number_types, typ, lambda: prio
+        )
+    return AbstractScalar({
+        VALUE: v,
+        TYPE: typ,
+    })
+
+
+@_abstract_type_map.register(tuple)
+def _handle_tuple(v, context, ref, loop):
+    return AbstractTuple([to_abstract(elem, context, loop=loop)
+                          for elem in v])
+
+
+@_abstract_type_map.register(list)
+def _handle_list(v, context, ref, loop):
+    if len(v) == 0:
+        raise NotImplementedError('No support for empty lists yet.')
+    return AbstractList(to_abstract(v[0], context, loop=loop))
+
+
+@_abstract_type_map.register(np.ndarray)
+def _handle_array(v, context, ref, loop):
+    return AbstractArray(
+        AbstractScalar({
+            VALUE: ANYTHING,
+            TYPE: dtype.np_dtype_to_type(str(v.dtype)),
+        }),
+        {SHAPE: v.shape}
+    )
+
+
 def to_abstract(v, context=None, ref=None, loop=None):
     """Translate the value to an abstract value.
 
@@ -345,24 +420,17 @@ def to_abstract(v, context=None, ref=None, loop=None):
     """
     ref = ref and ref.node
 
-    if isinstance(v, Graph):
-        ctx = context or Context.empty()
-        return AbstractFunction(
-            GraphFunction(v, ctx, tracking_id=ref)
-        )
+    tv = type(v)
 
-    elif isinstance(v, MetaGraph):
-        return AbstractFunction(
-            MetaGraphFunction(v, Context.empty(), tracking_id=ref)
-        )
+    try:
+        handler = _abstract_type_map[tv]
+    except KeyError:
+        handler = None
 
-    elif isinstance(v, Primitive):
-        return AbstractFunction(PrimitiveFunction(v, tracking_id=ref))
+    if handler is not None:
+        return handler(v, context, ref, loop)
 
-    elif isinstance(v, SymbolicKeyInstance):
-        return AbstractScalar({VALUE: v, TYPE: dtype.SymbolicKeyType})
-
-    elif is_dataclass_type(v):
+    if is_dataclass_type(v):
         typ = dtype.pytype_to_myiatype(v)
         typarg = AbstractScalar({
             VALUE: typ,
@@ -382,43 +450,6 @@ def to_abstract(v, context=None, ref=None, loop=None):
         for name, field in v.__dataclass_fields__.items():
             new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
         return AbstractClass(typ.tag, new_args, typ.methods)
-
-    elif isinstance(v, bool) or v is None:
-        typ = dtype.pytype_to_myiatype(type(v), v)
-        return AbstractScalar({
-            VALUE: v,
-            TYPE: typ,
-        })
-
-    elif isinstance(v, (int, float)):
-        typ = dtype.pytype_to_myiatype(type(v), v)
-        if loop is not None:
-            prio = 1 if dtype.ismyiatype(typ, dtype.Float) else 0
-            typ = loop.create_pending_from_list(
-                _number_types, typ, lambda: prio
-            )
-        return AbstractScalar({
-            VALUE: v,
-            TYPE: typ,
-        })
-
-    elif isinstance(v, tuple):
-        return AbstractTuple([to_abstract(elem, context, loop=loop)
-                              for elem in v])
-
-    elif isinstance(v, np.ndarray):
-        return AbstractArray(
-            AbstractScalar({
-                VALUE: ANYTHING,
-                TYPE: dtype.np_dtype_to_type(str(v.dtype)),
-            }),
-            {SHAPE: v.shape}
-        )
-
-    elif isinstance(v, list):
-        if len(v) == 0:
-            raise NotImplementedError('No support for empty lists yet.')
-        return AbstractList(to_abstract(v[0], context, loop=loop))
 
     elif dtype.ismyiatype(v):
         return AbstractType(v)
