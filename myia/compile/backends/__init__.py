@@ -86,7 +86,7 @@ class Backend:
         raise NotImplementedError("from_numpy")
 
     def to_numpy(self, v):
-        """Convert a backlend value to a numpy.ndarray."""
+        """Convert a backend value to a numpy.ndarray."""
         raise NotImplementedError("to_numpy")
 
     def from_scalar(self, s, t):
