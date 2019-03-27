@@ -9,7 +9,7 @@ from .. import dtype
 from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
 from ..utils import Overload, Partializable, is_dataclass_type, \
-    SymbolicKeyInstance
+    SymbolicKeyInstance, overload
 
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
@@ -330,7 +330,8 @@ def from_value(v, broaden=False):
     return a
 
 
-def to_abstract(v, context=None, ref=None, loop=None):
+@overload.wrapper(bootstrap=True)
+def to_abstract(fn, self, v, context=None, ref=None, loop=None):
     """Translate the value to an abstract value.
 
     Arguments:
@@ -345,24 +346,10 @@ def to_abstract(v, context=None, ref=None, loop=None):
     """
     ref = ref and ref.node
 
-    if isinstance(v, Graph):
-        ctx = context or Context.empty()
-        return AbstractFunction(
-            GraphFunction(v, ctx, tracking_id=ref)
-        )
+    if fn is not None:
+        return fn(self, v, context, ref, loop)
 
-    elif isinstance(v, MetaGraph):
-        return AbstractFunction(
-            MetaGraphFunction(v, Context.empty(), tracking_id=ref)
-        )
-
-    elif isinstance(v, Primitive):
-        return AbstractFunction(PrimitiveFunction(v, tracking_id=ref))
-
-    elif isinstance(v, SymbolicKeyInstance):
-        return AbstractScalar({VALUE: v, TYPE: dtype.SymbolicKeyType})
-
-    elif is_dataclass_type(v):
+    if is_dataclass_type(v):
         typ = dtype.pytype_to_myiatype(v)
         typarg = AbstractScalar({
             VALUE: typ,
@@ -383,43 +370,6 @@ def to_abstract(v, context=None, ref=None, loop=None):
             new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
         return AbstractClass(typ.tag, new_args, typ.methods)
 
-    elif isinstance(v, bool) or v is None:
-        typ = dtype.pytype_to_myiatype(type(v), v)
-        return AbstractScalar({
-            VALUE: v,
-            TYPE: typ,
-        })
-
-    elif isinstance(v, (int, float)):
-        typ = dtype.pytype_to_myiatype(type(v), v)
-        if loop is not None:
-            prio = 1 if dtype.ismyiatype(typ, dtype.Float) else 0
-            typ = loop.create_pending_from_list(
-                _number_types, typ, lambda: prio
-            )
-        return AbstractScalar({
-            VALUE: v,
-            TYPE: typ,
-        })
-
-    elif isinstance(v, tuple):
-        return AbstractTuple([to_abstract(elem, context, loop=loop)
-                              for elem in v])
-
-    elif isinstance(v, np.ndarray):
-        return AbstractArray(
-            AbstractScalar({
-                VALUE: ANYTHING,
-                TYPE: dtype.np_dtype_to_type(str(v.dtype)),
-            }),
-            {SHAPE: v.shape}
-        )
-
-    elif isinstance(v, list):
-        if len(v) == 0:
-            raise NotImplementedError('No support for empty lists yet.')
-        return AbstractList(to_abstract(v[0], context, loop=loop))
-
     elif dtype.ismyiatype(v):
         return AbstractType(v)
 
@@ -430,6 +380,78 @@ def to_abstract(v, context=None, ref=None, loop=None):
             VALUE: v,
             TYPE: typ,
         })
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: Graph, context=None, ref=None, loop=None):
+    ctx = context or Context.empty()
+    return AbstractFunction(
+        GraphFunction(v, ctx, tracking_id=ref)
+    )
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: MetaGraph, context, ref, loop):
+    return AbstractFunction(
+        MetaGraphFunction(v, Context.empty(), tracking_id=ref)
+    )
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: Primitive, context, ref, loop):
+    return AbstractFunction(PrimitiveFunction(v, tracking_id=ref))
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: SymbolicKeyInstance, context, ref, loop):
+    return AbstractScalar({VALUE: v, TYPE: dtype.SymbolicKeyType})
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: (bool, type(None)), context, ref, loop):
+    typ = dtype.pytype_to_myiatype(type(v), v)
+    return AbstractScalar({
+        VALUE: v,
+        TYPE: typ,
+    })
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: (int, float), context, ref, loop):
+    typ = dtype.pytype_to_myiatype(type(v), v)
+    if loop is not None:
+        prio = 1 if dtype.ismyiatype(typ, dtype.Float) else 0
+        typ = loop.create_pending_from_list(
+            _number_types, typ, lambda: prio
+        )
+    return AbstractScalar({
+        VALUE: v,
+        TYPE: typ,
+    })
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: tuple, context, ref, loop):
+    return AbstractTuple([self(elem, context, loop=loop)
+                          for elem in v])
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: list, context, ref, loop):
+    if len(v) == 0:
+        raise NotImplementedError('No support for empty lists yet.')
+    return AbstractList(self(v[0], context, loop=loop))
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: np.ndarray, context, ref, loop):
+    return AbstractArray(
+        AbstractScalar({
+            VALUE: ANYTHING,
+            TYPE: dtype.np_dtype_to_type(str(v.dtype)),
+        }),
+        {SHAPE: v.shape}
+    )
 
 
 class Inferrer(Partializable):
