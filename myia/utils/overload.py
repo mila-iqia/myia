@@ -112,7 +112,6 @@ class Overload:
                       for p in params]
             self.__signature__ = sign.replace(parameters=params)
 
-
     def wrapper(self, wrapper):
         """Set a wrapper function."""
         if self._wrapper is not None:
@@ -193,7 +192,7 @@ class Overload:
 
         try:
             method = self.map[type(main)]
-        except KeyError as err:
+        except KeyError:
             method = None
 
         if self._wrapper is None:
