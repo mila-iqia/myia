@@ -73,11 +73,11 @@ def test_Overload_mixins():
     h = Overload(mixins=[f, g])
 
     assert f(15) == 16
-    with pytest.raises(KeyError):
+    with pytest.raises(TypeError):
         f("hello")
 
     assert g("hello") == "HELLO"
-    with pytest.raises(KeyError):
+    with pytest.raises(TypeError):
         g(15)
 
     assert h(15) == 16
@@ -115,11 +115,16 @@ def test_Overload_bootstrap():
 
 def test_Overload_wrapper():
 
-    def wrapper(fn, x):
-        print(fn)
+    f = Overload()
+
+    @f.wrapper
+    def f(fn, x):
         return [fn(x)]
 
-    f = Overload(wrapper=wrapper)
+    with pytest.raises(TypeError):
+        @f.wrapper
+        def f(fn, x):
+            return [fn(x)]
 
     @f.register
     def f(x: int):
@@ -135,14 +140,15 @@ def test_Overload_wrapper():
 
 def test_Overload_stateful():
 
-    def counter(fn, self, x):
+    f = Overload(bind_to='stateful')
+
+    @f.wrapper
+    def f(fn, self, x):
         if self.state is None:
             self.state = 0
         else:
             self.state += 1
         return fn(self, x)
-
-    f = Overload(bind_to='stateful', wrapper=counter)
 
     @f.register
     def f(self, x: type(None)):

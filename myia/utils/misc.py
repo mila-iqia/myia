@@ -153,14 +153,14 @@ class Overload:
             bind_to = None
         self.__self__ = bind_to
         self._parent = _parent
-        self.wrapper = wrapper
+        self._wrapper = wrapper
         self.state = None
         if _parent:
             assert _parent.which is not None
             self.map = _parent.map
             self._uncached_map = _parent._uncached_map
             self.which = _parent.which
-            self.wrapper = _parent.wrapper
+            self._wrapper = _parent._wrapper
             return
         _map = {}
         self.which = None
@@ -172,6 +172,13 @@ class Overload:
             _map.update(mixin._uncached_map)
         self.map = TypeMap(_map)
         self._uncached_map = _map
+
+    def wrapper(self, wrapper):
+        """Set a wrapper function."""
+        if self._wrapper is not None:
+            raise TypeError(f'wrapper for {self} is already set')
+        self._wrapper = wrapper
+        return self
 
     def register(self, fn):
         """Register a function."""
@@ -212,7 +219,7 @@ class Overload:
         bootstrap = True if fself is self else fself
         ov = Overload(
             bind_to=bootstrap,
-            wrapper=self.wrapper,
+            wrapper=self._wrapper,
             mixins=[self]
         )
         if fn is not None:
@@ -228,27 +235,45 @@ class Overload:
         else:
             return self.map[t]
 
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         """Call the overloaded function."""
         fself = self.__self__
         if fself == 'stateful':
             ov = Overload(bind_to=True, _parent=self)
             return ov(*args)
-        elif fself is not None:
-            main = args[self.which - 1]
-            if self.wrapper is None:
-                return self.map[type(main)](fself, *args)
+
+        if fself is not None:
+            args = (fself,) + args
+
+        main = args[self.which]
+
+        try:
+            method = self.map[type(main)]
+        except KeyError as err:
+            method = None
+
+        if self._wrapper is None:
+            if method is None:
+                raise TypeError(f'No overloaded method for {type(main)}')
             else:
-                return self.wrapper(self.map[type(main)], fself, *args)
+                return method(*args, **kwargs)
         else:
-            main = args[self.which]
-            if self.wrapper is None:
-                return self.map[type(main)](*args)
-            else:
-                return self.wrapper(self.map[type(main)], *args)
+            return self._wrapper(method, *args, **kwargs)
 
 
-def overload(fn=None, *, bootstrap=False, wrapper=None):
+def _find_overload(fn, bootstrap):
+    mod = __import__(fn.__module__, fromlist='_')
+    dispatch = getattr(mod, fn.__name__, None)
+    if dispatch is None:
+        dispatch = Overload(bind_to=bootstrap)
+    else:  # pragma: no cover
+        assert bootstrap is False
+    if not isinstance(dispatch, Overload):  # pragma: no cover
+        raise TypeError('@overload requires Overload instance')
+    return dispatch
+
+
+def overload(fn=None, *, bootstrap=False):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -263,26 +288,25 @@ def overload(fn=None, *, bootstrap=False, wrapper=None):
     Arguments:
         bootstrap: Whether to bootstrap this function so that it receives
             itself as its first argument. Useful for recursive functions.
-        wrapper: A function wrapping every call.
     """
     if fn is None:
         def deco(fn):
-            return overload(
-                fn,
-                bootstrap=bootstrap,
-                wrapper=wrapper
-            )
+            return overload(fn, bootstrap=bootstrap)
         return deco
-    mod = __import__(fn.__module__, fromlist='_')
-    dispatch = getattr(mod, fn.__name__, None)
-    if dispatch is None:
-        dispatch = Overload(bind_to=bootstrap, wrapper=wrapper)
-    else:  # pragma: no cover
-        assert bootstrap is False
-        assert wrapper is None
-    if not isinstance(dispatch, Overload):  # pragma: no cover
-        raise TypeError('@overload requires Overload instance')
+    dispatch = _find_overload(fn, bootstrap)
     return dispatch.register(fn)
+
+
+def overload_wrapper(wrapper=None, *, bootstrap=False):
+    if wrapper is None:
+        def deco(wrapper):
+            return overload_wrapper(wrapper, bootstrap=bootstrap)
+        return deco
+    dispatch = _find_overload(wrapper, bootstrap)
+    return dispatch.wrapper(wrapper)
+
+
+overload.wrapper = overload_wrapper
 
 
 def require_same(fns, objs):
