@@ -128,14 +128,11 @@ def test_Overload_wrapper():
 
 def test_Overload_stateful():
 
-    f = Overload(bind_to='stateful')
+    f = Overload(initial_state=lambda: -1)
 
     @f.wrapper
     def f(fn, self, x):
-        if self.state is None:
-            self.state = 0
-        else:
-            self.state += 1
+        self.state += 1
         return fn(self, x)
 
     @f.register

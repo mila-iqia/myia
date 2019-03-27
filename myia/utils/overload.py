@@ -53,6 +53,8 @@ class Overload:
         wrapper: A function to use as the entry point. In addition to all
             normal arguments, it will receive as its first argument the
             function to dispatch to.
+        initial_state: A function returning the initial state, or None if
+            there is no state.
         mixins: A list of Overload instances that contribute functions to this
             Overload.
     """
@@ -61,6 +63,7 @@ class Overload:
                  *,
                  bind_to=None,
                  wrapper=None,
+                 initial_state=None,
                  mixins=[],
                  _parent=None):
         """Initialize an Overload."""
@@ -72,6 +75,7 @@ class Overload:
         self._parent = _parent
         self._wrapper = wrapper
         self.state = None
+        self.initial_state = initial_state
         self.name = None
         if _parent:
             assert _parent.which is not None
@@ -144,7 +148,8 @@ class Overload:
         ov = Overload(
             bind_to=bootstrap,
             wrapper=self._wrapper,
-            mixins=[self]
+            mixins=[self],
+            initial_state=self.initial_state
         )
         if fn is not None:
             ov.register(fn)
@@ -161,11 +166,12 @@ class Overload:
 
     def __call__(self, *args, **kwargs):
         """Call the overloaded function."""
-        fself = self.__self__
-        if fself == 'stateful':
+        if self.initial_state is not None:
             ov = Overload(bind_to=True, _parent=self)
-            return ov(*args)
+            ov.state = self.initial_state()
+            return ov(*args, **kwargs)
 
+        fself = self.__self__
         if fself is not None:
             args = (fself,) + args
 
@@ -188,19 +194,20 @@ class Overload:
         return f'<Overload {self.name or hex(self.id)}>'
 
 
-def _find_overload(fn, bootstrap):
+def _find_overload(fn, bootstrap, initial_state):
     mod = __import__(fn.__module__, fromlist='_')
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
-        dispatch = Overload(bind_to=bootstrap)
+        dispatch = Overload(bind_to=bootstrap, initial_state=initial_state)
     else:  # pragma: no cover
         assert bootstrap is False
+        assert initial_state is None
     if not isinstance(dispatch, Overload):  # pragma: no cover
         raise TypeError('@overload requires Overload instance')
     return dispatch
 
 
-def overload(fn=None, *, bootstrap=False):
+def overload(fn=None, *, bootstrap=False, initial_state=None):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -215,27 +222,41 @@ def overload(fn=None, *, bootstrap=False):
     Arguments:
         bootstrap: Whether to bootstrap this function so that it receives
             itself as its first argument. Useful for recursive functions.
+        initial_state: A function with no arguments that returns the initial
+            state for top level calls to the overloaded function, or None
+            if there is no initial state.
     """
     if fn is None:
         def deco(fn):
-            return overload(fn, bootstrap=bootstrap)
+            return overload(fn,
+                            bootstrap=bootstrap,
+                            initial_state=initial_state)
         return deco
-    dispatch = _find_overload(fn, bootstrap)
+    dispatch = _find_overload(fn, bootstrap, initial_state)
     return dispatch.register(fn)
 
 
-def overload_wrapper(wrapper=None, *, bootstrap=False):
+def overload_wrapper(wrapper=None, *, bootstrap=False, initial_state=None):
     """Overload a function using the decorated function as a wrapper.
 
     The wrapper is the entry point for the function and receives as its
     first argument the method to dispatch to, and then the arguments to
     give to that method.
+
+    Arguments:
+        bootstrap: Whether to bootstrap this function so that it receives
+            itself as its first argument. Useful for recursive functions.
+        initial_state: A function with no arguments that returns the initial
+            state for top level calls to the overloaded function, or None
+            if there is no initial state.
     """
     if wrapper is None:
         def deco(wrapper):
-            return overload_wrapper(wrapper, bootstrap=bootstrap)
+            return overload_wrapper(wrapper,
+                                    bootstrap=bootstrap,
+                                    initial_state=initial_state)
         return deco
-    dispatch = _find_overload(wrapper, bootstrap)
+    dispatch = _find_overload(wrapper, bootstrap, initial_state)
     return dispatch.wrapper(wrapper)
 
 
