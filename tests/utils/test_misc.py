@@ -1,8 +1,8 @@
 import pytest
 import numpy as np
 
-from myia.utils import Named, TypeMap, smap, Event, Events, NS, Overload, \
-    SymbolicKeyInstance, newenv
+from myia.utils import Named, smap, Event, Events, NS, SymbolicKeyInstance, \
+    newenv
 
 
 def test_named():
@@ -13,104 +13,6 @@ def test_named():
 @smap.variant
 def _sum(self, arg: object, *args):
     return arg + sum(args)
-
-
-def test_typemap():
-    tmap = TypeMap()
-    tmap.register(int)('int')
-    tmap.register(object)('obj')
-    assert tmap[int] == 'int'
-    assert tmap[str] == 'obj'
-
-
-def test_Overload():
-    o = Overload()
-
-    @o.register
-    def f(x, y: int):
-        return 'int'
-
-    @o.register  # noqa: F811
-    def f(x, y: float):
-        return 'float'
-
-    assert f(1, 2) == 'int'
-    assert f(1, 2.0) == 'float'
-
-    with pytest.raises(Exception):
-        @o.register  # noqa: F811
-        def f(x: object, y: object):
-            return 'too many annotations'
-
-    with pytest.raises(Exception):
-        @o.register  # noqa: F811
-        def f(x: object, y):
-            return 'wrong arg to annotate'
-
-    @o.register  # noqa: F811
-    def f(x, y: 'object'):
-        return 'object'
-
-    assert f(1, 2) == 'int'
-    assert f(1, 2.0) == 'float'
-    assert f(1, 'hello') == 'object'
-
-
-def test_Overload_mixins():
-
-    f = Overload()
-
-    @f.register
-    def f(t: int):
-        return t + 1
-
-    g = Overload()
-
-    @g.register
-    def g(t: str):
-        return t.upper()
-
-    h = Overload(mixins=[f, g])
-
-    assert f(15) == 16
-    with pytest.raises(KeyError):
-        f("hello")
-
-    assert g("hello") == "HELLO"
-    with pytest.raises(KeyError):
-        g(15)
-
-    assert h(15) == 16
-    assert h("hello") == "HELLO"
-
-
-def test_Overload_bootstrap():
-
-    f = Overload(bind_to=True)
-
-    @f.register
-    def f(self, xs: list):
-        return [self(x) for x in xs]
-
-    @f.register
-    def f(self, x: int):
-        return x + 1
-
-    @f.register
-    def f(self, x: object):
-        return "A"
-
-    assert f([1, 2, "xxx", [3, 4]]) == [2, 3, "A", [4, 5]]
-
-    @f.variant
-    def g(self, x: object):
-        return "B"
-
-    # This does not interfere with f
-    assert f([1, 2, "xxx", [3, 4]]) == [2, 3, "A", [4, 5]]
-
-    # The new method in g is used
-    assert g([1, 2, "xxx", [3, 4]]) == [2, 3, "B", [4, 5]]
 
 
 def test_smap():

@@ -86,8 +86,35 @@ def cleanup(xs: (tuple, list, set)):
 #########
 
 
-@overload
-def _merge_helper(d1: dict, d2, mode):
+@overload.wrapper
+def merge(__call__, a, b, mode=MergeMode.mode):
+    """Merge two data structures.
+
+    Arguments:
+        a: The original data.
+        b: The data to merge.
+        mode:
+            'merge': (default) Sequences will be concatenated, sets merged,
+                and dictionaries merged according to their keys.
+            'override': Dictionaries are merged, but sequences are not
+                concatenated.
+            'reset': b is returned, or takes primacy over the data in a.
+    """
+    if isinstance(b, MergeMode):
+        mode = b.mode
+        b = b.value
+    assert not isinstance(a, MergeMode)
+    if __call__ is None:
+        if hasattr(a, '__merge__'):
+            return a.__merge__(b, mode)
+        else:
+            return cleanup(b)
+    else:
+        return __call__(a, b, mode)
+
+
+@overload  # noqa: F811
+def merge(d1: dict, d2, mode):
     if mode == 'reset':
         return type(d1)(d2)
 
@@ -108,7 +135,7 @@ def _merge_helper(d1: dict, d2, mode):
 
 
 @overload  # noqa: F811
-def _merge_helper(xs: tuple, ys, mode):
+def merge(xs: tuple, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
     if mode == 'merge':
@@ -118,7 +145,7 @@ def _merge_helper(xs: tuple, ys, mode):
 
 
 @overload  # noqa: F811
-def _merge_helper(xs: list, ys, mode):
+def merge(xs: list, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
     if mode == 'merge':
@@ -128,38 +155,10 @@ def _merge_helper(xs: list, ys, mode):
 
 
 @overload  # noqa: F811
-def _merge_helper(xs: set, ys, mode):
+def merge(xs: set, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
     if mode == 'merge':
         return xs | ys
     else:
         return ys
-
-
-@overload  # noqa: F811
-def _merge_helper(a: object, b, mode):
-    if hasattr(a, '__merge__'):
-        return a.__merge__(b, mode)
-    else:
-        return cleanup(b)
-
-
-def merge(a, b, mode=MergeMode.mode):
-    """Merge two data structures.
-
-    Arguments:
-        a: The original data.
-        b: The data to merge.
-        mode:
-            'merge': (default) Sequences will be concatenated, sets merged,
-                and dictionaries merged according to their keys.
-            'override': Dictionaries are merged, but sequences are not
-                concatenated.
-            'reset': b is returned, or takes primacy over the data in a.
-    """
-    if isinstance(b, MergeMode):
-        mode = b.mode
-        b = b.value
-    assert not isinstance(a, MergeMode)
-    return _merge_helper(a, b, mode)

@@ -6,10 +6,14 @@ from .merge import (  # noqa
 )
 
 from .misc import (  # noqa
-    Named, UNKNOWN, Registry, repr_, list_str, TypeMap, smap,
+    Named, UNKNOWN, Registry, repr_, list_str, smap,
     Event, Events, NS, Namespace, ModuleNamespace, ClosureNamespace, eprint,
-    is_dataclass_type, as_frozen, Overload, overload, ErrorPool, flatten,
+    is_dataclass_type, as_frozen, ErrorPool, flatten,
     SymbolicKeyInstance, EnvInstance, newenv
+)
+
+from .overload import (  # noqa
+    TypeMap, Overload, overload, overload_wrapper
 )
 
 from .partial import (  # noqa
