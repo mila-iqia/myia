@@ -359,135 +359,8 @@ def sensitivity_transform(self, x: AbstractJTagged):
 #########
 
 
-@overload
-def _amerge(x1: Possibilities, x2, loop, forced):
-    if x1.issuperset(x2):
-        return x1
-    if forced:
-        raise MyiaTypeError(
-            'Additional possibilities cannot be merged.'
-        )
-    else:
-        return Possibilities(x1 | x2)
-
-
-@overload  # noqa: F811
-def _amerge(x1: dtype.TypeMeta, x2, loop, forced):
-    if x1 != x2:
-        raise TypeMismatchError(x1, x2)
-    return x1
-
-
-@overload  # noqa: F811
-def _amerge(x1: (dict, TrackDict), x2, loop, forced):
-    if set(x1.keys()) != set(x2.keys()):
-        # This shouldn't be possible at the moment
-        raise AssertionError(f'Keys mismatch')
-    changes = False
-    rval = type(x1)()
-    for k, v in x1.items():
-        res = amerge(v, x2[k], loop, forced)
-        if res is not v:
-            changes = True
-        rval[k] = res
-    return x1 if forced or not changes else rval
-
-
-@overload  # noqa: F811
-def _amerge(x1: tuple, x2, loop, forced):
-    if len(x1) != len(x2):  # pragma: no cover
-        raise MyiaTypeError(f'Tuple length mismatch')
-    changes = False
-    rval = []
-    for v1, v2 in zip(x1, x2):
-        res = amerge(v1, v2, loop, forced)
-        if res is not v1:
-            changes = True
-        rval.append(res)
-    return x1 if forced or not changes else tuple(rval)
-
-
-@overload  # noqa: F811
-def _amerge(x1: AbstractScalar, x2, loop, forced):
-    values = amerge(x1.values, x2.values, loop, forced)
-    if forced or values is x1.values:
-        return x1
-    return AbstractScalar(values)
-
-
-@overload  # noqa: F811
-def _amerge(x1: AbstractFunction, x2, loop, forced):
-    values = amerge(x1.get_sync(), x2.get_sync(), loop, forced)
-    if forced or values is x1.values:
-        return x1
-    return AbstractFunction(*values)
-
-
-@overload  # noqa: F811
-def _amerge(x1: AbstractTuple, x2, loop, forced):
-    args1 = (x1.elements, x1.values)
-    args2 = (x2.elements, x2.values)
-    merged = amerge(args1, args2, loop, forced)
-    if forced or merged is args1:
-        return x1
-    return AbstractTuple(*merged)
-
-
-@overload  # noqa: F811
-def _amerge(x1: AbstractArray, x2, loop, forced):
-    args1 = (x1.element, x1.values)
-    args2 = (x2.element, x2.values)
-    merged = amerge(args1, args2, loop, forced)
-    if forced or merged is args1:
-        return x1
-    return AbstractArray(*merged)
-
-
-@overload  # noqa: F811
-def _amerge(x1: AbstractList, x2, loop, forced):
-    args1 = (x1.element, x1.values)
-    args2 = (x2.element, x2.values)
-    merged = amerge(args1, args2, loop, forced)
-    if forced or merged is args1:
-        return x1
-    return AbstractList(*merged)
-
-
-@overload  # noqa: F811
-def _amerge(x1: AbstractClass, x2, loop, forced):
-    args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
-    args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
-    merged = amerge(args1, args2, loop, forced)
-    if forced or merged is args1:
-        return x1
-    return AbstractClass(*merged)
-
-
-@overload  # noqa: F811
-def _amerge(x1: AbstractJTagged, x2, loop, forced):
-    args1 = x1.element
-    args2 = x2.element
-    merged = amerge(args1, args2, loop, forced)
-    if forced or merged is args1:
-        return x1
-    return AbstractJTagged(merged)
-
-
-@overload  # noqa: F811
-def _amerge(x1: (int, float, bool), x2, loop, forced):
-    if forced and x1 != x2:
-        raise TypeMismatchError(x1, x2)
-    return x1 if x1 == x2 else ANYTHING
-
-
-@overload  # noqa: F811
-def _amerge(x1: object, x2, loop, forced):
-    if x1 != x2:
-        raise TypeMismatchError(x1, x2)
-    return x1
-
-
-def amerge(x1, x2, loop, forced, accept_pending=True):
+@overload.wrapper(bootstrap=False)
+def amerge(__call__, x1, x2, loop, forced, accept_pending=True):
     """Merge two values.
 
     If forced is False, amerge will return a superset of x1 and x2, if it
@@ -541,7 +414,135 @@ def amerge(x1, x2, loop, forced, accept_pending=True):
             f'Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}'
         )
     else:
-        return _amerge(x1, x2, loop, forced)
+        return __call__(x1, x2, loop, forced)
+
+
+@overload  # noqa: F811
+def amerge(x1: Possibilities, x2, loop, forced):
+    if x1.issuperset(x2):
+        return x1
+    if forced:
+        raise MyiaTypeError(
+            'Additional possibilities cannot be merged.'
+        )
+    else:
+        return Possibilities(x1 | x2)
+
+
+@overload  # noqa: F811
+def amerge(x1: dtype.TypeMeta, x2, loop, forced):
+    if x1 != x2:
+        raise TypeMismatchError(x1, x2)
+    return x1
+
+
+@overload  # noqa: F811
+def amerge(x1: (dict, TrackDict), x2, loop, forced):
+    if set(x1.keys()) != set(x2.keys()):
+        # This shouldn't be possible at the moment
+        raise AssertionError(f'Keys mismatch')
+    changes = False
+    rval = type(x1)()
+    for k, v in x1.items():
+        res = amerge(v, x2[k], loop, forced)
+        if res is not v:
+            changes = True
+        rval[k] = res
+    return x1 if forced or not changes else rval
+
+
+@overload  # noqa: F811
+def amerge(x1: tuple, x2, loop, forced):
+    if len(x1) != len(x2):  # pragma: no cover
+        raise MyiaTypeError(f'Tuple length mismatch')
+    changes = False
+    rval = []
+    for v1, v2 in zip(x1, x2):
+        res = amerge(v1, v2, loop, forced)
+        if res is not v1:
+            changes = True
+        rval.append(res)
+    return x1 if forced or not changes else tuple(rval)
+
+
+@overload  # noqa: F811
+def amerge(x1: AbstractScalar, x2, loop, forced):
+    values = amerge(x1.values, x2.values, loop, forced)
+    if forced or values is x1.values:
+        return x1
+    return AbstractScalar(values)
+
+
+@overload  # noqa: F811
+def amerge(x1: AbstractFunction, x2, loop, forced):
+    values = amerge(x1.get_sync(), x2.get_sync(), loop, forced)
+    if forced or values is x1.values:
+        return x1
+    return AbstractFunction(*values)
+
+
+@overload  # noqa: F811
+def amerge(x1: AbstractTuple, x2, loop, forced):
+    args1 = (x1.elements, x1.values)
+    args2 = (x2.elements, x2.values)
+    merged = amerge(args1, args2, loop, forced)
+    if forced or merged is args1:
+        return x1
+    return AbstractTuple(*merged)
+
+
+@overload  # noqa: F811
+def amerge(x1: AbstractArray, x2, loop, forced):
+    args1 = (x1.element, x1.values)
+    args2 = (x2.element, x2.values)
+    merged = amerge(args1, args2, loop, forced)
+    if forced or merged is args1:
+        return x1
+    return AbstractArray(*merged)
+
+
+@overload  # noqa: F811
+def amerge(x1: AbstractList, x2, loop, forced):
+    args1 = (x1.element, x1.values)
+    args2 = (x2.element, x2.values)
+    merged = amerge(args1, args2, loop, forced)
+    if forced or merged is args1:
+        return x1
+    return AbstractList(*merged)
+
+
+@overload  # noqa: F811
+def amerge(x1: AbstractClass, x2, loop, forced):
+    args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
+    args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
+    merged = amerge(args1, args2, loop, forced)
+    if forced or merged is args1:
+        return x1
+    return AbstractClass(*merged)
+
+
+@overload  # noqa: F811
+def amerge(x1: AbstractJTagged, x2, loop, forced):
+    args1 = x1.element
+    args2 = x2.element
+    merged = amerge(args1, args2, loop, forced)
+    if forced or merged is args1:
+        return x1
+    return AbstractJTagged(merged)
+
+
+@overload  # noqa: F811
+def amerge(x1: (int, float, bool), x2, loop, forced):
+    if forced and x1 != x2:
+        raise TypeMismatchError(x1, x2)
+    return x1 if x1 == x2 else ANYTHING
+
+
+@overload  # noqa: F811
+def amerge(x1: object, x2, loop, forced):
+    if x1 != x2:
+        raise TypeMismatchError(x1, x2)
+    return x1
 
 
 def bind(loop, committed, resolved, pending):
