@@ -347,7 +347,7 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
     ref = ref and ref.node
 
     if fn is not None:
-        return fn(v, context, ref, loop)
+        return fn(self, v, context, ref, loop)
 
     if is_dataclass_type(v):
         typ = dtype.pytype_to_myiatype(v)
