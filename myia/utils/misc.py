@@ -138,6 +138,11 @@ class Overload:
 
     Arguments:
         bind_to: Binds the first argument to the given object.
+        wrapper: A function to use as the entry point. In addition to all
+            normal arguments, it will receive as its first argument the
+            function to dispatch to.
+        mixins: A list of Overload instances that contribute functions to this
+            Overload.
     """
 
     def __init__(self,
@@ -155,6 +160,7 @@ class Overload:
         self._parent = _parent
         self._wrapper = wrapper
         self.state = None
+        self.name = None
         if _parent:
             assert _parent.which is not None
             self.map = _parent.map
@@ -173,11 +179,16 @@ class Overload:
         self.map = TypeMap(_map)
         self._uncached_map = _map
 
+    def _set_name_from(self, fn):
+        if self.name is None:
+            self.name = f'{fn.__module__}.{fn.__qualname__}'
+
     def wrapper(self, wrapper):
         """Set a wrapper function."""
         if self._wrapper is not None:
             raise TypeError(f'wrapper for {self} is already set')
         self._wrapper = wrapper
+        self._set_name_from(wrapper)
         return self
 
     def register(self, fn):
@@ -207,6 +218,7 @@ class Overload:
             self.map[t] = fn
             self._uncached_map[t] = fn
 
+        self._set_name_from(fn)
         return self
 
     def variant(self, fn=None):
@@ -259,6 +271,9 @@ class Overload:
                 return method(*args, **kwargs)
         else:
             return self._wrapper(method, *args, **kwargs)
+
+    def __repr__(self):
+        return f'<Overload {self.name or hex(self.id)}>'
 
 
 def _find_overload(fn, bootstrap):

@@ -171,6 +171,24 @@ def test_Overload_stateful():
     assert g((None, (None, None))) == (10, (30, 40))
 
 
+def test_Overload_repr():
+
+    humptydumpty = Overload()
+
+    @humptydumpty.register
+    def humptydumpty(x: int):
+        return x
+
+    @humptydumpty.register
+    def ignore_this_name(x: str):
+        return x
+
+    assert humptydumpty.name.endswith('.humptydumpty')
+    r = repr(humptydumpty)
+    assert r.startswith('<Overload ')
+    assert r.endswith('.humptydumpty>')
+
+
 def test_smap():
     assert _sum(10, 20) == 30
     assert _sum(10, 20, 30, 40) == 100
