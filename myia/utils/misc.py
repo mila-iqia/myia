@@ -298,6 +298,12 @@ def overload(fn=None, *, bootstrap=False):
 
 
 def overload_wrapper(wrapper=None, *, bootstrap=False):
+    """Overload a function using the decorated function as a wrapper.
+
+    The wrapper is the entry point for the function and receives as its
+    first argument the method to dispatch to, and then the arguments to
+    give to that method.
+    """
     if wrapper is None:
         def deco(wrapper):
             return overload_wrapper(wrapper, bootstrap=bootstrap)
