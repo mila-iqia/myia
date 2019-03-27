@@ -95,16 +95,30 @@ class Overload:
         self.map = TypeMap(_map)
         self._uncached_map = _map
 
-    def _set_name_from(self, fn):
+    def _set_attrs_from(self, fn, wrapper=False):
         if self.name is None:
             self.name = f'{fn.__module__}.{fn.__qualname__}'
+            self.__doc__ = fn.__doc__
+            self.__name__ = fn.__name__
+            self.__qualname__ = fn.__qualname__
+            self.__module__ = fn.__module__
+            sign = inspect.signature(fn)
+            params = list(sign.parameters.values())
+            if wrapper:
+                params = params[1:]
+            if self.__self__ is not None:
+                params = params[1:]
+            params = [p.replace(annotation=inspect.Parameter.empty)
+                      for p in params]
+            self.__signature__ = sign.replace(parameters=params)
+
 
     def wrapper(self, wrapper):
         """Set a wrapper function."""
         if self._wrapper is not None:
             raise TypeError(f'wrapper for {self} is already set')
         self._wrapper = wrapper
-        self._set_name_from(wrapper)
+        self._set_attrs_from(wrapper, wrapper=True)
         return self
 
     def register(self, fn):
@@ -134,7 +148,7 @@ class Overload:
             self.map[t] = fn
             self._uncached_map[t] = fn
 
-        self._set_name_from(fn)
+        self._set_attrs_from(fn)
         return self
 
     def variant(self, fn=None):
