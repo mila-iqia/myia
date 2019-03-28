@@ -450,7 +450,7 @@ def amerge(__call__, x1, x2, loop, forced, accept_pending=True):
         if forced:
             raise TypeMismatchError(x1, x2)
         return x2
-    elif type(x1) is not type(x2):
+    elif type(x1) is not type(x2) and not isinstance(x1, (int, float, bool)):
         raise MyiaTypeError(
             f'Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}'
         )

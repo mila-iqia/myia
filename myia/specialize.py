@@ -172,6 +172,34 @@ class _GraphSpecializer:
     async def _find_unique_argvals(self, a, inf, argvals):
         if argvals is not None:
             argvals = tuple(argvals)
+            # Let's try to get broader/more general argvals to avoid
+            # specializing on values, if we can.
+            broad_argvals = tuple([broaden(v, None) for v in argvals])
+            if argvals != broad_argvals:
+                while hasattr(inf, 'subinf'):
+                    inf = inf.subinf
+                try:
+                    res = await self._find_unique_argvals_helper(
+                        a, inf, broad_argvals, False
+                    )
+                    eng = self.specializer.engine
+                    if hasattr(inf, 'make_context'):
+                        # Have to check that this graph was processed by
+                        # the inferrer. It should have been, but sometimes
+                        # it isn't, not sure why. Hopefully a rewrite of the
+                        # specializer should fix everything.
+                        g = inf.get_graph(eng, broad_argvals)
+                        ctx = inf.make_context(eng, broad_argvals)
+                        if eng.ref(g.output, ctx) in eng.cache.cache:
+                            return res
+                    else:
+                        return res
+                except Unspecializable as e:
+                    pass
+        return await self._find_unique_argvals_helper(a, inf, argvals, True)
+
+    async def _find_unique_argvals_helper(self, a, inf, argvals,
+                                          try_generalize=True):
         if argvals in inf.cache:
             # We do this first because it's inexpensive
             return argvals, inf.cache[argvals]
@@ -186,10 +214,12 @@ class _GraphSpecializer:
                 return choice
         elif len(choices) == 0:
             raise Unspecializable(DEAD)
-        else:
+        elif try_generalize:
             generalized, outval = await self._find_generalized(inf)
             if generalized is not None:
                 return generalized, outval
+            raise Unspecializable(POLY)
+        else:
             raise Unspecializable(POLY)
 
     ###########
