@@ -68,11 +68,12 @@ class CompileGraph:
 
     """
 
-    def __init__(self, lin_convert, cut_list, backend):
+    def __init__(self, lin_convert, cut_list, backend, *, split_linear=False):
         """Create a CompileGraph with the specified linear backend."""
         self.lin_convert = lin_convert
         self.cut_list = cut_list
         self.backend = backend
+        self.split_linear = split_linear
 
     def _reset(self):
         """Set/clear shared values."""
@@ -102,7 +103,10 @@ class CompileGraph:
                 splits.append(node)
                 split = []
             elif not (node.is_constant() or node.is_parameter()):
-                split.append(node)
+                if self.split_linear:
+                    splits.append([node])
+                else:
+                    split.append(node)
 
         return splits
 
@@ -281,14 +285,15 @@ class CompileGraphs:
 
     """
 
-    def __init__(self, lin_convert, cut_list, backend):
+    def __init__(self, lin_convert, cut_list, backend, *, split_linear=False):
         """Create a compiler.
 
         This use the specifed implementation for linear parts and a
         list of excluded ops that will be covered by the built-in VM.
 
         """
-        self.transform = CompileGraph(lin_convert, cut_list, backend)
+        self.transform = CompileGraph(lin_convert, cut_list, backend,
+                                      split_linear=split_linear)
         self._reset()
 
     def _reset(self):
