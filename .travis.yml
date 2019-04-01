@@ -7,7 +7,7 @@ install:
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
-  - conda install -c abergeron --file=requirements.conda
+  - conda install -c abergeron -c pytorch --file=requirements.conda
   - pip install -r requirements.txt
   - pip install -e . --no-deps
 env:

@@ -5,4 +5,6 @@ nnvm=0.5.dev
 pytest
 pytest-cov
 flake8==3.5.0
+pytorch-cpu==1.0.1
+torchvision-cpu
 pydocstyle==2.1.1
