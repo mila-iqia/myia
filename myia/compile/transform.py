@@ -151,8 +151,7 @@ class CompileGraph:
                 self.add_instr('push_graph', node.value)
             else:
                 assert not isinstance(node.value, Primitive)
-                if ismyiatype(node.type, dtype.Number):
-                    v = self.backend.from_scalar(node.value, node.type)
+                v = self.backend.convert_value(node.value, node.type)
                 self.add_instr('push', v)
             self.push(node)
         return self.slots[node] - self.height
