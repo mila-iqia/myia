@@ -30,6 +30,7 @@ def import_load(pkg, name):
 
 _backends = {
     'nnvm': import_load('myia.compile.backends.nnvm', 'NNVMBackend'),
+    'pytorch': import_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
 }
 
 # This is used as the default backend and options if None is provided

@@ -13,7 +13,9 @@ from myia import dtype
 from ..common import MA, MB
 
 
-@pytest.fixture(params=[('nnvm', {'target': 'cpu', 'device_id': 0})])
+@pytest.fixture(params=[
+    pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
+    pytest.param(('pytorch', {'device': 'cpu'}), id='pytorch-cpu')])
 def backend_opt(request):
     name, options = request.param
     return BackendOption(name, options)
