@@ -27,7 +27,7 @@ _type_map = {
 
 def type_to_pytorch_type(t):
     """Map myia types to pytorch types."""
-    if t not in _type_map:
+    if t not in _type_map:  # pragma: no cover
         raise TypeError(f"Unsupported type: {t}")
     return _type_map[t]
 
@@ -182,6 +182,7 @@ class PyTorchBackend(Backend):
         return torch.utils.dlpack.from_dlpack(dlp).to(self.device)
 
     def check_array(self, v, t):
+        """Check if the value is a torch tensor of the right dtype."""
         if not isinstance(v, torch.Tensor):
             raise TypeError("Expected torch.Tensor")
         if v.device != self.device:  # pragma: no cover
