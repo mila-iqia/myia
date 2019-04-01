@@ -76,6 +76,7 @@ def pytorch_array_map(op):
         impl = simple_mapping[fn]
     else:
         raise NotImplementedError(f'array_map of {fn}')
+
     def _impl(*args):
         return (impl(*args),)
     return _impl, op.inputs[2:]

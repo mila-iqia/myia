@@ -4,8 +4,6 @@ from ..abstract import VALUE
 from ..ir import Apply, toposort, Graph, Constant
 from ..prim import Primitive, ops as P
 from .vm import FinalVM
-from ..dtype import ismyiatype
-from .. import dtype
 
 
 def wrap_primitives(graph):
