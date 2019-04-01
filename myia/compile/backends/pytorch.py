@@ -76,7 +76,9 @@ def pytorch_array_map(op):
         impl = simple_mapping[fn]
     else:
         raise NotImplementedError(f'array_map of {fn}')
-    return impl, op.inputs[2:]
+    def _impl(*args):
+        return (impl(*args),)
+    return _impl, op.inputs[2:]
 
 
 def pytorch_array_reduce(op):
@@ -103,10 +105,10 @@ def pytorch_array_reduce(op):
         axis = list(i for i, t in enumerate(ts) if t == 1)
         if len(axis) == 1:
             axis = axis[0]
-        res = impl(array, axis)
+        res = impl(array, axis, keepdim=True)
         if len(tshp) < len(ashp):
             res = torch.reshape(res, shape=tshp)
-        return res
+        return (res,)
     return _impl, (op.inputs[2],)
 
 
