@@ -1,11 +1,12 @@
 """Linear implementation using pytorch."""
 
 import torch
+import torch.utils.dlpack
 
 from . import Backend
 from ..transform import CompileGraphs, nonlinear_ops
 
-from ...dtype import Int, UInt, Float
+from ...dtype import Int, UInt, Float, Bool
 from ...prim import Primitive, ops as P
 
 
@@ -18,6 +19,9 @@ _type_map = {
     Float[16]: torch.float16,
     Float[32]: torch.float32,
     Float[64]: torch.float64,
+    Bool: torch.uint8,
+    # This is a hack but we really need uint64 support
+    UInt[64]: torch.int64,
 }
 
 
@@ -28,38 +32,7 @@ def type_to_pytorch_type(t):
     return _type_map[t]
 
 
-def pytorch_array_map(fn, *arrays):
-    """Implementation of array_map for pytorch."""
-    assert fn.is_constant(Primitive)
-    fn = fn.value
-    if fn in _mapping:
-        return _mapping[fn](*arrays)
-
-
-def pytorch_array_reduce(fn, array, shape):
-    """Implementation of array_reduce for pytorch."""
-    assert fn.is_constant(Primitive)
-    assert shape.is_constant(tuple)
-    fn = fn.value
-    tshp = shape.value
-    ashp = array.shape
-    if len(tshp) < len(ashp):
-        ts = (1,) * (len(ashp) - len(tshp)) + tshp
-    else:
-        ts = tshp
-    axis = list(i for i, t in enumerate(ts) if t == 1)
-    if len(axis) == 1:
-        axis = axis[0]
-    if fn == P.scalar_add:
-        res = torch.sum(array, axis)
-    else:
-        raise NotImplementedError(f"reduce with {fn}")
-    if len(tshp) < len(ashp):
-        res = torch.reshape(res, shape=tshp)
-    return res
-
-
-_mapping = {
+simple_mapping = {
     P.scalar_add: lambda a, b: a + b,
     P.scalar_sub: lambda a, b: a - b,
     P.scalar_mul: lambda a, b: a * b,
@@ -74,26 +47,76 @@ _mapping = {
     P.scalar_tan: torch.tan,
     P.scalar_tanh: torch.tanh,
 
-    P.scalar_eq: lambda a, b: a == b,
-    P.scalar_lt: lambda a, b: a < b,
-    P.scalar_gt: lambda a, b: a > b,
-    P.scalar_ne: lambda a, b: a != b,
-    P.scalar_le: lambda a, b: a <= b,
-    P.scalar_ge: lambda a, b: a >= b,
+    P.scalar_eq: torch.eq,
+    P.scalar_lt: torch.lt,
+    P.scalar_gt: torch.gt,
+    P.scalar_ne: torch.ne,
+    P.scalar_le: torch.le,
+    P.scalar_ge: torch.ge,
 
-    P.bool_and: lambda a, b: a and b,
-    P.bool_or: lambda a, b: a or b,
-    P.bool_eq: lambda a, b: a == b,
-    P.bool_not: lambda a: not a,
+    P.bool_and: lambda a, b: a & b,
+    P.bool_or: lambda a, b: a | b,
+    P.bool_eq: torch.eq,
+    P.bool_not: lambda a: ~a,
 
     P.distribute: lambda a, shp: a.expand(*shp),
     P.transpose: lambda a, perm: a.permute(*perm),
     P.dot: torch.mm,
 
     P.scalar_to_array: lambda x: x,
+}
+
+
+def pytorch_array_map(op):
+    """Implementation of array_map for pytorch."""
+    fn = op.inputs[1]
+    assert fn.is_constant(Primitive)
+    fn = fn.value
+    if fn in simple_mapping:
+        impl = simple_mapping[fn]
+    else:
+        raise NotImplementedError(f'array_map of {fn}')
+    return impl, op.inputs[2:]
+
+
+def pytorch_array_reduce(op):
+    """Implementation of array_reduce for pytorch."""
+    fn = op.inputs[1]
+    shape = op.inputs[3]
+    assert fn.is_constant(Primitive)
+    assert shape.is_constant(tuple)
+    fn = fn.value
+    tshp = shape.value
+
+    if fn == P.scalar_add:
+        impl = torch.sum
+    else:
+        raise NotImplementedError(f"reduce with {fn}")
+
+    def _impl(array):
+        ashp = array.shape
+
+        if len(tshp) < len(ashp):
+            ts = (1,) * (len(ashp) - len(tshp)) + tshp
+        else:
+            ts = tshp
+        axis = list(i for i, t in enumerate(ts) if t == 1)
+        if len(axis) == 1:
+            axis = axis[0]
+        res = impl(array, axis)
+        if len(tshp) < len(ashp):
+            res = torch.reshape(res, shape=tshp)
+        return res
+    return _impl, (op.inputs[2],)
+
+
+_mapping = {
     P.array_map: pytorch_array_map,
     P.array_reduce: pytorch_array_reduce,
 }
+
+for k, v in simple_mapping.items():
+    _mapping[k] = lambda op, v=v: (lambda *args: (v(*args),), op.inputs[1:])
 
 
 def pytorch_convert(lst):
@@ -105,10 +128,11 @@ def pytorch_convert(lst):
     assert op.inputs[0].is_constant(Primitive)
 
     fn = op.inputs[0].value
-    res = _mapping.get(fn, None)
-    if res is None:
+    mapper = _mapping.get(fn, None)
+    if mapper is None:
         raise NotImplementedError(fn)
-    return res
+    impl, inputs = mapper(op)
+    return impl, inputs, [op]
 
 
 class PyTorchBackend(Backend):
