@@ -52,41 +52,15 @@ from functools import reduce
 
 from .composite import zeros_like, hyper_add
 from .info import About
-from .ir import Constant, Graph
+from .ir import Constant, Graph, BasicRemapper, RemapperSet
 from .opt import sexp_to_node
 from .prim import ops as primops, Primitive
 from .prim.grad_implementations import augmented_graphs
-from .utils import Partializable, overload, newenv, OrderedSet
+from .utils import overload, newenv, OrderedSet
 
 
-class GraphRemapper(Partializable):
-    """Maps every node of a graph to a new node in a different graph.
-
-    Remapping rules can be adapted in subclasses.
-
-    Arguments:
-        relation: The relation between the original node and the new node.
-        graphs: The graphs to transform.
-        remappers (Optional): A RemapperSet for if the remapped nodes need
-            to refer to nodes in other remappers.
-        graph_relation (Optional): The relation between the original graph
-            and the new graph (defaults to relation).
-    """
-
-    def __init__(self,
-                 relation,
-                 graphs,
-                 *,
-                 remappers=None,
-                 graph_relation=None):
-        """Initialize a GraphRemapper."""
-        self.relation = relation
-        self.graph_relation = graph_relation or relation
-        self.graphs = graphs
-        self.graph_repl = {}
-        self.repl = {}
-        self.remappers = remappers
-        self.to_link = []
+class GradRemapper(BasicRemapper):
+    """GraphRemapper that allows mapping free variables differently."""
 
     def get(self, g, node):
         """Get the new node corresponding to the given (graph, node) pair.
@@ -102,124 +76,15 @@ class GraphRemapper(Partializable):
         else:
             raise AssertionError(f'Unprocessed node: {node}')
 
-    def get_graph(self, g):
-        """Get the new graph corresponding to g."""
-        return self.graph_repl[g]
 
-    def add_node(self, key, g, node, ng, new_node, link=None):
-        """Remap a node.
-
-        Arguments:
-            key: Either (g, node) or just a node. The latter case corresponds
-                to remapping all uses of node from all graphs to the same
-                node.
-            g: The graph to which node belongs.
-            node: The node to remap.
-            ng: Equivalent to self.get_graph(g).
-            new_node: What to remap node to.
-            link: Whether to link that node or not using link_apply. By default
-                it is True if the node is an Apply node.
-        """
-        if link is None:
-            link = new_node.is_apply()
-        self.repl[key] = new_node
-        if link:
-            self.to_link.append((key, g, node, ng, new_node))
-
-    def gen_graph(self, g):
-        """Generate a new graph corresponding to g."""
-        with About(g.debug, self.graph_relation):
-            ng = Graph()
-        self.graph_repl[g] = ng
-        return ng
-
-    def gen_parameter(self, g, ng, p):
-        """Generate the node for parameter p of g."""
-        with About(p.debug, self.relation):
-            self.add_node(p, g, p, ng, ng.add_parameter())
-
-    def gen_apply(self, g, ng, node):
-        """Generate the node for application node of g."""
-        with About(node.debug, self.relation):
-            self.add_node(node, g, node, ng, ng.apply())
-
-    def gen_child(self, g, ng, child):
-        """Generate the node for a child graph of g."""
-        pass
-
-    def gen_fv(self, g, ng, node):
-        """Generate the node for free variable node of g."""
-        pass
-
-    def gen_fv_graph(self, g, ng, g2):
-        """Generate the node for free variable graph g2 of g."""
-        pass
-
-    def gen_constant(self, g, ng, ct):
-        """Generate the node for constant ct used by g."""
-        with About(ct.debug, self.relation):
-            self.add_node(ct, g, ct, ng, ct)
-
-    def gen_constant_graph(self, g, ng, ct):
-        """Generate the node for constant graph ct used by g."""
-        return self.gen_constant(g, ng, ct)
-
-    def link_apply(self, g, ng, node, new_node):
-        """Generate the inputs for new_node."""
-        raise NotImplementedError()
-
-    def finalize_graph(self, g, ng):
-        """Finalize the new graph ng (set its output)."""
-        raise NotImplementedError()
-
-    def populate(self):
-        """Generate all necessary nodes."""
-        for g in self.graphs:
-            ng = self.gen_graph(g)
-
-        for g in self.graphs:
-            ng = self.get_graph(g)
-            for p in g.parameters:
-                self.gen_parameter(g, ng, p)
-
-            for node in g.nodes:
-                if node.is_apply():
-                    self.gen_apply(g, ng, node)
-
-            for child in g.children:
-                self.gen_child(g, ng, child)
-
-            for node in g.free_variables_nodes:
-                self.gen_fv(g, ng, node)
-
-            for graph in g.free_variables_graphs:
-                self.gen_fv_graph(g, ng, graph)
-
-            for ct in g.constants:
-                if ct.is_constant_graph():
-                    self.gen_constant_graph(g, ng, ct)
-                else:
-                    self.gen_constant(g, ng, ct)
-
-    def link(self):
-        """Link all nodes to their new inputs."""
-        for _, g, node, ng, new_node in self.to_link:
-            self.link_apply(g, ng, node, new_node)
-
-    def finalize(self):
-        """Finalize the graphs that belong to the remapper."""
-        for g in self.graphs:
-            self.finalize_graph(g, self.get_graph(g))
-
-
-class SlaveRemapper(GraphRemapper):
+class SlaveRemapper(GradRemapper):
     """Maps every node of a graph to new nodes in the master's graphs.
 
     Arguments:
-        relation: The relation between the original node and the new node.
         graphs: The graphs to transform.
         master: The name of a remapper whose graphs this remapper
             will generate nodes into.
+        relation: The relation between the original node and the new node.
         remappers (Optional): A RemapperSet for if the remapped nodes need
             to refer to nodes in other remappers.
         graph_relation (Optional): The relation between the original graph
@@ -227,15 +92,17 @@ class SlaveRemapper(GraphRemapper):
     """
 
     def __init__(self,
-                 relation,
                  graphs,
                  master,
                  *,
+                 relation,
                  remappers=None,
                  graph_relation=None):
         """Initialize a SlaveRemapper."""
         super().__init__(
-            relation, graphs, remappers=remappers,
+            graphs,
+            remappers=remappers,
+            relation=relation,
             graph_relation=graph_relation
         )
         self._master_name = master
@@ -245,12 +112,6 @@ class SlaveRemapper(GraphRemapper):
         """Remapper providing the graphs to generate into."""
         return self.remappers[self._master_name]
 
-    def gen_graph(self, g):
-        """Get the master's graph for g."""
-        ng = self.master.get_graph(g)
-        self.graph_repl[g] = ng
-        return ng
-
     def gen_parameter(self, g, ng, p):
         """Parameters are generated by the master."""
         pass
@@ -258,6 +119,10 @@ class SlaveRemapper(GraphRemapper):
     def gen_constant(self, g, ng, ct):
         """Constants are generated by the master."""
         pass
+
+    def generate(self):
+        """Use the same graph_repl as the master."""
+        self.graph_repl = self.master.graph_repl
 
     def finalize(self):
         """Only the master finalizes."""
@@ -272,17 +137,17 @@ class FPropAppRemapper(SlaveRemapper):
     x = a(b, c) => A:x = (B:a)(B:b, B:c)
     """
 
-    def link_apply(self, g, ng, node, new_node):
+    def link_apply(self, link):
         """Link generated nodes to their inputs.
 
         x = a(b, c) => A:x = (B:a)(B:b, B:c)
         """
-        new_inputs = [self.remappers['grad_fprop'].get(g, inp)
-                      for inp in node.inputs]
-        new_node.inputs = new_inputs
+        new_inputs = [self.remappers['grad_fprop'].get(link.graph, inp)
+                      for inp in link.node.inputs]
+        link.new_node.inputs = new_inputs
 
 
-class FPropRemapper(GraphRemapper):
+class FPropRemapper(GradRemapper):
     """Generate nodes in the forward graph.
 
     This is transform B.
@@ -321,16 +186,16 @@ class FPropRemapper(GraphRemapper):
         else:
             return self.gen_constant(g, ng, fvg)
 
-    def link_apply(self, g, ng, node, new_node):
+    def link_apply(self, link):
         """Link generated nodes to their inputs.
 
         x = a(b, c) => B:x = (A:x)[0]
         """
-        assert not node.is_parameter()
-        app = self.remappers['grad_fprop_app'].get(g, node)
-        new_node.inputs = sexp_to_node(
+        assert not link.node.is_parameter()
+        app = self.remappers['grad_fprop_app'].get(link.graph, link.node)
+        link.new_node.inputs = sexp_to_node(
             (primops.tuple_getitem, app, 0),
-            ng
+            link.new_graph
         ).inputs
 
     def finalize_graph(self, g, ng):
@@ -373,15 +238,15 @@ class BPropRemapper(SlaveRemapper):
     x = a(b, c) => C:x = (A:x)[1]
     """
 
-    def link_apply(self, g, ng, node, new_node):
+    def link_apply(self, link):
         """Link generated nodes to their inputs.
 
         x = a(b, c) => C:x = (A:x)[1]
         """
-        app = self.remappers['grad_fprop_app'].get(g, node)
-        new_node.inputs = sexp_to_node(
+        app = self.remappers['grad_fprop_app'].get(link.graph, link.node)
+        link.new_node.inputs = sexp_to_node(
             (primops.tuple_getitem, app, 1),
-            ng
+            link.new_graph
         ).inputs
 
 
@@ -393,18 +258,20 @@ class BPropAppRemapper(SlaveRemapper):
     x = a(b, c) => D:x = (C:x)(E:x)
     """
 
-    def link_apply(self, g, ng, node, new_node):
+    def link_apply(self, link):
         """Link generated nodes to their inputs.
 
         x = a(b, c) => D:x = (C:x)(E:x)
         """
+        g = link.graph
+        node = link.node
         assert not node.is_parameter()
         fn = self.remappers['grad_bprop'].get(g, node)
         arg = self.remappers['grad_sens'].get(g, node)
-        new_node.inputs = [fn, arg]
+        link.new_node.inputs = [fn, arg]
 
 
-class SensRemapper(GraphRemapper):
+class SensRemapper(GradRemapper):
     """Generate the sensitivities in the backward graph.
 
     This is transform E.
@@ -433,15 +300,15 @@ class SensRemapper(GraphRemapper):
                 new_node = ng.add_parameter()
             else:
                 new_node = ng.apply()
-        # NOTE: First parameter to add_node is (g, node) instead of just node.
-        # This lets us dispatch to a different node depending on whether it
-        # belongs to the graph that uses it, or is a free variable.
-        self.add_node((g, node), g, node, ng, new_node)
+        # NOTE: First parameter to remap_node is (g, node) instead of just
+        # node. This lets us dispatch to a different node depending on whether
+        # it belongs to the graph that uses it, or is a free variable.
+        self.remap_node((g, node), g, node, ng, new_node)
 
     def gen_child(self, g, ng, child):
         """Generate sensitivities for child graphs."""
         with About(child.debug, self.relation):
-            self.add_node((g, child), g, child, ng, ng.apply())
+            self.remap_node((g, child), g, child, ng, ng.apply())
 
     def gen_fv(self, g, ng, node):
         """Generate sensitivities for free variables.
@@ -450,19 +317,24 @@ class SensRemapper(GraphRemapper):
         behavior.
         """
         with About(node.debug, self.relation):
-            self.add_node((g, node), g, node, ng, ng.apply())
+            self.remap_node((g, node), g, node, ng, ng.apply())
 
     def gen_fv_graph(self, g, ng, g2):
         """Generate sensitivities for free variables that are graphs."""
         with About(g2.debug, self.relation):
-            self.add_node((g, g2), g, g2, ng, ng.apply())
+            self.remap_node((g, g2), g, g2, ng, ng.apply())
 
-    def link_apply(self, g, ng, node, new_node):
+    def link_apply(self, link):
         """Link generated nodes to their inputs.
 
         x, used by y at index i and z at index j =>
             E:x = D:y[i] + D:z[j]
         """
+        g = link.graph
+        ng = link.new_graph
+        node = link.node
+        new_node = link.new_node
+
         mng = g.manager
         assert not new_node.is_parameter()
 
@@ -578,33 +450,6 @@ class SensRemapper(GraphRemapper):
             # add a dummy parameter to satisfy the backpropagator protocol.
             with About(g.output.debug, 'grad_sens'):
                 ng.add_parameter()
-
-
-class RemapperSet:
-    """Set of remappers working together to generate one or more graphs."""
-
-    def __init__(self, graphs, **remappers):
-        """Initialize a RemapperSet."""
-        self.remappers = {
-            name: remapper(relation=name, graphs=graphs, remappers=self)
-            for name, remapper in remappers.items()
-        }
-        self.graphs = graphs
-
-    def run(self):
-        """Run all remappers.
-
-        All remappers are populated first, then linked, then finalized.
-        """
-        for remapper in self.remappers.values():
-            remapper.populate()
-        for remapper in self.remappers.values():
-            remapper.link()
-        for remapper in self.remappers.values():
-            remapper.finalize()
-
-    def __getitem__(self, item):
-        return self.remappers[item]
 
 
 def _grad(mng, root):

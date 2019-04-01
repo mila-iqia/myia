@@ -97,9 +97,7 @@ class _GraphSpecializer:
             clone_children=False,
             graph_relation=next(_count)
         )
-        self.cl.run()
-        self.repl = self.cl.repl
-        self.new_graph = self.repl[self.graph]
+        self.new_graph = self.cl[self.graph]
         self.todo = [self.graph.return_] + list(self.graph.parameters)
         self.marked = set()
 
@@ -108,7 +106,7 @@ class _GraphSpecializer:
         sp = self
         while g is not None and g is not sp.graph:
             sp = sp.parent
-        return sp.repl.get(node, node)
+        return sp.cl[node]
 
     async def run(self):
         await self.first_pass()
@@ -296,7 +294,7 @@ class _GraphSpecializer:
                 if repl is None:
                     _iref = self.specializer.engine.get_actual_ref(iref)
                     if _iref is not iref:
-                        self.cl.clone_disconnected(_iref.node)
+                        self.cl.remapper.clone_disconnected(_iref.node)
                         iref = _iref
                     self.todo.append(iref.node)
                     repl = self.get(iref.node)
