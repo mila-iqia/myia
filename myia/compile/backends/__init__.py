@@ -1,6 +1,8 @@
 """Compilation backends."""
 
 import importlib
+from ... import dtype
+from ...dtype import ismyiatype
 
 
 class UnknownBackend(Exception):
@@ -30,6 +32,7 @@ def import_load(pkg, name):
 
 _backends = {
     'nnvm': import_load('myia.compile.backends.nnvm', 'NNVMBackend'),
+    'pytorch': import_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
 }
 
 # This is used as the default backend and options if None is provided
@@ -105,7 +108,17 @@ class Backend:
         """Convert a backend-specific tensor to a DLpack PyCapsule."""
         raise NotImplementedError('to_dlpack')
 
-    def check_array(self, v, dt):
+    def convert_value(self, v, t):
+        """Convert a value to the appropriate backend representation."""
+        if ismyiatype(t, dtype.Number):
+            return self.from_scalar(v, t)
+        elif ismyiatype(t, dtype.Tuple):
+            return tuple(self.convert_value(v, t)
+                         for v, t in zip(v, t.elements))
+        else:
+            raise NotImplementedError(f'convert_value for {t}')
+
+    def check_array(self, v, t):
         """Check array value for type and element dtype.
 
         This must raise exceptions describing the problem encountered.
