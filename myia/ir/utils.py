@@ -192,10 +192,12 @@ def isomorphic(g1, g2, equiv=None):
 
 
 def print_graph(g):
-    """Prints a textual representation of a graph."""
+    """Returns a textual representation of a graph."""
+    import io
+    buf = io.StringIO()
     print(f"graph {g.debug.debug_name}(" +
           ", ".join(f"%{p.debug.debug_name}" for p in g.parameters) +
-          ") {")
+          ") {", file=buf)
 
     def repr_node(node):
         if node.is_constant_graph():
@@ -207,16 +209,18 @@ def print_graph(g):
 
     for node in toposort(g.output):
         if node.is_apply():
-            print(f"  %{node.debug.debug_name} = ", end="")
-            print(f"{repr_node(node.inputs[0])}(", end="")
-            print(", ".join(repr_node(a) for a in node.inputs[1:]), end="")
-            print(")")
+            print(f"  %{node.debug.debug_name} = ", end="", file=buf)
+            print(f"{repr_node(node.inputs[0])}(", end="", file=buf)
+            print(", ".join(repr_node(a) for a in node.inputs[1:]), end="",
+                  file=buf)
+            print(")", file=buf)
         elif node.is_constant():
             pass
         elif node.is_parameter():
             pass
-        else:
-            print(f"UNK: {node}")
+        else:  # pragma: no cover
+            print(f"UNK: {node}", file=buf)
 
-    print(f"  return %{g.output.debug.debug_name}")
-    print("}")
+    print(f"  return %{g.output.debug.debug_name}", file=buf)
+    print("}", file=buf)
+    return buf.getvalue()

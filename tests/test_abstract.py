@@ -10,7 +10,9 @@ from myia.abstract import (
     AbstractJTagged, AbstractError, AbstractFunction,
     InferenceLoop, to_abstract, build_value, amerge,
     Possibilities as _Poss,
-    VALUE, TYPE, DEAD
+    VALUE, TYPE, DEAD, build_type_fn,
+    PrimitiveFunction, PartialApplication, VirtualFunction,
+    TypedPrimitive
 )
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
@@ -55,6 +57,19 @@ def test_build_value():
 
     pt = Point(1, 2)
     assert build_value(to_abstract_test(pt)) == pt
+
+
+def test_build_type_fn():
+    assert build_type_fn(AbstractFunction(PrimitiveFunction('test'))) \
+        == ty.Function
+
+    assert build_type_fn(AbstractFunction(PartialApplication(
+        VirtualFunction((to_abstract(1), to_abstract(2)), to_abstract(3)),
+        (to_abstract(1),)))) == ty.Function[[ty.Int[64]], ty.Int[64]]
+
+    assert build_type_fn(AbstractFunction(TypedPrimitive(
+        'test2', (to_abstract(3.0), to_abstract(1)), to_abstract(True)))) \
+        == ty.Function[[ty.Float[64], ty.Int[64]], ty.Bool]
 
 
 def test_merge():

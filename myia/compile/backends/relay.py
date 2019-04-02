@@ -15,6 +15,7 @@ from ...prim import Primitive, ops as P
 from ...dtype import type_to_np_dtype, ismyiatype, Bool, Tuple
 from ...utils import overload
 
+from ..transform import set_types
 from .relay_helpers import optimize, build_module
 
 
@@ -324,8 +325,9 @@ class RelayBackend(Backend):
             raise RuntimeError("No hardware to support selected target/device")
         self.compiler = compiler
 
-    def compile(self, graph):
+    def compile(self, graph, argspec, outspec, pipeline):
         """Compiler a graph."""
+        graph = set_types(graph, argspec, outspec, pipeline)
         return self.compiler.run(graph, self.context)
 
     def to_numpy(self, v):

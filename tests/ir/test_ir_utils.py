@@ -5,7 +5,7 @@ from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs as _dfs
 from myia.ir import Apply, Constant, Graph, Parameter, Special, \
     dfs, exclude_from_set, freevars_boundary, isomorphic, \
-    succ_deep, succ_deeper, succ_incoming, toposort
+    succ_deep, succ_deeper, succ_incoming, toposort, print_graph
 from tests.test_graph_utils import _check_toposort
 
 
@@ -236,3 +236,23 @@ def test_helpers():
     assert s.is_special()
     assert s.is_special(int)
     assert not s.is_special(str)
+
+
+def test_print_graph():
+    g = Graph()
+    g.debug.name = 'testfn'
+    p = g.add_parameter()
+    p.debug.name = 'a'
+    p2 = g.add_parameter()
+    p2.debug.name = 'b'
+    c = g.constant(g)
+    c2 = g.constant(1)
+    g.output = g.apply(g, c2, p2)
+    g.output.debug.name = '_apply0'
+
+    s = print_graph(g)
+    assert s == """graph testfn(%a, %b) {
+  %_apply0 = @testfn(1, %b)
+  return %_apply0
+}
+"""

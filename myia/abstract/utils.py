@@ -178,7 +178,7 @@ def build_type_fn(self, x: GraphFunction):
 
 @overload  # noqa: F811
 def build_type_fn(self, x: TypedPrimitive):
-    return dtype.Function([self(a) for a in x.args], self(x.output))
+    return dtype.Function[[self(a) for a in x.args], self(x.output)]
 
 
 @overload  # noqa: F811

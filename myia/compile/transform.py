@@ -1,9 +1,22 @@
 """Transforms a graph into lower-level code."""
 
-from ..abstract import VALUE
+from ..abstract import VALUE, Pending
 from ..ir import Apply, toposort, Graph, Constant
 from ..prim import Primitive, ops as P
 from .vm import FinalVM
+
+
+def set_types(graph, argspec, outspec, pipeline):
+    """Re-infer and set all the types for the nodes."""
+    pipeline.resources.inferrer.infer(graph, argspec, outspec, clear=True)
+
+    for ref, fut in pipeline.resources.inferrer.engine.cache.cache.items():
+        v = fut.result()
+        if isinstance(v, Pending):
+            v = v.result()
+        ref.node.abstract = v
+
+    return graph
 
 
 def wrap_primitives(graph):
@@ -38,10 +51,11 @@ def wrap_primitives(graph):
             if ct.is_constant(Primitive):
                 for node, key in mng.uses[ct]:
                     if key != 0:
-                        if node.inputs[0].is_constant():
-                            if node.inputs[0].value in (P.array_map,
-                                                        P.array_reduce):
-                                continue
+                        if (key == 1 and
+                            node.inputs[0].is_constant() and
+                            node.inputs[0].value in (P.array_map,
+                                                     P.array_reduce)):
+                            continue
                         g = get_prim_graph(ct.value, ct.abstract)
                         tr.set_edge(node, key, Constant(g))
 
