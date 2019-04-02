@@ -1,9 +1,9 @@
 
-# myia_debug
+# debug
 
 Utility to debug Myia.
 
-You can call this with `<buche> python -m myia_debug <args>`, or alias `python -m myia_debug` to a shortcut like `dm`.
+You can call this with `<buche> python -m debug <args>`, or alias `python -m debug` to a shortcut like `mdbg`.
 
 ```
 Debug Myia
@@ -11,8 +11,6 @@ Debug Myia
 Usage:
   dm <command>
      [-f FUNCTION...] [-a ARG...] [-g...]
-     [-t TYPE...]
-     [--shapes SHAPE...]
      [-O OPT...]
      [--config FILE...]
      [--pipeline PIP...]
@@ -25,8 +23,6 @@ Options:
   -f --fn FUNCTION...   The function to run.
   -a --args ARG...      Arguments to feed to the function.
   -g                    Apply gradient once for each occurrence of the flag.
-  -t --types TYPE...    Types of the arguments.
-  --shapes SHAPE...     Shapes of the arguments.
   -c --config FILE...   Use given configuration.
   -O --opt OPT...       Run given optimizations.
   -p --pipeline PIP...  The pipeline to use.
@@ -61,22 +57,14 @@ def hibou(x, y):
     return x + y
 ```
 
-Running the function on test inputs:
-
-```
-dm run x:hibou --args 4,7
-dm run x:hibou --args x:x1,x:x2
-dm run x:hibou --args x:x2,x:x3
-```
-
 Showing the graph.
 
 ```
-buche dm show x:hibou
-buche dm show x:hibou --pipeline parse,resolve,infer,specialize,opt --types i64,i64
-buche dm show x:hibou --pipeline '!opt' --types i64,i64
-buche dm show x:hibou --pipeline '!opt' --args x:x2,x:x3
-buche dm show x:hibou --pipeline '!opt' --types i64,i64 -O inline
+mdbg show x:hibou
+mdbg show x:hibou --pipeline parse,resolve,infer,specialize,opt --types i64,i64
+mdbg show x:hibou --pipeline '!opt' --types i64,i64
+mdbg show x:hibou --pipeline '!opt' --args x:x2,x:x3
+mdbg show x:hibou --pipeline '!opt' --types i64,i64 -O inline
 ```
 
 The `!opt` pipeline is the same as `parse,resolve,infer,specialize,opt`.
@@ -89,23 +77,23 @@ Suppose `y.py` contains the following code:
 
 ```python
 
-from myia_debug import steps
+from debug import steps
 
 def inferred(o):
     res = o.run(default=[steps.parse,
                          steps.infer,
                          steps.specialize])
-    if 'error' in res:
-        raise res['error']
-    print(res['inference_results'])
-
+    ibuche(res)
 ```
 
-Then you can run this, and it will print the inference results:
+Then you can run this, and it will print the pipeline results:
 
 ```
-dm y:inferred x:hibou --args x:x2,x:x3
+mdbg y:inferred x:hibou --args x:x2,x:x3
 ```
 
-The call to `o.run` handles most parameters for you, so you can provide
-types, shapes, and customize the pipeline.
+You can also run this to get an interactive prompt, and you can click on parts of the results to put them in variables:
+
+```
+mdbg -i y:inferred x:hibou --args x:x2,x:x3
+```
