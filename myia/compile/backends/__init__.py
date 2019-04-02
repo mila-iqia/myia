@@ -32,7 +32,7 @@ def import_load(pkg, name):
 
 _backends = {
     'nnvm': import_load('myia.compile.backends.nnvm', 'NNVMBackend'),
-    'relay': import_load('myia.compile.backends.nnvm', 'RelayBackend'),
+    'relay': import_load('myia.compile.backends.relay', 'RelayBackend'),
     'pytorch': import_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
 }
 

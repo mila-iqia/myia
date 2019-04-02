@@ -46,6 +46,7 @@ standard_pipeline = PipelineDefinition(
         opt2=steps.step_opt2,
         cconv=steps.step_cconv,
         validate=steps.step_validate,
+        set_types=steps.step_set_types,
         compile=steps.step_compile,
         wrap=steps.step_wrap,
     )

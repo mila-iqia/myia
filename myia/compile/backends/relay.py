@@ -87,6 +87,7 @@ SIMPLE_MAP = {
     P.scalar_log: relay.op.log,
     # This is not right tangent vs hyperbolic tangent
     # P.scalar_tan: relay.op.tanh,
+    P.scalar_tanh: relay.op.tanh,
 
     P.scalar_eq: relay.op.equal,
     P.scalar_lt: relay.op.less,
@@ -329,7 +330,7 @@ class RelayBackend(Backend):
     def from_scalar(self, s, t):
         """Convert the scalar to an TVM array."""
         dt = type_to_np_dtype(t)
-        return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
+        return self.from_numpy(np.array(s, dtype=dt, copy=False))
 
     def to_dlpack(self, v):
         """Make a dlpack capsule from an TVM array."""
