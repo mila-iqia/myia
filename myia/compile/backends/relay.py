@@ -2,17 +2,16 @@
 
 from tvm import relay
 
-from ..abstract import AbstractArray, AbstractTuple, AbstractScalar, \
+from ...abstract import AbstractArray, AbstractTuple, AbstractScalar, \
     AbstractFunction, VirtualFunction, GraphFunction, TypedPrimitive, \
     PartialApplication, SHAPE, build_type
-from ..ir import Apply, Graph, Constant, manage, print_graph
-from ..graph_utils import toposort
-from ..pipeline import PipelineDefinition, PipelineStep
-from ..prim import Primitive, ops as P
-from ..prim.ops import partial, return_, switch, make_tuple
-from ..dtype import type_to_np_dtype, ismyiatype, Array, Bool, Function, \
+from ...ir import Apply, Graph, Constant, manage
+from ...graph_utils import toposort
+from ...prim import Primitive, ops as P
+from ...prim.ops import partial, return_, switch, make_tuple
+from ...dtype import type_to_np_dtype, ismyiatype, Array, Bool, Function, \
     Number, Tuple
-from ..utils import overload
+from ...utils import overload
 
 from .relay_helpers import optimize, build_module
 
@@ -197,23 +196,7 @@ class RelayMapper:
 MAP = RelayMapper(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 
 
-class RelayRunner:
-    def __init__(self, fn, dtypes):
-        self.fn = fn
-        self.dtypes = dtypes
-
-    def tonumpy(self, v):
-        if isinstance(v, relay.backend.interpreter.TupleValue):
-            return tuple(self.tonumpy(f) for f in v.fields)
-        return v.asnumpy()
-
-    def __call__(self, *args):
-        assert len(args) == len(self.dtypes)
-        args = [relay.const(a, dt) for a, dt in zip(args, self.dtypes)]
-        return self.tonumpy(self.fn(*args))
-
-
-class CompileGraph(PipelineStep):
+class CompileGraph:
     """Step to convert a myia graph to a relay graph.
 
     Inputs:
@@ -223,7 +206,7 @@ class CompileGraph(PipelineStep):
         output: a wrapped relay graph
 
     """
-    def step(self, graph):
+    def run(self, graph, context):
         """Convert the graph into a relay callable."""
         mng = manage(graph)
 
@@ -231,34 +214,20 @@ class CompileGraph(PipelineStep):
         self.node_map = {}
         self.graph_map = {}
 
-        print()
-
         for g in mng.graphs:
             self.graph_map[g] = relay.GlobalVar(g.debug.debug_name)
 
         for g in mng.graphs:
             function_map[self.graph_map[g]] = self.convert_func(g)
-            print(f"FN: {g.debug.debug_name}")
-            print_graph(g)
-            print("=======================================")
-            print(function_map[self.graph_map[g]].astext())
 
         module = build_module(function_map)
-        print(module.astext())
 
         module.entry_func = module.global_var_map_[graph.debug.debug_name]
 
         optimize(module)
 
-        print("OPTIMIZED")
-
-        exec = relay.create_executor(mod=module)
-        fn = exec.evaluate(module.entry_func)
-
-        output = RelayRunner(
-            fn, [to_relay_type(p.abstract) for p in graph.parameters])
-
-        return {'output': output}
+        exec = relay.create_executor(mod=module, ctx=context)
+        return exec.evaluate(module.entry_func)
 
     def on_parameter(self, node):
         return relay.var(
@@ -321,4 +290,62 @@ class CompileGraph(PipelineStep):
                               ret_type=to_relay_type(graph.output.abstract))
 
 
-step_compile = CompileGraph.partial()
+compiler = CompileGraph()
+
+
+class RelayBackend(Backend):
+    """Backend based on Relay.
+
+    Backend options:
+        target: the target device class ('cpu', 'cuda')
+        device_id: the target device identifier (an int)
+
+    """
+    def __init__(self, target, device_id):
+        """Create a Relay backend for the given device."""
+        self.context = tvm.ndarray.context(target, device_id)
+	if not self.context.exist:  # pragma: no cover
+            raise RuntimeError("No hardware to support selected target/device")
+        self.compiler = compiler
+
+    def compile(self, graph):
+        """Compiler a graph."""
+        return self.compiler.run(graph, self.context)
+
+    def to_numpy(self, v):
+        """Make a numpy array from a TVM array."""
+        return v.asnumpy()
+
+    def from_numpy(self, a):
+        """Make an TVM array from a numpy array."""
+	return tvm.ndarray.array(a, self.context)
+
+    def to_scalar(self, v):
+        """Convert the TVM array to a scalar."""
+        return v.asnumpy().item()
+
+    def from_scalar(self, s, t):
+        """Convert the scalar to an TVM array."""
+        dt = type_to_np_dtype(t)
+        return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
+
+        def to_dlpack(self, v):
+        """Make a dlpack capsule from an TVM array."""
+        return v.to_dlpack()
+
+    def from_dlpack(self, v):
+        """Make an TVM array from a dlpack capsule."""
+        t = tvm.ndarray.from_dlpack(v)
+        if t.context != self.context:  # pragma: no cover
+            # This may do a copy but we will need it
+            t = tvm.ndarray.array(t, self.context)
+	return t
+
+    def check_array(self, v, t):
+        """Check if value is an TVM array for this context."""
+        if not isinstance(v, tvm.ndarray.NDArray):
+            raise TypeError("Expected NNVM array")
+        if v.context != self.context:  # pragma: no cover
+            raise RuntimeError("Array on wrong context.")
+        if v.dtype != type_to_np_dtype(t):
+            raise TypeError("Wrong dtype")
