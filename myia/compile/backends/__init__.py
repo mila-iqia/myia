@@ -116,6 +116,8 @@ class Backend:
         elif ismyiatype(t, dtype.Tuple):
             return tuple(self.convert_value(v, t)
                          for v, t in zip(v, t.elements))
+        elif ismyiatype(t, dtype.Array):
+            return self.from_numpy(v)
         else:
             raise NotImplementedError(f'convert_value for {t}')
 

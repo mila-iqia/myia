@@ -65,7 +65,7 @@ def wrap_primitives(graph):
 nonlinear_ops = (
     P.return_, P.partial, P.switch, P.make_tuple, P.make_list,
     P.list_len, P.list_getitem, P.list_setitem, P.list_append, P.bool_and,
-    P.tuple_getitem, P.tuple_setitem
+    P.tuple_getitem, P.tuple_setitem, P.env_getitem,
 )
 
 
@@ -94,6 +94,7 @@ class CompileGraph:
         self.max_height = 0
         self.slots = {}
         self.instrs = []
+        self.env_keys = []
 
     def _is_cut(self, node):
         if node.is_apply():
@@ -268,6 +269,16 @@ class CompileGraph:
                         self.add_instr('tuple_setitem',
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]),
+                    elif fn.value == P.env_getitem:
+                        self.add_instr('env_getitem',
+                                       self.ref(split.inputs[1]),
+                                       split.inputs[2])
+                    elif fn.value == P.env_setitem:
+                        breakpoint()
+                        self.env_keys.append(split.inputs[2])
+                        self.add_instr('env_setitem',
+                                       self.ref(split.inputs[1]),
+                                       split.inputs[2],
                                        self.ref(split.inputs[3]))
                     else:
                         raise AssertionError(f"Unknown special function "
