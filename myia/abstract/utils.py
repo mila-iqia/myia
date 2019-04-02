@@ -156,6 +156,7 @@ def build_type(self, x: AbstractType):
 
 @build_type.variant
 def build_type_fn(self, x: AbstractFunction):
+    """Build the type for a function with fully-specified Function types."""
     return self(x.get_unique())
 
 

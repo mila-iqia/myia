@@ -1,12 +1,18 @@
+"""Collection of helpers for the Relay backend.
+
+Most of those should go away as Relay main development progresses.
+"""
+
 from tvm import relay
 from tvm.relay import ir_pass
 import numpy as np
 
 
 class _LiveSet(relay.expr_functor.ExprMutator):
-    """Compute the live set of globals, we use
-       ExprMutator here, but really want a visitor
-       as we don't care about the resulting Expr.
+    """Compute the live set of globals.
+
+    We use ExprMutator here, but really want a visitor as we don't
+    care about the resulting Expr.
     """
 
     def __init__(self, mod):
@@ -61,9 +67,7 @@ def _placeholder_body(type):
 
 
 def build_module(funcs):
-    """
-    Workaround for type checker and mutually recursive functions.
-    """
+    """Workaround for type checker and mutually recursive functions."""
     mod = relay.Module({})
     for gv in funcs:
         func = funcs[gv]
@@ -77,11 +81,11 @@ def build_module(funcs):
 
 
 def optimize(mod):
-    """
-    Modules are the only mutable piece of Relay.
-    We write an optimization pass over the module
-    which destructably updates each function while
-    optimizing.
+    """Optimize all the functions in a module.
+
+    Modules are the only mutable piece of Relay.  We write an
+    optimization pass over the module which destructably updates each
+    function while optimizing.
     """
     ls = _live_from_main(mod)
     for var in ls:

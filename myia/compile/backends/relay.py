@@ -20,6 +20,7 @@ from .relay_helpers import optimize, build_module
 
 @overload(bootstrap=True)
 def to_relay_type(self, a: AbstractScalar):
+    """Convert a myia abstract to a Relay type."""
     tp = build_type(a)
     if ismyiatype(tp, Bool):
         return relay.ty.TensorType((), 'bool')
@@ -109,6 +110,7 @@ SIMPLE_MAP = {
 
 
 def relay_partial(c, fn, *args):
+    """Implementation of partial for Relay."""
     ty = fn.type
     rargs = [relay.var("") for a in ty.arguments]
     fn = relay.Function(rargs, relay.Call(c.ref(fn), rargs))
@@ -120,23 +122,27 @@ def relay_partial(c, fn, *args):
 
 
 def relay_distribute(c, array, shape):
+    """Implementation of distribute for Relay."""
     assert shape.is_constant(tuple)
     return relay.op.broadcast_to(c.ref(array), shape.value)
 
 
 def relay_transpose(c, a, ax):
+    """Implementation of transpose for Relay."""
     na = c.ref(a)
     assert ax.is_constant(tuple)
     return relay.op.transpose(na, axes=ax.value)
 
 
 def relay_array_map(c, fn, *array):
+    """Implementation of array_map for Relay."""
     assert fn.is_constant(Primitive)
     fn = fn.value
     return SIMPLE_MAP[fn](*[c.ref(a) for a in array])
 
 
 def relay_array_reduce(c, fn, array, shape):
+    """Implementation of array_reduce for Relay."""
     assert fn.is_constant(Primitive)
     assert shape.is_constant(tuple)
     fn = fn.value
@@ -194,6 +200,7 @@ class RelayMapper:
             self.register(k, v)
 
     def get(self, fn):
+        """Get the mapping for the primitive."""
         return self.mapping.get(fn, None)
 
 
@@ -208,8 +215,8 @@ class CompileGraph:
 
     Outputs:
         output: a wrapped relay graph
-
     """
+
     def run(self, graph, context):
         """Convert the graph into a relay callable."""
         mng = manage(graph)
@@ -234,11 +241,13 @@ class CompileGraph:
         return exec.evaluate(module.entry_func)
 
     def on_parameter(self, node):
+        """Convert a parameter node."""
         return relay.var(
             node.debug.debug_name,
             type_annotation=to_relay_type(node.abstract))
 
     def on_apply(self, node):
+        """Convert an Apply node."""
         if node.inputs[0].is_constant(Primitive):
             fn = node.inputs[0].value
             conv = MAP.get(fn)
@@ -248,6 +257,7 @@ class CompileGraph:
                           [self.ref(i) for i in node.inputs[1:]])
 
     def on_constant(self, node):
+        """Convert a constant node."""
         def _helper(value, type):
             if ismyiatype(type, Tuple):
                 return relay.Tuple([_helper(e, et) for e, et in
@@ -261,12 +271,15 @@ class CompileGraph:
         return _helper(node.value, node.type)
 
     def on_graph(self, node):
+        """Convert a graph constant."""
         return self.graph_map[node.value]
 
     def ref(self, node):
+        """Return the value for a node."""
         return self.node_map[node]
 
     def convert_func(self, graph):
+        """Convert a graph."""
         for p in graph.parameters:
             self.node_map[p] = self.on_parameter(p)
 
@@ -302,8 +315,8 @@ class RelayBackend(Backend):
     Backend options:
         target: the target device class ('cpu', 'cuda')
         device_id: the target device identifier (an int)
-
     """
+
     def __init__(self, target, device_id):
         """Create a Relay backend for the given device."""
         self.context = tvm.ndarray.context(target, device_id)
