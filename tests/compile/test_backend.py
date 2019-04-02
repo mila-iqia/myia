@@ -15,6 +15,7 @@ from ..common import MA, MB
 
 @pytest.fixture(params=[
     pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
+    pytest.param(('relay', {'target': 'cpu', 'device_id': 0}), id='relay-cpu'),
     pytest.param(('pytorch', {'device': 'cpu'}), id='pytorch-cpu')])
 def backend_opt(request):
     name, options = request.param

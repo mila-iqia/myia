@@ -8,14 +8,14 @@ class _LiveSet(relay.expr_functor.ExprMutator):
        ExprMutator here, but really want a visitor
        as we don't care about the resulting Expr.
     """
-    
+
     def __init__(self, mod):
         self.live_set = set()
         self.mod = mod
         super().__init__()
 
     def visit_global_var(self, var):
-        if not var in self.live_set:
+        if var not in self.live_set:
             self.live_set.add(var)
             self.visit(self.mod[var])
         return var
@@ -26,7 +26,7 @@ class _LiveSet(relay.expr_functor.ExprMutator):
             self.visit(ite.true_branch),
             self.visit(ite.false_branch))
 
-    
+
 def _live_from_main(mod):
     ls = _LiveSet(mod)
     ls.visit(mod[mod.entry_func])

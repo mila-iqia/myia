@@ -1,16 +1,18 @@
 """Transforms a graph into lower-level code."""
 
+import tvm
 from tvm import relay
+import numpy as np
+
+from . import Backend
 
 from ...abstract import AbstractArray, AbstractTuple, AbstractScalar, \
     AbstractFunction, VirtualFunction, GraphFunction, TypedPrimitive, \
     PartialApplication, SHAPE, build_type
-from ...ir import Apply, Graph, Constant, manage
+from ...ir import manage
 from ...graph_utils import toposort
 from ...prim import Primitive, ops as P
-from ...prim.ops import partial, return_, switch, make_tuple
-from ...dtype import type_to_np_dtype, ismyiatype, Array, Bool, Function, \
-    Number, Tuple
+from ...dtype import type_to_np_dtype, ismyiatype, Bool, Tuple
 from ...utils import overload
 
 from .relay_helpers import optimize, build_module
@@ -125,6 +127,7 @@ def relay_transpose(c, a, ax):
     na = c.ref(a)
     assert ax.is_constant(tuple)
     return relay.op.transpose(na, axes=ax.value)
+
 
 def relay_array_map(c, fn, *array):
     assert fn.is_constant(Primitive)
@@ -285,7 +288,6 @@ class CompileGraph:
             elif node.is_constant():
                 self.node_map[node] = self.on_constant(node)
 
-
         return relay.Function(params, self.ref(graph.output),
                               ret_type=to_relay_type(graph.output.abstract))
 
@@ -304,7 +306,7 @@ class RelayBackend(Backend):
     def __init__(self, target, device_id):
         """Create a Relay backend for the given device."""
         self.context = tvm.ndarray.context(target, device_id)
-	if not self.context.exist:  # pragma: no cover
+        if not self.context.exist:  # pragma: no cover
             raise RuntimeError("No hardware to support selected target/device")
         self.compiler = compiler
 
@@ -318,7 +320,7 @@ class RelayBackend(Backend):
 
     def from_numpy(self, a):
         """Make an TVM array from a numpy array."""
-	return tvm.ndarray.array(a, self.context)
+        return tvm.ndarray.array(a, self.context)
 
     def to_scalar(self, v):
         """Convert the TVM array to a scalar."""
@@ -329,7 +331,7 @@ class RelayBackend(Backend):
         dt = type_to_np_dtype(t)
         return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
 
-        def to_dlpack(self, v):
+    def to_dlpack(self, v):
         """Make a dlpack capsule from an TVM array."""
         return v.to_dlpack()
 
@@ -339,7 +341,7 @@ class RelayBackend(Backend):
         if t.context != self.context:  # pragma: no cover
             # This may do a copy but we will need it
             t = tvm.ndarray.array(t, self.context)
-	return t
+        return t
 
     def check_array(self, v, t):
         """Check if value is an TVM array for this context."""

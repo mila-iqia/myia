@@ -192,8 +192,7 @@ def isomorphic(g1, g2, equiv=None):
 
 
 def print_graph(g):
-    node_map = {}
-
+    """Prints a textual representation of a graph."""
     print(f"graph {g.debug.debug_name}(" +
           ", ".join(f"%{p.debug.debug_name}" for p in g.parameters) +
           ") {")
