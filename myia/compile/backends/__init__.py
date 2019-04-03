@@ -36,7 +36,7 @@ _backends = {
 }
 
 # This is used as the default backend and options if None is provided
-default_name = 'pytorch'
+default_name = 'nnvm'
 
 
 def load_backend(name):
