@@ -9,7 +9,7 @@ from itertools import count
 
 from .. import dtype
 from ..abstract import AbstractTuple, AbstractList, AbstractClass, \
-    AbstractArray, TYPE, AbstractScalar, Pending
+    AbstractArray, TYPE, AbstractScalar
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \

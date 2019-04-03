@@ -245,9 +245,8 @@ def test_print_graph():
     p.debug.name = 'a'
     p2 = g.add_parameter()
     p2.debug.name = 'b'
-    c = g.constant(g)
-    c2 = g.constant(1)
-    g.output = g.apply(g, c2, p2)
+    c = g.constant(1)
+    g.output = g.apply(g, c, p2)
     g.output.debug.name = '_apply0'
 
     s = print_graph(g)
