@@ -63,14 +63,15 @@ def to_relay_type(self, a: GraphFunction):
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: object):
+def to_relay_type(self, a: object):  # pragma: no cover
     raise ValueError("Unknown type:", build_type(a))
 
 
 def ashape(node):
     """Make sure shape isn't None, that makes relay crash later."""
     shp = node.shape
-    if shp is None:
+    if shp is None:  # pragma: no cover
+        raise RuntimeError("You found a way to trigger this, please report it")
         shp = ()
     return shp
 
@@ -318,7 +319,7 @@ class RelayBackend(Backend):
         device_id: the target device identifier (an int)
     """
 
-    def __init__(self, target, device_id):
+    def __init__(self, target='cpu', device_id=0):
         """Create a Relay backend for the given device."""
         self.context = tvm.ndarray.context(target, device_id)
         if not self.context.exist:  # pragma: no cover
