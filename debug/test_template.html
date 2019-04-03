@@ -1,0 +1,119 @@
+
+<style>
+    .pytest-reports {
+        margin: 5px;
+        padding: 5px;
+    }
+    .testfile-report :nth-child(2) {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        color: transparent;
+        user-select: none;
+    }
+    .testgroup-report {
+        display: flex;
+        flex-direction: row;
+        margin-left: 3px;
+        margin-right: 3px;
+        align-items: center;
+    }
+    .test-report {
+        margin: 1px;
+    }
+    .test-report:empty {
+        border-radius: 2px;
+        height: 5px;
+        width: 5px;
+        background: #aaa;
+    }
+    .testresult {
+        /* color: transparent;
+        user-select: none; */
+        background: black;
+        border-radius: 2px;
+    }
+    .testresult-passed {
+        background: #0b0;
+    }
+    .testresult-skipped {
+        background: orange;
+    }
+    .testresult-failed {
+        background: red;
+    }
+    .testresult-xfailed {
+        background: orange;
+        padding: 2px;
+        border: 1px solid red;
+    }
+    .testresult-xpassed {
+        background: orange;
+        padding: 2px;
+        border: 1px solid #0b0;
+    }
+    .testresult-kind-short {
+        height: 5px;
+        width: 5px;
+    }
+    .testresult-kind-long {
+        height: 10px;
+    }
+    .repl-box {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .report-stdout {
+        border: 3px solid green;
+        margin: 5px;
+    }
+    .report-stdout > :nth-child(1) {
+        color: white;
+        font-weight: bold;
+        background: green;
+    }
+    /* .report-stdout > :nth-child(2) {
+        padding: 5px;
+    } */
+    .report-stderr {
+        border: 3px solid red;
+        margin: 5px;
+    }
+    .report-stderr > :nth-child(1) {
+        color: white;
+        font-weight: bold;
+        background: red;
+    }
+    /* .report-stderr > :nth-child(2) {
+        padding: 5px;
+    } */
+    .root {
+        height: 100%;
+        width: 100%;
+    }
+    .tippy-tooltip table {
+        text-align: left;
+    }
+    code.stdout {
+        white-space: pre;
+    }
+</style>
+
+<div address="/" class="root">
+    <buche-tabs address="main-tabs">
+        <tab-entry label="[out]">
+            <div address="/stdout">
+            </div>
+        </tab-entry>
+        <tab-entry label="[err]">
+            <div address="/stderr">
+            </div>
+        </tab-entry>
+        <tab-entry label="Summary" active>
+            <div class="pytest-reports" address="pytest-reports">
+            </div>                
+        </tab-entry>
+    </buche-tabs>
+</div>

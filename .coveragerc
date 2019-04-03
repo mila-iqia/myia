@@ -1,7 +1,9 @@
 [run]
 omit =
+    conftest.py
     setup.py
     tests/*
+    debug/*
     myia/debug/*
 
 [report]
