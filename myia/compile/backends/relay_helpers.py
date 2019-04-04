@@ -86,7 +86,7 @@ def optimize(mod):
     """Optimize all the functions in a module.
 
     Modules are the only mutable piece of Relay.  We write an
-    optimization pass over the module which destructably updates each
+    optimization pass over the module which destructively updates each
     function while optimizing.
     """
     ls = _live_from_main(mod)
