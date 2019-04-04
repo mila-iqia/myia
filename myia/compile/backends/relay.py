@@ -89,7 +89,6 @@ SIMPLE_MAP = {
     P.scalar_exp: relay.op.exp,
     P.scalar_log: relay.op.log,
     # This is not right tangent vs hyperbolic tangent
-    # P.scalar_tan: relay.op.tanh,
     P.scalar_tanh: relay.op.tanh,
 
     P.scalar_eq: relay.op.equal,
