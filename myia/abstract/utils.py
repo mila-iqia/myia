@@ -24,6 +24,11 @@ from .data import (
     AbstractClass,
     AbstractJTagged,
     TrackDict,
+    VirtualFunction,
+    GraphFunction,
+    TypedPrimitive,
+    PartialApplication,
+    Function,
     VALUE,
     TYPE,
     MyiaTypeError,
@@ -143,6 +148,42 @@ def build_type(self, x: AbstractJTagged):
 @overload  # noqa: F811
 def build_type(self, x: AbstractType):
     return dtype.TypeType
+
+
+# A variant of built_dtype with precise function types.
+# Use for the .type attributes of nodes
+
+
+@build_type.variant
+def build_type_fn(self, x: AbstractFunction):
+    """Build the type for a function with fully-specified Function types."""
+    return self(x.get_unique())
+
+
+@overload  # noqa: F811
+def build_type_fn(self, x: VirtualFunction):
+    return dtype.Function[tuple(self(a) for a in x.args), self(x.output)]
+
+
+@overload  # noqa: F811
+def build_type_fn(self, x: PartialApplication):
+    tp = self(x.fn)
+    return dtype.Function[tp.arguments[len(x.args):], tp.retval]
+
+
+@overload  # noqa: F811
+def build_type_fn(self, x: GraphFunction):
+    return self(x.graph.abstract)
+
+
+@overload  # noqa: F811
+def build_type_fn(self, x: TypedPrimitive):
+    return dtype.Function[[self(a) for a in x.args], self(x.output)]
+
+
+@overload  # noqa: F811
+def build_type_fn(self, x: Function):
+    return dtype.Function
 
 
 ###########

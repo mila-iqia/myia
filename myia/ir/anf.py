@@ -250,8 +250,8 @@ class ANFNode(Node):
     @property
     def type(self):
         """Return the node's type."""
-        from ..abstract import build_type
-        return self.abstract and build_type(self.abstract)
+        from ..abstract import build_type_fn
+        return self.abstract and build_type_fn(self.abstract)
 
     @property
     def shape(self):

@@ -15,6 +15,7 @@ from ..common import MA, MB
 
 @pytest.fixture(params=[
     pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
+    pytest.param(('relay', {'target': 'cpu', 'device_id': 0}), id='relay-cpu'),
     pytest.param(('pytorch', {'device': 'cpu'}), id='pytorch-cpu')])
 def backend_opt(request):
     name, options = request.param
@@ -269,3 +270,25 @@ def test_array_reduce2(x):
 @parse_compare((MA(2, 3),))
 def test_transpose(x):
     return transpose(x, (1, 0))
+
+
+@parse_compare((3, 4))
+def test_make_tuple(a, b):
+    return (a, b)
+
+
+@parse_compare((True, 42, 33))
+def test_call_hof(c, x, y):
+    def f1(x):
+        return x + y
+
+    def f2(x):
+        return x * y
+
+    def choose(c):
+        if c:
+            return f1
+        else:
+            return f2
+
+    return choose(c)(x) + choose(not c)(x)

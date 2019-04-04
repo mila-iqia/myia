@@ -358,7 +358,7 @@ class NNVMBackend(Backend):
             lambda l: converter.convert(l, context=self.context),
             nonlinear_ops, self)
 
-    def compile(self, graph):
+    def compile(self, graph, *others):
         """Compile a graph."""
         return self.compiler.compile_and_link(graph)
 

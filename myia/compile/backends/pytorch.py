@@ -152,7 +152,7 @@ class PyTorchBackend(Backend):
         self.compiler = CompileGraphs(pytorch_convert, nonlinear_ops, self,
                                       split_linear=True)
 
-    def compile(self, graph):
+    def compile(self, graph, *others):
         """Compile a graph."""
         return self.compiler.compile_and_link(graph)
 

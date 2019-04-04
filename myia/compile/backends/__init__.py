@@ -32,6 +32,7 @@ def import_load(pkg, name):
 
 _backends = {
     'nnvm': import_load('myia.compile.backends.nnvm', 'NNVMBackend'),
+    'relay': import_load('myia.compile.backends.relay', 'RelayBackend'),
     'pytorch': import_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
 }
 
@@ -75,7 +76,7 @@ def register_backend(name, load_fn):
 class Backend:
     """This is a class interface that all backends must implement."""
 
-    def compile(self, graph):
+    def compile(self, graph, argspec, outspec, pipeline):
         """Compile the group of graphs rooted at `graph`.
 
         This function takes in a fully typed graph cluster rooted at

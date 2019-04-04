@@ -462,9 +462,9 @@ class CompileStep(PipelineStep):
             backend_options = {}
         self.backend = backend_class(**backend_options)
 
-    def step(self, graph):
+    def step(self, graph, argspec, outspec):
         """Compile the set of graphs."""
-        out = self.backend.compile(graph)
+        out = self.backend.compile(graph, argspec, outspec, self.pipeline)
         return {'output': out}
 
 
