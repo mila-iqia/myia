@@ -25,6 +25,7 @@ from .data import (
     AbstractList,
     AbstractClass,
     AbstractJTagged,
+    AbstractUnion,
     TrackDict,
     VirtualFunction,
     GraphFunction,
@@ -145,6 +146,11 @@ def build_type(self, x: AbstractClass):
 @overload  # noqa: F811
 def build_type(self, x: AbstractJTagged):
     return dtype.JTagged[self(x.element)]
+
+
+@overload  # noqa: F811
+def build_type(self, x: AbstractUnion):
+    return dtype.Union[[self(opt) for opt in x.options]]
 
 
 @overload  # noqa: F811

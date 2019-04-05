@@ -5,7 +5,7 @@ from myia import dtype
 from myia.abstract import VALUE, TYPE, SHAPE, \
     AbstractValue, AbstractScalar, AbstractArray, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
-    AbstractJTagged, ANYTHING
+    AbstractJTagged, AbstractUnion, ANYTHING
 from myia.dtype import Bool, Int, UInt, Float, List, Array, Tuple, Function, \
     Object, pytype_to_myiatype
 from myia.ir import MultitypeGraph
@@ -96,6 +96,11 @@ def Shp(*vals):
 
 def Ty(t):
     return AbstractType(t)
+
+
+def U(*opts):
+    opts = [to_abstract_test(x) for x in opts]
+    return AbstractUnion(opts)
 
 
 @overload(bootstrap=True)

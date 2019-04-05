@@ -236,6 +236,29 @@ class Tuple(Object):
         return f'Tuple[{elems}]'
 
 
+class Union(Object):
+    """Represents a set of possible types.
+
+    Instantiate with `Union[type1, type2, ... typeN]`.  A single
+    sequence of types is also acceptable as the sole argument.
+    """
+
+    elements: TupleT[Type, ...]
+
+    @classmethod
+    def parameterize(cls, *elements):
+        """Parameterize using a list of elements."""
+        if len(elements) == 1 and isinstance(elements[0], (tuple, list)):
+            elements, = elements
+        return cls.make_subtype(elements=tuple(elements))
+
+    @classmethod
+    def __type_repr__(cls):
+        elems = getattr(cls, 'elements', [])
+        elems = ', '.join(map(repr, elems))
+        return f'Union[{elems}]'
+
+
 class Array(Object):
     """Represents an array of values.
 
