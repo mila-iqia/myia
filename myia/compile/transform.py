@@ -64,7 +64,8 @@ def wrap_primitives(graph):
 
 nonlinear_ops = (
     P.return_, P.partial, P.switch, P.make_tuple, P.make_list,
-    P.list_len, P.list_getitem, P.list_setitem, P.list_append, P.bool_and
+    P.list_len, P.list_getitem, P.list_setitem, P.list_append, P.bool_and,
+    P.tuple_getitem, P.tuple_setitem
 )
 
 
@@ -256,6 +257,15 @@ class CompileGraph:
                         self.add_instr('bool_and',
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]))
+                    elif fn.value == P.tuple_getitem:
+                        self.add_instr('tuple_getitem',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]))
+                    elif fn.value == P.tuple_setitem:
+                        self.add_instr('tuple_setitem',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]),
+                                       self.ref(split.inputs[3]))
                     else:
                         raise AssertionError(f"Unknown special function "
                                              "{fn.value}")
