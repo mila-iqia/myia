@@ -157,13 +157,9 @@ def test_clone_inline():
 
     g = parse(f)
 
-    cl = GraphCloner(clone_constants=False)
     target = _graph_for_inline()
     new_params = [ONE, TWO]
-    cl.add_clone(g, target, new_params)
-
-    # We ask twice to test that this doesn't cause problems
-    cl.add_clone(g, target, new_params)
+    cl = GraphCloner(inline=(g, target, new_params), clone_constants=False)
 
     _successful_inlining(cl, g, new_params, target)
 
@@ -187,10 +183,9 @@ def test_clone_recursive():
     assert d1 & d2 == set()
 
     # Now test inlining
-    cl2 = GraphCloner(clone_constants=True)
     target = _graph_for_inline()
     new_params = [ONE, TWO]
-    cl2.add_clone(g, target, new_params)
+    cl2 = GraphCloner(inline=(g, target, new_params), clone_constants=True)
 
     _successful_inlining(cl2, g, new_params, target)
 
@@ -199,12 +194,12 @@ def test_clone_recursive():
     assert any(node.value is g for node in new_nodes)
 
     # Now test that inlining+total will fail
-    cl2 = GraphCloner(total=True, clone_constants=True)
     target = _graph_for_inline()
     new_params = [ONE, TWO]
     with pytest.raises(Exception):
-        cl2.add_clone(g, target, new_params)
-        cl2[g.output]
+        cl2 = GraphCloner(inline=(g, target, new_params),
+                          total=True,
+                          clone_constants=True)
 
 
 def test_clone_unused_parameters():

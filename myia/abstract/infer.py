@@ -159,63 +159,64 @@ class InferenceEngine:
             for task in asyncio.all_tasks(self.loop):
                 task._log_destroy_pending = False
 
-    _get_inferrer_for = Overload()
+    get_inferrer_for = Overload()
 
-    @_get_inferrer_for.register
-    def _get_inferrer_for(self, pf: PrimitiveFunction):
+    @get_inferrer_for.wrapper
+    def get_inferrer_for(__call__, self, fn):
+        """Return the Inferrer for the given function."""
+        tracking = getattr(fn, 'tracking_id', None)
+        if tracking is None:
+            return __call__(self, fn)
+        if fn not in self.constructors:
+            fn_generic = dc_replace(fn, tracking_id=None)
+            inf = __call__(self, fn_generic)
+            self.constructors[fn] = TrackedInferrer(inf)
+        return self.constructors[fn]
+
+    @get_inferrer_for.register
+    def get_inferrer_for(self, pf: PrimitiveFunction):
         return self.constructors[pf.prim]
 
-    @_get_inferrer_for.register
-    def _get_inferrer_for(self, prim: Primitive):
+    @get_inferrer_for.register
+    def get_inferrer_for(self, prim: Primitive):
         return self.constructors[prim]
 
-    @_get_inferrer_for.register
-    def _get_inferrer_for(self, g: GraphFunction):
+    @get_inferrer_for.register
+    def get_inferrer_for(self, g: GraphFunction):
         if g not in self.constructors:
             self.constructors[g] = GraphInferrer(g.graph, g.context)
         return self.constructors[g]
 
-    @_get_inferrer_for.register
-    def _get_inferrer_for(self, part: PartialApplication):
+    @get_inferrer_for.register
+    def get_inferrer_for(self, part: PartialApplication):
         return PartialInferrer(
             self.get_inferrer_for(part.fn),
             part.args
         )
 
-    @_get_inferrer_for.register
-    def _get_inferrer_for(self, j: JTransformedFunction):
+    @get_inferrer_for.register
+    def get_inferrer_for(self, j: JTransformedFunction):
         return JInferrer(
             self.get_inferrer_for(j.fn),
             j.fn
         )
 
-    @_get_inferrer_for.register
-    def _get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive)):
+    @get_inferrer_for.register
+    def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive)):
         return VirtualInferrer(
             vf.args,
             vf.output
         )
 
-    @_get_inferrer_for.register
-    def _get_inferrer_for(self, df: DummyFunction):
+    @get_inferrer_for.register
+    def get_inferrer_for(self, df: DummyFunction):
         raise MyiaTypeError(f'Trying to call dummy')
 
-    @_get_inferrer_for.register
-    def _get_inferrer_for(self, mg: MetaGraphFunction):
+    @get_inferrer_for.register
+    def get_inferrer_for(self, mg: MetaGraphFunction):
         if mg not in self.constructors:
             self.constructors[mg] = MetaGraphInferrer(mg.metagraph)
         return self.constructors[mg]
-
-    def get_inferrer_for(self, fn):
-        """Return the Inferrer for the given function."""
-        tracking = getattr(fn, 'tracking_id', None)
-        if tracking is None:
-            return self._get_inferrer_for(fn)
-        if fn not in self.constructors:
-            fn_generic = dc_replace(fn, tracking_id=None)
-            inf = self._get_inferrer_for(fn_generic)
-            self.constructors[fn] = TrackedInferrer(inf)
-        return self.constructors[fn]
 
     async def execute(self, fn, *args):
         """Infer the result of fn(*args)."""

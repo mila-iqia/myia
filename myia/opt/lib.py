@@ -3,7 +3,8 @@
 from ..abstract import abstract_clone, AbstractFunction, AbstractJTagged
 from ..composite import hyper_add
 from ..dtype import Number, ismyiatype
-from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone
+from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone, \
+    BasicRemapper
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable, overload
 from ..utils.unify import Var, var, SVar
@@ -350,12 +351,13 @@ def unfuse_composite(optimizer, node, equiv):
 
     This must be applied to scalar-only graphs.
     """
-    from ..grad import GraphRemapper
-
     # This has to be defined inline because of circular imports
-    class UnfuseRemapper(GraphRemapper):
+    class UnfuseRemapper(BasicRemapper):
         def __init__(self, g, shape):
-            super().__init__('unfused', g.graphs_used.keys() | {g})
+            super().__init__(
+                graphs=g.graphs_used.keys() | {g},
+                relation='unfused'
+            )
             self.shape = shape
 
         def asarray(self, ng, i):
@@ -365,21 +367,22 @@ def unfuse_composite(optimizer, node, equiv):
             else:
                 return i
 
-        def link_apply(self, g, ng, node, new_node):
+        def link_apply(self, link):
+            ng = link.new_graph
+            node = link.node
             assert node.inputs[0].is_constant(Primitive)
-            ni = [self.asarray(ng, self.get(g, i)) for i in node.inputs[1:]]
-            new_node.inputs = \
+            ni = [self.asarray(ng, self.repl[i]) for i in node.inputs[1:]]
+            link.new_node.inputs = \
                 [ng.constant(P.array_map), node.inputs[0]] + ni
 
         def finalize_graph(self, g, ng):
-            ng.output = self.get(g, g.output)
+            # This fails if we set .return_ instead of .output, not sure why.
+            ng.output = self.repl[g.output]
 
     g = equiv[G].value
     xs = equiv[Xs]
     r = UnfuseRemapper(g, xs[0].shape)
-    r.populate()
-    r.link()
-    r.finalize()
+    r.run()
     ng = r.get_graph(g)
     return node.graph.apply(ng, *xs)
 
@@ -621,8 +624,7 @@ def make_inliner(inline_criterion, check_recursive):
             if g.recursive:
                 return node
 
-        clone = GraphCloner(total=False)
-        clone.add_clone(g, node.graph, args)
+        clone = GraphCloner(inline=(g, node.graph, args), total=False)
         return clone[g.output]
 
     return inline
