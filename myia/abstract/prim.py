@@ -24,6 +24,8 @@ from .data import (
     AbstractList,
     AbstractClass,
     AbstractJTagged,
+    AbstractUnion,
+    abstract_union,
     PartialApplication,
     JTransformedFunction,
     PrimitiveFunction,
@@ -456,6 +458,27 @@ uniform_prim(P.bool_eq, infer_value=True)(py.bool_eq)
 ######################
 
 
+async def _split_type(t, model):
+    """Checks t against the model and return matching/non-matching subtypes.
+
+    * If t is a Union, return a Union that fully matches model, and a Union
+      that does not match model. No matches in either case returns None for
+      that case.
+    * Otherwise, return (t, None) or (None, t) depending on whether t matches
+      the model.
+    """
+    if isinstance(t, AbstractUnion):
+        matching = [(opt, await issubtype(opt, model))
+                    for opt in t.options]
+        t1 = abstract_union([opt for opt, m in matching if m])
+        t2 = abstract_union([opt for opt, m in matching if not m])
+        return t1, t2
+    elif (await issubtype(t, model)):
+        return t, None
+    else:
+        return None, t
+
+
 @standard_prim(P.typeof)
 async def _inf_typeof(engine, value):
     t = build_type(value)
@@ -467,8 +490,13 @@ async def _inf_hastype(engine, value, model: dtype.TypeType):
     model_t = model.values[VALUE]
     if model_t is ANYTHING:
         raise MyiaTypeError('hastype must be resolvable statically')
+    match, nomatch = await _split_type(value, model_t)
+    if match is None:
+        v = False
+    elif nomatch is None:
+        v = True
     else:
-        v = await issubtype(value, model_t)
+        v = ANYTHING
     return AbstractScalar({
         VALUE: v,
         TYPE: dtype.Bool,
