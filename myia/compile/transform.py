@@ -1,9 +1,10 @@
 """Transforms a graph into lower-level code."""
 
-from ..abstract import VALUE, Pending
+from ..abstract import VALUE, Pending, to_abstract
 from ..ir import Apply, toposort, Graph, Constant
 from ..prim import Primitive, ops as P
 from .vm import FinalVM
+from ..utils import SymbolicKeyInstance, EnvInstance
 
 
 def set_types(graph, argspec, outspec, pipeline):
@@ -15,6 +16,26 @@ def set_types(graph, argspec, outspec, pipeline):
         if isinstance(v, Pending):
             v = v.result()
         ref.node.abstract = v
+
+    return graph
+
+
+def convert_grad(graph):
+    mng = graph.manager
+
+    counter = 0
+    key_map = {}
+
+    for node in mng.all_nodes:
+        if node.is_constant(SymbolicKeyInstance):
+            if node.value not in key_map:
+                key_map[node.value] = counter
+                counter += 1
+            node.value = key_map[node.value]
+            node.abstract = to_abstract(node.value)
+        elif node.is_constant(EnvInstance):
+            node.value = ()
+            node.abstract = to_abstract(())
 
     return graph
 
@@ -65,7 +86,7 @@ def wrap_primitives(graph):
 nonlinear_ops = (
     P.return_, P.partial, P.switch, P.make_tuple, P.make_list,
     P.list_len, P.list_getitem, P.list_setitem, P.list_append, P.bool_and,
-    P.tuple_getitem, P.tuple_setitem, P.env_getitem,
+    P.tuple_getitem, P.tuple_setitem, P.env_getitem, P.env_setitem, P.env_add
 )
 
 
@@ -269,17 +290,22 @@ class CompileGraph:
                         self.add_instr('tuple_setitem',
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]),
+                                       self.ref(split.inputs[3]))
                     elif fn.value == P.env_getitem:
                         self.add_instr('env_getitem',
                                        self.ref(split.inputs[1]),
-                                       split.inputs[2])
+                                       split.inputs[2].value,
+                                       self.ref(split.inputs[3]))
                     elif fn.value == P.env_setitem:
-                        breakpoint()
-                        self.env_keys.append(split.inputs[2])
                         self.add_instr('env_setitem',
                                        self.ref(split.inputs[1]),
-                                       split.inputs[2],
+                                       split.inputs[2].value,
                                        self.ref(split.inputs[3]))
+                    elif fn.value == P.env_add:
+                        breakpoint()
+                        self.add_instr('env_add',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]))
                     else:
                         raise AssertionError(f"Unknown special function "
                                              "{fn.value}")
@@ -352,6 +378,7 @@ class CompileGraphs:
         self._reset()
 
         graph = wrap_primitives(graph)
+        graph = convert_grad(graph)
 
         self.compile(graph)
 
