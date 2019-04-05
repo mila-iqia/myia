@@ -625,7 +625,6 @@ def make_inliner(inline_criterion, check_recursive):
                 return node
 
         clone = GraphCloner(inline=(g, node.graph, args), total=False)
-        # clone.add_clone(g, node.graph, args)
         return clone[g.output]
 
     return inline
