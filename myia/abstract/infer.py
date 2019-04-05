@@ -13,7 +13,8 @@ from ..utils import Overload, Partializable, is_dataclass_type, \
     SymbolicKeyInstance, overload
 
 from .loop import Pending, force_pending, InferenceLoop
-from .ref import VirtualReference, Context, EvaluationCache, Reference
+from .ref import VirtualReference, Context, EvaluationCache, Reference, \
+    ConditionalContext
 from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \

@@ -66,6 +66,7 @@ from .data import (  # noqa
 
 from .ref import (  # noqa
     Context,
+    ConditionalContext,
     Contextless,
     CONTEXTLESS,
     AbstractReference,

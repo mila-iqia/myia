@@ -37,7 +37,7 @@ from .data import (
     infer_trace
 )
 from .loop import Pending, find_coherent_result, force_pending
-from .ref import Context
+from .ref import Context, ConditionalContext, Reference
 from .utils import sensitivity_transform, build_value, build_type, broaden
 from .infer import Inferrer, to_abstract
 
