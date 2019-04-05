@@ -303,7 +303,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         if data_v is ANYTHING:
             raise InferenceError(
                 'Could not infer the type or the value of the object'
-                f" on which to resolve the attribute '{item_v}"
+                f" on which to resolve the attribute '{item_v}'"
             )
         if chk:
             chk(data_v, item_v)
