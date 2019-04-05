@@ -4,7 +4,7 @@ from ..abstract import VALUE, Pending, to_abstract
 from ..ir import Apply, toposort, Graph, Constant
 from ..prim import Primitive, ops as P
 from .vm import FinalVM
-from ..utils import SymbolicKeyInstance, EnvInstance
+from ..utils import SymbolicKeyInstance
 
 
 def set_types(graph, argspec, outspec, pipeline):
@@ -21,6 +21,10 @@ def set_types(graph, argspec, outspec, pipeline):
 
 
 def convert_grad(graph):
+    """Remove all instances of SymbolicKeyType in the graphs.
+
+    They will be replaced by globally-unique integers.
+    """
     mng = graph.manager
 
     counter = 0
@@ -33,9 +37,6 @@ def convert_grad(graph):
                 counter += 1
             node.value = key_map[node.value]
             node.abstract = to_abstract(node.value)
-        elif node.is_constant(EnvInstance):
-            node.value = ()
-            node.abstract = to_abstract(())
 
     return graph
 
@@ -301,8 +302,8 @@ class CompileGraph:
                                        self.ref(split.inputs[1]),
                                        split.inputs[2].value,
                                        self.ref(split.inputs[3]))
-                    elif fn.value == P.env_add:
-                        breakpoint()
+                    elif fn.value == P.env_add:  # pragma: no cover
+                        raise RuntimeError("apparently no model requires this")
                         self.add_instr('env_add',
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]))
