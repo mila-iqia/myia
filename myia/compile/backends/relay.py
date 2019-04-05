@@ -42,7 +42,10 @@ def to_relay_type(self, a: AbstractArray):
 
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractFunction):
-    return self(a.get_unique())
+    sings = list(self(sing) for sing in a.get_sync())
+    for sing in sings[1:]:
+        assert sing == sings[0]
+    return sings[0]
 
 
 @overload  # noqa: F811

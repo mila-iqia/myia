@@ -55,9 +55,7 @@ def _placeholder_body(type):
                            dtype=type.dtype)
     elif isinstance(type, relay.TupleType):
         return relay.Tuple([_placeholder_body(f) for f in type.fields])
-    elif isinstance(type, relay.FuncType):  # pragma: no cover
-        raise RuntimeError("You've triggered function types in relay, "
-                           "please report this")
+    elif isinstance(type, relay.FuncType):
         params = []
         for arg_ty in type.arg_types:
             params.append(relay.var("p", type_annotation=arg_ty))
