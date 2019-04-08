@@ -1,4 +1,4 @@
-python=3.7
+python>=3.7,<3.8a0
 colorama
 numpy
 nnvm=0.6.dev
