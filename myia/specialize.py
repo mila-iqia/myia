@@ -88,10 +88,8 @@ class _GraphSpecializer:
 
     def __init__(self, specializer, graph, context):
         parent_context = context.parent
-        assert not isinstance(parent_context, ConditionalContext)
-        # # Try the code below if this condition obtains
-        # while isinstance(parent_context, ConditionalContext):
-        #     parent_context = parent_context.parent
+        while isinstance(parent_context, ConditionalContext):
+            parent_context = parent_context.parent
         self.parent = specializer.specializations[parent_context]
         self.specializer = specializer
         self.engine = specializer.engine
@@ -300,16 +298,13 @@ class _GraphSpecializer:
                 _iref = self.specializer.engine.get_actual_ref(iref)
                 if _iref is not iref:
                     curr = self
-                    assert not _iref.node.is_constant_graph()
-                    assert _iref.node.graph is curr.graph
-                    # # Try the code below if these assertions are triggered
-                    # if _iref.node.is_constant_graph():
-                    #     _g = _iref.node.value.parent
-                    # else:
-                    #     _g = _iref.node.graph
-                    # while curr and _g is not curr.graph:
-                    #     curr = curr.parent
-                    # assert curr is not None
+                    if _iref.node.is_constant_graph():
+                        _g = _iref.node.value.parent
+                    else:
+                        _g = _iref.node.graph
+                    while curr and _g is not curr.graph:
+                        curr = curr.parent
+                    assert curr is not None
                     curr.cl.remapper.clone_disconnected(_iref.node)
                     iref = _iref
                     ival = await iref.get()

@@ -197,7 +197,9 @@ class Overload:
 
         if self._wrapper is None:
             if method is None:
-                raise TypeError(f'No overloaded method for {type(main)}')
+                raise TypeError(
+                    f'No overloaded method in {self} for {type(main)}'
+                )
             else:
                 return method(*args, **kwargs)
         else:

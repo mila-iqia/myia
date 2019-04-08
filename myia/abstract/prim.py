@@ -911,7 +911,7 @@ class _SwitchInferrer(Inferrer):
 
     async def _find_op(self, engine, condref):
         """Find a primitive operator to use for the condition.
-        
+
         This skips over the bool primitive or composite used for this
         pipeline.
         """

@@ -387,11 +387,15 @@ async def concretize_abstract(self, x: Pending):
 
 @overload  # noqa: F811
 async def concretize_abstract(self, r: Reference):
-    return Reference(
-        r.engine,
-        r.node,
-        await self(r.context)
-    )
+    # There's a bit of a messup here where we can't build Reference using the
+    # constructor because the node in the reference is sometimes unmanaged.
+    # That's likely because of redirections made by the union code in switch.
+    ref = object.__new__(Reference)
+    ref.engine = r.engine
+    ref.node = r.node
+    ref.context = await self(r.context)
+    ref._hash = hash((ref.node, ref.context))
+    return ref
 
 
 @overload  # noqa: F811
