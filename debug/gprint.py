@@ -226,12 +226,10 @@ class MyiaGraphPrinter(GraphPrinter):
         graphs = set()
         parents = mng.parents
         g = graph
-        clone = GraphCloner(total=True, relation='cosmetic')
         while g:
-            clone.add_clone(g)
             graphs.add(g)
             g = parents[g]
-
+        clone = GraphCloner(*graphs, total=True, relation='cosmetic')
         self.graphs |= {clone[g] for g in graphs}
         self.focus.add(clone[graph])
 
