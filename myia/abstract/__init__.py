@@ -39,7 +39,6 @@ from .data import (  # noqa
     VirtualFunction,
     TypedPrimitive,
     DummyFunction,
-    AbstractBase,
     AbstractValue,
     AbstractScalar,
     AbstractType,

@@ -13,7 +13,7 @@ from .data import (
     ABSENT,
     ANYTHING,
     Possibilities,
-    AbstractBase,
+    AbstractValue,
     AbstractScalar,
     AbstractType,
     AbstractError,
@@ -81,7 +81,7 @@ def build_value(a, default=ABSENT):
 
 
 @overload
-def _build_value(x: AbstractBase):
+def _build_value(x: AbstractValue):
     raise ValueError(x)
 
 

@@ -15,7 +15,7 @@ from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
 
 from .data import (
     ANYTHING,
-    AbstractBase,
+    AbstractValue,
     AbstractScalar,
     AbstractType,
     AbstractFunction,
@@ -76,7 +76,7 @@ class StandardInferrer(Inferrer):
                 pass
             elif dtype.ismyiatype(typ):
                 await force_pending(engine.check(typ, build_type(arg)))
-            elif isinstance(typ, type) and issubclass(typ, AbstractBase):
+            elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
                         f'Wrong type {arg} != {typ} for {self._infer}'
@@ -541,7 +541,7 @@ async def _inf_list_getitem(engine, arg: AbstractList, idx: dtype.Int[64]):
 async def _inf_tuple_setitem(engine,
                              arg: AbstractTuple,
                              idx: dtype.Int[64],
-                             value: AbstractBase):
+                             value: AbstractValue):
     idx_v = idx.values[VALUE]
     if idx_v is ANYTHING:
         raise MyiaTypeError(
@@ -561,7 +561,7 @@ async def _inf_tuple_setitem(engine,
 async def _inf_list_setitem(engine,
                             arg: AbstractList,
                             idx: dtype.Int[64],
-                            value: AbstractBase):
+                            value: AbstractValue):
     engine.abstract_merge(arg.element, value)
     return arg
 
@@ -569,7 +569,7 @@ async def _inf_list_setitem(engine,
 @standard_prim(P.list_append)
 async def _inf_list_append(engine,
                            arg: AbstractList,
-                           value: AbstractBase):
+                           value: AbstractValue):
     engine.abstract_merge(arg.element, value)
     return arg
 
@@ -977,7 +977,7 @@ async def _inf_env_add(engine, env1, env2):
 @standard_prim(P.unsafe_static_cast)
 async def _inf_unsafe_static_cast(engine, x, typ: AbstractScalar):
     v = typ.values[VALUE]
-    if not isinstance(v, AbstractBase):
+    if not isinstance(v, AbstractValue):
         raise MyiaTypeError('unsafe_static_cast expects a type constant')
     return v
 

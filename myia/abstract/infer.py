@@ -64,7 +64,7 @@ class InferenceEngine:
 
         Arguments:
             graph: The graph to analyze.
-            argspec: The arguments. Must be a tuple of AbstractBase.
+            argspec: The arguments. Must be a tuple of AbstractValue.
             outspec (optional): Expected inference result. If provided,
                 inference result will be checked against it.
         """

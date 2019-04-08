@@ -3,7 +3,7 @@ import numpy as np
 from dataclasses import dataclass, is_dataclass
 from myia import dtype
 from myia.abstract import VALUE, TYPE, SHAPE, \
-    AbstractBase, AbstractScalar, AbstractArray, \
+    AbstractValue, AbstractScalar, AbstractArray, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged, ANYTHING
 from myia.dtype import Bool, Int, UInt, Float, List, Array, Tuple, Function, \
@@ -125,7 +125,7 @@ def to_abstract_test(self, x: np.ndarray):
 
 
 @overload  # noqa: F811
-def to_abstract_test(self, x: AbstractBase):
+def to_abstract_test(self, x: AbstractValue):
     return x
 
 
