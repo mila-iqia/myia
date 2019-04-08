@@ -136,6 +136,12 @@ class InferenceEngine:
         """Return the replacement reference for ref, or ref itself."""
         while ref in self.reference_map:
             ref = self.reference_map[ref]
+        ctx = ref.context
+        if not ref.node.is_constant_graph():
+            while (isinstance(ctx, ConditionalContext)
+                   and ref not in self.cache.cache):
+                ctx = ctx.context
+                ref = self.ref(ref.node, ctx)
         return ref
 
     def run_coroutine(self, coro, throw=True):

@@ -29,7 +29,7 @@ from myia.utils import newenv
 from .common import B, T, L, i16, i32, i64, u64, f16, f32, f64, \
     ai64, af64, Point, Point_t, Point3D, Thing, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
-    to_abstract_test, EmptyTuple
+    to_abstract_test, EmptyTuple, U
 
 
 ########################
@@ -891,6 +891,46 @@ def test_hastype_2(x):
 
 
 @infer_std(
+    (U(i64, (i64, i64)), i64),
+    (U(i64, (f64, i64)), InferenceError),
+    (U(i64, f64), InferenceError),
+)
+def test_union(x):
+    if hastype(x, i64):
+        return x
+    else:
+        return x[0]
+
+
+@infer_std(
+    (U(i64, f64, (i64, i64)), i64, i64),
+    (U(i64, f64, (i64, i64)), f64, InferenceError),
+    (U(i64, (i64, i64)), f64, i64),
+    (f64, f64, f64),
+)
+def test_union_nested(x, y):
+    if hastype(x, i64):
+        return x
+    elif hastype(x, f64):
+        return y
+    else:
+        return x[0]
+
+
+@infer_std(
+    (U(i64, f64, (i64, i64)), i64),
+    (U(i64, (i64, i64)), i64),
+)
+def test_union_nested_2(x):
+    if hastype(x, i64):
+        return x
+    elif hastype(x, f64):
+        return 1234
+    else:
+        return x[0]
+
+
+@infer_std(
     ([i64], i64, [i64]),
     ([f64], i64, InferenceError),
     ([ai64_of(2, 3)], ai64_of(2, 3), [ai64_of(2, 3)]),
@@ -1218,6 +1258,25 @@ def test_bool_or(x, y):
 )
 def test_switch(c, x, y):
     return switch(c, x, y)
+
+
+@infer((i64, i64, i64))
+def test_switch_switch(x, y):
+    def f1(z):
+        return z > 0
+
+    def f2(z):
+        return z < 0
+    f = switch(x > 0, f1, f2)
+    return switch(f(y), 1, 2)
+
+
+@infer(
+    (i64, i64, i64),
+    (U(i64, f64), i64, InferenceError)
+)
+def test_switch_hastype(x, y):
+    return switch(hastype(x, i64), y + 1, y + 2)
 
 
 @infer((B, i64, i64))

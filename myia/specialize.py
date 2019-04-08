@@ -6,7 +6,8 @@ from dataclasses import replace as dc_replace
 from .abstract import GraphFunction, concretize_abstract, \
     AbstractFunction, AbstractError, build_value, MyiaTypeError, \
     TypedPrimitive, BaseGraphInferrer, broaden, \
-    TrackedInferrer, PrimitiveFunction, MetaGraphFunction
+    TrackedInferrer, PrimitiveFunction, MetaGraphFunction, \
+    ConditionalContext
 from .abstract import Context, Unspecializable, \
     DEAD, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
@@ -86,7 +87,12 @@ class _GraphSpecializer:
     """Helper class for TypeSpecializer."""
 
     def __init__(self, specializer, graph, context):
-        self.parent = specializer.specializations[context.parent]
+        parent_context = context.parent
+        assert not isinstance(parent_context, ConditionalContext)
+        # # Try the code below if this condition obtains
+        # while isinstance(parent_context, ConditionalContext):
+        #     parent_context = parent_context.parent
+        self.parent = specializer.specializations[parent_context]
         self.specializer = specializer
         self.engine = specializer.engine
         self.graph = graph
@@ -174,20 +180,21 @@ class _GraphSpecializer:
             # specializing on values, if we can.
             broad_argvals = tuple([broaden(v, None) for v in argvals])
             if argvals != broad_argvals:
-                while hasattr(inf, 'subinf'):
-                    inf = inf.subinf
+                currinf = inf
+                while hasattr(currinf, 'subinf'):
+                    currinf = currinf.subinf
                 try:
                     res = await self._find_unique_argvals_helper(
-                        a, inf, broad_argvals, False
+                        a, currinf, broad_argvals, False
                     )
                     eng = self.specializer.engine
-                    if hasattr(inf, 'make_context'):
+                    if hasattr(currinf, 'make_context'):
                         # Have to check that this graph was processed by
                         # the inferrer. It should have been, but sometimes
                         # it isn't, not sure why. Hopefully a rewrite of the
                         # specializer should fix everything.
-                        g = inf.get_graph(eng, broad_argvals)
-                        ctx = inf.make_context(eng, broad_argvals)
+                        g = currinf.get_graph(eng, broad_argvals)
+                        ctx = currinf.make_context(eng, broad_argvals)
                         if eng.ref(g.output, ctx) in eng.cache.cache:
                             return res
                     else:
@@ -293,13 +300,16 @@ class _GraphSpecializer:
                 _iref = self.specializer.engine.get_actual_ref(iref)
                 if _iref is not iref:
                     curr = self
-                    if _iref.node.is_constant_graph():
-                        _g = _iref.node.value.parent
-                    else:
-                        _g = _iref.node.graph
-                    while curr and _g is not curr.graph:
-                        curr = curr.parent
-                    assert curr is not None
+                    assert not _iref.node.is_constant_graph()
+                    assert _iref.node.graph is curr.graph
+                    # # Try the code below if these assertions are triggered
+                    # if _iref.node.is_constant_graph():
+                    #     _g = _iref.node.value.parent
+                    # else:
+                    #     _g = _iref.node.graph
+                    # while curr and _g is not curr.graph:
+                    #     curr = curr.parent
+                    # assert curr is not None
                     curr.cl.remapper.clone_disconnected(_iref.node)
                     iref = _iref
                     ival = await iref.get()

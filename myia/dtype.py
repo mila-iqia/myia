@@ -248,9 +248,10 @@ class Union(Object):
     @classmethod
     def parameterize(cls, *elements):
         """Parameterize using a list of elements."""
-        if len(elements) == 1 and isinstance(elements[0], (tuple, list)):
+        seqtype = (tuple, list, set, frozenset)
+        if len(elements) == 1 and isinstance(elements[0], seqtype):
             elements, = elements
-        return cls.make_subtype(elements=tuple(elements))
+        return cls.make_subtype(elements=frozenset(elements))
 
     @classmethod
     def __type_repr__(cls):

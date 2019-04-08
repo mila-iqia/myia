@@ -82,7 +82,7 @@ class ConditionalContext:
         parent = self.context.filter(graph.parent)
         if parent is self.context:
             return Context(self, graph, argkey)
-        else:
+        else:  # pragma: no cover
             return Context(parent, graph, argkey)
 
     def __hash__(self):

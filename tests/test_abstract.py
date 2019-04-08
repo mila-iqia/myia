@@ -124,6 +124,10 @@ def test_union():
     d = U(S(t=ty.Int[64]))
     assert c == d
 
+    u = ty.Union[ty.Int[64], ty.Int[32], ty.Int[16]]
+    assert build_type_fn(a) == u
+    assert repr(u).startswith('Union')  # member order can vary
+
 
 def test_repr():
 
