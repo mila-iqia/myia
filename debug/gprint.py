@@ -9,7 +9,8 @@ from myia.abstract import (
     AbstractValue, AbstractScalar, AbstractFunction, AbstractTuple,
     AbstractList, AbstractClass, AbstractJTagged, AbstractArray,
     GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
-    MetaGraphFunction, VALUE, ANYTHING, PendingTentative
+    MetaGraphFunction, AbstractUnion, ConditionalContext, VALUE, ANYTHING,
+    PendingTentative
 )
 from myia.dtype import Type, Bool, Int, Float, Tuple, List, Class, Function, \
     TypeMeta, UInt, Array
@@ -151,6 +152,16 @@ class GraphPrinter:
         )
 
 
+def _make_class_gen(cgen):
+    if isinstance(cgen, (tuple, list, set, frozenset)):
+        cgen = frozenset(cgen)
+        return lambda x, cl: f'error {cl}' if x in cgen else cl
+    elif isinstance(cgen, dict):
+        return lambda x, cl: f'{cgen[x]} {cl}' if x in cgen else cl
+    else:
+        return cgen
+
+
 class MyiaGraphPrinter(GraphPrinter):
     """
     Utility to generate a graphical representation for a graph.
@@ -211,7 +222,7 @@ class MyiaGraphPrinter(GraphPrinter):
             function_in_node=function_in_node,
             relation_symbols=short_relation_symbols
         )
-        self._class_gen = class_gen
+        self._class_gen = _make_class_gen(class_gen)
         # Nodes processed
         self.processed = set()
         # Nodes left to process
@@ -429,7 +440,7 @@ class MyiaNodesPrinter(GraphPrinter):
             function_in_node=function_in_node,
             relation_symbols=short_relation_symbols
         )
-        self._class_gen = class_gen
+        self._class_gen = _make_class_gen(class_gen)
         self.todo = set(nodes)
         self.graphs = {node.graph for node in nodes if node.graph}
         self.focus = set()
@@ -661,6 +672,14 @@ def _opt_fancy_getattr(optimizer, node, equiv):
         return Apply([ct, x], node.graph)
 
 
+@pattern_replacer(primops.unsafe_static_cast, X, V)
+def _opt_fancy_unsafe_static_cast(optimizer, node, equiv):
+    x = equiv[X]
+    ct = Constant(GraphCosmeticPrimitive(f'cast', on_edge=True))
+    with About(node.debug, 'cosmetic'):
+        return Apply([ct, x], node.graph)
+
+
 @pattern_replacer(primops.array_map, V, Xs)
 def _opt_fancy_array_map(optimizer, node, equiv):
     xs = equiv[Xs]
@@ -739,6 +758,7 @@ def cosmetic_transformer(g):
         _opt_fancy_distribute,
         _opt_fancy_transpose,
         _opt_fancy_sum,
+        _opt_fancy_unsafe_static_cast,
         # _opt_fancy_scalar_to_array,
         _opt_fancy_array_to_scalar,
         # careful=True
@@ -869,20 +889,23 @@ class _Reference:
 @mixin(Context)
 class _Context:
     def __hrepr__(self, H, hrepr):
-        d = {}
+        stack = []
         curr = self
         while curr:
-            if curr.argkey and isinstance(curr.argkey[0], tuple):
-                sig = {}
-                for group in curr.argkey:
-                    for name, value in group:
-                        li = sig.setdefault(name, [])
-                        li.append(value)
-                d[curr.graph] = sig
-            else:
-                d[curr.graph] = curr.argkey
+            stack.append((curr.graph, curr.argkey))
             curr = curr.parent
-        return hrepr.stdrepr_object('Context', list(d.items()))
+        return hrepr.stdrepr_object('Context', stack)
+
+
+@mixin(ConditionalContext)
+class _ConditionalContext:
+    def __hrepr__(self, H, hrepr):
+        stack = []
+        curr = self
+        while curr:
+            stack.append((curr.graph, curr.argkey))
+            curr = curr.parent
+        return hrepr.stdrepr_object('ConditionalContext', stack)
 
 
 @mixin(Location)
@@ -1304,6 +1327,16 @@ class _AbstractTuple:
         return hrepr.stdrepr_iterable(
             self.elements,
             before='★T',
+            cls='abstract',
+        )
+
+
+@mixin(AbstractUnion)
+class _AbstractUnion:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            self.options,
+            before='★U',
             cls='abstract',
         )
 
