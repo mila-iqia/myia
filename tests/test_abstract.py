@@ -1,18 +1,19 @@
 
 import pytest
+import asyncio
 
 from myia import dtype as ty
 from myia.prim import ops as P
 from myia.prim.py_implementations import typeof
 from myia.abstract import (
     ANYTHING, MyiaTypeError,
-    AbstractScalar as _S, AbstractTuple as T,
+    AbstractScalar, AbstractTuple as T, AbstractList as L,
     AbstractJTagged, AbstractError, AbstractFunction,
     InferenceLoop, to_abstract, build_value, amerge,
     Possibilities as _Poss,
     VALUE, TYPE, DEAD, build_type_fn,
     PrimitiveFunction, PartialApplication, VirtualFunction,
-    TypedPrimitive
+    TypedPrimitive, abstract_clone, abstract_clone_async, broaden
 )
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
@@ -21,14 +22,14 @@ from .common import Point, to_abstract_test, f32, Ty, af32_of
 
 
 def S(v=ANYTHING, t=None, s=None):
-    return _S({
+    return AbstractScalar({
         VALUE: v,
         TYPE: t or typeof(v),
     })
 
 
 def Poss(*things):
-    return _S({
+    return AbstractScalar({
         VALUE: _Poss(things),
         TYPE: typeof(things[0]),
     })
@@ -36,7 +37,7 @@ def Poss(*things):
 
 def test_to_abstract():
     inst = SymbolicKeyInstance(Constant(123), 456)
-    assert to_abstract(inst) == _S({VALUE: inst, TYPE: ty.SymbolicKeyType})
+    assert to_abstract(inst) == AbstractScalar({VALUE: inst, TYPE: ty.SymbolicKeyType})
 
 
 def test_build_value():
@@ -140,3 +141,52 @@ def test_repr():
 
     f1 = AbstractFunction(P.scalar_mul)
     assert repr(f1) == 'Fn(Possibilities({scalar_mul}))'
+
+
+@abstract_clone.variant
+def upcast(self, x: AbstractScalar, nbits):
+    return AbstractScalar({
+        VALUE: x.values[VALUE],
+        TYPE: ty.Int[nbits],
+    })
+
+
+def test_abstract_clone():
+    s1 = S(t=ty.Int[32])
+    s2 = S(t=ty.Int[64])
+    assert upcast(s1, 64) is s2
+
+    a1 = T([s1, L(s1)])
+    assert upcast(a1, 64) is T([s2, L(s2)])
+
+
+@abstract_clone_async.variant
+async def upcast_async(self, x: AbstractScalar):
+    return AbstractScalar({
+        VALUE: x.values[VALUE],
+        TYPE: ty.Int[64],
+    })
+
+
+def test_abstract_clone_async():
+    # Coverage test
+
+    async def coro():
+        s1 = S(t=ty.Int[32])
+        s2 = S(t=ty.Int[64])
+        assert (await upcast_async(s1)) is s2
+
+        a1 = T([s1, L(s1)])
+        assert (await upcast_async(a1)) is T([s2, L(s2)])
+
+        f1 = AbstractFunction(P.scalar_add, P.scalar_mul)
+        assert (await upcast_async(f1)) is f1
+
+    asyncio.run(coro())
+
+
+def test_broaden():
+    # Coverage test
+
+    p = _Poss([1, 2, 3])
+    assert broaden(p, None) is p
