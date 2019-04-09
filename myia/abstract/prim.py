@@ -925,7 +925,9 @@ class _SwitchInferrer(Inferrer):
             elif isinstance(op, GraphFunction):
                 op = op.graph
 
-            if op is engine.pipeline.resources.convert(bool):
+            converter = engine.pipeline.resources.convert
+            converted_bool = converter.object_map.get(bool, None)
+            if op is converted_bool:
                 return await self._find_op(engine, engine.ref(args[0], ctx))
             elif isinstance(op, Primitive):
                 return op, [engine.ref(a, ctx) for a in args]

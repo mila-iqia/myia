@@ -9,7 +9,6 @@ from .vm import FinalVM
 def set_types(graph, argspec, outspec, pipeline):
     """Re-infer and set all the types for the nodes."""
     pipeline.resources.inferrer.infer(graph, argspec, outspec, clear=True)
-    graph.manager.keep_roots()
 
     for ref, fut in pipeline.resources.inferrer.engine.cache.cache.items():
         v = fut.result()
