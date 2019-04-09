@@ -556,6 +556,9 @@ def convert_arg(self, arg, orig_t: AbstractUnion, backend):
             return self(arg, opt, backend)
         except TypeError:
             continue
+    else:
+        opts = ", ".join(map(str, orig_t.options))
+        raise TypeError(f'Expected one of {opts}')
 
 
 @overload  # noqa: F811

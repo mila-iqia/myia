@@ -51,12 +51,25 @@ def specializer_decorator(pipeline):
 
         def decorate(fn):
             def run_test(args):
+                if isinstance(args, Exception):
+                    exc = type(args)
+                    args = args.args
+                else:
+                    exc = None
                 pip = pipeline.make()
                 if abstract is None:
                     argspec = tuple(from_value(arg, broaden=True)
                                     for arg in args)
                 else:
                     argspec = abstract
+
+                if exc is not None:
+                    try:
+                        mfn = pip(input=fn, argspec=argspec)
+                        mfn['output'](*args)
+                    except exc as e:
+                        pass
+                    return
 
                 result_py = fn(*args)
 
@@ -404,6 +417,7 @@ _union_type = a.abstract_union([
 @specialize_no_validate(
     (int1,),
     ([int1, int2],),
+    TypeError((int1, int2),),
     abstract=(_union_type,)
 )
 def test_union(x):
