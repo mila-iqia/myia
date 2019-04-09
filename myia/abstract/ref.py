@@ -143,10 +143,7 @@ class Reference(AbstractReference):
         assert context is not None
         self.node = node
         self.engine = engine
-        if node.is_constant_graph():
-            self.context = context.filter(node.value.parent)
-        else:
-            self.context = context.filter(node.graph)
+        self.context = context
         self._hash = hash((self.node, self.context))
 
     async def get(self):

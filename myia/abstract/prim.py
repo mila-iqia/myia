@@ -274,9 +274,8 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             fn = _prim_or_graph(inferrer)
             g = outref.node.graph
             eng = outref.engine
-            ref = Reference(outref.engine,
-                            g.apply(P.partial, fn, dataref.node),
-                            outref.context)
+            ref = eng.ref(g.apply(P.partial, fn, dataref.node),
+                          outref.context)
             return await eng.reroute(outref, ref)
         else:
             raise InferenceError(f'Unknown field in {data_t}: {item_v}')
@@ -288,9 +287,8 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         fn = _prim_or_graph(inferrer)
         g = outref.node.graph
         eng = outref.engine
-        ref = Reference(outref.engine,
-                        g.apply(P.partial, fn, dataref.node),
-                        outref.context)
+        ref = eng.ref(g.apply(P.partial, fn, dataref.node),
+                      outref.context)
         return await eng.reroute(outref, ref)
 
     elif case == 'no_method':
@@ -320,9 +318,8 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             typ = dtype.pytype_to_myiatype(value)
             g = outref.node.graph
             eng = outref.engine
-            ref = Reference(outref.engine,
-                            g.apply(P.partial, P.make_record, typ),
-                            outref.context)
+            ref = eng.ref(g.apply(P.partial, P.make_record, typ),
+                          outref.context)
             return await eng.reroute(outref, ref)
         else:
             return to_abstract(value, Context.empty(), ref=outref)

@@ -98,6 +98,10 @@ class InferenceEngine:
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
+        if node.is_constant_graph():
+            context = context.filter(node.value.parent)
+        else:
+            context = context.filter(node.graph)
         return Reference(self, node, context)
 
     async def compute_ref(self, ref):
