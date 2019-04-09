@@ -37,7 +37,8 @@ def Poss(*things):
 
 def test_to_abstract():
     inst = SymbolicKeyInstance(Constant(123), 456)
-    assert to_abstract(inst) == AbstractScalar({VALUE: inst, TYPE: ty.SymbolicKeyType})
+    expected = AbstractScalar({VALUE: inst, TYPE: ty.SymbolicKeyType})
+    assert to_abstract(inst) == expected
 
 
 def test_build_value():
