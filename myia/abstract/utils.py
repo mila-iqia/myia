@@ -26,6 +26,7 @@ from .data import (
     AbstractClass,
     AbstractJTagged,
     AbstractUnion,
+    abstract_union,
     TrackDict,
     VirtualFunction,
     GraphFunction,
@@ -244,6 +245,11 @@ def abstract_clone(self, x: AbstractClass, *args):
 
 
 @overload  # noqa: F811
+def abstract_clone(self, x: AbstractUnion, *args):
+    return abstract_union([self(y, *args) for y in x.options])
+
+
+@overload  # noqa: F811
 def abstract_clone(self, x: AbstractJTagged, *args):
     return AbstractJTagged(self(x.element, *args))
 
@@ -309,6 +315,11 @@ async def abstract_clone_async(self, x: AbstractClass):
         x.methods,
         await self(x.values)
     )
+
+
+@overload  # noqa: F811
+async def abstract_clone_async(self, x: AbstractUnion):
+    return abstract_union([await self(y) for y in x.options])
 
 
 @overload  # noqa: F811

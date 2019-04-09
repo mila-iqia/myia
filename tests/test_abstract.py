@@ -201,6 +201,9 @@ def test_abstract_clone_async():
         f1 = AbstractFunction(P.scalar_add, P.scalar_mul)
         assert (await upcast_async(f1)) is f1
 
+        u1 = U(s1, s2)
+        assert (await upcast_async(u1)) is s2
+
     asyncio.run(coro())
 
 
