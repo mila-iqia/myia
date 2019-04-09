@@ -7,7 +7,7 @@ from contextvars import ContextVar
 
 from .. import dtype
 from ..debug.label import label
-from ..utils import Named, Partializable
+from ..utils import Named, Partializable, Interned, Atom, Elements
 
 from .loop import Pending
 
@@ -97,7 +97,7 @@ class PartialApplication(Function):
     """
 
     fn: Function
-    args: Tuple['AbstractBase']
+    args: Tuple['AbstractValue']
 
 
 @dataclass(frozen=True)
@@ -122,8 +122,8 @@ class VirtualFunction(Function):
 
     """
 
-    args: Tuple['AbstractBase']
-    output: 'AbstractBase'
+    args: Tuple['AbstractValue']
+    output: 'AbstractValue'
 
 
 @dataclass(frozen=True)
@@ -138,8 +138,8 @@ class TypedPrimitive(Function):
     """
 
     prim: 'Primitive'
-    args: Tuple['AbstractBase']
-    output: 'AbstractBase'
+    args: Tuple['AbstractValue']
+    output: 'AbstractValue'
 
 
 class DummyFunction(Function):
@@ -151,27 +151,7 @@ class DummyFunction(Function):
 #################
 
 
-class AbstractBase:
-    """Base class for abstract data."""
-
-    def key(self):
-        """Return a key for hash/equality purposes."""
-        if not hasattr(self, '_key'):
-            self._key = self._make_key()
-        return self._key
-
-    def _make_key(self):
-        raise NotImplementedError()
-
-    def __eq__(self, other):
-        return type(self) is type(other) \
-            and self.key() == other.key()
-
-    def __hash__(self):
-        return hash(self.key())
-
-
-class AbstractValue(AbstractBase):
+class AbstractValue(metaclass=Interned):
     """Base class for all abstract values.
 
     Attributes:
@@ -181,15 +161,21 @@ class AbstractValue(AbstractBase):
 
     """
 
+    __cache_eqkey__ = True
+
     def __init__(self, values):
         """Initialize an AbstractValue."""
         self.values = TrackDict(values)
 
-    def _make_key(self):
-        return tuple(sorted(self.values.items()))
+    def __eqkey__(self):
+        return Atom(self, tuple(sorted(self.values.items())))
 
 
-class AbstractScalar(AbstractValue):
+class AbstractAtom(AbstractValue):
+    """Base class for abstract values that are not structures."""
+
+
+class AbstractScalar(AbstractAtom):
     """Represents a scalar (integer, float, bool, etc.)."""
 
     def __repr__(self):
@@ -198,7 +184,7 @@ class AbstractScalar(AbstractValue):
         return f'S({", ".join(contents)})'
 
 
-class AbstractType(AbstractValue):
+class AbstractType(AbstractAtom):
     """Represents a type as a first class value."""
 
     def __init__(self, typ):
@@ -209,7 +195,7 @@ class AbstractType(AbstractValue):
         return f'Ty({self.values[VALUE]})'
 
 
-class AbstractError(AbstractValue):
+class AbstractError(AbstractAtom):
     """Represents some kind of error in the computation."""
 
     def __init__(self, err):
@@ -220,7 +206,7 @@ class AbstractError(AbstractValue):
         return f'E({self.values[VALUE]})'
 
 
-class AbstractFunction(AbstractValue):
+class AbstractFunction(AbstractAtom):
     """Represents a function or set of functions.
 
     The VALUE track for an AbstractFunction contains a Possibilities object
@@ -271,7 +257,14 @@ class AbstractFunction(AbstractValue):
         return f'Fn({self.values[VALUE]})'
 
 
-class AbstractTuple(AbstractValue):
+class AbstractStructure(AbstractValue):
+    """Base class for abstract values that are structures."""
+
+    def __eqkey__(self):
+        return Elements(self, super().__eqkey__(), self.children())
+
+
+class AbstractTuple(AbstractStructure):
     """Represents a tuple of elements."""
 
     def __init__(self, elements, values=None):
@@ -279,15 +272,15 @@ class AbstractTuple(AbstractValue):
         super().__init__(values or {})
         self.elements = tuple(elements)
 
-    def _make_key(self):
-        elms = tuple(e._make_key() for e in self.elements)
-        return (super()._make_key(), elms)
+    def children(self):
+        """Return all elements in the tuple."""
+        return self.elements
 
     def __repr__(self):
         return f'T({", ".join(map(repr, self.elements))})'
 
 
-class AbstractArray(AbstractValue):
+class AbstractArray(AbstractStructure):
     """Represents an array.
 
     The SHAPE track on an array contains the array's shape.
@@ -305,14 +298,15 @@ class AbstractArray(AbstractValue):
         super().__init__(values)
         self.element = element
 
-    def _make_key(self):
-        return (super()._make_key(), self.element._make_key())
+    def children(self):
+        """Return the array element."""
+        return self.element,
 
     def __repr__(self):
         return f'A({self.element}, SHAPE={self.values[SHAPE]})'
 
 
-class AbstractList(AbstractValue):
+class AbstractList(AbstractStructure):
     """Represents a list.
 
     Lists must be homogeneous, hence a single AbstractValue is used to
@@ -328,14 +322,15 @@ class AbstractList(AbstractValue):
         super().__init__(values or {})
         self.element = element
 
-    def _make_key(self):
-        return (super()._make_key(), self.element._make_key())
+    def children(self):
+        """Return the list element."""
+        return self.element,
 
     def __repr__(self):
         return f'L({self.element})'
 
 
-class AbstractClass(AbstractValue):
+class AbstractClass(AbstractStructure):
     """Represents a class, typically those defined using @dataclass.
 
     Attributes:
@@ -354,16 +349,20 @@ class AbstractClass(AbstractValue):
         self.attributes = attributes
         self.methods = methods
 
-    def _make_key(self):
-        attrs = tuple((k, v._make_key()) for k, v in self.attributes.items())
-        return (super()._make_key(), self.tag, attrs)
+    def children(self):
+        """Return the attribute values."""
+        return tuple(self.attributes.values())
+
+    def __eqkey__(self):
+        vals = AbstractValue.__eqkey__(self)
+        return Elements(self, vals, self.tag, self.attributes)
 
     def __repr__(self):
         elems = [f'{k}={v}' for k, v in self.attributes.items()]
         return f'*{self.tag}({", ".join(elems)})'
 
 
-class AbstractJTagged(AbstractValue):
+class AbstractJTagged(AbstractStructure):
     """Represents a value (non-function) transformed through J."""
 
     def __init__(self, element):
@@ -371,8 +370,9 @@ class AbstractJTagged(AbstractValue):
         super().__init__({})
         self.element = element
 
-    def _make_key(self):
-        return (super()._make_key(), self.element._make_key())
+    def children(self):
+        """Return the jtagged element."""
+        return self.element,
 
     def __repr__(self):
         return f'J({self.element})'

@@ -1,5 +1,10 @@
 """General utilities."""
 
+from .intern import (  # noqa
+    Interned, EqKey, Atom, Elements, eqkey, deep_eqkey, RecursionException,
+    hashrec, eqrec
+)
+
 from .merge import (  # noqa
     DELETE, MergeMode, Merge, Reset, Override,
     merge, cleanup

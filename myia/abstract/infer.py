@@ -2,6 +2,7 @@
 
 import asyncio
 import numpy as np
+import weakref
 from functools import reduce
 from dataclasses import is_dataclass, replace as dc_replace
 
@@ -64,7 +65,7 @@ class InferenceEngine:
 
         Arguments:
             graph: The graph to analyze.
-            argspec: The arguments. Must be a tuple of AbstractBase.
+            argspec: The arguments. Must be a tuple of AbstractValue.
             outspec (optional): Expected inference result. If provided,
                 inference result will be checked against it.
         """
@@ -331,6 +332,9 @@ def from_value(v, broaden=False):
     return a
 
 
+_abs_cache = weakref.WeakKeyDictionary()
+
+
 @overload.wrapper(bootstrap=True)
 def to_abstract(fn, self, v, context=None, ref=None, loop=None):
     """Translate the value to an abstract value.
@@ -345,18 +349,25 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
             will be given a Pending type so that it can adapt to the types of
             the variables they interact with.
     """
+    cachable = context is None and ref is None and loop is None
+    if cachable:
+        try:
+            return _abs_cache[v]
+        except (TypeError, KeyError) as e:
+            pass
+
     ref = ref and ref.node
 
     if fn is not None:
-        return fn(self, v, context, ref, loop)
+        rval = fn(self, v, context, ref, loop)
 
-    if is_dataclass_type(v):
+    elif is_dataclass_type(v):
         typ = dtype.pytype_to_myiatype(v)
         typarg = AbstractScalar({
             VALUE: typ,
             TYPE: dtype.TypeType,
         })
-        return AbstractFunction(
+        rval = AbstractFunction(
             PartialApplication(
                 P.make_record,
                 (typarg,)
@@ -369,18 +380,26 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
         new_args = {}
         for name, field in v.__dataclass_fields__.items():
             new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
-        return AbstractClass(typ.tag, new_args, typ.methods)
+        rval = AbstractClass(typ.tag, new_args, typ.methods)
 
     elif dtype.ismyiatype(v):
-        return AbstractType(v)
+        rval = AbstractType(v)
 
     else:
         typ = dtype.pytype_to_myiatype(type(v), v)
         assert dtype.ismyiatype(typ, (dtype.External, dtype.EnvType))
-        return AbstractScalar({
+        rval = AbstractScalar({
             VALUE: v,
             TYPE: typ,
         })
+
+    if cachable:
+        try:
+            _abs_cache[v] = rval
+        except TypeError:
+            pass
+
+    return rval
 
 
 @overload  # noqa: F811
