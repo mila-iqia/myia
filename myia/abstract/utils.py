@@ -13,6 +13,8 @@ from .data import (
     ABSENT,
     ANYTHING,
     Possibilities,
+    AbstractAtom,
+    AbstractStructure,
     AbstractValue,
     AbstractScalar,
     AbstractType,
@@ -308,6 +310,64 @@ async def abstract_clone_async(self, x: object):
     return x
 
 
+##################
+# Concrete check #
+##################
+
+
+@overload
+def _is_concrete(x: object):
+    return True
+
+
+@overload  # noqa: F811
+def _is_concrete(x: Pending):
+    return False
+
+
+@overload  # noqa: F811
+def _is_concrete(x: TrackDict):
+    return all(_is_concrete(v) for v in x.values())
+
+
+@overload  # noqa: F811
+def _is_concrete(x: AbstractScalar):
+    return _is_concrete(x.values)
+
+
+@overload  # noqa: F811
+def _is_concrete(x: AbstractAtom):
+    return True
+
+
+@overload  # noqa: F811
+def _is_concrete(xs: AbstractStructure):
+    return all(_is_concrete(x) for x in xs.children())
+
+
+@overload  # noqa: F811
+def _is_concrete(ctx: Context):
+    return (_is_concrete(ctx.parent)
+            and all(_is_concrete(x) for x in ctx.argkey))
+
+
+@overload  # noqa: F811
+def _is_concrete(ref: Reference):
+    return _is_concrete(ref.context)
+
+
+@overload.wrapper  # noqa: F811
+def _is_concrete(__call__, x):
+    if hasattr(x, '_concrete'):
+        return x._concrete is x
+    elif __call__(x):
+        if isinstance(x, (AbstractValue, Context, Reference)):
+            x._concrete = x
+        return True
+    else:
+        return False
+
+
 ##############
 # Concretize #
 ##############
@@ -336,6 +396,68 @@ async def concretize_abstract(self, ctx: Context):
         ctx.graph,
         tuple(c_argkey)
     )
+
+
+@overload.wrapper  # noqa: F811
+async def concretize_abstract(__call__, self, x):
+    if hasattr(x, '_concrete'):
+        return x._concrete
+    if isinstance(x, (AbstractValue, Context, Reference)):
+        if _is_concrete(x):
+            res = x
+        else:
+            res = await __call__(self, x)
+        x._concrete = res
+        return res
+    else:
+        return await __call__(self, x)
+
+
+###############
+# Broad check #
+###############
+
+
+@overload
+def _is_broad(x: object, loop):
+    return x is ANYTHING
+
+
+@overload  # noqa: F811
+def _is_broad(x: Pending, loop):
+    return False
+
+
+@overload  # noqa: F811
+def _is_broad(x: (AbstractScalar, AbstractFunction), loop):
+    return _is_broad(x.values[VALUE], loop)
+
+
+@overload  # noqa: F811
+def _is_broad(x: Possibilities, loop):
+    return loop is None
+
+
+@overload  # noqa: F811
+def _is_broad(x: AbstractAtom, loop):
+    return True
+
+
+@overload  # noqa: F811
+def _is_broad(xs: AbstractStructure, loop):
+    return all(_is_broad(x, loop) for x in xs.children())
+
+
+@overload.wrapper  # noqa: F811
+def _is_broad(__call__, x, loop):
+    if hasattr(x, '_broad'):
+        return x._broad is x
+    elif __call__(x, loop):
+        if isinstance(x, (AbstractValue, Context, Reference)):
+            x._broad = x
+        return True
+    else:
+        return False
 
 
 ###########
@@ -370,6 +492,21 @@ def broaden(self, p: Possibilities, loop):
         # Broadening Possibilities creates a PendingTentative. This allows
         # us to avoid resolving them earlier than we would like.
         return loop.create_pending_tentative(tentative=p)
+
+
+@overload.wrapper  # noqa: F811
+def broaden(__call__, self, x, loop):
+    if hasattr(x, '_broad'):
+        return x._broad
+    if isinstance(x, (AbstractValue, Context, Reference)):
+        if _is_broad(x, loop):
+            res = x
+        else:
+            res = __call__(self, x, loop)
+        x._broad = res
+        return res
+    else:
+        return __call__(self, x, loop)
 
 
 ###############

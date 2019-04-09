@@ -1,8 +1,9 @@
+"""Tools to intern the instances of certain classes."""
 
 import weakref
 
 
-_intern_pool = {}
+_intern_pool = weakref.WeakValueDictionary()
 
 
 class EqKey:
@@ -50,10 +51,10 @@ def eqkey(x):
 
 class RecursionException(Exception):
     """Raised when a data structure is found to be recursive."""
-    pass
 
 
 def deep_eqkey(obj):
+    """Return a key for equality tests for non-recursive structures."""
     cachable = getattr(obj, '__cache_eqkey__', False)
     if cachable:
         cached = getattr(obj, '_eqkey_deepkey', None)
@@ -111,6 +112,7 @@ class Interned(type):
     """
 
     def __init__(cls, name, bases, dct):
+        """Initialize an interned class."""
         super().__init__(name, bases, dct)
         cls.intern = lambda self: Interned.intern(type(self), self)
 
