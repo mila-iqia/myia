@@ -29,10 +29,14 @@ class Atom(EqKey):
 class Elements(EqKey):
     """Object with multiple values to process for equality recursively."""
 
-    def __init__(self, obj, *values):
+    def __init__(self, obj, *values, values_iterable=None):
         """Initialize an Elements."""
         super().__init__(obj)
-        self.values = values
+        if values_iterable is None:
+            self.values = values
+        else:
+            assert not values
+            self.values = values_iterable
 
 
 def eqkey(x):
@@ -41,6 +45,8 @@ def eqkey(x):
         return x
     elif isinstance(x, (list, tuple)):
         return Elements(x, *x)
+    elif isinstance(x, (set, frozenset)):
+        return Elements(x, values_iterable=frozenset(x))
     elif isinstance(x, dict):
         return Elements(x, *x.items())
     elif hasattr(x, '__eqkey__'):
@@ -63,7 +69,7 @@ def deep_eqkey(obj):
 
     key = eqkey(obj)
     if isinstance(key, Elements):
-        dk = key.type, tuple(deep_eqkey(x) for x in key.values)
+        dk = key.type, type(key.values)(deep_eqkey(x) for x in key.values)
     else:
         assert isinstance(key, Atom)
         dk = key.type, key.value

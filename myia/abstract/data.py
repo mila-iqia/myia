@@ -378,7 +378,7 @@ class AbstractJTagged(AbstractStructure):
         return f'J({self.element})'
 
 
-class AbstractUnion(AbstractValue):
+class AbstractUnion(AbstractStructure):
     """Represents the union of several possible abstract types."""
 
     def __init__(self, options):
@@ -386,9 +386,9 @@ class AbstractUnion(AbstractValue):
         super().__init__({})
         self.options = frozenset(options)
 
-    def _make_key(self):
-        opts = tuple(opt._make_key() for opt in self.options)
-        return (super()._make_key(), opts)
+    def children(self):
+        """Return the set of options."""
+        return self.options
 
     def __repr__(self):
         return f'U({", ".join(map(repr, self.options))})'
