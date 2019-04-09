@@ -24,6 +24,8 @@ from .data import (
     AbstractList,
     AbstractClass,
     AbstractJTagged,
+    AbstractUnion,
+    abstract_union,
     PartialApplication,
     JTransformedFunction,
     PrimitiveFunction,
@@ -35,7 +37,7 @@ from .data import (
     infer_trace
 )
 from .loop import Pending, find_coherent_result, force_pending
-from .ref import Context
+from .ref import Context, ConditionalContext
 from .utils import sensitivity_transform, build_value, build_type, broaden
 from .infer import Inferrer, to_abstract
 
@@ -243,8 +245,6 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         dataref: The Reference to the data.
         outref: The Reference to the output.
     """
-    from ..abstract import Reference
-
     resources = engine.pipeline.resources
 
     data_t = build_type(data)
@@ -274,9 +274,8 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             fn = _prim_or_graph(inferrer)
             g = outref.node.graph
             eng = outref.engine
-            ref = Reference(outref.engine,
-                            g.apply(P.partial, fn, dataref.node),
-                            outref.context)
+            ref = eng.ref(g.apply(P.partial, fn, dataref.node),
+                          outref.context)
             return await eng.reroute(outref, ref)
         else:
             raise InferenceError(f'Unknown field in {data_t}: {item_v}')
@@ -288,9 +287,8 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         fn = _prim_or_graph(inferrer)
         g = outref.node.graph
         eng = outref.engine
-        ref = Reference(outref.engine,
-                        g.apply(P.partial, fn, dataref.node),
-                        outref.context)
+        ref = eng.ref(g.apply(P.partial, fn, dataref.node),
+                      outref.context)
         return await eng.reroute(outref, ref)
 
     elif case == 'no_method':
@@ -303,7 +301,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         if data_v is ANYTHING:
             raise InferenceError(
                 'Could not infer the type or the value of the object'
-                f" on which to resolve the attribute '{item_v}"
+                f" on which to resolve the attribute '{item_v}'"
             )
         if chk:
             chk(data_v, item_v)
@@ -320,9 +318,8 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             typ = dtype.pytype_to_myiatype(value)
             g = outref.node.graph
             eng = outref.engine
-            ref = Reference(outref.engine,
-                            g.apply(P.partial, P.make_record, typ),
-                            outref.context)
+            ref = eng.ref(g.apply(P.partial, P.make_record, typ),
+                          outref.context)
             return await eng.reroute(outref, ref)
         else:
             return to_abstract(value, Context.empty(), ref=outref)
@@ -456,6 +453,27 @@ uniform_prim(P.bool_eq, infer_value=True)(py.bool_eq)
 ######################
 
 
+async def _split_type(t, model):
+    """Checks t against the model and return matching/non-matching subtypes.
+
+    * If t is a Union, return a Union that fully matches model, and a Union
+      that does not match model. No matches in either case returns None for
+      that case.
+    * Otherwise, return (t, None) or (None, t) depending on whether t matches
+      the model.
+    """
+    if isinstance(t, AbstractUnion):
+        matching = [(opt, await issubtype(opt, model))
+                    for opt in t.options]
+        t1 = abstract_union([opt for opt, m in matching if m])
+        t2 = abstract_union([opt for opt, m in matching if not m])
+        return t1, t2
+    elif (await issubtype(t, model)):
+        return t, None
+    else:
+        return None, t
+
+
 @standard_prim(P.typeof)
 async def _inf_typeof(engine, value):
     t = build_type(value)
@@ -467,8 +485,13 @@ async def _inf_hastype(engine, value, model: dtype.TypeType):
     model_t = model.values[VALUE]
     if model_t is ANYTHING:
         raise MyiaTypeError('hastype must be resolvable statically')
+    match, nomatch = await _split_type(value, model_t)
+    if match is None:
+        v = False
+    elif nomatch is None:
+        v = True
     else:
-        v = await issubtype(value, model_t)
+        v = ANYTHING
     return AbstractScalar({
         VALUE: v,
         TYPE: dtype.Bool,
@@ -840,17 +863,111 @@ async def _inf_dot(engine, a: AbstractArray, b: AbstractArray):
 ##############
 
 
-@standard_prim(P.switch)
-async def _inf_switch(engine, cond: Bool, tb, fb):
-    v = cond.values[VALUE]
-    if v is True:
-        return tb
-    elif v is False:
-        return fb
-    elif v is ANYTHING:
-        return engine.abstract_merge(tb, fb)
-    else:
-        raise AssertionError(f"Invalid condition value for switch: {v}")
+class _SwitchInferrer(Inferrer):
+
+    async def _special_hastype(self, engine, outref,
+                               xref, typref, tbref, fbref):
+        """Handle `switch(hastype(x, typ), tb, fb)`.
+
+        We want to evaluate tb in a context where x has type typ and fb
+        in a context where it doesn't.
+        """
+        async def wrap(branch_ref, branch_type):
+            node = branch_ref.node
+            if not node.is_constant_graph():
+                raise MyiaTypeError(
+                    'Branches of switch must be functions when the condition'
+                    ' is hastype on a Union.'
+                )
+            branch_ctx = ConditionalContext(ctx, (xref.node, branch_type))
+            new_branch_ref = engine.ref(node, branch_ctx)
+            new_x = g.apply(P.unsafe_static_cast, xref.node, branch_type)
+            await engine.reroute(
+                engine.ref(xref.node, branch_ctx),
+                engine.ref(new_x, ctx)
+            )
+            if branch_ref != new_branch_ref:
+                fn = await engine.reroute(branch_ref, new_branch_ref)
+            else:
+                fn = await branch_ref.get()
+            return fn.get_unique()
+
+        ctx = outref.context
+        g = xref.node.graph
+
+        fulltype = await xref.get()
+        typ = (await typref.get()).values[VALUE]
+        tbtyp, fbtyp = await _split_type(fulltype, typ)
+        # We are not supposed to be here if only one branch could be taken.
+        assert tbtyp is not None
+        assert fbtyp is not None
+        return AbstractFunction(
+            await wrap(tbref, tbtyp),
+            await wrap(fbref, fbtyp)
+        )
+
+    async def _find_op(self, engine, condref):
+        """Find a primitive operator to use for the condition.
+
+        This skips over the bool primitive or composite used for this
+        pipeline.
+        """
+        ctx = condref.context
+        if condref.node.is_apply():
+            opnode, *args = condref.node.inputs
+            opref = engine.ref(opnode, ctx)
+            try:
+                op = (await opref.get()).get_unique()
+            except MyiaTypeError:
+                return None, None
+            if isinstance(op, PrimitiveFunction):
+                op = op.prim
+            elif isinstance(op, GraphFunction):
+                op = op.graph
+
+            converter = engine.pipeline.resources.convert
+            converted_bool = converter.object_map.get(bool, None)
+            if op is converted_bool:
+                return await self._find_op(engine, engine.ref(args[0], ctx))
+            elif isinstance(op, Primitive):
+                return op, [engine.ref(a, ctx) for a in args]
+            else:
+                return None, None
+        else:
+            return None, None
+
+    async def run(self, engine, outref, argrefs):
+        res = await self._run_helper(engine, outref, argrefs)
+        # args = tuple([await ref.get() for ref in argrefs])
+        # self.cache[args] = res
+        return res
+
+    async def _run_helper(self, engine, outref, argrefs):
+        check_nargs(P.switch, 3, argrefs)
+        condref, tbref, fbref = argrefs
+
+        cond = await condref.get()
+        await force_pending(engine.check(Bool, build_type(cond)))
+
+        v = cond.values[VALUE]
+        if v is True:
+            return await tbref.get()
+        elif v is False:
+            return await fbref.get()
+        elif v is ANYTHING:
+            op, args = await self._find_op(engine, condref)
+            method = op and getattr(self, f'_special_{op}', None)
+            if method is None:
+                tb = await tbref.get()
+                fb = await fbref.get()
+                return engine.abstract_merge(tb, fb)
+            else:
+                return await method(engine, outref, *args, tbref, fbref)
+        else:
+            raise AssertionError(f"Invalid condition value for switch: {v}")
+
+
+abstract_inferrer_constructors[P.switch] = _SwitchInferrer.partial()
 
 
 #################

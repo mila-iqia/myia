@@ -49,6 +49,8 @@ from .data import (  # noqa
     AbstractList,
     AbstractClass,
     AbstractJTagged,
+    AbstractUnion,
+    abstract_union,
     TrackDict,
     Track,
     VALUE,
@@ -64,6 +66,7 @@ from .data import (  # noqa
 
 from .ref import (  # noqa
     Context,
+    ConditionalContext,
     Contextless,
     CONTEXTLESS,
     AbstractReference,

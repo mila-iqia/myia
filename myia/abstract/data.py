@@ -378,6 +378,41 @@ class AbstractJTagged(AbstractStructure):
         return f'J({self.element})'
 
 
+class AbstractUnion(AbstractStructure):
+    """Represents the union of several possible abstract types."""
+
+    def __init__(self, options):
+        """Initialize an AbstractUnion."""
+        super().__init__({})
+        self.options = frozenset(options)
+
+    def children(self):
+        """Return the set of options."""
+        return self.options
+
+    def __repr__(self):
+        return f'U({", ".join(map(repr, self.options))})'
+
+
+def abstract_union(options):
+    """Create a union if necessary.
+
+    If only one opt is given in the options list, return that option.
+    """
+    opts = []
+    for option in options:
+        if isinstance(option, AbstractUnion):
+            opts += option.options
+        else:
+            opts.append(option)
+    opts = frozenset(opts)
+    if len(opts) == 1:
+        opt, = opts
+        return opt
+    else:
+        return AbstractUnion(opts)
+
+
 ##########
 # Tracks #
 ##########

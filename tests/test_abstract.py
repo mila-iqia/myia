@@ -8,7 +8,7 @@ from myia.prim.py_implementations import typeof
 from myia.abstract import (
     ANYTHING, MyiaTypeError,
     AbstractScalar, AbstractTuple as T, AbstractList as L,
-    AbstractJTagged, AbstractError, AbstractFunction,
+    AbstractJTagged, abstract_union, AbstractError, AbstractFunction,
     InferenceLoop, to_abstract, build_value, amerge,
     Possibilities as _Poss,
     VALUE, TYPE, DEAD, build_type_fn,
@@ -19,6 +19,10 @@ from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
 
 from .common import Point, to_abstract_test, f32, Ty, af32_of
+
+
+def U(*opts):
+    return abstract_union(opts)
 
 
 def S(v=ANYTHING, t=None, s=None):
@@ -111,6 +115,20 @@ def test_merge_possibilities():
     assert amerge(a, c, loop=None, forced=True) is a
 
 
+def test_union():
+    a = U(S(t=ty.Int[64]), S(t=ty.Int[32]), S(t=ty.Int[16]))
+    b = U(S(t=ty.Int[64]), U(S(t=ty.Int[32]), S(t=ty.Int[16])))
+    assert a == b
+
+    c = S(t=ty.Int[64])
+    d = U(S(t=ty.Int[64]))
+    assert c == d
+
+    u = ty.Union[ty.Int[64], ty.Int[32], ty.Int[16]]
+    assert build_type_fn(a) == u
+    assert repr(u).startswith('Union')  # member order can vary
+
+
 def test_repr():
 
     s1 = to_abstract_test(1)
@@ -182,6 +200,9 @@ def test_abstract_clone_async():
 
         f1 = AbstractFunction(P.scalar_add, P.scalar_mul)
         assert (await upcast_async(f1)) is f1
+
+        u1 = U(s1, s2)
+        assert (await upcast_async(u1)) is s2
 
     asyncio.run(coro())
 

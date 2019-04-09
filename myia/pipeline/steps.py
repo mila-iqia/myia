@@ -9,7 +9,7 @@ from itertools import count
 
 from .. import dtype
 from ..abstract import AbstractTuple, AbstractList, AbstractClass, \
-    AbstractArray, TYPE, AbstractScalar
+    AbstractArray, TYPE, AbstractScalar, AbstractUnion
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
@@ -547,6 +547,18 @@ def convert_arg(self, arg, orig_t: AbstractArray, backend):
         arg = backend.from_numpy(arg)
     backend.check_array(arg, et)
     return [arg]
+
+
+@overload  # noqa: F811
+def convert_arg(self, arg, orig_t: AbstractUnion, backend):
+    for opt in orig_t.options:
+        try:
+            return self(arg, opt, backend)
+        except TypeError:
+            continue
+    else:
+        opts = ", ".join(map(str, orig_t.options))
+        raise TypeError(f'Expected one of {opts}')
 
 
 @overload  # noqa: F811

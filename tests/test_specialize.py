@@ -2,6 +2,7 @@
 import numpy
 from pytest import mark
 
+from myia import abstract as a, dtype
 from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.composite import list_map
@@ -46,12 +47,29 @@ def _eq(x: object, y):
 
 
 def specializer_decorator(pipeline):
-    def specialize(*arglists):
+    def specialize(*arglists, abstract=None):
 
         def decorate(fn):
             def run_test(args):
+                if isinstance(args, Exception):
+                    exc = type(args)
+                    args = args.args
+                else:
+                    exc = None
                 pip = pipeline.make()
-                argspec = tuple(from_value(arg, broaden=True) for arg in args)
+                if abstract is None:
+                    argspec = tuple(from_value(arg, broaden=True)
+                                    for arg in args)
+                else:
+                    argspec = abstract
+
+                if exc is not None:
+                    try:
+                        mfn = pip(input=fn, argspec=argspec)
+                        mfn['output'](*args)
+                    except exc as e:
+                        pass
+                    return
 
                 result_py = fn(*args)
 
@@ -82,6 +100,9 @@ def specializer_decorator(pipeline):
 
 specialize = specializer_decorator(specialize_pipeline)
 specialize_std = specializer_decorator(specialize_pipeline_std)
+specialize_no_validate = specializer_decorator(
+    specialize_pipeline.configure(validate=False)
+)
 
 
 int1 = 13
@@ -382,3 +403,25 @@ def test_partial_outside_scope(x, y):
         return partial(f, z)
 
     return g(x)(y)
+
+
+abs_i64 = a.AbstractScalar({a.VALUE: a.ANYTHING, a.TYPE: dtype.Int[64]})
+
+
+_union_type = a.abstract_union([
+    abs_i64,
+    a.AbstractList(abs_i64)
+])
+
+
+@specialize_no_validate(
+    (int1,),
+    ([int1, int2],),
+    TypeError((int1, int2),),
+    abstract=(_union_type,)
+)
+def test_union(x):
+    if hastype(x, i64):
+        return x
+    else:
+        return x[0]

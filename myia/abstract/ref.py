@@ -53,6 +53,47 @@ class Context:
 _empty_context = Context(None, None, ())
 
 
+class ConditionalContext:
+    """Wraps another context."""
+
+    def __init__(self, context, argkey):
+        """Initialize the ConditionalContext."""
+        self.graph = context.graph
+        self.context = context
+        self.argkey = argkey
+        self.parent = self.context
+        self.parent_cache = dict(context.parent_cache) if context else {}
+        self.parent_cache[self.graph] = self
+        self._hash = hash((self.parent, self.argkey))
+
+    def filter(self, graph):
+        """Return a context restricted to a graph's dependencies."""
+        if graph is self.graph:
+            return self
+        else:
+            res = self.context.filter(graph)
+            if res == Context.empty():
+                return res
+            else:
+                return ConditionalContext(res, self.argkey)
+
+    def add(self, graph, argkey):
+        """Extend this context with values for another graph."""
+        parent = self.context.filter(graph.parent)
+        if parent is self.context:
+            return Context(self, graph, argkey)
+        else:  # pragma: no cover
+            return Context(parent, graph, argkey)
+
+    def __hash__(self):
+        return self._hash
+
+    def __eq__(self, other):
+        return type(other) is ConditionalContext \
+            and self.parent == other.parent \
+            and self.argkey == other.argkey
+
+
 class Contextless:
     """Singleton Context which specializes to itself.
 
@@ -102,10 +143,7 @@ class Reference(AbstractReference):
         assert context is not None
         self.node = node
         self.engine = engine
-        if node.is_constant_graph():
-            self.context = context.filter(node.value.parent)
-        else:
-            self.context = context.filter(node.graph)
+        self.context = context
         self._hash = hash((self.node, self.context))
 
     async def get(self):

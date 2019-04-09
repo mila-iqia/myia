@@ -25,6 +25,8 @@ from .data import (
     AbstractList,
     AbstractClass,
     AbstractJTagged,
+    AbstractUnion,
+    abstract_union,
     TrackDict,
     VirtualFunction,
     GraphFunction,
@@ -148,6 +150,11 @@ def build_type(self, x: AbstractJTagged):
 
 
 @overload  # noqa: F811
+def build_type(self, x: AbstractUnion):
+    return dtype.Union[[self(opt) for opt in x.options]]
+
+
+@overload  # noqa: F811
 def build_type(self, x: AbstractType):
     return dtype.TypeType
 
@@ -238,6 +245,11 @@ def abstract_clone(self, x: AbstractClass, *args):
 
 
 @overload  # noqa: F811
+def abstract_clone(self, x: AbstractUnion, *args):
+    return abstract_union([self(y, *args) for y in x.options])
+
+
+@overload  # noqa: F811
 def abstract_clone(self, x: AbstractJTagged, *args):
     return AbstractJTagged(self(x.element, *args))
 
@@ -303,6 +315,11 @@ async def abstract_clone_async(self, x: AbstractClass):
         x.methods,
         await self(x.values)
     )
+
+
+@overload  # noqa: F811
+async def abstract_clone_async(self, x: AbstractUnion):
+    return abstract_union([await self(y) for y in x.options])
 
 
 @overload  # noqa: F811
@@ -384,7 +401,7 @@ async def concretize_abstract(self, r: Reference):
     return Reference(
         r.engine,
         r.node,
-        await self(r.context)
+        await self(r.context),
     )
 
 
