@@ -5,9 +5,10 @@ from dataclasses import dataclass
 from functools import reduce
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
-    AbstractFunction, GraphFunction, AbstractList, AbstractTuple
-from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
-    List, Class, EnvType, Function, Problem
+    AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
+    AbstractClass
+from .dtype import Array, Object, Int, UInt, Float, Number, Bool, \
+    EnvType, Function, Problem
 from .hypermap import HyperMap
 from .abstract import MyiaTypeError, broaden
 from .info import About
@@ -549,7 +550,7 @@ def _array_zero(xs):
 
 zeros_like = HyperMap(
     name='zeros_like',
-    nonleaf=(Tuple, List, Class),
+    nonleaf=(AbstractTuple, AbstractList, AbstractClass),
     fn_leaf=_leaf_zeros_like
 )
 

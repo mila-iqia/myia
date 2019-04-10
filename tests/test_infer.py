@@ -1605,16 +1605,25 @@ hyper_map_nobroadcast = HyperMap(broadcast=False)
     (f64, f64, f64),
     ([f64], [f64], [f64]),
     ([[f64]], [[f64]], [[f64]]),
-    ([f64], f64, InferenceError),
-    ([f64], [[f64]], InferenceError),
     ((i64, f64), (i64, f64), (i64, f64)),
     (Point(i64, i64), Point(i64, i64), Point(i64, i64)),
     (ai64_of(2, 5), ai64_of(2, 5), ai64_of(2, 5)),
     (ai64_of(2, 5), i64, ai64_of(2, 5)),
     (ai64_of(1, 5), ai64_of(2, 1), ai64_of(2, 5)),
     (i64, f64, InferenceError),
-    ([f64], f64, InferenceError),
     (ai64_of(2, 5), af64_of(2, 5), InferenceError),
+
+    # Generic broadcasting tests
+    ([f64], f64, [f64]),
+    ([f64], [[f64]], [[f64]]),
+    ((i64, i64), i64, (i64, i64)),
+    (i64, (i64, i64), (i64, i64)),
+    (Point(i64, i64), i64, Point(i64, i64)),
+
+    # Various errors
+    ((i64, i64), (i64, i64, i64), InferenceError),
+    (Point(i64, i64), Point3D(i64, i64, i64), InferenceError),
+    ((i64, i64), [i64], InferenceError),
 )
 def test_hyper_map(x, y):
     return hyper_map(scalar_add, x, y)

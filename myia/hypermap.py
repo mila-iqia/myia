@@ -1,14 +1,20 @@
 """Generate mapping graphs over classes, tuples, arrays, etc."""
 
 
-from . import operations, composite as C
-from .abstract import InferenceError, broaden
+from . import operations, composite as C, abstract
+from .abstract import MyiaTypeError, broaden
 from .ir import MetaGraph, Graph
-from .dtype import Array, List, Tuple, Class, tag_to_dataclass, \
-    pytype_to_myiatype
-from .utils import TypeMap, Overload
+from .dtype import tag_to_dataclass, pytype_to_myiatype
+from .utils import Overload
 from .prim import ops as P
-from .prim.py_implementations import issubtype
+
+
+nonleaf_defaults = (
+    abstract.AbstractArray,
+    abstract.AbstractList,
+    abstract.AbstractTuple,
+    abstract.AbstractClass,
+)
 
 
 class HyperMap(MetaGraph):
@@ -20,8 +26,8 @@ class HyperMap(MetaGraph):
         fn_rec: The function to apply recursively. If it is None,
             the HyperMap will apply itself. Using another function
             will implement a "shallow" HyperMap.
-        broadcast: Whether to automatically broadcast arguments
-            when one of them is an Array (default: True).
+        broadcast: Whether to automatically broadcast leaf arguments when
+            there are nonleaf arguments (default: True).
         nonleaf: List of Types to generate a recursive map over.
             Any type not in this list will generate a call to
             fn_leaf.
@@ -32,7 +38,7 @@ class HyperMap(MetaGraph):
                  fn_leaf=None,
                  fn_rec=None,
                  broadcast=True,
-                 nonleaf=(Array, List, Tuple, Class),
+                 nonleaf=nonleaf_defaults,
                  name=None):
         """Initialize a HyperMap."""
         if name is None:
@@ -44,52 +50,50 @@ class HyperMap(MetaGraph):
         self.fn_leaf = fn_leaf
         self.fn_rec = fn_rec or self
         self.broadcast = broadcast
-        # Pick out only the types we want to generate a mapping over.
-        self.make_map = TypeMap()
-        for t in (*nonleaf, object):
-            self.make_map[t] = self._full_make.map[t]
         self.nonleaf = nonleaf
 
     def normalize_args(self, args):
         """Return broadened arguments."""
         return tuple(broaden(a, None) for a in args)
 
-    _full_make = Overload()
+    def _is_nonleaf(self, arg):
+        return isinstance(arg, self.nonleaf)
 
-    @_full_make.register
-    def _full_make(self, t: List, g, fnarg, argmap):
-        args = list(argmap.keys())
-        if fnarg is None:
-            return g.apply(C.ListMap(self.fn_rec), *args)
-        else:
-            fn_rec = g.apply(P.partial, self.fn_rec, fnarg)
-            return g.apply(C.list_map, fn_rec, *args)
+    def _is_leaf(self, arg):
+        return not self._is_nonleaf(arg)
 
-    @_full_make.register
-    def _full_make(self, t: Array, g, fnarg, argmap):
+    _make = Overload(name='hypermap._make')
+
+    @_make.register
+    def _make(self, t: abstract.AbstractArray, g, fnarg, argmap):
         if fnarg is None:
             fnarg = self.fn_leaf
 
-        args = list(argmap.keys())
-        first, *rest = args
-
-        if rest and self.broadcast:
+        if len(argmap) > 1 and self.broadcast:
+            args = [g.apply(operations.to_array, arg) if isleaf else arg
+                    for arg, (a, isleaf) in argmap.items()]
+            first, *rest = args
             shp = g.apply(P.shape, first)
             for other in rest:
                 shp2 = g.apply(P.shape, other)
                 shp = g.apply(P.broadcast_shape, shp2, shp)
             args = [g.apply(P.distribute, arg, shp) for arg in args]
 
+        else:
+            args = list(argmap.keys())
+
         return g.apply(P.array_map, fnarg, *args)
 
-    @_full_make.register
-    def _full_make(self, t: Tuple, g, fnarg, argmap):
-        assert all(len(t.elements) == len(t2.elements)
-                   for t2 in argmap.values())
+    @_make.register
+    def _make(self, a: abstract.AbstractTuple, g, fnarg, argmap):
+        for a2, isleaf in argmap.values():
+            if not isleaf and len(a2.elements) != len(a.elements):
+                raise MyiaTypeError(f'Tuple length mismatch: {a} != {a2}')
+
         elems = []
-        for i in range(len(t.elements)):
-            args = [g.apply(P.tuple_getitem, arg, i)
-                    for arg in argmap.keys()]
+        for i in range(len(a.elements)):
+            args = [arg if isleaf else g.apply(P.tuple_getitem, arg, i)
+                    for arg, (_, isleaf) in argmap.items()]
             if fnarg is None:
                 val = g.apply(self.fn_rec, *args)
             else:
@@ -97,70 +101,64 @@ class HyperMap(MetaGraph):
             elems.append(val)
         return g.apply(P.make_tuple, *elems)
 
-    @_full_make.register
-    def _full_make(self, t: Class, g, fnarg, argmap):
-        assert all(t.tag == t2.tag
-                   and t.attributes.keys() == t2.attributes.keys()
-                   for t2 in argmap.values())
+    @_make.register
+    def _make(self, a: abstract.AbstractList, g, fnarg, argmap):
+        args = list(argmap.keys())
+        mask = [not isleaf for _, isleaf in argmap.values()]
+        if fnarg is None:
+            lm = C.ListMap(self.fn_rec, loop_mask=mask)
+            return g.apply(lm, *args)
+        else:
+            fn_rec = g.apply(P.partial, self.fn_rec, fnarg)
+            lm = C.ListMap(loop_mask=mask)
+            return g.apply(lm, fn_rec, *args)
+
+    @_make.register
+    def _make(self, a: abstract.AbstractClass, g, fnarg, argmap):
+        for a2, isleaf in argmap.values():
+            if not isleaf:
+                if (a2.tag != a.tag
+                        or a2.attributes.keys() != a.attributes.keys()):
+                    raise MyiaTypeError(f'Class mismatch: {a} != {a2}')
+
         vals = []
-        for k in t.attributes.keys():
-            args = [g.apply(P.getattr, arg, k)
-                    for arg in argmap.keys()]
+        for k in a.attributes.keys():
+            args = [arg if isleaf else g.apply(P.getattr, arg, k)
+                    for arg, (_, isleaf) in argmap.items()]
             if fnarg is None:
                 val = g.apply(self.fn_rec, *args)
             else:
                 val = g.apply(self.fn_rec, fnarg, *args)
             vals.append(val)
-        t = pytype_to_myiatype(tag_to_dataclass[t.tag])
+        t = pytype_to_myiatype(tag_to_dataclass[a.tag])
         return g.apply(P.make_record, t, *vals)
 
-    @_full_make.register
-    def _full_make(self, t: object, g, fnarg, argmap):
-        if fnarg is None:
-            fnarg = self.fn_leaf
-        return g.apply(fnarg, *argmap.keys())
-
-    def _make(self, g, fnarg, argmap):
-        for t in argmap.values():
-            # If any of the arguments is a nonleaf generic, pick it.
-            if hasattr(t, 'generic') and t.generic in self.nonleaf:
-                break
-        if hasattr(t, 'generic') and t.generic in self.nonleaf:
-            # In a nonleaf situation, all arguments must have the same
-            # generic.
-            for t2 in argmap.values():
-                if t.generic is not t2.generic:
-                    raise InferenceError(
-                        f'HyperMap cannot match up types {t} and {t2}'
-                    )
-        return self.make_map[t](self, t, g, fnarg, argmap)
-
-    def _harmonize(self, g, args):
-        if self.broadcast \
-                and any(issubtype(t, Array) for t in args.values()):
-            rval = {}
-            for arg, t in args.items():
-                if not issubtype(t, Array):
-                    arg = g.apply(operations.to_array, arg)
-                    t = Array[t]
-                rval[arg] = t
-            return rval
+    def _generate_helper(self, g, fnarg, argmap):
+        nonleafs = [a for a, isleaf in argmap.values() if not isleaf]
+        if not nonleafs:
+            if fnarg is None:
+                fnarg = self.fn_leaf
+            return g.apply(fnarg, *argmap.keys())
         else:
-            return args
+            types = set(type(a) for a in nonleafs)
+            if len(types) != 1:
+                raise MyiaTypeError(
+                    f'Incompatible types for hyper_map: {types}'
+                )
+            return self._make(nonleafs[0], g, fnarg, argmap)
 
-    def generate_from_types(self, types):
-        """Create a graph for mapping over the given types."""
+    def generate_graph(self, all_args):
+        """Create a graph for mapping over the given args."""
         g = Graph()
         g.debug.name = 'hyper_map'
         argmap = {}
         if self.fn_leaf is None:
-            fn_t, *arg_ts = types
+            fn_t, *args = all_args
             fnarg = g.add_parameter()
         else:
-            arg_ts = types
+            args = all_args
             fnarg = None
-        for t in arg_ts:
-            argmap[g.add_parameter()] = t
-        argmap = self._harmonize(g, argmap)
-        g.output = self._make(g, fnarg, argmap)
+        for a in args:
+            argmap[g.add_parameter()] = (a, self._is_leaf(a))
+        g.output = self._generate_helper(g, fnarg, argmap)
         return g
