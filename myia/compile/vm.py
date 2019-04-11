@@ -278,6 +278,30 @@ class FinalVM:
         b = self.backend.to_scalar(self._ref(b))
         self._push(self.backend.from_scalar(a and b, dtype.Bool))
 
+    def inst_tuple_getitem(self, t, idx):
+        """Get a item from a tuple.
+
+        Arguments:
+           t: tuple
+           idx: index
+        """
+        a = self._ref(t)
+        idx = self.backend.to_scalar(self._ref(idx))
+        self._push(a[idx])
+
+    def inst_tuple_setitem(self, t, idx, v):
+        """Set an item in a tuple.
+
+        Arguemnts:
+           t: tuple
+           idx: index
+           v: value to set
+        """
+        t = self._ref(t)
+        idx = self.backend.to_scalar(self._ref(idx))
+        v = self._ref(v)
+        self._push(t[:idx] + (v,) + t[idx + 1:])
+
     def inst_push(self, v):
         """Push a value on the stack.
 
