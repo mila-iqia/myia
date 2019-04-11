@@ -48,18 +48,23 @@ class InferenceEngine:
         self.loop = InferenceLoop(InferenceError)
         self.pipeline = pipeline
         self.mng = self.pipeline.resources.manager
-        self.constructors = {
-            prim: cons()
-            for prim, cons in constructors.items()
-        }
+        self._constructors = constructors
+        self.errors = []
+        self.context_class = context_class
+        self.reset()
+
+    def reset(self):
+        """Reset all of the InferenceEngine's caches."""
         self.cache = EvaluationCache(
             loop=self.loop,
             keycalc=self.compute_ref,
             keytransform=self.get_actual_ref
         )
-        self.errors = []
-        self.context_class = context_class
         self.reference_map = {}
+        self.constructors = {
+            prim: cons()
+            for prim, cons in self._constructors.items()
+        }
 
     def run(self, graph, *, argspec, outspec=None):
         """Run the inferrer on a graph given initial values.

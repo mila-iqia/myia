@@ -356,7 +356,7 @@ class InferenceResource(PipelineResource):
     def infer(self, graph, argspec, outspec=None, clear=False):
         """Perform inference."""
         if clear:
-            self.engine.cache.clear()
+            self.engine.reset()
             for node in self.manager.all_nodes:
                 orig_t = node.abstract
                 node.abstract = None

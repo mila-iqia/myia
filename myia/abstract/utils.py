@@ -415,6 +415,11 @@ async def concretize_abstract(self, ctx: Context):
     )
 
 
+@overload  # noqa: F811
+async def concretize_abstract(self, t: tuple):
+    return tuple([await self(x) for x in t])
+
+
 @overload.wrapper  # noqa: F811
 async def concretize_abstract(__call__, self, x):
     if hasattr(x, '_concrete'):

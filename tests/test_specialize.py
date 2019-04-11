@@ -14,6 +14,7 @@ from myia.prim.py_implementations import \
     scalar_usub, scalar_uadd, switch, array_map
 from myia.validate import ValidationError
 from myia.utils import overload
+from myia.hypermap import hyper_map
 
 from .common import mysum, i64, f64, Point
 
@@ -110,6 +111,9 @@ int2 = 21
 
 fp1 = 2.7
 fp2 = 6.91
+
+pt1 = Point(10, 20)
+pt2 = Point(100, 200)
 
 
 @specialize((int1, int2),
@@ -425,3 +429,17 @@ def test_union(x):
         return x
     else:
         return x[0]
+
+
+@specialize(
+    (int1, int2),
+    (pt1, int1),
+    (pt1, pt2),
+)
+def test_hyper_map(x, y):
+    return hyper_map(scalar_add, x, y)
+
+
+@specialize((int1,))
+def test_hyper_map_ct(x):
+    return hyper_map(scalar_add, x, 1)

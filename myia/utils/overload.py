@@ -65,6 +65,7 @@ class Overload:
                  wrapper=None,
                  initial_state=None,
                  mixins=[],
+                 name=None,
                  _parent=None):
         """Initialize an Overload."""
         if bind_to is True:
@@ -76,7 +77,7 @@ class Overload:
         self._wrapper = wrapper
         self.state = None
         self.initial_state = initial_state
-        self.name = None
+        self.name = name
         if _parent:
             assert _parent.which is not None
             self.map = _parent.map
@@ -169,7 +170,7 @@ class Overload:
         return ov
 
     def __get__(self, obj, cls):
-        return Overload(bind_to=obj, _parent=self)
+        return Overload(bind_to=obj, _parent=self, name=self.name)
 
     def __getitem__(self, t):
         if self.__self__:
@@ -206,7 +207,7 @@ class Overload:
             return self._wrapper(method, *args, **kwargs)
 
     def __repr__(self):
-        return f'<Overload {self.name or hex(self.id)}>'
+        return f'<Overload {self.name or hex(id(self))}>'
 
 
 def _find_overload(fn, bootstrap, initial_state):

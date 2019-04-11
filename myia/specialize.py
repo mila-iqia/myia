@@ -191,6 +191,8 @@ class _GraphSpecializer:
                         # the inferrer. It should have been, but sometimes
                         # it isn't, not sure why. Hopefully a rewrite of the
                         # specializer should fix everything.
+                        if hasattr(currinf, 'graph_cache'):
+                            await concretize_cache(currinf.graph_cache)
                         g = currinf.get_graph(eng, broad_argvals)
                         ctx = currinf.make_context(eng, broad_argvals)
                         if eng.ref(g.output, ctx) in eng.cache.cache:

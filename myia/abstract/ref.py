@@ -226,7 +226,3 @@ class EvaluationCache:
         fut = asyncio.Future(loop=self.loop)
         fut.set_result(value)
         self.cache[key] = fut
-
-    def clear(self):
-        """Clear the cache completely."""
-        self.cache.clear()

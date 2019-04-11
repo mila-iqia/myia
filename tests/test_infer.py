@@ -5,14 +5,14 @@ import numpy as np
 
 from types import SimpleNamespace
 
+from myia import abstract
 from myia.abstract import concretize_abstract
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
-from myia.dtype import Array as A, Int, External, List, \
-    Number, Class, EnvType as Env, Nil
-from myia.hypermap import HyperMap
+from myia.dtype import Int, External, List, Number, Class, EnvType as Env, Nil
+from myia.hypermap import HyperMap, hyper_map
 from myia.abstract import ANYTHING, InferenceError, Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
 from myia.prim import Primitive, ops as P
@@ -1565,6 +1565,57 @@ def test_dataclass_method(pt):
     return pt.abs()
 
 
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_add(pt1, pt2):
+    return pt1 + pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_add_ct(pt):
+    return pt + 10
+
+
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_sub(pt1, pt2):
+    return pt1 - pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_mul(pt1, pt2):
+    return pt1 * pt2
+
+
+@infer_std((Point3D(f64, f64, f64), Point3D(f64, f64, f64),
+            Point3D(f64, f64, f64)))
+def test_arithmetic_data_truediv(pt1, pt2):
+    return pt1 / pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_floordiv(pt1, pt2):
+    return pt1 // pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_mod(pt1, pt2):
+    return pt1 % pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_pow(pt1, pt2):
+    return pt1 ** pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_pos(pt):
+    return +pt
+
+
+@infer_std((Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_neg(pt):
+    return -pt
+
+
 @infer(
     (i64, i64, i64, i64, Point(i64, i64)),
     (f64, f64, f64, f64, InferenceError),
@@ -1595,8 +1646,11 @@ def test_dataclass_call(thing):
     return thing()
 
 
-hyper_map = HyperMap()
-hyper_map_notuple = HyperMap(nonleaf=(A, Class))
+hyper_map_notuple = HyperMap(
+    nonleaf=(abstract.AbstractArray,
+             abstract.AbstractList,
+             abstract.AbstractClass)
+)
 hyper_map_nobroadcast = HyperMap(broadcast=False)
 
 
@@ -1605,22 +1659,32 @@ hyper_map_nobroadcast = HyperMap(broadcast=False)
     (f64, f64, f64),
     ([f64], [f64], [f64]),
     ([[f64]], [[f64]], [[f64]]),
-    ([f64], f64, InferenceError),
-    ([f64], [[f64]], InferenceError),
     ((i64, f64), (i64, f64), (i64, f64)),
     (Point(i64, i64), Point(i64, i64), Point(i64, i64)),
     (ai64_of(2, 5), ai64_of(2, 5), ai64_of(2, 5)),
     (ai64_of(2, 5), i64, ai64_of(2, 5)),
     (ai64_of(1, 5), ai64_of(2, 1), ai64_of(2, 5)),
     (i64, f64, InferenceError),
-    ([f64], f64, InferenceError),
     (ai64_of(2, 5), af64_of(2, 5), InferenceError),
+
+    # Generic broadcasting tests
+    ([f64], f64, [f64]),
+    ([f64], [[f64]], [[f64]]),
+    ((i64, i64), i64, (i64, i64)),
+    (i64, (i64, i64), (i64, i64)),
+    (Point(i64, i64), i64, Point(i64, i64)),
+
+    # Various errors
+    ((i64, i64), (i64, i64, i64), InferenceError),
+    (Point(i64, i64), Point3D(i64, i64, i64), InferenceError),
+    ((i64, i64), [i64], InferenceError),
 )
 def test_hyper_map(x, y):
     return hyper_map(scalar_add, x, y)
 
 
-@infer(((i64, f64), (i64, f64), InferenceError))
+@infer(((i64, f64), (i64, f64), InferenceError),
+       ([f64], f64, [f64]))
 def test_hyper_map_notuple(x, y):
     return hyper_map_notuple(scalar_add, x, y)
 

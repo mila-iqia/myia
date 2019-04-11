@@ -5,10 +5,11 @@ from dataclasses import dataclass
 from functools import reduce
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
-    AbstractFunction, GraphFunction, AbstractList, AbstractTuple
-from .dtype import Array, Object, Int, UInt, Float, Number, Bool, Tuple, \
-    List, Class, EnvType, Function, Problem
-from .hypermap import HyperMap
+    AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
+    AbstractClass
+from .dtype import Array, Object, Int, UInt, Float, Number, Bool, \
+    EnvType, Function, Problem
+from .hypermap import HyperMap, hyper_map
 from .abstract import MyiaTypeError, broaden
 from .info import About
 from .ir import Graph, MetaGraph, MultitypeGraph, Constant
@@ -549,7 +550,7 @@ def _array_zero(xs):
 
 zeros_like = HyperMap(
     name='zeros_like',
-    nonleaf=(Tuple, List, Class),
+    nonleaf=(AbstractTuple, AbstractList, AbstractClass),
     fn_leaf=_leaf_zeros_like
 )
 
@@ -568,15 +569,19 @@ def list_reduce(fn, lst, dftl):
 class ListMap(MetaGraph):
     """Implementation of list_map."""
 
-    def __init__(self, fn_rec=None):
+    def __init__(self, fn_rec=None, loop_mask=None):
         """Initialize the list_map.
 
         Arguments:
             fn_rec: The function to map over, or None if the function to
                 map over must be provided as the first argument.
+            loop_mask: Either None or a list of booleans such that the
+                argument i is a list to iterate on if loop_mask[i] is
+                True, and otherwise it is not iterated on.
 
         """
         self.fn_rec = fn_rec
+        self.loop_mask = loop_mask
         super().__init__(self._decorate_name('list_map'))
 
     def _decorate_name(self, name):
@@ -587,12 +592,15 @@ class ListMap(MetaGraph):
 
     def generate_graph(self, args):
         """Return a graph for the number of lists."""
+        mask = self.loop_mask
         nfn = 1 if self.fn_rec is None else 0
+        if mask is None:
+            mask = (True,) * (len(args) - nfn)
         nmin = 1 + nfn
         if len(args) < nmin:
             raise MyiaTypeError(f'{self} takes at least {nmin} arguments')
-        for t in args[nfn:]:
-            if not isinstance(t, AbstractList):
+        for t, m in zip(args[nfn:], mask):
+            if m and not isinstance(t, AbstractList):
                 raise MyiaTypeError(f'list_map requires lists, not {t}')
 
         g = Graph()
@@ -600,9 +608,10 @@ class ListMap(MetaGraph):
         g.flags['ignore_values'] = True
         g.debug.name = 'list_map'
         fn = self.fn_rec or g.add_parameter()
-        lists = [g.add_parameter() for _ in args[nfn:]]
+        gargs = [g.add_parameter() for _ in args[nfn:]]
 
-        values = [g.apply(P.list_getitem, l, 0) for l in lists]
+        values = [g.apply(P.list_getitem, a, 0) if m else a
+                  for a, m in zip(gargs, mask)]
         resl = g.apply(P.make_list, g.apply(fn, *values))
 
         gnext = Graph()
@@ -616,7 +625,8 @@ class ListMap(MetaGraph):
             fn = self.fn_rec or g.add_parameter()
             curri = g.add_parameter()
             resl = g.add_parameter()
-            lists2 = [g.add_parameter() for _ in lists]
+            gargs2 = [g.add_parameter() for _ in gargs]
+            lists2 = [a for a, m in zip(gargs2, mask) if m]
             hasnexts = [g.apply(P.scalar_lt, curri, g.apply(P.list_len, l))
                         for l in lists2]
             cond = reduce(lambda a, b: g.apply(P.bool_and, a, b), hasnexts)
@@ -625,9 +635,9 @@ class ListMap(MetaGraph):
             gtrue.flags['core'] = True
             gtrue.flags['ignore_values'] = True
             if self.fn_rec is None:
-                gtrue.output = gtrue.apply(gnext, fn, curri, resl, *lists2)
+                gtrue.output = gtrue.apply(gnext, fn, curri, resl, *gargs2)
             else:
-                gtrue.output = gtrue.apply(gnext, curri, resl, *lists2)
+                gtrue.output = gtrue.apply(gnext, curri, resl, *gargs2)
             gfalse = Graph()
             gfalse.debug.name = self._decorate_name('lm_ffalse')
             gfalse.flags['core'] = True
@@ -639,21 +649,22 @@ class ListMap(MetaGraph):
             fn = self.fn_rec or g.add_parameter()
             curri = g.add_parameter()
             resl = g.add_parameter()
-            lists2 = [g.add_parameter() for _ in lists]
-            values = [g.apply(P.list_getitem, l, curri) for l in lists2]
+            gargs2 = [g.add_parameter() for _ in gargs]
+            values = [g.apply(P.list_getitem, a, curri) if m else a
+                      for a, m in zip(gargs2, mask)]
             resl = g.apply(P.list_append, resl, g.apply(fn, *values))
             nexti = g.apply(P.scalar_add, curri, 1)
             if self.fn_rec is None:
-                g.output = g.apply(gcond, fn, nexti, resl, *lists2)
+                g.output = g.apply(gcond, fn, nexti, resl, *gargs2)
             else:
-                g.output = g.apply(gcond, nexti, resl, *lists2)
+                g.output = g.apply(gcond, nexti, resl, *gargs2)
 
         make_cond(gcond)
         make_next(gnext)
         if self.fn_rec is None:
-            g.output = g.apply(gcond, fn, 1, resl, *lists)
+            g.output = g.apply(gcond, fn, 1, resl, *gargs)
         else:
-            g.output = g.apply(gcond, 1, resl, *lists)
+            g.output = g.apply(gcond, 1, resl, *gargs)
 
         return g
 
@@ -745,3 +756,47 @@ class GradOperation(MetaGraph):
 
 
 grad = GradOperation('grad')
+
+
+class ArithmeticData:
+    """Mixin to implement access to arithmetic operators.
+
+    When used for a dataclass D, operations like D + D will add together
+    all matching fields from the added instances.
+    """
+
+    @core
+    def __add__(self, x):
+        return hyper_map(add, self, x)
+
+    @core
+    def __sub__(self, x):
+        return hyper_map(sub, self, x)
+
+    @core
+    def __mul__(self, x):
+        return hyper_map(mul, self, x)
+
+    @core
+    def __truediv__(self, x):
+        return hyper_map(truediv, self, x)
+
+    @core
+    def __floordiv__(self, x):
+        return hyper_map(floordiv, self, x)
+
+    @core
+    def __mod__(self, x):
+        return hyper_map(mod, self, x)
+
+    @core
+    def __pow__(self, x):
+        return hyper_map(pow, self, x)
+
+    @core
+    def __pos__(self):
+        return hyper_map(uadd, self)
+
+    @core
+    def __neg__(self):
+        return hyper_map(usub, self)

@@ -10,6 +10,7 @@ from myia.dtype import Bool, Int, UInt, Float, List, Array, Tuple, Function, \
     Object, pytype_to_myiatype
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance
+from myia.composite import ArithmeticData
 
 
 B = Bool
@@ -181,7 +182,7 @@ class Thing:
 
 
 @dataclass(frozen=True)
-class Point:
+class Point(ArithmeticData):
     x: i64
     y: i64
 
@@ -190,10 +191,10 @@ class Point:
 
 
 @dataclass(frozen=True)
-class Point3D:
-    x: i64
-    y: i64
-    z: i64
+class Point3D(ArithmeticData):
+    x: Object
+    y: Object
+    z: Object
 
     def abs(self):
         return (self.x ** 2 + self.y ** 2 + self.z ** 2) ** 0.5
