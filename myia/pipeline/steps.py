@@ -352,27 +352,33 @@ step_opt2 = Optimizer.partial(
 
 
 @pipeline_function
-def step_erase_tuple(self, graph, argspec, outspec, erase_class=False):
-    """Expand Tuple in graph parameters whenever possible.
-
-    This should be run on the specialized graph.
+def step_erase_tuple(self, graph, argspec, erase_class=False):
+    """Expand tuples in the main graph parameters.
 
     Inputs:
-        graph: The graph to prepare.
+        graph: The graph to transform
+        argspec: The argument types.
+        erase_tuple: Must be True
 
     Outputs:
         graph: The prepared graph.
+        argspec: The transformed argspec
+        erase_tuple: True
+
     """
     assert erase_class
     mng = self.resources.manager
-    erase_tuple(graph, mng)
-    new_argspec = tuple(p.abstract for p in graph.parameters)
-    graph = self.resources.inferrer.renormalize(graph, new_argspec)
-    new_outspec = graph.output.abstract
-    return {'graph': graph,
-            'argspec': new_argspec,
-            'outspec': new_outspec,
-            'erase_tuple': True}
+    new_graph = erase_tuple(graph, mng)
+    if new_graph != graph:
+        new_argspec = tuple(p.abstract for p in new_graph.parameters)
+        new_graph = self.resources.inferrer.renormalize(new_graph, new_argspec)
+        return {'graph': new_graph,
+                'argspec': new_argspec,
+                'erase_tuple': True}
+    else:
+        return {'graph': graph,
+                'argspec': argspec,
+                'erase_tuple': True}
 
 
 ############
