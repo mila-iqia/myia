@@ -442,7 +442,9 @@ def pytype_to_myiatype(pytype, instance=None):
 
         fields = pytype.__dataclass_fields__
         if instance is None:
-            attributes = {name: pytype_to_myiatype(field.type)
+            attributes = {name: Object
+                          if isinstance(field.type, (str, type(None)))
+                          else pytype_to_myiatype(field.type)
                           for name, field in fields.items()}
         else:
             attributes = {}
