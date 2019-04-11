@@ -1565,6 +1565,57 @@ def test_dataclass_method(pt):
     return pt.abs()
 
 
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_add(pt1, pt2):
+    return pt1 + pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_add_ct(pt):
+    return pt + 10
+
+
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_sub(pt1, pt2):
+    return pt1 - pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_mul(pt1, pt2):
+    return pt1 * pt2
+
+
+@infer_std((Point3D(f64, f64, f64), Point3D(f64, f64, f64),
+            Point3D(f64, f64, f64)))
+def test_arithmetic_data_truediv(pt1, pt2):
+    return pt1 / pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_floordiv(pt1, pt2):
+    return pt1 // pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_mod(pt1, pt2):
+    return pt1 % pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_pow(pt1, pt2):
+    return pt1 ** pt2
+
+
+@infer_std((Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_pos(pt):
+    return +pt
+
+
+@infer_std((Point(i64, i64), Point(i64, i64)))
+def test_arithmetic_data_neg(pt):
+    return -pt
+
+
 @infer(
     (i64, i64, i64, i64, Point(i64, i64)),
     (f64, f64, f64, f64, InferenceError),

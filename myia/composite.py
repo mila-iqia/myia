@@ -9,7 +9,7 @@ from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractClass
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, \
     EnvType, Function, Problem
-from .hypermap import HyperMap
+from .hypermap import HyperMap, hyper_map
 from .abstract import MyiaTypeError, broaden
 from .info import About
 from .ir import Graph, MetaGraph, MultitypeGraph, Constant
@@ -756,3 +756,47 @@ class GradOperation(MetaGraph):
 
 
 grad = GradOperation('grad')
+
+
+class ArithmeticData:
+    """Mixin to implement access to arithmetic operators.
+
+    When used for a dataclass D, operations like D + D will add together
+    all matching fields from the added instances.
+    """
+
+    @core
+    def __add__(self, x):
+        return hyper_map(add, self, x)
+
+    @core
+    def __sub__(self, x):
+        return hyper_map(sub, self, x)
+
+    @core
+    def __mul__(self, x):
+        return hyper_map(mul, self, x)
+
+    @core
+    def __truediv__(self, x):
+        return hyper_map(truediv, self, x)
+
+    @core
+    def __floordiv__(self, x):
+        return hyper_map(floordiv, self, x)
+
+    @core
+    def __mod__(self, x):
+        return hyper_map(mod, self, x)
+
+    @core
+    def __pow__(self, x):
+        return hyper_map(pow, self, x)
+
+    @core
+    def __pos__(self):
+        return hyper_map(uadd, self)
+
+    @core
+    def __neg__(self):
+        return hyper_map(usub, self)
