@@ -5,14 +5,14 @@ import numpy as np
 
 from types import SimpleNamespace
 
+from myia import abstract
 from myia.abstract import concretize_abstract
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
-from myia.dtype import Array as A, Int, External, List, \
-    Number, Class, EnvType as Env, Nil
-from myia.hypermap import HyperMap
+from myia.dtype import Int, External, List, Number, Class, EnvType as Env, Nil
+from myia.hypermap import HyperMap, hyper_map
 from myia.abstract import ANYTHING, InferenceError, Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
 from myia.prim import Primitive, ops as P
@@ -1595,8 +1595,11 @@ def test_dataclass_call(thing):
     return thing()
 
 
-hyper_map = HyperMap()
-hyper_map_notuple = HyperMap(nonleaf=(A, Class))
+hyper_map_notuple = HyperMap(
+    nonleaf=(abstract.AbstractArray,
+             abstract.AbstractList,
+             abstract.AbstractClass)
+)
 hyper_map_nobroadcast = HyperMap(broadcast=False)
 
 
@@ -1629,7 +1632,8 @@ def test_hyper_map(x, y):
     return hyper_map(scalar_add, x, y)
 
 
-@infer(((i64, f64), (i64, f64), InferenceError))
+@infer(((i64, f64), (i64, f64), InferenceError),
+       ([f64], f64, [f64]))
 def test_hyper_map_notuple(x, y):
     return hyper_map_notuple(scalar_add, x, y)
 

@@ -1,5 +1,7 @@
 """Generate mapping graphs over classes, tuples, arrays, etc."""
 
+import numpy as np
+from dataclasses import is_dataclass
 
 from . import operations, composite as C, abstract
 from .abstract import MyiaTypeError, broaden
@@ -7,6 +9,7 @@ from .ir import MetaGraph, Graph
 from .dtype import tag_to_dataclass, pytype_to_myiatype
 from .utils import Overload
 from .prim import ops as P
+from .prim.py_implementations import array_map
 
 
 nonleaf_defaults = (
@@ -162,3 +165,75 @@ class HyperMap(MetaGraph):
             argmap[g.add_parameter()] = (a, self._is_leaf(a))
         g.output = self._generate_helper(g, fnarg, argmap)
         return g
+
+    def __call__(self, *all_args):
+        """Python implementation of HyperMap's functionality."""
+        assert self.broadcast  # TODO: implement the non-broadcast version
+
+        def _is_nonleaf(x):
+            return (
+                (isinstance(x, list)
+                 and abstract.AbstractList in self.nonleaf)
+                or (isinstance(x, tuple)
+                    and abstract.AbstractTuple in self.nonleaf)
+                or (isinstance(x, np.ndarray)
+                    and abstract.AbstractArray in self.nonleaf)
+                or (is_dataclass(x)
+                    and abstract.AbstractClass in self.nonleaf)
+            )
+
+        def _reccall(args):
+            if fnarg is None:
+                return self.fn_rec(*args)
+            else:
+                return self.fn_rec(fnarg, *args)
+
+        def _leafcall(args):
+            if fnarg is None:
+                return self.fn_leaf(*args)
+            else:
+                return fnarg(*args)
+
+        if self.fn_leaf is None:
+            fnarg, *args = all_args
+        else:
+            fnarg = None
+            args = all_args
+
+        argmap = [(x, _is_nonleaf(x)) for x in args]
+
+        nonleafs = [x for x, nonleaf in argmap if nonleaf]
+        assert len(set(map(type, nonleafs))) <= 1
+
+        if not nonleafs:
+            return _leafcall(args)
+
+        main = nonleafs[0]
+
+        if isinstance(main, (list, tuple)):
+            assert all(len(x) == len(main) for x in nonleafs[1:])
+            results = []
+            for i in range(len(main)):
+                args = [x[i] if nonleaf else x
+                        for x, nonleaf in argmap]
+                results.append(_reccall(args))
+            return type(main)(results)
+
+        elif is_dataclass(main):
+            results = {}
+            for name, field in main.__dataclass_fields__.items():
+                args = [getattr(x, name) if nonleaf else x
+                        for x, nonleaf in argmap]
+                results[name] = _reccall(args)
+            return type(main)(**results)
+
+        elif isinstance(main, np.ndarray):
+            if fnarg is None:
+                fnarg = self.fn_leaf
+            return array_map(fnarg, *args)
+
+        else:
+            raise AssertionError('Should be unreachable')
+
+
+hyper_map = HyperMap()
