@@ -6,7 +6,8 @@ from functools import reduce
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
-    AbstractClass
+    AbstractClass, build_value
+from .debug.label import short_labeler
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, \
     EnvType, Function, Problem
 from .hypermap import HyperMap, hyper_map
@@ -18,7 +19,7 @@ from .prim.py_implementations import \
     array_map, bool_not, bool_eq, hastype, distribute, shape, \
     broadcast_shape, typeof, scalar_cast, scalar_add, scalar_exp, \
     scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div, \
-    scalar_to_array, env_add, scalar_tanh
+    scalar_to_array, env_add, scalar_tanh, py_registry
 from .utils import newenv
 
 
@@ -119,6 +120,10 @@ class Elemwise(MetaGraph):
                 g.output = g.apply(fn, *rest)
             self.cache[sig] = g
         return self.cache[sig]
+
+    def __call__(self, *args):
+        """Python version of Elemwise's functionality."""
+        return array_map(py_registry[self.scalar_op], *args)
 
 
 add = Elemwise('__add__', P.scalar_add, name='add')
@@ -697,10 +702,25 @@ class GradOperation(MetaGraph):
     We just need to know how many parameters f takes.
     """
 
-    def make_gf(self, jf, orig_params,
-                dbg, sens_param=False, get_all=False,
-                apply_j=False):
-        """Make the graph for the grad."""
+    def __init__(self,
+                 name,
+                 return_value=False):
+        """Initialize GradOperation."""
+        super().__init__(name)
+        self.return_value = return_value
+
+    def make_gf(self, jf, orig_params, dbg, wrt,
+                sens_param=False, apply_j=False):
+        """Make the graph for the grad.
+
+        If wrt is an integer, the wrt-th gradient will be returned directly.
+        If it is a tuple of integers, then a tuple of the specified gradients
+        will be returned in the same order (duplicates are allowed).
+
+        If self.return_value is True, a tuple will always be returned and the
+        first element will be the return value of the function. The other
+        elements will be the gradients.
+        """
         with About(dbg, 'grad'):
             df = Graph()
             df.flags['core'] = True
@@ -723,20 +743,61 @@ class GradOperation(MetaGraph):
         else:
             bprop_arg = df.apply(_cast_helper, 1, out)
 
-        bapp = df.apply(bprop, bprop_arg)
-        if get_all:
-            df.output = df.apply(tail, bapp)
+        if isinstance(wrt, int):
+            direct_return = True
+            wrt = [wrt]
         else:
-            df.output = df.apply(P.tuple_getitem, bapp, 1)
+            direct_return = False
+
+        bapp = df.apply(bprop, bprop_arg)
+        elems = []
+        if self.return_value:
+            elems.append(out)
+        for idx in wrt:
+            elems.append(df.apply(P.tuple_getitem, bapp, idx + 1))
+
+        if len(elems) == 1 and direct_return:
+            df.output = elems[0]
+        else:
+            df.output = df.apply(P.make_tuple, *elems)
         return df
 
     def generate_graph(self, args):
         """Generate the graph."""
-        ft, = args
+        ft, *raw_wrt = args
         assert isinstance(ft, AbstractFunction)
         gf = ft.get_unique()
         assert isinstance(gf, GraphFunction)
         g = gf.graph
+
+        wrt = []
+        for entry in raw_wrt:
+            value = build_value(entry, default=None)
+            if value is None:
+                raise MyiaTypeError(
+                    'grad must statically know which parameters to use'
+                )
+            elif value == '*':
+                wrt += range(len(g.parameters))
+            elif isinstance(value, str):
+                parameter_names = [short_labeler.name(p)
+                                   for p in g.parameters]
+                try:
+                    wrt.append(parameter_names.index(value))
+                except ValueError:
+                    raise MyiaTypeError(f'No parameter named "{value}""')
+            elif isinstance(value, int):
+                wrt.append(value)
+            else:
+                raise MyiaTypeError(
+                    'The parameters to use for grad must be strings or'
+                    ' integers.'
+                )
+
+        if len(wrt) == 1:
+            wrt = wrt[0]
+        elif len(wrt) == 0:
+            wrt = 0
 
         dfbuilder = Graph()
         dfbuilder.flags['core'] = True
@@ -744,11 +805,14 @@ class GradOperation(MetaGraph):
 
         with About(g.debug, 'copy'):
             fn = dfbuilder.add_parameter()
+            for arg in args[1:]:
+                # These are dummy parameters
+                dfbuilder.add_parameter()
 
         with About(g.debug, 'grad_fprop'):
             jf = dfbuilder.apply(P.J, fn)
 
-        df = self.make_gf(jf, g.parameters, g.debug)
+        df = self.make_gf(jf, g.parameters, g.debug, wrt=wrt)
 
         dfbuilder.output = Constant(df)
 
@@ -756,6 +820,7 @@ class GradOperation(MetaGraph):
 
 
 grad = GradOperation('grad')
+value_and_grad = GradOperation('value_and_grad', return_value=True)
 
 
 class ArithmeticData:

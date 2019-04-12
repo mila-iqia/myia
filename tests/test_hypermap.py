@@ -31,3 +31,8 @@ def test_hypermap():
     assert adder((1, 2), (10, 20)) == (11, 22)
     assert (adder(numpy.ones((2, 2)), numpy.ones((2, 2)))
             == 2 * numpy.ones((2, 2))).all()
+
+
+def test_arithmetic_data():
+    assert Point(1, 2) + Point(10, 20) == Point(11, 22)
+    assert Point(1, 2) + 10 == Point(11, 12)
