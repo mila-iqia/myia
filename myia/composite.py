@@ -19,7 +19,7 @@ from .prim.py_implementations import \
     array_map, bool_not, bool_eq, hastype, distribute, shape, \
     broadcast_shape, typeof, scalar_cast, scalar_add, scalar_exp, \
     scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div, \
-    scalar_to_array, env_add, scalar_tanh, py_registry
+    scalar_to_array, env_add, scalar_tanh, py_registry, array_reduce
 from .utils import newenv
 
 
@@ -427,6 +427,11 @@ tail = Tail('tail')
 #################
 # Array methods #
 #################
+
+@core
+def sum(x):
+    """Implementation of `sum`."""
+    return array_reduce(scalar_add, x, ())
 
 
 @core
