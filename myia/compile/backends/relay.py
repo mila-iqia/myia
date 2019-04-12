@@ -158,7 +158,12 @@ def relay_array_reduce(c, fn, array, shape):
         axis = tuple(i for i, t in enumerate(ts) if t == 1)
         res = relay.op.sum(ary, axis=axis, keepdims=True)
         if len(tshp) < len(ashp):
+            rtshp = tshp
+            if tshp == ():
+                tshp = (1,)
             res = relay.op.reshape(res, newshape=tshp)
+            if rtshp == ():
+                res = relay.op.take(res, relay.const(0))
         return res
     else:
         raise NotImplementedError(f"reduce with {fn}")

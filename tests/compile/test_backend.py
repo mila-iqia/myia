@@ -268,6 +268,11 @@ def test_array_reduce2(x):
 
 
 @parse_compare((MA(2, 3),))
+def test_array_reduce3(x):
+    return array_reduce(scalar_add, x, ())
+
+
+@parse_compare((MA(2, 3),))
 def test_transpose(x):
     return transpose(x, (1, 0))
 

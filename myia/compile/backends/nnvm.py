@@ -99,6 +99,8 @@ def nnvm_array_reduce(c, fn, array, shape):
             axis = axis[0]
         res = sym.sum(ary, axis=axis, keepdims=1)
         if len(tshp) < len(ashp):
+            if tshp == ():
+                tshp = (1,)
             res = sym.reshape(res, shape=tshp)
         return res
     else:
