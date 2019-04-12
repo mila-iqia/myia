@@ -312,8 +312,11 @@ class CompileGraph:
                                              "{fn.value}")
 
                 else:
-                    # pre-push the function on the stack
+                    # ensure the function and arguments are available.
                     self.ref(fn)
+                    for i in split.inputs[1:]:
+                        self.ref(i)
+                    # make references to the arguments
                     for i in reversed(split.inputs[1:]):
                         self.dup(i)
                     if split is graph.output:
