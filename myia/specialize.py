@@ -7,7 +7,7 @@ from .abstract import GraphFunction, concretize_abstract, \
     AbstractFunction, AbstractError, build_value, MyiaTypeError, \
     TypedPrimitive, BaseGraphInferrer, broaden, \
     TrackedInferrer, PrimitiveFunction, MetaGraphFunction, \
-    ConditionalContext
+    ConditionalContext, InferenceError
 from .abstract import Context, Unspecializable, \
     DEAD, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
@@ -143,6 +143,9 @@ class _GraphSpecializer:
 
         assert _visible(self.graph, fn.context.graph)
 
+        if hasattr(inf, 'graph_cache'):
+            await concretize_cache(inf.graph_cache)
+
         ctx = inf.make_context(self.specializer.engine, argvals)
         v = await self.specializer._specialize(ctx.graph, ctx, None)
         return _const(v, a)
@@ -193,10 +196,14 @@ class _GraphSpecializer:
                         # specializer should fix everything.
                         if hasattr(currinf, 'graph_cache'):
                             await concretize_cache(currinf.graph_cache)
-                        g = currinf.get_graph(eng, broad_argvals)
-                        ctx = currinf.make_context(eng, broad_argvals)
-                        if eng.ref(g.output, ctx) in eng.cache.cache:
+                        try:
+                            g = currinf.get_graph(eng, broad_argvals)
+                        except InferenceError as e:  # pragma: no cover
                             return res
+                        else:
+                            ctx = currinf.make_context(eng, broad_argvals)
+                            if eng.ref(g.output, ctx) in eng.cache.cache:
+                                return res
                     else:
                         return res
                 except Unspecializable as e:

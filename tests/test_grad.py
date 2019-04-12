@@ -5,9 +5,10 @@ import numpy as np
 from types import FunctionType
 from dataclasses import dataclass
 
-from myia.abstract import from_value, AbstractJTagged
+from myia.abstract import from_value, AbstractJTagged, InferenceError
+from myia.api import myia
 from myia.pipeline import standard_resources, standard_pipeline
-from myia.composite import grad
+from myia.composite import grad, value_and_grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.grad import J as realJ
 from myia.pipeline import pipeline_function, PipelineDefinition, steps
@@ -49,11 +50,12 @@ step_grad_validate = Validator.partial(
 def grad_wrap(self, graph):
     if isinstance(graph, Primitive):
         jg = realJ(graph, self.resources)
-        g = grad.make_gf(jg, jg.parameters,
-                         dbg=jg.debug, sens_param=True, get_all=True)
+        g = grad.make_gf(jg, jg.parameters, wrt=range(len(jg.parameters)),
+                         dbg=jg.debug, sens_param=True)
     else:
         g = grad.make_gf(graph, graph.parameters,
-                         dbg=graph.debug, sens_param=True, get_all=True,
+                         wrt=range(len(graph.parameters)),
+                         dbg=graph.debug, sens_param=True,
                          apply_j=True)
     return g
 
@@ -504,3 +506,49 @@ def test_freegraph_outside_grad():
         return bprop(1)[1]
 
     assert _runwith(f, 5.0, 8.0) == 25.0
+
+
+def test_grad_interface():
+    def f(x, y):
+        a = x ** 3
+        b = y ** 4
+        return a * b
+
+    @myia
+    def grads(x, y):
+        return (
+            grad(f, 'x')(x, y),
+            grad(f, 0)(x, y),
+            grad(f, 'y')(x, y),
+            grad(f, 'x', 'y')(x, y),
+            grad(f, '*')(x, y),
+            value_and_grad(f)(x, y),
+        )
+
+    @myia
+    def gradbad(x, y):
+        return grad(f, (0, 1))(x, y)
+
+    @myia
+    def gradbad2(x, y):
+        return grad(f, 'z')(x, y)
+
+    @myia
+    def gradbad3(x, y, z):
+        return grad(f, z)(x, y)
+
+    x, y = 2.0, 3.0
+
+    dx = 3 * (x ** 2) * (y ** 4)
+    dy = 4 * (y ** 3) * (x ** 3)
+
+    assert grads(x, y) == (dx, dx, dy, (dx, dy), (dx, dy), (f(x, y), dx))
+
+    with pytest.raises(InferenceError):
+        print(gradbad(x, y))
+
+    with pytest.raises(InferenceError):
+        print(gradbad2(x, y))
+
+    with pytest.raises(InferenceError):
+        print(gradbad3(x, y, 0))
