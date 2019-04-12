@@ -6,6 +6,9 @@ import weakref
 _intern_pool = weakref.WeakValueDictionary()
 
 
+pyhash = hash
+
+
 class EqKey:
     """Base class for Atom/Elements."""
 
@@ -59,7 +62,7 @@ class RecursionException(Exception):
     """Raised when a data structure is found to be recursive."""
 
 
-def deep_eqkey(obj):
+def deep_eqkey(obj, path=frozenset()):
     """Return a key for equality tests for non-recursive structures."""
     cachable = getattr(obj, '__cache_eqkey__', False)
     if cachable:
@@ -67,9 +70,15 @@ def deep_eqkey(obj):
         if cached is not None:
             return cached
 
+    oid = id(obj)
+    if oid in path:
+        raise RecursionException()
+
     key = eqkey(obj)
     if isinstance(key, Elements):
-        dk = key.type, type(key.values)(deep_eqkey(x) for x in key.values)
+        dk = key.type, type(key.values)(
+            deep_eqkey(x, path | {oid}) for x in key.values
+        )
     else:
         assert isinstance(key, Atom)
         dk = key.type, key.value
@@ -79,30 +88,105 @@ def deep_eqkey(obj):
     return dk
 
 
-def hashrec(obj):
+def hashrec(obj, path, cache):
     """Hash a (possibly self-referential) object."""
-    return hash(deep_eqkey(obj))
+    oid = id(obj)
+    if oid in path:
+        return 0
+    if oid in cache:
+        return cache[oid][1]
+    path = path | {oid}
+
+    key = eqkey(obj)
+
+    if isinstance(key, Atom):
+        rval = pyhash((key.type, key.value))
+
+    elif isinstance(key, Elements):
+        rval = pyhash((key.type,)
+                      + tuple(hashrec(x, path, cache) for x in key.values))
+
+    else:
+        raise AssertionError()
+
+    cache[oid] = obj, rval
+    return rval
 
 
-def eqrec(obj1, obj2):
+def eqrec(obj1, obj2, path1=frozenset(), path2=frozenset(), cache=None):
     """Compare two (possibly self-referential) objects for equality."""
-    key1 = deep_eqkey(obj1)
-    key2 = deep_eqkey(obj2)
-    return key1 == key2
+    id1 = id(obj1)
+    id2 = id(obj2)
+
+    if (id1, id2) in cache:
+        return True
+
+    if id1 in path1 or id2 in path2:
+        return False
+
+    if obj1 is obj2:
+        return True
+
+    path1 = path1 | {id1}
+    path2 = path2 | {id2}
+    cache.add((id1, id2))
+
+    key1 = eqkey(obj1)
+    key2 = eqkey(obj2)
+
+    if type(key1) is not type(key2) or key1.type is not key2.type:
+        return False
+
+    if isinstance(key1, Atom):
+        return key1.value == key2.value
+
+    elif isinstance(key1, Elements):
+        v1 = key1.values
+        v2 = key2.values
+        if len(v1) != len(v2):
+            return False
+        for x1, x2 in zip(v1, v2):
+            if not eqrec(x1, x2, path1, path2, cache):
+                return False
+        else:
+            return True
+
+    else:
+        raise AssertionError()
+
+
+def hash(obj):
+    """Hash a (possibly self-referential) object."""
+    try:
+        return pyhash(deep_eqkey(obj))
+
+    except RecursionException:
+        return hashrec(obj, frozenset(), {})
+
+
+def eq(obj1, obj2):
+    """Compare two (possibly self-referential) objects for equality."""
+    try:
+        key1 = deep_eqkey(obj1)
+        key2 = deep_eqkey(obj2)
+        return key1 == key2
+
+    except RecursionException:
+        return eqrec(obj1, obj2, frozenset(), frozenset(), set())
 
 
 class Wrapper:
-    """Wraps an object and uses eqrec/hashrec for equality."""
+    """Wraps an object and uses eq/hash for equality."""
 
     def __init__(self, obj):
         """Initialize a Wrapper."""
         self._obj = weakref.ref(obj)
 
     def __eq__(self, other):
-        return eqrec(self._obj(), other._obj())
+        return eq(self._obj(), other._obj())
 
     def __hash__(self):
-        return hashrec(self._obj())
+        return hash(self._obj())
 
 
 class Interned(type):
