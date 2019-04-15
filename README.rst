@@ -9,6 +9,8 @@ Myia is a new differentiable programming language. It aims to support large scal
 
 * Compile to efficient CPU and GPU code that optimizes use of your resources.
 
+If you want to play with the current implementation, you can check out `ALPHA.md <https://github.com/mila-iqia/myia/blob/master/ALPHA.md>`_
+
 
 Status
 ------
