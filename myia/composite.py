@@ -835,6 +835,8 @@ class ArithmeticData:
     all matching fields from the added instances.
     """
 
+    __array_priority__ = 1_000_000
+
     @core
     def __add__(self, x):
         return hyper_map(add, self, x)
@@ -870,3 +872,31 @@ class ArithmeticData:
     @core
     def __neg__(self):
         return hyper_map(usub, self)
+
+    @core
+    def __radd__(self, x):
+        return hyper_map(add, x, self)
+
+    @core
+    def __rsub__(self, x):
+        return hyper_map(sub, x, self)
+
+    @core
+    def __rmul__(self, x):
+        return hyper_map(mul, x, self)
+
+    @core
+    def __rtruediv__(self, x):
+        return hyper_map(truediv, x, self)
+
+    @core
+    def __rfloordiv__(self, x):
+        return hyper_map(floordiv, x, self)
+
+    @core
+    def __rmod__(self, x):
+        return hyper_map(mod, x, self)
+
+    @core
+    def __rpow__(self, x):
+        return hyper_map(pow, x, self)

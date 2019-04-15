@@ -140,9 +140,7 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         for inp, target in data:
             cost, dmodel = step(model, inp, target)
             costs.append(cost)
-            # For various reasons including a numpy quirk, when multiplying
-            # by a scalar the scalar needs to be the right side operand.
-            model = model - (dmodel * numpy.float32(0.01))
+            model = model - (numpy.float32(0.01) * dmodel)
         print(f'Cost: {cost / n}')
 
 
