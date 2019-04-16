@@ -30,17 +30,7 @@ class MetaGraph:
 
     def generate_graph(self, args):
         """Generate a Graph for the given abstract arguments."""
-        from ..abstract.utils import build_type
-        types = tuple([build_type(arg) for arg in args])
-        if types not in self.cache:
-            self.cache[types] = self.generate_from_types(types)
-        return self.cache[types]
-
-    def generate_from_types(self, types):
-        """Generate a Graph for this type signature."""
-        raise NotImplementedError(
-            'Override generate_from_types in subclass.'
-        )
+        raise NotImplementedError('Override generate_graph in subclass.')
 
     def __str__(self):
         return self.name
@@ -70,6 +60,14 @@ class MultitypeGraph(MetaGraph):
                 return fn
         else:
             raise GraphGenerationError(types)
+
+    def generate_graph(self, args):
+        """Generate a Graph for the given abstract arguments."""
+        from ..abstract.utils import build_type
+        types = tuple([build_type(arg) for arg in args])
+        if types not in self.cache:
+            self.cache[types] = self.generate_from_types(types)
+        return self.cache[types]
 
     def generate_from_types(self, types):
         """Generate a Graph for this type signature."""
