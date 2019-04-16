@@ -2,11 +2,12 @@
 
 import torch
 import torch.utils.dlpack
+import numpy as np
 
 from . import Backend
 from ..transform import CompileGraphs, nonlinear_ops
 
-from ...dtype import Int, UInt, Float, Bool
+from ...dtype import Int, UInt, Float, Bool, type_to_np_dtype
 from ...prim import Primitive, ops as P
 
 
@@ -62,8 +63,6 @@ simple_mapping = {
     P.distribute: lambda a, shp: a.expand(*shp),
     P.transpose: lambda a, perm: a.permute(*perm),
     P.dot: torch.mm,
-
-    P.scalar_to_array: lambda x: x,
 }
 
 
@@ -122,7 +121,7 @@ for k, v in simple_mapping.items():
     _mapping[k] = lambda op, v=v: (lambda *args: (v(*args),), op.inputs[1:])
 
 
-def pytorch_convert(lst):
+def pytorch_convert(lst, backend):
     """Convert myia op to pytorch op."""
     assert len(lst) == 1
     op = lst[0]
@@ -131,6 +130,10 @@ def pytorch_convert(lst):
     assert op.inputs[0].is_constant(Primitive)
 
     fn = op.inputs[0].value
+    if fn == P.scalar_to_array:
+        # Hack because we need the runtime context here.
+        return lambda v: (backend.from_numpy(v),), op.inputs[1:], [op]
+
     mapper = _mapping.get(fn, None)
     if mapper is None:
         raise NotImplementedError(fn)
@@ -149,8 +152,8 @@ class PyTorchBackend(Backend):
     def __init__(self, device='cpu'):
         """Create a PyTorch backend on the given device."""
         self.device = torch.device(device)
-        self.compiler = CompileGraphs(pytorch_convert, nonlinear_ops, self,
-                                      split_linear=True)
+        self.compiler = CompileGraphs(lambda lst: pytorch_convert(lst, self),
+                                      nonlinear_ops, self, split_linear=True)
 
     def compile(self, graph, *others):
         """Compile a graph."""
@@ -158,6 +161,8 @@ class PyTorchBackend(Backend):
 
     def to_numpy(self, v):
         """Make a numpy array from a torch tensor."""
+        if v.is_cuda:
+            v = v.cpu()
         return v.numpy()
 
     def from_numpy(self, a):
@@ -170,8 +175,8 @@ class PyTorchBackend(Backend):
 
     def from_scalar(self, s, t):
         """Convert a scalar to a torch tensor."""
-        dt = type_to_pytorch_type(t)
-        return torch.tensor(s, dtype=dt, device=self.device)
+        dt = type_to_np_dtype(t)
+        return np.asarray(s, dtype=dt)
 
     def to_dlpack(self, v):
         """Make a dlpack capsule from a torch tensor."""
