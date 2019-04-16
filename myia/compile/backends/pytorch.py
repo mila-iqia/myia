@@ -190,7 +190,7 @@ class PyTorchBackend(Backend):
 
     def to_numpy(self, v):
         """Make a numpy array from a torch tensor."""
-        if v.is_cuda:
+        if v.is_cuda:  # pragma: no cover
             v = v.cpu()
         return v.numpy()
 
