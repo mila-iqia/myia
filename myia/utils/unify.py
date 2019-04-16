@@ -313,7 +313,7 @@ class Unification:
         New visitors can be added using the decorator
         `@unif.visitors.register`
         """
-        self.visitors = visitors or default_visit.variant()
+        self.visitors = visitors or default_visit.copy()
         self.eq = eq
 
     def visit(self, fn: Callable[[T], T], value: T) -> T:

@@ -151,23 +151,45 @@ class Overload:
         self._set_attrs_from(fn)
         return self
 
-    def variant(self, fn=None):
-        """Create a variant of this Overload.
+    def copy(self, wrapper=None, initial_state=None):
+        """Create a copy of this Overload.
 
-        New functions can be registered to the variant without affecting the
+        New functions can be registered to the copy without affecting the
         original.
         """
         fself = self.__self__
         bootstrap = True if fself is self else fself
-        ov = Overload(
+        return Overload(
             bind_to=bootstrap,
-            wrapper=self._wrapper,
+            wrapper=wrapper or self._wrapper,
             mixins=[self],
-            initial_state=self.initial_state
+            initial_state=initial_state or self.initial_state
         )
-        if fn is not None:
+
+    def variant(self, fn=None, *, wrapper=None, initial_state=None):
+        """Decorator to create a variant of this Overload.
+
+        New functions can be registered to the variant without affecting the
+        original.
+        """
+        ov = self.copy(wrapper, initial_state)
+        if fn is None:
+            return ov.register
+        else:
             ov.register(fn)
-        return ov
+            return ov
+
+    def variant_wrapper(self, wrapper=None, *, initial_state=None):
+        """Decorator to create a variant of this Overload with a new wrapper.
+
+        New functions can be registered to the variant without affecting the
+        original.
+        """
+        ov = self.copy(wrapper=None, initial_state=initial_state)
+        if wrapper is None:
+            return ov.wrapper
+        else:
+            return ov.wrapper(wrapper)
 
     def __get__(self, obj, cls):
         return Overload(bind_to=obj, _parent=self, name=self.name)
