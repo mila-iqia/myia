@@ -44,7 +44,9 @@ class Elements(EqKey):
 
 def eqkey(x):
     """Return the equality key for x."""
-    if isinstance(x, EqKey):
+    if getattr(x, '_incomplete', False):
+        raise IncompleteException()
+    elif isinstance(x, EqKey):
         return x
     elif isinstance(x, (list, tuple)):
         return Elements(x, *x)
@@ -60,6 +62,10 @@ def eqkey(x):
 
 class RecursionException(Exception):
     """Raised when a data structure is found to be recursive."""
+
+
+class IncompleteException(Exception):
+    """Raised when a data structure is incomplete."""
 
 
 def deep_eqkey(obj, path=frozenset()):
@@ -103,8 +109,8 @@ def hashrec(obj, path, cache):
         rval = pyhash((key.type, key.value))
 
     elif isinstance(key, Elements):
-        rval = pyhash((key.type,)
-                      + tuple(hashrec(x, path, cache) for x in key.values))
+        subhash = [hashrec(x, path, cache) for x in key.values]
+        rval = pyhash((key.type, type(key.values)(subhash)))
 
     else:
         raise AssertionError()
@@ -145,11 +151,25 @@ def eqrec(obj1, obj2, path1=frozenset(), path2=frozenset(), cache=None):
         v2 = key2.values
         if len(v1) != len(v2):
             return False
-        for x1, x2 in zip(v1, v2):
-            if not eqrec(x1, x2, path1, path2, cache):
-                return False
+        if isinstance(v1, frozenset):
+            # TODO: save on complexity by sorting v1/v2 by hash?
+            v2 = list(v2)
+            for x1 in v1:
+                for i, x2 in enumerate(v2):
+                    if eqrec(x1, x2, path1, path2, cache):
+                        break
+                else:
+                    return False
+                del v2[i]
+            else:
+                assert not v2
+                return True
         else:
-            return True
+            for x1, x2 in zip(v1, v2):
+                if not eqrec(x1, x2, path1, path2, cache):
+                    return False
+            else:
+                return True
 
     else:
         raise AssertionError()
@@ -215,9 +235,13 @@ class Interned(type):
     def intern(cls, inst):
         """Get the interned instance."""
         wrap = Wrapper(inst)
-        existing = _intern_pool.get(wrap, None)
+        try:
+            existing = _intern_pool.get(wrap, None)
+        except IncompleteException:
+            return inst
         if existing is None:
             _intern_pool[wrap] = inst
+            inst._canonical = True
             return inst
         else:
             return existing
