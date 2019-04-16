@@ -37,6 +37,39 @@ simple_mapping = {
     P.scalar_add: lambda a, b: a + b,
     P.scalar_sub: lambda a, b: a - b,
     P.scalar_mul: lambda a, b: a * b,
+    P.scalar_div: lambda a, b: (a / b).astype(a.dtype),
+    P.scalar_mod: lambda a, b: a % b,
+    P.scalar_pow: lambda a, b: a ** b,
+    P.scalar_floor: np.floor,
+    P.scalar_uadd: lambda a: a,
+    P.scalar_usub: lambda a: -a,
+    P.scalar_exp: np.exp,
+    P.scalar_log: np.log,
+    P.scalar_tan: np.tan,
+    P.scalar_tanh: np.tanh,
+
+    P.scalar_eq: lambda a, b: a == b,
+    P.scalar_lt: lambda a, b: a < b,
+    P.scalar_gt: lambda a, b: a > b,
+    P.scalar_ne: lambda a, b: a != b,
+    P.scalar_le: lambda a, b: a <= b,
+    P.scalar_ge: lambda a, b: a >= b,
+
+    P.bool_and: lambda a, b: a & b,
+    P.bool_or: lambda a, b: a | b,
+    P.bool_eq: lambda a, b: a == b,
+    P.bool_not: lambda a: ~a,
+
+    P.distribute: lambda a, shp: a.expand(*shp),
+    P.transpose: lambda a, perm: a.permute(*perm),
+    P.dot: torch.mm,
+}
+
+
+scalar_mapping = {
+    P.scalar_add: lambda a, b: a + b,
+    P.scalar_sub: lambda a, b: a - b,
+    P.scalar_mul: lambda a, b: a * b,
     P.scalar_div: lambda a, b: a / b,
     P.scalar_mod: lambda a, b: a % b,
     P.scalar_pow: lambda a, b: a ** b,
@@ -59,10 +92,6 @@ simple_mapping = {
     P.bool_or: lambda a, b: a | b,
     P.bool_eq: torch.eq,
     P.bool_not: lambda a: ~a,
-
-    P.distribute: lambda a, shp: a.expand(*shp),
-    P.transpose: lambda a, perm: a.permute(*perm),
-    P.dot: torch.mm,
 }
 
 
@@ -71,8 +100,8 @@ def pytorch_array_map(op):
     fn = op.inputs[1]
     assert fn.is_constant(Primitive)
     fn = fn.value
-    if fn in simple_mapping:
-        impl = simple_mapping[fn]
+    if fn in scalar_mapping:
+        impl = scalar_mapping[fn]
     else:
         raise NotImplementedError(f'array_map of {fn}')
 
