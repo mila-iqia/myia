@@ -104,7 +104,7 @@ def _build_value(ac: AbstractClass):
 
 
 @overload(bootstrap=True)
-def build_type(self, x: AbstractScalar):
+def build_type_limited(self, x: AbstractScalar):
     """Build a type from an abstract value."""
     t = x.values[TYPE]
     if isinstance(t, Pending) and t.done():
@@ -113,32 +113,81 @@ def build_type(self, x: AbstractScalar):
 
 
 @overload  # noqa: F811
-def build_type(self, x: AbstractFunction):
+def build_type_limited(self, x: AbstractFunction):
     return dtype.Function
 
 
 @overload  # noqa: F811
-def build_type(self, x: AbstractTuple):
-    return dtype.Tuple[[self(e) for e in x.elements]]
+def build_type_limited(self, x: AbstractTuple):
+    return dtype.Tuple
 
 
 @overload  # noqa: F811
-def build_type(self, x: AbstractError):
+def build_type_limited(self, x: AbstractError):
     return dtype.Problem[x.values[VALUE]]
 
 
 @overload  # noqa: F811
-def build_type(self, x: AbstractList):
-    return dtype.List[self(x.element)]
+def build_type_limited(self, x: AbstractList):
+    return dtype.List
 
 
 @overload  # noqa: F811
-def build_type(self, x: AbstractArray):
+def build_type_limited(self, x: AbstractArray):
     return dtype.Array[self(x.element)]
 
 
 @overload  # noqa: F811
-def build_type(self, x: AbstractClass):
+def build_type_limited(self, x: AbstractClass):
+    return dtype.Class
+
+
+@overload  # noqa: F811
+def build_type_limited(self, x: AbstractJTagged):
+    return dtype.JTagged
+
+
+@overload  # noqa: F811
+def build_type_limited(self, x: AbstractUnion):
+    return dtype.Union
+
+
+@overload  # noqa: F811
+def build_type_limited(self, x: AbstractType):
+    return dtype.TypeType
+
+
+@overload(bootstrap=True)
+def build_type_fn(self, x: AbstractScalar):
+    """Build a type from an abstract value."""
+    t = x.values[TYPE]
+    if isinstance(t, Pending) and t.done():
+        t = t.result()
+    return t
+
+
+@overload  # noqa: F811
+def build_type_fn(self, x: AbstractTuple):
+    return dtype.Tuple[[self(e) for e in x.elements]]
+
+
+@overload  # noqa: F811
+def build_type_fn(self, x: AbstractError):
+    return dtype.Problem[x.values[VALUE]]
+
+
+@overload  # noqa: F811
+def build_type_fn(self, x: AbstractList):
+    return dtype.List[self(x.element)]
+
+
+@overload  # noqa: F811
+def build_type_fn(self, x: AbstractArray):
+    return dtype.Array[self(x.element)]
+
+
+@overload  # noqa: F811
+def build_type_fn(self, x: AbstractClass):
     return dtype.Class[
         x.tag,
         {name: self(x2) for name, x2 in x.attributes.items()},
@@ -147,27 +196,22 @@ def build_type(self, x: AbstractClass):
 
 
 @overload  # noqa: F811
-def build_type(self, x: AbstractJTagged):
+def build_type_fn(self, x: AbstractJTagged):
     return dtype.JTagged[self(x.element)]
 
 
 @overload  # noqa: F811
-def build_type(self, x: AbstractUnion):
+def build_type_fn(self, x: AbstractUnion):
     return dtype.Union[[self(opt) for opt in x.options]]
 
 
 @overload  # noqa: F811
-def build_type(self, x: AbstractType):
+def build_type_fn(self, x: AbstractType):
     return dtype.TypeType
 
 
-# A variant of built_dtype with precise function types.
-# Use for the .type attributes of nodes
-
-
-@build_type.variant
+@overload  # noqa: F811
 def build_type_fn(self, x: AbstractFunction):
-    """Build the type for a function with fully-specified Function types."""
     return self(x.get_unique())
 
 

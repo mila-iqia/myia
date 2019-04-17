@@ -8,7 +8,7 @@ from . import Backend
 
 from ...abstract import AbstractArray, AbstractTuple, AbstractScalar, \
     AbstractFunction, VirtualFunction, GraphFunction, TypedPrimitive, \
-    PartialApplication, SHAPE, build_type
+    PartialApplication, SHAPE, build_type_limited, build_type_fn
 from ...ir import manage
 from ...graph_utils import toposort
 from ...prim import Primitive, ops as P
@@ -22,7 +22,7 @@ from .relay_helpers import optimize, build_module
 @overload(bootstrap=True)
 def to_relay_type(self, a: AbstractScalar):
     """Convert a myia abstract to a Relay type."""
-    tp = build_type(a)
+    tp = build_type_limited(a)
     if ismyiatype(tp, Bool):
         return relay.ty.TensorType((), 'bool')
     else:
@@ -36,7 +36,7 @@ def to_relay_type(self, a: AbstractTuple):
 
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractArray):
-    tp = build_type(a.element)
+    tp = build_type_limited(a.element)
     return relay.ty.TensorType(a.values[SHAPE], type_to_np_dtype(tp))
 
 
@@ -67,7 +67,7 @@ def to_relay_type(self, a: GraphFunction):
 
 @overload  # noqa: F811
 def to_relay_type(self, a: object):  # pragma: no cover
-    raise ValueError("Unknown type:", build_type(a))
+    raise ValueError("Unknown type:", a)
 
 
 def ashape(node):
@@ -115,7 +115,7 @@ SIMPLE_MAP = {
 
 def relay_partial(c, fn, *args):
     """Implementation of partial for Relay."""
-    ty = fn.type
+    ty = build_type_fn(fn.abstract)
     rargs = [relay.var("") for a in ty.arguments]
     fn = relay.Function(rargs, relay.Call(c.ref(fn), rargs))
     binds = {}
@@ -277,7 +277,7 @@ class CompileGraph:
         if isinstance(node.value, Primitive):
             # This is a hack for list_map and friends
             return None
-        return _helper(node.value, node.type)
+        return _helper(node.value, build_type_fn(node.abstract))
 
     def on_graph(self, node):
         """Convert a graph constant."""

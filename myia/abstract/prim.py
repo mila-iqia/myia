@@ -38,7 +38,8 @@ from .data import (
 )
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context, ConditionalContext
-from .utils import sensitivity_transform, build_value, build_type, broaden
+from .utils import sensitivity_transform, build_value, build_type_fn, \
+    build_type_limited, broaden
 from .infer import Inferrer, to_abstract
 
 
@@ -77,7 +78,7 @@ class StandardInferrer(Inferrer):
             if typ is None:
                 pass
             elif dtype.ismyiatype(typ):
-                await force_pending(engine.check(typ, build_type(arg)))
+                await force_pending(engine.check(typ, build_type_limited(arg)))
             elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
@@ -247,7 +248,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
     """
     resources = engine.pipeline.resources
 
-    data_t = build_type(data)
+    data_t = build_type_limited(data)
     item_v = build_value(item, default=ANYTHING)
 
     if item_v is ANYTHING:
@@ -265,10 +266,10 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
 
     if case == 'class':
         # Get field from Class
-        if item_v in data_t.attributes:
-            return await on_dcattr(data, data_t, item_v)
-        elif item_v in data_t.methods:
-            method = data_t.methods[item_v]
+        if item_v in data.attributes:
+            return await on_dcattr(data, item_v)
+        elif item_v in data.methods:
+            method = data.methods[item_v]
             method = resources.convert(method)
             inferrer = to_abstract(method, Context.empty(), ref=outref)
             fn = _prim_or_graph(inferrer)
@@ -278,7 +279,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
                           outref.context)
             return await eng.reroute(outref, ref)
         else:
-            raise InferenceError(f'Unknown field in {data_t}: {item_v}')
+            raise InferenceError(f'Unknown field in {data}: {item_v}')
 
     elif case == 'method':
         method, = args
@@ -292,7 +293,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         return await eng.reroute(outref, ref)
 
     elif case == 'no_method':
-        msg = f"object of type {data_t} has no attribute '{item_v}'"
+        msg = f"object of type {data} has no attribute '{item_v}'"
         raise MyiaAttributeError(msg)
 
     else:
@@ -476,7 +477,7 @@ async def _split_type(t, model):
 
 @standard_prim(P.typeof)
 async def _inf_typeof(engine, value):
-    t = build_type(value)
+    t = build_type_fn(value)
     return AbstractType(t)
 
 
@@ -610,7 +611,7 @@ class _GetAttrInferrer(Inferrer):
                     f'item argument to resolve must be a string, not {item_v}.'
                 )
 
-        async def on_dcattr(data, data_t, item_v):
+        async def on_dcattr(data, item_v):
             return data.attributes[item_v]
 
         rval = await static_getter(
@@ -947,7 +948,7 @@ class _SwitchInferrer(Inferrer):
         condref, tbref, fbref = argrefs
 
         cond = await condref.get()
-        await force_pending(engine.check(Bool, build_type(cond)))
+        await force_pending(engine.check(Bool, build_type_limited(cond)))
 
         v = cond.values[VALUE]
         if v is True:
@@ -1018,7 +1019,7 @@ class _ResolveInferrer(Inferrer):
                     refs=[item]
                 )
 
-        async def on_dcattr(data, data_t, item_v):  # pragma: no cover
+        async def on_dcattr(data, item_v):  # pragma: no cover
             raise MyiaTypeError('Cannot resolve on Class.')
 
         rval = await static_getter(

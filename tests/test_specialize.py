@@ -84,7 +84,8 @@ def specializer_decorator(pipeline):
                     for err in verr.errors:
                         n = err.node
                         nlbl = lbl.label(n)
-                        print(f'   {nlbl} ({type(n).__name__}) :: {n.type}')
+                        tname = type(n).__name__
+                        print(f'   {nlbl} ({tname}) :: {n.abstract}')
                         print(f'      {err.args[0]}')
                     raise verr
 
