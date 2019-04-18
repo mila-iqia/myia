@@ -2,11 +2,12 @@
 
 import torch
 import torch.utils.dlpack
+import numpy as np
 
 from . import Backend
 from ..transform import CompileGraphs, nonlinear_ops
 
-from ...dtype import Int, UInt, Float, Bool
+from ...dtype import Int, UInt, Float, Bool, type_to_np_dtype
 from ...prim import Primitive, ops as P
 
 
@@ -36,6 +37,39 @@ simple_mapping = {
     P.scalar_add: lambda a, b: a + b,
     P.scalar_sub: lambda a, b: a - b,
     P.scalar_mul: lambda a, b: a * b,
+    P.scalar_div: lambda a, b: (a / b).astype(a.dtype),
+    P.scalar_mod: lambda a, b: a % b,
+    P.scalar_pow: lambda a, b: a ** b,
+    P.scalar_floor: np.floor,
+    P.scalar_uadd: lambda a: a,
+    P.scalar_usub: lambda a: -a,
+    P.scalar_exp: np.exp,
+    P.scalar_log: np.log,
+    P.scalar_tan: np.tan,
+    P.scalar_tanh: np.tanh,
+
+    P.scalar_eq: lambda a, b: a == b,
+    P.scalar_lt: lambda a, b: a < b,
+    P.scalar_gt: lambda a, b: a > b,
+    P.scalar_ne: lambda a, b: a != b,
+    P.scalar_le: lambda a, b: a <= b,
+    P.scalar_ge: lambda a, b: a >= b,
+
+    P.bool_and: lambda a, b: a & b,
+    P.bool_or: lambda a, b: a | b,
+    P.bool_eq: lambda a, b: a == b,
+    P.bool_not: lambda a: ~a,
+
+    P.distribute: lambda a, shp: a.expand(*shp),
+    P.transpose: lambda a, perm: a.permute(*perm),
+    P.dot: torch.mm,
+}
+
+
+scalar_mapping = {
+    P.scalar_add: lambda a, b: a + b,
+    P.scalar_sub: lambda a, b: a - b,
+    P.scalar_mul: lambda a, b: a * b,
     P.scalar_div: lambda a, b: a / b,
     P.scalar_mod: lambda a, b: a % b,
     P.scalar_pow: lambda a, b: a ** b,
@@ -58,12 +92,6 @@ simple_mapping = {
     P.bool_or: lambda a, b: a | b,
     P.bool_eq: torch.eq,
     P.bool_not: lambda a: ~a,
-
-    P.distribute: lambda a, shp: a.expand(*shp),
-    P.transpose: lambda a, perm: a.permute(*perm),
-    P.dot: torch.mm,
-
-    P.scalar_to_array: lambda x: x,
 }
 
 
@@ -72,8 +100,8 @@ def pytorch_array_map(op):
     fn = op.inputs[1]
     assert fn.is_constant(Primitive)
     fn = fn.value
-    if fn in simple_mapping:
-        impl = simple_mapping[fn]
+    if fn in scalar_mapping:
+        impl = scalar_mapping[fn]
     else:
         raise NotImplementedError(f'array_map of {fn}')
 
@@ -122,7 +150,7 @@ for k, v in simple_mapping.items():
     _mapping[k] = lambda op, v=v: (lambda *args: (v(*args),), op.inputs[1:])
 
 
-def pytorch_convert(lst):
+def pytorch_convert(lst, backend):
     """Convert myia op to pytorch op."""
     assert len(lst) == 1
     op = lst[0]
@@ -131,6 +159,10 @@ def pytorch_convert(lst):
     assert op.inputs[0].is_constant(Primitive)
 
     fn = op.inputs[0].value
+    if fn == P.scalar_to_array:
+        # Hack because we need the runtime context here.
+        return lambda v: (backend.from_numpy(v),), op.inputs[1:], [op]
+
     mapper = _mapping.get(fn, None)
     if mapper is None:
         raise NotImplementedError(fn)
@@ -149,8 +181,8 @@ class PyTorchBackend(Backend):
     def __init__(self, device='cpu'):
         """Create a PyTorch backend on the given device."""
         self.device = torch.device(device)
-        self.compiler = CompileGraphs(pytorch_convert, nonlinear_ops, self,
-                                      split_linear=True)
+        self.compiler = CompileGraphs(lambda lst: pytorch_convert(lst, self),
+                                      nonlinear_ops, self, split_linear=True)
 
     def compile(self, graph, *others):
         """Compile a graph."""
@@ -158,6 +190,8 @@ class PyTorchBackend(Backend):
 
     def to_numpy(self, v):
         """Make a numpy array from a torch tensor."""
+        if v.is_cuda:  # pragma: no cover
+            v = v.cpu()
         return v.numpy()
 
     def from_numpy(self, a):
@@ -170,8 +204,8 @@ class PyTorchBackend(Backend):
 
     def from_scalar(self, s, t):
         """Convert a scalar to a torch tensor."""
-        dt = type_to_pytorch_type(t)
-        return torch.tensor(s, dtype=dt, device=self.device)
+        dt = type_to_np_dtype(t)
+        return np.asarray(s, dtype=dt)
 
     def to_dlpack(self, v):
         """Make a dlpack capsule from a torch tensor."""
