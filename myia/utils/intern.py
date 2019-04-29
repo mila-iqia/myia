@@ -241,7 +241,10 @@ class Interned(type):
             return inst
         if existing is None:
             _intern_pool[wrap] = inst
-            inst._canonical = True
+            try:
+                inst._canonical = True
+            except Exception:
+                pass
             return inst
         else:
             return existing
