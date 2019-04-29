@@ -126,6 +126,29 @@ def test_Overload_wrapper():
     assert f((1, 2, (3, 4))) == [([2], [3], [([4], [5])])]
 
 
+def test_Overload_variant_wrapper():
+
+    f = Overload()
+
+    @f.register
+    def f(x: int):
+        return x + 1
+
+    assert f(1) == 2
+
+    @f.variant_wrapper
+    def g(fn, x):
+        return {fn(x)}
+
+    assert g(1) == {2}
+
+    @f.variant_wrapper(initial_state=lambda: 10)
+    def h(fn, self, x):
+        return self.state * x
+
+    assert h(1) == 10
+
+
 def test_Overload_stateful():
 
     f = Overload(initial_state=lambda: -1)
@@ -154,6 +177,14 @@ def test_Overload_stateful():
     assert g((None, None)) == (10, 20)
     assert g((None, (None, None))) == (10, (30, 40))
     assert g((None, (None, None))) == (10, (30, 40))
+
+    @f.variant(initial_state=lambda: 0)
+    def h(self, x: type(None)):
+        return self.state * 100
+
+    assert h((None, None)) == (200, 300)
+    assert h((None, (None, None))) == (200, (400, 500))
+    assert h((None, (None, None))) == (200, (400, 500))
 
 
 def test_Overload_repr():

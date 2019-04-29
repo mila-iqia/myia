@@ -332,7 +332,19 @@ async def abstract_clone_async(self, x: object):
 ##################
 
 
-@overload
+@overload.wrapper
+def _is_concrete(__call__, x):
+    if hasattr(x, '_concrete'):
+        return x._concrete is x
+    elif __call__(x):
+        if isinstance(x, (AbstractValue, Context, Reference)):
+            x._concrete = x
+        return True
+    else:
+        return False
+
+
+@overload  # noqa: F811
 def _is_concrete(x: object):
     return True
 
@@ -373,26 +385,29 @@ def _is_concrete(ref: Reference):
     return _is_concrete(ref.context)
 
 
-@overload.wrapper  # noqa: F811
-def _is_concrete(__call__, x):
-    if hasattr(x, '_concrete'):
-        return x._concrete is x
-    elif __call__(x):
-        if isinstance(x, (AbstractValue, Context, Reference)):
-            x._concrete = x
-        return True
-    else:
-        return False
-
-
 ##############
 # Concretize #
 ##############
 
 
-@abstract_clone_async.variant
-async def concretize_abstract(self, x: Pending):
+@abstract_clone_async.variant_wrapper
+async def concretize_abstract(__call__, self, x):
     """Clone an abstract value while resolving all Pending (asynchronous)."""
+    if hasattr(x, '_concrete'):
+        return x._concrete
+    if isinstance(x, (AbstractValue, Context, Reference)):
+        if _is_concrete(x):
+            res = x
+        else:
+            res = await __call__(self, x)
+        x._concrete = res
+        return res
+    else:
+        return await __call__(self, x)
+
+
+@overload  # noqa: F811
+async def concretize_abstract(self, x: Pending):
     return await self(await x)
 
 
@@ -420,27 +435,24 @@ async def concretize_abstract(self, t: tuple):
     return tuple([await self(x) for x in t])
 
 
-@overload.wrapper  # noqa: F811
-async def concretize_abstract(__call__, self, x):
-    if hasattr(x, '_concrete'):
-        return x._concrete
-    if isinstance(x, (AbstractValue, Context, Reference)):
-        if _is_concrete(x):
-            res = x
-        else:
-            res = await __call__(self, x)
-        x._concrete = res
-        return res
-    else:
-        return await __call__(self, x)
-
-
 ###############
 # Broad check #
 ###############
 
 
-@overload
+@overload.wrapper
+def _is_broad(__call__, x, loop):
+    if hasattr(x, '_broad'):
+        return x._broad is x
+    elif __call__(x, loop):
+        if isinstance(x, (AbstractValue, Context, Reference)):
+            x._broad = x
+        return True
+    else:
+        return False
+
+
+@overload  # noqa: F811
 def _is_broad(x: object, loop):
     return x is ANYTHING
 
@@ -470,25 +482,13 @@ def _is_broad(xs: AbstractStructure, loop):
     return all(_is_broad(x, loop) for x in xs.children())
 
 
-@overload.wrapper  # noqa: F811
-def _is_broad(__call__, x, loop):
-    if hasattr(x, '_broad'):
-        return x._broad is x
-    elif __call__(x, loop):
-        if isinstance(x, (AbstractValue, Context, Reference)):
-            x._broad = x
-        return True
-    else:
-        return False
-
-
 ###########
 # Broaden #
 ###########
 
 
-@abstract_clone.variant
-def broaden(self, d: TrackDict, loop):
+@abstract_clone.variant_wrapper
+def broaden(__call__, self, x, loop):
     """Broaden an abstract value.
 
     * Concrete values such as 1 or True will be broadened to ANYTHING.
@@ -498,6 +498,21 @@ def broaden(self, d: TrackDict, loop):
         d: The abstract data to clone.
         loop: The InferenceLoop, used to broaden Possibilities.
     """
+    if hasattr(x, '_broad'):
+        return x._broad
+    if isinstance(x, (AbstractValue, Context, Reference)):
+        if _is_broad(x, loop):
+            res = x
+        else:
+            res = __call__(self, x, loop)
+        x._broad = res
+        return res
+    else:
+        return __call__(self, x, loop)
+
+
+@overload  # noqa: F811
+def broaden(self, d: TrackDict, loop):
     return {k: k.broaden(v, self, loop) for k, v in d.items()}
 
 
@@ -514,21 +529,6 @@ def broaden(self, p: Possibilities, loop):
         # Broadening Possibilities creates a PendingTentative. This allows
         # us to avoid resolving them earlier than we would like.
         return loop.create_pending_tentative(tentative=p)
-
-
-@overload.wrapper  # noqa: F811
-def broaden(__call__, self, x, loop):
-    if hasattr(x, '_broad'):
-        return x._broad
-    if isinstance(x, (AbstractValue, Context, Reference)):
-        if _is_broad(x, loop):
-            res = x
-        else:
-            res = __call__(self, x, loop)
-        x._broad = res
-        return res
-    else:
-        return __call__(self, x, loop)
 
 
 ###############

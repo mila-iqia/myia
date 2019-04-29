@@ -2,7 +2,7 @@
 
 from .intern import (  # noqa
     Interned, EqKey, Atom, Elements, eqkey, deep_eqkey, RecursionException,
-    hashrec, eqrec
+    eq, hash, hashrec, eqrec, IncompleteException
 )
 
 from .merge import (  # noqa
