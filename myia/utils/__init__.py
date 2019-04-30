@@ -1,5 +1,9 @@
 """General utilities."""
 
+from .env import (  # noqa
+    smap, SymbolicKeyInstance, EnvInstance, newenv
+)
+
 from .intern import (  # noqa
     Interned, InternedMC, EqKey, Atom, Elements, eqkey, deep_eqkey,
     RecursionException, eq, hash, hashrec, eqrec, IncompleteException
@@ -11,10 +15,9 @@ from .merge import (  # noqa
 )
 
 from .misc import (  # noqa
-    Named, UNKNOWN, Registry, repr_, list_str, smap,
+    Named, MISSING, UNKNOWN, Registry, repr_, list_str,
     Event, Events, NS, Namespace, ModuleNamespace, ClosureNamespace, eprint,
     is_dataclass_type, as_frozen, ErrorPool, flatten,
-    SymbolicKeyInstance, EnvInstance, newenv
 )
 
 from .overload import (  # noqa
