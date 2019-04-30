@@ -631,7 +631,24 @@ def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend):
 
 
 class Wrap(PipelineStep):
+    """Pipeline step to export a callable.
+
+    Inputs:
+        graph: The graph to wrap into a callable.
+        output: callable
+        argspec: types of inputs
+        outspec: types of outputs
+        orig_argspec: initial argspec
+        orig_outspec: intial outspec
+        erase_class: boolean marker
+        erase_tuple: boolean marker
+
+    Outputs:
+        output: wrapped callable.
+    """
+
     def __init__(self, pipeline_init, return_backend=False):
+        """Initialize the Wrap."""
         super().__init__(pipeline_init)
         self.return_backend = return_backend
 
