@@ -264,9 +264,36 @@ def abstract_check(self, ref: Reference, *args):
 ###########
 
 
-@overload(bootstrap=True)
-def abstract_clone(self, x: AbstractScalar, *args):
+@dataclass
+class CloneState:
+    """State of abstract_clone."""
+
+    cache: dict
+    prop: str
+    check: callable
+
+
+@overload.wrapper(initial_state=lambda: None)
+def abstract_clone(__call__, self, x, *args):
     """Clone an abstract value."""
+
+    prop = self.state.prop
+    if hasattr(x, prop):
+        return getattr(x, prop)
+
+    if isinstance(x, (AbstractValue, Context, Reference)):
+        if self.state.check(x, *args):
+            res = x
+        else:
+            res = __call__(self, x, *args)
+        setattr(x, prop, res)
+        return res
+    else:
+        return __call__(self, x, *args)
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: AbstractScalar, *args):
     return AbstractScalar(self(x.values, *args))
 
 
@@ -336,9 +363,27 @@ def abstract_clone(self, x: object, *args):
 #################
 
 
-@overload(bootstrap=True)
-async def abstract_clone_async(self, x: AbstractScalar):
+@overload.wrapper(initial_state=lambda: None)
+async def abstract_clone_async(__call__, self, x, *args):
     """Clone an abstract value (asynchronous)."""
+
+    prop = self.state.prop
+    if hasattr(x, prop):
+        return getattr(x, prop)
+
+    if isinstance(x, (AbstractValue, Context, Reference)):
+        if self.state.check(x, *args):
+            res = x
+        else:
+            res = await __call__(self, x, *args)
+        setattr(x, prop, res)
+        return res
+    else:
+        return await __call__(self, x, *args)
+
+
+@overload  # noqa: F811
+async def abstract_clone_async(self, x: AbstractScalar):
     return AbstractScalar(await self(x.values))
 
 
@@ -408,24 +453,11 @@ def _is_concrete(self, x: Pending):
 ##############
 
 
-@abstract_clone_async.variant_wrapper
-async def concretize_abstract(__call__, self, x):
-    """Clone an abstract value while resolving all Pending (asynchronous)."""
-    if hasattr(x, '_concrete'):
-        return x._concrete
-    if isinstance(x, (AbstractValue, Context, Reference)):
-        if _is_concrete(x):
-            res = x
-        else:
-            res = await __call__(self, x)
-        x._concrete = res
-        return res
-    else:
-        return await __call__(self, x)
-
-
-@overload  # noqa: F811
+@abstract_clone_async.variant(
+    initial_state=lambda: CloneState({}, '_concrete', _is_concrete)
+)
 async def concretize_abstract(self, x: Pending):
+    """Clone an abstract value while resolving all Pending (asynchronous)."""
     return await self(await x)
 
 
@@ -485,8 +517,10 @@ def _is_broad(self, x: Possibilities, loop):
 ###########
 
 
-@abstract_clone.variant_wrapper
-def broaden(__call__, self, x, loop):
+@abstract_clone.variant(
+    initial_state=lambda: CloneState({}, '_broad', _is_broad)
+)
+def broaden(self, d: TrackDict, loop):
     """Broaden an abstract value.
 
     * Concrete values such as 1 or True will be broadened to ANYTHING.
@@ -496,21 +530,6 @@ def broaden(__call__, self, x, loop):
         d: The abstract data to clone.
         loop: The InferenceLoop, used to broaden Possibilities.
     """
-    if hasattr(x, '_broad'):
-        return x._broad
-    if isinstance(x, (AbstractValue, Context, Reference)):
-        if _is_broad(x, loop):
-            res = x
-        else:
-            res = __call__(self, x, loop)
-        x._broad = res
-        return res
-    else:
-        return __call__(self, x, loop)
-
-
-@overload  # noqa: F811
-def broaden(self, d: TrackDict, loop):
     return {k: k.broaden(v, self, loop) for k, v in d.items()}
 
 
@@ -534,7 +553,7 @@ def broaden(self, p: Possibilities, loop):
 ###############
 
 
-@abstract_clone.variant
+@abstract_clone.variant(wrapper=None)
 def sensitivity_transform(self, x: AbstractFunction):
     """Return an abstract value for the sensitivity of x.
 

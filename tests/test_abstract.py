@@ -162,7 +162,7 @@ def test_repr():
     assert repr(f1) == 'Fn(Possibilities({scalar_mul}))'
 
 
-@abstract_clone.variant
+@abstract_clone.variant(wrapper=None)
 def upcast(self, x: AbstractScalar, nbits):
     return AbstractScalar({
         VALUE: x.values[VALUE],
@@ -179,7 +179,7 @@ def test_abstract_clone():
     assert upcast(a1, 64) is T([s2, L(s2)])
 
 
-@abstract_clone_async.variant
+@abstract_clone_async.variant(wrapper=None)
 async def upcast_async(self, x: AbstractScalar):
     return AbstractScalar({
         VALUE: x.values[VALUE],

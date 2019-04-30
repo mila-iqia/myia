@@ -187,7 +187,7 @@ class Overload:
         New functions can be registered to the variant without affecting the
         original.
         """
-        ov = self.copy(wrapper=MISSING, initial_state=initial_state)
+        ov = self.copy(wrapper=None, initial_state=initial_state)
         if wrapper is MISSING:
             return ov.wrapper
         else:

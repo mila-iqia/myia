@@ -923,12 +923,12 @@ def expand_J(optimizer, node, equiv):
     return Constant(newg)
 
 
-@abstract_clone.variant
+@abstract_clone.variant(wrapper=None)
 def _jelim_retype(self, j: AbstractJTagged):
     return _jelim_retype_helper(j.element)
 
 
-@abstract_clone.variant
+@abstract_clone.variant(wrapper=None)
 def _jelim_retype_helper(self, f: AbstractFunction):
     raise TypeError('Function found')
 

@@ -7,7 +7,7 @@ from ..abstract import abstract_clone, AbstractClass, AbstractTuple, \
     AbstractScalar, VALUE, TYPE, AbstractJTagged
 
 
-@abstract_clone.variant
+@abstract_clone.variant(wrapper=None)
 def _reabs(self, a: AbstractClass):
     return AbstractTuple(self(x) for x in a.attributes.values())
 
