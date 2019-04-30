@@ -151,7 +151,7 @@ class DummyFunction(Function):
 #################
 
 
-class AbstractValue(metaclass=Interned):
+class AbstractValue(Interned):
     """Base class for all abstract values.
 
     Attributes:
