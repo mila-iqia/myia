@@ -154,6 +154,7 @@ class HyperMap(MetaGraph):
         """Create a graph for mapping over the given args."""
         g = Graph()
         g.debug.name = 'hyper_map'
+        g.flags['core'] = True
         argmap = {}
         if self.fn_leaf is None:
             fn_t, *args = all_args
