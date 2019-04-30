@@ -14,6 +14,7 @@ from .utils import (  # noqa
     build_value,
     build_type,
     build_type_fn,
+    abstract_check,
     abstract_clone,
     abstract_clone_async,
     concretize_abstract,

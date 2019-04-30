@@ -1,5 +1,6 @@
 """Utilities for abstract values and inference."""
 
+from dataclasses import dataclass
 from functools import reduce
 from itertools import chain
 
@@ -195,6 +196,69 @@ def build_type_fn(self, x: Function):
     return dtype.Function
 
 
+############
+# Checking #
+############
+
+
+@dataclass
+class CheckState:
+    """State of abstract_check."""
+
+    cache: dict
+    prop: str
+
+
+@overload.wrapper(initial_state=lambda: None)
+def abstract_check(__call__, self, x, *args):
+    """Check that the given object has a certain property."""
+    prop = self.state.prop
+    if hasattr(x, prop):
+        return getattr(x, prop) is x
+    elif __call__(self, x, *args):
+        if isinstance(x, (AbstractValue, Context, Reference)):
+            setattr(x, prop, x)
+        return True
+    else:
+        return False
+
+
+@overload  # noqa: F811
+def abstract_check(self, x: TrackDict, *args):
+    return all(self(v, *args) for v in x.values())
+
+
+@overload  # noqa: F811
+def abstract_check(self, x: AbstractScalar, *args):
+    return self(x.values, *args)
+
+
+@overload  # noqa: F811
+def abstract_check(self, xs: AbstractStructure, *args):
+    return all(self(x, *args) for x in xs.children())
+
+
+@overload  # noqa: F811
+def abstract_check(self, xs: AbstractAtom, *args):
+    return True
+
+
+@overload  # noqa: F811
+def abstract_check(self, xs: object, *args):
+    return True
+
+
+@overload  # noqa: F811
+def abstract_check(self, ctx: Context, *args):
+    return (self(ctx.parent, *args)
+            and all(self(x, *args) for x in ctx.argkey))
+
+
+@overload  # noqa: F811
+def abstract_check(self, ref: Reference, *args):
+    return self(ref.context, *args)
+
+
 ###########
 # Cloning #
 ###########
@@ -332,57 +396,11 @@ async def abstract_clone_async(self, x: object):
 ##################
 
 
-@overload.wrapper
-def _is_concrete(__call__, x):
-    if hasattr(x, '_concrete'):
-        return x._concrete is x
-    elif __call__(x):
-        if isinstance(x, (AbstractValue, Context, Reference)):
-            x._concrete = x
-        return True
-    else:
-        return False
-
-
-@overload  # noqa: F811
-def _is_concrete(x: object):
-    return True
-
-
-@overload  # noqa: F811
-def _is_concrete(x: Pending):
+@abstract_check.variant(
+    initial_state=lambda: CheckState(cache={}, prop='_concrete')
+)
+def _is_concrete(self, x: Pending):
     return False
-
-
-@overload  # noqa: F811
-def _is_concrete(x: TrackDict):
-    return all(_is_concrete(v) for v in x.values())
-
-
-@overload  # noqa: F811
-def _is_concrete(x: AbstractScalar):
-    return _is_concrete(x.values)
-
-
-@overload  # noqa: F811
-def _is_concrete(x: AbstractAtom):
-    return True
-
-
-@overload  # noqa: F811
-def _is_concrete(xs: AbstractStructure):
-    return all(_is_concrete(x) for x in xs.children())
-
-
-@overload  # noqa: F811
-def _is_concrete(ctx: Context):
-    return (_is_concrete(ctx.parent)
-            and all(_is_concrete(x) for x in ctx.argkey))
-
-
-@overload  # noqa: F811
-def _is_concrete(ref: Reference):
-    return _is_concrete(ref.context)
 
 
 ##############
@@ -440,46 +458,26 @@ async def concretize_abstract(self, t: tuple):
 ###############
 
 
-@overload.wrapper
-def _is_broad(__call__, x, loop):
-    if hasattr(x, '_broad'):
-        return x._broad is x
-    elif __call__(x, loop):
-        if isinstance(x, (AbstractValue, Context, Reference)):
-            x._broad = x
-        return True
-    else:
-        return False
-
-
-@overload  # noqa: F811
-def _is_broad(x: object, loop):
+@abstract_check.variant(
+    initial_state=lambda: CheckState(cache={}, prop='_broad')
+)
+def _is_broad(self, x: object, loop):
     return x is ANYTHING
 
 
 @overload  # noqa: F811
-def _is_broad(x: Pending, loop):
+def _is_broad(self, x: (AbstractScalar, AbstractFunction), loop):
+    return self(x.values[VALUE], loop)
+
+
+@overload  # noqa: F811
+def _is_broad(self, x: Pending, loop):
     return False
 
 
 @overload  # noqa: F811
-def _is_broad(x: (AbstractScalar, AbstractFunction), loop):
-    return _is_broad(x.values[VALUE], loop)
-
-
-@overload  # noqa: F811
-def _is_broad(x: Possibilities, loop):
+def _is_broad(self, x: Possibilities, loop):
     return loop is None
-
-
-@overload  # noqa: F811
-def _is_broad(x: AbstractAtom, loop):
-    return True
-
-
-@overload  # noqa: F811
-def _is_broad(xs: AbstractStructure, loop):
-    return all(_is_broad(x, loop) for x in xs.children())
 
 
 ###########
