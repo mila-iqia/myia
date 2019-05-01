@@ -62,6 +62,9 @@ from .data import (  # noqa
     InferenceError,
     MyiaTypeError,
     MyiaShapeError,
+    format_abstract,
+    pretty_struct,
+    pretty_type,
 )
 
 

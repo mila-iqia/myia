@@ -132,34 +132,34 @@ def test_union():
 def test_repr():
 
     s1 = to_abstract_test(1)
-    assert repr(s1) == 'S(VALUE=1, TYPE=Int[64])'
+    assert repr(s1) == 'AbstractScalar(i64 = 1)'
 
     s2 = to_abstract_test(f32)
-    assert repr(s2) == 'S(TYPE=Float[32])'
+    assert repr(s2) == 'AbstractScalar(f32)'
 
     t1 = to_abstract_test((1, f32))
-    assert repr(t1) == f'T({s1}, {s2})'
+    assert repr(t1) == f'AbstractTuple((i64 = 1, f32))'
 
     l1 = to_abstract_test([f32])
-    assert repr(l1) == f'L({s2})'
+    assert repr(l1) == f'AbstractList([f32])'
 
     a1 = to_abstract_test(af32_of(4, 5))
-    assert repr(a1) == f'A({s2}, SHAPE=(4, 5))'
+    assert repr(a1) == f'AbstractArray(f32 x 4 x 5)'
 
     p1 = to_abstract_test(Point(1, f32))
-    assert repr(p1) == f'*Point(x={s1}, y={s2})'
+    assert repr(p1) == f'AbstractClass(Point(x :: i64 = 1, y :: f32))'
 
     j1 = AbstractJTagged(to_abstract_test(1))
-    assert repr(j1) == f'J({s1})'
+    assert repr(j1) == f'AbstractJTagged(J(i64 = 1))'
 
     ty1 = Ty(f32)
-    assert repr(ty1) == 'Ty(Float[32])'
+    assert repr(ty1) == 'AbstractType(Ty(f32))'
 
     e1 = AbstractError(DEAD)
-    assert repr(e1) == 'E(DEAD)'
+    assert repr(e1) == 'AbstractError(E(DEAD))'
 
     f1 = AbstractFunction(P.scalar_mul)
-    assert repr(f1) == 'Fn(Possibilities({scalar_mul}))'
+    assert repr(f1) == 'AbstractFunction(scalar_mul)'
 
 
 @abstract_clone.variant(wrapper=None)
