@@ -51,6 +51,15 @@ def test_myia_specialize_values():
     assert ft is not ff
 
 
+def test_myia_return_backend():
+    @myia(return_backend=True)
+    def f(x, y):
+        return x + y
+
+    # Only tests that it returns something and it works
+    assert f(10, 20) is not None
+
+
 def test_myia_struct_arg():
     @myia
     def f(pt):

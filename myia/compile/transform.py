@@ -261,7 +261,10 @@ class CompileGraph:
                         self.add_instr('tuple_getitem',
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]))
-                    elif fn.value == P.tuple_setitem:
+                    elif fn.value == P.tuple_setitem:  # pragma: no cover
+                        raise RuntimeError(
+                            "Please report your testcase so that "
+                            "we can add it to the testsuite")
                         self.add_instr('tuple_setitem',
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]),

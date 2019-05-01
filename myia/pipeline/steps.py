@@ -630,16 +630,37 @@ def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend):
     return backend.to_numpy(arg)
 
 
-@pipeline_function
-def step_wrap(self,
-              graph,
-              output,
-              argspec,
-              outspec,
-              orig_argspec=None,
-              orig_outspec=None,
-              erase_class=False,
-              erase_tuple=False):
+class Wrap(PipelineStep):
+    """Pipeline step to export a callable.
+
+    Inputs:
+        graph: The graph to wrap into a callable.
+        output: callable
+        argspec: types of inputs
+        outspec: types of outputs
+        orig_argspec: initial argspec
+        orig_outspec: intial outspec
+        erase_class: boolean marker
+        erase_tuple: boolean marker
+
+    Outputs:
+        output: wrapped callable.
+    """
+
+    def __init__(self, pipeline_init, return_backend=False):
+        """Initialize the Wrap."""
+        super().__init__(pipeline_init)
+        self.return_backend = return_backend
+
+    def step(self,
+             graph,
+             output,
+             argspec,
+             outspec,
+             orig_argspec=None,
+             orig_outspec=None,
+             erase_class=False,
+             erase_tuple=False):
         """Convert args to vm format, and output from vm format."""
         if not (erase_class and erase_tuple):
             raise AssertionError(
@@ -659,10 +680,15 @@ def step_wrap(self,
             args = tuple(flatten(convert_arg(arg, ot, backend) for arg, ot in
                                  zip(args, orig_arg_t)))
             res = fn(*args)
+            if self.return_backend:
+                backend = NumpyChecker()
             res = convert_result(res, orig_out_t, vm_out_t, backend)
             return res
 
         return {'output': wrapped}
+
+
+step_wrap = Wrap.partial()
 
 
 ################

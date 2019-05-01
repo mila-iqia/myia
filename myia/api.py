@@ -25,14 +25,15 @@ class MyiaFunction:
 
     """
 
-    def __init__(self, fn, specialize_values=[],
+    def __init__(self, fn, specialize_values=[], return_backend=False,
                  backend=None, backend_options=None):
         """Initialize a MyiaFunction."""
         self.fn = fn
         self.specialize_values = set(specialize_values)
         self.pip = standard_pipeline.configure({
             'compile.backend': backend,
-            'compile.backend_options': backend_options
+            'compile.backend_options': backend_options,
+            'wrap.return_backend': return_backend
         })
         self._cache = {}
 
@@ -71,7 +72,8 @@ class MyiaFunction:
         return self.compile(args)(*args)
 
 
-def myia(fn=None, *, specialize_values=[], backend=None, backend_options=None):
+def myia(fn=None, *, specialize_values=[], backend=None, backend_options=None,
+         return_backend=False):
     """Create a function using Myia's runtime.
 
     `@myia` can be used as a simple decorator. If custom options are needed,
@@ -91,12 +93,13 @@ def myia(fn=None, *, specialize_values=[], backend=None, backend_options=None):
             function based on their values (list of argument names).
         backend: the backend to use for compilation
         backend_options: backend-specific options.
+        return_backend: return backend values (avoids copies to CPU).
     """
+    def deco(fn):
+        return MyiaFunction(fn, specialize_values, backend=backend,
+                            backend_options=backend_options,
+                            return_backend=return_backend)
     if fn is None:
-        def deco(fn):
-            return MyiaFunction(fn, specialize_values, backend=backend,
-                                backend_options=backend_options)
         return deco
     else:
-        return MyiaFunction(fn, specialize_values, backend=backend,
-                            backend_options=backend_options)
+        return deco(fn)
