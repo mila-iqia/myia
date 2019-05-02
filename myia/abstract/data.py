@@ -213,7 +213,7 @@ class AbstractError(AbstractAtom):
         super().__init__({VALUE: err})
 
     def __pretty__(self, ctx):
-        return pp.pretty_call_alt(ctx, "E", [self.values[VALUE]], {})
+        return f'E({self.values[VALUE]})'
 
 
 class AbstractFunction(AbstractAtom):

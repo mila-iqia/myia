@@ -406,6 +406,19 @@ def abstract_clone(self, x: AbstractJTagged, *args):
 
 
 @overload  # noqa: F811
+def abstract_clone(self, x: Possibilities, *args):
+    return Possibilities([self(v, *args) for v in x])
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: PartialApplication, *args):
+    return PartialApplication(
+        self(x.fn, *args),
+        tuple([self(arg, *args) for arg in x.args])
+    )
+
+
+@overload  # noqa: F811
 def abstract_clone(self, x: Pending, *args):
     if x.done():
         return self(x.result(), *args)
@@ -597,13 +610,11 @@ def _is_broad(self, x: (AbstractScalar, AbstractFunction), loop):
 
 
 @overload  # noqa: F811
-def _is_broad(self, x: Pending, loop):
-    return False
-
-
-@overload  # noqa: F811
 def _is_broad(self, x: Possibilities, loop):
-    return loop is None
+    if loop is None:
+        return all(self(v, loop) for v in x)
+    else:
+        return False
 
 
 ###########
@@ -628,14 +639,9 @@ def broaden(self, d: TrackDict, loop):
 
 
 @overload  # noqa: F811
-def broaden(self, p: Pending, loop):
-    return p
-
-
-@overload  # noqa: F811
 def broaden(self, p: Possibilities, loop):
     if loop is None:
-        return p
+        return Possibilities([self(v, loop) for v in p])
     else:
         # Broadening Possibilities creates a PendingTentative. This allows
         # us to avoid resolving them earlier than we would like.

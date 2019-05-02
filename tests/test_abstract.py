@@ -156,8 +156,8 @@ def test_repr():
     ty1 = Ty(f32)
     assert repr(ty1) == 'AbstractType(Ty(f32))'
 
-    e1 = AbstractError(DEAD)
-    assert repr(e1) == 'AbstractError(E(DEAD))'
+    e1 = AbstractError(ty.Problem[DEAD])
+    assert repr(e1) == 'AbstractError(E(Problem[DEAD]))'
 
     f1 = AbstractFunction(P.scalar_mul)
     assert repr(f1) == 'AbstractFunction(scalar_mul)'
@@ -215,13 +215,6 @@ def test_abstract_clone_async():
         assert (await upcast_async(u1)) is s2
 
     asyncio.run(coro())
-
-
-def test_broaden():
-    # Coverage test
-
-    p = _Poss([1, 2, 3])
-    assert broaden(p, None) is p
 
 
 def test_broaden_recursive():
