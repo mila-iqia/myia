@@ -255,3 +255,18 @@ class Interned(metaclass=InternedMC):
     def __eqkey__(self):
         """Generate a key for equality/hashing purposes."""
         raise NotImplementedError('Implement in subclass')
+
+
+class PossiblyRecursive:
+    """Base class for data that might be recursive."""
+
+    @classmethod
+    def empty(cls):
+        """Create an empty, incomplete instance."""
+        inst = object.__new__(cls)
+        inst._incomplete = True
+        return inst
+
+    def __init__(self):
+        """Initialization sets the object to complete."""
+        self._incomplete = False

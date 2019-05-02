@@ -10,7 +10,8 @@ from contextvars import ContextVar
 
 from .. import dtype
 from ..debug.label import label
-from ..utils import Named, Partializable, Interned, Atom, Elements
+from ..utils import Named, Partializable, Interned, Atom, Elements, \
+    PossiblyRecursive
 
 from .loop import Pending
 
@@ -153,7 +154,7 @@ class DummyFunction(Function):
 #################
 
 
-class AbstractValue(Interned):
+class AbstractValue(Interned, PossiblyRecursive):
     """Base class for all abstract values.
 
     Attributes:
@@ -167,6 +168,7 @@ class AbstractValue(Interned):
 
     def __init__(self, values):
         """Initialize an AbstractValue."""
+        super().__init__()
         self.values = TrackDict(values)
 
     def __eqkey__(self):

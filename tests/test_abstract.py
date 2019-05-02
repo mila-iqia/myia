@@ -13,7 +13,8 @@ from myia.abstract import (
     Possibilities as _Poss,
     VALUE, TYPE, DEAD, build_type_fn,
     PrimitiveFunction, PartialApplication, VirtualFunction,
-    TypedPrimitive, abstract_clone, abstract_clone_async, broaden
+    TypedPrimitive, abstract_clone, abstract_clone_async, broaden,
+    Pending, concretize_abstract
 )
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
@@ -162,7 +163,16 @@ def test_repr():
     assert repr(f1) == 'AbstractFunction(scalar_mul)'
 
 
-@abstract_clone.variant(wrapper=None)
+def test_repr_recursive():
+    sa = S(t=ty.Int[64])
+    ta = T.empty()
+    la = L(ta)
+    ta.__init__([sa, la])
+    ta = ta.intern()
+    repr(ta)
+
+
+@abstract_clone.variant
 def upcast(self, x: AbstractScalar, nbits):
     return AbstractScalar({
         VALUE: x.values[VALUE],
@@ -179,7 +189,7 @@ def test_abstract_clone():
     assert upcast(a1, 64) is T([s2, L(s2)])
 
 
-@abstract_clone_async.variant(wrapper=None)
+@abstract_clone_async.variant
 async def upcast_async(self, x: AbstractScalar):
     return AbstractScalar({
         VALUE: x.values[VALUE],
@@ -212,3 +222,48 @@ def test_broaden():
 
     p = _Poss([1, 2, 3])
     assert broaden(p, None) is p
+
+
+def test_broaden_recursive():
+    s1 = S(1)
+    t1 = T.empty()
+    t1.__init__([s1, t1])
+    t1 = t1.intern()
+
+    sa = S(t=ty.Int[64])
+    ta = T.empty()
+    ta.__init__([sa, ta])
+    ta = ta.intern()
+
+    assert broaden(t1, None) is ta
+    assert broaden(ta, None) is ta
+
+    t2 = T.empty()
+    u2 = U(s1, t2)
+    t2.__init__([s1, u2])
+
+    tb = T.empty()
+    ub = U(sa, tb)
+    tb.__init__([sa, ub])
+    tb = tb.intern()
+
+    assert broaden(t2, None) is tb
+    assert broaden(tb, None) is tb
+
+
+def test_concretize_recursive():
+    loop = asyncio.new_event_loop()
+    s = S(t=ty.Int[64])
+    p = Pending(None, None, loop=loop)
+    t = T([s, p])
+    p.set_result(t)
+
+    sa = S(t=ty.Int[64])
+    ta = T.empty()
+    ta.__init__([sa, ta])
+    ta = ta.intern()
+
+    async def coro():
+        assert (await concretize_abstract(t)) is ta
+
+    asyncio.run(coro())

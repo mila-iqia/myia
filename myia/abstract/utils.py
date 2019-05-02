@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from functools import reduce
 from itertools import chain
+from types import GeneratorType, AsyncGeneratorType
 
 from .. import dtype
 from ..utils import overload
@@ -212,15 +213,30 @@ class CheckState:
 @overload.wrapper(initial_state=lambda: None)
 def abstract_check(__call__, self, x, *args):
     """Check that the given object has a certain property."""
+    def proceed():
+        if hasattr(x, prop):
+            return getattr(x, prop) is x
+        elif __call__(self, x, *args):
+            if isinstance(x, (AbstractValue, Context, Reference)):
+                setattr(x, prop, x)
+            return True
+        else:
+            return False
+
     prop = self.state.prop
-    if hasattr(x, prop):
-        return getattr(x, prop) is x
-    elif __call__(self, x, *args):
-        if isinstance(x, (AbstractValue, Context, Reference)):
-            setattr(x, prop, x)
-        return True
+    cache = self.state.cache
+
+    try:
+        rval = cache.get(x, None)
+    except TypeError:
+        return proceed()
+
+    if rval is None:
+        cache[x] = True
+        cache[x] = proceed()
+        return cache[x]
     else:
-        return False
+        return rval
 
 
 @overload  # noqa: F811
@@ -273,23 +289,52 @@ class CloneState:
     check: callable
 
 
-@overload.wrapper(initial_state=lambda: None)
+def _make_constructor(inst):
+    def f(*args, **kwargs):
+        inst.__init__(*args, **kwargs)
+        return inst
+    return f
+
+
+@overload.wrapper(
+    initial_state=lambda: CloneState({}, None, None)
+)
 def abstract_clone(__call__, self, x, *args):
     """Clone an abstract value."""
+    def proceed():
+        if isinstance(x, AbstractValue) and x in cache:
+            return cache[x]
+        result = __call__(self, x, *args)
+        if not isinstance(result, GeneratorType):
+            return result
+        constructor = None
+        while True:
+            try:
+                cls = result.send(constructor)
+                inst = cls.empty()
+                cache[x] = inst
+                constructor = _make_constructor(inst)
+            except StopIteration as e:
+                rval = e.value.intern()
+                cache[x] = rval
+                return rval
 
+    cache = self.state.cache
     prop = self.state.prop
-    if hasattr(x, prop):
-        return getattr(x, prop)
-
-    if isinstance(x, (AbstractValue, Context, Reference)):
-        if self.state.check(x, *args):
-            res = x
+    if prop:
+        if hasattr(x, prop):
+            return getattr(x, prop)
+        elif isinstance(x, (AbstractValue, Context, Reference)):
+            if self.state.check(x, *args):
+                res = x
+            else:
+                res = proceed()
+            setattr(x, prop, res)
+            return res
         else:
-            res = __call__(self, x, *args)
-        setattr(x, prop, res)
-        return res
+            return proceed()
     else:
-        return __call__(self, x, *args)
+        return proceed()
 
 
 @overload  # noqa: F811
@@ -299,7 +344,7 @@ def abstract_clone(self, x: AbstractScalar, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractFunction, *args):
-    return AbstractFunction(value=self(x.get_sync(), *args))
+    return (yield AbstractFunction)(value=self(x.get_sync(), *args))
 
 
 @overload  # noqa: F811
@@ -309,7 +354,7 @@ def abstract_clone(self, d: TrackDict, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractTuple, *args):
-    return AbstractTuple(
+    return (yield AbstractTuple)(
         [self(y, *args) for y in x.elements],
         self(x.values, *args)
     )
@@ -317,17 +362,17 @@ def abstract_clone(self, x: AbstractTuple, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractList, *args):
-    return AbstractList(self(x.element, *args), self(x.values, *args))
+    return (yield AbstractList)(self(x.element, *args), self(x.values, *args))
 
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractArray, *args):
-    return AbstractArray(self(x.element, *args), self(x.values, *args))
+    return (yield AbstractArray)(self(x.element, *args), self(x.values, *args))
 
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractClass, *args):
-    return AbstractClass(
+    return (yield AbstractClass)(
         x.tag,
         {k: self(v, *args) for k, v in x.attributes.items()},
         x.methods,
@@ -342,7 +387,7 @@ def abstract_clone(self, x: AbstractUnion, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractJTagged, *args):
-    return AbstractJTagged(self(x.element, *args))
+    return (yield AbstractJTagged)(self(x.element, *args))
 
 
 @overload  # noqa: F811
@@ -363,23 +408,44 @@ def abstract_clone(self, x: object, *args):
 #################
 
 
-@overload.wrapper(initial_state=lambda: None)
+@overload.wrapper(
+    initial_state=lambda: CloneState({}, None, None)
+)
 async def abstract_clone_async(__call__, self, x, *args):
     """Clone an abstract value (asynchronous)."""
+    async def proceed():
+        if isinstance(x, AbstractValue) and x in cache:
+            return cache[x]
 
-    prop = self.state.prop
-    if hasattr(x, prop):
-        return getattr(x, prop)
-
-    if isinstance(x, (AbstractValue, Context, Reference)):
-        if self.state.check(x, *args):
-            res = x
+        call = __call__(self, x, *args)
+        if isinstance(call, AsyncGeneratorType):
+            cls = await call.asend(None)
+            inst = cls.empty()
+            cache[x] = inst
+            constructor = _make_constructor(inst)
+            rval = await call.asend(constructor)
+            rval = rval.intern()
+            cache[x] = rval
+            return rval
         else:
-            res = await __call__(self, x, *args)
-        setattr(x, prop, res)
-        return res
+            return await call
+
+    cache = self.state.cache
+    prop = self.state.prop
+    if prop:
+        if hasattr(x, prop):
+            return getattr(x, prop)
+        elif isinstance(x, (AbstractValue, Context, Reference)):
+            if self.state.check(x, *args):
+                res = x
+            else:
+                res = await proceed()
+            setattr(x, prop, res)
+            return res
+        else:
+            return await proceed()
     else:
-        return await __call__(self, x, *args)
+        return await proceed()
 
 
 @overload  # noqa: F811
@@ -389,7 +455,7 @@ async def abstract_clone_async(self, x: AbstractScalar):
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractFunction):
-    return AbstractFunction(*(await self(x.get_sync())))
+    yield (yield AbstractFunction)(*(await self(x.get_sync())))
 
 
 @overload  # noqa: F811
@@ -400,7 +466,7 @@ async def abstract_clone_async(self, d: TrackDict):
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractTuple):
-    return AbstractTuple(
+    yield (yield AbstractTuple)(
         [(await self(y)) for y in x.elements],
         await self(x.values)
     )
@@ -408,17 +474,17 @@ async def abstract_clone_async(self, x: AbstractTuple):
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractList):
-    return AbstractList(await self(x.element), await self(x.values))
+    yield (yield AbstractList)(await self(x.element), await self(x.values))
 
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractArray):
-    return AbstractArray(await self(x.element), await self(x.values))
+    yield (yield AbstractArray)(await self(x.element), await self(x.values))
 
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractClass):
-    return AbstractClass(
+    yield (yield AbstractClass)(
         x.tag,
         {k: (await self(v)) for k, v in x.attributes.items()},
         x.methods,
@@ -553,7 +619,7 @@ def broaden(self, p: Possibilities, loop):
 ###############
 
 
-@abstract_clone.variant(wrapper=None)
+@abstract_clone.variant
 def sensitivity_transform(self, x: AbstractFunction):
     """Return an abstract value for the sensitivity of x.
 
