@@ -210,18 +210,23 @@ class CheckState:
     prop: str
 
 
-@overload.wrapper(initial_state=lambda: None)
+@overload.wrapper(
+    initial_state=lambda: CheckState({}, None)
+)
 def abstract_check(__call__, self, x, *args):
     """Check that the given object has a certain property."""
     def proceed():
-        if hasattr(x, prop):
-            return getattr(x, prop) is x
-        elif __call__(self, x, *args):
-            if isinstance(x, (AbstractValue, Context, Reference)):
-                setattr(x, prop, x)
-            return True
+        if prop:
+            if hasattr(x, prop):
+                return getattr(x, prop) is x
+            elif __call__(self, x, *args):
+                if isinstance(x, (AbstractValue, Context, Reference)):
+                    setattr(x, prop, x)
+                return True
+            else:
+                return False
         else:
-            return False
+            return __call__(self, x, *args)
 
     prop = self.state.prop
     cache = self.state.cache
@@ -322,17 +327,20 @@ def abstract_clone(__call__, self, x, *args):
         result = __call__(self, x, *args)
         if not isinstance(result, GeneratorType):
             return result
-        constructor = None
-        while True:
-            try:
-                cls = result.send(constructor)
-                inst = cls.empty()
-                cache[x] = inst
-                constructor = _make_constructor(inst)
-            except StopIteration as e:
-                rval = e.value.intern()
-                cache[x] = rval
-                return rval
+        cls = result.send(None)
+        inst = cls.empty()
+        cache[x] = inst
+        constructor = _make_constructor(inst)
+        try:
+            result.send(constructor)
+        except StopIteration as e:
+            rval = e.value.intern()
+            cache[x] = rval
+            return rval
+        else:
+            raise AssertionError(
+                'Generators in abstract_clone must yield once, then return.'
+            )
 
     cache = self.state.cache
     prop = self.state.prop

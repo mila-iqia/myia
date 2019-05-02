@@ -12,7 +12,7 @@ class ValidationError(Exception):
     """Error validating a Graph."""
 
 
-@abstract_check.variant(wrapper=None)
+@abstract_check.variant
 def validate_abstract(self, a: (AbstractClass, AbstractJTagged)):
     """Validate a type."""
     raise ValidationError(f'Illegal type in the graph: {a}')
