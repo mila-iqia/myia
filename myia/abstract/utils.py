@@ -260,6 +260,21 @@ def abstract_check(self, xs: AbstractAtom, *args):
 
 
 @overload  # noqa: F811
+def abstract_check(self, x: AbstractFunction, *args):
+    return self(x.values, *args)
+
+
+@overload  # noqa: F811
+def abstract_check(self, x: Possibilities, *args):
+    return all(self(v, *args) for v in x)
+
+
+@overload  # noqa: F811
+def abstract_check(self, t: PartialApplication, *args):
+    return self(t.fn, *args) and all(self(v, *args) for v in t.args)
+
+
+@overload  # noqa: F811
 def abstract_check(self, xs: object, *args):
     return True
 
@@ -495,6 +510,19 @@ async def abstract_clone_async(self, x: AbstractClass):
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractUnion):
     return abstract_union([await self(y) for y in x.options])
+
+
+@overload  # noqa: F811
+async def abstract_clone_async(self, x: Possibilities):
+    return Possibilities([await self(v) for v in x])
+
+
+@overload  # noqa: F811
+async def abstract_clone_async(self, x: PartialApplication):
+    return PartialApplication(
+        await self(x.fn),
+        tuple([await self(arg) for arg in x.args])
+    )
 
 
 @overload  # noqa: F811
