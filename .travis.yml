@@ -16,7 +16,5 @@ env:
 script:
   - if [[ $TEST_SUITE == "static" ]]; then flake8 && pydocstyle myia; fi
   - if [[ $TEST_SUITE == "unit" ]]; then pytest --cov=./ tests; fi
-  - if [[ $TEST_SUITE == "unit" ]]; then pytest tests; fi
-  - if [[ $TEST_SUITE == "unit" ]]; then pytest tests/test_grad.py::test_list_for; fi
 after_success:
   - if [[ $TEST_SUITE == "unit" ]]; then codecov; fi
