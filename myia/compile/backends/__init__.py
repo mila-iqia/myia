@@ -121,7 +121,8 @@ class Backend:
         elif isinstance(t, abstract.AbstractTuple):
             return tuple(self.convert_value(v, t)
                          for v, t in zip(v, t.elements))
-        elif ismyiatype(t, dtype.EnvType):
+        elif isinstance(t, abstract.AbstractScalar) \
+                and ismyiatype(t.values[abstract.TYPE], dtype.EnvType):
             assert len(v._contents) == 0
             return self.empty_env()
         else:
