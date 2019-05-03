@@ -120,14 +120,9 @@ class Backend:
         elif ismyiatype(t, dtype.Tuple):
             return tuple(self.convert_value(v, t)
                          for v, t in zip(v, t.elements))
-        # elif ismyiatype(t, dtype.Array):
-        #    return self.from_numpy(v)
         elif ismyiatype(t, dtype.EnvType):
             assert len(v._contents) == 0
             return self.empty_env()
-        elif ismyiatype(t, dtype.Problem):
-            # This is usually Problem[DEAD] so just ignore it
-            return self.from_scalar(0, dtype.Int[8])
         else:
             raise NotImplementedError(f'convert_value for {t}')
 

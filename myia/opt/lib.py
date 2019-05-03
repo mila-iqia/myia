@@ -797,14 +797,12 @@ def incorporate_getitem_through_switch(optimizer, node, equiv):
     idx = equiv[C].value
     xs = equiv[Xs]
 
-    if not check_uses(g1) or not check_uses(g2):
-        return
+    if check_uses(g1) and check_uses(g2):
+        g1t = getitem_transform(g1, idx)
+        g2t = getitem_transform(g2, idx)
 
-    g1t = getitem_transform(g1, idx)
-    g2t = getitem_transform(g2, idx)
-
-    new = ((P.switch, equiv[X], g1t, g2t), *xs)
-    return sexp_to_node(new, node.graph)
+        new = ((P.switch, equiv[X], g1t, g2t), *xs)
+        return sexp_to_node(new, node.graph)
 
 
 @GraphTransform
@@ -842,14 +840,12 @@ def incorporate_env_getitem_through_switch(optimizer, node, equiv):
     dflt = equiv[Y]
     xs = equiv[Xs]
 
-    if not check_uses(g1) or not check_uses(g2):
-        return
+    if check_uses(g1) and check_uses(g2):
+        g1t = env_getitem_transform(g1, key, dflt)
+        g2t = env_getitem_transform(g2, key, dflt)
 
-    g1t = env_getitem_transform(g1, key, dflt)
-    g2t = env_getitem_transform(g2, key, dflt)
-
-    new = ((P.switch, equiv[X], g1t, g2t), *xs)
-    return sexp_to_node(new, node.graph)
+        new = ((P.switch, equiv[X], g1t, g2t), *xs)
+        return sexp_to_node(new, node.graph)
 
 
 @GraphTransform
@@ -899,14 +895,12 @@ def incorporate_call_through_switch(optimizer, node, equiv):
     xs = equiv[Xs]
     ys = equiv[Ys]
 
-    if not check_uses(g1) or not check_uses(g2):
-        return
+    if check_uses(g1) and check_uses(g2):
+        g1t = call_output_transform(g1, len(ys))
+        g2t = call_output_transform(g2, len(ys))
 
-    g1t = call_output_transform(g1, len(ys))
-    g2t = call_output_transform(g2, len(ys))
-
-    new = ((P.switch, equiv[X], g1t, g2t), *xs, *ys)
-    return sexp_to_node(new, node.graph)
+        new = ((P.switch, equiv[X], g1t, g2t), *xs, *ys)
+        return sexp_to_node(new, node.graph)
 
 
 #################
