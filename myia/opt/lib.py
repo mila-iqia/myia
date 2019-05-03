@@ -702,6 +702,12 @@ def replace_applicator(optimizer, node, equiv):
 ##################
 
 
+def check_used_once(g):
+    """Returns True if a graph has only one usage."""
+    mng = g.manager
+    return sum(mng.graph_users[g].values()) == 1
+
+
 @GraphTransform
 def specialize_transform(graph, args):
     """Specialize on provided non-None args.
@@ -767,7 +773,8 @@ def incorporate_getitem(optimizer, node, equiv):
     """
     g = equiv[G].value
     idx = equiv[C].value
-    return node.graph.apply(getitem_transform(g, idx), *equiv[Xs])
+    if check_used_once(g):
+        return node.graph.apply(getitem_transform(g, idx), *equiv[Xs])
 
 
 @pattern_replacer(P.tuple_getitem, ((P.switch, X, G1, G2), Xs), C)
@@ -787,11 +794,12 @@ def incorporate_getitem_through_switch(optimizer, node, equiv):
     idx = equiv[C].value
     xs = equiv[Xs]
 
-    g1t = getitem_transform(g1, idx)
-    g2t = getitem_transform(g2, idx)
+    if check_used_once(g1) and check_used_once(g2):
+        g1t = getitem_transform(g1, idx)
+        g2t = getitem_transform(g2, idx)
 
-    new = ((P.switch, equiv[X], g1t, g2t), *xs)
-    return sexp_to_node(new, node.graph)
+        new = ((P.switch, equiv[X], g1t, g2t), *xs)
+        return sexp_to_node(new, node.graph)
 
 
 @GraphTransform
@@ -815,7 +823,9 @@ def incorporate_env_getitem(optimizer, node, equiv):
     g = equiv[G].value
     key = equiv[C].value
     dflt = equiv[Y]
-    return node.graph.apply(env_getitem_transform(g, key, dflt), *equiv[Xs])
+    if check_used_once(g):
+        return node.graph.apply(env_getitem_transform(g, key, dflt),
+                                *equiv[Xs])
 
 
 @pattern_replacer(P.env_getitem, ((P.switch, X, G1, G2), Xs), C, Y)
@@ -827,11 +837,12 @@ def incorporate_env_getitem_through_switch(optimizer, node, equiv):
     dflt = equiv[Y]
     xs = equiv[Xs]
 
-    g1t = env_getitem_transform(g1, key, dflt)
-    g2t = env_getitem_transform(g2, key, dflt)
+    if check_used_once(g1) and check_used_once(g2):
+        g1t = env_getitem_transform(g1, key, dflt)
+        g2t = env_getitem_transform(g2, key, dflt)
 
-    new = ((P.switch, equiv[X], g1t, g2t), *xs)
-    return sexp_to_node(new, node.graph)
+        new = ((P.switch, equiv[X], g1t, g2t), *xs)
+        return sexp_to_node(new, node.graph)
 
 
 @GraphTransform
@@ -859,8 +870,9 @@ def incorporate_call(optimizer, node, equiv):
     g = equiv[G].value
     xs = equiv[Xs]
     ys = equiv[Ys]
-    g2 = call_output_transform(g, len(ys))
-    return node.graph.apply(g2, *xs, *ys)
+    if check_used_once(g):
+        g2 = call_output_transform(g, len(ys))
+        return node.graph.apply(g2, *xs, *ys)
 
 
 @pattern_replacer(((P.switch, X, G1, G2), Xs), Ys, interest=Apply)
@@ -880,11 +892,12 @@ def incorporate_call_through_switch(optimizer, node, equiv):
     xs = equiv[Xs]
     ys = equiv[Ys]
 
-    g1t = call_output_transform(g1, len(ys))
-    g2t = call_output_transform(g2, len(ys))
+    if check_used_once(g1) and check_used_once(g2):
+        g1t = call_output_transform(g1, len(ys))
+        g2t = call_output_transform(g2, len(ys))
 
-    new = ((P.switch, equiv[X], g1t, g2t), *xs, *ys)
-    return sexp_to_node(new, node.graph)
+        new = ((P.switch, equiv[X], g1t, g2t), *xs, *ys)
+        return sexp_to_node(new, node.graph)
 
 
 #################

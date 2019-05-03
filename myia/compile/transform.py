@@ -1,9 +1,10 @@
 """Transforms a graph into lower-level code."""
 
-from ..abstract import VALUE, Pending
+from ..abstract import VALUE, Pending, to_abstract
 from ..ir import Apply, toposort, Graph, Constant
 from ..prim import Primitive, ops as P
 from .vm import FinalVM
+from ..utils import SymbolicKeyInstance
 
 
 def set_types(graph, argspec, outspec, pipeline):
@@ -15,6 +16,27 @@ def set_types(graph, argspec, outspec, pipeline):
         if isinstance(v, Pending):
             v = v.result()
         ref.node.abstract = v
+
+    return graph
+
+
+def convert_grad(graph):
+    """Remove all instances of SymbolicKeyType in the graphs.
+
+    They will be replaced by globally-unique integers.
+    """
+    mng = graph.manager
+
+    counter = 0
+    key_map = {}
+
+    for node in mng.all_nodes:
+        if node.is_constant(SymbolicKeyInstance):
+            if node.value not in key_map:
+                key_map[node.value] = counter
+                counter += 1
+            node.value = key_map[node.value]
+            node.abstract = to_abstract(node.value)
 
     return graph
 
@@ -65,7 +87,7 @@ def wrap_primitives(graph):
 nonlinear_ops = (
     P.return_, P.partial, P.switch, P.make_tuple, P.make_list,
     P.list_len, P.list_getitem, P.list_setitem, P.list_append, P.bool_and,
-    P.tuple_getitem, P.tuple_setitem
+    P.tuple_getitem, P.tuple_setitem, P.env_getitem, P.env_setitem, P.env_add
 )
 
 
@@ -94,6 +116,7 @@ class CompileGraph:
         self.max_height = 0
         self.slots = {}
         self.instrs = []
+        self.env_keys = []
 
     def _is_cut(self, node):
         if node.is_apply():
@@ -269,13 +292,31 @@ class CompileGraph:
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]),
                                        self.ref(split.inputs[3]))
+                    elif fn.value == P.env_getitem:
+                        self.add_instr('env_getitem',
+                                       self.ref(split.inputs[1]),
+                                       split.inputs[2].value,
+                                       self.ref(split.inputs[3]))
+                    elif fn.value == P.env_setitem:
+                        self.add_instr('env_setitem',
+                                       self.ref(split.inputs[1]),
+                                       split.inputs[2].value,
+                                       self.ref(split.inputs[3]))
+                    elif fn.value == P.env_add:  # pragma: no cover
+                        raise RuntimeError("apparently no model requires this")
+                        self.add_instr('env_add',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]))
                     else:
                         raise AssertionError(f"Unknown special function "
                                              "{fn.value}")
 
                 else:
-                    # pre-push the function on the stack
+                    # ensure the function and arguments are available.
                     self.ref(fn)
+                    for i in split.inputs[1:]:
+                        self.ref(i)
+                    # make references to the arguments
                     for i in reversed(split.inputs[1:]):
                         self.dup(i)
                     if split is graph.output:
@@ -341,6 +382,7 @@ class CompileGraphs:
         self._reset()
 
         graph = wrap_primitives(graph)
+        graph = convert_grad(graph)
 
         self.compile(graph)
 

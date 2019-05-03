@@ -109,6 +109,10 @@ class Backend:
         """Convert a backend-specific tensor to a DLpack PyCapsule."""
         raise NotImplementedError('to_dlpack')
 
+    def empty_env(self):
+        """An empty grad environment for the backend."""
+        return ()
+
     def convert_value(self, v, t):
         """Convert a value to the appropriate backend representation."""
         if ismyiatype(t, dtype.Number):
@@ -116,6 +120,9 @@ class Backend:
         elif ismyiatype(t, dtype.Tuple):
             return tuple(self.convert_value(v, t)
                          for v, t in zip(v, t.elements))
+        elif ismyiatype(t, dtype.EnvType):
+            assert len(v._contents) == 0
+            return self.empty_env()
         else:
             raise NotImplementedError(f'convert_value for {t}')
 

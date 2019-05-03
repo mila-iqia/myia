@@ -304,6 +304,21 @@ class FinalVM:
         v = self._ref(v)
         self._push(t[:idx] + (v,) + t[idx + 1:])
 
+    def inst_env_getitem(self, env, idx, default):
+        """Get an item from a grad environment."""
+        env = self._ref(env)
+        if len(env) < idx + 1 or env[idx] is None:
+            self._push(self._ref(default))
+            return
+        self._push(env[idx])
+
+    def inst_env_setitem(self, env, idx, val):
+        """Set an item in a grad environment."""
+        env = self._ref(env)
+        before = env[:idx] + (None,) * (idx - len(env))
+        after = env[idx + 1:]
+        self._push(before + (self._ref(val),) + after)
+
     def inst_push(self, v):
         """Push a value on the stack.
 
