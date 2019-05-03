@@ -214,7 +214,7 @@ class CheckState:
     initial_state=lambda: CheckState({}, None)
 )
 def abstract_check(__call__, self, x, *args):
-    """Check that the given object has a certain property."""
+    """Check that a predicate applies to a given object."""
     def proceed():
         if prop:
             if hasattr(x, prop):
