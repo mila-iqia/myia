@@ -708,7 +708,7 @@ def check_uses(g):
     all_uses = set()
     for c in mng.graph_constants[g].keys():
         all_uses.update(mng.uses[c])
-    return len(all_uses) != 1
+    return len(all_uses) == 1
 
 
 @GraphTransform
