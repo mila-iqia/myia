@@ -3,6 +3,8 @@
 
 import inspect
 
+from .misc import MISSING
+
 
 class TypeMap(dict):
     """Map types to handlers or values.
@@ -151,7 +153,7 @@ class Overload:
         self._set_attrs_from(fn)
         return self
 
-    def copy(self, wrapper=None, initial_state=None):
+    def copy(self, wrapper=MISSING, initial_state=None):
         """Create a copy of this Overload.
 
         New functions can be registered to the copy without affecting the
@@ -161,12 +163,12 @@ class Overload:
         bootstrap = True if fself is self else fself
         return Overload(
             bind_to=bootstrap,
-            wrapper=wrapper or self._wrapper,
+            wrapper=self._wrapper if wrapper is MISSING else wrapper,
             mixins=[self],
             initial_state=initial_state or self.initial_state
         )
 
-    def variant(self, fn=None, *, wrapper=None, initial_state=None):
+    def variant(self, fn=None, *, wrapper=MISSING, initial_state=None):
         """Decorator to create a variant of this Overload.
 
         New functions can be registered to the variant without affecting the
@@ -179,14 +181,14 @@ class Overload:
             ov.register(fn)
             return ov
 
-    def variant_wrapper(self, wrapper=None, *, initial_state=None):
+    def variant_wrapper(self, wrapper=MISSING, *, initial_state=None):
         """Decorator to create a variant of this Overload with a new wrapper.
 
         New functions can be registered to the variant without affecting the
         original.
         """
         ov = self.copy(wrapper=None, initial_state=initial_state)
-        if wrapper is None:
+        if wrapper is MISSING:
             return ov.wrapper
         else:
             return ov.wrapper(wrapper)

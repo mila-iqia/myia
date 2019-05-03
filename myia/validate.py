@@ -4,7 +4,7 @@ from .dtype import Problem, External, ismyiatype
 from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
-from .abstract import abstract_clone, AbstractClass, AbstractJTagged, \
+from .abstract import abstract_check, AbstractClass, AbstractJTagged, \
     AbstractScalar, TYPE, VALUE, DEAD, AbstractError
 
 
@@ -12,7 +12,7 @@ class ValidationError(Exception):
     """Error validating a Graph."""
 
 
-@abstract_clone.variant
+@abstract_check.variant
 def validate_abstract(self, a: (AbstractClass, AbstractJTagged)):
     """Validate a type."""
     raise ValidationError(f'Illegal type in the graph: {a}')

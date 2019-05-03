@@ -1,7 +1,9 @@
 """Utilities for abstract values and inference."""
 
+from dataclasses import dataclass
 from functools import reduce
 from itertools import chain
+from types import GeneratorType, AsyncGeneratorType
 
 from .. import dtype
 from ..utils import overload
@@ -195,20 +197,177 @@ def build_type_fn(self, x: Function):
     return dtype.Function
 
 
+############
+# Checking #
+############
+
+
+@dataclass
+class CheckState:
+    """State of abstract_check."""
+
+    cache: dict
+    prop: str
+
+
+@overload.wrapper(
+    initial_state=lambda: CheckState({}, None)
+)
+def abstract_check(__call__, self, x, *args):
+    """Check that a predicate applies to a given object."""
+    def proceed():
+        if prop:
+            if hasattr(x, prop):
+                return getattr(x, prop) is x
+            elif __call__(self, x, *args):
+                if isinstance(x, (AbstractValue, Context, Reference)):
+                    setattr(x, prop, x)
+                return True
+            else:
+                return False
+        else:
+            return __call__(self, x, *args)
+
+    prop = self.state.prop
+    cache = self.state.cache
+
+    try:
+        rval = cache.get(x, None)
+    except TypeError:
+        return proceed()
+
+    if rval is None:
+        cache[x] = True
+        cache[x] = proceed()
+        return cache[x]
+    else:
+        return rval
+
+
+@overload  # noqa: F811
+def abstract_check(self, x: TrackDict, *args):
+    return all(self(v, *args) for v in x.values())
+
+
+@overload  # noqa: F811
+def abstract_check(self, x: AbstractScalar, *args):
+    return self(x.values, *args)
+
+
+@overload  # noqa: F811
+def abstract_check(self, xs: AbstractStructure, *args):
+    return all(self(x, *args) for x in xs.children())
+
+
+@overload  # noqa: F811
+def abstract_check(self, xs: AbstractAtom, *args):
+    return True
+
+
+@overload  # noqa: F811
+def abstract_check(self, x: AbstractFunction, *args):
+    return self(x.values, *args)
+
+
+@overload  # noqa: F811
+def abstract_check(self, x: Possibilities, *args):
+    return all(self(v, *args) for v in x)
+
+
+@overload  # noqa: F811
+def abstract_check(self, t: PartialApplication, *args):
+    return self(t.fn, *args) and all(self(v, *args) for v in t.args)
+
+
+@overload  # noqa: F811
+def abstract_check(self, xs: object, *args):
+    return True
+
+
+@overload  # noqa: F811
+def abstract_check(self, ctx: Context, *args):
+    return (self(ctx.parent, *args)
+            and all(self(x, *args) for x in ctx.argkey))
+
+
+@overload  # noqa: F811
+def abstract_check(self, ref: Reference, *args):
+    return self(ref.context, *args)
+
+
 ###########
 # Cloning #
 ###########
 
 
-@overload(bootstrap=True)
-def abstract_clone(self, x: AbstractScalar, *args):
+@dataclass
+class CloneState:
+    """State of abstract_clone."""
+
+    cache: dict
+    prop: str
+    check: callable
+
+
+def _make_constructor(inst):
+    def f(*args, **kwargs):
+        inst.__init__(*args, **kwargs)
+        return inst
+    return f
+
+
+@overload.wrapper(
+    initial_state=lambda: CloneState({}, None, None)
+)
+def abstract_clone(__call__, self, x, *args):
     """Clone an abstract value."""
+    def proceed():
+        if isinstance(x, AbstractValue) and x in cache:
+            return cache[x]
+        result = __call__(self, x, *args)
+        if not isinstance(result, GeneratorType):
+            return result
+        cls = result.send(None)
+        inst = cls.empty()
+        cache[x] = inst
+        constructor = _make_constructor(inst)
+        try:
+            result.send(constructor)
+        except StopIteration as e:
+            rval = e.value.intern()
+            cache[x] = rval
+            return rval
+        else:
+            raise AssertionError(
+                'Generators in abstract_clone must yield once, then return.'
+            )
+
+    cache = self.state.cache
+    prop = self.state.prop
+    if prop:
+        if hasattr(x, prop):
+            return getattr(x, prop)
+        elif isinstance(x, (AbstractValue, Context, Reference)):
+            if self.state.check(x, *args):
+                res = x
+            else:
+                res = proceed()
+            setattr(x, prop, res)
+            return res
+        else:
+            return proceed()
+    else:
+        return proceed()
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: AbstractScalar, *args):
     return AbstractScalar(self(x.values, *args))
 
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractFunction, *args):
-    return AbstractFunction(value=self(x.get_sync(), *args))
+    return (yield AbstractFunction)(value=self(x.get_sync(), *args))
 
 
 @overload  # noqa: F811
@@ -218,7 +377,7 @@ def abstract_clone(self, d: TrackDict, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractTuple, *args):
-    return AbstractTuple(
+    return (yield AbstractTuple)(
         [self(y, *args) for y in x.elements],
         self(x.values, *args)
     )
@@ -226,17 +385,17 @@ def abstract_clone(self, x: AbstractTuple, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractList, *args):
-    return AbstractList(self(x.element, *args), self(x.values, *args))
+    return (yield AbstractList)(self(x.element, *args), self(x.values, *args))
 
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractArray, *args):
-    return AbstractArray(self(x.element, *args), self(x.values, *args))
+    return (yield AbstractArray)(self(x.element, *args), self(x.values, *args))
 
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractClass, *args):
-    return AbstractClass(
+    return (yield AbstractClass)(
         x.tag,
         {k: self(v, *args) for k, v in x.attributes.items()},
         x.methods,
@@ -251,7 +410,20 @@ def abstract_clone(self, x: AbstractUnion, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractJTagged, *args):
-    return AbstractJTagged(self(x.element, *args))
+    return (yield AbstractJTagged)(self(x.element, *args))
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: Possibilities, *args):
+    return Possibilities([self(v, *args) for v in x])
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: PartialApplication, *args):
+    return PartialApplication(
+        self(x.fn, *args),
+        tuple([self(arg, *args) for arg in x.args])
+    )
 
 
 @overload  # noqa: F811
@@ -272,15 +444,54 @@ def abstract_clone(self, x: object, *args):
 #################
 
 
-@overload(bootstrap=True)
-async def abstract_clone_async(self, x: AbstractScalar):
+@overload.wrapper(
+    initial_state=lambda: CloneState({}, None, None)
+)
+async def abstract_clone_async(__call__, self, x, *args):
     """Clone an abstract value (asynchronous)."""
+    async def proceed():
+        if isinstance(x, AbstractValue) and x in cache:
+            return cache[x]
+
+        call = __call__(self, x, *args)
+        if isinstance(call, AsyncGeneratorType):
+            cls = await call.asend(None)
+            inst = cls.empty()
+            cache[x] = inst
+            constructor = _make_constructor(inst)
+            rval = await call.asend(constructor)
+            rval = rval.intern()
+            cache[x] = rval
+            return rval
+        else:
+            return await call
+
+    cache = self.state.cache
+    prop = self.state.prop
+    if prop:
+        if hasattr(x, prop):
+            return getattr(x, prop)
+        elif isinstance(x, (AbstractValue, Context, Reference)):
+            if self.state.check(x, *args):
+                res = x
+            else:
+                res = await proceed()
+            setattr(x, prop, res)
+            return res
+        else:
+            return await proceed()
+    else:
+        return await proceed()
+
+
+@overload  # noqa: F811
+async def abstract_clone_async(self, x: AbstractScalar):
     return AbstractScalar(await self(x.values))
 
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractFunction):
-    return AbstractFunction(*(await self(x.get_sync())))
+    yield (yield AbstractFunction)(*(await self(x.get_sync())))
 
 
 @overload  # noqa: F811
@@ -291,7 +502,7 @@ async def abstract_clone_async(self, d: TrackDict):
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractTuple):
-    return AbstractTuple(
+    yield (yield AbstractTuple)(
         [(await self(y)) for y in x.elements],
         await self(x.values)
     )
@@ -299,17 +510,17 @@ async def abstract_clone_async(self, x: AbstractTuple):
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractList):
-    return AbstractList(await self(x.element), await self(x.values))
+    yield (yield AbstractList)(await self(x.element), await self(x.values))
 
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractArray):
-    return AbstractArray(await self(x.element), await self(x.values))
+    yield (yield AbstractArray)(await self(x.element), await self(x.values))
 
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractClass):
-    return AbstractClass(
+    yield (yield AbstractClass)(
         x.tag,
         {k: (await self(v)) for k, v in x.attributes.items()},
         x.methods,
@@ -323,6 +534,19 @@ async def abstract_clone_async(self, x: AbstractUnion):
 
 
 @overload  # noqa: F811
+async def abstract_clone_async(self, x: Possibilities):
+    return Possibilities([await self(v) for v in x])
+
+
+@overload  # noqa: F811
+async def abstract_clone_async(self, x: PartialApplication):
+    return PartialApplication(
+        await self(x.fn),
+        tuple([await self(arg) for arg in x.args])
+    )
+
+
+@overload  # noqa: F811
 async def abstract_clone_async(self, x: object):
     return x
 
@@ -332,57 +556,11 @@ async def abstract_clone_async(self, x: object):
 ##################
 
 
-@overload.wrapper
-def _is_concrete(__call__, x):
-    if hasattr(x, '_concrete'):
-        return x._concrete is x
-    elif __call__(x):
-        if isinstance(x, (AbstractValue, Context, Reference)):
-            x._concrete = x
-        return True
-    else:
-        return False
-
-
-@overload  # noqa: F811
-def _is_concrete(x: object):
-    return True
-
-
-@overload  # noqa: F811
-def _is_concrete(x: Pending):
+@abstract_check.variant(
+    initial_state=lambda: CheckState(cache={}, prop='_concrete')
+)
+def _is_concrete(self, x: Pending):
     return False
-
-
-@overload  # noqa: F811
-def _is_concrete(x: TrackDict):
-    return all(_is_concrete(v) for v in x.values())
-
-
-@overload  # noqa: F811
-def _is_concrete(x: AbstractScalar):
-    return _is_concrete(x.values)
-
-
-@overload  # noqa: F811
-def _is_concrete(x: AbstractAtom):
-    return True
-
-
-@overload  # noqa: F811
-def _is_concrete(xs: AbstractStructure):
-    return all(_is_concrete(x) for x in xs.children())
-
-
-@overload  # noqa: F811
-def _is_concrete(ctx: Context):
-    return (_is_concrete(ctx.parent)
-            and all(_is_concrete(x) for x in ctx.argkey))
-
-
-@overload  # noqa: F811
-def _is_concrete(ref: Reference):
-    return _is_concrete(ref.context)
 
 
 ##############
@@ -390,24 +568,11 @@ def _is_concrete(ref: Reference):
 ##############
 
 
-@abstract_clone_async.variant_wrapper
-async def concretize_abstract(__call__, self, x):
-    """Clone an abstract value while resolving all Pending (asynchronous)."""
-    if hasattr(x, '_concrete'):
-        return x._concrete
-    if isinstance(x, (AbstractValue, Context, Reference)):
-        if _is_concrete(x):
-            res = x
-        else:
-            res = await __call__(self, x)
-        x._concrete = res
-        return res
-    else:
-        return await __call__(self, x)
-
-
-@overload  # noqa: F811
+@abstract_clone_async.variant(
+    initial_state=lambda: CloneState({}, '_concrete', _is_concrete)
+)
 async def concretize_abstract(self, x: Pending):
+    """Clone an abstract value while resolving all Pending (asynchronous)."""
     return await self(await x)
 
 
@@ -440,46 +605,24 @@ async def concretize_abstract(self, t: tuple):
 ###############
 
 
-@overload.wrapper
-def _is_broad(__call__, x, loop):
-    if hasattr(x, '_broad'):
-        return x._broad is x
-    elif __call__(x, loop):
-        if isinstance(x, (AbstractValue, Context, Reference)):
-            x._broad = x
-        return True
-    else:
-        return False
-
-
-@overload  # noqa: F811
-def _is_broad(x: object, loop):
+@abstract_check.variant(
+    initial_state=lambda: CheckState(cache={}, prop='_broad')
+)
+def _is_broad(self, x: object, loop):
     return x is ANYTHING
 
 
 @overload  # noqa: F811
-def _is_broad(x: Pending, loop):
-    return False
+def _is_broad(self, x: (AbstractScalar, AbstractFunction), loop):
+    return self(x.values[VALUE], loop)
 
 
 @overload  # noqa: F811
-def _is_broad(x: (AbstractScalar, AbstractFunction), loop):
-    return _is_broad(x.values[VALUE], loop)
-
-
-@overload  # noqa: F811
-def _is_broad(x: Possibilities, loop):
-    return loop is None
-
-
-@overload  # noqa: F811
-def _is_broad(x: AbstractAtom, loop):
-    return True
-
-
-@overload  # noqa: F811
-def _is_broad(xs: AbstractStructure, loop):
-    return all(_is_broad(x, loop) for x in xs.children())
+def _is_broad(self, x: Possibilities, loop):
+    if loop is None:
+        return all(self(v, loop) for v in x)
+    else:
+        return False
 
 
 ###########
@@ -487,8 +630,10 @@ def _is_broad(xs: AbstractStructure, loop):
 ###########
 
 
-@abstract_clone.variant_wrapper
-def broaden(__call__, self, x, loop):
+@abstract_clone.variant(
+    initial_state=lambda: CloneState({}, '_broad', _is_broad)
+)
+def broaden(self, d: TrackDict, loop):
     """Broaden an abstract value.
 
     * Concrete values such as 1 or True will be broadened to ANYTHING.
@@ -498,33 +643,13 @@ def broaden(__call__, self, x, loop):
         d: The abstract data to clone.
         loop: The InferenceLoop, used to broaden Possibilities.
     """
-    if hasattr(x, '_broad'):
-        return x._broad
-    if isinstance(x, (AbstractValue, Context, Reference)):
-        if _is_broad(x, loop):
-            res = x
-        else:
-            res = __call__(self, x, loop)
-        x._broad = res
-        return res
-    else:
-        return __call__(self, x, loop)
-
-
-@overload  # noqa: F811
-def broaden(self, d: TrackDict, loop):
     return {k: k.broaden(v, self, loop) for k, v in d.items()}
-
-
-@overload  # noqa: F811
-def broaden(self, p: Pending, loop):
-    return p
 
 
 @overload  # noqa: F811
 def broaden(self, p: Possibilities, loop):
     if loop is None:
-        return p
+        return Possibilities([self(v, loop) for v in p])
     else:
         # Broadening Possibilities creates a PendingTentative. This allows
         # us to avoid resolving them earlier than we would like.

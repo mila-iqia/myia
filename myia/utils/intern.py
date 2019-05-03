@@ -209,22 +209,8 @@ class Wrapper:
         return hash(self._obj())
 
 
-class Interned(type):
-    """Represents a class where all members are interned.
-
-    Using the __eqkey__ method to generate a key for equality purposes, each
-    instance with the same eqkey is mapped to a single canonical instance.
-
-    It is possible to create a non-interned instance with `new`.
-
-    The `intern` method on an instance can be used to get the interned version
-    of the instance.
-    """
-
-    def __init__(cls, name, bases, dct):
-        """Initialize an interned class."""
-        super().__init__(name, bases, dct)
-        cls.intern = lambda self: Interned.intern(type(self), self)
+class InternedMC(type):
+    """Metaclass for a class where all members are interned."""
 
     def new(cls, *args, **kwargs):
         """Instantiates a non-interned instance."""
@@ -253,3 +239,34 @@ class Interned(type):
         """Instantiates an interned instance."""
         inst = cls.new(*args, **kwargs)
         return inst.intern()
+
+
+class Interned(metaclass=InternedMC):
+    """Instances of this class are interned.
+
+    Using the __eqkey__ method to generate a key for equality purposes, each
+    instance with the same eqkey is mapped to a single canonical instance.
+    """
+
+    def intern(self):
+        """Get the interned version of the instance."""
+        return InternedMC.intern(type(self), self)
+
+    def __eqkey__(self):
+        """Generate a key for equality/hashing purposes."""
+        raise NotImplementedError('Implement in subclass')
+
+
+class PossiblyRecursive:
+    """Base class for data that might be recursive."""
+
+    @classmethod
+    def empty(cls):
+        """Create an empty, incomplete instance."""
+        inst = object.__new__(cls)
+        inst._incomplete = True
+        return inst
+
+    def __init__(self):
+        """Initialization sets the object to complete."""
+        self._incomplete = False

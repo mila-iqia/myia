@@ -1,14 +1,12 @@
 """Tools to print a traceback for an error in Myia."""
 
-import re
 import ast
 import sys
 from colorama import Fore, Style
 import prettyprinter as pp
 
-from .. import dtype
-from ..abstract import InferenceError, Reference, data, ANYTHING, \
-    TYPE, SHAPE, VALUE
+from ..abstract import InferenceError, Reference, data, format_abstract, \
+    pretty_struct
 from ..utils import eprint
 from ..ir import Graph
 
@@ -65,55 +63,9 @@ class _PBlock:
         self.kwargs = kwargs
 
 
-def _pretty(ctx, title, args, kwargs, sep=' :: '):
-    kwargs = {f'{k}<<{sep}>>': v
-              for k, v in kwargs.items()}
-    return pp.pretty_call_alt(ctx, str(title), args, kwargs)
-
-
 @pp.register_pretty(_PBlock)
 def _pretty_pblock(pb, ctx):
-    return _pretty(ctx, pb.title, pb.args, pb.kwargs)
-
-
-@pp.register_pretty(data.AbstractClass)
-def _pretty_aclass(a, ctx):
-    return _pretty(ctx, a.tag, [], a.attributes)
-
-
-@pp.register_pretty(data.AbstractTuple)
-def _pretty_atuple(a, ctx):
-    return pp.pretty_call_alt(ctx, "", a.elements, {})
-
-
-@pp.register_pretty(data.AbstractScalar)
-def _pretty_ascalar(a, ctx):
-    t = a.values[TYPE]
-    if dtype.ismyiatype(t, dtype.Float):
-        rval = f'f{t.bits}'
-    elif dtype.ismyiatype(t, dtype.Int):
-        rval = f'i{t.bits}'
-    elif dtype.ismyiatype(t, dtype.UInt):
-        rval = f'u{t.bits}'
-    else:
-        rval = str(t)
-    v = a.values[VALUE]
-    if v is not ANYTHING:
-        rval += f' = {v}'
-    return rval
-
-
-@pp.register_pretty(data.AbstractArray)
-def _pretty_aarray(a, ctx):
-    elem = pp.pformat(a.element)
-    shp = ' x '.join('?' if s is ANYTHING else str(s)
-                     for s in a.values[SHAPE])
-    return f'{elem} x {shp}'
-
-
-@pp.register_pretty(data.AbstractFunction)
-def _pretty_afunc(a, ctx):
-    return '|'.join([pp.pformat(fn) for fn in a.get_sync()])
+    return pretty_struct(ctx, pb.title, pb.args, pb.kwargs)
 
 
 @pp.register_pretty(data.PrimitiveFunction)
@@ -132,9 +84,7 @@ def _format_call(fn, args):
         args = []
     else:
         kwargs = {}
-    rval = pp.pformat(_PBlock(label(fn), ' :: ', args, kwargs))
-    rval = re.sub(r'<<([^>]+)>>=', r'\1', rval)
-    return rval
+    return format_abstract(_PBlock(label(fn), ' :: ', args, kwargs))
 
 
 def _show_location(loc, label):

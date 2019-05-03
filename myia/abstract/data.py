@@ -1,13 +1,17 @@
 """Data structures to represent data in an abstract way, for inference."""
 
 
+import re
+import prettyprinter as pp
+from prettyprinter.prettyprinter import pretty_python_value
 from typing import Tuple
 from dataclasses import dataclass
 from contextvars import ContextVar
 
 from .. import dtype
 from ..debug.label import label
-from ..utils import Named, Partializable, Interned, Atom, Elements
+from ..utils import Named, Partializable, Interned, Atom, Elements, \
+    PossiblyRecursive
 
 from .loop import Pending
 
@@ -35,7 +39,6 @@ class Possibilities(frozenset):
     """Represents a set of possible values."""
 
 
-@dataclass(frozen=True)
 class Function:
     """Represents a possible function in an AbstractFunction."""
 
@@ -151,7 +154,7 @@ class DummyFunction(Function):
 #################
 
 
-class AbstractValue(metaclass=Interned):
+class AbstractValue(Interned, PossiblyRecursive):
     """Base class for all abstract values.
 
     Attributes:
@@ -165,10 +168,14 @@ class AbstractValue(metaclass=Interned):
 
     def __init__(self, values):
         """Initialize an AbstractValue."""
+        super().__init__()
         self.values = TrackDict(values)
 
     def __eqkey__(self):
         return Atom(self, tuple(sorted(self.values.items())))
+
+    def __repr__(self):
+        return f'{type(self).__qualname__}({format_abstract(self)})'
 
 
 class AbstractAtom(AbstractValue):
@@ -178,10 +185,12 @@ class AbstractAtom(AbstractValue):
 class AbstractScalar(AbstractAtom):
     """Represents a scalar (integer, float, bool, etc.)."""
 
-    def __repr__(self):
-        contents = [f'{k}={v}' for k, v in self.values.items()
-                    if v not in (ABSENT, ANYTHING)]
-        return f'S({", ".join(contents)})'
+    def __pretty__(self, ctx):
+        rval = pretty_type(self.values[TYPE])
+        v = self.values[VALUE]
+        if v is not ANYTHING:
+            rval += f' = {v}'
+        return rval
 
 
 class AbstractType(AbstractAtom):
@@ -191,8 +200,9 @@ class AbstractType(AbstractAtom):
         """Initialize an AbstractType."""
         super().__init__({VALUE: typ})
 
-    def __repr__(self):
-        return f'Ty({self.values[VALUE]})'
+    def __pretty__(self, ctx):
+        t = pretty_type(self.values[VALUE])
+        return pp.doc.concat(['Ty(', t, ')'])
 
 
 class AbstractError(AbstractAtom):
@@ -202,7 +212,7 @@ class AbstractError(AbstractAtom):
         """Initialize an AbstractError."""
         super().__init__({VALUE: err})
 
-    def __repr__(self):
+    def __pretty__(self, ctx):
         return f'E({self.values[VALUE]})'
 
 
@@ -253,8 +263,12 @@ class AbstractFunction(AbstractAtom):
         fn, = poss
         return fn
 
-    def __repr__(self):
-        return f'Fn({self.values[VALUE]})'
+    def __pretty__(self, ctx):
+        elems = []
+        for fn in self.get_sync():
+            elems.append(pretty_python_value(fn, ctx))
+            elems.append(' | ')
+        return pp.doc.concat(elems[:-1])
 
 
 class AbstractStructure(AbstractValue):
@@ -276,8 +290,8 @@ class AbstractTuple(AbstractStructure):
         """Return all elements in the tuple."""
         return self.elements
 
-    def __repr__(self):
-        return f'T({", ".join(map(repr, self.elements))})'
+    def __pretty__(self, ctx):
+        return pp.pretty_call_alt(ctx, "", self.elements, {})
 
 
 class AbstractArray(AbstractStructure):
@@ -302,8 +316,11 @@ class AbstractArray(AbstractStructure):
         """Return the array element."""
         return self.element,
 
-    def __repr__(self):
-        return f'A({self.element}, SHAPE={self.values[SHAPE]})'
+    def __pretty__(self, ctx):
+        elem = pretty_python_value(self.element, ctx)
+        shp = ' x '.join('?' if s is ANYTHING else str(s)
+                         for s in self.values[SHAPE])
+        return pp.doc.concat([elem, ' x ', shp])
 
 
 class AbstractList(AbstractStructure):
@@ -326,8 +343,12 @@ class AbstractList(AbstractStructure):
         """Return the list element."""
         return self.element,
 
-    def __repr__(self):
-        return f'L({self.element})'
+    def __pretty__(self, ctx):
+        return pp.doc.concat([
+            '[',
+            pretty_python_value(self.element, ctx),
+            ']'
+        ])
 
 
 class AbstractClass(AbstractStructure):
@@ -357,9 +378,8 @@ class AbstractClass(AbstractStructure):
         vals = AbstractValue.__eqkey__(self)
         return Elements(self, vals, self.tag, self.attributes)
 
-    def __repr__(self):
-        elems = [f'{k}={v}' for k, v in self.attributes.items()]
-        return f'*{self.tag}({", ".join(elems)})'
+    def __pretty__(self, ctx):
+        return pretty_struct(ctx, self.tag, [], self.attributes)
 
 
 class AbstractJTagged(AbstractStructure):
@@ -374,8 +394,8 @@ class AbstractJTagged(AbstractStructure):
         """Return the jtagged element."""
         return self.element,
 
-    def __repr__(self):
-        return f'J({self.element})'
+    def __pretty__(self, ctx):
+        return pp.pretty_call_alt(ctx, "J", [self.element], {})
 
 
 class AbstractUnion(AbstractStructure):
@@ -390,8 +410,8 @@ class AbstractUnion(AbstractStructure):
         """Return the set of options."""
         return self.options
 
-    def __repr__(self):
-        return f'U({", ".join(map(repr, self.options))})'
+    def __pretty__(self, ctx):
+        return pp.pretty_call_alt(ctx, "U", self.options, {})
 
 
 def abstract_union(options):
@@ -429,7 +449,7 @@ class Track:
         """Initialize the Track."""
         self.name = name
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return self.name
 
     def __lt__(self, other):
@@ -559,3 +579,39 @@ class TypeMismatchError(MyiaTypeError):
         super().__init__(message)
         self.expected = expected
         self.got = got
+
+
+#############################
+# Pretty printing utilities #
+#############################
+
+
+def format_abstract(a):
+    """Pretty print an AbstractValue."""
+    rval = pp.pformat(a)
+    rval = re.sub(r'<<([^>]+)>>=', r'\1', rval)
+    return rval
+
+
+def pretty_type(t):
+    """Pretty print a type."""
+    if dtype.ismyiatype(t, dtype.Float):
+        return f'f{t.bits}'
+    elif dtype.ismyiatype(t, dtype.Int):
+        return f'i{t.bits}'
+    elif dtype.ismyiatype(t, dtype.UInt):
+        return f'u{t.bits}'
+    else:
+        return str(t)
+
+
+def pretty_struct(ctx, title, args, kwargs, sep=' :: '):
+    """Pretty print a struct."""
+    kwargs = {f'{k}<<{sep}>>': v
+              for k, v in kwargs.items()}
+    return pp.pretty_call_alt(ctx, str(title), args, kwargs)
+
+
+@pp.register_pretty(AbstractValue)
+def _pretty_avalue(a, ctx):
+    return a.__pretty__(ctx)

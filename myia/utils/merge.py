@@ -1,15 +1,12 @@
 """Utilities to merge dictionaries and other data structures."""
 
 
-from .misc import Named, overload
+from .overload import overload
+from .misc import Named, MISSING
 
 
 # Use in a merge to indicate that a key should be deleted
 DELETE = Named('DELETE')
-
-
-# Placeholder for MergeMode.__init__
-_ABSENT = Named('_ABSENT')
 
 
 class MergeMode:
@@ -25,13 +22,13 @@ class MergeMode:
 
     mode = 'merge'  # NOTE: This is the default merge mode used by merge()
 
-    def __init__(self, __value=_ABSENT, **kwargs):
+    def __init__(self, __value=MISSING, **kwargs):
         """Initialize a MergeMode.
 
         The value to merge will be the single argument given, or if there is no
         positional argument, the keywords dictionary.
         """
-        if __value is _ABSENT:
+        if __value is MISSING:
             self.value = kwargs
         else:
             assert not kwargs

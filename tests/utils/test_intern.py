@@ -6,7 +6,7 @@ from myia.utils import Interned, Elements, eqrec, hashrec, eq, hash as hsh, \
 
 
 @dataclass(frozen=True)
-class Point(metaclass=Interned):
+class Point(Interned):
     x: object
     y: object
 
@@ -14,7 +14,7 @@ class Point(metaclass=Interned):
         return Elements(self, (self.x, self.y))
 
 
-class Thingy(metaclass=Interned):
+class Thingy(Interned):
     def __init__(self, value=None):
         if value is None:
             self._incomplete = True
