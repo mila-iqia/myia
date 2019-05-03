@@ -711,7 +711,6 @@ def check_uses(g):
     return len(all_uses) != 1
 
 
-
 @GraphTransform
 def specialize_transform(graph, args):
     """Specialize on provided non-None args.
@@ -830,7 +829,8 @@ def incorporate_env_getitem(optimizer, node, equiv):
     key = equiv[C].value
     dflt = equiv[Y]
     if check_uses(g):
-        return node.graph.apply(env_getitem_transform(g, key, dflt), *equiv[Xs])
+        return node.graph.apply(env_getitem_transform(g, key, dflt),
+                                *equiv[Xs])
 
 
 @pattern_replacer(P.env_getitem, ((P.switch, X, G1, G2), Xs), C, Y)
@@ -842,7 +842,7 @@ def incorporate_env_getitem_through_switch(optimizer, node, equiv):
     dflt = equiv[Y]
     xs = equiv[Xs]
 
-    if not check_use(g1) or not check_uses(g2):
+    if not check_uses(g1) or not check_uses(g2):
         return
 
     g1t = env_getitem_transform(g1, key, dflt)
