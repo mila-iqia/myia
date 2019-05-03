@@ -702,13 +702,10 @@ def replace_applicator(optimizer, node, equiv):
 ##################
 
 
-def check_uses(g):
-    """Returns True if a graph a only one usage."""
+def check_used_once(g):
+    """Returns True if a graph has only one usage."""
     mng = g.manager
-    all_uses = set()
-    for c in mng.graph_constants[g].keys():
-        all_uses.update(mng.uses[c])
-    return len(all_uses) == 1
+    return sum(mng.graph_users[g].values()) == 1
 
 
 @GraphTransform
@@ -776,7 +773,7 @@ def incorporate_getitem(optimizer, node, equiv):
     """
     g = equiv[G].value
     idx = equiv[C].value
-    if check_uses(g):
+    if check_used_once(g):
         return node.graph.apply(getitem_transform(g, idx), *equiv[Xs])
 
 
@@ -797,7 +794,7 @@ def incorporate_getitem_through_switch(optimizer, node, equiv):
     idx = equiv[C].value
     xs = equiv[Xs]
 
-    if check_uses(g1) and check_uses(g2):
+    if check_used_once(g1) and check_used_once(g2):
         g1t = getitem_transform(g1, idx)
         g2t = getitem_transform(g2, idx)
 
@@ -826,7 +823,7 @@ def incorporate_env_getitem(optimizer, node, equiv):
     g = equiv[G].value
     key = equiv[C].value
     dflt = equiv[Y]
-    if check_uses(g):
+    if check_used_once(g):
         return node.graph.apply(env_getitem_transform(g, key, dflt),
                                 *equiv[Xs])
 
@@ -840,7 +837,7 @@ def incorporate_env_getitem_through_switch(optimizer, node, equiv):
     dflt = equiv[Y]
     xs = equiv[Xs]
 
-    if check_uses(g1) and check_uses(g2):
+    if check_used_once(g1) and check_used_once(g2):
         g1t = env_getitem_transform(g1, key, dflt)
         g2t = env_getitem_transform(g2, key, dflt)
 
@@ -873,7 +870,7 @@ def incorporate_call(optimizer, node, equiv):
     g = equiv[G].value
     xs = equiv[Xs]
     ys = equiv[Ys]
-    if check_uses(g):
+    if check_used_once(g):
         g2 = call_output_transform(g, len(ys))
         return node.graph.apply(g2, *xs, *ys)
 
@@ -895,7 +892,7 @@ def incorporate_call_through_switch(optimizer, node, equiv):
     xs = equiv[Xs]
     ys = equiv[Ys]
 
-    if check_uses(g1) and check_uses(g2):
+    if check_used_once(g1) and check_used_once(g2):
         g1t = call_output_transform(g1, len(ys))
         g2t = call_output_transform(g2, len(ys))
 
