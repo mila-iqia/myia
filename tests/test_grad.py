@@ -23,6 +23,9 @@ from myia.validate import whitelist, validate_abstract
 from .common import f64, u64, MA, MB, to_abstract_test
 
 
+_u64 = to_abstract_test(u64)
+
+
 @dataclass
 class Point:
     x: f64
@@ -466,8 +469,8 @@ def test_transpose(x, y):
 
 @grad_test((MA(3, 4), MB(2, 3), NoTestGrad(1), NoTestGrad(0)),)
 def test_transpose2(x, y, axis1, axis2):
-    perm = (scalar_cast(axis1, u64),
-            scalar_cast(axis2, u64))
+    perm = (scalar_cast(axis1, _u64),
+            scalar_cast(axis2, _u64))
     xt = transpose(x, perm)
     yt = transpose(y, perm)
     d = dot(xt, yt)

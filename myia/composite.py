@@ -6,7 +6,7 @@ from functools import reduce
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
-    AbstractClass, build_value
+    AbstractClass, build_value, AbstractScalar, TYPE, VALUE
 from .debug.label import short_labeler
 from .dtype import Array, Object, Int, UInt, Float, Number, Bool, \
     EnvType, Function, Problem
@@ -271,12 +271,12 @@ def int_bool(x):
 
 
 # The parser/inferrer don't like when those are defined inline.
-ui8 = UInt[8]
-ui16 = UInt[16]
-i8 = Int[8]
-i16 = Int[16]
-f32 = Float[32]
-f64 = Float[64]
+ui8 = AbstractScalar({VALUE: ANYTHING, TYPE: UInt[8]})
+ui16 = AbstractScalar({VALUE: ANYTHING, TYPE: UInt[16]})
+i8 = AbstractScalar({VALUE: ANYTHING, TYPE: Int[8]})
+i16 = AbstractScalar({VALUE: ANYTHING, TYPE: Int[16]})
+f32 = AbstractScalar({VALUE: ANYTHING, TYPE: Float[32]})
+f64 = AbstractScalar({VALUE: ANYTHING, TYPE: Float[64]})
 
 
 @core
@@ -554,7 +554,7 @@ def _scalar_zero(x):
 @_leaf_zeros_like.register(Array)
 @core
 def _array_zero(xs):
-    scalar_zero = scalar_cast(0, typeof(xs).elements)
+    scalar_zero = scalar_cast(0, typeof(xs).element)
     return distribute(to_array(scalar_zero), shape(xs))
 
 
@@ -692,7 +692,7 @@ list_map = ListMap()
 def _cast_helper(x, model):
     t = typeof(model)
     if hastype(model, Array):
-        return scalar_to_array(scalar_cast(x, t.elements))
+        return scalar_to_array(scalar_cast(x, t.element))
     else:
         return scalar_cast(x, t)
 

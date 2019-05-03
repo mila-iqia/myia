@@ -1,6 +1,8 @@
 """Utilities for abstract values and inference."""
 
 from dataclasses import dataclass
+import typing
+import numpy as np
 from functools import reduce
 from itertools import chain
 from types import GeneratorType, AsyncGeneratorType
@@ -8,7 +10,8 @@ from types import GeneratorType, AsyncGeneratorType
 from .. import dtype
 from ..utils import overload
 
-from .loop import Pending, is_simple, PendingTentative
+from .loop import Pending, is_simple, PendingTentative, \
+    find_coherent_result_sync
 from .ref import Reference, Context
 
 from .data import (
@@ -30,13 +33,10 @@ from .data import (
     AbstractUnion,
     abstract_union,
     TrackDict,
-    VirtualFunction,
-    GraphFunction,
-    TypedPrimitive,
     PartialApplication,
-    Function,
     VALUE,
     TYPE,
+    SHAPE,
     MyiaTypeError,
     TypeMismatchError,
 )
@@ -104,6 +104,116 @@ def _build_value(ac: AbstractClass):
 
 
 @overload(bootstrap=True)
+def type_to_abstract(self, t: dtype.TypeMeta):
+    return self[t](t)
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: (dtype.Number, dtype.Bool, dtype.EnvType,
+                               dtype.SymbolicKeyType, dtype.Nil)):
+    return AbstractScalar({
+        VALUE: ANYTHING,
+        TYPE: t,
+    })
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: dtype.Tuple):
+    if t.is_generic():
+        return AbstractTuple(ANYTHING)
+    else:
+        return AbstractTuple([self(x) for x in t.elements])
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: dtype.List):
+    if t.is_generic():
+        return AbstractList(ANYTHING)
+    else:
+        return AbstractList(self(t.element_type))
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: dtype.Array):
+    if t.is_generic():
+        return AbstractArray(ANYTHING, {SHAPE: ANYTHING})
+    else:
+        return AbstractArray(self(t.elements), {SHAPE: ANYTHING})
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: dtype.Class):
+    if t.is_generic():
+        return AbstractClass(ANYTHING, ANYTHING, ANYTHING)
+    else:
+        return AbstractClass(
+            t.tag,
+            {k: self(v) for k, v in t.attributes.items()},
+            t.methods
+        )
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: dtype.Object):
+    return ANYTHING
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: dtype.Function):
+    return AbstractFunction(value=ANYTHING)
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: dtype.Problem):
+    return AbstractError(t)
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: type):
+    tmap = {
+        tuple: lambda: AbstractTuple(ANYTHING),
+        list: lambda: AbstractList(ANYTHING),
+        np.ndarray: lambda: AbstractArray(ANYTHING, {SHAPE: ANYTHING}),
+        int: lambda: AbstractScalar({
+            VALUE: ANYTHING,
+            TYPE: dtype.Int,
+        }),
+        float: lambda: AbstractScalar({
+            VALUE: ANYTHING,
+            TYPE: dtype.Float,
+        }),
+        bool: lambda: AbstractScalar({
+            VALUE: ANYTHING,
+            TYPE: dtype.Bool,
+        }),
+    }
+    return tmap[t]()
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: typing._GenericAlias):
+    # breakpoint()
+    args = t.__args__
+    if args == ():
+        args = None
+    elif len(args) == 1 and args[0] == ():
+        args = ()
+
+    if args is None:
+        return self(t.__origin__)
+    else:
+        pass
+
+    # else:
+    #     return self(t.__origin__)
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: object):
+    raise MyiaTypeError(f'{t} is not a recognized type')
+
+
+@overload(bootstrap=True)
 def build_type_limited(self, x: AbstractScalar):
     """Build a type from an abstract value."""
     t = x.values[TYPE]
@@ -155,90 +265,6 @@ def build_type_limited(self, x: AbstractUnion):
 @overload  # noqa: F811
 def build_type_limited(self, x: AbstractType):
     return dtype.TypeType
-
-
-@overload(bootstrap=True)
-def build_type_fn(self, x: AbstractScalar):
-    """Build a type from an abstract value."""
-    t = x.values[TYPE]
-    if isinstance(t, Pending) and t.done():
-        t = t.result()
-    return t
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: AbstractTuple):
-    return dtype.Tuple[[self(e) for e in x.elements]]
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: AbstractError):
-    return dtype.Problem[x.values[VALUE]]
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: AbstractList):
-    return dtype.List[self(x.element)]
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: AbstractArray):
-    return dtype.Array[self(x.element)]
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: AbstractClass):
-    return dtype.Class[
-        x.tag,
-        {name: self(x2) for name, x2 in x.attributes.items()},
-        x.methods
-    ]
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: AbstractJTagged):
-    return dtype.JTagged[self(x.element)]
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: AbstractUnion):
-    return dtype.Union[[self(opt) for opt in x.options]]
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: AbstractType):
-    return dtype.TypeType
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: AbstractFunction):
-    return self(x.get_unique())
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: VirtualFunction):
-    return dtype.Function[tuple(self(a) for a in x.args), self(x.output)]
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: PartialApplication):
-    tp = self(x.fn)
-    return dtype.Function[tp.arguments[len(x.args):], tp.retval]
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: GraphFunction):
-    return self(x.graph.abstract)
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: TypedPrimitive):
-    return dtype.Function[[self(a) for a in x.args], self(x.output)]
-
-
-@overload  # noqa: F811
-def build_type_fn(self, x: Function):
-    return dtype.Function
 
 
 ############
@@ -763,7 +789,17 @@ def amerge(__call__, x1, x2, loop, forced, bind_pending=True,
         x2 = x2.result()
         isp2 = False
     if (isp1 or isp2) and (not accept_pending or not bind_pending):
-        raise ValueError('Cannot have Pending here.')
+        # raise ValueError('Cannot have Pending here.')
+        if forced and isp1:
+            raise ValueError('Cannot have Pending here.')
+        if isp1:
+            def chk(a):
+                return amerge(a, x2, loop, forced, bind_pending)
+            return find_coherent_result_sync(x1, chk)
+        if isp2:
+            def chk(a):
+                return amerge(x1, a, loop, forced, bind_pending)
+            return find_coherent_result_sync(x2, chk)
     if isinstance(x1, PendingTentative):
         assert not x1.done()  # TODO: handle this case?
         x1.tentative = amerge(x1.tentative, x2, loop, False, True,
@@ -803,7 +839,11 @@ def amerge(x1: Possibilities, x2, loop, forced, bp):
 
 @overload  # noqa: F811
 def amerge(x1: dtype.TypeMeta, x2, loop, forced, bp):
-    if x1 != x2:
+    if issubclass(x2, x1):
+        return x1
+    elif not forced and issubclass(x1, x2):
+        return x2
+    elif x1 != x2:
         raise TypeMismatchError(x1, x2)
     return x1
 
@@ -1008,3 +1048,13 @@ def bind(loop, committed, resolved, pending):
             rval.tie(p)
 
         return rval
+
+
+def typecheck(model, abstract):
+    """Check that abstract matches the model."""
+    try:
+        amerge(model, abstract, forced=True, bind_pending=False, loop=None)
+    except MyiaTypeError:
+        return False
+    else:
+        return True

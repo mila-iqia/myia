@@ -6,7 +6,7 @@ from typing import Callable
 import numpy as np
 import math
 
-from .. import dtype as types
+from .. import dtype as types, abstract
 from ..dtype import Number, Float, Bool
 from ..utils import Registry, overload
 
@@ -512,6 +512,8 @@ def return_(x):
 @register(primops.scalar_cast)
 def scalar_cast(x, t):
     """Implement `scalar_cast`."""
+    assert isinstance(t, abstract.AbstractScalar)
+    t = t.values[abstract.TYPE]
     assert types.ismyiatype(t, types.Number)
     dtype = types.type_to_np_dtype(t)
     return getattr(np, dtype)(x)

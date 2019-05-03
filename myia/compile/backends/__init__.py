@@ -1,7 +1,7 @@
 """Compilation backends."""
 
 import importlib
-from ... import dtype
+from ... import dtype, abstract
 from ...dtype import ismyiatype
 
 
@@ -115,9 +115,10 @@ class Backend:
 
     def convert_value(self, v, t):
         """Convert a value to the appropriate backend representation."""
-        if ismyiatype(t, dtype.Number):
-            return self.from_scalar(v, t)
-        elif ismyiatype(t, dtype.Tuple):
+        if isinstance(t, abstract.AbstractScalar) \
+                and ismyiatype(t.values[abstract.TYPE], dtype.Number):
+            return self.from_scalar(v, t.values[abstract.TYPE])
+        elif isinstance(t, abstract.AbstractTuple):
             return tuple(self.convert_value(v, t)
                          for v, t in zip(v, t.elements))
         elif ismyiatype(t, dtype.EnvType):

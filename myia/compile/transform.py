@@ -187,8 +187,7 @@ class CompileGraph:
                 self.add_instr('push_graph', node.value)
             else:
                 assert not isinstance(node.value, Primitive)
-                t = build_type_fn(node.abstract)
-                v = self.backend.convert_value(node.value, t)
+                v = self.backend.convert_value(node.value, node.abstract)
                 self.add_instr('push', v)
             self.push(node)
         return self.slots[node] - self.height

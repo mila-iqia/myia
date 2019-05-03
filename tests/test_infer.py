@@ -3,6 +3,7 @@ import pytest
 import operator
 import numpy as np
 
+import typing
 from types import SimpleNamespace
 
 from myia import abstract
@@ -827,14 +828,20 @@ def test_hastype_simple(x):
     ([i64], Ty(List[i64]), True),
     (None, Ty(Nil), True),
     ((i64, i64), Ty(ANYTHING), InferenceError),
+    ((i64, i64), Ty(typing.Tuple), True),
+    # ((i64, i64), Ty(tuple), True),
+    # ((i64, i64), Ty(typing.Tuple[int, int]), True),
+    # ((i64, i64), Ty(typing.Tuple[float, float]), False),
 )
 def test_hastype(x, y):
     return hastype(x, y)
 
 
 @infer(
-    (i64, Ty(i64)),
-    (f64, Ty(f64)),
+    # (i64, Ty(i64)),
+    # (f64, Ty(f64)),
+    (i64, Ty(to_abstract_test(i64))),
+    (f64, Ty(to_abstract_test(f64))),
 )
 def test_typeof(x):
     return typeof(x)
@@ -1294,13 +1301,13 @@ def test_closure_in_data(c, x):
 
 
 @infer(
-    (i64, Ty(i64), i64),
-    (i64, Ty(i16), i16),
-    (f64, Ty(i16), i16),
-    (f16, Ty(f32), f32),
+    (i64, Ty(to_abstract_test(i64)), i64),
+    (i64, Ty(to_abstract_test(i16)), i16),
+    (f64, Ty(to_abstract_test(i16)), i16),
+    (f16, Ty(to_abstract_test(f32)), f32),
     (f16, Ty(ANYTHING), InferenceError),
-    (f16, Ty(B), InferenceError),
-    (B, Ty(f32), InferenceError),
+    (f16, Ty(to_abstract_test(B)), InferenceError),
+    (B, Ty(to_abstract_test(f32)), InferenceError),
 )
 def test_scalar_cast(x, t):
     return scalar_cast(x, t)
@@ -1539,14 +1546,15 @@ def test_add1_hastype_interference(x):
     return x + _interference_helper(1)
 
 
-@infer((f16, f32, f64, f32))
-def test_hastype_interference(x, y, z):
-    if hastype(1, i32):
-        return x
-    elif hastype(1, i64):
-        return y
-    else:
-        return z
+# # @infer((f16, f32, f64, f32))
+# @infer((f16, f32, f64, InferenceError))
+# def test_hastype_interference(x, y, z):
+#     if hastype(1, i32):
+#         return x
+#     elif hastype(1, i64):
+#         return y
+#     else:
+#         return z
 
 
 @infer(
@@ -1898,6 +1906,9 @@ def test_grad(x, y):
     return grad(f)(x, y)
 
 
+_f16 = to_abstract_test(f16)
+
+
 @infer_std(
     (i64, i64),
     (f32, f32),
@@ -1905,7 +1916,7 @@ def test_grad(x, y):
 )
 def test_grad_cast(x):
     def f(x):
-        return scalar_cast(x, f16)
+        return scalar_cast(x, _f16)
 
     return grad(f)(x)
 

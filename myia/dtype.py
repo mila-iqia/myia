@@ -236,28 +236,28 @@ class Tuple(Object):
         return f'Tuple[{elems}]'
 
 
-class Union(Object):
-    """Represents a set of possible types.
+# class Union(Object):
+#     """Represents a set of possible types.
 
-    Instantiate with `Union[type1, type2, ... typeN]`.  A single
-    sequence of types is also acceptable as the sole argument.
-    """
+#     Instantiate with `Union[type1, type2, ... typeN]`.  A single
+#     sequence of types is also acceptable as the sole argument.
+#     """
 
-    elements: TupleT[Type, ...]
+#     elements: TupleT[Type, ...]
 
-    @classmethod
-    def parameterize(cls, *elements):
-        """Parameterize using a list of elements."""
-        seqtype = (tuple, list, set, frozenset)
-        if len(elements) == 1 and isinstance(elements[0], seqtype):
-            elements, = elements
-        return cls.make_subtype(elements=frozenset(elements))
+#     @classmethod
+#     def parameterize(cls, *elements):
+#         """Parameterize using a list of elements."""
+#         seqtype = (tuple, list, set, frozenset)
+#         if len(elements) == 1 and isinstance(elements[0], seqtype):
+#             elements, = elements
+#         return cls.make_subtype(elements=frozenset(elements))
 
-    @classmethod
-    def __type_repr__(cls):
-        elems = getattr(cls, 'elements', [])
-        elems = ', '.join(map(repr, elems))
-        return f'Union[{elems}]'
+#     @classmethod
+#     def __type_repr__(cls):
+#         elems = getattr(cls, 'elements', [])
+#         elems = ', '.join(map(repr, elems))
+#         return f'Union[{elems}]'
 
 
 class Array(Object):
@@ -285,10 +285,10 @@ class Function(Object):
         return cls.make_subtype(arguments=arguments, retval=retval)
 
 
-class JTagged(Object):
-    """Represents a type tagged through the J function."""
+# class JTagged(Object):
+#     """Represents a type tagged through the J function."""
 
-    subtype: Type
+#     subtype: Type
 
 
 class SymbolicKeyType(Object):

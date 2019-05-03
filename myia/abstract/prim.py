@@ -7,6 +7,7 @@ from collections import defaultdict
 from operator import getitem
 
 from .. import dtype
+from ..abstract import typecheck
 from ..ir import Graph
 from ..dtype import Number, Bool
 from ..prim import ops as P, Primitive, py_implementations as py
@@ -38,8 +39,8 @@ from .data import (
 )
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context, ConditionalContext
-from .utils import sensitivity_transform, build_value, build_type_fn, \
-    build_type_limited, broaden
+from .utils import sensitivity_transform, build_value, \
+    build_type_limited, broaden, type_to_abstract
 from .infer import Inferrer, to_abstract
 
 
@@ -365,48 +366,7 @@ def prod(iterable):
 
 async def issubtype(x, model):
     """Check whether type x is a subtype of model."""
-    if model is dtype.Object:
-        return True
-    elif model is dtype.Tuple:
-        return isinstance(x, AbstractTuple)
-    elif model is dtype.Array:
-        return isinstance(x, AbstractArray)
-    elif model is dtype.List:
-        return isinstance(x, AbstractList)
-    elif model is dtype.Class:
-        return isinstance(x, AbstractClass)
-
-    elif dtype.ismyiatype(model, dtype.Tuple):
-        return isinstance(x, AbstractTuple) \
-            and len(x.elements) == len(model.elements) \
-            and all([await issubtype(xe, me)
-                     for xe, me in zip(x.elements, model.elements)])
-    elif dtype.ismyiatype(model, dtype.Array):
-        return isinstance(x, AbstractArray) \
-            and await issubtype(x.element, model.elements)
-    elif dtype.ismyiatype(model, dtype.List):
-        return isinstance(x, AbstractList) \
-            and await issubtype(x.element, model.element_type)
-    elif dtype.ismyiatype(model, dtype.Class):
-        return isinstance(x, AbstractClass) \
-            and x.tag == model.tag \
-            and all([await issubtype(x.attributes[name], attr_t)
-                     for name, attr_t in model.attributes.items()])
-
-    elif dtype.ismyiatype(model, dtype.Number) \
-            or dtype.ismyiatype(model, dtype.Bool) \
-            or dtype.ismyiatype(model, dtype.Nil):
-        if not isinstance(x, AbstractScalar):
-            return False
-        t = x.values[TYPE]
-        if isinstance(t, Pending):
-            async def chk(t):
-                return dtype.ismyiatype(t, model)
-            return await find_coherent_result(t, chk)
-        else:
-            return dtype.ismyiatype(t, model)
-    else:
-        raise AssertionError(f'Invalid model: {model}')
+    return typecheck(model, x)
 
 
 ##############
@@ -477,16 +437,13 @@ async def _split_type(t, model):
 
 @standard_prim(P.typeof)
 async def _inf_typeof(engine, value):
-    t = build_type_fn(value)
-    return AbstractType(t)
+    return AbstractType(value)
 
 
 @standard_prim(P.hastype)
 async def _inf_hastype(engine, value, model: dtype.TypeType):
-    model_t = model.values[VALUE]
-    if model_t is ANYTHING:
-        raise MyiaTypeError('hastype must be resolvable statically')
-    match, nomatch = await _split_type(value, model_t)
+    a = type_to_abstract(model.values[VALUE])
+    match, nomatch = await _split_type(value, a)
     if match is None:
         v = False
     elif nomatch is None:
@@ -522,8 +479,7 @@ async def _inf_make_list(engine, *args):
 async def infer_type_make_record(engine, _cls: dtype.TypeType, *elems):
     """Infer the return type of make_record."""
     cls = _cls.values[VALUE]
-    if cls is ANYTHING:
-        raise MyiaTypeError('Expected a class to inst')
+    cls = type_to_abstract(cls)
     expected = list(cls.attributes.items())
     if len(expected) != len(elems):
         raise MyiaTypeError('Wrong class inst')
@@ -898,6 +854,7 @@ class _SwitchInferrer(Inferrer):
 
         fulltype = await xref.get()
         typ = (await typref.get()).values[VALUE]
+        typ = type_to_abstract(typ)
         tbtyp, fbtyp = await _split_type(fulltype, typ)
         # We are not supposed to be here if only one branch could be taken.
         assert tbtyp is not None
@@ -983,8 +940,8 @@ async def _inf_scalar_cast(engine,
     t = typ.values[VALUE]
     if t is ANYTHING:
         raise MyiaTypeError('Must have concrete type for scalar_cast')
-    engine.check(Number, t)
-    values = {**scalar.values, TYPE: t}
+    engine.check(AbstractScalar({VALUE: ANYTHING, TYPE: Number}), t)
+    values = {**scalar.values, TYPE: t.values[TYPE]}
     return AbstractScalar(values)
 
 
@@ -1093,7 +1050,7 @@ async def _inf_env_add(engine, env1, env2):
 
 
 @standard_prim(P.unsafe_static_cast)
-async def _inf_unsafe_static_cast(engine, x, typ: AbstractScalar):
+async def _inf_unsafe_static_cast(engine, x, typ: AbstractType):
     v = typ.values[VALUE]
     if not isinstance(v, AbstractValue):
         raise MyiaTypeError('unsafe_static_cast expects a type constant')

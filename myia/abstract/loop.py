@@ -291,6 +291,32 @@ async def find_coherent_result(v, fn):
     return await fn(x)
 
 
+def find_coherent_result_sync(v, fn):
+    """Return fn(v) without fully resolving v, if possible.
+
+    If v is a PendingFromList and fn(x) is the same for every x in v,
+    this will return that result without resolving which possibility
+    v is. Otherwise, v will be resolved.
+    """
+    from .data import InferenceError
+    if isinstance(v, PendingFromList):
+        exc = None
+        results = set()
+        for option in v.possibilities:
+            try:
+                results.add(fn(option))
+            except Exception as e:
+                exc = e
+        if len(results) == 1:
+            return results.pop()
+        elif len(results) == 0:
+            if exc:
+                raise exc
+            else:
+                raise InferenceError('Nothing matches')
+    raise InferenceError('Must resolve Pending to find result')
+
+
 async def force_pending(v):
     """Resolve v if v is Pending, otherwise return v directly."""
     if isinstance(v, Pending):

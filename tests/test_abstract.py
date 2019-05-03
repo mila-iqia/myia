@@ -11,10 +11,9 @@ from myia.abstract import (
     AbstractJTagged, abstract_union, AbstractError, AbstractFunction,
     InferenceLoop, to_abstract, build_value, amerge,
     Possibilities as _Poss,
-    VALUE, TYPE, DEAD, build_type_fn,
-    PrimitiveFunction, PartialApplication, VirtualFunction,
-    TypedPrimitive, abstract_clone, abstract_clone_async, broaden,
-    Pending, concretize_abstract
+    VALUE, TYPE, DEAD,
+    abstract_clone, abstract_clone_async, broaden,
+    Pending, concretize_abstract, type_to_abstract
 )
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
@@ -66,19 +65,6 @@ def test_build_value():
     assert build_value(to_abstract_test(pt)) == pt
 
 
-def test_build_type_fn():
-    assert build_type_fn(AbstractFunction(PrimitiveFunction('test'))) \
-        == ty.Function
-
-    assert build_type_fn(AbstractFunction(PartialApplication(
-        VirtualFunction((to_abstract(1), to_abstract(2)), to_abstract(3)),
-        (to_abstract(1),)))) == ty.Function[[ty.Int[64]], ty.Int[64]]
-
-    assert build_type_fn(AbstractFunction(TypedPrimitive(
-        'test2', (to_abstract(3.0), to_abstract(1)), to_abstract(True)))) \
-        == ty.Function[[ty.Float[64], ty.Int[64]], ty.Bool]
-
-
 def test_merge():
     a = T([S(1), S(t=ty.Int[64])])
     b = T([S(1), S(t=ty.Int[64])])
@@ -116,6 +102,18 @@ def test_merge_possibilities():
     assert amerge(a, c, loop=None, forced=True) is a
 
 
+def test_merge_from_types():
+    a = T([S(1), S(t=ty.Int[64])])
+
+    t1 = type_to_abstract(ty.Tuple)
+    t2 = type_to_abstract(ty.Tuple[ty.Int[64], ty.Int[64]])
+    t3 = type_to_abstract(ty.Tuple[ty.Int[64]])
+    assert amerge(t1, a, loop=None, forced=True) is t1
+    assert amerge(t2, a, loop=None, forced=True) is t2
+    with pytest.raises(MyiaTypeError):
+        amerge(t3, a, loop=None, forced=True)
+
+
 def test_union():
     a = U(S(t=ty.Int[64]), S(t=ty.Int[32]), S(t=ty.Int[16]))
     b = U(S(t=ty.Int[64]), U(S(t=ty.Int[32]), S(t=ty.Int[16])))
@@ -124,10 +122,6 @@ def test_union():
     c = S(t=ty.Int[64])
     d = U(S(t=ty.Int[64]))
     assert c == d
-
-    u = ty.Union[ty.Int[64], ty.Int[32], ty.Int[16]]
-    assert build_type_fn(a) == u
-    assert repr(u).startswith('Union')  # member order can vary
 
 
 def test_repr():

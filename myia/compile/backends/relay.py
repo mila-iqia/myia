@@ -8,7 +8,7 @@ from . import Backend
 
 from ...abstract import AbstractArray, AbstractTuple, AbstractScalar, \
     AbstractFunction, VirtualFunction, GraphFunction, TypedPrimitive, \
-    PartialApplication, SHAPE, build_type_limited, build_type_fn
+    PartialApplication, SHAPE, build_type_limited, TYPE
 from ...ir import manage
 from ...graph_utils import toposort
 from ...prim import Primitive, ops as P
@@ -115,8 +115,8 @@ SIMPLE_MAP = {
 
 def relay_partial(c, fn, *args):
     """Implementation of partial for Relay."""
-    ty = build_type_fn(fn.abstract)
-    rargs = [relay.var("") for a in ty.arguments]
+    ty = to_relay_type(fn.abstract)
+    rargs = [relay.var("") for a in ty.arg_types]
     fn = relay.Function(rargs, relay.Call(c.ref(fn), rargs))
     binds = {}
     for ra, a in zip(rargs, args):
@@ -268,16 +268,16 @@ class CompileGraph:
     def on_constant(self, node):
         """Convert a constant node."""
         def _helper(value, type):
-            if ismyiatype(type, Tuple):
+            if isinstance(type, AbstractTuple):
                 return relay.Tuple([_helper(e, et) for e, et in
                                     zip(value, type.elements)])
             else:
-                return relay.const(value,
-                                   dtype=type_to_np_dtype(type))
+                dtype = type_to_np_dtype(type.values[TYPE])
+                return relay.const(value, dtype=dtype)
         if isinstance(node.value, Primitive):
             # This is a hack for list_map and friends
             return None
-        return _helper(node.value, build_type_fn(node.abstract))
+        return _helper(node.value, node.abstract)
 
     def on_graph(self, node):
         """Convert a graph constant."""

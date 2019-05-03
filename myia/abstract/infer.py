@@ -16,7 +16,7 @@ from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference, \
     ConditionalContext
 from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
-    GraphFunction, PartialApplication, \
+    AbstractValue, GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, \
     VALUE, TYPE, SHAPE, DummyFunction, \
@@ -24,7 +24,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractList, type_error_nargs, TypeDispatchError, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
-    bind
+    bind, typecheck
 
 
 class InferenceEngine:
@@ -291,6 +291,8 @@ class InferenceEngine:
             return dtype.ismyiatype(x, predicate)
         elif isinstance(predicate, type):
             return isinstance(x, predicate)
+        elif isinstance(predicate, AbstractValue):
+            return typecheck(predicate, x)
         elif callable(predicate):
             return predicate(self, x)
         else:
@@ -416,6 +418,11 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
             pass
 
     return rval
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: AbstractValue, context, ref, loop):
+    return AbstractType(v)
 
 
 @overload  # noqa: F811

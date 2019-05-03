@@ -18,7 +18,11 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
-from ..common import i64, f64, to_abstract_test, Point
+from ..common import i64, f16, f64, to_abstract_test, Point
+
+
+_i64 = to_abstract_test(i64)
+_f16 = to_abstract_test(f16)
 
 
 @parse_compare((2, 7), (4, -6))
@@ -424,8 +428,8 @@ def test_broadcast_shape():
 
 
 def test_scalar_cast():
-    assert isinstance(scalar_cast(1.5, Int[64]), np.int64)
-    assert isinstance(scalar_cast(1.5, Float[16]), np.float16)
+    assert isinstance(scalar_cast(1.5, _i64), np.int64)
+    assert isinstance(scalar_cast(1.5, _f16), np.float16)
 
 
 def test_env():
