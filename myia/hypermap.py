@@ -6,7 +6,6 @@ from dataclasses import is_dataclass
 from . import operations, composite as C, abstract
 from .abstract import MyiaTypeError, broaden
 from .ir import MetaGraph, Graph
-from .dtype import tag_to_dataclass, pytype_to_myiatype
 from .utils import Overload
 from .prim import ops as P
 from .prim.py_implementations import array_map
@@ -133,8 +132,8 @@ class HyperMap(MetaGraph):
             else:
                 val = g.apply(self.fn_rec, fnarg, *args)
             vals.append(val)
-        t = pytype_to_myiatype(tag_to_dataclass[a.tag])
-        return g.apply(P.make_record, t, *vals)
+
+        return g.apply(P.make_record, a, *vals)
 
     def _generate_helper(self, g, fnarg, argmap):
         nonleafs = [a for a, isleaf in argmap.values() if not isleaf]

@@ -3,13 +3,14 @@
 
 from dataclasses import dataclass
 from functools import reduce
+from typing import Callable
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
-    AbstractClass, build_value, AbstractScalar, TYPE, VALUE
+    AbstractClass, build_value, AbstractScalar, AbstractError, TYPE, VALUE
 from .debug.label import short_labeler
-from .dtype import Array, Object, Int, UInt, Float, Number, Bool, \
-    EnvType, Function, Problem
+from .dtype import Array, Int, UInt, Float, Number, Bool, \
+    EnvType
 from .hypermap import HyperMap, hyper_map
 from .abstract import MyiaTypeError, broaden
 from .info import About
@@ -358,8 +359,8 @@ def hasnext(it):
 class SequenceIterator:
     """Iterator to use for sequences like List, Array."""
 
-    idx: Int
-    seq: Object
+    idx: int
+    seq: object
 
     @core(ignore_values=True)
     def __myia_hasnext__(self):
@@ -527,13 +528,13 @@ hyper_add = HyperMap(name='hyper_add', fn_leaf=_leaf_add)
 _leaf_zeros_like = MultitypeGraph('zeros_like')
 
 
-@_leaf_zeros_like.register(Function)
+@_leaf_zeros_like.register(Callable)
 @core
 def _function_zero(_):
     return newenv
 
 
-@_leaf_zeros_like.register(Problem)
+@_leaf_zeros_like.register(AbstractError)
 @core
 def _dead_zero(x):
     return x

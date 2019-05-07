@@ -3,7 +3,7 @@ import pytest
 import operator
 import numpy as np
 
-import typing
+from typing import List, Tuple
 from types import SimpleNamespace
 
 from myia import abstract
@@ -12,7 +12,7 @@ from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
-from myia.dtype import Int, External, List, Number, Class, EnvType as Env, Nil
+from myia.dtype import Int, External, Number, EnvType as Env, Nil, Array
 from myia.hypermap import HyperMap, hyper_map
 from myia.abstract import ANYTHING, InferenceError, Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
@@ -27,10 +27,14 @@ from myia.prim.py_implementations import \
     transpose, make_record, unsafe_static_cast
 from myia.utils import newenv
 
-from .common import B, T, L, i16, i32, i64, u64, f16, f32, f64, \
-    ai64, af64, Point, Point_t, Point3D, Thing, Thing_ftup, mysum, \
+from .common import B, i16, i32, i64, u64, f16, f32, f64, \
+    Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
     to_abstract_test, EmptyTuple, U
+
+
+ai64 = Array[i64]
+af64 = Array[f64]
 
 
 ########################
@@ -822,24 +826,20 @@ def test_hastype_simple(x):
     (i64, i64, InferenceError),
     (i64, Ty(i64), True),
     (f64, Ty(i64), False),
-    ((i64, i64), Ty(T[i64, i64]), True),
-    ((i64, i64), Ty(T[Number, Number]), True),
-    (Point(1, 2), Ty(Class), True),
+    ((i64, i64), Ty(tuple), True),
+    ((i64, i64), Ty(Tuple), True),
+    ((i64, i64), Ty(Tuple[Number, Number]), True),
+    ((i64, i64), Ty(Tuple[i64, i64]), True),
+    ((i64, i64), Ty(Tuple[float, float]), False),
+    ((i64, i64), Ty(ANYTHING), InferenceError),
     ([i64], Ty(List[i64]), True),
     (None, Ty(Nil), True),
-    ((i64, i64), Ty(ANYTHING), InferenceError),
-    ((i64, i64), Ty(typing.Tuple), True),
-    # ((i64, i64), Ty(tuple), True),
-    # ((i64, i64), Ty(typing.Tuple[int, int]), True),
-    # ((i64, i64), Ty(typing.Tuple[float, float]), False),
 )
 def test_hastype(x, y):
     return hastype(x, y)
 
 
 @infer(
-    # (i64, Ty(i64)),
-    # (f64, Ty(f64)),
     (i64, Ty(to_abstract_test(i64))),
     (f64, Ty(to_abstract_test(f64))),
 )
@@ -847,7 +847,7 @@ def test_typeof(x):
     return typeof(x)
 
 
-Tf4 = T[f64, f64, f64, f64]
+Tf4 = Tuple[f64, f64, f64, f64]
 
 
 @infer(
@@ -863,10 +863,8 @@ Tf4 = T[f64, f64, f64, f64]
     ((i64, [i64]), i64),
     (Point(i64, i64), i64),
     (Point3D(i64, i64, i64), 0),
-    # TODO
-    # (Thing_ftup, T[f64, f64]),
-    # (Thing_f, i64),
-
+    (Thing_ftup, (f64, f64)),
+    (Thing_f, 0),
     (5, 5),
     (Point3D(5, 7, 9), 0),
 )
@@ -879,15 +877,15 @@ def test_hastype_2(x):
             return f(_to_i64(x))
         elif hastype(x, ai64):
             return 0.0
-        elif hastype(x, Point_t):
+        elif hastype(x, Point):
             return f(x.x) * f(x.y)
         elif hastype(x, EmptyTuple):
             return 0
         elif hastype(x, Tf4):
             return x
-        elif hastype(x, T):
+        elif hastype(x, Tuple):
             return f(x[0]) + f(tail(x))
-        elif hastype(x, L):
+        elif hastype(x, List):
             return 1.0
         elif hastype(x, Thing_ftup):
             return x.contents
@@ -1532,7 +1530,7 @@ def test_add1_std_indirect(x):
 
 
 def _interference_helper(x):
-    if hastype(x, T):
+    if hastype(x, Tuple):
         return x[0]
     else:
         return x

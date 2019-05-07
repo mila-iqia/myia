@@ -12,7 +12,7 @@ from ...abstract import AbstractArray, AbstractTuple, AbstractScalar, \
 from ...ir import manage
 from ...graph_utils import toposort
 from ...prim import Primitive, ops as P
-from ...dtype import type_to_np_dtype, ismyiatype, Bool, Tuple
+from ...dtype import type_to_np_dtype, ismyiatype, Bool
 from ...utils import overload
 
 from ..transform import set_types

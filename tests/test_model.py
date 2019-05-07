@@ -1,9 +1,10 @@
 
 import numpy
+import typing
 from dataclasses import dataclass
 from numpy import ones as _ones, zeros as _zeros
-from myia.dtype import Array, Tuple, pytype_to_myiatype
-from myia.abstract import InferenceError
+from myia.dtype import Array
+from myia.abstract import InferenceError, from_value
 from myia.composite import grad
 from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import array_reduce, scalar_add
@@ -54,7 +55,7 @@ class TanhLayer:
 
 @dataclass(frozen=True)
 class Model:
-    layers: Tuple
+    layers: typing.Tuple
 
     def apply(self, x):
         for layer in self.layers:
@@ -77,8 +78,8 @@ def make_model(dtype='float64'):
     )
 
 
-Model_t = pytype_to_myiatype(Model, make_model())
-Model_t_f32 = pytype_to_myiatype(Model, make_model('float32'))
+Model_t = from_value(make_model(), broaden=True)
+Model_t_f32 = from_value(make_model('float32'), broaden=True)
 
 
 def cost(model, x, y):

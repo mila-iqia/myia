@@ -5,20 +5,18 @@ import numpy as np
 import math
 
 from myia.pipeline import scalar_debug_pipeline
-from myia.dtype import Int, Float, List, Tuple, Class, Number, External, \
-    TypeType, pytype_to_myiatype
 from myia.prim.py_implementations import setattr as myia_setattr, \
-    tuple_setitem, list_setitem, hastype, typeof, \
+    tuple_setitem, list_setitem, \
     shape, reshape, array_map, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
-    issubtype, list_map, env_getitem, env_setitem, env_add, embed, \
+    list_map, env_getitem, env_setitem, env_add, embed, \
     array_to_scalar, transpose, return_, make_record, list_getitem, \
     array_getitem, array_setitem, bool_eq
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
-from ..common import i64, f16, f64, to_abstract_test, Point
+from ..common import i64, f16, to_abstract_test, Point
 
 
 _i64 = to_abstract_test(i64)
@@ -196,48 +194,6 @@ def test_prim_setattr():
     assert ns != ns2  # test that this is not inplace
 
 
-def test_prim_typeof():
-    assert typeof(1) == i64
-    assert typeof(1.2) == f64
-    assert typeof((1, 2.0, (3, 4))) == Tuple[i64, f64, Tuple[i64, i64]]
-    assert typeof([1, 2]) == List[i64]
-    with pytest.raises(TypeError):
-        typeof([1, 2, 3.4])
-    assert typeof(object()) == External[object]
-    assert typeof(i64) == TypeType
-    assert typeof(int) == TypeType
-
-
-def test_issubtype():
-    assert issubtype(Tuple[i64, i64], Tuple)
-    assert issubtype(Tuple[i64, i64], Tuple[i64, i64])
-    assert issubtype(Tuple[i64, i64], Tuple[Number, Number])
-    assert not issubtype(Tuple[i64, i64], Tuple[i64, i64, i64])
-
-    AN = Class["A", {'x': Number}, {}]
-    Ai = Class["A", {'x': i64}, {}]
-    Bi = Class["B", {'x': i64}, {}]
-    assert issubtype(AN, Class)
-    assert issubtype(Ai, AN)
-    assert not issubtype(AN, Ai)
-    assert not issubtype(Bi, AN)
-
-
-def test_prim_ismyiatype():
-    i64 = Int[64]
-    f64 = Float[64]
-    assert hastype(123, i64)
-    assert not hastype(123.4, i64)
-    assert hastype(123.4, f64)
-    assert hastype([1, 2, 3], List)
-    assert hastype([1, 2, 3], List[i64])
-    assert hastype((1, 2.0, (3, 4)), Tuple)
-    assert hastype((1, 2.0, (3, 4)), Tuple[i64, f64, Tuple[i64, i64]])
-    with pytest.raises(TypeError):
-        hastype([1, 2, 3.4], List)
-    assert hastype(object(), External[object])
-
-
 def test_prim_shape():
     v = np.empty((2, 3))
     assert shape(v) == (2, 3)
@@ -376,8 +332,7 @@ def test_prim_identity():
 
 
 def test_prim_make_record():
-    t = pytype_to_myiatype(Point)
-    assert make_record(t, 1, 2) == Point(1, 2)
+    assert make_record(Point, 1, 2) == Point(1, 2)
 
 
 def test_prim_switch():

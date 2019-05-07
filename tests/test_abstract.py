@@ -1,10 +1,10 @@
 
 import pytest
 import asyncio
+import typing
 
 from myia import dtype as ty
 from myia.prim import ops as P
-from myia.prim.py_implementations import typeof
 from myia.abstract import (
     ANYTHING, MyiaTypeError,
     AbstractScalar, AbstractTuple as T, AbstractList as L,
@@ -28,14 +28,14 @@ def U(*opts):
 def S(v=ANYTHING, t=None, s=None):
     return AbstractScalar({
         VALUE: v,
-        TYPE: t or typeof(v),
+        TYPE: t or ty.pytype_to_myiatype(type(v)),
     })
 
 
 def Poss(*things):
     return AbstractScalar({
         VALUE: _Poss(things),
-        TYPE: typeof(things[0]),
+        TYPE: ty.pytype_to_myiatype(type(things[0])),
     })
 
 
@@ -105,9 +105,9 @@ def test_merge_possibilities():
 def test_merge_from_types():
     a = T([S(1), S(t=ty.Int[64])])
 
-    t1 = type_to_abstract(ty.Tuple)
-    t2 = type_to_abstract(ty.Tuple[ty.Int[64], ty.Int[64]])
-    t3 = type_to_abstract(ty.Tuple[ty.Int[64]])
+    t1 = type_to_abstract(typing.Tuple)
+    t2 = type_to_abstract(typing.Tuple[ty.Int[64], ty.Int[64]])
+    t3 = type_to_abstract(typing.Tuple[ty.Int[64]])
     assert amerge(t1, a, loop=None, forced=True) is t1
     assert amerge(t2, a, loop=None, forced=True) is t2
     with pytest.raises(MyiaTypeError):
@@ -150,8 +150,8 @@ def test_repr():
     ty1 = Ty(f32)
     assert repr(ty1) == 'AbstractType(Ty(f32))'
 
-    e1 = AbstractError(ty.Problem[DEAD])
-    assert repr(e1) == 'AbstractError(E(Problem[DEAD]))'
+    e1 = AbstractError(DEAD)
+    assert repr(e1) == 'AbstractError(E(DEAD))'
 
     f1 = AbstractFunction(P.scalar_mul)
     assert repr(f1) == 'AbstractFunction(scalar_mul)'

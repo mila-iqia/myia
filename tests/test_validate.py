@@ -7,7 +7,7 @@ from myia.prim import ops as P
 from myia.prim.py_implementations import make_record, partial
 from myia.validate import validate as _validate, ValidationError
 
-from .common import i64, Point, Point_t, to_abstract_test
+from .common import i64, Point, to_abstract_test
 
 
 Point_a = Point(i64, i64)
@@ -127,11 +127,11 @@ def test_clean():
 
     @valid_after_ec(i64, i64)
     def f1(x, y):
-        return make_record(Point_t, x, y)
+        return make_record(Point, x, y)
 
     @valid_after_ec(i64, i64)
     def f2(x, y):
-        return partial(make_record, Point_t, x)(y)
+        return partial(make_record, Point, x)(y)
 
     @valid_after_ec([Point_a])
     def f3(xs):
@@ -142,11 +142,11 @@ def test_clean():
     @valid_after_ec(i64, i64)
     def f4(x, y):
         def f():
-            return partial(make_record, Point_t)
+            return partial(make_record, Point)
         return f()(x, y)
 
     @valid_after_ec(i64, i64)
     def f5(x, y):
         def f(x):
-            return partial(make_record, Point_t, x)
+            return partial(make_record, Point, x)
         return f(x)(y)

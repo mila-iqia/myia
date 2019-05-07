@@ -3,6 +3,7 @@
 import asyncio
 import numpy as np
 import weakref
+import typing
 from functools import reduce
 from dataclasses import is_dataclass, replace as dc_replace
 
@@ -10,7 +11,7 @@ from .. import dtype
 from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
 from ..utils import Overload, Partializable, is_dataclass_type, \
-    SymbolicKeyInstance, overload
+    SymbolicKeyInstance, overload, dataclass_methods
 
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference, \
@@ -24,7 +25,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractList, type_error_nargs, TypeDispatchError, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
-    bind, typecheck
+    bind, typecheck, type_to_abstract
 
 
 class InferenceEngine:
@@ -195,10 +196,6 @@ class InferenceEngine:
         return self.constructors[pf.prim]
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, prim: Primitive):
-        return self.constructors[prim]
-
-    @get_inferrer_for.register
     def get_inferrer_for(self, g: GraphFunction):
         if g not in self.constructors:
             self.constructors[g] = GraphInferrer(g.graph, g.context)
@@ -251,7 +248,13 @@ class InferenceEngine:
         fn = await fn_ref.get()
         argrefs = [self.ref(node, ctx) for node in n_args]
 
-        if not isinstance(fn, AbstractFunction):
+        if isinstance(fn, AbstractType):
+            g = ref.node.graph
+            newfn = g.apply(P.partial, P.make_record, fn.values[VALUE])
+            newcall = g.apply(newfn, *n_args)
+            return await self.reroute(ref, self.ref(newcall, ctx))
+
+        elif not isinstance(fn, AbstractFunction):
             g = ref.node.graph
             newfn = g.apply(P.getattr, fn_ref.node, '__call__')
             newcall = g.apply(newfn, *n_args)
@@ -380,31 +383,21 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
         rval = fn(self, v, context, ref, loop)
 
     elif is_dataclass_type(v):
-        typ = dtype.pytype_to_myiatype(v)
-        typarg = AbstractScalar({
-            VALUE: typ,
-            TYPE: dtype.TypeType,
-        })
-        rval = AbstractFunction(
-            PartialApplication(
-                P.make_record,
-                (typarg,)
-            )
-        )
+        return AbstractType(type_to_abstract(v))
 
     elif is_dataclass(v):
         assert not isinstance(v, Function)
-        typ = dtype.pytype_to_myiatype(type(v), v)
         new_args = {}
         for name, field in v.__dataclass_fields__.items():
             new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
-        rval = AbstractClass(typ.tag, new_args, typ.methods)
+        methods = dataclass_methods(type(v))
+        rval = AbstractClass(type(v), new_args, methods)
 
     elif dtype.ismyiatype(v):
         rval = AbstractType(v)
 
     else:
-        typ = dtype.pytype_to_myiatype(type(v), v)
+        typ = dtype.pytype_to_myiatype(type(v))
         assert dtype.ismyiatype(typ, (dtype.External, dtype.EnvType))
         rval = AbstractScalar({
             VALUE: v,
@@ -452,7 +445,7 @@ def to_abstract(self, v: SymbolicKeyInstance, context, ref, loop):
 
 @overload  # noqa: F811
 def to_abstract(self, v: (bool, type(None)), context, ref, loop):
-    typ = dtype.pytype_to_myiatype(type(v), v)
+    typ = dtype.pytype_to_myiatype(type(v))
     return AbstractScalar({
         VALUE: v,
         TYPE: typ,
@@ -461,7 +454,7 @@ def to_abstract(self, v: (bool, type(None)), context, ref, loop):
 
 @overload  # noqa: F811
 def to_abstract(self, v: (int, float), context, ref, loop):
-    typ = dtype.pytype_to_myiatype(type(v), v)
+    typ = dtype.pytype_to_myiatype(type(v))
     if loop is not None:
         prio = 1 if dtype.ismyiatype(typ, dtype.Float) else 0
         typ = loop.create_pending_from_list(
@@ -495,6 +488,11 @@ def to_abstract(self, v: np.ndarray, context, ref, loop):
         }),
         {SHAPE: v.shape}
     )
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: typing._GenericAlias, context, ref, loop):
+    return AbstractType(type_to_abstract(v))
 
 
 class Inferrer(Partializable):

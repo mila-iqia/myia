@@ -1,5 +1,6 @@
 """Utilities for abstract values and inference."""
 
+import collections
 from dataclasses import dataclass
 import typing
 import numpy as np
@@ -8,7 +9,7 @@ from itertools import chain
 from types import GeneratorType, AsyncGeneratorType
 
 from .. import dtype
-from ..utils import overload
+from ..utils import overload, is_dataclass_type, dataclass_methods
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
@@ -34,6 +35,7 @@ from .data import (
     abstract_union,
     TrackDict,
     PartialApplication,
+    VirtualFunction,
     VALUE,
     TYPE,
     SHAPE,
@@ -98,14 +100,26 @@ def _build_value(x: AbstractTuple):
 
 @overload  # noqa: F811
 def _build_value(ac: AbstractClass):
-    kls = dtype.tag_to_dataclass[ac.tag]
     args = {k: build_value(v) for k, v in ac.attributes.items()}
-    return kls(**args)
+    return ac.tag(**args)
+
+
+_default_type_params = {
+    tuple: (),
+    list: (object,),
+    collections.abc.Callable: (),
+}
 
 
 @overload(bootstrap=True)
 def type_to_abstract(self, t: dtype.TypeMeta):
+    """Convert a type to an AbstractValue."""
     return self[t](t)
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: AbstractValue):
+    return t
 
 
 @overload  # noqa: F811
@@ -118,99 +132,102 @@ def type_to_abstract(self, t: (dtype.Number, dtype.Bool, dtype.EnvType,
 
 
 @overload  # noqa: F811
-def type_to_abstract(self, t: dtype.Tuple):
-    if t.is_generic():
-        return AbstractTuple(ANYTHING)
-    else:
-        return AbstractTuple([self(x) for x in t.elements])
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: dtype.List):
-    if t.is_generic():
-        return AbstractList(ANYTHING)
-    else:
-        return AbstractList(self(t.element_type))
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: dtype.Array):
-    if t.is_generic():
-        return AbstractArray(ANYTHING, {SHAPE: ANYTHING})
-    else:
-        return AbstractArray(self(t.elements), {SHAPE: ANYTHING})
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: dtype.Class):
-    if t.is_generic():
-        return AbstractClass(ANYTHING, ANYTHING, ANYTHING)
-    else:
-        return AbstractClass(
-            t.tag,
-            {k: self(v) for k, v in t.attributes.items()},
-            t.methods
-        )
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: dtype.Object):
-    return ANYTHING
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: dtype.Function):
-    return AbstractFunction(value=ANYTHING)
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: dtype.Problem):
-    return AbstractError(t)
-
-
-@overload  # noqa: F811
 def type_to_abstract(self, t: type):
-    tmap = {
-        tuple: lambda: AbstractTuple(ANYTHING),
-        list: lambda: AbstractList(ANYTHING),
-        np.ndarray: lambda: AbstractArray(ANYTHING, {SHAPE: ANYTHING}),
-        int: lambda: AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: dtype.Int,
-        }),
-        float: lambda: AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: dtype.Float,
-        }),
-        bool: lambda: AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: dtype.Bool,
-        }),
-    }
-    return tmap[t]()
+    if is_dataclass_type(t):
+        fields = t.__dataclass_fields__
+        attributes = {name: ANYTHING
+                      if isinstance(field.type, (str, type(None)))
+                      else self(field.type)
+                      for name, field in fields.items()}
+        return AbstractClass(t, attributes, dataclass_methods(t))
+
+    elif t is object:
+        return ANYTHING
+
+    else:
+        return _t2a_helper[t](t, _default_type_params.get(t, None))
 
 
 @overload  # noqa: F811
 def type_to_abstract(self, t: typing._GenericAlias):
-    # breakpoint()
-    args = t.__args__
-    if args == ():
-        args = None
-    elif len(args) == 1 and args[0] == ():
-        args = ()
-
-    if args is None:
-        return self(t.__origin__)
-    else:
-        pass
-
-    # else:
-    #     return self(t.__origin__)
+    args = tuple(object if isinstance(arg, typing.TypeVar) else arg
+                 for arg in t.__args__)
+    return _t2a_helper[t.__origin__](t, args)
 
 
 @overload  # noqa: F811
 def type_to_abstract(self, t: object):
     raise MyiaTypeError(f'{t} is not a recognized type')
+
+
+@overload
+def _t2a_helper(main: tuple, args):
+    if args == () or args is None:
+        targs = ANYTHING
+    elif args == ((),):
+        targs = []
+    else:
+        targs = [type_to_abstract(a) for a in args]
+    return AbstractTuple(targs)
+
+
+@overload  # noqa: F811
+def _t2a_helper(main: list, args):
+    arg, = args
+    return AbstractList(type_to_abstract(arg))
+
+
+@overload  # noqa: F811
+def _t2a_helper(main: np.ndarray, args):
+    if len(args) == 1:
+        arg, = args
+        arg = type_to_abstract(arg)
+        shp = ANYTHING
+    else:
+        arg, shp = args
+        arg = type_to_abstract(arg)
+    return AbstractArray(arg, {SHAPE: shp})
+
+
+@overload  # noqa: F811
+def _t2a_helper(main: int, args):
+    return AbstractScalar({
+        VALUE: ANYTHING,
+        TYPE: dtype.Int,
+    })
+
+
+@overload  # noqa: F811
+def _t2a_helper(main: float, args):
+    return AbstractScalar({
+        VALUE: ANYTHING,
+        TYPE: dtype.Float,
+    })
+
+
+@overload  # noqa: F811
+def _t2a_helper(main: bool, args):
+    return AbstractScalar({
+        VALUE: ANYTHING,
+        TYPE: dtype.Bool,
+    })
+
+
+@overload  # noqa: F811
+def _t2a_helper(main: collections.abc.Callable, args):
+    if args == () or args is None:
+        return AbstractFunction(value=ANYTHING)
+    else:
+        *inputs, ret = args
+        return AbstractFunction(VirtualFunction(
+            [type_to_abstract(x) for x in inputs],
+            type_to_abstract(ret)
+        ))
+
+
+@overload  # noqa: F811
+def _t2a_helper(main: AbstractError, args):
+    return AbstractError(ANYTHING)
 
 
 @overload(bootstrap=True)
@@ -223,48 +240,18 @@ def build_type_limited(self, x: AbstractScalar):
 
 
 @overload  # noqa: F811
-def build_type_limited(self, x: AbstractFunction):
-    return dtype.Function
-
-
-@overload  # noqa: F811
-def build_type_limited(self, x: AbstractTuple):
-    return dtype.Tuple
-
-
-@overload  # noqa: F811
 def build_type_limited(self, x: AbstractError):
-    return dtype.Problem[x.values[VALUE]]
-
-
-@overload  # noqa: F811
-def build_type_limited(self, x: AbstractList):
-    return dtype.List
-
-
-@overload  # noqa: F811
-def build_type_limited(self, x: AbstractArray):
-    return dtype.Array[self(x.element)]
-
-
-@overload  # noqa: F811
-def build_type_limited(self, x: AbstractClass):
-    return dtype.Class
-
-
-@overload  # noqa: F811
-def build_type_limited(self, x: AbstractJTagged):
-    return dtype.JTagged
-
-
-@overload  # noqa: F811
-def build_type_limited(self, x: AbstractUnion):
-    return dtype.Union
+    return AbstractError
 
 
 @overload  # noqa: F811
 def build_type_limited(self, x: AbstractType):
-    return dtype.TypeType
+    return AbstractType
+
+
+@overload  # noqa: F811
+def build_type_limited(self, x: AbstractValue):
+    return type(x)
 
 
 ############
@@ -1050,6 +1037,11 @@ def bind(loop, committed, resolved, pending):
         return rval
 
 
+###########################
+# Typing-related routines #
+###########################
+
+
 def typecheck(model, abstract):
     """Check that abstract matches the model."""
     try:
@@ -1058,3 +1050,35 @@ def typecheck(model, abstract):
         return False
     else:
         return True
+
+
+def split_type(t, model):
+    """Checks t against the model and return matching/non-matching subtypes.
+
+    * If t is a Union, return a Union that fully matches model, and a Union
+      that does not match model. No matches in either case returns None for
+      that case.
+    * Otherwise, return (t, None) or (None, t) depending on whether t matches
+      the model.
+    """
+    if isinstance(t, AbstractUnion):
+        matching = [(opt, typecheck(model, opt))
+                    for opt in t.options]
+        t1 = abstract_union([opt for opt, m in matching if m])
+        t2 = abstract_union([opt for opt, m in matching if not m])
+        return t1, t2
+    elif typecheck(model, t):
+        return t, None
+    else:
+        return None, t
+
+
+def hastype_helper(value, model):
+    """Helper to implement hastype."""
+    match, nomatch = split_type(value, model)
+    if match is None:
+        return False
+    elif nomatch is None:
+        return True
+    else:
+        return ANYTHING

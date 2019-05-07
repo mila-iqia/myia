@@ -23,6 +23,8 @@ from .utils import (  # noqa
     amerge,
     bind,
     typecheck,
+    split_type,
+    hastype_helper,
 )
 
 

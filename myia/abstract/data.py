@@ -206,7 +206,15 @@ class AbstractType(AbstractAtom):
 
 
 class AbstractError(AbstractAtom):
-    """Represents some kind of error in the computation."""
+    """This represents some kind of problem in the computation.
+
+    For example, when the specializer tries to specialize a graph that is not
+    called anywhere, it won't have the information it needs to do that, so it
+    may produce the type AbstractError(DEAD). This may not end up being a real
+    problem: dead code won't be called anyway, so it doesn't matter if we can't
+    type it. Others may be real problems, e.g. AbstractError(POLY) which
+    happens when there are multiple ways to type a graph in a given context.
+    """
 
     def __init__(self, err):
         """Initialize an AbstractError."""
@@ -383,7 +391,8 @@ class AbstractClass(AbstractStructure):
         return Elements(self, vals, self.tag, self.attributes)
 
     def __pretty__(self, ctx):
-        return pretty_struct(ctx, self.tag, [], self.attributes)
+        tagname = self.tag.__qualname__
+        return pretty_struct(ctx, tagname, [], self.attributes)
 
 
 class AbstractJTagged(AbstractStructure):
@@ -513,7 +522,6 @@ class Unspecializable(Exception):
 
     def __init__(self, problem):
         """Initialize Unspecializable."""
-        problem = dtype.Problem[problem]
         super().__init__(problem)
         self.problem = problem
 

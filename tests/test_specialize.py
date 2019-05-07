@@ -262,9 +262,9 @@ def test_unused_parameter(x, y):
 
 @specialize((int1,))
 def test_unused_function_parameter(x):
-    # The type of square will be Problem(DEAD), but that's not really an issue
-    # because it is indeed not used, and we can simply replace the reference
-    # by a dummy.
+    # The type of square will be AbstractError(DEAD), but that's not really
+    # an issue because it is indeed not used, and we can simply replace the
+    # reference by a dummy.
     def square(y):
         return y * y
 

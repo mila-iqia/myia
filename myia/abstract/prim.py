@@ -11,7 +11,7 @@ from ..abstract import typecheck
 from ..ir import Graph
 from ..dtype import Number, Bool
 from ..prim import ops as P, Primitive, py_implementations as py
-from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
+from ..utils import Namespace, SymbolicKeyInstance
 
 
 from .data import (
@@ -25,8 +25,6 @@ from .data import (
     AbstractList,
     AbstractClass,
     AbstractJTagged,
-    AbstractUnion,
-    abstract_union,
     PartialApplication,
     JTransformedFunction,
     PrimitiveFunction,
@@ -40,7 +38,7 @@ from .data import (
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context, ConditionalContext
 from .utils import sensitivity_transform, build_value, \
-    build_type_limited, broaden, type_to_abstract
+    build_type_limited, broaden, type_to_abstract, split_type, hastype_helper
 from .infer import Inferrer, to_abstract
 
 
@@ -316,21 +314,13 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         except Exception as e:  # pragma: no cover
             raise InferenceError(f'Unexpected error in getter: {e!r}')
         value = resources.convert(raw)
-        if is_dataclass_type(value):
-            typ = dtype.pytype_to_myiatype(value)
-            g = outref.node.graph
-            eng = outref.engine
-            ref = eng.ref(g.apply(P.partial, P.make_record, typ),
-                          outref.context)
-            return await eng.reroute(outref, ref)
-        else:
-            return to_abstract(value, Context.empty(), ref=outref)
+        return to_abstract(value, Context.empty(), ref=outref)
 
 
 async def _resolve_case(resources, data_t, item_v, chk):
     mmap = resources.method_map
 
-    if dtype.ismyiatype(data_t, dtype.Class):
+    if data_t is AbstractClass:
         return ('class', data_t)
 
     # Try method map
@@ -362,11 +352,6 @@ def _shape_type(engine, shp):
 def prod(iterable):
     """Return the product of the elements of the iterator."""
     return reduce(operator.mul, iterable, 1)
-
-
-async def issubtype(x, model):
-    """Check whether type x is a subtype of model."""
-    return typecheck(model, x)
 
 
 ##############
@@ -414,44 +399,16 @@ uniform_prim(P.bool_eq, infer_value=True)(py.bool_eq)
 ######################
 
 
-async def _split_type(t, model):
-    """Checks t against the model and return matching/non-matching subtypes.
-
-    * If t is a Union, return a Union that fully matches model, and a Union
-      that does not match model. No matches in either case returns None for
-      that case.
-    * Otherwise, return (t, None) or (None, t) depending on whether t matches
-      the model.
-    """
-    if isinstance(t, AbstractUnion):
-        matching = [(opt, await issubtype(opt, model))
-                    for opt in t.options]
-        t1 = abstract_union([opt for opt, m in matching if m])
-        t2 = abstract_union([opt for opt, m in matching if not m])
-        return t1, t2
-    elif (await issubtype(t, model)):
-        return t, None
-    else:
-        return None, t
-
-
 @standard_prim(P.typeof)
 async def _inf_typeof(engine, value):
     return AbstractType(value)
 
 
 @standard_prim(P.hastype)
-async def _inf_hastype(engine, value, model: dtype.TypeType):
+async def _inf_hastype(engine, value, model: AbstractType):
     a = type_to_abstract(model.values[VALUE])
-    match, nomatch = await _split_type(value, a)
-    if match is None:
-        v = False
-    elif nomatch is None:
-        v = True
-    else:
-        v = ANYTHING
     return AbstractScalar({
-        VALUE: v,
+        VALUE: hastype_helper(value, a),
         TYPE: dtype.Bool,
     })
 
@@ -476,7 +433,7 @@ async def _inf_make_list(engine, *args):
 
 
 @standard_prim(P.make_record)
-async def infer_type_make_record(engine, _cls: dtype.TypeType, *elems):
+async def infer_type_make_record(engine, _cls: AbstractType, *elems):
     """Infer the return type of make_record."""
     cls = _cls.values[VALUE]
     cls = type_to_abstract(cls)
@@ -484,7 +441,7 @@ async def infer_type_make_record(engine, _cls: dtype.TypeType, *elems):
     if len(expected) != len(elems):
         raise MyiaTypeError('Wrong class inst')
     for (name, t), elem in zip(expected, elems):
-        if not (await issubtype(elem, t)):
+        if not typecheck(t, elem):
             raise MyiaTypeError('Wrong class inst')
 
     return AbstractClass(
@@ -855,7 +812,7 @@ class _SwitchInferrer(Inferrer):
         fulltype = await xref.get()
         typ = (await typref.get()).values[VALUE]
         typ = type_to_abstract(typ)
-        tbtyp, fbtyp = await _split_type(fulltype, typ)
+        tbtyp, fbtyp = split_type(fulltype, typ)
         # We are not supposed to be here if only one branch could be taken.
         assert tbtyp is not None
         assert fbtyp is not None
@@ -1051,10 +1008,7 @@ async def _inf_env_add(engine, env1, env2):
 
 @standard_prim(P.unsafe_static_cast)
 async def _inf_unsafe_static_cast(engine, x, typ: AbstractType):
-    v = typ.values[VALUE]
-    if not isinstance(v, AbstractValue):
-        raise MyiaTypeError('unsafe_static_cast expects a type constant')
-    return v
+    return typ.values[VALUE]
 
 
 @standard_prim(P.J)
