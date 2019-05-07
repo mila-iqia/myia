@@ -20,21 +20,6 @@ def as_frozen(x):
         return x
 
 
-def ismyiatype(t, model=None):
-    """Check that the argument is a Myia type.
-
-    Arguments:
-        t: The object to check.
-        model: If not None, check that t is the model, or a subtype
-            of it.
-    """
-    if not isinstance(t, TypeMeta):
-        return False
-    if model is None:
-        return True
-    return issubclass(t, model)
-
-
 class TypeMeta(type):
     """Metaclass for types."""
 

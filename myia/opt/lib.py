@@ -3,7 +3,7 @@
 from ..abstract import abstract_clone, AbstractFunction, AbstractJTagged, \
     build_type_limited
 from ..composite import hyper_add
-from ..dtype import Number, ismyiatype
+from ..dtype import Number
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone, \
     BasicRemapper
 from ..prim import Primitive, ops as P
@@ -417,7 +417,7 @@ def simplify_array_map(optimizer, node, equiv):
             idx = g.parameters.index(x)
             return xs[idx]
         elif x.is_constant() \
-                and ismyiatype(build_type_limited(x.abstract), Number):
+                and issubclass(build_type_limited(x.abstract), Number):
             shp = Constant(xs[0].shape)
             sexp = (P.distribute, (P.scalar_to_array, x), shp)
             return sexp_to_node(sexp, node.graph)

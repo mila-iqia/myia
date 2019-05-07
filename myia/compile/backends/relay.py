@@ -12,7 +12,7 @@ from ...abstract import AbstractArray, AbstractTuple, AbstractScalar, \
 from ...ir import manage
 from ...graph_utils import toposort
 from ...prim import Primitive, ops as P
-from ...dtype import type_to_np_dtype, ismyiatype, Bool
+from ...dtype import type_to_np_dtype, Bool
 from ...utils import overload
 
 from ..transform import set_types
@@ -23,7 +23,7 @@ from .relay_helpers import optimize, build_module
 def to_relay_type(self, a: AbstractScalar):
     """Convert a myia abstract to a Relay type."""
     tp = build_type_limited(a)
-    if ismyiatype(tp, Bool):
+    if issubclass(tp, Bool):
         return relay.ty.TensorType((), 'bool')
     else:
         return relay.ty.TensorType((), type_to_np_dtype(tp))

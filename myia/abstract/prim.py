@@ -76,7 +76,7 @@ class StandardInferrer(Inferrer):
             typ = self.typemap.get(i)
             if typ is None:
                 pass
-            elif dtype.ismyiatype(typ):
+            elif isinstance(typ, dtype.TypeMeta):
                 await force_pending(engine.check(typ, build_type_limited(arg)))
             elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):

@@ -4,7 +4,7 @@ import asyncio
 from contextvars import copy_context
 from collections import deque
 
-from ..dtype import ismyiatype
+from .. import dtype
 
 
 class InferenceLoop(asyncio.AbstractEventLoop):
@@ -163,7 +163,7 @@ def is_simple(x):
         return x.is_simple()
     if isinstance(x, AbstractScalar):
         return is_simple(x.values[TYPE])
-    elif ismyiatype(x):
+    elif isinstance(x, dtype.TypeMeta):
         return True
     else:
         return False

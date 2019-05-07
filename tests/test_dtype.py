@@ -1,9 +1,9 @@
 
 import pytest
 
-from myia.dtype import ismyiatype, Bool, Float, Int, Number, \
-    UInt, SymbolicKeyType, np_dtype_to_type, type_to_np_dtype, Object, \
-    pytype_to_myiatype as ptm, EnvType
+from myia.dtype import Bool, Float, Int, Number, UInt, SymbolicKeyType, \
+    np_dtype_to_type, type_to_np_dtype, Object, pytype_to_myiatype as ptm, \
+    EnvType
 from myia.utils import SymbolicKeyInstance, EnvInstance
 
 
@@ -22,8 +22,8 @@ def test_cache():
 
 
 def test_Number():
-    assert ismyiatype(Int[32], Number)
-    assert not ismyiatype(Bool, Number)
+    assert issubclass(Int[32], Number)
+    assert not issubclass(Bool, Number)
     with pytest.raises(ValueError):
         Float[33]
 
@@ -41,20 +41,6 @@ def test_make_subtype():
         Int.make_subtype(x=64)
     with pytest.raises(TypeError):
         Int.make_subtype()
-
-
-def test_ismyiatype():
-    assert ismyiatype(Number)
-    assert ismyiatype(Number, Object)
-    assert ismyiatype(Int)
-    assert ismyiatype(Int, Number)
-    assert ismyiatype(Int[64])
-    assert ismyiatype(Int[64], Int)
-    assert ismyiatype(Int[64], Number)
-    assert ismyiatype(Int[64], Object)
-    assert not ismyiatype(Int[64], Float)
-    assert not ismyiatype(1234)
-    assert not ismyiatype(object)
 
 
 def test_repr():

@@ -1,6 +1,5 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
-from .dtype import ismyiatype
 from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool

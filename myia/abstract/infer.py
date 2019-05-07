@@ -290,8 +290,8 @@ class InferenceEngine:
             * A Python class
             * A callable that returns a boolean
         """
-        if dtype.ismyiatype(predicate):
-            return dtype.ismyiatype(x, predicate)
+        if isinstance(predicate, dtype.TypeMeta):
+            return issubclass(x, predicate)
         elif isinstance(predicate, type):
             return isinstance(x, predicate)
         elif isinstance(predicate, AbstractValue):
@@ -393,7 +393,7 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
         methods = dataclass_methods(type(v))
         rval = AbstractClass(type(v), new_args, methods)
 
-    elif dtype.ismyiatype(v):
+    elif isinstance(v, dtype.TypeMeta):
         rval = AbstractType(v)
 
     else:
@@ -405,7 +405,7 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
                 TYPE: type(v),
             })
         else:
-            assert dtype.ismyiatype(typ, (dtype.External, dtype.EnvType))
+            assert issubclass(typ, (dtype.External, dtype.EnvType))
             rval = AbstractScalar({
                 VALUE: v,
                 TYPE: typ,
@@ -463,7 +463,7 @@ def to_abstract(self, v: (bool, type(None)), context, ref, loop):
 def to_abstract(self, v: (int, float), context, ref, loop):
     typ = dtype.pytype_to_myiatype(type(v))
     if loop is not None:
-        prio = 1 if dtype.ismyiatype(typ, dtype.Float) else 0
+        prio = 1 if issubclass(typ, dtype.Float) else 0
         typ = loop.create_pending_from_list(
             _number_types, typ, lambda: prio
         )

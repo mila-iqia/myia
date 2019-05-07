@@ -475,7 +475,7 @@ def scalar_cast(x, t):
     """Implement `scalar_cast`."""
     assert isinstance(t, abstract.AbstractScalar)
     t = t.values[abstract.TYPE]
-    assert types.ismyiatype(t, types.Number)
+    assert issubclass(t, types.Number)
     dtype = types.type_to_np_dtype(t)
     return getattr(np, dtype)(x)
 

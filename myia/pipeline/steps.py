@@ -548,7 +548,7 @@ def convert_arg(self, arg, orig_t: AbstractArray, backend):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
     et = et.values[TYPE]
-    assert dtype.ismyiatype(et, dtype.Number)
+    assert issubclass(et, dtype.Number)
     if isinstance(arg, np.ndarray):
         arg = backend.from_numpy(arg)
     backend.check_array(arg, et)
@@ -570,13 +570,13 @@ def convert_arg(self, arg, orig_t: AbstractUnion, backend):
 @overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractScalar, backend):
     t = orig_t.values[TYPE]
-    if dtype.ismyiatype(t, dtype.Int):
+    if issubclass(t, dtype.Int):
         if not isinstance(arg, int):
             raise TypeError(f'Expected int')
-    elif dtype.ismyiatype(t, dtype.Float):
+    elif issubclass(t, dtype.Float):
         if not isinstance(arg, float):
             raise TypeError(f'Expected float')
-    elif dtype.ismyiatype(t, dtype.Bool):
+    elif issubclass(t, dtype.Bool):
         if not isinstance(arg, bool):
             raise TypeError(f'Expected bool')
     else:

@@ -2,7 +2,6 @@
 
 import importlib
 from ... import dtype, abstract
-from ...dtype import ismyiatype
 
 
 class UnknownBackend(Exception):
@@ -116,13 +115,13 @@ class Backend:
     def convert_value(self, v, t):
         """Convert a value to the appropriate backend representation."""
         if isinstance(t, abstract.AbstractScalar) \
-                and ismyiatype(t.values[abstract.TYPE], dtype.Number):
+                and issubclass(t.values[abstract.TYPE], dtype.Number):
             return self.from_scalar(v, t.values[abstract.TYPE])
         elif isinstance(t, abstract.AbstractTuple):
             return tuple(self.convert_value(v, t)
                          for v, t in zip(v, t.elements))
         elif isinstance(t, abstract.AbstractScalar) \
-                and ismyiatype(t.values[abstract.TYPE], dtype.EnvType):
+                and issubclass(t.values[abstract.TYPE], dtype.EnvType):
             assert len(v._contents) == 0
             return self.empty_env()
         else:
