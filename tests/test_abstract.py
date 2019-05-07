@@ -8,7 +8,7 @@ from myia.prim import ops as P
 from myia.abstract import (
     ANYTHING, MyiaTypeError,
     AbstractScalar, AbstractTuple as T, AbstractList as L,
-    AbstractJTagged, abstract_union, AbstractError, AbstractFunction,
+    AbstractJTagged, AbstractError, AbstractFunction,
     InferenceLoop, to_abstract, build_value, amerge,
     Possibilities as _Poss,
     VALUE, TYPE, DEAD,
@@ -18,18 +18,7 @@ from myia.abstract import (
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
 
-from .common import Point, to_abstract_test, f32, Ty, af32_of
-
-
-def U(*opts):
-    return abstract_union(opts)
-
-
-def S(v=ANYTHING, t=None, s=None):
-    return AbstractScalar({
-        VALUE: v,
-        TYPE: t or ty.pytype_to_myiatype(type(v)),
-    })
+from .common import Point, to_abstract_test, f32, Ty, af32_of, S, U
 
 
 def Poss(*things):
@@ -56,10 +45,10 @@ def test_build_value():
     loop = InferenceLoop(errtype=Exception)
     p = loop.create_pending(resolve=(lambda: None), priority=(lambda: None))
     with pytest.raises(ValueError):
-        assert build_value(S(p)) is p
-    assert build_value(S(p), default=ANYTHING) is ANYTHING
+        assert build_value(S(p, t=ty.Int[64])) is p
+    assert build_value(S(p, t=ty.Int[64]), default=ANYTHING) is ANYTHING
     p.set_result(1234)
-    assert build_value(S(p)) == 1234
+    assert build_value(S(p, t=ty.Int[64])) == 1234
 
     pt = Point(1, 2)
     assert build_value(to_abstract_test(pt)) == pt

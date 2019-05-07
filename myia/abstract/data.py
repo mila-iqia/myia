@@ -224,6 +224,21 @@ class AbstractError(AbstractAtom):
         return f'E({self.values[VALUE]})'
 
 
+class AbstractExternal(AbstractAtom):
+    """Represents a value with an external type, coming from Python."""
+
+    def __init__(self, values):
+        """Initialize an AbstractExternal."""
+        super().__init__(values)
+
+    def __pretty__(self, ctx):
+        rval = pretty_type(self.values[TYPE])
+        v = self.values[VALUE]
+        if v is not ANYTHING:
+            rval += f' = {v}'
+        return rval
+
+
 class AbstractFunction(AbstractAtom):
     """Represents a function or set of functions.
 

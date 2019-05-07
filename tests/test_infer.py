@@ -30,7 +30,7 @@ from myia.utils import newenv
 from .common import B, i16, i32, i64, u64, f16, f32, f64, \
     Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
-    to_abstract_test, EmptyTuple, U
+    to_abstract_test, EmptyTuple, U, Ex
 
 
 ai64 = Array[i64]
@@ -1012,7 +1012,7 @@ def test_getattr_flex(name, x):
 
 @infer(
     (External[SimpleNamespace],
-     S('surprise'),
+     Ex('surprise'),
      InferenceError)
 )
 def test_unknown_data(data, field):

@@ -3,7 +3,7 @@
 
 import typing
 import numpy
-from typing import Tuple as TupleT, Any
+from typing import Tuple as TupleT
 from .utils import SymbolicKeyInstance, EnvInstance
 
 
@@ -178,12 +178,6 @@ class EnvType(Object):
     """
 
 
-class External(Type):
-    """Represents a type external to Myia (essentially invalid)."""
-
-    t: Any
-
-
 DTYPE_TO_MTYPE = dict(
     int8=Int[8],
     int16=Int[16],
@@ -243,12 +237,21 @@ def pytype_to_myiatype(pytype):
     Arguments:
         pytype: The Python type to convert.
     """
-    return _simple_types.get(pytype, None) or External[pytype]
+    return _simple_types[pytype]
 
 
-############################################
-# Array type compatible with typing module #
-############################################
+#############################################
+# Extra types compatible with typing module #
+#############################################
 
 
-Array = typing._GenericAlias(numpy.ndarray, typing.TypeVar('T'))
+T = typing.TypeVar('T')
+
+
+Array = typing._GenericAlias(numpy.ndarray, T)
+
+
+class External(typing.Generic[T]):
+    """Represents a type external to Myia (essentially invalid)."""
+
+    obj: T

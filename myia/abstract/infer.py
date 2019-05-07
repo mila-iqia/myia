@@ -19,7 +19,7 @@ from .ref import VirtualReference, Context, EvaluationCache, Reference, \
 from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractValue, GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
-    VirtualFunction, AbstractFunction, \
+    VirtualFunction, AbstractFunction, AbstractExternal, \
     VALUE, TYPE, SHAPE, DummyFunction, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
     AbstractList, type_error_nargs, TypeDispatchError, \
@@ -397,12 +397,19 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
         rval = AbstractType(v)
 
     else:
-        typ = dtype.pytype_to_myiatype(type(v))
-        assert dtype.ismyiatype(typ, (dtype.External, dtype.EnvType))
-        rval = AbstractScalar({
-            VALUE: v,
-            TYPE: typ,
-        })
+        try:
+            typ = dtype.pytype_to_myiatype(type(v))
+        except KeyError:
+            rval = AbstractExternal({
+                VALUE: v,
+                TYPE: type(v),
+            })
+        else:
+            assert dtype.ismyiatype(typ, (dtype.External, dtype.EnvType))
+            rval = AbstractScalar({
+                VALUE: v,
+                TYPE: typ,
+            })
 
     if cachable:
         try:

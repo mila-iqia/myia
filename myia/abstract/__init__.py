@@ -47,6 +47,7 @@ from .data import (  # noqa
     AbstractScalar,
     AbstractType,
     AbstractError,
+    AbstractExternal,
     AbstractFunction,
     AbstractTuple,
     AbstractArray,

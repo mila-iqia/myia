@@ -6,7 +6,7 @@ from myia import dtype
 from myia.abstract import VALUE, TYPE, SHAPE, \
     AbstractValue, AbstractScalar, AbstractArray, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
-    AbstractJTagged, AbstractUnion, ANYTHING, from_value
+    AbstractJTagged, abstract_union, AbstractExternal, ANYTHING, from_value
 from myia.dtype import Bool, Int, UInt, Float
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance, dataclass_methods
@@ -69,10 +69,17 @@ def JT(a):
     return AbstractJTagged(to_abstract_test(a))
 
 
-def S(x, t=None):
+def S(x=ANYTHING, t=None):
     return AbstractScalar({
         VALUE: x,
         TYPE: t or dtype.pytype_to_myiatype(type(x)),
+    })
+
+
+def Ex(x, t=None):
+    return AbstractExternal({
+        VALUE: x,
+        TYPE: t or type(x)
     })
 
 
@@ -86,7 +93,7 @@ def Ty(t):
 
 def U(*opts):
     opts = [to_abstract_test(x) for x in opts]
-    return AbstractUnion(opts)
+    return abstract_union(opts)
 
 
 @overload(bootstrap=True)
@@ -99,8 +106,15 @@ def to_abstract_test(self, x: (bool, int, float, str,
 
 
 @overload  # noqa: F811
-def to_abstract_test(self, x: (dtype.Number, dtype.Bool,
-                               dtype.External, dtype.EnvType)):
+def to_abstract_test(self, x: str):
+    return AbstractExternal({
+        VALUE: x,
+        TYPE: type(x),
+    })
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, x: (dtype.Number, dtype.Bool, dtype.EnvType)):
     return AbstractScalar({VALUE: ANYTHING, TYPE: x})
 
 
@@ -148,6 +162,9 @@ def to_abstract_test(self, x: object):
         for name, field in x.__dataclass_fields__.items():
             new_args[name] = self(getattr(x, name))
         return AbstractClass(type(x), new_args, dataclass_methods(type(x)))
+    elif getattr(x, '__origin__') is dtype.External:
+        arg, = x.__args__
+        return AbstractExternal({VALUE: ANYTHING, TYPE: arg})
     else:
         raise Exception(f'Cannot convert: {x}')
 
