@@ -294,8 +294,6 @@ class InferenceEngine:
             return issubclass(x, predicate)
         elif isinstance(predicate, type):
             return isinstance(x, predicate)
-        elif isinstance(predicate, AbstractValue):
-            return typecheck(predicate, x)
         elif callable(predicate):
             return predicate(self, x)
         else:
