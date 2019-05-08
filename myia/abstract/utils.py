@@ -225,7 +225,7 @@ def _t2a_helper(main: AbstractError, args):
     return AbstractError(ANYTHING)
 
 
-def build_type_limited(x):
+def type_token(x):
     """Build a type from an abstract value."""
     if isinstance(x, AbstractScalar):
         return x.dtype()

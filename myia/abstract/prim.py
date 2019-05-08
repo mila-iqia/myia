@@ -38,7 +38,7 @@ from .data import (
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context, ConditionalContext
 from .utils import sensitivity_transform, build_value, \
-    build_type_limited, broaden, type_to_abstract, split_type, hastype_helper
+    type_token, broaden, type_to_abstract, split_type, hastype_helper
 from .infer import Inferrer, to_abstract
 
 
@@ -77,7 +77,7 @@ class StandardInferrer(Inferrer):
             if typ is None:
                 pass
             elif isinstance(typ, dtype.TypeMeta):
-                await force_pending(engine.check(typ, build_type_limited(arg)))
+                await force_pending(engine.check(typ, type_token(arg)))
             elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
@@ -247,7 +247,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
     """
     resources = engine.pipeline.resources
 
-    data_t = build_type_limited(data)
+    data_t = type_token(data)
     item_v = build_value(item, default=ANYTHING)
 
     if item_v is ANYTHING:
@@ -862,7 +862,7 @@ class _SwitchInferrer(Inferrer):
         condref, tbref, fbref = argrefs
 
         cond = await condref.get()
-        await force_pending(engine.check(Bool, build_type_limited(cond)))
+        await force_pending(engine.check(Bool, type_token(cond)))
 
         v = cond.values[VALUE]
         if v is True:

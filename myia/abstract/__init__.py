@@ -13,7 +13,7 @@ from .loop import (  # noqa
 
 from .utils import (  # noqa
     build_value,
-    build_type_limited,
+    type_token,
     type_to_abstract,
     abstract_check,
     abstract_clone,

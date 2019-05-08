@@ -317,13 +317,13 @@ def _vm_getattr(vm, data, attr):
     """Implement `getattr`."""
     from types import MethodType, BuiltinMethodType
     from ..vm import Partial
-    from ..abstract import build_type_limited
+    from ..abstract import type_token
     # I don't know how else to get a reference to this type
     method_wrapper_type = type((0).__add__)
     try:
         x = getattr(data, attr)
     except AttributeError:
-        t = build_type_limited(typeof(data))
+        t = type_token(typeof(data))
         mmap = vm.convert.resources.method_map[t]
         if attr in mmap:
             return Partial(vm.convert(mmap[attr]), [data], vm)
