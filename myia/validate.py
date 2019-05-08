@@ -4,7 +4,7 @@ from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
 from .abstract import abstract_check, AbstractClass, AbstractJTagged, \
-    AbstractScalar, VALUE, DEAD, AbstractError, AbstractExternal
+    VALUE, DEAD, AbstractError, AbstractExternal
 
 
 class ValidationError(Exception):

@@ -14,7 +14,7 @@ from . import Backend
 from ..utils import get_outputs
 from ..transform import CompileGraphs, nonlinear_ops
 
-from ...abstract import AbstractArray, build_type_limited
+from ...abstract import AbstractArray
 from ...dtype import type_to_np_dtype
 from ...prim import Primitive, ops as P
 
@@ -49,7 +49,7 @@ SIMPLE_MAP = {
 
 def nnvm_bool_not(c, arg):
     """Implementation of boolean not."""
-    t = build_type_limited(arg.abstract)
+    t = arg.abstract.dtype()
     zero = c.make_constant(0, nnvm_type=nnvm_type_map(t))
     return sym.broadcast_equal(zero, c.ref(arg))
 
@@ -235,7 +235,7 @@ class NNVMConverter:
             """Associate name with n."""
             self.eqv[n] = sym.Variable(name)
             if isinstance(t, AbstractArray):
-                te = build_type_limited(t.element)
+                te = t.element.dtype()
                 self.types[name] = nnvm_type_map(te)
                 self.shapes[name] = ashape(n)
             elif n.is_constant_graph():  # pragma: no cover
@@ -243,14 +243,14 @@ class NNVMConverter:
                 self.types[name] = 'int64'
                 self.shapes[name] = (1,)
             else:
-                te = build_type_limited(t)
+                te = t.dtype()
                 self.types[name] = nnvm_type_map(te)
                 self.shapes[name] = (1,)
 
         t = n.abstract
         if n.is_constant() and not n.is_constant_graph():
             name = f"cst{next(self.c)}"
-            te = build_type_limited(t)
+            te = t.dtype()
             self.constants[name] = nnvm_val([n.value],
                                             dtype=type_to_np_dtype(te),
                                             ctx=self.context)

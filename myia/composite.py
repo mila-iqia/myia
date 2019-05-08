@@ -7,10 +7,10 @@ from typing import Callable
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
-    AbstractClass, build_value, AbstractScalar, AbstractError, TYPE, VALUE
+    AbstractClass, build_value, AbstractError
 from .debug.label import short_labeler
-from .dtype import Array, Int, UInt, Float, Number, Bool, \
-    EnvType
+from .dtype import Array, Number, Bool, \
+    EnvType, u8, u16, i8, i16, f32, f64
 from .hypermap import HyperMap, hyper_map
 from .abstract import MyiaTypeError, broaden
 from .info import About
@@ -271,15 +271,6 @@ def int_bool(x):
     return x != 0
 
 
-# The parser/inferrer don't like when those are defined inline.
-ui8 = AbstractScalar({VALUE: ANYTHING, TYPE: UInt[8]})
-ui16 = AbstractScalar({VALUE: ANYTHING, TYPE: UInt[16]})
-i8 = AbstractScalar({VALUE: ANYTHING, TYPE: Int[8]})
-i16 = AbstractScalar({VALUE: ANYTHING, TYPE: Int[16]})
-f32 = AbstractScalar({VALUE: ANYTHING, TYPE: Float[32]})
-f64 = AbstractScalar({VALUE: ANYTHING, TYPE: Float[64]})
-
-
 @core
 def int_floordiv(x, y):
     """Implementation of `int_floordiv`."""
@@ -293,8 +284,8 @@ def int_floordiv(x, y):
 def int_truediv(x, y):
     """Implementation of `int_truediv`."""
     if hastype(x, typeof(y)):
-        if (hastype(x, i8) or hastype(x, ui8) or
-                hastype(x, i16) or hastype(x, ui16)):
+        if (hastype(x, i8) or hastype(x, u8) or
+                hastype(x, i16) or hastype(x, u16)):
             return scalar_div(scalar_cast(x, f32), scalar_cast(y, f32))
         return scalar_div(scalar_cast(x, f64), scalar_cast(y, f64))
     else:

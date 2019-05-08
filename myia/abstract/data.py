@@ -185,6 +185,13 @@ class AbstractAtom(AbstractValue):
 class AbstractScalar(AbstractAtom):
     """Represents a scalar (integer, float, bool, etc.)."""
 
+    def dtype(self):
+        """Return the type of this scalar."""
+        t = self.values[TYPE]
+        if isinstance(t, Pending) and t.done():
+            t = t.result()
+        return t
+
     def __pretty__(self, ctx):
         rval = pretty_type(self.values[TYPE])
         v = self.values[VALUE]

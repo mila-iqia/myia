@@ -473,6 +473,8 @@ def return_(x):
 @register(primops.scalar_cast)
 def scalar_cast(x, t):
     """Implement `scalar_cast`."""
+    from ..abstract import type_to_abstract
+    t = type_to_abstract(t)
     assert isinstance(t, abstract.AbstractScalar)
     t = t.values[abstract.TYPE]
     assert issubclass(t, types.Number)

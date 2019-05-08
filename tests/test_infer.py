@@ -12,7 +12,8 @@ from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
-from myia.dtype import Int, External, Number, EnvType as Env, Nil, Array
+from myia.dtype import Int, External, Number, EnvType as Env, Nil, Array, \
+    i16, i32, i64, u64, f16, f32, f64
 from myia.hypermap import HyperMap, hyper_map
 from myia.abstract import ANYTHING, InferenceError, Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
@@ -27,7 +28,7 @@ from myia.prim.py_implementations import \
     transpose, make_record, unsafe_static_cast
 from myia.utils import newenv
 
-from .common import B, i16, i32, i64, u64, f16, f32, f64, \
+from .common import B, \
     Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
     to_abstract_test, EmptyTuple, U, Ex

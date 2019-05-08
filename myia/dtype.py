@@ -163,6 +163,19 @@ class EnvType(Object):
     """
 
 
+i8 = Int[8]
+i16 = Int[16]
+i32 = Int[32]
+i64 = Int[64]
+u8 = UInt[8]
+u16 = UInt[16]
+u32 = UInt[32]
+u64 = UInt[64]
+f16 = Float[16]
+f32 = Float[32]
+f64 = Float[64]
+
+
 DTYPE_TO_MTYPE = dict(
     int8=Int[8],
     int16=Int[16],

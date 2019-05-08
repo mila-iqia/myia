@@ -8,7 +8,7 @@ from . import Backend
 
 from ...abstract import AbstractArray, AbstractTuple, AbstractScalar, \
     AbstractFunction, VirtualFunction, GraphFunction, TypedPrimitive, \
-    PartialApplication, SHAPE, build_type_limited, TYPE
+    PartialApplication, SHAPE, TYPE
 from ...ir import manage
 from ...graph_utils import toposort
 from ...prim import Primitive, ops as P
@@ -22,7 +22,7 @@ from .relay_helpers import optimize, build_module
 @overload(bootstrap=True)
 def to_relay_type(self, a: AbstractScalar):
     """Convert a myia abstract to a Relay type."""
-    tp = build_type_limited(a)
+    tp = a.dtype()
     if issubclass(tp, Bool):
         return relay.ty.TensorType((), 'bool')
     else:
@@ -36,7 +36,7 @@ def to_relay_type(self, a: AbstractTuple):
 
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractArray):
-    tp = build_type_limited(a.element)
+    tp = a.element.dtype()
     return relay.ty.TensorType(a.values[SHAPE], type_to_np_dtype(tp))
 
 

@@ -23,7 +23,6 @@ from .data import (
     AbstractStructure,
     AbstractValue,
     AbstractScalar,
-    AbstractType,
     AbstractError,
     AbstractFunction,
     AbstractTuple,
@@ -230,28 +229,12 @@ def _t2a_helper(main: AbstractError, args):
     return AbstractError(ANYTHING)
 
 
-@overload(bootstrap=True)
-def build_type_limited(self, x: AbstractScalar):
+def build_type_limited(x):
     """Build a type from an abstract value."""
-    t = x.values[TYPE]
-    if isinstance(t, Pending) and t.done():
-        t = t.result()
-    return t
-
-
-@overload  # noqa: F811
-def build_type_limited(self, x: AbstractError):
-    return AbstractError
-
-
-@overload  # noqa: F811
-def build_type_limited(self, x: AbstractType):
-    return AbstractType
-
-
-@overload  # noqa: F811
-def build_type_limited(self, x: AbstractValue):
-    return type(x)
+    if isinstance(x, AbstractScalar):
+        return x.dtype()
+    else:
+        return type(x)
 
 
 ############

@@ -7,29 +7,13 @@ from myia.abstract import VALUE, TYPE, SHAPE, \
     AbstractValue, AbstractScalar, AbstractArray, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged, abstract_union, AbstractExternal, ANYTHING, from_value
-from myia.dtype import Bool, Int, UInt, Float
+from myia.dtype import Bool, i16, i32, i64, u64, f16, f32, f64
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance, dataclass_methods
 from myia.composite import ArithmeticData
 
 
-#############
-# Shorthand #
-#############
-
-
 B = Bool
-
-i16 = Int[16]
-i32 = Int[32]
-i64 = Int[64]
-
-u64 = UInt[64]
-
-f16 = Float[16]
-f32 = Float[32]
-f64 = Float[64]
-
 EmptyTuple = typing.Tuple[()]
 
 
