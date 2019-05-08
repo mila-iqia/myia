@@ -6,6 +6,7 @@ from .loop import (  # noqa
     PendingFromList,
     PendingTentative,
     find_coherent_result,
+    find_coherent_result_sync,
     force_pending,
 )
 

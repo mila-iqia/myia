@@ -178,13 +178,9 @@ def _t2a_helper(main: list, args):
 
 @overload  # noqa: F811
 def _t2a_helper(main: np.ndarray, args):
-    if len(args) == 1:
-        arg, = args
-        arg = type_to_abstract(arg)
-        shp = ANYTHING
-    else:
-        arg, shp = args
-        arg = type_to_abstract(arg)
+    arg, = args
+    arg = type_to_abstract(arg)
+    shp = ANYTHING
     return AbstractArray(arg, {SHAPE: shp})
 
 
@@ -192,7 +188,7 @@ def _t2a_helper(main: np.ndarray, args):
 def _t2a_helper(main: int, args):
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.Int,
+        TYPE: dtype.Int[64],
     })
 
 
@@ -200,7 +196,7 @@ def _t2a_helper(main: int, args):
 def _t2a_helper(main: float, args):
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.Float,
+        TYPE: dtype.Float[64],
     })
 
 
@@ -219,7 +215,7 @@ def _t2a_helper(main: collections.abc.Callable, args):
     else:
         *inputs, ret = args
         return AbstractFunction(VirtualFunction(
-            [type_to_abstract(x) for x in inputs],
+            tuple(type_to_abstract(x) for x in inputs),
             type_to_abstract(ret)
         ))
 
@@ -759,9 +755,8 @@ def amerge(__call__, x1, x2, loop, forced, bind_pending=True,
         x2 = x2.result()
         isp2 = False
     if (isp1 or isp2) and (not accept_pending or not bind_pending):
-        # raise ValueError('Cannot have Pending here.')
         if forced and isp1:
-            raise ValueError('Cannot have Pending here.')
+            raise MyiaTypeError('Cannot have Pending here.')
         if isp1:
             def chk(a):
                 return amerge(a, x2, loop, forced, bind_pending)
@@ -813,9 +808,8 @@ def amerge(x1: dtype.TypeMeta, x2, loop, forced, bp):
         return x1
     elif not forced and issubclass(x1, x2):
         return x2
-    elif x1 != x2:
+    else:
         raise TypeMismatchError(x1, x2)
-    return x1
 
 
 @overload  # noqa: F811

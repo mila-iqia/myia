@@ -300,7 +300,7 @@ def find_coherent_result_sync(v, fn):
     """
     from .data import InferenceError
     if isinstance(v, PendingFromList):
-        exc = None
+        exc = InferenceError('Nothing matches')
         results = set()
         for option in v.possibilities:
             try:
@@ -310,11 +310,13 @@ def find_coherent_result_sync(v, fn):
         if len(results) == 1:
             return results.pop()
         elif len(results) == 0:
-            if exc:
-                raise exc
-            else:
-                raise InferenceError('Nothing matches')
-    raise InferenceError('Must resolve Pending to find result')
+            raise exc
+        else:
+            raise InferenceError('Must resolve Pending to find result')
+    elif isinstance(v, Pending):
+        raise InferenceError('Must resolve Pending to find result')
+    else:
+        return fn(v)
 
 
 async def force_pending(v):

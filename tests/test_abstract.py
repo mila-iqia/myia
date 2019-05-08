@@ -10,10 +10,11 @@ from myia.abstract import (
     AbstractScalar, AbstractTuple as T, AbstractList as L,
     AbstractJTagged, AbstractError, AbstractFunction,
     InferenceLoop, to_abstract, build_value, amerge,
-    Possibilities as _Poss,
-    VALUE, TYPE, DEAD,
+    Possibilities as _Poss, PendingFromList,
+    VALUE, TYPE, DEAD, find_coherent_result_sync,
     abstract_clone, abstract_clone_async, broaden,
-    Pending, concretize_abstract, type_to_abstract
+    Pending, concretize_abstract, type_to_abstract,
+    InferenceError, VirtualFunction
 )
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
@@ -54,7 +55,7 @@ def test_build_value():
     assert build_value(to_abstract_test(pt)) == pt
 
 
-def test_merge():
+def test_amerge():
     a = T([S(1), S(t=ty.Int[64])])
     b = T([S(1), S(t=ty.Int[64])])
     c = T([S(t=ty.Int[64]), S(t=ty.Int[64])])
@@ -72,6 +73,22 @@ def test_merge():
 
     with pytest.raises(MyiaTypeError):
         assert amerge("hello", "world", loop=None, forced=False)
+
+    assert amerge(ty.Int, ty.Int[64], loop=None, forced=False) is ty.Int
+    assert amerge(ty.Int[64], ty.Int, loop=None, forced=False) is ty.Int
+    with pytest.raises(MyiaTypeError):
+        amerge(ty.Float, ty.Int, loop=None, forced=False)
+    with pytest.raises(MyiaTypeError):
+        amerge(ty.Int[64], ty.Int, loop=None, forced=True)
+
+    loop = asyncio.new_event_loop()
+    p = PendingFromList([ty.Int[64], ty.Float[64]], None, None, loop=loop)
+    assert amerge(ty.Number, p, loop=None, forced=False, bind_pending=False) \
+        is ty.Number
+    assert amerge(p, ty.Number, loop=None, forced=False, bind_pending=False) \
+        is ty.Number
+    with pytest.raises(MyiaTypeError):
+        print(amerge(p, ty.Number, loop=None, forced=True, bind_pending=False))
 
 
 def test_merge_possibilities():
@@ -243,3 +260,39 @@ def test_concretize_recursive():
         assert (await concretize_abstract(t)) is ta
 
     asyncio.run(coro())
+
+
+def test_find_coherent_result_sync():
+    def fn(x):
+        if x == 0:
+            raise ValueError('Oh no! Zero!')
+        else:
+            return x > 0
+
+    loop = asyncio.new_event_loop()
+    p1 = PendingFromList([1, 2, 3], None, None, loop=loop)
+    p2 = PendingFromList([-1, -2, -3], None, None, loop=loop)
+    p3 = PendingFromList([1, 2, -3], None, None, loop=loop)
+    p4 = PendingFromList([0], None, None, loop=loop)
+    assert find_coherent_result_sync(p1, fn) is True
+    assert find_coherent_result_sync(p2, fn) is False
+    with pytest.raises(InferenceError):
+        find_coherent_result_sync(p3, fn)
+    with pytest.raises(ValueError):
+        find_coherent_result_sync(p4, fn)
+
+    p = Pending(None, None, loop=loop)
+    with pytest.raises(InferenceError):
+        find_coherent_result_sync(p, fn)
+
+    assert find_coherent_result_sync(10, fn) is True
+    assert find_coherent_result_sync(-10, fn) is False
+
+
+def test_type_to_abstract():
+    assert type_to_abstract(bool) is S(t=ty.Bool)
+    assert type_to_abstract(typing.List) is L(ANYTHING)
+    assert type_to_abstract(typing.Tuple) is T(ANYTHING)
+    si = S(t=ty.i64)
+    f = AbstractFunction(VirtualFunction((si, si), si))
+    assert type_to_abstract(typing.Callable[[int, int], int]) is f

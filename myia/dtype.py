@@ -32,7 +32,7 @@ class TypeMeta(type):
         cls._fields = [k for k in ann.keys()
                        if not k.startswith('_')]
 
-    def parameterize(cls, *args):
+    def parameterize(cls, *args):  # pragma: no cover
         """Parameterize this generic to get a concrete type.
 
         This is called by __getitem__.
