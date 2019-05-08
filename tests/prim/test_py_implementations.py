@@ -19,10 +19,6 @@ from ..test_lang import parse_compare
 from ..common import i64, f16, to_abstract_test, Point
 
 
-_i64 = to_abstract_test(i64)
-_f16 = to_abstract_test(f16)
-
-
 @parse_compare((2, 7), (4, -6))
 def test_prim_add(x, y):
     return x + y
@@ -383,8 +379,8 @@ def test_broadcast_shape():
 
 
 def test_scalar_cast():
-    assert isinstance(scalar_cast(1.5, _i64), np.int64)
-    assert isinstance(scalar_cast(1.5, _f16), np.float16)
+    assert isinstance(scalar_cast(1.5, i64), np.int64)
+    assert isinstance(scalar_cast(1.5, f16), np.float16)
 
 
 def test_env():

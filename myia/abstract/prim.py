@@ -894,11 +894,10 @@ abstract_inferrer_constructors[P.switch] = _SwitchInferrer.partial()
 async def _inf_scalar_cast(engine,
                            scalar: Number,
                            typ: AbstractType):
-    t = typ.values[VALUE]
-    if t is ANYTHING:
-        raise MyiaTypeError('Must have concrete type for scalar_cast')
-    engine.check(AbstractScalar({VALUE: ANYTHING, TYPE: Number}), t)
-    values = {**scalar.values, TYPE: t.values[TYPE]}
+    a = type_to_abstract(typ.values[VALUE])
+    t = type_token(a)
+    engine.check(Number, t)
+    values = {**scalar.values, TYPE: t}
     return AbstractScalar(values)
 
 

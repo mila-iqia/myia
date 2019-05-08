@@ -1545,17 +1545,6 @@ def test_add1_hastype_interference(x):
     return x + _interference_helper(1)
 
 
-# # @infer((f16, f32, f64, f32))
-# @infer((f16, f32, f64, InferenceError))
-# def test_hastype_interference(x, y, z):
-#     if hastype(1, i32):
-#         return x
-#     elif hastype(1, i64):
-#         return y
-#     else:
-#         return z
-
-
 @infer(
     (Point(i64, i64), i64),
     (Point(f64, f64), f64),
@@ -1905,9 +1894,6 @@ def test_grad(x, y):
     return grad(f)(x, y)
 
 
-_f16 = to_abstract_test(f16)
-
-
 @infer_std(
     (i64, i64),
     (f32, f32),
@@ -1915,7 +1901,7 @@ _f16 = to_abstract_test(f16)
 )
 def test_grad_cast(x):
     def f(x):
-        return scalar_cast(x, _f16)
+        return scalar_cast(x, f16)
 
     return grad(f)(x)
 
