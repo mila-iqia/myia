@@ -296,7 +296,7 @@ def find_coherent_result_sync(v, fn):
 
     If v is a PendingFromList and fn(x) is the same for every x in v,
     this will return that result without resolving which possibility
-    v is. Otherwise, v will be resolved.
+    v is. Otherwise, an exception is raised.
     """
     from .data import InferenceError
     if isinstance(v, PendingFromList):

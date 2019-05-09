@@ -636,16 +636,7 @@ def format_abstract(a):
 
 def pretty_type(t):
     """Pretty print a type."""
-    if not isinstance(t, type):
-        return str(t)
-    elif issubclass(t, dtype.Float):
-        return f'f{getattr(t, "bits", "??")}'
-    elif issubclass(t, dtype.Int):
-        return f'i{getattr(t, "bits", "??")}'
-    elif issubclass(t, dtype.UInt):
-        return f'u{getattr(t, "bits", "??")}'
-    else:
-        return str(t)
+    return str(t)
 
 
 def pretty_call(ctx, title, args, sep=' :: '):

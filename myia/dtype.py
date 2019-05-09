@@ -14,9 +14,8 @@ def as_frozen(x):
     """Return an immutable representation for x."""
     if isinstance(x, dict):
         return tuple(sorted((k, as_frozen(v)) for k, v in x.items()))
-    elif isinstance(x, (list, tuple)):  # pragma: no cover
-        return tuple(as_frozen(y) for y in x)
     else:
+        assert not isinstance(x, (list, tuple))
         return x
 
 
@@ -37,11 +36,13 @@ class TypeMeta(type):
 
         This is called by __getitem__.
         """
-        fields = cls._fields
-        if len(fields) != len(args):
-            raise TypeError('Invalid type parameterization')
-        kw = {name: arg for name, arg in zip(fields, args)}
-        return cls.make_subtype(**kw)
+        raise TypeError('Cannot parameterize type.')
+        # # The following generic implementation may be uncommented if needed.
+        # fields = cls._fields
+        # if len(fields) != len(args):
+        #     raise TypeError('Invalid type parameterization')
+        # kw = {name: arg for name, arg in zip(fields, args)}
+        # return cls.make_subtype(**kw)
 
     def make_subtype(cls, **params):
         """Low-level parameterization function.
