@@ -1,11 +1,10 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
-from .dtype import Problem, External, ismyiatype
 from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
 from .abstract import abstract_check, AbstractClass, AbstractJTagged, \
-    AbstractScalar, TYPE, VALUE, DEAD, AbstractError
+    VALUE, DEAD, AbstractError, AbstractExternal
 
 
 class ValidationError(Exception):
@@ -19,21 +18,14 @@ def validate_abstract(self, a: (AbstractClass, AbstractJTagged)):
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: AbstractScalar):
-    t = a.values[TYPE]
-    if ismyiatype(t, (Problem, External)):
-        raise ValidationError(f'Illegal type in the graph: {a}')
-
-
-@overload  # noqa: F811
 def validate_abstract(self, a: AbstractError):
     kind = a.values[VALUE]
-    if kind is not Problem[DEAD]:
+    if kind is not DEAD:
         raise ValidationError(f'Illegal type in the graph: {a}')
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: type(None)):
+def validate_abstract(self, a: (type(None), AbstractExternal)):
     raise ValidationError(f'Illegal type in the graph: {a}')
 
 

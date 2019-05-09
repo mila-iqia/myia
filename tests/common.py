@@ -1,51 +1,20 @@
 
+import typing
 import numpy as np
 from dataclasses import dataclass, is_dataclass
 from myia import dtype
 from myia.abstract import VALUE, TYPE, SHAPE, \
     AbstractValue, AbstractScalar, AbstractArray, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
-    AbstractJTagged, AbstractUnion, ANYTHING
-from myia.dtype import Bool, Int, UInt, Float, List, Array, Tuple, Function, \
-    Object, pytype_to_myiatype
+    AbstractJTagged, abstract_union, AbstractExternal, ANYTHING, from_value
+from myia.dtype import Bool, i32, i64, u64, f16, f32, f64
 from myia.ir import MultitypeGraph
-from myia.utils import overload, EnvInstance
+from myia.utils import overload, EnvInstance, dataclass_methods
 from myia.composite import ArithmeticData
 
 
 B = Bool
-L = List
-A = Array
-T = Tuple
-F = Function
-
-i16 = Int[16]
-i32 = Int[32]
-i64 = Int[64]
-
-u64 = UInt[64]
-
-f16 = Float[16]
-f32 = Float[32]
-f64 = Float[64]
-
-li16 = L[Int[16]]
-li32 = L[Int[32]]
-li64 = L[Int[64]]
-
-lf16 = L[Float[16]]
-lf32 = L[Float[32]]
-lf64 = L[Float[64]]
-
-ai16 = A[i16]
-ai32 = A[i32]
-ai64 = A[i64]
-
-af16 = A[f16]
-af32 = A[f32]
-af64 = A[f64]
-
-EmptyTuple = T[()]
+EmptyTuple = typing.Tuple[()]
 
 
 ###########################
@@ -84,10 +53,17 @@ def JT(a):
     return AbstractJTagged(to_abstract_test(a))
 
 
-def S(x, t=None):
+def S(x=ANYTHING, t=None):
     return AbstractScalar({
         VALUE: x,
         TYPE: t or dtype.pytype_to_myiatype(type(x)),
+    })
+
+
+def Ex(x, t=None):
+    return AbstractExternal({
+        VALUE: x,
+        TYPE: t or type(x)
     })
 
 
@@ -101,7 +77,7 @@ def Ty(t):
 
 def U(*opts):
     opts = [to_abstract_test(x) for x in opts]
-    return AbstractUnion(opts)
+    return abstract_union(opts)
 
 
 @overload(bootstrap=True)
@@ -114,8 +90,15 @@ def to_abstract_test(self, x: (bool, int, float, str,
 
 
 @overload  # noqa: F811
-def to_abstract_test(self, x: (dtype.Number, dtype.Bool,
-                               dtype.External, dtype.EnvType)):
+def to_abstract_test(self, x: str):
+    return AbstractExternal({
+        VALUE: x,
+        TYPE: type(x),
+    })
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, x: (dtype.Number, dtype.Bool, dtype.EnvType)):
     return AbstractScalar({VALUE: ANYTHING, TYPE: x})
 
 
@@ -159,11 +142,13 @@ def to_abstract_test(self, t: type):
 @overload  # noqa: F811
 def to_abstract_test(self, x: object):
     if is_dataclass(x):
-        typ = dtype.pytype_to_myiatype(type(x), x)
         new_args = {}
         for name, field in x.__dataclass_fields__.items():
             new_args[name] = self(getattr(x, name))
-        return AbstractClass(typ.tag, new_args, typ.methods)
+        return AbstractClass(type(x), new_args, dataclass_methods(type(x)))
+    elif getattr(x, '__origin__') is dtype.External:
+        arg, = x.__args__
+        return AbstractExternal({VALUE: ANYTHING, TYPE: arg})
     else:
         raise Exception(f'Cannot convert: {x}')
 
@@ -175,7 +160,7 @@ def to_abstract_test(self, x: object):
 
 @dataclass(frozen=True)
 class Thing:
-    contents: Object
+    contents: object
 
     def __call__(self):
         return self.contents * 2
@@ -192,18 +177,16 @@ class Point(ArithmeticData):
 
 @dataclass(frozen=True)
 class Point3D(ArithmeticData):
-    x: Object
-    y: Object
-    z: Object
+    x: object
+    y: object
+    z: object
 
     def abs(self):
         return (self.x ** 2 + self.y ** 2 + self.z ** 2) ** 0.5
 
 
-Point_t = pytype_to_myiatype(Point)
-Point3D_t = pytype_to_myiatype(Point3D)
-Thing_f = pytype_to_myiatype(Thing, Thing(1.0))
-Thing_ftup = pytype_to_myiatype(Thing, Thing((1.0, 2.0)))
+Thing_f = from_value(Thing(1.0), broaden=True)
+Thing_ftup = from_value(Thing((1.0, 2.0)), broaden=True)
 
 
 mysum = MultitypeGraph('mysum')

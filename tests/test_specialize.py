@@ -84,7 +84,8 @@ def specializer_decorator(pipeline):
                     for err in verr.errors:
                         n = err.node
                         nlbl = lbl.label(n)
-                        print(f'   {nlbl} ({type(n).__name__}) :: {n.type}')
+                        tname = type(n).__name__
+                        print(f'   {nlbl} ({tname}) :: {n.abstract}')
                         print(f'      {err.args[0]}')
                     raise verr
 
@@ -261,9 +262,9 @@ def test_unused_parameter(x, y):
 
 @specialize((int1,))
 def test_unused_function_parameter(x):
-    # The type of square will be Problem(DEAD), but that's not really an issue
-    # because it is indeed not used, and we can simply replace the reference
-    # by a dummy.
+    # The type of square will be AbstractError(DEAD), but that's not really
+    # an issue because it is indeed not used, and we can simply replace the
+    # reference by a dummy.
     def square(y):
         return y * y
 

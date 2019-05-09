@@ -4,7 +4,7 @@ import asyncio
 from contextvars import copy_context
 from collections import deque
 
-from ..dtype import ismyiatype
+from .. import dtype
 
 
 class InferenceLoop(asyncio.AbstractEventLoop):
@@ -163,7 +163,7 @@ def is_simple(x):
         return x.is_simple()
     if isinstance(x, AbstractScalar):
         return is_simple(x.values[TYPE])
-    elif ismyiatype(x):
+    elif isinstance(x, dtype.TypeMeta):
         return True
     else:
         return False
@@ -289,6 +289,34 @@ async def find_coherent_result(v, fn):
             return results.pop()
     x = await v
     return await fn(x)
+
+
+def find_coherent_result_sync(v, fn):
+    """Return fn(v) without fully resolving v, if possible.
+
+    If v is a PendingFromList and fn(x) is the same for every x in v,
+    this will return that result without resolving which possibility
+    v is. Otherwise, an exception is raised.
+    """
+    from .data import InferenceError
+    if isinstance(v, PendingFromList):
+        exc = InferenceError('Nothing matches')
+        results = set()
+        for option in v.possibilities:
+            try:
+                results.add(fn(option))
+            except Exception as e:
+                exc = e
+        if len(results) == 1:
+            return results.pop()
+        elif len(results) == 0:
+            raise exc
+        else:
+            raise InferenceError('Must resolve Pending to find result')
+    elif isinstance(v, Pending):
+        raise InferenceError('Must resolve Pending to find result')
+    else:
+        return fn(v)
 
 
 async def force_pending(v):

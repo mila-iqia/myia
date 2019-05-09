@@ -236,12 +236,6 @@ class ANFNode(Node):
         self.abstract = None
 
     @property
-    def type(self):
-        """Return the node's type."""
-        from ..abstract import build_type_fn
-        return self.abstract and build_type_fn(self.abstract)
-
-    @property
     def shape(self):
         """Return the node's shape."""
         from ..abstract import AbstractArray, SHAPE

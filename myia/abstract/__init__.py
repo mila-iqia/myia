@@ -6,14 +6,15 @@ from .loop import (  # noqa
     PendingFromList,
     PendingTentative,
     find_coherent_result,
+    find_coherent_result_sync,
     force_pending,
 )
 
 
 from .utils import (  # noqa
     build_value,
-    build_type,
-    build_type_fn,
+    type_token,
+    type_to_abstract,
     abstract_check,
     abstract_clone,
     abstract_clone_async,
@@ -22,6 +23,9 @@ from .utils import (  # noqa
     sensitivity_transform,
     amerge,
     bind,
+    typecheck,
+    split_type,
+    hastype_helper,
 )
 
 
@@ -44,6 +48,7 @@ from .data import (  # noqa
     AbstractScalar,
     AbstractType,
     AbstractError,
+    AbstractExternal,
     AbstractFunction,
     AbstractTuple,
     AbstractArray,

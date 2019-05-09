@@ -12,8 +12,7 @@ from myia.abstract import (
     MetaGraphFunction, AbstractUnion, ConditionalContext, VALUE, ANYTHING,
     PendingTentative
 )
-from myia.dtype import Type, Bool, Int, Float, Tuple, List, Class, Function, \
-    TypeMeta, UInt, Array
+from myia.dtype import Type, Bool, Int, Float, TypeMeta, UInt
 from myia.utils import OrderedSet, UNKNOWN
 
 try:
@@ -1058,7 +1057,7 @@ class _Bool:
 class _Int:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
-        if cls.is_generic():
+        if cls is Int:
             return H.span('Int')
         else:
             return H.span['myia-type-int'](
@@ -1070,7 +1069,7 @@ class _Int:
 class _UInt:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
-        if cls.is_generic():
+        if cls is UInt:
             return H.span('UInt')
         else:
             return H.span['myia-type-uint'](
@@ -1082,95 +1081,11 @@ class _UInt:
 class _Float:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
-        if cls.is_generic():
+        if cls is Float:
             return H.span('Float')
         else:
             return H.span['myia-type-float'](
                 H.sub(cls.bits)
-            )
-
-
-@mixin(Tuple)
-class _Tuple:
-    @classmethod
-    def __type_hrepr__(cls, H, hrepr):
-        if cls.is_generic():
-            return H.span('Tuple')
-        else:
-            return hrepr.stdrepr_iterable(
-                cls.elements,
-                cls='myia-type-tuple',
-                before='(',
-                after=')'
-            )
-
-
-@mixin(List)
-class _List:
-    @classmethod
-    def __type_hrepr__(cls, H, hrepr):
-        if cls.is_generic():
-            return H.span('List')
-        else:
-            return hrepr.stdrepr_iterable(
-                [cls.element_type],
-                cls='myia-type-list',
-                before='[',
-                after=']'
-            )
-
-
-@mixin(Array)
-class _Array:
-    @classmethod
-    def __type_hrepr__(cls, H, hrepr):
-        if cls.is_generic():
-            return H.span('Array')
-        else:
-            return H.span['myia-type-Array'](
-                H.span['myia-type-prefix']('A'),
-                hrepr(cls.elements)
-            )
-
-
-@mixin(JTagged)
-class _JTagged:
-    @classmethod
-    def __type_hrepr__(cls, H, hrepr):
-        if cls.is_generic():
-            return H.span('JTagged')
-        else:
-            return H.span['myia-type-JTagged'](
-                H.span['myia-type-prefix']('J'),
-                hrepr(cls.subtype)
-            )
-
-
-@mixin(Class)
-class _Class:
-    @classmethod
-    def __type_hrepr__(cls, H, hrepr):
-        if cls.is_generic():
-            return H.span('Class')
-        else:
-            return hrepr.stdrepr_object(
-                str(cls.tag),
-                [(attr, hrepr(typ))
-                 for attr, typ in cls.attributes.items()],
-                delimiter='↦'
-            )
-
-
-@mixin(Function)
-class _Function:
-    @classmethod
-    def __type_hrepr__(cls, H, hrepr):
-        if cls.is_generic():
-            return H.span('Function')
-        else:
-            return hrepr.stdrepr_iterable(
-                list(cls.arguments) + [H.span('→'), cls.retval],
-                cls='myia-type-function'
             )
 
 

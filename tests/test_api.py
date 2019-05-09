@@ -3,13 +3,14 @@ import pytest
 
 from myia.api import myia
 from myia.cconv import closure_convert
-from myia.dtype import Bool
+from myia.dtype import Bool, EnvType
 from myia.abstract import InferenceError
 from myia.ir import clone
 from myia.pipeline import \
     scalar_parse as parse, scalar_debug_compile as compile
 from myia.pipeline.steps import convert_arg, convert_result, NumpyChecker
 from myia.prim.py_implementations import tuple_getitem
+from myia.utils import newenv
 
 from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
     ai32_of, af64_of
@@ -91,6 +92,8 @@ def test_convert_arg():
     assert _convert(False, Bool) == [False]
     assert _convert(10, i64) == [10]
     assert _convert(1.5, f64) == [1.5]
+    with pytest.raises(TypeError):
+        _convert(newenv, EnvType)
 
     # Class -> Tuple conversion
 

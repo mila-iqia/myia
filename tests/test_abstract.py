@@ -1,42 +1,31 @@
 
 import pytest
 import asyncio
+import typing
 
 from myia import dtype as ty
 from myia.prim import ops as P
-from myia.prim.py_implementations import typeof
 from myia.abstract import (
     ANYTHING, MyiaTypeError,
     AbstractScalar, AbstractTuple as T, AbstractList as L,
-    AbstractJTagged, abstract_union, AbstractError, AbstractFunction,
+    AbstractJTagged, AbstractError, AbstractFunction,
     InferenceLoop, to_abstract, build_value, amerge,
-    Possibilities as _Poss,
-    VALUE, TYPE, DEAD, build_type_fn,
-    PrimitiveFunction, PartialApplication, VirtualFunction,
-    TypedPrimitive, abstract_clone, abstract_clone_async, broaden,
-    Pending, concretize_abstract
+    Possibilities as _Poss, PendingFromList,
+    VALUE, TYPE, DEAD, find_coherent_result_sync,
+    abstract_clone, abstract_clone_async, broaden,
+    Pending, concretize_abstract, type_to_abstract,
+    InferenceError
 )
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
 
-from .common import Point, to_abstract_test, f32, Ty, af32_of
-
-
-def U(*opts):
-    return abstract_union(opts)
-
-
-def S(v=ANYTHING, t=None, s=None):
-    return AbstractScalar({
-        VALUE: v,
-        TYPE: t or typeof(v),
-    })
+from .common import Point, to_abstract_test, f32, Ty, af32_of, S, U
 
 
 def Poss(*things):
     return AbstractScalar({
         VALUE: _Poss(things),
-        TYPE: typeof(things[0]),
+        TYPE: ty.pytype_to_myiatype(type(things[0])),
     })
 
 
@@ -57,29 +46,16 @@ def test_build_value():
     loop = InferenceLoop(errtype=Exception)
     p = loop.create_pending(resolve=(lambda: None), priority=(lambda: None))
     with pytest.raises(ValueError):
-        assert build_value(S(p)) is p
-    assert build_value(S(p), default=ANYTHING) is ANYTHING
+        assert build_value(S(p, t=ty.Int[64])) is p
+    assert build_value(S(p, t=ty.Int[64]), default=ANYTHING) is ANYTHING
     p.set_result(1234)
-    assert build_value(S(p)) == 1234
+    assert build_value(S(p, t=ty.Int[64])) == 1234
 
     pt = Point(1, 2)
     assert build_value(to_abstract_test(pt)) == pt
 
 
-def test_build_type_fn():
-    assert build_type_fn(AbstractFunction(PrimitiveFunction('test'))) \
-        == ty.Function
-
-    assert build_type_fn(AbstractFunction(PartialApplication(
-        VirtualFunction((to_abstract(1), to_abstract(2)), to_abstract(3)),
-        (to_abstract(1),)))) == ty.Function[[ty.Int[64]], ty.Int[64]]
-
-    assert build_type_fn(AbstractFunction(TypedPrimitive(
-        'test2', (to_abstract(3.0), to_abstract(1)), to_abstract(True)))) \
-        == ty.Function[[ty.Float[64], ty.Int[64]], ty.Bool]
-
-
-def test_merge():
+def test_amerge():
     a = T([S(1), S(t=ty.Int[64])])
     b = T([S(1), S(t=ty.Int[64])])
     c = T([S(t=ty.Int[64]), S(t=ty.Int[64])])
@@ -97,6 +73,22 @@ def test_merge():
 
     with pytest.raises(MyiaTypeError):
         assert amerge("hello", "world", loop=None, forced=False)
+
+    assert amerge(ty.Int, ty.Int[64], loop=None, forced=False) is ty.Int
+    assert amerge(ty.Int[64], ty.Int, loop=None, forced=False) is ty.Int
+    with pytest.raises(MyiaTypeError):
+        amerge(ty.Float, ty.Int, loop=None, forced=False)
+    with pytest.raises(MyiaTypeError):
+        amerge(ty.Int[64], ty.Int, loop=None, forced=True)
+
+    loop = asyncio.new_event_loop()
+    p = PendingFromList([ty.Int[64], ty.Float[64]], None, None, loop=loop)
+    assert amerge(ty.Number, p, loop=None, forced=False, bind_pending=False) \
+        is ty.Number
+    assert amerge(p, ty.Number, loop=None, forced=False, bind_pending=False) \
+        is ty.Number
+    with pytest.raises(MyiaTypeError):
+        print(amerge(p, ty.Number, loop=None, forced=True, bind_pending=False))
 
 
 def test_merge_possibilities():
@@ -116,6 +108,18 @@ def test_merge_possibilities():
     assert amerge(a, c, loop=None, forced=True) is a
 
 
+def test_merge_from_types():
+    a = T([S(1), S(t=ty.Int[64])])
+
+    t1 = type_to_abstract(typing.Tuple)
+    t2 = type_to_abstract(typing.Tuple[ty.Int[64], ty.Int[64]])
+    t3 = type_to_abstract(typing.Tuple[ty.Int[64]])
+    assert amerge(t1, a, loop=None, forced=True) is t1
+    assert amerge(t2, a, loop=None, forced=True) is t2
+    with pytest.raises(MyiaTypeError):
+        amerge(t3, a, loop=None, forced=True)
+
+
 def test_union():
     a = U(S(t=ty.Int[64]), S(t=ty.Int[32]), S(t=ty.Int[16]))
     b = U(S(t=ty.Int[64]), U(S(t=ty.Int[32]), S(t=ty.Int[16])))
@@ -125,39 +129,36 @@ def test_union():
     d = U(S(t=ty.Int[64]))
     assert c == d
 
-    u = ty.Union[ty.Int[64], ty.Int[32], ty.Int[16]]
-    assert build_type_fn(a) == u
-    assert repr(u).startswith('Union')  # member order can vary
-
 
 def test_repr():
 
     s1 = to_abstract_test(1)
-    assert repr(s1) == 'AbstractScalar(i64 = 1)'
+    assert repr(s1) == 'AbstractScalar(Int[64] = 1)'
 
     s2 = to_abstract_test(f32)
-    assert repr(s2) == 'AbstractScalar(f32)'
+    assert repr(s2) == 'AbstractScalar(Float[32])'
 
     t1 = to_abstract_test((1, f32))
-    assert repr(t1) == f'AbstractTuple((i64 = 1, f32))'
+    assert repr(t1) == f'AbstractTuple((Int[64] = 1, Float[32]))'
 
     l1 = to_abstract_test([f32])
-    assert repr(l1) == f'AbstractList([f32])'
+    assert repr(l1) == f'AbstractList([Float[32]])'
 
     a1 = to_abstract_test(af32_of(4, 5))
-    assert repr(a1) == f'AbstractArray(f32 x 4 x 5)'
+    assert repr(a1) == f'AbstractArray(Float[32] x 4 x 5)'
 
     p1 = to_abstract_test(Point(1, f32))
-    assert repr(p1) == f'AbstractClass(Point(x :: i64 = 1, y :: f32))'
+    assert repr(p1) == \
+        f'AbstractClass(Point(x :: Int[64] = 1, y :: Float[32]))'
 
     j1 = AbstractJTagged(to_abstract_test(1))
-    assert repr(j1) == f'AbstractJTagged(J(i64 = 1))'
+    assert repr(j1) == f'AbstractJTagged(J(Int[64] = 1))'
 
     ty1 = Ty(f32)
-    assert repr(ty1) == 'AbstractType(Ty(f32))'
+    assert repr(ty1) == 'AbstractType(Ty(Float[32]))'
 
-    e1 = AbstractError(ty.Problem[DEAD])
-    assert repr(e1) == 'AbstractError(E(Problem[DEAD]))'
+    e1 = AbstractError(DEAD)
+    assert repr(e1) == 'AbstractError(E(DEAD))'
 
     f1 = AbstractFunction(P.scalar_mul)
     assert repr(f1) == 'AbstractFunction(scalar_mul)'
@@ -260,3 +261,36 @@ def test_concretize_recursive():
         assert (await concretize_abstract(t)) is ta
 
     asyncio.run(coro())
+
+
+def test_find_coherent_result_sync():
+    def fn(x):
+        if x == 0:
+            raise ValueError('Oh no! Zero!')
+        else:
+            return x > 0
+
+    loop = asyncio.new_event_loop()
+    p1 = PendingFromList([1, 2, 3], None, None, loop=loop)
+    p2 = PendingFromList([-1, -2, -3], None, None, loop=loop)
+    p3 = PendingFromList([1, 2, -3], None, None, loop=loop)
+    p4 = PendingFromList([0], None, None, loop=loop)
+    assert find_coherent_result_sync(p1, fn) is True
+    assert find_coherent_result_sync(p2, fn) is False
+    with pytest.raises(InferenceError):
+        find_coherent_result_sync(p3, fn)
+    with pytest.raises(ValueError):
+        find_coherent_result_sync(p4, fn)
+
+    p = Pending(None, None, loop=loop)
+    with pytest.raises(InferenceError):
+        find_coherent_result_sync(p, fn)
+
+    assert find_coherent_result_sync(10, fn) is True
+    assert find_coherent_result_sync(-10, fn) is False
+
+
+def test_type_to_abstract():
+    assert type_to_abstract(bool) is S(t=ty.Bool)
+    assert type_to_abstract(typing.List) is L(ANYTHING)
+    assert type_to_abstract(typing.Tuple) is T(ANYTHING)

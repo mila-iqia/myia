@@ -18,7 +18,7 @@ from .merge import (  # noqa
 from .misc import (  # noqa
     Named, MISSING, UNKNOWN, Registry, repr_, list_str,
     Event, Events, NS, Namespace, ModuleNamespace, ClosureNamespace, eprint,
-    is_dataclass_type, as_frozen, ErrorPool, flatten,
+    is_dataclass_type, dataclass_methods, ErrorPool, flatten,
 )
 
 from .overload import (  # noqa

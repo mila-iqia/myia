@@ -535,9 +535,8 @@ def convert_arg(self, arg, orig_t: AbstractList, backend):
 
 @overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractClass, backend):
-    dc = dtype.tag_to_dataclass[orig_t.tag]
-    if not isinstance(arg, dc):
-        raise TypeError(f'Expected {dc.__qualname__}')
+    if not isinstance(arg, orig_t.tag):
+        raise TypeError(f'Expected {orig_t.tag.__qualname__}')
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
     return list(flatten(self(x, o, backend)
@@ -549,7 +548,7 @@ def convert_arg(self, arg, orig_t: AbstractArray, backend):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
     et = et.values[TYPE]
-    assert dtype.ismyiatype(et, dtype.Number)
+    assert issubclass(et, dtype.Number)
     if isinstance(arg, np.ndarray):
         arg = backend.from_numpy(arg)
     backend.check_array(arg, et)
@@ -571,13 +570,13 @@ def convert_arg(self, arg, orig_t: AbstractUnion, backend):
 @overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractScalar, backend):
     t = orig_t.values[TYPE]
-    if dtype.ismyiatype(t, dtype.Int):
+    if issubclass(t, dtype.Int):
         if not isinstance(arg, int):
             raise TypeError(f'Expected int')
-    elif dtype.ismyiatype(t, dtype.Float):
+    elif issubclass(t, dtype.Float):
         if not isinstance(arg, float):
             raise TypeError(f'Expected float')
-    elif dtype.ismyiatype(t, dtype.Bool):
+    elif issubclass(t, dtype.Bool):
         if not isinstance(arg, bool):
             raise TypeError(f'Expected bool')
     else:
@@ -588,12 +587,11 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
 
 @overload(bootstrap=True)
 def convert_result(self, res, orig_t, vm_t: AbstractClass, backend):
-    dc = dtype.tag_to_dataclass[orig_t.tag]
     oe = orig_t.attributes.values()
     ve = vm_t.attributes.values()
     tup = tuple(self(getattr(res, attr), o, v, backend)
                 for attr, o, v in zip(orig_t.attributes, oe, ve))
-    return dc(*tup)
+    return orig_t.tag(*tup)
 
 
 @overload  # noqa: F811
@@ -615,8 +613,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend):
     tup = tuple(self(x, o, v, backend)
                 for x, o, v in zip(res, oe, ve))
     if orig_is_class:
-        dc = dtype.tag_to_dataclass[orig_t.tag]
-        return dc(*tup)
+        return orig_t.tag(*tup)
     else:
         return tup
 

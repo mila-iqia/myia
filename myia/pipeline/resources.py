@@ -4,7 +4,7 @@ import math
 import numpy as np
 from types import FunctionType
 
-from .. import dtype, operations, parser, composite as C
+from .. import dtype, operations, parser, composite as C, abstract
 from ..specialize import TypeSpecializer
 from ..abstract import AbstractFunction, InferenceEngine
 from ..ir import Graph, clone
@@ -199,7 +199,7 @@ standard_method_map = TypeMap({
         '__bool__': C.float_bool,
         '__myia_to_array__': P.scalar_to_array,
     },
-    dtype.Tuple: {
+    abstract.AbstractTuple: {
         '__len__': P.tuple_len,
         '__getitem__': P.tuple_getitem,
         '__setitem__': P.tuple_setitem,
@@ -207,13 +207,13 @@ standard_method_map = TypeMap({
         '__myia_next__': C.tuple_next,
         '__myia_hasnext__': C.tuple_hasnext,
     },
-    dtype.List: {
+    abstract.AbstractList: {
         '__len__': P.list_len,
         '__getitem__': P.list_getitem,
         '__setitem__': P.list_setitem,
         '__myia_iter__': C.list_iter,
     },
-    dtype.Array: {
+    abstract.AbstractArray: {
         '__add__': C.add,
         '__sub__': C.sub,
         '__mul__': C.mul,
@@ -238,8 +238,6 @@ standard_method_map = TypeMap({
         '__myia_iter__': C.array_iter,
         '__myia_to_array__': P.identity,
         'item': P.array_to_scalar,
-    },
-    dtype.JTagged: {
     },
     dtype.SymbolicKeyType: {
     },
@@ -305,7 +303,7 @@ class ConverterResource(PipelineResource):
             bool: dtype.Bool,
             int: dtype.Int,
             float: dtype.Float,
-            np.ndarray: dtype.Array,
+            np.ndarray: abstract.AbstractArray,
             np.int8: dtype.Int,
             np.int16: dtype.Int,
             np.int32: dtype.Int,
@@ -313,8 +311,8 @@ class ConverterResource(PipelineResource):
             np.float16: dtype.Float,
             np.float32: dtype.Float,
             np.float64: dtype.Float,
-            tuple: dtype.Tuple,
-            list: dtype.List,
+            tuple: abstract.AbstractTuple,
+            list: abstract.AbstractList,
         }
         mmap = self.resources.method_map
         for t1, t2 in type_map.items():

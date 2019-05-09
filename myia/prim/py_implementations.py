@@ -6,9 +6,9 @@ from typing import Callable
 import numpy as np
 import math
 
-from .. import dtype as types
+from .. import dtype as types, abstract
 from ..dtype import Number, Float, Bool
-from ..utils import Registry, overload
+from ..utils import Registry
 
 from . import ops as primops
 
@@ -235,59 +235,18 @@ def bool_eq(x: Bool, y: Bool) -> Bool:
 @register(primops.typeof)
 def typeof(x):
     """Implement typeof."""
-    if isinstance(x, types.Type) or isinstance(x, type):
-        return types.TypeType
-    else:
-        return types.pytype_to_myiatype(type(x), x)
-
-
-@overload
-def _issubtype_helper(t: types.Array, model):
-    return issubtype(t.elements, model.elements)
-
-
-@overload  # noqa: F811
-def _issubtype_helper(t: types.Tuple, model):
-    if len(t.elements) != len(model.elements):
-        return False
-    return all(issubtype(t1, t2)
-               for t1, t2 in zip(t.elements, model.elements))
-
-
-@overload  # noqa: F811
-def _issubtype_helper(t: types.Class, model):
-    if t.tag != model.tag:
-        return False
-    if tuple(t.attributes.keys()) != tuple(model.attributes.keys()):
-        raise AssertionError(
-            'Identical Class tags should imply identical attributes.'
-        )
-    return all(issubtype(t1, t2)
-               for t1, t2 in zip(t.attributes.values(),
-                                 model.attributes.values()))
-
-
-@overload  # noqa: F811
-def _issubtype_helper(t: object, model):
-    return False
-
-
-def issubtype(t, model):
-    """Check that type t is represented by model."""
-    if t == model:
-        return True
-    elif types.ismyiatype(model, generic=True):
-        return types.ismyiatype(t, model)
-    elif types.get_generic(t, model):
-        return _issubtype_helper[t.generic](t, model)
-    else:
-        return False
+    from ..abstract import from_value
+    return from_value(x, broaden=True)
 
 
 @register(primops.hastype)
 def hastype(x, t):
     """Implement `hastype`."""
-    return issubtype(typeof(x), t)
+    from ..abstract import type_to_abstract, hastype_helper, ANYTHING
+    v = hastype_helper(typeof(x), type_to_abstract(t))
+    if v is ANYTHING:
+        raise AssertionError()
+    return v
 
 
 @register(primops.make_tuple)
@@ -358,12 +317,14 @@ def _vm_getattr(vm, data, attr):
     """Implement `getattr`."""
     from types import MethodType, BuiltinMethodType
     from ..vm import Partial
+    from ..abstract import type_token
     # I don't know how else to get a reference to this type
     method_wrapper_type = type((0).__add__)
     try:
         x = getattr(data, attr)
     except AttributeError:
-        mmap = vm.convert.resources.method_map[typeof(data)]
+        t = type_token(typeof(data))
+        mmap = vm.convert.resources.method_map[t]
         if attr in mmap:
             return Partial(vm.convert(mmap[attr]), [data], vm)
         else:
@@ -512,7 +473,11 @@ def return_(x):
 @register(primops.scalar_cast)
 def scalar_cast(x, t):
     """Implement `scalar_cast`."""
-    assert types.ismyiatype(t, types.Number)
+    from ..abstract import type_to_abstract
+    t = type_to_abstract(t)
+    assert isinstance(t, abstract.AbstractScalar)
+    t = t.values[abstract.TYPE]
+    assert issubclass(t, types.Number)
     dtype = types.type_to_np_dtype(t)
     return getattr(np, dtype)(x)
 
@@ -618,8 +583,9 @@ def invert_permutation(perm):
 @register(primops.make_record)
 def make_record(typ, *args):
     """Implement `make_record`."""
-    dataclass = types.tag_to_dataclass[typ.tag]
-    return dataclass(*args)
+    from ..abstract import type_to_abstract
+    typ = type_to_abstract(typ)
+    return typ.tag(*args)
 
 
 @register(primops.tuple_len)

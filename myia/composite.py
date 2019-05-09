@@ -6,10 +6,10 @@ from functools import reduce
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
-    AbstractClass, build_value
+    AbstractClass, build_value, AbstractError
 from .debug.label import short_labeler
-from .dtype import Array, Object, Int, UInt, Float, Number, Bool, \
-    EnvType, Function, Problem
+from .dtype import Array, Number, Bool, \
+    EnvType, u8, u16, i8, i16, f32, f64
 from .hypermap import HyperMap, hyper_map
 from .abstract import MyiaTypeError, broaden
 from .info import About
@@ -270,15 +270,6 @@ def int_bool(x):
     return x != 0
 
 
-# The parser/inferrer don't like when those are defined inline.
-ui8 = UInt[8]
-ui16 = UInt[16]
-i8 = Int[8]
-i16 = Int[16]
-f32 = Float[32]
-f64 = Float[64]
-
-
 @core
 def int_floordiv(x, y):
     """Implementation of `int_floordiv`."""
@@ -292,8 +283,8 @@ def int_floordiv(x, y):
 def int_truediv(x, y):
     """Implementation of `int_truediv`."""
     if hastype(x, typeof(y)):
-        if (hastype(x, i8) or hastype(x, ui8) or
-                hastype(x, i16) or hastype(x, ui16)):
+        if (hastype(x, i8) or hastype(x, u8) or
+                hastype(x, i16) or hastype(x, u16)):
             return scalar_div(scalar_cast(x, f32), scalar_cast(y, f32))
         return scalar_div(scalar_cast(x, f64), scalar_cast(y, f64))
     else:
@@ -358,8 +349,8 @@ def hasnext(it):
 class SequenceIterator:
     """Iterator to use for sequences like List, Array."""
 
-    idx: Int
-    seq: Object
+    idx: int
+    seq: object
 
     @core(ignore_values=True)
     def __myia_hasnext__(self):
@@ -527,13 +518,13 @@ hyper_add = HyperMap(name='hyper_add', fn_leaf=_leaf_add)
 _leaf_zeros_like = MultitypeGraph('zeros_like')
 
 
-@_leaf_zeros_like.register(Function)
+@_leaf_zeros_like.register(AbstractFunction)
 @core
 def _function_zero(_):
     return newenv
 
 
-@_leaf_zeros_like.register(Problem)
+@_leaf_zeros_like.register(AbstractError)
 @core
 def _dead_zero(x):
     return x
@@ -554,7 +545,7 @@ def _scalar_zero(x):
 @_leaf_zeros_like.register(Array)
 @core
 def _array_zero(xs):
-    scalar_zero = scalar_cast(0, typeof(xs).elements)
+    scalar_zero = scalar_cast(0, typeof(xs).element)
     return distribute(to_array(scalar_zero), shape(xs))
 
 
@@ -692,7 +683,7 @@ list_map = ListMap()
 def _cast_helper(x, model):
     t = typeof(model)
     if hastype(model, Array):
-        return scalar_to_array(scalar_cast(x, t.elements))
+        return scalar_to_array(scalar_cast(x, t.element))
     else:
         return scalar_cast(x, t)
 

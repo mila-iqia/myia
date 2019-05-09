@@ -1,8 +1,7 @@
 """Graph generation from number of arguments or type signatures."""
 
 
-from ..dtype import ismyiatype
-from ..prim.py_implementations import issubtype, typeof
+from .. import abstract, parser
 
 
 class GraphGenerationError(Exception):
@@ -44,37 +43,36 @@ class MultitypeGraph(MetaGraph):
         super().__init__(name)
         self.entries = list(entries.items())
 
+    def normalize_args(self, args):
+        """Return broadened arguments."""
+        from ..abstract import broaden
+        return tuple(broaden(a, None) for a in args)
+
     def register(self, *types):
         """Register a function for the given type signature."""
         def deco(fn):
-            self.entries.append((types, fn))
+            atypes = tuple(abstract.type_to_abstract(t) for t in types)
+            self.entries.append((atypes, fn))
             return fn
         return deco
 
     def _getfn(self, types):
         for sig, fn in self.entries:
-            if len(sig) != len(types):
-                continue
-            if all(issubtype(t2, t1) if ismyiatype(t1) else isinstance(t2, t1)
-                   for t1, t2 in zip(sig, types)):
+            if abstract.typecheck(sig, types):
                 return fn
         else:
             raise GraphGenerationError(types)
 
     def generate_graph(self, args):
         """Generate a Graph for the given abstract arguments."""
-        from ..abstract.utils import build_type
-        types = tuple([build_type(arg) for arg in args])
+        types = tuple(args)
         if types not in self.cache:
-            self.cache[types] = self.generate_from_types(types)
+            self.cache[types] = parser.parse(self._getfn(types))
         return self.cache[types]
-
-    def generate_from_types(self, types):
-        """Generate a Graph for this type signature."""
-        from ..parser import parse
-        return parse(self._getfn(types))
 
     def __call__(self, *args):
         """Call like a normal function."""
-        fn = self._getfn([typeof(arg) for arg in args])
+        from ..abstract import to_abstract
+        types = tuple(to_abstract(arg) for arg in args)
+        fn = self._getfn(types)
         return fn(*args)

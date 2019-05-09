@@ -7,10 +7,11 @@ from collections import defaultdict
 from operator import getitem
 
 from .. import dtype
+from ..abstract import typecheck
 from ..ir import Graph
 from ..dtype import Number, Bool
 from ..prim import ops as P, Primitive, py_implementations as py
-from ..utils import Namespace, SymbolicKeyInstance, is_dataclass_type
+from ..utils import Namespace, SymbolicKeyInstance
 
 
 from .data import (
@@ -24,8 +25,6 @@ from .data import (
     AbstractList,
     AbstractClass,
     AbstractJTagged,
-    AbstractUnion,
-    abstract_union,
     PartialApplication,
     JTransformedFunction,
     PrimitiveFunction,
@@ -38,7 +37,8 @@ from .data import (
 )
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context, ConditionalContext
-from .utils import sensitivity_transform, build_value, build_type, broaden
+from .utils import sensitivity_transform, build_value, \
+    type_token, broaden, type_to_abstract, split_type, hastype_helper
 from .infer import Inferrer, to_abstract
 
 
@@ -76,8 +76,8 @@ class StandardInferrer(Inferrer):
             typ = self.typemap.get(i)
             if typ is None:
                 pass
-            elif dtype.ismyiatype(typ):
-                await force_pending(engine.check(typ, build_type(arg)))
+            elif isinstance(typ, dtype.TypeMeta):
+                await force_pending(engine.check(typ, type_token(arg)))
             elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
@@ -247,7 +247,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
     """
     resources = engine.pipeline.resources
 
-    data_t = build_type(data)
+    data_t = type_token(data)
     item_v = build_value(item, default=ANYTHING)
 
     if item_v is ANYTHING:
@@ -265,10 +265,10 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
 
     if case == 'class':
         # Get field from Class
-        if item_v in data_t.attributes:
-            return await on_dcattr(data, data_t, item_v)
-        elif item_v in data_t.methods:
-            method = data_t.methods[item_v]
+        if item_v in data.attributes:
+            return await on_dcattr(data, item_v)
+        elif item_v in data.methods:
+            method = data.methods[item_v]
             method = resources.convert(method)
             inferrer = to_abstract(method, Context.empty(), ref=outref)
             fn = _prim_or_graph(inferrer)
@@ -278,7 +278,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
                           outref.context)
             return await eng.reroute(outref, ref)
         else:
-            raise InferenceError(f'Unknown field in {data_t}: {item_v}')
+            raise InferenceError(f'Unknown field in {data}: {item_v}')
 
     elif case == 'method':
         method, = args
@@ -292,7 +292,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         return await eng.reroute(outref, ref)
 
     elif case == 'no_method':
-        msg = f"object of type {data_t} has no attribute '{item_v}'"
+        msg = f"object of type {data} has no attribute '{item_v}'"
         raise MyiaAttributeError(msg)
 
     else:
@@ -314,21 +314,13 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         except Exception as e:  # pragma: no cover
             raise InferenceError(f'Unexpected error in getter: {e!r}')
         value = resources.convert(raw)
-        if is_dataclass_type(value):
-            typ = dtype.pytype_to_myiatype(value)
-            g = outref.node.graph
-            eng = outref.engine
-            ref = eng.ref(g.apply(P.partial, P.make_record, typ),
-                          outref.context)
-            return await eng.reroute(outref, ref)
-        else:
-            return to_abstract(value, Context.empty(), ref=outref)
+        return to_abstract(value, Context.empty(), ref=outref)
 
 
 async def _resolve_case(resources, data_t, item_v, chk):
     mmap = resources.method_map
 
-    if dtype.ismyiatype(data_t, dtype.Class):
+    if data_t is AbstractClass:
         return ('class', data_t)
 
     # Try method map
@@ -360,52 +352,6 @@ def _shape_type(engine, shp):
 def prod(iterable):
     """Return the product of the elements of the iterator."""
     return reduce(operator.mul, iterable, 1)
-
-
-async def issubtype(x, model):
-    """Check whether type x is a subtype of model."""
-    if model is dtype.Object:
-        return True
-    elif model is dtype.Tuple:
-        return isinstance(x, AbstractTuple)
-    elif model is dtype.Array:
-        return isinstance(x, AbstractArray)
-    elif model is dtype.List:
-        return isinstance(x, AbstractList)
-    elif model is dtype.Class:
-        return isinstance(x, AbstractClass)
-
-    elif dtype.ismyiatype(model, dtype.Tuple):
-        return isinstance(x, AbstractTuple) \
-            and len(x.elements) == len(model.elements) \
-            and all([await issubtype(xe, me)
-                     for xe, me in zip(x.elements, model.elements)])
-    elif dtype.ismyiatype(model, dtype.Array):
-        return isinstance(x, AbstractArray) \
-            and await issubtype(x.element, model.elements)
-    elif dtype.ismyiatype(model, dtype.List):
-        return isinstance(x, AbstractList) \
-            and await issubtype(x.element, model.element_type)
-    elif dtype.ismyiatype(model, dtype.Class):
-        return isinstance(x, AbstractClass) \
-            and x.tag == model.tag \
-            and all([await issubtype(x.attributes[name], attr_t)
-                     for name, attr_t in model.attributes.items()])
-
-    elif dtype.ismyiatype(model, dtype.Number) \
-            or dtype.ismyiatype(model, dtype.Bool) \
-            or dtype.ismyiatype(model, dtype.Nil):
-        if not isinstance(x, AbstractScalar):
-            return False
-        t = x.values[TYPE]
-        if isinstance(t, Pending):
-            async def chk(t):
-                return dtype.ismyiatype(t, model)
-            return await find_coherent_result(t, chk)
-        else:
-            return dtype.ismyiatype(t, model)
-    else:
-        raise AssertionError(f'Invalid model: {model}')
 
 
 ##############
@@ -453,47 +399,16 @@ uniform_prim(P.bool_eq, infer_value=True)(py.bool_eq)
 ######################
 
 
-async def _split_type(t, model):
-    """Checks t against the model and return matching/non-matching subtypes.
-
-    * If t is a Union, return a Union that fully matches model, and a Union
-      that does not match model. No matches in either case returns None for
-      that case.
-    * Otherwise, return (t, None) or (None, t) depending on whether t matches
-      the model.
-    """
-    if isinstance(t, AbstractUnion):
-        matching = [(opt, await issubtype(opt, model))
-                    for opt in t.options]
-        t1 = abstract_union([opt for opt, m in matching if m])
-        t2 = abstract_union([opt for opt, m in matching if not m])
-        return t1, t2
-    elif (await issubtype(t, model)):
-        return t, None
-    else:
-        return None, t
-
-
 @standard_prim(P.typeof)
 async def _inf_typeof(engine, value):
-    t = build_type(value)
-    return AbstractType(t)
+    return AbstractType(value)
 
 
 @standard_prim(P.hastype)
-async def _inf_hastype(engine, value, model: dtype.TypeType):
-    model_t = model.values[VALUE]
-    if model_t is ANYTHING:
-        raise MyiaTypeError('hastype must be resolvable statically')
-    match, nomatch = await _split_type(value, model_t)
-    if match is None:
-        v = False
-    elif nomatch is None:
-        v = True
-    else:
-        v = ANYTHING
+async def _inf_hastype(engine, value, model: AbstractType):
+    a = type_to_abstract(model.values[VALUE])
     return AbstractScalar({
-        VALUE: v,
+        VALUE: hastype_helper(value, a),
         TYPE: dtype.Bool,
     })
 
@@ -518,16 +433,15 @@ async def _inf_make_list(engine, *args):
 
 
 @standard_prim(P.make_record)
-async def infer_type_make_record(engine, _cls: dtype.TypeType, *elems):
+async def infer_type_make_record(engine, _cls: AbstractType, *elems):
     """Infer the return type of make_record."""
     cls = _cls.values[VALUE]
-    if cls is ANYTHING:
-        raise MyiaTypeError('Expected a class to inst')
+    cls = type_to_abstract(cls)
     expected = list(cls.attributes.items())
     if len(expected) != len(elems):
         raise MyiaTypeError('Wrong class inst')
     for (name, t), elem in zip(expected, elems):
-        if not (await issubtype(elem, t)):
+        if not typecheck(t, elem):
             raise MyiaTypeError('Wrong class inst')
 
     return AbstractClass(
@@ -610,7 +524,7 @@ class _GetAttrInferrer(Inferrer):
                     f'item argument to resolve must be a string, not {item_v}.'
                 )
 
-        async def on_dcattr(data, data_t, item_v):
+        async def on_dcattr(data, item_v):
             return data.attributes[item_v]
 
         rval = await static_getter(
@@ -897,7 +811,8 @@ class _SwitchInferrer(Inferrer):
 
         fulltype = await xref.get()
         typ = (await typref.get()).values[VALUE]
-        tbtyp, fbtyp = await _split_type(fulltype, typ)
+        typ = type_to_abstract(typ)
+        tbtyp, fbtyp = split_type(fulltype, typ)
         # We are not supposed to be here if only one branch could be taken.
         assert tbtyp is not None
         assert fbtyp is not None
@@ -947,7 +862,7 @@ class _SwitchInferrer(Inferrer):
         condref, tbref, fbref = argrefs
 
         cond = await condref.get()
-        await force_pending(engine.check(Bool, build_type(cond)))
+        await force_pending(engine.check(Bool, type_token(cond)))
 
         v = cond.values[VALUE]
         if v is True:
@@ -979,9 +894,8 @@ abstract_inferrer_constructors[P.switch] = _SwitchInferrer.partial()
 async def _inf_scalar_cast(engine,
                            scalar: Number,
                            typ: AbstractType):
-    t = typ.values[VALUE]
-    if t is ANYTHING:
-        raise MyiaTypeError('Must have concrete type for scalar_cast')
+    a = type_to_abstract(typ.values[VALUE])
+    t = type_token(a)
     engine.check(Number, t)
     values = {**scalar.values, TYPE: t}
     return AbstractScalar(values)
@@ -1018,7 +932,7 @@ class _ResolveInferrer(Inferrer):
                     refs=[item]
                 )
 
-        async def on_dcattr(data, data_t, item_v):  # pragma: no cover
+        async def on_dcattr(data, item_v):  # pragma: no cover
             raise MyiaTypeError('Cannot resolve on Class.')
 
         rval = await static_getter(
@@ -1092,11 +1006,8 @@ async def _inf_env_add(engine, env1, env2):
 
 
 @standard_prim(P.unsafe_static_cast)
-async def _inf_unsafe_static_cast(engine, x, typ: AbstractScalar):
-    v = typ.values[VALUE]
-    if not isinstance(v, AbstractValue):
-        raise MyiaTypeError('unsafe_static_cast expects a type constant')
-    return v
+async def _inf_unsafe_static_cast(engine, x, typ: AbstractType):
+    return typ.values[VALUE]
 
 
 @standard_prim(P.J)

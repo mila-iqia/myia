@@ -3,6 +3,7 @@
 import builtins
 import itertools
 import sys
+from types import FunctionType
 from typing import Any, Dict, List, TypeVar
 from colorama import AnsiToWin32
 
@@ -293,14 +294,11 @@ def is_dataclass_type(cls):
     return isinstance(cls, type) and hasattr(cls, '__dataclass_fields__')
 
 
-def as_frozen(x):
-    """Return an immutable representation for x."""
-    if isinstance(x, dict):
-        return tuple(sorted((k, as_frozen(v)) for k, v in x.items()))
-    elif isinstance(x, (list, tuple)):
-        return tuple(as_frozen(y) for y in x)
-    else:
-        return x
+def dataclass_methods(dc):
+    """Returns a dataclass's method dictionary."""
+    return {name: getattr(dc, name)
+            for name in dir(dc)
+            if isinstance(getattr(dc, name), (FunctionType,))}
 
 
 class ErrorPool:

@@ -54,7 +54,8 @@ def erase_class(root, manager):
                     )
 
         elif node.is_constant() and is_dataclass_type(node.value):
-            new_node = Constant(P.make_tuple)
+            raise NotImplementedError()
+            # new_node = Constant(P.make_tuple)
 
         if new_node is not None:
             new_node.abstract = node.abstract
