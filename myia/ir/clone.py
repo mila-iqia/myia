@@ -317,6 +317,8 @@ class CloneRemapper(BasicRemapper):
 
     def clone_disconnected(self, droot):
         """Clone a subgraph that's not (yet) connected to its graph/manager."""
+        if droot.graph not in self.graph_repl:
+            return droot
         if droot in self.repl:
             return False
         target_graph = self.get_graph(droot.graph)

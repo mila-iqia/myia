@@ -124,6 +124,8 @@ class Backend:
                 and issubclass(t.values[abstract.TYPE], dtype.EnvType):
             assert len(v._contents) == 0
             return self.empty_env()
+        elif isinstance(t, abstract.AbstractError):
+            return None
         else:
             raise NotImplementedError(f'convert_value for {t}')
 
