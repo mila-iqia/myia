@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 from functools import reduce
-from typing import Callable
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
@@ -519,7 +518,7 @@ hyper_add = HyperMap(name='hyper_add', fn_leaf=_leaf_add)
 _leaf_zeros_like = MultitypeGraph('zeros_like')
 
 
-@_leaf_zeros_like.register(Callable)
+@_leaf_zeros_like.register(AbstractFunction)
 @core
 def _function_zero(_):
     return newenv

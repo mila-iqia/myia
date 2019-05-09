@@ -14,7 +14,7 @@ from myia.abstract import (
     VALUE, TYPE, DEAD, find_coherent_result_sync,
     abstract_clone, abstract_clone_async, broaden,
     Pending, concretize_abstract, type_to_abstract,
-    InferenceError, VirtualFunction
+    InferenceError
 )
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
@@ -293,6 +293,3 @@ def test_type_to_abstract():
     assert type_to_abstract(bool) is S(t=ty.Bool)
     assert type_to_abstract(typing.List) is L(ANYTHING)
     assert type_to_abstract(typing.Tuple) is T(ANYTHING)
-    si = S(t=ty.i64)
-    f = AbstractFunction(VirtualFunction((si, si), si))
-    assert type_to_abstract(typing.Callable[[int, int], int]) is f

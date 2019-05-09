@@ -1,6 +1,5 @@
 """Utilities for abstract values and inference."""
 
-import collections
 from dataclasses import dataclass
 import typing
 import numpy as np
@@ -34,7 +33,6 @@ from .data import (
     abstract_union,
     TrackDict,
     PartialApplication,
-    VirtualFunction,
     VALUE,
     TYPE,
     SHAPE,
@@ -106,7 +104,6 @@ def _build_value(ac: AbstractClass):
 _default_type_params = {
     tuple: (),
     list: (object,),
-    collections.abc.Callable: (),
 }
 
 
@@ -209,15 +206,8 @@ def _t2a_helper(main: bool, args):
 
 
 @overload  # noqa: F811
-def _t2a_helper(main: collections.abc.Callable, args):
-    if args == () or args is None:
-        return AbstractFunction(value=ANYTHING)
-    else:
-        *inputs, ret = args
-        return AbstractFunction(VirtualFunction(
-            tuple(type_to_abstract(x) for x in inputs),
-            type_to_abstract(ret)
-        ))
+def _t2a_helper(main: AbstractFunction, args):
+    return AbstractFunction(value=ANYTHING)
 
 
 @overload  # noqa: F811
