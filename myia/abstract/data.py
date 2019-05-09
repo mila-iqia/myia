@@ -8,7 +8,6 @@ from typing import Tuple
 from dataclasses import dataclass
 from contextvars import ContextVar
 
-from .. import dtype
 from ..debug.label import label
 from ..utils import Named, Partializable, Interned, Atom, Elements, \
     PossiblyRecursive
