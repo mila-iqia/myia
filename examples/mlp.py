@@ -109,7 +109,7 @@ def cost(model, x, target):
     return sum(diff * diff)
 
 
-# @myia(backend='pytorch')
+# @myia(backend='pytorch', backend_options={'device': device_type})
 @myia(backend_options={'target': device_type})
 def step(model, x, y):
     """Returns the loss and parameter gradients."""
