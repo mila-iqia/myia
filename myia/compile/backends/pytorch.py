@@ -180,7 +180,7 @@ class PyTorchBackend(Backend):
 
     def __init__(self, device='cpu'):
         """Create a PyTorch backend on the given device."""
-        if device == 'cuda':
+        if device == 'cuda':  # pragma: no cover
             device = 'cuda:0'
         self.device = torch.device(device)
         self.compiler = CompileGraphs(lambda lst: pytorch_convert(lst, self),
