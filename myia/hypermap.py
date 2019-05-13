@@ -50,6 +50,7 @@ class HyperMap(MetaGraph):
                 name = f'hyper_map[{fn_leaf}]'  # pragma: no cover
         super().__init__(name)
         self.fn_leaf = fn_leaf
+        self._rec = fn_rec
         self.fn_rec = fn_rec or self
         self.broadcast = broadcast
         self.nonleaf = nonleaf
@@ -107,6 +108,8 @@ class HyperMap(MetaGraph):
     def _make(self, a: abstract.AbstractList, g, fnarg, argmap):
         args = list(argmap.keys())
         mask = [not isleaf for _, isleaf in argmap.values()]
+        if all(mask):
+            mask = None
         if fnarg is None:
             lm = C.ListMap(self.fn_rec, loop_mask=mask)
             return g.apply(lm, *args)
@@ -165,6 +168,16 @@ class HyperMap(MetaGraph):
             argmap[g.add_parameter()] = (a, self._is_leaf(a))
         g.output = self._generate_helper(g, fnarg, argmap)
         return g
+
+    def __eq__(self, hm):
+        return (isinstance(hm, HyperMap)
+                and self.fn_leaf == hm.fn_leaf
+                and self._rec == hm._rec
+                and self.nonleaf == hm.nonleaf
+                and self.broadcast == hm.broadcast)
+
+    def __hash__(self):
+        return hash((self.fn_leaf, self._rec, self.nonleaf, self.broadcast))
 
     def __call__(self, *all_args):
         """Python implementation of HyperMap's functionality."""

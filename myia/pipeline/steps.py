@@ -250,6 +250,7 @@ step_opt = Optimizer.partial(
             optlib.simplify_switch2,
             optlib.simplify_switch_idem,
             optlib.combine_switches,
+            optlib.combine_switches_array,
 
             # Safe inlining
             optlib.inline_trivial,
@@ -302,6 +303,9 @@ step_opt = Optimizer.partial(
             optlib.getitem_newenv,
             optlib.getitem_env_add,
             optlib.simplify_array_map,
+            optlib.lmadd_zero_l,
+            optlib.lmadd_zero_r,
+            optlib.lmadd_setitem_zero,
         ],
         main2=[
             # Costlier optimizations
@@ -342,6 +346,10 @@ step_opt2 = Optimizer.partial(
             optlib.inline_unique_uses,
             optlib.inline_inside_marked_caller,
             optlib.inline_core,
+            optlib.combine_switches_array,
+            optlib.lmadd_zero_l,
+            optlib.lmadd_zero_r,
+            optlib.lmadd_setitem_zero,
         ],
     )
 )

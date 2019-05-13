@@ -26,7 +26,7 @@ parse = standard_pipeline \
     .make_transformer('input', 'graph')
 
 
-_flags = {'ignore_values': True}
+_flags = {'ignore_values': True, 'core': True}
 
 
 def bprop_to_augm(prim, fn, flags):

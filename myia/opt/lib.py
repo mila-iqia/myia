@@ -2,7 +2,7 @@
 
 from ..abstract import abstract_clone, AbstractFunction, AbstractJTagged, \
     type_token
-from ..composite import hyper_add
+from ..composite import ListMap, hyper_add, zeros_like
 from ..dtype import Number
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone, \
     BasicRemapper
@@ -52,6 +52,14 @@ NIL = var(lambda x: x.is_constant() and x.value == ())
 Xs = SVar(Var())
 Ys = SVar(Var())
 Cs = SVar(var(_is_c))
+
+
+def M(mg):
+    """Create a variable that matches a Metagraph."""
+    def chk(x):
+        return (x.is_constant_graph()
+                and x.value.flags.get('metagraph') == mg)
+    return var(chk)
 
 
 def primset_var(*prims):
@@ -124,21 +132,6 @@ def setitem_tuple_ct(optimizer, node, equiv):
     return sexp_to_node((P.make_tuple, *elems), node.graph)
 
 
-@pattern_replacer(P.list_getitem, (P.list_setitem, X, C1, Y), C2)
-def getitem_setitem_list(optimizer, node, equiv):
-    """Simplify getitem over setitem.
-
-    setitem(xs, 0, v)[0] => v
-    setitem(xs, 0, v)[1] => xs[1]
-    """
-    i1 = equiv[C1].value
-    i2 = equiv[C2].value
-    if i1 == i2:
-        return equiv[Y]
-    else:
-        return node.graph.apply(P.list_getitem, equiv[X], i2)
-
-
 # f((a, b, ...), (p, q, ...)) => (f(a, p), f(b, q), ...)
 # For f in the following list:
 _BubbleBinary = primset_var(P.scalar_add)
@@ -156,6 +149,56 @@ def bubble_op_tuple_binary(optimizer, node, equiv):
     assert len(xs) == len(ys)
     elems = [(op, x, y) for x, y in zip(xs, ys)]
     return sexp_to_node((P.make_tuple, *elems), node.graph)
+
+
+##############################
+# List-related optimizations #
+##############################
+
+
+@pattern_replacer(P.list_getitem, (P.list_setitem, X, C1, Y), C2)
+def getitem_setitem_list(optimizer, node, equiv):
+    """Simplify getitem over setitem.
+
+    setitem(xs, 0, v)[0] => v
+    setitem(xs, 0, v)[1] => xs[1]
+    """
+    i1 = equiv[C1].value
+    i2 = equiv[C2].value
+    if i1 == i2:
+        return equiv[Y]
+    else:
+        return node.graph.apply(P.list_getitem, equiv[X], i2)
+
+
+_lmadd = M(ListMap(fn_rec=hyper_add))
+_lmzlk = M(ListMap(fn_rec=zeros_like))
+
+
+lmadd_zero_l = psub(
+    pattern=(_lmadd, (_lmzlk, X), Y),
+    replacement=Y,
+    name='lmadd_zero_l'
+)
+
+
+lmadd_zero_r = psub(
+    pattern=(_lmadd, Y, (_lmzlk, X)),
+    replacement=Y,
+    name='lmadd_zero_r'
+)
+
+
+lmadd_setitem_zero = psub(
+    pattern=(_lmadd, X1, (P.list_setitem, (_lmzlk, X2), X3, X4)),
+    replacement=(P.list_setitem,
+                 X1,
+                 X3,
+                 (hyper_add,
+                  (P.list_getitem, X1, X3),
+                  X4)),
+    name='lmadd_setitem_zero'
+)
 
 
 ##############################
@@ -551,6 +594,18 @@ combine_switches = psub(
     replacement=(P.switch, X1, (_PutInSwitch, X2, X4), (_PutInSwitch, X3, X5)),
     name='combine_switches',
     interest=_PutInSwitch_l
+)
+
+
+combine_switches_array = psub(
+    pattern=(P.array_map,
+             _PutInSwitch,
+             (P.switch, X1, X2, X3),
+             (P.switch, X1, X4, X5)),
+    replacement=(P.switch, X1,
+                 (P.array_map, _PutInSwitch, X2, X4),
+                 (P.array_map, _PutInSwitch, X3, X5)),
+    name='combine_switches_array'
 )
 
 
