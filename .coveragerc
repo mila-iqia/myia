@@ -5,6 +5,7 @@ omit =
     tests/*
     debug/*
     myia/debug/*
+    examples/*
 
 [report]
 exclude_lines =
