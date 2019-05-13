@@ -667,6 +667,7 @@ class ListMap(MetaGraph):
         else:
             g.output = g.apply(gcond, 1, resl, *gargs)
 
+        g.flags['forbid_inlining'] = True
         return g
 
     def __call__(self, fn, *lists):

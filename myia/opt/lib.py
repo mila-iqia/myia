@@ -618,6 +618,9 @@ def make_inliner(inline_criterion, check_recursive):
         g = equiv[G].value
         args = equiv[Xs]
 
+        if g.flags.get('forbid_inlining', False):
+            return node
+
         if inline_criterion is not None:
             if not inline_criterion(g, node, args):
                 return node
