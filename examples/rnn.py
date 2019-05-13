@@ -51,16 +51,22 @@ def generate_data(n, batch_size, input_size, target_size, sequence_size,
             for i in range(n)]
 
 
-def rnn_parameters(*layer_sizes, seed=123123):
-    """Generates parameters for a MLP given a list of layer sizes."""
+def rnn_parameters(*layer_sizes, batch_size, seed=123123):
+    """Generates parameters for an RNN given a list of layer sizes."""
     R = RandomState(seed=seed)
-    parameters = []
-    for i, o in zip(layer_sizes[:-1], layer_sizes[1:]):
+    i, h, *rest = layer_sizes
+
+    W = param(R, i, h)
+    U = param(R, h, h)
+    b = param(R, 1, h)
+    h0 = param(R, batch_size, h)
+    parameters = [(W, U, b, h0)]
+
+    for i, o in zip((h, *rest[:-1]), rest):
         W = param(R, i, o)
-        r = param(R, o, o)
         b = param(R, 1, o)
-        h0 = param(R, 5, o)
-        parameters.append((W, r, b, h0))
+        parameters.append((W, b))
+
     return parameters
 
 
@@ -150,6 +156,8 @@ def step(model, x, y):
 def run_helper(epochs, n, batch_size, layer_sizes):
     """Run a model with the specified layer sizes on n random batches.
 
+    The first layer is an RNN layer, the rest are linear+tanh.
+
     Arguments:
         epochs: How many epochs to run.
         n: Number of training batches to generate.
@@ -157,8 +165,10 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         layer_sizes: Sizes of the model's layers.
     """
     layers = []
-    for W, R, b, h0 in rnn_parameters(*layer_sizes):
-        layers.append(RNNLayer(W, R, b, h0))
+    (W, U, b, h0), *linp = rnn_parameters(*layer_sizes, batch_size=batch_size)
+    layers.append(RNNLayer(W, U, b, h0))
+    for W, b in linp:
+        layers.append(Linear(W, b))
         layers.append(Tanh())
     model = Sequential(tuple(layers))
     data = generate_data(n, batch_size, layer_sizes[0], layer_sizes[-1], 10)
@@ -168,6 +178,8 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         t0 = time.time()
         for inp, target in data:
             cost, dmodel = step(model, inp, target)
+            if isinstance(cost, numpy.ndarray):
+                cost = float(cost)
             costs.append(cost)
             model = model - (numpy.float32(0.01) * dmodel)
         c = sum(costs) / n
@@ -187,8 +199,7 @@ def run_helper(epochs, n, batch_size, layer_sizes):
 
 def run():
     """Run the model."""
-    # run_helper(100, 10, 5, (10, 50, 1))
-    run_helper(100, 10, 5, (10, 1))
+    run_helper(100, 10, 5, (10, 7, 1))
 
 
 if __name__ == '__main__':
