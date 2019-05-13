@@ -19,6 +19,7 @@ from myia.debug import traceback  # noqa
 ###########
 
 
+dtype = 'float32'
 device_type = 'cpu'
 # device_type = 'cuda'  # Uncomment to run on the gpu
 
@@ -34,7 +35,7 @@ device_type = 'cpu'
 
 def param(R, *size):
     """Generates a random array using the generator R."""
-    return numpy.array(R.rand(*size) * 2 - 1, dtype='float32')
+    return numpy.array(R.rand(*size) * 2 - 1, dtype=dtype)
 
 
 def generate_data(n, batch_size, input_size, target_size, *, seed=87):
@@ -135,6 +136,7 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         layers.append(Tanh())
     model = Sequential(tuple(layers))
     data = generate_data(n, batch_size, layer_sizes[0], layer_sizes[-1])
+    lr = getattr(numpy, dtype)(0.01)
 
     for _ in range(epochs):
         costs = []
@@ -144,7 +146,7 @@ def run_helper(epochs, n, batch_size, layer_sizes):
             if isinstance(cost, numpy.ndarray):
                 cost = float(cost)
             costs.append(cost)
-            model = model - (numpy.float32(0.01) * dmodel)
+            model = model - (lr * dmodel)
         c = sum(costs) / n
         t = time.time() - t0
         print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')

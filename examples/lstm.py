@@ -20,6 +20,7 @@ from myia.debug import traceback  # noqa
 ###########
 
 
+dtype = 'float32'
 device_type = 'cpu'
 # device_type = 'cuda'  # Uncomment to run on the gpu
 
@@ -35,7 +36,7 @@ device_type = 'cpu'
 
 def param(R, *size):
     """Generates a random array using the generator R."""
-    return numpy.array(R.rand(*size) * 2 - 1, dtype='float32')
+    return numpy.array(R.rand(*size) * 2 - 1, dtype=dtype)
 
 
 def generate_data(n, batch_size, input_size, target_size, sequence_size,
@@ -71,8 +72,8 @@ def lstm_parameters(*layer_sizes, batch_size, seed=6666):
     b_c = param(R, 1, h)
     b_o = param(R, 1, h)
 
-    s0 = numpy.zeros((batch_size, h), dtype='float32')
-    c0 = numpy.zeros((batch_size, h), dtype='float32')
+    s0 = numpy.zeros((batch_size, h), dtype=dtype)
+    c0 = numpy.zeros((batch_size, h), dtype=dtype)
 
     parameters = [(
         W_i, W_f, W_c, W_o,
@@ -219,6 +220,7 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         layers.append(Tanh())
     model = Sequential(tuple(layers))
     data = generate_data(n, batch_size, layer_sizes[0], layer_sizes[-1], 10)
+    lr = getattr(numpy, dtype)(0.01)
 
     for _ in range(epochs):
         costs = []
@@ -228,7 +230,7 @@ def run_helper(epochs, n, batch_size, layer_sizes):
             if isinstance(cost, numpy.ndarray):
                 cost = float(cost)
             costs.append(cost)
-            model = model - (numpy.float32(0.01) * dmodel)
+            model = model - (lr * dmodel)
         c = sum(costs) / n
         t = time.time() - t0
         print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')
