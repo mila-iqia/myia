@@ -10,10 +10,9 @@ from numpy.random import RandomState
 from dataclasses import dataclass
 
 from myia import myia, value_and_grad, ArithmeticData
-from myia.prim.py_implementations import distribute, shape, tuple_setitem
 from myia.dtype import Array
 # The following import installs custom tracebacks for inference errors
-# from myia.debug import traceback  # noqa
+from myia.debug import traceback  # noqa
 
 
 ###########
