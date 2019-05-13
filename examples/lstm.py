@@ -236,6 +236,9 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')
 
 
+# We do not currently run this test in the test suite because it is too
+# expensive to run.
+
 # def test_run():
 #     """Run the model.
 
