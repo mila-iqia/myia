@@ -1,4 +1,4 @@
-"""Example of an MLP in Myia.
+"""Example of an RNN in Myia.
 
 Myia is still a work in progress, and this example may change in the future.
 """
@@ -10,6 +10,7 @@ from numpy.random import RandomState
 from dataclasses import dataclass
 
 from myia import myia, value_and_grad, ArithmeticData
+from myia.dtype import Array
 # The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
 
@@ -38,26 +39,54 @@ def param(R, *size):
     return numpy.array(R.rand(*size) * 2 - 1, dtype=dtype)
 
 
-def generate_data(n, batch_size, input_size, target_size, *, seed=87):
+def generate_data(n, batch_size, input_size, target_size, sequence_size,
+                  *, seed=91):
     """Generate inputs and targets.
 
     Generates n batches of samples of size input_size, matched with
     a single target.
     """
     R = RandomState(seed=seed)
-    return [(param(R, batch_size, input_size),
+    return [([param(R, batch_size, input_size) for i in range(sequence_size)],
              param(R, batch_size, target_size))
             for i in range(n)]
 
 
-def mlp_parameters(*layer_sizes, seed=90909):
+def lstm_parameters(*layer_sizes, batch_size, seed=6666):
     """Generates parameters for a MLP given a list of layer sizes."""
     R = RandomState(seed=seed)
-    parameters = []
-    for i, o in zip(layer_sizes[:-1], layer_sizes[1:]):
+    i, h, *rest = layer_sizes
+
+    W_i = param(R, i, h)
+    W_f = param(R, i, h)
+    W_c = param(R, i, h)
+    W_o = param(R, i, h)
+
+    R_i = param(R, h, h)
+    R_f = param(R, h, h)
+    R_c = param(R, h, h)
+    R_o = param(R, h, h)
+
+    b_i = param(R, 1, h)
+    b_f = param(R, 1, h)
+    b_c = param(R, 1, h)
+    b_o = param(R, 1, h)
+
+    s0 = numpy.zeros((batch_size, h), dtype=dtype)
+    c0 = numpy.zeros((batch_size, h), dtype=dtype)
+
+    parameters = [(
+        W_i, W_f, W_c, W_o,
+        R_i, R_f, R_c, R_o,
+        b_i, b_f, b_c, b_o,
+        s0, c0
+    )]
+
+    for i, o in zip((h, *rest[:-1]), rest):
         W = param(R, i, o)
         b = param(R, 1, o)
         parameters.append((W, b))
+
     return parameters
 
 
@@ -66,8 +95,12 @@ def mlp_parameters(*layer_sizes, seed=90909):
 #########
 
 
-# We generate a MLP model with some arbitrary number of layers and tanh
-# activations.
+# We generate an LSTM.
+
+
+def sigmoid(x):
+    """Sigmoid activation function."""
+    return (numpy.tanh(x) + 1) / 2
 
 
 @dataclass(frozen=True)
@@ -89,6 +122,53 @@ class Tanh(ArithmeticData):
     def apply(self, input):
         """Apply the layer."""
         return numpy.tanh(input)
+
+
+@dataclass(frozen=True)
+class LSTMLayer(ArithmeticData):
+    """LSTM layer."""
+
+    W_i: Array
+    W_f: Array
+    W_c: Array
+    W_o: Array
+
+    R_i: Array
+    R_f: Array
+    R_c: Array
+    R_o: Array
+
+    b_i: Array
+    b_f: Array
+    b_c: Array
+    b_o: Array
+
+    s0: Array
+    c0: Array
+
+    def step(self, x_t, h_tm1, c_tm1):
+        """Run one LSTM step."""
+        i_t = sigmoid((x_t @ self.W_i) + (h_tm1 @ self.R_i) + self.b_i)
+        f_t = sigmoid((x_t @ self.W_f) + (h_tm1 @ self.R_f) + self.b_f)
+        o_t = sigmoid((x_t @ self.W_o) + (h_tm1 @ self.R_o) + self.b_o)
+
+        c_hat_t = numpy.tanh(
+            (x_t @ self.W_c) + (h_tm1 @ self.R_c) + self.b_c
+        )
+
+        c_t = f_t * c_tm1 + i_t * c_hat_t
+        h_t = o_t * numpy.tanh(c_t)
+
+        return h_t, c_t
+
+    def apply(self, x):
+        """Apply the layer."""
+        s = self.s0
+        c = self.c0
+        for e in x:
+            s, c = self.step(e, s, c)
+        # Maybe collect and return the full list of s outputs?
+        return s
 
 
 @dataclass(frozen=True)
@@ -124,6 +204,8 @@ def step(model, x, y):
 def run_helper(epochs, n, batch_size, layer_sizes):
     """Run a model with the specified layer sizes on n random batches.
 
+    The first layer is an LSTM layer, the rest are linear+tanh.
+
     Arguments:
         epochs: How many epochs to run.
         n: Number of training batches to generate.
@@ -131,11 +213,13 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         layer_sizes: Sizes of the model's layers.
     """
     layers = []
-    for W, b in mlp_parameters(*layer_sizes):
+    lstmp, *linp = lstm_parameters(*layer_sizes, batch_size=batch_size)
+    layers.append(LSTMLayer(*lstmp))
+    for W, b in linp:
         layers.append(Linear(W, b))
         layers.append(Tanh())
     model = Sequential(tuple(layers))
-    data = generate_data(n, batch_size, layer_sizes[0], layer_sizes[-1])
+    data = generate_data(n, batch_size, layer_sizes[0], layer_sizes[-1], 10)
     lr = getattr(numpy, dtype)(0.01)
 
     for _ in range(epochs):
@@ -152,19 +236,22 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')
 
 
-def test_run():
-    """Run the model.
+# We do not currently run this test in the test suite because it is too
+# expensive to run.
 
-    This function is run automatically in the test suite to check against
-    regressions, so keep a low number of narrow layers to make sure it runs
-    quickly.
-    """
-    run_helper(1, 5, 5, (10, 3))
+# def test_run():
+#     """Run the model.
+
+#     This function is run automatically in the test suite to check against
+#     regressions, so keep a low number of narrow layers to make sure it runs
+#     quickly.
+#     """
+#     run_helper(1, 1, 5, (10, 3))
 
 
 def run():
     """Run the model."""
-    run_helper(100, 10, 5, (10, 50, 1))
+    run_helper(100, 10, 5, (10, 7, 1))
 
 
 if __name__ == '__main__':

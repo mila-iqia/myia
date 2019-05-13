@@ -3,4 +3,5 @@ ignore:
   - "docs"
   - "setup.py"
   - "myia/debug"
+  - "examples"
 comment: false

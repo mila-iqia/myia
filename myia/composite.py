@@ -607,7 +607,7 @@ class ListMap(MetaGraph):
         g = Graph()
         g.flags['core'] = True
         g.flags['ignore_values'] = True
-        g.debug.name = 'list_map'
+        g.debug.name = self._decorate_name('list_map')
         fn = self.fn_rec or g.add_parameter()
         gargs = [g.add_parameter() for _ in args[nfn:]]
 
