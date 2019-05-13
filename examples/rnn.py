@@ -10,7 +10,6 @@ from numpy.random import RandomState
 from dataclasses import dataclass
 
 from myia import myia, value_and_grad, ArithmeticData
-from myia.prim.py_implementations import distribute, shape, tuple_setitem
 # The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
 
@@ -115,9 +114,7 @@ class RNNLayer(ArithmeticData):
 
     def apply(self, x):
         """Apply the layer."""
-        shp = tuple_setitem(shape(self.h0), 0, shape(x[0])[0])
-        h = distribute(self.h0, shp)
-        # h = self.h0
+        h = self.h0
         for e in x:
             h = self.step(e, h)
         # Maybe collect and return the full list of outputs?
