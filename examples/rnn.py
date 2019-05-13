@@ -4,6 +4,7 @@ Myia is still a work in progress, and this example may change in the future.
 """
 
 
+import time
 import numpy
 from numpy.random import RandomState
 from dataclasses import dataclass
@@ -164,11 +165,14 @@ def run_helper(epochs, n, batch_size, layer_sizes):
 
     for _ in range(epochs):
         costs = []
+        t0 = time.time()
         for inp, target in data:
             cost, dmodel = step(model, inp, target)
             costs.append(cost)
             model = model - (numpy.float32(0.01) * dmodel)
-        print(f'Cost: {cost / n}')
+        c = sum(costs) / n
+        t = time.time() - t0
+        print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')
 
 
 # def test_run():
