@@ -243,7 +243,7 @@ def run_helper(epochs, n, batch_size, layer_sizes):
 #     regressions, so keep a low number of narrow layers to make sure it runs
 #     quickly.
 #     """
-#     run_helper(1, 5, 5, (10, 3))
+#     run_helper(1, 1, 5, (10, 3))
 
 
 def run():

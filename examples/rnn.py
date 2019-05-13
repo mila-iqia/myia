@@ -189,14 +189,14 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')
 
 
-# def test_run():
-#     """Run the model.
+def test_run():
+    """Run the model.
 
-#     This function is run automatically in the test suite to check against
-#     regressions, so keep a low number of narrow layers to make sure it runs
-#     quickly.
-#     """
-#     run_helper(1, 5, 5, (10, 3))
+    This function is run automatically in the test suite to check against
+    regressions, so keep a low number of narrow layers to make sure it runs
+    quickly.
+    """
+    run_helper(1, 1, 5, (10, 3))
 
 
 def run():
