@@ -33,6 +33,7 @@ from .data import (
     abstract_union,
     TrackDict,
     PartialApplication,
+    JTransformedFunction,
     VALUE,
     TYPE,
     SHAPE,
@@ -306,6 +307,11 @@ def abstract_check(self, t: PartialApplication, *args):
 
 
 @overload  # noqa: F811
+def abstract_check(self, t: JTransformedFunction, *args):
+    return self(t.fn, *args)
+
+
+@overload  # noqa: F811
 def abstract_check(self, xs: object, *args):
     return True
 
@@ -450,6 +456,11 @@ def abstract_clone(self, x: PartialApplication, *args):
         self(x.fn, *args),
         tuple([self(arg, *args) for arg in x.args])
     )
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: JTransformedFunction, *args):
+    return JTransformedFunction(self(x.fn, *args))
 
 
 @overload  # noqa: F811
