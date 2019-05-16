@@ -4,9 +4,9 @@ from collections import defaultdict
 from ..prim import ops as P
 from ..utils import newenv
 from ..abstract import AbstractFunction, GraphFunction, PartialApplication, \
-    DEAD, AbstractError
+    DEAD, AbstractError, PrimitiveFunction, TypedPrimitive
 from ..graph_utils import dfs
-from ..ir import Constant, succ_incoming
+from ..ir import Constant, succ_incoming, Graph
 
 
 def analyze_structure(root):
@@ -23,7 +23,6 @@ def analyze_structure(root):
             _, env, key, value = node.inputs
             envd = collect_from(env)
             if isinstance(envd, dict):
-                # return {**envd, key.value: (value, collect_from(value))}
                 return {**envd, key.value: ((node, 3), collect_from(value))}
             else:
                 return node
@@ -38,11 +37,30 @@ def analyze_structure(root):
     return structure
 
 
+def flatten_call(fn):
+
+    if isinstance(fn, PartialApplication):
+        return (*flatten_call(fn.fn), *fn.args)
+
+    elif isinstance(fn, GraphFunction):
+        return (fn.graph,)
+
+    elif isinstance(fn, (PrimitiveFunction, TypedPrimitive)):
+        return (fn.prim,)
+
+    else:
+        raise AssertionError(f'Unsupported: {x}')
+
+
+def graphs_from(calls):
+    return [x[0] for x in calls]
+
+
 def analyze_structural_deps(root):
     mng = root.manager
     mng.keep_roots(root)
 
-    finished = {}
+    finished = defaultdict(list)
     cache = {}
 
     def collect_fngraph(fn):
@@ -50,6 +68,9 @@ def analyze_structural_deps(root):
             return fn.graph
         elif isinstance(fn, PartialApplication):
             return collect_fngraph(fn.fn)
+        elif (isinstance(fn, (PrimitiveFunction, TypedPrimitive))
+              and fn.prim is P.array_map):
+            return True
         else:
             return None
 
@@ -68,12 +89,27 @@ def analyze_structural_deps(root):
 
         elif node.is_apply():
             for inp in node.inputs:
-                finished[inp] = collect_deps(inp)
-            fn, *_ = node.inputs
+                finished[inp].append(collect_deps(inp))
+
+            fn, *args = node.inputs
+            args = [a.abstract for a in args]
             fna = fn.abstract
-            assert fna is None or isinstance(fna, AbstractFunction)
-            rval = (fna and tuple(collect_fngraph(f)
-                                  for f in fna.get_sync()),)
+            assert isinstance(fna, AbstractFunction)
+
+            calls = [flatten_call(f) for f in fna.get_sync()]
+
+            rval = []
+
+            for f, *args1 in calls:
+                if f is P.array_map:
+                    f, *_ = (*args1, *args)
+                    calls = [flatten_call(f2) for f2 in f.get_sync()]
+                    finished[node].append((graphs_from(calls),))
+                elif isinstance(f, Graph):
+                    rval.append(f)
+
+            rval = tuple(rval) if rval else (None,)
+            rval = rval,
 
         else:
             rval = (None,)
@@ -83,17 +119,6 @@ def analyze_structural_deps(root):
 
     for node in mng.all_nodes:
         collect_deps(node)
-
-    # from collections import defaultdict
-    # paths = defaultdict(set)
-    # for node, seq in finished.items():
-    #     start, *path = seq
-    #     if start is None:
-    #         continue
-    #     for fn in start:
-    #         paths[fn].add(tuple(path))
-
-    # return paths
 
     return finished
 
@@ -107,7 +132,6 @@ def analyze_final(root):
 
     def helper(x):
         if isinstance(x, dict):
-            # return {k: (node, helper(v)) for k, (node, v) in x.items()}
             rval = {}
             ttotal = set()
             for k, (node, v) in x.items():
@@ -121,26 +145,25 @@ def analyze_final(root):
                     rval[(k,)] = (node, total)
                 else:
                     rval[(k,)] = (node, path)
-                # for path in helper(v):
-                #     if isinstance(path, dict):
-                #         for k2, v2 in path.items():
-                #             rval[(k, *k2)] = v2
-                #     else:
-                #         rval[(k,)] = path
-            # rval[()] = ()
             return rval
         else:
             all_paths = set()
             for node in dfs(x, succ_incoming):
-                start, *path = paths.get(node, (None,))
-                for fn in start or (None,):
-                    if fn is not None:
-                        all_paths.add((fn, *path))
+                possibilities = paths.get(node, [])
+                for (start, *path) in possibilities:
+                    for fn in start or (None,):
+                        if fn is not None:
+                            all_paths.add((fn, *path))
             return all_paths
 
     for g, s in structure.items():
         res = helper(s)
         if isinstance(res, dict):
+            total = set()
+            for k, (_, contrib) in res.items():
+                assert isinstance(contrib, set)
+                total.update(contrib)
+            res[()] = ((g.return_, 1), total)
             results[g] = res
         else:
             results[g] = {(): ((g.return_, 1), res)}
@@ -149,7 +172,7 @@ def analyze_final(root):
 
 
 def _subslices(seq, keep=0):
-    for i in range(len(seq) - keep):
+    for i in range(len(seq) - keep + 1):
         yield seq[:-i] if i else seq
 
 
@@ -162,14 +185,6 @@ def find_dead_paths(root):
     def succ(path):
         if path in seen:
             return
-        # seen.add(path)
-        # for i in range(len(path) - 1):
-        #     seen.add(path[:-(i + 1)])
-
-        # seen.update(_subslices(path, keep=1))
-
-        # seen.add(path)
-
         g, *path = path
         if g not in structure:
             return
@@ -187,24 +202,21 @@ def find_dead_paths(root):
         for _ in dfs((root, *path), succ):
             pass
 
-    view = defaultdict(set)
-    for g, *p in seen:
-        view[g].add(tuple(p))
+    # view = defaultdict(set)
+    # for g, *p in seen:
+    #     view[g].add(tuple(p))
 
-    view2 = defaultdict(set)
-    for g, paths in structure.items():
-        if not isinstance(paths, dict):
-            continue
-        view2[g] = set(paths)
+    # view2 = defaultdict(set)
+    # for g, paths in structure.items():
+    #     if not isinstance(paths, dict):
+    #         continue
+    #     view2[g] = set(paths)
 
-    view3 = defaultdict(set)
+    # view3 = defaultdict(set)
     missing = {}
     for g, paths in structure.items():
         if not isinstance(paths, dict):
             continue
-        # missing[g] = set((node, p) for (p, (node, _)) in paths.items()
-        #                  if all(subp not in seen
-        #                         for subp in _subslices((g, *p), keep=1)))
 
         # view3[g] = set(p for (p, (node, _)) in paths.items()
         #                if (g, *p) not in keep
@@ -216,14 +228,13 @@ def find_dead_paths(root):
                          and all(subp not in seen
                                  for subp in _subslices((g, *p), keep=1)))
 
-    # buche.dict(seen=view, all=view2, minus=view3)
+    # buche.dict(seen=view, all=view2, minus=view3, keep=keep)
 
     return missing
 
 
 def dead_data_elimination(root):
     missing = find_dead_paths(root)
-    # ibuche(missing)
     mng = root.manager
     for g, dead in missing.items():
         if g not in mng.graphs:
@@ -232,7 +243,3 @@ def dead_data_elimination(root):
             repl = Constant(DEAD)
             repl.abstract = AbstractError(DEAD)
             mng.set_edge(node, idx, repl)
-        # for node, _ in dead:
-        #     repl = Constant(DEAD)
-        #     repl.abstract = AbstractError(DEAD)
-        #     mng.replace(node, repl)
