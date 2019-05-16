@@ -222,6 +222,21 @@ def test_array_map_polymorphic(xs, ys):
     return array_map(square, xs), array_map(square, ys)
 
 
+@specialize((int1, numpy.array([fp1, fp2]),))
+def test_array_map_partial(c, xs):
+    def square(x):
+        return x * x
+
+    def identity(x):
+        return x
+
+    if c < 0:
+        fn = partial(array_map, square)
+    else:
+        fn = identity
+    return fn(xs)
+
+
 @specialize(([fp1, fp2],))
 def test_list_map(xs):
     def square(x):
