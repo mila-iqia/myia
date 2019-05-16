@@ -6,7 +6,8 @@ from types import FunctionType
 
 from .. import dtype, operations, parser, composite as C, abstract
 from ..specialize import TypeSpecializer
-from ..abstract import AbstractFunction, InferenceEngine
+from ..abstract import AbstractFunction, InferenceEngine, \
+    GraphFunction, DEAD, POLY, abstract_clone, DummyFunction
 from ..ir import Graph, clone
 from ..prim import ops as P
 from ..utils import overload, TypeMap
@@ -336,6 +337,19 @@ class ConverterResource(PipelineResource):
         return v
 
 
+@abstract_clone.variant
+def _fix_type(self, a: GraphFunction, ctcache, mng):
+    if a.graph in ctcache:
+        ct = ctcache[a.graph]
+        if ct.value in (DEAD, POLY):
+            a = DummyFunction()
+        else:
+            a = GraphFunction(ct.value, a.context, ct)
+    elif a.graph not in mng.graphs:
+        a = DummyFunction()
+    return a
+
+
 class InferenceResource(PipelineResource):
     """Performs inference and specialization."""
 
@@ -374,12 +388,20 @@ class InferenceResource(PipelineResource):
 
     def specialize(self, graph, context):
         """Perform specialization."""
-        spc = TypeSpecializer(self.engine)
-        result = spc.run(graph, context)
+        self.specializer = TypeSpecializer(self.engine)
+        result = self.specializer.run(graph, context)
         self.manager.keep_roots(result)
         return result
+
+    def fix_types(self, graph):
+        """Fix function types to point to the right graphs."""
+        ctc = self.specializer.ctcache
+        for node in graph.manager.all_nodes:
+            node.abstract = _fix_type(node.abstract, ctc, graph.manager)
 
     def renormalize(self, graph, argspec, outspec=None):
         """Perform inference and specialization."""
         _, context = self.infer(graph, argspec, outspec, clear=True)
-        return self.specialize(graph, context)
+        graph = self.specialize(graph, context)
+        self.fix_types(graph)
+        return graph

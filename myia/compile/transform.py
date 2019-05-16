@@ -1,23 +1,10 @@
 """Transforms a graph into lower-level code."""
 
-from ..abstract import VALUE, Pending, to_abstract
+from ..abstract import VALUE, to_abstract
 from ..ir import Apply, toposort, Graph, Constant
 from ..prim import Primitive, ops as P
 from .vm import FinalVM
 from ..utils import SymbolicKeyInstance
-
-
-def set_types(graph, argspec, outspec, pipeline):
-    """Re-infer and set all the types for the nodes."""
-    pipeline.resources.inferrer.infer(graph, argspec, outspec, clear=True)
-
-    for ref, fut in pipeline.resources.inferrer.engine.cache.cache.items():
-        v = fut.result()
-        if isinstance(v, Pending):
-            v = v.result()
-        ref.node.abstract = v
-
-    return graph
 
 
 def convert_grad(graph):

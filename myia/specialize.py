@@ -45,6 +45,7 @@ class TypeSpecializer:
         self.mng = self.engine.mng
         self.specializations = {Context.empty(): None}
         self.infcaches = {}
+        self.ctcache = {}
 
     def run(self, graph, context):
         """Run the specializer on the given graph in the given context."""
@@ -148,7 +149,12 @@ class _GraphSpecializer:
 
         ctx = inf.make_context(self.specializer.engine, argvals)
         v = await self.specializer._specialize(ctx.graph, ctx, None)
-        return _const(v, a)
+
+        assert isinstance(v, Graph)
+        newa = AbstractFunction(GraphFunction(v, ctx))
+        rval = _const(v, newa)
+        newa.tracking_id = rval
+        return rval
 
     async def _find_choices(self, inf):
         if inf not in self.specializer.infcaches:
@@ -340,6 +346,8 @@ class _GraphSpecializer:
                     repl = await self.build_inferrer(a, fn, argvals)
                 except Unspecializable as e:
                     repl = _const(e.problem, AbstractError(e.problem))
+                if isinstance(fn, GraphFunction) and argvals is None:
+                    self.specializer.ctcache[node.value] = repl
                 new_inputs[i] = repl
 
         new_inputs = new_node.inputs
