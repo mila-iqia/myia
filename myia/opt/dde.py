@@ -76,6 +76,10 @@ class DeadDataElimination(Partializable):
         finished = defaultdict(list)
         cache = {}
 
+        def finish(node, deps):
+            start, *path = deps
+            finished[node] += [(fn, *path) for fn in start]
+
         def collect_deps(node):
 
             if node in cache:
@@ -91,7 +95,7 @@ class DeadDataElimination(Partializable):
 
             elif node.is_apply():
                 for inp in node.inputs:
-                    finished[inp].append(collect_deps(inp))
+                    finish(inp, collect_deps(inp))
 
                 fn, *args = node.inputs
                 args = [a.abstract for a in args]
@@ -106,15 +110,14 @@ class DeadDataElimination(Partializable):
                     if f is P.array_map:
                         f = (*args1, *args)[0]
                         calls = [_flatten_call(f2) for f2 in f.get_sync()]
-                        finished[node].append((_graphs_from(calls),))
+                        finish(node, (_graphs_from(calls),))
                     elif isinstance(f, Graph):
                         rval.append(f)
 
-                rval = tuple(rval) if rval else (None,)
-                rval = rval,
+                rval = (tuple(rval),)
 
             else:
-                rval = (None,)
+                rval = ((),)
 
             cache[node] = rval
             return rval
@@ -150,11 +153,7 @@ class DeadDataElimination(Partializable):
             else:
                 all_paths = set()
                 for node in dfs(x, succ_incoming):
-                    possibilities = paths.get(node, [])
-                    for (start, *path) in possibilities:
-                        for fn in start or (None,):
-                            if fn is not None:
-                                all_paths.add((fn, *path))
+                    all_paths.update(paths.get(node, []))
                 return all_paths
 
         for g, s in structure.items():
