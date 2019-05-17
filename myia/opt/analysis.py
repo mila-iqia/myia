@@ -2,9 +2,9 @@
 from collections import defaultdict
 
 from ..prim import ops as P
-from ..utils import newenv
+from ..utils import newenv, Partializable
 from ..abstract import AbstractFunction, GraphFunction, PartialApplication, \
-    DEAD, AbstractError, PrimitiveFunction, TypedPrimitive
+    DEAD, PrimitiveFunction, TypedPrimitive
 from ..graph_utils import dfs
 from ..ir import Constant, succ_incoming, Graph
 
@@ -49,7 +49,7 @@ def flatten_call(fn):
         return (fn.prim,)
 
     else:
-        raise AssertionError(f'Unsupported: {x}')
+        raise AssertionError(f'Unsupported: {fn}')
 
 
 def graphs_from(calls):
@@ -62,17 +62,6 @@ def analyze_structural_deps(root):
 
     finished = defaultdict(list)
     cache = {}
-
-    def collect_fngraph(fn):
-        if isinstance(fn, GraphFunction):
-            return fn.graph
-        elif isinstance(fn, PartialApplication):
-            return collect_fngraph(fn.fn)
-        elif (isinstance(fn, (PrimitiveFunction, TypedPrimitive))
-              and fn.prim is P.array_map):
-            return True
-        else:
-            return None
 
     def collect_deps(node):
 
@@ -102,7 +91,7 @@ def analyze_structural_deps(root):
 
             for f, *args1 in calls:
                 if f is P.array_map:
-                    f, *_ = (*args1, *args)
+                    f = (*args1, *args)[0]
                     calls = [flatten_call(f2) for f2 in f.get_sync()]
                     finished[node].append((graphs_from(calls),))
                 elif isinstance(f, Graph):
@@ -202,34 +191,12 @@ def find_dead_paths(root):
         for _ in dfs((root, *path), succ):
             pass
 
-    # view = defaultdict(set)
-    # for g, *p in seen:
-    #     view[g].add(tuple(p))
-
-    # view2 = defaultdict(set)
-    # for g, paths in structure.items():
-    #     if not isinstance(paths, dict):
-    #         continue
-    #     view2[g] = set(paths)
-
-    # view3 = defaultdict(set)
     missing = {}
     for g, paths in structure.items():
-        if not isinstance(paths, dict):
-            continue
-
-        # view3[g] = set(p for (p, (node, _)) in paths.items()
-        #                if (g, *p) not in keep
-        #                and all(subp not in seen
-        #                        for subp in _subslices((g, *p), keep=1)))
-
         missing[g] = set((node, p) for (p, (node, _)) in paths.items()
                          if (g, *p) not in keep
                          and all(subp not in seen
                                  for subp in _subslices((g, *p), keep=1)))
-
-    # buche.dict(seen=view, all=view2, minus=view3, keep=keep)
-
     return missing
 
 
@@ -241,5 +208,20 @@ def dead_data_elimination(root):
             continue
         for (node, idx), _ in dead:
             repl = Constant(DEAD)
-            repl.abstract = AbstractError(DEAD)
+            # repl.abstract = AbstractError(DEAD)
+            repl.abstract = node.inputs[idx].abstract
             mng.set_edge(node, idx, repl)
+
+
+class DeadDataElimination(Partializable):
+    """Eliminate expressions that compute unretrieved data."""
+
+    def __init__(self, optimizer=None):
+        """Initialize a DeadDataElimination."""
+        self.optimizer = optimizer
+
+    def __call__(self, graph):
+        """Apply dead data elimination."""
+        # bucheg(graph)
+        dead_data_elimination(graph)
+        return False  # Pretend there are no changes, for now

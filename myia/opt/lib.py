@@ -1,7 +1,7 @@
 """Library of optimizations."""
 
 from ..abstract import abstract_clone, AbstractFunction, AbstractJTagged, \
-    type_token
+    type_token, DEAD
 from ..composite import ListMap, hyper_add, zeros_like
 from ..dtype import Number
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone, \
@@ -529,6 +529,14 @@ getitem_env_add = psub(
                  (P.env_getitem, X, C, Z),
                  (P.env_getitem, Y, C, Z)),
     name='getitem_env_add'
+)
+
+
+# setitem(e, key, DEAD) => e
+setitem_dead = psub(
+    pattern=(P.env_setitem, X, Y, DEAD),
+    replacement=X,
+    name='setitem_dead'
 )
 
 

@@ -13,7 +13,7 @@ from ..abstract import AbstractTuple, AbstractList, AbstractClass, \
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
-    LocalPassOptimizer
+    LocalPassOptimizer, DeadDataElimination
 from ..prim import vm_registry
 from ..utils import overload, flatten, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
@@ -332,6 +332,7 @@ step_opt = Optimizer.partial(
 # Final optimization pass
 step_opt2 = Optimizer.partial(
     phases=dict(
+        dde=DeadDataElimination.partial(),
         main=[
             optlib.unfuse_composite,
             optlib.getitem_tuple,
@@ -350,7 +351,9 @@ step_opt2 = Optimizer.partial(
             optlib.lmadd_zero_l,
             optlib.lmadd_zero_r,
             optlib.lmadd_setitem_zero,
+            optlib.setitem_dead,
         ],
+        renormalize='renormalize',
     )
 )
 
