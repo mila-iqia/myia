@@ -18,6 +18,6 @@ from .clean import (  # noqa
 )
 
 
-from .analysis import (  # noqa
+from .dde import (  # noqa
     DeadDataElimination,
 )

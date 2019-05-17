@@ -1,3 +1,5 @@
+"""Dead data elimination."""
+
 
 from collections import defaultdict
 
