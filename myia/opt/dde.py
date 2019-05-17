@@ -24,10 +24,10 @@ def analyze_structure(root):
         elif node.is_apply(P.env_setitem):
             _, env, key, value = node.inputs
             envd = collect_from(env)
-            if isinstance(envd, dict):
-                return {**envd, key.value: ((node, 3), collect_from(value))}
-            else:
-                return node
+            # It could be a non-dict in user code that uses env_setitem on
+            # something other than newenv
+            assert isinstance(envd, dict)
+            return {**envd, key.value: ((node, 3), collect_from(value))}
         elif node.is_constant() and node.value == newenv:
             return {}
         else:
@@ -224,6 +224,5 @@ class DeadDataElimination(Partializable):
 
     def __call__(self, graph):
         """Apply dead data elimination."""
-        # bucheg(graph)
         dead_data_elimination(graph)
         return False  # Pretend there are no changes, for now
