@@ -4,7 +4,7 @@
 from collections import defaultdict
 
 from ..prim import ops as P
-from ..utils import newenv, Partializable
+from ..utils import Partializable
 from ..abstract import AbstractFunction, GraphFunction, PartialApplication, \
     DEAD, PrimitiveFunction, TypedPrimitive
 from ..graph_utils import dfs
@@ -42,7 +42,7 @@ class DeadDataElimination(Partializable):
         """Initialize a DeadDataElimination."""
         self.optimizer = optimizer
 
-    def output_structure(self, root):
+    def output_structure(self, graph):
         """Yield the output structure for the graph.
 
         Generates entries with the form:
@@ -52,31 +52,22 @@ class DeadDataElimination(Partializable):
         the output of the graph. The empty path represents the
         return value itself.
         """
-        mng = root.manager
-        mng.keep_roots(root)
-
-        structure = {}
-
-        def collect_from(node):
+        def collect(node, path):
             if node.is_apply(P.make_tuple):
-                return {i: ((node, i + 1), collect_from(inp))
-                        for i, inp in enumerate(node.inputs[1:])}
+                for i, inp in enumerate(node.inputs[1:]):
+                    p = (*path, i)
+                    yield p, (node, i + 1)
+                    yield from collect(inp, p)
             elif node.is_apply(P.env_setitem):
                 _, env, key, value = node.inputs
-                envd = collect_from(env)
-                # It could be a non-dict in user code that uses env_setitem on
-                # something other than newenv
-                assert isinstance(envd, dict)
-                return {**envd, key.value: ((node, 3), collect_from(value))}
-            elif node.is_constant() and node.value == newenv:
-                return {}
+                p = (*path, key.value)
+                yield from collect(env, path)
+                yield p, (node, 3)
+                yield from collect(value, p)
             else:
-                return node
-
-        for g in mng.graphs:
-            structure[g] = collect_from(g.output)
-
-        return structure
+                pass
+        yield (), (graph.return_, 1)
+        yield from collect(graph.output, ())
 
     def node_to_paths(self, root):
         """Maps each node to possible accesses.
@@ -152,45 +143,17 @@ class DeadDataElimination(Partializable):
         Meaning that computing graph(...)[*path] may require computing
         graph2(...)[*path2].
         """
-
-        structure = self.output_structure(root)
+        results = {}
         paths = self.node_to_paths(root)
 
-        results = {}
-
-        def helper(x):
-            if isinstance(x, dict):
-                rval = {}
-                ttotal = set()
-                for k, (node, v) in x.items():
-                    path = helper(v)
-                    if isinstance(path, dict):
-                        total = set()
-                        for k2, (node2, v2) in path.items():
-                            rval[(k, *k2)] = (node2, v2)
-                            total.update(v2)
-                            ttotal.update(v2)
-                        rval[(k,)] = (node, total)
-                    else:
-                        rval[(k,)] = (node, path)
-                return rval
-            else:
+        for g in root.manager.graphs:
+            results[g] = {}
+            for path, (parent, idx) in self.output_structure(g):
+                node = parent.inputs[idx]
                 all_paths = set()
-                for node in dfs(x, succ_incoming):
-                    all_paths.update(paths.get(node, []))
-                return all_paths
-
-        for g, s in structure.items():
-            res = helper(s)
-            if isinstance(res, dict):
-                total = set()
-                for k, (_, contrib) in res.items():
-                    assert isinstance(contrib, set)
-                    total.update(contrib)
-                res[()] = ((g.return_, 1), total)
-                results[g] = res
-            else:
-                results[g] = {(): ((g.return_, 1), res)}
+                for node2 in dfs(node, succ_incoming):
+                    all_paths.update(paths.get(node2, []))
+                results[g][path] = (parent, idx), all_paths
 
         return results
 
