@@ -30,8 +30,8 @@ def _graphs_from(calls):
     return [x[0] for x in calls]
 
 
-def _subslices(seq, keep=0):
-    for i in range(len(seq) - keep + 1):
+def _subslices(seq):
+    for i in range(len(seq)):
         yield seq[:-i] if i else seq
 
 
@@ -43,6 +43,15 @@ class DeadDataElimination(Partializable):
         self.optimizer = optimizer
 
     def output_structure(self, root):
+        """Yield the output structure for the graph.
+
+        Generates entries with the form:
+            path, (node, index)
+
+        Where path is a tuple of int/SymbolicKey that can index
+        the output of the graph. The empty path represents the
+        return value itself.
+        """
         mng = root.manager
         mng.keep_roots(root)
 
@@ -69,7 +78,15 @@ class DeadDataElimination(Partializable):
 
         return structure
 
-    def structural_dependencies(self, root):
+    def node_to_paths(self, root):
+        """Maps each node to possible accesses.
+
+        Returns {node: [(graph, *path), ...]}
+
+        Meaning that node is computed as graph(...)[*path]. Note that the
+        relation is not transitive here, the transitive relation is computed by
+        self.dependencies.
+        """
         mng = root.manager
         mng.keep_roots(root)
 
@@ -80,22 +97,22 @@ class DeadDataElimination(Partializable):
             start, *path = deps
             finished[node] += [(fn, *path) for fn in start]
 
-        def collect_deps(node):
+        def access_path(node):
 
             if node in cache:
                 return cache[node]
 
             if node.is_apply(P.tuple_getitem):
                 _, x, key = node.inputs
-                rval = (*collect_deps(x), key.value)
+                rval = (*access_path(x), key.value)
 
             elif node.is_apply(P.env_getitem):
                 _, x, key, _ = node.inputs
-                rval = (*collect_deps(x), key.value)
+                rval = (*access_path(x), key.value)
 
             elif node.is_apply():
                 for inp in node.inputs:
-                    finish(inp, collect_deps(inp))
+                    finish(inp, access_path(inp))
 
                 fn, *args = node.inputs
                 args = [a.abstract for a in args]
@@ -123,14 +140,21 @@ class DeadDataElimination(Partializable):
             return rval
 
         for node in mng.all_nodes:
-            collect_deps(node)
+            access_path(node)
 
         return finished
 
-    def full_structural_dependencies(self, root):
+    def dependencies(self, root):
+        """Return dependencies for each graph and output path.
+
+        Returns {graph: {path: [(graph2, *path2), ...], ...}, ...}
+
+        Meaning that computing graph(...)[*path] may require computing
+        graph2(...)[*path2].
+        """
 
         structure = self.output_structure(root)
-        paths = self.structural_dependencies(root)
+        paths = self.node_to_paths(root)
 
         results = {}
 
@@ -171,7 +195,12 @@ class DeadDataElimination(Partializable):
         return results
 
     def find_dead_paths(self, root):
-        fulldeps = self.full_structural_dependencies(root)
+        """Returns a set of dead paths for each graph.
+
+        Returns {graph: {(node, idx) ...}} where the edge represented
+        by (node, idx) is dead.
+        """
+        deps = self.dependencies(root)
 
         seen = set()
         keep = set()
@@ -180,28 +209,28 @@ class DeadDataElimination(Partializable):
             if path in seen:
                 return
             g, *path = path
-            if g not in fulldeps:
+            if g not in deps:
                 return
             path = tuple(path)
-            sg = fulldeps[g]
+            sg = deps[g]
             while path and path not in sg:
                 path = path[:-1]
             seen.add((g, *path))
-            keep.update(_subslices((g, *path), keep=1))
+            keep.update(_subslices((g, *path)))
             node, paths = sg[path]
             for p in paths:
                 yield p
 
-        for path in fulldeps.get(root, []):
+        for path in deps.get(root, []):
             for _ in dfs((root, *path), succ):
                 pass
 
         missing = {}
-        for g, paths in fulldeps.items():
-            missing[g] = set((node, p) for (p, (node, _)) in paths.items()
+        for g, paths in deps.items():
+            missing[g] = set(node for (p, (node, _)) in paths.items()
                              if (g, *p) not in keep
                              and all(subp not in seen
-                                     for subp in _subslices((g, *p), keep=1)))
+                                     for subp in _subslices((g, *p))))
         return missing
 
     def __call__(self, root):
@@ -210,8 +239,9 @@ class DeadDataElimination(Partializable):
         mng = root.manager
         for g, dead in missing.items():
             if g not in mng.graphs:
+                # This might happen if set_edge removes a graph.
                 continue
-            for (node, idx), _ in dead:
+            for node, idx in dead:
                 repl = Constant(DEAD)
                 # repl.abstract = AbstractError(DEAD)
                 repl.abstract = node.inputs[idx].abstract
