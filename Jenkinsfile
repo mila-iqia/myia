@@ -8,14 +8,8 @@ node ('gpu') {
     }
   }
   stage ('Test') {
-    steps {
-      sh script: '$HOME/miniconda/bin/pytest --cov-report=term-missing --cov-report=xml  --cov=./ --gpu --junit-xml test-report.xml'
-    }
-    post {
-      always {
-        junit 'test-report.xml'
-      }
-    }
+    sh script: '$HOME/miniconda/bin/pytest --cov-report=term-missing --cov-report=xml  --cov=./ --gpu --junit-xml test-report.xml'
+    junit 'test-report.xml'
   }
   stage ('Coverage') {
     sh script: 'ls'
