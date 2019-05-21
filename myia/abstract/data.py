@@ -34,7 +34,7 @@ POLY = Named('POLY')
 #####################
 
 
-class Possibilities(frozenset):
+class Possibilities(tuple):
     """Represents a set of possible values."""
 
 
@@ -287,6 +287,7 @@ class AbstractFunction(AbstractAtom):
         if isinstance(poss, Pending):  # pragma: no cover
             # This is a bit circumstantial and difficult to test explicitly
             raise MyiaTypeError('get_unique invalid because Pending')
+        poss = frozenset(poss)
         if len(poss) != 1:
             raise MyiaTypeError(f'Expected unique function, not {poss}')
         fn, = poss
@@ -459,7 +460,7 @@ def abstract_union(options):
             opts += option.options
         else:
             opts.append(option)
-    opts = frozenset(opts)
+    opts = tuple(opts)
     if len(opts) == 1:
         opt, = opts
         return opt

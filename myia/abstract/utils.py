@@ -757,14 +757,14 @@ def amerge(__call__, x1, x2, loop, forced, bind_pending=True,
 
 @overload  # noqa: F811
 def amerge(x1: Possibilities, x2, loop, forced, bp):
-    if x1.issuperset(x2):
+    if set(x1).issuperset(set(x2)):
         return x1
     if forced:
         raise MyiaTypeError(
             'Additional possibilities cannot be merged.'
         )
     else:
-        return Possibilities(x1 | x2)
+        return Possibilities(x1 + x2)
 
 
 @overload  # noqa: F811
@@ -1005,7 +1005,7 @@ def split_type(t, model):
     """
     if isinstance(t, AbstractUnion):
         matching = [(opt, typecheck(model, opt))
-                    for opt in t.options]
+                    for opt in set(t.options)]
         t1 = abstract_union([opt for opt, m in matching if m])
         t2 = abstract_union([opt for opt, m in matching if not m])
         return t1, t2
