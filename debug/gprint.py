@@ -10,7 +10,7 @@ from myia.abstract import (
     AbstractList, AbstractClass, AbstractJTagged, AbstractArray,
     GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
     MetaGraphFunction, AbstractUnion, VALUE, ANYTHING,
-    PendingTentative
+    PendingTentative, AbstractADT
 )
 from myia.dtype import Type, Bool, Int, Float, TypeMeta, UInt
 from myia.utils import OrderedSet, UNKNOWN, SymbolicKeyInstance
@@ -1295,8 +1295,21 @@ class _AbstractList:
 @mixin(AbstractClass)
 class _AbstractClass:
     def __hrepr__(self, H, hrepr):
+        tagname = self.tag.__qualname__
         return hrepr.stdrepr_object(
-            f'★{self.tag}',
+            f'★{tagname}',
+            self.attributes.items(),
+            delimiter="↦",
+            cls='abstract'
+        )
+
+
+@mixin(AbstractADT)
+class _AbstractADT:
+    def __hrepr__(self, H, hrepr):
+        tagname = self.tag.__qualname__
+        return hrepr.stdrepr_object(
+            f'★★{tagname}',
             self.attributes.items(),
             delimiter="↦",
             cls='abstract'

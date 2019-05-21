@@ -422,6 +422,73 @@ class AbstractClass(AbstractStructure):
         return pretty_struct(ctx, tagname, [], self.attributes)
 
 
+class ADT:
+    """Base class for an algebraic data type."""
+
+
+def normalize_adt(x, done, tag_to_adt):
+    """Normalize the ADT to make it properly recursive."""
+    if x in done:
+        return done[x]
+    if isinstance(x, AbstractADT):
+        if x.tag not in tag_to_adt:
+            adt = AbstractADT.new(
+                x.tag,
+                {k: AbstractUnion([]) for k in x.attributes},
+                x.methods
+            )
+            adt._incomplete = True
+            tag_to_adt = {**tag_to_adt, x.tag: adt}
+        else:
+            adt = tag_to_adt[x.tag]
+        done[x] = adt
+        for attr, value in x.attributes.items():
+            value = normalize_adt(value, done, tag_to_adt)
+            adt.attributes[attr] = abstract_union(
+                [adt.attributes[attr], value]
+            )
+        return adt
+    elif isinstance(x, AbstractUnion):
+        opts = [normalize_adt(opt, done, tag_to_adt) for opt in x.options]
+        rval = abstract_union(opts)
+        done[x] = rval
+        return rval
+    else:
+        return x
+
+
+class AbstractADT(AbstractStructure):
+    """Represents an ADT.
+
+    Attributes:
+        tag: The class's name (a Named instance).
+        attributes: Maps each field name to a corresponding AbstractValue.
+        methods: Maps method names to corresponding functions, which will
+            be parsed and converted by the engine when necessary, with the
+            instance as the first argument.
+
+    """
+
+    def __init__(self, tag, attributes, methods, values={}):
+        """Initialize an AbstractADT."""
+        super().__init__(values)
+        self.tag = tag
+        self.attributes = attributes
+        self.methods = methods
+
+    def children(self):
+        """Return the attribute values."""
+        return tuple(self.attributes.values())
+
+    def __eqkey__(self):
+        vals = AbstractValue.__eqkey__(self)
+        return Elements(self, vals, self.tag, self.attributes)
+
+    def __pretty__(self, ctx):
+        tagname = f'**{self.tag.__qualname__}'
+        return pretty_struct(ctx, tagname, [], self.attributes)
+
+
 class AbstractJTagged(AbstractStructure):
     """Represents a value (non-function) transformed through J."""
 
