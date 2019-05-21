@@ -8,7 +8,7 @@ node ('gpu') {
     }
   }
   stage ('Test') {
-    sh script: '$HOME/miniconda/bin/pytest --cov=./ --gpu'
+    sh script: '$HOME/miniconda/bin/pytest --cov-report=xml --cov=./ --gpu'
   }
   stage ('Coverage') {
     sh script: 'curl -s https://codecov.io/bash | bash'
