@@ -14,9 +14,11 @@ while [[ $# -gt 0 ]]; do
     ;;
 esac
 done
-  
-wget https://repo.continuum.io/miniconda/Miniconda3-latest-`uname -s`-`uname -m`.sh -O miniconda.sh
-bash miniconda.sh -b -p $HOME/miniconda
+
+if [ ! -d $HOME/miniconda ]; then
+    wget https://repo.continuum.io/miniconda/Miniconda3-latest-`uname -s`-`uname -m`.sh -O miniconda.sh
+    bash miniconda.sh -b -p $HOME/miniconda
+fi
 export PATH="$HOME/miniconda/bin:$PATH"
 hash -r
 conda config --set always_yes yes --set changeps1 no
