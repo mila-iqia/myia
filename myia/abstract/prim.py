@@ -24,6 +24,7 @@ from .data import (
     AbstractArray,
     AbstractList,
     AbstractClass,
+    AbstractADT,
     AbstractJTagged,
     PartialApplication,
     JTransformedFunction,
@@ -327,6 +328,9 @@ async def _resolve_case(resources, data_t, item_v, chk):
     mmap = resources.method_map
 
     if data_t is AbstractClass:
+        return ('class', data_t)
+
+    if data_t is AbstractADT:
         return ('class', data_t)
 
     # Try method map

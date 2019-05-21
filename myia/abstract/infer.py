@@ -19,9 +19,9 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractValue, GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, AbstractExternal, \
-    VALUE, TYPE, SHAPE, DummyFunction, \
+    VALUE, TYPE, SHAPE, DummyFunction, ADT, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractList, type_error_nargs, TypeDispatchError, \
+    AbstractList, type_error_nargs, TypeDispatchError, AbstractADT, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind, type_to_abstract
@@ -491,6 +491,18 @@ def to_abstract(self, v: np.ndarray, context, ref, loop):
 @overload  # noqa: F811
 def to_abstract(self, v: typing._GenericAlias, context, ref, loop):
     return AbstractType(type_to_abstract(v))
+
+
+@overload
+def to_abstract(self, v: ADT, context, ref, loop):
+    new_args = {}
+    for name, field in v.__dataclass_fields__.items():
+        new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
+    draft = AbstractADT(type(v), new_args, dataclass_methods(type(v)))
+    from .data import normalize_adt
+    result = normalize_adt(draft, {}, {})
+    result = result.intern()
+    return result
 
 
 class Inferrer(Partializable):

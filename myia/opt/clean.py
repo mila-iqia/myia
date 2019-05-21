@@ -4,12 +4,18 @@ from ..dtype import Int
 from ..ir import Constant
 from ..prim import ops as P
 from ..abstract import abstract_clone, AbstractClass, AbstractTuple, \
-    AbstractScalar, VALUE, TYPE
+    AbstractScalar, VALUE, TYPE, AbstractADT
+from ..utils import overload
 
 
 @abstract_clone.variant
 def _reabs(self, a: AbstractClass):
-    return AbstractTuple(self(x) for x in a.attributes.values())
+    return (yield AbstractTuple)(self(x) for x in a.attributes.values())
+
+
+@overload
+def _reabs(self, a: AbstractADT):
+    return (yield AbstractTuple)(self(x) for x in a.attributes.values())
 
 
 def erase_class(root, manager):
@@ -31,7 +37,7 @@ def erase_class(root, manager):
         if node.is_apply(P.getattr):
             _, data, item = node.inputs
             dt = data.abstract
-            assert isinstance(dt, AbstractClass)
+            assert isinstance(dt, (AbstractClass, AbstractADT))
             idx = list(dt.attributes.keys()).index(item.value)
             idx_c = Constant(idx)
             idx_c.abstract = AbstractScalar({
