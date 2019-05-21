@@ -667,4 +667,11 @@ def pretty_join(elems, sep=None):
 
 @pp.register_pretty(AbstractValue)
 def _pretty_avalue(a, ctx):
-    return a.__pretty__(ctx)
+    try:
+        if getattr(a, '_incomplete', False):  # pragma: no cover
+            return f'<{a.__class__.__qualname__}: incomplete>'
+        else:
+            return a.__pretty__(ctx)
+    except Exception as e:  # pragma: no cover
+        # Pytest fails badly without this failsafe.
+        return f'<{a.__class__.__qualname__}: error in printing>'
