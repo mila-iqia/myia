@@ -327,6 +327,7 @@ class RelayBackend(Backend):
 
     def __init__(self, target='cpu', device_id=0):
         """Create a Relay backend for the given device."""
+        device_id = int(device_id)
         self.context = tvm.ndarray.context(target, device_id)
         if not self.context.exist:  # pragma: no cover
             raise RuntimeError("No hardware to support selected target/device")
