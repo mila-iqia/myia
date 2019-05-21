@@ -1,9 +1,11 @@
 
 import numpy
 from pytest import mark
+from dataclasses import dataclass
 
 from myia import abstract as a, dtype
-from myia.abstract import from_value
+from myia.dtype import Number, Nil
+from myia.abstract import from_value, ADT
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.composite import list_map
 from myia.debug.label import short_labeler as lbl
@@ -460,3 +462,29 @@ def test_hyper_map(x, y):
 @specialize((int1,))
 def test_hyper_map_ct(x):
     return hyper_map(scalar_add, x, 1)
+
+
+@dataclass(frozen=True)
+class Pair(ADT):
+    left: object
+    right: object
+
+
+def tree(depth, x=1):
+    if depth == 0:
+        return x
+    else:
+        return Pair(tree(depth - 1, x * 2), tree(depth - 1, x * 2 + 1))
+
+
+@mark.xfail(reason="WIP")
+@specialize((tree(3),))
+def test_sumtree(t):
+    def sumtree(t):
+        if hastype(t, Number):
+            return t
+        elif hastype(t, Nil):
+            return 0
+        else:
+            return sumtree(t.left) + sumtree(t.right)
+    return sumtree(t)
