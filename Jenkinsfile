@@ -11,6 +11,6 @@ node ('gpu') {
     sh script: '$HOME/miniconda/bin/pytest --cov=./ --gpu'
   }
   stage ('Coverage') {
-    sh script: 'codecov'
+    sh script: 'curl -s https://codecov.io/bash | bash'
   }
 }
