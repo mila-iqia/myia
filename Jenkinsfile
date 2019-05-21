@@ -1,8 +1,14 @@
 node ('gpu') {
-  stage ('checkout') {
+  stage ('Checkout') {
     checkout scm
   }
-  stage ('tries') {
-    sh script: 'ls'
+  stage ('Install') {
+    sh script: '.testing/install.sh'
+  }
+  stage ('Test') {
+    sh script: 'pytest --cov=./ --gpu'
+  }
+  stage ('Coverage') {
+    sh script: 'codecov'
   }
 }
