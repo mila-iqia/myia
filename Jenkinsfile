@@ -10,4 +10,8 @@ node ('gpu') {
   stage ('Test') {
     sh script: '$HOME/miniconda/bin/pytest --cov-report=term-missing --cov-report=xml  --cov=./ --gpu'
   }
+  stage ('Coverage') {
+    sh script: 'ls'
+    sh script: 'cat coverage.token'
+  }
 }
