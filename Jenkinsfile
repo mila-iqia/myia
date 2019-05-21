@@ -8,6 +8,6 @@ node ('gpu') {
     }
   }
   stage ('Test') {
-    sh script: '$HOME/miniconda/bin/pytest --cov-report=term-missin --cov=./ --gpu'
+    sh script: '$HOME/miniconda/bin/pytest --cov-report=term-missing --cov-report=xml  --cov=./ --gpu'
   }
 }
