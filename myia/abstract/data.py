@@ -438,7 +438,7 @@ class AbstractUnion(AbstractStructure):
     def __init__(self, options):
         """Initialize an AbstractUnion."""
         super().__init__({})
-        self.options = frozenset(options)
+        self.options = tuple(options)
 
     def children(self):
         """Return the set of options."""

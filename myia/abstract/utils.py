@@ -425,7 +425,7 @@ def abstract_clone(self, x: AbstractClass, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractUnion, *args):
-    return abstract_union([self(y, *args) for y in x.options])
+    return (yield AbstractUnion)([self(y, *args) for y in x.options])
 
 
 @overload  # noqa: F811
@@ -555,7 +555,7 @@ async def abstract_clone_async(self, x: AbstractClass):
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractUnion):
-    return abstract_union([await self(y) for y in x.options])
+    yield (yield AbstractUnion)([await self(y) for y in x.options])
 
 
 @overload  # noqa: F811
