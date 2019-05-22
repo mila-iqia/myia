@@ -21,13 +21,16 @@ from .common import mysum, i64, f64, Point
 
 specialize_pipeline = scalar_debug_pipeline \
     .select('parse', 'infer', 'specialize',
-            'erase_class', 'erase_tuple',
-            'validate', 'export', 'wrap')
+            'erase_class', 'erase_tuple', 'opt2',
+            'validate', 'export', 'wrap') \
+    .configure({
+        'opt2.phases.main': [],
+    })
 
 
 specialize_pipeline_std = standard_debug_pipeline \
     .select('parse', 'infer', 'specialize',
-            'erase_class', 'opt', 'erase_tuple',
+            'erase_class', 'opt', 'erase_tuple', 'opt2',
             'validate', 'export', 'wrap')
 
 
@@ -220,6 +223,21 @@ def test_array_map_polymorphic(xs, ys):
         return x * x
 
     return array_map(square, xs), array_map(square, ys)
+
+
+@specialize((int1, numpy.array([fp1, fp2]),))
+def test_array_map_partial(c, xs):
+    def square(x):
+        return x * x
+
+    def identity(x):
+        return x
+
+    if c < 0:
+        fn = partial(array_map, square)
+    else:
+        fn = identity
+    return fn(xs)
 
 
 @specialize(([fp1, fp2],))

@@ -7,7 +7,7 @@ from .abstract import GraphFunction, concretize_abstract, \
     AbstractFunction, AbstractError, build_value, MyiaTypeError, \
     TypedPrimitive, BaseGraphInferrer, broaden, \
     TrackedInferrer, PrimitiveFunction, MetaGraphFunction, \
-    ConditionalContext, InferenceError
+    ConditionalContext, InferenceError, abstract_clone
 from .abstract import Context, Unspecializable, \
     DEAD, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
@@ -21,6 +21,11 @@ def _const(v, t):
     ct = Constant(v)
     ct.abstract = t
     return ct
+
+
+@abstract_clone.variant
+def _no_tracking_id(self, x: GraphFunction):
+    return dc_replace(x, tracking_id=None)
 
 
 async def concretize_cache(cache):
@@ -45,6 +50,7 @@ class TypeSpecializer:
         self.mng = self.engine.mng
         self.specializations = {Context.empty(): None}
         self.infcaches = {}
+        self.ctcache = {}
 
     def run(self, graph, context):
         """Run the specializer on the given graph in the given context."""
@@ -67,12 +73,13 @@ class TypeSpecializer:
         return await self._specialize(g, ctx, argrefs)
 
     async def _specialize(self, g, ctx, argrefs):
-        if ctx in self.specializations:
-            return self.specializations[ctx].new_graph
-
-        gspec = _GraphSpecializer(self, g, await concretize_abstract(ctx))
+        ctx = await concretize_abstract(ctx)
+        ctxkey = _no_tracking_id(ctx)
+        if ctxkey in self.specializations:
+            return self.specializations[ctxkey].new_graph
+        gspec = _GraphSpecializer(self, g, ctx)
         g2 = gspec.new_graph
-        self.specializations[ctx] = gspec
+        self.specializations[ctxkey] = gspec
         await gspec.run()
         return g2
 
@@ -90,6 +97,7 @@ class _GraphSpecializer:
         parent_context = context.parent
         while isinstance(parent_context, ConditionalContext):
             parent_context = parent_context.parent
+        parent_context = _no_tracking_id(parent_context)
         self.parent = specializer.specializations[parent_context]
         self.specializer = specializer
         self.engine = specializer.engine
@@ -148,7 +156,12 @@ class _GraphSpecializer:
 
         ctx = inf.make_context(self.specializer.engine, argvals)
         v = await self.specializer._specialize(ctx.graph, ctx, None)
-        return _const(v, a)
+
+        assert isinstance(v, Graph)
+        newa = AbstractFunction(GraphFunction(v, ctx))
+        rval = _const(v, newa)
+        newa.tracking_id = rval
+        return rval
 
     async def _find_choices(self, inf):
         if inf not in self.specializer.infcaches:
@@ -340,6 +353,8 @@ class _GraphSpecializer:
                     repl = await self.build_inferrer(a, fn, argvals)
                 except Unspecializable as e:
                     repl = _const(e.problem, AbstractError(e.problem))
+                if isinstance(fn, GraphFunction) and argvals is None:
+                    self.specializer.ctcache[node.value] = repl
                 new_inputs[i] = repl
 
         new_inputs = new_node.inputs

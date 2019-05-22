@@ -199,7 +199,9 @@ class VM:
                         i.is_constant_graph() and i.value.parent == graph):
                     yield i
             if node.is_constant_graph() and node.value.parent == graph:
-                yield from self._vars[node.value]
+                for v in self._vars[node.value]:
+                    if v.graph is graph or v.graph is None:
+                        yield v
         return succ
 
     def call(self, fn, args):

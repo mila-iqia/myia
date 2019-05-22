@@ -114,7 +114,9 @@ class Backend:
 
     def convert_value(self, v, t):
         """Convert a value to the appropriate backend representation."""
-        if isinstance(t, abstract.AbstractScalar) \
+        if isinstance(t, abstract.AbstractError) or v is abstract.DEAD:
+            return None
+        elif isinstance(t, abstract.AbstractScalar) \
                 and issubclass(t.values[abstract.TYPE], dtype.Number):
             return self.from_scalar(v, t.values[abstract.TYPE])
         elif isinstance(t, abstract.AbstractTuple):
@@ -124,8 +126,6 @@ class Backend:
                 and issubclass(t.values[abstract.TYPE], dtype.EnvType):
             assert len(v._contents) == 0
             return self.empty_env()
-        elif isinstance(t, abstract.AbstractError):
-            return None
         else:
             raise NotImplementedError(f'convert_value for {t}')
 

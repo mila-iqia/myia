@@ -16,3 +16,8 @@ from .cse import (  # noqa
 from .clean import (  # noqa
     erase_class, erase_tuple
 )
+
+
+from .dde import (  # noqa
+    DeadDataElimination,
+)

@@ -12,7 +12,7 @@ from ..utils import overload, is_dataclass_type, dataclass_methods
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
-from .ref import Reference, Context
+from .ref import Reference, Context, ConditionalContext
 
 from .data import (
     ABSENT,
@@ -33,6 +33,7 @@ from .data import (
     abstract_union,
     TrackDict,
     PartialApplication,
+    JTransformedFunction,
     VALUE,
     TYPE,
     SHAPE,
@@ -306,6 +307,11 @@ def abstract_check(self, t: PartialApplication, *args):
 
 
 @overload  # noqa: F811
+def abstract_check(self, t: JTransformedFunction, *args):
+    return self(t.fn, *args)
+
+
+@overload  # noqa: F811
 def abstract_check(self, xs: object, *args):
     return True
 
@@ -449,6 +455,28 @@ def abstract_clone(self, x: PartialApplication, *args):
     return PartialApplication(
         self(x.fn, *args),
         tuple([self(arg, *args) for arg in x.args])
+    )
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: JTransformedFunction, *args):
+    return JTransformedFunction(self(x.fn, *args))
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: Context, *args):
+    return Context(
+        self(x.parent, *args),
+        x.graph,
+        tuple(self(arg) for arg in x.argkey)
+    )
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: ConditionalContext, *args):
+    return ConditionalContext(
+        self(x.parent, *args),
+        tuple(self(arg) for arg in x.argkey)
     )
 
 

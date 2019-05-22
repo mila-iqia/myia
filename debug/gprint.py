@@ -13,7 +13,7 @@ from myia.abstract import (
     PendingTentative
 )
 from myia.dtype import Type, Bool, Int, Float, TypeMeta, UInt
-from myia.utils import OrderedSet, UNKNOWN
+from myia.utils import OrderedSet, UNKNOWN, SymbolicKeyInstance
 
 try:
     from myia.dtype import JTagged
@@ -865,6 +865,15 @@ class _NS:
 class _OrderedSet:
     def __hrepr__(self, H, hrepr):
         return hrepr(set(self._d.keys()))
+
+
+@mixin(SymbolicKeyInstance)
+class _SymbolicKeyInstance:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_object(
+            'SymbolicKey',
+            (('node', self.node),)
+        )
 
 
 @mixin(VirtualReference)

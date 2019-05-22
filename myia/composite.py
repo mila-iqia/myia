@@ -582,7 +582,7 @@ class ListMap(MetaGraph):
 
         """
         self.fn_rec = fn_rec
-        self.loop_mask = loop_mask
+        self.loop_mask = loop_mask and tuple(loop_mask)
         super().__init__(self._decorate_name('list_map'))
 
     def _decorate_name(self, name):
@@ -667,7 +667,17 @@ class ListMap(MetaGraph):
         else:
             g.output = g.apply(gcond, 1, resl, *gargs)
 
+        g.flags['forbid_inlining'] = True
+        g.flags['metagraph'] = self
         return g
+
+    def __eq__(self, lm):
+        return (isinstance(lm, ListMap)
+                and self.fn_rec == lm.fn_rec
+                and self.loop_mask == lm.loop_mask)
+
+    def __hash__(self):
+        return hash((self.fn_rec, self.loop_mask))
 
     def __call__(self, fn, *lists):
         """Python implementation of list_map."""
