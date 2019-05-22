@@ -5,7 +5,7 @@ from .env import (  # noqa
 )
 
 from .intern import (  # noqa
-    Interned, InternedMC, EqKey, Atom, Elements, eqkey, deep_eqkey,
+    Interned, InternedMC, EqKey, Atom, AttrEK, ItemEK, eqkey, deep_eqkey,
     RecursionException, eq, hash, hashrec, eqrec, IncompleteException,
     PossiblyRecursive, intern,
 )

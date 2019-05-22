@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from contextvars import ContextVar
 
 from ..debug.label import label
-from ..utils import Named, Partializable, Interned, Atom, Elements, \
+from ..utils import Named, Partializable, Interned, Atom, ItemEK, AttrEK, \
     PossiblyRecursive
 
 from .loop import Pending
@@ -310,9 +310,6 @@ class AbstractFunction(AbstractAtom):
 class AbstractStructure(AbstractValue):
     """Base class for abstract values that are structures."""
 
-    def __eqkey__(self):
-        return Elements(self, super().__eqkey__(), self.children())
-
 
 class AbstractTuple(AbstractStructure):
     """Represents a tuple of elements."""
@@ -321,12 +318,16 @@ class AbstractTuple(AbstractStructure):
         """Initialize an AbstractTuple."""
         super().__init__(values or {})
         if elements is not ANYTHING:
-            elements = tuple(elements)
+            elements = list(elements)
         self.elements = elements
 
     def children(self):
         """Return all elements in the tuple."""
         return self.elements
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'elements'))
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "", self.elements)
@@ -353,6 +354,10 @@ class AbstractArray(AbstractStructure):
     def children(self):
         """Return the array element."""
         return self.element,
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'element'))
 
     def __pretty__(self, ctx):
         elem = pretty_python_value(self.element, ctx)
@@ -385,6 +390,10 @@ class AbstractList(AbstractStructure):
         """Return the list element."""
         return self.element,
 
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'element'))
+
     def __pretty__(self, ctx):
         elem = pretty_python_value(self.element, ctx)
         return pretty_join(['[', elem, ']'])
@@ -413,9 +422,13 @@ class AbstractClass(AbstractStructure):
         """Return the attribute values."""
         return tuple(self.attributes.values())
 
+    # def __eqkey__(self):
+    #     vals = AbstractValue.__eqkey__(self)
+    #     return Elements(self, vals, self.tag, self.attributes)
+
     def __eqkey__(self):
-        vals = AbstractValue.__eqkey__(self)
-        return Elements(self, vals, self.tag, self.attributes)
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'tag', 'attributes'))
 
     def __pretty__(self, ctx):
         tagname = self.tag.__qualname__
@@ -481,8 +494,8 @@ class AbstractADT(AbstractStructure):
         return tuple(self.attributes.values())
 
     def __eqkey__(self):
-        vals = AbstractValue.__eqkey__(self)
-        return Elements(self, vals, self.tag, self.attributes)
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'tag', 'attributes'))
 
     def __pretty__(self, ctx):
         tagname = f'**{self.tag.__qualname__}'
@@ -500,6 +513,10 @@ class AbstractJTagged(AbstractStructure):
     def children(self):
         """Return the jtagged element."""
         return self.element,
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'element'))
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "J", self.element)
@@ -526,6 +543,10 @@ class AbstractUnion(AbstractStructure):
     def children(self):
         """Return the set of options."""
         return self.options
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'options'))
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "U", self.options)

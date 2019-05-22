@@ -814,7 +814,7 @@ def amerge(x1: (dict, TrackDict), x2, loop, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(x1: tuple, x2, loop, forced, bp):
+def amerge(x1: (tuple, list), x2, loop, forced, bp):
     if len(x1) != len(x2):  # pragma: no cover
         raise MyiaTypeError(f'Tuple length mismatch')
     changes = False
@@ -824,7 +824,7 @@ def amerge(x1: tuple, x2, loop, forced, bp):
         if res is not v1:
             changes = True
         rval.append(res)
-    return x1 if forced or not changes else tuple(rval)
+    return x1 if forced or not changes else type(x1)(rval)
 
 
 @overload  # noqa: F811

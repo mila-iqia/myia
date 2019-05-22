@@ -18,6 +18,10 @@ class EqKey:
         if t in (int, bool):
             t = float
         self.type = t
+        self.obj = obj
+
+    def canonicalize(self):
+        """Canonicalize the underlying object."""
 
 
 class Atom(EqKey):
@@ -29,13 +33,58 @@ class Atom(EqKey):
         self.value = value
 
 
-class Elements(EqKey):
+class ElementsBase(EqKey):
     """Object with multiple values to process for equality recursively."""
 
-    def __init__(self, obj, *values):
-        """Initialize an Elements."""
+
+class ItemEK(ElementsBase):
+    """Object indexed using getitem."""
+
+    def __init__(self, obj, keys):
+        """Initialize an ItemEK."""
         super().__init__(obj)
-        self.values = values
+        self.keys = tuple(keys)
+        self.values = tuple(key if isinstance(key, EqKey)
+                            else obj[key]
+                            for key in keys)
+
+    def canonicalize(self):
+        """Canonicalize the underlying object."""
+        obj = self.obj
+        if getattr(obj, '_canonical', False):
+            return
+        if isinstance(obj, Interned):
+            obj._canonical = True
+        for key, value in zip(self.keys, self.values):
+            if isinstance(key, EqKey):
+                key.canonicalize()
+            elif isinstance(value, Interned):
+                obj[key] = value.intern()
+
+
+class AttrEK(ElementsBase):
+    """Object indexed using getattr."""
+
+    def __init__(self, obj, keys):
+        """Initialize an AttrEK."""
+        super().__init__(obj)
+        self.keys = tuple(keys)
+        self.values = tuple(key if isinstance(key, EqKey)
+                            else getattr(obj, key)
+                            for key in keys)
+
+    def canonicalize(self):
+        """Canonicalize the underlying object."""
+        obj = self.obj
+        if getattr(obj, '_canonical', False):
+            return
+        if isinstance(obj, Interned):
+            obj._canonical = True
+        for key, value in zip(self.keys, self.values):
+            if isinstance(key, EqKey):
+                key.canonicalize()
+            elif isinstance(value, Interned):
+                setattr(obj, key, value.intern())
 
 
 def eqkey(x):
@@ -45,12 +94,13 @@ def eqkey(x):
     elif isinstance(x, EqKey):
         return x
     elif isinstance(x, (list, tuple)):
-        return Elements(x, *x)
+        return ItemEK(x, range(len(x)))
     elif isinstance(x, dict):
-        return Elements(x, *x.items())
+        return ItemEK(x, x.keys())
     elif hasattr(x, '__eqkey__'):
         return x.__eqkey__()
     else:
+        assert not isinstance(x, (set, frozenset))
         return Atom(x, x)
 
 
@@ -75,7 +125,7 @@ def deep_eqkey(obj, path=frozenset()):
         raise RecursionException()
 
     key = eqkey(obj)
-    if isinstance(key, Elements):
+    if isinstance(key, ElementsBase):
         dk = key.type, type(key.values)(
             deep_eqkey(x, path | {oid}) for x in key.values
         )
@@ -144,7 +194,7 @@ def eqrec(obj1, obj2, cache=None):
     if isinstance(key1, Atom):
         return key1.value == key2.value
 
-    elif isinstance(key1, Elements):
+    elif isinstance(key1, ElementsBase):
         v1 = key1.values
         v2 = key2.values
         if len(v1) != len(v2):
@@ -252,10 +302,7 @@ def intern(inst):
         return inst
     if existing is None:
         _intern_pool[wrap] = inst
-        try:
-            inst._canonical = True
-        except Exception:
-            pass
+        eqkey(inst).canonicalize()
         return inst
     else:
         return existing
