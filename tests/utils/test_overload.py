@@ -100,6 +100,20 @@ def test_Overload_bootstrap():
     # The new method in g is used
     assert g([1, 2, "xxx", [3, 4]]) == [2, 3, "B", [4, 5]]
 
+    @f.variant(postprocess=lambda x: {'result': x})
+    def h(self, x: object):
+        return "C"
+
+    # Only the end result is postprocessed
+    assert h([1, 2, "xxx", [3, 4]]) == {'result': [2, 3, "C", [4, 5]]}
+
+    @h.variant
+    def i(self, x: object):
+        return "D"
+
+    # Postprocessor is kept
+    assert i([1, 2, "xxx", [3, 4]]) == {'result': [2, 3, "D", [4, 5]]}
+
 
 def test_Overload_wrapper():
 

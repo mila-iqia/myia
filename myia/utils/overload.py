@@ -57,6 +57,8 @@ class Overload:
             function to dispatch to.
         initial_state: A function returning the initial state, or None if
             there is no state.
+        postprocess: A function to call on the return value. It is not called
+            after recursive calls.
         mixins: A list of Overload instances that contribute functions to this
             Overload.
     """
@@ -66,6 +68,7 @@ class Overload:
                  bind_to=None,
                  wrapper=None,
                  initial_state=None,
+                 postprocess=None,
                  mixins=[],
                  name=None,
                  _parent=None):
@@ -79,6 +82,7 @@ class Overload:
         self._wrapper = wrapper
         self.state = None
         self.initial_state = initial_state
+        self.postprocess = postprocess
         self.name = name
         if _parent:
             assert _parent.which is not None
@@ -153,7 +157,7 @@ class Overload:
         self._set_attrs_from(fn)
         return self
 
-    def copy(self, wrapper=MISSING, initial_state=None):
+    def copy(self, wrapper=MISSING, initial_state=None, postprocess=None):
         """Create a copy of this Overload.
 
         New functions can be registered to the copy without affecting the
@@ -165,16 +169,18 @@ class Overload:
             bind_to=bootstrap,
             wrapper=self._wrapper if wrapper is MISSING else wrapper,
             mixins=[self],
-            initial_state=initial_state or self.initial_state
+            initial_state=initial_state or self.initial_state,
+            postprocess=postprocess or self.postprocess
         )
 
-    def variant(self, fn=None, *, wrapper=MISSING, initial_state=None):
+    def variant(self, fn=None, *, wrapper=MISSING, initial_state=None,
+                postprocess=None):
         """Decorator to create a variant of this Overload.
 
         New functions can be registered to the variant without affecting the
         original.
         """
-        ov = self.copy(wrapper, initial_state)
+        ov = self.copy(wrapper, initial_state, postprocess)
         if fn is None:
             return ov.register
         else:
@@ -204,10 +210,14 @@ class Overload:
 
     def __call__(self, *args, **kwargs):
         """Call the overloaded function."""
-        if self.initial_state is not None:
+        if self.initial_state or self.postprocess:
             ov = Overload(bind_to=True, _parent=self)
-            ov.state = self.initial_state()
-            return ov(*args, **kwargs)
+            if self.initial_state:
+                ov.state = self.initial_state()
+            res = ov(*args, **kwargs)
+            if self.postprocess:
+                res = self.postprocess(res)
+            return res
 
         fself = self.__self__
         if fself is not None:
@@ -234,21 +244,24 @@ class Overload:
         return f'<Overload {self.name or hex(id(self))}>'
 
 
-def _find_overload(fn, bootstrap, initial_state):
+def _find_overload(fn, bootstrap, initial_state, postprocess):
     mod = __import__(fn.__module__, fromlist='_')
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
-        dispatch = Overload(bind_to=bootstrap, initial_state=initial_state)
+        dispatch = Overload(bind_to=bootstrap,
+                            initial_state=initial_state,
+                            postprocess=postprocess)
     else:  # pragma: no cover
         assert bootstrap is False
         assert initial_state is None
+        assert postprocess is None
     if not isinstance(dispatch, Overload):  # pragma: no cover
         raise TypeError('@overload requires Overload instance')
     return dispatch
 
 
 @keyword_decorator
-def overload(fn, *, bootstrap=False, initial_state=None):
+def overload(fn, *, bootstrap=False, initial_state=None, postprocess=None):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -266,13 +279,16 @@ def overload(fn, *, bootstrap=False, initial_state=None):
         initial_state: A function with no arguments that returns the initial
             state for top level calls to the overloaded function, or None
             if there is no initial state.
+        postprocess: A function to transform the result. Not called on the
+            results of recursive calls.
     """
-    dispatch = _find_overload(fn, bootstrap, initial_state)
+    dispatch = _find_overload(fn, bootstrap, initial_state, postprocess)
     return dispatch.register(fn)
 
 
 @keyword_decorator
-def overload_wrapper(wrapper, *, bootstrap=False, initial_state=None):
+def overload_wrapper(wrapper, *, bootstrap=False, initial_state=None,
+                     postprocess=None):
     """Overload a function using the decorated function as a wrapper.
 
     The wrapper is the entry point for the function and receives as its
@@ -285,8 +301,10 @@ def overload_wrapper(wrapper, *, bootstrap=False, initial_state=None):
         initial_state: A function with no arguments that returns the initial
             state for top level calls to the overloaded function, or None
             if there is no initial state.
+        postprocess: A function to transform the result. Not called on the
+            results of recursive calls.
     """
-    dispatch = _find_overload(wrapper, bootstrap, initial_state)
+    dispatch = _find_overload(wrapper, bootstrap, initial_state, postprocess)
     return dispatch.wrapper(wrapper)
 
 
