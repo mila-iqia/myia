@@ -13,7 +13,7 @@ def _reabs(self, a: AbstractClass):
     return (yield AbstractTuple)(self(x) for x in a.attributes.values())
 
 
-@overload
+@overload  # noqa: F811
 def _reabs(self, a: AbstractADT):
     return (yield AbstractTuple)(self(x) for x in a.attributes.values())
 

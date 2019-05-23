@@ -101,8 +101,8 @@ def test_eqrec():
 
 
 def test_eqrec_incomplete():
-    rec1 = Thingy()
-    rec2 = Thingy()
+    rec1 = Thingy.new()
+    rec2 = Thingy.new()
 
     with pytest.raises(IncompleteException):
         _test(rec1, rec2)

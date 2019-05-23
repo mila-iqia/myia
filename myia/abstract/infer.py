@@ -493,7 +493,7 @@ def to_abstract(self, v: typing._GenericAlias, context, ref, loop):
     return AbstractType(type_to_abstract(v))
 
 
-@overload
+@overload  # noqa: F811
 def to_abstract(self, v: ADT, context, ref, loop):
     new_args = {}
     for name, field in v.__dataclass_fields__.items():

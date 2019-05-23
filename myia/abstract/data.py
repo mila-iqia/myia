@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from contextvars import ContextVar
 
 from ..debug.label import label
-from ..utils import Named, Partializable, Interned, Atom, ItemEK, AttrEK, \
+from ..utils import Named, Partializable, Interned, Atom, AttrEK, \
     PossiblyRecursive
 
 from .loop import Pending
@@ -47,7 +47,7 @@ class Function:
     """Represents a possible function in an AbstractFunction."""
 
 
-@dataclass(frozen=True)
+@dataclass(unsafe_hash=True)
 class GraphFunction(Function):
     """Represents a Graph in a certain Context.
 
@@ -63,7 +63,7 @@ class GraphFunction(Function):
     tracking_id: object = None
 
 
-@dataclass(frozen=True)
+@dataclass(unsafe_hash=True)
 class PrimitiveFunction(Function):
     """Represents a Primitive.
 
@@ -77,7 +77,7 @@ class PrimitiveFunction(Function):
     tracking_id: object = None
 
 
-@dataclass(frozen=True)
+@dataclass(unsafe_hash=True)
 class MetaGraphFunction(Function):
     """Represents a MetaGraph in a certain Context.
 
@@ -93,7 +93,7 @@ class MetaGraphFunction(Function):
     tracking_id: object = None
 
 
-@dataclass(frozen=True)
+@dataclass(unsafe_hash=True)
 class PartialApplication(Function):
     """Represents a partial application.
 
@@ -107,7 +107,7 @@ class PartialApplication(Function):
     args: Tuple['AbstractValue']
 
 
-@dataclass(frozen=True)
+@dataclass(unsafe_hash=True)
 class JTransformedFunction(Function):
     """Represents a Function transformed through the application of J.
 
@@ -119,7 +119,7 @@ class JTransformedFunction(Function):
     fn: object
 
 
-@dataclass(frozen=True)
+@dataclass(unsafe_hash=True)
 class VirtualFunction(Function):
     """Represents some function with an explicitly given type signature.
 
@@ -133,7 +133,7 @@ class VirtualFunction(Function):
     output: 'AbstractValue'
 
 
-@dataclass(frozen=True)
+@dataclass(unsafe_hash=True)
 class TypedPrimitive(Function):
     """Represents a Primitive with an explicitly given type signature.
 
@@ -149,6 +149,7 @@ class TypedPrimitive(Function):
     output: 'AbstractValue'
 
 
+@dataclass(unsafe_hash=True)
 class DummyFunction(Function):
     """Represents a function that can't be called."""
 
