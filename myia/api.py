@@ -4,6 +4,7 @@ import inspect
 
 from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
+from .utils import keyword_decorator
 
 
 #################
@@ -72,7 +73,8 @@ class MyiaFunction:
         return self.compile(args)(*args)
 
 
-def myia(fn=None, *, specialize_values=[], backend=None, backend_options=None,
+@keyword_decorator
+def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
          return_backend=False):
     """Create a function using Myia's runtime.
 
@@ -95,11 +97,6 @@ def myia(fn=None, *, specialize_values=[], backend=None, backend_options=None,
         backend_options: backend-specific options.
         return_backend: return backend values (avoids copies to CPU).
     """
-    def deco(fn):
-        return MyiaFunction(fn, specialize_values, backend=backend,
-                            backend_options=backend_options,
-                            return_backend=return_backend)
-    if fn is None:
-        return deco
-    else:
-        return deco(fn)
+    return MyiaFunction(fn, specialize_values, backend=backend,
+                        backend_options=backend_options,
+                        return_backend=return_backend)

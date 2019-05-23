@@ -3,7 +3,7 @@
 
 import inspect
 
-from .misc import MISSING
+from .misc import MISSING, keyword_decorator
 
 
 class TypeMap(dict):
@@ -247,7 +247,8 @@ def _find_overload(fn, bootstrap, initial_state):
     return dispatch
 
 
-def overload(fn=None, *, bootstrap=False, initial_state=None):
+@keyword_decorator
+def overload(fn, *, bootstrap=False, initial_state=None):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -266,17 +267,12 @@ def overload(fn=None, *, bootstrap=False, initial_state=None):
             state for top level calls to the overloaded function, or None
             if there is no initial state.
     """
-    if fn is None:
-        def deco(fn):
-            return overload(fn,
-                            bootstrap=bootstrap,
-                            initial_state=initial_state)
-        return deco
     dispatch = _find_overload(fn, bootstrap, initial_state)
     return dispatch.register(fn)
 
 
-def overload_wrapper(wrapper=None, *, bootstrap=False, initial_state=None):
+@keyword_decorator
+def overload_wrapper(wrapper, *, bootstrap=False, initial_state=None):
     """Overload a function using the decorated function as a wrapper.
 
     The wrapper is the entry point for the function and receives as its
@@ -290,12 +286,6 @@ def overload_wrapper(wrapper=None, *, bootstrap=False, initial_state=None):
             state for top level calls to the overloaded function, or None
             if there is no initial state.
     """
-    if wrapper is None:
-        def deco(wrapper):
-            return overload_wrapper(wrapper,
-                                    bootstrap=bootstrap,
-                                    initial_state=initial_state)
-        return deco
     dispatch = _find_overload(wrapper, bootstrap, initial_state)
     return dispatch.wrapper(wrapper)
 

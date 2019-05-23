@@ -2,6 +2,7 @@
 
 import builtins
 import itertools
+import functools
 import sys
 from types import FunctionType
 from typing import Any, Dict, List, TypeVar
@@ -325,3 +326,17 @@ class ErrorPool:
             exc = self.exc_class(msg)
             exc.errors = self.errors
             raise exc
+
+
+def keyword_decorator(deco):
+    """Wrap a decorator to optionally takes keyword arguments."""
+    @functools.wraps(deco)
+    def new_deco(fn=None, **kwargs):
+        if fn is None:
+            @functools.wraps(deco)
+            def newer_deco(fn):
+                return deco(fn, **kwargs)
+            return newer_deco
+        else:
+            return deco(fn, **kwargs)
+    return new_deco
