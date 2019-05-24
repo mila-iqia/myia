@@ -12,7 +12,6 @@ from ..utils import overload, is_dataclass_type, dataclass_methods
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
-from .ref import Reference, Context, ConditionalContext
 
 from .data import (
     ABSENT,
@@ -247,7 +246,7 @@ def abstract_check(__call__, self, x, *args):
             if hasattr(x, prop):
                 return getattr(x, prop) is x
             elif __call__(self, x, *args):
-                if isinstance(x, (AbstractValue, Context, Reference)):
+                if isinstance(x, AbstractValue):
                     setattr(x, prop, x)
                 return True
             else:
@@ -316,17 +315,6 @@ def abstract_check(self, xs: object, *args):
     return True
 
 
-@overload  # noqa: F811
-def abstract_check(self, ctx: Context, *args):
-    return (self(ctx.parent, *args)
-            and all(self(x, *args) for x in ctx.argkey))
-
-
-@overload  # noqa: F811
-def abstract_check(self, ref: Reference, *args):
-    return self(ref.context, *args)
-
-
 ###########
 # Cloning #
 ###########
@@ -379,7 +367,7 @@ def abstract_clone(__call__, self, x, *args):
     if prop:
         if hasattr(x, prop):
             return getattr(x, prop)
-        elif isinstance(x, (AbstractValue, Context, Reference)):
+        elif isinstance(x, AbstractValue):
             if self.state.check(x, *args):
                 res = x
             else:
@@ -464,23 +452,6 @@ def abstract_clone(self, x: JTransformedFunction, *args):
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: Context, *args):
-    return Context(
-        self(x.parent, *args),
-        x.graph,
-        tuple(self(arg) for arg in x.argkey)
-    )
-
-
-@overload  # noqa: F811
-def abstract_clone(self, x: ConditionalContext, *args):
-    return ConditionalContext(
-        self(x.parent, *args),
-        tuple(self(arg) for arg in x.argkey)
-    )
-
-
-@overload  # noqa: F811
 def abstract_clone(self, x: Pending, *args):
     if x.done():
         return self(x.result(), *args)
@@ -525,7 +496,7 @@ async def abstract_clone_async(__call__, self, x, *args):
     if prop:
         if hasattr(x, prop):
             return getattr(x, prop)
-        elif isinstance(x, (AbstractValue, Context, Reference)):
+        elif isinstance(x, AbstractValue):
             if self.state.check(x, *args):
                 res = x
             else:
@@ -628,30 +599,6 @@ def _is_concrete(self, x: Pending):
 async def concretize_abstract(self, x: Pending):
     """Clone an abstract value while resolving all Pending (asynchronous)."""
     return await self(await x)
-
-
-@overload  # noqa: F811
-async def concretize_abstract(self, r: Reference):
-    return Reference(
-        r.engine,
-        r.node,
-        await self(r.context),
-    )
-
-
-@overload  # noqa: F811
-async def concretize_abstract(self, ctx: Context):
-    c_argkey = [await self(x) for x in ctx.argkey]
-    return Context(
-        await self(ctx.parent),
-        ctx.graph,
-        tuple(c_argkey)
-    )
-
-
-@overload  # noqa: F811
-async def concretize_abstract(self, t: tuple):
-    return tuple([await self(x) for x in t])
 
 
 ###############
