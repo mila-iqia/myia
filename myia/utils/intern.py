@@ -58,8 +58,8 @@ class ItemEK(ElementsBase):
         for key, value in zip(self.keys, self.values):
             if isinstance(key, EqKey):
                 key.canonicalize()
-            elif isinstance(value, Interned):
-                obj[key] = value.intern()
+            else:
+                obj[key] = intern(value)
 
 
 class AttrEK(ElementsBase):
@@ -83,8 +83,8 @@ class AttrEK(ElementsBase):
         for key, value in zip(self.keys, self.values):
             if isinstance(key, EqKey):
                 key.canonicalize()
-            elif isinstance(value, Interned):
-                setattr(obj, key, value.intern())
+            else:
+                setattr(obj, key, intern(value))
 
 
 def eqkey(x):
@@ -295,14 +295,20 @@ class PossiblyRecursive:
 
 def intern(inst):
     """Get the interned instance."""
-    wrap = Wrapper(inst)
+
     try:
+        wrap = Wrapper(inst)
+    except TypeError:
+        wrap = None
+        existing = None
+    else:
         existing = _intern_pool.get(wrap, None)
-    except IncompleteException:
-        return inst
+
     if existing is None:
-        _intern_pool[wrap] = inst
-        eqkey(inst).canonicalize()
+        if wrap is not None:
+            _intern_pool[wrap] = inst
+        eqk = eqkey(inst)
+        eqk.canonicalize()
         return inst
     else:
         return existing

@@ -703,7 +703,7 @@ class PartialInferrer(Inferrer):
         argvals = tuple([await ref.get() for ref in argrefs])
         if argvals not in self.cache:
             args = tuple(VirtualReference(arg)
-                         for arg in self.args + argvals)
+                         for arg in tuple(self.args) + argvals)
             self.cache[argvals] = await self.fn.run(engine, outref, args)
         return self.cache[argvals]
 

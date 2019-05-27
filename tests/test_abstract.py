@@ -160,7 +160,8 @@ def test_repr():
 def test_repr_recursive():
     sa = S(t=ty.Int[64])
     ta = T.empty()
-    la = L(ta)
+    la = L.empty()
+    la.__init__(ta)
     ta.__init__([sa, la])
     ta = ta.intern()
     repr(ta)

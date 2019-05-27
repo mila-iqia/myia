@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from contextvars import ContextVar
 
 from ..debug.label import label
-from ..utils import Named, Partializable, Interned, Atom, AttrEK, \
+from ..utils import Named, Partializable, Interned, Atom, AttrEK, ItemEK, \
     PossiblyRecursive
 
 from .loop import Pending
@@ -34,13 +34,36 @@ POLY = Named('POLY')
 #####################
 
 
-class Possibilities(tuple):
+class Possibilities:
     """Represents a set of possible values.
 
     This is technically implemented as a tuple, because the possibility of
     recursive types or values, which may be incomplete when a Possibilities is
     constructed, may impair the equality comparisons needed to construct a set.
     """
+
+    def __init__(self, values):
+        """Initialize possibilities."""
+        self.values = list(values)
+
+    def __getitem__(self, idx):
+        return self.values[idx]
+
+    def __setitem__(self, idx, value):
+        self.values[idx] = value
+
+    def __add__(self, other):
+        return Possibilities(self.values + other.values)
+
+    def __eqkey__(self):
+        return ItemEK(self, range(len(self.values)))
+
+    def __hash__(self):
+        return hash(tuple(self.values))
+
+    def __eq__(self, other):
+        return isinstance(other, Possibilities) \
+            and self.values == other.values
 
 
 class Function:
@@ -93,7 +116,7 @@ class MetaGraphFunction(Function):
     tracking_id: object = None
 
 
-@dataclass(unsafe_hash=True)
+@dataclass
 class PartialApplication(Function):
     """Represents a partial application.
 
@@ -105,6 +128,17 @@ class PartialApplication(Function):
 
     fn: Function
     args: Tuple['AbstractValue']
+
+    def __init__(self, fn, args):
+        """Initialize a PartialApplication."""
+        self.fn = fn
+        self.args = list(args)
+
+    def __hash__(self):
+        return hash((self.fn, *self.args))
+
+    def __eqkey__(self):
+        return AttrEK(self, ('fn', 'args'))
 
 
 @dataclass(unsafe_hash=True)
@@ -539,7 +573,7 @@ class AbstractUnion(AbstractStructure):
     def __init__(self, options):
         """Initialize an AbstractUnion."""
         super().__init__({})
-        self.options = tuple(options)
+        self.options = list(options)
 
     def children(self):
         """Return the set of options."""
