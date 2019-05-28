@@ -3,10 +3,8 @@ node ('gpu') {
     checkout scm
   }
   stage ('Install') {
-    cache(caches: [[$class: 'ArbitraryFileCache', excludes: '', includes: '**/*', path: '/home/jenkins/miniconda']], maxCacheSize: 6000) {
-      sh script: '.testing/install.sh --gpu'
-      sh script: 'du -hs /home/jenkins/miniconda'
-    }
+    sh script: 'env'
+    sh script: '.testing/install.sh --gpu'
   }
   stage ('Test') {
     sh script: '$HOME/miniconda/bin/pytest --cov-report=term-missing --cov-report=xml  --cov=./ --gpu --junit-xml test-report.xml'
