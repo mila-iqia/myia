@@ -52,7 +52,7 @@ def test_interned():
 
 def _test(a, b):
     eq = eqrec(a, b, cache=set())
-    hq = hashrec(a, frozenset(), {}) == hashrec(b, frozenset(), {})
+    hq = hashrec(a) == hashrec(b)
     # This is a sanity check that assumes no collisions
     assert hq == eq
     return eq
@@ -79,12 +79,12 @@ def test_eqrec():
 
     assert _test([a, b], [b, b])
     assert _test(a, b)
-    assert not _test(a, [1, a])
-    assert not _test(a, [1, [1, a]])
-    assert not _test(b, [1, a])
+    assert _test(a, [1, a])
+    assert _test(a, [1, [1, a]])
+    assert _test(b, [1, a])
     assert _test([1, b], [1, a])
-    assert not _test(z1, z2)
-    assert not _test(c, [1, c])
+    assert _test(z1, z2)
+    assert _test(c, [1, c])
 
     assert _test(Point(1, 2), Point(1, 2))
     assert _test(2+9j, 2+9j)
@@ -94,6 +94,24 @@ def test_eqrec():
 
     assert eq([a, b], [b, b])
     assert hsh([a, b]) == hsh([b, b])
+
+    # assert _test([a, b], [b, b])
+    # assert _test(a, b)
+    # assert not _test(a, [1, a])
+    # assert not _test(a, [1, [1, a]])
+    # assert not _test(b, [1, a])
+    # assert _test([1, b], [1, a])
+    # assert not _test(z1, z2)
+    # assert not _test(c, [1, c])
+
+    # assert _test(Point(1, 2), Point(1, 2))
+    # assert _test(2+9j, 2+9j)
+    # assert _test((1, 2), (1, 2))
+    # assert not _test((1, 2), (1, 2, 3))
+    # assert not _test((1, 2), [1, 2])
+
+    # assert eq([a, b], [b, b])
+    # assert hsh([a, b]) == hsh([b, b])
 
 
 def test_eqrec_incomplete():
