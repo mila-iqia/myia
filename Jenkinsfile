@@ -3,7 +3,7 @@ node ('gpu') {
     checkout scm
   }
   stage ('Install') {
-    cache(caches: [[$class: 'ArbitraryFileCache', excludes: '', includes: '**/*', path: '/home/jenkins/miniconda']], maxCacheSize: 3000) {
+    cache(caches: [[$class: 'ArbitraryFileCache', excludes: '', includes: '**/*', path: '/home/jenkins/miniconda']], maxCacheSize: 6000) {
       sh script: '.testing/install.sh --gpu'
     }
   }
