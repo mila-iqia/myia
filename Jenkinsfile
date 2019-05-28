@@ -5,6 +5,7 @@ node ('gpu') {
   stage ('Install') {
     cache(caches: [[$class: 'ArbitraryFileCache', excludes: '', includes: '**/*', path: '/home/jenkins/miniconda']], maxCacheSize: 6000) {
       sh script: '.testing/install.sh --gpu'
+      sh script: 'du -hs /home/jenkins/miniconda'
     }
   }
   stage ('Test') {
