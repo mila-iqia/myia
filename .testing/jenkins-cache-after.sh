@@ -12,8 +12,9 @@ fi
 NAME=${JOB_NAME//[\/]/_}
 
 echo "Archiving artifacts" "$@" "to $NAME"
-tar -czf $BASE/$NAME.tgz -C workspace "$@"
+tar -czf $BASE/$NAME.tgz -C $WORKSPACE "$@"
 
 if [ x"$GIT_BRANCH" == x"master" ]; then
     echo "Master branch; updating master cache"
     cp $BASE/$NAME.tgz $BASE/$PROJECT-master.tgz
+fi
