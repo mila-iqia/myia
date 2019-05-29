@@ -22,7 +22,10 @@ V = var(lambda n: n.is_constant())
 
 parse = scalar_pipeline \
     .configure({
-        'convert.object_map': Merge({operations.getitem: prim.tuple_getitem})
+        'convert.object_map': Merge({
+            operations.getitem: prim.tuple_getitem,
+            operations.user_switch: prim.switch
+        })
     }) \
     .select('parse', 'resolve') \
     .make_transformer('input', 'graph')

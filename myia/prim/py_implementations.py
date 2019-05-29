@@ -530,6 +530,12 @@ def switch(c, x, y):
     return x if c else y
 
 
+@register(primops.user_switch)
+def user_switch(c, x, y):
+    """Implement `user_switch`."""
+    return x if c else y
+
+
 @register(primops.scalar_to_array)
 def scalar_to_array(x):
     """Implement `scalar_to_array`."""

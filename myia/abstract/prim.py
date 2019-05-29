@@ -793,6 +793,20 @@ async def _inf_dot(engine, a: AbstractArray, b: AbstractArray):
 ##############
 
 
+class _UserSwitchInferrer(Inferrer):
+
+    async def reroute(self, engine, outref, argrefs):
+        g = outref.node.graph
+        to_bool = engine.pipeline.resources.convert(bool)
+        _, cond, tb, fb = outref.node.inputs
+        app = g.apply(to_bool, cond)
+        newnode = g.apply(P.switch, app, tb, fb)
+        return engine.ref(newnode, outref.context)
+
+
+abstract_inferrer_constructors[P.user_switch] = _UserSwitchInferrer.partial()
+
+
 class _SwitchInferrer(Inferrer):
 
     async def _special_hastype(self, engine, outref,
