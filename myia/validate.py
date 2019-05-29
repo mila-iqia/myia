@@ -121,6 +121,7 @@ class Validator:
             fn(node)
         except ValidationError as err:
             err.node = node
+            node.debug.errors.add(err)
             self.errors.add(err)
 
     def _validate_oper(self, node):

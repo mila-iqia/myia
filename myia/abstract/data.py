@@ -477,7 +477,7 @@ def normalize_adt(x, done, tag_to_adt):
         if x.tag not in tag_to_adt:
             adt = AbstractADT.new(
                 x.tag,
-                {k: AbstractUnion([]) for k in x.attributes},
+                {k: AbstractUnion.new([]) for k in x.attributes},
                 x.methods
             )
             adt._incomplete = True
@@ -487,13 +487,13 @@ def normalize_adt(x, done, tag_to_adt):
         done[x] = adt
         for attr, value in x.attributes.items():
             value = normalize_adt(value, done, tag_to_adt)
-            adt.attributes[attr] = abstract_union(
+            adt.attributes[attr] = AbstractUnion.new(
                 [adt.attributes[attr], value]
-            )
+            ).simplify()
         return adt
     elif isinstance(x, AbstractUnion):
         opts = [normalize_adt(opt, done, tag_to_adt) for opt in x.options]
-        rval = abstract_union(opts)
+        rval = AbstractUnion.new(opts).simplify()
         done[x] = rval
         return rval
     else:
@@ -579,6 +579,13 @@ class AbstractUnion(AbstractStructure):
     def children(self):
         """Return the set of options."""
         return self.options
+
+    def simplify(self):
+        """Simplify the Union if there is only one possibility."""
+        if len(self.options) == 1:
+            return self.options[0]
+        else:
+            return self
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
