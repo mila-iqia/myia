@@ -1034,7 +1034,7 @@ async def _inf_partial(engine, fn, *args):
     fns = await fn.get()
     assert isinstance(fns, Possibilities)
     return AbstractFunction(*[
-        PartialApplication(fn, args) for fn in fns
+        PartialApplication(fn, list(args)) for fn in fns
     ])
 
 

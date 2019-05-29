@@ -4,7 +4,7 @@
 import re
 import prettyprinter as pp
 from prettyprinter.prettyprinter import pretty_python_value
-from typing import Tuple
+from typing import Tuple, List
 from dataclasses import dataclass
 from contextvars import ContextVar
 
@@ -116,7 +116,7 @@ class MetaGraphFunction(Function):
     tracking_id: object = None
 
 
-@dataclass
+@dataclass(eq=False)
 class PartialApplication(Function):
     """Represents a partial application.
 
@@ -127,15 +127,7 @@ class PartialApplication(Function):
     """
 
     fn: Function
-    args: Tuple['AbstractValue']
-
-    def __init__(self, fn, args):
-        """Initialize a PartialApplication."""
-        self.fn = fn
-        self.args = list(args)
-
-    def __hash__(self):
-        return hash((self.fn, *self.args))
+    args: List['AbstractValue']
 
     def __eqkey__(self):
         return AttrEK(self, ('fn', 'args'))
@@ -332,6 +324,9 @@ class AbstractFunction(AbstractAtom):
             raise MyiaTypeError(f'Expected unique function, not {poss}')
         fn, = poss
         return fn
+
+    def __eqkey__(self):
+        return AttrEK(self, ('values',))
 
     def __pretty__(self, ctx):
         fns = self.get_sync()
@@ -573,7 +568,13 @@ class AbstractUnion(AbstractStructure):
     def __init__(self, options):
         """Initialize an AbstractUnion."""
         super().__init__({})
-        self.options = list(options)
+        opts = []
+        for option in options:
+            if isinstance(option, AbstractUnion):
+                opts += option.options
+            else:
+                opts.append(option)
+        self.options = opts
 
     def children(self):
         """Return the set of options."""

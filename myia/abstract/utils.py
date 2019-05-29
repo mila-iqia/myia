@@ -8,7 +8,7 @@ from itertools import chain
 from types import GeneratorType, AsyncGeneratorType
 
 from .. import dtype
-from ..utils import overload, is_dataclass_type, dataclass_methods
+from ..utils import overload, is_dataclass_type, dataclass_methods, intern
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
@@ -338,7 +338,8 @@ def _make_constructor(inst):
 
 
 @overload.wrapper(
-    initial_state=lambda: CloneState({}, None, None)
+    initial_state=lambda: CloneState({}, None, None),
+    postprocess=intern,
 )
 def abstract_clone(__call__, self, x, *args):
     """Clone an abstract value."""
@@ -355,9 +356,8 @@ def abstract_clone(__call__, self, x, *args):
         try:
             result.send(constructor)
         except StopIteration as e:
-            rval = e.value.intern()
-            cache[x] = rval
-            return rval
+            assert e.value is inst
+            return inst
         else:
             raise AssertionError(
                 'Generators in abstract_clone must yield once, then return.'
@@ -453,7 +453,7 @@ def abstract_clone(self, x: Possibilities, *args):
 def abstract_clone(self, x: PartialApplication, *args):
     return PartialApplication(
         self(x.fn, *args),
-        tuple([self(arg, *args) for arg in x.args])
+        [self(arg, *args) for arg in x.args]
     )
 
 
@@ -480,8 +480,13 @@ def abstract_clone(self, x: object, *args):
 #################
 
 
+async def _abstract_clone_async_post(x):
+    return intern(await x)
+
+
 @overload.wrapper(
-    initial_state=lambda: CloneState({}, None, None)
+    initial_state=lambda: CloneState({}, None, None),
+    postprocess=_abstract_clone_async_post,
 )
 async def abstract_clone_async(__call__, self, x, *args):
     """Clone an abstract value (asynchronous)."""
@@ -496,8 +501,7 @@ async def abstract_clone_async(__call__, self, x, *args):
             cache[x] = inst
             constructor = _make_constructor(inst)
             rval = await call.asend(constructor)
-            rval = rval.intern()
-            cache[x] = rval
+            assert rval is inst
             return rval
         else:
             return await call
@@ -588,7 +592,7 @@ async def abstract_clone_async(self, x: Possibilities):
 async def abstract_clone_async(self, x: PartialApplication):
     return PartialApplication(
         await self(x.fn),
-        tuple([await self(arg) for arg in x.args])
+        [await self(arg) for arg in x.args]
     )
 
 
