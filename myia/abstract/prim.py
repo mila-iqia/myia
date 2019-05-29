@@ -266,7 +266,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
     if case == 'class':
         # Get field from Class
         if item_v in data.attributes:
-            return await on_dcattr(data, item_v)
+            return 'rval', await on_dcattr(data, item_v)
         elif item_v in data.methods:
             method = data.methods[item_v]
             method = resources.convert(method)
@@ -276,7 +276,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             eng = outref.engine
             ref = eng.ref(g.apply(P.partial, fn, dataref.node),
                           outref.context)
-            return await eng.reroute(outref, ref)
+            return 'reroute', ref
         else:
             raise InferenceError(f'Unknown field in {data}: {item_v}')
 
@@ -289,7 +289,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         eng = outref.engine
         ref = eng.ref(g.apply(P.partial, fn, dataref.node),
                       outref.context)
-        return await eng.reroute(outref, ref)
+        return 'reroute', ref
 
     elif case == 'no_method':
         msg = f"object of type {data} has no attribute '{item_v}'"
@@ -314,7 +314,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         except Exception as e:  # pragma: no cover
             raise InferenceError(f'Unexpected error in getter: {e!r}')
         value = resources.convert(raw)
-        return to_abstract(value, Context.empty(), ref=outref)
+        return 'rval', to_abstract(value, Context.empty(), ref=outref)
 
 
 async def _resolve_case(resources, data_t, item_v, chk):
@@ -511,30 +511,46 @@ async def _inf_list_append(engine,
     return arg
 
 
+def _getattr_chk(data_v, item_v):
+    if not isinstance(item_v, str):  # pragma: no cover
+        raise MyiaTypeError(
+            f'item argument to resolve must be a string, not {item_v}.'
+        )
+
+async def _getattr_on_dcattr(data, item_v):
+    return data.attributes[item_v]
+
+
 class _GetAttrInferrer(Inferrer):
+    async def reroute(self, engine, outref, argrefs):
+        check_nargs(P.getattr, 2, argrefs)
+        r_data, r_item = argrefs
+        data = await r_data.get()
+        item = await r_item.get()
+        policy, newref = await static_getter(
+            engine, data, item,
+            fetch=getattr,
+            on_dcattr=_getattr_on_dcattr,
+            chk=_getattr_chk,
+            outref=outref,
+            dataref=r_data,
+        )
+        return newref if policy == 'reroute' else None
+
     async def run(self, engine, outref, argrefs):
         check_nargs(P.getattr, 2, argrefs)
         r_data, r_item = argrefs
         data = await r_data.get()
         item = await r_item.get()
-
-        def chk(data_v, item_v):
-            if not isinstance(item_v, str):  # pragma: no cover
-                raise MyiaTypeError(
-                    f'item argument to resolve must be a string, not {item_v}.'
-                )
-
-        async def on_dcattr(data, item_v):
-            return data.attributes[item_v]
-
-        rval = await static_getter(
+        policy, rval = await static_getter(
             engine, data, item,
             fetch=getattr,
-            on_dcattr=on_dcattr,
-            chk=chk,
+            on_dcattr=_getattr_on_dcattr,
+            chk=_getattr_chk,
             outref=outref,
             dataref=r_data,
         )
+        assert policy == 'rval'
         self.cache[(data, item)] = rval
         return rval
 
@@ -911,38 +927,56 @@ async def _inf_return(engine, x):
     return x
 
 
+def _resolve_chk(data_v, item_v):
+    if not isinstance(data_v, Namespace):  # pragma: no cover
+        raise MyiaTypeError(
+            f'data argument to resolve must be Namespace,'
+            f' not {data_v}',
+            refs=[data]
+        )
+    if not isinstance(item_v, str):  # pragma: no cover
+        raise MyiaTypeError(
+            f'item argument to resolve must be a string,'
+            f' not {item_v}.',
+            refs=[item]
+        )
+
+
+async def _resolve_on_dcattr(data, item_v):  # pragma: no cover
+    raise MyiaTypeError('Cannot resolve on Class.')
+
+
 class _ResolveInferrer(Inferrer):
+
+    async def reroute(self, engine, outref, argrefs):
+        check_nargs(P.resolve, 2, argrefs)
+        r_data, r_item = argrefs
+        data = await r_data.get()
+        item = await r_item.get()
+        policy, newref = await static_getter(
+            engine, data, item,
+            fetch=getitem,
+            on_dcattr=_resolve_on_dcattr,
+            chk=_resolve_chk,
+            outref=outref,
+            dataref=r_data,
+        )
+        return newref if policy == 'reroute' else None
+
     async def run(self, engine, outref, argrefs):
         check_nargs(P.resolve, 2, argrefs)
         r_data, r_item = argrefs
         data = await r_data.get()
         item = await r_item.get()
-
-        def chk(data_v, item_v):
-            if not isinstance(data_v, Namespace):  # pragma: no cover
-                raise MyiaTypeError(
-                    f'data argument to resolve must be Namespace,'
-                    f' not {data_v}',
-                    refs=[data]
-                )
-            if not isinstance(item_v, str):  # pragma: no cover
-                raise MyiaTypeError(
-                    f'item argument to resolve must be a string,'
-                    f' not {item_v}.',
-                    refs=[item]
-                )
-
-        async def on_dcattr(data, item_v):  # pragma: no cover
-            raise MyiaTypeError('Cannot resolve on Class.')
-
-        rval = await static_getter(
+        policy, rval = await static_getter(
             engine, data, item,
             fetch=getitem,
-            on_dcattr=on_dcattr,
-            chk=chk,
+            on_dcattr=_resolve_on_dcattr,
+            chk=_resolve_chk,
             outref=outref,
             dataref=r_data,
         )
+        assert policy == 'rval'
         self.cache[(data, item)] = rval
         return rval
 

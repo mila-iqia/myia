@@ -87,7 +87,7 @@ class InferenceEngine:
         async def _run():
             inf = GraphInferrer(graph, empty_context)
             self.loop.schedule(
-                inf.run(self, None, argrefs)
+                execute_inferrers(self, [inf], None, argrefs)
             )
 
         async def _check():
@@ -519,6 +519,10 @@ class Inferrer(Partializable):
         """
         return args
 
+    async def reroute(self, engine, outref, argrefs):
+        """Return a replacement node to infer from instead of this one."""
+        return None
+
     async def run(self, engine, outref, argrefs):
         """Run inference.
 
@@ -562,9 +566,14 @@ class TrackedInferrer(Inferrer):
         super().__init__()
         self.subinf = subinf
 
+    async def reroute(self, engine, outref, argrefs):
+        """Return a replacement node to infer from instead of this one."""
+        return await self.subinf.reroute(engine, outref, argrefs)
+
     async def run(self, engine, outref, argrefs):
         """Run the inference."""
         args = tuple([await ref.get() for ref in argrefs])
+        args = self.subinf.normalize_args(args)
         self.cache[args] = await self.subinf.run(engine, outref, argrefs)
         return self.cache[args]
 
@@ -772,6 +781,14 @@ async def execute_inferrers(engine, inferrers, outref, argrefs):
     The results of the inferrers will be bound together and an error will
     be raised eventually if they cannot be merged.
     """
+    reroutes = set([await inf.reroute(engine, outref, argrefs)
+                    for inf in inferrers])
+    if len(reroutes) > 1:
+        raise MyiaTypeError('Only one macro may be used at a call point.')
+    newref, = reroutes
+    if newref is not None:
+        return await engine.reroute(outref, newref)
+
     if len(inferrers) == 1:
         inf, = inferrers
         return await inf.run(engine, outref, argrefs)
