@@ -7,7 +7,7 @@ from .abstract import GraphFunction, concretize_abstract, \
     AbstractFunction, AbstractError, build_value, MyiaTypeError, \
     TypedPrimitive, BaseGraphInferrer, broaden, \
     TrackedInferrer, PrimitiveFunction, MetaGraphFunction, \
-    ConditionalContext, InferenceError, abstract_clone, Reference
+    InferenceError, abstract_clone, Reference
 from .abstract import Context, Unspecializable, \
     DEAD, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
@@ -34,14 +34,6 @@ def _refmap(self, fn, x: Context):
 
 
 @overload  # noqa: F811
-def _refmap(self, fn, x: ConditionalContext):
-    return ConditionalContext(
-        self(fn, x.parent),
-        tuple(fn(arg) for arg in x.argkey)
-    )
-
-
-@overload  # noqa: F811
 def _refmap(self, fn, x: type(None)):
     return None
 
@@ -51,14 +43,6 @@ async def _refmap_async(self, fn, x: Context):
     return Context(
         await self(fn, x.parent),
         x.graph,
-        tuple([await fn(arg) for arg in x.argkey])
-    )
-
-
-@overload  # noqa: F811
-async def _refmap_async(self, fn, x: ConditionalContext):
-    return ConditionalContext(
-        await self(fn, x.parent),
         tuple([await fn(arg) for arg in x.argkey])
     )
 
@@ -153,10 +137,7 @@ class _GraphSpecializer:
     """Helper class for TypeSpecializer."""
 
     def __init__(self, specializer, graph, context):
-        parent_context = context.parent
-        while isinstance(parent_context, ConditionalContext):
-            parent_context = parent_context.parent
-        parent_context = _refmap(_no_tracking_id, parent_context)
+        parent_context = _refmap(_no_tracking_id, context.parent)
         self.parent = specializer.specializations[parent_context]
         self.specializer = specializer
         self.engine = specializer.engine

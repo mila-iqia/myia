@@ -26,6 +26,7 @@ def erase_class(root, manager):
 
     for node in list(manager.all_nodes):
         new_node = None
+        keep_abstract = True
 
         if node.is_apply(P.getattr):
             _, data, item = node.inputs
@@ -53,12 +54,17 @@ def erase_class(root, manager):
                         P.partial, P.make_tuple, *args[1:]
                     )
 
+        elif node.is_constant(AbstractADT):
+            new_node = Constant(_reabs(node.value))
+            keep_abstract = False
+
         elif node.is_constant() and is_dataclass_type(node.value):
             raise NotImplementedError()
             # new_node = Constant(P.make_tuple)
 
         if new_node is not None:
-            new_node.abstract = node.abstract
+            if keep_abstract:
+                new_node.abstract = node.abstract
             manager.replace(node, new_node)
 
     for node in manager.all_nodes:

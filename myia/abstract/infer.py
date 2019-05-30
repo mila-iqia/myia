@@ -14,8 +14,7 @@ from ..utils import Overload, Partializable, is_dataclass_type, \
     SymbolicKeyInstance, overload, dataclass_methods
 
 from .loop import Pending, force_pending, InferenceLoop
-from .ref import VirtualReference, Context, EvaluationCache, Reference, \
-    ConditionalContext
+from .ref import VirtualReference, Context, EvaluationCache, Reference
 from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractValue, GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
@@ -146,12 +145,6 @@ class InferenceEngine:
         """Return the replacement reference for ref, or ref itself."""
         while ref in self.reference_map:
             ref = self.reference_map[ref]
-        ctx = ref.context
-        if not ref.node.is_constant_graph():
-            while (isinstance(ctx, ConditionalContext)
-                   and ref not in self.cache.cache):
-                ctx = ctx.context
-                ref = self.ref(ref.node, ctx)
         return ref
 
     def run_coroutine(self, coro, throw=True):
