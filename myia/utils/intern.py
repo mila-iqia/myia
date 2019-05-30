@@ -295,7 +295,6 @@ class PossiblyRecursive:
 
 def intern(inst):
     """Get the interned instance."""
-
     try:
         wrap = Wrapper(inst)
     except TypeError:
