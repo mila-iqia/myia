@@ -98,7 +98,7 @@ def _bfs(obj):
         obj = queue.popleft()
         key = eqkey(obj)
         yield key
-        if isinstance(key, ElementsBase):
+        if isinstance(key, Elements):
             queue.extend(key.values)
 
 

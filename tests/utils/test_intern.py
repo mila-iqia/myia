@@ -69,6 +69,9 @@ def test_eqrec():
     c = [1, [1]]
     c[1].append(c)
 
+    d = [2]
+    d.append(d)
+
     z1 = []
     z1.append(z1)
     z1.append(z1)
@@ -79,6 +82,7 @@ def test_eqrec():
 
     assert _test([a, b], [b, b])
     assert _test(a, b)
+    assert not _test(a, d)
     assert _test(a, [1, a])
     assert _test(a, [1, [1, a]])
     assert _test(b, [1, a])
@@ -94,24 +98,6 @@ def test_eqrec():
 
     assert eq([a, b], [b, b])
     assert hsh([a, b]) == hsh([b, b])
-
-    # assert _test([a, b], [b, b])
-    # assert _test(a, b)
-    # assert not _test(a, [1, a])
-    # assert not _test(a, [1, [1, a]])
-    # assert not _test(b, [1, a])
-    # assert _test([1, b], [1, a])
-    # assert not _test(z1, z2)
-    # assert not _test(c, [1, c])
-
-    # assert _test(Point(1, 2), Point(1, 2))
-    # assert _test(2+9j, 2+9j)
-    # assert _test((1, 2), (1, 2))
-    # assert not _test((1, 2), (1, 2, 3))
-    # assert not _test((1, 2), [1, 2])
-
-    # assert eq([a, b], [b, b])
-    # assert hsh([a, b]) == hsh([b, b])
 
 
 def test_eqrec_incomplete():
