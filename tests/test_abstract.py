@@ -8,7 +8,7 @@ from myia.prim import ops as P
 from myia.abstract import (
     ANYTHING, MyiaTypeError,
     AbstractScalar, AbstractTuple as T, AbstractList as L,
-    AbstractJTagged, AbstractError, AbstractFunction,
+    AbstractJTagged, AbstractError, AbstractFunction, AbstractUnion,
     InferenceLoop, to_abstract, build_value, amerge,
     Possibilities, PendingFromList,
     VALUE, TYPE, DEAD, find_coherent_result_sync,
@@ -204,6 +204,9 @@ def test_abstract_clone_async():
 
         f1 = AbstractFunction(P.scalar_add, P.scalar_mul)
         assert (await upcast_async(f1)) is f1
+
+        u1 = AbstractUnion([s1])
+        assert (await upcast_async(u1)) is AbstractUnion([s2])
 
     asyncio.run(coro())
 
