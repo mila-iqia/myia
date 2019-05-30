@@ -74,7 +74,6 @@ async def _refmap_async(self, fn, x: Reference):
 
 @overload  # noqa: F811
 async def _refmap_async(self, fn, x: tuple):
-    # return tuple([await self(fn, y) for y in x])
     return tuple([await fn(y) for y in x])
 
 
