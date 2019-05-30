@@ -34,7 +34,7 @@ POLY = Named('POLY')
 #####################
 
 
-class Possibilities:
+class Possibilities(list):
     """Represents a set of possible values.
 
     This is technically implemented as a tuple, because the possibility of
@@ -42,28 +42,11 @@ class Possibilities:
     constructed, may impair the equality comparisons needed to construct a set.
     """
 
-    def __init__(self, values):
-        """Initialize possibilities."""
-        self.values = list(values)
-
-    def __getitem__(self, idx):
-        return self.values[idx]
-
-    def __setitem__(self, idx, value):
-        self.values[idx] = value
-
-    def __add__(self, other):
-        return Possibilities(self.values + other.values)
-
     def __eqkey__(self):
-        return ItemEK(self, range(len(self.values)))
+        return ItemEK(self, range(len(self)))
 
     def __hash__(self):
-        return hash(tuple(self.values))
-
-    def __eq__(self, other):
-        return isinstance(other, Possibilities) \
-            and self.values == other.values
+        return hash(tuple(self))
 
 
 class Function:
