@@ -95,14 +95,6 @@ def test_eqrec():
     assert eq([a, b], [b, b])
     assert hsh([a, b]) == hsh([b, b])
 
-    s1 = frozenset([Point(1, 2), Point(3, 4)])
-    s2 = frozenset([Point(1, 2), Point(3, 4)])
-    s3 = frozenset([Point(1, 2), Point(5, 6)])
-    s4 = frozenset([Point(1, 2), Point(3, 4), Point(5, 6)])
-    assert _test(s1, s2)
-    assert not _test(s1, s3)
-    assert not _test(s1, s4)
-
 
 def test_eqrec_incomplete():
     rec1 = Thingy()
