@@ -112,7 +112,6 @@ def hashrec(obj, n=100):
         obj: The object for which to compute a hash.
         n: The maximum number of contributions to the hash.
     """
-
     count = 0
     h = []
     for key in _bfs(obj):
