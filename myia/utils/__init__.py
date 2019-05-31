@@ -7,7 +7,7 @@ from .env import (  # noqa
 from .intern import (  # noqa
     Interned, InternedMC, EqKey, Atom, Elements, eqkey, deep_eqkey,
     RecursionException, eq, hash, hashrec, eqrec, IncompleteException,
-    PossiblyRecursive
+    PossiblyRecursive, intern,
 )
 
 from .merge import (  # noqa

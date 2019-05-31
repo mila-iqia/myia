@@ -204,20 +204,7 @@ class InternedMC(type):
 
     def intern(cls, inst):
         """Get the interned instance."""
-        wrap = Wrapper(inst)
-        try:
-            existing = _intern_pool.get(wrap, None)
-        except IncompleteException:
-            return inst
-        if existing is None:
-            _intern_pool[wrap] = inst
-            try:
-                inst._canonical = True
-            except Exception:
-                pass
-            return inst
-        else:
-            return existing
+        return intern(inst)
 
     def __call__(cls, *args, **kwargs):
         """Instantiates an interned instance."""
@@ -254,3 +241,21 @@ class PossiblyRecursive:
     def __init__(self):
         """Initialization sets the object to complete."""
         self._incomplete = False
+
+
+def intern(inst):
+    """Get the interned instance."""
+    wrap = Wrapper(inst)
+    try:
+        existing = _intern_pool.get(wrap, None)
+    except IncompleteException:
+        return inst
+    if existing is None:
+        _intern_pool[wrap] = inst
+        try:
+            inst._canonical = True
+        except Exception:
+            pass
+        return inst
+    else:
+        return existing
