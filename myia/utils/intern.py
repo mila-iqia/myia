@@ -51,10 +51,6 @@ class ItemEK(ElementsBase):
     def canonicalize(self):
         """Canonicalize the underlying object."""
         obj = self.obj
-        if getattr(obj, '_canonical', False):
-            return
-        if isinstance(obj, Interned):
-            obj._canonical = True
         for key, value in zip(self.keys, self.values):
             if isinstance(key, EqKey):
                 key.canonicalize()
@@ -76,10 +72,6 @@ class AttrEK(ElementsBase):
     def canonicalize(self):
         """Canonicalize the underlying object."""
         obj = self.obj
-        if getattr(obj, '_canonical', False):
-            return
-        if isinstance(obj, Interned):
-            obj._canonical = True
         for key, value in zip(self.keys, self.values):
             if isinstance(key, EqKey):
                 key.canonicalize()

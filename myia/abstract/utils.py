@@ -559,18 +559,8 @@ async def abstract_clone_async(self, x: AbstractArray):
 
 
 @overload  # noqa: F811
-async def abstract_clone_async(self, x: AbstractClass):
-    yield (yield AbstractClass)(
-        x.tag,
-        {k: (await self(v)) for k, v in x.attributes.items()},
-        x.methods,
-        await self(x.values)
-    )
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: AbstractADT):
-    yield (yield AbstractADT)(
+async def abstract_clone_async(self, x: (AbstractClass, AbstractADT)):
+    yield (yield type(x))(
         x.tag,
         {k: (await self(v)) for k, v in x.attributes.items()},
         x.methods,
@@ -878,23 +868,13 @@ def amerge(x1: AbstractList, x2, loop, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(x1: AbstractClass, x2, loop, forced, bp):
+def amerge(x1: (AbstractClass, AbstractADT), x2, loop, forced, bp):
     args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
     args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
     merged = amerge(args1, args2, loop, forced, bp)
     if forced or merged is args1:
         return x1
-    return AbstractClass(*merged)
-
-
-@overload  # noqa: F811
-def amerge(x1: AbstractADT, x2, loop, forced, bp):
-    args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
-    args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
-    merged = amerge(args1, args2, loop, forced, bp)
-    if forced or merged is args1:
-        return x1
-    return AbstractADT(*merged)
+    return type(x1)(*merged)
 
 
 @overload  # noqa: F811
