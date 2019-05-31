@@ -121,7 +121,7 @@ def hashrec(obj, n=100):
         if isinstance(key, Atom):
             h.extend((key.type, key.value))
         else:
-            h.append(key.type)
+            h.extend((key.type, len(key.values)))
     return pyhash(tuple(h))
 
 
