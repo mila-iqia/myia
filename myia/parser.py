@@ -321,10 +321,7 @@ class Parser:
                 b1.graph.output = fold(b1, rest, mode)
                 b2.graph.output = test
 
-                switch = block.graph.apply(block.operation('switch'),
-                                           block.force_bool(test),
-                                           true_block.graph,
-                                           false_block.graph)
+                switch = block.make_switch(test, true_block, false_block)
                 return block.graph.apply(switch)
             else:
                 return test
@@ -354,7 +351,7 @@ class Parser:
         tg.output = tb
         fg.output = fb
 
-        switch = block.graph.apply(block.operation('switch'), cond, tg, fg)
+        switch = block.make_switch(cond, true_block, false_block)
         return block.graph.apply(switch)
 
     def process_Lambda(self, block: 'Block', node: ast.Lambda) -> ANFNode:
@@ -500,7 +497,6 @@ class Parser:
         """
         # Process the condition
         cond = self.process_node(block, node.test)
-        cond = block.force_bool(cond)
 
         # Create two branches
         true_block, false_block = self.make_condition_blocks(block)
@@ -716,18 +712,16 @@ class Block:
             Constant(symbol_name)
         )
 
+    def make_switch(self, cond, true_block, false_block):
+        """Return a subtree that implements a switch operation."""
+        return self.graph.apply(self.operation('user_switch'),
+                                cond,
+                                true_block.graph,
+                                false_block.graph)
+
     def operation(self, symbol_name):
         """Return a subtree that resolves a name in the operations module."""
         return self.make_resolve(operations_ns, symbol_name)
-
-    def force_bool(self, cond):
-        """Wrap a condition in a call to bool()."""
-        rval = self.graph.apply(
-            self.operation('bool'),
-            cond
-        )
-        rval.debug.location = cond.debug.location
-        return rval
 
     def read(self, varnum: str) -> ANFNode:
         """Read a variable.
@@ -811,10 +805,5 @@ class Block:
 
         """
         assert self.graph.return_ is None
-        switch = self.graph.apply(
-            self.operation('switch'),
-            cond,
-            true.graph,
-            false.graph
-        )
+        switch = self.make_switch(cond, true, false)
         self.graph.output = self.graph.apply(switch)

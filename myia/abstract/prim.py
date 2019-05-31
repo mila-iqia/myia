@@ -8,7 +8,7 @@ from operator import getitem
 
 from .. import dtype
 from ..abstract import typecheck
-from ..ir import Graph
+from ..ir import Graph, GraphCloner, CloneRemapper
 from ..dtype import Number, Bool
 from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance
@@ -36,7 +36,7 @@ from .data import (
     infer_trace
 )
 from .loop import Pending, find_coherent_result, force_pending
-from .ref import Context, ConditionalContext
+from .ref import Context
 from .utils import sensitivity_transform, build_value, \
     type_token, broaden, type_to_abstract, split_type, hastype_helper
 from .infer import Inferrer, to_abstract
@@ -232,7 +232,7 @@ def _prim_or_graph(afn):
 
 async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
                         dataref=None, outref=None):
-    """Return an inferrer for resolve or getattr.
+    """Analyze a call to getattr or resolve.
 
     Arguments:
         engine: The engine on which the inference operates.
@@ -244,6 +244,12 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             data and item.
         dataref: The Reference to the data.
         outref: The Reference to the output.
+
+    Returns:
+        ('rval', value): An AbstractValue representing the result type
+            of the call.
+        ('reroute', ref): A new reference to reroute the call to.
+
     """
     resources = engine.pipeline.resources
 
@@ -266,7 +272,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
     if case == 'class':
         # Get field from Class
         if item_v in data.attributes:
-            return await on_dcattr(data, item_v)
+            return 'rval', await on_dcattr(data, item_v)
         elif item_v in data.methods:
             method = data.methods[item_v]
             method = resources.convert(method)
@@ -276,7 +282,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             eng = outref.engine
             ref = eng.ref(g.apply(P.partial, fn, dataref.node),
                           outref.context)
-            return await eng.reroute(outref, ref)
+            return 'reroute', ref
         else:
             raise InferenceError(f'Unknown field in {data}: {item_v}')
 
@@ -289,7 +295,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         eng = outref.engine
         ref = eng.ref(g.apply(P.partial, fn, dataref.node),
                       outref.context)
-        return await eng.reroute(outref, ref)
+        return 'reroute', ref
 
     elif case == 'no_method':
         msg = f"object of type {data} has no attribute '{item_v}'"
@@ -314,7 +320,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
         except Exception as e:  # pragma: no cover
             raise InferenceError(f'Unexpected error in getter: {e!r}')
         value = resources.convert(raw)
-        return to_abstract(value, Context.empty(), ref=outref)
+        return 'rval', to_abstract(value, Context.empty(), ref=outref)
 
 
 async def _resolve_case(resources, data_t, item_v, chk):
@@ -511,30 +517,47 @@ async def _inf_list_append(engine,
     return arg
 
 
+def _getattr_chk(data_v, item_v):
+    if not isinstance(item_v, str):  # pragma: no cover
+        raise MyiaTypeError(
+            f'item argument to resolve must be a string, not {item_v}.'
+        )
+
+
+async def _getattr_on_dcattr(data, item_v):
+    return data.attributes[item_v]
+
+
 class _GetAttrInferrer(Inferrer):
+    async def reroute(self, engine, outref, argrefs):
+        check_nargs(P.getattr, 2, argrefs)
+        r_data, r_item = argrefs
+        data = await r_data.get()
+        item = await r_item.get()
+        policy, newref = await static_getter(
+            engine, data, item,
+            fetch=getattr,
+            on_dcattr=_getattr_on_dcattr,
+            chk=_getattr_chk,
+            outref=outref,
+            dataref=r_data,
+        )
+        return newref if policy == 'reroute' else None
+
     async def run(self, engine, outref, argrefs):
         check_nargs(P.getattr, 2, argrefs)
         r_data, r_item = argrefs
         data = await r_data.get()
         item = await r_item.get()
-
-        def chk(data_v, item_v):
-            if not isinstance(item_v, str):  # pragma: no cover
-                raise MyiaTypeError(
-                    f'item argument to resolve must be a string, not {item_v}.'
-                )
-
-        async def on_dcattr(data, item_v):
-            return data.attributes[item_v]
-
-        rval = await static_getter(
+        policy, rval = await static_getter(
             engine, data, item,
             fetch=getattr,
-            on_dcattr=on_dcattr,
-            chk=chk,
+            on_dcattr=_getattr_on_dcattr,
+            chk=_getattr_chk,
             outref=outref,
             dataref=r_data,
         )
+        assert policy == 'rval'
         self.cache[(data, item)] = rval
         return rval
 
@@ -777,87 +800,128 @@ async def _inf_dot(engine, a: AbstractArray, b: AbstractArray):
 ##############
 
 
-class _SwitchInferrer(Inferrer):
+class _CastRemapper(CloneRemapper):
+
+    def __init__(self,
+                 graphs,
+                 inlines,
+                 manager,
+                 relation,
+                 graph_relation,
+                 clone_constants,
+                 fv_replacements):
+        """Initialize the GraphCloner."""
+        super().__init__(
+            graphs=graphs,
+            inlines=inlines,
+            manager=manager,
+            relation=relation,
+            graph_relation=graph_relation,
+            clone_constants=clone_constants,
+        )
+        self.fv_replacements = fv_replacements
+
+    def gen_fv(self, g, ng, fv):
+        """Remap the free variables we want to remap."""
+        if fv in self.fv_replacements:
+            new = self.fv_replacements[fv]
+            self.remap_node((g, fv), g, fv, ng, new, link=False)
+
+
+class _UserSwitchInferrer(Inferrer):
 
     async def _special_hastype(self, engine, outref,
-                               xref, typref, tbref, fbref):
-        """Handle `switch(hastype(x, typ), tb, fb)`.
+                               xref, typref,
+                               condref, tbref, fbref):
+        """Handle `user_switch(hastype(x, typ), tb, fb)`.
 
         We want to evaluate tb in a context where x has type typ and fb
         in a context where it doesn't.
         """
         async def wrap(branch_ref, branch_type):
-            node = branch_ref.node
-            if not node.is_constant_graph():
-                raise MyiaTypeError(
-                    'Branches of switch must be functions when the condition'
-                    ' is hastype on a Union.'
+            # We transform branch_graph into a new graph which refers to a cast
+            # version of x. We also transform all of the children of x's graph
+            # so that closures called in the branch also refer to the cast
+            # version of x.
+            branch_graph = branch_ref.node.value
+            cast = xg.apply(P.unsafe_static_cast, xref.node, branch_type)
+            cl = GraphCloner(
+                *xg.children,
+                total=False,
+                remapper_class=_CastRemapper.partial(
+                    fv_replacements={xref.node: cast}
                 )
-            branch_ctx = ConditionalContext(ctx, (xref.node, branch_type))
-            new_branch_ref = engine.ref(node, branch_ctx)
-            new_x = g.apply(P.unsafe_static_cast, xref.node, branch_type)
-            await engine.reroute(
-                engine.ref(xref.node, branch_ctx),
-                engine.ref(new_x, ctx)
             )
-            if branch_ref != new_branch_ref:
-                fn = await engine.reroute(branch_ref, new_branch_ref)
-            else:
-                fn = await branch_ref.get()
-            return fn.get_unique()
+            rval = cl[branch_graph]
+            cast.graph = rval
+            engine.mng.add_graph(rval)
+            return rval
 
-        ctx = outref.context
-        g = xref.node.graph
+        xg = xref.node.graph
 
         fulltype = await xref.get()
         typ = (await typref.get()).values[VALUE]
         typ = type_to_abstract(typ)
         tbtyp, fbtyp = split_type(fulltype, typ)
-        # We are not supposed to be here if only one branch could be taken.
-        assert tbtyp is not None
-        assert fbtyp is not None
-        return AbstractFunction(
-            await wrap(tbref, tbtyp),
-            await wrap(fbref, fbtyp)
-        )
+
+        if tbtyp is None:
+            return fbref
+        elif fbtyp is None:
+            return tbref
+        else:
+            g = outref.node.graph
+            new_tb = await wrap(tbref, tbtyp)
+            new_fb = await wrap(fbref, fbtyp)
+            new_node = g.apply(P.switch, condref.node, new_tb, new_fb)
+            return engine.ref(new_node, outref.context)
 
     async def _find_op(self, engine, condref):
-        """Find a primitive operator to use for the condition.
-
-        This skips over the bool primitive or composite used for this
-        pipeline.
-        """
+        """Find a primitive operator to use for the condition."""
         ctx = condref.context
         if condref.node.is_apply():
             opnode, *args = condref.node.inputs
             opref = engine.ref(opnode, ctx)
-            try:
-                op = (await opref.get()).get_unique()
-            except MyiaTypeError:
-                return None, None
-            if isinstance(op, PrimitiveFunction):
-                op = op.prim
-            elif isinstance(op, GraphFunction):
-                op = op.graph
+            ops = (await opref.get()).get_sync()
+            if len(ops) == 1:
+                op, = ops
+                if isinstance(op, PrimitiveFunction):
+                    return op.prim, [engine.ref(a, ctx) for a in args]
+        return None, None
 
-            converter = engine.pipeline.resources.convert
-            converted_bool = converter.object_map.get(bool, None)
-            if op is converted_bool:
-                return await self._find_op(engine, engine.ref(args[0], ctx))
-            elif isinstance(op, Primitive):
-                return op, [engine.ref(a, ctx) for a in args]
-            else:
-                return None, None
-        else:
-            return None, None
+    async def reroute(self, engine, outref, argrefs):
+        check_nargs(P.switch, 3, argrefs)
+        condref, tbref, fbref = argrefs
+
+        for branch_ref in [tbref, fbref]:
+            if not branch_ref.node.is_constant_graph():
+                raise MyiaTypeError(
+                    'Branches of switch must be functions when the condition'
+                    ' is hastype on a Union.'
+                )
+
+        op, args = await self._find_op(engine, condref)
+        if op is not None:
+            method = getattr(self, f'_special_{op.name}', None)
+            if method is not None:
+                return await method(engine, outref, *args,
+                                    condref, tbref, fbref)
+
+        g = outref.node.graph
+        _, cond, tb, fb = outref.node.inputs
+        condt = await condref.get()
+        if not engine.check_predicate(Bool, type_token(condt)):
+            to_bool = engine.pipeline.resources.convert(bool)
+            cond = g.apply(to_bool, cond)
+        newnode = g.apply(P.switch, cond, tb, fb)
+        return engine.ref(newnode, outref.context)
+
+
+abstract_inferrer_constructors[P.user_switch] = _UserSwitchInferrer.partial()
+
+
+class _SwitchInferrer(Inferrer):
 
     async def run(self, engine, outref, argrefs):
-        res = await self._run_helper(engine, outref, argrefs)
-        # args = tuple([await ref.get() for ref in argrefs])
-        # self.cache[args] = res
-        return res
-
-    async def _run_helper(self, engine, outref, argrefs):
         check_nargs(P.switch, 3, argrefs)
         condref, tbref, fbref = argrefs
 
@@ -870,14 +934,9 @@ class _SwitchInferrer(Inferrer):
         elif v is False:
             return await fbref.get()
         elif v is ANYTHING:
-            op, args = await self._find_op(engine, condref)
-            method = op and getattr(self, f'_special_{op}', None)
-            if method is None:
-                tb = await tbref.get()
-                fb = await fbref.get()
-                return engine.abstract_merge(tb, fb)
-            else:
-                return await method(engine, outref, *args, tbref, fbref)
+            tb = await tbref.get()
+            fb = await fbref.get()
+            return engine.abstract_merge(tb, fb)
         else:
             raise AssertionError(f"Invalid condition value for switch: {v}")
 
@@ -911,38 +970,54 @@ async def _inf_return(engine, x):
     return x
 
 
+def _resolve_chk(data_v, item_v):
+    if not isinstance(data_v, Namespace):  # pragma: no cover
+        raise MyiaTypeError(
+            f'data argument to resolve must be Namespace,'
+            f' not {data_v}',
+        )
+    if not isinstance(item_v, str):  # pragma: no cover
+        raise MyiaTypeError(
+            f'item argument to resolve must be a string,'
+            f' not {item_v}.',
+        )
+
+
+async def _resolve_on_dcattr(data, item_v):  # pragma: no cover
+    raise MyiaTypeError('Cannot resolve on Class.')
+
+
 class _ResolveInferrer(Inferrer):
+
+    async def reroute(self, engine, outref, argrefs):
+        check_nargs(P.resolve, 2, argrefs)
+        r_data, r_item = argrefs
+        data = await r_data.get()
+        item = await r_item.get()
+        policy, newref = await static_getter(
+            engine, data, item,
+            fetch=getitem,
+            on_dcattr=_resolve_on_dcattr,
+            chk=_resolve_chk,
+            outref=outref,
+            dataref=r_data,
+        )
+        return newref if policy == 'reroute' else None
+
     async def run(self, engine, outref, argrefs):
         check_nargs(P.resolve, 2, argrefs)
         r_data, r_item = argrefs
         data = await r_data.get()
         item = await r_item.get()
-
-        def chk(data_v, item_v):
-            if not isinstance(data_v, Namespace):  # pragma: no cover
-                raise MyiaTypeError(
-                    f'data argument to resolve must be Namespace,'
-                    f' not {data_v}',
-                    refs=[data]
-                )
-            if not isinstance(item_v, str):  # pragma: no cover
-                raise MyiaTypeError(
-                    f'item argument to resolve must be a string,'
-                    f' not {item_v}.',
-                    refs=[item]
-                )
-
-        async def on_dcattr(data, item_v):  # pragma: no cover
-            raise MyiaTypeError('Cannot resolve on Class.')
-
-        rval = await static_getter(
+        policy, rval = await static_getter(
             engine, data, item,
             fetch=getitem,
-            on_dcattr=on_dcattr,
-            chk=chk,
+            on_dcattr=_resolve_on_dcattr,
+            chk=_resolve_chk,
             outref=outref,
             dataref=r_data,
         )
+        assert policy == 'rval'
         self.cache[(data, item)] = rval
         return rval
 

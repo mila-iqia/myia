@@ -228,6 +228,7 @@ def test_broaden_recursive():
     t2 = T.empty()
     u2 = U(s1, t2)
     t2.__init__([s1, u2])
+    t2 = t2.intern()
 
     tb = T.empty()
     ub = U(sa, tb)

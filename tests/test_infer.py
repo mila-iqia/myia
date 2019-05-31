@@ -25,7 +25,7 @@ from myia.prim.py_implementations import \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
-    transpose, make_record, unsafe_static_cast
+    transpose, make_record, unsafe_static_cast, user_switch
 from myia.utils import newenv
 
 from .common import B, \
@@ -1278,11 +1278,10 @@ def test_switch_switch(x, y):
 
 
 @infer(
-    (i64, i64, i64),
-    (U(i64, f64), i64, InferenceError)
+    (i64, i64, InferenceError),
 )
-def test_switch_hastype(x, y):
-    return switch(hastype(x, i64), y + 1, y + 2)
+def test_user_switch_hastype(x, y):
+    return user_switch(hastype(x, i64), y + 1, y + 2)
 
 
 @infer((B, i64, i64))

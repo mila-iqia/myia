@@ -3,7 +3,7 @@
 from .abstract import Node  # noqa
 from .anf import Graph, ANFNode, Apply, Constant, Parameter, Special  # noqa
 from .clone import (  # noqa
-    GraphRemapper, BasicRemapper, RemapperSet,
+    GraphRemapper, BasicRemapper, CloneRemapper, RemapperSet,
     clone, GraphCloner, transformable_clone,
 )
 from .manager import (  # noqa

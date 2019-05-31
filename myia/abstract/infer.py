@@ -14,8 +14,7 @@ from ..utils import Overload, Partializable, is_dataclass_type, \
     SymbolicKeyInstance, overload, dataclass_methods
 
 from .loop import Pending, force_pending, InferenceLoop
-from .ref import VirtualReference, Context, EvaluationCache, Reference, \
-    ConditionalContext
+from .ref import VirtualReference, Context, EvaluationCache, Reference
 from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractValue, GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
@@ -87,7 +86,7 @@ class InferenceEngine:
         async def _run():
             inf = GraphInferrer(graph, empty_context)
             self.loop.schedule(
-                inf.run(self, None, argrefs)
+                execute_inferrers(self, [inf], None, argrefs)
             )
 
         async def _check():
@@ -146,12 +145,6 @@ class InferenceEngine:
         """Return the replacement reference for ref, or ref itself."""
         while ref in self.reference_map:
             ref = self.reference_map[ref]
-        ctx = ref.context
-        if not ref.node.is_constant_graph():
-            while (isinstance(ctx, ConditionalContext)
-                   and ref not in self.cache.cache):
-                ctx = ctx.context
-                ref = self.ref(ref.node, ctx)
         return ref
 
     def run_coroutine(self, coro, throw=True):
@@ -519,6 +512,10 @@ class Inferrer(Partializable):
         """
         return args
 
+    async def reroute(self, engine, outref, argrefs):
+        """Return a replacement node to infer from instead of this one."""
+        return None
+
     async def run(self, engine, outref, argrefs):
         """Run inference.
 
@@ -562,9 +559,14 @@ class TrackedInferrer(Inferrer):
         super().__init__()
         self.subinf = subinf
 
+    async def reroute(self, engine, outref, argrefs):
+        """Return a replacement node to infer from instead of this one."""
+        return await self.subinf.reroute(engine, outref, argrefs)
+
     async def run(self, engine, outref, argrefs):
         """Run the inference."""
         args = tuple([await ref.get() for ref in argrefs])
+        args = self.subinf.normalize_args(args)
         self.cache[args] = await self.subinf.run(engine, outref, argrefs)
         return self.cache[args]
 
@@ -772,6 +774,16 @@ async def execute_inferrers(engine, inferrers, outref, argrefs):
     The results of the inferrers will be bound together and an error will
     be raised eventually if they cannot be merged.
     """
+    reroutes = set([await inf.reroute(engine, outref, argrefs)
+                    for inf in inferrers])
+    if len(reroutes) > 1:
+        # Unlikely to happen naturally, so I'm leaving it as an assert for the
+        # time being.
+        raise AssertionError('Only one macro may be used at a call point.')
+    newref, = reroutes
+    if newref is not None:
+        return await engine.reroute(outref, newref)
+
     if len(inferrers) == 1:
         inf, = inferrers
         return await inf.run(engine, outref, argrefs)

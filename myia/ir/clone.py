@@ -307,7 +307,9 @@ class CloneRemapper(BasicRemapper):
     def link_apply(self, link):
         """Fill a node's inputs."""
         for inp in link.node.inputs:
-            repl = self.repl.get(inp, inp)
+            repl = self.repl.get((link.graph, inp), None)
+            if repl is None:
+                repl = self.repl.get(inp, inp)
             link.new_node.inputs.append(repl)
 
     def finalize_graph(self, graph, new_graph):
@@ -403,7 +405,8 @@ class GraphCloner:
                  relation='copy',
                  clone_constants=False,
                  clone_children=True,
-                 graph_relation=None):
+                 graph_relation=None,
+                 remapper_class=CloneRemapper):
         """Initialize a GraphCloner."""
         self.total = total
         self.clone_children = clone_children
@@ -412,7 +415,7 @@ class GraphCloner:
         _graphs = graphs + tuple(g for g, _, _ in inline)
         self.manager = manage(*_graphs, weak=True)
         self.collect_graphs(graphs, inline)
-        self.remapper = CloneRemapper(
+        self.remapper = remapper_class(
             graphs=self.graphs,
             manager=self.manager,
             inlines=self.inlines,

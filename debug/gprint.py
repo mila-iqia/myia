@@ -9,7 +9,7 @@ from myia.abstract import (
     AbstractValue, AbstractScalar, AbstractFunction, AbstractTuple,
     AbstractList, AbstractClass, AbstractJTagged, AbstractArray,
     GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
-    MetaGraphFunction, AbstractUnion, ConditionalContext, VALUE, ANYTHING,
+    MetaGraphFunction, AbstractUnion, VALUE, ANYTHING,
     PendingTentative
 )
 from myia.dtype import Type, Bool, Int, Float, TypeMeta, UInt
@@ -903,17 +903,6 @@ class _Context:
             stack.append((curr.graph, curr.argkey))
             curr = curr.parent
         return hrepr.stdrepr_object('Context', stack)
-
-
-@mixin(ConditionalContext)
-class _ConditionalContext:
-    def __hrepr__(self, H, hrepr):
-        stack = []
-        curr = self
-        while curr:
-            stack.append((curr.graph, curr.argkey))
-            curr = curr.parent
-        return hrepr.stdrepr_object('ConditionalContext', stack)
 
 
 @mixin(Location)
