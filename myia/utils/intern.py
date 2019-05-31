@@ -32,14 +32,10 @@ class Atom(EqKey):
 class Elements(EqKey):
     """Object with multiple values to process for equality recursively."""
 
-    def __init__(self, obj, *values, values_iterable=None):
+    def __init__(self, obj, *values):
         """Initialize an Elements."""
         super().__init__(obj)
-        if values_iterable is None:
-            self.values = values
-        else:
-            assert not values
-            self.values = values_iterable
+        self.values = values
 
 
 def eqkey(x):
@@ -50,8 +46,6 @@ def eqkey(x):
         return x
     elif isinstance(x, (list, tuple)):
         return Elements(x, *x)
-    elif isinstance(x, (set, frozenset)):
-        return Elements(x, values_iterable=frozenset(x))
     elif isinstance(x, dict):
         return Elements(x, *x.items())
     elif hasattr(x, '__eqkey__'):
@@ -151,25 +145,11 @@ def eqrec(obj1, obj2, path1=frozenset(), path2=frozenset(), cache=None):
         v2 = key2.values
         if len(v1) != len(v2):
             return False
-        if isinstance(v1, frozenset):
-            # TODO: save on complexity by sorting v1/v2 by hash?
-            v2 = list(v2)
-            for x1 in v1:
-                for i, x2 in enumerate(v2):
-                    if eqrec(x1, x2, path1, path2, cache):
-                        break
-                else:
-                    return False
-                del v2[i]
-            else:
-                assert not v2
-                return True
+        for x1, x2 in zip(v1, v2):
+            if not eqrec(x1, x2, path1, path2, cache):
+                return False
         else:
-            for x1, x2 in zip(v1, v2):
-                if not eqrec(x1, x2, path1, path2, cache):
-                    return False
-            else:
-                return True
+            return True
 
     else:
         raise AssertionError()

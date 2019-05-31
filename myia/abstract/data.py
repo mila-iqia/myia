@@ -34,8 +34,13 @@ POLY = Named('POLY')
 #####################
 
 
-class Possibilities(frozenset):
-    """Represents a set of possible values."""
+class Possibilities(tuple):
+    """Represents a set of possible values.
+
+    This is technically implemented as a tuple, because the possibility of
+    recursive types or values, which may be incomplete when a Possibilities is
+    constructed, may impair the equality comparisons needed to construct a set.
+    """
 
 
 class Function:
@@ -287,6 +292,7 @@ class AbstractFunction(AbstractAtom):
         if isinstance(poss, Pending):  # pragma: no cover
             # This is a bit circumstantial and difficult to test explicitly
             raise MyiaTypeError('get_unique invalid because Pending')
+        poss = frozenset(poss)
         if len(poss) != 1:
             raise MyiaTypeError(f'Expected unique function, not {poss}')
         fn, = poss
@@ -433,12 +439,22 @@ class AbstractJTagged(AbstractStructure):
 
 
 class AbstractUnion(AbstractStructure):
-    """Represents the union of several possible abstract types."""
+    """Represents the union of several possible abstract types.
+
+    Attributes:
+        options: A tuple of possible types. Technically, this should be
+            understood as a set, but there are a few issues with using
+            sets in the context of recursive types, chiefly the fact that
+            an AbstractUnion could be constructed with types that are
+            currently incomplete and therefore cannot be compared for
+            equality.
+
+    """
 
     def __init__(self, options):
         """Initialize an AbstractUnion."""
         super().__init__({})
-        self.options = frozenset(options)
+        self.options = tuple(options)
 
     def children(self):
         """Return the set of options."""
@@ -459,7 +475,7 @@ def abstract_union(options):
             opts += option.options
         else:
             opts.append(option)
-    opts = frozenset(opts)
+    opts = tuple(opts)
     if len(opts) == 1:
         opt, = opts
         return opt
@@ -667,4 +683,11 @@ def pretty_join(elems, sep=None):
 
 @pp.register_pretty(AbstractValue)
 def _pretty_avalue(a, ctx):
-    return a.__pretty__(ctx)
+    try:
+        if getattr(a, '_incomplete', False):  # pragma: no cover
+            return f'<{a.__class__.__qualname__}: incomplete>'
+        else:
+            return a.__pretty__(ctx)
+    except Exception as e:  # pragma: no cover
+        # Pytest fails badly without this failsafe.
+        return f'<{a.__class__.__qualname__}: error in printing>'

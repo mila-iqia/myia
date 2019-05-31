@@ -7,11 +7,12 @@ from .abstract import GraphFunction, concretize_abstract, \
     AbstractFunction, AbstractError, build_value, MyiaTypeError, \
     TypedPrimitive, BaseGraphInferrer, broaden, \
     TrackedInferrer, PrimitiveFunction, MetaGraphFunction, \
-    ConditionalContext, InferenceError, abstract_clone
+    ConditionalContext, InferenceError, abstract_clone, Reference
 from .abstract import Context, Unspecializable, \
     DEAD, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
 from .prim import ops as P, Primitive
+from .utils import overload
 
 
 _count = count(1)
@@ -21,6 +22,64 @@ def _const(v, t):
     ct = Constant(v)
     ct.abstract = t
     return ct
+
+
+@overload(bootstrap=True)
+def _refmap(self, fn, x: Context):
+    return Context(
+        self(fn, x.parent),
+        x.graph,
+        tuple(fn(arg) for arg in x.argkey)
+    )
+
+
+@overload  # noqa: F811
+def _refmap(self, fn, x: ConditionalContext):
+    return ConditionalContext(
+        self(fn, x.parent),
+        tuple(fn(arg) for arg in x.argkey)
+    )
+
+
+@overload  # noqa: F811
+def _refmap(self, fn, x: type(None)):
+    return None
+
+
+@overload(bootstrap=True)
+async def _refmap_async(self, fn, x: Context):
+    return Context(
+        await self(fn, x.parent),
+        x.graph,
+        tuple([await fn(arg) for arg in x.argkey])
+    )
+
+
+@overload  # noqa: F811
+async def _refmap_async(self, fn, x: ConditionalContext):
+    return ConditionalContext(
+        await self(fn, x.parent),
+        tuple([await fn(arg) for arg in x.argkey])
+    )
+
+
+@overload  # noqa: F811
+async def _refmap_async(self, fn, x: Reference):
+    return Reference(
+        x.engine,
+        x.node,
+        await self(fn, x.context),
+    )
+
+
+@overload  # noqa: F811
+async def _refmap_async(self, fn, x: tuple):
+    return tuple([await fn(y) for y in x])
+
+
+@overload  # noqa: F811
+async def _refmap_async(self, fn, x: type(None)):
+    return None
 
 
 @abstract_clone.variant
@@ -36,7 +95,7 @@ async def concretize_cache(cache):
     so that it can be found more easily.
     """
     for k, v in list(cache.items()):
-        kc = await concretize_abstract(k)
+        kc = await _refmap_async(concretize_abstract, k)
         cache[kc] = v
 
 
@@ -73,8 +132,8 @@ class TypeSpecializer:
         return await self._specialize(g, ctx, argrefs)
 
     async def _specialize(self, g, ctx, argrefs):
-        ctx = await concretize_abstract(ctx)
-        ctxkey = _no_tracking_id(ctx)
+        ctx = await _refmap_async(concretize_abstract, ctx)
+        ctxkey = _refmap(_no_tracking_id, ctx)
         if ctxkey in self.specializations:
             return self.specializations[ctxkey].new_graph
         gspec = _GraphSpecializer(self, g, ctx)
@@ -97,7 +156,7 @@ class _GraphSpecializer:
         parent_context = context.parent
         while isinstance(parent_context, ConditionalContext):
             parent_context = parent_context.parent
-        parent_context = _no_tracking_id(parent_context)
+        parent_context = _refmap(_no_tracking_id, parent_context)
         self.parent = specializer.specializations[parent_context]
         self.specializer = specializer
         self.engine = specializer.engine

@@ -12,7 +12,6 @@ from ..utils import overload, is_dataclass_type, dataclass_methods
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
-from .ref import Reference, Context, ConditionalContext
 
 from .data import (
     ABSENT,
@@ -247,7 +246,7 @@ def abstract_check(__call__, self, x, *args):
             if hasattr(x, prop):
                 return getattr(x, prop) is x
             elif __call__(self, x, *args):
-                if isinstance(x, (AbstractValue, Context, Reference)):
+                if isinstance(x, AbstractValue):
                     setattr(x, prop, x)
                 return True
             else:
@@ -316,17 +315,6 @@ def abstract_check(self, xs: object, *args):
     return True
 
 
-@overload  # noqa: F811
-def abstract_check(self, ctx: Context, *args):
-    return (self(ctx.parent, *args)
-            and all(self(x, *args) for x in ctx.argkey))
-
-
-@overload  # noqa: F811
-def abstract_check(self, ref: Reference, *args):
-    return self(ref.context, *args)
-
-
 ###########
 # Cloning #
 ###########
@@ -379,7 +367,7 @@ def abstract_clone(__call__, self, x, *args):
     if prop:
         if hasattr(x, prop):
             return getattr(x, prop)
-        elif isinstance(x, (AbstractValue, Context, Reference)):
+        elif isinstance(x, AbstractValue):
             if self.state.check(x, *args):
                 res = x
             else:
@@ -437,7 +425,7 @@ def abstract_clone(self, x: AbstractClass, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractUnion, *args):
-    return abstract_union([self(y, *args) for y in x.options])
+    return (yield AbstractUnion)([self(y, *args) for y in x.options])
 
 
 @overload  # noqa: F811
@@ -461,23 +449,6 @@ def abstract_clone(self, x: PartialApplication, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: JTransformedFunction, *args):
     return JTransformedFunction(self(x.fn, *args))
-
-
-@overload  # noqa: F811
-def abstract_clone(self, x: Context, *args):
-    return Context(
-        self(x.parent, *args),
-        x.graph,
-        tuple(self(arg) for arg in x.argkey)
-    )
-
-
-@overload  # noqa: F811
-def abstract_clone(self, x: ConditionalContext, *args):
-    return ConditionalContext(
-        self(x.parent, *args),
-        tuple(self(arg) for arg in x.argkey)
-    )
 
 
 @overload  # noqa: F811
@@ -525,7 +496,7 @@ async def abstract_clone_async(__call__, self, x, *args):
     if prop:
         if hasattr(x, prop):
             return getattr(x, prop)
-        elif isinstance(x, (AbstractValue, Context, Reference)):
+        elif isinstance(x, AbstractValue):
             if self.state.check(x, *args):
                 res = x
             else:
@@ -584,7 +555,7 @@ async def abstract_clone_async(self, x: AbstractClass):
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractUnion):
-    return abstract_union([await self(y) for y in x.options])
+    yield (yield AbstractUnion)([await self(y) for y in x.options])
 
 
 @overload  # noqa: F811
@@ -628,30 +599,6 @@ def _is_concrete(self, x: Pending):
 async def concretize_abstract(self, x: Pending):
     """Clone an abstract value while resolving all Pending (asynchronous)."""
     return await self(await x)
-
-
-@overload  # noqa: F811
-async def concretize_abstract(self, r: Reference):
-    return Reference(
-        r.engine,
-        r.node,
-        await self(r.context),
-    )
-
-
-@overload  # noqa: F811
-async def concretize_abstract(self, ctx: Context):
-    c_argkey = [await self(x) for x in ctx.argkey]
-    return Context(
-        await self(ctx.parent),
-        ctx.graph,
-        tuple(c_argkey)
-    )
-
-
-@overload  # noqa: F811
-async def concretize_abstract(self, t: tuple):
-    return tuple([await self(x) for x in t])
 
 
 ###############
@@ -810,14 +757,14 @@ def amerge(__call__, x1, x2, loop, forced, bind_pending=True,
 
 @overload  # noqa: F811
 def amerge(x1: Possibilities, x2, loop, forced, bp):
-    if x1.issuperset(x2):
+    if set(x1).issuperset(set(x2)):
         return x1
     if forced:
         raise MyiaTypeError(
             'Additional possibilities cannot be merged.'
         )
     else:
-        return Possibilities(x1 | x2)
+        return Possibilities(x1 + x2)
 
 
 @overload  # noqa: F811
@@ -1058,7 +1005,7 @@ def split_type(t, model):
     """
     if isinstance(t, AbstractUnion):
         matching = [(opt, typecheck(model, opt))
-                    for opt in t.options]
+                    for opt in set(t.options)]
         t1 = abstract_union([opt for opt, m in matching if m])
         t2 = abstract_union([opt for opt, m in matching if not m])
         return t1, t2
