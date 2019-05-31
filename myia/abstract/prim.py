@@ -8,7 +8,7 @@ from operator import getitem
 
 from .. import dtype
 from ..abstract import typecheck
-from ..ir import Graph
+from ..ir import Graph, GraphCloner, CloneRemapper
 from ..dtype import Number, Bool
 from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance
@@ -517,6 +517,7 @@ def _getattr_chk(data_v, item_v):
             f'item argument to resolve must be a string, not {item_v}.'
         )
 
+
 async def _getattr_on_dcattr(data, item_v):
     return data.attributes[item_v]
 
@@ -793,10 +794,7 @@ async def _inf_dot(engine, a: AbstractArray, b: AbstractArray):
 ##############
 
 
-from ..ir.clone import clone, GraphCloner, CloneRemapper
-
-
-class CastRemapper(CloneRemapper):
+class _CastRemapper(CloneRemapper):
 
     def __init__(self,
                  graphs,
@@ -820,9 +818,8 @@ class CastRemapper(CloneRemapper):
     def gen_fv(self, g, ng, fv):
         """Remap the free variables we want to remap."""
         if fv in self.fv_replacements:
-            casted = self.fv_replacements[fv]
-            self.remap_node((g, fv), g, fv, ng, self.fv_replacements[fv],
-                            link=False)
+            cast = self.fv_replacements[fv]
+            self.remap_node((g, fv), g, fv, ng, cast, link=False)
 
 
 class _UserSwitchInferrer(Inferrer):
@@ -845,7 +842,7 @@ class _UserSwitchInferrer(Inferrer):
             cl = GraphCloner(
                 *xg.children,
                 total=False,
-                remapper_class=CastRemapper.partial(
+                remapper_class=_CastRemapper.partial(
                     fv_replacements={xref.node: cast}
                 )
             )
@@ -975,13 +972,11 @@ def _resolve_chk(data_v, item_v):
         raise MyiaTypeError(
             f'data argument to resolve must be Namespace,'
             f' not {data_v}',
-            refs=[data]
         )
     if not isinstance(item_v, str):  # pragma: no cover
         raise MyiaTypeError(
             f'item argument to resolve must be a string,'
             f' not {item_v}.',
-            refs=[item]
         )
 
 
