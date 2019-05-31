@@ -226,14 +226,12 @@ def test_broaden_recursive():
     assert broaden(ta, None) is ta
 
     t2 = T.empty()
-    u2 = AbstractUnion.empty()
-    u2.__init__([s1, t2])
+    u2 = U(s1, t2)
     t2.__init__([s1, u2])
     t2 = t2.intern()
 
     tb = T.empty()
-    ub = AbstractUnion.empty()
-    ub.__init__([sa, tb])
+    ub = U(sa, tb)
     tb.__init__([sa, ub])
     tb = tb.intern()
 

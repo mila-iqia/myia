@@ -34,10 +34,6 @@ specialize_pipeline_std = standard_debug_pipeline \
             'validate', 'export', 'wrap')
 
 
-specialize_pipeline_little = standard_debug_pipeline \
-    .select('parse', 'infer', 'specialize', 'export')
-
-
 @overload
 def _eq(t1: tuple, t2):
     return (isinstance(t2, tuple)
@@ -112,7 +108,6 @@ specialize_std = specializer_decorator(specialize_pipeline_std)
 specialize_no_validate = specializer_decorator(
     specialize_pipeline.configure(validate=False)
 )
-specialize_little = specializer_decorator(specialize_pipeline_little)
 
 
 int1 = 13
