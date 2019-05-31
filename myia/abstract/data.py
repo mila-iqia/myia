@@ -448,6 +448,7 @@ class AbstractUnion(AbstractStructure):
             an AbstractUnion could be constructed with types that are
             currently incomplete and therefore cannot be compared for
             equality.
+
     """
 
     def __init__(self, options):
