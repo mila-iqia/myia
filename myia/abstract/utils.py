@@ -30,7 +30,6 @@ from .data import (
     AbstractADT,
     AbstractJTagged,
     AbstractUnion,
-    abstract_union,
     TrackDict,
     PartialApplication,
     JTransformedFunction,
@@ -1021,8 +1020,12 @@ def split_type(t, model):
     if isinstance(t, AbstractUnion):
         matching = [(opt, typecheck(model, opt))
                     for opt in set(t.options)]
-        t1 = abstract_union([opt for opt, m in matching if m])
-        t2 = abstract_union([opt for opt, m in matching if not m])
+        t1 = AbstractUnion([opt for opt, m in matching if m])
+        t2 = AbstractUnion([opt for opt, m in matching if not m])
+        if len(t1.options) == 1:
+            t1, = t1.options
+        if len(t2.options) == 1:
+            t2, = t2.options
         return t1, t2
     elif typecheck(model, t):
         return t, None

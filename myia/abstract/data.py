@@ -37,7 +37,7 @@ POLY = Named('POLY')
 class Possibilities(list):
     """Represents a set of possible values.
 
-    This is technically implemented as a tuple, because the possibility of
+    This is technically implemented as a list, because the possibility of
     recursive types or values, which may be incomplete when a Possibilities is
     constructed, may impair the equality comparisons needed to construct a set.
     """
@@ -539,7 +539,7 @@ class AbstractUnion(AbstractStructure):
     """Represents the union of several possible abstract types.
 
     Attributes:
-        options: A tuple of possible types. Technically, this should be
+        options: A list of possible types. Technically, this should be
             understood as a set, but there are a few issues with using
             sets in the context of recursive types, chiefly the fact that
             an AbstractUnion could be constructed with types that are
@@ -576,25 +576,6 @@ class AbstractUnion(AbstractStructure):
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "U", self.options)
-
-
-def abstract_union(options):
-    """Create a union if necessary.
-
-    If only one opt is given in the options list, return that option.
-    """
-    opts = []
-    for option in options:
-        if isinstance(option, AbstractUnion):
-            opts += option.options
-        else:
-            opts.append(option)
-    opts = tuple(opts)
-    if len(opts) == 1:
-        opt, = opts
-        return opt
-    else:
-        return AbstractUnion(opts)
 
 
 ##########

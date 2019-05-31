@@ -436,7 +436,7 @@ def test_partial_outside_scope(x, y):
 abs_i64 = a.AbstractScalar({a.VALUE: a.ANYTHING, a.TYPE: dtype.Int[64]})
 
 
-_union_type = a.abstract_union([
+_union_type = a.AbstractUnion([
     abs_i64,
     a.AbstractList(abs_i64)
 ])

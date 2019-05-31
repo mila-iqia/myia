@@ -5,7 +5,6 @@ from ..ir import Constant
 from ..prim import ops as P
 from ..abstract import abstract_clone, AbstractClass, AbstractTuple, \
     AbstractScalar, VALUE, TYPE, AbstractADT
-from ..utils import overload
 
 
 @abstract_clone.variant

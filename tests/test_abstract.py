@@ -118,10 +118,6 @@ def test_union():
     b = U(S(t=ty.Int[64]), U(S(t=ty.Int[32]), S(t=ty.Int[16])))
     assert a == b
 
-    c = S(t=ty.Int[64])
-    d = U(S(t=ty.Int[64]))
-    assert c == d
-
 
 def test_repr():
 
