@@ -52,7 +52,7 @@ def test_interned():
 
 def _test(a, b):
     eq = eqrec(a, b, cache=set())
-    hq = hashrec(a, frozenset(), {}) == hashrec(b, frozenset(), {})
+    hq = hashrec(a) == hashrec(b)
     # This is a sanity check that assumes no collisions
     assert hq == eq
     return eq
@@ -69,6 +69,9 @@ def test_eqrec():
     c = [1, [1]]
     c[1].append(c)
 
+    d = [2]
+    d.append(d)
+
     z1 = []
     z1.append(z1)
     z1.append(z1)
@@ -79,12 +82,13 @@ def test_eqrec():
 
     assert _test([a, b], [b, b])
     assert _test(a, b)
-    assert not _test(a, [1, a])
-    assert not _test(a, [1, [1, a]])
-    assert not _test(b, [1, a])
+    assert not _test(a, d)
+    assert _test(a, [1, a])
+    assert _test(a, [1, [1, a]])
+    assert _test(b, [1, a])
     assert _test([1, b], [1, a])
-    assert not _test(z1, z2)
-    assert not _test(c, [1, c])
+    assert _test(z1, z2)
+    assert _test(c, [1, c])
 
     assert _test(Point(1, 2), Point(1, 2))
     assert _test(2+9j, 2+9j)

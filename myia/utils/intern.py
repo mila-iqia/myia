@@ -88,32 +88,44 @@ def deep_eqkey(obj, path=frozenset()):
     return dk
 
 
-def hashrec(obj, path, cache):
-    """Hash a (possibly self-referential) object."""
-    oid = id(obj)
-    if oid in path:
-        return 0
-    if oid in cache:
-        return cache[oid][1]
-    path = path | {oid}
+def _bfs(obj):
+    from collections import deque
 
-    key = eqkey(obj)
+    queue = deque()
+    queue.append(obj)
 
-    if isinstance(key, Atom):
-        rval = pyhash((key.type, key.value))
-
-    elif isinstance(key, Elements):
-        subhash = [hashrec(x, path, cache) for x in key.values]
-        rval = pyhash((key.type, type(key.values)(subhash)))
-
-    else:
-        raise AssertionError()
-
-    cache[oid] = obj, rval
-    return rval
+    while queue:
+        obj = queue.popleft()
+        key = eqkey(obj)
+        yield key
+        if isinstance(key, Elements):
+            queue.extend(key.values)
 
 
-def eqrec(obj1, obj2, path1=frozenset(), path2=frozenset(), cache=None):
+def hashrec(obj, n=100):
+    """Hash a (possibly self-referential) object.
+
+    This explores the object breadth-first and uses the first n elements
+    to compute the hash.
+
+    Arguments:
+        obj: The object for which to compute a hash.
+        n: The maximum number of contributions to the hash.
+    """
+    count = 0
+    h = []
+    for key in _bfs(obj):
+        if count == n:
+            break
+        count += 1
+        if isinstance(key, Atom):
+            h.extend((key.type, key.value))
+        else:
+            h.extend((key.type, len(key.values)))
+    return pyhash(tuple(h))
+
+
+def eqrec(obj1, obj2, cache=None):
     """Compare two (possibly self-referential) objects for equality."""
     id1 = id(obj1)
     id2 = id(obj2)
@@ -121,14 +133,6 @@ def eqrec(obj1, obj2, path1=frozenset(), path2=frozenset(), cache=None):
     if (id1, id2) in cache:
         return True
 
-    if id1 in path1 or id2 in path2:
-        return False
-
-    if obj1 is obj2:
-        return True
-
-    path1 = path1 | {id1}
-    path2 = path2 | {id2}
     cache.add((id1, id2))
 
     key1 = eqkey(obj1)
@@ -146,7 +150,7 @@ def eqrec(obj1, obj2, path1=frozenset(), path2=frozenset(), cache=None):
         if len(v1) != len(v2):
             return False
         for x1, x2 in zip(v1, v2):
-            if not eqrec(x1, x2, path1, path2, cache):
+            if not eqrec(x1, x2, cache):
                 return False
         else:
             return True
@@ -161,7 +165,7 @@ def hash(obj):
         return pyhash(deep_eqkey(obj))
 
     except RecursionException:
-        return hashrec(obj, frozenset(), {})
+        return hashrec(obj)
 
 
 def eq(obj1, obj2):
@@ -172,7 +176,7 @@ def eq(obj1, obj2):
         return key1 == key2
 
     except RecursionException:
-        return eqrec(obj1, obj2, frozenset(), frozenset(), set())
+        return eqrec(obj1, obj2, set())
 
 
 class Wrapper:
@@ -200,20 +204,7 @@ class InternedMC(type):
 
     def intern(cls, inst):
         """Get the interned instance."""
-        wrap = Wrapper(inst)
-        try:
-            existing = _intern_pool.get(wrap, None)
-        except IncompleteException:
-            return inst
-        if existing is None:
-            _intern_pool[wrap] = inst
-            try:
-                inst._canonical = True
-            except Exception:
-                pass
-            return inst
-        else:
-            return existing
+        return intern(inst)
 
     def __call__(cls, *args, **kwargs):
         """Instantiates an interned instance."""
@@ -250,3 +241,21 @@ class PossiblyRecursive:
     def __init__(self):
         """Initialization sets the object to complete."""
         self._incomplete = False
+
+
+def intern(inst):
+    """Get the interned instance."""
+    wrap = Wrapper(inst)
+    try:
+        existing = _intern_pool.get(wrap, None)
+    except IncompleteException:
+        return inst
+    if existing is None:
+        _intern_pool[wrap] = inst
+        try:
+            inst._canonical = True
+        except Exception:
+            pass
+        return inst
+    else:
+        return existing
