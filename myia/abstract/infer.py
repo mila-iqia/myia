@@ -777,7 +777,9 @@ async def execute_inferrers(engine, inferrers, outref, argrefs):
     reroutes = set([await inf.reroute(engine, outref, argrefs)
                     for inf in inferrers])
     if len(reroutes) > 1:
-        raise MyiaTypeError('Only one macro may be used at a call point.')
+        # Unlikely to happen naturally, so I'm leaving it as an assert for the
+        # time being.
+        raise AssertionError('Only one macro may be used at a call point.')
     newref, = reroutes
     if newref is not None:
         return await engine.reroute(outref, newref)

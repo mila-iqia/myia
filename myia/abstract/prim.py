@@ -818,8 +818,8 @@ class _CastRemapper(CloneRemapper):
     def gen_fv(self, g, ng, fv):
         """Remap the free variables we want to remap."""
         if fv in self.fv_replacements:
-            cast = self.fv_replacements[fv]
-            self.remap_node((g, fv), g, fv, ng, cast, link=False)
+            new = self.fv_replacements[fv]
+            self.remap_node((g, fv), g, fv, ng, new, link=False)
 
 
 class _UserSwitchInferrer(Inferrer):
@@ -875,17 +875,12 @@ class _UserSwitchInferrer(Inferrer):
         if condref.node.is_apply():
             opnode, *args = condref.node.inputs
             opref = engine.ref(opnode, ctx)
-            try:
-                op = (await opref.get()).get_unique()
-            except MyiaTypeError:
-                return None, None
-
-            if isinstance(op, PrimitiveFunction):
-                return op.prim, [engine.ref(a, ctx) for a in args]
-            else:
-                return None, None
-        else:
-            return None, None
+            ops = (await opref.get()).get_sync()
+            if len(ops) == 1:
+                op, = ops
+                if isinstance(op, PrimitiveFunction):
+                    return op.prim, [engine.ref(a, ctx) for a in args]
+        return None, None
 
     async def reroute(self, engine, outref, argrefs):
         check_nargs(P.switch, 3, argrefs)
