@@ -435,10 +435,6 @@ class AbstractClass(AbstractStructure):
         """Return the attribute values."""
         return tuple(self.attributes.values())
 
-    # def __eqkey__(self):
-    #     vals = AbstractValue.__eqkey__(self)
-    #     return Elements(self, vals, self.tag, self.attributes)
-
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
         return AttrEK(self, (v, 'tag', 'attributes'))
