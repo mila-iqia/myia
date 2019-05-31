@@ -901,10 +901,12 @@ class _UserSwitchInferrer(Inferrer):
                                     condref, tbref, fbref)
 
         g = outref.node.graph
-        to_bool = engine.pipeline.resources.convert(bool)
         _, cond, tb, fb = outref.node.inputs
-        app = g.apply(to_bool, cond)
-        newnode = g.apply(P.switch, app, tb, fb)
+        condt = await condref.get()
+        if not engine.check_predicate(Bool, type_token(condt)):
+            to_bool = engine.pipeline.resources.convert(bool)
+            cond = g.apply(to_bool, cond)
+        newnode = g.apply(P.switch, cond, tb, fb)
         return engine.ref(newnode, outref.context)
 
 
