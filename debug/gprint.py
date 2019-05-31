@@ -1248,7 +1248,7 @@ class _AbstractTuple:
 class _AbstractUnion:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_iterable(
-            self.options,
+            set(self.options),
             before='★U',
             cls='abstract',
         )
