@@ -232,7 +232,7 @@ def _prim_or_graph(afn):
 
 async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
                         dataref=None, outref=None):
-    """Return an inferrer for resolve or getattr.
+    """Analyze a call to getattr or resolve.
 
     Arguments:
         engine: The engine on which the inference operates.
@@ -244,6 +244,12 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             data and item.
         dataref: The Reference to the data.
         outref: The Reference to the output.
+
+    Returns:
+        ('rval', value): An AbstractValue representing the result type
+            of the call.
+        ('reroute', ref): A new reference to reroute the call to.
+
     """
     resources = engine.pipeline.resources
 
