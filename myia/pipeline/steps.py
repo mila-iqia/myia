@@ -9,7 +9,7 @@ from itertools import count
 
 from .. import dtype
 from ..abstract import AbstractTuple, AbstractList, AbstractClass, \
-    AbstractArray, TYPE, AbstractScalar, AbstractUnion
+    AbstractArray, TYPE, AbstractScalar, AbstractUnion, AbstractADT
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, NodeMap, \
@@ -504,7 +504,7 @@ def convert_arg(self, arg, orig_t: AbstractList, backend):
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractClass, backend):
+def convert_arg(self, arg, orig_t: (AbstractClass, AbstractADT), backend):
     if not isinstance(arg, orig_t.tag):
         raise TypeError(f'Expected {orig_t.tag.__qualname__}')
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
