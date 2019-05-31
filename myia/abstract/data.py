@@ -35,7 +35,12 @@ POLY = Named('POLY')
 
 
 class Possibilities(tuple):
-    """Represents a set of possible values."""
+    """Represents a set of possible values.
+
+    This is technically implemented as a tuple, because the possibility of
+    recursive types or values, which may be incomplete when a Possibilities is
+    constructed, may impair the equality comparisons needed to construct a set.
+    """
 
 
 class Function:
@@ -434,7 +439,16 @@ class AbstractJTagged(AbstractStructure):
 
 
 class AbstractUnion(AbstractStructure):
-    """Represents the union of several possible abstract types."""
+    """Represents the union of several possible abstract types.
+
+    Attributes:
+        options: A tuple of possible types. Technically, this should be
+            understood as a set, but there are a few issues with using
+            sets in the context of recursive types, chiefly the fact that
+            an AbstractUnion could be constructed with types that are
+            currently incomplete and therefore cannot be compared for
+            equality.
+    """
 
     def __init__(self, options):
         """Initialize an AbstractUnion."""
