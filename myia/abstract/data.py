@@ -10,7 +10,7 @@ from contextvars import ContextVar
 
 from ..debug.label import label
 from ..utils import Named, Partializable, Interned, Atom, AttrEK, ItemEK, \
-    PossiblyRecursive
+    PossiblyRecursive, OrderedSet
 
 from .loop import Pending
 
@@ -547,13 +547,17 @@ class AbstractUnion(AbstractStructure):
     def __init__(self, options):
         """Initialize an AbstractUnion."""
         super().__init__({})
-        opts = []
+        # We use OrderedSet to trim the options, but it is possible that some
+        # of the options which appear unequal at this point will turn out to be
+        # equal later on, so we cannot rely on the fact that each option in the
+        # list is different.
+        opts = OrderedSet()
         for option in options:
             if isinstance(option, AbstractUnion):
-                opts += option.options
+                opts.update(option.options)
             else:
-                opts.append(option)
-        self.options = opts
+                opts.add(option)
+        self.options = list(opts)
 
     def children(self):
         """Return the set of options."""
