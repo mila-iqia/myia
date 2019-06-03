@@ -10,6 +10,9 @@ node ('gpu') {
     junit 'test-report.xml'
   }
   stage ('Coverage') {
-    sh script: 'ls'
+    configFileProvider([configFile('2168de59-9641-4ad3-95bb-28e0a131815e')]) {
+      sh script: 'ls'
+      sh script: 'curl -s https://codecov.io/bash | bash -- -t `cat coverage.token`'
+    }
   }
 }
