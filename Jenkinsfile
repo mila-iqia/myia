@@ -3,7 +3,7 @@ node ('gpu') {
     checkout scm
   }
   stage ('Install') {
-    sh script: 'ci-install.sh --gpu'
+    sh script: './ci-install.sh --gpu'
   }
   stage ('Test') {
     sh script: '$HOME/miniconda/bin/pytest --cov-report=term-missing --cov-report=xml  --cov=./ --gpu --junit-xml test-report.xml'
