@@ -11,7 +11,7 @@ node ('gpu') {
   }
   stage ('Coverage') {
     withCredentials([string(credentialsId: 'myia-coverage', variable: 'COVERAGE_TOKEN')]) {
-      sh script: 'curl -s https://codecov.io/bash | bash -s -- -t $COVERAGE_TOKEN'
+      sh script: 'curl -s https://codecov.io/bash | bash -s -- -ZK -t $COVERAGE_TOKEN'
     }
   }
 }
