@@ -26,8 +26,8 @@ from .data import (
     AbstractTuple,
     AbstractArray,
     AbstractList,
+    AbstractClassBase,
     AbstractClass,
-    AbstractADT,
     AbstractJTagged,
     AbstractUnion,
     TrackDict,
@@ -414,18 +414,8 @@ def abstract_clone(self, x: AbstractArray, *args):
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractClass, *args):
-    return (yield AbstractClass)(
-        x.tag,
-        {k: self(v, *args) for k, v in x.attributes.items()},
-        x.methods,
-        self(x.values, *args)
-    )
-
-
-@overload  # noqa: F811
-def abstract_clone(self, x: AbstractADT, *args):
-    return (yield AbstractADT)(
+def abstract_clone(self, x: AbstractClassBase, *args):
+    return (yield type(x))(
         x.tag,
         {k: self(v, *args) for k, v in x.attributes.items()},
         x.methods,
@@ -558,7 +548,7 @@ async def abstract_clone_async(self, x: AbstractArray):
 
 
 @overload  # noqa: F811
-async def abstract_clone_async(self, x: (AbstractClass, AbstractADT)):
+async def abstract_clone_async(self, x: AbstractClassBase):
     yield (yield type(x))(
         x.tag,
         {k: (await self(v)) for k, v in x.attributes.items()},
@@ -867,7 +857,7 @@ def amerge(x1: AbstractList, x2, loop, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(x1: (AbstractClass, AbstractADT), x2, loop, forced, bp):
+def amerge(x1: AbstractClassBase, x2, loop, forced, bp):
     args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
     args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
     merged = amerge(args1, args2, loop, forced, bp)

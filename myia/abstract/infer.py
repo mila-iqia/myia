@@ -11,7 +11,7 @@ from .. import dtype
 from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
 from ..utils import Overload, Partializable, is_dataclass_type, \
-    SymbolicKeyInstance, overload, dataclass_methods
+    SymbolicKeyInstance, overload, dataclass_methods, ADT
 
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
@@ -19,7 +19,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractValue, GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, AbstractExternal, \
-    VALUE, TYPE, SHAPE, DummyFunction, ADT, normalize_adt, \
+    VALUE, TYPE, SHAPE, DummyFunction, normalize_adt, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
     AbstractList, type_error_nargs, TypeDispatchError, AbstractADT, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function

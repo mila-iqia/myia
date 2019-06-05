@@ -15,6 +15,10 @@ T1 = TypeVar('T1')
 T2 = TypeVar('T2')
 
 
+class ADT:
+    """Base class for an algebraic data type."""
+
+
 class Named:
     """A named object.
 

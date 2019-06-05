@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from contextvars import ContextVar
 
 from ..debug.label import label
-from ..utils import Named, Partializable, Interned, Atom, AttrEK, ItemEK, \
+from ..utils import Named, Partializable, Interned, Atom, AttrEK, \
     PossiblyRecursive, OrderedSet
 
 from .loop import Pending
@@ -41,9 +41,6 @@ class Possibilities(list):
     recursive types or values, which may be incomplete when a Possibilities is
     constructed, may impair the equality comparisons needed to construct a set.
     """
-
-    def __eqkey__(self):
-        return ItemEK(self, range(len(self)))
 
     def __hash__(self):
         return hash(tuple(self))
@@ -412,11 +409,11 @@ class AbstractList(AbstractStructure):
         return pretty_join(['[', elem, ']'])
 
 
-class AbstractClass(AbstractStructure):
-    """Represents a class, typically those defined using @dataclass.
+class AbstractClassBase(AbstractStructure):
+    """Represents a class with named attributes and methods.
 
     Attributes:
-        tag: The class's name (a Named instance).
+        tag: A pointer to the original Python class
         attributes: Maps each field name to a corresponding AbstractValue.
         methods: Maps method names to corresponding functions, which will
             be parsed and converted by the engine when necessary, with the
@@ -444,8 +441,17 @@ class AbstractClass(AbstractStructure):
         return pretty_struct(ctx, tagname, [], self.attributes)
 
 
-class ADT:
-    """Base class for an algebraic data type."""
+class AbstractClass(AbstractClassBase):
+    """Represents a class, typically those defined using @dataclass."""
+
+
+class AbstractADT(AbstractClassBase):
+    """Represents an algebraic data type.
+
+    Unlike AbstractClass, this is suitable to define recursive types. Nested
+    ADTs with the same tag must have the same attribute types, which is
+    enforced with the normalize_adt function.
+    """
 
 
 def normalize_adt(x, done, tag_to_adt):
@@ -477,38 +483,6 @@ def normalize_adt(x, done, tag_to_adt):
         return rval
     else:
         return x
-
-
-class AbstractADT(AbstractStructure):
-    """Represents an ADT.
-
-    Attributes:
-        tag: The class's name (a Named instance).
-        attributes: Maps each field name to a corresponding AbstractValue.
-        methods: Maps method names to corresponding functions, which will
-            be parsed and converted by the engine when necessary, with the
-            instance as the first argument.
-
-    """
-
-    def __init__(self, tag, attributes, methods, values={}):
-        """Initialize an AbstractADT."""
-        super().__init__(values)
-        self.tag = tag
-        self.attributes = attributes
-        self.methods = methods
-
-    def children(self):
-        """Return the attribute values."""
-        return tuple(self.attributes.values())
-
-    def __eqkey__(self):
-        v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, 'tag', 'attributes'))
-
-    def __pretty__(self, ctx):
-        tagname = f'**{self.tag.__qualname__}'
-        return pretty_struct(ctx, tagname, [], self.attributes)
 
 
 class AbstractJTagged(AbstractStructure):

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from myia import abstract as a, dtype
 from myia.dtype import Number, Nil
-from myia.abstract import from_value, ADT
+from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.composite import list_map
 from myia.debug.label import short_labeler as lbl
@@ -15,7 +15,7 @@ from myia.prim.py_implementations import \
     hastype, partial, scalar_add, scalar_sub, \
     scalar_usub, scalar_uadd, switch, array_map
 from myia.validate import ValidationError
-from myia.utils import overload
+from myia.utils import overload, ADT
 from myia.hypermap import hyper_map
 
 from .common import mysum, i64, f64, Point
