@@ -437,10 +437,7 @@ class CompileStep(PipelineStep):
 
         """
         super().__init__(pipeline_init)
-        backend_class = load_backend(backend)
-        if backend_options is None:
-            backend_options = {}
-        self.backend = backend_class(**backend_options)
+        self.backend = load_backend(backend, backend_options)
 
     def step(self, graph, argspec, outspec):
         """Compile the set of graphs."""

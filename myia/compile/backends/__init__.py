@@ -1,6 +1,9 @@
 """Compilation backends."""
 
 import importlib
+import os
+import urllib
+
 from ... import dtype, abstract
 
 
@@ -35,14 +38,56 @@ _backends = {
     'pytorch': import_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
 }
 
-# This is used as the default backend and options if None is provided
-default_name = 'nnvm'
+
+def get_default():
+    """Returns the default backend.
+
+    This is fetched from the MYIA_BACKEND environement variable or
+    from the built-in defaults.
+
+    The syntax for specifiying a backend is
+    'name?option1=value1&option2=value2' when name is the name of the
+    backend and option1 is a valid keyword option for that backend.
+    This is strongly inspired by HTTP query syntax except you don't
+    need to urlencode values.
+
+    As an example here is a string for pytorch on the GPU
+
+        pytorch?target=cuda:0
+
+    """
+    backend, opts = parse_default()
+    assert backend is not None
+    return load_backend(backend, opts)
 
 
-def load_backend(name):
+def parse_default():
+    """Parses the default backend.
+
+    Returns name and options from the environement or builtin default.
+    See the documentation of get_default() for the backend string syntax.
+    """
+    backend_spec = os.environ.get('MYIA_BACKEND', 'nnvm')
+    backend, *opts = backend_spec.split('?', maxsplit=1)
+    if len(opts) == 1:
+        opts = urllib.parse.parse_qs(opts[0], keep_blank_values=True,
+                                     strict_parsing=True, errors='strict')
+        for k in opts:
+            assert len(opts[k]) == 1
+            opts[k] = opts[k][0]
+    else:
+        assert len(opts) == 0
+        opts = {}
+    return backend, opts
+
+
+def load_backend(name, options=None):
     """Load the named backend.
 
     Returns the backend class registered for the name.
+
+    If you pass None as the name, this will load the default backend.
+    See the documenation for get_default() for more information.
 
     Raises:
         UnknownBackend: The name is not recognized.
@@ -50,11 +95,14 @@ def load_backend(name):
 
     """
     if name is None:
-        name = default_name
+        assert options is None
+        return get_default()
+    if options is None:
+        options = {}
     if name not in _backends:
         raise UnknownBackend(name)
     try:
-        res = _backends[name]()
+        res = _backends[name]()(**options)
     except Exception as e:
         raise LoadingError(name) from e
     return res
