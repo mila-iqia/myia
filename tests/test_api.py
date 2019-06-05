@@ -88,10 +88,10 @@ def test_convert_arg():
 
     # Leaves
 
-    assert _convert(True, Bool) == [True]
-    assert _convert(False, Bool) == [False]
-    assert _convert(10, i64) == [10]
-    assert _convert(1.5, f64) == [1.5]
+    assert _convert(True, Bool) == True
+    assert _convert(False, Bool) == False
+    assert _convert(10, i64) == 10
+    assert _convert(1.5, f64) == 1.5
     with pytest.raises(TypeError):
         _convert(newenv, EnvType)
 
@@ -104,18 +104,18 @@ def test_convert_arg():
         _convert((1, 2), Point(i64, i64))
 
     assert list(_convert((pt, pt),
-                (Point(i64, i64), Point(i64, i64)))) == [1, 2, 1, 2]
+                (Point(i64, i64), Point(i64, i64)))) == [(1, 2), (1, 2)]
 
     assert _convert([pt, pt, pt],
-                    [Point(i64, i64)]) == [[1, 2, 1, 2, 1, 2]]
+                    [Point(i64, i64)]) == [(1, 2), (1, 2), (1, 2)]
 
     # Arrays
 
     fmat = np.ones((5, 8))
     imat = np.ones((5, 8), dtype='int32')
 
-    assert _convert(fmat, af64_of(5, 8))[0] is fmat
-    assert _convert(imat, ai32_of(5, 8))[0] is imat
+    assert _convert(fmat, af64_of(5, 8)) is fmat
+    assert _convert(imat, ai32_of(5, 8)) is imat
     with pytest.raises(TypeError):
         _convert(imat, ai64_of(5, 8))
 

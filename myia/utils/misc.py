@@ -1,7 +1,6 @@
 """Miscellaneous utilities."""
 
 import builtins
-import itertools
 import functools
 import sys
 from types import FunctionType
@@ -85,11 +84,6 @@ def list_str(lst: List):
     """
     elements = ', '.join(str(elem) for elem in lst)
     return f'[{elements}]'
-
-
-def flatten(lst):
-    """Flatten a list of lists (one level)."""
-    return itertools.chain.from_iterable(lst)
 
 
 class Event:

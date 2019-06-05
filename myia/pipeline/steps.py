@@ -15,7 +15,7 @@ from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, NodeMap, \
     LocalPassOptimizer, DeadDataElimination
 from ..prim import vm_registry
-from ..utils import overload, flatten, no_prof
+from ..utils import overload, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
 from ..vm import VM
@@ -329,9 +329,9 @@ step_opt = Optimizer.partial(
 )
 
 
-# Final optimization pass
 step_opt2 = Optimizer.partial(
     phases=dict(
+        renormalize='renormalize',
         dde=DeadDataElimination.partial(),
         main=[
             optlib.unfuse_composite,
@@ -341,8 +341,6 @@ step_opt2 = Optimizer.partial(
             optlib.setitem_tuple_ct,
             optlib.getitem_setitem_list,
             optlib.float_tuple_getitem_through_switch,
-            # optlib.incorporate_getitem,
-            # optlib.incorporate_getitem_through_switch,
             optlib.inline_trivial,
             optlib.inline_unique_uses,
             optlib.inline_inside_marked_caller,
@@ -353,7 +351,6 @@ step_opt2 = Optimizer.partial(
             optlib.lmadd_setitem_zero,
             optlib.setitem_dead,
         ],
-        renormalize='renormalize',
     )
 )
 
@@ -497,8 +494,8 @@ def convert_arg(self, arg, orig_t: AbstractTuple, backend):
     oe = orig_t.elements
     if len(arg) != len(oe):
         raise TypeError(f'Expected {len(oe)} elements')
-    return list(flatten(self(x, o, backend)
-                        for x, o in zip(arg, oe)))
+    return tuple(self(x, o, backend)
+                 for x, o in zip(arg, oe))
 
 
 @overload  # noqa: F811
@@ -506,7 +503,7 @@ def convert_arg(self, arg, orig_t: AbstractList, backend):
     if not isinstance(arg, list):
         raise TypeError('Expected list')
     ot = orig_t.element
-    return [list(flatten(self(x, ot, backend) for x in arg))]
+    return list(self(x, ot, backend) for x in arg)
 
 
 @overload  # noqa: F811
@@ -515,8 +512,8 @@ def convert_arg(self, arg, orig_t: AbstractClass, backend):
         raise TypeError(f'Expected {orig_t.tag.__qualname__}')
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
-    return list(flatten(self(x, o, backend)
-                        for x, o in zip(arg, oe)))
+    return tuple(self(x, o, backend)
+                 for x, o in zip(arg, oe))
 
 
 @overload  # noqa: F811
@@ -528,7 +525,7 @@ def convert_arg(self, arg, orig_t: AbstractArray, backend):
     if isinstance(arg, np.ndarray):
         arg = backend.from_numpy(arg)
     backend.check_array(arg, et)
-    return [arg]
+    return arg
 
 
 @overload  # noqa: F811
@@ -558,7 +555,7 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
     else:
         raise TypeError(f'Invalid type: {t}')
     arg = backend.from_scalar(arg, t)
-    return [arg]
+    return arg
 
 
 @overload(bootstrap=True)
@@ -649,8 +646,8 @@ class Wrap(PipelineStep):
                 backend = steps.compile.backend
             else:
                 backend = NumpyChecker()
-            args = tuple(flatten(convert_arg(arg, ot, backend) for arg, ot in
-                                 zip(args, orig_arg_t)))
+            args = tuple(convert_arg(arg, ot, backend) for arg, ot in
+                         zip(args, orig_arg_t))
             res = fn(*args)
             if self.return_backend:
                 backend = NumpyChecker()
