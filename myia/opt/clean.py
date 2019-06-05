@@ -1,10 +1,10 @@
 """Clean up Class types."""
 
 from ..dtype import Int
-from ..ir import Constant, Parameter, Graph
+from ..ir import Constant
 from ..prim import ops as P
 from ..abstract import abstract_clone, AbstractClass, AbstractTuple, \
-    AbstractScalar, VALUE, TYPE, AbstractJTagged
+    AbstractScalar, VALUE, TYPE
 
 
 @abstract_clone.variant
@@ -65,45 +65,3 @@ def erase_class(root, manager):
 
     for node in manager.all_nodes:
         node.abstract = _reabs(node.abstract)
-
-
-def params_no_tuple(params):
-    """Make a new version of params without tuples.
-
-    This will return the new parameters and a list of node to rebuild
-    the original arguments from the new parameters.
-    """
-    g = Graph()
-    inputs = []
-
-    def _helper(p):
-        a = p.abstract
-        if not isinstance(a, AbstractTuple):
-            assert not isinstance(a, AbstractJTagged)
-            np = g.add_parameter()
-            np.abstract = a
-            return np
-
-        new_param = []
-        for elem in a.elements:
-            np = Parameter(g)
-            np.abstract = elem
-            new_param.append(_helper(np))
-        return g.apply(P.make_tuple, *new_param)
-
-    inputs = [_helper(p) for p in params]
-    return g, inputs
-
-
-def erase_tuple(root, manager):
-    """Remove use of tuple in the main function arguments."""
-    params = root.parameters
-
-    if any(isinstance(p.abstract, AbstractTuple) for p in params):
-        g, inputs = params_no_tuple(params)
-        g.output = g.apply(root, *inputs)
-        # Set the new graph as the entry point
-        manager.keep_roots(g)
-        return g
-
-    return root

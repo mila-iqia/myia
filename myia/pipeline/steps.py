@@ -12,7 +12,7 @@ from ..abstract import AbstractTuple, AbstractList, AbstractClass, \
     AbstractArray, TYPE, AbstractScalar, AbstractUnion
 from ..cconv import closure_convert
 from ..ir import Graph
-from ..opt import lib as optlib, CSE, erase_class, erase_tuple, NodeMap, \
+from ..opt import lib as optlib, CSE, erase_class, NodeMap, \
     LocalPassOptimizer, DeadDataElimination
 from ..prim import vm_registry
 from ..utils import overload, flatten, no_prof
@@ -358,41 +358,6 @@ step_opt2 = Optimizer.partial(
 )
 
 
-####################
-# Erase Tuple type #
-####################
-
-
-@pipeline_function
-def step_erase_tuple(self, graph, argspec, erase_class=False):
-    """Expand tuples in the main graph parameters.
-
-    Inputs:
-        graph: The graph to transform
-        argspec: The argument types.
-        erase_tuple: Must be True
-
-    Outputs:
-        graph: The prepared graph.
-        argspec: The transformed argspec
-        erase_tuple: True
-
-    """
-    assert erase_class
-    mng = self.resources.manager
-    new_graph = erase_tuple(graph, mng)
-    if new_graph != graph:
-        new_argspec = tuple(p.abstract for p in new_graph.parameters)
-        new_graph = self.resources.inferrer.renormalize(new_graph, new_argspec)
-        return {'graph': new_graph,
-                'argspec': new_argspec,
-                'erase_tuple': True}
-    else:
-        return {'graph': graph,
-                'argspec': argspec,
-                'erase_tuple': True}
-
-
 ############
 # Validate #
 ############
@@ -650,7 +615,6 @@ class Wrap(PipelineStep):
         orig_argspec: initial argspec
         orig_outspec: intial outspec
         erase_class: boolean marker
-        erase_tuple: boolean marker
 
     Outputs:
         output: wrapped callable.
@@ -668,12 +632,11 @@ class Wrap(PipelineStep):
              outspec,
              orig_argspec=None,
              orig_outspec=None,
-             erase_class=False,
-             erase_tuple=False):
+             erase_class=False):
         """Convert args to vm format, and output from vm format."""
-        if not (erase_class and erase_tuple):
+        if not erase_class:
             raise AssertionError(
-                'OutputWrapper step requires the erase_class/tuple steps'
+                'OutputWrapper step requires the erase_class step'
             )
         fn = output
         orig_arg_t = orig_argspec or argspec
