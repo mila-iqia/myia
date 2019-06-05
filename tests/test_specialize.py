@@ -27,7 +27,6 @@ specialize_pipeline = scalar_debug_pipeline \
     })
 
 
-
 specialize_pipeline_std = standard_debug_pipeline \
     .select('parse', 'infer', 'specialize', 'erase_class',
             'opt', 'opt2', 'validate', 'export', 'wrap')

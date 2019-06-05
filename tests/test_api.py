@@ -88,8 +88,8 @@ def test_convert_arg():
 
     # Leaves
 
-    assert _convert(True, Bool) == True
-    assert _convert(False, Bool) == False
+    assert _convert(True, Bool) is True
+    assert _convert(False, Bool) is False
     assert _convert(10, i64) == 10
     assert _convert(1.5, f64) == 1.5
     with pytest.raises(TypeError):
