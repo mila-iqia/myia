@@ -52,10 +52,8 @@ class ItemEK(ElementsBase):
         """Canonicalize the underlying object."""
         obj = self.obj
         for key, value in zip(self.keys, self.values):
-            if isinstance(key, EqKey):
-                key.canonicalize()
-            else:
-                obj[key] = intern(value)
+            assert not isinstance(key, EqKey)
+            obj[key] = intern(value)
 
 
 class AttrEK(ElementsBase):

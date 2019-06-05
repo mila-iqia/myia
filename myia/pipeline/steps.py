@@ -574,7 +574,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractList, backend):
 @overload  # noqa: F811
 def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend):
     # If the EraseClass opt was applied, orig_t may be Class
-    orig_is_class = isinstance(orig_t, AbstractClass)
+    orig_is_class = isinstance(orig_t, (AbstractClass, AbstractADT))
     if orig_is_class:
         oe = orig_t.attributes.values()
     else:

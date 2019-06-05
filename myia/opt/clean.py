@@ -5,6 +5,7 @@ from ..ir import Constant
 from ..prim import ops as P
 from ..abstract import abstract_clone, AbstractClass, AbstractTuple, \
     AbstractScalar, VALUE, TYPE, AbstractADT
+from ..utils import is_dataclass_type
 
 
 @abstract_clone.variant
@@ -19,9 +20,6 @@ def erase_class(root, manager):
     * getattr(data, attr) => getitem(data, idx)
     * make_record(cls, *args) => make_tuple(*args)
     """
-    from ..abstract import AbstractClass
-    from ..utils import is_dataclass_type
-
     manager.add_graph(root)
 
     for node in list(manager.all_nodes):
@@ -54,7 +52,8 @@ def erase_class(root, manager):
                         P.partial, P.make_tuple, *args[1:]
                     )
 
-        elif node.is_constant(AbstractADT):
+        elif node.is_constant((AbstractClass, AbstractADT)):
+            # This is a constant that contains a type, used e.g. with hastype.
             new_node = Constant(_reabs(node.value))
             keep_abstract = False
 

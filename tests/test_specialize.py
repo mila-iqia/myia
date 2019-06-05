@@ -482,7 +482,7 @@ def tree(depth, x=1):
         return Pair(tree(depth - 1, x * 2), tree(depth - 1, x * 2 + 1))
 
 
-@specialize_little((tree(3),))
+@specialize_no_validate((tree(3),))
 def test_sumtree(t):
     def sumtree(t):
         if hastype(t, Number):
