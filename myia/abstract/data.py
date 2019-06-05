@@ -50,7 +50,7 @@ class Function:
     """Represents a possible function in an AbstractFunction."""
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class GraphFunction(Function):
     """Represents a Graph in a certain Context.
 
@@ -66,7 +66,7 @@ class GraphFunction(Function):
     tracking_id: object = None
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PrimitiveFunction(Function):
     """Represents a Primitive.
 
@@ -80,7 +80,7 @@ class PrimitiveFunction(Function):
     tracking_id: object = None
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class MetaGraphFunction(Function):
     """Represents a MetaGraph in a certain Context.
 
@@ -113,7 +113,7 @@ class PartialApplication(Function):
         return AttrEK(self, ('fn', 'args'))
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class JTransformedFunction(Function):
     """Represents a Function transformed through the application of J.
 
@@ -125,7 +125,7 @@ class JTransformedFunction(Function):
     fn: object
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class VirtualFunction(Function):
     """Represents some function with an explicitly given type signature.
 
@@ -139,7 +139,7 @@ class VirtualFunction(Function):
     output: 'AbstractValue'
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TypedPrimitive(Function):
     """Represents a Primitive with an explicitly given type signature.
 
@@ -155,7 +155,7 @@ class TypedPrimitive(Function):
     output: 'AbstractValue'
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class DummyFunction(Function):
     """Represents a function that can't be called."""
 
