@@ -14,7 +14,7 @@ from .cse import (  # noqa
 )
 
 from .clean import (  # noqa
-    erase_class, erase_tuple
+    erase_class
 )
 
 
