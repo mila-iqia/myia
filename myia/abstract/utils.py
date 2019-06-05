@@ -653,12 +653,13 @@ def broaden(self, d: TrackDict, loop):
 
 @overload  # noqa: F811
 def broaden(self, p: Possibilities, loop):
+    bp = Possibilities([self(v, loop) for v in p])
     if loop is None:
-        return Possibilities([self(v, loop) for v in p])
+        return bp
     else:
         # Broadening Possibilities creates a PendingTentative. This allows
         # us to avoid resolving them earlier than we would like.
-        return loop.create_pending_tentative(tentative=p)
+        return loop.create_pending_tentative(tentative=bp)
 
 
 ###############
@@ -988,6 +989,9 @@ def bind(loop, committed, resolved, pending):
 ###########################
 
 
+_empty_union = AbstractUnion([])
+
+
 def typecheck(model, abstract):
     """Check that abstract matches the model."""
     try:
@@ -1012,7 +1016,12 @@ def split_type(t, model):
                     for opt in set(t.options)]
         t1 = AbstractUnion([opt for opt, m in matching if m]).simplify()
         t2 = AbstractUnion([opt for opt, m in matching if not m]).simplify()
-        return t1, t2
+        if t1 is _empty_union:
+            return None, t2
+        elif t2 is _empty_union:
+            return t1, None
+        else:
+            return t1, t2
     elif typecheck(model, t):
         return t, None
     else:
