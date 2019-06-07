@@ -297,6 +297,11 @@ def abstract_check(self, x: AbstractFunction, *args):
 
 
 @overload  # noqa: F811
+def abstract_check(self, x: AbstractUnion, *args):
+    return self(x.options, *args)
+
+
+@overload  # noqa: F811
 def abstract_check(self, x: Possibilities, *args):
     return all(self(v, *args) for v in x)
 
@@ -430,7 +435,7 @@ def abstract_clone(self, x: AbstractClassBase, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractUnion, *args):
-    return (yield AbstractUnion)([self(y, *args) for y in x.options])
+    return (yield AbstractUnion)(self(x.options, *args))
 
 
 @overload  # noqa: F811
@@ -564,7 +569,7 @@ async def abstract_clone_async(self, x: AbstractClassBase):
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractUnion):
-    yield (yield AbstractUnion)([await self(y) for y in x.options])
+    yield (yield AbstractUnion)(await self(x.options))
 
 
 @overload  # noqa: F811
@@ -1065,7 +1070,6 @@ def _normalize_adt_helper(x, done, tag_to_adt):
                 {k: AbstractUnion.new([]) for k in x.attributes},
                 x.methods
             )
-            # adt._incomplete = True
             tag_to_adt = {**tag_to_adt, x.tag: adt}
         else:
             adt = tag_to_adt[x.tag]
@@ -1077,11 +1081,12 @@ def _normalize_adt_helper(x, done, tag_to_adt):
             ).simplify()
         return adt
     elif isinstance(x, AbstractUnion):
-        opts = [_normalize_adt_helper(opt, done, tag_to_adt)
-                for opt in x.options]
+        opts = _normalize_adt_helper(x.options, done, tag_to_adt)
         rval = AbstractUnion.new(opts).simplify()
         done[x] = rval
         return rval
+    elif isinstance(x, Possibilities):
+        return [_normalize_adt_helper(opt, done, tag_to_adt) for opt in x]
     else:
         return x
 
@@ -1090,7 +1095,7 @@ def _normalize_adt_helper(x, done, tag_to_adt):
 def _finalize_adt(self, x: AbstractUnion):
     x = x.simplify()
     if isinstance(x, AbstractUnion):
-        return (yield AbstractUnion)([self(y) for y in x.options])
+        return (yield AbstractUnion)(self(x.options))
     else:
         yield None
         return self(x)

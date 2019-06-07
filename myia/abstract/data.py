@@ -42,6 +42,14 @@ class Possibilities(list):
     constructed, may impair the equality comparisons needed to construct a set.
     """
 
+    def __init__(self, options):
+        """Initialize Possibilities."""
+        # We use OrderedSet to trim the options, but it is possible that some
+        # of the options which appear unequal at this point will turn out to be
+        # equal later on, so we cannot rely on the fact that each option in the
+        # list is different.
+        super().__init__(OrderedSet(options))
+
     def __hash__(self):
         return hash(tuple(self))
 
@@ -490,21 +498,13 @@ class AbstractUnion(AbstractStructure):
     def __init__(self, options):
         """Initialize an AbstractUnion."""
         super().__init__({})
-        # We use OrderedSet to trim the options, but it is possible that some
-        # of the options which appear unequal at this point will turn out to be
-        # equal later on, so we cannot rely on the fact that each option in the
-        # list is different.
-        opts = OrderedSet()
+        opts = []
         for option in options:
             if isinstance(option, AbstractUnion):
-                opts.update(option.options)
+                opts.extend(option.options)
             else:
-                opts.add(option)
-        self.options = list(opts)
-
-    def children(self):
-        """Return the set of options."""
-        return self.options
+                opts.append(option)
+        self.options = Possibilities(opts)
 
     def simplify(self):
         """Simplify the Union if there is only one possibility."""
