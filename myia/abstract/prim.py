@@ -27,6 +27,7 @@ from .data import (
     AbstractClassBase,
     AbstractJTagged,
     AbstractBottom,
+    AbstractUnion,
     PartialApplication,
     JTransformedFunction,
     PrimitiveFunction,
@@ -1152,6 +1153,11 @@ async def _inf_env_add(self, engine, env1, env2):
 @standard_prim(P.unsafe_static_cast)
 async def _inf_unsafe_static_cast(self, engine, x, typ: AbstractType):
     return typ.values[VALUE]
+
+
+@standard_prim(P.tagged)
+async def _inf_tagged(self, engine, x):
+    return AbstractUnion([broaden(x, engine.loop)])
 
 
 @standard_prim(P.J)

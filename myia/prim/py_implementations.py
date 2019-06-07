@@ -685,3 +685,9 @@ def env_add(env1, env2):
 def unsafe_static_cast(x, t):  # pragma: no cover
     """Implement `unsafe_static_cast`."""
     return x  # pragma: no cover
+
+
+@register(primops.tagged)
+def tagged(x):
+    """Implement `tagged`."""
+    return x
