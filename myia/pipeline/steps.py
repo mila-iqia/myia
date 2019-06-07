@@ -9,7 +9,7 @@ from itertools import count
 
 from .. import dtype
 from ..abstract import AbstractTuple, AbstractList, AbstractClass, \
-    AbstractArray, TYPE, AbstractScalar, AbstractUnion
+    AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, NodeMap, \
@@ -22,6 +22,8 @@ from ..vm import VM
 from ..compile import load_backend
 
 from .pipeline import pipeline_function, PipelineStep
+
+from ..abstract.infer import ArrayWrapper
 
 
 #############
@@ -484,6 +486,10 @@ class SlowdownWarning(UserWarning):
     """Used to indicate a potential slowdown source."""
 
 
+#####################################
+# Converts args while running model #
+#####################################
+
 @overload(bootstrap=True)
 def convert_arg(self, arg, orig_t: AbstractTuple, backend):
     if not isinstance(arg, tuple):
@@ -519,6 +525,8 @@ def convert_arg(self, arg, orig_t: AbstractArray, backend):
     assert isinstance(et, AbstractScalar)
     et = et.values[TYPE]
     assert issubclass(et, dtype.Number)
+    if isinstance(arg, ArrayWrapper):
+        arg = arg.array
     if isinstance(arg, np.ndarray):
         arg = backend.from_numpy(arg)
     backend.check_array(arg, et)
@@ -595,7 +603,14 @@ def convert_result(self, arg, orig_t, vm_t: AbstractScalar, backend):
 
 @overload  # noqa: F811
 def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend):
-    return backend.to_numpy(arg)
+    a = backend.to_numpy(arg)
+    if isinstance(backend, NumpyChecker):
+        a = ArrayWrapper(
+            a,
+            dtype.type_to_np_dtype(orig_t.element.dtype()),
+            orig_t.values[SHAPE]
+            )
+    return a
 
 
 class Wrap(PipelineStep):

@@ -31,7 +31,7 @@ def convert_grad(graph):
 def wrap_primitives(graph):
     """Helper function to wrap primitives.
 
-    This wraps all primitves used in non-call positions in a graph.
+    This wraps all primitives used in non-call positions in a graph.
     """
     mng = graph.manager
 

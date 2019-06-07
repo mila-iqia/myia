@@ -1,10 +1,20 @@
 """User-friendly interfaces to Myia machinery."""
 
+import numpy as np
+
+from myia import dtype
 import inspect
 
 from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
-from .utils import keyword_decorator
+from .utils import keyword_decorator, overload
+
+from .abstract import AbstractTuple, AbstractList, AbstractClass, \
+    AbstractArray, TYPE, AbstractScalar, AbstractUnion
+
+from .abstract.infer import ArrayWrapper
+
+from myia.compile.backends import load_backend
 
 
 #################
@@ -100,3 +110,94 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
     return MyiaFunction(fn, specialize_values, backend=backend,
                         backend_options=backend_options,
                         return_backend=return_backend)
+
+
+######################################################################
+# Converts args to initialize model on target accelerator hardware   #
+# Note: not to be conflated with weight initialization distributions #
+######################################################################
+
+@overload(bootstrap=True)
+def _convert_arg_init(self, arg, orig_t: AbstractTuple, backend):
+    if not isinstance(arg, tuple):
+        raise TypeError('Expected tuple')
+    oe = orig_t.elements
+    if len(arg) != len(oe):
+        raise TypeError(f'Expected {len(oe)} elements')
+    return tuple(self(x, o, backend) for x, o in zip(arg, oe))
+
+
+@overload  # noqa: F811
+def _convert_arg_init(self, arg, orig_t: AbstractList, backend):
+    if not isinstance(arg, list):
+        raise TypeError('Expected list')
+    ot = orig_t.element
+    return [self(x, ot, backend) for x in arg]
+
+
+@overload  # noqa: F811
+def _convert_arg_init(self, arg, orig_t: AbstractClass, backend):
+    if not isinstance(arg, orig_t.tag):
+        raise TypeError(f'Expected {orig_t.tag.__qualname__}')
+    arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
+    oe = list(orig_t.attributes.values())
+    return orig_t.tag(*(self(x, o, backend) for x, o in zip(arg, oe)))
+
+
+@overload  # noqa: F811
+def _convert_arg_init(self, arg, orig_t: AbstractArray, backend):
+    et = orig_t.element
+    assert isinstance(et, AbstractScalar)
+    et = et.values[TYPE]
+    assert issubclass(et, dtype.Number)
+    if isinstance(arg, np.ndarray):
+        arg = ArrayWrapper(backend.from_numpy(arg), arg.dtype, arg.shape)
+    backend.check_array(arg.array, et)
+    return arg
+
+
+# TODO: AbstractUnion overload of _convert_arg_init is not tested
+#       (and could need modification)
+@overload  # noqa: F811
+def _convert_arg_init(self, arg, orig_t: AbstractUnion, backend):
+    for opt in orig_t.options:
+        try:
+            return self(arg, opt, backend)
+        except TypeError:
+            continue
+    else:
+        opts = ", ".join(map(str, orig_t.options))
+        raise TypeError(f'Expected one of {opts}')
+
+
+@overload  # noqa: F811
+def _convert_arg_init(self, arg, orig_t: AbstractScalar, backend):
+    t = orig_t.values[TYPE]
+    if issubclass(t, dtype.Int):
+        if not isinstance(arg, int):
+            raise TypeError(f'Expected int')
+    elif issubclass(t, dtype.Float):
+        if not isinstance(arg, float):
+            raise TypeError(f'Expected float')
+    elif issubclass(t, dtype.Bool):
+        if not isinstance(arg, bool):
+            raise TypeError(f'Expected bool')
+    else:
+        raise TypeError(f'Invalid type: {t}')
+    arg = backend.from_scalar(arg, t)
+    return arg
+
+
+#############################################
+# Move model to target accelerator hardware #
+#############################################
+
+def to_device(model, backend, backend_options):
+    """Move model to target accelerator hardware
+    (using selected backend)."""
+    model = _convert_arg_init(
+        model,
+        from_value(model, broaden=True),
+        load_backend(backend, backend_options)
+        )
+    return model

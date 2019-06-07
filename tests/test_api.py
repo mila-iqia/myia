@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
-from myia.api import myia
+from myia.api import myia, to_device
 from myia.cconv import closure_convert
 from myia.dtype import Bool, EnvType
-from myia.abstract import InferenceError
+from myia.abstract import InferenceError, TYPE
 from myia.ir import clone
 from myia.pipeline import \
     scalar_parse as parse, scalar_debug_compile as compile
@@ -14,6 +14,13 @@ from myia.utils import newenv
 
 from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
     ai32_of, af64_of
+
+from myia import myia, value_and_grad, ArithmeticData
+from myia.abstract.infer import ArrayWrapper
+from myia.compile import load_backend
+
+from dataclasses import dataclass
+import types
 
 
 def test_myia():
@@ -77,6 +84,7 @@ def test_myia_return_struct():
 
     pt = f(5, 6)
     assert pt == Point(5, 6)
+
 
 
 def test_convert_arg():
@@ -143,6 +151,7 @@ def test_convert_arg():
         _convert(10, ai64_of())
     with pytest.raises(TypeError):
         _convert(1, Bool)
+
 
 
 def test_convert_result():
@@ -314,3 +323,102 @@ def test_tail_call():
         while x > 0:
             x = x - 1
         return x
+
+#####################################################
+# Test convert_arg_init functions used by to_device #
+#####################################################
+
+device_type = 'cpu'
+# device_type = 'cuda'  # Uncomment to run on the gpu
+
+@pytest.fixture(params=[
+    pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
+    pytest.param(('relay', {'target': 'cpu', 'device_id': 0}), id='relay-cpu'),
+    pytest.param(('pytorch', {'device': 'cpu'}), id='pytorch-cpu')])
+def backend_opt(request):
+    name, options = request.param
+    return (name, options)
+
+__W = np.array([[ 0.22490819, -0.71516967, -0.6626606],
+    [-0.14859799, 0.924496, 0.4032511]])
+
+__b = np.array([[-0.00300545, 0.10826713, -0.29246148]])
+
+def test__convert_arg_init_AbstractTuple(backend_opt):
+    backend, backend_options = backend_opt
+    b = load_backend(backend, backend_options)
+
+    model = (9, 5.0)
+    m = to_device(model, backend, backend_options)
+
+    assert isinstance(m, tuple)
+    assert isinstance(b.to_scalar(m[0]), int)
+    assert isinstance(b.to_scalar(m[1]), float)
+    assert b.to_scalar(m[0]) == 9
+    assert b.to_scalar(m[1]) == 5.0
+
+
+def test__convert_arg_init_AbstractList(backend_opt):
+    backend, backend_options = backend_opt
+    b = load_backend(backend, backend_options)
+
+    model = [91.0, 51.0]
+    m = to_device(model, backend, backend_options)
+
+    assert isinstance(m, list)
+    assert isinstance(b.to_scalar(m[0]), float)
+    assert isinstance(b.to_scalar(m[1]), float)
+    assert b.to_scalar(m[0]) == 91.0
+    assert b.to_scalar(m[1]) == 51.0
+
+
+def test__convert_arg_init_AbstractClass(backend_opt):
+    backend, backend_options = backend_opt
+    b = load_backend(backend, backend_options)
+
+    @dataclass(frozen=True)
+    class A():
+        
+        s: 'scalar number'
+
+        def apply(self, input):
+            """Apply the layer."""
+            return (input, self.s)
+
+    model = A(2.0)
+    m = to_device(model, backend, backend_options)
+
+    assert isinstance(m, A)
+    assert isinstance(b.to_scalar(m.s), float)
+    assert b.to_scalar(m.s) == 2.0
+
+
+def test__convert_arg_init_AbstractArray(backend_opt):
+    backend, backend_options = backend_opt
+    b = load_backend(backend, backend_options)
+    m = to_device(__W, backend, backend_options)
+
+    assert isinstance(m, ArrayWrapper)
+    np.testing.assert_allclose(b.to_numpy(m.array), __W)
+
+
+def test__convert_arg_init_AbstractUnion(backend_opt):
+    # TODO
+    pass
+
+
+def test__convert_arg_init_AbstractScalar(backend_opt):
+    backend, backend_options = backend_opt
+    b = load_backend(backend, backend_options)
+
+    model1 = 3.0
+    m1 = to_device(model1, backend, backend_options)
+    assert isinstance(b.to_scalar(m1), float)
+    assert b.to_scalar(m1) == 3.0
+
+    model2 = 14
+    m2 = to_device(model2, backend, backend_options)
+    assert isinstance(b.to_scalar(m2), int)
+    assert b.to_scalar(m2) == 14
+
+#####################################################

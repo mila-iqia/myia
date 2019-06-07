@@ -15,6 +15,7 @@ from myia.prim.py_implementations import \
 from myia.validate import ValidationError
 from myia.utils import overload
 from myia.hypermap import hyper_map
+from myia.abstract.infer import ArrayWrapper
 
 from .common import mysum, i64, f64, Point
 
@@ -91,6 +92,14 @@ def specializer_decorator(pipeline):
                     raise verr
 
                 result_final = res['output'](*args)
+
+                if isinstance(result_final, ArrayWrapper):
+                    result_final = result_final.array
+                elif isinstance(result_final, tuple):
+                    result_final = tuple(a.array if isinstance(a, ArrayWrapper) else a for a in result_final)
+                elif isinstance(result_final, list):
+                    result_final = [a.array if isinstance(a, ArrayWrapper) else a for a in result_final]
+                    
                 assert _eq(result_py, result_final)
 
             m = mark.parametrize('args', arglists)(run_test)
