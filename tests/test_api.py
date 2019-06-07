@@ -4,7 +4,7 @@ import pytest
 from myia.api import myia, to_device
 from myia.cconv import closure_convert
 from myia.dtype import Bool, EnvType
-from myia.abstract import InferenceError, TYPE
+from myia.abstract import InferenceError
 from myia.ir import clone
 from myia.pipeline import \
     scalar_parse as parse, scalar_debug_compile as compile
@@ -15,12 +15,10 @@ from myia.utils import newenv
 from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
     ai32_of, af64_of
 
-from myia import myia, value_and_grad, ArithmeticData
 from myia.abstract.infer import ArrayWrapper
 from myia.compile import load_backend
 
 from dataclasses import dataclass
-import types
 
 
 def test_myia():
