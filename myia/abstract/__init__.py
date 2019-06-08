@@ -85,6 +85,7 @@ from .ref import (  # noqa
 
 
 from .infer import (  # noqa
+    ArrayWrapper,
     Inferrer,
     BaseGraphInferrer,
     GraphInferrer,

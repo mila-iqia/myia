@@ -1,20 +1,17 @@
 """User-friendly interfaces to Myia machinery."""
 
 import numpy as np
+import inspect
 
 from myia import dtype
-import inspect
 
 from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
 from .utils import keyword_decorator, overload
-
 from .abstract import AbstractTuple, AbstractList, AbstractClass, \
     AbstractArray, TYPE, AbstractScalar, AbstractUnion
-
-from .abstract.infer import ArrayWrapper
-
-from myia.compile.backends import load_backend
+from .abstract import ArrayWrapper
+from .compile.backends import load_backend
 
 
 #################
@@ -193,8 +190,7 @@ def _convert_arg_init(self, arg, orig_t: AbstractScalar, backend):
 #############################################
 
 def to_device(model, backend, backend_options):
-    """Move model to target accelerator hardware
-    (using selected backend)."""
+    """Move model to target accelerator hardware (using selected backend)."""
     model = _convert_arg_init(
         model,
         from_value(model, broaden=True),

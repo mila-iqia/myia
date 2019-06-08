@@ -1,5 +1,5 @@
 
-import numpy
+import numpy as np
 from pytest import mark
 
 from myia import abstract as a, dtype
@@ -15,7 +15,6 @@ from myia.prim.py_implementations import \
 from myia.validate import ValidationError
 from myia.utils import overload
 from myia.hypermap import hyper_map
-from myia.abstract.infer import ArrayWrapper
 
 from .common import mysum, i64, f64, Point
 
@@ -40,7 +39,7 @@ def _eq(t1: tuple, t2):
 
 
 @overload  # noqa: F811
-def _eq(a1: numpy.ndarray, a2):
+def _eq(a1: np.ndarray, a2):
     return (a1 == a2).all()
 
 
@@ -92,14 +91,6 @@ def specializer_decorator(pipeline):
                     raise verr
 
                 result_final = res['output'](*args)
-
-                if isinstance(result_final, ArrayWrapper):
-                    result_final = result_final.array
-                elif isinstance(result_final, tuple):
-                    result_final = tuple(a.array if isinstance(a, ArrayWrapper) else a for a in result_final)
-                elif isinstance(result_final, list):
-                    result_final = [a.array if isinstance(a, ArrayWrapper) else a for a in result_final]
-                    
                 assert _eq(result_py, result_final)
 
             m = mark.parametrize('args', arglists)(run_test)
@@ -120,11 +111,48 @@ specialize_no_validate = specializer_decorator(
 int1 = 13
 int2 = 21
 
+int1_np64 = np.int64(17)
+int2_np64 = np.int64(29)
+
+int1_np32 = np.int32(37)
+int2_np32 = np.int32(41)
+
 fp1 = 2.7
 fp2 = 6.91
 
+fp1_np64 = np.float64(3.3)
+fp2_np64 = np.float64(7.23)
+
+fp1_np32 = np.float32(3.9)
+fp2_np32 = np.float32(9.29)
+
 pt1 = Point(10, 20)
 pt2 = Point(100, 200)
+
+
+@specialize((int1, int2_np64), (int1_np64, int2_np64),
+            (fp1, fp2_np64), (fp1_np64, fp2_np64),
+            (fp1_np32, fp2_np32), (int1_np32, int2_np32))
+def test_prim_arithmetic_np_same_precision(x, y):
+
+    def test_prim_mul_np(x, y):
+        return x * y
+
+    def test_prim_add_np(x, y):
+        return x + y
+
+    def test_prim_sub_np(x, y):
+        return x - y
+
+    def test_prim_div_np(x, y):
+        return x / y
+
+    _a = test_prim_mul_np(x, y)
+    _b = test_prim_add_np(x, y)
+    _c = test_prim_sub_np(x, y)
+    _d = test_prim_div_np(x, y)
+
+    return _a, _b, _c, _d
 
 
 @specialize((int1, int2),
@@ -215,7 +243,7 @@ def test_struct2(x, y):
     return p.x + p.y
 
 
-@specialize((numpy.array([fp1, fp2]),))
+@specialize((np.array([fp1, fp2]),))
 def test_array_map(xs):
     def square(x):
         return x * x
@@ -223,8 +251,8 @@ def test_array_map(xs):
     return array_map(square, xs)
 
 
-@specialize((numpy.array([fp1, fp2]),
-             numpy.array([int1, int2])))
+@specialize((np.array([fp1, fp2]),
+             np.array([int1, int2])))
 def test_array_map_polymorphic(xs, ys):
     def square(x):
         return x * x
@@ -232,7 +260,7 @@ def test_array_map_polymorphic(xs, ys):
     return array_map(square, xs), array_map(square, ys)
 
 
-@specialize((int1, numpy.array([fp1, fp2]),))
+@specialize((int1, np.array([fp1, fp2]),))
 def test_array_map_partial(c, xs):
     def square(x):
         return x * x

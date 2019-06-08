@@ -20,10 +20,9 @@ from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
 from ..vm import VM
 from ..compile import load_backend
+from ..abstract import ArrayWrapper
 
 from .pipeline import pipeline_function, PipelineStep
-
-from ..abstract.infer import ArrayWrapper
 
 
 #############
@@ -549,10 +548,10 @@ def convert_arg(self, arg, orig_t: AbstractUnion, backend):
 def convert_arg(self, arg, orig_t: AbstractScalar, backend):
     t = orig_t.values[TYPE]
     if issubclass(t, dtype.Int):
-        if not isinstance(arg, int):
+        if not isinstance(arg, (int, np.integer)):
             raise TypeError(f'Expected int')
     elif issubclass(t, dtype.Float):
-        if not isinstance(arg, float):
+        if not isinstance(arg, (float, np.floating)):
             raise TypeError(f'Expected float')
     elif issubclass(t, dtype.Bool):
         if not isinstance(arg, bool):
@@ -564,23 +563,26 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
 
 
 @overload(bootstrap=True)
-def convert_result(self, res, orig_t, vm_t: AbstractClass, backend):
+def convert_result(self, res, orig_t, vm_t: AbstractClass, backend,
+                   return_backend):
     oe = orig_t.attributes.values()
     ve = vm_t.attributes.values()
-    tup = tuple(self(getattr(res, attr), o, v, backend)
+    tup = tuple(self(getattr(res, attr), o, v, backend, return_backend)
                 for attr, o, v in zip(orig_t.attributes, oe, ve))
     return orig_t.tag(*tup)
 
 
 @overload  # noqa: F811
-def convert_result(self, res, orig_t, vm_t: AbstractList, backend):
+def convert_result(self, res, orig_t, vm_t: AbstractList, backend,
+                   return_backend):
     ot = orig_t.element
     vt = vm_t.element
-    return [self(x, ot, vt, backend) for x in res]
+    return [self(x, ot, vt, backend, return_backend) for x in res]
 
 
 @overload  # noqa: F811
-def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend):
+def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
+                   return_backend):
     # If the EraseClass opt was applied, orig_t may be Class
     orig_is_class = isinstance(orig_t, AbstractClass)
     if orig_is_class:
@@ -588,7 +590,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend):
     else:
         oe = orig_t.elements
     ve = vm_t.elements
-    tup = tuple(self(x, o, v, backend)
+    tup = tuple(self(x, o, v, backend, return_backend)
                 for x, o, v in zip(res, oe, ve))
     if orig_is_class:
         return orig_t.tag(*tup)
@@ -597,19 +599,22 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend):
 
 
 @overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractScalar, backend):
+def convert_result(self, arg, orig_t, vm_t: AbstractScalar, backend,
+                   return_backend):
     return backend.to_scalar(arg)
 
 
 @overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend):
-    a = backend.to_numpy(arg)
-    if isinstance(backend, NumpyChecker):
+def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
+                   return_backend):
+    if return_backend:
         a = ArrayWrapper(
-            a,
+            arg,
             dtype.type_to_np_dtype(orig_t.element.dtype()),
             orig_t.values[SHAPE]
             )
+    else:
+        a = backend.to_numpy(arg)
     return a
 
 
@@ -661,9 +666,8 @@ class Wrap(PipelineStep):
             args = tuple(convert_arg(arg, ot, backend) for arg, ot in
                          zip(args, orig_arg_t))
             res = fn(*args)
-            if self.return_backend:
-                backend = NumpyChecker()
-            res = convert_result(res, orig_out_t, vm_out_t, backend)
+            res = convert_result(res, orig_out_t, vm_out_t, backend,
+                                 self.return_backend)
             return res
 
         return {'output': wrapped}

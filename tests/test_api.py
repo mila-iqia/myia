@@ -1,4 +1,5 @@
 import numpy as np
+from dataclasses import dataclass
 import pytest
 
 from myia.api import myia, to_device
@@ -11,14 +12,11 @@ from myia.pipeline import \
 from myia.pipeline.steps import convert_arg, convert_result, NumpyChecker
 from myia.prim.py_implementations import tuple_getitem
 from myia.utils import newenv
+from myia.abstract import ArrayWrapper
+from myia.compile import load_backend
 
 from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
     ai32_of, af64_of
-
-from myia.abstract.infer import ArrayWrapper
-from myia.compile import load_backend
-
-from dataclasses import dataclass
 
 
 def test_myia():
@@ -82,7 +80,6 @@ def test_myia_return_struct():
 
     pt = f(5, 6)
     assert pt == Point(5, 6)
-
 
 
 def test_convert_arg():
@@ -151,8 +148,15 @@ def test_convert_arg():
         _convert(1, Bool)
 
 
+@pytest.fixture(params=[
+    pytest.param(True),
+    pytest.param(False)
+    ])
+def _return_backend(request):
+    return request.param
 
-def test_convert_result():
+
+def test_convert_result(_return_backend):
 
     backend = NumpyChecker()
 
@@ -160,7 +164,8 @@ def test_convert_result():
         return convert_result(data,
                               to_abstract_test(typ1),
                               to_abstract_test(typ2),
-                              backend)
+                              backend,
+                              _return_backend)
 
     # Leaves
 
@@ -322,12 +327,14 @@ def test_tail_call():
             x = x - 1
         return x
 
+
 #####################################################
 # Test convert_arg_init functions used by to_device #
 #####################################################
 
 device_type = 'cpu'
 # device_type = 'cuda'  # Uncomment to run on the gpu
+
 
 @pytest.fixture(params=[
     pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
@@ -337,10 +344,16 @@ def backend_opt(request):
     name, options = request.param
     return (name, options)
 
-__W = np.array([[ 0.22490819, -0.71516967, -0.6626606],
-    [-0.14859799, 0.924496, 0.4032511]])
+
+__W = np.array(
+    [
+        [0.22490819, -0.71516967, -0.6626606],
+        [-0.14859799, 0.924496, 0.4032511]
+    ]
+)
 
 __b = np.array([[-0.00300545, 0.10826713, -0.29246148]])
+
 
 def test__convert_arg_init_AbstractTuple(backend_opt):
     backend, backend_options = backend_opt
@@ -376,7 +389,7 @@ def test__convert_arg_init_AbstractClass(backend_opt):
 
     @dataclass(frozen=True)
     class A():
-        
+
         s: 'scalar number'
 
         def apply(self, input):

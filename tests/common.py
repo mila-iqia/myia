@@ -82,6 +82,7 @@ def U(*opts):
 
 @overload(bootstrap=True)
 def to_abstract_test(self, x: (bool, int, float, str,
+                               np.floating, np.integer,
                                type(None), EnvInstance)):
     return AbstractScalar({
         VALUE: x,

@@ -12,14 +12,8 @@ from dataclasses import dataclass
 from myia import myia, value_and_grad, ArithmeticData
 # The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
-
-from myia.abstract import from_value 
-from myia.compile.backends import load_backend
-
 from myia.api import to_device
-
-from myia.dtype import Float
-from myia.prim.py_implementations import scalar_cast
+from myia.dtype import DTYPE_TO_MTYPE
 
 ###########
 # Options #
@@ -28,19 +22,30 @@ from myia.prim.py_implementations import scalar_cast
 
 dtype = 'float32'
 
+mtype = DTYPE_TO_MTYPE[dtype]
+
 backend = 'pytorch'
-#backend = 'nnvm'
-#backend = 'relay'
+# backend = 'nnvm'  # Uncomment to use nnvm backend
+# backend = 'relay'  # Uncomment to use relay backend
 
 device_type = 'cpu'
 # device_type = 'cuda'  # Uncomment to run on the gpu
 
-if backend == 'pytorch':
-    backend_options = {'device': device_type}
-elif backend == 'nnvm':
-    backend_options = {'target': device_type, 'device_id': 0}
-elif backend == 'relay':
-    backend_options = {'target': device_type, 'device_id': 0}
+backend_options_dict = {
+    'pytorch': {'device': device_type},
+    'nnvm': {'target': device_type, 'device_id': 0},
+    'relay': {'target': device_type, 'device_id': 0}
+    }
+
+backend_options = backend_options_dict[backend]
+
+
+###############
+# Hyperparams #
+###############
+
+
+lr = getattr(numpy, dtype)(0.01)
 
 
 ########
@@ -129,16 +134,17 @@ def cost(model, x, target):
     diff = target - y
     return sum(diff * diff)
 
-f32 = Float[32]
 
 @myia(backend=backend, backend_options=backend_options, return_backend=True)
-def step(model, x, y):
-    """Returns the loss and parameter gradients."""
-    # value_and_grad will return cost(model, x, y) and dcost(...)/dmodel.
-    # The 'model' argument can be omitted: by default the derivative wrt
-    # the first argument is returned.
-    cost, dmodel = value_and_grad(cost, 'model')(model, x, y)
-    return cost, model - dmodel * scalar_cast(0.01, f32)
+def step(model, x, y, lr):
+    """Returns the loss and parameter gradients.
+
+    value_and_grad will return cost(model, x, y) and dcost(...)/dmodel.
+    The 'model' argument can be omitted: by default the derivative wrt
+    the first argument is returned.
+    """
+    _cost, dmodel = value_and_grad(cost, 'model')(model, x, y)
+    return _cost, model - dmodel * lr
 
 
 def run_helper(epochs, n, batch_size, layer_sizes):
@@ -159,13 +165,12 @@ def run_helper(epochs, n, batch_size, layer_sizes):
     model = to_device(model, backend, backend_options)
 
     data = generate_data(n, batch_size, layer_sizes[0], layer_sizes[-1])
-    lr = getattr(numpy, dtype)(0.01)
 
     for _ in range(epochs):
         costs = []
         t0 = time.time()
         for inp, target in data:
-            cost, model = step(model, inp, target)
+            cost, model = step(model, inp, target, lr)
             cost = cost.array
             if isinstance(cost, numpy.ndarray):
                 cost = float(cost)

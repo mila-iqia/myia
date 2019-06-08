@@ -468,7 +468,8 @@ def to_abstract(self, v: (bool, type(None)), context, ref, loop):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: (int, float), context, ref, loop):
+def to_abstract(self, v: (int, float, np.integer, np.floating),
+                context, ref, loop):
     typ = dtype.pytype_to_myiatype(type(v))
     if loop is not None:
         prio = 1 if issubclass(typ, dtype.Float) else 0
