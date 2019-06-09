@@ -8,9 +8,9 @@ from myia import dtype
 from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
 from .utils import keyword_decorator, overload
-from .abstract import AbstractTuple, AbstractList, AbstractClass, \
-    AbstractArray, TYPE, AbstractScalar, AbstractUnion
-from .abstract import ArrayWrapper
+from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
+    AbstractList, AbstractClass, AbstractArray, AbstractScalar
+# TODO: AbstractUnion overload for _convert_arg_init
 from .compile.backends import load_backend
 
 
@@ -153,18 +153,22 @@ def _convert_arg_init(self, arg, orig_t: AbstractArray, backend):
     return arg
 
 
-# TODO: AbstractUnion overload of _convert_arg_init is not tested
-#       (and could need modification)
-@overload  # noqa: F811
-def _convert_arg_init(self, arg, orig_t: AbstractUnion, backend):
-    for opt in orig_t.options:
-        try:
-            return self(arg, opt, backend)
-        except TypeError:
-            continue
-    else:
-        opts = ", ".join(map(str, orig_t.options))
-        raise TypeError(f'Expected one of {opts}')
+"""
+TODO: AbstractUnion overload of _convert_arg_init().
+
+This overliad will look similar to AbstractUnion overload
+from convert_arg() in myia/pipeline/steps.py
+
+AbstractUnion overload from convert_arg() at time of this commit:
+https://github.com/mila-iqia/myia/blob/
+c350b341f52d2d0e3dc1e5ab1d890103a45b60c9/
+myia/pipeline/steps.py#L528-L537
+
+Current AbstractUnion overload from convert_arg():
+(Note: might have been moved to different location of codebase
+since this comment was written/commited):
+https://github.com/mila-iqia/myia/blob/master/myia/pipeline/steps.py#L528-L537
+"""
 
 
 @overload  # noqa: F811

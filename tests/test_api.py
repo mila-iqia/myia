@@ -2,7 +2,7 @@ import numpy as np
 from dataclasses import dataclass
 import pytest
 
-from myia.api import myia, to_device
+from myia.api import myia, to_device, _convert_arg_init
 from myia.cconv import closure_convert
 from myia.dtype import Bool, EnvType
 from myia.abstract import InferenceError
@@ -431,5 +431,60 @@ def test__convert_arg_init_AbstractScalar(backend_opt):
     m2 = to_device(model2, backend, backend_options)
     assert isinstance(b.to_scalar(m2), int)
     assert b.to_scalar(m2) == 14
+
+
+def test_convert_arg_init(backend_opt):
+
+    backend, backend_options = backend_opt
+
+    def _convert(data, typ):
+        return _convert_arg_init(data,
+                                 to_abstract_test(typ),
+                                 load_backend(backend, backend_options))
+
+    with pytest.raises(TypeError):
+        _convert(newenv, EnvType)
+
+    # Class TypeError check and Tuple TypeError check
+
+    pt3 = Point3D(1, 2, 3)
+
+    with pytest.raises(TypeError):
+        _convert((1, 2), Point(i64, i64))
+    with pytest.raises(TypeError):
+        _convert(Point(i64, i64), (1, 2))
+
+    # Arrays
+
+    fmat = np.ones((5, 8), dtype='float64')
+    imat = np.ones((5, 8), dtype='int32')
+
+    with pytest.raises(TypeError):
+        _convert(imat, af64_of(5, 8))
+    with pytest.raises(TypeError):
+        _convert(fmat, ai32_of(5, 8))
+
+    # Misc errors
+
+    pt3 = Point3D(1, 2, 3)
+    with pytest.raises(TypeError):
+        _convert(10, f64)
+    with pytest.raises(TypeError):
+        _convert("blah", to_abstract_test("blah"))
+    with pytest.raises(TypeError):
+        _convert(1.5, i64)
+    with pytest.raises(TypeError):
+        _convert(10, (i64, i64))
+    with pytest.raises(TypeError):
+        _convert((1,), (i64, i64))
+    with pytest.raises(TypeError):
+        _convert((1, 2, 3), (i64, i64))
+    with pytest.raises(TypeError):
+        _convert((1, 2, 3), [i64])
+    with pytest.raises(TypeError):
+        _convert(pt3, Point(i64, i64))
+    with pytest.raises(TypeError):
+        _convert(1, Bool)
+
 
 #####################################################
