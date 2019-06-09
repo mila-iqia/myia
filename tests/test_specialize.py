@@ -470,14 +470,25 @@ class Pair(ADT):
     right: object
 
 
-def tree(depth, x=1):
+def tree(depth, x):
     if depth == 0:
         return x
     else:
-        return Pair(tree(depth - 1, x * 2), tree(depth - 1, x * 2 + 1))
+        return Pair(tree(depth - 1, x * 2),
+                    tree(depth - 1, x * 2 + 1))
 
 
-@specialize_no_validate((tree(3),))
+def countdown(n):
+    if n == 0:
+        return None
+    else:
+        return Pair(n, countdown(n - 1))
+
+
+@specialize_no_validate(
+    (tree(3, 1),),
+    (countdown(10),)
+)
 def test_sumtree(t):
     def sumtree(t):
         if hastype(t, Number):

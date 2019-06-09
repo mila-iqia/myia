@@ -454,37 +454,6 @@ class AbstractADT(AbstractClassBase):
     """
 
 
-def normalize_adt(x, done, tag_to_adt):
-    """Normalize the ADT to make it properly recursive."""
-    if x in done:
-        return done[x]
-    if isinstance(x, AbstractADT):
-        if x.tag not in tag_to_adt:
-            adt = AbstractADT.new(
-                x.tag,
-                {k: AbstractUnion.new([]) for k in x.attributes},
-                x.methods
-            )
-            adt._incomplete = True
-            tag_to_adt = {**tag_to_adt, x.tag: adt}
-        else:
-            adt = tag_to_adt[x.tag]
-        done[x] = adt
-        for attr, value in x.attributes.items():
-            value = normalize_adt(value, done, tag_to_adt)
-            adt.attributes[attr] = AbstractUnion.new(
-                [adt.attributes[attr], value]
-            ).simplify()
-        return adt
-    elif isinstance(x, AbstractUnion):
-        opts = [normalize_adt(opt, done, tag_to_adt) for opt in x.options]
-        rval = AbstractUnion.new(opts).simplify()
-        done[x] = rval
-        return rval
-    else:
-        return x
-
-
 class AbstractJTagged(AbstractStructure):
     """Represents a value (non-function) transformed through J."""
 

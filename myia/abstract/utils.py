@@ -28,6 +28,7 @@ from .data import (
     AbstractList,
     AbstractClassBase,
     AbstractClass,
+    AbstractADT,
     AbstractJTagged,
     AbstractUnion,
     TrackDict,
@@ -349,14 +350,18 @@ def abstract_clone(__call__, self, x, *args):
         if not isinstance(result, GeneratorType):
             return result
         cls = result.send(None)
-        inst = cls.empty()
-        cache[x] = inst
+        if cls is not None:
+            inst = cls.empty()
+        else:
+            inst = None
         constructor = _make_constructor(inst)
+        cache[x] = inst
         try:
             result.send(constructor)
         except StopIteration as e:
-            assert e.value is inst
-            return inst
+            if inst is not None:
+                assert e.value is inst
+            return e.value
         else:
             raise AssertionError(
                 'Generators in abstract_clone must yield once, then return.'
@@ -1016,12 +1021,9 @@ def split_type(t, model):
                     for opt in set(t.options)]
         t1 = AbstractUnion([opt for opt, m in matching if m]).simplify()
         t2 = AbstractUnion([opt for opt, m in matching if not m]).simplify()
-        if t1 is _empty_union:
-            return None, t2
-        elif t2 is _empty_union:
-            return t1, None
-        else:
-            return t1, t2
+        t1 = None if t1 is _empty_union else t1
+        t2 = None if t2 is _empty_union else t2
+        return t1, t2
     elif typecheck(model, t):
         return t, None
     else:
@@ -1037,3 +1039,58 @@ def hastype_helper(value, model):
         return True
     else:
         return ANYTHING
+
+
+#########################
+# ADT-related utilities #
+#########################
+
+
+def normalize_adt(x):
+    """Normalize the ADT to make it properly recursive."""
+    rval = _normalize_adt_helper(x, {}, {})
+    rval = rval.intern()
+    rval = broaden(rval, None)
+    rval = _finalize_adt(rval)
+    return rval
+
+
+def _normalize_adt_helper(x, done, tag_to_adt):
+    if x in done:
+        return done[x]
+    if isinstance(x, AbstractADT):
+        if x.tag not in tag_to_adt:
+            adt = AbstractADT.new(
+                x.tag,
+                {k: AbstractUnion.new([]) for k in x.attributes},
+                x.methods
+            )
+            # adt._incomplete = True
+            tag_to_adt = {**tag_to_adt, x.tag: adt}
+        else:
+            adt = tag_to_adt[x.tag]
+        done[x] = adt
+        for attr, value in x.attributes.items():
+            value = _normalize_adt_helper(value, done, tag_to_adt)
+            adt.attributes[attr] = AbstractUnion.new(
+                [adt.attributes[attr], value]
+            ).simplify()
+        return adt
+    elif isinstance(x, AbstractUnion):
+        opts = [_normalize_adt_helper(opt, done, tag_to_adt)
+                for opt in x.options]
+        rval = AbstractUnion.new(opts).simplify()
+        done[x] = rval
+        return rval
+    else:
+        return x
+
+
+@abstract_clone.variant
+def _finalize_adt(self, x: AbstractUnion):
+    x = x.simplify()
+    if isinstance(x, AbstractUnion):
+        return (yield AbstractUnion)([self(y) for y in x.options])
+    else:
+        yield None
+        return self(x)

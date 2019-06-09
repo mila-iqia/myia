@@ -549,6 +549,9 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
     elif issubclass(t, dtype.Bool):
         if not isinstance(arg, bool):
             raise TypeError(f'Expected bool')
+    elif issubclass(t, dtype.Nil):
+        if arg is not None:
+            raise TypeError(f'Expected None')
     else:
         raise TypeError(f'Invalid type: {t}')
     arg = backend.from_scalar(arg, t)

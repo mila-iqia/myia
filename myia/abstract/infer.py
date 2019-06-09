@@ -19,12 +19,12 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractValue, GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, AbstractExternal, \
-    VALUE, TYPE, SHAPE, DummyFunction, normalize_adt, \
+    VALUE, TYPE, SHAPE, DummyFunction, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
     AbstractList, type_error_nargs, TypeDispatchError, AbstractADT, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
-    bind, type_to_abstract
+    bind, type_to_abstract, normalize_adt
 
 
 class InferenceEngine:
@@ -499,10 +499,7 @@ def to_abstract(self, v: ADT, context, ref, loop):
     for name, field in v.__dataclass_fields__.items():
         new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
     draft = AbstractADT(type(v), new_args, dataclass_methods(type(v)))
-    rval = normalize_adt(draft, {}, {})
-    rval._incomplete = False
-    rval = rval.intern()
-    return rval
+    return normalize_adt(draft)
 
 
 class Inferrer(Partializable):
