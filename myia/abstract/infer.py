@@ -27,6 +27,23 @@ from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind, type_to_abstract, normalize_adt
 
 
+class ArrayWrapper:
+    """Wrap array so that it remains on accelerator device.
+
+    Attributes:
+        array: The array that is inside ArrayWrapper.
+        dtype: The dtype of the array that is inside ArrayWrapper.
+        shape: The shape of the array that is inside ArrayWrapper.
+
+    """
+
+    def __init__(self, array, dtype, shape):
+        """Initialize the ArrayWrapper."""
+        self.array = array
+        self.dtype = dtype
+        self.shape = shape
+
+
 class InferenceEngine:
     """Infer various properties about nodes in graphs.
 
@@ -451,7 +468,8 @@ def to_abstract(self, v: (bool, type(None)), context, ref, loop):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: (int, float), context, ref, loop):
+def to_abstract(self, v: (int, float, np.integer, np.floating),
+                context, ref, loop):
     typ = dtype.pytype_to_myiatype(type(v))
     if loop is not None:
         prio = 1 if issubclass(typ, dtype.Float) else 0
@@ -479,6 +497,17 @@ def to_abstract(self, v: list, context, ref, loop):
 
 @overload  # noqa: F811
 def to_abstract(self, v: np.ndarray, context, ref, loop):
+    return AbstractArray(
+        AbstractScalar({
+            VALUE: ANYTHING,
+            TYPE: dtype.np_dtype_to_type(str(v.dtype)),
+        }),
+        {SHAPE: v.shape}
+    )
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: ArrayWrapper, context, ref, loop):
     return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,

@@ -2,6 +2,7 @@
 import pytest
 import asyncio
 import typing
+import numpy as np
 
 from myia import dtype as ty
 from myia.prim import ops as P
@@ -19,13 +20,21 @@ from myia.abstract import (
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
 
-from .common import Point, to_abstract_test, f32, Ty, af32_of, S, U
+from .common import Point, to_abstract_test, i16, f32, Ty, af32_of, S, U
 
 
 def test_to_abstract():
     inst = SymbolicKeyInstance(Constant(123), 456)
     expected = AbstractScalar({VALUE: inst, TYPE: ty.SymbolicKeyType})
     assert to_abstract(inst) == expected
+
+
+def test_numpy_scalar_to_abstract():
+    s1 = AbstractScalar({VALUE: 2, TYPE: i16})
+    assert to_abstract_test(np.int16(2)) == s1
+
+    s2 = AbstractScalar({VALUE: 1.5, TYPE: f32})
+    assert to_abstract_test(np.float32(1.5)) == s2
 
 
 def test_build_value():

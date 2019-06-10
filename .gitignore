@@ -5,3 +5,4 @@ __pycache__/
 *.egg-info
 prof/
 myia_debug/
+.DS_Store

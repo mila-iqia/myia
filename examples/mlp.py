@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from myia import myia, value_and_grad, ArithmeticData
 # The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
-
+from myia.api import to_device
 
 ###########
 # Options #
@@ -20,8 +20,29 @@ from myia.debug import traceback  # noqa
 
 
 dtype = 'float32'
+
+backend = 'pytorch'
+# backend = 'nnvm'  # Uncomment to use nnvm backend
+# backend = 'relay'  # Uncomment to use relay backend
+
 device_type = 'cpu'
 # device_type = 'cuda'  # Uncomment to run on the gpu
+
+backend_options_dict = {
+    'pytorch': {'device': device_type},
+    'nnvm': {'target': device_type, 'device_id': 0},
+    'relay': {'target': device_type, 'device_id': 0}
+    }
+
+backend_options = backend_options_dict[backend]
+
+
+###############
+# Hyperparams #
+###############
+
+
+lr = getattr(numpy, dtype)(0.01)
 
 
 ########
@@ -111,14 +132,16 @@ def cost(model, x, target):
     return sum(diff * diff)
 
 
-# @myia(backend_options={'target': device_type})
-@myia(backend='pytorch', backend_options={'device': device_type})
-def step(model, x, y):
-    """Returns the loss and parameter gradients."""
-    # value_and_grad will return cost(model, x, y) and dcost(...)/dmodel.
-    # The 'model' argument can be omitted: by default the derivative wrt
-    # the first argument is returned.
-    return value_and_grad(cost, 'model')(model, x, y)
+@myia(backend=backend, backend_options=backend_options, return_backend=True)
+def step(model, x, y, lr):
+    """Returns the loss and parameter gradients.
+
+    value_and_grad will return cost(model, x, y) and dcost(...)/dmodel.
+    The 'model' argument can be omitted: by default the derivative wrt
+    the first argument is returned.
+    """
+    _cost, dmodel = value_and_grad(cost, 'model')(model, x, y)
+    return _cost, model - dmodel * lr
 
 
 def run_helper(epochs, n, batch_size, layer_sizes):
@@ -134,19 +157,21 @@ def run_helper(epochs, n, batch_size, layer_sizes):
     for W, b in mlp_parameters(*layer_sizes):
         layers.append(Linear(W, b))
         layers.append(Tanh())
+
     model = Sequential(tuple(layers))
+    model = to_device(model, backend, backend_options)
+
     data = generate_data(n, batch_size, layer_sizes[0], layer_sizes[-1])
-    lr = getattr(numpy, dtype)(0.01)
 
     for _ in range(epochs):
         costs = []
         t0 = time.time()
         for inp, target in data:
-            cost, dmodel = step(model, inp, target)
+            cost, model = step(model, inp, target, lr)
+            cost = cost.array
             if isinstance(cost, numpy.ndarray):
                 cost = float(cost)
             costs.append(cost)
-            model = model - (lr * dmodel)
         c = sum(costs) / n
         t = time.time() - t0
         print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')

@@ -1,10 +1,17 @@
 """User-friendly interfaces to Myia machinery."""
 
+import numpy as np
 import inspect
+
+from myia import dtype
 
 from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
-from .utils import keyword_decorator
+from .utils import keyword_decorator, overload
+from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
+    AbstractList, AbstractClass, AbstractArray, AbstractScalar
+# TODO: AbstractUnion overload for _convert_arg_init
+from .compile.backends import load_backend
 
 
 #################
@@ -100,3 +107,78 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
     return MyiaFunction(fn, specialize_values, backend=backend,
                         backend_options=backend_options,
                         return_backend=return_backend)
+
+
+######################################################################
+# Converts args to initialize model on target accelerator hardware   #
+# Note: not to be conflated with weight initialization distributions #
+######################################################################
+
+@overload(bootstrap=True)
+def _convert_arg_init(self, arg, orig_t: AbstractTuple, backend):
+    oe = orig_t.elements
+    return tuple(self(x, o, backend) for x, o in zip(arg, oe))
+
+
+@overload  # noqa: F811
+def _convert_arg_init(self, arg, orig_t: AbstractList, backend):
+    ot = orig_t.element
+    return [self(x, ot, backend) for x in arg]
+
+
+@overload  # noqa: F811
+def _convert_arg_init(self, arg, orig_t: AbstractClass, backend):
+    arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
+    oe = list(orig_t.attributes.values())
+    return orig_t.tag(*(self(x, o, backend) for x, o in zip(arg, oe)))
+
+
+@overload  # noqa: F811
+def _convert_arg_init(self, arg, orig_t: AbstractArray, backend):
+    et = orig_t.element
+    assert isinstance(et, AbstractScalar)
+    et = et.values[TYPE]
+    assert issubclass(et, dtype.Number)
+    if isinstance(arg, np.ndarray):
+        arg = ArrayWrapper(backend.from_numpy(arg), arg.dtype, arg.shape)
+    backend.check_array(arg.array, et)
+    return arg
+
+
+"""
+TODO: AbstractUnion overload of _convert_arg_init().
+
+This overload will look similar to AbstractUnion overload
+from convert_arg() in myia/pipeline/steps.py
+
+AbstractUnion overload from convert_arg() at time of this commit:
+https://github.com/mila-iqia/myia/blob/
+c350b341f52d2d0e3dc1e5ab1d890103a45b60c9/
+myia/pipeline/steps.py#L528-L537
+
+Current AbstractUnion overload from convert_arg():
+(Note: might have been moved to different location of codebase
+since this comment was written/committed):
+https://github.com/mila-iqia/myia/blob/master/myia/pipeline/steps.py#L528-L537
+"""
+
+
+@overload  # noqa: F811
+def _convert_arg_init(self, arg, orig_t: AbstractScalar, backend):
+    t = orig_t.values[TYPE]
+    arg = backend.from_scalar(arg, t)
+    return arg
+
+
+#############################################
+# Move model to target accelerator hardware #
+#############################################
+
+def to_device(model, backend, backend_options):
+    """Move model to target accelerator hardware (using selected backend)."""
+    model = _convert_arg_init(
+        model,
+        from_value(model, broaden=True),
+        load_backend(backend, backend_options)
+        )
+    return model

@@ -7,7 +7,7 @@ from myia.abstract import VALUE, TYPE, SHAPE, \
     AbstractValue, AbstractScalar, AbstractArray, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged, AbstractUnion, AbstractExternal, ANYTHING, from_value
-from myia.dtype import Bool, i32, i64, u64, f16, f32, f64
+from myia.dtype import Bool, i16, i32, i64, u64, f16, f32, f64
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance, dataclass_methods
 from myia.composite import ArithmeticData
@@ -35,6 +35,10 @@ def ai64_of(*shp, value=ANYTHING):
 
 def ai32_of(*shp, value=ANYTHING):
     return arr_of(i32, shp, value)
+
+
+def ai16_of(*shp, value=ANYTHING):
+    return arr_of(i16, shp, value)
 
 
 def af64_of(*shp, value=ANYTHING):
@@ -82,6 +86,7 @@ def U(*opts):
 
 @overload(bootstrap=True)
 def to_abstract_test(self, x: (bool, int, float, str,
+                               np.floating, np.integer,
                                type(None), EnvInstance)):
     return AbstractScalar({
         VALUE: x,
