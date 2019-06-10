@@ -11,7 +11,7 @@ from .. import dtype
 from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
 from ..utils import Overload, Partializable, is_dataclass_type, \
-    SymbolicKeyInstance, overload, dataclass_methods
+    SymbolicKeyInstance, overload, dataclass_methods, ADT
 
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
@@ -21,10 +21,10 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     VirtualFunction, AbstractFunction, AbstractExternal, \
     VALUE, TYPE, SHAPE, DummyFunction, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractList, type_error_nargs, TypeDispatchError, \
+    AbstractList, type_error_nargs, TypeDispatchError, AbstractADT, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
-    bind, type_to_abstract
+    bind, type_to_abstract, normalize_adt
 
 
 class ArrayWrapper:
@@ -522,6 +522,15 @@ def to_abstract(self, v: typing._GenericAlias, context, ref, loop):
     return AbstractType(type_to_abstract(v))
 
 
+@overload  # noqa: F811
+def to_abstract(self, v: ADT, context, ref, loop):
+    new_args = {}
+    for name, field in v.__dataclass_fields__.items():
+        new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
+    draft = AbstractADT(type(v), new_args, dataclass_methods(type(v)))
+    return normalize_adt(draft)
+
+
 class Inferrer(Partializable):
     """Infer the result of a function.
 
@@ -720,7 +729,7 @@ class PartialInferrer(Inferrer):
         argvals = tuple([await ref.get() for ref in argrefs])
         if argvals not in self.cache:
             args = tuple(VirtualReference(arg)
-                         for arg in self.args + argvals)
+                         for arg in tuple(self.args) + argvals)
             self.cache[argvals] = await self.fn.run(engine, outref, args)
         return self.cache[argvals]
 

@@ -3,13 +3,14 @@
 from ..dtype import Int
 from ..ir import Constant
 from ..prim import ops as P
-from ..abstract import abstract_clone, AbstractClass, AbstractTuple, \
+from ..abstract import abstract_clone, AbstractClassBase, AbstractTuple, \
     AbstractScalar, VALUE, TYPE
+from ..utils import is_dataclass_type
 
 
 @abstract_clone.variant
-def _reabs(self, a: AbstractClass):
-    return AbstractTuple(self(x) for x in a.attributes.values())
+def _reabs(self, a: AbstractClassBase):
+    return (yield AbstractTuple)(self(x) for x in a.attributes.values())
 
 
 def erase_class(root, manager):
@@ -19,9 +20,6 @@ def erase_class(root, manager):
     * getattr(data, attr) => getitem(data, idx)
     * make_record(cls, *args) => make_tuple(*args)
     """
-    from ..abstract import AbstractClass
-    from ..utils import is_dataclass_type
-
     manager.add_graph(root)
 
     for node in list(manager.all_nodes):
@@ -31,7 +29,7 @@ def erase_class(root, manager):
         if node.is_apply(P.getattr):
             _, data, item = node.inputs
             dt = data.abstract
-            assert isinstance(dt, AbstractClass)
+            assert isinstance(dt, AbstractClassBase)
             idx = list(dt.attributes.keys()).index(item.value)
             idx_c = Constant(idx)
             idx_c.abstract = AbstractScalar({
@@ -53,6 +51,11 @@ def erase_class(root, manager):
                     new_node = node.graph.apply(
                         P.partial, P.make_tuple, *args[1:]
                     )
+
+        elif node.is_constant(AbstractClassBase):
+            # This is a constant that contains a type, used e.g. with hastype.
+            new_node = Constant(_reabs(node.value))
+            keep_abstract = False
 
         elif node.is_constant() and is_dataclass_type(node.value):
             raise NotImplementedError()

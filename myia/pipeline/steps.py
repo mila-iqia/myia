@@ -8,7 +8,7 @@ import numpy as np
 from itertools import count
 
 from .. import dtype
-from ..abstract import AbstractTuple, AbstractList, AbstractClass, \
+from ..abstract import AbstractTuple, AbstractList, AbstractClassBase, \
     AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE
 from ..cconv import closure_convert
 from ..ir import Graph
@@ -509,7 +509,7 @@ def convert_arg(self, arg, orig_t: AbstractList, backend):
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractClass, backend):
+def convert_arg(self, arg, orig_t: AbstractClassBase, backend):
     if not isinstance(arg, orig_t.tag):
         raise TypeError(f'Expected {orig_t.tag.__qualname__}')
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
@@ -556,6 +556,9 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
     elif issubclass(t, dtype.Bool):
         if not isinstance(arg, bool):
             raise TypeError(f'Expected bool')
+    elif issubclass(t, dtype.Nil):
+        if arg is not None:
+            raise TypeError(f'Expected None')
     else:
         raise TypeError(f'Invalid type: {t}')
     arg = backend.from_scalar(arg, t)
@@ -563,7 +566,7 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
 
 
 @overload(bootstrap=True)
-def convert_result(self, res, orig_t, vm_t: AbstractClass, backend,
+def convert_result(self, res, orig_t, vm_t: AbstractClassBase, backend,
                    return_backend):
     oe = orig_t.attributes.values()
     ve = vm_t.attributes.values()
@@ -584,7 +587,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractList, backend,
 def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
                    return_backend):
     # If the EraseClass opt was applied, orig_t may be Class
-    orig_is_class = isinstance(orig_t, AbstractClass)
+    orig_is_class = isinstance(orig_t, AbstractClassBase)
     if orig_is_class:
         oe = orig_t.attributes.values()
     else:

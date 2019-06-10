@@ -8,7 +8,7 @@ from itertools import chain
 from types import GeneratorType, AsyncGeneratorType
 
 from .. import dtype
-from ..utils import overload, is_dataclass_type, dataclass_methods
+from ..utils import overload, is_dataclass_type, dataclass_methods, intern
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
@@ -26,10 +26,11 @@ from .data import (
     AbstractTuple,
     AbstractArray,
     AbstractList,
+    AbstractClassBase,
     AbstractClass,
+    AbstractADT,
     AbstractJTagged,
     AbstractUnion,
-    abstract_union,
     TrackDict,
     PartialApplication,
     JTransformedFunction,
@@ -296,6 +297,11 @@ def abstract_check(self, x: AbstractFunction, *args):
 
 
 @overload  # noqa: F811
+def abstract_check(self, x: AbstractUnion, *args):
+    return self(x.options, *args)
+
+
+@overload  # noqa: F811
 def abstract_check(self, x: Possibilities, *args):
     return all(self(v, *args) for v in x)
 
@@ -337,7 +343,8 @@ def _make_constructor(inst):
 
 
 @overload.wrapper(
-    initial_state=lambda: CloneState({}, None, None)
+    initial_state=lambda: CloneState({}, None, None),
+    postprocess=intern,
 )
 def abstract_clone(__call__, self, x, *args):
     """Clone an abstract value."""
@@ -348,15 +355,18 @@ def abstract_clone(__call__, self, x, *args):
         if not isinstance(result, GeneratorType):
             return result
         cls = result.send(None)
-        inst = cls.empty()
-        cache[x] = inst
+        if cls is not None:
+            inst = cls.empty()
+        else:
+            inst = None
         constructor = _make_constructor(inst)
+        cache[x] = inst
         try:
             result.send(constructor)
         except StopIteration as e:
-            rval = e.value.intern()
-            cache[x] = rval
-            return rval
+            if inst is not None:
+                assert e.value is inst
+            return e.value
         else:
             raise AssertionError(
                 'Generators in abstract_clone must yield once, then return.'
@@ -414,8 +424,8 @@ def abstract_clone(self, x: AbstractArray, *args):
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractClass, *args):
-    return (yield AbstractClass)(
+def abstract_clone(self, x: AbstractClassBase, *args):
+    return (yield type(x))(
         x.tag,
         {k: self(v, *args) for k, v in x.attributes.items()},
         x.methods,
@@ -425,7 +435,7 @@ def abstract_clone(self, x: AbstractClass, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractUnion, *args):
-    return (yield AbstractUnion)([self(y, *args) for y in x.options])
+    return (yield AbstractUnion)(self(x.options, *args))
 
 
 @overload  # noqa: F811
@@ -442,7 +452,7 @@ def abstract_clone(self, x: Possibilities, *args):
 def abstract_clone(self, x: PartialApplication, *args):
     return PartialApplication(
         self(x.fn, *args),
-        tuple([self(arg, *args) for arg in x.args])
+        [self(arg, *args) for arg in x.args]
     )
 
 
@@ -469,8 +479,13 @@ def abstract_clone(self, x: object, *args):
 #################
 
 
+async def _abstract_clone_async_post(x):
+    return intern(await x)
+
+
 @overload.wrapper(
-    initial_state=lambda: CloneState({}, None, None)
+    initial_state=lambda: CloneState({}, None, None),
+    postprocess=_abstract_clone_async_post,
 )
 async def abstract_clone_async(__call__, self, x, *args):
     """Clone an abstract value (asynchronous)."""
@@ -485,8 +500,7 @@ async def abstract_clone_async(__call__, self, x, *args):
             cache[x] = inst
             constructor = _make_constructor(inst)
             rval = await call.asend(constructor)
-            rval = rval.intern()
-            cache[x] = rval
+            assert rval is inst
             return rval
         else:
             return await call
@@ -544,8 +558,8 @@ async def abstract_clone_async(self, x: AbstractArray):
 
 
 @overload  # noqa: F811
-async def abstract_clone_async(self, x: AbstractClass):
-    yield (yield AbstractClass)(
+async def abstract_clone_async(self, x: AbstractClassBase):
+    yield (yield type(x))(
         x.tag,
         {k: (await self(v)) for k, v in x.attributes.items()},
         x.methods,
@@ -555,7 +569,7 @@ async def abstract_clone_async(self, x: AbstractClass):
 
 @overload  # noqa: F811
 async def abstract_clone_async(self, x: AbstractUnion):
-    yield (yield AbstractUnion)([await self(y) for y in x.options])
+    yield (yield AbstractUnion)(await self(x.options))
 
 
 @overload  # noqa: F811
@@ -567,7 +581,7 @@ async def abstract_clone_async(self, x: Possibilities):
 async def abstract_clone_async(self, x: PartialApplication):
     return PartialApplication(
         await self(x.fn),
-        tuple([await self(arg) for arg in x.args])
+        [await self(arg) for arg in x.args]
     )
 
 
@@ -649,12 +663,13 @@ def broaden(self, d: TrackDict, loop):
 
 @overload  # noqa: F811
 def broaden(self, p: Possibilities, loop):
+    bp = Possibilities([self(v, loop) for v in p])
     if loop is None:
-        return Possibilities([self(v, loop) for v in p])
+        return bp
     else:
         # Broadening Possibilities creates a PendingTentative. This allows
         # us to avoid resolving them earlier than we would like.
-        return loop.create_pending_tentative(tentative=p)
+        return loop.create_pending_tentative(tentative=bp)
 
 
 ###############
@@ -793,7 +808,7 @@ def amerge(x1: (dict, TrackDict), x2, loop, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(x1: tuple, x2, loop, forced, bp):
+def amerge(x1: (tuple, list), x2, loop, forced, bp):
     if len(x1) != len(x2):  # pragma: no cover
         raise MyiaTypeError(f'Tuple length mismatch')
     changes = False
@@ -803,7 +818,7 @@ def amerge(x1: tuple, x2, loop, forced, bp):
         if res is not v1:
             changes = True
         rval.append(res)
-    return x1 if forced or not changes else tuple(rval)
+    return x1 if forced or not changes else type(x1)(rval)
 
 
 @overload  # noqa: F811
@@ -853,13 +868,13 @@ def amerge(x1: AbstractList, x2, loop, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(x1: AbstractClass, x2, loop, forced, bp):
+def amerge(x1: AbstractClassBase, x2, loop, forced, bp):
     args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
     args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
     merged = amerge(args1, args2, loop, forced, bp)
     if forced or merged is args1:
         return x1
-    return AbstractClass(*merged)
+    return type(x1)(*merged)
 
 
 @overload  # noqa: F811
@@ -984,6 +999,9 @@ def bind(loop, committed, resolved, pending):
 ###########################
 
 
+_empty_union = AbstractUnion([])
+
+
 def typecheck(model, abstract):
     """Check that abstract matches the model."""
     try:
@@ -1006,8 +1024,10 @@ def split_type(t, model):
     if isinstance(t, AbstractUnion):
         matching = [(opt, typecheck(model, opt))
                     for opt in set(t.options)]
-        t1 = abstract_union([opt for opt, m in matching if m])
-        t2 = abstract_union([opt for opt, m in matching if not m])
+        t1 = AbstractUnion([opt for opt, m in matching if m]).simplify()
+        t2 = AbstractUnion([opt for opt, m in matching if not m]).simplify()
+        t1 = None if t1 is _empty_union else t1
+        t2 = None if t2 is _empty_union else t2
         return t1, t2
     elif typecheck(model, t):
         return t, None
@@ -1024,3 +1044,58 @@ def hastype_helper(value, model):
         return True
     else:
         return ANYTHING
+
+
+#########################
+# ADT-related utilities #
+#########################
+
+
+def normalize_adt(x):
+    """Normalize the ADT to make it properly recursive."""
+    rval = _normalize_adt_helper(x, {}, {})
+    rval = rval.intern()
+    rval = broaden(rval, None)
+    rval = _finalize_adt(rval)
+    return rval
+
+
+def _normalize_adt_helper(x, done, tag_to_adt):
+    if x in done:
+        return done[x]
+    if isinstance(x, AbstractADT):
+        if x.tag not in tag_to_adt:
+            adt = AbstractADT.new(
+                x.tag,
+                {k: AbstractUnion.new([]) for k in x.attributes},
+                x.methods
+            )
+            tag_to_adt = {**tag_to_adt, x.tag: adt}
+        else:
+            adt = tag_to_adt[x.tag]
+        done[x] = adt
+        for attr, value in x.attributes.items():
+            value = _normalize_adt_helper(value, done, tag_to_adt)
+            adt.attributes[attr] = AbstractUnion.new(
+                [adt.attributes[attr], value]
+            ).simplify()
+        return adt
+    elif isinstance(x, AbstractUnion):
+        opts = _normalize_adt_helper(x.options, done, tag_to_adt)
+        rval = AbstractUnion.new(opts).simplify()
+        done[x] = rval
+        return rval
+    elif isinstance(x, Possibilities):
+        return [_normalize_adt_helper(opt, done, tag_to_adt) for opt in x]
+    else:
+        return x
+
+
+@abstract_clone.variant
+def _finalize_adt(self, x: AbstractUnion):
+    x = x.simplify()
+    if isinstance(x, AbstractUnion):
+        return (yield AbstractUnion)(self(x.options))
+    else:
+        yield None
+        return self(x)

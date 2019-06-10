@@ -7,7 +7,7 @@ from hrepr import hrepr
 
 from myia.abstract import (
     AbstractValue, AbstractScalar, AbstractFunction, AbstractTuple,
-    AbstractList, AbstractClass, AbstractJTagged, AbstractArray,
+    AbstractList, AbstractClassBase, AbstractJTagged, AbstractArray,
     GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
     MetaGraphFunction, AbstractUnion, VALUE, ANYTHING,
     PendingTentative
@@ -1292,11 +1292,12 @@ class _AbstractList:
         )
 
 
-@mixin(AbstractClass)
-class _AbstractClass:
+@mixin(AbstractClassBase)
+class _AbstractClassBase:
     def __hrepr__(self, H, hrepr):
+        tagname = self.tag.__qualname__
         return hrepr.stdrepr_object(
-            f'★{self.tag}',
+            f'★{tagname}',
             self.attributes.items(),
             delimiter="↦",
             cls='abstract'

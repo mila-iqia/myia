@@ -23,6 +23,7 @@ from .data import (
     AbstractTuple,
     AbstractArray,
     AbstractList,
+    AbstractClassBase,
     AbstractClass,
     AbstractJTagged,
     PartialApplication,
@@ -326,7 +327,7 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
 async def _resolve_case(resources, data_t, item_v, chk):
     mmap = resources.method_map
 
-    if data_t is AbstractClass:
+    if isinstance(data_t, type) and issubclass(data_t, AbstractClassBase):
         return ('class', data_t)
 
     # Try method map
@@ -1030,7 +1031,7 @@ async def _inf_partial(engine, fn, *args):
     fns = await fn.get()
     assert isinstance(fns, Possibilities)
     return AbstractFunction(*[
-        PartialApplication(fn, args) for fn in fns
+        PartialApplication(fn, list(args)) for fn in fns
     ])
 
 

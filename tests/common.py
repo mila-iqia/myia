@@ -6,7 +6,7 @@ from myia import dtype
 from myia.abstract import VALUE, TYPE, SHAPE, \
     AbstractValue, AbstractScalar, AbstractArray, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
-    AbstractJTagged, abstract_union, AbstractExternal, ANYTHING, from_value
+    AbstractJTagged, AbstractUnion, AbstractExternal, ANYTHING, from_value
 from myia.dtype import Bool, i16, i32, i64, u64, f16, f32, f64
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance, dataclass_methods
@@ -81,7 +81,7 @@ def Ty(t):
 
 def U(*opts):
     opts = [to_abstract_test(x) for x in opts]
-    return abstract_union(opts)
+    return AbstractUnion(opts)
 
 
 @overload(bootstrap=True)

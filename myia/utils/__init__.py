@@ -5,7 +5,7 @@ from .env import (  # noqa
 )
 
 from .intern import (  # noqa
-    Interned, InternedMC, EqKey, Atom, Elements, eqkey, deep_eqkey,
+    Interned, InternedMC, EqKey, Atom, AttrEK, ItemEK, eqkey, deep_eqkey,
     RecursionException, eq, hash, hashrec, eqrec, IncompleteException,
     PossiblyRecursive, intern,
 )
@@ -16,7 +16,7 @@ from .merge import (  # noqa
 )
 
 from .misc import (  # noqa
-    Named, MISSING, UNKNOWN, Registry, repr_, list_str, keyword_decorator,
+    ADT, Named, MISSING, UNKNOWN, Registry, repr_, list_str, keyword_decorator,
     Event, Events, NS, Namespace, ModuleNamespace, ClosureNamespace, eprint,
     is_dataclass_type, dataclass_methods, ErrorPool,
 )
