@@ -7,10 +7,10 @@ from hrepr import hrepr
 
 from myia.abstract import (
     AbstractValue, AbstractScalar, AbstractFunction, AbstractTuple,
-    AbstractList, AbstractClass, AbstractJTagged, AbstractArray,
+    AbstractList, AbstractClassBase, AbstractJTagged, AbstractArray,
     GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
     MetaGraphFunction, AbstractUnion, VALUE, ANYTHING,
-    PendingTentative, AbstractADT
+    PendingTentative
 )
 from myia.dtype import Type, Bool, Int, Float, TypeMeta, UInt
 from myia.utils import OrderedSet, UNKNOWN, SymbolicKeyInstance
@@ -1248,7 +1248,7 @@ class _AbstractTuple:
 class _AbstractUnion:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_iterable(
-            set(self.options),
+            self.options,
             before='★U',
             cls='abstract',
         )
@@ -1292,24 +1292,12 @@ class _AbstractList:
         )
 
 
-@mixin(AbstractClass)
-class _AbstractClass:
+@mixin(AbstractClassBase)
+class _AbstractClassBase:
     def __hrepr__(self, H, hrepr):
         tagname = self.tag.__qualname__
         return hrepr.stdrepr_object(
             f'★{tagname}',
-            self.attributes.items(),
-            delimiter="↦",
-            cls='abstract'
-        )
-
-
-@mixin(AbstractADT)
-class _AbstractADT:
-    def __hrepr__(self, H, hrepr):
-        tagname = self.tag.__qualname__
-        return hrepr.stdrepr_object(
-            f'★★{tagname}',
             self.attributes.items(),
             delimiter="↦",
             cls='abstract'
