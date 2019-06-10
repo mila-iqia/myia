@@ -1,17 +1,17 @@
 
 import pytest
 from dataclasses import dataclass
-from myia.utils import Interned, Elements, eqrec, hashrec, eq, hash as hsh, \
+from myia.utils import Interned, AttrEK, eqrec, hashrec, eq, hash as hsh, \
     IncompleteException
 
 
-@dataclass(frozen=True)
+@dataclass
 class Point(Interned):
     x: object
     y: object
 
     def __eqkey__(self):
-        return Elements(self, (self.x, self.y))
+        return AttrEK(self, ('x', 'y'))
 
 
 class Thingy(Interned):
@@ -26,7 +26,7 @@ class Thingy(Interned):
         self._incomplete = False
 
     def __eqkey__(self):
-        return Elements(self, (self.value,))
+        return AttrEK(self, ('value',))
 
 
 def test_interned():
@@ -101,8 +101,8 @@ def test_eqrec():
 
 
 def test_eqrec_incomplete():
-    rec1 = Thingy()
-    rec2 = Thingy()
+    rec1 = Thingy.new()
+    rec2 = Thingy.new()
 
     with pytest.raises(IncompleteException):
         _test(rec1, rec2)
@@ -114,3 +114,15 @@ def test_eqrec_incomplete():
     rec2 = rec2.intern()
 
     assert _test(rec1, rec2)
+
+
+def test_canonical():
+    t1 = Thingy.new(1)
+    t2 = Thingy.new(1)
+    assert t1 is not t2
+    p1 = Point(t1, 1)
+    p2 = Point(t2, 1)
+    p3 = Point(t2, 2)
+    assert p1 is p2
+    assert p1.x is p3.x
+    assert p2.x is p3.x

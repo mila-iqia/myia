@@ -4,13 +4,13 @@
 import re
 import prettyprinter as pp
 from prettyprinter.prettyprinter import pretty_python_value
-from typing import Tuple
+from typing import Tuple, List
 from dataclasses import dataclass
 from contextvars import ContextVar
 
 from ..debug.label import label
-from ..utils import Named, Partializable, Interned, Atom, Elements, \
-    PossiblyRecursive
+from ..utils import Named, Partializable, Interned, Atom, AttrEK, \
+    PossiblyRecursive, OrderedSet
 
 from .loop import Pending
 
@@ -34,13 +34,24 @@ POLY = Named('POLY')
 #####################
 
 
-class Possibilities(tuple):
+class Possibilities(list):
     """Represents a set of possible values.
 
-    This is technically implemented as a tuple, because the possibility of
+    This is technically implemented as a list, because the possibility of
     recursive types or values, which may be incomplete when a Possibilities is
     constructed, may impair the equality comparisons needed to construct a set.
     """
+
+    def __init__(self, options):
+        """Initialize Possibilities."""
+        # We use OrderedSet to trim the options, but it is possible that some
+        # of the options which appear unequal at this point will turn out to be
+        # equal later on, so we cannot rely on the fact that each option in the
+        # list is different.
+        super().__init__(OrderedSet(options))
+
+    def __hash__(self):
+        return hash(tuple(self))
 
 
 class Function:
@@ -93,7 +104,7 @@ class MetaGraphFunction(Function):
     tracking_id: object = None
 
 
-@dataclass(frozen=True)
+@dataclass(eq=False)
 class PartialApplication(Function):
     """Represents a partial application.
 
@@ -104,7 +115,10 @@ class PartialApplication(Function):
     """
 
     fn: Function
-    args: Tuple['AbstractValue']
+    args: List['AbstractValue']
+
+    def __eqkey__(self):
+        return AttrEK(self, ('fn', 'args'))
 
 
 @dataclass(frozen=True)
@@ -149,6 +163,7 @@ class TypedPrimitive(Function):
     output: 'AbstractValue'
 
 
+@dataclass(frozen=True)
 class DummyFunction(Function):
     """Represents a function that can't be called."""
 
@@ -298,6 +313,9 @@ class AbstractFunction(AbstractAtom):
         fn, = poss
         return fn
 
+    def __eqkey__(self):
+        return AttrEK(self, ('values',))
+
     def __pretty__(self, ctx):
         fns = self.get_sync()
         if isinstance(fns, Possibilities):
@@ -310,9 +328,6 @@ class AbstractFunction(AbstractAtom):
 class AbstractStructure(AbstractValue):
     """Base class for abstract values that are structures."""
 
-    def __eqkey__(self):
-        return Elements(self, super().__eqkey__(), self.children())
-
 
 class AbstractTuple(AbstractStructure):
     """Represents a tuple of elements."""
@@ -321,12 +336,16 @@ class AbstractTuple(AbstractStructure):
         """Initialize an AbstractTuple."""
         super().__init__(values or {})
         if elements is not ANYTHING:
-            elements = tuple(elements)
+            elements = list(elements)
         self.elements = elements
 
     def children(self):
         """Return all elements in the tuple."""
         return self.elements
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'elements'))
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "", self.elements)
@@ -353,6 +372,10 @@ class AbstractArray(AbstractStructure):
     def children(self):
         """Return the array element."""
         return self.element,
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'element'))
 
     def __pretty__(self, ctx):
         elem = pretty_python_value(self.element, ctx)
@@ -385,16 +408,20 @@ class AbstractList(AbstractStructure):
         """Return the list element."""
         return self.element,
 
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'element'))
+
     def __pretty__(self, ctx):
         elem = pretty_python_value(self.element, ctx)
         return pretty_join(['[', elem, ']'])
 
 
-class AbstractClass(AbstractStructure):
-    """Represents a class, typically those defined using @dataclass.
+class AbstractClassBase(AbstractStructure):
+    """Represents a class with named attributes and methods.
 
     Attributes:
-        tag: The class's name (a Named instance).
+        tag: A pointer to the original Python class
         attributes: Maps each field name to a corresponding AbstractValue.
         methods: Maps method names to corresponding functions, which will
             be parsed and converted by the engine when necessary, with the
@@ -414,12 +441,25 @@ class AbstractClass(AbstractStructure):
         return tuple(self.attributes.values())
 
     def __eqkey__(self):
-        vals = AbstractValue.__eqkey__(self)
-        return Elements(self, vals, self.tag, self.attributes)
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'tag', 'attributes'))
 
     def __pretty__(self, ctx):
         tagname = self.tag.__qualname__
         return pretty_struct(ctx, tagname, [], self.attributes)
+
+
+class AbstractClass(AbstractClassBase):
+    """Represents a class, typically those defined using @dataclass."""
+
+
+class AbstractADT(AbstractClassBase):
+    """Represents an algebraic data type.
+
+    Unlike AbstractClass, this is suitable to define recursive types. Nested
+    ADTs with the same tag must have the same attribute types, which is
+    enforced with the normalize_adt function.
+    """
 
 
 class AbstractJTagged(AbstractStructure):
@@ -434,6 +474,10 @@ class AbstractJTagged(AbstractStructure):
         """Return the jtagged element."""
         return self.element,
 
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'element'))
+
     def __pretty__(self, ctx):
         return pretty_call(ctx, "J", self.element)
 
@@ -442,7 +486,7 @@ class AbstractUnion(AbstractStructure):
     """Represents the union of several possible abstract types.
 
     Attributes:
-        options: A tuple of possible types. Technically, this should be
+        options: A list of possible types. Technically, this should be
             understood as a set, but there are a few issues with using
             sets in the context of recursive types, chiefly the fact that
             an AbstractUnion could be constructed with types that are
@@ -454,33 +498,27 @@ class AbstractUnion(AbstractStructure):
     def __init__(self, options):
         """Initialize an AbstractUnion."""
         super().__init__({})
-        self.options = tuple(options)
+        opts = []
+        for option in options:
+            if isinstance(option, AbstractUnion):
+                opts.extend(option.options)
+            else:
+                opts.append(option)
+        self.options = Possibilities(opts)
 
-    def children(self):
-        """Return the set of options."""
-        return self.options
+    def simplify(self):
+        """Simplify the Union if there is only one possibility."""
+        if len(self.options) == 1:
+            return self.options[0]
+        else:
+            return self
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'options'))
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "U", self.options)
-
-
-def abstract_union(options):
-    """Create a union if necessary.
-
-    If only one opt is given in the options list, return that option.
-    """
-    opts = []
-    for option in options:
-        if isinstance(option, AbstractUnion):
-            opts += option.options
-        else:
-            opts.append(option)
-    opts = tuple(opts)
-    if len(opts) == 1:
-        opt, = opts
-        return opt
-    else:
-        return AbstractUnion(opts)
 
 
 ##########
