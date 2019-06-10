@@ -13,7 +13,6 @@ from myia import myia, value_and_grad, ArithmeticData
 # The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
 from myia.api import to_device
-from myia.dtype import DTYPE_TO_MTYPE
 
 ###########
 # Options #
@@ -21,8 +20,6 @@ from myia.dtype import DTYPE_TO_MTYPE
 
 
 dtype = 'float32'
-
-mtype = DTYPE_TO_MTYPE[dtype]
 
 backend = 'pytorch'
 # backend = 'nnvm'  # Uncomment to use nnvm backend

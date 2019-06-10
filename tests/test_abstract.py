@@ -20,7 +20,7 @@ from myia.abstract import (
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
 
-from .common import Point, to_abstract_test, i64, f32, Ty, af32_of, S, U
+from .common import Point, to_abstract_test, i16, f32, Ty, af32_of, S, U
 
 
 def test_to_abstract():
@@ -30,8 +30,8 @@ def test_to_abstract():
 
 
 def test_numpy_scalar_to_abstract():
-    s1 = AbstractScalar({VALUE: 2, TYPE: i64})
-    assert to_abstract_test(np.int64(2)) == s1
+    s1 = AbstractScalar({VALUE: 2, TYPE: i16})
+    assert to_abstract_test(np.int16(2)) == s1
 
     s2 = AbstractScalar({VALUE: 1.5, TYPE: f32})
     assert to_abstract_test(np.float32(1.5)) == s2

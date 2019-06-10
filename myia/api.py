@@ -116,26 +116,18 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
 
 @overload(bootstrap=True)
 def _convert_arg_init(self, arg, orig_t: AbstractTuple, backend):
-    if not isinstance(arg, tuple):
-        raise TypeError('Expected tuple')
     oe = orig_t.elements
-    if len(arg) != len(oe):
-        raise TypeError(f'Expected {len(oe)} elements')
     return tuple(self(x, o, backend) for x, o in zip(arg, oe))
 
 
 @overload  # noqa: F811
 def _convert_arg_init(self, arg, orig_t: AbstractList, backend):
-    if not isinstance(arg, list):
-        raise TypeError('Expected list')
     ot = orig_t.element
     return [self(x, ot, backend) for x in arg]
 
 
 @overload  # noqa: F811
 def _convert_arg_init(self, arg, orig_t: AbstractClass, backend):
-    if not isinstance(arg, orig_t.tag):
-        raise TypeError(f'Expected {orig_t.tag.__qualname__}')
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
     return orig_t.tag(*(self(x, o, backend) for x, o in zip(arg, oe)))
@@ -174,17 +166,6 @@ https://github.com/mila-iqia/myia/blob/master/myia/pipeline/steps.py#L528-L537
 @overload  # noqa: F811
 def _convert_arg_init(self, arg, orig_t: AbstractScalar, backend):
     t = orig_t.values[TYPE]
-    if issubclass(t, dtype.Int):
-        if not isinstance(arg, int):
-            raise TypeError(f'Expected int')
-    elif issubclass(t, dtype.Float):
-        if not isinstance(arg, float):
-            raise TypeError(f'Expected float')
-    elif issubclass(t, dtype.Bool):
-        if not isinstance(arg, bool):
-            raise TypeError(f'Expected bool')
-    else:
-        raise TypeError(f'Invalid type: {t}')
     arg = backend.from_scalar(arg, t)
     return arg
 
