@@ -16,7 +16,7 @@ from myia.abstract import ArrayWrapper
 from myia.compile import load_backend
 
 from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
-    ai32_of, af64_of
+    ai32_of, af64_of, MA
 
 
 def test_myia():
@@ -345,16 +345,6 @@ def backend_opt(request):
     return (name, options)
 
 
-__W = np.array(
-    [
-        [0.22490819, -0.71516967, -0.6626606],
-        [-0.14859799, 0.924496, 0.4032511]
-    ]
-)
-
-__b = np.array([[-0.00300545, 0.10826713, -0.29246148]])
-
-
 def test__convert_arg_init_AbstractTuple(backend_opt):
     backend, backend_options = backend_opt
     b = load_backend(backend, backend_options)
@@ -407,10 +397,10 @@ def test__convert_arg_init_AbstractClass(backend_opt):
 def test__convert_arg_init_AbstractArray(backend_opt):
     backend, backend_options = backend_opt
     b = load_backend(backend, backend_options)
-    m = to_device(__W, backend, backend_options)
+    m = to_device(MA(2, 3), backend, backend_options)
 
     assert isinstance(m, ArrayWrapper)
-    np.testing.assert_allclose(b.to_numpy(m.array), __W)
+    np.testing.assert_allclose(b.to_numpy(m.array), MA(2, 3))
 
 
 def test__convert_arg_init_AbstractUnion(backend_opt):

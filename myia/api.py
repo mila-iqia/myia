@@ -156,7 +156,7 @@ def _convert_arg_init(self, arg, orig_t: AbstractArray, backend):
 """
 TODO: AbstractUnion overload of _convert_arg_init().
 
-This overliad will look similar to AbstractUnion overload
+This overload will look similar to AbstractUnion overload
 from convert_arg() in myia/pipeline/steps.py
 
 AbstractUnion overload from convert_arg() at time of this commit:
@@ -166,7 +166,7 @@ myia/pipeline/steps.py#L528-L537
 
 Current AbstractUnion overload from convert_arg():
 (Note: might have been moved to different location of codebase
-since this comment was written/commited):
+since this comment was written/committed):
 https://github.com/mila-iqia/myia/blob/master/myia/pipeline/steps.py#L528-L537
 """
 
