@@ -28,7 +28,7 @@ _type_map = {
 
 def type_to_pytorch_type(t):
     """Map myia types to pytorch types."""
-    if t not in _type_map:  # pragma: no cover
+    if t not in _type_map:
         raise TypeError(f"Unsupported type: {t}")
     return _type_map[t]
 

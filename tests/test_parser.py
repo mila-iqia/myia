@@ -10,14 +10,14 @@ from myia.debug.traceback import myia_warning
 
 
 def test_undefined():
-    def f():  # pragma: no cover
+    def f():
         return c  # noqa
     with pytest.raises(NameError):
         parse(f)
 
 
 def test_defined_later():
-    def f():  # pragma: no cover
+    def f():
         return c  # noqa
     with pytest.raises(UnboundLocalError):
         parse(f)
@@ -46,7 +46,7 @@ def test_no_return_while():
 
 
 def test_maybe():
-    def f():  # pragma: no cover
+    def f():
         while True:
             x = 2
         return x
@@ -55,8 +55,15 @@ def test_maybe():
         parse(f)
 
 
+def test_unsupported():
+    def f():
+        assert False
+    with pytest.raises(NotImplementedError):
+        parse(f)
+
+
 def test_expression_statements():
-    def f(x):  # pragma: no cover
+    def f(x):
         """Foo."""
         print(x)
         return x

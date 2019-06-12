@@ -67,16 +67,14 @@ def to_relay_type(self, a: GraphFunction):
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: object):  # pragma: no cover
+def to_relay_type(self, a: object):
     raise ValueError("Unknown type:", a)
 
 
 def ashape(node):
     """Make sure shape isn't None, that makes relay crash later."""
     shp = node.shape
-    if shp is None:  # pragma: no cover
-        raise RuntimeError("You found a way to trigger this, please report it")
-        shp = ()
+    assert shp is not None
     return shp
 
 

@@ -193,7 +193,7 @@ def test_convert_result(_return_backend):
 
 def test_function_arg():
     """Give a Python function as an argument."""
-    def square(x):  # pragma: no cover
+    def square(x):
         return x * x
 
     @compile
@@ -205,10 +205,10 @@ def test_function_arg():
 
 def test_function_in_tuple():
     """Give a tuple of functions as an argument."""
-    def square(x):  # pragma: no cover
+    def square(x):
         return x * x
 
-    def double(x):  # pragma: no cover
+    def double(x):
         return x + x
 
     @compile
