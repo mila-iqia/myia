@@ -226,7 +226,7 @@ class CompileGraph:
         output: a wrapped relay graph
     """
 
-    def run(self, graph, context):
+    def run(self, graph, context, target):
         """Convert the graph into a relay callable."""
         mng = manage(graph)
 
@@ -246,7 +246,7 @@ class CompileGraph:
 
         module.entry_func = module.get_global_var(graph.debug.debug_name)
 
-        exec = relay.create_executor(mod=module, ctx=context)
+        exec = relay.create_executor(mod=module, ctx=context, target=target)
         return exec.evaluate(module.entry_func)
 
     def on_parameter(self, node):
@@ -330,13 +330,17 @@ class RelayBackend(Backend):
         """Create a Relay backend for the given device."""
         device_id = int(device_id)
         self.context = tvm.ndarray.context(target, device_id)
-        if not self.context.exist:  # pragma: no cover
-            raise RuntimeError("No hardware to support selected target/device")
+        if target == 'cpu':
+            target = 'llvm'
+        self.target = target
+        if not self.context.exist:
+            raise RuntimeError("No hardware to support selected target "
+                               f"'{target}' on device {device_id}")
         self.compiler = compiler
 
     def compile(self, graph, argspec, outspec, pipeline):
         """Compiler a graph."""
-        return self.compiler.run(graph, self.context)
+        return self.compiler.run(graph, self.context, self.target)
 
     def to_numpy(self, v):
         """Make a numpy array from a TVM array."""
