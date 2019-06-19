@@ -23,6 +23,6 @@ export PATH="$HOME/miniconda/bin:$PATH"
 hash -r
 conda config --set always_yes yes --set changeps1 no
 conda update -q conda
-conda install -c abergeron -c pytorch --file=requirements-$DEV.conda
+conda install --file=requirements-$DEV.conda
 pip install -r requirements.txt
 pip install -e . --no-deps
