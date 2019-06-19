@@ -11,7 +11,8 @@ from contextvars import ContextVar
 from ..debug.label import label
 from ..utils import Named, Partializable, Interned, Atom, AttrEK, \
     PossiblyRecursive, OrderedSet
-from ..ir import Graph, Primitive, MetaGraph
+from ..ir import Graph, MetaGraph
+from ..prim import Primitive
 
 from .loop import Pending
 from .ref import Context
