@@ -256,7 +256,7 @@ class ANFNode(Node):
         a = self.abstract
         if a is not None and isinstance(a, AbstractArray):
             return a.values[SHAPE]
-        else:  # pragma: no cover
+        else:
             return None
 
     @property
@@ -379,7 +379,7 @@ class Constant(ANFNode):
     def __str__(self) -> str:
         if isinstance(self.value, LITERALS) or isinstance(self.value, Graph):
             return f'_constant:{self.value}'
-        return super().__str__()  # pragma: no cover
+        return super().__str__()
 
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, value=self.value)

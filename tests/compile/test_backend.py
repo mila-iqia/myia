@@ -17,7 +17,11 @@ from ..common import MA, MB
 
 @pytest.fixture(params=[
     pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
+    pytest.param(('nnvm', {'target': 'cuda', 'device_id': 0}), id='nnvm-cuda',
+                 marks=pytest.mark.gpu),
     pytest.param(('relay', {'target': 'cpu', 'device_id': 0}), id='relay-cpu'),
+    pytest.param(('relay', {'target': 'cuda', 'device_id': 0}),
+                 id='relay-cuda', marks=pytest.mark.gpu),
     pytest.param(('pytorch', {'device': 'cpu'}), id='pytorch-cpu'),
     pytest.param(('pytorch', {'device': 'cuda'}), id='pytorch-cuda',
                  marks=pytest.mark.gpu)])

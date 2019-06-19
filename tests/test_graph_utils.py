@@ -24,6 +24,19 @@ def test_dfs():
     assert order == [d, a, 1, 2, c, b, 3, 4, 5, 6]
 
 
+def test_dfs_bad_include():
+    a = (1, 2)
+    b = (3, 4, 5)
+    c = (b, 6)
+    d = (a, c)
+
+    def inc(n):
+        return None
+
+    with pytest.raises(ValueError):
+        list(dfs(d, _succ, inc))
+
+
 def test_dfs_dups():
     a = (1, 2, 2)
     b = (3, 4, 5, 2)
@@ -52,6 +65,19 @@ def test_toposort():
 
     order = list(toposort(d, _succ, _incl))
     _check_toposort(order, d, _succ, _incl)
+
+
+def test_toposort_bad_include():
+    a = (1, 2)
+    b = (3, 4, 5)
+    c = (b, a, 6)
+    d = (a, c)
+
+    def inc(n):
+        return None
+
+    with pytest.raises(ValueError):
+        list(toposort(d, _succ, inc))
 
 
 def test_toposort_overlap():

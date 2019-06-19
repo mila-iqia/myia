@@ -181,9 +181,7 @@ class CompileGraph:
 
     def dup(self, node):
         """Ensures that the value for node is at the top of the stack."""
-        if node not in self.slots:
-            # This used to be covered by test_compile::test_tailcall
-            return self.ref(node)  # pragma: no cover
+        assert node in self.slots
         self.add_instr('dup', self.ref(node))
         self.height += 1
         return -1
@@ -238,7 +236,7 @@ class CompileGraph:
                         self.add_instr(
                             'partial', self.ref(split.inputs[1]),
                             *tuple(self.ref(inp) for inp in split.inputs[2:]))
-                    elif fn.value == P.switch:  # pragma: no cover
+                    elif fn.value == P.switch:
                         self.add_instr('switch', self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]),
                                        self.ref(split.inputs[3]))

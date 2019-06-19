@@ -52,8 +52,7 @@ def dfs(root: T,
             pass
         else:
             raise ValueError('include(node) must return one of: '
-                             '"follow", "nofollow", "exclude"') \
-                # pragma: no cover
+                             '"follow", "nofollow", "exclude"')
 
 
 def toposort(root: T,
@@ -98,8 +97,7 @@ def toposort(root: T,
             continue
         else:
             raise ValueError('include(node) must return one of: '
-                             '"follow", "nofollow", "exclude"') \
-                # pragma: no cover
+                             '"follow", "nofollow", "exclude"')
 
         if cont:
             continue

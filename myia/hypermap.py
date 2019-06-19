@@ -47,7 +47,7 @@ class HyperMap(MetaGraph):
             if fn_leaf is None:
                 name = 'hyper_map'
             else:
-                name = f'hyper_map[{fn_leaf}]'  # pragma: no cover
+                name = f'hyper_map[{fn_leaf}]'
         super().__init__(name)
         self.fn_leaf = fn_leaf
         self._rec = fn_rec

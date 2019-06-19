@@ -1,4 +1,4 @@
-# Most of the tests ar in test_backend, this is just for relay-specific
+# Most of the tests ar in test_backend, this is just for nnvm-specific
 # tests that can't be made generic.
 
 import pytest
@@ -7,26 +7,21 @@ import numpy as np
 from myia import dtype
 
 try:
-    from myia.compile.backends import relay
+    from myia.compile.backends import nnvm
 except ImportError:
-    pytestmark = pytest.mark.skip(f"Can't import relay")
-
-
-def test_relay_type_convert():
-    with pytest.raises(ValueError):
-        relay.to_relay_type(object())
+    pytestmark = pytest.mark.skip(f"Can't import nnvm")
 
 
 @pytest.mark.gpu
-def test_relay_backend_exists():
+def test_nnvm_backend_exists():
     with pytest.raises(RuntimeError):
-        relay.RelayBackend(target='cuda', device_id=31)
+        nnvm.NNVMBackend(target='cuda', device_id=31)
 
 
 @pytest.mark.gpu
-def test_relay_cross_context():
-    backend_cuda = relay.RelayBackend(target='cuda', device_id=0)
-    backend_cpu = relay.RelayBackend(target='cpu')
+def test_nnvm_cross_context():
+    backend_cuda = nnvm.NNVMBackend(target='cuda', device_id=0)
+    backend_cpu = nnvm.NNVMBackend(target='cpu')
 
     v = np.ndarray([1, 2, 3])
     tp = dtype.Int[64]

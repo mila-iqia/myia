@@ -372,7 +372,7 @@ class RelayBackend(Backend):
     def from_dlpack(self, v):
         """Make an TVM array from a dlpack capsule."""
         t = tvm.ndarray.from_dlpack(v)
-        if t.context != self.context:  # pragma: no cover
+        if t.context != self.context:
             # This may do a copy but we will need it
             t = tvm.ndarray.array(t, self.context)
         return t
@@ -381,7 +381,7 @@ class RelayBackend(Backend):
         """Check if value is an TVM array for this context."""
         if not isinstance(v, tvm.ndarray.NDArray):
             raise TypeError("Expected NNVM array")
-        if v.context != self.context:  # pragma: no cover
+        if v.context != self.context:
             raise RuntimeError("Array on wrong context.")
         if v.dtype != type_to_np_dtype(t):
             raise TypeError("Wrong dtype")

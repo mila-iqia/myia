@@ -307,7 +307,7 @@ class NNVMConverter:
         target = context.MASK2STR[context.device_type]
         if target == 'cpu':
             nnvm_target = 'llvm'
-        elif target == 'cuda':  # pragma: no cover
+        elif target == 'gpu':
             nnvm_target = 'cuda -libs=cublas'
 
         g = nnvm.graph.create(sym.Group(list(self.eqv[o] for o in outputs)))
@@ -354,7 +354,7 @@ class NNVMBackend(Backend):
         """Create a NNVM backend for the given device."""
         device_id = int(device_id)
         self.context = tvm.ndarray.context(target, device_id)
-        if not self.context.exist:  # pragma: no cover
+        if not self.context.exist:
             raise RuntimeError("No hardware to support selected target/device")
         self.compiler = CompileGraphs(
             lambda l: converter.convert(l, context=self.context),
@@ -393,7 +393,7 @@ class NNVMBackend(Backend):
     def from_dlpack(self, v):
         """Make an NNVM array from a dlpack capsule."""
         t = tvm.ndarray.from_dlpack(v)
-        if t.context != self.context:  # pragma: no cover
+        if t.context != self.context:
             # This may do a copy but we will need it
             t = tvm.ndarray.array(t, self.context)
         return t
@@ -402,7 +402,7 @@ class NNVMBackend(Backend):
         """Check if value is an NNVM array for this context."""
         if not isinstance(v, tvm.ndarray.NDArray):
             raise TypeError("Expected NNVM array")
-        if v.context != self.context:  # pragma: no cover
+        if v.context != self.context:
             raise RuntimeError("Array on wrong context.")
         if v.dtype != type_to_np_dtype(t):
             raise TypeError("Wrong dtype")
