@@ -5,5 +5,4 @@ abergeron::tvm
 pytest
 pytest-cov
 flake8==3.5.0
-pytorch-cpu==1.0.1
 pydocstyle==2.1.1
