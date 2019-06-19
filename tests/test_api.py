@@ -151,7 +151,7 @@ def test_convert_arg():
 @pytest.fixture(params=[
     pytest.param(True),
     pytest.param(False)
-    ])
+])
 def _return_backend(request):
     return request.param
 

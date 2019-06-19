@@ -382,7 +382,7 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
     if cachable:
         try:
             return _abs_cache[v]
-        except (TypeError, KeyError) as e:
+        except (TypeError, KeyError):
             pass
 
     ref = ref and ref.node

@@ -613,7 +613,7 @@ def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
             arg,
             dtype.type_to_np_dtype(orig_t.element.dtype()),
             orig_t.values[SHAPE]
-            )
+        )
     else:
         a = backend.to_numpy(arg)
     return a

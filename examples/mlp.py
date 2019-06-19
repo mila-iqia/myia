@@ -32,7 +32,7 @@ backend_options_dict = {
     'pytorch': {'device': device_type},
     'nnvm': {'target': device_type, 'device_id': 0},
     'relay': {'target': device_type, 'device_id': 0}
-    }
+}
 
 backend_options = backend_options_dict[backend]
 

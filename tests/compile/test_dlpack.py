@@ -29,4 +29,3 @@ def test_dlpack_cross():
             b_np = dst.to_numpy(a_dst)
             if not (a_np == b_np).all():
                 AssertionError(f"Error in dlpack transfer from {src} to {dst}")
-

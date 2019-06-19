@@ -22,8 +22,7 @@ def always_include(node: Any) -> str:
 
 def dfs(root: T,
         succ: Callable[[T], Iterable[T]],
-        include: Callable[[T], str] = always_include) \
-            -> Iterable[T]:
+        include: Callable[[T], str] = always_include) -> Iterable[T]:
     """Perform a depth-first search.
 
     Arguments:

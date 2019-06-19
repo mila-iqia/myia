@@ -23,7 +23,7 @@ def test_pytorch_check_array():
 
     v = np.ndarray([1, 2, 3])
     tp = dtype.Int[64]
-    
+
     t_cuda = backend_cuda.from_numpy(v)
     t_cpu = backend_cpu.from_numpy(v)
 

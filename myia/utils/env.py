@@ -48,7 +48,7 @@ def smap(self, arg: np.ndarray, *rest):
 class SymbolicKeyInstance:
     """Stores information that corresponds to a node in the graph."""
 
-    node: "ANFNode"
+    node: "ANFNode"  # noqa: F821
     abstract: object
 
 

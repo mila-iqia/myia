@@ -180,5 +180,5 @@ def to_device(model, backend, backend_options=None):
         model,
         from_value(model, broaden=True),
         backend
-        )
+    )
     return model
