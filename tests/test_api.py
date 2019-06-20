@@ -345,7 +345,7 @@ def backend_opt(request):
     try:
         b = load_backend(name, options)
     except LoadingError as e:
-        pytest.skip(f"Can't load {b}: {e.__cause__}")
+        pytest.skip(f"Can't load {name}: {e.__cause__}")
     return b
 
 
