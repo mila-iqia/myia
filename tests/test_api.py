@@ -342,12 +342,15 @@ device_type = 'cpu'
     pytest.param(('pytorch', {'device': 'cpu'}), id='pytorch-cpu')])
 def backend_opt(request):
     name, options = request.param
-    return (name, options)
+    try:
+        b = load_backend(name, options)
+    except LoadingError:
+        pytest.skip(f"Can't load {backend}: {e.__cause__}")
+    return b
 
 
 def test__convert_arg_init_AbstractTuple(backend_opt):
-    backend, backend_options = backend_opt
-    b = load_backend(backend, backend_options)
+    b = backend_opt
 
     model = (9, 5.0)
     m = to_device(model, backend, backend_options)
@@ -360,8 +363,7 @@ def test__convert_arg_init_AbstractTuple(backend_opt):
 
 
 def test__convert_arg_init_AbstractList(backend_opt):
-    backend, backend_options = backend_opt
-    b = load_backend(backend, backend_options)
+    b = backend_opt
 
     model = [91.0, 51.0]
     m = to_device(model, backend, backend_options)
@@ -374,8 +376,7 @@ def test__convert_arg_init_AbstractList(backend_opt):
 
 
 def test__convert_arg_init_AbstractClass(backend_opt):
-    backend, backend_options = backend_opt
-    b = load_backend(backend, backend_options)
+    b = backend_opt
 
     @dataclass(frozen=True)
     class A():
@@ -395,22 +396,15 @@ def test__convert_arg_init_AbstractClass(backend_opt):
 
 
 def test__convert_arg_init_AbstractArray(backend_opt):
-    backend, backend_options = backend_opt
-    b = load_backend(backend, backend_options)
+    b = backend_opt
     m = to_device(MA(2, 3), backend, backend_options)
 
     assert isinstance(m, ArrayWrapper)
     np.testing.assert_allclose(b.to_numpy(m.array), MA(2, 3))
 
 
-def test__convert_arg_init_AbstractUnion(backend_opt):
-    # TODO
-    pass
-
-
 def test__convert_arg_init_AbstractScalar(backend_opt):
-    backend, backend_options = backend_opt
-    b = load_backend(backend, backend_options)
+    b = backend_opt
 
     model1 = 3.0
     m1 = to_device(model1, backend, backend_options)
