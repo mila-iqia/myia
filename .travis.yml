@@ -1,20 +1,13 @@
 language: python
 
 install:
-  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-  - bash miniconda.sh -b -p $HOME/miniconda
+  - ./ci-install.sh
   - export PATH="$HOME/miniconda/bin:$PATH"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  - conda install -c abergeron -c pytorch --file=requirements-cpu.conda
-  - pip install -r requirements.txt
-  - pip install -e . --no-deps
 env:
   - TEST_SUITE=static
   - TEST_SUITE=unit
 script:
   - if [[ $TEST_SUITE == "static" ]]; then flake8 && pydocstyle myia; fi
-  - if [[ $TEST_SUITE == "unit" ]]; then pytest --cov=./; fi
+  - if [[ $TEST_SUITE == "unit" ]]; then pytest tests --cov=./; fi
 after_success:
   - if [[ $TEST_SUITE == "unit" ]]; then codecov; fi

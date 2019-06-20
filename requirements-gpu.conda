@@ -1,10 +1,10 @@
 python>=3.7,<3.8a0
 colorama
 numpy
-nnvm=0.6.dev
+abergeron/label/cuda::tvm-libs
+abergeron::tvm
 pytest
 pytest-cov
 flake8==3.5.0
 pytorch==1.0.1
-torchvision
 pydocstyle==2.1.1
