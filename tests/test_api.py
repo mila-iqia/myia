@@ -353,7 +353,7 @@ def test__convert_arg_init_AbstractTuple(backend_opt):
     b = backend_opt
 
     model = (9, 5.0)
-    m = to_device(model, backend, backend_options)
+    m = to_device(model, b)
 
     assert isinstance(m, tuple)
     assert isinstance(b.to_scalar(m[0]), int)
@@ -366,7 +366,7 @@ def test__convert_arg_init_AbstractList(backend_opt):
     b = backend_opt
 
     model = [91.0, 51.0]
-    m = to_device(model, backend, backend_options)
+    m = to_device(model, b)
 
     assert isinstance(m, list)
     assert isinstance(b.to_scalar(m[0]), float)
@@ -388,7 +388,7 @@ def test__convert_arg_init_AbstractClass(backend_opt):
             return (input, self.s)
 
     model = A(2.0)
-    m = to_device(model, backend, backend_options)
+    m = to_device(model, b)
 
     assert isinstance(m, A)
     assert isinstance(b.to_scalar(m.s), float)
@@ -397,7 +397,7 @@ def test__convert_arg_init_AbstractClass(backend_opt):
 
 def test__convert_arg_init_AbstractArray(backend_opt):
     b = backend_opt
-    m = to_device(MA(2, 3), backend, backend_options)
+    m = to_device(MA(2, 3), b)
 
     assert isinstance(m, ArrayWrapper)
     np.testing.assert_allclose(b.to_numpy(m.array), MA(2, 3))
@@ -407,12 +407,12 @@ def test__convert_arg_init_AbstractScalar(backend_opt):
     b = backend_opt
 
     model1 = 3.0
-    m1 = to_device(model1, backend, backend_options)
+    m1 = to_device(model1, b)
     assert isinstance(b.to_scalar(m1), float)
     assert b.to_scalar(m1) == 3.0
 
     model2 = 14
-    m2 = to_device(model2, backend, backend_options)
+    m2 = to_device(model2, b)
     assert isinstance(b.to_scalar(m2), int)
     assert b.to_scalar(m2) == 14
 

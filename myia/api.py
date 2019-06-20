@@ -11,7 +11,7 @@ from .utils import keyword_decorator, overload
 from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
     AbstractList, AbstractClass, AbstractArray, AbstractScalar
 # TODO: AbstractUnion overload for _convert_arg_init
-from .compile.backends import load_backend
+from .compile.backends import load_backend, Backend
 
 
 #################
@@ -174,11 +174,13 @@ def _convert_arg_init(self, arg, orig_t: AbstractScalar, backend):
 # Move model to target accelerator hardware #
 #############################################
 
-def to_device(model, backend, backend_options):
+def to_device(model, backend, backend_options=None):
     """Move model to target accelerator hardware (using selected backend)."""
+    if not isinstance(backend, Backend):
+        backend = load_backend(backend, backend_options)
     model = _convert_arg_init(
         model,
         from_value(model, broaden=True),
-        load_backend(backend, backend_options)
+        backend
         )
     return model
