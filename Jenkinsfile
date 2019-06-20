@@ -10,8 +10,8 @@ node ('gpu') {
     junit 'test-report.xml'
   }
   stage ('Coverage') {
-    withCredentials([string(credentialsId: 'myia-coverage', variable: 'COVERAGE_TOKEN')]) {
-      sh script: 'curl -s https://codecov.io/bash | bash -s -- -ZK -t $COVERAGE_TOKEN'
+    withCredentials([string(credentialsId: 'myia-coverage', variable: 'CODECOV_TOKEN')]) {
+      sh script: 'curl -s https://codecov.io/bash | bash -s -- -ZK'
     }
   }
 }
