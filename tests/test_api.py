@@ -13,7 +13,7 @@ from myia.pipeline.steps import convert_arg, convert_result, NumpyChecker
 from myia.prim.py_implementations import tuple_getitem
 from myia.utils import newenv
 from myia.abstract import ArrayWrapper
-from myia.compile import load_backend
+from myia.compile import load_backend, LoadingError
 
 from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
     ai32_of, af64_of, MA
@@ -344,8 +344,8 @@ def backend_opt(request):
     name, options = request.param
     try:
         b = load_backend(name, options)
-    except LoadingError:
-        pytest.skip(f"Can't load {backend}: {e.__cause__}")
+    except LoadingError as e:
+        pytest.skip(f"Can't load {b}: {e.__cause__}")
     return b
 
 
