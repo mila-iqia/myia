@@ -2,13 +2,15 @@
 
 import ast
 import sys
-from colorama import Fore, Style
+import warnings
 import prettyprinter as pp
 
 from ..abstract import InferenceError, Reference, data, format_abstract, \
     pretty_struct
+from ..parser import MyiaSyntaxError, MyiaDisconnectedCodeWarning
 from ..utils import eprint
 from ..ir import Graph
+from .location import _show_location
 
 from .label import label
 
@@ -87,42 +89,6 @@ def _format_call(fn, args):
     return format_abstract(_PBlock(label(fn), ' :: ', args, kwargs))
 
 
-def _show_location(loc, label):
-    with open(loc.filename, 'r') as contents:
-        lines = contents.read().split('\n')
-        _print_lines(lines, loc.line, loc.column,
-                     loc.line_end, loc.column_end,
-                     label)
-
-
-def _print_lines(lines, l1, c1, l2, c2, label='', mode='color'):
-    for ln in range(l1, l2 + 1):
-        line = lines[ln - 1]
-        if ln == l1:
-            trimmed = line.lstrip()
-            to_trim = len(line) - len(trimmed)
-            start = c1 - to_trim
-        else:
-            trimmed = line[to_trim:]
-            start = 0
-
-        if ln == l2:
-            end = c2 - to_trim
-        else:
-            end = len(trimmed)
-
-        if mode == 'color':
-            prefix = trimmed[:start]
-            hl = trimmed[start:end]
-            rest = trimmed[end:]
-            eprint(f'{ln}: {prefix}{Fore.RED}{Style.BRIGHT}'
-                   f'{hl}{Style.RESET_ALL}{rest}')
-        else:
-            eprint(f'{ln}: {trimmed}')
-            prefix = ' ' * (start + 2 + len(str(ln)))
-            eprint(prefix + '^' * (end - start) + label)
-
-
 def print_inference_error(error):
     """Print an InferenceError's traceback."""
     stack = _get_stack(error)
@@ -137,15 +103,43 @@ def print_inference_error(error):
     eprint(f'{type(error).__name__}: {error.message}')
 
 
+def print_myia_syntax_error(error):
+    """Print MyiaSyntaxError's location."""
+    loc = error.loc
+    eprint('=' * 80)
+    if loc is not None:
+        eprint(f'{loc.filename}:{loc.line}')
+    if loc is not None:
+        _show_location(loc, '')
+    eprint('~' * 80)
+    eprint(f'{type(error).__name__}: {error}')
+
+
 _previous_excepthook = sys.excepthook
 
 
 def myia_excepthook(exc_type, exc_value, tb):
-    """Print out InferenceError specially."""
+    """Print out InferenceError and MyiaSyntaxError specially."""
     if isinstance(exc_value, InferenceError):
         print_inference_error(exc_value)
+    elif isinstance(exc_value, MyiaSyntaxError):
+        print_myia_syntax_error(exc_value)
     else:
         _previous_excepthook(exc_type, exc_value, tb)
 
 
 sys.excepthook = myia_excepthook
+
+
+_previous_warning = warnings.showwarning
+
+
+def myia_warning(message, category, filename, lineno, file, line):
+    """Print out MyiaDisconnectedCodeWarning specially."""
+    if category is MyiaDisconnectedCodeWarning:
+        pass
+    else:
+        _previous_warning(message, category, filename, lineno, file, line)
+
+
+warnings.showwarning = myia_warning

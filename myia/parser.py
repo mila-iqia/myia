@@ -34,14 +34,19 @@ import ast
 import asttokens
 import inspect
 import textwrap
+import warnings
 from types import FunctionType
 from typing import Dict, List, NamedTuple, Optional, Tuple, \
     overload as pyoverload
 
 from .info import About, DebugInherit, NamedDebugInfo
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
+from .ir.utils import succ_deeper
 from .prim import ops as primops
 from .utils import ModuleNamespace, ClosureNamespace
+from .graph_utils import dfs
+from .utils import eprint
+from .debug.location import _show_location
 
 
 _parse_cache = {}
@@ -72,6 +77,23 @@ class MyiaSyntaxError(Exception):
         """Initialize with a message and source location."""
         super().__init__(msg)
         self.loc = loc
+
+
+class MyiaDisconnectedCodeWarning(UserWarning):
+    """Warning to indicate that code is disconnected from output."""
+
+    pass
+
+
+def print_myia_warning(error, msg, loc):
+    """Print Myia Warning's location."""
+    eprint('=' * 80)
+    if loc is not None:
+        eprint(f'{loc.filename}:{loc.line}')
+    if loc is not None:
+        _show_location(loc, '', 'color', 'magenta')
+    eprint('~' * 80)
+    eprint(f'{error.__name__}: {msg}')
 
 
 operations_ns = ModuleNamespace('myia.operations')
@@ -165,6 +187,30 @@ class Parser:
         self.closure_namespace = ClosureNamespace(self.function)
         # Will be set later
         self.graph = None
+        # Flag that indicates if node is used by output
+        self.flag_used = 0
+        # Cache of all nodes before nodes disconnected from output are pruned
+        self.cache = set()
+
+    def Apply(self, *args):
+        """Wrapper around ir.Apply.
+
+        Caches all nodes before _process_functionprunes nodes disconnected
+        from output.
+        """
+        app = Apply(*args)
+        self.cache.add(app)
+        return app
+
+    def Constant(self, *args):
+        """Wrapper around ir.Constant.
+
+        Caches all nodes before _process_functionprunes nodes disconnected
+        from output.
+        """
+        con = Constant(*args)
+        self.cache.add(con)
+        return con
 
     def make_location(self, node) -> Location:
         """Create a Location from an AST node."""
@@ -214,6 +260,51 @@ class Parser:
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
         graph = self._process_function(None, function_def).graph
+
+        """
+        for _ in self.cache:
+            print("_", _, repr(_))
+        g = set(dfs(graph.return_, succ_deeper))
+        #g.update(set(pre_graph.variables.values()))
+        print("\nset(dfs(graph.return_, succ_deeper))")
+        print(g, "\n")
+        for _ in g:
+            print("_", _, repr(_), "INPUTS__:", _.inputs)
+        diff = self.cache - g
+        print("\ndiff1 (self.cache - g)\n", diff, "\n")
+        for _ in diff:
+            print("_", _, repr(_))
+        print("\n")
+        for ___ in list(diff):
+            print("___r", repr(___.value))
+            print("___t", type(___.value))
+            if not isinstance(___.value, Graph):
+                print("not node")
+        #"""
+
+        for gg in dfs(graph.return_, succ_deeper):
+            if gg.is_constant_graph():
+                if gg.value.return_ is None:
+                    obj = gg.value.debug
+                    pos = "____initial_inner_level"
+                    while 1:
+                        pos = getattr(obj, "about", None)
+                        if pos is None:
+                            break
+                        pos = getattr(pos, "debug", None)
+                        obj = pos
+                    raise MyiaSyntaxError(
+                        "Function doesn't return a value in all cases",
+                        obj.location)
+
+        """
+        diff = self.cache - g
+        print("diff2", diff)
+        breakpoint()
+        #"""
+
+        # TODO: also clean_up/delete/gc any left over nodes from dfs
+        self.cache = set()
         return graph
 
     def process_FunctionDef(self, block: 'Block',
@@ -227,38 +318,48 @@ class Parser:
 
         """
         function_block = self._process_function(block, node)
-        block.write(node.name, Constant(function_block.graph))
+        block.write(node.name, self.Constant(function_block.graph))
         return block
 
     def _process_function(self, block: Optional['Block'],
                           node: ast.FunctionDef) -> Tuple['Block', 'Block']:
         """Process a function definition and return first and final blocks."""
-        function_block = Block(self)
-        if block:
-            function_block.preds.append(block)
-        else:
-            # This is the top-level function, so we set self.graph
-            self.graph = function_block.graph
+        with DebugInherit(ast=node, location=self.make_location(node)):
+            function_block = Block(self)
+            if block:
+                function_block.preds.append(block)
+            else:
+                # This is the top-level function, so we set self.graph
+                self.graph = function_block.graph
 
-        function_block.mature()
-        function_block.graph.debug.name = node.name
-        if node.args.kwarg is not None or node.args.kwonlyargs != []:
-            raise NotImplementedError("No support for keyword arguments")
-        if node.args.vararg:
-            raise NotImplementedError("No support for varargs")
-        for arg in node.args.args:
-            with DebugInherit(ast=arg, location=self.make_location(arg)):
-                anf_node = Parameter(function_block.graph)
-            anf_node.debug.name = arg.arg
-            function_block.graph.parameters.append(anf_node)
-            function_block.write(arg.arg, anf_node)
-        function_block.write(node.name, Constant(function_block.graph))
-        self.process_statements(function_block, node.body)
-        if function_block.graph.return_ is None:
-            raise MyiaSyntaxError("Function doesn't return a value",
-                                  self.make_location(node))
-        # TODO: check that if after_block returns?
-        return function_block
+            function_block.mature()
+            function_block.graph.debug.name = node.name
+            if node.args.kwarg is not None or node.args.kwonlyargs != []:
+                raise NotImplementedError("No support for keyword arguments")
+            if node.args.vararg:
+                raise NotImplementedError("No support for varargs")
+            for arg in node.args.args:
+                print("\n", "arg", arg.arg)
+                with DebugInherit(ast=arg, location=self.make_location(arg)):
+                    anf_node = Parameter(function_block.graph)
+                anf_node.debug.name = arg.arg
+                function_block.graph.parameters.append(anf_node)
+                function_block.write(arg.arg, anf_node)
+            function_block.write(node.name,
+                                 self.Constant(function_block.graph))
+            self.process_statements(function_block, node.body)
+            if function_block.graph.return_ is None:
+                raise MyiaSyntaxError("Function doesn't return a value",
+                                      self.make_location(node))
+            # TODO: check that if after_block returns?
+            return function_block
+
+    def process_node_used(self, block, node):
+        """Wraps process_node to later catch that unassigned node is unused."""
+        self.flag_used += 1
+        res = self.process_node(block, node)
+        self.flag_used -= 1
+        return res
 
     @pyoverload
     def process_node(self, block: 'Block', node: ast.expr) -> ANFNode:
@@ -280,36 +381,37 @@ class Parser:
             with DebugInherit(ast=node, location=self.make_location(node)):
                 return method(block, node)
         else:
-            raise NotImplementedError(node)  # pragma: no cover
+            raise MyiaSyntaxError(f"{node.__class__.__name__} not supported",
+                                  self.make_location(node))
 
     # Expression implementations
 
     def process_BinOp(self, block: 'Block', node: ast.BinOp) -> ANFNode:
         """Process binary operators: `a + b`, `a | b`, etc."""
         func = block._resolve_ast_type(node.op)
-        left = self.process_node(block, node.left)
-        right = self.process_node(block, node.right)
-        return Apply([func, left, right], block.graph)
+        left = self.process_node_used(block, node.left)
+        right = self.process_node_used(block, node.right)
+        return self.Apply([func, left, right], block.graph)
 
     def process_UnaryOp(self, block: 'Block', node: ast.UnaryOp) -> ANFNode:
         """Process unary operators: `+a`, `-a`, etc."""
         func = block._resolve_ast_type(node.op)
-        operand = self.process_node(block, node.operand)
-        return Apply([func, operand], block.graph)
+        operand = self.process_node_used(block, node.operand)
+        return self.Apply([func, operand], block.graph)
 
     def process_Compare(self, block: 'Block', node: ast.Compare) -> ANFNode:
         """Process comparison operators: `a == b`, `a > b`, etc."""
         ops = [block._resolve_ast_type(op) for op in node.ops]
         assert len(ops) == 1
-        left = self.process_node(block, node.left)
-        right = self.process_node(block, node.comparators[0])
-        return Apply([ops[0], left, right], block.graph)
+        left = self.process_node_used(block, node.left)
+        right = self.process_node_used(block, node.comparators[0])
+        return self.Apply([ops[0], left, right], block.graph)
 
     def process_BoolOp(self, block: 'Block', node: ast.BinOp) -> ANFNode:
         """Process boolean operators: `a and b`, `a or b`."""
         def fold(block, values, mode):
             first, *rest = values
-            test = self.process_node(block, first)
+            test = self.process_node_used(block, first)
             if rest:
                 true_block, false_block = self.make_condition_blocks(block)
 
@@ -336,7 +438,7 @@ class Parser:
 
     def process_IfExp(self, block: 'Block', node: ast.IfExp) -> ANFNode:
         """Process if expression: `a if b else c`."""
-        cond = self.process_node(block, node.test)
+        cond = self.process_node_used(block, node.test)
 
         true_block, false_block = self.make_condition_blocks(block)
         true_block.graph.debug.location = self.make_location(node.body)
@@ -368,8 +470,8 @@ class Parser:
             function_block.write(arg.arg, anf_node)
 
         function_block.graph.output = \
-            self.process_node(function_block, node.body)
-        return Constant(function_block.graph)
+            self.process_node_used(function_block, node.body)
+        return self.Constant(function_block.graph)
 
     def process_Name(self, block: 'Block', node: ast.Name) -> ANFNode:
         """Process variables: `variable_name`."""
@@ -377,45 +479,45 @@ class Parser:
 
     def process_Num(self, block: 'Block', node: ast.Num) -> ANFNode:
         """Process numbers: `1`, `2.5`, etc."""
-        return Constant(node.n)
+        return self.Constant(node.n)
 
     def process_Str(self, block: 'Block', node: ast.Str) -> ANFNode:
         """Process strings: `"a"`, `'hello world'`, etc."""
-        return Constant(node.s)
+        return self.Constant(node.s)
 
     def process_Call(self, block: 'Block', node: ast.Call) -> ANFNode:
         """Process function calls: `f(x)`, etc."""
-        func = self.process_node(block, node.func)
-        args = [self.process_node(block, arg) for arg in node.args]
-        return Apply([func] + args, block.graph)
+        func = self.process_node_used(block, node.func)
+        args = [self.process_node_used(block, arg) for arg in node.args]
+        return self.Apply([func] + args, block.graph)
 
     def process_NameConstant(self, block: 'Block',
                              node: ast.NameConstant) -> ANFNode:
         """Process special constants: `True`, `False`, `None`, etc."""
-        return Constant(node.value)
+        return self.Constant(node.value)
 
     def process_Tuple(self, block: 'Block', node: ast.Tuple) -> ANFNode:
         """Process tuple literals."""
         op = block.operation('make_tuple')
-        elts = [self.process_node(block, e) for e in node.elts]
+        elts = [self.process_node_used(block, e) for e in node.elts]
         if len(elts) == 0:
-            return Constant(())
+            return self.Constant(())
         else:
             return block.graph.apply(op, *elts)
 
     def process_List(self, block: 'Block', node: ast.List) -> ANFNode:
         """Process list literals."""
         op = block.operation('make_list')
-        elts = [self.process_node(block, e) for e in node.elts]
+        elts = [self.process_node_used(block, e) for e in node.elts]
         return block.graph.apply(op, *elts)
 
     def process_Subscript(self, block: 'Block',
                           node: ast.Subscript) -> ANFNode:
         """Process subscripts: `x[y]`."""
         op = block.operation('getitem')
-        value = self.process_node(block, node.value)
-        slice = self.process_node(block, node.slice)
-        return Apply([op, value, slice], block.graph)
+        value = self.process_node_used(block, node.value)
+        slice = self.process_node_used(block, node.slice)
+        return self.Apply([op, value, slice], block.graph)
 
     def process_Index(self, block: 'Block', node: ast.Index) -> ANFNode:
         """Process subscript indexes."""
@@ -425,8 +527,8 @@ class Parser:
                           node: ast.Attribute) -> ANFNode:
         """Process attributes: `x.y`."""
         op = block.operation('getattr')
-        value = self.process_node(block, node.value)
-        return Apply([op, value, Constant(node.attr)], block.graph)
+        value = self.process_node_used(block, node.value)
+        return self.Apply([op, value, self.Constant(node.attr)], block.graph)
 
     # Statement implementations
 
@@ -442,20 +544,25 @@ class Parser:
         """
         for node in nodes:
             block = self.process_node(block, node)
+            """
+            print("block.variables", block.variables)
+            print("node", node, block)
+            breakpoint()
+            #"""
         return block
 
     def process_Return(self, block: 'Block', node: ast.Return) -> 'Block':
         """Process a return statement."""
-        inputs = [Constant(primops.return_),
-                  self.process_node(block, node.value)]
-        return_ = Apply(inputs, block.graph)
+        inputs = [self.Constant(primops.return_),
+                  self.process_node_used(block, node.value)]
+        return_ = self.Apply(inputs, block.graph)
         assert block.graph.return_ is None
         block.graph.return_ = return_
         return block
 
     def process_Assign(self, block: 'Block', node: ast.Assign) -> 'Block':
         """Process an assignment."""
-        anf_node = self.process_node(block, node.value)
+        anf_node = self.process_node_used(block, node.value)
 
         def write(targ, anf_node):
 
@@ -471,7 +578,8 @@ class Parser:
                 # CASE: x, y = value
                 for i, elt in enumerate(targ.elts):
                     op = block.operation('getitem')
-                    new_node = Apply([op, anf_node, Constant(i)], block.graph)
+                    new_node = self.Apply([op, anf_node, self.Constant(i)],
+                                          block.graph)
                     write(elt, new_node)
 
             else:
@@ -487,6 +595,12 @@ class Parser:
 
         This ignores the statement.
         """
+        if self.flag_used == 0 and not isinstance(node.value, ast.Str):
+            warnings.warn("", MyiaDisconnectedCodeWarning)
+            print_myia_warning(
+                MyiaDisconnectedCodeWarning,
+                f"{node.__class__.__name__} is disconnected from output",
+                self.make_location(node))
         return block
 
     def process_If(self, block: 'Block', node: ast.If) -> 'Block':
@@ -496,7 +610,7 @@ class Parser:
         false branch, and the continuation.
         """
         # Process the condition
-        cond = self.process_node(block, node.test)
+        cond = self.process_node_used(block, node.test)
 
         # Create two branches
         true_block, false_block = self.make_condition_blocks(block)
@@ -540,7 +654,7 @@ class Parser:
         body_block.preds.append(header_block)
         after_block.preds.append(header_block)
         block.jump(header_block)
-        cond = self.process_node(header_block, node.test)
+        cond = self.process_node_used(header_block, node.test)
         body_block.mature()
         header_block.cond(cond, body_block, after_block)
         after_body = self.process_statements(body_block, node.body)
@@ -577,7 +691,7 @@ class Parser:
 
         # Initialization of the iterator, only done once
         init = block.graph.apply(op_iter,
-                                 self.process_node(block, node.iter))
+                                 self.process_node_used(block, node.iter))
 
         # Checks hasnext on the iterator.
         with About(block.graph.debug, 'for_header'):
@@ -669,7 +783,7 @@ class Block:
         self.preds: List[Block] = []
         self.phi_nodes: Dict[Parameter, str] = {}
         self.jumps: Dict[Block, Apply] = {}
-        self.graph: Graph = Graph()
+        self.graph: Graph = Graph(parser=self.parser, block=self)
         self.graph.flags.update(flags)
 
     def set_phi_arguments(self, phi: Parameter) -> None:
@@ -708,8 +822,8 @@ class Block:
         """Return a subtree that resolves a name in a module."""
         return self.graph.apply(
             primops.resolve,
-            Constant(module_name),
-            Constant(symbol_name)
+            self.parser.Constant(module_name),
+            self.parser.Constant(symbol_name)
         )
 
     def make_switch(self, cond, true_block, false_block):
