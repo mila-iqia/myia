@@ -42,6 +42,10 @@ class Graph:
             this graph.
         transforms: A dictionary of available transforms for this graph, e.g.
             'grad' or 'primal'.
+        parser: The Parser which initialized the Block which initialized this
+            Graph.
+        block: Currently is always set to None. In future version of Myia,
+            this might be set to be the Block which initialized this Graph.
 
     """
 

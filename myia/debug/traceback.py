@@ -14,6 +14,7 @@ from ..ir import Graph
 from .label import label
 from .location import _show_location
 
+
 def skip_node(node):
     """Whether to skip a step in the traceback based on ast node type."""
     return isinstance(node, (ast.If, ast.While, ast.For))
