@@ -42,22 +42,16 @@ class Graph:
             this graph.
         transforms: A dictionary of available transforms for this graph, e.g.
             'grad' or 'primal'.
-        parser: The Parser which initialized the Block which initialized this
-            Graph.
-        block: Currently is always set to None. In future version of Myia,
-            this might be set to be the Block which initialized this Graph.
 
     """
 
-    def __init__(self, parser=None, block=None) -> None:
+    def __init__(self) -> None:
         """Construct a graph."""
         self.parameters: List[Parameter] = []
         self.return_: Apply = None
         self.debug = NamedDebugInfo(self)
         self.flags = {}
         self.transforms: Dict[str, Union[Graph, Primitive]] = {}
-        self.parser = parser
-        self.block = block
         self._manager = None
 
     @property
@@ -110,19 +104,13 @@ class Graph:
 
     def constant(self, obj: Any) -> 'Constant':
         """Create a constant for the given object."""
-        if self.parser is not None:
-            return self.parser.Constant(obj)
-        else:
-            return Constant(obj)
+        return Constant(obj)
 
     def apply(self, *inputs: Any) -> 'Apply':
         """Create an Apply node with given inputs, bound to this graph."""
         wrapped_inputs = [i if isinstance(i, ANFNode) else self.constant(i)
                           for i in inputs]
-        if self.parser is not None:
-            return self.parser.Apply(wrapped_inputs, self)
-        else:
-            return Apply(wrapped_inputs, self)
+        return Apply(wrapped_inputs, self)
 
     ######################
     # Managed properties #

@@ -132,8 +132,6 @@ def test_disconnected_from_output__warning():
         parse(a2)
     assert len(record) == 0
 
-
-"""
     def a3():
         x = 1
         return 1
@@ -149,4 +147,3 @@ def test_disconnected_from_output__warning():
         return b4
     with pytest.warns(MyiaDisconnectedCodeWarning):
         parse(a4)
-"""
