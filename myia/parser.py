@@ -130,14 +130,13 @@ ast_map = {
     # ast.NotIn: operator.???,  # Not in operator module
 }
 
-'''
+
 def _fresh(node):
     """If node is a constant, return a copy of it."""
     if node.is_constant():
         return Constant(node.value)
     else:
         return node
-        '''
 
 
 def parse(func):
@@ -194,13 +193,6 @@ class Parser:
         self.write_cache = set()
         # Cache of all nodes that are read
         self.read_cache = set()
-
-    def _fresh(self, node):
-        """If node is a constant, return a copy of it."""
-        if node.is_constant():
-            return Constant(node.value)
-        else:
-            return node
 
     def make_location(self, node) -> Location:
         """Create a Location from an AST node."""
@@ -822,7 +814,7 @@ class Block:
         """
         self.parser.read_cache.add((self, varnum))
         if varnum in self.variables:
-            return self.parser._fresh(self.variables[varnum])
+            return _fresh(self.variables[varnum])
         if self.matured:
             if len(self.preds) == 1:
                 return self.preds[0].read(varnum)
