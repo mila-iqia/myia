@@ -10,10 +10,9 @@ from ..abstract import InferenceError, Reference, data, format_abstract, \
 from ..parser import MyiaSyntaxError, MyiaDisconnectedCodeWarning
 from ..utils import eprint
 from ..ir import Graph
-from .location import _show_location
 
 from .label import label
-
+from .location import _show_location
 
 def skip_node(node):
     """Whether to skip a step in the traceback based on ast node type."""

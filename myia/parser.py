@@ -339,7 +339,6 @@ class Parser:
             if node.args.vararg:
                 raise NotImplementedError("No support for varargs")
             for arg in node.args.args:
-                print("\n", "arg", arg.arg)
                 with DebugInherit(ast=arg, location=self.make_location(arg)):
                     anf_node = Parameter(function_block.graph)
                 anf_node.debug.name = arg.arg
@@ -544,11 +543,6 @@ class Parser:
         """
         for node in nodes:
             block = self.process_node(block, node)
-            """
-            print("block.variables", block.variables)
-            print("node", node, block)
-            breakpoint()
-            #"""
         return block
 
     def process_Return(self, block: 'Block', node: ast.Return) -> 'Block':

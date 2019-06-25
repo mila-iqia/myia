@@ -1,6 +1,7 @@
 """Displays line locations in color."""
 
 from colorama import Fore, Style
+
 from ..utils import eprint
 
 
