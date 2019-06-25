@@ -18,7 +18,7 @@ def test_relay_type_convert():
 
 
 @pytest.mark.gpu
-def test_relay_backend_exists():
+def test_relay_backend_bad_device():
     with pytest.raises(RuntimeError):
         relay.RelayBackend(target='cuda', device_id=31)
 

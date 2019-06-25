@@ -13,7 +13,7 @@ except ImportError:
 
 
 @pytest.mark.gpu
-def test_nnvm_backend_exists():
+def test_nnvm_backend_bad_device():
     with pytest.raises(RuntimeError):
         nnvm.NNVMBackend(target='cuda', device_id=31)
 
