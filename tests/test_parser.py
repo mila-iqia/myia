@@ -133,7 +133,7 @@ def test_disconnected_from_output__warning():
     assert len(record) == 0
 
     def a3():
-        x = 1
+        x = 1  # noqa: F841
         return 1
     with pytest.warns(MyiaDisconnectedCodeWarning):
         parse(a3)
@@ -141,7 +141,7 @@ def test_disconnected_from_output__warning():
     def a4():
         def b4():
             def c4():
-                x = 1
+                x = 1  # noqa: F841
                 return 1
             return c4()
         return b4
