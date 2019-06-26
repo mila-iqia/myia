@@ -1294,7 +1294,7 @@ def test_closure_in_data(c, x):
 
     a = Thing((1, [f]))
     b = Thing((2, [g]))
-    i, h = switch(c, a, b).contents
+    _, h = switch(c, a, b).contents
     return h[0](x)
 
 

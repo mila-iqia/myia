@@ -390,7 +390,6 @@ def test_env():
     def f(x, y):
         e1 = env_setitem(newenv, embed(x), 100)
 
-        e2 = newenv
         e2 = env_setitem(newenv, embed(x), 10)
         e2 = env_setitem(e2, embed(y), 20)
 

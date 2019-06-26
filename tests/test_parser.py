@@ -26,7 +26,7 @@ def test_defined_later():
 
 def test_no_return():
     def f():
-        1 + 2
+        """Hello, there is nothing here!"""
     with pytest.raises(MyiaSyntaxError):
         parse(f)
 
@@ -60,7 +60,8 @@ def test_expression_statements():
         """Foo."""
         print(x)
         return x
-    parse(f)
+    with pytest.warns(MyiaDisconnectedCodeWarning):
+        parse(f)
 
 
 def _global_f():
@@ -453,7 +454,7 @@ def test_disconnected_from_output__warning__format(capsys):
         r"(.+?)     \^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaDisconnectedCodeWarning: Expression is not used " + \
+        r"MyiaDisconnectedCodeWarning: x is not used " + \
         r"and will therefore not be computed"
 
     regex = re.compile(reg_pattern)
@@ -485,7 +486,7 @@ def test_disconnected_from_output__warning__format(capsys):
         r"(.+?)     \^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaDisconnectedCodeWarning: Expression is not used " + \
+        r"MyiaDisconnectedCodeWarning: x is not used " + \
         r"and will therefore not be computed"
 
     regex = re.compile(reg_pattern)

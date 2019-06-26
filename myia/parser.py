@@ -234,29 +234,22 @@ class Parser:
         for gg in dfs(graph.return_, succ_deeper):
             if gg.is_constant_graph():
                 if gg.value.return_ is None:
-                    obj = gg.value.debug
-                    pos = "____initial_inner_level"
-                    while 1:
-                        pos = getattr(obj, "about", None)
-                        if pos is None:
-                            break
-                        pos = getattr(pos, "debug", None)
-                        obj = pos
+                    current = gg.value.debug
+                    while getattr(current, "about", None) is not None:
+                        current = getattr(current.about, 'debug', None)
                     raise MyiaSyntaxError(
                         "Function doesn't return a value in all cases",
-                        obj.location)
-
-        # TODO: also clean_up/delete/gc any left over nodes from dfs?
+                        current.location)
 
         diff_cache = self.write_cache - self.read_cache
         if diff_cache != OrderedSet():
-            for i in diff_cache:
-                node = i[2]
-                warnings.warn(MyiaDisconnectedCodeWarning(
-                    f"Expression is not used " +
-                    r"and will therefore not be computed",
-                    node.debug.location)
-                )
+            for _, varname, node in diff_cache:
+                if varname != '_':
+                    warnings.warn(MyiaDisconnectedCodeWarning(
+                        f"{varname} is not used " +
+                        f"and will therefore not be computed",
+                        node.debug.location)
+                    )
 
         self.write_cache = OrderedSet()
         self.read_cache = OrderedSet()
@@ -823,7 +816,7 @@ class Block:
 
         """
         self.variables[varnum] = node
-        if track:
+        if track and not node.is_parameter():
             self.parser.write_cache.add((self, varnum, node))
 
     def jump(self, target: 'Block', *args) -> Apply:
