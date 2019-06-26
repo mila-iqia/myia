@@ -285,7 +285,11 @@ stderr = AnsiToWin32(sys.stderr).stream
 
 def eprint(*things):
     """Print to stderr."""
-    print(*things, file=stderr)
+    # Turns off AnsiToWin32 for pytest stderr capture
+    if sys.stderr.isatty():
+        print(*things, file=stderr)  # pragma: no cover
+    else:
+        print(*things, file=sys.stderr)
 
 
 def is_dataclass_type(cls):

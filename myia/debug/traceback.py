@@ -3,6 +3,7 @@
 import ast
 import sys
 import warnings
+from colorama import Fore, Style
 import prettyprinter as pp
 
 from ..abstract import InferenceError, Reference, data, format_abstract, \
@@ -12,7 +13,6 @@ from ..utils import eprint
 from ..ir import Graph
 
 from .label import label
-from .location import _show_location
 
 
 def skip_node(node):
@@ -89,6 +89,49 @@ def _format_call(fn, args):
     return format_abstract(_PBlock(label(fn), ' :: ', args, kwargs))
 
 
+def _show_location(loc, label, mode=None, color='red'):
+    with open(loc.filename, 'r') as contents:
+        lines = contents.read().split('\n')
+        _print_lines(lines, loc.line, loc.column,
+                     loc.line_end, loc.column_end,
+                     label, mode, color)
+
+
+def _print_lines(lines, l1, c1, l2, c2, label='', mode=None, color='red'):
+    if mode is None:
+        if sys.stderr.isatty():
+            mode = 'color'
+    for ln in range(l1, l2 + 1):
+        line = lines[ln - 1]
+        if ln == l1:
+            trimmed = line.lstrip()
+            to_trim = len(line) - len(trimmed)
+            start = c1 - to_trim
+        else:
+            trimmed = line[to_trim:]
+            start = 0
+
+        if ln == l2:
+            end = c2 - to_trim
+        else:
+            end = len(trimmed)
+
+        if mode == 'color':
+            prefix = trimmed[:start]
+            hl = trimmed[start:end]
+            rest = trimmed[end:]
+            if color == 'red':
+                eprint(f'{ln}: {prefix}{Fore.RED}{Style.BRIGHT}'
+                       f'{hl}{Style.RESET_ALL}{rest}')
+            elif color == 'magenta':
+                eprint(f'{ln}: {prefix}{Fore.MAGENTA}{Style.BRIGHT}'
+                       f'{hl}{Style.RESET_ALL}{rest}')
+        else:
+            eprint(f'{ln}: {trimmed}')
+            prefix = ' ' * (start + 2 + len(str(ln)))
+            eprint(prefix + '^' * (end - start) + label)
+
+
 def print_inference_error(error):
     """Print an InferenceError's traceback."""
     stack = _get_stack(error)
@@ -131,15 +174,30 @@ def myia_excepthook(exc_type, exc_value, tb):
 sys.excepthook = myia_excepthook
 
 
+def print_myia_warning(warning):
+    """Print Myia Warning's location."""
+    msg = warning.args[0]
+    loc = warning.loc
+    eprint('=' * 80)
+    if loc is not None:
+        eprint(f'{loc.filename}:{loc.line}')
+    if loc is not None:
+        _show_location(loc, '', None, 'magenta')
+    eprint('~' * 80)
+    eprint(f'{warning.__class__.__name__}: {msg}')
+
+
 _previous_warning = warnings.showwarning
 
 
 def myia_warning(message, category, filename, lineno, file, line):
     """Print out MyiaDisconnectedCodeWarning specially."""
     if category is MyiaDisconnectedCodeWarning:
-        pass
+        __warning = message
+        print_myia_warning(__warning)
     else:
         _previous_warning(message, category, filename, lineno, file, line)
 
 
 warnings.showwarning = myia_warning
+warnings.filterwarnings('always', category=MyiaDisconnectedCodeWarning)
