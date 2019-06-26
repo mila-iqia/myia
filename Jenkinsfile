@@ -5,8 +5,11 @@ node ('gpu') {
   stage ('Install') {
     sh script: './ci-install.sh --gpu'
   }
-  stage ('Test') {
-    sh script: '$HOME/miniconda/bin/pytest --cov-report=term-missing --cov-report=xml  --cov=./ --gpu --junit-xml test-report.xml'
+  try {
+    stage ('Test') {
+      sh script: '$HOME/miniconda/bin/pytest --cov-report=term-missing --cov-report=xml  --cov=./ --gpu --junit-xml test-report.xml'
+    }
+  } finally {
     junit 'test-report.xml'
   }
   stage ('Coverage') {
