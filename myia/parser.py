@@ -231,10 +231,10 @@ class Parser:
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
         graph = self._process_function(None, function_def).graph
-        for gg in dfs(graph.return_, succ_deeper):
-            if gg.is_constant_graph():
-                if gg.value.return_ is None:
-                    current = gg.value.debug
+        for node in dfs(graph.return_, succ_deeper):
+            if node.is_constant_graph():
+                if node.value.return_ is None:
+                    current = node.value.debug
                     while getattr(current, "about", None) is not None:
                         current = getattr(current.about, 'debug', None)
                     raise MyiaSyntaxError(
@@ -242,7 +242,7 @@ class Parser:
                         current.location)
 
         diff_cache = self.write_cache - self.read_cache
-        if diff_cache != OrderedSet():
+        if diff_cache:
             for _, varname, node in diff_cache:
                 if varname != '_':
                     warnings.warn(MyiaDisconnectedCodeWarning(
@@ -274,33 +274,33 @@ class Parser:
         """Process a function definition and return first and final blocks."""
         with DebugInherit(ast=node, location=self.make_location(node)):
             function_block = Block(self)
-            if block:
-                function_block.preds.append(block)
-            else:
-                # This is the top-level function, so we set self.graph
-                self.graph = function_block.graph
+        if block:
+            function_block.preds.append(block)
+        else:
+            # This is the top-level function, so we set self.graph
+            self.graph = function_block.graph
 
-            function_block.mature()
-            function_block.graph.debug.name = node.name
-            if node.args.kwarg is not None or node.args.kwonlyargs != []:
-                raise NotImplementedError("No support for keyword arguments")
-            if node.args.vararg:
-                raise NotImplementedError("No support for varargs")
-            for arg in node.args.args:
-                with DebugInherit(ast=arg, location=self.make_location(arg)):
-                    anf_node = Parameter(function_block.graph)
-                anf_node.debug.name = arg.arg
-                function_block.graph.parameters.append(anf_node)
-                function_block.write(arg.arg, anf_node, track=False)
-            function_block.write(node.name,
-                                 Constant(function_block.graph),
-                                 track=False)
-            self.process_statements(function_block, node.body)
-            if function_block.graph.return_ is None:
-                raise MyiaSyntaxError("Function doesn't return a value",
-                                      self.make_location(node))
-            # TODO: check that if after_block returns?
-            return function_block
+        function_block.mature()
+        function_block.graph.debug.name = node.name
+        if node.args.kwarg is not None or node.args.kwonlyargs != []:
+            raise NotImplementedError("No support for keyword arguments")
+        if node.args.vararg:
+            raise NotImplementedError("No support for varargs")
+        for arg in node.args.args:
+            with DebugInherit(ast=arg, location=self.make_location(arg)):
+                anf_node = Parameter(function_block.graph)
+            anf_node.debug.name = arg.arg
+            function_block.graph.parameters.append(anf_node)
+            function_block.write(arg.arg, anf_node, track=False)
+        function_block.write(node.name,
+                             Constant(function_block.graph),
+                             track=False)
+        self.process_statements(function_block, node.body)
+        if function_block.graph.return_ is None:
+            raise MyiaSyntaxError("Function doesn't return a value",
+                                  self.make_location(node))
+        # TODO: check that if after_block returns?
+        return function_block
 
     def process_node(self, block, node, used=True):  # noqa
         """Process an ast node."""
@@ -813,6 +813,7 @@ class Block:
         Args:
             varnum: The name of the variable to store.
             node: The node representing this value.
+            track: True if we want to warn about this variable not being used.
 
         """
         self.variables[varnum] = node

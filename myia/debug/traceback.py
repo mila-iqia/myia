@@ -89,7 +89,7 @@ def _format_call(fn, args):
     return format_abstract(_PBlock(label(fn), ' :: ', args, kwargs))
 
 
-def _show_location(loc, label, mode=None, color='red'):
+def _show_location(loc, label, mode=None, color='RED'):
     with open(loc.filename, 'r') as contents:
         lines = contents.read().split('\n')
         _print_lines(lines, loc.line, loc.column,
@@ -97,7 +97,7 @@ def _show_location(loc, label, mode=None, color='red'):
                      label, mode, color)
 
 
-def _print_lines(lines, l1, c1, l2, c2, label='', mode=None, color='red'):
+def _print_lines(lines, l1, c1, l2, c2, label='', mode=None, color='RED'):
     if mode is None:
         if sys.stderr.isatty():
             mode = 'color'
@@ -120,12 +120,8 @@ def _print_lines(lines, l1, c1, l2, c2, label='', mode=None, color='red'):
             prefix = trimmed[:start]
             hl = trimmed[start:end]
             rest = trimmed[end:]
-            if color == 'red':
-                eprint(f'{ln}: {prefix}{Fore.RED}{Style.BRIGHT}'
-                       f'{hl}{Style.RESET_ALL}{rest}')
-            elif color == 'magenta':
-                eprint(f'{ln}: {prefix}{Fore.MAGENTA}{Style.BRIGHT}'
-                       f'{hl}{Style.RESET_ALL}{rest}')
+            eprint(f'{ln}: {prefix}{getattr(Fore, color)}{Style.BRIGHT}'
+                   f'{hl}{Style.RESET_ALL}{rest}')
         else:
             eprint(f'{ln}: {trimmed}')
             prefix = ' ' * (start + 2 + len(str(ln)))
@@ -182,7 +178,7 @@ def print_myia_warning(warning):
     if loc is not None:
         eprint(f'{loc.filename}:{loc.line}')
     if loc is not None:
-        _show_location(loc, '', None, 'magenta')
+        _show_location(loc, '', None, 'MAGENTA')
     eprint('~' * 80)
     eprint(f'{warning.__class__.__name__}: {msg}')
 
@@ -193,8 +189,10 @@ _previous_warning = warnings.showwarning
 def myia_warning(message, category, filename, lineno, file, line):
     """Print out MyiaDisconnectedCodeWarning specially."""
     if category is MyiaDisconnectedCodeWarning:
-        __warning = message
-        print_myia_warning(__warning)
+        # message is actually a MyiaDisconnectedCodeWarning object,
+        # even though this parameter of myia_warning is called message
+        # (in order to match parameter names of overrided showwarning)
+        print_myia_warning(message)
     else:
         _previous_warning(message, category, filename, lineno, file, line)
 
