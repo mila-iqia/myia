@@ -815,6 +815,16 @@ def amerge(x1: AbstractJTagged, x2, loop, forced, bp):
 
 
 @overload  # noqa: F811
+def amerge(x1: AbstractUnion, x2, loop, forced, bp):
+    args1 = x1.options
+    args2 = x2.options
+    merged = amerge(args1, args2, loop, forced, bp)
+    if forced or merged is args1:
+        return x1
+    return AbstractUnion(merged)
+
+
+@overload  # noqa: F811
 def amerge(x1: (int, float, bool), x2, loop, forced, bp):
     if forced and x1 != x2:
         raise TypeMismatchError(x1, x2)
