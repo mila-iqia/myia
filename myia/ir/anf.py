@@ -112,6 +112,20 @@ class Graph:
                           for i in inputs]
         return Apply(wrapped_inputs, self)
 
+    #########
+    # Flags #
+    #########
+
+    def set_flags(self, *flags, **kwflags):
+        """Set flags for this graph."""
+        for flag in flags:
+            self.flags[flag] = True
+        self.flags.update(kwflags)
+
+    def has_flags(self, *flags):
+        """Check if this graph has the given flags."""
+        return all(self.flags.get(flag, False) for flag in flags)
+
     ######################
     # Managed properties #
     ######################
