@@ -800,6 +800,8 @@ class GraphManager(Partializable):
         adds = Counter()
         rms = Counter()
 
+        undolog = []
+
         for operation, *args in changes:
             if operation == 'set_edge':
                 root_node, key, new_node = args
@@ -809,6 +811,7 @@ class GraphManager(Partializable):
                 rms[old_node] += 1
                 adds[new_node] += 1
                 root_node.inputs[key] = new_node
+                undolog.append(('set_edge', root_node, key, old_node))
             elif operation == 'set_parameters':
                 graph, new_parameters = args
                 old_parameters = graph.parameters
@@ -817,6 +820,7 @@ class GraphManager(Partializable):
                 for p in old_parameters:
                     rms[p] += 1
                 graph.parameters = new_parameters
+                undolog.append(('set_parameters', graph, old_parameters))
 
         for root_node, key, new_node in addedges - rmedges:
             self._process_edge(root_node, key, new_node, 1)
@@ -829,6 +833,7 @@ class GraphManager(Partializable):
         maybe_drop_graphs = self._maybe_drop_nodes(rms - adds)
 
         self._maybe_drop_graphs(maybe_drop_graphs)
+        return undolog
 
 
 class GraphTransaction:
@@ -878,7 +883,12 @@ class GraphTransaction:
     def commit(self):
         """Commit the changes."""
         changes, self.changes = self.changes, None
-        self.manager._commit_changes(changes)
+        self.undolog = self.manager._commit_changes(changes)
+
+    def undo(self):
+        """Undo this transaction."""
+        undolog, self.undolog = self.undolog, None
+        self.manager._commit_changes(undolog)
 
     def __enter__(self):
         return self
