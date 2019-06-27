@@ -27,7 +27,7 @@ from myia.prim.py_implementations import \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
     transpose, make_record, unsafe_static_cast, user_switch, \
-    hastag, casttag
+    hastag, casttag, tagged
 from myia.utils import newenv
 
 from .common import B, \
@@ -1888,6 +1888,24 @@ def test_raise_rec(x):
         else:
             return x * f(x - 1)
     return f(x)
+
+
+@infer((i64, i32, i64, U(i32, i64)))
+def test_tagged(x, y, z):
+    if x > 0:
+        return tagged(y)
+    else:
+        return tagged(z)
+
+
+@infer((i64, i16, i32, i64, U(i16, i32, i64)))
+def test_tagged_more(c, x, y, z):
+    if c == 0:
+        return tagged(x)
+    elif c > 0:
+        return tagged(y)
+    else:
+        return tagged(z)
 
 
 @infer(
