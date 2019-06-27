@@ -92,6 +92,7 @@ class GraphRemapper(Partializable):
         return self.gen_constant(graph, new_graph, ct)
 
     gen_child = NotImplemented
+    gen_fv_direct = NotImplemented
     gen_fv = NotImplemented
     gen_fv_graph = NotImplemented
 
@@ -161,6 +162,10 @@ class GraphRemapper(Partializable):
             if self.gen_child is not NotImplemented:
                 for child in mng.children[graph]:
                     self.gen_child(graph, target_graph, child)
+
+            if self.gen_fv_direct is not NotImplemented:
+                for node in mng.free_variables_direct[graph]:
+                    self.gen_fv_direct(graph, target_graph, node)
 
             if self.gen_fv is not NotImplemented:
                 for node in mng.free_variables_total[graph]:
@@ -236,7 +241,8 @@ class CloneRemapper(BasicRemapper):
                  manager,
                  relation,
                  graph_relation,
-                 clone_constants):
+                 clone_constants,
+                 set_abstract=True):
         """Initialize the GraphCloner."""
         super().__init__(
             graphs,
@@ -246,11 +252,13 @@ class CloneRemapper(BasicRemapper):
         )
         self.inlines = inlines
         self.clone_constants = clone_constants
+        self.set_abstract = set_abstract
 
     def remap_node(self, key, graph, node, new_graph, new_node, link=None):
         """Remap the given node as normal and also copy the abstract."""
         nn = super().remap_node(key, graph, node, new_graph, new_node, link)
-        nn.abstract = node.abstract
+        if self.set_abstract and nn.abstract is None:
+            nn.abstract = node.abstract
         return nn
 
     def get_graph(self, graph):
@@ -316,25 +324,6 @@ class CloneRemapper(BasicRemapper):
         """Set the graph's output, unless it is an inlined graph."""
         if graph not in self.inlines:
             new_graph.return_ = self.repl[graph.return_]
-
-    def clone_disconnected(self, droot):
-        """Clone a subgraph that's not (yet) connected to its graph/manager."""
-        if droot.graph not in self.graph_repl:
-            return droot
-        if droot in self.repl:
-            return False
-        target_graph = self.get_graph(droot.graph)
-        if droot.is_parameter() and droot not in self.repl:  # pragma: no cover
-            self.gen_rogue_parameter(None, target_graph, droot)
-        elif droot.is_apply():
-            self.gen_apply(None, target_graph, droot)
-            new = self.repl[droot]
-            new_inputs = []
-            for inp in droot.inputs:
-                new_inputs.append(self.clone_disconnected(inp))
-            new.inputs = new_inputs
-        else:
-            return False
 
 
 class RemapperSet:

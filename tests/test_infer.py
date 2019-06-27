@@ -102,9 +102,7 @@ def inferrer_decorator(pipeline):
                     rval = res['outspec']
 
                     print('Output of inferrer:')
-                    rval = pip.resources.inferrer.engine.run_coroutine(
-                        concretize_abstract(rval)
-                    )
+                    rval = concretize_abstract(rval)
                     print(rval)
                     return rval
 

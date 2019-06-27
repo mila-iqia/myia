@@ -383,9 +383,10 @@ def test_list_for(xs):
 @grad_test(4.5,)
 def test_nested_closure(x):
     a = x * x
-    b = x + 5
 
     def f():
+        b = x + 5
+
         def g():
             return a + b
 
