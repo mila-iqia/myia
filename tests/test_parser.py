@@ -191,6 +191,10 @@ def test_no_return__format(capsys):
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
 
+    with capsys.disabled():
+        print("\nout\n", out)
+        print("\nerr\n", err)
+
     assert match is not None
 
 
@@ -235,6 +239,10 @@ def test_no_return_while__format(capsys):
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
 
+    with capsys.disabled():
+        print("\nout\n", out)
+        print("\nerr\n", err)
+
     assert match is not None
 
 
@@ -260,6 +268,10 @@ def test_unsupported_AST__error__format(capsys):
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
+
+    with capsys.disabled():
+        print("\nout\n", out)
+        print("\nerr\n", err)
 
     assert match is not None
     #########################################################################
@@ -366,6 +378,10 @@ def test_disconnected_from_output__warning__format(capsys):
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
+
+    with capsys.disabled():
+        print("\nout\n", out)
+        print("\nerr\n", err)
 
     assert match is not None
     #########################################################################
