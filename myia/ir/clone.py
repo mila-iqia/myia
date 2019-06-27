@@ -325,25 +325,6 @@ class CloneRemapper(BasicRemapper):
         if graph not in self.inlines:
             new_graph.return_ = self.repl[graph.return_]
 
-    def clone_disconnected(self, droot):
-        """Clone a subgraph that's not (yet) connected to its graph/manager."""
-        if droot.graph not in self.graph_repl:
-            return droot
-        if droot in self.repl:
-            return False
-        target_graph = self.get_graph(droot.graph)
-        if droot.is_parameter() and droot not in self.repl:  # pragma: no cover
-            self.gen_rogue_parameter(None, target_graph, droot)
-        elif droot.is_apply():
-            self.gen_apply(None, target_graph, droot)
-            new = self.repl[droot]
-            new_inputs = []
-            for inp in droot.inputs:
-                new_inputs.append(self.clone_disconnected(inp))
-            new.inputs = new_inputs
-        else:
-            return False
-
 
 class RemapperSet:
     """Set of remappers working together to generate one or more graphs."""

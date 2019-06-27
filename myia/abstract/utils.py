@@ -5,7 +5,7 @@ import typing
 import numpy as np
 from functools import reduce
 from itertools import chain
-from types import GeneratorType, AsyncGeneratorType
+from types import GeneratorType
 
 from .. import dtype
 from ..utils import overload, is_dataclass_type, dataclass_methods, intern
@@ -317,6 +317,11 @@ def abstract_check(self, t: JTransformedFunction, *args):
 
 
 @overload  # noqa: F811
+def abstract_check(self, x: Pending, *args):
+    return False
+
+
+@overload  # noqa: F811
 def abstract_check(self, xs: object, *args):
     return True
 
@@ -474,145 +479,20 @@ def abstract_clone(self, x: object, *args):
     return x
 
 
-#################
-# Async cloning #
-#################
-
-
-async def _abstract_clone_async_post(x):
-    return intern(await x)
-
-
-@overload.wrapper(
-    initial_state=lambda: CloneState({}, None, None),
-    postprocess=_abstract_clone_async_post,
-)
-async def abstract_clone_async(__call__, self, x, *args):
-    """Clone an abstract value (asynchronous)."""
-    async def proceed():
-        if isinstance(x, AbstractValue) and x in cache:
-            return cache[x]
-
-        call = __call__(self, x, *args)
-        if isinstance(call, AsyncGeneratorType):
-            cls = await call.asend(None)
-            inst = cls.empty()
-            cache[x] = inst
-            constructor = _make_constructor(inst)
-            rval = await call.asend(constructor)
-            assert rval is inst
-            return rval
-        else:
-            return await call
-
-    cache = self.state.cache
-    prop = self.state.prop
-    if prop:
-        if hasattr(x, prop):
-            return getattr(x, prop)
-        elif isinstance(x, AbstractValue):
-            if self.state.check(x, *args):
-                res = x
-            else:
-                res = await proceed()
-            setattr(x, prop, res)
-            return res
-        else:
-            return await proceed()
-    else:
-        return await proceed()
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: AbstractScalar):
-    return AbstractScalar(await self(x.values))
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: AbstractFunction):
-    yield (yield AbstractFunction)(*(await self(x.get_sync())))
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, d: TrackDict):
-    return {k: (await k.async_clone(v, self))
-            for k, v in d.items()}
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: AbstractTuple):
-    yield (yield AbstractTuple)(
-        [(await self(y)) for y in x.elements],
-        await self(x.values)
-    )
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: AbstractList):
-    yield (yield AbstractList)(await self(x.element), await self(x.values))
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: AbstractArray):
-    yield (yield AbstractArray)(await self(x.element), await self(x.values))
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: AbstractClassBase):
-    yield (yield type(x))(
-        x.tag,
-        {k: (await self(v)) for k, v in x.attributes.items()},
-        x.methods,
-        await self(x.values)
-    )
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: AbstractUnion):
-    yield (yield AbstractUnion)(await self(x.options))
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: Possibilities):
-    return Possibilities([await self(v) for v in x])
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: PartialApplication):
-    return PartialApplication(
-        await self(x.fn),
-        [await self(arg) for arg in x.args]
-    )
-
-
-@overload  # noqa: F811
-async def abstract_clone_async(self, x: object):
-    return x
-
-
-##################
-# Concrete check #
-##################
-
-
-@abstract_check.variant(
-    initial_state=lambda: CheckState(cache={}, prop='_concrete')
-)
-def _is_concrete(self, x: Pending):
-    return False
-
-
 ##############
 # Concretize #
 ##############
 
 
-@abstract_clone_async.variant(
-    initial_state=lambda: CloneState({}, '_concrete', _is_concrete)
+@abstract_clone.variant(
+    initial_state=lambda: CloneState({}, '_concrete', abstract_check)
 )
-async def concretize_abstract(self, x: Pending):
-    """Clone an abstract value while resolving all Pending (asynchronous)."""
-    return await self(await x)
+def concretize_abstract(self, x: Pending):
+    """Clone an abstract value while resolving all Pending (synchronous)."""
+    if x.done():
+        return self(x.result())
+    else:
+        raise AssertionError('Unresolved Pending', x)
 
 
 ###############

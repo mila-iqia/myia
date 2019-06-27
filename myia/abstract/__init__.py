@@ -17,7 +17,6 @@ from .utils import (  # noqa
     type_to_abstract,
     abstract_check,
     abstract_clone,
-    abstract_clone_async,
     concretize_abstract,
     broaden,
     sensitivity_transform,

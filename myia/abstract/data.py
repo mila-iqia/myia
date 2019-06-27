@@ -547,13 +547,6 @@ class Track:
         """Clone the value associated to this Track in a TrackDict."""
         return recurse(v)
 
-    async def async_clone(self, v, recurse):
-        """Clone the value associated to this Track in a TrackDict.
-
-        This is an asynchronous version of clone.
-        """
-        return await recurse(v)
-
     def broaden(self, v, recurse, loop):
         """Make a value more generic.
 

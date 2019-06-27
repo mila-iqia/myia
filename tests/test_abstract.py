@@ -13,8 +13,8 @@ from myia.abstract import (
     InferenceLoop, to_abstract, build_value, amerge,
     Possibilities, PendingFromList,
     VALUE, TYPE, DEAD, find_coherent_result_sync,
-    abstract_clone, abstract_clone_async, broaden,
-    Pending, concretize_abstract, type_to_abstract,
+    abstract_clone, broaden,
+    Pending, type_to_abstract,
     InferenceError
 )
 from myia.utils import SymbolicKeyInstance
@@ -189,34 +189,6 @@ def test_abstract_clone():
     assert upcast(a1, 64) is T([s2, L(s2)])
 
 
-@abstract_clone_async.variant
-async def upcast_async(self, x: AbstractScalar):
-    return AbstractScalar({
-        VALUE: x.values[VALUE],
-        TYPE: ty.Int[64],
-    })
-
-
-def test_abstract_clone_async():
-    # Coverage test
-
-    async def coro():
-        s1 = S(t=ty.Int[32])
-        s2 = S(t=ty.Int[64])
-        assert (await upcast_async(s1)) is s2
-
-        a1 = T([s1, L(s1)])
-        assert (await upcast_async(a1)) is T([s2, L(s2)])
-
-        f1 = AbstractFunction(P.scalar_add, P.scalar_mul)
-        assert (await upcast_async(f1)) is f1
-
-        u1 = AbstractUnion([s1])
-        assert (await upcast_async(u1)) is AbstractUnion([s2])
-
-    asyncio.run(coro())
-
-
 def test_broaden_recursive():
     s1 = S(1)
     t1 = T.empty()
@@ -245,24 +217,6 @@ def test_broaden_recursive():
 
     assert broaden(t2, None) is tb
     assert broaden(tb, None) is tb
-
-
-def test_concretize_recursive():
-    loop = asyncio.new_event_loop()
-    s = S(t=ty.Int[64])
-    p = Pending(None, None, loop=loop)
-    t = T([s, p])
-    p.set_result(t)
-
-    sa = S(t=ty.Int[64])
-    ta = T.empty()
-    ta.__init__([sa, ta])
-    ta = ta.intern()
-
-    async def coro():
-        assert (await concretize_abstract(t)) is ta
-
-    asyncio.run(coro())
 
 
 def test_find_coherent_result_sync():

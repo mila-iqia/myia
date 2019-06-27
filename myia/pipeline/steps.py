@@ -172,9 +172,7 @@ def step_specialize(self, graph, inference_context):
     Outputs:
         graph: The specialized graph.
     """
-    new_graph = self.resources.inferrer.specialize(
-        graph, inference_context
-    )
+    new_graph = self.resources.inferrer.monomorphize(inference_context)
     return {'graph': new_graph}
 
 
