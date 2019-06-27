@@ -92,6 +92,7 @@ class GraphRemapper(Partializable):
         return self.gen_constant(graph, new_graph, ct)
 
     gen_child = NotImplemented
+    gen_fv_direct = NotImplemented
     gen_fv = NotImplemented
     gen_fv_graph = NotImplemented
 
@@ -161,6 +162,10 @@ class GraphRemapper(Partializable):
             if self.gen_child is not NotImplemented:
                 for child in mng.children[graph]:
                     self.gen_child(graph, target_graph, child)
+
+            if self.gen_fv_direct is not NotImplemented:
+                for node in mng.free_variables_direct[graph]:
+                    self.gen_fv_direct(graph, target_graph, node)
 
             if self.gen_fv is not NotImplemented:
                 for node in mng.free_variables_total[graph]:
