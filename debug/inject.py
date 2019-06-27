@@ -6,6 +6,7 @@ from buche import buche
 
 # Load custom hrepr methods for Graph etc.
 from . import gprint  # noqa
+from .logword import ibuche, logword, afterword, breakword
 
 
 def bucheg(graph, **kwargs):
@@ -14,17 +15,11 @@ def bucheg(graph, **kwargs):
     def ttip(node):
         if isinstance(node, ANFNode):
             return node.abstract
-    buche(graph, node_tooltip=ttip, function_in_node=True,
-          graph_width='95vw', graph_height='95vh',
-          **kwargs)
 
-
-_log = []
-
-
-def ibuche(*args, **kwargs):
-    _log.append(args)
-    buche(*args, interactive=True, **kwargs)
+    kw = dict(node_tooltip=ttip, function_in_node=True,
+              graph_width='95vw', graph_height='95vh')
+    kw.update(kwargs)
+    buche(graph, **kw)
 
 
 suite = {
@@ -32,6 +27,9 @@ suite = {
     'bucheg': bucheg,
     'ibuche': ibuche,
     'Subgraph': gprint.Subgraph,
+    'logword': logword,
+    'afterword': afterword,
+    'breakword': breakword,
 }
 
 
