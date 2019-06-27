@@ -381,7 +381,7 @@ class ParentStatistic(NestingStatisticGraphWise):
             self[g], = deps
         else:
             # The way code is structured, this should never happen
-            raise AssertionError('Too many parents')
+            raise AssertionError(f'Too many parents for {g}')
         return self.get(g)
 
 
