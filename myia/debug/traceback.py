@@ -23,7 +23,7 @@ def skip_node(node):
 def _get_call(ref):
     ctx = ref.context
     g = ctx.graph
-    while g and g.flags.get('auxiliary') \
+    while g and g.has_flags('auxiliary') \
             and ctx.parent and ctx.parent.graph:
         ctx = ctx.parent
         g = ctx.graph
@@ -43,7 +43,7 @@ def _get_stack(error):
     for ref in refs:
         if isinstance(ref, Reference):
             g, args = _get_call(ref)
-            if g.flags.get('core'):
+            if g.has_flags('core'):
                 continue
             loctype = 'direct'
             loc = _get_loc(ref)

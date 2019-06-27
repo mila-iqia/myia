@@ -202,6 +202,8 @@ class FPropRemapper(GradRemapper):
         """We generate the pair (B:output, E:g)."""
         g.transforms['grad'] = ng
         ng.transforms['primal'] = g
+        g.set_flags('reference')
+        ng.set_flags('reference')
         out = self.get(g, g.output)
         bprop = self.remappers['grad_sens'].get_graph(g)
         ng.output = ng.apply(primops.make_tuple, out, bprop)

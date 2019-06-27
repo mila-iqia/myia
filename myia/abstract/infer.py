@@ -670,7 +670,7 @@ class GraphInferrer(BaseGraphInferrer):
 
     def normalize_args(self, args):
         """Broaden args if flag ignore_values is True."""
-        if self._graph.flags.get('ignore_values', False):
+        if self._graph.has_flags('ignore_values'):
             return tuple(_broaden(a, None) for a in args)
         else:
             return args

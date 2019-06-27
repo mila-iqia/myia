@@ -483,10 +483,10 @@ def simplify_array_map(optimizer, node, equiv):
             return node  # pragma: no cover
 
     except NotImplementedError:
-        if g.flags.get('inline_inside'):
+        if g.has_flags('inline_inside'):
             return node
         else:
-            g.flags['inline_inside'] = True
+            g.set_flags('inline_inside')
             return True
 
 
@@ -682,7 +682,7 @@ def make_inliner(inline_criterion, check_recursive, name):
         g = equiv[G].value
         args = equiv[Xs]
 
-        if g.flags.get('forbid_inlining', False):
+        if g.has_flags('forbid_inlining'):
             return node
 
         if inline_criterion is not None:
@@ -720,12 +720,12 @@ def is_unique_use(g, node, args):
 
 def is_core(g, node, args):
     """Inline graphs that are marked as part of the core."""
-    return g.flags.get('core', False)
+    return g.has_flags('core')
 
 
 def caller_is_marked(g, node, args):
     """Inline into graphs that are marked."""
-    return node.graph.flags.get('inline_inside', False)
+    return node.graph.has_flags('inline_inside')
 
 
 inline_trivial = make_inliner(inline_criterion=is_trivial_graph,

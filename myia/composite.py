@@ -35,6 +35,7 @@ def core(fn=None, **flags):
     flags = {
         # This is a function defined in Myia's core
         'core': True,
+        'reference': True,
         **flags,
     }
 
@@ -78,7 +79,7 @@ class Elemwise(MetaGraph):
                     for arg in args)
         if sig not in self.cache:
             g = Graph()
-            g.flags['core'] = True
+            g.set_flags('core', 'reference')
             g.debug.name = self.mname
             shapes = [x for x in sig if x is not False]
 
@@ -403,7 +404,7 @@ class Tail(MetaGraph):
         if len(a.elements) == 0:
             raise MyiaTypeError('tail requires a non-empty Tuple')
         g = Graph()
-        g.flags['core'] = True
+        g.set_flags('core', 'reference')
         tup = g.add_parameter()
         tup.debug.name = "tup"
         elems = [g.apply(P.tuple_getitem, tup, i)
@@ -605,8 +606,7 @@ class ListMap(MetaGraph):
                 raise MyiaTypeError(f'list_map requires lists, not {t}')
 
         g = Graph()
-        g.flags['core'] = True
-        g.flags['ignore_values'] = True
+        g.set_flags('core', 'reference', 'ignore_values')
         g.debug.name = self._decorate_name('list_map')
         fn = self.fn_rec or g.add_parameter()
         gargs = [g.add_parameter() for _ in args[nfn:]]
@@ -617,10 +617,10 @@ class ListMap(MetaGraph):
 
         gnext = Graph()
         gnext.debug.name = self._decorate_name('lm_body')
-        gnext.flags['ignore_values'] = True
+        gnext.set_flags('reference', 'ignore_values')
         gcond = Graph()
         gcond.debug.name = self._decorate_name('lm_cond')
-        gcond.flags['ignore_values'] = True
+        gcond.set_flags('reference', 'ignore_values')
 
         def make_cond(g):
             fn = self.fn_rec or g.add_parameter()
@@ -633,16 +633,14 @@ class ListMap(MetaGraph):
             cond = reduce(lambda a, b: g.apply(P.bool_and, a, b), hasnexts)
             gtrue = Graph()
             gtrue.debug.name = self._decorate_name('lm_ftrue')
-            gtrue.flags['core'] = True
-            gtrue.flags['ignore_values'] = True
+            gtrue.set_flags('core', 'reference', 'ignore_values')
             if self.fn_rec is None:
                 gtrue.output = gtrue.apply(gnext, fn, curri, resl, *gargs2)
             else:
                 gtrue.output = gtrue.apply(gnext, curri, resl, *gargs2)
             gfalse = Graph()
             gfalse.debug.name = self._decorate_name('lm_ffalse')
-            gfalse.flags['core'] = True
-            gfalse.flags['ignore_values'] = True
+            gfalse.set_flags('core', 'reference', 'ignore_values')
             gfalse.output = resl
             g.output = g.apply(g.apply(P.switch, cond, gtrue, gfalse))
 
@@ -667,8 +665,7 @@ class ListMap(MetaGraph):
         else:
             g.output = g.apply(gcond, 1, resl, *gargs)
 
-        g.flags['forbid_inlining'] = True
-        g.flags['metagraph'] = self
+        g.set_flags('forbid_inlining', metagraph=self)
         return g
 
     def __eq__(self, lm):
@@ -729,7 +726,7 @@ class GradOperation(MetaGraph):
         """
         with About(dbg, 'grad'):
             df = Graph()
-            df.flags['core'] = True
+            df.set_flags('core', 'reference')
 
         if apply_j:
             jf = df.apply(P.J, jf)
@@ -806,7 +803,7 @@ class GradOperation(MetaGraph):
             wrt = 0
 
         dfbuilder = Graph()
-        dfbuilder.flags['core'] = True
+        dfbuilder.set_flags('core', 'reference')
         dfbuilder.debug.name = f"grad{len(g.parameters)}"
 
         with About(g.debug, 'copy'):
