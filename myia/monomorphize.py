@@ -27,13 +27,10 @@ from .utils import overload
 def _fix_type(self, a: GraphFunction, spc):
     if a.graph in spc.ctcache:
         ctx = spc.ctcache[a.graph]
-        if ctx is None:
-            a = DummyFunction()
-        else:
-            a = GraphFunction(spc.results[ctx], Context.empty(), None)
-    elif a.graph not in spc.results:
-        a = DummyFunction()
-    return a
+        return GraphFunction(spc.results[ctx], Context.empty(), None)
+    else:
+        assert a.graph not in spc.results
+        return DummyFunction()
 
 
 @abstract_check.variant(
