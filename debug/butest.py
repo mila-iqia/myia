@@ -9,6 +9,8 @@ from itertools import count
 from dataclasses import dataclass
 from buche import buche, H, Reader, Repl, CodeGlobals, BucheDb
 
+from .gprint import mcss
+
 template_path = f'{os.path.dirname(__file__)}/test_template.html'
 
 _currid = count()
@@ -207,6 +209,8 @@ def pytest_sessionstart(session):
     for s in scripts:
         buche(H.script(type="text/javascript", src=s))
     buche(H.span())
+    buche(H.style(mcss))
+    buche.require('cytoscape')
 
 
 def pytest_report_collectionfinish(config, startdir, items):
