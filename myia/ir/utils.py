@@ -173,17 +173,16 @@ def isomorphic(g1, g2, equiv=None):
     g1.return_ and g2.return_ must represent the same node under the
     isomorphism. Parameters must match in the same order.
     """
-    if equiv and (g1, g2) in equiv:
+    if equiv is None:
+        equiv = {}
+
+    if (g1, g2) in equiv:
         return equiv[(g1, g2)] is not False
 
     if len(g1.parameters) != len(g2.parameters):
         return False
 
-    prev_equiv = equiv
-    equiv = dict(zip(g1.parameters, g2.parameters))
-    if prev_equiv:
-        equiv.update(prev_equiv)
-
+    equiv.update(dict(zip(g1.parameters, g2.parameters)))
     equiv[(g1, g2)] = 'PENDING'
     rval = _same_subgraph(g1.return_, g2.return_, equiv)
     equiv[(g1, g2)] = rval
