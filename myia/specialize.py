@@ -11,7 +11,7 @@ from .abstract import GraphFunction, concretize_abstract, \
 from .abstract import Context, Unspecializable, \
     DEAD, POLY, VirtualReference
 from .ir import GraphCloner, Constant, Graph, MetaGraph
-from .prim import ops as P, Primitive
+from .prim import Primitive
 from .utils import overload
 
 
@@ -399,10 +399,6 @@ class _GraphSpecializer:
 
         new_inputs = new_node.inputs
         fn, *args = new_inputs
-        while fn.is_apply(P.partial):
-            args = fn.inputs[2:] + args
-            fn = fn.inputs[1]
-            new_inputs = [fn, *args]
         fnval, *argvals = [x.abstract for x in new_inputs]
         await _helper(0, fn, fnval, argvals)
         for i, val in enumerate(argvals):

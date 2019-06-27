@@ -724,6 +724,32 @@ class PartialInferrer(Inferrer):
         self.fn = fn
         self.args = args
 
+    async def reroute(self, engine, outref, argrefs):
+        """Reroute partial(f, ...)(...) to f(..., ...)."""
+        ctx = outref.context
+        fn, *args = outref.node.inputs
+        collapse = False
+        while True:
+            fn = engine.get_actual_ref(engine.ref(fn, ctx)).node
+            if fn.is_apply():
+                fnfn = await engine.ref(fn.inputs[0], ctx).get()
+                if isinstance(fnfn, AbstractFunction):
+                    poss = await fnfn.get()
+                    if len(poss) == 1:
+                        prim, = poss
+                        if (isinstance(prim, PrimitiveFunction)
+                                and prim.prim is P.partial):
+                            args = fn.inputs[2:] + args
+                            fn = fn.inputs[1]
+                            collapse = True
+                            continue
+            break
+        if collapse:
+            new_node = outref.node.graph.apply(fn, *args)
+            return engine.ref(new_node, ctx)
+        else:
+            return None
+
     async def run(self, engine, outref, argrefs):
         """Run the inference."""
         argvals = tuple([await ref.get() for ref in argrefs])
