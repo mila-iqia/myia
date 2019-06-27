@@ -195,8 +195,7 @@ class Monomorphizer:
             argvals: The abstract arguments given to the function.
 
         Returns:
-            ct: A Constant to use for this call, or None.
-            graph: The graph to use for this call, or None
+            ct: A Constant to use for this call.
             ctx: The context for this call, or None
             norm_ctx: The normalized context for this call, or None
 
@@ -211,7 +210,7 @@ class Monomorphizer:
 
         if isinstance(fn, PrimitiveFunction):
             a = AbstractFunction(TypedPrimitive(fn.prim, argvals, outval))
-            return _const(fn.prim, a), None, None, None
+            return _const(fn.prim, a), None, None
 
         assert isinstance(inf, BaseGraphInferrer)
 
@@ -222,7 +221,8 @@ class Monomorphizer:
         norm_ctx = _normalize_context(ctx)
         if norm_ctx not in self.specializations:
             self.specializations[norm_ctx] = ctx
-        return None, inf.get_graph(self.engine, argvals), ctx, norm_ctx
+        new_ct = _const(_Placeholder(norm_ctx), None)
+        return new_ct, ctx, norm_ctx
 
     def _find_choices(self, inf):
         if inf not in self.infcaches:
@@ -368,27 +368,19 @@ class Monomorphizer:
 
                 fn = a.get_unique()
                 try:
-                    repl, g, ctx, sctx = self.analyze_function(
+                    new_node, ctx, norm_ctx = self.analyze_function(
                         a, fn, entry.argvals)
                 except Unspecializable as e:
-                    repl = _const(e.problem, AbstractError(e.problem))
-                    ctx = None
-                    sctx = None
-
-                if isinstance(fn, GraphFunction) and entry.argvals is None:
-                    self.ctcache[ref.node.value] = sctx
-
-                if ctx is not None and isinstance(g, Graph):
-                    assert ctx.graph is g
-                    todo.append(_TodoEntry(
-                        self.engine.ref(g.return_, ctx),
-                        None, None
-                    ))
-
-                if ctx is not None:
-                    new_node = _const(_Placeholder(sctx), None)
+                    new_node = _const(e.problem, AbstractError(e.problem))
                 else:
-                    new_node = repl
+                    if isinstance(fn, GraphFunction) and entry.argvals is None:
+                        self.ctcache[ref.node.value] = norm_ctx
+
+                    if ctx is not None:
+                        todo.append(_TodoEntry(
+                            self.engine.ref(ctx.graph.return_, ctx),
+                            None, None
+                        ))
 
             if new_node is not entry.ref.node:
                 if entry.link is None:
