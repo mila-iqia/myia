@@ -114,6 +114,10 @@ class Reference(AbstractReference):
         """Get the value (synchronous)."""
         return self.engine.run_coroutine(self.get(), throw=True)
 
+    def get_resolved(self):
+        """Get the value if resolved. Error out if not."""
+        return self.engine.cache.cache[self].result()
+
     def __hash__(self):
         return self._hash
 
