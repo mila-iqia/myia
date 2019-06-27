@@ -177,7 +177,7 @@ def test_no_return__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): def f\(\):\n" + \
         r"(.+?)  \^\^\^\^\^\^\^\^\n" + \
         r"(.+?):     '''\n" + \
@@ -190,10 +190,6 @@ def test_no_return__format(capsys):
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
-
-    with capsys.disabled():
-        print("\nout\n", out)
-        print("\nerr\n", err)
 
     assert match is not None
 
@@ -217,7 +213,7 @@ def test_no_return_while__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): def g\(\):\n" + \
         r"     \^\^\^\^\^\^\^\^\n" + \
         r"(.+?):     y = 0\n" + \
@@ -239,10 +235,6 @@ def test_no_return_while__format(capsys):
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
 
-    with capsys.disabled():
-        print("\nout\n", out)
-        print("\nerr\n", err)
-
     assert match is not None
 
 
@@ -259,7 +251,7 @@ def test_unsupported_AST__error__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): _a0 = \{\}  # noqa: F841\n" + \
         r"(.+?)        \^\^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
@@ -268,10 +260,6 @@ def test_unsupported_AST__error__format(capsys):
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
-
-    with capsys.disabled():
-        print("\nout\n", out)
-        print("\nerr\n", err)
 
     assert match is not None
     #########################################################################
@@ -288,7 +276,7 @@ def test_unsupported_AST__error__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): pass\n" + \
         r"(.+?)  \^\^\^\^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
@@ -313,7 +301,7 @@ def test_unsupported_AST__error__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): import builtins  # noqa: F401\n" + \
         r"(.+?)  \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
@@ -338,7 +326,7 @@ def test_unsupported_AST__error__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): assert True\n" + \
         r"(.+?)  \^\^\^\^\^\^\^\^\^\^\^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
@@ -366,7 +354,7 @@ def test_disconnected_from_output__warning__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): print\(1\)\n" + \
         r"(.+?)  \^\^\^\^\^\^\^\^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
@@ -378,10 +366,6 @@ def test_disconnected_from_output__warning__format(capsys):
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
-
-    with capsys.disabled():
-        print("\nout\n", out)
-        print("\nerr\n", err)
 
     assert match is not None
     #########################################################################
@@ -403,7 +387,7 @@ def test_disconnected_from_output__warning__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): print\(1\)\n" + \
         r"(.+?)  \^\^\^\^\^\^\^\^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
@@ -435,7 +419,7 @@ def test_disconnected_from_output__warning__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): b2\(\)\n" + \
         r"(.+?)  \^\^\^\^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
@@ -465,7 +449,7 @@ def test_disconnected_from_output__warning__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): x = 1  # noqa: F841\n" + \
         r"(.+?)     \^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
@@ -497,7 +481,7 @@ def test_disconnected_from_output__warning__format(capsys):
 
     reg_pattern = r"========================================" + \
         r"========================================\n" + \
-        r"(.+?)myia/tests/test_parser\.py:(.+?)\n" + \
+        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): x = 1  # noqa: F841\n" + \
         r"(.+?)     \^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
