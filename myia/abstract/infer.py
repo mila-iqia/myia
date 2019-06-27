@@ -129,12 +129,12 @@ class InferenceEngine:
     async def compute_ref(self, ref):
         """Compute the value associated to the Reference."""
         node = ref.node
-        inferred = ref.node.abstract
 
-        if inferred is not None:
-            return inferred
-
-        elif node.is_constant():
+        if node.is_constant():
+            inferred = ref.node.abstract
+            if (inferred is not None
+                    and not isinstance(inferred, AbstractFunction)):
+                return inferred
             return await self.infer_constant(ref)
 
         elif node.is_apply():
