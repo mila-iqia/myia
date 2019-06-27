@@ -9,8 +9,8 @@ from myia.abstract import (
     AbstractValue, AbstractScalar, AbstractFunction, AbstractTuple,
     AbstractList, AbstractClassBase, AbstractJTagged, AbstractArray,
     GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
-    MetaGraphFunction, AbstractUnion, VALUE, ANYTHING,
-    PendingTentative
+    MetaGraphFunction, AbstractUnion, VALUE, ANYTHING, JTransformedFunction,
+    VirtualFunction, PendingTentative
 )
 from myia.dtype import Type, Bool, Int, Float, TypeMeta, UInt
 from myia.utils import OrderedSet, UNKNOWN, SymbolicKeyInstance
@@ -1295,9 +1295,8 @@ class _AbstractList:
 @mixin(AbstractClassBase)
 class _AbstractClassBase:
     def __hrepr__(self, H, hrepr):
-        tagname = self.tag.__qualname__
         return hrepr.stdrepr_object(
-            f'★{tagname}',
+            f'★{self.tag.__qualname__}',
             self.attributes.items(),
             delimiter="↦",
             cls='abstract'
@@ -1307,9 +1306,13 @@ class _AbstractClassBase:
 @mixin(GraphFunction)
 class _GraphFunction:
     def __hrepr__(self, H, hrepr):
+        optkey = ([('tracking_id', self.tracking_id)]
+                  if self.tracking_id is not None else [])
         return hrepr.stdrepr_object(
             'GraphFunction',
-            (('graph', self.graph), ('context', self.context)),
+            (('graph', self.graph),
+             ('context', self.context),
+             *optkey),
             delimiter="↦",
         )
 
@@ -1352,5 +1355,26 @@ class _PrimitiveFunction:
         return hrepr.stdrepr_object(
             'PrimitiveFunction',
             (('prim', self.prim),),
+            delimiter="↦",
+        )
+
+
+@mixin(JTransformedFunction)
+class _JTransformedFunction:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_object(
+            'JTransformedFunction',
+            (('fn', self.fn),),
+            delimiter="↦",
+        )
+
+
+@mixin(VirtualFunction)
+class _VirtualFunction:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_object(
+            'VirtualFunction',
+            (('args', self.args),
+             ('output', self.output)),
             delimiter="↦",
         )

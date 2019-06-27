@@ -667,7 +667,7 @@ def resolve_globals(optimizer, node, equiv):
 ############
 
 
-def make_inliner(inline_criterion, check_recursive):
+def make_inliner(inline_criterion, check_recursive, name):
     """Create an inliner.
 
     Args:
@@ -675,6 +675,7 @@ def make_inliner(inline_criterion, check_recursive):
             returns whether the graph should be inlined or not.
         check_recursive: Check whether a function is possibly recursive
             before inlining it. If it is, don't inline.
+        name: The name of the optimization.
     """
     @pattern_replacer(G, Xs, interest=Graph)
     def inline(optimizer, node, equiv):
@@ -695,6 +696,7 @@ def make_inliner(inline_criterion, check_recursive):
         clone = GraphCloner(inline=(g, node.graph, args), total=False)
         return clone[g.output]
 
+    inline.name = name
     return inline
 
 
@@ -727,19 +729,25 @@ def caller_is_marked(g, node, args):
 
 
 inline_trivial = make_inliner(inline_criterion=is_trivial_graph,
-                              check_recursive=False)
+                              check_recursive=False,
+                              name='inline_trivial')
 
 inline_unique_uses = make_inliner(inline_criterion=is_unique_use,
-                                  check_recursive=True)
+                                  check_recursive=True,
+                                  name='inline_unique_uses')
 
 inline_core = make_inliner(inline_criterion=is_core,
-                           check_recursive=False)
+                           check_recursive=False,
+                           name='inline_core')
 
 inline_inside_marked_caller = \
     make_inliner(inline_criterion=caller_is_marked,
-                 check_recursive=False)
+                 check_recursive=False,
+                 name='inline_inside_marked_caller')
 
-inline = make_inliner(inline_criterion=None, check_recursive=True)
+inline = make_inliner(inline_criterion=None,
+                      check_recursive=True,
+                      name='inline')
 
 
 @pattern_replacer('just', G, interest=None)

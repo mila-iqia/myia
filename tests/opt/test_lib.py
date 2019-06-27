@@ -770,7 +770,8 @@ def test_inline_criterion():
 
     inline_binary = lib.make_inliner(
         lambda node, g, args: len(args) == 2,
-        check_recursive=False
+        check_recursive=False,
+        name='inline_binary'
     )
 
     def bin(x, y):
