@@ -488,7 +488,7 @@ def test_freevar_outside_grad():
 
         def mula(z):
             return a * z
-        res, bprop = J(mula)(J(y))
+        _, bprop = J(mula)(J(y))
         return bprop(1)[1]
 
     assert _runwith(f, 5.0, 8.0) == 25.0
@@ -502,7 +502,7 @@ def test_freegraph_outside_grad():
 
         def mulsqx(z):
             return sqx() * z
-        res, bprop = J(mulsqx)(J(y))
+        _, bprop = J(mulsqx)(J(y))
         return bprop(1)[1]
 
     assert _runwith(f, 5.0, 8.0) == 25.0

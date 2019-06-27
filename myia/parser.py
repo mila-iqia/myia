@@ -34,14 +34,16 @@ import ast
 import asttokens
 import inspect
 import textwrap
+import warnings
 from types import FunctionType
-from typing import Dict, List, NamedTuple, Optional, Tuple, \
-    overload as pyoverload
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 from .info import About, DebugInherit, NamedDebugInfo
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
+from .ir.utils import succ_deeper
 from .prim import ops as primops
-from .utils import ModuleNamespace, ClosureNamespace
+from .utils import ModuleNamespace, ClosureNamespace, OrderedSet
+from .graph_utils import dfs
 
 
 _parse_cache = {}
@@ -67,6 +69,15 @@ class Location(NamedTuple):
 
 class MyiaSyntaxError(Exception):
     """Exception to indicate that the syntax is invalid for myia."""
+
+    def __init__(self, msg, loc):
+        """Initialize with a message and source location."""
+        super().__init__(msg)
+        self.loc = loc
+
+
+class MyiaDisconnectedCodeWarning(UserWarning):
+    """Warning to indicate that code is disconnected from output."""
 
     def __init__(self, msg, loc):
         """Initialize with a message and source location."""
@@ -111,7 +122,7 @@ ast_map = {
 
 def _fresh(node):
     """If node is a constant, return a copy of it."""
-    if node.is_constant():
+    if node.is_constant_graph():
         return Constant(node.value)
     else:
         return node
@@ -165,6 +176,12 @@ class Parser:
         self.closure_namespace = ClosureNamespace(self.function)
         # Will be set later
         self.graph = None
+        # Flag that indicates if node is used by output
+        self.flag_used = 0
+        # Cache of all nodes that are written
+        self.write_cache = OrderedSet()
+        # Cache of all nodes that are read
+        self.read_cache = OrderedSet()
 
     def make_location(self, node) -> Location:
         """Create a Location from an AST node."""
@@ -214,6 +231,28 @@ class Parser:
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
         graph = self._process_function(None, function_def).graph
+        for node in dfs(graph.return_, succ_deeper):
+            if node.is_constant_graph():
+                if node.value.return_ is None:
+                    current = node.value.debug
+                    while getattr(current, "about", None) is not None:
+                        current = getattr(current.about, 'debug', None)
+                    raise MyiaSyntaxError(
+                        "Function doesn't return a value in all cases",
+                        current.location)
+
+        diff_cache = self.write_cache - self.read_cache
+        if diff_cache:
+            for _, varname, node in diff_cache:
+                if varname != '_':
+                    warnings.warn(MyiaDisconnectedCodeWarning(
+                        f"{varname} is not used " +
+                        f"and will therefore not be computed",
+                        node.debug.location)
+                    )
+
+        self.write_cache = OrderedSet()
+        self.read_cache = OrderedSet()
         return graph
 
     def process_FunctionDef(self, block: 'Block',
@@ -227,13 +266,14 @@ class Parser:
 
         """
         function_block = self._process_function(block, node)
-        block.write(node.name, Constant(function_block.graph))
+        block.write(node.name, Constant(function_block.graph), track=False)
         return block
 
     def _process_function(self, block: Optional['Block'],
                           node: ast.FunctionDef) -> Tuple['Block', 'Block']:
         """Process a function definition and return first and final blocks."""
-        function_block = Block(self)
+        with DebugInherit(ast=node, location=self.make_location(node)):
+            function_block = Block(self)
         if block:
             function_block.preds.append(block)
         else:
@@ -251,8 +291,10 @@ class Parser:
                 anf_node = Parameter(function_block.graph)
             anf_node.debug.name = arg.arg
             function_block.graph.parameters.append(anf_node)
-            function_block.write(arg.arg, anf_node)
-        function_block.write(node.name, Constant(function_block.graph))
+            function_block.write(arg.arg, anf_node, track=False)
+        function_block.write(node.name,
+                             Constant(function_block.graph),
+                             track=False)
         self.process_statements(function_block, node.body)
         if function_block.graph.return_ is None:
             raise MyiaSyntaxError("Function doesn't return a value",
@@ -260,27 +302,21 @@ class Parser:
         # TODO: check that if after_block returns?
         return function_block
 
-    @pyoverload
-    def process_node(self, block: 'Block', node: ast.expr) -> ANFNode:
-        pass
-
-    @pyoverload  # noqa
-    def process_node(self, block: 'Block', node: ast.slice) -> ANFNode:
-        pass
-
-    @pyoverload  # noqa
-    def process_node(self, block: 'Block', node: ast.stmt) -> 'Block':
-        pass
-
-    def process_node(self, block, node):  # noqa
+    def process_node(self, block, node, used=True):  # noqa
         """Process an ast node."""
+        if used:
+            self.flag_used += 1
         method_name = f'process_{node.__class__.__name__}'
         method = getattr(self, method_name, None)
         if method:
             with DebugInherit(ast=node, location=self.make_location(node)):
-                return method(block, node)
+                m = method(block, node)
+                if used:
+                    self.flag_used -= 1
+                return m
         else:
-            raise NotImplementedError(node)  # pragma: no cover
+            raise MyiaSyntaxError(f"{node.__class__.__name__} not supported",
+                                  self.make_location(node))
 
     # Expression implementations
 
@@ -342,8 +378,8 @@ class Parser:
         true_block.graph.debug.location = self.make_location(node.body)
         false_block.graph.debug.location = self.make_location(node.orelse)
 
-        tb = self.process_node(true_block, node.body)
-        fb = self.process_node(false_block, node.orelse)
+        tb = self.process_node(true_block, node.body, used=False)
+        fb = self.process_node(false_block, node.orelse, used=False)
 
         tg = true_block.graph
         fg = false_block.graph
@@ -419,7 +455,7 @@ class Parser:
 
     def process_Index(self, block: 'Block', node: ast.Index) -> ANFNode:
         """Process subscript indexes."""
-        return self.process_node(block, node.value)
+        return self.process_node(block, node.value, used=False)
 
     def process_Attribute(self, block: 'Block',
                           node: ast.Attribute) -> ANFNode:
@@ -441,7 +477,7 @@ class Parser:
 
         """
         for node in nodes:
-            block = self.process_node(block, node)
+            block = self.process_node(block, node, used=False)
         return block
 
     def process_Return(self, block: 'Block', node: ast.Return) -> 'Block':
@@ -487,6 +523,13 @@ class Parser:
 
         This ignores the statement.
         """
+        if self.flag_used == 0 and not isinstance(node.value, ast.Str):
+            warnings.warn(MyiaDisconnectedCodeWarning(
+                f"Expression was not assigned to a variable." +
+                f"\n\tAs a result, it is not connected to the output " +
+                f"and will not be executed.",
+                self.make_location(node))
+                )
         return block
 
     def process_If(self, block: 'Block', node: ast.If) -> 'Block':
@@ -739,6 +782,7 @@ class Block:
 
         """
         if varnum in self.variables:
+            self.parser.read_cache.add((self, varnum, self.variables[varnum]))
             return _fresh(self.variables[varnum])
         if self.matured:
             if len(self.preds) == 1:
@@ -760,7 +804,7 @@ class Block:
             self.set_phi_arguments(phi)
         return phi
 
-    def write(self, varnum: str, node: ANFNode) -> None:
+    def write(self, varnum: str, node: ANFNode, track=True) -> None:
         """Write a variable.
 
         When assignment is used to bound a value to a name, we store this
@@ -769,9 +813,12 @@ class Block:
         Args:
             varnum: The name of the variable to store.
             node: The node representing this value.
+            track: True if we want to warn about this variable not being used.
 
         """
         self.variables[varnum] = node
+        if track and not node.is_parameter():
+            self.parser.write_cache.add((self, varnum, node))
 
     def jump(self, target: 'Block', *args) -> Apply:
         """Jumping from one block to the next becomes a tail call.
