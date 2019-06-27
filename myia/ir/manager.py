@@ -560,6 +560,11 @@ class GraphManager(Partializable):
         self.manage = manage
         self.reset()
 
+    def clear(self):
+        """Clear the manager entirely."""
+        self.roots = []
+        self.reset()
+
     def reset(self):
         """Reset the manager's state.
 
