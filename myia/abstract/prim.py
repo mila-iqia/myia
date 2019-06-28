@@ -26,6 +26,7 @@ from .data import (
     AbstractClassBase,
     AbstractClass,
     AbstractJTagged,
+    AbstractBottom,
     PartialApplication,
     JTransformedFunction,
     PrimitiveFunction,
@@ -969,6 +970,11 @@ async def _inf_identity(engine, x):
 @standard_prim(P.return_)
 async def _inf_return(engine, x):
     return x
+
+
+@standard_prim(P.raise_)
+async def _inf_raise(engine, x):
+    return AbstractBottom()
 
 
 def _resolve_chk(data_v, item_v):

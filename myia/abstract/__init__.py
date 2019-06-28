@@ -57,6 +57,7 @@ from .data import (  # noqa
     AbstractADT,
     AbstractJTagged,
     AbstractUnion,
+    AbstractBottom,
     TrackDict,
     Track,
     VALUE,

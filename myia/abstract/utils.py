@@ -31,6 +31,7 @@ from .data import (
     AbstractADT,
     AbstractJTagged,
     AbstractUnion,
+    AbstractBottom,
     TrackDict,
     PartialApplication,
     JTransformedFunction,
@@ -636,6 +637,13 @@ def amerge(__call__, x1, x2, loop, forced, bind_pending=True,
         return bind(loop, x1 if forced else None, [x2], [x1])
     elif isp2:
         return bind(loop, x1 if forced else None, [x1], [x2])
+    elif isinstance(x2, AbstractBottom):  # pragma: no cover
+        return x1
+    elif isinstance(x1, AbstractBottom):
+        if forced:  # pragma: no cover
+            # I am not sure how to trigger this
+            raise TypeMismatchError(x1, x2)
+        return x2
     elif x1 is ANYTHING:
         return x1
     elif x2 is ANYTHING:

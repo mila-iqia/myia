@@ -328,6 +328,27 @@ def test_tail_call():
         return x
 
 
+def test_raise():
+    @compile
+    def f(x):
+        if x == 0:
+            return 1
+        elif x >= 10:
+            raise "too big"
+        else:
+            return x * f(x - 1)
+
+    assert f(5) == 120
+
+    try:
+        f(10)
+    except Exception as exc:
+        assert type(exc) is Exception
+        assert exc.args == ('too big',)
+    else:
+        raise Exception('Expected an exception')
+
+
 #####################################################
 # Test convert_arg_init functions used by to_device #
 #####################################################
