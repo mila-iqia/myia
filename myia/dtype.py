@@ -164,6 +164,10 @@ class EnvType(Object):
     """
 
 
+class ExceptionType(Object):
+    """Represents an exception."""
+
+
 i8 = Int[8]
 i16 = Int[16]
 i32 = Int[32]

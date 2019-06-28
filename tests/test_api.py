@@ -334,7 +334,7 @@ def test_raise():
         if x == 0:
             return 1
         elif x >= 10:
-            raise "too big"
+            raise Exception("too big")
         else:
             return x * f(x - 1)
 

@@ -473,9 +473,13 @@ def return_(x):
 @register(primops.raise_)
 def raise_(x):
     """Implement `raise_`."""
-    if isinstance(x, str):
-        x = Exception(x)
     raise x
+
+
+@register(primops.exception)
+def exception(x):
+    """Implement `exception`."""
+    return Exception(x)
 
 
 @register(primops.scalar_cast)

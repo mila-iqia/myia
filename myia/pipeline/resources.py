@@ -61,6 +61,7 @@ scalar_object_map = {
     math.cos: P.scalar_cos,
     math.tan: P.scalar_tan,
     sum: C.sum,
+    Exception: P.exception,
 }
 
 
@@ -127,6 +128,7 @@ standard_object_map = {
     np.tanh: C.tanh,
     np.sum: C.sum,
     sum: C.sum,
+    Exception: P.exception,
 }
 
 
