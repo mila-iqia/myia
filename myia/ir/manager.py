@@ -344,10 +344,10 @@ class GDepTotalStatistic(NestingStatisticGraphWise):
         if path is None:
             path = set()
         if g in path:
-            return set()
+            return OrderedSet()
         all_deps = self.manager.graph_dependencies_prox
         deps = all_deps[g]
-        parents = set()
+        parents = OrderedSet()
         for dep in deps:
             if isinstance(dep, ParentProxy):
                 parents |= self._compute(dep.graph, path | {g})
@@ -365,8 +365,8 @@ class ParentStatistic(NestingStatisticGraphWise):
         if g in self:
             return self.get(g)
         all_deps = self.manager.graph_dependencies_total
-        todo = set(all_deps[g])
-        deps = set(all_deps[g])
+        todo = OrderedSet(all_deps[g])
+        deps = OrderedSet(all_deps[g])
         while todo:
             # We eliminate all grandparents
             g2 = todo.pop()
@@ -462,7 +462,7 @@ class GraphsReachableStatistic(UsesStatistic):
         used = self.manager.graphs_used
         todo = {g}
         seen = set()
-        reach = set()
+        reach = OrderedSet()
         while todo:
             g2 = todo.pop()
             if g2 in seen:
@@ -646,7 +646,7 @@ class GraphManager(Partializable):
 
     def _maybe_drop_graphs(self, graphs, ignore_users=False):
         todo = OrderedSet(graphs)
-        dropped = set()
+        dropped = OrderedSet()
 
         while todo:
             graph = todo.pop()
