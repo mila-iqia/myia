@@ -489,6 +489,17 @@ class Parser:
         block.graph.return_ = return_
         return block
 
+    def process_Raise(self, block: 'Block', node: ast.Raise) -> 'Block':
+        """Process a raise statement."""
+        inputs = [Constant(primops.raise_),
+                  self.process_node(block, node.exc)]
+        raise_ = Apply(inputs, block.graph)
+        inputs = [Constant(primops.return_), raise_]
+        return_ = Apply(inputs, block.graph)
+        assert block.graph.return_ is None
+        block.graph.return_ = return_
+        return block
+
     def process_Assign(self, block: 'Block', node: ast.Assign) -> 'Block':
         """Process an assignment."""
         anf_node = self.process_node(block, node.value)

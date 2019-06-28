@@ -250,6 +250,17 @@ class AbstractError(AbstractAtom):
         return f'E({self.values[VALUE]})'
 
 
+class AbstractBottom(AbstractAtom):
+    """Represents the type of an expression that does not return."""
+
+    def __init__(self):
+        """Initialize an AbstractBottom."""
+        super().__init__({})
+
+    def __pretty__(self, ctx):
+        return '⊥'
+
+
 class AbstractExternal(AbstractAtom):
     """Represents a value with an external type, coming from Python."""
 

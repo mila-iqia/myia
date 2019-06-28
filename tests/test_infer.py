@@ -31,7 +31,7 @@ from myia.utils import newenv
 from .common import B, \
     Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
-    to_abstract_test, EmptyTuple, U, Ex
+    to_abstract_test, EmptyTuple, U, Ex, Bot
 
 
 ai64 = Array[i64]
@@ -1793,6 +1793,58 @@ def test_unsafe_static_cast(x):
        (i32, (i32, i32), InferenceError))
 def test_unsafe_static_cast_error(x, y):
     return unsafe_static_cast(x, y)
+
+
+@infer((i32, i32))
+def test_raise(x):
+    if x >= 0:
+        return x ** 0.5
+    else:
+        raise "sqrt of negative number"
+
+
+@infer((i32, Bot))
+def test_raise_unconditional(x):
+    raise "I don't like your face"
+
+
+@infer((i32, i32))
+def test_raise_multiple(x):
+    if x < 0:
+        raise "You are too ugly"
+    elif x > 0:
+        raise "You are too beautiful"
+    else:
+        return x
+
+
+@infer((i32, Bot), (f64, f64), (U(i32, i64), i64))
+def test_raise_hastype(x):
+    if hastype(x, i32):
+        raise "What a terrible type"
+    else:
+        return x
+
+
+@infer((i32, i32))
+def test_raise_loop(x):
+    while x < 100:
+        x = x * x
+        if x > 150:
+            raise "oh no"
+    return x
+
+
+@infer((i32, i32))
+def test_raise_rec(x):
+    def f(x):
+        if x == 0:
+            return 1
+        elif x >= 10:
+            raise "too big"
+        else:
+            return x * f(x - 1)
+    return f(x)
 
 
 @infer(
