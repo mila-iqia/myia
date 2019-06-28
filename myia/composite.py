@@ -289,7 +289,7 @@ def int_truediv(x, y):
             return scalar_div(scalar_cast(x, f32), scalar_cast(y, f32))
         return scalar_div(scalar_cast(x, f64), scalar_cast(y, f64))
     else:
-        raise "Incompatible types for division."
+        raise Exception("Incompatible types for division.")
 
 
 @core

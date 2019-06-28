@@ -1800,20 +1800,20 @@ def test_raise(x):
     if x >= 0:
         return x ** 0.5
     else:
-        raise "sqrt of negative number"
+        raise Exception("sqrt of negative number")
 
 
 @infer((i32, Bot))
 def test_raise_unconditional(x):
-    raise "I don't like your face"
+    raise Exception("I don't like your face")
 
 
 @infer((i32, i32))
 def test_raise_multiple(x):
     if x < 0:
-        raise "You are too ugly"
+        raise Exception("You are too ugly")
     elif x > 0:
-        raise "You are too beautiful"
+        raise Exception("You are too beautiful")
     else:
         return x
 
@@ -1821,7 +1821,7 @@ def test_raise_multiple(x):
 @infer((i32, Bot), (f64, f64), (U(i32, i64), i64))
 def test_raise_hastype(x):
     if hastype(x, i32):
-        raise "What a terrible type"
+        raise Exception("What a terrible type")
     else:
         return x
 
@@ -1831,7 +1831,7 @@ def test_raise_loop(x):
     while x < 100:
         x = x * x
         if x > 150:
-            raise "oh no"
+            raise Exception("oh no")
     return x
 
 
@@ -1841,7 +1841,7 @@ def test_raise_rec(x):
         if x == 0:
             return 1
         elif x >= 10:
-            raise "too big"
+            raise Exception("too big")
         else:
             return x * f(x - 1)
     return f(x)

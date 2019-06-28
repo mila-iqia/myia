@@ -9,7 +9,7 @@ from operator import getitem
 from .. import dtype
 from ..abstract import typecheck
 from ..ir import Graph, GraphCloner, CloneRemapper
-from ..dtype import Number, Bool
+from ..dtype import Number, Bool, ExceptionType
 from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance
 
@@ -973,8 +973,13 @@ async def _inf_return(engine, x):
 
 
 @standard_prim(P.raise_)
-async def _inf_raise(engine, x):
+async def _inf_raise(engine, x: ExceptionType):
     return AbstractBottom()
+
+
+@standard_prim(P.exception)
+async def _inf_exception(engine, x):
+    return AbstractScalar({VALUE: ANYTHING, TYPE: ExceptionType})
 
 
 def _resolve_chk(data_v, item_v):
