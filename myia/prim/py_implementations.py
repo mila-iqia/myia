@@ -267,6 +267,12 @@ def list_getitem(data, item):
     return data[item]
 
 
+@py_register(primops.dict_getitem)
+def dict_getitem(data, item):
+    """Implement `dict_getitem`."""
+    return data[item]
+
+
 @py_register(primops.array_getitem)
 def array_getitem(data, item):
     """Implement `getitem`."""
@@ -618,6 +624,12 @@ def _len(x):
 def make_list(*xs):
     """Implement `make_list`."""
     return list(xs)
+
+
+@register(primops.make_dict)
+def make_dict(typ, *values):
+    """Implement `make_dict`."""
+    return dict(zip(typ.entries.keys(), values))
 
 
 @py_register(primops.list_reduce)

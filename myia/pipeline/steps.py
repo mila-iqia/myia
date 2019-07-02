@@ -9,7 +9,7 @@ from itertools import count
 
 from .. import dtype
 from ..abstract import AbstractTuple, AbstractList, AbstractClassBase, \
-    AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE
+    AbstractDict, AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, NodeMap, \
@@ -507,6 +507,18 @@ def convert_arg(self, arg, orig_t: AbstractList, backend):
 
 
 @overload  # noqa: F811
+def convert_arg(self, arg, orig_t: AbstractDict, backend):
+    if not isinstance(arg, dict):
+        raise TypeError('Expected dict')
+    types = orig_t.entries
+    if len(arg) != len(types):
+        raise TypeError("Dictionary input doesn't have the expected size")
+    if set(arg.keys()) != set(types.keys()):
+        raise TypeError("Mismatched keys for input dictionary.")
+    return tuple(self(arg[k], o, backend) for k, o in orig_t.entries.items())
+
+
+@overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractClassBase, backend):
     if not isinstance(arg, orig_t.tag):
         raise TypeError(f'Expected {orig_t.tag.__qualname__}')
@@ -586,8 +598,11 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
                    return_backend):
     # If the EraseClass opt was applied, orig_t may be Class
     orig_is_class = isinstance(orig_t, AbstractClassBase)
+    orig_is_dict = isinstance(orig_t, AbstractDict)
     if orig_is_class:
         oe = orig_t.attributes.values()
+    elif orig_is_dict:
+        oe = orig_t.entries.values()
     else:
         oe = orig_t.elements
     ve = vm_t.elements
@@ -595,6 +610,8 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
                 for x, o, v in zip(res, oe, ve))
     if orig_is_class:
         return orig_t.constructor(*tup)
+    elif orig_is_dict:
+        return dict(zip(orig_t.entries.keys(), tup))
     else:
         return tup
 

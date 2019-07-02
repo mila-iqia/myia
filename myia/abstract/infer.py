@@ -21,8 +21,8 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     VirtualFunction, AbstractFunction, AbstractExternal, \
     VALUE, TYPE, SHAPE, DATA, DummyFunction, AbstractError, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractList, type_error_nargs, TypeDispatchError, AbstractADT, \
-    InferenceError, PrimitiveFunction, MetaGraphFunction, Function
+    AbstractList, AbstractDict, type_error_nargs, TypeDispatchError, \
+    AbstractADT, InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind, type_to_abstract, normalize_adt, concretize_abstract
 
@@ -488,6 +488,14 @@ def to_abstract(self, v: list, context, ref, loop):
     if len(v) == 0:
         raise NotImplementedError('No support for empty lists yet.')
     return AbstractList(self(v[0], context, loop=loop))
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: dict, context, ref, loop):
+    if len(v) == 0:
+        raise NotImplementedError('No support for empty dicts yet.')
+    entries = dict((k, self(val)) for k, val in v.items())
+    return AbstractDict(entries)
 
 
 @overload  # noqa: F811

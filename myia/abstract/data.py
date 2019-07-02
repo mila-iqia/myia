@@ -450,6 +450,38 @@ class AbstractList(AbstractStructure):
         return pretty_join(['[', elem, ']'])
 
 
+class AbstractDict(AbstractStructure):
+    """Represents a dictionary.
+
+    Dictionaries must have the same type for all the values.
+
+    Attributes:
+      entries: dict mapping string keys to types
+
+    """
+
+    def __init__(self, entries, values=None):
+        """Initalize an AbstractDict."""
+        super().__init__(values or {})
+        self.entries = entries
+
+    def children(self):
+        """Return the dict element."""
+        return tuple(self.entries.values())
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'entries',
+                             Atom(self, tuple(self.entries.keys()))))
+
+    def __pretty__(self, ctx):
+        lst = ['{']
+        for k, v in self.entries.items():
+            lst.append(f'{k}: {pretty_python_value(v, ctx)}')
+        lst.append('}')
+        return pretty_join(lst, sep=',\n')
+
+
 class AbstractClassBase(AbstractStructure):
     """Represents a class with named attributes and methods.
 

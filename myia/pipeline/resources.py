@@ -49,6 +49,7 @@ scalar_object_map = {
     operations.len: C._len,
     operations.make_tuple: P.make_tuple,
     operations.make_list: P.make_list,
+    operations.make_dict: P.make_dict,
     operations.iter: C.iter,
     operations.hasnext: C.hasnext,
     operations.next: C.next,
@@ -102,6 +103,7 @@ standard_object_map = {
     operations.len: C._len,
     operations.make_tuple: P.make_tuple,
     operations.make_list: P.make_list,
+    operations.make_dict: P.make_dict,
     operations.iter: C.iter,
     operations.hasnext: C.hasnext,
     operations.next: C.next,
@@ -225,6 +227,9 @@ standard_method_map = TypeMap({
         '__getitem__': P.list_getitem,
         '__setitem__': P.list_setitem,
         '__myia_iter__': C.list_iter,
+    },
+    abstract.AbstractDict: {
+        '__getitem__': P.dict_getitem,
     },
     abstract.AbstractArray: {
         '__add__': C.add,

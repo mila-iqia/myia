@@ -46,7 +46,7 @@ class BackendOption:
         return tuple(to_device(arg, self.backend) for arg in args)
 
 
-def parse_compare(*tests):
+def parse_compare(*tests, justeq=False):
     """Decorate a function to run it against pure python.
 
     This will run and compare the function using all available backends.
@@ -61,8 +61,7 @@ def parse_compare(*tests):
             myia_fn = res['output']
             myia_args = backend_opt.convert_args(args)
             myia_result = myia_fn(*myia_args)
-            if (ref_result is True) or (ref_result is False) \
-                    or (ref_result is None):
+            if justeq:
                 assert ref_result == myia_result
             else:
                 np.testing.assert_allclose(ref_result, myia_result)
@@ -321,18 +320,18 @@ def test_call_hof(c, x, y):
     return choose(c)(x) + choose(not c)(x)
 
 
-@parse_compare((None,), (True,), (False,))
+@parse_compare((None,), (True,), (False,), justeq=True)
 def test_bool_and_nil_args(x):
     return x
 
 
-@parse_compare((None,))
+@parse_compare((None,), justeq=True)
 def test_True_assign(_x):
     x = True
     return x
 
 
-@parse_compare((None,))
+@parse_compare((None,), justeq=True)
 def test_False_assign(_x):
     x = False
     return x

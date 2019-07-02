@@ -4,7 +4,7 @@ import numpy as np
 from dataclasses import dataclass, is_dataclass
 from myia import dtype
 from myia.abstract import VALUE, TYPE, SHAPE, \
-    AbstractValue, AbstractScalar, AbstractArray, \
+    AbstractValue, AbstractScalar, AbstractArray, AbstractDict, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged, AbstractUnion, AbstractExternal, ANYTHING, from_value, \
     AbstractBottom
@@ -54,6 +54,17 @@ def af32_of(*shp, value=ANYTHING):
 
 def af16_of(*shp, value=ANYTHING):
     return arr_of(f16, shp, value)
+
+
+def D(__d=None, **dct):
+    if __d is None:
+        d = {}
+    else:
+        d = __d
+    d.update(**dct)
+    keys = list(d.keys())
+    values = list(to_abstract_test(v) for v in d.values())
+    return AbstractDict(dict(zip(keys, values)))
 
 
 def JT(a):

@@ -4,13 +4,18 @@ from ..dtype import Int
 from ..ir import Constant
 from ..prim import ops as P
 from ..abstract import abstract_clone, AbstractClassBase, AbstractTuple, \
-    AbstractScalar, VALUE, TYPE
-from ..utils import is_dataclass_type
+    AbstractScalar, AbstractDict, VALUE, TYPE
+from ..utils import is_dataclass_type, overload
 
 
 @abstract_clone.variant
 def _reabs(self, a: AbstractClassBase):
     return (yield AbstractTuple)(self(x) for x in a.attributes.values())
+
+
+@overload  # noqa: F811
+def _reabs(self, a: AbstractDict):
+    return (yield AbstractTuple)(self(x) for x in a.entries.values())
 
 
 def erase_class(root, manager):
@@ -38,7 +43,23 @@ def erase_class(root, manager):
             })
             new_node = node.graph.apply(P.tuple_getitem, data, idx_c)
 
+        elif node.is_apply(P.dict_getitem):
+            _, data, item = node.inputs
+            dt = data.abstract
+            assert isinstance(dt, AbstractDict)
+            idx = list(dt.entries.keys()).index(item.value)
+            idx_c = Constant(idx)
+            idx_c.abstract = AbstractScalar({
+                VALUE: idx,
+                TYPE: Int[64],
+            })
+            new_node = node.graph.apply(P.tuple_getitem, data, idx_c)
+
         elif node.is_apply(P.make_record):
+            mkr, typ, *args = node.inputs
+            new_node = node.graph.apply(P.make_tuple, *args)
+
+        elif node.is_apply(P.make_dict):
             mkr, typ, *args = node.inputs
             new_node = node.graph.apply(P.make_tuple, *args)
 
@@ -53,6 +74,11 @@ def erase_class(root, manager):
                     )
 
         elif node.is_constant(AbstractClassBase):
+            # This is a constant that contains a type, used e.g. with hastype.
+            new_node = Constant(_reabs(node.value))
+            keep_abstract = False
+
+        elif node.is_constant(AbstractDict):
             # This is a constant that contains a type, used e.g. with hastype.
             new_node = Constant(_reabs(node.value))
             keep_abstract = False
