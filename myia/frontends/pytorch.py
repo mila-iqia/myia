@@ -61,12 +61,14 @@ class AbstractParameter(AbstractTensor):
 @to_abstract.variant
 def _to_abstract(self, v: torch.nn.Module, context, ref, loop):
     fwd_fn = getattr(type(v), 'forward')
+    
     attrs = {c[0]: self(c[1]) for c in v._modules.items()}
 
     for par_k, par_v in v._parameters.items():
         attrs[par_k] = self(par_v)
 
     for var_k, var_v in vars(v).items():
+        #TODO: should torch.nn.Module be an instance type to check for?
         if isinstance(var_v, (torch.nn.Module, torch.Tensor)):
             attrs[var_k] = self(var_v)
 
