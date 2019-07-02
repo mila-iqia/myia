@@ -12,6 +12,7 @@ from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
     AbstractList, AbstractClass, AbstractArray, AbstractScalar
 # TODO: AbstractUnion overload for _convert_arg_init
 from .compile.backends import load_backend, Backend
+from .frontends import load_frontend
 
 
 #################
@@ -34,7 +35,7 @@ class MyiaFunction:
     """
 
     def __init__(self, fn, specialize_values=[], return_backend=False,
-                 backend=None, backend_options=None):
+                 backend=None, backend_options=None, frontend=None):
         """Initialize a MyiaFunction."""
         self.fn = fn
         self.specialize_values = set(specialize_values)
@@ -44,6 +45,7 @@ class MyiaFunction:
             'wrap.return_backend': return_backend
         })
         self._cache = {}
+        self.frontend = load_frontend(frontend)
 
     def specialize(self, args):
         """Specialize on the types of the given arguments.
@@ -60,7 +62,9 @@ class MyiaFunction:
             )
 
         argspec = tuple(
-            from_value(arg, broaden=name not in self.specialize_values)
+            from_value(arg,
+                broaden=name not in self.specialize_values,
+                frontend=self.frontend)
             for arg, name in zip(args, argnames)
         )
 
@@ -82,7 +86,7 @@ class MyiaFunction:
 
 @keyword_decorator
 def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
-         return_backend=False):
+         return_backend=False, frontend=None):
     """Create a function using Myia's runtime.
 
     `@myia` can be used as a simple decorator. If custom options are needed,
@@ -103,10 +107,12 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
         backend: the backend to use for compilation
         backend_options: backend-specific options.
         return_backend: return backend values (avoids copies to CPU).
+        frontend: the frontend to use
     """
     return MyiaFunction(fn, specialize_values, backend=backend,
                         backend_options=backend_options,
-                        return_backend=return_backend)
+                        return_backend=return_backend,
+                        frontend=frontend)
 
 
 ######################################################################

@@ -358,7 +358,7 @@ _number_types = [
 ]
 
 
-def from_value(v, broaden=False):
+def from_value(v, broaden=False, frontend=None):
     """Convert a value to an abstract value.
 
     Arguments:
@@ -366,7 +366,7 @@ def from_value(v, broaden=False):
         broaden: If True, concrete values will be made more abstract, so e.g.
             the value 1234 would become ANYTHING.
     """
-    a = to_abstract(v, None, None)
+    a = frontend.to_abstract(v, None, None)
     if broaden:
         a = _broaden(a)
     return a
@@ -408,14 +408,14 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
         assert not isinstance(v, Function)
         new_args = {}
         for name, field in v.__dataclass_fields__.items():
-            new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
+            new_args[name] = self(getattr(v, name), context, loop=loop)
         methods = dataclass_methods(type(v))
         rval = AbstractClass(type(v), new_args, methods)
 
     elif isinstance(v, dtype.TypeMeta):
         rval = AbstractType(v)
 
-    else:
+    else:      
         try:
             typ = dtype.pytype_to_myiatype(type(v))
         except KeyError:
@@ -537,7 +537,7 @@ def to_abstract(self, v: typing._GenericAlias, context, ref, loop):
 def to_abstract(self, v: ADT, context, ref, loop):
     new_args = {}
     for name, field in v.__dataclass_fields__.items():
-        new_args[name] = to_abstract(getattr(v, name), context, loop=loop)
+        new_args[name] = self(getattr(v, name), context, loop=loop)
     draft = AbstractADT(type(v), new_args, dataclass_methods(type(v)))
     return normalize_adt(draft)
 
