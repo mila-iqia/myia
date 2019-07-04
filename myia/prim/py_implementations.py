@@ -603,7 +603,7 @@ def make_record(typ, *args):
     """Implement `make_record`."""
     from ..abstract import type_to_abstract
     typ = type_to_abstract(typ)
-    return typ.tag(*args)
+    return typ.constructor(*args)
 
 
 @register(primops.tuple_len)

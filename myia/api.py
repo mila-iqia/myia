@@ -130,7 +130,7 @@ def _convert_arg_init(self, arg, orig_t: AbstractList, backend):
 def _convert_arg_init(self, arg, orig_t: AbstractClass, backend):
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
-    return orig_t.tag(*(self(x, o, backend) for x, o in zip(arg, oe)))
+    return orig_t.constructor(*(self(x, o, backend) for x, o in zip(arg, oe)))
 
 
 @overload  # noqa: F811
