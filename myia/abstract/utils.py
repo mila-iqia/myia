@@ -100,7 +100,7 @@ def _build_value(x: AbstractTuple):
 @overload  # noqa: F811
 def _build_value(ac: AbstractClass):
     args = {k: build_value(v) for k, v in ac.attributes.items()}
-    return ac.tag(**args)
+    return ac.constructor(**args)
 
 
 _default_type_params = {
@@ -426,7 +426,7 @@ def abstract_clone(self, x: AbstractList, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractArray, *args):
-    return (yield AbstractArray)(self(x.element, *args), self(x.values, *args))
+    return (yield type(x))(self(x.element, *args), self(x.values, *args))
 
 
 @overload  # noqa: F811
@@ -435,7 +435,8 @@ def abstract_clone(self, x: AbstractClassBase, *args):
         x.tag,
         {k: self(v, *args) for k, v in x.attributes.items()},
         x.methods,
-        self(x.values, *args)
+        self(x.values, *args),
+        constructor=x.constructor
     )
 
 

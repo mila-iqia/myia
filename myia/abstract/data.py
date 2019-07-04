@@ -440,12 +440,16 @@ class AbstractClassBase(AbstractStructure):
 
     """
 
-    def __init__(self, tag, attributes, methods, values={}):
+    def __init__(self, tag, attributes, methods, values={}, *,
+                 constructor=None):
         """Initialize an AbstractClass."""
         super().__init__(values)
         self.tag = tag
         self.attributes = attributes
         self.methods = methods
+        if constructor is None:
+            constructor = tag
+        self.constructor = constructor
 
     def children(self):
         """Return the attribute values."""

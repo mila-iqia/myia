@@ -570,7 +570,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractClassBase, backend,
     ve = vm_t.attributes.values()
     tup = tuple(self(getattr(res, attr), o, v, backend, return_backend)
                 for attr, o, v in zip(orig_t.attributes, oe, ve))
-    return orig_t.tag(*tup)
+    return orig_t.constructor(*tup)
 
 
 @overload  # noqa: F811
@@ -594,7 +594,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
     tup = tuple(self(x, o, v, backend, return_backend)
                 for x, o, v in zip(res, oe, ve))
     if orig_is_class:
-        return orig_t.tag(*tup)
+        return orig_t.constructor(*tup)
     else:
         return tup
 
