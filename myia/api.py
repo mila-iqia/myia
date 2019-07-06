@@ -165,8 +165,6 @@ https://github.com/mila-iqia/myia/blob/master/myia/pipeline/steps.py#L528-L537
 
 @overload  # noqa: F811
 def _convert_arg_init(self, arg, orig_t: AbstractScalar, backend):
-    t = orig_t.values[TYPE]
-    arg = backend.from_scalar(arg, t)
     return arg
 
 

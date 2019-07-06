@@ -43,7 +43,8 @@ SIMPLE_MAP = {
     # P.bool_or: sym.logical_or
     P.bool_eq: sym.broadcast_equal,
 
-    P.scalar_to_array: lambda x: x
+    P.scalar_to_array: lambda x: x,
+    P.array_to_scalar: lambda x: x
 }
 
 

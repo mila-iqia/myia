@@ -33,6 +33,13 @@ def type_to_pytorch_type(t):
     return _type_map[t]
 
 
+def pytorch_array_to_scalar(v):
+    """Implementation of array_to_scalar for pytorch."""
+    if v.is_cuda:
+        v = v.cpu()  # pragma: no cover
+    return v.detach().numpy()
+
+
 simple_mapping = {
     P.scalar_add: lambda a, b: a + b,
     P.scalar_sub: lambda a, b: a - b,
@@ -63,6 +70,8 @@ simple_mapping = {
     P.distribute: lambda a, shp: a.expand(*shp),
     P.transpose: lambda a, perm: a.permute(*perm),
     P.dot: torch.mm,
+
+    P.array_to_scalar: pytorch_array_to_scalar
 }
 
 
@@ -194,7 +203,7 @@ class PyTorchBackend(Backend):
         """Make a numpy array from a torch tensor."""
         if v.is_cuda:  # pragma: no cover
             v = v.cpu()
-        return v.numpy()
+        return v.detach().numpy()
 
     def from_numpy(self, a):
         """Make a torch tensor from a numpy array."""
