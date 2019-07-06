@@ -15,7 +15,8 @@ from myia.debug.traceback import print_inference_error
 from myia.dtype import Int, External, Number, EnvType as Env, Nil, Array, \
     i16, i32, i64, u64, f16, f32, f64
 from myia.hypermap import HyperMap, hyper_map
-from myia.abstract import ANYTHING, InferenceError, Contextless, CONTEXTLESS
+from myia.abstract import ANYTHING, InferenceError, MyiaTypeError, \
+    Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import \
@@ -1963,3 +1964,25 @@ def test_grad_reduce(xs, ys):
         return array_reduce(scalar_add, xs * ys, ())
 
     return grad(f)(xs, ys)
+
+
+@infer_std(
+    (None, f64, False),
+    (B, f64, False),
+    (f64, f64, MyiaTypeError),
+    (B, B, B),
+    (None, None, True),
+)
+def test_is(x, y):
+    return x is y
+
+
+@infer_std(
+    (None, f64, True),
+    (B, f64, True),
+    (f64, f64, MyiaTypeError),
+    (B, B, B),
+    (None, None, False),
+)
+def test_is_not(x, y):
+    return x is not y

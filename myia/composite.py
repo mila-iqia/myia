@@ -6,10 +6,10 @@ from functools import reduce
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
-    AbstractClass, build_value, AbstractError
+    AbstractClass, build_value, AbstractError, TYPE, AbstractScalar
 from .debug.label import short_labeler
 from .dtype import Array, Number, Bool, \
-    EnvType, u8, u16, i8, i16, f32, f64
+    EnvType, u8, u16, i8, i16, f32, f64, Nil
 from .hypermap import HyperMap, hyper_map
 from .abstract import MyiaTypeError, broaden
 from .info import About
@@ -497,6 +497,27 @@ def array_tanh(xs):
     return array_map(scalar_tanh, xs)
 
 
+@core
+def nil_eq(a, b):
+    """Implementation of `equal` (only use with Nil types)."""
+    if hastype(a, Nil) and hastype(b, Nil):
+        return True
+    else:
+        return False
+
+
+@core
+def nil_ne(a, b):
+    """Implementation of `not_equal` (only use with Nil types)."""
+    return not nil_eq(a, b)
+
+
+@core
+def nil_bool(x):
+    """Converting Nil (None) to Bool returns False."""
+    return False
+
+
 _leaf_add = MultitypeGraph('hyper_add')
 
 
@@ -554,6 +575,70 @@ zeros_like = HyperMap(
     nonleaf=(AbstractTuple, AbstractList, AbstractClass),
     fn_leaf=_leaf_zeros_like
 )
+
+
+class IsCompare(MetaGraph):
+    """Implementation of Is Compare (i.e. 'is' and 'is not')."""
+
+    def __init__(self, do_not=False):
+        """Initialize the is_compare.
+
+        Arguments:
+            do_not: If True, this graph becomes a negative ("is not")
+                comparison. If False, this graph remains a psotive ("is")
+                comparison.
+
+        """
+        self.do_not = do_not
+
+    def normalize_args(self, args):
+        """Return broadened arguments."""
+        return tuple(broaden(a, None) for a in args)
+
+    def generate_graph(self, args):
+        """Make the graph for the IsCompare.
+
+        This requires that least one argument of
+        comparison be a Bool or None.
+
+        Generate Boolean Compare if False and
+        Equal_To (and not Equal_To) compare if True.
+        """
+        assert len(args) == 2
+        a, b = args
+        g = Graph()
+        g.debug.name = "is_not" if self.do_not else "is_"
+        g.set_flags('core', 'reference')
+        pa = g.add_parameter()
+        pb = g.add_parameter()
+
+        valid_types = (Bool, Nil)
+        if ((not isinstance(a, AbstractScalar))
+            or (a.values[TYPE] not in valid_types)) \
+                and ((not isinstance(b, AbstractScalar))
+                     or (b.values[TYPE] not in valid_types)):
+                        if not self.do_not:
+                            raise MyiaTypeError(
+                                f'The operator "is" must have at ' +
+                                f'least one argument be a Bool or None'
+                            )
+                        else:
+                            raise MyiaTypeError(
+                                f'The operator "is not" must have at ' +
+                                f'least one argument be a Bool or None'
+                            )
+
+        if a != b:
+            g.return_ = g.apply(P.return_, self.do_not)
+        else:
+            cmp_fn = g.apply(P.getattr, pa,
+                             "__ne__" if self.do_not else "__eq__")
+            g.output = g.apply(cmp_fn, pb)
+        return g
+
+
+is_ = IsCompare()
+is_not = IsCompare(do_not=True)
 
 
 @core

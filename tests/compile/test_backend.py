@@ -57,7 +57,11 @@ def parse_compare(*tests):
             myia_fn = res['output']
             myia_args = backend_opt.convert_args(args)
             myia_result = myia_fn(*myia_args)
-            np.testing.assert_allclose(ref_result, myia_result)
+            if (ref_result is True) or (ref_result is False) \
+                    or (ref_result is None):
+                        assert ref_result == myia_result
+            else:
+                np.testing.assert_allclose(ref_result, myia_result)
 
         m = pytest.mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
@@ -311,6 +315,23 @@ def test_call_hof(c, x, y):
             return f2
 
     return choose(c)(x) + choose(not c)(x)
+
+
+@parse_compare((None,), (True,), (False,))
+def test_bool_and_nil_args(x):
+    return x
+
+
+@parse_compare((None,))
+def test_True_assign(_x):
+    x = True
+    return x
+
+
+@parse_compare((None,))
+def test_False_assign(_x):
+    x = False
+    return x
 
 
 @parse_compare((np.array(2),))

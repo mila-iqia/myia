@@ -24,6 +24,8 @@ scalar_object_map = {
     operations.pow: P.scalar_pow,
     operations.eq: P.scalar_eq,
     operations.ne: P.scalar_ne,
+    operations.is_: C.is_,
+    operations.is_not: C.is_not,
     operations.lt: P.scalar_lt,
     operations.gt: P.scalar_gt,
     operations.le: P.scalar_le,
@@ -75,6 +77,8 @@ standard_object_map = {
     operations.pow: C.pow,
     operations.eq: C.eq,
     operations.ne: C.ne,
+    operations.is_: C.is_,
+    operations.is_not: C.is_not,
     operations.lt: C.lt,
     operations.gt: C.gt,
     operations.le: C.le,
@@ -131,8 +135,13 @@ standard_object_map = {
     Exception: P.exception,
 }
 
-
 standard_method_map = TypeMap({
+    dtype.Nil: {
+        '__eq__': C.nil_eq,
+        '__ne__': C.nil_ne,
+        '__bool__': C.nil_bool,
+    },
+
     dtype.Bool: {
         '__and__': P.bool_and,
         '__or__': P.bool_or,

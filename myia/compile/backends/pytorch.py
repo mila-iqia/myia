@@ -36,7 +36,7 @@ def type_to_pytorch_type(t):
 def pytorch_array_to_scalar(v):
     """Implementation of array_to_scalar for pytorch."""
     if v.is_cuda:
-        v = v.cpu()  # pragma: no cover
+        v = v.cpu()
     return v.detach().numpy()
 
 
@@ -211,10 +211,15 @@ class PyTorchBackend(Backend):
 
     def to_scalar(self, v):
         """Convert a torch tensor to a scalar."""
-        return v.item()
+        if (v is None) or (v is True) or (v is False):
+            return v
+        else:
+            return v.item()
 
     def from_scalar(self, s, t):
         """Convert a scalar to a torch tensor."""
+        if s is None:
+            return None
         dt = type_to_np_dtype(t)
         return np.asarray(s, dtype=dt)
 

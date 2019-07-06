@@ -161,3 +161,15 @@ def test_switch_nontail():
     for test in [(6, 23, 23**2), (67, 23, 67**2)]:
         *args, expected = test
         assert myia_fn(*args) == expected
+
+
+@parse_compare((None,),
+               (42,))
+def test_is_(x):
+    return x is None
+
+
+@parse_compare((None,),
+               (42,))
+def test_is_not(x):
+    return x is not None

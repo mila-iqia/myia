@@ -15,7 +15,7 @@ from ..utils import get_outputs
 from ..transform import CompileGraphs, nonlinear_ops
 
 from ...abstract import AbstractArray
-from ...dtype import type_to_np_dtype
+from ...dtype import type_to_np_dtype, Nil
 from ...prim import Primitive, ops as P
 
 
@@ -51,7 +51,7 @@ SIMPLE_MAP = {
 def nnvm_bool_not(c, arg):
     """Implementation of boolean not."""
     t = arg.abstract.dtype()
-    zero = c.make_constant(0, nnvm_type=nnvm_type_map(t))
+    zero = c.make_constant(0, nnvm_type=type_to_np_dtype(t))
     return sym.broadcast_equal(zero, c.ref(arg))
 
 
@@ -125,14 +125,6 @@ COMPLEX_MAP = {
     P.array_reduce: nnvm_array_reduce,
     P.transpose: nnvm_transpose,
 }
-
-
-def nnvm_type_map(type):
-    """Map a numpy type to an NNVM type."""
-    dt = type_to_np_dtype(type)
-    if dt == 'bool':
-        dt = 'uint8'
-    return dt
 
 
 def nnvm_val(val, dtype, ctx):
@@ -237,7 +229,7 @@ class NNVMConverter:
             self.eqv[n] = sym.Variable(name)
             if isinstance(t, AbstractArray):
                 te = t.element.dtype()
-                self.types[name] = nnvm_type_map(te)
+                self.types[name] = type_to_np_dtype(te)
                 self.shapes[name] = ashape(n)
             elif n.is_constant_graph():  # pragma: no cover
                 raise Exception("This isn't tested")
@@ -245,7 +237,7 @@ class NNVMConverter:
                 self.shapes[name] = (1,)
             else:
                 te = t.dtype()
-                self.types[name] = nnvm_type_map(te)
+                self.types[name] = type_to_np_dtype(te)
                 self.shapes[name] = (1,)
 
         t = n.abstract
@@ -382,10 +374,15 @@ class NNVMBackend(Backend):
 
     def to_scalar(self, v):
         """Convert the NNVM array to a scalar."""
-        return v.asnumpy().item()
+        if v is None:
+            return v
+        else:
+            return v.asnumpy().item()
 
     def from_scalar(self, s, t):
         """Convert the scalar to an NNVM array."""
+        if t == Nil:
+            return None
         dt = type_to_np_dtype(t)
         return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
 

@@ -12,7 +12,7 @@ from ...abstract import AbstractArray, AbstractTuple, AbstractScalar, \
 from ...ir import manage
 from ...graph_utils import toposort
 from ...prim import Primitive, ops as P
-from ...dtype import type_to_np_dtype, Bool
+from ...dtype import type_to_np_dtype, Bool, Nil
 from ...utils import overload
 
 from .relay_helpers import optimize, build_module
@@ -24,6 +24,8 @@ def to_relay_type(self, a: AbstractScalar):
     tp = a.dtype()
     if issubclass(tp, Bool):
         return relay.ty.TensorType((), 'bool')
+    elif issubclass(tp, Nil):
+        return relay.ty.TupleType([])
     else:
         return relay.ty.TensorType((), type_to_np_dtype(tp))
 
@@ -348,10 +350,16 @@ class RelayBackend(Backend):
 
     def to_scalar(self, v):
         """Convert the TVM array to a scalar."""
-        return v.asnumpy().item()
+        if isinstance(v, relay.backend.interpreter.TupleValue):
+            assert len(v) == 0
+            return None
+        else:
+            return v.asnumpy().item()
 
     def from_scalar(self, s, t):
         """Convert the scalar to an TVM array."""
+        if t == Nil:
+            return ()
         dt = type_to_np_dtype(t)
         return self.from_numpy(np.array(s, dtype=dt, copy=False))
 
