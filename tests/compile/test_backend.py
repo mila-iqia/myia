@@ -9,6 +9,7 @@ from myia.compile.backends import load_backend, LoadingError, UnknownBackend, \
 from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import distribute, scalar_to_array, dot, \
     scalar_add, array_reduce, transpose
+from myia.api import to_device
 from myia import dtype
 
 from ..common import MA, MB
@@ -35,22 +36,10 @@ class BackendOption:
             'compile.backend': backend,
             'compile.backend_options': backend_options
         }).make()
+        self.backend = load_backend(backend, backend_options)
 
     def convert_args(self, args):
-        return tuple(self.convert_arg(arg) for arg in args)
-
-    def convert_arg(self, arg):
-        if isinstance(arg, np.ndarray):
-            return self.pip.steps.compile.backend.from_numpy(arg)
-        elif isinstance(arg, tuple):
-            return tuple(self.convert_arg(e) for e in arg)
-        elif isinstance(arg, list):
-            return list(self.convert_arg(e) for e in arg)
-        elif isinstance(arg, (int, bool, float)):
-            return arg
-        # dataclasses
-        else:
-            raise ValueError(f"what is this: {arg}")
+        return tuple(to_device(arg, self.backend) for arg in args)
 
 
 def parse_compare(*tests):
@@ -322,3 +311,8 @@ def test_call_hof(c, x, y):
             return f2
 
     return choose(c)(x) + choose(not c)(x)
+
+
+@parse_compare((np.array(2),))
+def test_array_to_scalar(x):
+    return x.item()
