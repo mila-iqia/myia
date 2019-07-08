@@ -241,9 +241,9 @@ class CompileGraph:
 
         module = build_module(function_map)
 
-        module.entry_func = module.global_var_map_[graph.debug.debug_name]
+        module = optimize(module)
 
-        optimize(module)
+        module.entry_func = module.get_global_var(graph.debug.debug_name)
 
         exec = relay.create_executor(mod=module, ctx=context)
         return exec.evaluate(module.entry_func)
