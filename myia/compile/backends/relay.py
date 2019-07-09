@@ -67,16 +67,14 @@ def to_relay_type(self, a: GraphFunction):
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: object):  # pragma: no cover
+def to_relay_type(self, a: object):
     raise ValueError("Unknown type:", a)
 
 
 def ashape(node):
     """Make sure shape isn't None, that makes relay crash later."""
     shp = node.shape
-    if shp is None:  # pragma: no cover
-        raise RuntimeError("You found a way to trigger this, please report it")
-        shp = ()
+    assert shp is not None
     return shp
 
 
@@ -228,7 +226,7 @@ class CompileGraph:
         output: a wrapped relay graph
     """
 
-    def run(self, graph, context):
+    def run(self, graph, context, target):
         """Convert the graph into a relay callable."""
         mng = manage(graph)
 
@@ -248,7 +246,7 @@ class CompileGraph:
 
         module.entry_func = module.get_global_var(graph.debug.debug_name)
 
-        exec = relay.create_executor(mod=module, ctx=context)
+        exec = relay.create_executor(mod=module, ctx=context, target=target)
         return exec.evaluate(module.entry_func)
 
     def on_parameter(self, node):
@@ -332,13 +330,17 @@ class RelayBackend(Backend):
         """Create a Relay backend for the given device."""
         device_id = int(device_id)
         self.context = tvm.ndarray.context(target, device_id)
-        if not self.context.exist:  # pragma: no cover
-            raise RuntimeError("No hardware to support selected target/device")
+        if target == 'cpu':
+            target = 'llvm'
+        self.target = target
+        if not self.context.exist:
+            raise RuntimeError("No hardware to support selected target "
+                               f"'{target}' on device {device_id}")
         self.compiler = compiler
 
     def compile(self, graph, argspec, outspec, pipeline):
         """Compiler a graph."""
-        return self.compiler.run(graph, self.context)
+        return self.compiler.run(graph, self.context, self.target)
 
     def to_numpy(self, v):
         """Make a numpy array from a TVM array."""
@@ -370,7 +372,7 @@ class RelayBackend(Backend):
     def from_dlpack(self, v):
         """Make an TVM array from a dlpack capsule."""
         t = tvm.ndarray.from_dlpack(v)
-        if t.context != self.context:  # pragma: no cover
+        if t.context != self.context:
             # This may do a copy but we will need it
             t = tvm.ndarray.array(t, self.context)
         return t
@@ -379,7 +381,7 @@ class RelayBackend(Backend):
         """Check if value is an TVM array for this context."""
         if not isinstance(v, tvm.ndarray.NDArray):
             raise TypeError("Expected NNVM array")
-        if v.context != self.context:  # pragma: no cover
+        if v.context != self.context:
             raise RuntimeError("Array on wrong context.")
         if v.dtype != type_to_np_dtype(t):
             raise TypeError("Wrong dtype")

@@ -17,7 +17,11 @@ from ..common import MA, MB
 
 @pytest.fixture(params=[
     pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
+    pytest.param(('nnvm', {'target': 'cuda', 'device_id': 0}), id='nnvm-cuda',
+                 marks=pytest.mark.gpu),
     pytest.param(('relay', {'target': 'cpu', 'device_id': 0}), id='relay-cpu'),
+    pytest.param(('relay', {'target': 'cuda', 'device_id': 0}),
+                 id='relay-cuda', marks=pytest.mark.gpu),
     pytest.param(('pytorch', {'device': 'cpu'}), id='pytorch-cpu'),
     pytest.param(('pytorch', {'device': 'cuda'}), id='pytorch-cuda',
                  marks=pytest.mark.gpu)])
@@ -59,7 +63,7 @@ def parse_compare(*tests):
             myia_result = myia_fn(*myia_args)
             if (ref_result is True) or (ref_result is False) \
                     or (ref_result is None):
-                        assert ref_result == myia_result
+                assert ref_result == myia_result
             else:
                 np.testing.assert_allclose(ref_result, myia_result)
 

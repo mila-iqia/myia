@@ -653,10 +653,9 @@ async def _inf_invert_permutation(engine, perm: _shape_type):
     v = [x.values[VALUE] for x in perm.elements]
     return AbstractTuple(
         [perm.elements[i] if i in v else AbstractScalar({
-             VALUE: ANYTHING,
-             TYPE: dtype.UInt[64],
-         })
-         for i in range(len(v))]
+            VALUE: ANYTHING,
+            TYPE: dtype.UInt[64],
+        }) for i in range(len(v))]
     )
 
 

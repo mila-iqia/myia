@@ -284,7 +284,7 @@ def test_return_in_while(x):
     while x > 0:
         x = x - 1
         return x
-    return -1  # pragma: no cover
+    return -1
 
 
 @parse_compare(10)
@@ -293,7 +293,7 @@ def test_return_in_double_while(x):
         while x > 0:
             x = x - 1
             return x
-    return -1  # pragma: no cover
+    return -1
 
 
 @parse_compare(10)

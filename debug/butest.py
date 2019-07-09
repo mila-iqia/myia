@@ -69,8 +69,8 @@ def prout(out, bu):
 
 @dataclass
 class Information:
-    item: "Item"
-    report: "Report"
+    item: "Item"  # noqa: F821
+    report: "Report"  # noqa: F821
     interactor: "ReportInteractor"
 
 

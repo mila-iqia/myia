@@ -232,7 +232,7 @@ class FilterVar(Var):
         return f"FilterVar({self.tag}, {PredicateSet(self.filter)})"
 
 
-def var(filter: FilterT = None)-> Var:
+def var(filter: FilterT = None) -> Var:
     """Create a variable for unification purposes.
 
     Arguments:
@@ -536,15 +536,15 @@ class Unification:
         if sv != -1 and len(values_w) >= len(values_v) - 1:
             wb = values_w[:sv]
             diff = len(values_w) - len(values_v) + 1
-            wm = Seq(values_w[sv:sv+diff])
-            we = values_w[sv+diff:]
+            wm = Seq(values_w[sv:sv + diff])
+            we = values_w[sv + diff:]
             values_w = wb + [wm] + we
 
         if sw != -1 and len(values_v) >= len(values_w) - 1:
             vb = values_v[:sw]
             diff = len(values_v) - len(values_w) + 1
-            vm = Seq(values_v[sw:sw+diff])
-            ve = values_v[sw+diff:]
+            vm = Seq(values_v[sw:sw + diff])
+            ve = values_v[sw + diff:]
             values_v = vb + [vm] + ve
 
         if len(values_w) != len(values_v):

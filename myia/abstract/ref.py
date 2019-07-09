@@ -136,7 +136,7 @@ class VirtualReference(AbstractReference):
 
     """
 
-    abstract: 'AbstractValue'
+    abstract: 'AbstractValue'  # noqa: F821
 
     async def get(self):
         """Get the value (asynchronous)."""

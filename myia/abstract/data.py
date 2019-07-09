@@ -11,8 +11,11 @@ from contextvars import ContextVar
 from ..debug.label import label
 from ..utils import Named, Partializable, Interned, Atom, AttrEK, \
     PossiblyRecursive, OrderedSet
+from ..ir import Graph, MetaGraph
+from ..prim import Primitive
 
 from .loop import Pending
+from .ref import Context
 
 
 # Represents the absence of inferred data
@@ -734,6 +737,6 @@ def _pretty_avalue(a, ctx):
             return f'<{a.__class__.__qualname__}: incomplete>'
         else:
             return a.__pretty__(ctx)
-    except Exception as e:  # pragma: no cover
+    except Exception:  # pragma: no cover
         # Pytest fails badly without this failsafe.
         return f'<{a.__class__.__qualname__}: error in printing>'

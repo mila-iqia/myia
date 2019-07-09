@@ -1,4 +1,3 @@
-
 from pytest import mark
 
 from myia.pipeline import standard_debug_pipeline
@@ -80,7 +79,7 @@ def test_return_in_double_while(x):
         while x > 0:
             x = x - 1
             return x
-    return -1  # pragma: no cover
+    return -1
 
 
 @cconv((3,))

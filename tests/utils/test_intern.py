@@ -91,7 +91,7 @@ def test_eqrec():
     assert _test(c, [1, c])
 
     assert _test(Point(1, 2), Point(1, 2))
-    assert _test(2+9j, 2+9j)
+    assert _test(2 + 9j, 2 + 9j)
     assert _test((1, 2), (1, 2))
     assert not _test((1, 2), (1, 2, 3))
     assert not _test((1, 2), [1, 2])

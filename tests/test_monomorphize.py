@@ -71,7 +71,7 @@ def specializer_decorator(pipeline):
                     try:
                         mfn = pip(input=fn, argspec=argspec)
                         mfn['output'](*args)
-                    except exc as e:
+                    except exc:
                         pass
                     return
 

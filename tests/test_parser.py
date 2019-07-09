@@ -10,14 +10,14 @@ from myia.debug.traceback import myia_warning
 
 
 def test_undefined():
-    def f():  # pragma: no cover
+    def f():
         return c  # noqa
     with pytest.raises(NameError):
         parse(f)
 
 
 def test_defined_later():
-    def f():  # pragma: no cover
+    def f():
         return c  # noqa
     with pytest.raises(UnboundLocalError):
         parse(f)
@@ -46,7 +46,7 @@ def test_no_return_while():
 
 
 def test_maybe():
-    def f():  # pragma: no cover
+    def f():
         while True:
             x = 2
         return x
@@ -55,8 +55,15 @@ def test_maybe():
         parse(f)
 
 
+def test_unsupported():
+    def f():
+        assert False
+    with pytest.raises(MyiaSyntaxError):
+        parse(f)
+
+
 def test_expression_statements():
-    def f(x):  # pragma: no cover
+    def f(x):
         """Foo."""
         print(x)
         return x
@@ -170,7 +177,7 @@ def test_no_return__format(capsys):
         '''
     try:
         parse(f)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()
@@ -206,7 +213,7 @@ def test_no_return_while__format(capsys):
         return g()
     try:
         parse(f)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()
@@ -244,7 +251,7 @@ def test_unsupported_AST__error__format(capsys):
         return 1
     try:
         parse(a0)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()
@@ -269,7 +276,7 @@ def test_unsupported_AST__error__format(capsys):
         return 1
     try:
         parse(a1)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()
@@ -294,7 +301,7 @@ def test_unsupported_AST__error__format(capsys):
         return 1
     try:
         parse(a2)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()
@@ -319,7 +326,7 @@ def test_unsupported_AST__error__format(capsys):
         return 1
     try:
         parse(a3)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()

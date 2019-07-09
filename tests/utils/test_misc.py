@@ -22,7 +22,7 @@ def test_smap():
     assert _sum([1, 2, 3], [4, 5, 6]) == [5, 7, 9]
     assert _sum([(1, [2]), 3], [(4, [5]), 6]) == [(5, [7]), 9]
     assert (_sum(np.ones((2, 2)), np.ones((2, 2)))
-            == np.ones((2, 2))*2).all()
+            == np.ones((2, 2)) * 2).all()
 
 
 def test_smap_failures():

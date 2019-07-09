@@ -41,7 +41,7 @@ def inject(**utilities):
             if key not in glob:
                 try:
                     glob[key] = value
-                except TypeError as e:
+                except TypeError:
                     pass
 
 

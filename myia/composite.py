@@ -617,16 +617,16 @@ class IsCompare(MetaGraph):
             or (a.values[TYPE] not in valid_types)) \
                 and ((not isinstance(b, AbstractScalar))
                      or (b.values[TYPE] not in valid_types)):
-                        if not self.do_not:
-                            raise MyiaTypeError(
-                                f'The operator "is" must have at ' +
-                                f'least one argument be a Bool or None'
-                            )
-                        else:
-                            raise MyiaTypeError(
-                                f'The operator "is not" must have at ' +
-                                f'least one argument be a Bool or None'
-                            )
+            if not self.do_not:
+                raise MyiaTypeError(
+                    f'The operator "is" must have at ' +
+                    f'least one argument be a Bool or None'
+                )
+            else:
+                raise MyiaTypeError(
+                    f'The operator "is not" must have at ' +
+                    f'least one argument be a Bool or None'
+                )
 
         if a != b:
             g.return_ = g.apply(P.return_, self.do_not)

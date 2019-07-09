@@ -28,7 +28,7 @@ _type_map = {
 
 def type_to_pytorch_type(t):
     """Map myia types to pytorch types."""
-    if t not in _type_map:  # pragma: no cover
+    if t not in _type_map:
         raise TypeError(f"Unsupported type: {t}")
     return _type_map[t]
 
@@ -189,7 +189,7 @@ class PyTorchBackend(Backend):
 
     def __init__(self, device='cpu'):
         """Create a PyTorch backend on the given device."""
-        if device == 'cuda':  # pragma: no cover
+        if device == 'cuda':
             device = 'cuda:0'
         self.device = torch.device(device)
         self.compiler = CompileGraphs(lambda lst: pytorch_convert(lst, self),
@@ -201,7 +201,7 @@ class PyTorchBackend(Backend):
 
     def to_numpy(self, v):
         """Make a numpy array from a torch tensor."""
-        if v.is_cuda:  # pragma: no cover
+        if v.is_cuda:
             v = v.cpu()
         return v.detach().numpy()
 
@@ -229,13 +229,14 @@ class PyTorchBackend(Backend):
 
     def from_dlpack(self, dlp):
         """Make a torch tensor from a dlpack capsule."""
-        return torch.utils.dlpack.from_dlpack(dlp).to(self.device)
+        v = torch.utils.dlpack.from_dlpack(dlp)
+        return v.to(self.device)
 
     def check_array(self, v, t):
         """Check if the value is a torch tensor of the right dtype."""
         if not isinstance(v, torch.Tensor):
             raise TypeError("Expected torch.Tensor")
-        if v.device != self.device:  # pragma: no cover
+        if v.device != self.device:
             raise RuntimeError("Tensor on wrong device.")
         if v.dtype != type_to_pytorch_type(t):
             raise TypeError("Wrong dtype")

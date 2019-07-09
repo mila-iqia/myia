@@ -22,8 +22,7 @@ def always_include(node: Any) -> str:
 
 def dfs(root: T,
         succ: Callable[[T], Iterable[T]],
-        include: Callable[[T], str] = always_include) \
-            -> Iterable[T]:
+        include: Callable[[T], str] = always_include) -> Iterable[T]:
     """Perform a depth-first search.
 
     Arguments:
@@ -52,8 +51,7 @@ def dfs(root: T,
             pass
         else:
             raise ValueError('include(node) must return one of: '
-                             '"follow", "nofollow", "exclude"') \
-                # pragma: no cover
+                             '"follow", "nofollow", "exclude"')
 
 
 def toposort(root: T,
@@ -98,8 +96,7 @@ def toposort(root: T,
             continue
         else:
             raise ValueError('include(node) must return one of: '
-                             '"follow", "nofollow", "exclude"') \
-                # pragma: no cover
+                             '"follow", "nofollow", "exclude"')
 
         if cont:
             continue
