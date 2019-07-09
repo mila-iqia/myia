@@ -4,6 +4,7 @@ Monomorphization creates a separate function for each type signature the
 function may be called with.
 """
 
+from typing import Optional
 from copy import copy
 from itertools import count, chain
 from dataclasses import dataclass, replace as dc_replace
@@ -271,7 +272,7 @@ class Monomorphizer:
                             concretize_cache(currinf.graph_cache)
                         try:
                             g = currinf.get_graph(eng, broad_argvals)
-                        except InferenceError as e:  # pragma: no cover
+                        except InferenceError:  # pragma: no cover
                             return res
                         else:
                             ctx = currinf.make_context(eng, broad_argvals)
@@ -279,7 +280,7 @@ class Monomorphizer:
                                 return res
                     else:
                         return res
-                except Unspecializable as e:
+                except Unspecializable:
                     pass
         return self._find_unique_argvals_helper(a, inf, argvals, True)
 

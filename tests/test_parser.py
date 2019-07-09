@@ -58,7 +58,7 @@ def test_maybe():
 def test_unsupported():
     def f():
         assert False
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(MyiaSyntaxError):
         parse(f)
 
 
@@ -177,7 +177,7 @@ def test_no_return__format(capsys):
         '''
     try:
         parse(f)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()
@@ -213,7 +213,7 @@ def test_no_return_while__format(capsys):
         return g()
     try:
         parse(f)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()
@@ -251,7 +251,7 @@ def test_unsupported_AST__error__format(capsys):
         return 1
     try:
         parse(a0)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()
@@ -276,7 +276,7 @@ def test_unsupported_AST__error__format(capsys):
         return 1
     try:
         parse(a1)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()
@@ -301,7 +301,7 @@ def test_unsupported_AST__error__format(capsys):
         return 1
     try:
         parse(a2)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()
@@ -326,7 +326,7 @@ def test_unsupported_AST__error__format(capsys):
         return 1
     try:
         parse(a3)
-    except MyiaSyntaxError as e:
+    except MyiaSyntaxError:
         sys.excepthook(*sys.exc_info())
 
     out, err = capsys.readouterr()

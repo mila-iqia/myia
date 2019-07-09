@@ -540,7 +540,7 @@ class Parser:
                 f"\n\tAs a result, it is not connected to the output " +
                 f"and will not be executed.",
                 self.make_location(node))
-                )
+            )
         return block
 
     def process_If(self, block: 'Block', node: ast.If) -> 'Block':

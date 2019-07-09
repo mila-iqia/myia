@@ -63,7 +63,7 @@ def parse_compare(*tests):
             myia_result = myia_fn(*myia_args)
             if (ref_result is True) or (ref_result is False) \
                     or (ref_result is None):
-                        assert ref_result == myia_result
+                assert ref_result == myia_result
             else:
                 np.testing.assert_allclose(ref_result, myia_result)
 
