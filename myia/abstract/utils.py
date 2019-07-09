@@ -851,7 +851,11 @@ def bind(loop, committed, resolved, pending):
             return None
         if any(is_simple(x) for x in chain([committed], resolved, pending)):
             return 1000
-        return -1000
+        elif any(isinstance(x, AbstractBottom) for x in resolved):
+            # Bottom is always lower-priority
+            return -2000
+        else:
+            return -1000
 
     if any(is_simple(x) for x in chain(resolved, pending)):
         # rval = None because we will not make a new Pending
