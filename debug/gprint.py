@@ -10,7 +10,7 @@ from myia.abstract import (
     AbstractList, AbstractClassBase, AbstractJTagged, AbstractArray,
     GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
     MetaGraphFunction, AbstractUnion, VALUE, ANYTHING, JTransformedFunction,
-    VirtualFunction, PendingTentative
+    VirtualFunction, PendingTentative, Possibilities
 )
 from myia.dtype import Type, Bool, Int, Float, TypeMeta, UInt
 from myia.utils import OrderedSet, UNKNOWN, SymbolicKeyInstance
@@ -1168,7 +1168,6 @@ class _PendingTentative:
         return hrepr.stdrepr_object(
             'PendingTentative',
             (('tentative', self.tentative),
-             ('done', self.resolved()),
              ('prio', self.priority()))
         )
 
@@ -1208,8 +1207,9 @@ class _AbstractScalar:
 @mixin(AbstractFunction)
 class _AbstractFunction:
     def __hrepr__(self, H, hrepr):
+        v = self.values[VALUE]
         return hrepr.stdrepr_iterable(
-            self.values[VALUE],
+            v if isinstance(v, Possibilities) else [v],
             before='★Function',
             cls='abstract',
         )
@@ -1247,8 +1247,9 @@ class _AbstractTuple:
 @mixin(AbstractUnion)
 class _AbstractUnion:
     def __hrepr__(self, H, hrepr):
+        v = self.options
         return hrepr.stdrepr_iterable(
-            self.options,
+            v if isinstance(v, Possibilities) else [v],
             before='★U',
             cls='abstract',
         )
