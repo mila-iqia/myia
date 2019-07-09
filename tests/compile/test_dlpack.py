@@ -1,5 +1,3 @@
-import pytest
-
 from myia.compile.backends import load_backend, LoadingError
 import numpy as np
 
