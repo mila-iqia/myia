@@ -1,5 +1,3 @@
-import pytest
-
 from myia.compile.backends import load_backend, LoadingError
 import numpy as np
 
@@ -11,7 +9,6 @@ def safe_load(name):
         return None
 
 
-@pytest.mark.skip('Segfaults with pytorch 1.0.1')
 def test_dlpack_cross():
     relay = safe_load('relay')
     nnvm = safe_load('nnvm')
