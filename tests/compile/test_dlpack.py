@@ -11,7 +11,6 @@ def safe_load(name):
         return None
 
 
-@pytest.mark.skip('Segfaults with pytorch 1.0.1')
 def test_dlpack_cross():
     relay = safe_load('relay')
     nnvm = safe_load('nnvm')
