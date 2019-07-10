@@ -46,7 +46,7 @@ class MultitypeGraph(MetaGraph):
     def normalize_args(self, args):
         """Return broadened arguments."""
         from ..abstract import broaden
-        return tuple(broaden(a, None) for a in args)
+        return tuple(broaden(a) for a in args)
 
     def register(self, *types):
         """Register a function for the given type signature."""

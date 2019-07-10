@@ -392,6 +392,8 @@ def abstract_clone(__call__, self, x, *args):
             return res
         else:
             return proceed()
+    elif self.state.check and self.state.check(x, *args):
+        return x
     else:
         return proceed()
 
@@ -505,21 +507,13 @@ def concretize_abstract(self, x: Pending):
 @abstract_check.variant(
     initial_state=lambda: CheckState(cache={}, prop='_broad')
 )
-def _is_broad(self, x: object, loop):
+def _is_broad(self, x: object, *args):
     return x is ANYTHING
 
 
 @overload  # noqa: F811
-def _is_broad(self, x: (AbstractScalar, AbstractFunction), loop):
-    return self(x.values[VALUE], loop)
-
-
-@overload  # noqa: F811
-def _is_broad(self, x: Possibilities, loop):
-    if loop is None:
-        return all(self(v, loop) for v in x)
-    else:
-        return False
+def _is_broad(self, x: (AbstractScalar, AbstractFunction), *args):
+    return self(x.values[VALUE], *args)
 
 
 ###########
@@ -530,28 +524,50 @@ def _is_broad(self, x: Possibilities, loop):
 @abstract_clone.variant(
     initial_state=lambda: CloneState({}, '_broad', _is_broad)
 )
-def broaden(self, d: TrackDict, loop):
+def broaden(self, d: TrackDict, *args):
     """Broaden an abstract value.
 
     * Concrete values such as 1 or True will be broadened to ANYTHING.
-    * Possibilities will be broadened to PendingTentative.
+
+    Arguments:
+        d: The abstract data to clone.
+    """
+    return {k: k.broaden(v, self, *args) for k, v in d.items()}
+
+
+###################
+# Tentative check #
+###################
+
+
+@_is_broad.variant(
+    initial_state=lambda: CheckState(cache={}, prop=None)
+)
+def _is_tentative(self, x: Possibilities, loop):
+    return False
+
+
+#############
+# Tentative #
+#############
+
+
+@broaden.variant(
+    initial_state=lambda: CloneState({}, None, _is_tentative)
+)
+def tentative(self, p: Possibilities, loop):
+    """Broaden an abstract value and make it tentative.
+
+    * Concrete values such as 1 or True will be broadened to ANYTHING.
+    * Possibilities will be broadened to PendingTentative. This allows
+      us to avoid resolving them earlier than we would like.
 
     Arguments:
         d: The abstract data to clone.
         loop: The InferenceLoop, used to broaden Possibilities.
     """
-    return {k: k.broaden(v, self, loop) for k, v in d.items()}
-
-
-@overload  # noqa: F811
-def broaden(self, p: Possibilities, loop):
     bp = Possibilities([self(v, loop) for v in p])
-    if loop is None:
-        return bp
-    else:
-        # Broadening Possibilities creates a PendingTentative. This allows
-        # us to avoid resolving them earlier than we would like.
-        return loop.create_pending_tentative(tentative=bp)
+    return loop.create_pending_tentative(tentative=bp)
 
 
 ###############
@@ -841,7 +857,7 @@ def bind(loop, committed, resolved, pending):
         committed = amergeall()
         # We broaden the result so that the as-of-yet unresolved stuff
         # can be merged more easily.
-        committed = broaden(committed, loop)
+        committed = tentative(committed, loop)
         resolved.clear()
         return committed
 
@@ -948,7 +964,7 @@ def normalize_adt(x):
     """Normalize the ADT to make it properly recursive."""
     rval = _normalize_adt_helper(x, {}, {})
     rval = rval.intern()
-    rval = broaden(rval, None)
+    rval = broaden(rval)
     rval = _finalize_adt(rval)
     return rval
 

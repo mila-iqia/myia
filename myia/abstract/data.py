@@ -584,18 +584,18 @@ class Track:
         """Clone the value associated to this Track in a TrackDict."""
         return recurse(v)
 
-    def broaden(self, v, recurse, loop):
+    def broaden(self, v, recurse, *args):
         """Make a value more generic.
 
         By default, this amounts to a straight copy.
         """
-        return recurse(v, loop)
+        return recurse(v, *args)
 
 
 class _ValueTrack(Track):
     """Represents the VALUE track."""
 
-    def broaden(self, v, recurse, loop):
+    def broaden(self, v, recurse, *args):
         """Values are broadened to ANYTHING."""
         return ANYTHING
 

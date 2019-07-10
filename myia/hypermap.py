@@ -57,7 +57,7 @@ class HyperMap(MetaGraph):
 
     def normalize_args(self, args):
         """Return broadened arguments."""
-        return tuple(broaden(a, None) for a in args)
+        return tuple(broaden(a) for a in args)
 
     def _is_nonleaf(self, arg):
         return isinstance(arg, self.nonleaf)

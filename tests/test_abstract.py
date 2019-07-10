@@ -200,8 +200,8 @@ def test_broaden_recursive():
     ta.__init__([sa, ta])
     ta = ta.intern()
 
-    assert broaden(t1, None) is ta
-    assert broaden(ta, None) is ta
+    assert broaden(t1) is ta
+    assert broaden(ta) is ta
 
     t2 = T.empty()
     u2 = AbstractUnion.empty()
@@ -215,8 +215,8 @@ def test_broaden_recursive():
     tb.__init__([sa, ub])
     tb = tb.intern()
 
-    assert broaden(t2, None) is tb
-    assert broaden(tb, None) is tb
+    assert broaden(t2) is tb
+    assert broaden(tb) is tb
 
 
 def test_find_coherent_result_sync():

@@ -172,7 +172,7 @@ class UniformPrimitiveInferrer(WithImplInferrer):
     def normalize_args(self, args):
         """If infer_value is False, return broadened arguments."""
         if not self.infer_value:
-            args = tuple(broaden(a, None) for a in args)
+            args = tuple(broaden(a) for a in args)
         return args
 
     async def infer(self, engine, *args):
