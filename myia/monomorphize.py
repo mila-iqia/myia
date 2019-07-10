@@ -141,14 +141,14 @@ def _build(a):
 
 @dataclass(frozen=True)
 class _Placeholder:
-    context: 'Context'
+    context: Context
 
 
 @dataclass(frozen=True)
 class _TodoEntry:
-    ref: 'Reference'
-    argvals: 'Optional[tuple]'
-    link: 'Optional[tuple]'
+    ref: Reference
+    argvals: Optional[tuple]
+    link: Optional[tuple]
 
 
 def _normalize_context(ctx):

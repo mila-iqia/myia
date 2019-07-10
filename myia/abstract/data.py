@@ -72,8 +72,8 @@ class GraphFunction(Function):
 
     """
 
-    graph: 'Graph'
-    context: 'Context'
+    graph: Graph
+    context: Context
     tracking_id: object = None
 
 
@@ -87,7 +87,7 @@ class PrimitiveFunction(Function):
 
     """
 
-    prim: 'Primitive'
+    prim: Primitive
     tracking_id: object = None
 
 
@@ -102,8 +102,8 @@ class MetaGraphFunction(Function):
 
     """
 
-    metagraph: 'MetaGraph'
-    context: 'Context'
+    metagraph: MetaGraph
+    context: Context
     tracking_id: object = None
 
 
@@ -161,7 +161,7 @@ class TypedPrimitive(Function):
 
     """
 
-    prim: 'Primitive'
+    prim: Primitive
     args: Tuple['AbstractValue']
     output: 'AbstractValue'
 
