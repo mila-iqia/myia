@@ -8,6 +8,7 @@ from functools import reduce
 from dataclasses import is_dataclass, replace as dc_replace
 
 from .. import dtype
+from ..info import About
 from ..ir import Graph, MetaGraph, GraphGenerationError
 from ..prim import Primitive, ops as P
 from ..utils import Overload, Partializable, is_dataclass_type, \
@@ -155,6 +156,10 @@ class InferenceEngine:
 
         This sets an entry in reference_map from orig to new.
         """
+        if not new.node.debug.about:
+            # This will link the old node's debug info to the new node, if
+            # necessary.
+            new.node.debug.about = About(orig.node.debug, 'reroute')
         self.reference_map[orig] = new
         return await self.get_inferred(new)
 
