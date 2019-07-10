@@ -312,6 +312,21 @@ class Monomorphizer:
     # Collect #
     ###########
 
+    def _special_array_map(self, todo, ref, irefs, argvals):
+        todo.append(_TodoEntry(irefs[0], tuple(argvals), (ref, 0)))
+        am_argvals = [a.element for a in argvals[1:]]
+        todo.append(_TodoEntry(irefs[1], tuple(am_argvals), (ref, 1)))
+        # Iterate through the rest of the inputs
+        for i, iref in enumerate(irefs[2:]):
+            todo.append(_TodoEntry(iref, None, (ref, i + 2)))
+
+    def _special_array_reduce(self, todo, ref, irefs, argvals):
+        todo.append(_TodoEntry(irefs[0], tuple(argvals), (ref, 0)))
+        elem_t = argvals[1].element
+        todo.append(_TodoEntry(irefs[1], (elem_t, elem_t), (ref, 1)))
+        todo.append(_TodoEntry(irefs[2], None, (ref, 2)))
+        todo.append(_TodoEntry(irefs[3], None, (ref, 3)))
+
     def collect(self, root_context):
         """Collect all the available contexts.
 
@@ -351,8 +366,17 @@ class Monomorphizer:
                 # Grab the argvals
                 irefs = [self.engine.ref(inp, entry.ref.context)
                          for inp in ref.node.inputs]
+                absfn = concretize_abstract(irefs[0].get_resolved())
                 argvals = [concretize_abstract(iref.get_resolved())
                            for iref in irefs[1:]]
+
+                prim = absfn.get_prim()
+                if prim is not None:
+                    method = getattr(self, f'_special_{prim}', None)
+                    if method is not None:
+                        method(todo, ref, irefs, argvals)
+                        continue
+
                 # Keep traversing the graph. Element 0 is special.
                 todo.append(_TodoEntry(irefs[0], tuple(argvals),
                                        (ref, 0)))

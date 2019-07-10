@@ -312,20 +312,39 @@ class AbstractFunction(AbstractAtom):
         """Return a set of all possible Functions (synchronous)."""
         return self.values[VALUE]
 
-    def get_unique(self):
-        """If there is exactly one possible function, return it.
-
-        Otherwise, raise a MyiaTypeError.
-        """
+    def _maybe_get_unique(self):
         poss = self.values[VALUE]
         if isinstance(poss, Pending):  # pragma: no cover
             # This is a bit circumstantial and difficult to test explicitly
             raise MyiaTypeError('get_unique invalid because Pending')
         poss = frozenset(poss)
         if len(poss) != 1:
-            raise MyiaTypeError(f'Expected unique function, not {poss}')
+            return None
         fn, = poss
         return fn
+
+    def get_unique(self):
+        """If there is exactly one possible function, return it.
+
+        Otherwise, raise a MyiaTypeError.
+        """
+        rval = self._maybe_get_unique()
+        if rval is None:
+            raise MyiaTypeError(
+                f'Expected unique function, not {self.values[VALUE]}'
+            )
+        return rval
+
+    def get_prim(self):
+        """If this AbstractFunction represents a a Primitive, return it.
+
+        Otherwise, return None.
+        """
+        fn = self._maybe_get_unique()
+        if isinstance(fn, (PrimitiveFunction, TypedPrimitive)):
+            return fn.prim
+        else:
+            return None
 
     def __eqkey__(self):
         return AttrEK(self, ('values',))

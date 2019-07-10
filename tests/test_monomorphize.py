@@ -13,7 +13,7 @@ from myia.debug.traceback import print_inference_error
 from myia.abstract import InferenceError
 from myia.prim.py_implementations import \
     hastype, partial, scalar_add, scalar_sub, \
-    scalar_usub, scalar_uadd, switch, array_map
+    scalar_usub, scalar_uadd, switch, array_map, array_reduce
 from myia.validate import ValidationError
 from myia.utils import overload, ADT
 from myia.hypermap import hyper_map
@@ -260,6 +260,27 @@ def test_array_map_polymorphic(xs, ys):
         return x * x
 
     return array_map(square, xs), array_map(square, ys)
+
+
+@specialize((np.array([fp1, fp2]),
+             np.array([int1, int2])))
+def test_array_map_polymorphic_indirect(xs, ys):
+    def square(x):
+        return x * x
+
+    def helper(fn):
+        return array_map(fn, xs), array_map(fn, ys)
+
+    return helper(square)
+
+
+@specialize((np.array([fp1, fp2]),
+             np.array([int1, int2])))
+def test_array_reduce_polymorphic_indirect(xs, ys):
+    def helper(fn):
+        return array_reduce(fn, xs, ()), array_reduce(fn, ys, ())
+
+    return helper(scalar_add)
 
 
 @specialize((int1, np.array([fp1, fp2]),))
