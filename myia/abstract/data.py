@@ -245,9 +245,9 @@ class AbstractError(AbstractAtom):
     happens when there are multiple ways to type a graph in a given context.
     """
 
-    def __init__(self, err):
+    def __init__(self, err, data=None):
         """Initialize an AbstractError."""
-        super().__init__({VALUE: err})
+        super().__init__({VALUE: err, DATA: data})
 
     def __pretty__(self, ctx):
         return f'E({self.values[VALUE]})'
@@ -611,6 +611,7 @@ class _ShapeTrack(Track):
 VALUE = _ValueTrack('VALUE')
 TYPE = _TypeTrack('TYPE')
 SHAPE = _ShapeTrack('SHAPE')
+DATA = _ValueTrack('DATA')
 
 
 ##########
@@ -620,15 +621,6 @@ SHAPE = _ShapeTrack('SHAPE')
 
 infer_trace = ContextVar('infer_trace')
 infer_trace.set({})
-
-
-class Unspecializable(Exception):
-    """Raised when it is impossible to specialize an inferrer."""
-
-    def __init__(self, problem):
-        """Initialize Unspecializable."""
-        super().__init__(problem)
-        self.problem = problem
 
 
 class InferenceError(Exception, Partializable):

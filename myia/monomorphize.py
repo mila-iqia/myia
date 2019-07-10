@@ -12,7 +12,7 @@ from collections import defaultdict
 from .abstract import AbstractFunction, PrimitiveFunction, GraphFunction, \
     MetaGraphFunction, MyiaTypeError, build_value, AbstractError, \
     BaseGraphInferrer, TrackedInferrer, DummyFunction, \
-    Unspecializable, TypedPrimitive, broaden, DEAD, POLY, \
+    TypedPrimitive, broaden, DEAD, POLY, \
     VirtualReference, Context, Reference, abstract_clone, \
     abstract_check, concretize_abstract, InferenceError
 from .abstract.utils import CheckState, CloneState
@@ -22,6 +22,16 @@ from .ir import Graph, Constant, MetaGraph, CloneRemapper, GraphCloner, \
     succ_incoming
 from .graph_utils import dfs
 from .utils import overload
+
+
+class Unspecializable(Exception):
+    """Raised when it is impossible to specialize an inferrer."""
+
+    def __init__(self, problem, data=None):
+        """Initialize Unspecializable."""
+        super().__init__(problem)
+        self.problem = problem
+        self.data = data
 
 
 @abstract_clone.variant
@@ -304,9 +314,9 @@ class Monomorphizer:
             generalized, outval = self._find_generalized(inf)
             if generalized is not None:
                 return generalized, outval
-            raise Unspecializable(POLY)
+            raise Unspecializable(POLY, tuple(choices.keys()))
         else:
-            raise Unspecializable(POLY)
+            raise Unspecializable(POLY, tuple(choices.keys()))
 
     ###########
     # Collect #
@@ -393,7 +403,8 @@ class Monomorphizer:
                     new_node, ctx, norm_ctx = self.analyze_function(
                         a, fn, entry.argvals)
                 except Unspecializable as e:
-                    new_node = _const(e.problem, AbstractError(e.problem))
+                    aerr = AbstractError(e.problem, e.data)
+                    new_node = _const(e.problem, aerr)
                 else:
                     if isinstance(fn, GraphFunction) and entry.argvals is None:
                         self.ctcache[ref.node.value] = norm_ctx

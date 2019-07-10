@@ -19,7 +19,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractValue, GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, AbstractExternal, \
-    VALUE, TYPE, SHAPE, DummyFunction, \
+    VALUE, TYPE, SHAPE, DATA, DummyFunction, AbstractError, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
     AbstractList, type_error_nargs, TypeDispatchError, AbstractADT, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
@@ -263,6 +263,12 @@ class InferenceEngine:
             newfn = g.apply(P.partial, P.make_record, fn.values[VALUE])
             newcall = g.apply(newfn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
+
+        elif isinstance(fn, AbstractError):
+            raise MyiaTypeError(
+                f'Trying to call a function with type '
+                f'{fn.values[VALUE]} {fn.values[DATA] or ""}.'
+            )
 
         elif not isinstance(fn, AbstractFunction):
             g = ref.node.graph
