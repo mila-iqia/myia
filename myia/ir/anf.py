@@ -23,8 +23,6 @@ PARAMETER = Named('PARAMETER')
 SPECIAL = Named('SPECIAL')
 APPLY = Named('APPLY')
 
-LITERALS = (bool, int, str, float, Primitive)
-
 
 class Graph:
     """A function graph.
@@ -377,9 +375,7 @@ class Constant(ANFNode):
         return ct
 
     def __str__(self) -> str:
-        if isinstance(self.value, LITERALS) or isinstance(self.value, Graph):
-            return f'_constant:{self.value}'
-        return super().__str__()
+        return f'_constant:{self.value}'
 
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, value=self.value)
