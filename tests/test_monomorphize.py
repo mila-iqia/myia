@@ -302,11 +302,13 @@ def test_list_map_polymorphic_2(c, xs, ys):
     def double(x):
         return x + x
 
-    if c:
-        f = square
-    else:
-        f = double
+    def picker(c):
+        if c:
+            return square
+        else:
+            return double
 
+    f = picker(c)
     return list_map(f, xs), list_map(f, ys)
 
 
