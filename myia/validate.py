@@ -4,7 +4,7 @@ from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
 from .abstract import abstract_check, AbstractClass, AbstractJTagged, \
-    VALUE, DEAD, AbstractError, AbstractExternal
+    VALUE, DEAD, POLY, AbstractError, AbstractExternal
 
 
 class ValidationError(Exception):
@@ -12,20 +12,26 @@ class ValidationError(Exception):
 
 
 @abstract_check.variant
-def validate_abstract(self, a: (AbstractClass, AbstractJTagged)):
+def validate_abstract(self, a: (AbstractClass, AbstractJTagged), uses):
     """Validate a type."""
     raise ValidationError(f'Illegal type in the graph: {a}')
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: AbstractError):
+def validate_abstract(self, a: AbstractError, uses):
     kind = a.values[VALUE]
-    if kind is not DEAD:
+    if kind is DEAD:
+        return True
+    elif kind is POLY:
+        return not any(key == 0 for node, key in uses)
+    else:  # pragma: no cover
+        # As it turns out, the inferrer now catches this error before we get to
+        # validation.
         raise ValidationError(f'Illegal type in the graph: {a}')
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: (type(None), AbstractExternal)):
+def validate_abstract(self, a: (type(None), AbstractExternal), uses):
     raise ValidationError(f'Illegal type in the graph: {a}')
 
 
@@ -130,11 +136,12 @@ class Validator:
                 raise ValidationError(f'Illegal primitive: {node.value}')
 
     def _validate_abstract(self, node):
-        return self._validate_abstract_fn(node.abstract)
+        return self._validate_abstract_fn(node.abstract,
+                                          self.manager.uses[node])
 
     def _run(self, root):
-        manager = manage(root)
-        for node in list(manager.all_nodes):
+        self.manager = manage(root)
+        for node in list(self.manager.all_nodes):
             self._test(node, self._validate_abstract)
             self._test(node, self._validate_oper)
 
