@@ -245,7 +245,7 @@ class Monomorphizer:
     def _find_generalized(self, inf):
         choices = set()
         for argvals in self.infcaches[inf]:
-            argvals = tuple([broaden(v, None) for v in argvals])
+            argvals = tuple(broaden(v) for v in argvals)
             choices.add(argvals)
         if len(choices) == 1:
             choice, = choices
@@ -263,7 +263,7 @@ class Monomorphizer:
             argvals = tuple(argvals)
             # Let's try to get broader/more general argvals to avoid
             # specializing on values, if we can.
-            broad_argvals = tuple([broaden(v, None) for v in argvals])
+            broad_argvals = tuple(broaden(v) for v in argvals)
             if argvals != broad_argvals:
                 currinf = inf
                 while hasattr(currinf, 'subinf'):

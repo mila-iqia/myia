@@ -363,7 +363,7 @@ def from_value(v, broaden=False):
     """
     a = to_abstract(v, None, None)
     if broaden:
-        a = _broaden(a, None)
+        a = _broaden(a)
     return a
 
 
@@ -677,7 +677,7 @@ class GraphInferrer(BaseGraphInferrer):
     def normalize_args(self, args):
         """Broaden args if flag ignore_values is True."""
         if self._graph.has_flags('ignore_values'):
-            return tuple(_broaden(a, None) for a in args)
+            return tuple(_broaden(a) for a in args)
         else:
             return args
 

@@ -69,7 +69,7 @@ class Elemwise(MetaGraph):
     def normalize_args(self, args):
         """If infer_value is False, return broadened arguments."""
         if not self.infer_value:
-            args = tuple(broaden(a, None) for a in args)
+            args = tuple(broaden(a) for a in args)
         return args
 
     def generate_graph(self, args):
@@ -593,7 +593,7 @@ class IsCompare(MetaGraph):
 
     def normalize_args(self, args):
         """Return broadened arguments."""
-        return tuple(broaden(a, None) for a in args)
+        return tuple(broaden(a) for a in args)
 
     def generate_graph(self, args):
         """Make the graph for the IsCompare.
