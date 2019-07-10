@@ -24,7 +24,6 @@ from .data import (
     AbstractArray,
     AbstractList,
     AbstractClassBase,
-    AbstractClass,
     AbstractJTagged,
     AbstractBottom,
     PartialApplication,
@@ -447,12 +446,17 @@ async def infer_type_make_record(engine, _cls: AbstractType, *elems):
     cls = type_to_abstract(cls)
     expected = list(cls.attributes.items())
     if len(expected) != len(elems):
-        raise MyiaTypeError('Wrong class inst')
+        raise MyiaTypeError(
+            f'{cls.tag.__qualname__} expects {len(expected)} fields '
+            f'but got {len(elems)} instead.'
+        )
     for (name, t), elem in zip(expected, elems):
         if not typecheck(t, elem):
-            raise MyiaTypeError('Wrong class inst')
-
-    return AbstractClass(
+            raise MyiaTypeError(
+                f'{cls.tag.__qualname__} expects field `{name}` '
+                f'to have type {elem} but got {t}'
+            )
+    return type(cls)(
         cls.tag,
         {
             name: elem
