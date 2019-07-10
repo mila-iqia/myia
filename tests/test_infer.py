@@ -1643,7 +1643,7 @@ def test_dataclass_call(thing):
 hyper_map_notuple = HyperMap(
     nonleaf=(abstract.AbstractArray,
              abstract.AbstractList,
-             abstract.AbstractClass)
+             abstract.AbstractClassBase)
 )
 hyper_map_nobroadcast = HyperMap(broadcast=False)
 

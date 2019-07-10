@@ -4,7 +4,7 @@ import numpy as np
 from dataclasses import is_dataclass
 
 from . import operations, composite as C, abstract
-from .abstract import MyiaTypeError, broaden
+from .abstract import MyiaTypeError, broaden, type_to_abstract
 from .ir import MetaGraph, Graph
 from .utils import Overload
 from .prim import ops as P
@@ -15,7 +15,7 @@ nonleaf_defaults = (
     abstract.AbstractArray,
     abstract.AbstractList,
     abstract.AbstractTuple,
-    abstract.AbstractClass,
+    abstract.AbstractClassBase,
 )
 
 
@@ -119,7 +119,7 @@ class HyperMap(MetaGraph):
             return g.apply(lm, fn_rec, *args)
 
     @_make.register
-    def _make(self, a: abstract.AbstractClass, g, fnarg, argmap):
+    def _make(self, a: abstract.AbstractClassBase, g, fnarg, argmap):
         for a2, isleaf in argmap.values():
             if not isleaf:
                 if (a2.tag != a.tag
@@ -136,7 +136,11 @@ class HyperMap(MetaGraph):
                 val = g.apply(self.fn_rec, fnarg, *args)
             vals.append(val)
 
-        return g.apply(P.make_record, a, *vals)
+        # We recover the original, potentially more generic type corresponding
+        # to the tag. This allows the mapping function to return a different
+        # type from its input.
+        original = type_to_abstract(a.tag)
+        return g.apply(P.make_record, original, *vals)
 
     def _generate_helper(self, g, fnarg, argmap):
         nonleafs = [a for a, isleaf in argmap.values() if not isleaf]
@@ -192,7 +196,7 @@ class HyperMap(MetaGraph):
                 or (isinstance(x, np.ndarray)
                     and abstract.AbstractArray in self.nonleaf)
                 or (is_dataclass(x)
-                    and abstract.AbstractClass in self.nonleaf)
+                    and abstract.AbstractClassBase in self.nonleaf)
             )
 
         def _reccall(args):
