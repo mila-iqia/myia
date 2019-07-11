@@ -539,13 +539,13 @@ hyper_add = HyperMap(name='hyper_add', fn_leaf=_leaf_add)
 _leaf_zeros_like = MultitypeGraph('zeros_like')
 
 
-@_leaf_zeros_like.register(AbstractFunction)
+@_leaf_zeros_like.register(AbstractFunction(value=ANYTHING))
 @core
 def _function_zero(_):
     return newenv
 
 
-@_leaf_zeros_like.register(AbstractError)
+@_leaf_zeros_like.register(AbstractError(ANYTHING))
 @core
 def _dead_zero(x):
     return x
