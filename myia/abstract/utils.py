@@ -21,7 +21,6 @@ from .data import (
     AbstractStructure,
     AbstractValue,
     AbstractScalar,
-    AbstractError,
     AbstractFunction,
     AbstractTuple,
     AbstractArray,
@@ -111,7 +110,10 @@ _default_type_params = {
 
 @overload(bootstrap=True)
 def type_to_abstract(self, t: dtype.TypeMeta):
-    """Convert a type to an AbstractValue."""
+    """Convert a type to an AbstractValue.
+
+    If the value is already an AbstractValue, returns it directly.
+    """
     return self[t](t)
 
 
@@ -143,14 +145,14 @@ def type_to_abstract(self, t: type):
         return ANYTHING
 
     else:
-        return _t2a_helper[t](t, _default_type_params.get(t, None))
+        return pytype_to_abstract[t](t, _default_type_params.get(t, None))
 
 
 @overload  # noqa: F811
 def type_to_abstract(self, t: typing._GenericAlias):
     args = tuple(object if isinstance(arg, typing.TypeVar) else arg
                  for arg in t.__args__)
-    return _t2a_helper[t.__origin__](t, args)
+    return pytype_to_abstract[t.__origin__](t, args)
 
 
 @overload  # noqa: F811
@@ -159,7 +161,8 @@ def type_to_abstract(self, t: object):
 
 
 @overload
-def _t2a_helper(main: tuple, args):
+def pytype_to_abstract(main: tuple, args):
+    """Convert a Python type to an AbstractValue."""
     if args == () or args is None:
         targs = ANYTHING
     elif args == ((),):
@@ -170,13 +173,13 @@ def _t2a_helper(main: tuple, args):
 
 
 @overload  # noqa: F811
-def _t2a_helper(main: list, args):
+def pytype_to_abstract(main: list, args):
     arg, = args
     return AbstractList(type_to_abstract(arg))
 
 
 @overload  # noqa: F811
-def _t2a_helper(main: np.ndarray, args):
+def pytype_to_abstract(main: np.ndarray, args):
     arg, = args
     arg = type_to_abstract(arg)
     shp = ANYTHING
@@ -184,7 +187,7 @@ def _t2a_helper(main: np.ndarray, args):
 
 
 @overload  # noqa: F811
-def _t2a_helper(main: int, args):
+def pytype_to_abstract(main: int, args):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.Int[64],
@@ -192,7 +195,7 @@ def _t2a_helper(main: int, args):
 
 
 @overload  # noqa: F811
-def _t2a_helper(main: float, args):
+def pytype_to_abstract(main: float, args):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.Float[64],
@@ -200,21 +203,11 @@ def _t2a_helper(main: float, args):
 
 
 @overload  # noqa: F811
-def _t2a_helper(main: bool, args):
+def pytype_to_abstract(main: bool, args):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.Bool,
     })
-
-
-@overload  # noqa: F811
-def _t2a_helper(main: AbstractFunction, args):
-    return AbstractFunction(value=ANYTHING)
-
-
-@overload  # noqa: F811
-def _t2a_helper(main: AbstractError, args):
-    return AbstractError(ANYTHING)
 
 
 def type_token(x):
