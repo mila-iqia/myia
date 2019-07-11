@@ -25,7 +25,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     AbstractList, type_error_nargs, TypeDispatchError, AbstractADT, \
     InferenceError, PrimitiveFunction, MetaGraphFunction, Function
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
-    bind, type_to_abstract, normalize_adt
+    bind, type_to_abstract, normalize_adt, concretize_abstract
 
 
 class ArrayWrapper:
@@ -108,7 +108,7 @@ class InferenceEngine:
             )
 
         async def _check():
-            amerge(await output_ref.get(),
+            amerge(concretize_abstract(await output_ref.get()),
                    outspec,
                    loop=self.loop,
                    forced=False)
