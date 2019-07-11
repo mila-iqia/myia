@@ -4,7 +4,7 @@ import numpy as np
 from dataclasses import is_dataclass
 
 from . import operations, composite as C, abstract
-from .abstract import MyiaTypeError, broaden, type_to_abstract
+from .abstract import MyiaTypeError, broaden
 from .ir import MetaGraph, Graph
 from .utils import Overload
 from .prim import ops as P
@@ -139,7 +139,7 @@ class HyperMap(MetaGraph):
         # We recover the original, potentially more generic type corresponding
         # to the tag. This allows the mapping function to return a different
         # type from its input.
-        original = type_to_abstract(a.tag)
+        original = a.user_defined_version()
         return g.apply(P.make_record, original, *vals)
 
     def _generate_helper(self, g, fnarg, argmap):
