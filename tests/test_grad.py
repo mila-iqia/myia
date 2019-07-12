@@ -19,6 +19,7 @@ from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
     distribute, dot, reshape, transpose, scalar_cast
 from myia.prim.py_implementations import py_registry as pyi
 from myia.validate import whitelist, validate_abstract
+from myia.frontends import load_frontend
 
 from .common import f64, u64, MA, MB, to_abstract_test
 
@@ -141,7 +142,7 @@ def _grad_test(fn, obj, args,
                pipeline=grad_pipeline,
                rel_error=1e-3):
     pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
-    argspec = tuple(from_value(arg, broaden=True)
+    argspec = tuple(from_value(arg, broaden=True, frontend=load_frontend('numpy'))
                     for arg in clean_args(args))
     sens_type = to_abstract_test(sens_type)
     if isinstance(obj, FunctionType):
@@ -477,7 +478,7 @@ def test_transpose2(x, y, axis1, axis2):
 
 
 def _runwith(f, *args):
-    argspec = tuple(from_value(arg, broaden=True) for arg in args)
+    argspec = tuple(from_value(arg, broaden=True, frontend=load_frontend('numpy')) for arg in args)
     res = grad_pipeline.run(input=f, argspec=argspec)
     return res['output'](*args)
 

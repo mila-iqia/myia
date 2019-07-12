@@ -557,6 +557,12 @@ def _bool_zero(_):
     return False
 
 
+@_leaf_zeros_like.register(Nil)
+@core
+def _nil_zero(_):
+    return None
+
+
 @_leaf_zeros_like.register(Number)
 @core
 def _scalar_zero(x):
@@ -852,6 +858,8 @@ class GradOperation(MetaGraph):
     def generate_graph(self, args):
         """Generate the graph."""
         ft, *raw_wrt = args
+        if not isinstance(ft, AbstractFunction):
+            breakpoint()
         assert isinstance(ft, AbstractFunction)
         gf = ft.get_unique()
         assert isinstance(gf, GraphFunction)

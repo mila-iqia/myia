@@ -10,6 +10,7 @@ from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import distribute, scalar_to_array, dot, \
     scalar_add, array_reduce, transpose
 from myia.api import to_device
+from myia.frontends import load_frontend
 from myia import dtype
 
 from ..common import MA, MB
@@ -56,7 +57,7 @@ def parse_compare(*tests):
             if not isinstance(args, tuple):
                 args = (args,)
             ref_result = fn(*map(copy, args))
-            argspec = tuple(from_value(arg, broaden=True) for arg in args)
+            argspec = tuple(from_value(arg, broaden=True, frontend=load_frontend('numpy')) for arg in args)
             res = backend_opt.pip(input=fn, argspec=argspec)
             myia_fn = res['output']
             myia_args = backend_opt.convert_args(args)

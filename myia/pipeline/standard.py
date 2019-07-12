@@ -1,7 +1,7 @@
 """Pre-made pipelines."""
 
 
-from ..abstract import Context
+from ..abstract import Context, AbstractArray
 from ..ir import GraphManager
 from ..prim import py_registry
 from ..abstract import abstract_inferrer_constructors
@@ -11,6 +11,8 @@ from ..pipeline.resources import scalar_object_map, standard_object_map, \
 
 from . import steps
 from .pipeline import PipelineDefinition
+from ..utils import PartialCallable
+from ..frontends import load_frontend
 
 
 standard_resources = dict(
@@ -24,7 +26,9 @@ standard_resources = dict(
     inferrer=InferenceResource.partial(
         constructors=abstract_inferrer_constructors,
         context_class=Context,
-    )
+    ),
+    array_class=AbstractArray,
+    frontend=PartialCallable.partial(fn=load_frontend, name='numpy')
 )
 
 

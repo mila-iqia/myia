@@ -4,7 +4,8 @@ from .ir import manage
 from .prim import Primitive, ops as P
 from .utils import overload, ErrorPool
 from .abstract import abstract_check, AbstractClass, AbstractJTagged, \
-    VALUE, DEAD, POLY, AbstractError, AbstractExternal
+    VALUE, TYPE, DEAD, POLY, AbstractError, AbstractExternal, AbstractScalar
+from . import dtype
 
 
 class ValidationError(Exception):
@@ -27,6 +28,14 @@ def validate_abstract(self, a: AbstractError, uses):
     else:  # pragma: no cover
         # As it turns out, the inferrer now catches this error before we get to
         # validation.
+        raise ValidationError(f'Illegal type in the graph: {a}')
+
+
+@overload  # noqa: F811
+def validate_abstract(self, a: AbstractScalar, uses):
+    if not issubclass(a.values[TYPE],
+                      (dtype.Number, dtype.Bool, dtype.Nil,
+                       dtype.EnvType, dtype.SymbolicKeyType)):
         raise ValidationError(f'Illegal type in the graph: {a}')
 
 

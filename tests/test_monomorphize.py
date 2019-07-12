@@ -17,6 +17,7 @@ from myia.prim.py_implementations import \
 from myia.validate import ValidationError
 from myia.utils import overload, ADT
 from myia.hypermap import hyper_map
+from myia.frontends import load_frontend
 
 from .common import mysum, i64, f64, Point
 
@@ -62,7 +63,7 @@ def specializer_decorator(pipeline):
                     exc = None
                 pip = pipeline.make()
                 if abstract is None:
-                    argspec = tuple(from_value(arg, broaden=True)
+                    argspec = tuple(from_value(arg, broaden=True, frontend=load_frontend('numpy'))
                                     for arg in args)
                 else:
                     argspec = abstract

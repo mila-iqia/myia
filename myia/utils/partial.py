@@ -97,3 +97,9 @@ class Partializable:
     def partial(cls, **kwargs):
         """Return a Partial on this class constructor."""
         return Partial(cls, **kwargs)
+
+
+class PartialCallable(Partializable):
+    def __new__(self, fn, pipeline_init, **kwargs):
+        return fn(**kwargs)
+

@@ -8,7 +8,7 @@ from operator import getitem
 
 from .. import dtype
 from ..abstract import typecheck
-from ..ir import Graph, GraphCloner, CloneRemapper
+from ..ir import Graph, MetaGraph, GraphCloner, CloneRemapper
 from ..dtype import Number, Bool, ExceptionType
 from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance
@@ -31,6 +31,7 @@ from .data import (
     PrimitiveFunction,
     Possibilities,
     GraphFunction,
+    MetaGraphFunction,
     DummyFunction,
     VALUE, TYPE, SHAPE,
     MyiaTypeError, InferenceError, MyiaShapeError, check_nargs,
@@ -249,7 +250,10 @@ def _prim_or_graph(afn):
     if isinstance(fn, GraphFunction):
         assert fn.context == Context.empty()
         fn = fn.graph
-    assert isinstance(fn, (Primitive, Graph))
+    if isinstance(fn, MetaGraphFunction):
+        assert fn.context == Context.empty()
+        fn = fn.metagraph
+    assert isinstance(fn, (Primitive, Graph, MetaGraph))
     return fn
 
 
@@ -478,13 +482,15 @@ async def infer_type_make_record(self, engine, _cls: AbstractType, *elems):
                 f'{cls.tag.__qualname__} expects field `{name}` '
                 f'to have type {elem} but got {t}'
             )
+
     return type(cls)(
         cls.tag,
         {
             name: elem
             for (name, _), elem in zip(expected, elems)
         },
-        cls.methods
+        cls.methods,
+        constructor = cls.constructor
     )
 
 
@@ -713,7 +719,13 @@ async def _inf_array_map(self, engine, fn: AbstractFunction, *arrays):
         else:
             raise MyiaShapeError("Expect same shapes for array_map")
 
-    return AbstractArray(result, {SHAPE: tuple(rshape)})
+    for arr in arrays:
+        if type(arrays[0]) != type(arr):
+            raise MyiaTypeError(f' 1: ' + f' Expect array of type {type(arrays[0])} ' + 
+                f'to have same type as array of type {type(arr)}')
+
+    #return AbstractArray(result, {SHAPE: tuple(rshape)})
+    return type(arrays[0])(result, {SHAPE: tuple(rshape)})
 
 
 # TODO: array_scan
@@ -742,7 +754,8 @@ async def _inf_array_reduce(self, engine,
             )
 
     res = await engine.execute(fn, a.element, a.element)
-    return AbstractArray(res, {SHAPE: shp_v})
+    #return AbstractArray(res, {SHAPE: shp_v})
+    return type(a)(res, {SHAPE: shp_v})
 
 
 @standard_prim(P.distribute)
@@ -757,7 +770,8 @@ async def _inf_distribute(self, engine, a: AbstractArray, _shp: _shape_type):
     for vs, s in zip(a_shp, shp):
         if vs != s and vs not in (1, ANYTHING) and s not in (1, ANYTHING):
             raise MyiaShapeError("Cannot change shape when distributing")
-    return AbstractArray(a.element, {SHAPE: shp})
+    #return AbstractArray(a.element, {SHAPE: shp})
+    return type(a)(a.element, {SHAPE: shp})
 
 
 @standard_prim(P.reshape)
@@ -771,7 +785,8 @@ async def _inf_reshape(self, engine, a: AbstractArray, _shp: _shape_type):
             prod(shp) != prod(a_shp)):
         raise MyiaShapeError("Cannot change the total number of elements "
                              "in reshape")
-    return AbstractArray(a.element, {SHAPE: shp})
+    #return AbstractArray(a.element, {SHAPE: shp})
+    return type(a)(a.element, {SHAPE: shp})
 
 
 @standard_prim(P.transpose)
@@ -790,7 +805,8 @@ async def _inf_transpose(self, engine,
             )
 
         shp = tuple(a_shp[i] for i in perm)
-    return AbstractArray(a.element, {SHAPE: shp})
+    #return AbstractArray(a.element, {SHAPE: shp})
+    return type(a)(a.element, {SHAPE: shp})
 
 
 @standard_prim(P.dot)
@@ -806,7 +822,13 @@ async def _inf_dot(self, engine, a: AbstractArray, b: AbstractArray):
         )
     engine.abstract_merge(a.element, b.element)
     c_shp = (a_shp[0], b_shp[1])
-    return AbstractArray(a.element, {SHAPE: c_shp})
+
+    if type(a) != type(b):
+        raise MyiaTypeError(f' 2: ' + f'Expect array of type {type(a)} ' + 
+            f'to have same type as array of type {type(b)}')
+
+    #return AbstractArray(a.element, {SHAPE: c_shp})
+    return type(a)(a.element, {SHAPE: c_shp})
 
 
 ##############

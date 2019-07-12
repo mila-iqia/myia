@@ -9,6 +9,7 @@ from myia.prim import ops as P
 from myia.prim.py_implementations import \
     typeof, scalar_add, partial, bool_and
 from myia.utils import no_prof, Profile
+from myia.frontends import load_frontend
 
 
 from .common import to_abstract_test
@@ -43,7 +44,7 @@ def parse_compare(*tests, optimize=True, python=True, profile=no_prof):
                 args = (args,)
             if python:
                 ref_result = fn(*map(copy, args))
-            argspec = tuple(from_value(arg, broaden=True) for arg in args)
+            argspec = tuple(from_value(arg, broaden=True, frontend=load_frontend('numpy')) for arg in args)
             if profile is True:
                 profile = Profile()
             res = pipeline.run(input=fn, argspec=argspec, profile=profile)

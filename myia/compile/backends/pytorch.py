@@ -32,6 +32,12 @@ def type_to_pytorch_type(t):
         raise TypeError(f"Unsupported type: {t}")
     return _type_map[t]
 
+def pytorch_array_to_scalar(v):
+    """Implementation of array_to_scalar for pytorch."""
+    if v.is_cuda:
+        v = v.cpu()
+    return v.detach().numpy()
+
 
 def pytorch_array_to_scalar(v):
     """Implementation of array_to_scalar for pytorch."""

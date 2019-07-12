@@ -660,14 +660,15 @@ class Wrap(PipelineStep):
 
         def wrapped(*args):
             steps = self.pipeline.steps
+            frontend = self.pipeline.resources.frontend
             if hasattr(steps, 'compile'):
                 backend = steps.compile.backend
             else:
                 backend = NumpyChecker()
-            args = tuple(convert_arg(arg, ot, backend) for arg, ot in
+            args = tuple(frontend.convert_arg(arg, ot, backend) for arg, ot in
                          zip(args, orig_arg_t))
             res = fn(*args)
-            res = convert_result(res, orig_out_t, vm_out_t, backend,
+            res = frontend.convert_result(res, orig_out_t, vm_out_t, backend,
                                  self.return_backend)
             return res
 

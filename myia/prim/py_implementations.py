@@ -236,7 +236,10 @@ def bool_eq(x: Bool, y: Bool) -> Bool:
 def typeof(x):
     """Implement typeof."""
     from ..abstract import from_value
-    return from_value(x, broaden=True)
+
+    #TODO: should frontend=load_frontend('numpy') or other things?
+    from myia.frontends import load_frontend
+    return from_value(x, broaden=True, frontend=load_frontend('numpy'))
 
 
 @register(primops.hastype)

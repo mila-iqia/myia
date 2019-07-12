@@ -365,6 +365,7 @@ def from_value(v, broaden=False, frontend=None):
         v: The value to convert.
         broaden: If True, concrete values will be made more abstract, so e.g.
             the value 1234 would become ANYTHING.
+        frontend: frontend whose to_abstract variant is used
     """
     a = frontend.to_abstract(v, None, None)
     if broaden:
@@ -415,7 +416,7 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
     elif isinstance(v, dtype.TypeMeta):
         rval = AbstractType(v)
 
-    else:      
+    else:
         try:
             typ = dtype.pytype_to_myiatype(type(v))
         except KeyError:

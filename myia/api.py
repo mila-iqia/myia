@@ -42,10 +42,12 @@ class MyiaFunction:
         self.pip = standard_pipeline.configure({
             'compile.backend': backend,
             'compile.backend_options': backend_options,
-            'wrap.return_backend': return_backend
+            'wrap.return_backend': return_backend,
+            'frontend.name': frontend
         })
         self._cache = {}
         self.frontend = load_frontend(frontend)
+        self.pip = self.frontend.configure(self.pip)
 
     def specialize(self, args):
         """Specialize on the types of the given arguments.
@@ -147,7 +149,7 @@ def _convert_arg_init(self, arg, orig_t: AbstractArray, backend):
     assert issubclass(et, dtype.Number)
     if isinstance(arg, np.ndarray):
         arg = ArrayWrapper(backend.from_numpy(arg), arg.dtype, arg.shape)
-    backend.check_array(arg.array, et)
+    #backend.check_array(arg.array, et)
     return arg
 
 
@@ -178,13 +180,13 @@ def _convert_arg_init(self, arg, orig_t: AbstractScalar, backend):
 # Move model to target accelerator hardware #
 #############################################
 
-def to_device(model, backend, backend_options=None):
+def to_device(model, backend, backend_options=None, frontend=None):
     """Move model to target accelerator hardware (using selected backend)."""
     if not isinstance(backend, Backend):
         backend = load_backend(backend, backend_options)
     model = _convert_arg_init(
         model,
-        from_value(model, broaden=True),
+        from_value(model, broaden=True, frontend=load_frontend(frontend)),
         backend
     )
     return model
