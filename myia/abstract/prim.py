@@ -82,11 +82,33 @@ class StandardInferrer(Inferrer):
             elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
-                        f'Wrong type {arg} != {typ} for {self._infer}'
+                        f'Wrong type {arg} != {typ} for {self.prim}'
                     )
             elif callable(typ):
                 await force_pending(engine.check(typ, arg))
         return await self._infer(self, engine, *args)
+
+    def require_constant(self, a, *, argnum, range=None):
+        """Returns the constant associated to abstract argument a.
+
+        If a is not a constant, raises a MyiaTypeError.
+
+        Arguments:
+            argnum (int): Which argument we are checking.
+            range (optional): A range or collection in which the argument
+                must lie.
+        """
+        v = a.values[VALUE]
+        if v is ANYTHING:
+            raise MyiaTypeError(
+                f'Argument {argnum} to {self.prim} must be constant.'
+            )
+        if range is not None and v not in range:
+            raise MyiaTypeError(
+                f'Argument {argnum} to {self.prim} is out of range.'
+                f' It should lie in {range}'
+            )
+        return v
 
 
 def standard_prim(prim):
@@ -180,7 +202,7 @@ class UniformPrimitiveInferrer(WithImplInferrer):
         infer_trace.set({**infer_trace.get(), self.prim: (self.prim, args)})
         outtype = self.outtype
         if any(not isinstance(arg, AbstractScalar) for arg in args):
-            raise MyiaTypeError('Expected scalar')
+            raise MyiaTypeError(f'Expected scalar as argument to {self.prim}')
         ts = [arg.values[TYPE] for arg in args]
         for typ, indexes in self.typemap.items():
             # Each group is merged using check
@@ -469,16 +491,8 @@ async def infer_type_make_record(self, engine, _cls: AbstractType, *elems):
 @standard_prim(P.tuple_getitem)
 async def _inf_tuple_getitem(self, engine,
                              arg: AbstractTuple, idx: dtype.Int[64]):
-    idx_v = idx.values[VALUE]
-    if idx_v is ANYTHING:
-        raise MyiaTypeError(
-            'Tuples must be indexed with a constant'
-        )
     nelems = len(arg.elements)
-    if not -nelems <= idx_v < nelems:
-        raise MyiaTypeError(
-            'Tuple element out of range'
-        )
+    idx_v = self.require_constant(idx, argnum=2, range=range(-nelems, nelems))
     return arg.elements[idx_v]
 
 
@@ -493,16 +507,8 @@ async def _inf_tuple_setitem(self, engine,
                              arg: AbstractTuple,
                              idx: dtype.Int[64],
                              value: AbstractValue):
-    idx_v = idx.values[VALUE]
-    if idx_v is ANYTHING:
-        raise MyiaTypeError(
-            'Tuples must be indexed with a constant'
-        )
     nelems = len(arg.elements)
-    if not -nelems <= idx_v < nelems:
-        raise MyiaTypeError(
-            'Tuple element out of range'
-        )
+    idx_v = self.require_constant(idx, argnum=2, range=range(-nelems, nelems))
     elts = arg.elements
     new_elts = tuple([*elts[:idx_v], value, *elts[idx_v + 1:]])
     return AbstractTuple(new_elts)
@@ -528,7 +534,7 @@ async def _inf_list_append(self, engine,
 def _getattr_chk(data_v, item_v):
     if not isinstance(item_v, str):  # pragma: no cover
         raise MyiaTypeError(
-            f'item argument to resolve must be a string, not {item_v}.'
+            f'Argument to getattr must be a string, not {item_v}.'
         )
 
 
@@ -1142,7 +1148,7 @@ async def _inf_Jinv(self, engine, x):
                             tid = getattr(f, 'tracking_id', None)
                             res = PrimitiveFunction(res, tracking_id=tid)
                 else:
-                    raise MyiaTypeError(f'Bad input type for Jinv: {f}')
+                    raise MyiaTypeError(f'Bad input type for {self.prim}: {f}')
             else:
                 raise MyiaTypeError(
                     f'Expected JTransformedFunction, not {f}'
