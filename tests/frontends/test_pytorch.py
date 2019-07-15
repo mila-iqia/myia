@@ -9,19 +9,10 @@ from myia.api import to_device, MyiaIgnoreReturnBackendWarning
 
 from ..common import MA
 
-"""
-try:
-    import torch
-    from torch import nn
-except ImportError:
-    pytest.skip('no pytorch')
-"""
+torch = pytest.importorskip("torch")
+nn = torch.nn
 
-import torch
-from torch import nn
-
-
-from myia.frontends.pytorch import pytorch_dtype_to_type
+from myia.frontends.pytorch import pytorch_dtype_to_type  # noqa: E402
 
 
 def test_pytorch_dtype_to_type():
