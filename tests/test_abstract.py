@@ -20,7 +20,7 @@ from myia.abstract import (
 from myia.utils import SymbolicKeyInstance
 from myia.ir import Constant
 
-from .common import Point, to_abstract_test, i16, f32, Ty, af32_of, S, U
+from .common import Point, to_abstract_test, i16, f32, Ty, af32_of, S
 
 
 def test_to_abstract():
@@ -120,12 +120,6 @@ def test_merge_from_types():
     assert amerge(t2, a, loop=None, forced=True) is t2
     with pytest.raises(MyiaTypeError):
         amerge(t3, a, loop=None, forced=True)
-
-
-def test_union():
-    a = U(S(t=ty.Int[64]), S(t=ty.Int[32]), S(t=ty.Int[16]))
-    b = U(S(t=ty.Int[64]), U(S(t=ty.Int[32]), S(t=ty.Int[16])))
-    assert a == b
 
 
 def test_repr():

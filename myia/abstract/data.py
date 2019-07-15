@@ -544,20 +544,7 @@ class AbstractUnion(AbstractStructure):
     def __init__(self, options):
         """Initialize an AbstractUnion."""
         super().__init__({})
-        opts = []
-        for option in options:
-            if isinstance(option, AbstractUnion):
-                opts.extend(option.options)
-            else:
-                opts.append(option)
-        self.options = Possibilities(opts)
-
-    def simplify(self):
-        """Simplify the Union if there is only one possibility."""
-        if len(self.options) == 1:
-            return self.options[0]
-        else:
-            return self
+        self.options = Possibilities(options)
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
