@@ -10,7 +10,7 @@ from myia.abstract import (
     ANYTHING, MyiaTypeError,
     AbstractScalar, AbstractTuple as T, AbstractList as L,
     AbstractJTagged, AbstractError, AbstractFunction, AbstractUnion,
-    InferenceLoop, to_abstract, build_value, amerge,
+    AbstractTaggedUnion, InferenceLoop, to_abstract, build_value, amerge,
     Possibilities, PendingFromList,
     VALUE, TYPE, DEAD, find_coherent_result_sync,
     abstract_clone, broaden,
@@ -154,6 +154,10 @@ def test_repr():
 
     f1 = AbstractFunction(P.scalar_mul)
     assert repr(f1) == 'AbstractFunction(scalar_mul)'
+
+    tu1 = AbstractTaggedUnion([[13, s2], [4, l1]])
+    assert repr(tu1) == \
+        'AbstractTaggedUnion(U(4 :: [Float[32]], 13 :: Float[32]))'
 
 
 def test_repr_recursive():

@@ -620,7 +620,7 @@ class AbstractTaggedUnion(AbstractStructure):
         return AttrEK(self, (v, 'options'))
 
     def __pretty__(self, ctx):
-        return pretty_call(ctx, "TU", self.options)
+        return pretty_struct(ctx, 'U', [], dict(self.options))
 
 
 ##########
