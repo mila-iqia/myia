@@ -63,8 +63,13 @@ def specializer_decorator(pipeline):
                     exc = None
                 pip = pipeline.make()
                 if abstract is None:
-                    argspec = tuple(from_value(arg, broaden=True, frontend=load_frontend('numpy'))
-                                    for arg in args)
+                    argspec = tuple(
+                        from_value(
+                            arg,
+                            broaden=True,
+                            frontend=load_frontend('numpy')
+                        )
+                        for arg in args)
                 else:
                     argspec = abstract
 

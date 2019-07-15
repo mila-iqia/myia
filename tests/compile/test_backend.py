@@ -57,7 +57,9 @@ def parse_compare(*tests):
             if not isinstance(args, tuple):
                 args = (args,)
             ref_result = fn(*map(copy, args))
-            argspec = tuple(from_value(arg, broaden=True, frontend=load_frontend('numpy')) for arg in args)
+            argspec = tuple(
+                from_value(arg, broaden=True, frontend=load_frontend('numpy'))
+                for arg in args)
             res = backend_opt.pip(input=fn, argspec=argspec)
             myia_fn = res['output']
             myia_args = backend_opt.convert_args(args)

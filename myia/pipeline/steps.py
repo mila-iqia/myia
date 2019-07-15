@@ -612,7 +612,8 @@ def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
         a = ArrayWrapper(
             arg,
             dtype.type_to_np_dtype(orig_t.element.dtype()),
-            orig_t.values[SHAPE]
+            orig_t.values[SHAPE],
+            backend
         )
     else:
         a = backend.to_numpy(arg)
@@ -669,7 +670,7 @@ class Wrap(PipelineStep):
                          zip(args, orig_arg_t))
             res = fn(*args)
             res = frontend.convert_result(res, orig_out_t, vm_out_t, backend,
-                                 self.return_backend)
+                                          self.return_backend)
             return res
 
         return {'output': wrapped}

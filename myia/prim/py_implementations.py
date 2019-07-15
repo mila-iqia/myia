@@ -237,7 +237,7 @@ def typeof(x):
     """Implement typeof."""
     from ..abstract import from_value
 
-    #TODO: should frontend=load_frontend('numpy') or other things?
+    # TODO: should frontend=load_frontend('numpy') or other things?
     from myia.frontends import load_frontend
     return from_value(x, broaden=True, frontend=load_frontend('numpy'))
 

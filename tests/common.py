@@ -193,10 +193,10 @@ class Point3D(ArithmeticData):
         return (self.x ** 2 + self.y ** 2 + self.z ** 2) ** 0.5
 
 
-#Thing_f = from_value(Thing(1.0), broaden=True)
-#Thing_ftup = from_value(Thing((1.0, 2.0)), broaden=True)
-Thing_f = from_value(Thing(1.0), broaden=True, frontend=load_frontend('numpy'))
-Thing_ftup = from_value(Thing((1.0, 2.0)), broaden=True, frontend=load_frontend('numpy'))
+Thing_f = from_value(Thing(1.0), broaden=True,
+                     frontend=load_frontend('numpy'))
+Thing_ftup = from_value(Thing((1.0, 2.0)), broaden=True,
+                        frontend=load_frontend('numpy'))
 
 
 mysum = MultitypeGraph('mysum')

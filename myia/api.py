@@ -2,6 +2,7 @@
 
 import numpy as np
 import inspect
+import warnings
 
 from myia import dtype
 
@@ -9,11 +10,22 @@ from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
 from .utils import keyword_decorator, overload
 from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
-    AbstractList, AbstractClass, AbstractArray, AbstractScalar
+    AbstractList, AbstractArray, AbstractScalar, AbstractClassBase
 # TODO: AbstractUnion overload for _convert_arg_init
 from .compile.backends import load_backend, Backend
 from .frontends import load_frontend
 
+
+class MyiaIgnoreReturnBackendWarning(UserWarning):
+    """Warning to indicate that code is disconnected from output."""
+
+    def __init__(self, msg, loc=None):
+        """Initialize with a message and source location.
+
+        TODO: maybe add suuport for obtaining location of @myia decorators?
+        """
+        super().__init__(msg)
+        self.loc = loc
 
 #################
 # Top-level API #
@@ -37,6 +49,11 @@ class MyiaFunction:
     def __init__(self, fn, specialize_values=[], return_backend=False,
                  backend=None, backend_options=None, frontend=None):
         """Initialize a MyiaFunction."""
+        if return_backend is True and frontend == 'pytorch':
+            warn_msg = "All Arrays returned by Myia Function will still " + \
+                "be PyTorch Tensors even if backend is not pytorch " + \
+                "and/or arrays were wrapped in ArrayWrappers via to_device"
+            warnings.warn(MyiaIgnoreReturnBackendWarning(warn_msg))
         self.fn = fn
         self.specialize_values = set(specialize_values)
         self.pip = standard_pipeline.configure({
@@ -64,7 +81,8 @@ class MyiaFunction:
             )
 
         argspec = tuple(
-            from_value(arg,
+            from_value(
+                arg,
                 broaden=name not in self.specialize_values,
                 frontend=self.frontend)
             for arg, name in zip(args, argnames)
@@ -135,7 +153,7 @@ def _convert_arg_init(self, arg, orig_t: AbstractList, backend):
 
 
 @overload  # noqa: F811
-def _convert_arg_init(self, arg, orig_t: AbstractClass, backend):
+def _convert_arg_init(self, arg, orig_t: AbstractClassBase, backend):
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
     return orig_t.constructor(*(self(x, o, backend) for x, o in zip(arg, oe)))
@@ -148,8 +166,9 @@ def _convert_arg_init(self, arg, orig_t: AbstractArray, backend):
     et = et.values[TYPE]
     assert issubclass(et, dtype.Number)
     if isinstance(arg, np.ndarray):
-        arg = ArrayWrapper(backend.from_numpy(arg), arg.dtype, arg.shape)
-    #backend.check_array(arg.array, et)
+        arg = ArrayWrapper(
+            backend.from_numpy(arg), arg.dtype, arg.shape, backend
+        )
     return arg
 
 
@@ -182,11 +201,12 @@ def _convert_arg_init(self, arg, orig_t: AbstractScalar, backend):
 
 def to_device(model, backend, backend_options=None, frontend=None):
     """Move model to target accelerator hardware (using selected backend)."""
+    fe = load_frontend(frontend)
     if not isinstance(backend, Backend):
         backend = load_backend(backend, backend_options)
-    model = _convert_arg_init(
+    model = fe._convert_arg_init(
         model,
-        from_value(model, broaden=True, frontend=load_frontend(frontend)),
+        from_value(model, broaden=True, frontend=fe),
         backend
     )
     return model

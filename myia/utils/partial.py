@@ -100,6 +100,8 @@ class Partializable:
 
 
 class PartialCallable(Partializable):
-    def __new__(self, fn, pipeline_init, **kwargs):
-        return fn(**kwargs)
+    """TODO: Ask Arnaud."""
 
+    def __new__(self, fn, pipeline_init, **kwargs):
+        """TODO: Ask Arnaud."""
+        return fn(**kwargs)

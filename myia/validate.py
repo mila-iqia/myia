@@ -36,7 +36,9 @@ def validate_abstract(self, a: AbstractScalar, uses):
     if not issubclass(a.values[TYPE],
                       (dtype.Number, dtype.Bool, dtype.Nil,
                        dtype.EnvType, dtype.SymbolicKeyType)):
-        raise ValidationError(f'Illegal type in the graph: {a}')
+        raise ValidationError(
+            f'Illegal type in the graph: {a}'
+        )   # pragma: no cover
 
 
 @overload  # noqa: F811

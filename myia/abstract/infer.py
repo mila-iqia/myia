@@ -2,7 +2,6 @@
 
 import asyncio
 import numpy as np
-import weakref
 import typing
 from functools import reduce
 from dataclasses import is_dataclass, replace as dc_replace
@@ -38,11 +37,12 @@ class ArrayWrapper:
 
     """
 
-    def __init__(self, array, dtype, shape):
+    def __init__(self, array, dtype, shape, backend):
         """Initialize the ArrayWrapper."""
         self.array = array
         self.dtype = dtype
         self.shape = shape
+        self.backend = backend
 
 
 class InferenceEngine:
@@ -373,9 +373,6 @@ def from_value(v, broaden=False, frontend=None):
     return a
 
 
-_abs_cache = weakref.WeakKeyDictionary()
-
-
 @overload.wrapper(bootstrap=True)
 def to_abstract(fn, self, v, context=None, ref=None, loop=None):
     """Translate the value to an abstract value.
@@ -390,13 +387,6 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
             will be given a Pending type so that it can adapt to the types of
             the variables they interact with.
     """
-    cachable = context is None and ref is None and loop is None
-    if cachable:
-        try:
-            return _abs_cache[v]
-        except (TypeError, KeyError):
-            pass
-
     ref = ref and ref.node
 
     if fn is not None:
@@ -430,12 +420,6 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
                 VALUE: v,
                 TYPE: typ,
             })
-
-    if cachable:
-        try:
-            _abs_cache[v] = rval
-        except TypeError:
-            pass
 
     return rval
 

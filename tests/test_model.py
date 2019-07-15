@@ -79,10 +79,10 @@ def make_model(dtype='float64'):
     )
 
 
-#Model_t = from_value(make_model(), broaden=True)
-#Model_t_f32 = from_value(make_model('float32'), broaden=True)
-Model_t = from_value(make_model(), broaden=True, frontend=load_frontend('numpy'))
-Model_t_f32 = from_value(make_model('float32'), broaden=True, frontend=load_frontend('numpy'))
+Model_t = from_value(make_model(), broaden=True,
+                     frontend=load_frontend('numpy'))
+Model_t_f32 = from_value(make_model('float32'), broaden=True,
+                         frontend=load_frontend('numpy'))
 
 
 def cost(model, x, y):

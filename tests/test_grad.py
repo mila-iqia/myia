@@ -142,8 +142,9 @@ def _grad_test(fn, obj, args,
                pipeline=grad_pipeline,
                rel_error=1e-3):
     pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
-    argspec = tuple(from_value(arg, broaden=True, frontend=load_frontend('numpy'))
-                    for arg in clean_args(args))
+    argspec = tuple(
+        from_value(arg, broaden=True, frontend=load_frontend('numpy'))
+        for arg in clean_args(args))
     sens_type = to_abstract_test(sens_type)
     if isinstance(obj, FunctionType):
         res = pipeline.run(input=obj, argspec=[*argspec, sens_type])
@@ -478,7 +479,9 @@ def test_transpose2(x, y, axis1, axis2):
 
 
 def _runwith(f, *args):
-    argspec = tuple(from_value(arg, broaden=True, frontend=load_frontend('numpy')) for arg in args)
+    argspec = tuple(
+        from_value(arg, broaden=True, frontend=load_frontend('numpy'))
+        for arg in args)
     res = grad_pipeline.run(input=f, argspec=argspec)
     return res['output'](*args)
 

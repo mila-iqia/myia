@@ -69,9 +69,36 @@ def register_frontend(name, load_fn):
     _frontends[name] = load_fn
 
 
+###################################################################
+# These are frontend methods.                                     #
+# They are instantiated outside of Class because their "self"     #
+# parameter is different from "self" attribute of Frontend Class. #
+###################################################################
+def _to_abstract(self, v, context, ref, loop):
+    raise NotImplementedError("to_abstract")
+
+
+def _ni__convert_arg_init(self, arg, orig_t, backend):
+    raise NotImplementedError("_convert_arg_init")
+
+
+def _convert_arg(self, arg, orig_t, backend):
+    raise NotImplementedError("convert_arg")
+
+
+def _convert_result(self, arg, orig_t, vm_t, backend,
+                    return_backend):
+    raise NotImplementedError("convert_result")
+
+
 class Frontend:
     """This is a class interface that all frontends must implement."""
 
-    def convert_value(self, v, t):
-        """Convert a value to the appropriate frontend representation."""
-        raise NotImplementedError("convert_value")
+    to_abstract = staticmethod(_to_abstract)
+    _convert_arg_init = staticmethod(_ni__convert_arg_init)
+    convert_result = staticmethod(_convert_arg)
+    convert_arg = staticmethod(_convert_result)
+
+    def configure(self, pip):
+        """Additional configuration of pipeline for Frontend."""
+        return NotImplementedError("configure")
