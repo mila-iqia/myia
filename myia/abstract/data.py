@@ -57,6 +57,22 @@ class Possibilities(list):
         return hash(tuple(self))
 
 
+class TaggedPossibilities(list):
+    """Represents a set of possible tag/type combos.
+
+    Each entry in the list must be a list of [tag, type], the tag being an
+    integer.
+    """
+
+    def __init__(self, options):
+        """Initialize TaggedPossibilities."""
+        opts = [[tag, typ] for tag, typ in sorted(set(map(tuple, options)))]
+        super().__init__(opts)
+
+    def __hash__(self):
+        return hash(tuple(self))
+
+
 class Function:
     """Represents a possible function in an AbstractFunction."""
 
@@ -584,6 +600,27 @@ class AbstractUnion(AbstractStructure):
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "U", self.options)
+
+
+class AbstractTaggedUnion(AbstractStructure):
+    """Represents a tagged union.
+
+    Attributes:
+        options: A list of (tag, type) pairs.
+
+    """
+
+    def __init__(self, options):
+        """Initialize an AbstractTaggedUnion."""
+        super().__init__({})
+        self.options = TaggedPossibilities(options)
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'options'))
+
+    def __pretty__(self, ctx):
+        return pretty_call(ctx, "TU", self.options)
 
 
 ##########

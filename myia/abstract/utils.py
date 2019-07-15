@@ -17,6 +17,7 @@ from .data import (
     ABSENT,
     ANYTHING,
     Possibilities,
+    TaggedPossibilities,
     AbstractAtom,
     AbstractStructure,
     AbstractValue,
@@ -31,6 +32,7 @@ from .data import (
     AbstractADT,
     AbstractJTagged,
     AbstractUnion,
+    AbstractTaggedUnion,
     AbstractBottom,
     TrackDict,
     PartialApplication,
@@ -302,6 +304,16 @@ def abstract_check(self, x: Possibilities, *args):
 
 
 @overload  # noqa: F811
+def abstract_check(self, x: AbstractTaggedUnion, *args):
+    return self(x.options, *args)
+
+
+@overload  # noqa: F811
+def abstract_check(self, x: TaggedPossibilities, *args):
+    return all(self(v, *args) for _, v in x)
+
+
+@overload  # noqa: F811
 def abstract_check(self, t: PartialApplication, *args):
     return self(t.fn, *args) and all(self(v, *args) for v in t.args)
 
@@ -448,6 +460,11 @@ def abstract_clone(self, x: AbstractUnion, *args):
 
 
 @overload  # noqa: F811
+def abstract_clone(self, x: AbstractTaggedUnion, *args):
+    return (yield AbstractTaggedUnion)(self(x.options, *args))
+
+
+@overload  # noqa: F811
 def abstract_clone(self, x: AbstractJTagged, *args):
     return (yield AbstractJTagged)(self(x.element, *args))
 
@@ -455,6 +472,11 @@ def abstract_clone(self, x: AbstractJTagged, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: Possibilities, *args):
     return Possibilities([self(v, *args) for v in x])
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: TaggedPossibilities, *args):
+    return TaggedPossibilities([[i, self(v, *args)] for i, v in x])
 
 
 @overload  # noqa: F811
