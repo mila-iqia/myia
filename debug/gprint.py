@@ -10,7 +10,7 @@ from myia.abstract import (
     AbstractList, AbstractClassBase, AbstractJTagged, AbstractArray,
     GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
     MetaGraphFunction, AbstractUnion, VALUE, ANYTHING, JTransformedFunction,
-    VirtualFunction, PendingTentative, Possibilities
+    VirtualFunction, PendingTentative, Possibilities, AbstractTaggedUnion
 )
 from myia.dtype import Type, Bool, Int, Float, TypeMeta, UInt
 from myia.utils import OrderedSet, UNKNOWN, SymbolicKeyInstance
@@ -679,6 +679,33 @@ def _opt_fancy_unsafe_static_cast(optimizer, node, equiv):
         return Apply([ct, x], node.graph)
 
 
+@pattern_replacer(primops.hastag, X, V)
+def _opt_fancy_hastag(optimizer, node, equiv):
+    x = equiv[X]
+    v = equiv[V]
+    ct = Constant(GraphCosmeticPrimitive(f'?{v.value}', on_edge=True))
+    with About(node.debug, 'cosmetic'):
+        return Apply([ct, x], node.graph)
+
+
+@pattern_replacer(primops.casttag, X, V)
+def _opt_fancy_casttag(optimizer, node, equiv):
+    x = equiv[X]
+    v = equiv[V]
+    ct = Constant(GraphCosmeticPrimitive(f'!{v.value}', on_edge=True))
+    with About(node.debug, 'cosmetic'):
+        return Apply([ct, x], node.graph)
+
+
+@pattern_replacer(primops.tagged, X, V)
+def _opt_fancy_tagged(optimizer, node, equiv):
+    x = equiv[X]
+    v = equiv[V]
+    ct = Constant(GraphCosmeticPrimitive(f'@{v.value}', on_edge=True))
+    with About(node.debug, 'cosmetic'):
+        return Apply([ct, x], node.graph)
+
+
 @pattern_replacer(primops.array_map, V, Xs)
 def _opt_fancy_array_map(optimizer, node, equiv):
     xs = equiv[Xs]
@@ -760,6 +787,9 @@ def cosmetic_transformer(g):
         _opt_fancy_unsafe_static_cast,
         # _opt_fancy_scalar_to_array,
         _opt_fancy_array_to_scalar,
+        _opt_fancy_hastag,
+        _opt_fancy_casttag,
+        _opt_fancy_tagged,
         # careful=True
     )
     nmap = NodeMap()
@@ -1253,6 +1283,25 @@ class _AbstractUnion:
             before='★U',
             cls='abstract',
         )
+
+
+@mixin(AbstractTaggedUnion)
+class _AbstractTaggedUnion:
+    def __hrepr__(self, H, hrepr):
+        v = self.options
+        if isinstance(v, (Possibilities, list)):
+            return hrepr.stdrepr_object(
+                f'★TaggedUnion',
+                self.options,
+                delimiter="↦",
+                cls='abstract'
+            )
+        else:
+            return hrepr.stdrepr_iterable(
+                [v],
+                before='★TaggedUnion',
+                cls='abstract',
+            )
 
 
 @mixin(AbstractArray)
