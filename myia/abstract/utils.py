@@ -901,7 +901,36 @@ def bind(loop, committed, resolved, pending):
 ###########################
 
 
-_empty_union = AbstractUnion([])
+def collapse_options(options):
+    """Collapse a list of options, some of which may be AbstractUnions."""
+    opts = []
+    todo = list(options)
+    while todo:
+        option = todo.pop()
+        if isinstance(option, AbstractUnion):
+            todo.extend(option.options)
+        else:
+            opts.append(option)
+    opts = Possibilities(opts)
+    return opts
+
+
+def union_simplify(options, constructor=AbstractUnion):
+    """Simplify a list of options.
+
+    Returns:
+        * None, if there are no options.
+        * A single type, if there is one option.
+        * An AbstractUnion.
+
+    """
+    options = collapse_options(options)
+    if len(options) == 0:
+        return None
+    elif len(options) == 1:
+        return options.pop()
+    else:
+        return constructor(options)
 
 
 def typecheck(model, abstract):
@@ -926,10 +955,8 @@ def split_type(t, model):
     if isinstance(t, AbstractUnion):
         matching = [(opt, typecheck(model, opt))
                     for opt in set(t.options)]
-        t1 = AbstractUnion([opt for opt, m in matching if m]).simplify()
-        t2 = AbstractUnion([opt for opt, m in matching if not m]).simplify()
-        t1 = None if t1 is _empty_union else t1
-        t2 = None if t2 is _empty_union else t2
+        t1 = union_simplify(opt for opt, m in matching if m)
+        t2 = union_simplify(opt for opt, m in matching if not m)
         return t1, t2
     elif typecheck(model, t):
         return t, None
@@ -978,13 +1005,14 @@ def _normalize_adt_helper(x, done, tag_to_adt):
         done[x] = adt
         for attr, value in x.attributes.items():
             value = _normalize_adt_helper(value, done, tag_to_adt)
-            adt.attributes[attr] = AbstractUnion.new(
-                [adt.attributes[attr], value]
-            ).simplify()
+            adt.attributes[attr] = union_simplify(
+                [adt.attributes[attr], value],
+                constructor=AbstractUnion.new
+            )
         return adt
     elif isinstance(x, AbstractUnion):
         opts = _normalize_adt_helper(x.options, done, tag_to_adt)
-        rval = AbstractUnion.new(opts).simplify()
+        rval = union_simplify(opts, constructor=AbstractUnion.new)
         done[x] = rval
         return rval
     elif isinstance(x, Possibilities):
@@ -995,7 +1023,7 @@ def _normalize_adt_helper(x, done, tag_to_adt):
 
 @abstract_clone.variant
 def _finalize_adt(self, x: AbstractUnion):
-    x = x.simplify()
+    x = union_simplify(x.options)
     if isinstance(x, AbstractUnion):
         return (yield AbstractUnion)(self(x.options))
     else:
