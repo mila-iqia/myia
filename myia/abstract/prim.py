@@ -28,6 +28,7 @@ from .data import (
     AbstractJTagged,
     AbstractBottom,
     AbstractUnion,
+    AbstractTaggedUnion,
     PartialApplication,
     JTransformedFunction,
     PrimitiveFunction,
@@ -1158,6 +1159,32 @@ async def _inf_unsafe_static_cast(self, engine, x, typ: AbstractType):
 @standard_prim(P.tagged)
 async def _inf_tagged(self, engine, x):
     return AbstractUnion([broaden(x, engine.loop)])
+
+
+@standard_prim(P.hastag)
+async def _inf_hastag(self, engine,
+                      x: AbstractTaggedUnion, tag: dtype.Int[64]):
+    self.require_constant(
+        tag, argnum=2,
+        range={i for i, _ in x.options}
+    )
+    return AbstractScalar({
+        VALUE: ANYTHING,
+        TYPE: dtype.Bool,
+    })
+
+
+@standard_prim(P.casttag)
+async def _inf_casttag(self, engine,
+                       x: AbstractTaggedUnion, tag: dtype.Int[64]):
+    tag_v = self.require_constant(
+        tag, argnum=2,
+        range={i for i, _ in x.options}
+    )
+    for i, typ in x.options:
+        if i == tag_v:
+            return typ
+    raise AssertionError('Unreachable')
 
 
 @standard_prim(P.J)

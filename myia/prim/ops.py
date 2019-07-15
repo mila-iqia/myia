@@ -54,13 +54,18 @@ bool_or = Primitive('bool_or')
 bool_eq = Primitive('bool_eq')
 
 
-######################
-# Type introspection #
-######################
+##########
+# Typing #
+##########
 
 
 typeof = Primitive('typeof')
 hastype = Primitive('hastype')
+tagged = Primitive('tagged')
+unsafe_static_cast = Primitive('unsafe_static_cast')
+scalar_cast = Primitive('scalar_cast')
+hastag = Primitive('hastag')
+casttag = Primitive('casttag')
 
 
 ###################
@@ -124,7 +129,6 @@ raise_ = Primitive('raise')
 #################
 
 
-scalar_cast = Primitive('scalar_cast')
 identity = Primitive('identity')
 resolve = Primitive('resolve')
 partial = Primitive('partial')
@@ -134,6 +138,4 @@ embed = Primitive('embed')
 env_setitem = Primitive('env_setitem')
 env_getitem = Primitive('env_getitem')
 env_add = Primitive('env_add')
-unsafe_static_cast = Primitive('unsafe_static_cast')
 exception = Primitive('exception')
-tagged = Primitive('tagged')

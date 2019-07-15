@@ -545,7 +545,7 @@ def countdown(n):
         return Pair(n, countdown(n - 1))
 
 
-@specialize_no_validate(
+@specialize(
     (tree(3, 1),),
     (countdown(10),)
 )

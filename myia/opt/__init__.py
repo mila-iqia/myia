@@ -14,7 +14,7 @@ from .cse import (  # noqa
 )
 
 from .clean import (  # noqa
-    erase_class
+    type_to_tag, erase_class
 )
 
 

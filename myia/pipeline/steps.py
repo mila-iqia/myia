@@ -13,9 +13,9 @@ from ..abstract import AbstractTuple, AbstractList, AbstractClassBase, \
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, erase_class, NodeMap, \
-    LocalPassOptimizer, DeadDataElimination
+    LocalPassOptimizer, DeadDataElimination, type_to_tag
 from ..prim import vm_registry
-from ..utils import overload, no_prof
+from ..utils import overload, no_prof, TaggedValue
 from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
 from ..vm import VM
@@ -546,9 +546,11 @@ def convert_arg(self, arg, orig_t: AbstractArray, backend):
 def convert_arg(self, arg, orig_t: AbstractUnion, backend):
     for opt in orig_t.options:
         try:
-            return self(arg, opt, backend)
+            value = self(arg, opt, backend)
+            tag = type_to_tag(opt)
         except TypeError:
             continue
+        return TaggedValue(tag, value)
     else:
         opts = ", ".join(map(str, orig_t.options))
         raise TypeError(f'Expected one of {opts}')
