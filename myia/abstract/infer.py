@@ -117,7 +117,7 @@ class InferenceEngine:
         if outspec is not None:
             self.run_coroutine(_check())
 
-        return output_ref.get_sync(), root_context
+        return concretize_abstract(output_ref.get_sync()), root_context
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
