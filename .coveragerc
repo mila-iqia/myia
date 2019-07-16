@@ -6,7 +6,6 @@ omit =
     debug/*
     myia/debug/*
     examples/*
-    myia/frontends/pytorch_functions.py
 
 [report]
 exclude_lines =

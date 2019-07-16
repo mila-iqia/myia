@@ -2,7 +2,7 @@
 
 #############################################################################
 # WARNING:  None of this file is explicitly executed by pytest or forced    #
-#           to be covered by Codecov. It's ommitted in .coveragerc          #
+#           to be covered by Codecov. It's omitted in .coveragerc           #
 #                                                                           #
 #           It is instead only parsed by Myia.                              #
 #                                                                           #
@@ -16,11 +16,11 @@
 #############################################################################
 
 
-# import torch
-
 from ..prim import ops as P
+from ..composite import core
 
 
+@core
 def linear(input, weight, bias=None):
     r"""
     Applies a linear transformation to the incoming data: :math:`y = xA^T + b`.
@@ -43,11 +43,13 @@ def linear(input, weight, bias=None):
     return ret
 
 
+@core
 def tensor_dim(t):
     """Map of 'dim' pytorch method."""
     return len(P.shape(t))
 
 
+@core
 def t(a):
     """Map of 't' pytorch method."""
     return P.transpose(a, (1, 0))

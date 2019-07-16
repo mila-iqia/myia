@@ -11,7 +11,7 @@ from ..pipeline.resources import scalar_object_map, standard_object_map, \
 
 from . import steps
 from .pipeline import PipelineDefinition
-from ..utils import PartialCallable
+from ..utils import partial_callable
 from ..frontends import load_frontend
 
 
@@ -28,7 +28,7 @@ standard_resources = dict(
         context_class=Context,
     ),
     array_class=AbstractArray,
-    frontend=PartialCallable.partial(fn=load_frontend, name='numpy')
+    frontend=partial_callable(fn=load_frontend, name='numpy')
 )
 
 

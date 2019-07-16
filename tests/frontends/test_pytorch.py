@@ -20,9 +20,7 @@ def test_pytorch_dtype_to_type():
         pytorch_dtype_to_type("fake_pytorch_type")
 
 
-# pt_debug_pipeline = standard_debug_pipeline \
-#     .select('parse', 'resolve', 'infer', 'export')
-
+# Uncomment this line to print values at specific precision
 # torch.set_printoptions(precision=8)
 
 
@@ -159,6 +157,7 @@ def test_module_matmul_fwd():
     assert torch.allclose(output, output_expected)
 
 
+# This will be uncomment once debug VM is compatible with PyTorch
 """
 from myia.pipeline import standard_debug_pipeline
 from myia.frontends import load_frontend

@@ -17,12 +17,12 @@ from .frontends import load_frontend
 
 
 class MyiaIgnoreReturnBackendWarning(UserWarning):
-    """Warning to indicate that code is disconnected from output."""
+    """Warns that backend won't be returned despite return_backend=True."""
 
     def __init__(self, msg, loc=None):
         """Initialize with a message and source location.
 
-        TODO: maybe add suuport for obtaining location of @myia decorators?
+        TODO: maybe add support for obtaining location of @myia decorators?
         """
         super().__init__(msg)
         self.loc = loc

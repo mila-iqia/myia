@@ -67,11 +67,11 @@ class AbstractModule(AbstractClassBase):
         return self
 
 
-class AbstractTensor(AbstractArray):
+class AbstractPyTorchTensor(AbstractArray):
     """Represents a PyTorch Tensor."""
 
     def __init__(self, element, values, requires_grad=None, retain_grad=None):
-        """Initialize an AbstractTensor."""
+        """Initialize an AbstractPyTorchTensor."""
         super().__init__(element, values)
         self.requires_grad = requires_grad
 
@@ -79,20 +79,18 @@ class AbstractTensor(AbstractArray):
         self.retain_grad = retain_grad
 
 
-'''
-class AbstractParameter(AbstractTensor):
-    """Represents a PyTorch Parameter."""
+# class AbstractPyTorchParameter(AbstractPyTorchTensor):
+#     """Represents a PyTorch Parameter."""
 
-    # This might end up as an alternative way to log that this is a Parameter.
-'''
+#     # This might become an alternative way to log that this is a Parameter.
 
 
-class TensorWrapper(ArrayWrapper):
-    """Represents a PyTorch Parameter."""
+class PyTorchTensorWrapper(ArrayWrapper):
+    """Represents a PyTorch Tensor wrapped by to_device."""
 
     def __init__(self, array, dtype, shape, backend,
                  requires_grad=None, retain_grad=None):
-        """Initialize the TensorWrapper."""
+        """Initialize the PyTorchTensorWrapper."""
         super().__init__(array, dtype, shape, backend)
         self.requires_grad = requires_grad
 
@@ -100,14 +98,10 @@ class TensorWrapper(ArrayWrapper):
         self.retain_grad = retain_grad
 
 
-AT = AbstractTensor(ANYTHING, {SHAPE: ANYTHING})
+AT = AbstractPyTorchTensor(ANYTHING, {SHAPE: ANYTHING})
 
 
-@C.tanh.register(AT)
-@core
-def array_tanh(xs):
-    """Implementation of `array_tanh`."""
-    return P.array_map(P.scalar_tanh, xs)
+C.tanh.register(AT)(C.array_tanh)
 
 
 @C._leaf_zeros_like.register(AT)
@@ -118,8 +112,9 @@ def _array_zero(xs):
 
 
 pytorch_method_map = standard_method_map.copy()
-pytorch_method_map[AbstractTensor] = pytorch_method_map[AbstractArray].copy()
-pytorch_method_map[AbstractTensor].update({
+pytorch_method_map[AbstractPyTorchTensor] = \
+    pytorch_method_map[AbstractArray].copy()
+pytorch_method_map[AbstractPyTorchTensor].update({
     'dim': tensor_dim,
     't': t,
     'tanh': C.tanh,
@@ -132,19 +127,19 @@ def mod_sub(self, x):
     """Hypermap subtraction."""
     return hyper_map(C.sub, self, x)
 
+##############################################################################
 
-"""
-# This might end up as an alternative to blacklist of Module constructors.
-# I.e. get the list of constructors from a dummy pytorch module.
-class DummyModule(nn.Module):
-    def __init__(self):
-        super(Model, self).__init__()
 
-    def forward(self, x):
-       return 9
+# # This might end up as an alternative to blacklist of Module constructors.
+# # I.e. get the list of constructors from a dummy pytorch module.
+# class DummyModule(nn.Module):
+#     def __init__(self):
+#         super(Model, self).__init__()
 
-dummy_module =  DummyModule()
-# """
+#     def forward(self, x):
+#        return 9
+
+# dummy_module =  DummyModule()
 
 
 # TODO: should all of these actually be blacklisted (not used).
@@ -218,7 +213,7 @@ def _to_abstract(self, v: torch.nn.Module, context, ref, loop):
 
 @overload  # noqa: F811
 def _to_abstract(self, v: torch.Tensor, context, ref, loop):
-    return AbstractTensor(
+    return AbstractPyTorchTensor(
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: pytorch_dtype_to_type(v.dtype),
@@ -231,8 +226,8 @@ def _to_abstract(self, v: torch.Tensor, context, ref, loop):
 
 @overload  # noqa: F811
 def _to_abstract(self, v: torch.nn.Parameter, context, ref, loop):
-    # return AbstractParameter(
-    return AbstractTensor(
+    # return AbstractPyTorchParameter(
+    return AbstractPyTorchTensor(
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: pytorch_dtype_to_type(v.dtype),
@@ -241,23 +236,11 @@ def _to_abstract(self, v: torch.nn.Parameter, context, ref, loop):
         v.requires_grad,
         v.retain_grad
     )
-
-
-"""
-from ..dtype import Nil
-@overload
-def _to_abstract(self, v: torch.nn.backends.thnn.THNNFunctionBackend,
-                 context, ref, loop):
-    return AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: Nil,
-        })
-#"""
 
 
 @overload  # noqa: F811
 def _to_abstract(self, v: ArrayWrapper, context, ref, loop):
-    return AbstractTensor(
+    return AbstractPyTorchTensor(
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: pytorch_dtype_to_type(v.dtype),
@@ -267,25 +250,22 @@ def _to_abstract(self, v: ArrayWrapper, context, ref, loop):
         v.retain_grad
     )
 
+##############################################################################
+
 
 @_convert_arg_init.variant
-def _pt__convert_arg_init(self, arg, orig_t: AbstractTensor, backend):
+def _pt__convert_arg_init(self, arg, orig_t: AbstractPyTorchTensor, backend):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
     et = et.values[TYPE]
     assert issubclass(et, Number)
     if isinstance(arg, torch.Tensor):
-        arg = TensorWrapper(
+        arg = PyTorchTensorWrapper(
             backend.from_dlpack(torch.utils.dlpack.to_dlpack(arg)),
             arg.dtype, arg.shape, backend, arg.requires_grad, arg.retain_grad)
     return arg
 
-
-@overload  # noqa: F811
-def _pt__convert_arg_init(self, arg, orig_t: AbstractModule, backend):
-    arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
-    oe = list(orig_t.attributes.values())
-    return orig_t.constructor(*(self(x, o, backend) for x, o in zip(arg, oe)))
+##############################################################################
 
 
 @convert_arg.variant
@@ -301,6 +281,8 @@ def _convert_arg(self, arg, orig_t: AbstractArray, backend):
     backend.check_array(arg, et)
     return arg
 
+##############################################################################
+
 
 @convert_result.variant
 def _convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
@@ -309,16 +291,7 @@ def _convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
         arg = torch.utils.dlpack.from_dlpack(backend.to_dlpack(arg))
     return arg
 
-
-# Proabably will never need torch.nn.Module overload of _convert_result
-# @overload  # noqa: F811
-# def _convert_result(self, res, orig_t, vm_t: torch.nn.Module, backend,
-#                    return_backend):
-#     oe = orig_t.attributes.values()
-#     ve = vm_t.attributes.values()
-#     tup = tuple(self(getattr(res, attr), o, v, backend, return_backend)
-#                 for attr, o, v in zip(orig_t.attributes, oe, ve))
-#     return orig_t.tag(*tup)
+##############################################################################
 
 
 class PyTorchFrontend(Frontend):
@@ -342,4 +315,4 @@ class PyTorchFrontend(Frontend):
         """Additional configuration of pipeline for PyTorch frontend."""
         return pip.configure({'convert.object_map': pytorch_object_map,
                               'method_map': pytorch_method_map,
-                              'array_class': AbstractTensor})
+                              'array_class': AbstractPyTorchTensor})
