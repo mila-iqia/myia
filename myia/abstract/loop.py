@@ -93,18 +93,16 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         """Return a collection of all exceptions from all futures."""
         futs, self._tasks = self._tasks, []
         errors, self._errors = self._errors, []
-        for fut in futs:
-            if fut.done():
-                exc = fut.exception()
-            else:
-                exc = self.errtype(
-                    f'Could not run inference to completion.'
-                    ' There might be an infinite loop in the program'
-                    ' which prevents type inference from working.',
-                    refs=[]
-                )
-            if exc is not None:
-                errors.append(exc)
+        errors += [fut.exception()
+                   for fut in futs if fut.done() and fut.exception()]
+        if any(fut for fut in futs if not fut.done()):
+            exc = self.errtype(
+                f'Could not run inference to completion.'
+                ' There might be an infinite loop in the program'
+                ' which prevents type inference from working.',
+                refs=[]
+            )
+            errors.append(exc)
         return errors
 
     def call_soon(self, callback, *args, context=None):
