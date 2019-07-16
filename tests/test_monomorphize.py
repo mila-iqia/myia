@@ -21,7 +21,7 @@ from .common import mysum, i64, f64, Point, U, to_abstract_test
 
 
 specialize_pipeline = scalar_debug_pipeline \
-    .select('parse', 'infer', 'specialize', 'erase_class',
+    .select('parse', 'infer', 'specialize', 'simplify_types',
             'opt2', 'validate', 'export', 'wrap') \
     .configure({
         'opt2.phases.main': [],
@@ -29,7 +29,7 @@ specialize_pipeline = scalar_debug_pipeline \
 
 
 specialize_pipeline_std = standard_debug_pipeline \
-    .select('parse', 'infer', 'specialize', 'erase_class',
+    .select('parse', 'infer', 'specialize', 'simplify_types',
             'opt', 'opt2', 'validate', 'export', 'wrap')
 
 

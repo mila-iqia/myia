@@ -41,12 +41,19 @@ def _reabs(self, a: AbstractUnion):
     )
 
 
-def erase_class(root, manager):
-    """Remove the Class type from graphs.
+def simplify_types(root, manager):
+    """Simplify the set of types that can be found in the graph.
 
-    * Class[x: t, ...] => Tuple[t, ...]
-    * getattr(data, attr) => getitem(data, idx)
-    * make_record(cls, *args) => make_tuple(*args)
+    * Replace AbstractClass by AbstractTuple:
+      * Class[x: t, ...] => Tuple[t, ...]
+      * getattr(data, attr) => getitem(data, idx)
+      * make_record(cls, *args) => make_tuple(*args)
+
+    * Replace AbstractUnion by AbstractTaggedUnion:
+      * Union[a, b, c, ...] => TaggedUnion[1 => a, 2 => b, 3 => c, ...]
+      * hastype(x, type) => hastag(x, tag)
+      *                  => bool_or(hastag(x, tag1), hastag(x, tag2), ...)
+      * unsafe_static_cast(x, type) => casttag(x, tag)
     """
     manager.add_graph(root)
 

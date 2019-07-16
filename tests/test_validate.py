@@ -44,7 +44,7 @@ pip = scalar_pipeline \
 
 pip_ec = scalar_pipeline \
     .select('parse', 'infer', 'specialize',
-            'erase_class', 'validate') \
+            'simplify_types', 'validate') \
     .configure({'validate.whitelist': test_whitelist})
 
 
@@ -85,7 +85,7 @@ def test_validate():
         return x ** y
 
     # make_record is not in the whitelist
-    # erase_class should remove it
+    # simplify_types should remove it
     @valid_after_ec(i64, i64)
     def f3(x, y):
         return Point(x, y)
@@ -104,13 +104,13 @@ def test_validate():
         return x.__add__(y)
 
     # Cannot have Class types
-    # erase_class should remove it
+    # simplify_types should remove it
     @valid_after_ec(Point_a)
     def f7(pt):
         return pt
 
     # Cannot have getattr
-    # erase_class should remove it
+    # simplify_types should remove it
     @valid_after_ec(Point_a)
     def f8(pt):
         return pt.x
