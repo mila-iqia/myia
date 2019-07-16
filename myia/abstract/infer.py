@@ -358,16 +358,15 @@ _number_types = [
 ]
 
 
-def from_value(v, broaden=False, frontend=None):
+def from_value(v, broaden=False):
     """Convert a value to an abstract value.
 
     Arguments:
         v: The value to convert.
         broaden: If True, concrete values will be made more abstract, so e.g.
             the value 1234 would become ANYTHING.
-        frontend: frontend whose to_abstract variant is used
     """
-    a = frontend.to_abstract(v, None, None)
+    a = to_abstract(v, None, None)
     if broaden:
         a = _broaden(a)
     return a

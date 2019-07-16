@@ -14,6 +14,9 @@ nn = torch.nn
 
 from myia.frontends.pytorch import pytorch_dtype_to_type  # noqa: E402
 
+from myia.frontends import load_frontend  # noqa: E402
+load_frontend('pytorch')
+
 
 def test_pytorch_dtype_to_type():
     with pytest.raises(TypeError):
@@ -409,9 +412,9 @@ def test_module_2_layer_mlp_update__to_device(_backend_fixture):
     model = MLP_2_Layers(4, 2, 3)
     target = torch.Tensor([2.5])
 
-    inp = to_device(inp, backend, backend_options, 'pytorch')
-    model = to_device(model, backend, backend_options, 'pytorch')
-    target = to_device(target, backend, backend_options, 'pytorch')
+    inp = to_device(inp, backend, backend_options)
+    model = to_device(model, backend, backend_options)
+    target = to_device(target, backend, backend_options)
 
     def mse(value, target):
         diff = value - target

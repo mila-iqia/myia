@@ -26,7 +26,7 @@ from .overload import (  # noqa
 )
 
 from .partial import (  # noqa
-    partition_keywords, Partial, Partializable, partial_callable
+    partition_keywords, Partial, Partializable
 )
 
 from .profile import Profile, no_prof, print_profile  # noqa

@@ -97,8 +97,3 @@ class Partializable:
     def partial(cls, **kwargs):
         """Return a Partial on this class constructor."""
         return Partial(cls, **kwargs)
-
-
-def partial_callable(fn, **kwargs):
-    """Make a Partial out of Callables; and return it."""
-    return Partial(fn, **kwargs)

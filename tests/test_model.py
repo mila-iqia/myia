@@ -8,7 +8,6 @@ from myia.abstract import InferenceError, from_value
 from myia.composite import grad
 from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import array_reduce, scalar_add
-from myia.frontends import load_frontend
 
 from .test_compile import parse_compare
 from .test_grad import grad_test
@@ -79,10 +78,8 @@ def make_model(dtype='float64'):
     )
 
 
-Model_t = from_value(make_model(), broaden=True,
-                     frontend=load_frontend('numpy'))
-Model_t_f32 = from_value(make_model('float32'), broaden=True,
-                         frontend=load_frontend('numpy'))
+Model_t = from_value(make_model(), broaden=True)
+Model_t_f32 = from_value(make_model('float32'), broaden=True)
 
 
 def cost(model, x, y):

@@ -12,7 +12,6 @@ from myia.dtype import Bool, i16, i32, i64, u64, f16, f32, f64
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance, dataclass_methods
 from myia.composite import ArithmeticData
-from myia.frontends import load_frontend
 
 
 B = Bool
@@ -193,10 +192,8 @@ class Point3D(ArithmeticData):
         return (self.x ** 2 + self.y ** 2 + self.z ** 2) ** 0.5
 
 
-Thing_f = from_value(Thing(1.0), broaden=True,
-                     frontend=load_frontend('numpy'))
-Thing_ftup = from_value(Thing((1.0, 2.0)), broaden=True,
-                        frontend=load_frontend('numpy'))
+Thing_f = from_value(Thing(1.0), broaden=True)
+Thing_ftup = from_value(Thing((1.0, 2.0)), broaden=True)
 
 
 mysum = MultitypeGraph('mysum')

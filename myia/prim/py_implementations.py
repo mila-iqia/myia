@@ -236,10 +236,7 @@ def bool_eq(x: Bool, y: Bool) -> Bool:
 def typeof(x):
     """Implement typeof."""
     from ..abstract import from_value
-
-    # TODO: We are about to change this via register instead of variant.
-    from myia.frontends import load_frontend
-    return from_value(x, broaden=True, frontend=load_frontend('numpy'))
+    return from_value(x, broaden=True)
 
 
 @register(primops.hastype)

@@ -60,7 +60,6 @@ class MyiaFunction:
             'compile.backend': backend,
             'compile.backend_options': backend_options,
             'wrap.return_backend': return_backend,
-            'frontend.name': frontend
         })
         self._cache = {}
         self.frontend = load_frontend(frontend)
@@ -83,8 +82,7 @@ class MyiaFunction:
         argspec = tuple(
             from_value(
                 arg,
-                broaden=name not in self.specialize_values,
-                frontend=self.frontend)
+                broaden=name not in self.specialize_values)
             for arg, name in zip(args, argnames)
         )
 
@@ -199,14 +197,13 @@ def _convert_arg_init(self, arg, orig_t: AbstractScalar, backend):
 # Move model to target accelerator hardware #
 #############################################
 
-def to_device(model, backend, backend_options=None, frontend=None):
+def to_device(model, backend, backend_options=None):
     """Move model to target accelerator hardware (using selected backend)."""
-    fe = load_frontend(frontend)
     if not isinstance(backend, Backend):
         backend = load_backend(backend, backend_options)
-    model = fe._convert_arg_init(
+    model = _convert_arg_init(
         model,
-        from_value(model, broaden=True, frontend=fe),
+        from_value(model, broaden=True),
         backend
     )
     return model

@@ -12,7 +12,6 @@ from ..abstract.infer import to_abstract, ArrayWrapper
 from ..abstract.data import AbstractClassBase, AbstractArray, AbstractScalar, \
     ANYTHING, VALUE, TYPE, SHAPE
 from ..dtype import Int, UInt, Float, Bool, Number
-from ..utils import overload
 from ..pipeline.resources import standard_object_map, standard_method_map
 from ..hypermap import hyper_map
 from ..api import _convert_arg_init
@@ -153,7 +152,7 @@ blacklist = ('_backend', '_buffers', '_backward_hooks', '_forward_hooks',
              )
 
 
-@to_abstract.variant
+@to_abstract.register
 def _to_abstract(self, v: torch.nn.Module, context, ref, loop):
     fwd_fn = getattr(type(v), 'forward')
     attrs = {}
@@ -211,7 +210,7 @@ def _to_abstract(self, v: torch.nn.Module, context, ref, loop):
                           '__sub__': mod_sub}, constructor=new_module)
 
 
-@overload  # noqa: F811
+@to_abstract.register  # noqa: F811
 def _to_abstract(self, v: torch.Tensor, context, ref, loop):
     return AbstractPyTorchTensor(
         AbstractScalar({
@@ -224,7 +223,7 @@ def _to_abstract(self, v: torch.Tensor, context, ref, loop):
     )
 
 
-@overload  # noqa: F811
+@to_abstract.register  # noqa: F811
 def _to_abstract(self, v: torch.nn.Parameter, context, ref, loop):
     # return AbstractPyTorchParameter(
     return AbstractPyTorchTensor(
@@ -238,8 +237,8 @@ def _to_abstract(self, v: torch.nn.Parameter, context, ref, loop):
     )
 
 
-@overload  # noqa: F811
-def _to_abstract(self, v: ArrayWrapper, context, ref, loop):
+@to_abstract.register  # noqa: F811
+def _to_abstract(self, v: PyTorchTensorWrapper, context, ref, loop):
     return AbstractPyTorchTensor(
         AbstractScalar({
             VALUE: ANYTHING,
@@ -253,7 +252,7 @@ def _to_abstract(self, v: ArrayWrapper, context, ref, loop):
 ##############################################################################
 
 
-@_convert_arg_init.variant
+@_convert_arg_init.register
 def _pt__convert_arg_init(self, arg, orig_t: AbstractPyTorchTensor, backend):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
@@ -268,8 +267,8 @@ def _pt__convert_arg_init(self, arg, orig_t: AbstractPyTorchTensor, backend):
 ##############################################################################
 
 
-@convert_arg.variant
-def _convert_arg(self, arg, orig_t: AbstractArray, backend):
+@convert_arg.register
+def _convert_arg(self, arg, orig_t: AbstractPyTorchTensor, backend):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
     et = et.values[TYPE]
@@ -284,8 +283,8 @@ def _convert_arg(self, arg, orig_t: AbstractArray, backend):
 ##############################################################################
 
 
-@convert_result.variant
-def _convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
+@convert_result.register
+def _convert_result(self, arg, orig_t, vm_t: AbstractPyTorchTensor, backend,
                     return_backend):
     if not isinstance(arg, torch.Tensor):
         arg = torch.utils.dlpack.from_dlpack(backend.to_dlpack(arg))
@@ -305,11 +304,6 @@ class PyTorchFrontend(Frontend):
     def __init__(self):
         """Create a PyTorch frontend."""
         pass
-
-    to_abstract = staticmethod(_to_abstract)
-    _convert_arg_init = staticmethod(_pt__convert_arg_init)
-    convert_arg = staticmethod(_convert_arg)
-    convert_result = staticmethod(_convert_result)
 
     def configure(self, pip):
         """Additional configuration of pipeline for PyTorch frontend."""
