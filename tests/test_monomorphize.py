@@ -3,7 +3,6 @@ import numpy as np
 from pytest import mark
 from dataclasses import dataclass
 
-from myia import abstract as a, dtype
 from myia.dtype import Number, Nil
 from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
@@ -18,7 +17,7 @@ from myia.validate import ValidationError
 from myia.utils import overload, ADT
 from myia.hypermap import hyper_map
 
-from .common import mysum, i64, f64, Point
+from .common import mysum, i64, f64, Point, U, to_abstract_test
 
 
 specialize_pipeline = scalar_debug_pipeline \
@@ -65,7 +64,7 @@ def specializer_decorator(pipeline):
                     argspec = tuple(from_value(arg, broaden=True)
                                     for arg in args)
                 else:
-                    argspec = abstract
+                    argspec = tuple(to_abstract_test(a) for a in abstract)
 
                 if exc is not None:
                     try:
@@ -488,24 +487,46 @@ def test_partial_outside_scope(x, y):
     return g(x)(y)
 
 
-abs_i64 = a.AbstractScalar({a.VALUE: a.ANYTHING, a.TYPE: dtype.Int[64]})
-
-
-_union_type = a.AbstractUnion([
-    abs_i64,
-    a.AbstractList(abs_i64)
-])
-
-
-@specialize_no_validate(
+@specialize(
     (int1,),
     ([int1, int2],),
     TypeError((int1, int2),),
-    abstract=(_union_type,)
+    abstract=(U(i64, [i64]),)
 )
 def test_union(x):
     if hastype(x, i64):
         return x
+    else:
+        return x[0]
+
+
+@specialize(
+    (int1, int2),
+    ([int1, int2], int1),
+    TypeError((int1, int2), int1),
+    abstract=(U(i64, f64, [i64]), i64)
+)
+def test_union_nested(x, y):
+    if hastype(x, i64):
+        return x
+    elif hastype(x, f64):
+        return y
+    else:
+        return x[0]
+
+
+@specialize(
+    (int1, int2),
+    ([int1, int2], int1),
+    TypeError((int1, int2), int1),
+    abstract=(U(i64, f64, [i64]), i64)
+)
+def test_union_nested_2(x, y):
+    if hastype(x, Number):
+        if hastype(x, i64):
+            return x
+        else:
+            return y
     else:
         return x[0]
 
