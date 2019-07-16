@@ -37,7 +37,8 @@ from .data import (
     DummyFunction,
     VALUE, TYPE, SHAPE,
     MyiaTypeError, InferenceError, MyiaShapeError, check_nargs,
-    infer_trace
+    infer_trace,
+    type_error_nargs,
 )
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context
@@ -1157,8 +1158,15 @@ async def _inf_unsafe_static_cast(self, engine, x, typ: AbstractType):
 
 
 @standard_prim(P.tagged)
-async def _inf_tagged(self, engine, x):
-    return AbstractUnion([broaden(x, engine.loop)])
+async def _inf_tagged(self, engine, x, *rest):
+    if len(rest) == 0:
+        return AbstractUnion([broaden(x, engine.loop)])
+    elif len(rest) == 1:
+        tag, = rest
+        tag_v = self.require_constant(tag, argnum=2)
+        return AbstractTaggedUnion([[tag_v, broaden(x, engine.loop)]])
+    else:
+        raise type_error_nargs(P.tagged, "1 or 2", len(rest) + 1)
 
 
 @standard_prim(P.hastag)

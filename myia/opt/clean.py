@@ -136,7 +136,7 @@ def simplify_types(root, manager):
             # tagged(x, tag) -> unchanged
             if len(node.inputs) == 2:
                 _, x = node.inputs
-                tag = type_to_tag(node.abstract)
+                tag = type_to_tag(x.abstract)
                 new_node = node.graph.apply(P.tagged, x, tag)
 
         elif node.is_constant(AbstractClassBase):

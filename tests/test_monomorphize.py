@@ -11,7 +11,7 @@ from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
 from myia.abstract import InferenceError
 from myia.prim.py_implementations import \
-    hastype, partial, scalar_add, scalar_sub, \
+    hastype, partial, scalar_add, scalar_sub, tagged, \
     scalar_usub, scalar_uadd, switch, array_map, array_reduce
 from myia.validate import ValidationError
 from myia.utils import overload, ADT
@@ -529,6 +529,20 @@ def test_union_nested_2(x, y):
             return y
     else:
         return x[0]
+
+
+@specialize(
+    (1, fp1, pt1, (int1, int2)),
+    (0, fp1, pt1, (int1, int2)),
+    (-1, fp1, pt1, (int1, int2)),
+)
+def test_tagged(c, x, y, z):
+    if c > 0:
+        return tagged(x)
+    elif c == 0:
+        return tagged(y)
+    else:
+        return tagged(z)
 
 
 @specialize(

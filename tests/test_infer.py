@@ -1908,6 +1908,11 @@ def test_tagged_more(c, x, y, z):
         return tagged(z)
 
 
+@infer((i64, InferenceError))
+def test_tagged_too_many_arguments(x):
+    return tagged(x, 1, 2)
+
+
 @infer(
     (i32, (JT(i32), Env, i32)),
     (f64, (JT(f64), Env, f64)),

@@ -69,6 +69,14 @@ class TaggedPossibilities(list):
         opts = [[tag, typ] for tag, typ in sorted(set(map(tuple, options)))]
         super().__init__(opts)
 
+    def get(self, tag):
+        """Get the type associated to the tag."""
+        for i, t in self:
+            if i == tag:
+                return t
+        else:
+            raise KeyError(tag)
+
     def __hash__(self):
         return hash(tuple(self))
 

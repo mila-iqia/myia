@@ -710,6 +710,31 @@ def amerge(x1: Possibilities, x2, loop, forced, bp):
 
 
 @overload  # noqa: F811
+def amerge(x1: TaggedPossibilities, x2, loop, forced, bp):
+    d1 = dict(x1)
+    d2 = dict(x2)
+    results = {}
+    for i, t in d1.items():
+        if i in d2:
+            t = amerge(t, d2[i], loop, forced, bp)
+        results[i] = t
+    for i, t in d2.items():
+        if i not in d1:
+            results[i] = t
+    res = TaggedPossibilities(results.items())
+    if res == x1:
+        return x1
+    elif forced:
+        raise MyiaTypeError(
+            'Additional possibilities cannot be merged.'
+        )
+    elif res == x2:
+        return x2
+    else:
+        return res
+
+
+@overload  # noqa: F811
 def amerge(x1: dtype.TypeMeta, x2, loop, forced, bp):
     if issubclass(x2, x1):
         return x1
@@ -815,13 +840,13 @@ def amerge(x1: AbstractJTagged, x2, loop, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(x1: AbstractUnion, x2, loop, forced, bp):
+def amerge(x1: (AbstractUnion, AbstractTaggedUnion), x2, loop, forced, bp):
     args1 = x1.options
     args2 = x2.options
     merged = amerge(args1, args2, loop, forced, bp)
     if forced or merged is args1:
         return x1
-    return AbstractUnion(merged)
+    return type(x1)(merged)
 
 
 @overload  # noqa: F811

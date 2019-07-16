@@ -9,7 +9,8 @@ from itertools import count
 
 from .. import dtype
 from ..abstract import AbstractTuple, AbstractList, AbstractClassBase, \
-    AbstractDict, AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE
+    AbstractDict, AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE, \
+    AbstractTaggedUnion
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, simplify_types, NodeMap, \
@@ -642,6 +643,19 @@ def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
     else:
         a = convert_result_array(arg, orig_t, backend)
     return a
+
+
+@overload  # noqa: F811
+def convert_result(self, arg, orig_t, vm_t: AbstractTaggedUnion, backend,
+                   return_backend):
+    assert isinstance(orig_t, AbstractUnion)
+    for typ in orig_t.options:
+        tag = type_to_tag(typ)
+        if tag == arg.tag:
+            return self(arg.value, typ,
+                        vm_t.options.get(tag), backend, return_backend)
+    else:
+        raise AssertionError(f'Badly formed TaggedValue')
 
 
 class Wrap(PipelineStep):
