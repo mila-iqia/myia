@@ -33,8 +33,7 @@ class TaggedValue:
 
     def cast(self, tag):
         """Cast this TaggedValue to its value if the correct tag is given."""
-        if not self.has(tag):
-            raise TypeError('Wrong tag for cast.')
+        assert self.has(tag)
         return self.value
 
 

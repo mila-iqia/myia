@@ -103,7 +103,7 @@ def erase_class(root, manager):
             real_typ = type_to_abstract(typ.value)
             matches, _ = split_type(x.abstract, real_typ)
             if isinstance(matches, AbstractUnion):
-                tags = [type_to_tag(poss) for poss in matches]
+                tags = [type_to_tag(poss) for poss in matches.options]
             else:
                 tags = [type_to_tag(matches)]
             hastags = [node.graph.apply(P.hastag, x, tag) for tag in tags]
@@ -119,6 +119,7 @@ def erase_class(root, manager):
             assert isinstance(typ.value, AbstractValue)
             if isinstance(typ.value, AbstractUnion):
                 new_node = x
+                keep_abstract = False
             else:
                 tag = type_to_tag(typ.value)
                 new_node = node.graph.apply(P.casttag, x, tag)
