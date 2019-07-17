@@ -703,7 +703,7 @@ def amerge(x1: Possibilities, x2, loop, forced, bp):
         return x1
     if forced:
         raise MyiaTypeError(
-            'Additional possibilities cannot be merged.'
+            'Additional Possibilities cannot be merged.'
         )
     else:
         return Possibilities(x1 + x2)
@@ -726,7 +726,7 @@ def amerge(x1: TaggedPossibilities, x2, loop, forced, bp):
         return x1
     elif forced:
         raise MyiaTypeError(
-            'Additional possibilities cannot be merged.'
+            'Additional TaggedPossibilities cannot be merged.'
         )
     elif res == x2:
         return x2
