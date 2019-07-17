@@ -4,7 +4,7 @@ import numpy as np
 
 from myia import myia, value_and_grad
 from myia.abstract import MyiaTypeError
-from myia.api import to_device, MyiaIgnoreReturnBackendWarning
+from myia.api import to_device
 
 from ..common import MA
 
@@ -74,69 +74,6 @@ class Tiny(nn.Module):
         return input @ self.W
 
 
-def test_return_backend__ignore(_backend_fixture):
-    backend = _backend_fixture
-    backend_options = get_backend_options(args, _backend_fixture)
-
-    torch.manual_seed(123)
-
-    inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
-    model = Tiny(4, 3)
-    target = torch.Tensor([2.5])
-
-    def mse(value, target):
-        diff = value - target
-        return sum(diff * diff)
-
-    def cost(model, inp, target):
-        value = model(inp)
-        loss = mse(value, target)
-        return loss.item()
-
-    output_expected = torch.Tensor(
-        [[-2.92155361,  2.21107101, -4.36360359],
-         [6.78069878, -4.06704664,  7.29815578]])
-
-    loss_expected = 161.0585479736328
-
-    model_expected = torch.Tensor(
-        [[15.42187691, -34.19045258,  16.33688736],
-         [-82.06187439,  38.71609116, -99.63981628],
-         [39.45422363, -23.73973656,  47.91710663],
-         [-66.33718109, 107.40527344, -73.99190521]])
-
-    with pytest.warns(MyiaIgnoreReturnBackendWarning):
-        @myia(backend=backend, backend_options=backend_options,
-              return_backend=True)
-        def step__rt_t(model, inp, target):
-            _output = model(inp)
-            _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
-            return _cost, model - dmodel, _output
-
-    loss__rt_t, model__rt_t, output__rt_t = step__rt_t(model, inp, target)
-
-    assert np.isclose(loss__rt_t, loss_expected)
-    assert torch.allclose(model__rt_t.W, model_expected)
-    assert torch.allclose(output__rt_t, output_expected)
-
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=False)
-    def step__rt_f(model, inp, target):
-        _output = model(inp)
-        _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
-        return _cost, model - dmodel, _output
-
-    loss__rt_f, model__rt_f, output__rt_f = step__rt_f(model, inp, target)
-
-    assert np.isclose(loss__rt_f, loss_expected)
-    assert torch.allclose(model__rt_f.W, model_expected)
-    assert torch.allclose(output__rt_f, output_expected)
-
-    assert np.isclose(loss__rt_f, loss__rt_t)
-    assert torch.allclose(model__rt_f.W, model__rt_t.W)
-    assert torch.allclose(output__rt_f, output__rt_t)
-
-
 def test_module_matmul_fwd():
     backend = 'pytorch'
     backend_options = get_backend_options(args, backend)
@@ -146,8 +83,7 @@ def test_module_matmul_fwd():
     inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
     model = Tiny(4, 3)
 
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=False)
+    @myia(backend=backend, backend_options=backend_options)
     def step(model, inp):
         return model(inp)
     output = step(model, inp)
@@ -211,8 +147,7 @@ def test_module_matmul_bwd():
         loss = mse(value, target)
         return loss.item()
 
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=False, frontend='pytorch')
+    @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
         _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
         return _cost, dmodel
@@ -250,12 +185,11 @@ def test_module_matmul_update(_backend_fixture):
         loss = mse(value, target)
         return loss.item()
 
-    with pytest.warns(MyiaIgnoreReturnBackendWarning):
-        @myia(backend=backend, backend_options=backend_options,
-              return_backend=True, frontend='pytorch')
-        def step(model, inp, target):
-            _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
-            return _cost, model - dmodel
+    @myia(backend=backend, backend_options=backend_options,
+          return_backend=True)
+    def step(model, inp, target):
+        _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
+        return _cost, model - dmodel
 
     loss, model = step(model, inp, target)
 
@@ -296,8 +230,7 @@ def test_module_2_layer_mlp_fwd():
     inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
     model = MLP_2_Layers(4, 2, 3)
 
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=False, frontend='pytorch')
+    @myia(backend=backend, backend_options=backend_options)
     def step(model, inp):
         return model(inp)
     output = step(model, inp)
@@ -328,8 +261,7 @@ def test_module_2_layer_mlp_bwd():
         loss = mse(value, target)
         return loss.item()
 
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=False, frontend='pytorch')
+    @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
         _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
         return _cost, dmodel
@@ -370,8 +302,7 @@ def test_module_2_layer_mlp_update():
         loss = mse(value, target)
         return loss.item()
 
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=False, frontend='pytorch')
+    @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
         _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
         return _cost, model - dmodel
@@ -416,12 +347,11 @@ def test_module_2_layer_mlp_update__to_device(_backend_fixture):
         loss = mse(value, target)
         return loss.item()
 
-    with pytest.warns(MyiaIgnoreReturnBackendWarning):
-        @myia(backend=backend, backend_options=backend_options,
-              return_backend=True, frontend='pytorch')
-        def step(model, inp, target):
-            _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
-            return _cost, model - dmodel
+    @myia(backend=backend, backend_options=backend_options,
+          return_backend=True)
+    def step(model, inp, target):
+        _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
+        return _cost, model - dmodel
 
     loss, model = step(model, inp, target)
 
@@ -445,13 +375,11 @@ def test_pytorch_inference_errors(_backend_fixture):
     backend = _backend_fixture
     backend_options = get_backend_options(args, _backend_fixture)
 
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=False, frontend='pytorch')
+    @myia(backend=backend, backend_options=backend_options)
     def step_add(a, b):
         return a + b
 
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=False, frontend='pytorch')
+    @myia(backend=backend, backend_options=backend_options)
     def step_dot(a, b):
         return a @ b
 
@@ -470,11 +398,9 @@ def test_pytorch_scalar(_backend_fixture):
     backend_options = get_backend_options(args, _backend_fixture)
 
     _a = 42.759910583496094
-    # _a = torch.DoubleTensor([[1.31208074]])
     _b = 13.92138671875
 
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=False, frontend='pytorch')
+    @myia(backend=backend, backend_options=backend_options)
     def step_add(a, b):
         return a + b
 
