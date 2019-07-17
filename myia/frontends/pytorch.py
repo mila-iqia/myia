@@ -17,7 +17,6 @@ from ..hypermap import hyper_map
 from ..api import _convert_arg_init
 from ..pipeline.steps import convert_arg, convert_result
 
-from . import Frontend
 from .pytorch_functions import linear, tensor_dim, t
 
 
@@ -31,8 +30,6 @@ _type_map = {
     torch.float32: Float[32],
     torch.float64: Float[64],
     torch.uint8: Bool,
-    # This is a hack but we really need uint64 support
-    # torch.int64: Int[64],
 }
 
 
@@ -43,8 +40,7 @@ def pytorch_dtype_to_type(dtype):
     return _type_map[dtype]
 
 
-pytorch_object_map = standard_object_map.copy()
-pytorch_object_map.update({
+standard_object_map.update({
     torch.nn.functional.linear: linear,
     torch.tanh: C.tanh,
 })
@@ -110,10 +106,9 @@ def _array_zero(xs):
     return P.distribute(C.to_array(scalar_zero), P.shape(xs))
 
 
-pytorch_method_map = standard_method_map.copy()
-pytorch_method_map[AbstractPyTorchTensor] = \
-    pytorch_method_map[AbstractArray].copy()
-pytorch_method_map[AbstractPyTorchTensor].update({
+standard_method_map[AbstractPyTorchTensor] = \
+    standard_method_map[AbstractArray].copy()
+standard_method_map[AbstractPyTorchTensor].update({
     'dim': tensor_dim,
     't': t,
     'tanh': C.tanh,
@@ -291,22 +286,3 @@ def _convert_result(self, arg, orig_t, vm_t: AbstractPyTorchTensor, backend,
     return arg
 
 ##############################################################################
-
-
-class PyTorchFrontend(Frontend):
-    """Frontend to run using PyTorch.
-
-    Frontend options:
-
-
-    """
-
-    def __init__(self):
-        """Create a PyTorch frontend."""
-        pass
-
-    def configure(self, pip):
-        """Additional configuration of pipeline for PyTorch frontend."""
-        return pip.configure({'convert.object_map': pytorch_object_map,
-                              'method_map': pytorch_method_map,
-                              'array_class': AbstractPyTorchTensor})

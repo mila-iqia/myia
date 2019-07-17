@@ -3,22 +3,21 @@ import pytest
 import numpy as np
 
 from myia import myia, value_and_grad
-from myia.debug import traceback  # noqa
 from myia.abstract import MyiaTypeError
 from myia.api import to_device, MyiaIgnoreReturnBackendWarning
 
 from ..common import MA
 
+from myia.frontends import activate_frontend
+
 torch = pytest.importorskip("torch")
 nn = torch.nn
 
-from myia.frontends.pytorch import pytorch_dtype_to_type  # noqa: E402
-
-from myia.frontends import load_frontend  # noqa: E402
-load_frontend('pytorch')
+activate_frontend('pytorch')
 
 
 def test_pytorch_dtype_to_type():
+    from myia.frontends.pytorch import pytorch_dtype_to_type
     with pytest.raises(TypeError):
         pytorch_dtype_to_type("fake_pytorch_type")
 
@@ -108,7 +107,7 @@ def test_return_backend__ignore(_backend_fixture):
 
     with pytest.warns(MyiaIgnoreReturnBackendWarning):
         @myia(backend=backend, backend_options=backend_options,
-              return_backend=True, frontend='pytorch')
+              return_backend=True)
         def step__rt_t(model, inp, target):
             _output = model(inp)
             _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
@@ -121,7 +120,7 @@ def test_return_backend__ignore(_backend_fixture):
     assert torch.allclose(output__rt_t, output_expected)
 
     @myia(backend=backend, backend_options=backend_options,
-          return_backend=False, frontend='pytorch')
+          return_backend=False)
     def step__rt_f(model, inp, target):
         _output = model(inp)
         _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
@@ -148,7 +147,7 @@ def test_module_matmul_fwd():
     model = Tiny(4, 3)
 
     @myia(backend=backend, backend_options=backend_options,
-          return_backend=False, frontend='pytorch')
+          return_backend=False)
     def step(model, inp):
         return model(inp)
     output = step(model, inp)
@@ -163,7 +162,6 @@ def test_module_matmul_fwd():
 # This will be uncomment once debug VM is compatible with PyTorch
 """
 from myia.pipeline import standard_debug_pipeline
-from myia.frontends import load_frontend
 
 pt_debug_pipeline = standard_debug_pipeline \
     .select('parse', 'resolve', 'infer', 'export')
@@ -172,13 +170,6 @@ def test_module_matmul_fwd__debug():
 
     inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
     model = Tiny(4, 3)
-
-    pip = pt_debug_pipeline.configure({
-        'frontend.name': 'pytorch'
-    })
-    frontend = load_frontend('pytorch')
-    pip = frontend.configure(pip)
-
 
     def step(model, inp):
         return model(inp)

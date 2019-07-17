@@ -2,7 +2,6 @@
 
 import numpy as np
 import inspect
-import warnings
 
 from myia import dtype
 
@@ -11,21 +10,8 @@ from .pipeline import standard_pipeline
 from .utils import keyword_decorator, overload
 from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
     AbstractList, AbstractArray, AbstractScalar, AbstractClassBase
-# TODO: AbstractUnion overload for _convert_arg_init
 from .compile.backends import load_backend, Backend
-from .frontends import load_frontend
 
-
-class MyiaIgnoreReturnBackendWarning(UserWarning):
-    """Warns that backend won't be returned despite return_backend=True."""
-
-    def __init__(self, msg, loc=None):
-        """Initialize with a message and source location.
-
-        TODO: maybe add support for obtaining location of @myia decorators?
-        """
-        super().__init__(msg)
-        self.loc = loc
 
 #################
 # Top-level API #
@@ -47,13 +33,8 @@ class MyiaFunction:
     """
 
     def __init__(self, fn, specialize_values=[], return_backend=False,
-                 backend=None, backend_options=None, frontend=None):
+                 backend=None, backend_options=None):
         """Initialize a MyiaFunction."""
-        if return_backend is True and frontend == 'pytorch':
-            warn_msg = "All Arrays returned by Myia Function will still " + \
-                "be PyTorch Tensors even if backend is not pytorch " + \
-                "and/or arrays were wrapped in ArrayWrappers via to_device"
-            warnings.warn(MyiaIgnoreReturnBackendWarning(warn_msg))
         self.fn = fn
         self.specialize_values = set(specialize_values)
         self.pip = standard_pipeline.configure({
@@ -62,8 +43,6 @@ class MyiaFunction:
             'wrap.return_backend': return_backend,
         })
         self._cache = {}
-        self.frontend = load_frontend(frontend)
-        self.pip = self.frontend.configure(self.pip)
 
     def specialize(self, args):
         """Specialize on the types of the given arguments.
@@ -104,7 +83,7 @@ class MyiaFunction:
 
 @keyword_decorator
 def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
-         return_backend=False, frontend=None):
+         return_backend=False):
     """Create a function using Myia's runtime.
 
     `@myia` can be used as a simple decorator. If custom options are needed,
@@ -125,12 +104,10 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
         backend: the backend to use for compilation
         backend_options: backend-specific options.
         return_backend: return backend values (avoids copies to CPU).
-        frontend: the frontend to use
     """
     return MyiaFunction(fn, specialize_values, backend=backend,
                         backend_options=backend_options,
-                        return_backend=return_backend,
-                        frontend=frontend)
+                        return_backend=return_backend)
 
 
 ######################################################################
@@ -168,24 +145,6 @@ def _convert_arg_init(self, arg, orig_t: AbstractArray, backend):
             backend.from_numpy(arg), arg.dtype, arg.shape, backend
         )
     return arg
-
-
-"""
-TODO: AbstractUnion overload of _convert_arg_init().
-
-This overload will look similar to AbstractUnion overload
-from convert_arg() in myia/pipeline/steps.py
-
-AbstractUnion overload from convert_arg() at time of this commit:
-https://github.com/mila-iqia/myia/blob/
-c350b341f52d2d0e3dc1e5ab1d890103a45b60c9/
-myia/pipeline/steps.py#L528-L537
-
-Current AbstractUnion overload from convert_arg():
-(Note: might have been moved to different location of codebase
-since this comment was written/committed):
-https://github.com/mila-iqia/myia/blob/master/myia/pipeline/steps.py#L528-L537
-"""
 
 
 @overload  # noqa: F811
