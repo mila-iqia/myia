@@ -1172,9 +1172,10 @@ async def _inf_tagged(self, engine, x, *rest):
 @standard_prim(P.hastag)
 async def _inf_hastag(self, engine,
                       x: AbstractTaggedUnion, tag: dtype.Int[64]):
+    opts = await force_pending(x.options)
     self.require_constant(
         tag, argnum=2,
-        range={i for i, _ in x.options}
+        range={i for i, _ in opts}
     )
     return AbstractScalar({
         VALUE: ANYTHING,
@@ -1185,11 +1186,12 @@ async def _inf_hastag(self, engine,
 @standard_prim(P.casttag)
 async def _inf_casttag(self, engine,
                        x: AbstractTaggedUnion, tag: dtype.Int[64]):
+    opts = await force_pending(x.options)
     tag_v = self.require_constant(
         tag, argnum=2,
-        range={i for i, _ in x.options}
+        range={i for i, _ in opts}
     )
-    for i, typ in x.options:
+    for i, typ in opts:
         if i == tag_v:
             return typ
     raise AssertionError('Unreachable')
