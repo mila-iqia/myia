@@ -279,9 +279,8 @@ def _convert_arg(self, arg, orig_t: AbstractPyTorchTensor, backend):
 ##############################################################################
 
 
-@convert_result.register
-def _convert_result(self, arg, orig_t, vm_t: AbstractPyTorchTensor, backend,
-                    return_backend):
+@convert_result_array.register
+def _convert_result_array(arg, orig_t: AbstractPyTorchTensor, backend)
     if not isinstance(arg, torch.Tensor):
         arg = torch.utils.dlpack.from_dlpack(backend.to_dlpack(arg))
     return arg

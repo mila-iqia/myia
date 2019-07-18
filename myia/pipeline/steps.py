@@ -605,6 +605,11 @@ def convert_result(self, arg, orig_t, vm_t: AbstractScalar, backend,
     return backend.to_scalar(arg)
 
 
+@overload
+def convert_result_array(arg, orig_t: AbstractArray, backend):
+    return backend.to_numpy(arg)
+
+
 @overload  # noqa: F811
 def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
                    return_backend):
@@ -616,7 +621,7 @@ def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
             backend
         )
     else:
-        a = backend.to_numpy(arg)
+        a = convert_result_array(arg, orig_t, backend)
     return a
 
 
