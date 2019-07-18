@@ -635,9 +635,7 @@ async def _inf_list_reduce(self, engine, fn, lst: AbstractList, dflt):
 async def _inf_scalar_to_array(self, engine, a: AbstractScalar, t):
     tp = t.values[VALUE]
     tp = type(tp)
-    if not issubclass(tp, AbstractArray):
-        raise MyiaTypeError('Expected an array class type or instance '
-                            'for type of scalar_to_array')
+    assert issubclass(tp, AbstractArray)
     return tp(a, {SHAPE: ()})
 
 
