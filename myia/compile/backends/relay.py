@@ -274,8 +274,9 @@ class CompileGraph:
             else:
                 dtype = type_to_np_dtype(type.values[TYPE])
                 return relay.const(value, dtype=dtype)
-        if isinstance(node.value, Primitive):
+        if isinstance(node.value, (Primitive, AbstractArray)):
             # This is a hack for list_map and friends
+            # And also for scalar_to_array
             return None
         return _helper(node.value, node.abstract)
 
