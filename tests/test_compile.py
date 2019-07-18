@@ -43,11 +43,7 @@ def parse_compare(*tests, optimize=True, python=True, profile=no_prof):
                 args = (args,)
             if python:
                 ref_result = fn(*map(copy, args))
-            argspec = tuple(
-                from_value(
-                    arg,
-                    broaden=True)
-                for arg in args)
+            argspec = tuple(from_value(arg, broaden=True) for arg in args)
             if profile is True:
                 profile = Profile()
             res = pipeline.run(input=fn, argspec=argspec, profile=profile)
