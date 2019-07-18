@@ -20,7 +20,6 @@ EmptyTuple = typing.Tuple[()]
 AA = AbstractArray(ANYTHING, {SHAPE: ANYTHING})
 
 
-
 ###########################
 # Abstract value builders #
 ###########################

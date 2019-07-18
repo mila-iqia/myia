@@ -15,7 +15,7 @@ from ..dtype import Int, UInt, Float, Bool, Number
 from ..pipeline.resources import standard_object_map, standard_method_map
 from ..hypermap import hyper_map
 from ..api import _convert_arg_init
-from ..pipeline.steps import convert_arg, convert_result
+from ..pipeline.steps import convert_arg, convert_result_array
 
 from .pytorch_functions import linear, tensor_dim, t
 
@@ -280,7 +280,7 @@ def _convert_arg(self, arg, orig_t: AbstractPyTorchTensor, backend):
 
 
 @convert_result_array.register
-def _convert_result_array(arg, orig_t: AbstractPyTorchTensor, backend)
+def _convert_result_array(arg, orig_t: AbstractPyTorchTensor, backend):
     if not isinstance(arg, torch.Tensor):
         arg = torch.utils.dlpack.from_dlpack(backend.to_dlpack(arg))
     return arg
