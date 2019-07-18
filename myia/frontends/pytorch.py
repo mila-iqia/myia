@@ -103,7 +103,8 @@ C.tanh.register(AT)(C.array_tanh)
 @core
 def _array_zero(xs):
     scalar_zero = P.scalar_cast(0, C.typeof(xs).element)
-    return P.distribute(C.to_array(scalar_zero), P.shape(xs))
+    return P.distribute(C.to_array(scalar_zero, C.typeof(xs)),
+                        P.shape(xs))
 
 
 standard_method_map[AbstractPyTorchTensor] = \

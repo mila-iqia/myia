@@ -73,7 +73,8 @@ class HyperMap(MetaGraph):
             fnarg = self.fn_leaf
 
         if len(argmap) > 1 and self.broadcast:
-            args = [g.apply(operations.to_array, arg) if isleaf else arg
+            args = [g.apply(operations.to_array, arg, t)
+                    if isleaf else arg
                     for arg, (a, isleaf) in argmap.items()]
             first, *rest = args
             shp = g.apply(P.shape, first)

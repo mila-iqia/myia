@@ -1,7 +1,7 @@
 """Library of optimizations."""
 
 from ..abstract import abstract_clone, AbstractFunction, AbstractJTagged, \
-    type_token, DEAD
+    AbstractArray, ANYTHING, SHAPE, type_token, DEAD
 from ..composite import ListMap, hyper_add, zeros_like
 from ..dtype import Number
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone, \
@@ -65,6 +65,9 @@ def M(mg):
 def primset_var(*prims):
     """Create a variable that matches a Primitive node."""
     return var(lambda node: node.is_constant() and node.value in prims)
+
+
+AA = AbstractArray(ANYTHING, {SHAPE: ANYTHING})
 
 
 ###############################
@@ -219,7 +222,8 @@ def _transform(pattern: Var):
 
 @overload  # noqa: F811
 def _transform(pattern: (int, float)):
-    return (P.distribute, (P.scalar_to_array, pattern), var(_is_c))
+    return (P.distribute, (P.scalar_to_array, pattern, AA),
+            var(_is_c))
 
 
 def on_array_map(orig):
@@ -406,7 +410,8 @@ def unfuse_composite(optimizer, node, equiv):
 
         def asarray(self, ng, i):
             if i.is_constant():
-                return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i),
+                return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i,
+                                                       AA),
                                 self.shape)
             else:
                 return i
@@ -462,7 +467,7 @@ def simplify_array_map(optimizer, node, equiv):
         elif x.is_constant() \
                 and issubclass(type_token(x.abstract), Number):
             shp = Constant(xs[0].shape)
-            sexp = (P.distribute, (P.scalar_to_array, x), shp)
+            sexp = (P.distribute, (P.scalar_to_array, x, AA), shp)
             return sexp_to_node(sexp, node.graph)
         else:
             # Raise a semi-rare exception that won't hide bugs

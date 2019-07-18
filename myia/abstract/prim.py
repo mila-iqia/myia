@@ -632,8 +632,13 @@ async def _inf_list_reduce(self, engine, fn, lst: AbstractList, dflt):
 
 
 @standard_prim(P.scalar_to_array)
-async def _inf_scalar_to_array(self, engine, a: AbstractScalar):
-    return AbstractArray(a, {SHAPE: ()})
+async def _inf_scalar_to_array(self, engine, a: AbstractScalar, t):
+    tp = t.values[VALUE]
+    tp = type(tp)
+    if not issubclass(tp, AbstractArray):
+        raise MyiaTypeError('Expected an array class type or instance '
+                            'for type of scalar_to_array')
+    return tp(a, {SHAPE: ()})
 
 
 @standard_prim(P.array_to_scalar)

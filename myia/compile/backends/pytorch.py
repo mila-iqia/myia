@@ -170,7 +170,7 @@ def pytorch_convert(lst, backend):
     fn = op.inputs[0].value
     if fn == P.scalar_to_array:
         # Hack because we need the runtime context here.
-        return lambda v: (backend.from_numpy(v),), op.inputs[1:], [op]
+        return lambda v: (backend.from_numpy(v),), [op.inputs[1]], [op]
 
     mapper = _mapping.get(fn, None)
     if mapper is None:

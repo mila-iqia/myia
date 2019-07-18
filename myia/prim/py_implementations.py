@@ -549,7 +549,7 @@ def user_switch(c, x, y):
 
 
 @register(primops.scalar_to_array)
-def scalar_to_array(x):
+def scalar_to_array(x, t):
     """Implement `scalar_to_array`."""
     return np.array(x)
 

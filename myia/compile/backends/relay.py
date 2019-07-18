@@ -104,7 +104,6 @@ SIMPLE_MAP = {
     P.bool_eq: relay.op.equal,
     P.bool_not: relay.op.logical_not,
 
-    P.scalar_to_array: lambda x: x,
     P.array_to_scalar: lambda x: x,
     P.dot: lambda x, y: relay.op.nn.dense(x, relay.op.transpose(y)),
 
@@ -177,7 +176,8 @@ COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
     P.array_map: relay_array_map,
-    P.array_reduce: relay_array_reduce
+    P.array_reduce: relay_array_reduce,
+    P.scalar_to_array: lambda c, x, t: c.ref(x),
 }
 
 

@@ -222,7 +222,7 @@ def bprop_identity(x, out, dout):
 
 
 @register_bprop(primops.scalar_to_array)
-def bprop_scalar_to_array(x, out, dout):
+def bprop_scalar_to_array(x, t, out, dout):
     """Backpropagator for primitive `scalar_to_array`."""
     return (array_to_scalar(dout),)
 
@@ -230,7 +230,7 @@ def bprop_scalar_to_array(x, out, dout):
 @register_bprop(primops.array_to_scalar)
 def bprop_array_to_scalar(x, out, dout):
     """Backpropagator for primitive `array_to_scalar`."""
-    return (scalar_to_array(dout),)
+    return (scalar_to_array(dout, typeof(x)),)
 
 
 @register_bprop(primops.dot)
