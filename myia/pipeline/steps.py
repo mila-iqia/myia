@@ -554,7 +554,7 @@ def convert_arg(self, arg, orig_t: AbstractUnion, backend):
         return TaggedValue(tag, value)
     else:
         opts = ", ".join(map(str, orig_t.options))
-        raise TypeError(f'Expected one of {opts}')
+        raise TypeError(f'Expected one of {opts}, not {arg}')
 
 
 @overload  # noqa: F811
