@@ -74,8 +74,8 @@ class Tiny(nn.Module):
         return input @ self.W
 
 
-def test_module_matmul_fwd():
-    backend = 'pytorch'
+def test_module_matmul_fwd(_backend_fixture):
+    backend = _backend_fixture
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)

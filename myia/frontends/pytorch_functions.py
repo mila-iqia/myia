@@ -19,6 +19,8 @@
 from ..prim import ops as P
 from ..composite import core
 
+# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER
+
 
 @core
 def linear(input, weight, bias=None):
@@ -44,12 +46,12 @@ def linear(input, weight, bias=None):
 
 
 @core
-def tensor_dim(t):
-    """Map of 'dim' pytorch method."""
-    return len(P.shape(t))
-
-
-@core
 def t(a):
     """Map of 't' pytorch method."""
     return P.transpose(a, (1, 0))
+
+
+@core
+def tensor_dim(t):
+    """Map of 'dim' pytorch method."""
+    return len(P.shape(t))

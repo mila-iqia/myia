@@ -284,5 +284,3 @@ def _convert_result_array(arg, orig_t: AbstractPyTorchTensor, backend):
     if not isinstance(arg, torch.Tensor):
         arg = torch.utils.dlpack.from_dlpack(backend.to_dlpack(arg))
     return arg
-
-##############################################################################
