@@ -99,12 +99,15 @@ def test_forward_reference():
         return 2 + 2
 
 
-def test_unsupported_AST__error():
-    def a0():
-        _a0 = {}  # noqa: F841
-    with pytest.raises(MyiaSyntaxError):
-        parse(a0)
+def test_dict():
+    def bad(x):
+        return {x: 2}
 
+    with pytest.raises(MyiaSyntaxError):
+        parse(bad)
+
+
+def test_unsupported_AST__error():
     def a1():
         pass
     with pytest.raises(MyiaSyntaxError):
@@ -246,31 +249,6 @@ def test_no_return_while__format(capsys):
 
 
 def test_unsupported_AST__error__format(capsys):
-    def a0():
-        _a0 = {}  # noqa: F841
-        return 1
-    try:
-        parse(a0)
-    except MyiaSyntaxError:
-        sys.excepthook(*sys.exc_info())
-
-    out, err = capsys.readouterr()
-
-    reg_pattern = r"========================================" + \
-        r"========================================\n" + \
-        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
-        r"(.+?): _a0 = \{\}  # noqa: F841\n" + \
-        r"(.+?)        \^\^\n" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaSyntaxError: Dict not supported"
-
-    regex = re.compile(reg_pattern)
-    match = re.match(regex, err)
-
-    assert match is not None
-    #########################################################################
-
     def a1():
         pass
         return 1

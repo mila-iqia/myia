@@ -12,7 +12,7 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
     list_map, env_getitem, env_setitem, env_add, embed, \
     array_to_scalar, transpose, return_, make_record, list_getitem, \
-    array_getitem, array_setitem, bool_eq
+    array_getitem, array_setitem, bool_eq, dict_getitem
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
@@ -275,6 +275,10 @@ def test_prim_list_map(l):
     def add2(a):
         return a + 2
     return list_map(add2, l)
+
+
+def test_prim_dict_getitem():
+    assert dict_getitem({'x': 2}, 'x') == 2
 
 
 def test_prim_distribute():

@@ -445,6 +445,20 @@ class Parser:
         elts = [self.process_node(block, e) for e in node.elts]
         return block.graph.apply(op, *elts)
 
+    def process_Dict(self, block: 'Block', node: ast.Dict) -> ANFNode:
+        """Process dict literals."""
+        from .abstract import AbstractDict, ANYTHING
+        op = block.operation('make_dict')
+        keys = [self.process_node(block, k) for k in node.keys]
+        for k in keys:
+            if not isinstance(k, Constant):
+                raise MyiaSyntaxError("Dictionary keys must be constants",
+                                      self.make_location(node))
+        keys = [k.value for k in keys]
+        values = [self.process_node(block, v) for v in node.values]
+        typ = AbstractDict(dict((key, ANYTHING) for key in keys))
+        return block.graph.apply(op, typ, *values)
+
     def process_Subscript(self, block: 'Block',
                           node: ast.Subscript) -> ANFNode:
         """Process subscripts: `x[y]`."""

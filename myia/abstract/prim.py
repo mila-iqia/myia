@@ -23,6 +23,7 @@ from .data import (
     AbstractTuple,
     AbstractArray,
     AbstractList,
+    AbstractDict,
     AbstractClassBase,
     AbstractJTagged,
     AbstractBottom,
@@ -461,6 +462,17 @@ async def _inf_make_list(self, engine, *args):
     return AbstractList(res)
 
 
+@standard_prim(P.make_dict)
+async def _inf_make_dict(self, engine, _dct: AbstractType, *values):
+    dct = _dct.values[VALUE]
+    assert len(dct.entries) == len(values)
+    for t, elem in zip(dct.entries.values(), values):
+        assert typecheck(t, elem)
+
+    return AbstractDict(dict((key, val) for key, val in
+                             zip(dct.entries.keys(), values)))
+
+
 @standard_prim(P.make_record)
 async def infer_type_make_record(self, engine, _cls: AbstractType, *elems):
     """Infer the return type of make_record."""
@@ -502,6 +514,22 @@ async def _inf_tuple_getitem(self, engine,
 async def _inf_list_getitem(self, engine,
                             arg: AbstractList, idx: dtype.Int[64]):
     return arg.element
+
+
+@standard_prim(P.dict_getitem)
+async def _inf_dict_getitem(self, engine, arg: AbstractDict, idx):
+    idx_v = idx.values[VALUE]
+    if idx_v is ANYTHING:
+        raise MyiaTypeError(
+            'Dictionaries must be indexed with a constant'
+        )
+    if not isinstance(idx_v, str):
+        raise MyiaTypeError(
+            f'Dictionary indexes must be strings, not {idx_v}.'
+        )
+    if idx_v not in arg.entries:
+        raise MyiaTypeError(f'Invalid index for indexed dictionary')
+    return arg.entries[idx_v]
 
 
 @standard_prim(P.tuple_setitem)

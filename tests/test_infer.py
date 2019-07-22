@@ -32,7 +32,7 @@ from myia.utils import newenv
 from .common import B, \
     Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
-    to_abstract_test, EmptyTuple, U, Ex, Bot, AA
+    to_abstract_test, EmptyTuple, U, D, Ex, Bot, AA
 
 
 ai64 = Array[i64]
@@ -353,6 +353,21 @@ def test_list_and_scalar(x, y):
 
 
 @infer(
+    (1, D(x=1),),
+    (f32, D(x=f32),),
+)
+def test_dict(x):
+    return {'x': x}
+
+
+@infer(
+    (i64, f32, D(x=i64, y=f32)),
+)
+def test_dict2(x, y):
+    return {'x': x, 'y': y}
+
+
+@infer(
     ((), 0),
     ((1,), 1),
     ((i64, f64), 2),
@@ -429,6 +444,18 @@ def test_tuple_outofbound_negative(x, y):
 )
 def test_list_getitem(xs, i):
     return xs[i]
+
+
+@infer((D(x=i64), i64),
+       (D(y=f32), InferenceError))
+def test_dict_getitem(d):
+    return d['x']
+
+
+@infer((D(x=i64), Ex(ANYTHING, t=str), InferenceError),
+       (D(x=i64), 2, InferenceError))
+def test_dict_getitem_nonconst(d, i):
+    return d[i]
 
 
 @infer(

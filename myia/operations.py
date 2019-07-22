@@ -25,6 +25,11 @@ def make_list(*elts):  # pragma: no cover
     raise RuntimeError('This operation is not meant to be called directly.')
 
 
+def make_dict(k, v):  # pragma: no cover
+    """Dict builder."""
+    raise RuntimeError('This operation is not meant to be called directly.')
+
+
 def switch(cond, tb, fb):  # pragma: no cover
     """Switch statement, returns one of the two values."""
     raise RuntimeError('This operation is not meant to be called directly.')

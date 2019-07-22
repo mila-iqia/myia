@@ -16,7 +16,7 @@ from myia.abstract import ArrayWrapper
 from myia.compile import load_backend, LoadingError
 
 from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
-    ai32_of, af64_of, MA
+    ai32_of, af64_of, MA, D
 
 
 def test_myia():
@@ -80,6 +80,15 @@ def test_myia_return_struct():
 
     pt = f(5, 6)
     assert pt == Point(5, 6)
+
+
+def test_myia_dict_field():
+    @myia
+    def f(d):
+        return d['x']
+
+    v = f({'x': 2})
+    assert v == 2
 
 
 def test_convert_arg():
@@ -146,6 +155,14 @@ def test_convert_arg():
         _convert(10, ai64_of())
     with pytest.raises(TypeError):
         _convert(1, Bool)
+    with pytest.raises(TypeError):
+        _convert(1, D(x=i64))
+    with pytest.raises(TypeError):
+        _convert({'x': 2.0}, D(x=i64))
+    with pytest.raises(TypeError):
+        _convert({'x': 2.0, 'y': 1}, D(x=i64))
+    with pytest.raises(TypeError):
+        _convert({'y': 2.0}, D(x=i64))
 
 
 @pytest.fixture(params=[

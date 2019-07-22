@@ -25,6 +25,7 @@ from .data import (
     AbstractTuple,
     AbstractArray,
     AbstractList,
+    AbstractDict,
     AbstractClassBase,
     AbstractClass,
     AbstractADT,
@@ -417,6 +418,12 @@ def abstract_clone(self, x: AbstractTuple, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractList, *args):
     return (yield AbstractList)(self(x.element, *args), self(x.values, *args))
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: AbstractDict, *args):
+    return (yield AbstractDict)(dict((k, self(v, *args))
+                                     for k, v in x.entries.items()))
 
 
 @overload  # noqa: F811
