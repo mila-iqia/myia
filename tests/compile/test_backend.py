@@ -12,7 +12,7 @@ from myia.prim.py_implementations import distribute, scalar_to_array, dot, \
 from myia.api import to_device
 from myia import dtype
 
-from ..common import MA, MB
+from ..common import MA, MB, AA
 
 
 @pytest.fixture(params=[
@@ -239,7 +239,7 @@ def test_bool_eq(x, y):
 
 @parse_compare((2,))
 def test_to_array(x):
-    return scalar_to_array(x)
+    return scalar_to_array(x, AA)
 
 
 @parse_compare((False,), (True,))
@@ -249,12 +249,12 @@ def test_bool_not(x,):
 
 @parse_compare((2,))
 def test_distribute(x):
-    return distribute(scalar_to_array(x), (2, 3))
+    return distribute(scalar_to_array(x, AA), (2, 3))
 
 
 @parse_compare((2,))
 def test_distribute2(x):
-    return distribute(scalar_to_array(x), (1,))
+    return distribute(scalar_to_array(x, AA), (1,))
 
 
 @parse_compare(np.ones((1, 3)), np.ones((3,)))

@@ -32,7 +32,7 @@ from myia.utils import newenv
 from .common import B, \
     Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
-    to_abstract_test, EmptyTuple, U, Ex, Bot
+    to_abstract_test, EmptyTuple, U, Ex, Bot, AA
 
 
 ai64 = Array[i64]
@@ -1317,7 +1317,7 @@ def test_scalar_cast(x, t):
     ((i64,), InferenceError)
 )
 def test_scalar_to_array(x):
-    return scalar_to_array(x)
+    return scalar_to_array(x, AA)
 
 
 @infer(

@@ -16,7 +16,7 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
-from ..common import i64, f16, to_abstract_test, Point
+from ..common import i64, f16, to_abstract_test, Point, AA
 
 
 @parse_compare((2, 7), (4, -6))
@@ -337,10 +337,10 @@ def test_prim_switch():
 
 
 def test_scalar_to_array():
-    a = scalar_to_array(1)
+    a = scalar_to_array(1, AA)
     assert isinstance(a, np.ndarray)
     assert a.dtype == np.int64
-    b = scalar_to_array(1.5)
+    b = scalar_to_array(1.5, AA)
     assert isinstance(b, np.ndarray)
     assert b.dtype == np.float64
 

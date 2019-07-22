@@ -20,7 +20,7 @@ from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
 from myia.prim.py_implementations import py_registry as pyi
 from myia.validate import whitelist, validate_abstract
 
-from .common import f64, u64, MA, MB, to_abstract_test
+from .common import f64, u64, MA, MB, to_abstract_test, AA
 
 
 @dataclass
@@ -141,8 +141,7 @@ def _grad_test(fn, obj, args,
                pipeline=grad_pipeline,
                rel_error=1e-3):
     pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
-    argspec = tuple(from_value(arg, broaden=True)
-                    for arg in clean_args(args))
+    argspec = tuple(from_value(arg, broaden=True) for arg in clean_args(args))
     sens_type = to_abstract_test(sens_type)
     if isinstance(obj, FunctionType):
         res = pipeline.run(input=obj, argspec=[*argspec, sens_type])
@@ -426,8 +425,8 @@ def test_array_operations(xs, ys):
 
 @grad_test((3.1, 7.6),)
 def test_array_operations_distribute(x, y):
-    xs = distribute(scalar_to_array(x), (4, 3))
-    ys = distribute(scalar_to_array(y), (4, 3))
+    xs = distribute(scalar_to_array(x, AA), (4, 3))
+    ys = distribute(scalar_to_array(y, AA), (4, 3))
     div = array_map(scalar_div, xs, ys)
     sm = array_reduce(scalar_add, div, ())
     return array_to_scalar(sm)

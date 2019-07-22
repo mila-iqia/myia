@@ -1,7 +1,7 @@
 """Pre-made pipelines."""
 
 
-from ..abstract import Context
+from ..abstract import Context, AbstractArray
 from ..ir import GraphManager
 from ..prim import py_registry
 from ..abstract import abstract_inferrer_constructors
@@ -24,7 +24,8 @@ standard_resources = dict(
     inferrer=InferenceResource.partial(
         constructors=abstract_inferrer_constructors,
         context_class=Context,
-    )
+    ),
+    array_class=AbstractArray
 )
 
 

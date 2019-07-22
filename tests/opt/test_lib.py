@@ -8,7 +8,7 @@ from myia.prim.py_implementations import \
     list_setitem
 from myia.utils import newenv
 
-from ..common import to_abstract_test, i64, f64, af64_of
+from ..common import to_abstract_test, i64, f64, af64_of, AA
 
 from .test_opt import _check_opt
 
@@ -406,7 +406,7 @@ def test_simplify_array_map_4():
         return array_map(f, xs)
 
     def after(xs):
-        return distribute(scalar_to_array(3), (3, 5))
+        return distribute(scalar_to_array(3, AA), (3, 5))
 
     _check_opt(before, after,
                lib.simplify_array_map,
@@ -459,7 +459,7 @@ def test_unfuse_composite_constant():
     def after(x):
         def up1(x):
             return array_map(scalar_add, x,
-                             distribute(scalar_to_array(1), (2, 3)))
+                             distribute(scalar_to_array(1, AA), (2, 3)))
         return up1(x)
 
     _check_opt(before, after,

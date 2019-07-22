@@ -17,6 +17,7 @@ from myia.composite import ArithmeticData
 B = Bool
 Bot = AbstractBottom()
 EmptyTuple = typing.Tuple[()]
+AA = AbstractArray(ANYTHING, {SHAPE: ANYTHING})
 
 
 ###########################

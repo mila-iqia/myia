@@ -74,22 +74,24 @@ class Elemwise(MetaGraph):
 
     def generate_graph(self, args):
         """Generate the graph."""
-        sig = tuple(arg.values[SHAPE]
-                    if isinstance(arg, AbstractArray) else False
+        sig = tuple((type(arg), arg.values[SHAPE])
+                    if isinstance(arg, AbstractArray) else (None, False)
                     for arg in args)
         if sig not in self.cache:
             g = Graph()
             g.set_flags('core', 'reference')
             g.debug.name = self.mname
-            shapes = [x for x in sig if x is not False]
-
+            shapes = [x for _, x in sig if x is not False]
             is_array_op = len(shapes) > 0
+            if is_array_op:
+                array_types = [t for t, _ in sig if t is not None]
+                array_type = array_types[0](ANYTHING, {SHAPE: ANYTHING})
             params = []
             for i, arg in enumerate(args):
                 p = g.add_parameter()
                 p.debug.name = f'x{i + 1}'
                 if is_array_op and not isinstance(arg, AbstractArray):
-                    p = g.apply(to_array, p)
+                    p = g.apply(to_array, p, array_type)
                 params.append(p)
 
             if is_array_op:
@@ -426,9 +428,9 @@ def sum(x):
 
 
 @core
-def to_array(x):
+def to_array(x, t):
     """Implementation of `to_array`."""
-    return x.__myia_to_array__()
+    return x.__myia_to_array__(t)
 
 
 @core
@@ -557,6 +559,12 @@ def _bool_zero(_):
     return False
 
 
+@_leaf_zeros_like.register(Nil)
+@core
+def _nil_zero(_):
+    return None
+
+
 @_leaf_zeros_like.register(Number)
 @core
 def _scalar_zero(x):
@@ -567,7 +575,7 @@ def _scalar_zero(x):
 @core
 def _array_zero(xs):
     scalar_zero = scalar_cast(0, typeof(xs).element)
-    return distribute(to_array(scalar_zero), shape(xs))
+    return distribute(to_array(scalar_zero, typeof(xs)), shape(xs))
 
 
 zeros_like = HyperMap(
@@ -774,7 +782,7 @@ list_map = ListMap()
 def _cast_helper(x, model):
     t = typeof(model)
     if hastype(model, Array):
-        return scalar_to_array(scalar_cast(x, t.element))
+        return scalar_to_array(scalar_cast(x, t.element), typeof(model))
     else:
         return scalar_cast(x, t)
 

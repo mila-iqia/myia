@@ -9,8 +9,7 @@ from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
 from .utils import keyword_decorator, overload
 from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
-    AbstractList, AbstractClass, AbstractArray, AbstractScalar
-# TODO: AbstractUnion overload for _convert_arg_init
+    AbstractList, AbstractArray, AbstractScalar, AbstractClassBase
 from .compile.backends import load_backend, Backend
 
 
@@ -41,7 +40,7 @@ class MyiaFunction:
         self.pip = standard_pipeline.configure({
             'compile.backend': backend,
             'compile.backend_options': backend_options,
-            'wrap.return_backend': return_backend
+            'wrap.return_backend': return_backend,
         })
         self._cache = {}
 
@@ -60,7 +59,9 @@ class MyiaFunction:
             )
 
         argspec = tuple(
-            from_value(arg, broaden=name not in self.specialize_values)
+            from_value(
+                arg,
+                broaden=name not in self.specialize_values)
             for arg, name in zip(args, argnames)
         )
 
@@ -127,7 +128,7 @@ def _convert_arg_init(self, arg, orig_t: AbstractList, backend):
 
 
 @overload  # noqa: F811
-def _convert_arg_init(self, arg, orig_t: AbstractClass, backend):
+def _convert_arg_init(self, arg, orig_t: AbstractClassBase, backend):
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
     return orig_t.constructor(*(self(x, o, backend) for x, o in zip(arg, oe)))
@@ -140,27 +141,10 @@ def _convert_arg_init(self, arg, orig_t: AbstractArray, backend):
     et = et.values[TYPE]
     assert issubclass(et, dtype.Number)
     if isinstance(arg, np.ndarray):
-        arg = ArrayWrapper(backend.from_numpy(arg), arg.dtype, arg.shape)
-    backend.check_array(arg.array, et)
+        arg = ArrayWrapper(
+            backend.from_numpy(arg), arg.dtype, arg.shape, backend
+        )
     return arg
-
-
-"""
-TODO: AbstractUnion overload of _convert_arg_init().
-
-This overload will look similar to AbstractUnion overload
-from convert_arg() in myia/pipeline/steps.py
-
-AbstractUnion overload from convert_arg() at time of this commit:
-https://github.com/mila-iqia/myia/blob/
-c350b341f52d2d0e3dc1e5ab1d890103a45b60c9/
-myia/pipeline/steps.py#L528-L537
-
-Current AbstractUnion overload from convert_arg():
-(Note: might have been moved to different location of codebase
-since this comment was written/committed):
-https://github.com/mila-iqia/myia/blob/master/myia/pipeline/steps.py#L528-L537
-"""
 
 
 @overload  # noqa: F811
