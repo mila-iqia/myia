@@ -78,7 +78,7 @@ class TaggedPossibilities(list):
             raise KeyError(tag)
 
     def __hash__(self):
-        return hash(tuple(self))
+        return hash(tuple((i, t) for i, t in self))
 
 
 class Function:
