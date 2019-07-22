@@ -74,24 +74,24 @@ class Elemwise(MetaGraph):
 
     def generate_graph(self, args):
         """Generate the graph."""
-        sig = tuple(arg.values[SHAPE]
-                    if isinstance(arg, AbstractArray) else False
+        sig = tuple((type(arg), arg.values[SHAPE])
+                    if isinstance(arg, AbstractArray) else (None, False)
                     for arg in args)
         if sig not in self.cache:
             g = Graph()
             g.set_flags('core', 'reference')
             g.debug.name = self.mname
-            shapes = [x for x in sig if x is not False]
-
+            shapes = [x for _, x in sig if x is not False]
             is_array_op = len(shapes) > 0
+            if is_array_op:
+                array_types = [t for t, _ in sig if t is not None]
+                array_type = array_types[0](ANYTHING, {SHAPE: ANYTHING})
             params = []
             for i, arg in enumerate(args):
                 p = g.add_parameter()
                 p.debug.name = f'x{i + 1}'
                 if is_array_op and not isinstance(arg, AbstractArray):
-                    # XXX Get the right array class somewhere
-                    p = g.apply(to_array, p,
-                                AbstractArray(ANYTHING, {SHAPE: ANYTHING}))
+                    p = g.apply(to_array, p, array_type)
                 params.append(p)
 
             if is_array_op:
