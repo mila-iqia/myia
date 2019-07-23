@@ -416,7 +416,8 @@ def step_cconv(self, graph):
 ###############
 
 
-class CompileStep(PipelineStep):
+@pipeline_function
+def step_compile(self, graph, argspec, outspec):
     """Step to compile a graph to a configurable backend.
 
     Inputs:
@@ -426,25 +427,10 @@ class CompileStep(PipelineStep):
         output: a callable
 
     """
-
-    def __init__(self, pipeline_init, backend=None, backend_options=None):
-        """Initialize a CompileStep.
-
-        Arguments:
-            backend: (str) the name of the backend to use
-            backend_options: (dict) options for the backend
-
-        """
-        super().__init__(pipeline_init)
-        self.backend = load_backend(backend, backend_options)
-
-    def step(self, graph, argspec, outspec):
-        """Compile the set of graphs."""
-        out = self.backend.compile(graph, argspec, outspec, self.pipeline)
-        return {'output': out}
-
-
-step_compile = CompileStep.partial()
+    backend = self.pipeline.resources.backend
+    assert backend is not None, "Misconfigured pipeline (no backend)"
+    out = backend.compile(graph, argspec, outspec, self.pipeline)
+    return {'output': out}
 
 
 ############################

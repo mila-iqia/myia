@@ -37,11 +37,13 @@ class MyiaFunction:
         """Initialize a MyiaFunction."""
         self.fn = fn
         self.specialize_values = set(specialize_values)
+
         self.pip = standard_pipeline.configure({
-            'compile.backend': backend,
-            'compile.backend_options': backend_options,
-            'wrap.return_backend': return_backend,
+        pip = standard_pipeline.configure({
+            'wrap.return_backend': return_backend
         })
+        backend = load_backend(backend, backend_options)
+        self.pip = backend.configure(pip)
         self._cache = {}
 
     def specialize(self, args):

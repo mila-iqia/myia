@@ -36,11 +36,8 @@ class BackendOption:
             load_backend(backend)
         except LoadingError as e:
             pytest.skip(f"Can't load {backend}: {e.__cause__}")
-        self.pip = standard_pipeline.configure({
-            'compile.backend': backend,
-            'compile.backend_options': backend_options
-        }).make()
         self.backend = load_backend(backend, backend_options)
+        self.pip = self.backend.configure(standard_pipeline).make()
 
     def convert_args(self, args):
         return tuple(to_device(arg, self.backend) for arg in args)

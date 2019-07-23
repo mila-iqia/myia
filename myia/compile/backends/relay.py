@@ -386,3 +386,8 @@ class RelayBackend(Backend):
             raise RuntimeError("Array on wrong context.")
         if v.dtype != type_to_np_dtype(t):
             raise TypeError("Wrong dtype")
+
+    def configure(self, pip):
+        """Configure pipeline for relay."""
+        return pip.configure({'backend': self,
+                              'cconv': False})

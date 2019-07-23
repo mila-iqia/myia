@@ -1,10 +1,11 @@
 """Pre-made pipelines."""
 
 
-from ..abstract import Context, AbstractArray
+
+from ..abstract import abstract_inferrer_constructors, Context, AbstractArray
+from ..compile import load_backend
 from ..ir import GraphManager
 from ..prim import py_registry
-from ..abstract import abstract_inferrer_constructors
 from ..pipeline.resources import scalar_object_map, standard_object_map, \
     standard_method_map, default_convert, ConverterResource, \
     InferenceResource
@@ -25,7 +26,7 @@ standard_resources = dict(
         constructors=abstract_inferrer_constructors,
         context_class=Context,
     ),
-    array_class=AbstractArray
+    backend=None
 )
 
 
@@ -34,7 +35,7 @@ standard_resources = dict(
 ######################
 
 
-standard_pipeline = PipelineDefinition(
+_standard_pipeline = PipelineDefinition(
     resources=standard_resources,
     steps=dict(
         parse=steps.step_parse,
@@ -51,6 +52,9 @@ standard_pipeline = PipelineDefinition(
     )
 )
 
+_backend = load_backend(None)
+standard_pipeline = _backend.configure(_standard_pipeline)
+del _backend
 
 scalar_pipeline = standard_pipeline.configure({
     'convert.object_map': scalar_object_map,

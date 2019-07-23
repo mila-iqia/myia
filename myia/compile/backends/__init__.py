@@ -56,18 +56,26 @@ def get_default():
         pytorch?target=cuda:0
 
     """
-    backend, opts = parse_default()
-    assert backend is not None
+    backend, opts = parse_env()
+    if backend is None:
+        for backend in _backends.keys():
+            try:
+                return load_backend(backend)
+            except LoadingError:
+                pass
+        raise LoadingError("No backends available.")
     return load_backend(backend, opts)
 
 
-def parse_default():
-    """Parses the default backend.
+def parse_env():
+    """Parses the environement-specified backend (if any)
 
-    Returns name and options from the environement or builtin default.
-    See the documentation of get_default() for the backend string syntax.
+    Returns name and options from the environement. See the
+    documentation of get_default() for the backend string syntax.
     """
-    backend_spec = os.environ.get('MYIA_BACKEND', 'nnvm')
+    backend_spec = os.environ.get('MYIA_BACKEND', None)
+    if backend_spec is None:
+        return None, {}
     backend, *opts = backend_spec.split('?', maxsplit=1)
     if len(opts) == 1:
         opts = urllib.parse.parse_qs(opts[0], keep_blank_values=True,
@@ -185,3 +193,7 @@ class Backend:
         This must raise exceptions describing the problem encountered.
         """
         raise NotImplementedError('check_array')
+
+    def configure(self, pip):
+        """Configure the pipeline for the backend needs."""
+        return pip.configure({'backend': self})
