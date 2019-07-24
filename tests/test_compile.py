@@ -9,12 +9,16 @@ from myia.prim import ops as P
 from myia.prim.py_implementations import \
     typeof, scalar_add, partial, bool_and
 from myia.utils import no_prof, Profile
-
+from myia.compile import load_backend
 
 from .common import to_abstract_test
 
 
-compile_pipeline = standard_pipeline
+backend = load_backend(None)
+if backend.__class__.__name__ ==  'NumPyBackend':
+    pytest.skip("can't test compile with the numpy backend")
+
+compile_pipeline = backend.configure(standard_pipeline)
 
 debug_fn = standard_debug_pipeline \
     .select('parse', 'resolve', 'infer', 'specialize', 'export')

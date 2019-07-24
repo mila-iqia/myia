@@ -33,7 +33,7 @@ standard_resources = dict(
 ######################
 
 
-_standard_pipeline = PipelineDefinition(
+standard_pipeline = PipelineDefinition(
     resources=standard_resources,
     steps=dict(
         parse=steps.step_parse,
@@ -50,9 +50,6 @@ _standard_pipeline = PipelineDefinition(
     )
 )
 
-_backend = load_backend(None)
-standard_pipeline = _backend.configure(_standard_pipeline)
-del _backend
 
 scalar_pipeline = standard_pipeline.configure({
     'convert.object_map': scalar_object_map,

@@ -19,8 +19,12 @@ from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
     distribute, dot, reshape, transpose, scalar_cast
 from myia.prim.py_implementations import py_registry as pyi
 from myia.validate import whitelist, validate_abstract
+from myia.compile import load_backend
 
 from .common import f64, u64, MA, MB, to_abstract_test, AA
+
+backend = load_backend(None)
+standard_pipeline = backend.configure(standard_pipeline)
 
 
 @dataclass
@@ -235,11 +239,15 @@ def test_tuples(x, y):
     return z
 
 
+@pytest.mark.skipif(backend.__class__.__name__ == 'NumPyBackend',
+                    reason='numpy backend')
 @grad_test((Point(3.0, 5.0),), pipeline=standard_pipeline)
 def test_dataclass(pt):
     return pt.x * pt.y
 
 
+@pytest.mark.skipif(backend.__class__.__name__ == 'NumPyBackend',
+                    reason='numpy backend')
 @grad_test((Point(3.0, 5.0),), pipeline=standard_pipeline)
 def test_dataclass_2(pt):
     return pt.abs()
@@ -319,7 +327,8 @@ def test_fact(x):
             return n * fact(n - 1)
     return fact(x)
 
-
+@pytest.mark.skipif(backend.__class__.__name__ == 'NumPyBackend',
+                    reason='numpy backend')
 @grad_test((4.1,), pipeline=standard_pipeline)
 def test_fact_opt(x):
     def fact(n):
@@ -371,6 +380,8 @@ def test_list_while(xs):
     return y
 
 
+@pytest.mark.skipif(backend.__class__.__name__ == 'NumPyBackend',
+                    reason='numpy backend')
 @grad_test(([1.0, 2.0, 3.0, 4.0],), pipeline=standard_pipeline)
 def test_list_for(xs):
     y = 1

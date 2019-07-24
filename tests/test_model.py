@@ -1,4 +1,6 @@
 
+import pytest
+
 import numpy
 import typing
 from dataclasses import dataclass
@@ -6,11 +8,10 @@ from numpy import ones as _ones, zeros as _zeros
 from myia.dtype import Array
 from myia.abstract import InferenceError, from_value
 from myia.composite import grad
-from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import array_reduce, scalar_add
 
 from .test_compile import parse_compare
-from .test_grad import grad_test
+from .test_grad import grad_test, standard_pipeline, backend
 from .test_infer import infer_std, af64_of, af32_of
 from .common import MA, MB, MC, MD
 
@@ -121,6 +122,8 @@ def test_backward_infer(model, x, y):
     return grad(cost)(model, x, y)
 
 
+@pytest.mark.skipif(backend.__class__.__name__ == 'NumPyBackend',
+                    reason='numpy backend')
 @grad_test((make_model(), MC(3, 6), MD(3, 8)),
            pipeline=standard_pipeline,
            rel_error=1e-1)
