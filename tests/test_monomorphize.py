@@ -1,9 +1,8 @@
 
 import numpy as np
 from pytest import mark
-from dataclasses import dataclass
 
-from myia.dtype import Number, Nil
+from myia.dtype import Number
 from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.composite import list_map
@@ -14,7 +13,7 @@ from myia.prim.py_implementations import \
     hastype, partial, scalar_add, scalar_sub, tagged, \
     scalar_usub, scalar_uadd, switch, array_map, array_reduce, scalar_mul
 from myia.validate import ValidationError
-from myia.utils import overload, ADT
+from myia.utils import overload
 from myia.hypermap import hyper_map
 
 from .common import mysum, i64, f64, Point, U, to_abstract_test, \

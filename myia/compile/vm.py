@@ -306,7 +306,7 @@ class FinalVM:
         self._push(t[:idx] + (v,) + t[idx + 1:])
 
     def inst_tagged(self, x, tag):
-        """Create a TaggedValue
+        """Create a TaggedValue.
 
         Arguments:
            x: some object
