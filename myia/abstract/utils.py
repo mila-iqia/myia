@@ -832,8 +832,7 @@ def amerge(self, x1: AbstractClassBase, x2, forced, bp):
     args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
     args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
     merged = self(args1, args2, forced, bp)
-    if forced or merged is args1:  # pragma: no cover
-        # This used to be covered before the `x1 is x2` check in amerge
+    if forced or merged is args1:
         return x1
     return type(x1)(*merged)
 
@@ -843,8 +842,7 @@ def amerge(self, x1: AbstractJTagged, x2, forced, bp):
     args1 = x1.element
     args2 = x2.element
     merged = self(args1, args2, forced, bp)
-    if forced or merged is args1:  # pragma: no cover
-        # This used to be covered before the `x1 is x2` check in amerge
+    if forced or merged is args1:
         return x1
     return AbstractJTagged(merged)
 
@@ -872,9 +870,7 @@ def amerge(self, x1: (int, float, bool), x2, forced, bp):
 def amerge(self, x1: object, x2, forced, bp):
     if x1 != x2:
         raise TypeMismatchError(x1, x2)
-    else:  # pragma: no cover
-        # This used to be covered before the `x1 is x2` check in amerge
-        return x1
+    return x1
 
 
 def bind(loop, committed, resolved, pending):

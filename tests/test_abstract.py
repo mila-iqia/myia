@@ -11,7 +11,7 @@ from myia.abstract import (
     AbstractScalar, AbstractTuple as T, AbstractList as L,
     AbstractJTagged, AbstractError, AbstractFunction, AbstractUnion,
     AbstractTaggedUnion, InferenceLoop, to_abstract, build_value, amerge,
-    Possibilities, PendingFromList, TaggedPossibilities,
+    AbstractClass, Possibilities, PendingFromList, TaggedPossibilities,
     VALUE, TYPE, DEAD, find_coherent_result_sync,
     abstract_clone, broaden,
     Pending, type_to_abstract,
@@ -140,6 +140,20 @@ def test_merge_from_types():
     assert amerge(t2, a, forced=True) is t2
     with pytest.raises(MyiaTypeError):
         amerge(t3, a, forced=True)
+
+
+def test_merge_edge_cases():
+    a = {1, 2, 3}
+    b = {1, 2, 3}
+    assert amerge(a, b) is a
+
+    a = AbstractJTagged(ANYTHING)
+    b = AbstractJTagged(123)
+    assert amerge(a, b) is a
+
+    a = AbstractClass(object, {'x': ANYTHING, 'y': ANYTHING}, {})
+    b = AbstractClass(object, {'x': 123, 'y': ANYTHING}, {})
+    assert amerge(a, b) is a
 
 
 def test_repr():
