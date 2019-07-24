@@ -8,7 +8,7 @@ from operator import getitem
 
 from .. import dtype
 from ..abstract import typecheck
-from ..ir import Graph, GraphCloner, CloneRemapper
+from ..ir import Graph, GraphCloner, CloneRemapper, new_graph
 from ..dtype import Number, Bool, ExceptionType
 from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance
@@ -908,16 +908,19 @@ class _UserSwitchInferrer(Inferrer):
             # so that closures called in the branch also refer to the cast
             # version of x.
             branch_graph = branch_ref.node.value
-            cast = xg.apply(P.unsafe_static_cast, xref.node, branch_type)
+            if branch_graph not in xg.scope:
+                return branch_graph
+            rval = new_graph(branch_graph, relation='copy')
+            cast = rval.apply(P.unsafe_static_cast, xref.node, branch_type)
             cl = GraphCloner(
                 *xg.children,
                 total=False,
+                graph_repl={branch_graph: rval},
                 remapper_class=_CastRemapper.partial(
                     fv_replacements={xref.node: cast}
                 )
             )
-            rval = cl[branch_graph]
-            cast.graph = rval
+            assert rval is cl[branch_graph]
             engine.mng.add_graph(rval)
             return rval
 
