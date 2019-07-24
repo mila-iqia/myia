@@ -49,6 +49,11 @@ def simplify_types(root, manager):
       * getattr(data, attr) => getitem(data, idx)
       * make_record(cls, *args) => make_tuple(*args)
 
+    * Replace AbstractDict by AbstractTuple:
+      * Dict[x: t, ...] => Tuple[t, ...]
+      * dict_getitem(data, item) => getitem(data, idx)
+      * make_dict(cls, *args) => make_tuple(*args)
+
     * Replace AbstractUnion by AbstractTaggedUnion:
       * Union[a, b, c, ...] => TaggedUnion[1 => a, 2 => b, 3 => c, ...]
       * hastype(x, type) => hastag(x, tag)
