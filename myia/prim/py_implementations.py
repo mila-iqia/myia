@@ -7,7 +7,7 @@ import numpy as np
 import math
 
 from .. import dtype as types, abstract
-from ..dtype import Number, Float, Bool
+from ..dtype import Number, Float, Bool, pytype_to_myiatype
 from ..utils import Registry, TaggedValue
 
 from . import ops as primops
@@ -235,18 +235,29 @@ def bool_eq(x: Bool, y: Bool) -> Bool:
 @register(primops.typeof)
 def typeof(x):
     """Implement typeof."""
-    from ..abstract import from_value
-    return from_value(x, broaden=True)
+    return abstract.from_value(x, broaden=True)
 
 
 @register(primops.hastype)
 def hastype(x, t):
     """Implement `hastype`."""
-    from ..abstract import type_to_abstract, hastype_helper, ANYTHING
-    v = hastype_helper(typeof(x), type_to_abstract(t))
-    if v is ANYTHING:
-        raise AssertionError()
-    return v
+    from ..abstract import type_to_abstract, TYPE, AbstractScalar
+    tt = type_to_abstract(t)
+    if isinstance(tt, AbstractScalar):
+        try:
+            typ = pytype_to_myiatype(type(x))
+            return issubclass(typ, tt.values[TYPE])
+        except KeyError:
+            return False
+    else:
+        raise NotImplementedError(
+            'The Python implementation of hastype only support simple types.'
+        )
+        # from ..abstract import hastype_helper, ANYTHING
+        # v = hastype_helper(typeof(x), type_to_abstract(t))
+        # if v is ANYTHING:
+        #     raise AssertionError()
+        # return v
 
 
 @register(primops.make_tuple)
