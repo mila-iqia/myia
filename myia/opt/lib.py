@@ -734,7 +734,7 @@ def caller_is_marked(g, node, args):
 
 
 inline_trivial = make_inliner(inline_criterion=is_trivial_graph,
-                              check_recursive=False,
+                              check_recursive=True,
                               name='inline_trivial')
 
 inline_unique_uses = make_inliner(inline_criterion=is_unique_use,
