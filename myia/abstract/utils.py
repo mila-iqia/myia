@@ -35,6 +35,7 @@ from .data import (
     AbstractUnion,
     AbstractTaggedUnion,
     AbstractBottom,
+    AbstractError,
     TrackDict,
     PartialApplication,
     JTransformedFunction,
@@ -921,6 +922,16 @@ def amerge(self, x1: AbstractScalar, x2, forced, bp):
     if forced or values is x1.values:
         return x1
     return AbstractScalar(values)
+
+
+@overload  # noqa: F811
+def amerge(self, x1: AbstractError, x2, forced, bp):
+    e1 = x1.values[VALUE]
+    e2 = x2.values[VALUE]
+    e = self(e1, e2, forced, bp)
+    if forced or e is e1:
+        return x1
+    return AbstractError(e)
 
 
 @overload  # noqa: F811

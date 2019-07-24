@@ -101,6 +101,10 @@ def test_amerge():
     with pytest.raises(MyiaTypeError):
         print(amerge(p, ty.Number, forced=True, bind_pending=False))
 
+    assert amerge(AbstractError(DEAD),
+                  AbstractError(ANYTHING),
+                  forced=False) is AbstractError(ANYTHING)
+
 
 def test_merge_possibilities():
     a = Possibilities((1, 2))
