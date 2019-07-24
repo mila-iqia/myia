@@ -389,5 +389,4 @@ class RelayBackend(Backend):
 
     def configure(self, pip):
         """Configure pipeline for relay."""
-        return pip.configure({'backend': self,
-                              'cconv': False})
+        return pip.configure({'backend': self})

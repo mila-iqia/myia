@@ -34,4 +34,4 @@ class NumPyBackend(Backend):
     def configure(self, pip):
         from myia.pipeline.steps import step_debug_export
         return pip.insert_after('compile', export=step_debug_export) \
-                  .configure(compile=False)
+                  .configure(compile=False, backend=self)

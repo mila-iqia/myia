@@ -5,7 +5,7 @@ import numpy as np
 
 from myia.abstract import from_value
 from myia.compile.backends import load_backend, LoadingError, UnknownBackend, \
-    parse_default
+    parse_env
 from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import distribute, scalar_to_array, dot, \
     scalar_add, array_reduce, transpose
@@ -16,7 +16,7 @@ from ..common import MA, MB, AA
 
 
 @pytest.fixture(params=[
-    pytest.param(('numpy'), id='numpy-debug'),
+    pytest.param(('numpy', {}), id='numpy-debug'),
     pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
     pytest.param(('nnvm', {'target': 'cuda', 'device_id': 0}), id='nnvm-cuda',
                  marks=pytest.mark.gpu),
@@ -34,10 +34,9 @@ def backend_opt(request):
 class BackendOption:
     def __init__(self, backend, backend_options):
         try:
-            load_backend(backend)
+            self.backend = load_backend(backend, backend_options)
         except LoadingError as e:
             pytest.skip(f"Can't load {backend}: {e.__cause__}")
-        self.backend = load_backend(backend, backend_options)
         self.pip = self.backend.configure(standard_pipeline).make()
 
     def convert_args(self, args):
@@ -71,19 +70,19 @@ def parse_compare(*tests):
     return decorate
 
 
-def test_default_backend():
+def test_env_backend():
     import os
 
     before = os.environ.get('MYIA_BACKEND', None)
     try:
         os.environ['MYIA_BACKEND'] = 'pytorch'
-        assert parse_default() == ('pytorch', {})
+        assert parse_env() == ('pytorch', {})
 
         os.environ['MYIA_BACKEND'] = 'pytorch?target=cpu'
-        assert parse_default() == ('pytorch', {'target': 'cpu'})
+        assert parse_env() == ('pytorch', {'target': 'cpu'})
 
         os.environ['MYIA_BACKEND'] = 'relay?target=cpu&device_id=0'
-        assert parse_default() == ('relay', {'target': 'cpu',
+        assert parse_env() == ('relay', {'target': 'cpu',
                                              'device_id': '0'})
     finally:
         # Make sure we don't switch the default for other tests.
@@ -114,7 +113,9 @@ def test_backend_error():
 
 
 def test_dlpack(backend_opt):
-    backend = backend_opt.pip.steps.compile.backend
+    backend = backend_opt.backend
+    if backend.__class__.__name__ == 'NumPyBackend':
+        pytest.skip('No support for dlpack in numpy')
     v = MA(4, 3)
     nv = backend.from_numpy(v)
     dv = backend.to_dlpack(nv)
@@ -124,9 +125,9 @@ def test_dlpack(backend_opt):
 
 
 def test_check_array_errors(backend_opt):
-    backend = backend_opt.pip.steps.compile.backend
+    backend = backend_opt.backend
     with pytest.raises(Exception):
-        backend.check_array(MA(1, 2), dtype.Float[64])
+        backend.check_array([1.0, 2.0, 3.0], dtype.Float[64])
 
     bv = backend.from_numpy(MA(1, 2))
     with pytest.raises(Exception):

@@ -9,7 +9,7 @@ from myia.abstract import InferenceError
 from myia.ir import clone
 from myia.pipeline import \
     scalar_parse as parse, scalar_debug_compile as compile
-from myia.pipeline.steps import convert_arg, convert_result, NumpyChecker
+from myia.pipeline.steps import convert_arg, convert_result
 from myia.prim.py_implementations import tuple_getitem
 from myia.utils import newenv
 from myia.abstract import ArrayWrapper
@@ -84,7 +84,7 @@ def test_myia_return_struct():
 
 def test_convert_arg():
 
-    backend = NumpyChecker()
+    backend = load_backend('numpy')
 
     def _convert(data, typ):
         return convert_arg(data, to_abstract_test(typ), backend)
@@ -158,7 +158,7 @@ def _return_backend(request):
 
 def test_convert_result(_return_backend):
 
-    backend = NumpyChecker()
+    backend = load_backend('numpy')
 
     def _convert(data, typ1, typ2):
         return convert_result(data,
