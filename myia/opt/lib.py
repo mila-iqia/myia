@@ -204,6 +204,40 @@ lmadd_setitem_zero = psub(
 )
 
 
+###########################
+# hyper_add optimizations #
+###########################
+
+
+_hadd = M(hyper_add)
+_hzlk = M(zeros_like)
+
+
+hadd_zero_l = psub(
+    pattern=(_hadd, (_hzlk, X), Y),
+    replacement=Y,
+    name='hadd_zero_l'
+)
+
+
+hadd_zero_r = psub(
+    pattern=(_hadd, Y, (_hzlk, X)),
+    replacement=Y,
+    name='hadd_zero_r'
+)
+
+
+hadd_switch = psub(
+    pattern=(_hadd,
+             (P.switch, Y, X1, X2),
+             (P.switch, Y, X3, X4)),
+    replacement=(P.switch, Y,
+                 (hyper_add, X1, X3),
+                 (hyper_add, X2, X4)),
+    name='hadd_switch'
+)
+
+
 ##############################
 # Arithmetic simplifications #
 ##############################
