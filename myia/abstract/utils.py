@@ -8,7 +8,8 @@ from itertools import chain
 from types import GeneratorType
 
 from .. import dtype
-from ..utils import overload, is_dataclass_type, dataclass_methods, intern
+from ..utils import overload, is_dataclass_type, dataclass_methods, intern, \
+    ADT
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
@@ -142,7 +143,10 @@ def type_to_abstract(self, t: type):
                       if isinstance(field.type, (str, type(None)))
                       else self(field.type)
                       for name, field in fields.items()}
-        return AbstractClass(t, attributes, dataclass_methods(t))
+        if issubclass(t, ADT):
+            return AbstractADT(t, attributes, dataclass_methods(t))
+        else:
+            return AbstractClass(t, attributes, dataclass_methods(t))
 
     elif t is object:
         return ANYTHING
