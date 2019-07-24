@@ -569,7 +569,7 @@ def broaden(self, d: TrackDict, *args):
 @_is_broad.variant(
     initial_state=lambda: CheckState(cache={}, prop=None)
 )
-def _is_tentative(self, x: Possibilities, loop):
+def _is_tentative(self, x: (Possibilities, TaggedPossibilities), loop):
     return False
 
 
@@ -592,8 +592,12 @@ def tentative(self, p: Possibilities, loop):
         d: The abstract data to clone.
         loop: The InferenceLoop, used to broaden Possibilities.
     """
-    bp = Possibilities([self(v, loop) for v in p])
-    return loop.create_pending_tentative(tentative=bp)
+    return loop.create_pending_tentative(tentative=p)
+
+
+@overload  # noqa: F811
+def tentative(self, p: TaggedPossibilities, loop):
+    return loop.create_pending_tentative(tentative=p)
 
 
 ###############
