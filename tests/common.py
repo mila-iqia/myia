@@ -259,6 +259,16 @@ def sumtree(t):
         return sumtree(t.left) + sumtree(t.right)
 
 
+def reducetree(fn, t, init):
+    if hastype(t, Number):
+        return t
+    elif hastype(t, Nil):
+        return init
+    else:
+        return fn(reducetree(fn, t.left, init),
+                  reducetree(fn, t.right, init))
+
+
 ###################
 # MultitypeGraphs #
 ###################

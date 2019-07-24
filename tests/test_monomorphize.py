@@ -12,13 +12,13 @@ from myia.debug.traceback import print_inference_error
 from myia.abstract import InferenceError
 from myia.prim.py_implementations import \
     hastype, partial, scalar_add, scalar_sub, tagged, \
-    scalar_usub, scalar_uadd, switch, array_map, array_reduce
+    scalar_usub, scalar_uadd, switch, array_map, array_reduce, scalar_mul
 from myia.validate import ValidationError
 from myia.utils import overload, ADT
 from myia.hypermap import hyper_map
 
 from .common import mysum, i64, f64, Point, U, to_abstract_test, \
-    make_tree, countdown, sumtree
+    make_tree, countdown, sumtree, reducetree
 
 
 specialize_pipeline = scalar_debug_pipeline \
@@ -566,3 +566,11 @@ def test_hyper_map_ct(x):
 )
 def test_sumtree(t):
     return sumtree(t)
+
+
+@specialize(
+    (make_tree(3, 1),),
+    (countdown(10),)
+)
+def test_reducetree(t):
+    return reducetree(scalar_mul, t, 1)
