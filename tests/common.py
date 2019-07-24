@@ -8,10 +8,12 @@ from myia.abstract import VALUE, TYPE, SHAPE, \
     AbstractList, AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged, AbstractUnion, AbstractExternal, ANYTHING, from_value, \
     AbstractBottom, AbstractTaggedUnion
-from myia.dtype import Bool, i16, i32, i64, u64, f16, f32, f64
+from myia.dtype import Bool, i16, i32, i64, u64, f16, f32, f64, Number, Nil
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance, dataclass_methods
+from myia.prim.py_implementations import hastype, tagged
 from myia.composite import ArithmeticData
+from myia.utils import ADT
 
 
 B = Bool
@@ -211,6 +213,55 @@ class Point3D(ArithmeticData):
 
 Thing_f = from_value(Thing(1.0), broaden=True)
 Thing_ftup = from_value(Thing((1.0, 2.0)), broaden=True)
+
+
+########
+# ADTs #
+########
+
+
+@dataclass(frozen=True)
+class Pair(ADT):
+    left: object
+    right: object
+
+
+def make_tree(depth, x):
+    if depth == 0:
+        return tagged(x)
+    else:
+        return tagged(
+            Pair(
+                make_tree(depth - 1, x * 2),
+                make_tree(depth - 1, x * 2 + 1)
+            )
+        )
+
+
+def countdown(n):
+    if n == 0:
+        return tagged(None)
+    else:
+        return tagged(
+            Pair(
+                n,
+                countdown(n - 1)
+            )
+        )
+
+
+def sumtree(t):
+    if hastype(t, Number):
+        return t
+    elif hastype(t, Nil):
+        return 0
+    else:
+        return sumtree(t.left) + sumtree(t.right)
+
+
+###################
+# MultitypeGraphs #
+###################
 
 
 mysum = MultitypeGraph('mysum')

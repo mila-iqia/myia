@@ -7,11 +7,11 @@ from myia.abstract import from_value
 from myia.pipeline import standard_pipeline
 from myia.prim import ops as P
 from myia.prim.py_implementations import \
-    typeof, scalar_add, partial, bool_and
+    typeof, scalar_add, partial, bool_and, tagged
 from myia.utils import no_prof, Profile
 
 
-from .common import to_abstract_test
+from .common import to_abstract_test, make_tree, sumtree, Point
 
 
 compile_pipeline = standard_pipeline
@@ -184,3 +184,23 @@ def test_is_(x):
                (42,))
 def test_is_not(x):
     return x is not None
+
+
+@parse_compare((make_tree(3, 1),))
+def test_sumtree(t):
+    return sumtree(t)
+
+
+@parse_compare(
+    (1, 1.7, Point(3, 4), (8, 9)),
+    (0, 1.7, Point(3, 4), (8, 9)),
+    (-1, 1.7, Point(3, 4), (8, 9)),
+    justeq=True
+)
+def test_tagged(c, x, y, z):
+    if c > 0:
+        return tagged(x)
+    elif c == 0:
+        return tagged(y)
+    else:
+        return tagged(z)
