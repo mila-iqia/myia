@@ -142,7 +142,7 @@ def _bfs(obj):
             queue.extend(key.values)
 
 
-def hashrec(obj, n=100):
+def hashrec(obj, n=10):
     """Hash a (possibly self-referential) object.
 
     This explores the object breadth-first and uses the first n elements

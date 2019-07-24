@@ -66,7 +66,7 @@ class Elemwise(MetaGraph):
         self.infer_value = infer_value
         self.cache = {}
 
-    def normalize_args(self, args):
+    def normalize_args_sync(self, args):
         """If infer_value is False, return broadened arguments."""
         if not self.infer_value:
             args = tuple(broaden(a) for a in args)
@@ -599,7 +599,7 @@ class IsCompare(MetaGraph):
         """
         self.do_not = do_not
 
-    def normalize_args(self, args):
+    def normalize_args_sync(self, args):
         """Return broadened arguments."""
         return tuple(broaden(a) for a in args)
 

@@ -55,7 +55,7 @@ class HyperMap(MetaGraph):
         self.broadcast = broadcast
         self.nonleaf = nonleaf
 
-    def normalize_args(self, args):
+    def normalize_args_sync(self, args):
         """Return broadened arguments."""
         return tuple(broaden(a) for a in args)
 
