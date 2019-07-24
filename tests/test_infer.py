@@ -7,7 +7,7 @@ from typing import List, Tuple
 from types import SimpleNamespace
 
 from myia import abstract
-from myia.abstract import concretize_abstract
+from myia.abstract import concretize_abstract, from_value
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import hyper_add, zeros_like, grad, list_map, tail
@@ -33,7 +33,8 @@ from myia.utils import newenv
 from .common import B, \
     Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
-    to_abstract_test, EmptyTuple, U, D, TU, Ex, Bot, AA
+    to_abstract_test, EmptyTuple, U, D, TU, Ex, Bot, AA, \
+    make_tree, countdown, Pair
 
 
 ai64 = Array[i64]
@@ -1911,6 +1912,24 @@ def test_tagged_more(c, x, y, z):
 @infer((i64, InferenceError))
 def test_tagged_too_many_arguments(x):
     return tagged(x, 1, 2)
+
+
+pair_t1 = from_value(Pair(Pair(1, 2), Pair(2, 3)))
+pair_t1_u = pair_t1.attributes['left']
+
+
+@infer((i64, pair_t1_u))
+def test_tagged_adt(depth):
+    return make_tree(depth, 1)
+
+
+pair_t2 = from_value(Pair(1, Pair(2, Pair(3, None))))
+pair_t2_u = pair_t2.attributes['right']
+
+
+@infer((i64, pair_t2_u))
+def test_tagged_adt_2(depth):
+    return countdown(depth)
 
 
 @infer(
