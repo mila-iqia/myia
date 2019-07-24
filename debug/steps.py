@@ -5,7 +5,7 @@ from myia.pipeline.steps import (
     step_resolve as resolve,
     step_infer as infer,
     step_specialize as specialize,
-    step_erase_class as erase_class,
+    step_simplify_types as simplify_types,
     step_opt as opt,
     step_debug_opt as debug_opt,
     step_opt2 as opt2,
@@ -16,19 +16,19 @@ from myia.pipeline.steps import (
 
 standard = [
     parse, resolve, infer, specialize,
-    erase_class, opt, opt2, validate, cconv, export
+    simplify_types, opt, opt2, validate, cconv, export
 ]
 
 _debug_opt = [
     parse, resolve, infer, specialize,
-    erase_class, debug_opt, opt2, validate, cconv, export
+    simplify_types, debug_opt, opt2, validate, cconv, export
 ]
 
 _bang_parse = standard[:standard.index(parse) + 1]
 _bang_resolve = standard[:standard.index(resolve) + 1]
 _bang_infer = standard[:standard.index(infer) + 1]
 _bang_specialize = standard[:standard.index(specialize) + 1]
-_bang_erase_class = standard[:standard.index(erase_class) + 1]
+_bang_simplify_types = standard[:standard.index(simplify_types) + 1]
 _bang_opt = standard[:standard.index(opt) + 1]
 _bang_opt2 = standard[:standard.index(opt2) + 1]
 _bang_validate = standard[:standard.index(validate) + 1]

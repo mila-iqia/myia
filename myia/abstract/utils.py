@@ -17,6 +17,7 @@ from .data import (
     ABSENT,
     ANYTHING,
     Possibilities,
+    TaggedPossibilities,
     AbstractAtom,
     AbstractStructure,
     AbstractValue,
@@ -31,6 +32,7 @@ from .data import (
     AbstractADT,
     AbstractJTagged,
     AbstractUnion,
+    AbstractTaggedUnion,
     AbstractBottom,
     TrackDict,
     PartialApplication,
@@ -302,6 +304,16 @@ def abstract_check(self, x: Possibilities, *args):
 
 
 @overload  # noqa: F811
+def abstract_check(self, x: AbstractTaggedUnion, *args):
+    return self(x.options, *args)
+
+
+@overload  # noqa: F811
+def abstract_check(self, x: TaggedPossibilities, *args):
+    return all(self(v, *args) for _, v in x)
+
+
+@overload  # noqa: F811
 def abstract_check(self, t: PartialApplication, *args):
     return self(t.fn, *args) and all(self(v, *args) for v in t.args)
 
@@ -448,6 +460,11 @@ def abstract_clone(self, x: AbstractUnion, *args):
 
 
 @overload  # noqa: F811
+def abstract_clone(self, x: AbstractTaggedUnion, *args):
+    return (yield AbstractTaggedUnion)(self(x.options, *args))
+
+
+@overload  # noqa: F811
 def abstract_clone(self, x: AbstractJTagged, *args):
     return (yield AbstractJTagged)(self(x.element, *args))
 
@@ -455,6 +472,11 @@ def abstract_clone(self, x: AbstractJTagged, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: Possibilities, *args):
     return Possibilities([self(v, *args) for v in x])
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: TaggedPossibilities, *args):
+    return TaggedPossibilities([[i, self(v, *args)] for i, v in x])
 
 
 @overload  # noqa: F811
@@ -681,10 +703,35 @@ def amerge(x1: Possibilities, x2, loop, forced, bp):
         return x1
     if forced:
         raise MyiaTypeError(
-            'Additional possibilities cannot be merged.'
+            'Additional Possibilities cannot be merged.'
         )
     else:
         return Possibilities(x1 + x2)
+
+
+@overload  # noqa: F811
+def amerge(x1: TaggedPossibilities, x2, loop, forced, bp):
+    d1 = dict(x1)
+    d2 = dict(x2)
+    results = {}
+    for i, t in d1.items():
+        if i in d2:
+            t = amerge(t, d2[i], loop, forced, bp)
+        results[i] = t
+    for i, t in d2.items():
+        if i not in d1:
+            results[i] = t
+    res = TaggedPossibilities(results.items())
+    if res == x1:
+        return x1
+    elif forced:
+        raise MyiaTypeError(
+            'Additional TaggedPossibilities cannot be merged.'
+        )
+    elif res == x2:
+        return x2
+    else:
+        return res
 
 
 @overload  # noqa: F811
@@ -790,6 +837,16 @@ def amerge(x1: AbstractJTagged, x2, loop, forced, bp):
     if forced or merged is args1:
         return x1
     return AbstractJTagged(merged)
+
+
+@overload  # noqa: F811
+def amerge(x1: (AbstractUnion, AbstractTaggedUnion), x2, loop, forced, bp):
+    args1 = x1.options
+    args2 = x2.options
+    merged = amerge(args1, args2, loop, forced, bp)
+    if forced or merged is args1:
+        return x1
+    return type(x1)(merged)
 
 
 @overload  # noqa: F811

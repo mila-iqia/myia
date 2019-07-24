@@ -1,10 +1,8 @@
 
 import numpy as np
 from pytest import mark
-from dataclasses import dataclass
 
-from myia import abstract as a, dtype
-from myia.dtype import Number, Nil
+from myia.dtype import Number
 from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.composite import list_map
@@ -12,17 +10,18 @@ from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
 from myia.abstract import InferenceError
 from myia.prim.py_implementations import \
-    hastype, partial, scalar_add, scalar_sub, \
-    scalar_usub, scalar_uadd, switch, array_map, array_reduce
+    hastype, partial, scalar_add, scalar_sub, tagged, \
+    scalar_usub, scalar_uadd, switch, array_map, array_reduce, scalar_mul
 from myia.validate import ValidationError
-from myia.utils import overload, ADT
+from myia.utils import overload
 from myia.hypermap import hyper_map
 
-from .common import mysum, i64, f64, Point
+from .common import mysum, i64, f64, Point, U, to_abstract_test, \
+    make_tree, countdown, sumtree, reducetree
 
 
 specialize_pipeline = scalar_debug_pipeline \
-    .select('parse', 'infer', 'specialize', 'erase_class',
+    .select('parse', 'infer', 'specialize', 'simplify_types',
             'opt2', 'validate', 'export', 'wrap') \
     .configure({
         'opt2.phases.main': [],
@@ -30,7 +29,7 @@ specialize_pipeline = scalar_debug_pipeline \
 
 
 specialize_pipeline_std = standard_debug_pipeline \
-    .select('parse', 'infer', 'specialize', 'erase_class',
+    .select('parse', 'infer', 'specialize', 'simplify_types',
             'opt', 'opt2', 'validate', 'export', 'wrap')
 
 
@@ -65,7 +64,7 @@ def specializer_decorator(pipeline):
                     argspec = tuple(from_value(arg, broaden=True)
                                     for arg in args)
                 else:
-                    argspec = abstract
+                    argspec = tuple(to_abstract_test(a) for a in abstract)
 
                 if exc is not None:
                     try:
@@ -488,26 +487,62 @@ def test_partial_outside_scope(x, y):
     return g(x)(y)
 
 
-abs_i64 = a.AbstractScalar({a.VALUE: a.ANYTHING, a.TYPE: dtype.Int[64]})
-
-
-_union_type = a.AbstractUnion([
-    abs_i64,
-    a.AbstractList(abs_i64)
-])
-
-
-@specialize_no_validate(
+@specialize(
     (int1,),
     ([int1, int2],),
     TypeError((int1, int2),),
-    abstract=(_union_type,)
+    abstract=(U(i64, [i64]),)
 )
 def test_union(x):
     if hastype(x, i64):
         return x
     else:
         return x[0]
+
+
+@specialize(
+    (int1, int2),
+    ([int1, int2], int1),
+    TypeError((int1, int2), int1),
+    abstract=(U(i64, f64, [i64]), i64)
+)
+def test_union_nested(x, y):
+    if hastype(x, i64):
+        return x
+    elif hastype(x, f64):
+        return y
+    else:
+        return x[0]
+
+
+@specialize(
+    (int1, int2),
+    ([int1, int2], int1),
+    TypeError((int1, int2), int1),
+    abstract=(U(i64, f64, [i64]), i64)
+)
+def test_union_nested_2(x, y):
+    if hastype(x, Number):
+        if hastype(x, i64):
+            return x
+        else:
+            return y
+    else:
+        return x[0]
+
+
+@specialize(
+    (1, fp1, pt1, (int1, int2)),
+    (0, fp1, pt1, (int1, int2)),
+    (-1, fp1, pt1, (int1, int2)),
+)
+def test_tagged(c, x, y, z):
+    if c > 0:
+        return tagged(x)
+    elif c == 0:
+        return tagged(y)
+    else:
+        return tagged(z)
 
 
 @specialize(
@@ -524,37 +559,17 @@ def test_hyper_map_ct(x):
     return hyper_map(scalar_add, x, 1)
 
 
-@dataclass(frozen=True)
-class Pair(ADT):
-    left: object
-    right: object
-
-
-def tree(depth, x):
-    if depth == 0:
-        return x
-    else:
-        return Pair(tree(depth - 1, x * 2),
-                    tree(depth - 1, x * 2 + 1))
-
-
-def countdown(n):
-    if n == 0:
-        return None
-    else:
-        return Pair(n, countdown(n - 1))
-
-
-@specialize_no_validate(
-    (tree(3, 1),),
+@specialize(
+    (make_tree(3, 1),),
     (countdown(10),)
 )
 def test_sumtree(t):
-    def sumtree(t):
-        if hastype(t, Number):
-            return t
-        elif hastype(t, Nil):
-            return 0
-        else:
-            return sumtree(t.left) + sumtree(t.right)
     return sumtree(t)
+
+
+@specialize(
+    (make_tree(3, 1),),
+    (countdown(10),)
+)
+def test_reducetree(t):
+    return reducetree(scalar_mul, t, 1)

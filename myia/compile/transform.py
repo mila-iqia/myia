@@ -74,7 +74,8 @@ def wrap_primitives(graph):
 nonlinear_ops = (
     P.return_, P.partial, P.switch, P.make_tuple, P.make_list,
     P.list_len, P.list_getitem, P.list_setitem, P.list_append, P.bool_and,
-    P.tuple_getitem, P.tuple_setitem, P.env_getitem, P.env_setitem, P.env_add
+    P.tuple_getitem, P.tuple_setitem, P.env_getitem, P.env_setitem, P.env_add,
+    P.tagged, P.hastag, P.casttag,
 )
 
 
@@ -277,6 +278,18 @@ class CompileGraph:
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]),
                                        self.ref(split.inputs[3]))
+                    elif fn.value == P.tagged:
+                        self.add_instr('tagged',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]))
+                    elif fn.value == P.hastag:
+                        self.add_instr('hastag',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]))
+                    elif fn.value == P.casttag:
+                        self.add_instr('casttag',
+                                       self.ref(split.inputs[1]),
+                                       self.ref(split.inputs[2]))
                     elif fn.value == P.env_getitem:
                         self.add_instr('env_getitem',
                                        self.ref(split.inputs[1]),

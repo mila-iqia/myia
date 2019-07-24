@@ -2,7 +2,8 @@
 
 from copy import copy
 
-from myia import dtype
+from .. import dtype
+from ..utils import TaggedValue
 
 
 class struct_partial:
@@ -292,7 +293,7 @@ class FinalVM:
     def inst_tuple_setitem(self, t, idx, v):  # pragma: no cover
         """Set an item in a tuple.
 
-        Arguemnts:
+        Arguments:
            t: tuple
            idx: index
            v: value to set
@@ -303,6 +304,40 @@ class FinalVM:
         idx = self.backend.to_scalar(self._ref(idx))
         v = self._ref(v)
         self._push(t[:idx] + (v,) + t[idx + 1:])
+
+    def inst_tagged(self, x, tag):
+        """Create a TaggedValue.
+
+        Arguments:
+           x: some object
+           tag: the tag
+        """
+        x = self._ref(x)
+        tag = self.backend.to_scalar(self._ref(tag))
+        self._push(TaggedValue(tag, x))
+
+    def inst_hastag(self, x, tag):
+        """Check if a TaggedValue has the given tag.
+
+        Arguments:
+           x: TaggedValue
+           tag: the tag
+        """
+        x = self._ref(x)
+        tag = self.backend.to_scalar(self._ref(tag))
+        res = self.backend.from_scalar(x.has(tag), dtype.Bool)
+        self._push(res)
+
+    def inst_casttag(self, x, tag):
+        """Extract the value of a TaggedValue.
+
+        Arguments:
+           x: TaggedValue
+           tag: the expected tag
+        """
+        x = self._ref(x)
+        tag = self.backend.to_scalar(self._ref(tag))
+        self._push(x.cast(tag))
 
     def inst_env_getitem(self, env, idx, default):
         """Get an item from a grad environment."""

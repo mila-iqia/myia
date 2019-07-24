@@ -19,6 +19,24 @@ class ADT:
     """Base class for an algebraic data type."""
 
 
+class TaggedValue:
+    """Represents a tagged value for a TaggedUnion."""
+
+    def __init__(self, tag, value):
+        """Initialize a TaggedValue."""
+        self.tag = tag
+        self.value = value
+
+    def has(self, tag):
+        """Return whether this TaggedValue has the given tag."""
+        return tag == self.tag
+
+    def cast(self, tag):
+        """Cast this TaggedValue to its value if the correct tag is given."""
+        assert self.has(tag)
+        return self.value
+
+
 class Named:
     """A named object.
 

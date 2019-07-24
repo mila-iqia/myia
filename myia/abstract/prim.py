@@ -27,6 +27,8 @@ from .data import (
     AbstractClassBase,
     AbstractJTagged,
     AbstractBottom,
+    AbstractUnion,
+    AbstractTaggedUnion,
     PartialApplication,
     JTransformedFunction,
     PrimitiveFunction,
@@ -35,7 +37,8 @@ from .data import (
     DummyFunction,
     VALUE, TYPE, SHAPE,
     MyiaTypeError, InferenceError, MyiaShapeError, check_nargs,
-    infer_trace
+    infer_trace,
+    type_error_nargs,
 )
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context
@@ -1152,6 +1155,46 @@ async def _inf_env_add(self, engine, env1, env2):
 @standard_prim(P.unsafe_static_cast)
 async def _inf_unsafe_static_cast(self, engine, x, typ: AbstractType):
     return typ.values[VALUE]
+
+
+@standard_prim(P.tagged)
+async def _inf_tagged(self, engine, x, *rest):
+    if len(rest) == 0:
+        return AbstractUnion([broaden(x, engine.loop)])
+    elif len(rest) == 1:
+        tag, = rest
+        tag_v = self.require_constant(tag, argnum=2)
+        return AbstractTaggedUnion([[tag_v, broaden(x, engine.loop)]])
+    else:
+        raise type_error_nargs(P.tagged, "1 or 2", len(rest) + 1)
+
+
+@standard_prim(P.hastag)
+async def _inf_hastag(self, engine,
+                      x: AbstractTaggedUnion, tag: dtype.Int[64]):
+    opts = await force_pending(x.options)
+    self.require_constant(
+        tag, argnum=2,
+        range={i for i, _ in opts}
+    )
+    return AbstractScalar({
+        VALUE: ANYTHING,
+        TYPE: dtype.Bool,
+    })
+
+
+@standard_prim(P.casttag)
+async def _inf_casttag(self, engine,
+                       x: AbstractTaggedUnion, tag: dtype.Int[64]):
+    opts = await force_pending(x.options)
+    tag_v = self.require_constant(
+        tag, argnum=2,
+        range={i for i, _ in opts}
+    )
+    for i, typ in opts:
+        if i == tag_v:
+            return typ
+    raise AssertionError('Unreachable')
 
 
 @standard_prim(P.J)

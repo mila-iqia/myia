@@ -8,7 +8,7 @@ import math
 
 from .. import dtype as types, abstract
 from ..dtype import Number, Float, Bool
-from ..utils import Registry
+from ..utils import Registry, TaggedValue
 
 from . import ops as primops
 
@@ -685,3 +685,24 @@ def env_add(env1, env2):
 def unsafe_static_cast(x, t):  # pragma: no cover
     """Implement `unsafe_static_cast`."""
     return x  # pragma: no cover
+
+
+@register(primops.hastag)
+def hastag(x, tag):
+    """Implement `hastag`."""
+    return x.has(tag)
+
+
+@register(primops.casttag)
+def casttag(x, tag):
+    """Implement `casttag`."""
+    return x.cast(tag)
+
+
+@register(primops.tagged)
+def tagged(x, tag=None):
+    """Implement `tagged`."""
+    if tag is None:
+        return x
+    else:
+        return TaggedValue(tag, x)

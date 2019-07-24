@@ -115,6 +115,9 @@ whitelist = frozenset({
     # P.J,
     # P.Jinv,
     P.scalar_cast,
+    P.hastag,
+    P.casttag,
+    P.tagged,
 })
 
 

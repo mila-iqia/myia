@@ -10,8 +10,8 @@ from myia.abstract import (
     ANYTHING, MyiaTypeError,
     AbstractScalar, AbstractTuple as T, AbstractList as L,
     AbstractJTagged, AbstractError, AbstractFunction, AbstractUnion,
-    InferenceLoop, to_abstract, build_value, amerge,
-    Possibilities, PendingFromList,
+    AbstractTaggedUnion, InferenceLoop, to_abstract, build_value, amerge,
+    Possibilities, PendingFromList, TaggedPossibilities,
     VALUE, TYPE, DEAD, find_coherent_result_sync,
     abstract_clone, broaden,
     Pending, type_to_abstract,
@@ -55,6 +55,15 @@ def test_build_value():
 
     pt = Point(1, 2)
     assert build_value(to_abstract_test(pt)) == pt
+
+
+def test_tagged_possibilities():
+    abc = TaggedPossibilities([[1, 'a'], [2, 'b'], [3, 'c']])
+    cab = TaggedPossibilities([[3, 'c'], [1, 'a'], [2, 'b']])
+    assert abc == cab
+    assert abc.get(1) == 'a'
+    with pytest.raises(KeyError):
+        abc.get(4)
 
 
 def test_amerge():
@@ -110,6 +119,25 @@ def test_merge_possibilities():
     assert amerge(a, c, loop=None, forced=True) is a
 
 
+def test_merge_tagged_possibilities():
+    abc = TaggedPossibilities([[1, 'a'], [2, 'b'], [3, 'c']])
+    ab = TaggedPossibilities([[1, 'a'], [2, 'b']])
+    bc = TaggedPossibilities([[2, 'b'], [3, 'c']])
+    b = TaggedPossibilities([[2, 'b']])
+    assert amerge(ab, bc,
+                  loop=None,
+                  forced=False) == abc
+    assert amerge(ab, b,
+                  loop=None,
+                  forced=False) is ab
+    assert amerge(b, ab,
+                  loop=None,
+                  forced=False) is ab
+
+    with pytest.raises(MyiaTypeError):
+        amerge(ab, bc, loop=None, forced=True)
+
+
 def test_merge_from_types():
     a = T([S(1), S(t=ty.Int[64])])
 
@@ -154,6 +182,10 @@ def test_repr():
 
     f1 = AbstractFunction(P.scalar_mul)
     assert repr(f1) == 'AbstractFunction(scalar_mul)'
+
+    tu1 = AbstractTaggedUnion([[13, s2], [4, l1]])
+    assert repr(tu1) == \
+        'AbstractTaggedUnion(U(4 :: [Float[32]], 13 :: Float[32]))'
 
 
 def test_repr_recursive():

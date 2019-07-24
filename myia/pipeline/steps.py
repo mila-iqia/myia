@@ -9,13 +9,14 @@ from itertools import count
 
 from .. import dtype
 from ..abstract import AbstractTuple, AbstractList, AbstractClassBase, \
-    AbstractDict, AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE
+    AbstractDict, AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE, \
+    AbstractTaggedUnion
 from ..cconv import closure_convert
 from ..ir import Graph
-from ..opt import lib as optlib, CSE, erase_class, NodeMap, \
-    LocalPassOptimizer, DeadDataElimination
+from ..opt import lib as optlib, CSE, simplify_types, NodeMap, \
+    LocalPassOptimizer, DeadDataElimination, type_to_tag
 from ..prim import vm_registry
-from ..utils import overload, no_prof
+from ..utils import overload, no_prof, TaggedValue
 from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
 from ..vm import VM
@@ -182,7 +183,7 @@ def step_specialize(self, graph, inference_context):
 
 
 @pipeline_function
-def step_erase_class(self, graph, argspec, outspec):
+def step_simplify_types(self, graph, argspec, outspec):
     """Replace the Class type by Tuple type.
 
     This should be run on the specialized graph.
@@ -194,7 +195,7 @@ def step_erase_class(self, graph, argspec, outspec):
         graph: The prepared graph.
     """
     mng = self.resources.manager
-    erase_class(graph, mng)
+    simplify_types(graph, mng)
     new_argspec = tuple(p.abstract for p in graph.parameters)
     graph = self.resources.inferrer.renormalize(graph, new_argspec)
     new_outspec = graph.output.abstract
@@ -203,7 +204,7 @@ def step_erase_class(self, graph, argspec, outspec):
             'argspec': new_argspec,
             'orig_outspec': outspec,
             'outspec': new_outspec,
-            'erase_class': True}
+            'simplify_types': True}
 
 
 ############
@@ -546,12 +547,14 @@ def convert_arg(self, arg, orig_t: AbstractArray, backend):
 def convert_arg(self, arg, orig_t: AbstractUnion, backend):
     for opt in orig_t.options:
         try:
-            return self(arg, opt, backend)
+            value = self(arg, opt, backend)
+            tag = type_to_tag(opt)
         except TypeError:
             continue
+        return TaggedValue(tag, value)
     else:
         opts = ", ".join(map(str, orig_t.options))
-        raise TypeError(f'Expected one of {opts}')
+        raise TypeError(f'Expected one of {opts}, not {arg}')
 
 
 @overload  # noqa: F811
@@ -642,6 +645,19 @@ def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
     return a
 
 
+@overload  # noqa: F811
+def convert_result(self, arg, orig_t, vm_t: AbstractTaggedUnion, backend,
+                   return_backend):
+    assert isinstance(orig_t, AbstractUnion)
+    for typ in orig_t.options:
+        tag = type_to_tag(typ)
+        if tag == arg.tag:
+            return self(arg.value, typ,
+                        vm_t.options.get(tag), backend, return_backend)
+    else:
+        raise AssertionError(f'Badly formed TaggedValue')
+
+
 class Wrap(PipelineStep):
     """Pipeline step to export a callable.
 
@@ -652,7 +668,7 @@ class Wrap(PipelineStep):
         outspec: types of outputs
         orig_argspec: initial argspec
         orig_outspec: intial outspec
-        erase_class: boolean marker
+        simplify_types: boolean marker
 
     Outputs:
         output: wrapped callable.
@@ -670,11 +686,11 @@ class Wrap(PipelineStep):
              outspec,
              orig_argspec=None,
              orig_outspec=None,
-             erase_class=False):
+             simplify_types=False):
         """Convert args to vm format, and output from vm format."""
-        if not erase_class:
+        if not simplify_types:
             raise AssertionError(
-                'OutputWrapper step requires the erase_class step'
+                'OutputWrapper step requires the simplify_types step'
             )
         fn = output
         orig_arg_t = orig_argspec or argspec

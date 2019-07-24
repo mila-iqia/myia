@@ -26,13 +26,14 @@ from myia.prim.py_implementations import \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
     tuple_setitem, list_setitem, scalar_cast, list_reduce, \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
-    transpose, make_record, unsafe_static_cast, user_switch
+    transpose, make_record, unsafe_static_cast, user_switch, \
+    hastag, casttag, tagged
 from myia.utils import newenv
 
 from .common import B, \
     Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \
     ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
-    to_abstract_test, EmptyTuple, U, D, Ex, Bot, AA
+    to_abstract_test, EmptyTuple, U, D, TU, Ex, Bot, AA
 
 
 ai64 = Array[i64]
@@ -963,6 +964,20 @@ def test_union_nested_2(x):
 
 
 @infer_std(
+    (TU(_1=i64, _2=f64, _37=(i64, i64)), i64),
+    (TU(_2=f64, _3=(i64, i64)), InferenceError),
+    (TU(_1=i64, _2=f64, _77=(i64, i64)), InferenceError),
+)
+def test_hastag_casttag(x):
+    if hastag(x, 1):
+        return casttag(x, 1)
+    elif hastag(x, 2):
+        return 1234
+    else:
+        return casttag(x, 37)[0]
+
+
+@infer_std(
     ([i64], i64, [i64]),
     ([f64], i64, InferenceError),
     ([ai64_of(2, 3)], ai64_of(2, 3), [ai64_of(2, 3)]),
@@ -1873,6 +1888,29 @@ def test_raise_rec(x):
         else:
             return x * f(x - 1)
     return f(x)
+
+
+@infer((i64, i32, i64, U(i32, i64)))
+def test_tagged(x, y, z):
+    if x > 0:
+        return tagged(y)
+    else:
+        return tagged(z)
+
+
+@infer((i64, i16, i32, i64, U(i16, i32, i64)))
+def test_tagged_more(c, x, y, z):
+    if c == 0:
+        return tagged(x)
+    elif c > 0:
+        return tagged(y)
+    else:
+        return tagged(z)
+
+
+@infer((i64, InferenceError))
+def test_tagged_too_many_arguments(x):
+    return tagged(x, 1, 2)
 
 
 @infer(
