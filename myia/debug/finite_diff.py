@@ -11,7 +11,10 @@ from ..utils import smap, overload
 
 @smap.variant
 def _zeros_like(self, x: object):
-    return 0
+    if x is None:
+        return None
+    else:
+        return 0
 
 
 class NoTestGrad:
@@ -218,7 +221,10 @@ class GradTester:
 
     def wiggle(self, x):
         """Return x +- some epsilon."""
-        return x - self.epsilon, x + self.epsilon
+        if x is None:
+            return None, None
+        else:
+            return x - self.epsilon, x + self.epsilon
 
     def compute_finite_diff(self) -> Dict[str, float]:
         """
@@ -267,11 +273,17 @@ class GradTester:
         for k in exact:
             e = exact[k]
             f = fin[k]
-            threshold = max(abs(rel * e), abs(rel * f))
+            if e is None:
+                match = (f == 0)
+            elif e == f:
+                match = True
+            else:
+                threshold = max(abs(rel * e), abs(rel * f))
+                match = bool(abs(e - f) <= threshold)
             results[k] = dict(
                 exact=e,
                 difference=f,
-                match=bool(abs(e - f) <= threshold)
+                match=match
             )
         return results
 
