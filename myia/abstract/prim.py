@@ -8,7 +8,7 @@ from operator import getitem
 
 from .. import dtype
 from ..abstract import typecheck
-from ..ir import Graph, GraphCloner, CloneRemapper, new_graph, MetaGraph
+from ..ir import Graph, MetaGraph, GraphCloner, CloneRemapper, new_graph
 from ..dtype import Number, Bool, ExceptionType
 from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance, Cons, Empty
@@ -260,6 +260,7 @@ def _prim_or_graph(afn):
         assert fn.context == Context.empty()
         fn = fn.graph
     if isinstance(fn, MetaGraphFunction):
+        assert fn.context == Context.empty()
         fn = fn.metagraph
     assert isinstance(fn, (Primitive, Graph, MetaGraph))
     return fn
@@ -676,6 +677,7 @@ async def _inf_scalar_to_array(self, engine, a: AbstractScalar, t):
 async def _inf_array_to_scalar(self, engine, a: AbstractArray):
     a_shp = a.values[SHAPE]
     if len(a_shp) != 0:
+        #if any(shp != 1 for shp in a_shp):
         raise MyiaShapeError("array_to_scalar requires shape ()")
     return a.element
 

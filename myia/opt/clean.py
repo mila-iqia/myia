@@ -8,7 +8,7 @@ from ..ir import Constant
 from ..prim import ops as P
 from ..abstract import abstract_clone, AbstractClassBase, AbstractTuple, \
     AbstractUnion, AbstractTaggedUnion, AbstractScalar, VALUE, TYPE, \
-    AbstractValue, AbstractDict, type_to_abstract, split_type
+    AbstractValue, AbstractDict, AbstractArray, type_to_abstract, split_type
 from ..utils import is_dataclass_type, overload
 
 
@@ -134,6 +134,10 @@ def simplify_types(root, manager):
                 _, x = node.inputs
                 tag = type_to_tag(x.abstract)
                 new_node = node.graph.apply(P.tagged, x, tag)
+
+        elif node.is_constant(AbstractArray) and type(node.value) is not AbstractArray:
+            new_node = Constant(AbstractArray(node.value.element, node.value.values))
+            keep_abstract = False
 
         elif node.is_constant(AbstractClassBase):
             # This is a constant that contains a type, used e.g. with hastype.

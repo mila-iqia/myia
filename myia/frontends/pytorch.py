@@ -16,8 +16,10 @@ from ..pipeline.resources import standard_object_map, standard_method_map
 from ..hypermap import hyper_map
 from ..api import _convert_arg_init
 from ..pipeline.steps import convert_arg, convert_result_array
+from ..prim.py_implementations import hastype, scalar_cast, scalar_to_array
+from ..opt.clean import _reabs
 
-from .pytorch_functions import linear, tensor_dim, t
+from .pytorch_functions import item, linear, sigmoid, t, tensor_dim
 
 
 _type_map = {
@@ -39,9 +41,37 @@ def pytorch_dtype_to_type(dtype):
         raise TypeError(f"Unsupported dtype {dtype}")
     return _type_map[dtype]
 
+#TODO: DELETE THIS ###########################################
+"""
+all_torch_ops = dir(torch)
+
+it = 0
+ie = 0
+match = [] 
+for name in all_torch_ops:
+    try:
+        standard_object_map.update({
+            #torch.tanh: C.tanh
+            getattr(torch, name): getattr(C, name)
+        })
+        it+=1
+        match.append(name)
+    except:
+        ie+=1
+        pass
+
+print("it torch", it)
+print("ie torch", ie)
+print("torch match", match)
+
+##############################################################
+#"""
+
 
 standard_object_map.update({
+    torch.exp: C.exp,
     torch.nn.functional.linear: linear,
+    torch.sigmoid: sigmoid,
     torch.tanh: C.tanh,
 })
 
@@ -93,13 +123,50 @@ class PyTorchTensorWrapper(ArrayWrapper):
         self.retain_grad = retain_grad
 
 
-AT = AbstractPyTorchTensor(ANYTHING, {SHAPE: ANYTHING})
+APT = AbstractPyTorchTensor(ANYTHING, {SHAPE: ANYTHING})
+
+#TODO: DELETE THIS ###########################################
+"""
+
+standard_method_map[AbstractPyTorchTensor] = \
+    standard_method_map[AbstractArray].copy()
+
+all_torch_tensor_ops = dir(torch.Tensor([5.49670]))
+for name in all_torch_tensor_ops:
+    #C.tanh.register(APT)(C.array_tanh)
+    try:
+        getattr(C, name).register(APT)(getattr(C, "array_" + name))
+    except:
+        pass
+
+it = 0
+ie = 0
+match = []
+for name in all_torch_tensor_ops:
+    try:
+        standard_method_map[AbstractPyTorchTensor].update({
+            #'tanh': C.tanh
+            name: getattr(C, name)
+        })
+        it+=1
+        match.append(name)
+    except:
+        ie+=1
+        pass
+
+print("it tensor", it)
+print("ie tensor", ie)
+print("tensor match", match)
+
+##############################################################
+#"""
 
 
-C.tanh.register(AT)(C.array_tanh)
+C.exp.register(APT)(C.array_exp)
+C.tanh.register(APT)(C.array_tanh)
 
 
-@C._leaf_zeros_like.register(AT)
+@C._leaf_zeros_like.register(APT)
 @core
 def _array_zero(xs):
     scalar_zero = P.scalar_cast(0, C.typeof(xs).element)
@@ -111,8 +178,12 @@ standard_method_map[AbstractPyTorchTensor] = \
     standard_method_map[AbstractArray].copy()
 standard_method_map[AbstractPyTorchTensor].update({
     'dim': tensor_dim,
+    'exp': C.exp,
+    'item': item,
+    'reshape': P.reshape,
     't': t,
     'tanh': C.tanh,
+    'sigmoid': sigmoid,
     'zeros_like': C.zeros_like,
 })
 
@@ -284,3 +355,17 @@ def _convert_result_array(arg, orig_t: AbstractPyTorchTensor, backend):
     if not isinstance(arg, torch.Tensor):
         arg = torch.utils.dlpack.from_dlpack(backend.to_dlpack(arg))
     return arg
+
+##############################################################################
+
+
+@C._cast_helper.register(Number, APT)
+@core
+def _pt__cast_helper(x, model):
+    t = P.typeof(model)
+    return scalar_to_array(scalar_cast(x, t.element), P.typeof(model))
+
+
+@_reabs.register
+def _pt__reabs(self, a: AbstractPyTorchTensor):
+    return (yield AbstractArray)(self(a.element), a.values)

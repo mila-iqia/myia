@@ -1348,7 +1348,7 @@ def test_scalar_cast(x, t):
 def test_scalar_to_array(x):
     return scalar_to_array(x, AA)
 
-
+#(af64_of(1, 1, 1), f64)
 @infer(
     (ai64_of(), i64),
     (af64_of(), f64),

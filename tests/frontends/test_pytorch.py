@@ -23,7 +23,7 @@ def test_pytorch_dtype_to_type():
 
 
 # Uncomment this line to print values at specific precision
-# torch.set_printoptions(precision=8)
+torch.set_printoptions(precision=8)
 
 
 def get_backend_options(args, backend):
@@ -168,7 +168,7 @@ def test_module_matmul_bwd():
 
 def test_module_matmul_update(_backend_fixture):
     backend = _backend_fixture
-    backend_options = get_backend_options(args, _backend_fixture)
+    backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
 
@@ -185,8 +185,7 @@ def test_module_matmul_update(_backend_fixture):
         loss = mse(value, target)
         return loss.item()
 
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=True)
+    @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
         _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
         return _cost, model - dmodel
@@ -326,7 +325,7 @@ def test_module_2_layer_mlp_update():
 
 def test_module_2_layer_mlp_update__to_device(_backend_fixture):
     backend = _backend_fixture
-    backend_options = get_backend_options(args, _backend_fixture)
+    backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
 
@@ -347,8 +346,7 @@ def test_module_2_layer_mlp_update__to_device(_backend_fixture):
         loss = mse(value, target)
         return loss.item()
 
-    @myia(backend=backend, backend_options=backend_options,
-          return_backend=True)
+    @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
         _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
         return _cost, model - dmodel
@@ -373,7 +371,7 @@ def test_module_2_layer_mlp_update__to_device(_backend_fixture):
 
 def test_pytorch_inference_errors(_backend_fixture):
     backend = _backend_fixture
-    backend_options = get_backend_options(args, _backend_fixture)
+    backend_options = get_backend_options(args, backend)
 
     @myia(backend=backend, backend_options=backend_options)
     def step_add(a, b):
@@ -395,7 +393,7 @@ def test_pytorch_inference_errors(_backend_fixture):
 
 def test_pytorch_scalar(_backend_fixture):
     backend = _backend_fixture
-    backend_options = get_backend_options(args, _backend_fixture)
+    backend_options = get_backend_options(args, backend)
 
     _a = 42.759910583496094
     _b = 13.92138671875

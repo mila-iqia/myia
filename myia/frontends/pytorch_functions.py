@@ -15,11 +15,13 @@
 #           pytorch original.                                               #
 #############################################################################
 
+import numpy as np
 
 from ..prim import ops as P
+from .. import composite as C
 from ..composite import core
 
-# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER
+############## THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER ##############
 
 
 @core
@@ -43,6 +45,18 @@ def linear(input, weight, bias=None):
             output = output + bias
         ret = output
     return ret
+
+
+@core
+def item(x):
+    """Map of 'item' pytorch method."""
+    return P.array_to_scalar(x.reshape(()))
+
+
+@core
+def sigmoid(x):
+    """Sigmoid activation function."""
+    return (C.tanh(x / 2) + 1) / 2
 
 
 @core
