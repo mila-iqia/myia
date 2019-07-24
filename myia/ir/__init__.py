@@ -4,7 +4,7 @@ from .abstract import Node  # noqa
 from .anf import Graph, ANFNode, Apply, Constant, Parameter, Special  # noqa
 from .clone import (  # noqa
     GraphRemapper, BasicRemapper, CloneRemapper, RemapperSet,
-    clone, GraphCloner, transformable_clone,
+    clone, GraphCloner, transformable_clone, new_graph,
 )
 from .manager import (  # noqa
     ManagerError, manage, ParentProxy, GraphManager

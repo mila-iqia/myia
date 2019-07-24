@@ -871,6 +871,7 @@ class _CastRemapper(CloneRemapper):
                  relation,
                  graph_relation,
                  clone_constants,
+                 graph_repl,
                  fv_replacements):
         """Initialize the GraphCloner."""
         super().__init__(
@@ -878,6 +879,7 @@ class _CastRemapper(CloneRemapper):
             inlines=inlines,
             manager=manager,
             relation=relation,
+            graph_repl=graph_repl,
             graph_relation=graph_relation,
             clone_constants=clone_constants,
         )

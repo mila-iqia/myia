@@ -5,7 +5,6 @@ function may be called with.
 """
 
 from typing import Optional
-from copy import copy
 from itertools import count, chain
 from dataclasses import dataclass, replace as dc_replace
 from collections import defaultdict
@@ -19,7 +18,7 @@ from .abstract.utils import CheckState, CloneState
 from .prim import Primitive
 from .info import About
 from .ir import Graph, Constant, MetaGraph, CloneRemapper, GraphCloner, \
-    succ_incoming
+    succ_incoming, new_graph
 from .graph_utils import dfs
 from .utils import overload
 
@@ -476,11 +475,8 @@ class Monomorphizer:
                     and not ctx.graph.has_flags('reference')):
                 newgraph = ctx.graph
             else:
-                with About(ctx.graph.debug, next(_count)):
-                    newgraph = Graph()
-                    newgraph.flags = copy(ctx.graph.flags)
-                    newgraph.set_flags(reference=False)
-                    newgraph.transforms = copy(ctx.graph.transforms)
+                newgraph = new_graph(ctx.graph, relation=next(_count))
+                newgraph.set_flags(reference=False)
             self.results[ctx] = newgraph
             entry.append(newgraph)
 
@@ -551,10 +547,10 @@ class Monomorphizer:
                 total=False,
                 clone_children=False,
                 clone_constants=True,
+                graph_repl={ctx.graph: newgraph},
                 remapper_class=_MonoRemapper.partial(
                     engine=self.engine,
                     fv_function=fv_function,
-                    graph_repl={ctx.graph: newgraph}
                 )
             )
             assert cl[ctx.graph] is newgraph
@@ -619,12 +615,12 @@ class _MonoRemapper(CloneRemapper):
             inlines=inlines,
             manager=manager,
             relation=relation,
+            graph_repl=graph_repl,
             graph_relation=graph_relation,
             clone_constants=clone_constants,
             set_abstract=False,
         )
         self.engine = engine
-        self.graph_repl = graph_repl
         self.fv_function = fv_function
 
     def generate(self):

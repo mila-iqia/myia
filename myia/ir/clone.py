@@ -30,6 +30,15 @@ class _ToLink:
     new_node: ANFNode
 
 
+def new_graph(g, relation='copy'):
+    """Make an empty Graph that's based on g with the given relation."""
+    with About(g.debug, relation):
+        g2 = Graph()
+        g2.flags = copy(g.flags)
+        g2.transforms = copy(g.transforms)
+    return g2
+
+
 class GraphRemapper(Partializable):
     """Base class for remappers.
 
@@ -53,6 +62,7 @@ class GraphRemapper(Partializable):
                  relation,
                  remappers=None,
                  manager=None,
+                 graph_repl=None,
                  graph_relation=None):
         """Initialize a GraphRemapper."""
         self.relation = relation
@@ -62,7 +72,9 @@ class GraphRemapper(Partializable):
             self.manager = manage(*graphs, weak=True)
         else:
             self.manager = manager
-        self.graph_repl = {None: None}
+        if graph_repl is None:
+            graph_repl = {None: None}
+        self.graph_repl = graph_repl
         self.repl = {}
         self.to_link = []
         self.remappers = remappers
@@ -240,6 +252,7 @@ class CloneRemapper(BasicRemapper):
                  inlines,
                  manager,
                  relation,
+                 graph_repl,
                  graph_relation,
                  clone_constants,
                  set_abstract=True):
@@ -248,6 +261,7 @@ class CloneRemapper(BasicRemapper):
             graphs,
             manager=manager or manage(*graphs, *inlines, weak=True),
             relation=relation,
+            graph_repl=graph_repl,
             graph_relation=graph_relation
         )
         self.inlines = inlines
@@ -278,12 +292,8 @@ class CloneRemapper(BasicRemapper):
             target_graph, new_params = self.inlines[graph]
             for p, new_p in zip(graph.parameters, new_params):
                 self.repl[p] = new_p
-        else:
-            with About(graph.debug, self.graph_relation):
-                target_graph = Graph()
-                target_graph.flags = copy(graph.flags)
-                target_graph.transforms = copy(graph.transforms)
-            self.graph_repl[graph] = target_graph
+        elif graph not in self.graph_repl:
+            self.graph_repl[graph] = new_graph(graph, self.graph_relation)
 
     def gen_rogue_parameter(self, graph, new_graph, node):
         """Generate a new parameter."""
@@ -395,6 +405,7 @@ class GraphCloner:
                  clone_constants=False,
                  clone_children=True,
                  graph_relation=None,
+                 graph_repl=None,
                  remapper_class=CloneRemapper):
         """Initialize a GraphCloner."""
         self.total = total
@@ -409,6 +420,7 @@ class GraphCloner:
             manager=self.manager,
             inlines=self.inlines,
             relation=relation,
+            graph_repl=graph_repl,
             graph_relation=graph_relation,
             clone_constants=clone_constants,
         )
