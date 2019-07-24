@@ -651,11 +651,7 @@ class Wrap(PipelineStep):
         vm_out_t = graph.return_.abstract
 
         def wrapped(*args):
-            steps = self.pipeline.steps
-            if hasattr(steps, 'compile'):
-                backend = steps.compile.backend
-            else:
-                backend = NumpyChecker()
+            backend = self.pipeline.resources.backend
             args = tuple(convert_arg(arg, ot, backend) for arg, ot in
                          zip(args, orig_arg_t))
             res = fn(*args)
