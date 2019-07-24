@@ -16,6 +16,7 @@ from ..common import MA, MB, AA
 
 
 @pytest.fixture(params=[
+    pytest.param(('numpy'), id='numpy-debug'),
     pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
     pytest.param(('nnvm', {'target': 'cuda', 'device_id': 0}), id='nnvm-cuda',
                  marks=pytest.mark.gpu),
