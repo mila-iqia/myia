@@ -926,7 +926,7 @@ def bind(loop, committed, resolved, pending):
             return 1000
         elif any(isinstance(x, AbstractBottom) for x in resolved):
             # Bottom is always lower-priority
-            return -2000
+            return None
         else:
             return -1000
 
