@@ -71,35 +71,35 @@ def test_amerge():
     b = T([S(1), S(t=ty.Int[64])])
     c = T([S(t=ty.Int[64]), S(t=ty.Int[64])])
 
-    assert amerge(a, b, loop=None, forced=False) is a
-    assert amerge(a, c, loop=None, forced=False) == c
-    assert amerge(c, a, loop=None, forced=False) is c
+    assert amerge(a, b, forced=False) is a
+    assert amerge(a, c, forced=False) == c
+    assert amerge(c, a, forced=False) is c
 
     with pytest.raises(MyiaTypeError):
-        amerge(a, c, loop=None, forced=True)
+        amerge(a, c, forced=True)
 
-    assert amerge(1, 2, loop=None, forced=False) is ANYTHING
+    assert amerge(1, 2, forced=False) is ANYTHING
     with pytest.raises(MyiaTypeError):
-        assert amerge(1, 2, loop=None, forced=True)
+        assert amerge(1, 2, forced=True)
 
     with pytest.raises(MyiaTypeError):
-        assert amerge("hello", "world", loop=None, forced=False)
+        assert amerge("hello", "world", forced=False)
 
-    assert amerge(ty.Int, ty.Int[64], loop=None, forced=False) is ty.Int
-    assert amerge(ty.Int[64], ty.Int, loop=None, forced=False) is ty.Int
+    assert amerge(ty.Int, ty.Int[64], forced=False) is ty.Int
+    assert amerge(ty.Int[64], ty.Int, forced=False) is ty.Int
     with pytest.raises(MyiaTypeError):
-        amerge(ty.Float, ty.Int, loop=None, forced=False)
+        amerge(ty.Float, ty.Int, forced=False)
     with pytest.raises(MyiaTypeError):
-        amerge(ty.Int[64], ty.Int, loop=None, forced=True)
+        amerge(ty.Int[64], ty.Int, forced=True)
 
     loop = asyncio.new_event_loop()
     p = PendingFromList([ty.Int[64], ty.Float[64]], None, None, loop=loop)
-    assert amerge(ty.Number, p, loop=None, forced=False, bind_pending=False) \
+    assert amerge(ty.Number, p, forced=False, bind_pending=False) \
         is ty.Number
-    assert amerge(p, ty.Number, loop=None, forced=False, bind_pending=False) \
+    assert amerge(p, ty.Number, forced=False, bind_pending=False) \
         is ty.Number
     with pytest.raises(MyiaTypeError):
-        print(amerge(p, ty.Number, loop=None, forced=True, bind_pending=False))
+        print(amerge(p, ty.Number, forced=True, bind_pending=False))
 
 
 def test_merge_possibilities():
@@ -107,16 +107,14 @@ def test_merge_possibilities():
     b = Possibilities((2, 3))
     c = Possibilities((2,))
     assert set(amerge(a, b,
-                      loop=None,
                       forced=False)) == {1, 2, 3}
     assert amerge(a, c,
-                  loop=None,
                   forced=False) is a
 
     with pytest.raises(MyiaTypeError):
-        amerge(a, b, loop=None, forced=True)
+        amerge(a, b, forced=True)
 
-    assert amerge(a, c, loop=None, forced=True) is a
+    assert amerge(a, c, forced=True) is a
 
 
 def test_merge_tagged_possibilities():
@@ -124,18 +122,12 @@ def test_merge_tagged_possibilities():
     ab = TaggedPossibilities([[1, 'a'], [2, 'b']])
     bc = TaggedPossibilities([[2, 'b'], [3, 'c']])
     b = TaggedPossibilities([[2, 'b']])
-    assert amerge(ab, bc,
-                  loop=None,
-                  forced=False) == abc
-    assert amerge(ab, b,
-                  loop=None,
-                  forced=False) is ab
-    assert amerge(b, ab,
-                  loop=None,
-                  forced=False) is ab
+    assert amerge(ab, bc, forced=False) == abc
+    assert amerge(ab, b, forced=False) is ab
+    assert amerge(b, ab, forced=False) is ab
 
     with pytest.raises(MyiaTypeError):
-        amerge(ab, bc, loop=None, forced=True)
+        amerge(ab, bc, forced=True)
 
 
 def test_merge_from_types():
@@ -144,10 +136,10 @@ def test_merge_from_types():
     t1 = type_to_abstract(typing.Tuple)
     t2 = type_to_abstract(typing.Tuple[ty.Int[64], ty.Int[64]])
     t3 = type_to_abstract(typing.Tuple[ty.Int[64]])
-    assert amerge(t1, a, loop=None, forced=True) is t1
-    assert amerge(t2, a, loop=None, forced=True) is t2
+    assert amerge(t1, a, forced=True) is t1
+    assert amerge(t2, a, forced=True) is t2
     with pytest.raises(MyiaTypeError):
-        amerge(t3, a, loop=None, forced=True)
+        amerge(t3, a, forced=True)
 
 
 def test_repr():

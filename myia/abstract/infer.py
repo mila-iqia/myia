@@ -110,7 +110,6 @@ class InferenceEngine:
         async def _check():
             amerge(concretize_abstract(await output_ref.get()),
                    outspec,
-                   loop=self.loop,
                    forced=False)
 
         self.run_coroutine(_run())
@@ -298,10 +297,7 @@ class InferenceEngine:
 
     def abstract_merge(self, *values):
         """Merge a list of AbstractValues together."""
-        return reduce(self._merge, values)
-
-    def _merge(self, x1, x2):
-        return amerge(x1, x2, loop=self.loop, forced=False)
+        return reduce(amerge, values)
 
     def check_predicate(self, predicate, x):
         """Returns whether the predicate applies on x.
