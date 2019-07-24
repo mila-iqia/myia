@@ -209,7 +209,7 @@ class Monomorphizer:
 
         """
         inf = self.engine.get_inferrer_for(fn)
-        argvals = argvals and inf.normalize_args(argvals)
+        argvals = argvals and inf.normalize_args_sync(argvals)
         argvals, outval = self._find_unique_argvals(a, inf, argvals)
 
         if isinstance(inf, TrackedInferrer):

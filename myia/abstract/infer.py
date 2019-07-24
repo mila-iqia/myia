@@ -546,7 +546,14 @@ class Inferrer(Partializable):
         """Initialize the Inferrer."""
         self.cache = {}
 
-    def normalize_args(self, args):
+    async def normalize_args(self, args):
+        """Return normalized versions of the arguments.
+
+        By default, this returns args unchanged.
+        """
+        return self.normalize_args_sync(args)
+
+    def normalize_args_sync(self, args):
         """Return normalized versions of the arguments.
 
         By default, this returns args unchanged.
@@ -570,7 +577,7 @@ class Inferrer(Partializable):
             argrefs: A tuple of References to the arguments
         """
         args = tuple([await ref.get() for ref in argrefs])
-        args = self.normalize_args(args)
+        args = await self.normalize_args(args)
         if args not in self.cache:
             self.cache[args] = await self.infer(engine, *args)
         return self.cache[args]
@@ -607,7 +614,7 @@ class TrackedInferrer(Inferrer):
     async def run(self, engine, outref, argrefs):
         """Run the inference."""
         args = tuple([await ref.get() for ref in argrefs])
-        args = self.subinf.normalize_args(args)
+        args = await self.subinf.normalize_args(args)
         self.cache[args] = await self.subinf.run(engine, outref, argrefs)
         return self.cache[args]
 
@@ -631,7 +638,7 @@ class BaseGraphInferrer(Inferrer):
 
     def make_context(self, engine, args):
         """Create a Context object using the given args."""
-        args = self.normalize_args(args)
+        args = self.normalize_args_sync(args)
         _, ctx = self._make_argkey_and_context(engine, args)
         return ctx
 
@@ -671,7 +678,7 @@ class GraphInferrer(BaseGraphInferrer):
         assert context is not None
         super().__init__(context.filter(graph and graph.parent))
 
-    def normalize_args(self, args):
+    def normalize_args_sync(self, args):
         """Broaden args if flag ignore_values is True."""
         if self._graph.has_flags('ignore_values'):
             return tuple(_broaden(a) for a in args)
@@ -695,9 +702,13 @@ class MetaGraphInferrer(BaseGraphInferrer):
         self.metagraph = metagraph
         self.graph_cache = {}
 
-    def normalize_args(self, args):
+    async def normalize_args(self, args):
         """Return normalized versions of the arguments."""
-        return self.metagraph.normalize_args(args)
+        return await self.metagraph.normalize_args(args)
+
+    def normalize_args_sync(self, args):
+        """Return normalized versions of the arguments."""
+        return self.metagraph.normalize_args_sync(args)
 
     def get_graph(self, engine, args):
         """Generate the graph for the given args."""

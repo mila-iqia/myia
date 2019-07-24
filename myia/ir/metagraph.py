@@ -20,7 +20,14 @@ class MetaGraph:
         self.name = name
         self.cache = {}
 
-    def normalize_args(self, args):
+    async def normalize_args(self, args):
+        """Return normalized versions of the arguments.
+
+        By default, this returns args unchanged.
+        """
+        return self.normalize_args_sync(args)
+
+    def normalize_args_sync(self, args):
         """Return normalized versions of the arguments.
 
         By default, this returns args unchanged.
@@ -43,7 +50,7 @@ class MultitypeGraph(MetaGraph):
         super().__init__(name)
         self.entries = list(entries.items())
 
-    def normalize_args(self, args):
+    def normalize_args_sync(self, args):
         """Return broadened arguments."""
         from ..abstract import broaden
         return tuple(broaden(a) for a in args)

@@ -194,7 +194,7 @@ class UniformPrimitiveInferrer(WithImplInferrer):
         self.outtype = data.annotations['return']
         self.infer_value = infer_value
 
-    def normalize_args(self, args):
+    def normalize_args_sync(self, args):
         """If infer_value is False, return broadened arguments."""
         if not self.infer_value:
             args = tuple(broaden(a) for a in args)
