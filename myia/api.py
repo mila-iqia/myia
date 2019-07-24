@@ -38,7 +38,6 @@ class MyiaFunction:
         self.fn = fn
         self.specialize_values = set(specialize_values)
 
-        self.pip = standard_pipeline.configure({
         pip = standard_pipeline.configure({
             'wrap.return_backend': return_backend
         })

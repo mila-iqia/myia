@@ -36,6 +36,7 @@ _backends = {
     'nnvm': import_load('myia.compile.backends.nnvm', 'NNVMBackend'),
     'relay': import_load('myia.compile.backends.relay', 'RelayBackend'),
     'pytorch': import_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
+    'numpy': import_load('myia.compile.backends.numpy', 'NumPyBackend'),
 }
 
 

@@ -19,7 +19,6 @@ from ..utils import overload, no_prof
 from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
 from ..vm import VM
-from ..compile import load_backend
 from ..abstract import ArrayWrapper
 
 from .pipeline import pipeline_function, PipelineStep
@@ -436,37 +435,6 @@ def step_compile(self, graph, argspec, outspec):
 ############################
 # Wrap the output function #
 ############################
-
-class NumpyChecker:
-    """Dummy backend used for debug mode."""
-
-    def from_numpy(self, n):
-        """Returns n."""
-        return n
-
-    def to_numpy(self, n):
-        """Returns n."""
-        return n
-
-    def from_scalar(self, s, dt):
-        """Returns s."""
-        return s
-
-    def to_scalar(self, s):
-        """Returns s."""
-        return s
-
-    def check_array(self, arg, t):
-        """Checks that arg has elements of the right dtype."""
-        if not isinstance(arg, np.ndarray):
-            raise TypeError('Expected ndarray')
-        if arg.dtype != dtype.type_to_np_dtype(t):
-            raise TypeError('Wrong dtype')
-        return arg
-
-
-class SlowdownWarning(UserWarning):
-    """Used to indicate a potential slowdown source."""
 
 
 #####################################

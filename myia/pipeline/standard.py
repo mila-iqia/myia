@@ -1,8 +1,6 @@
 """Pre-made pipelines."""
 
-
-
-from ..abstract import abstract_inferrer_constructors, Context, AbstractArray
+from ..abstract import abstract_inferrer_constructors, Context
 from ..compile import load_backend
 from ..ir import GraphManager
 from ..prim import py_registry
