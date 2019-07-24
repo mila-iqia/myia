@@ -74,7 +74,7 @@ standard_debug_pipeline = PipelineDefinition(
         export=steps.step_debug_export,
         wrap=steps.step_wrap,
     )
-)
+).configure(backend=load_backend('numpy'))
 
 
 scalar_debug_pipeline = standard_debug_pipeline.configure({
