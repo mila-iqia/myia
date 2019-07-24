@@ -5,7 +5,7 @@ import typing
 import numpy as np
 from functools import reduce
 from itertools import chain
-from types import GeneratorType
+from types import GeneratorType, AsyncGeneratorType
 
 from .. import dtype
 from ..utils import overload, is_dataclass_type, dataclass_methods, intern, \
@@ -617,6 +617,127 @@ def sensitivity_transform(self, x: AbstractFunction):
 @overload  # noqa: F811
 def sensitivity_transform(self, x: AbstractJTagged):
     return self(x.element)
+
+
+#################
+# Force through #
+#################
+
+
+async def _force_through_post(x):
+    return intern(await x)
+
+
+@overload.wrapper(
+    initial_state=lambda: {},
+    postprocess=_force_through_post,
+)
+async def force_through(__call__, self, x, through):
+    """Clone an abstract value (asynchronous)."""
+    if not isinstance(x, through) and not isinstance(x, Pending):
+        return x
+    cache = self.state
+    if isinstance(x, AbstractValue) and x in cache:
+        return cache[x]
+
+    call = __call__(self, x, through)
+    if isinstance(call, AsyncGeneratorType):
+        cls = await call.asend(None)
+        inst = cls.empty()
+        cache[x] = inst
+        constructor = _make_constructor(inst)
+        rval = await call.asend(constructor)
+        assert rval is inst
+        return rval
+    else:
+        return await call
+
+
+# Uncomment and test the other implementations if/when needed:
+
+
+# @overload  # noqa: F811
+# async def force_through(self, x: AbstractScalar, through):
+#     return AbstractScalar(await self(x.values, through))
+
+
+# @overload  # noqa: F811
+# async def force_through(self, x: AbstractFunction, through):
+#     yield (yield AbstractFunction)(*(await self(x.get_sync(), through)))
+
+
+# @overload  # noqa: F811
+# async def force_through(self, d: TrackDict, through):
+#     return {k: await self(v, through) for k, v in d.items()}
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractTuple, through):
+    yield (yield AbstractTuple)(
+        [(await self(y, through)) for y in x.elements],
+        await self(x.values, through)
+    )
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractList, through):
+    yield (yield AbstractList)(await self(x.element, through),
+                               await self(x.values, through))
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractArray, through):
+    yield (yield type(x))(await self(x.element, through),
+                          await self(x.values, through))
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractClassBase, through):
+    yield (yield type(x))(
+        x.tag,
+        {k: (await self(v, through)) for k, v in x.attributes.items()},
+        x.methods,
+        await self(x.values, through)
+    )
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractUnion, through):
+    yield (yield AbstractUnion)(await self(x.options, through))
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractTaggedUnion, through):
+    opts = await self(x.options, through)
+    yield (yield AbstractTaggedUnion)(opts)
+
+
+@overload  # noqa: F811
+async def force_through(self, x: Possibilities, through):
+    return Possibilities([await self(v, through) for v in x])
+
+
+@overload  # noqa: F811
+async def force_through(self, x: TaggedPossibilities, through):
+    return TaggedPossibilities([[i, await self(v, through)] for i, v in x])
+
+
+# @overload  # noqa: F811
+# async def force_through(self, x: PartialApplication, through):
+#     return PartialApplication(
+#         await self(x.fn, through),
+#         [await self(arg, through) for arg in x.args]
+#     )
+
+
+@overload  # noqa: F811
+async def force_through(self, x: Pending, through):
+    return await self(await x, through)
+
+
+# @overload  # noqa: F811
+# async def force_through(self, x: object, through):
+#     return x
 
 
 #########
