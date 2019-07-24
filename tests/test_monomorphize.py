@@ -573,3 +573,10 @@ def test_sumtree(t):
 )
 def test_reducetree(t):
     return reducetree(scalar_mul, t, 1)
+
+
+@specialize_no_validate(
+    (make_tree(3, 1),),
+)
+def test_hypermap_tree(t):
+    return hyper_map(scalar_add, t, t)

@@ -1703,6 +1703,8 @@ hyper_map_nobroadcast = HyperMap(broadcast=False)
     (ai64_of(1, 5), ai64_of(2, 1), ai64_of(2, 5)),
     (i64, f64, InferenceError),
     (ai64_of(2, 5), af64_of(2, 5), InferenceError),
+    (U(i64, (i64, i64)), U(i64, (i64, i64)), U(i64, (i64, i64))),
+    (U(i64, (i64, i64)), U(i64, (i64, i64, i64)), InferenceError),
 
     # Generic broadcasting tests
     ([f64], f64, [f64]),
