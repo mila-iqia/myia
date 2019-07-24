@@ -795,7 +795,12 @@ def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
         assert not isinstance(new_tentative, Pending)
         x1.tentative = new_tentative
         return x1
-    assert not isinstance(x2, PendingTentative)
+    if isinstance(x2, PendingTentative):
+        new_tentative = self(x1, x2.tentative, forced,
+                             bind_pending, accept_pending)
+        assert not isinstance(new_tentative, Pending)
+        x2.tentative = new_tentative
+        return new_tentative if forced else x2
     if (isp1 or isp2) and (not accept_pending or not bind_pending):
         if forced and isp1:
             raise MyiaTypeError('Cannot have Pending here.')
@@ -982,8 +987,7 @@ def amerge(self, x1: (AbstractUnion, AbstractTaggedUnion),
     args1 = x1.options
     args2 = x2.options
     merged = self(args1, args2, forced, bp)
-    if forced or merged is args1:  # pragma: no cover
-        # Covered in the next PR
+    if forced or merged is args1:
         return x1
     return type(x1)(merged)
 

@@ -7,7 +7,8 @@ from dataclasses import dataclass
 
 from myia.abstract import from_value, AbstractJTagged, InferenceError
 from myia.api import myia
-from myia.pipeline import standard_resources, standard_pipeline
+from myia.pipeline import standard_resources, standard_pipeline, \
+    standard_debug_pipeline
 from myia.composite import grad, value_and_grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.grad import J as realJ
@@ -16,11 +17,12 @@ from myia.pipeline.steps import Validator
 from myia.prim import ops as P, Primitive
 from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
     array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
-    distribute, dot, reshape, transpose, scalar_cast
+    distribute, dot, reshape, transpose, scalar_cast, hastype
 from myia.prim.py_implementations import py_registry as pyi
 from myia.validate import whitelist, validate_abstract
 
-from .common import f64, u64, MA, MB, to_abstract_test, AA
+from .common import f64, u64, MA, MB, to_abstract_test, AA, \
+    U, make_tree, countdown, sumtree, reducetree
 
 
 @dataclass
@@ -139,9 +141,14 @@ prim_tests = {
 def _grad_test(fn, obj, args,
                sens_type=f64,
                pipeline=grad_pipeline,
-               rel_error=1e-3):
+               rel_error=1e-3,
+               argspec=None):
     pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
-    argspec = tuple(from_value(arg, broaden=True) for arg in clean_args(args))
+    if argspec is None:
+        argspec = tuple(from_value(arg, broaden=True)
+                        for arg in clean_args(args))
+    else:
+        argspec = tuple(to_abstract_test(x) for x in argspec)
     sens_type = to_abstract_test(sens_type)
     if isinstance(obj, FunctionType):
         res = pipeline.run(input=obj, argspec=[*argspec, sens_type])
@@ -165,7 +172,10 @@ def test_prim_grads(prim, cases):
         _grad_test(pyi[prim], prim, case)
 
 
-def grad_test(*tests, pipeline=grad_pipeline, rel_error=1e-3):
+def grad_test(*tests,
+              pipeline=grad_pipeline,
+              rel_error=1e-3,
+              argspec=None):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -182,7 +192,10 @@ def grad_test(*tests, pipeline=grad_pipeline, rel_error=1e-3):
             if not isinstance(args, tuple):
                 args = (args,)
 
-            _grad_test(fn, fn, args, pipeline=pipeline, rel_error=rel_error)
+            _grad_test(fn, fn, args,
+                       pipeline=pipeline,
+                       rel_error=rel_error,
+                       argspec=argspec)
 
         m = pytest.mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
@@ -473,6 +486,38 @@ def test_transpose2(x, y, axis1, axis2):
     d = dot(xt, yt)
     sm = array_reduce(scalar_add, d, ())
     return array_to_scalar(sm)
+
+
+@grad_test(
+    (4.5,),
+    ((5.5, 1.3),),
+    pipeline=standard_debug_pipeline.configure(validate=False),
+    argspec=(U(f64, (f64, f64)),)
+)
+def test_union(x):
+    if hastype(x, f64):
+        return x * x * x
+    else:
+        a, b = x
+        return a * b
+
+
+@grad_test(
+    (make_tree(3, 1.0),),
+    (countdown(3.0),),
+    pipeline=standard_debug_pipeline.configure(validate=False),
+)
+def test_sumtree(x):
+    return sumtree(x)
+
+
+@grad_test(
+    (make_tree(3, 1.0), 1.0),
+    (countdown(4.0), 1.0),
+    pipeline=standard_debug_pipeline.configure(validate=False),
+)
+def test_reducetree(t, init):
+    return reducetree(scalar_mul, t, init)
 
 
 def _runwith(f, *args):

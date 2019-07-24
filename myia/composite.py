@@ -536,6 +536,12 @@ def _sm_add(x, y):
     return env_add(x, y)
 
 
+@_leaf_add.register(Nil, Nil)
+@core
+def _nil_add(x, y):
+    return None
+
+
 hyper_add = HyperMap(name='hyper_add', fn_leaf=_leaf_add)
 
 
