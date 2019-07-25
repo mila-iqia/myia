@@ -7,8 +7,7 @@ from dataclasses import dataclass
 
 from myia.abstract import from_value, AbstractJTagged, InferenceError
 from myia.api import myia
-from myia.pipeline import standard_resources, standard_pipeline, \
-    standard_debug_pipeline
+from myia.pipeline import standard_resources, standard_pipeline
 from myia.composite import grad, value_and_grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.grad import J as realJ
@@ -491,7 +490,7 @@ def test_transpose2(x, y, axis1, axis2):
 @grad_test(
     (4.5,),
     ((5.5, 1.3),),
-    pipeline=standard_debug_pipeline.configure(validate=False),
+    pipeline=standard_pipeline,
     argspec=(U(f64, (f64, f64)),)
 )
 def test_union(x):
@@ -505,7 +504,7 @@ def test_union(x):
 @grad_test(
     (make_tree(3, 1.0),),
     (countdown(3.0),),
-    pipeline=standard_debug_pipeline.configure(validate=False),
+    pipeline=standard_pipeline,
 )
 def test_sumtree(x):
     return sumtree(x)
@@ -514,7 +513,7 @@ def test_sumtree(x):
 @grad_test(
     (make_tree(3, 1.0), 1.0),
     (countdown(4.0), 1.0),
-    pipeline=standard_debug_pipeline.configure(validate=False),
+    pipeline=standard_pipeline,
 )
 def test_reducetree(t, init):
     return reducetree(scalar_mul, t, init)

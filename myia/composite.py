@@ -521,7 +521,7 @@ def nil_bool(x):
     return False
 
 
-_leaf_add = MultitypeGraph('hyper_add')
+_leaf_add = MultitypeGraph('gadd')
 
 
 @_leaf_add.register(Number, Number)
@@ -542,7 +542,8 @@ def _nil_add(x, y):
     return None
 
 
-hyper_add = HyperMap(name='hyper_add', fn_leaf=_leaf_add)
+gadd = HyperMap(name='gadd', fn_leaf=_leaf_add,
+                broadcast=False, trust_union_match=True)
 
 
 _leaf_zeros_like = MultitypeGraph('zeros_like')

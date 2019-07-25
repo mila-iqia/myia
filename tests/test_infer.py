@@ -10,7 +10,7 @@ from myia import abstract
 from myia.abstract import concretize_abstract, from_value
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
-from myia.composite import hyper_add, zeros_like, grad, list_map, tail
+from myia.composite import gadd, zeros_like, grad, list_map, tail
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Int, External, Number, EnvType as Env, Nil, Array, \
     i16, i32, i64, u64, f16, f32, f64
@@ -1744,11 +1744,11 @@ def test_hyper_map_nobroadcast(x, y):
     ((i64, f64), (i64, f64), (i64, f64)),
     (Point(i64, i64), Point(i64, i64), Point(i64, i64)),
     (ai64_of(2, 5), ai64_of(2, 5), ai64_of(2, 5)),
-    (ai64_of(2, 1), ai64_of(1, 5), ai64_of(2, 5)),
+    (ai64_of(2, 1), ai64_of(1, 5), InferenceError),
     (Env, Env, Env),
 )
-def test_hyper_add(x, y):
-    return hyper_add(x, y)
+def test_gadd(x, y):
+    return gadd(x, y)
 
 
 @infer(

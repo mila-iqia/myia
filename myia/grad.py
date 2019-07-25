@@ -50,7 +50,7 @@ expressions. See `SensRemapper.link_apply` for more information.
 
 from functools import reduce
 
-from .composite import zeros_like, hyper_add
+from .composite import zeros_like, gadd
 from .info import About
 from .ir import Constant, Graph, BasicRemapper, RemapperSet
 from .opt import sexp_to_node
@@ -408,9 +408,9 @@ class SensRemapper(GradRemapper):
         if n == 0:
             sexp = (zeros_like, jinv)
         else:
-            # All contributions are added together with hyper_add.
+            # All contributions are added together with gadd.
             def mkadd(x, y):
-                return (hyper_add, x, y)
+                return (gadd, x, y)
             sexp = reduce(mkadd, contribs)
 
         new_node.inputs = sexp_to_node(sexp, ng).inputs

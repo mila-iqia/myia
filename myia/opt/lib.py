@@ -2,7 +2,7 @@
 
 from ..abstract import abstract_clone, AbstractFunction, AbstractJTagged, \
     AbstractArray, ANYTHING, SHAPE, type_token, DEAD
-from ..composite import ListMap, hyper_add, zeros_like
+from ..composite import ListMap, gadd, zeros_like
 from ..dtype import Number
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone, \
     BasicRemapper
@@ -174,7 +174,7 @@ def getitem_setitem_list(optimizer, node, equiv):
         return node.graph.apply(P.list_getitem, equiv[X], i2)
 
 
-_lmadd = M(ListMap(fn_rec=hyper_add))
+_lmadd = M(ListMap(fn_rec=gadd))
 _lmzlk = M(ListMap(fn_rec=zeros_like))
 
 
@@ -197,7 +197,7 @@ lmadd_setitem_zero = psub(
     replacement=(P.list_setitem,
                  X1,
                  X3,
-                 (hyper_add,
+                 (gadd,
                   (P.list_getitem, X1, X3),
                   X4)),
     name='lmadd_setitem_zero'
@@ -205,36 +205,36 @@ lmadd_setitem_zero = psub(
 
 
 ###########################
-# hyper_add optimizations #
+# gadd optimizations #
 ###########################
 
 
-_hadd = M(hyper_add)
-_hzlk = M(zeros_like)
+_gadd = M(gadd)
+_zlk = M(zeros_like)
 
 
-hadd_zero_l = psub(
-    pattern=(_hadd, (_hzlk, X), Y),
+gadd_zero_l = psub(
+    pattern=(_gadd, (_zlk, X), Y),
     replacement=Y,
-    name='hadd_zero_l'
+    name='gadd_zero_l'
 )
 
 
-hadd_zero_r = psub(
-    pattern=(_hadd, Y, (_hzlk, X)),
+gadd_zero_r = psub(
+    pattern=(_gadd, Y, (_zlk, X)),
     replacement=Y,
-    name='hadd_zero_r'
+    name='gadd_zero_r'
 )
 
 
-hadd_switch = psub(
-    pattern=(_hadd,
+gadd_switch = psub(
+    pattern=(_gadd,
              (P.switch, Y, X1, X2),
              (P.switch, Y, X3, X4)),
     replacement=(P.switch, Y,
-                 (hyper_add, X1, X3),
-                 (hyper_add, X2, X4)),
-    name='hadd_switch'
+                 (gadd, X1, X3),
+                 (gadd, X2, X4)),
+    name='gadd_switch'
 )
 
 
@@ -561,10 +561,10 @@ getitem_newenv = psub(
 
 
 # getitem(env_add(e1, e2), key, default)
-#     => hyper_add(getitem(e1, key, default), getitem(e2, key, default))
+#     => gadd(getitem(e1, key, default), getitem(e2, key, default))
 getitem_env_add = psub(
     pattern=(P.env_getitem, (P.env_add, X, Y), C, Z),
-    replacement=(hyper_add,
+    replacement=(gadd,
                  (P.env_getitem, X, C, Z),
                  (P.env_getitem, Y, C, Z)),
     name='getitem_env_add'

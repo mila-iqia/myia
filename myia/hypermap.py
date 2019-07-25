@@ -44,6 +44,7 @@ class HyperMap(MetaGraph):
                  fn_rec=None,
                  broadcast=True,
                  nonleaf=nonleaf_defaults,
+                 trust_union_match=False,
                  name=None):
         """Initialize a HyperMap."""
         if name is None:
@@ -56,6 +57,7 @@ class HyperMap(MetaGraph):
         self._rec = fn_rec
         self.fn_rec = fn_rec or self
         self.broadcast = broadcast
+        self.trust_union_match = trust_union_match
         self.nonleaf = nonleaf
         self._through = (*nonleaf,
                          abstract.Possibilities,
@@ -86,6 +88,8 @@ class HyperMap(MetaGraph):
         # Options must be a list of (tag, type) pairs. If the tag is None,
         # we generate hastype, unsafe_static_cast and tagged(x)
         # Else we generate hastag, casttag and tagged(x, tag)
+        trust = self.trust_union_match or len(argmap) == 1
+
         self._name(g, f'U')
 
         for a2, isleaf in argmap.values():
@@ -94,19 +98,25 @@ class HyperMap(MetaGraph):
 
         currg = g
 
-        for tag, t in options:
+        for i, (tag, t) in enumerate(options):
+            is_last = i == len(options) - 1
             if tag is None:
                 terms = [currg.apply(P.hastype, arg, t)
                          for arg, (_, nonleaf) in argmap.items()]
             else:
                 terms = [currg.apply(P.hastag, arg, tag)
                          for arg, (_, nonleaf) in argmap.items()]
+            if trust:
+                terms = terms[:1]
 
             cond = reduce(lambda x, y: currg.apply(P.bool_and, x, y),
                           terms)
 
-            trueg = Graph()
-            self._name(trueg, f'U✓{tag}')
+            if is_last and trust:
+                trueg = currg
+            else:
+                trueg = Graph()
+                self._name(trueg, f'U✓{tag}')
 
             if tag is None:
                 args = [arg if isleaf
@@ -127,18 +137,19 @@ class HyperMap(MetaGraph):
             else:
                 trueg.output = trueg.apply(P.tagged, val, tag)
 
-            falseg = Graph()
-            currg.output = currg.apply(
-                currg.apply(P.switch, cond, trueg, falseg)
-            )
-            currg = falseg
+            if not (is_last and trust):
+                falseg = Graph()
+                currg.output = currg.apply(
+                    currg.apply(P.switch, cond, trueg, falseg)
+                )
+                currg = falseg
 
-        assert currg.return_ is None
-        currg.output = currg.apply(
-            P.raise_,
-            currg.apply(P.exception, "Type mismatch.")
-        )
-        currg.debug.name = 'type_error'
+        if currg.return_ is None:
+            currg.output = currg.apply(
+                P.raise_,
+                currg.apply(P.exception, "Type mismatch.")
+            )
+            currg.debug.name = 'type_error'
 
         g.set_flags(core=False)
         return g.output
