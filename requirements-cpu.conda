@@ -4,5 +4,6 @@ numpy
 abergeron::tvm
 pytest
 pytest-cov
+pytest-timeout
 flake8==3.7.7
 pydocstyle==2.1.1
