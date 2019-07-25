@@ -1,3 +1,5 @@
+"""Run the graph using the debug VM."""
+
 import numpy as np
 
 from . import Backend
@@ -32,6 +34,7 @@ class NumPyBackend(Backend):
         return arg
 
     def configure(self, pip):
+        """Configure the pipeline for numpy runtime."""
         from myia.pipeline.steps import step_debug_export
         return pip.insert_before('compile', export=step_debug_export) \
                   .configure(compile=False, backend=self)

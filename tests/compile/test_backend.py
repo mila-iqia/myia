@@ -83,7 +83,7 @@ def test_env_backend():
 
         os.environ['MYIA_BACKEND'] = 'relay?target=cpu&device_id=0'
         assert parse_env() == ('relay', {'target': 'cpu',
-                                             'device_id': '0'})
+                                         'device_id': '0'})
     finally:
         # Make sure we don't switch the default for other tests.
         if before is None:

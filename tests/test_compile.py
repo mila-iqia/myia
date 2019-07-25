@@ -1,3 +1,4 @@
+import pytest
 from pytest import mark
 from copy import copy
 import numpy as np
@@ -15,7 +16,7 @@ from .common import to_abstract_test
 
 
 backend = load_backend(None)
-if backend.__class__.__name__ ==  'NumPyBackend':
+if backend.__class__.__name__ == 'NumPyBackend':
     pytest.skip("can't test compile with the numpy backend")
 
 compile_pipeline = backend.configure(standard_pipeline)

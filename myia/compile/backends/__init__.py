@@ -69,7 +69,7 @@ def get_default():
 
 
 def parse_env():
-    """Parses the environement-specified backend (if any)
+    """Parses the environement-specified backend (if any).
 
     Returns name and options from the environement. See the
     documentation of get_default() for the backend string syntax.
