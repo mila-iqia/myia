@@ -4,6 +4,10 @@ from .env import (  # noqa
     smap, SymbolicKeyInstance, EnvInstance, newenv
 )
 
+from .errors import (  # noqa
+    MyiaInputTypeError,
+)
+
 from .intern import (  # noqa
     Interned, InternedMC, EqKey, Atom, AttrEK, ItemEK, eqkey, deep_eqkey,
     RecursionException, eq, hash, hashrec, eqrec, IncompleteException,
