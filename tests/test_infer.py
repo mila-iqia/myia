@@ -896,6 +896,8 @@ Tf4 = Tuple[f64, f64, f64, f64]
     (Thing_f, 0),
     (5, 5),
     (Point3D(5, 7, 9), 0),
+    (U(ai64_of(2, 5), [f32]), f64),
+    (U([i64], [f32]), 1.0),
 )
 def test_hastype_2(x):
 
@@ -934,6 +936,33 @@ def test_union(x):
         return x
     else:
         return x[0]
+
+
+@pytest.mark.xfail(
+    reason="user_switch can't process conditions that partly depend on type"
+)
+@infer_std(
+    (U(i64, (i64, i64)), i64),
+)
+def test_union_2(x):
+    def condition(x):
+        return hastype(x, i64) and x > 0
+
+    if condition(x):
+        return x
+    else:
+        return -1
+
+
+@infer_std(
+    (U(i64, None), i64),
+    (None, 0),
+)
+def test_union_nil(x):
+    if x is None:
+        return 0
+    else:
+        return x
 
 
 @infer_std(

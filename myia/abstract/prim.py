@@ -43,7 +43,7 @@ from .data import (
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context
 from .utils import sensitivity_transform, build_value, \
-    type_token, broaden, type_to_abstract, split_type, hastype_helper
+    type_token, broaden, type_to_abstract, hastype_helper
 from .infer import Inferrer, to_abstract
 
 
@@ -894,14 +894,24 @@ class _CastRemapper(CloneRemapper):
 
 class _UserSwitchInferrer(Inferrer):
 
-    async def _special_hastype(self, engine, outref,
-                               xref, typref,
-                               condref, tbref, fbref):
+    async def type_trials(self, engine, focus, outref,
+                          opnode, argrefs,
+                          condref, tbref, fbref):
         """Handle `user_switch(hastype(x, typ), tb, fb)`.
 
         We want to evaluate tb in a context where x has type typ and fb
         in a context where it doesn't.
         """
+        def cond_trial(cg, opt):
+            # For each possible type we make a "cond trial" which replaces the
+            # focus input in the condition function by one that's cast to the
+            # type. We can thus check if the value of the condition depends
+            # directly on the type.
+            return cg.apply(opnode,
+                            *nodes[:focus],
+                            cg.apply(P.unsafe_static_cast, nodes[focus], opt),
+                            *nodes[focus + 1:])
+
         async def wrap(branch_ref, branch_type):
             # We transform branch_graph into a new graph which refers to a cast
             # version of x. We also transform all of the children of x's graph
@@ -924,12 +934,32 @@ class _UserSwitchInferrer(Inferrer):
             engine.mng.add_graph(rval)
             return rval
 
-        xg = xref.node.graph
-
+        nodes = [ref.node for ref in argrefs]
+        xref = argrefs[focus]
         fulltype = await xref.get()
-        typ = (await typref.get()).values[VALUE]
-        typ = type_to_abstract(typ)
-        tbtyp, fbtyp = split_type(fulltype, typ)
+        assert isinstance(fulltype, AbstractUnion)
+
+        xg = xref.node.graph
+        cg = condref.node.graph
+        cond_trials = [cond_trial(cg, t) for t in fulltype.options]
+        results = [await engine.ref(node, condref.context).get()
+                   for node in cond_trials]
+
+        groups = {True: [], False: [], ANYTHING: []}
+
+        for t, result in zip(fulltype.options, results):
+            assert isinstance(result, AbstractScalar)
+            assert result.values[TYPE] is dtype.Bool
+            value = result.values[VALUE]
+            groups[value].append(t)
+
+        if groups[ANYTHING]:
+            return await self.default(engine, outref, condref, tbref, fbref)
+
+        from .utils import union_simplify
+        from functools import reduce
+        tbtyp = union_simplify(groups[True])
+        fbtyp = union_simplify(groups[False])
 
         if tbtyp is None:
             return fbref
@@ -937,9 +967,13 @@ class _UserSwitchInferrer(Inferrer):
             return tbref
         else:
             g = outref.node.graph
+            new_conds = [g.apply(P.hastype, xref.node, t)
+                         for t in groups[True]]
+            new_cond = reduce(lambda x, y: g.apply(P.bool_or, x, y),
+                              new_conds)
             new_tb = await wrap(tbref, tbtyp)
             new_fb = await wrap(fbref, fbtyp)
-            new_node = g.apply(P.switch, condref.node, new_tb, new_fb)
+            new_node = g.apply(P.switch, new_cond, new_tb, new_fb)
             return engine.ref(new_node, outref.context)
 
     async def _find_op(self, engine, condref):
@@ -951,9 +985,22 @@ class _UserSwitchInferrer(Inferrer):
             ops = (await opref.get()).get_sync()
             if len(ops) == 1:
                 op, = ops
-                if isinstance(op, PrimitiveFunction):
-                    return op.prim, [engine.ref(a, ctx) for a in args]
-        return None, None
+                argrefs = [engine.ref(a, ctx) for a in args]
+                argtypes = [await arg.get() for arg in argrefs]
+                for i, arg in enumerate(argtypes):
+                    if isinstance(arg, AbstractUnion):
+                        return i + 1, opnode, argrefs
+        return None, None, None
+
+    async def default(self, engine, outref, condref, tbref, fbref):
+        g = outref.node.graph
+        _, cond, tb, fb = outref.node.inputs
+        condt = await condref.get()
+        if not engine.check_predicate(Bool, type_token(condt)):
+            to_bool = engine.pipeline.resources.convert(bool)
+            cond = g.apply(to_bool, cond)
+        newnode = g.apply(P.switch, cond, tb, fb)
+        return engine.ref(newnode, outref.context)
 
     async def reroute(self, engine, outref, argrefs):
         check_nargs(P.switch, 3, argrefs)
@@ -966,21 +1013,13 @@ class _UserSwitchInferrer(Inferrer):
                     ' is hastype on a Union.'
                 )
 
-        op, args = await self._find_op(engine, condref)
-        if op is not None:
-            method = getattr(self, f'_special_{op.name}', None)
-            if method is not None:
-                return await method(engine, outref, *args,
-                                    condref, tbref, fbref)
+        focus, opnode, args = await self._find_op(engine, condref)
+        if focus is not None:
+            return await self.type_trials(engine, focus - 1, outref,
+                                          opnode, args, condref,
+                                          tbref, fbref)
 
-        g = outref.node.graph
-        _, cond, tb, fb = outref.node.inputs
-        condt = await condref.get()
-        if not engine.check_predicate(Bool, type_token(condt)):
-            to_bool = engine.pipeline.resources.convert(bool)
-            cond = g.apply(to_bool, cond)
-        newnode = g.apply(P.switch, cond, tb, fb)
-        return engine.ref(newnode, outref.context)
+        return await self.default(engine, outref, condref, tbref, fbref)
 
 
 abstract_inferrer_constructors[P.user_switch] = _UserSwitchInferrer.partial()
