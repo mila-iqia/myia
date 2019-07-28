@@ -243,6 +243,9 @@ gadd_switch = psub(
 ##############################
 
 
+_ArrayType = Var('ArrayType')
+
+
 @overload
 def _transform(pattern: tuple):
     f, *args = pattern
@@ -256,7 +259,7 @@ def _transform(pattern: Var):
 
 @overload  # noqa: F811
 def _transform(pattern: (int, float)):
-    return (P.distribute, (P.scalar_to_array, pattern, AA),
+    return (P.distribute, (P.scalar_to_array, pattern, _ArrayType),
             var(_is_c))
 
 
