@@ -1,5 +1,5 @@
 
-from myia.composite import hyper_add
+from myia.composite import gadd
 from myia.opt import lib
 from myia.prim.py_implementations import \
     scalar_add, scalar_mul, tuple_setitem, identity, partial, switch, \
@@ -204,7 +204,7 @@ def test_env_get_add():
         return env_getitem(env_add(e1, e2), embed(x), 0)
 
     def after(x, y):
-        return hyper_add(x, x)
+        return gadd(x, x)
 
     _check_opt(before, after,
                lib.getitem_env_add,

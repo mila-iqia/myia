@@ -306,6 +306,9 @@ step_opt = Optimizer.partial(
             optlib.lmadd_zero_l,
             optlib.lmadd_zero_r,
             optlib.lmadd_setitem_zero,
+            optlib.gadd_zero_l,
+            optlib.gadd_zero_r,
+            optlib.gadd_switch,
         ],
         main2=[
             # Costlier optimizations
@@ -349,8 +352,12 @@ step_opt2 = Optimizer.partial(
             optlib.lmadd_zero_l,
             optlib.lmadd_zero_r,
             optlib.lmadd_setitem_zero,
+            optlib.gadd_zero_l,
+            optlib.gadd_zero_r,
+            optlib.gadd_switch,
             optlib.setitem_dead,
         ],
+        cse=CSE.partial(report_changes=False),
     )
 )
 

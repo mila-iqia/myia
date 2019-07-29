@@ -313,9 +313,9 @@ class Monomorphizer:
             generalized, outval = self._find_generalized(inf)
             if generalized is not None:
                 return generalized, outval
-            raise Unspecializable(POLY, tuple(choices.keys()))
+            raise Unspecializable(POLY, (a, *choices.keys()))
         else:
-            raise Unspecializable(POLY, tuple(choices.keys()))
+            raise Unspecializable(POLY, (a, *choices.keys()))
 
     ###########
     # Collect #

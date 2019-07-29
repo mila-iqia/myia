@@ -600,7 +600,10 @@ class AbstractUnion(AbstractStructure):
     def __init__(self, options):
         """Initialize an AbstractUnion."""
         super().__init__({})
-        self.options = Possibilities(options)
+        if isinstance(options, Pending):
+            self.options = options
+        else:
+            self.options = Possibilities(options)
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
@@ -621,7 +624,10 @@ class AbstractTaggedUnion(AbstractStructure):
     def __init__(self, options):
         """Initialize an AbstractTaggedUnion."""
         super().__init__({})
-        self.options = TaggedPossibilities(options)
+        if isinstance(options, Pending):
+            self.options = options
+        else:
+            self.options = TaggedPossibilities(options)
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)

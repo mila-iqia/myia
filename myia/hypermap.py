@@ -2,6 +2,7 @@
 
 import numpy as np
 from dataclasses import is_dataclass
+from functools import reduce
 
 from . import operations, composite as C, abstract
 from .abstract import MyiaTypeError, broaden
@@ -16,6 +17,8 @@ nonleaf_defaults = (
     abstract.AbstractList,
     abstract.AbstractTuple,
     abstract.AbstractClassBase,
+    abstract.AbstractUnion,
+    abstract.AbstractTaggedUnion,
 )
 
 
@@ -41,6 +44,7 @@ class HyperMap(MetaGraph):
                  fn_rec=None,
                  broadcast=True,
                  nonleaf=nonleaf_defaults,
+                 trust_union_match=False,
                  name=None):
         """Initialize a HyperMap."""
         if name is None:
@@ -53,11 +57,24 @@ class HyperMap(MetaGraph):
         self._rec = fn_rec
         self.fn_rec = fn_rec or self
         self.broadcast = broadcast
+        self.trust_union_match = trust_union_match
         self.nonleaf = nonleaf
+        self._through = (*nonleaf,
+                         abstract.Possibilities,
+                         abstract.TaggedPossibilities)
+
+    async def normalize_args(self, args):
+        """Return broadened arguments."""
+        res = [await abstract.force_through(arg, self._through)
+               for arg in args]
+        return self.normalize_args_sync(res)
 
     def normalize_args_sync(self, args):
         """Return broadened arguments."""
         return tuple(broaden(a) for a in args)
+
+    def _name(self, graph, info):
+        graph.debug.name = f'{self.name}[{info}]'
 
     def _is_nonleaf(self, arg):
         return isinstance(arg, self.nonleaf)
@@ -67,8 +84,89 @@ class HyperMap(MetaGraph):
 
     _make = Overload(name='hypermap._make')
 
+    def _make_union_helper(self, a, options, g, fnarg, argmap):
+        # Options must be a list of (tag, type) pairs. If the tag is None,
+        # we generate hastype, unsafe_static_cast and tagged(x)
+        # Else we generate hastag, casttag and tagged(x, tag)
+        trust = self.trust_union_match or len(argmap) == 1
+
+        self._name(g, f'U')
+
+        for a2, isleaf in argmap.values():
+            if not isleaf and a != a2:
+                raise MyiaTypeError(f'Union mismatch: {a} != {a2}')
+
+        currg = g
+
+        for i, (tag, t) in enumerate(options):
+            is_last = i == len(options) - 1
+            if tag is None:
+                terms = [currg.apply(P.hastype, arg, t)
+                         for arg, (_, nonleaf) in argmap.items()]
+            else:
+                terms = [currg.apply(P.hastag, arg, tag)
+                         for arg, (_, nonleaf) in argmap.items()]
+            if trust:
+                terms = terms[:1]
+
+            cond = reduce(lambda x, y: currg.apply(P.bool_and, x, y),
+                          terms)
+
+            if is_last and trust:
+                trueg = currg
+            else:
+                trueg = Graph()
+                self._name(trueg, f'U✓{tag}')
+
+            if tag is None:
+                args = [arg if isleaf
+                        else trueg.apply(P.unsafe_static_cast, arg, t)
+                        for arg, (_, isleaf) in argmap.items()]
+            else:
+                args = [arg if isleaf
+                        else trueg.apply(P.casttag, arg, tag)
+                        for arg, (_, isleaf) in argmap.items()]
+
+            if fnarg is None:
+                val = trueg.apply(self.fn_rec, *args)
+            else:
+                val = trueg.apply(self.fn_rec, fnarg, *args)
+
+            if tag is None:
+                trueg.output = trueg.apply(P.tagged, val)
+            else:
+                trueg.output = trueg.apply(P.tagged, val, tag)
+
+            if not (is_last and trust):
+                falseg = Graph()
+                currg.output = currg.apply(
+                    currg.apply(P.switch, cond, trueg, falseg)
+                )
+                currg = falseg
+
+        if currg.return_ is None:
+            currg.output = currg.apply(
+                P.raise_,
+                currg.apply(P.exception, "Type mismatch.")
+            )
+            currg.debug.name = 'type_error'
+
+        g.set_flags(core=False)
+        return g.output
+
+    @_make.register
+    def _make(self, a: abstract.AbstractUnion, g, fnarg, argmap):
+        options = [[None, x] for x in a.options]
+        return self._make_union_helper(a, options, g, fnarg, argmap)
+
+    @_make.register
+    def _make(self, a: abstract.AbstractTaggedUnion, g, fnarg, argmap):
+        return self._make_union_helper(a, a.options, g, fnarg, argmap)
+
     @_make.register
     def _make(self, t: abstract.AbstractArray, g, fnarg, argmap):
+        self._name(g, 'A')
+
         if fnarg is None:
             fnarg = self.fn_leaf
 
@@ -90,6 +188,7 @@ class HyperMap(MetaGraph):
 
     @_make.register
     def _make(self, a: abstract.AbstractTuple, g, fnarg, argmap):
+        self._name(g, 'T')
         for a2, isleaf in argmap.values():
             if not isleaf and len(a2.elements) != len(a.elements):
                 raise MyiaTypeError(f'Tuple length mismatch: {a} != {a2}')
@@ -107,6 +206,7 @@ class HyperMap(MetaGraph):
 
     @_make.register
     def _make(self, a: abstract.AbstractList, g, fnarg, argmap):
+        self._name(g, 'L')
         args = list(argmap.keys())
         mask = [not isleaf for _, isleaf in argmap.values()]
         if all(mask):
@@ -160,8 +260,8 @@ class HyperMap(MetaGraph):
     def generate_graph(self, all_args):
         """Create a graph for mapping over the given args."""
         g = Graph()
-        g.debug.name = 'hyper_map'
-        g.set_flags('core', 'reference')
+        g.debug.name = self.name
+        g.set_flags('core', 'reference', metagraph=self)
         argmap = {}
         if self.fn_leaf is None:
             fn_t, *args = all_args

@@ -25,6 +25,7 @@ from .utils import (  # noqa
     typecheck,
     split_type,
     hastype_helper,
+    force_through,
 )
 
 

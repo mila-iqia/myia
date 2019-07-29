@@ -5,10 +5,11 @@ import typing
 import numpy as np
 from functools import reduce
 from itertools import chain
-from types import GeneratorType
+from types import GeneratorType, AsyncGeneratorType
 
 from .. import dtype
-from ..utils import overload, is_dataclass_type, dataclass_methods, intern
+from ..utils import overload, is_dataclass_type, dataclass_methods, intern, \
+    ADT
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
@@ -34,6 +35,7 @@ from .data import (
     AbstractUnion,
     AbstractTaggedUnion,
     AbstractBottom,
+    AbstractError,
     TrackDict,
     PartialApplication,
     JTransformedFunction,
@@ -142,7 +144,10 @@ def type_to_abstract(self, t: type):
                       if isinstance(field.type, (str, type(None)))
                       else self(field.type)
                       for name, field in fields.items()}
-        return AbstractClass(t, attributes, dataclass_methods(t))
+        if issubclass(t, ADT):
+            return AbstractADT(t, attributes, dataclass_methods(t))
+        else:
+            return AbstractClass(t, attributes, dataclass_methods(t))
 
     elif t is object:
         return ANYTHING
@@ -565,7 +570,7 @@ def broaden(self, d: TrackDict, *args):
 @_is_broad.variant(
     initial_state=lambda: CheckState(cache={}, prop=None)
 )
-def _is_tentative(self, x: Possibilities, loop):
+def _is_tentative(self, x: (Possibilities, TaggedPossibilities), loop):
     return False
 
 
@@ -588,8 +593,12 @@ def tentative(self, p: Possibilities, loop):
         d: The abstract data to clone.
         loop: The InferenceLoop, used to broaden Possibilities.
     """
-    bp = Possibilities([self(v, loop) for v in p])
-    return loop.create_pending_tentative(tentative=bp)
+    return loop.create_pending_tentative(tentative=p)
+
+
+@overload  # noqa: F811
+def tentative(self, p: TaggedPossibilities, loop):
+    return loop.create_pending_tentative(tentative=p)
 
 
 ###############
@@ -613,6 +622,127 @@ def sensitivity_transform(self, x: AbstractFunction):
 @overload  # noqa: F811
 def sensitivity_transform(self, x: AbstractJTagged):
     return self(x.element)
+
+
+#################
+# Force through #
+#################
+
+
+async def _force_through_post(x):
+    return intern(await x)
+
+
+@overload.wrapper(
+    initial_state=lambda: {},
+    postprocess=_force_through_post,
+)
+async def force_through(__call__, self, x, through):
+    """Clone an abstract value (asynchronous)."""
+    if not isinstance(x, through) and not isinstance(x, Pending):
+        return x
+    cache = self.state
+    if isinstance(x, AbstractValue) and x in cache:
+        return cache[x]
+
+    call = __call__(self, x, through)
+    if isinstance(call, AsyncGeneratorType):
+        cls = await call.asend(None)
+        inst = cls.empty()
+        cache[x] = inst
+        constructor = _make_constructor(inst)
+        rval = await call.asend(constructor)
+        assert rval is inst
+        return rval
+    else:
+        return await call
+
+
+# Uncomment and test the other implementations if/when needed:
+
+
+# @overload  # noqa: F811
+# async def force_through(self, x: AbstractScalar, through):
+#     return AbstractScalar(await self(x.values, through))
+
+
+# @overload  # noqa: F811
+# async def force_through(self, x: AbstractFunction, through):
+#     yield (yield AbstractFunction)(*(await self(x.get_sync(), through)))
+
+
+# @overload  # noqa: F811
+# async def force_through(self, d: TrackDict, through):
+#     return {k: await self(v, through) for k, v in d.items()}
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractTuple, through):
+    yield (yield AbstractTuple)(
+        [(await self(y, through)) for y in x.elements],
+        await self(x.values, through)
+    )
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractList, through):
+    yield (yield AbstractList)(await self(x.element, through),
+                               await self(x.values, through))
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractArray, through):
+    yield (yield type(x))(await self(x.element, through),
+                          await self(x.values, through))
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractClassBase, through):
+    yield (yield type(x))(
+        x.tag,
+        {k: (await self(v, through)) for k, v in x.attributes.items()},
+        x.methods,
+        await self(x.values, through)
+    )
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractUnion, through):
+    yield (yield AbstractUnion)(await self(x.options, through))
+
+
+@overload  # noqa: F811
+async def force_through(self, x: AbstractTaggedUnion, through):
+    opts = await self(x.options, through)
+    yield (yield AbstractTaggedUnion)(opts)
+
+
+@overload  # noqa: F811
+async def force_through(self, x: Possibilities, through):
+    return Possibilities([await self(v, through) for v in x])
+
+
+@overload  # noqa: F811
+async def force_through(self, x: TaggedPossibilities, through):
+    return TaggedPossibilities([[i, await self(v, through)] for i, v in x])
+
+
+# @overload  # noqa: F811
+# async def force_through(self, x: PartialApplication, through):
+#     return PartialApplication(
+#         await self(x.fn, through),
+#         [await self(arg, through) for arg in x.args]
+#     )
+
+
+@overload  # noqa: F811
+async def force_through(self, x: Pending, through):
+    return await self(await x, through)
+
+
+# @overload  # noqa: F811
+# async def force_through(self, x: object, through):
+#     return x
 
 
 #########
@@ -666,7 +796,12 @@ def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
         assert not isinstance(new_tentative, Pending)
         x1.tentative = new_tentative
         return x1
-    assert not isinstance(x2, PendingTentative)
+    if isinstance(x2, PendingTentative):
+        new_tentative = self(x1, x2.tentative, forced,
+                             bind_pending, accept_pending)
+        assert not isinstance(new_tentative, Pending)
+        x2.tentative = new_tentative
+        return new_tentative if forced else x2
     if (isp1 or isp2) and (not accept_pending or not bind_pending):
         if forced and isp1:
             raise MyiaTypeError('Cannot have Pending here.')
@@ -790,6 +925,16 @@ def amerge(self, x1: AbstractScalar, x2, forced, bp):
 
 
 @overload  # noqa: F811
+def amerge(self, x1: AbstractError, x2, forced, bp):
+    e1 = x1.values[VALUE]
+    e2 = x2.values[VALUE]
+    e = self(e1, e2, forced, bp)
+    if forced or e is e1:
+        return x1
+    return AbstractError(e)
+
+
+@overload  # noqa: F811
 def amerge(self, x1: AbstractFunction, x2, forced, bp):
     values = self(x1.get_sync(), x2.get_sync(), forced, bp)
     if forced or values is x1.values:
@@ -853,8 +998,7 @@ def amerge(self, x1: (AbstractUnion, AbstractTaggedUnion),
     args1 = x1.options
     args2 = x2.options
     merged = self(args1, args2, forced, bp)
-    if forced or merged is args1:  # pragma: no cover
-        # Covered in the next PR
+    if forced or merged is args1:
         return x1
     return type(x1)(merged)
 

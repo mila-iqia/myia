@@ -18,7 +18,8 @@ from .py_implementations import \
     scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
     scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
     array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
-    reshape, scalar_cast, typeof, invert_permutation, list_setitem
+    reshape, scalar_cast, typeof, invert_permutation, list_setitem, \
+    tagged, casttag
 
 
 parse = standard_pipeline \
@@ -299,6 +300,24 @@ def __fprop__switch(jcond, jtb, jfb):
                 switch(cond, dout, zeros_like(fb)),
                 switch(cond, zeros_like(tb), dout))
     return rval, __bprop__switch
+
+
+@register_bprop(primops.hastag, ignore_values=False)
+def bprop_hastag(x, t, out, dout):
+    """Backpropagator for primitive `hastag`."""
+    return (zeros_like(x), zeros_like(t))
+
+
+@register_bprop(primops.casttag, ignore_values=False)
+def bprop_casttag(x, t, out, dout):
+    """Backpropagator for primitive `casttag`."""
+    return (tagged(dout, t), zeros_like(t))
+
+
+@register_bprop(primops.tagged, ignore_values=False)
+def bprop_tagged(x, t, out, dout):
+    """Backpropagator for primitive `tagged`."""
+    return (casttag(dout, t), zeros_like(t))
 
 
 class MakeTupleGradient(MetaGraph):
