@@ -2,7 +2,7 @@ python>=3.7,<3.8a0
 colorama
 numpy
 abergeron/label/cuda::tvm-libs
-abergeron::tvm
+abergeron::tvm>=0.6dev+1
 pytest
 pytest-cov
 pytest-timeout
