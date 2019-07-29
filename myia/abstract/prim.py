@@ -580,16 +580,45 @@ class _GetAttrInferrer(Inferrer):
         check_nargs(P.getattr, 2, argrefs)
         r_data, r_item = argrefs
         data = await r_data.get()
-        item = await r_item.get()
-        policy, newref = await static_getter(
-            engine, data, item,
-            fetch=getattr,
-            on_dcattr=_getattr_on_dcattr,
-            chk=_getattr_chk,
-            outref=outref,
-            dataref=r_data,
-        )
-        return newref if policy == 'reroute' else None
+
+        if isinstance(data, AbstractUnion):
+            g = outref.node.graph
+            currg = g
+            opts = await force_pending(data.options)
+            for i, opt in enumerate(opts):
+                last = (i == len(opts) - 1)
+                if last:
+                    falseg = None
+                    cast = currg.apply(P.unsafe_static_cast, r_data.node, opt)
+                    out = currg.apply(P.getattr, cast, r_item.node)
+                else:
+                    trueg = Graph()
+                    falseg = Graph()
+                    cond = currg.apply(P.hastype, r_data.node, opt)
+                    cast = trueg.apply(P.unsafe_static_cast, r_data.node, opt)
+                    trueg.output = trueg.apply(P.getattr, cast, r_item.node)
+                    engine.mng.add_graph(trueg)
+                    out = currg.apply(P.switch, cond, trueg, falseg)
+                    out = currg.apply(out)
+                if currg is g:
+                    rval = out
+                else:
+                    currg.output = out
+                    engine.mng.add_graph(currg)
+                currg = falseg
+            return engine.ref(rval, outref.context)
+
+        else:
+            item = await r_item.get()
+            policy, newref = await static_getter(
+                engine, data, item,
+                fetch=getattr,
+                on_dcattr=_getattr_on_dcattr,
+                chk=_getattr_chk,
+                outref=outref,
+                dataref=r_data,
+            )
+            return newref if policy == 'reroute' else None
 
     async def run(self, engine, outref, argrefs):
         check_nargs(P.getattr, 2, argrefs)

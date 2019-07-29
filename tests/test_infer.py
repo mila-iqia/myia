@@ -1,4 +1,5 @@
 
+from dataclasses import dataclass
 import pytest
 import operator
 import numpy as np
@@ -1067,6 +1068,29 @@ def test_getattr_multitype(x, y):
 )
 def test_getattr_shape():
     return data.a25
+
+
+@dataclass
+class C1:
+    value: object
+
+    def f(self, x):
+        return x + self.value
+
+
+@dataclass
+class C2:
+    value: object
+
+    def f(self, x):
+        return x * self.value
+
+
+@infer(
+    (U(C1(2), C2(5)), i64, i64)
+)
+def test_getattr_union(c, x):
+    return c.f(x)
 
 
 _getattr = getattr
