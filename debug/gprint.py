@@ -785,7 +785,7 @@ def cosmetic_transformer(g):
         _opt_fancy_transpose,
         _opt_fancy_sum,
         _opt_fancy_unsafe_static_cast,
-        # _opt_fancy_scalar_to_array,
+        _opt_fancy_scalar_to_array,
         _opt_fancy_array_to_scalar,
         _opt_fancy_hastag,
         _opt_fancy_casttag,
