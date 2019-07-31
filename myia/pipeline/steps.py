@@ -10,13 +10,14 @@ from itertools import count
 from .. import dtype
 from ..abstract import AbstractTuple, AbstractList, AbstractClassBase, \
     AbstractDict, AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE, \
-    AbstractTaggedUnion, VALUE, ANYTHING
+    AbstractTaggedUnion, VALUE, ANYTHING, empty
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, simplify_types, NodeMap, \
     LocalPassOptimizer, DeadDataElimination, type_to_tag
 from ..prim import vm_registry
-from ..utils import overload, no_prof, TaggedValue, MyiaInputTypeError
+from ..utils import overload, no_prof, TaggedValue, MyiaInputTypeError, \
+    Cons, Empty, list_to_cons
 from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
 from ..vm import VM
@@ -309,7 +310,6 @@ step_opt = Optimizer.partial(
             optlib.gadd_zero_l,
             optlib.gadd_zero_r,
             optlib.gadd_switch,
-
             optlib.incorporate_call_through_switch,
         ],
         main2=[
@@ -532,12 +532,28 @@ def convert_arg(self, arg, orig_t: AbstractDict, backend):
 
 @overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractClassBase, backend):
-    if not isinstance(arg, orig_t.tag):
-        raise MyiaInputTypeError(f'Expected {orig_t.tag.__qualname__}')
-    arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
-    oe = list(orig_t.attributes.values())
-    return tuple(self(x, o, backend)
-                 for x, o in zip(arg, oe))
+    if orig_t.tag is Empty:
+        if arg != []:
+            raise MyiaInputTypeError(f'Expected empty list')
+        return ()
+    elif orig_t.tag is Cons:
+        if not isinstance(arg, list):
+            raise MyiaInputTypeError(f'Expected list')
+        ot = orig_t.attributes['head']
+        li = list(self(x, ot, backend) for x in arg)
+        rval = TaggedValue(type_to_tag(empty), ())
+        for elem in reversed(li):
+            rval = TaggedValue(type_to_tag(orig_t), (elem, rval))
+        return rval.value
+    else:
+        if not isinstance(arg, orig_t.tag):
+            raise MyiaInputTypeError(f'Expected {orig_t.tag.__qualname__}')
+        arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
+        oe = list(orig_t.attributes.values())
+        res = tuple(self(x, o, backend)
+                    for x, o in zip(arg, oe))
+        # breakpoint()
+        return res
 
 
 @overload  # noqa: F811
@@ -615,6 +631,17 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
                    return_backend):
     # If the EraseClass opt was applied, orig_t may be Class
     orig_is_class = isinstance(orig_t, AbstractClassBase)
+    if orig_is_class:
+        if orig_t.tag is Empty:
+            return []
+        elif orig_t.tag is Cons:
+            rval = []
+            while res:
+                value = self(res[0], orig_t.attributes['head'],
+                             vm_t.elements[0], backend, return_backend)
+                rval.append(value)
+                res = res[1].value
+            return rval
     orig_is_dict = isinstance(orig_t, AbstractDict)
     if orig_is_class:
         oe = orig_t.attributes.values()

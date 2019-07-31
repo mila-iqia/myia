@@ -9,7 +9,7 @@ from types import GeneratorType, AsyncGeneratorType
 
 from .. import dtype
 from ..utils import overload, is_dataclass_type, dataclass_methods, intern, \
-    ADT
+    ADT, Cons, Empty
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
@@ -44,6 +44,7 @@ from .data import (
     SHAPE,
     MyiaTypeError,
     TypeMismatchError,
+    listof,
 )
 
 
@@ -183,7 +184,13 @@ def pytype_to_abstract(main: tuple, args):
 @overload  # noqa: F811
 def pytype_to_abstract(main: list, args):
     arg, = args
-    return AbstractList(type_to_abstract(arg))
+    argt = type_to_abstract(arg)
+    assert argt is ANYTHING
+    rval = AbstractUnion([
+        type_to_abstract(Empty),
+        type_to_abstract(Cons)
+    ])
+    return rval
 
 
 @overload  # noqa: F811
@@ -745,6 +752,22 @@ async def force_through(self, x: Pending, through):
 #     return x
 
 
+############
+# Nobottom #
+############
+
+
+@abstract_check.variant
+def nobottom(self, x: AbstractBottom):
+    """Check whether bottom appears anywhere in this type."""
+    return False
+
+
+@overload  # noqa: F811
+def nobottom(self, x: Pending, *args):
+    return True
+
+
 #########
 # Merge #
 #########
@@ -1076,7 +1099,7 @@ def bind(loop, committed, resolved, pending):
             return None
         if any(is_simple(x) for x in chain([committed], resolved, pending)):
             return 1000
-        elif any(isinstance(x, AbstractBottom) for x in resolved):
+        elif any(not nobottom(x) for x in resolved):
             # Bottom is always lower-priority
             return None
         else:
@@ -1182,13 +1205,22 @@ def split_type(t, model):
 
 def hastype_helper(value, model):
     """Helper to implement hastype."""
-    match, nomatch = split_type(value, model)
-    if match is None:
-        return False
-    elif nomatch is None:
-        return True
+    if isinstance(model, AbstractUnion):
+        results = [hastype_helper(value, opt) for opt in model.options]
+        if any(r is True for r in results):
+            return True
+        elif all(r is False for r in results):
+            return False
+        else:
+            return ANYTHING
     else:
-        return ANYTHING
+        match, nomatch = split_type(value, model)
+        if match is None:
+            return False
+        elif nomatch is None:
+            return True
+        else:
+            return ANYTHING
 
 
 #########################

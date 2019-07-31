@@ -325,14 +325,6 @@ def array_setitem(data, item, value):
     return data2
 
 
-@register(primops.list_append)
-def list_append(data, value):
-    """Implement `list_append`."""
-    data2 = copy(data)
-    data2.append(value)
-    return data2
-
-
 @vm_register(primops.getattr)
 def _vm_getattr(vm, data, attr):
     """Implement `getattr`."""
@@ -344,7 +336,10 @@ def _vm_getattr(vm, data, attr):
     try:
         x = getattr(data, attr)
     except AttributeError:
-        t = type_token(typeof(data))
+        if isinstance(data, list):
+            t = list
+        else:
+            t = type_token(typeof(data))
         mmap = vm.convert.resources.method_map[t]
         if attr in mmap:
             return Partial(vm.convert(mmap[attr]), [data], vm)
