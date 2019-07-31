@@ -178,6 +178,12 @@ def bprop_scalar_lt(x, y, out, dout):
     return (zeros_like(x), zeros_like(y))
 
 
+@register_bprop(primops.scalar_eq)
+def bprop_scalar_eq(x, y, out, dout):
+    """Backpropagator for primitive `scalar_eq`."""
+    return (zeros_like(x), zeros_like(y))
+
+
 @register_bprop(primops.scalar_ge)
 def bprop_scalar_ge(x, y, out, dout):
     """Backpropagator for primitive `scalar_ge`."""
@@ -319,6 +325,18 @@ def bprop_casttag(x, t, out, dout):
 def bprop_tagged(x, t, out, dout):
     """Backpropagator for primitive `tagged`."""
     return (casttag(dout, t), zeros_like(t))
+
+
+@register_bprop(primops.raise_)
+def bprop_raise_(x, out, dout):
+    """Backpropagator for primitive `raise_`."""
+    raise x
+
+
+@register_bprop(primops.exception)
+def bprop_exception(x, out, dout):
+    """Backpropagator for primitive `exception`."""
+    return x,
 
 
 class MakeTupleGradient(MetaGraph):
