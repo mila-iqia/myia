@@ -7,7 +7,8 @@ from myia import dtype
 
 from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
-from .utils import keyword_decorator, overload, MyiaInputTypeError
+from .utils import keyword_decorator, overload, MyiaInputTypeError, \
+    Cons, Empty
 from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
     AbstractList, AbstractArray, AbstractScalar, AbstractClassBase
 from .compile.backends import load_backend, Backend
@@ -129,16 +130,17 @@ def _convert_arg_init(self, arg, orig_t: AbstractTuple, backend):
 
 
 @overload  # noqa: F811
-def _convert_arg_init(self, arg, orig_t: AbstractList, backend):
-    ot = orig_t.element
-    return [self(x, ot, backend) for x in arg]
-
-
-@overload  # noqa: F811
 def _convert_arg_init(self, arg, orig_t: AbstractClassBase, backend):
-    arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
-    oe = list(orig_t.attributes.values())
-    return orig_t.constructor(*(self(x, o, backend) for x, o in zip(arg, oe)))
+    if orig_t.tag is Empty:
+        return []
+    elif orig_t.tag is Cons:
+        ot = orig_t.attributes['head']
+        return [self(x, ot, backend) for x in arg]
+    else:
+        arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
+        oe = list(orig_t.attributes.values())
+        return orig_t.constructor(*(self(x, o, backend)
+                                    for x, o in zip(arg, oe)))
 
 
 @overload  # noqa: F811

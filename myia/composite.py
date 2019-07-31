@@ -702,10 +702,8 @@ is_not = IsCompare(do_not=True)
 def list_reduce(fn, lst, dftl):
     """Implementation of list_reduce."""
     res = dftl
-    i = 0
-    while i < len(lst):
-        res = fn(res, lst[i])
-        i = i + 1
+    for elem in lst:
+        res = fn(res, elem)
     return res
 
 

@@ -25,6 +25,7 @@ from .data import (
     AbstractList,
     AbstractDict,
     AbstractClassBase,
+    AbstractADT,
     AbstractJTagged,
     AbstractBottom,
     AbstractUnion,
@@ -471,13 +472,23 @@ async def _inf_make_tuple(self, engine, *args):
     return AbstractTuple(args)
 
 
-@standard_prim(P.make_list)
-async def _inf_make_list(self, engine, *args):
-    if len(args) == 0:
-        raise NotImplementedError('Cannot make empty lists.')
-    else:
-        res = engine.abstract_merge(*args)
-    return AbstractList(res)
+class _MakeListInferrer(Inferrer):
+    async def reroute(self, engine, outref, argrefs):
+        from ..utils.misc import Cons, Empty
+        from .data import listof
+        g = outref.node.graph
+        lst = g.apply(Empty)
+        argtypes = [await arg.get() for arg in argrefs]
+        if argtypes == []:
+            return engine.ref(lst, outref.context)
+        restype = engine.abstract_merge(*argtypes)
+        for arg in reversed(argrefs):
+            lst = g.apply(Cons, arg.node, lst)
+        rval = g.apply(P.unsafe_static_cast, lst, listof(restype))
+        return engine.ref(rval, outref.context)
+
+
+abstract_inferrer_constructors[P.make_list] = _MakeListInferrer.partial()
 
 
 @standard_prim(P.make_dict)
@@ -509,10 +520,12 @@ async def infer_type_make_record(self, engine, _cls: AbstractType, *elems):
                 f'to have type {elem} but got {t}'
             )
 
+    wrap = broaden if type(cls) is AbstractADT else None
+
     return type(cls)(
         cls.tag,
         {
-            name: elem
+            name: wrap(elem) if wrap else elem
             for (name, _), elem in zip(expected, elems)
         },
         cls.methods,

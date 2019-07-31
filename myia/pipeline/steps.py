@@ -309,6 +309,8 @@ step_opt = Optimizer.partial(
             optlib.gadd_zero_l,
             optlib.gadd_zero_r,
             optlib.gadd_switch,
+
+            optlib.incorporate_call_through_switch,
         ],
         main2=[
             # Costlier optimizations

@@ -225,12 +225,6 @@ standard_method_map = TypeMap({
         '__myia_next__': C.tuple_next,
         '__myia_hasnext__': C.tuple_hasnext,
     },
-    abstract.AbstractList: {
-        '__len__': P.list_len,
-        '__getitem__': P.list_getitem,
-        '__setitem__': P.list_setitem,
-        '__myia_iter__': C.list_iter,
-    },
     abstract.AbstractDict: {
         '__getitem__': P.dict_getitem,
     },
@@ -333,7 +327,6 @@ class ConverterResource(PipelineResource):
             np.float32: dtype.Float,
             np.float64: dtype.Float,
             tuple: abstract.AbstractTuple,
-            list: abstract.AbstractList,
         }
         mmap = self.resources.method_map
         for t1, t2 in type_map.items():

@@ -10,7 +10,7 @@ from contextvars import ContextVar
 
 from ..debug.label import label
 from ..utils import Named, Partializable, Interned, Atom, AttrEK, \
-    PossiblyRecursive, OrderedSet
+    PossiblyRecursive, OrderedSet, dataclass_methods, Cons, Empty
 from ..ir import Graph, MetaGraph
 from ..prim import Primitive
 
@@ -767,6 +767,21 @@ class TypeMismatchError(MyiaTypeError):
         super().__init__(message)
         self.expected = expected
         self.got = got
+
+
+##########################
+# List-related utilities #
+##########################
+
+
+empty = AbstractADT(Empty, {}, dataclass_methods(Empty))
+
+
+def listof(t):
+    rval = AbstractADT.new(Cons, {'head': t, 'tail': None},
+                           dataclass_methods(Cons))
+    rval.attributes['tail'] = AbstractUnion.new([empty, rval])
+    return rval.intern()
 
 
 #############################
