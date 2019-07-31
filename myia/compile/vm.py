@@ -339,6 +339,15 @@ class FinalVM:
         tag = self.backend.to_scalar(self._ref(tag))
         self._push(x.cast(tag))
 
+    def inst_unsafe_static_cast(self, x, type):
+        """No-op.
+
+        Arguments:
+           x: Value
+           type: the type to static cast to (ignored)
+        """
+        self._push(self._ref(x))
+
     def inst_env_getitem(self, env, idx, default):
         """Get an item from a grad environment."""
         env = self._ref(env)
