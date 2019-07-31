@@ -334,7 +334,8 @@ def test_tup(x, y):
 
 @infer((i64, i64, [i64]),
        (i64, f64, InferenceError),
-       ([ai64_of(8, 3)], [ai64_of(4, 3)], [[ai64_of(ANYTHING, 3)]]),
+       ([i64], [i64], [[i64]]),
+       # ([ai64_of(8, 3)], [ai64_of(4, 3)], [[ai64_of(ANYTHING, 3)]]),
        (ai64_of(4, 7), ai64_of(4, 7), [ai64_of(4, 7)]),
        (ai64_of(4, 7), ai64_of(9, 7), [ai64_of(ANYTHING, 7)]))
 def test_list(x, y):
@@ -349,10 +350,9 @@ def test_list_and_scalar(x, y):
     return [x, y, 3]
 
 
-# @infer(type=[(L[Problem[VOID]],)],
-#        shape=[(InferenceError,)])
-# def test_list_empty():
-#     return []
+@infer(([],))
+def test_list_empty():
+    return []
 
 
 @infer(
@@ -380,16 +380,6 @@ def test_dict2(x, y):
 )
 def test_tuple_len(xs):
     return P.tuple_len(xs)
-
-
-@infer(
-    ((i64, f64), InferenceError),
-    ([f64], i64),
-    (af64_of(2, 5), InferenceError),
-    (i64, InferenceError),
-)
-def test_list_len(xs):
-    return P.list_len(xs)
 
 
 @infer(
@@ -449,17 +439,6 @@ def test_tuple_outofbound_negative(x, y):
     return (x, y)[-3]
 
 
-@infer(
-    ([i64], i64, i64),
-    ([f64], i64, f64),
-    ([f64], f64, InferenceError),
-    (f64, i64, InferenceError),
-    ((i64, f64), i64, InferenceError)
-)
-def test_list_getitem(xs, i):
-    return xs[i]
-
-
 @infer((D(x=i64), i64),
        (D(y=f32), InferenceError))
 def test_dict_getitem(d):
@@ -481,15 +460,6 @@ def test_dict_getitem_nonconst(d, i):
 )
 def test_tuple_setitem(xs, idx, x):
     return tuple_setitem(xs, idx, x)
-
-
-@infer(
-    ([i64], i64, i64, [i64]),
-    ([i64], f64, i64, InferenceError),
-    ([i64], i64, f64, InferenceError),
-)
-def test_list_setitem(xs, idx, x):
-    return list_setitem(xs, idx, x)
 
 
 @infer((i64, f64, (i64, f64)))
@@ -832,30 +802,6 @@ def test_not(x):
 
 
 @infer(
-    ([i64], [f64], ([i64], [f64])),
-    ([i64], f64, InferenceError),
-)
-def test_list_map_prim(xs, ys):
-
-    def square(x):
-        return x * x
-
-    return list_map_prim(square, xs), list_map_prim(square, ys)
-
-
-@infer(
-    ([i64], [i64], [i64]),
-    ([i64], [f64], InferenceError),
-)
-def test_list_map_prim2(xs, ys):
-
-    def mulm(x, y):
-        return x * -y
-
-    return list_map_prim(mulm, xs, ys)
-
-
-@infer(
     (i64, True),
     (f64, False),
 )
@@ -873,7 +819,7 @@ def test_hastype_simple(x):
     ((i64, i64), Ty(Tuple[i64, i64]), True),
     ((i64, i64), Ty(Tuple[float, float]), False),
     ((i64, i64), Ty(ANYTHING), InferenceError),
-    ([i64], Ty(List[i64]), True),
+    ([i64], Ty(List), True),
     (None, Ty(Nil), True),
 )
 def test_hastype(x, y):
@@ -1017,21 +963,6 @@ def test_hastag_casttag(x):
         return 1234
     else:
         return casttag(x, 37)[0]
-
-
-@infer_std(
-    ([i64], i64, [i64]),
-    ([f64], i64, InferenceError),
-    ([ai64_of(2, 3)], ai64_of(2, 3), [ai64_of(2, 3)]),
-)
-def test_map_2(xs, z):
-
-    def adder(x):
-        def f(y):
-            return x + y
-        return f
-
-    return list_map_prim(adder(z), xs)
 
 
 def _square(x):
@@ -1302,18 +1233,6 @@ def test_array_reduce(ary, shp):
     def f(a, b):
         return a + b
     return array_reduce(f, ary, shp)
-
-
-@infer_std(
-    ([i64], i64, i64),
-    ([i64], f64, InferenceError),
-    ([ai64_of(6, 7)], ai64_of(6, 7), ai64_of(6, 7)),
-    ([ai64_of(6, 7)], ai64_of(6, 17), InferenceError),
-)
-def test_list_reduce(lst, dflt):
-    def f(a, b):
-        return a + b
-    return list_reduce(f, lst, dflt)
 
 
 @infer((i64, i64))
@@ -1757,7 +1676,7 @@ def test_dataclass_call(thing):
 
 hyper_map_notuple = HyperMap(
     nonleaf=(abstract.AbstractArray,
-             abstract.AbstractList,
+             abstract.AbstractUnion,
              abstract.AbstractClassBase)
 )
 hyper_map_nobroadcast = HyperMap(broadcast=False)
@@ -1780,7 +1699,7 @@ hyper_map_nobroadcast = HyperMap(broadcast=False)
 
     # Generic broadcasting tests
     ([f64], f64, [f64]),
-    ([f64], [[f64]], [[f64]]),
+    ([[f64]], [[f64]], [[f64]]),
     ((i64, i64), i64, (i64, i64)),
     (i64, (i64, i64), (i64, i64)),
     (Point(i64, i64), i64, Point(i64, i64)),
@@ -1826,7 +1745,7 @@ def test_gadd(x, y):
 @infer(
     (i64, 0),
     (f64, 0.0),
-    ([f64], [f64]),  # NOTE: not sure why not [0.0] but it's not important
+    ([f64], [f64]),  # list element types are broadened
     ((i64, f64), (0, 0.0)),
     (Point(i64, i64), Point(0, 0)),
     (ai64_of(2, 5), ai64_of(2, 5, value=0)),
@@ -1844,39 +1763,6 @@ def test_zeros_like_fn(x):
     def f(y):
         return x + y
     return zeros_like(f)
-
-
-@infer(
-    ([i64], [f64], ([i64], [f64])),
-    ([i64], f64, InferenceError),
-)
-def test_list_map(xs, ys):
-
-    def square(x):
-        return x * x
-
-    return list_map(square, xs), list_map(square, ys)
-
-
-@infer(
-    ([i64], [i64], [i64]),
-    ([i64], [f64], InferenceError),
-)
-def test_list_map2(xs, ys):
-
-    def mulm(x, y):
-        return x * -y
-
-    return list_map(mulm, xs, ys)
-
-
-@infer((InferenceError,))
-def test_list_map0():
-
-    def f():
-        return 1234
-
-    return list_map(f)
 
 
 @infer(

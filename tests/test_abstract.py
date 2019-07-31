@@ -17,10 +17,10 @@ from myia.abstract import (
     Pending, type_to_abstract,
     InferenceError
 )
-from myia.utils import SymbolicKeyInstance
+from myia.utils import SymbolicKeyInstance, Cons, Empty
 from myia.ir import Constant
 
-from .common import Point, to_abstract_test, i16, f32, Ty, af32_of, S
+from .common import Point, to_abstract_test, i16, f32, Ty, af32_of, S, U
 
 
 def test_to_abstract():
@@ -171,9 +171,6 @@ def test_repr():
     t1 = to_abstract_test((1, f32))
     assert repr(t1) == f'AbstractTuple((Int[64] = 1, Float[32]))'
 
-    l1 = to_abstract_test([f32])
-    assert repr(l1) == f'AbstractList([Float[32]])'
-
     a1 = to_abstract_test(af32_of(4, 5))
     assert repr(a1) == f'AbstractArray(Float[32] x 4 x 5)'
 
@@ -193,9 +190,9 @@ def test_repr():
     f1 = AbstractFunction(P.scalar_mul)
     assert repr(f1) == 'AbstractFunction(scalar_mul)'
 
-    tu1 = AbstractTaggedUnion([[13, s2], [4, l1]])
+    tu1 = AbstractTaggedUnion([[13, s2], [4, to_abstract_test(i16)]])
     assert repr(tu1) == \
-        'AbstractTaggedUnion(U(4 :: [Float[32]], 13 :: Float[32]))'
+        'AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))'
 
 
 def test_repr_recursive():
@@ -284,5 +281,7 @@ def test_find_coherent_result_sync():
 
 def test_type_to_abstract():
     assert type_to_abstract(bool) is S(t=ty.Bool)
-    assert type_to_abstract(typing.List) is L(ANYTHING)
+    assert (type_to_abstract(typing.List)
+            is U(type_to_abstract(Empty),
+                 type_to_abstract(Cons)))
     assert type_to_abstract(typing.Tuple) is T(ANYTHING)

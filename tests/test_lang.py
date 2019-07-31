@@ -316,7 +316,7 @@ def test_if_return_in_while(x):
 #################
 
 
-@parse_compare(([1, 2, 3, 4],))
+@parse_compare(((1, 2, 3, 4),))
 def test_for(xs):
     result = 0
     for x in xs:

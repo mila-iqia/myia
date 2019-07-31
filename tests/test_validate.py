@@ -30,6 +30,9 @@ test_whitelist = frozenset({
     P.partial,
     P.switch,
     P.return_,
+    P.tagged,
+    P.hastag,
+    P.casttag,
 })
 
 
@@ -133,11 +136,11 @@ def test_clean():
     def f2(x, y):
         return partial(make_record, Point, x)(y)
 
-    @valid_after_ec([Point_a])
+    @valid_after_ec((Point_a, Point_a))
     def f3(xs):
         def f(pt):
             return pt.x + pt.y
-        return list_map(f, xs)
+        return f(xs[0]), f(xs[1])
 
     @valid_after_ec(i64, i64)
     def f4(x, y):
