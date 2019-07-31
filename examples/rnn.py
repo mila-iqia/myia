@@ -59,7 +59,7 @@ def rnn_parameters(*layer_sizes, batch_size, seed=123123):
     W = param(R, i, h)
     U = param(R, h, h)
     b = param(R, 1, h)
-    h0 = param(R, batch_size, h)
+    h0 = param(R, 1, h)
     parameters = [(W, U, b, h0)]
 
     for i, o in zip((h, *rest[:-1]), rest):

@@ -72,8 +72,8 @@ def lstm_parameters(*layer_sizes, batch_size, seed=6666):
     b_c = param(R, 1, h)
     b_o = param(R, 1, h)
 
-    s0 = numpy.zeros((batch_size, h), dtype=dtype)
-    c0 = numpy.zeros((batch_size, h), dtype=dtype)
+    s0 = numpy.zeros((1, h), dtype=dtype)
+    c0 = numpy.zeros((1, h), dtype=dtype)
 
     parameters = [(
         W_i, W_f, W_c, W_o,
