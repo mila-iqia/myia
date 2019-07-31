@@ -72,7 +72,7 @@ class Cons(ADT):
         return self.head, self.tail
 
 
-@dataclass
+@dataclass  # pragma: no cover
 class Empty(ADT):
     """Empty list."""
 
