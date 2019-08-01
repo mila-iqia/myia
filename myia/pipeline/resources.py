@@ -227,6 +227,7 @@ standard_method_map = TypeMap({
     },
     abstract.AbstractDict: {
         '__getitem__': P.dict_getitem,
+        'values': P.dict_values,
     },
     abstract.AbstractArray: {
         '__add__': C.add,

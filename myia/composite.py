@@ -8,7 +8,7 @@ from functools import reduce
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractTuple, \
     AbstractClassBase, build_value, AbstractError, TYPE, AbstractScalar, \
-    AbstractUnion, AbstractTaggedUnion
+    AbstractUnion, AbstractTaggedUnion, AbstractDict
 from .abstract.data import check_nargs
 from .debug.label import short_labeler
 from .dtype import Array, Number, Bool, \
@@ -623,7 +623,7 @@ def _array_zero(xs):
 zeros_like = HyperMap(
     name='zeros_like',
     nonleaf=(AbstractTuple, AbstractClassBase,
-             AbstractUnion, AbstractTaggedUnion),
+             AbstractUnion, AbstractTaggedUnion, AbstractDict),
     fn_leaf=_leaf_zeros_like
 )
 

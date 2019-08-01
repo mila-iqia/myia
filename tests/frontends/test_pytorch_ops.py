@@ -1,26 +1,34 @@
 
 import pytest
-import numpy as np
+from pytest import mark
+from copy import copy, deepcopy
+from types import FunctionType
 
-from myia import myia, value_and_grad, grad
-from myia.debug import traceback  # noqa
-from myia.abstract import MyiaTypeError
-from myia.api import to_device
+from myia.abstract import from_value, AbstractJTagged
+from myia.pipeline import standard_resources, standard_pipeline, \
+    PipelineDefinition, steps, pipeline_function
+from myia.composite import grad
+from myia.debug.finite_diff import clean_args
+from myia.grad import J as realJ
+from myia.pipeline.steps import Validator
+from myia.prim import ops as P, Primitive
+from myia.utils import Profile  # , no_prof
+from myia.validate import whitelist, validate_abstract
+from myia.abstract.data import SHAPE, TYPE, VALUE, ANYTHING, AbstractScalar
 
-from ..common import MA
+from ..common import f32, MA, to_abstract_test
 
 torch = pytest.importorskip("torch")
 nn = torch.nn
-
-from myia.frontends.pytorch import pytorch_dtype_to_type  # noqa: E402
+F = torch.nn.functional
 
 from myia.frontends import activate_frontend  # noqa: E402
 activate_frontend('pytorch')
 
+from myia.frontends.pytorch_abstract_types import \
+    AbstractPyTorchTensor  # noqa: E402
 
-def test_pytorch_dtype_to_type():
-    with pytest.raises(TypeError):
-        pytorch_dtype_to_type("fake_pytorch_type")
+compile_pipeline = standard_pipeline
 
 
 # Uncomment this line to print values at specific precision
@@ -64,13 +72,7 @@ class Args():
 
 args = Args()
 
-from pytest import mark
-from copy import copy
-from myia.abstract import from_value
-from myia.pipeline import standard_pipeline
-compile_pipeline = standard_pipeline
 
-#def parse_compare_exp(*tests, optimize=True, python=True, profile=no_prof):
 def compare_fwd(*tests, optimize=True, python=True, profile=False):
     """Decorate a function to parse and run it against pure Python.
 
@@ -93,37 +95,16 @@ def compare_fwd(*tests, optimize=True, python=True, profile=False):
             if not isinstance(args, tuple):
                 args = (args,)
 
-            _fwd_test(fn, args, pipeline=fwd_pipeline, optimize=optimize, python=python, profile=profile)
+            _fwd_test(fn, args,
+                      pipeline=fwd_pipeline,
+                      optimize=optimize,
+                      python=python,
+                      profile=profile)
 
         m = mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
         return m
     return decorate
-
-
-import pytest
-from pytest import mark
-import numpy as np
-from types import FunctionType
-from dataclasses import dataclass
-
-from myia.abstract import from_value, AbstractJTagged, InferenceError
-from myia.api import myia
-from myia.pipeline import standard_resources, standard_pipeline
-from myia.composite import grad, value_and_grad
-from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
-from myia.grad import J as realJ
-from myia.pipeline import pipeline_function, PipelineDefinition, steps
-from myia.pipeline.steps import Validator
-from myia.prim import ops as P, Primitive
-from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
-    array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
-    distribute, dot, reshape, transpose, scalar_cast
-from myia.prim.py_implementations import py_registry as pyi
-from myia.validate import whitelist, validate_abstract
-from myia.ir import Graph
-
-from ..common import f64, f32, u64, MA, MB, to_abstract_test, AA
 
 
 grad_whitelist = whitelist | {P.J, P.Jinv}
@@ -163,79 +144,107 @@ grad_pipeline = PipelineDefinition(
         specialize=steps.step_specialize,
         opt=steps.step_debug_opt,
         validate=step_grad_validate,
+        # compile=steps.step_compile,
         export=steps.step_debug_export,
     )
 )
 
-def pt_fn_wrap(fn):
-    def pt_fn(*args, **kwargs):
-        a = fn(*args, **kwargs)
-        #print("args", args)
-        try:
-            args[0].grad.data.zero_()
-        except:
-            pass
-        a.backward()
-        return args
-    return pt_fn
+"""
+backend = args.backend
+backend_options = get_backend_options(args, backend)
 
-from myia.abstract.data import SHAPE, TYPE, VALUE, ANYTHING, AbstractScalar
-from myia.frontends.pytorch import AbstractPyTorchTensor
+standard_pipeline = \
+standard_pipeline.configure({
+            'compile.backend': backend,
+            'compile.backend_options': backend_options,
+        })
 
-APT_loss = AbstractPyTorchTensor(AbstractScalar({TYPE: f32, VALUE: ANYTHING}), {SHAPE: (1,)})
+grad_pipeline = \
+grad_pipeline.configure({
+            'compile.backend': backend,
+            'compile.backend_options': backend_options,
+        })
+#"""
 
 
-def _fwd_test(fn, args, pipeline=standard_pipeline, optimize=True, python=True, profile=False):
+# TODO: should this also return grads with respect to kwargs
+def pt_fn_grads(fn, *args, **kwargs):
+    output = fn(*args, **kwargs)
+    return torch.autograd.grad(
+        output, args, torch.ones(output.shape))
+
+
+APT_loss = AbstractPyTorchTensor(
+    AbstractScalar({TYPE: f32, VALUE: ANYTHING}), {SHAPE: (1,)})
+APT_0d_loss = AbstractPyTorchTensor(
+    AbstractScalar({TYPE: f32, VALUE: ANYTHING}), {SHAPE: ()})
+
+
+def _fwd_test(fn, args, pipeline=standard_pipeline,
+              optimize=True, python=True, profile=False):
     if python:
         ref_result = fn(*map(copy, args))
     argspec = tuple(from_value(arg, broaden=True) for arg in args)
     if profile is True:
         profile = Profile()
-    #res = pipeline.run(input=fn, argspec=argspec, profile=profile)
+    # res = pipeline.run(input=fn, argspec=argspec, profile=profile)
     res = pipeline.run(input=fn, argspec=argspec)
-    #profile.print()
+    # profile.print()
     myia_fn = res['output']
     myia_result = myia_fn(*map(copy, args))
     if python:
-        print("ref_result", ref_result)
-        print("myia_result", myia_result)
-        assert torch.allclose(ref_result, myia_result)
+        # print("ref_result", ref_result)
+        # print("myia_result", myia_result)
+        assert torch.allclose(ref_result, myia_result, equal_nan=True)
+        assert ref_result.shape == myia_result.shape
+
+    return tuple(myia_result.shape)
 
 
 def _grad_test(fn, obj, args,
-               #sens_type=f32,
-               sens_type=APT_loss,
+               sens_type,
                pipeline=grad_pipeline,
                rel_error=1e-3):
 
-    pt_grad = pt_fn_wrap(fn)
-    pytorch_grad = pt_grad(*args)[0].grad
+    pytorch_grads = pt_fn_grads(fn, *args)
+
+    sens_type_shape = sens_type
+    if sens_type == ():
+        sens_type = APT_0d_loss
+    elif sens_type == (1,):
+        sens_type = APT_loss
+    else:
+        sens_type = AbstractPyTorchTensor(
+            AbstractScalar({TYPE: f32, VALUE: ANYTHING}), {SHAPE: sens_type})
 
     pipeline = standard_pipeline
     pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
-    #pipeline = standard_pipeline
     argspec = tuple(from_value(arg, broaden=True) for arg in clean_args(args))
     sens_type = to_abstract_test(sens_type)
     if isinstance(obj, FunctionType):
         res = pipeline.run(input=obj, argspec=[*argspec, sens_type])
-        #res = pipeline.run(input=obj, argspec=[*argspec])
     else:
         pip = pipeline.configure(parse=False)
         res = pip.run(graph=obj, argspec=[*argspec, sens_type])
 
     if sens_type == APT_loss:
         sens = torch.Tensor([1.0])
-    elif sens_type == AbstractScalar({TYPE: f32, VALUE: ANYTHING}):
-        sens = 1.0
+    elif sens_type == APT_0d_loss:
+        sens = torch.Tensor([1.0]).reshape(())
+    else:
+        sens = torch.ones(sens_type_shape)
 
-    myia_grad = res['output'](*args, sens)
+    myia_grads = res['output'](*args, sens)
 
-    print("pytorch_grad", pytorch_grad)
-    print("myia_grad", myia_grad)
+    for pt_g, my_g in zip(pytorch_grads, myia_grads):
+        # print("pytorch_grad", pt_g)
+        # print("myia_grad", my_g)
+        assert torch.allclose(
+            pt_g, my_g, rtol=1e-05, atol=1e-06, equal_nan=True)
 
-    assert torch.allclose(pytorch_grad, myia_grad[0])
 
-def compare_bwd(*tests, sens_type=APT_loss, pipeline=grad_pipeline, rel_error=1e-3):
+def compare_bwd(*tests, sens_type=APT_loss, pipeline=grad_pipeline,
+                rel_error=1e-3):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -252,7 +261,8 @@ def compare_bwd(*tests, sens_type=APT_loss, pipeline=grad_pipeline, rel_error=1e
             if not isinstance(args, tuple):
                 args = (args,)
 
-            _grad_test(fn, fn, args, pipeline=pipeline, rel_error=rel_error, sens_type=sens_type)
+            _grad_test(fn, fn, args, pipeline=pipeline, rel_error=rel_error,
+                       sens_type=sens_type)
 
         m = pytest.mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
@@ -260,7 +270,9 @@ def compare_bwd(*tests, sens_type=APT_loss, pipeline=grad_pipeline, rel_error=1e
     return decorate
 
 
-def compare_fwd_and_bwd(*tests, optimize=True, python=True, profile=False, sens_type=APT_loss, pipeline=grad_pipeline, rel_error=1e-3):
+def compare_fwd_and_bwd(*tests, optimize=True, python=True, profile=False,
+                        sens_type=APT_0d_loss, pipeline=grad_pipeline,
+                        rel_error=1e-3):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -277,116 +289,135 @@ def compare_fwd_and_bwd(*tests, optimize=True, python=True, profile=False, sens_
 
     def decorate(fn):
         def test(args):
-            #TODO: "nonlocal profile" maybe should be be made nonlocal inside of _fwd_test
-            #nonlocal profile
             if not isinstance(args, tuple):
                 args = (args,)
-            _fwd_test(fn, args, pipeline=fwd_pipeline, optimize=optimize, python=python, profile=profile)
-            _grad_test(fn, fn, args, pipeline=pipeline, rel_error=rel_error, sens_type=sens_type)
+            out_shape = _fwd_test(fn, args, pipeline=fwd_pipeline,
+                                  optimize=optimize, python=python,
+                                  profile=profile)
+            _grad_test(fn, fn, args, pipeline=pipeline,
+                       rel_error=rel_error, sens_type=out_shape)
 
         m = pytest.mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
         return m
     return decorate
-    
+
 
 '''
 def _name_args_helper(name, args):
-    return [('sigmoid', args) for arg in args]
+    return [(name, args) for arg in args]
+    #'''
 
-#TODO
-@pytest.mark.parametrize('name,arg', 
-                    _name_args_helper('sigmoid', ((nn.Parameter(torch.Tensor([2.1]))), 
-                                                (nn.Parameter(torch.Tensor([-2.0]))))
-                                     )
-                    )
-#@pytest.mark.parametrize()
-def test_ops(name, arg):
-    code = f"""
-    def fn1(x):
-        return x.{name}()
-    def fn2(x):
-        return torch.{name}(x)
-    """
 
-    ns = {}
-    exec(code, ns)
-    fn1 = ns['fn1']
-
-    _fwd_test(fn1, args, pipeline=fwd_pipeline, optimize=optimize, python=python, profile=profile)
-    _grad_test(fn1, fn1, args, pipeline=pipeline, rel_error=rel_error, sens_type=sens_type)
-
-    fn2 = ns['fn2']
-    
-    _fwd_test(fn2, args, pipeline=fwd_pipeline, optimize=optimize, python=python, profile=profile)
-    _grad_test(fn2, fn2, args, pipeline=pipeline, rel_error=rel_error, sens_type=sens_type)
-#'''
-
-"""
 # THIS TEST ALL OPS that are in dir of "torch" or "torch.tensor"
+# all_torch_ops = dir(torch)
+# all_torch_tensor_ops = dir(torch.Tensor([5.49670]))
 
-all_torch_ops = dir(torch)
-all_torch_tensor_ops = dir(torch.Tensor([5.49670]))
-torch_tensor_args_exp = ((nn.Parameter(torch.Tensor([2.1]))))
+
+all_torch_ops__1_tensor_arg = all_torch_tensor_ops__1_tensor_arg = \
+    [
+        'exp',
+        'log',
+        'relu',
+        'sigmoid',
+        'sum',
+        'tanh',
+    ]
+"""
+[
+'relu',
+]
+"""
+
+
+single_tensor_args = (
+    (nn.Parameter(torch.Tensor([2.1]).reshape(()))),
+    (nn.Parameter(torch.Tensor([2.1]))),
+    (nn.Parameter(torch.Tensor([-2.2]))),
+    (nn.Parameter(torch.Tensor(MA(2, 3)))),
+)
+
 
 @pytest.mark.parametrize(
     'name,args',
-    [(op, torch_tensor_args_exp) for op in all_torch_ops]
-    )
-#@pytest.mark.timeout(1)
-def test_torch_ops(name, args):
+    [(op, single_tensor_args) for op in all_torch_ops__1_tensor_arg]
+)
+@pytest.mark.timeout(5)
+def test_torch_ops__1_tensor_arg(name, args):
     def fn1(x):
         return getattr(torch, name)(x)
 
     if not isinstance(args, tuple):
         args = (args,)
 
-    _fwd_test(fn1, args)
-    _grad_test(fn1, fn1, args)
+    for arg in args:
+        out_shape = _fwd_test(fn1, (arg,))
+        _grad_test(fn1, fn1, (arg,), sens_type=out_shape)
 
 
 @pytest.mark.parametrize(
     'name,args',
-    [(op, torch_tensor_args_exp) for op in all_torch_tensor_ops]
-    )
-def test_torch_tensor_ops(name, args):
+    [(op, single_tensor_args) for op in all_torch_tensor_ops__1_tensor_arg]
+)
+@pytest.mark.timeout(5)
+def test_torch_tensor_ops__1_tensor_arg(name, args):
     def fn1(x):
         return getattr(x, name)()
 
     if not isinstance(args, tuple):
         args = (args,)
 
-    _fwd_test(fn1, args)
-    _grad_test(fn1, fn1, args)
-#"""
+    for arg in args:
+        out_shape = _fwd_test(fn1, (arg,))
+        _grad_test(fn1, fn1, (arg,), sens_type=out_shape)
 
 
-@compare_fwd_and_bwd((nn.Parameter(torch.Tensor([2.1]))), 
-                     (nn.Parameter(torch.Tensor([-2.0]))))
-def test_op_torch_tanh(x):
-    return torch.tanh(x)
+all_torch_ops__1_tensor_arg__fwd_only = \
+    all_torch_tensor_ops__1_tensor_arg__fwd_only = \
+    [
+        'zeros_like',
+    ]
 
-@compare_fwd_and_bwd((nn.Parameter(torch.Tensor([2.1]))), 
-                     (nn.Parameter(torch.Tensor([-2.0]))))
-def test_op_tensor_tanh(x):
-    return x.tanh()
+'''
+@pytest.mark.parametrize(
+    'name,args',
+    [(op, single_tensor_args) for op in all_torch_ops__1_tensor_arg__fwd_only]
+    )
+@pytest.mark.timeout(5)
+def test_torch_ops__1_tensor_arg__fwd_only(name, args):
+    def fn1(x):
+        return getattr(torch, name)(x)
 
-@compare_fwd_and_bwd((nn.Parameter(torch.Tensor([2.1]))), 
-                     (nn.Parameter(torch.Tensor([-2.0]))))
-def test_op_torch_sigmoid(x):
-    return torch.sigmoid(x)
 
-@compare_fwd_and_bwd((nn.Parameter(torch.Tensor([2.1]))), 
-                     (nn.Parameter(torch.Tensor([-2.0]))))
-def test_op_tensor_sigmoid(x):
-    return x.sigmoid()
+    if not isinstance(args, tuple):
+        args = (args,)
 
-@compare_fwd_and_bwd((nn.Parameter(torch.Tensor([2.1]))), 
-                     (nn.Parameter(torch.Tensor([-2.0]))))
-def test_op_torch_exp(x):
-    return torch.exp(x)
 
-@compare_fwd_and_bwd((nn.Parameter(torch.Tensor([2.1]))), 
-                     (nn.Parameter(torch.Tensor([-2.0]))))
-def test_op_tensor_exp(x):
-    return x.exp()
+    for arg in args:
+        out_shape = _fwd_test(fn1, (arg,))
+
+
+@pytest.mark.parametrize(
+    'name,args',
+    [(op, single_tensor_args) for op
+     in all_torch_tensor_ops__1_tensor_arg__fwd_only]
+    )
+@pytest.mark.timeout(5)
+def test_torch_tensor_ops__1_tensor_arg__fwd_only(name, args):
+    def fn1(x):
+        return getattr(x, name)()
+
+    if not isinstance(args, tuple):
+        args = (args,)
+
+    for arg in args:
+        out_shape = _fwd_test(fn1, (arg,))
+#'''
+
+all_torch_ops__2_args = all_torch_tensor_ops____2_args = \
+    [
+        'reshape',
+        'sum',  # version with dim arg to reduce over
+        't',
+        'view',
+    ]

@@ -102,6 +102,14 @@ def scalar_floor(x: Number) -> Number:
     return np.floor(x)
 
 
+@register(primops.scalar_max)
+def scalar_max(x: Number, y: Number) -> Number:
+    """Implement `scalar_max`."""
+    _assert_scalar(x)
+    _assert_scalar(y)
+    return np.maximum(x, y)
+
+
 @register(primops.scalar_uadd)
 def scalar_uadd(x: Number) -> Number:
     """Implement `scalar_uadd`."""

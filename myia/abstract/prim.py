@@ -417,6 +417,7 @@ uniform_prim(P.scalar_mod)(py.scalar_mod)
 uniform_prim(P.scalar_pow)(py.scalar_pow)
 uniform_prim(P.scalar_trunc)(py.scalar_trunc)
 uniform_prim(P.scalar_floor)(py.scalar_floor)
+uniform_prim(P.scalar_max)(py.scalar_max)
 uniform_prim(P.scalar_uadd, infer_value=True)(py.scalar_uadd)
 uniform_prim(P.scalar_usub, infer_value=True)(py.scalar_usub)
 uniform_prim(P.scalar_exp)(py.scalar_exp)
@@ -552,6 +553,11 @@ async def _inf_dict_getitem(self, engine, arg: AbstractDict, idx):
     if idx_v not in arg.entries:
         raise MyiaTypeError(f'Invalid index for indexed dictionary')
     return arg.entries[idx_v]
+
+
+@standard_prim(P.dict_values)
+async def _inf_dict_values(self, engine, arg: AbstractDict):
+    return AbstractTuple(list(arg.entries.values()))
 
 
 @standard_prim(P.tuple_setitem)

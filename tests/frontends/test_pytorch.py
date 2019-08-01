@@ -299,7 +299,7 @@ def test_module_2_layer_mlp_update():
     def cost(model, inp, target):
         value = model(inp)
         loss = mse(value, target)
-        return loss.item()
+        return loss
 
     @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
@@ -403,3 +403,190 @@ def test_pytorch_scalar(_backend_fixture):
         return a + b
 
     c = step_add(_a, _b)  # noqa: F841
+
+
+class MLP_2_Layers_Seq(nn.Module):
+    def __init__(self, i_size, h_size, o_size):
+        super(MLP_2_Layers_Seq, self).__init__()
+        self.f1 = nn.Linear(i_size, h_size)
+        self.a = nn.Tanh()
+        self.f2 = nn.Linear(h_size, o_size)
+
+        self.f = nn.Sequential(
+            self.f1,
+            self.a,
+            self.f2,
+            self.a,
+        )
+
+    def forward(self, x):
+        x = self.f(x)
+        return x
+
+
+class Linear_Seq(nn.Module):
+    def __init__(self, i_size, h_size, o_size):
+        super(Linear_Seq, self).__init__()
+        self.f1 = nn.Linear(i_size, h_size)
+
+        self.f = nn.Sequential(
+            self.f1,
+        )
+
+    def forward(self, x):
+        x = self.f(x)
+        return x
+
+
+def test_module_2_layer_mlp_seq_fwd():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
+    model = MLP_2_Layers_Seq(4, 2, 3)
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model, inp):
+        return model(inp)
+    output = step(model, inp)
+
+    output_expected = torch.Tensor(
+        [[-0.55702960,  0.85518718,  0.13796528],
+         [-0.67215765, -0.09247651, -0.38900381]])
+
+    assert torch.allclose(output, output_expected)
+
+
+"""
+def test_module_2_layer_mlp_seq_bwd():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
+    model = MLP_2_Layers_Seq(4, 2, 3)
+    target = torch.Tensor([2.5])
+
+    def mse(value, target):
+        diff = value - target
+        return sum(diff * diff)
+
+    def cost(model, inp, target):
+        value = model(inp)
+        loss = mse(value, target)
+        return loss.item()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model, inp, target):
+        _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
+        return _cost, dmodel
+    loss, grad = step(model, inp, target)
+
+    assert loss == 42.759910583496094
+
+    expected_grads = [
+        torch.Tensor([[-1.51596880, -7.51286650,  3.24008656,  2.31766868],
+                      [-5.04396868,  6.33524609, -3.62623000, 16.01710510]]),
+        torch.Tensor([1.85057139, 1.95227396]),
+        torch.Tensor([[-0.65377355,  4.39202595],
+                      [-4.45504284,  1.24591899],
+                      [-1.77709150,  4.90630770]]),
+        torch.Tensor([-7.69495678, -6.02438641, -9.53780556])
+    ]
+
+    print()
+    for n, g in grad.named_parameters():
+        print("g", n, g)
+
+    for g, eg in zip(grad.parameters(), expected_grads):
+        assert torch.allclose(g, eg)
+
+
+def test_module_linear_seq_bwd():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
+    #model = Linear_Seq(4, 2, 3)
+    model = MLP_2_Layers_Seq(4, 2, 3)
+    target = torch.Tensor([2.5])
+
+    def mse(value, target):
+        diff = value - target
+        return sum(diff * diff)
+
+    def cost(model, inp, target):
+        value = model(inp)
+        loss = mse(value, target)
+        return loss.item()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model, inp, target):
+        _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
+        return _cost, dmodel
+    loss, grad = step(model, inp, target)
+
+    #assert loss == 42.759910583496094
+
+    expected_grads = [
+        torch.Tensor([[-1.51596880, -7.51286650,  3.24008656,  2.31766868],
+                      [-5.04396868,  6.33524609, -3.62623000, 16.01710510]]),
+        torch.Tensor([1.85057139, 1.95227396]),
+        torch.Tensor([[-0.65377355,  4.39202595],
+                      [-4.45504284,  1.24591899],
+                      [-1.77709150,  4.90630770]]),
+        torch.Tensor([-7.69495678, -6.02438641, -9.53780556])
+    ]
+
+    # print()
+    # for n, g in grad.named_parameters():
+    #     print("g", n, g)
+
+    for g, eg in zip(grad.parameters(), expected_grads):
+        assert torch.allclose(g, eg)
+
+def test_module_2_layer_mlp_seq_update():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
+    model = MLP_2_Layers_Seq(4, 2, 3)
+    target = torch.Tensor([2.5])
+
+    def mse(value, target):
+        diff = value - target
+        return sum(diff * diff)
+
+    def cost(model, inp, target):
+        value = model(inp)
+        loss = mse(value, target)
+        return loss.item()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model, inp, target):
+        _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
+        return _cost, model - dmodel
+    loss, model = step(model, inp, target)
+
+    assert loss == 42.759910583496094
+
+    expected_model = [
+        torch.Tensor([[1.31208074,  7.52942896, -3.48841572, -2.12911177],
+                      [4.61794090, -5.96872425,  3.26280975, -16.41462517]]),
+        torch.Tensor([-2.16651487, -1.72582722]),
+        torch.Tensor([[0.39250314, -4.12741709],
+                      [3.85490060, -1.67493737],
+                      [1.51745880, -5.04526806]]),
+        torch.Tensor([7.15553093,  6.48739338,  9.37104797])
+    ]
+
+    for p, ep in zip(model.parameters(), expected_model):
+        assert torch.allclose(p, ep)
+#"""
