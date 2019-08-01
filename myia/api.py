@@ -10,7 +10,7 @@ from .pipeline import standard_pipeline
 from .utils import keyword_decorator, overload, MyiaInputTypeError, \
     Cons, Empty
 from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
-    AbstractList, AbstractArray, AbstractScalar, AbstractClassBase
+    AbstractArray, AbstractScalar, AbstractClassBase
 from .compile.backends import load_backend, Backend
 
 

@@ -26,7 +26,6 @@ from .data import (
     AbstractFunction,
     AbstractTuple,
     AbstractArray,
-    AbstractList,
     AbstractDict,
     AbstractClassBase,
     AbstractClass,
@@ -44,7 +43,6 @@ from .data import (
     SHAPE,
     MyiaTypeError,
     TypeMismatchError,
-    listof,
 )
 
 
@@ -440,11 +438,6 @@ def abstract_clone(self, x: AbstractTuple, *args):
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractList, *args):
-    return (yield AbstractList)(self(x.element, *args), self(x.values, *args))
-
-
-@overload  # noqa: F811
 def abstract_clone(self, x: AbstractDict, *args):
     return (yield AbstractDict)(dict((k, self(v, *args))
                                      for k, v in x.entries.items()))
@@ -689,12 +682,6 @@ async def force_through(self, x: AbstractTuple, through):
         [(await self(y, through)) for y in x.elements],
         await self(x.values, through)
     )
-
-
-@overload  # noqa: F811
-async def force_through(self, x: AbstractList, through):
-    yield (yield AbstractList)(await self(x.element, through),
-                               await self(x.values, through))
 
 
 @overload  # noqa: F811
@@ -983,16 +970,6 @@ def amerge(self, x1: AbstractArray, x2, forced, bp):
     if forced or merged is args1:
         return x1
     return AbstractArray(*merged)
-
-
-@overload  # noqa: F811
-def amerge(self, x1: AbstractList, x2, forced, bp):
-    args1 = (x1.element, x1.values)
-    args2 = (x2.element, x2.values)
-    merged = self(args1, args2, forced, bp)
-    if forced or merged is args1:
-        return x1
-    return AbstractList(*merged)
 
 
 @overload  # noqa: F811

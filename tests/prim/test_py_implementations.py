@@ -6,12 +6,12 @@ import math
 
 from myia.pipeline import scalar_debug_pipeline
 from myia.prim.py_implementations import setattr as myia_setattr, \
-    tuple_setitem, list_setitem, \
+    tuple_setitem, \
     shape, reshape, array_map, array_scan, array_reduce, \
     distribute, dot, partial as myia_partial, identity, _assert_scalar, \
-    switch, scalar_to_array, broadcast_shape, scalar_cast, list_reduce, \
-    list_map, env_getitem, env_setitem, env_add, embed, \
-    array_to_scalar, transpose, return_, make_record, list_getitem, \
+    switch, scalar_to_array, broadcast_shape, scalar_cast, \
+    env_getitem, env_setitem, env_add, embed, \
+    array_to_scalar, transpose, return_, make_record, \
     array_getitem, array_setitem, bool_eq, dict_getitem, tuple_getitem
 from myia.utils import newenv
 
@@ -149,11 +149,6 @@ def test_prim_tuple_getitem(data, item):
     return tuple_getitem(data, item)
 
 
-@parse_compare(([1, 2, 3], 0), ([4, -6, 7], 2))
-def test_prim_list_getitem(data, item):
-    return list_getitem(data, item)
-
-
 @parse_compare((np.array([1, 2, 3]), 0), (np.array([4, -6, 7]), 2))
 def test_prim_array_getitem(data, item):
     return array_getitem(data, item)
@@ -167,13 +162,6 @@ def test_prim_bool_eq():
 def test_prim_tuple_setitem():
     tup = (1, 2, 3, 4)
     assert tuple_setitem(tup, 1, 22) == (1, 22, 3, 4)
-
-
-def test_prim_list_setitem():
-    L = [1, 2, 3, 4]
-    L2 = [1, 22, 3, 4]
-    assert list_setitem(L, 1, 22) == L2
-    assert L != L2  # test that this is not inplace
 
 
 def test_prim_array_setitem():
@@ -260,21 +248,6 @@ def test_prim_array_reduce():
 
         assert res.shape == outshp
         assert (res == value).all()
-
-
-@parse_compare([1, 2, 3])
-def test_prim_list_reduce(l):
-    def add(a, b):
-        return a + b
-
-    return list_reduce(add, l, 4)
-
-
-@parse_compare([1, 2, 3])
-def test_prim_list_map(l):
-    def add2(a):
-        return a + 2
-    return list_map(add2, l)
 
 
 def test_prim_dict_getitem():

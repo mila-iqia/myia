@@ -2,7 +2,6 @@
 import pytest
 
 from myia.pipeline import scalar_pipeline, scalar_parse
-from myia.composite import list_map
 from myia.prim import ops as P
 from myia.prim.py_implementations import make_record, partial
 from myia.validate import validate as _validate, ValidationError
@@ -20,13 +19,8 @@ test_whitelist = frozenset({
     P.scalar_div,
     P.make_tuple,
     P.tuple_getitem,
-    # P.list_map,
     P.bool_and,
     P.scalar_lt,
-    P.list_len,
-    P.list_append,
-    P.list_getitem,
-    P.make_list,
     P.partial,
     P.switch,
     P.return_,

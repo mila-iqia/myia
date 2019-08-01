@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import reduce
 
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
-    AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
+    AbstractFunction, GraphFunction, AbstractTuple, \
     AbstractClassBase, build_value, AbstractError, TYPE, AbstractScalar, \
     AbstractUnion, AbstractTaggedUnion
 from .abstract.data import check_nargs
@@ -628,7 +628,7 @@ def _array_zero(xs):
 
 zeros_like = HyperMap(
     name='zeros_like',
-    nonleaf=(AbstractTuple, AbstractList, AbstractClassBase,
+    nonleaf=(AbstractTuple, AbstractClassBase,
              AbstractUnion, AbstractTaggedUnion),
     fn_leaf=_leaf_zeros_like
 )
@@ -705,124 +705,6 @@ def list_reduce(fn, lst, dftl):
     for elem in lst:
         res = fn(res, elem)
     return res
-
-
-class ListMap(MetaGraph):
-    """Implementation of list_map."""
-
-    def __init__(self, fn_rec=None, loop_mask=None):
-        """Initialize the list_map.
-
-        Arguments:
-            fn_rec: The function to map over, or None if the function to
-                map over must be provided as the first argument.
-            loop_mask: Either None or a list of booleans such that the
-                argument i is a list to iterate on if loop_mask[i] is
-                True, and otherwise it is not iterated on.
-
-        """
-        self.fn_rec = fn_rec
-        self.loop_mask = loop_mask and tuple(loop_mask)
-        super().__init__(self._decorate_name('list_map'))
-
-    def _decorate_name(self, name):
-        if self.fn_rec is None:
-            return name
-        else:
-            return f'{name}[{self.fn_rec}]'
-
-    def generate_graph(self, args):
-        """Return a graph for the number of lists."""
-        mask = self.loop_mask
-        nfn = 1 if self.fn_rec is None else 0
-        if mask is None:
-            mask = (True,) * (len(args) - nfn)
-        nmin = 1 + nfn
-        if len(args) < nmin:
-            raise MyiaTypeError(f'{self} takes at least {nmin} arguments')
-        for t, m in zip(args[nfn:], mask):
-            if m and not isinstance(t, AbstractList):
-                raise MyiaTypeError(f'list_map requires lists, not {t}')
-
-        g = Graph()
-        g.set_flags('core', 'reference', 'ignore_values')
-        g.debug.name = self._decorate_name('list_map')
-        fn = self.fn_rec or g.add_parameter()
-        gargs = [g.add_parameter() for _ in args[nfn:]]
-
-        values = [g.apply(P.list_getitem, a, 0) if m else a
-                  for a, m in zip(gargs, mask)]
-        resl = g.apply(P.make_list, g.apply(fn, *values))
-
-        gnext = Graph()
-        gnext.debug.name = self._decorate_name('lm_body')
-        gnext.set_flags('reference', 'ignore_values')
-        gcond = Graph()
-        gcond.debug.name = self._decorate_name('lm_cond')
-        gcond.set_flags('reference', 'ignore_values')
-
-        def make_cond(g):
-            fn = self.fn_rec or g.add_parameter()
-            curri = g.add_parameter()
-            resl = g.add_parameter()
-            gargs2 = [g.add_parameter() for _ in gargs]
-            lists2 = [a for a, m in zip(gargs2, mask) if m]
-            hasnexts = [g.apply(P.scalar_lt, curri, g.apply(P.list_len, l))
-                        for l in lists2]
-            cond = reduce(lambda a, b: g.apply(P.bool_and, a, b), hasnexts)
-            gtrue = Graph()
-            gtrue.debug.name = self._decorate_name('lm_ftrue')
-            gtrue.set_flags('core', 'reference', 'ignore_values')
-            if self.fn_rec is None:
-                gtrue.output = gtrue.apply(gnext, fn, curri, resl, *gargs2)
-            else:
-                gtrue.output = gtrue.apply(gnext, curri, resl, *gargs2)
-            gfalse = Graph()
-            gfalse.debug.name = self._decorate_name('lm_ffalse')
-            gfalse.set_flags('core', 'reference', 'ignore_values')
-            gfalse.output = resl
-            g.output = g.apply(g.apply(P.switch, cond, gtrue, gfalse))
-
-        def make_next(g):
-            fn = self.fn_rec or g.add_parameter()
-            curri = g.add_parameter()
-            resl = g.add_parameter()
-            gargs2 = [g.add_parameter() for _ in gargs]
-            values = [g.apply(P.list_getitem, a, curri) if m else a
-                      for a, m in zip(gargs2, mask)]
-            resl = g.apply(P.list_append, resl, g.apply(fn, *values))
-            nexti = g.apply(P.scalar_add, curri, 1)
-            if self.fn_rec is None:
-                g.output = g.apply(gcond, fn, nexti, resl, *gargs2)
-            else:
-                g.output = g.apply(gcond, nexti, resl, *gargs2)
-
-        make_cond(gcond)
-        make_next(gnext)
-        if self.fn_rec is None:
-            g.output = g.apply(gcond, fn, 1, resl, *gargs)
-        else:
-            g.output = g.apply(gcond, 1, resl, *gargs)
-
-        g.set_flags('forbid_inlining', metagraph=self)
-        return g
-
-    def __eq__(self, lm):
-        return (isinstance(lm, ListMap)
-                and self.fn_rec == lm.fn_rec
-                and self.loop_mask == lm.loop_mask)
-
-    def __hash__(self):
-        return hash((self.fn_rec, self.loop_mask))
-
-    def __call__(self, fn, *lists):
-        """Python implementation of list_map."""
-        assert self.fn_rec is None
-        from .prim.py_implementations import list_map
-        return list_map(fn, *lists)
-
-
-list_map = ListMap()
 
 
 @core

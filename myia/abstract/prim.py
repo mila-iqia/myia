@@ -22,7 +22,6 @@ from .data import (
     AbstractFunction,
     AbstractTuple,
     AbstractArray,
-    AbstractList,
     AbstractDict,
     AbstractClassBase,
     AbstractADT,
@@ -541,12 +540,6 @@ async def _inf_tuple_getitem(self, engine,
     return arg.elements[idx_v]
 
 
-@standard_prim(P.list_getitem)
-async def _inf_list_getitem(self, engine,
-                            arg: AbstractList, idx: dtype.Int[64]):
-    return arg.element
-
-
 @standard_prim(P.dict_getitem)
 async def _inf_dict_getitem(self, engine, arg: AbstractDict, idx):
     idx_v = idx.values[VALUE]
@@ -573,23 +566,6 @@ async def _inf_tuple_setitem(self, engine,
     elts = arg.elements
     new_elts = tuple([*elts[:idx_v], value, *elts[idx_v + 1:]])
     return AbstractTuple(new_elts)
-
-
-@standard_prim(P.list_setitem)
-async def _inf_list_setitem(self, engine,
-                            arg: AbstractList,
-                            idx: dtype.Int[64],
-                            value: AbstractValue):
-    engine.abstract_merge(arg.element, value)
-    return arg
-
-
-@standard_prim(P.list_append)
-async def _inf_list_append(self, engine,
-                           arg: AbstractList,
-                           value: AbstractValue):
-    engine.abstract_merge(arg.element, value)
-    return arg
 
 
 def _getattr_chk(data_v, item_v):
@@ -678,38 +654,12 @@ async def _inf_tuple_len(self, engine, xs: AbstractTuple):
     })
 
 
-@standard_prim(P.list_len)
-async def _inf_list_len(self, engine, xs: AbstractList):
-    return AbstractScalar({
-        VALUE: ANYTHING,
-        TYPE: dtype.Int[64],
-    })
-
-
 @standard_prim(P.array_len)
 async def _inf_array_len(self, engine, xs: AbstractArray):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: dtype.Int[64],
     })
-
-
-@standard_prim(P.list_map)
-async def _inf_list_map(self, engine, fn, *lists):
-    if len(lists) < 1:  # pragma: no cover
-        raise MyiaTypeError('list_map requires at least one list')
-    await engine.check_immediate(AbstractList, *lists)
-    subargs = [l.element for l in lists]
-    result = await engine.execute(fn, *subargs)
-    return AbstractList(result)
-
-
-@standard_prim(P.list_reduce)
-async def _inf_list_reduce(self, engine, fn, lst: AbstractList, dflt):
-    result1 = await engine.execute(fn, lst.element, lst.element)
-    result2 = await engine.execute(fn, dflt, lst.element)
-    result = engine.abstract_merge(result1, result2)
-    return result
 
 
 ##########

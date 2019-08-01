@@ -375,7 +375,7 @@ def test_pow10(x):
 
 
 @grad_test(([1.0, 2.0, 3.0, 4.0],),
-            pipeline=standard_debug_pipeline.configure(validate=False))
+           pipeline=standard_debug_pipeline.configure(validate=False))
 def test_list_while(xs):
     y = 1.0
     index = 0

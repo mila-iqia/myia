@@ -21,7 +21,7 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     VirtualFunction, AbstractFunction, AbstractExternal, \
     VALUE, TYPE, SHAPE, DATA, DummyFunction, AbstractError, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractList, AbstractDict, type_error_nargs, TypeDispatchError, \
+    AbstractDict, type_error_nargs, TypeDispatchError, \
     AbstractADT, InferenceError, PrimitiveFunction, MetaGraphFunction, \
     Function, listof, empty
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \

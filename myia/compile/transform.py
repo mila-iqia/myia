@@ -72,8 +72,7 @@ def wrap_primitives(graph):
 
 
 nonlinear_ops = (
-    P.return_, P.partial, P.switch, P.make_tuple, P.make_list,
-    P.list_len, P.list_getitem, P.list_setitem, P.list_append, P.bool_and,
+    P.return_, P.partial, P.switch, P.make_tuple, P.bool_and,
     P.tuple_getitem, P.tuple_setitem, P.env_getitem, P.env_setitem, P.env_add,
     P.tagged, P.hastag, P.casttag, P.unsafe_static_cast,
 )

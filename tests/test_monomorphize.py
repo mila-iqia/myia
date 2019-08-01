@@ -5,7 +5,6 @@ from pytest import mark
 from myia.dtype import Number
 from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
-from myia.composite import list_map
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
 from myia.abstract import InferenceError

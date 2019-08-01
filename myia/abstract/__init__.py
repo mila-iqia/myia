@@ -53,7 +53,6 @@ from .data import (  # noqa
     AbstractFunction,
     AbstractTuple,
     AbstractArray,
-    AbstractList,
     AbstractDict,
     AbstractClassBase,
     AbstractClass,

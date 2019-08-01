@@ -11,7 +11,7 @@ from myia import abstract
 from myia.abstract import concretize_abstract, from_value
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
-from myia.composite import gadd, zeros_like, grad, list_map
+from myia.composite import gadd, zeros_like, grad
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Int, External, Number, EnvType as Env, Nil, Array, \
     i16, i32, i64, u64, f16, f32, f64
@@ -21,11 +21,11 @@ from myia.abstract import ANYTHING, InferenceError, MyiaTypeError, \
 from myia.ir import Graph, MultitypeGraph
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, scalar_lt, list_map as list_map_prim, \
+    scalar_add, scalar_mul, scalar_lt, \
     hastype, typeof, scalar_usub, dot, distribute, shape, array_map, \
     array_reduce, reshape, partial as myia_partial, identity, \
     bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
-    tuple_setitem, list_setitem, scalar_cast, list_reduce, \
+    tuple_setitem, scalar_cast, \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
     transpose, make_record, unsafe_static_cast, user_switch, \
     hastag, casttag, tagged

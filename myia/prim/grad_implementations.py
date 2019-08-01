@@ -18,7 +18,7 @@ from .py_implementations import \
     scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
     scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
     array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
-    reshape, scalar_cast, typeof, invert_permutation, list_setitem, \
+    reshape, scalar_cast, typeof, invert_permutation, \
     tagged, casttag, unsafe_static_cast
 
 
@@ -207,19 +207,6 @@ def bprop_tuple_getitem(data, idx, out, dout):
     """Backpropagator for primitive `tuple_getitem`."""
     return (tuple_setitem(zeros_like(data), idx, dout),
             zeros_like(idx))
-
-
-@register_bprop(primops.list_getitem)
-def bprop_list_getitem(data, idx, out, dout):
-    """Backpropagator for primitive `list_getitem`."""
-    return (list_setitem(zeros_like(data), idx, dout),
-            zeros_like(idx))
-
-
-@register_bprop(primops.list_len)
-def bprop_list_len(data, out, dout):
-    """Backpropagator for primitive `list_len`."""
-    return (zeros_like(data),)
 
 
 @register_bprop(primops.identity)

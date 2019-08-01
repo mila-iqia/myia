@@ -8,7 +8,7 @@ from myia import dtype as ty
 from myia.prim import ops as P
 from myia.abstract import (
     ANYTHING, MyiaTypeError,
-    AbstractScalar, AbstractTuple as T, AbstractList as L,
+    AbstractScalar, AbstractTuple as T, AbstractClass as AC,
     AbstractJTagged, AbstractError, AbstractFunction, AbstractUnion,
     AbstractTaggedUnion, InferenceLoop, to_abstract, build_value, amerge,
     AbstractClass, Possibilities, PendingFromList, TaggedPossibilities,
@@ -198,8 +198,8 @@ def test_repr():
 def test_repr_recursive():
     sa = S(t=ty.Int[64])
     ta = T.empty()
-    la = L.empty()
-    la.__init__(ta)
+    la = T.empty()
+    la.__init__([ta])
     ta.__init__([sa, la])
     ta = ta.intern()
     repr(ta)
@@ -218,8 +218,9 @@ def test_abstract_clone():
     s2 = S(t=ty.Int[64])
     assert upcast(s1, 64) is s2
 
-    a1 = T([s1, L(s1)])
-    assert upcast(a1, 64) is T([s2, L(s2)])
+    a1 = T([s1, AC(object, {'field': s1}, {})])
+    a2 = T([s2, AC(object, {'field': s2}, {})])
+    assert upcast(a1, 64) is a2
 
 
 def test_broaden_recursive():

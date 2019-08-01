@@ -1,7 +1,5 @@
 """Implementation of a prototype optimized VM in python."""
 
-from copy import copy
-
 from .. import dtype
 from ..utils import TaggedValue
 

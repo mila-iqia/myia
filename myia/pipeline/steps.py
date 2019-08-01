@@ -8,7 +8,7 @@ import numpy as np
 from itertools import count
 
 from .. import dtype
-from ..abstract import AbstractTuple, AbstractList, AbstractClassBase, \
+from ..abstract import AbstractTuple, AbstractClassBase, \
     AbstractDict, AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE, \
     AbstractTaggedUnion, VALUE, ANYTHING, empty
 from ..cconv import closure_convert
@@ -17,7 +17,7 @@ from ..opt import lib as optlib, CSE, simplify_types, NodeMap, \
     LocalPassOptimizer, DeadDataElimination, type_to_tag
 from ..prim import vm_registry
 from ..utils import overload, no_prof, TaggedValue, MyiaInputTypeError, \
-    Cons, Empty, list_to_cons
+    Cons, Empty
 from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
 from ..vm import VM
@@ -297,16 +297,12 @@ step_opt = Optimizer.partial(
             optlib.getitem_setitem_tuple,
             optlib.setitem_tuple,
             optlib.setitem_tuple_ct,
-            optlib.getitem_setitem_list,
             optlib.elim_j_jinv,
             optlib.elim_jinv_j,
             optlib.cancel_env_set_get,
             optlib.getitem_newenv,
             optlib.getitem_env_add,
             optlib.simplify_array_map,
-            optlib.lmadd_zero_l,
-            optlib.lmadd_zero_r,
-            optlib.lmadd_setitem_zero,
             optlib.gadd_zero_l,
             optlib.gadd_zero_r,
             optlib.gadd_switch,
@@ -344,16 +340,12 @@ step_opt2 = Optimizer.partial(
             optlib.getitem_setitem_tuple,
             optlib.setitem_tuple,
             optlib.setitem_tuple_ct,
-            optlib.getitem_setitem_list,
             optlib.float_tuple_getitem_through_switch,
             optlib.inline_trivial,
             optlib.inline_unique_uses,
             optlib.inline_inside_marked_caller,
             optlib.inline_core,
             optlib.combine_switches_array,
-            optlib.lmadd_zero_l,
-            optlib.lmadd_zero_r,
-            optlib.lmadd_setitem_zero,
             optlib.gadd_zero_l,
             optlib.gadd_zero_r,
             optlib.gadd_switch,
@@ -509,14 +501,6 @@ def convert_arg(self, arg, orig_t: AbstractTuple, backend):
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractList, backend):
-    if not isinstance(arg, list):
-        raise MyiaInputTypeError('Expected list')
-    ot = orig_t.element
-    return list(self(x, ot, backend) for x in arg)
-
-
-@overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractDict, backend):
     if not isinstance(arg, dict):
         raise MyiaInputTypeError('Expected dict')
@@ -616,14 +600,6 @@ def convert_result(self, res, orig_t, vm_t: AbstractClassBase, backend,
     tup = tuple(self(getattr(res, attr), o, v, backend, return_backend)
                 for attr, o, v in zip(orig_t.attributes, oe, ve))
     return orig_t.constructor(*tup)
-
-
-@overload  # noqa: F811
-def convert_result(self, res, orig_t, vm_t: AbstractList, backend,
-                   return_backend):
-    ot = orig_t.element
-    vt = vm_t.element
-    return [self(x, ot, vt, backend, return_backend) for x in res]
 
 
 @overload  # noqa: F811
