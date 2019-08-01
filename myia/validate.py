@@ -99,7 +99,7 @@ whitelist = frozenset({
     P.dot,
     P.switch,
     P.return_,
-    P.make_list,
+    # P.make_list,
     P.identity,
     # P.resolve,
     P.partial,

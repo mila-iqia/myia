@@ -11,7 +11,7 @@ from ..abstract import typecheck
 from ..ir import Graph, GraphCloner, CloneRemapper, new_graph, MetaGraph
 from ..dtype import Number, Bool, ExceptionType
 from ..prim import ops as P, Primitive, py_implementations as py
-from ..utils import Namespace, SymbolicKeyInstance
+from ..utils import Namespace, SymbolicKeyInstance, Cons, Empty
 
 
 from .data import (
@@ -40,6 +40,7 @@ from .data import (
     MyiaTypeError, InferenceError, MyiaShapeError, check_nargs,
     infer_trace,
     type_error_nargs,
+    listof,
 )
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context
@@ -474,8 +475,6 @@ async def _inf_make_tuple(self, engine, *args):
 @standard_prim(P.make_list)
 class _MakeListInferrer(Inferrer):
     async def reroute(self, engine, outref, argrefs):
-        from ..utils.misc import Cons, Empty
-        from .data import listof
         g = outref.node.graph
         lst = g.apply(Empty)
         argtypes = [await arg.get() for arg in argrefs]
