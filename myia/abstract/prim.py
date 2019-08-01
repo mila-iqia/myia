@@ -118,8 +118,11 @@ class StandardInferrer(Inferrer):
 def standard_prim(prim):
     """Decorator to define and register a StandardInferrer."""
     def deco(fn):
-        xinf = StandardInferrer.partial(prim=prim, infer=fn)
-        abstract_inferrer_constructors[prim] = xinf
+        if isinstance(fn, type):
+            abstract_inferrer_constructors[prim] = fn.partial()
+        else:
+            xinf = StandardInferrer.partial(prim=prim, infer=fn)
+            abstract_inferrer_constructors[prim] = xinf
     return deco
 
 
@@ -575,6 +578,7 @@ async def _getattr_on_dcattr(data, item_v):
     return data.attributes[item_v]
 
 
+@standard_prim(P.getattr)
 class _GetAttrInferrer(Inferrer):
     async def reroute(self, engine, outref, argrefs):
         check_nargs(P.getattr, 2, argrefs)
@@ -636,9 +640,6 @@ class _GetAttrInferrer(Inferrer):
         assert policy == 'rval'
         self.cache[(data, item)] = rval
         return rval
-
-
-abstract_inferrer_constructors[P.getattr] = _GetAttrInferrer.partial()
 
 
 # TODO: setattr
@@ -921,6 +922,7 @@ class _CastRemapper(CloneRemapper):
             self.remap_node((g, fv), g, fv, ng, new, link=False)
 
 
+@standard_prim(P.user_switch)
 class _UserSwitchInferrer(Inferrer):
 
     async def type_trials(self, engine, focus, outref,
@@ -1051,9 +1053,7 @@ class _UserSwitchInferrer(Inferrer):
         return await self.default(engine, outref, condref, tbref, fbref)
 
 
-abstract_inferrer_constructors[P.user_switch] = _UserSwitchInferrer.partial()
-
-
+@standard_prim(P.switch)
 class _SwitchInferrer(Inferrer):
 
     async def run(self, engine, outref, argrefs):
@@ -1074,9 +1074,6 @@ class _SwitchInferrer(Inferrer):
             return engine.abstract_merge(tb, fb)
         else:
             raise AssertionError(f"Invalid condition value for switch: {v}")
-
-
-abstract_inferrer_constructors[P.switch] = _SwitchInferrer.partial()
 
 
 #################
@@ -1132,6 +1129,7 @@ async def _resolve_on_dcattr(data, item_v):  # pragma: no cover
     raise MyiaTypeError('Cannot resolve on Class.')
 
 
+@standard_prim(P.resolve)
 class _ResolveInferrer(Inferrer):
 
     async def reroute(self, engine, outref, argrefs):
@@ -1167,9 +1165,6 @@ class _ResolveInferrer(Inferrer):
         return rval
 
 
-abstract_inferrer_constructors[P.resolve] = _ResolveInferrer.partial()
-
-
 @standard_prim(P.partial)
 async def _inf_partial(self, engine, fn, *args):
     fns = await fn.get()
@@ -1179,6 +1174,7 @@ async def _inf_partial(self, engine, fn, *args):
     ])
 
 
+@standard_prim(P.embed)
 class _EmbedInferrer(Inferrer):
     async def run(self, engine, outref, argrefs):
         check_nargs(P.embed, 1, argrefs)
@@ -1189,9 +1185,6 @@ class _EmbedInferrer(Inferrer):
             VALUE: key,
             TYPE: dtype.SymbolicKeyType,
         })
-
-
-abstract_inferrer_constructors[P.embed] = _EmbedInferrer.partial()
 
 
 @standard_prim(P.env_getitem)
