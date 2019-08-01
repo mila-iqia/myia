@@ -471,6 +471,7 @@ async def _inf_make_tuple(self, engine, *args):
     return AbstractTuple(args)
 
 
+@standard_prim(P.make_list)
 class _MakeListInferrer(Inferrer):
     async def reroute(self, engine, outref, argrefs):
         from ..utils.misc import Cons, Empty
@@ -485,9 +486,6 @@ class _MakeListInferrer(Inferrer):
             lst = g.apply(Cons, arg.node, lst)
         rval = g.apply(P.unsafe_static_cast, lst, listof(restype))
         return engine.ref(rval, outref.context)
-
-
-abstract_inferrer_constructors[P.make_list] = _MakeListInferrer.partial()
 
 
 @standard_prim(P.make_dict)
