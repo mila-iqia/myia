@@ -521,6 +521,8 @@ def convert_arg(self, arg, orig_t: AbstractClassBase, backend):
             raise MyiaInputTypeError(f'Expected empty list')
         return ()
     elif orig_t.tag is Cons:
+        if arg == []:
+            raise MyiaInputTypeError(f'Expected non-empty list')
         if not isinstance(arg, list):
             raise MyiaInputTypeError(f'Expected list')
         ot = orig_t.attributes['head']
@@ -536,7 +538,6 @@ def convert_arg(self, arg, orig_t: AbstractClassBase, backend):
         oe = list(orig_t.attributes.values())
         res = tuple(self(x, o, backend)
                     for x, o in zip(arg, oe))
-        # breakpoint()
         return res
 
 
@@ -608,9 +609,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
     # If the EraseClass opt was applied, orig_t may be Class
     orig_is_class = isinstance(orig_t, AbstractClassBase)
     if orig_is_class:
-        if orig_t.tag is Empty:
-            return []
-        elif orig_t.tag is Cons:
+        if orig_t.tag in (Empty, Cons):
             rval = []
             while res:
                 value = self(res[0], orig_t.attributes['head'],

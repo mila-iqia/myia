@@ -15,7 +15,7 @@ from myia.abstract import (
     VALUE, TYPE, DEAD, find_coherent_result_sync,
     abstract_clone, broaden,
     Pending, type_to_abstract,
-    InferenceError
+    InferenceError, empty, listof
 )
 from myia.utils import SymbolicKeyInstance, Cons, Empty
 from myia.ir import Constant
@@ -23,10 +23,15 @@ from myia.ir import Constant
 from .common import Point, to_abstract_test, i16, f32, Ty, af32_of, S, U
 
 
-def test_to_abstract():
+def test_to_abstract_skey():
     inst = SymbolicKeyInstance(Constant(123), 456)
     expected = AbstractScalar({VALUE: inst, TYPE: ty.SymbolicKeyType})
     assert to_abstract(inst) == expected
+
+
+def test_to_abstract_list():
+    assert to_abstract([]) is empty
+    assert to_abstract([1, 2, 3]) is listof(S(t=ty.Int[64]))
 
 
 def test_numpy_scalar_to_abstract():
@@ -223,6 +228,16 @@ def test_abstract_clone():
     assert upcast(a1, 64) is a2
 
 
+def test_abstract_clone_pending():
+    loop = asyncio.new_event_loop()
+    s1 = S(t=ty.Int[32])
+    p = Pending(loop=loop, resolve=None, priority=None)
+    sp = S(t=p)
+    assert abstract_clone(sp) is sp
+    p.set_result(ty.Int[32])
+    assert abstract_clone(sp) is s1
+
+
 def test_broaden_recursive():
     s1 = S(1)
     t1 = T.empty()
@@ -281,6 +296,8 @@ def test_find_coherent_result_sync():
 
 
 def test_type_to_abstract():
+    assert type_to_abstract(int) is S(t=ty.Int[64])
+    assert type_to_abstract(float) is S(t=ty.Float[64])
     assert type_to_abstract(bool) is S(t=ty.Bool)
     assert (type_to_abstract(typing.List)
             is U(type_to_abstract(Empty),

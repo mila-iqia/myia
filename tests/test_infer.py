@@ -821,6 +821,9 @@ def test_hastype_simple(x):
     ((i64, i64), Ty(ANYTHING), InferenceError),
     ([i64], Ty(List), True),
     (None, Ty(Nil), True),
+    (U(i32, i64), Ty(i64), B),
+    (i32, Ty(U(i16, i32)), True),
+    (U(i32, i64), Ty(U(i16, i32)), B),
 )
 def test_hastype(x, y):
     return hastype(x, y)

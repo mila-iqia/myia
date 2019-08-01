@@ -486,7 +486,7 @@ def to_abstract(self, v: list, context, ref, loop):
         return empty
     else:
         elem_type = self(v[0], context, loop=loop)
-        return listof(elem_type)
+        return listof(_broaden(elem_type))
 
 
 @overload  # noqa: F811

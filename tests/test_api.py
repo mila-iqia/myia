@@ -104,6 +104,11 @@ def test_convert_arg():
     assert _convert(False, Bool) is False
     assert _convert(10, i64) == 10
     assert _convert(1.5, f64) == 1.5
+    assert _convert([], []) == ()
+    with pytest.raises(TypeError):
+        _convert([], [f64])
+    with pytest.raises(TypeError):
+        _convert([1, 2], [])
     with pytest.raises(TypeError):
         _convert(newenv, EnvType)
 
@@ -409,6 +414,10 @@ def test__convert_arg_init_AbstractList(backend_opt):
     assert isinstance(m[1], float)
     assert m[0] == 91.0
     assert m[1] == 51.0
+
+    model2 = []
+    m2 = to_device(model2, b)
+    assert m2 == []
 
 
 def test__convert_arg_init_AbstractClass(backend_opt):

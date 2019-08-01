@@ -320,10 +320,7 @@ def _vm_getattr(vm, data, attr):
     try:
         x = getattr(data, attr)
     except AttributeError:
-        if isinstance(data, list):
-            t = list
-        else:
-            t = type_token(typeof(data))
+        t = type_token(typeof(data))
         mmap = vm.convert.resources.method_map[t]
         if attr in mmap:
             return Partial(vm.convert(mmap[attr]), [data], vm)
@@ -334,8 +331,10 @@ def _vm_getattr(vm, data, attr):
         # Don't know how else to retrieve the unwrapped method
         unwrapped = getattr(x.__objclass__, x.__name__)
         return Partial(vm.convert(unwrapped), [x.__self__], vm)
-    elif isinstance(x, BuiltinMethodType) and hasattr(type(data), attr):
+    elif (isinstance(x, BuiltinMethodType)
+          and hasattr(type(data), attr)):  # pragma: no cover
         # This is returned by <list>.__getitem__ and maybe others.
+        # May not be relevant anymore
         x = getattr(type(data), attr)
         return Partial(vm.convert(x), [data], vm)
     elif isinstance(x, MethodType):
