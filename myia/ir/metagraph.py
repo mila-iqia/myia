@@ -18,7 +18,6 @@ class MetaGraph:
     def __init__(self, name):
         """Initialize a MetaGraph."""
         self.name = name
-        self.cache = {}
 
     async def normalize_args(self, args):
         """Return normalized versions of the arguments.
@@ -31,6 +30,13 @@ class MetaGraph:
         """Return normalized versions of the arguments.
 
         By default, this returns args unchanged.
+        """
+        return args
+
+    def make_signature(self, args):
+        """Return a signature corresponding to the args.
+
+        Each signature corresponds to a graph.
         """
         return args
 
@@ -72,10 +78,7 @@ class MultitypeGraph(MetaGraph):
 
     def generate_graph(self, args):
         """Generate a Graph for the given abstract arguments."""
-        types = tuple(args)
-        if types not in self.cache:
-            self.cache[types] = parser.parse(self._getfn(types))
-        return self.cache[types]
+        return parser.parse(self._getfn(tuple(args)))
 
     def __call__(self, *args):
         """Call like a normal function."""

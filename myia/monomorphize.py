@@ -11,7 +11,7 @@ from collections import defaultdict
 from .abstract import AbstractFunction, PrimitiveFunction, GraphFunction, \
     MetaGraphFunction, MyiaTypeError, build_value, AbstractError, \
     BaseGraphInferrer, TrackedInferrer, DummyFunction, \
-    TypedPrimitive, broaden, DEAD, POLY, \
+    AbstractValue, TypedPrimitive, broaden, DEAD, POLY, \
     VirtualReference, Context, Reference, abstract_clone, \
     abstract_check, concretize_abstract, InferenceError
 from .abstract.utils import CheckState, CloneState
@@ -81,12 +81,17 @@ def _refmap(self, fn, x: Reference):
 
 @overload  # noqa: F811
 def _refmap(self, fn, x: tuple):
-    return tuple(fn(y) for y in x)
+    return tuple(self(fn, y) for y in x)
 
 
 @overload  # noqa: F811
-def _refmap(self, fn, x: type(None)):
-    return None
+def _refmap(self, fn, x: AbstractValue):
+    return fn(x)
+
+
+@overload  # noqa: F811
+def _refmap(self, fn, x: object):
+    return x
 
 
 def concretize_cache(cache):

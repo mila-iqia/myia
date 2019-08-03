@@ -68,7 +68,6 @@ class Elemwise(MetaGraph):
         self.mname = mname
         self.scalar_op = scalar_op
         self.infer_value = infer_value
-        self.cache = {}
 
     def normalize_args_sync(self, args):
         """If infer_value is False, return broadened arguments."""
@@ -76,57 +75,58 @@ class Elemwise(MetaGraph):
             args = tuple(broaden(a) for a in args)
         return args
 
-    def generate_graph(self, args):
+    def make_signature(self, args):
+        """Create the signature: whether arguments are arrays, and shapes."""
+        return tuple((type(arg), arg.values[SHAPE])
+                     if isinstance(arg, AbstractArray) else (None, False)
+                     for arg in args)
+
+    def generate_graph(self, sig):
         """Generate the graph."""
-        sig = tuple((type(arg), arg.values[SHAPE])
-                    if isinstance(arg, AbstractArray) else (None, False)
-                    for arg in args)
-        if sig not in self.cache:
-            g = Graph()
-            g.set_flags('core', 'reference')
-            g.debug.name = self.mname
-            shapes = [x for _, x in sig if x is not False]
-            is_array_op = len(shapes) > 0
-            if is_array_op:
-                array_types = [t for t, _ in sig if t is not None]
-                array_type = array_types[0](ANYTHING, {SHAPE: ANYTHING})
-            params = []
-            for i, arg in enumerate(args):
-                p = g.add_parameter()
-                p.debug.name = f'x{i + 1}'
-                if is_array_op and not isinstance(arg, AbstractArray):
-                    p = g.apply(to_array, p, array_type)
-                params.append(p)
+        g = Graph()
+        g.set_flags('core', 'reference')
+        g.debug.name = self.mname
+        shapes = [x for _, x in sig if x is not False]
+        is_array_op = len(shapes) > 0
+        if is_array_op:
+            array_types = [t for t, _ in sig if t is not None]
+            array_type = array_types[0](ANYTHING, {SHAPE: ANYTHING})
+        params = []
+        for i, (t, _) in enumerate(sig):
+            p = g.add_parameter()
+            p.debug.name = f'x{i + 1}'
+            if is_array_op and t is None:
+                p = g.apply(to_array, p, array_type)
+            params.append(p)
 
-            if is_array_op:
-                try:
-                    final_shape = reduce(broadcast_shape, shapes)
-                except ValueError as e:
-                    raise MyiaShapeError(e.args[0])
-                if any(dim is ANYTHING for dim in final_shape):
-                    # We will need to get the shapes dynamically
-                    def _build(a, b):
-                        return g.apply(broadcast_shape, a, b)
-                    argshapes = [g.apply(shape, p) for p in params]
-                    final_shape = reduce(_build, argshapes)
+        if is_array_op:
+            try:
+                final_shape = reduce(broadcast_shape, shapes)
+            except ValueError as e:
+                raise MyiaShapeError(e.args[0])
+            if any(dim is ANYTHING for dim in final_shape):
+                # We will need to get the shapes dynamically
+                def _build(a, b):
+                    return g.apply(broadcast_shape, a, b)
+                argshapes = [g.apply(shape, p) for p in params]
+                final_shape = reduce(_build, argshapes)
 
-            transformed = []
-            for arg, p in zip(args, params):
-                if is_array_op:
-                    sh = arg.values.get(SHAPE, ())
-                    if final_shape != sh:
-                        p = g.apply(distribute, p, final_shape)
-                transformed.append(p)
-
+        transformed = []
+        for (_, sh), p in zip(sig, params):
             if is_array_op:
-                fn = self.scalar_op or self
-                g.output = g.apply(array_map, fn, *transformed)
-            else:
-                first, *rest = transformed
-                fn = g.apply(P.getattr, first, self.mname)
-                g.output = g.apply(fn, *rest)
-            self.cache[sig] = g
-        return self.cache[sig]
+                sh = sh or ()
+                if final_shape != sh:
+                    p = g.apply(distribute, p, final_shape)
+            transformed.append(p)
+
+        if is_array_op:
+            fn = self.scalar_op or self
+            g.output = g.apply(array_map, fn, *transformed)
+        else:
+            first, *rest = transformed
+            fn = g.apply(P.getattr, first, self.mname)
+            g.output = g.apply(fn, *rest)
+        return g
 
     def __call__(self, *args):
         """Python version of Elemwise's functionality."""

@@ -711,15 +711,16 @@ class MetaGraphInferrer(BaseGraphInferrer):
 
     def get_graph(self, engine, args):
         """Generate the graph for the given args."""
-        if args not in self.graph_cache:
+        sig = self.metagraph.make_signature(args)
+        if sig not in self.graph_cache:
             try:
-                g = self.metagraph.generate_graph(args)
+                g = self.metagraph.generate_graph(sig)
             except GraphGenerationError as err:
                 types = err.args[0]
                 raise TypeDispatchError(self.metagraph, types)
             g = engine.pipeline.resources.convert(g)
-            self.graph_cache[args] = g
-        return self.graph_cache[args]
+            self.graph_cache[sig] = g
+        return self.graph_cache[sig]
 
 
 class PartialInferrer(Inferrer):
