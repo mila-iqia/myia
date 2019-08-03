@@ -102,16 +102,22 @@ class Optimizer(PipelineStep):
 
 
 @pipeline_function
-def step_parse(self, input):
+def step_parse(self, input, argspec=None):
     """Assert that input is a Graph, and set it as the 'graph' key.
 
     Inputs:
         input: A function.
+        argspec: Information about argument types.
 
     Outputs:
         graph: A graph.
     """
     g = self.resources.convert(input)
+    if isinstance(g, MetaGraph):
+        assert argspec is not None
+        sig = g.make_signature(argspec)
+        g = g.generate_graph(sig)
+        g = self.resources.convert(g)
     assert isinstance(g, Graph)
     return {'graph': g}
 

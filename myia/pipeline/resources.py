@@ -272,7 +272,9 @@ standard_method_map = TypeMap({
 @overload
 def default_convert(env, fn: FunctionType):
     """Default converter for Python types."""
-    g = clone(parser.parse(fn))
+    g = parser.parse(fn)
+    if isinstance(g, Graph):
+        g = clone(g)
     env.object_map[fn] = g
     return g
 

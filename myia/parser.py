@@ -139,7 +139,7 @@ def parse(func):
         return _parse_cache[func]
     parser = Parser(func)
     graph = parser.parse()
-    graph.flags.update(getattr(func, '_myia_flags', {}))
+    graph.set_flags(**getattr(func, '_myia_flags', {}))
     _parse_cache[func] = graph
     return graph
 
@@ -230,8 +230,8 @@ class Parser:
         tree = asttokens.ASTTokens(src, parse=True).tree
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
-        graph = self._process_function(None, function_def).graph
-        for node in dfs(graph.return_, succ_deeper):
+        main_block = self._process_function(None, function_def)
+        for node in dfs(main_block.graph.return_, succ_deeper):
             if node.is_constant_graph():
                 if node.value.return_ is None:
                     current = node.value.debug
@@ -253,7 +253,7 @@ class Parser:
 
         self.write_cache = OrderedSet()
         self.read_cache = OrderedSet()
-        return graph
+        return main_block.object
 
     def process_FunctionDef(self, block: 'Block',
                             node: ast.FunctionDef) -> 'Block':
@@ -266,7 +266,7 @@ class Parser:
 
         """
         function_block = self._process_function(block, node)
-        block.write(node.name, Constant(function_block.graph), track=False)
+        block.write(node.name, Constant(function_block.object), track=False)
         return block
 
     def _process_function(self, block: Optional['Block'],
@@ -284,17 +284,45 @@ class Parser:
         function_block.graph.debug.name = node.name
         if node.args.kwarg is not None or node.args.kwonlyargs != []:
             raise NotImplementedError("No support for keyword arguments")
-        if node.args.vararg:
-            raise NotImplementedError("No support for varargs")
-        for arg in node.args.args:
+
+        # Process default arguments
+        nondefaults = [None] * (len(node.args.args) - len(node.args.defaults))
+        defaults = nondefaults + node.args.defaults
+        defaults_pairs = []
+        for arg, dflt in zip(node.args.args, defaults):
             with DebugInherit(ast=arg, location=self.make_location(arg)):
-                anf_node = Parameter(function_block.graph)
-            anf_node.debug.name = arg.arg
-            function_block.graph.parameters.append(anf_node)
-            function_block.write(arg.arg, anf_node, track=False)
-        function_block.write(node.name,
-                             Constant(function_block.graph),
-                             track=False)
+                param_node = Parameter(function_block.graph)
+            param_node.debug.name = arg.arg
+            if dflt is None:
+                function_block.graph.parameters.append(param_node)
+                function_block.write(arg.arg, param_node, track=False)
+            else:
+                dflt_node = self.process_node(function_block, dflt)
+                defaults_pairs.append((param_node, dflt_node))
+                function_block.write(arg.arg, dflt_node, track=False)
+
+        # Process varargs
+        if node.args.vararg:
+            arg = node.args.vararg
+            with DebugInherit(ast=arg, location=self.make_location(arg)):
+                vararg_node = Parameter(function_block.graph)
+            vname = arg.arg
+            vararg_node.debug.name = vname
+            function_block.graph.parameters.append(vararg_node)
+            function_block.write(vname, vararg_node, track=False)
+        else:
+            vararg_node = None
+
+        # Defaults and varargs produce a ParametricGraph
+        if node.args.defaults or node.args.vararg:
+            from .ir import ParametricGraph
+            obj = ParametricGraph(function_block.graph,
+                                  defaults_pairs, vararg_node)
+        else:
+            obj = function_block.graph
+
+        function_block.object = obj
+        function_block.write(node.name, Constant(obj), track=False)
         self.process_statements(function_block, node.body)
         if function_block.graph.return_ is None:
             raise MyiaSyntaxError("Function doesn't return a value",
@@ -424,8 +452,32 @@ class Parser:
     def process_Call(self, block: 'Block', node: ast.Call) -> ANFNode:
         """Process function calls: `f(x)`, etc."""
         func = self.process_node(block, node.func)
-        args = [self.process_node(block, arg) for arg in node.args]
-        return Apply([func] + args, block.graph)
+
+        groups = []
+        current = []
+        for arg in node.args:
+            if isinstance(arg, ast.Starred):
+                groups.append(current)
+                groups.append(self.process_node(block, arg.value))
+                current = []
+            else:
+                current.append(self.process_node(block, arg))
+        if current or not groups:
+            groups.append(current)
+
+        if len(groups) == 1:
+            args, = groups
+            return Apply([func, *args], block.graph)
+        else:
+            args = []
+            for group in groups:
+                if isinstance(group, list):
+                    args.append(Apply([block.operation('make_tuple'),
+                                       *group], block.graph))
+                else:
+                    args.append(group)
+            return Apply([block.operation('apply'),
+                          func, *args], block.graph)
 
     def process_NameConstant(self, block: 'Block',
                              node: ast.NameConstant) -> ANFNode:
@@ -758,6 +810,7 @@ class Block:
         self.jumps: Dict[Block, Apply] = {}
         self.graph: Graph = Graph()
         self.graph.flags.update(flags)
+        self.object = self.graph
 
     def set_phi_arguments(self, phi: Parameter) -> None:
         """Resolve the arguments to a phi node.

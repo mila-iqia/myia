@@ -493,6 +493,53 @@ def test_return_closure(w, x, y, z):
 @infer(
     (i64, i64),
     (f64, f64),
+    (i64, i64, i64),
+    (InferenceError,),
+    (i64, i64, i64, InferenceError),
+)
+def test_default_arg(x, y=3):
+    return x + y
+
+
+@pytest.mark.xfail(reason='Closures cannot have default arguments')
+@infer(
+    (i64, i64, i64),
+)
+def test_default_closure(x, y):
+    def clos(z=5):
+        return x + z
+    return clos(y)
+
+
+@infer(
+    (0,),
+    (i64, i64, i64),
+    (i64, i64, i64, i64, i64, i64, i64),
+)
+def test_varargs(*args):
+    rval = 0
+    for arg in args:
+        rval = rval + arg
+    return rval
+
+
+@infer(
+    ((i64, i64, i64), i64),
+    ((i64, i64, f64), InferenceError),
+    ((i64, i64, i64, i64), InferenceError),
+    ((i64, i64), InferenceError),
+    (i64, InferenceError),
+)
+def test_apply(args):
+    def _f(x, y, z):
+        return x + y + z
+
+    return _f(*args)
+
+
+@infer(
+    (i64, i64),
+    (f64, f64),
 )
 def test_fact(n):
     def fact(n):

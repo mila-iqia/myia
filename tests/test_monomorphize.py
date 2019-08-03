@@ -588,3 +588,30 @@ def test_hypermap_tree(t):
 @specialize(((int1, int2), (fp1, fp2)),)
 def test_tuple_surgery(xs, ys):
     return xs[::-1]
+
+
+@specialize(
+    (int1,),
+    (fp1,),
+    (int1, int2),
+    (int1, int2, int1),
+)
+def test_default_arg(x, y=3, z=6):
+    return x + y + z
+
+
+@specialize(
+    (1, 2, 3, 4, 5),
+)
+def test_varargs(x, *args):
+    return args[1]
+
+
+def _v(x, *args):
+    return x + args[-1]
+
+
+@specialize((int1, int2))
+def test_varargs_2(x, y):
+    argos = (1, 2, 3, 4, 5)
+    return _v(x, 1, 2, 3) + _v(y, 5) + _v(*argos, 6, *(4, 5))

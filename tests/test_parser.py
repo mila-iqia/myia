@@ -4,7 +4,9 @@ import warnings
 import re
 
 from myia.pipeline import scalar_parse as parse, scalar_pipeline
-from myia.parser import MyiaSyntaxError, MyiaDisconnectedCodeWarning
+from myia.parser import MyiaSyntaxError, MyiaDisconnectedCodeWarning, \
+    parse as raw_parse
+from myia.ir import ParametricGraph
 
 from myia.debug.traceback import myia_warning
 
@@ -105,6 +107,21 @@ def test_dict():
 
     with pytest.raises(MyiaSyntaxError):
         parse(bad)
+
+
+def test_parametric():
+    def f(x, y=6):
+        return x + y
+
+    def g(x, y, *args):
+        return x + args[0]
+
+    def h(*args):
+        return f(*args) * g(*args)
+
+    assert isinstance(raw_parse(f), ParametricGraph)
+    assert isinstance(raw_parse(g), ParametricGraph)
+    assert isinstance(raw_parse(h), ParametricGraph)
 
 
 def test_unsupported_AST__error():
