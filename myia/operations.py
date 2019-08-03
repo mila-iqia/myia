@@ -61,5 +61,10 @@ def to_array(x, t):  # pragma: no cover
 
 
 def slice(start, stop, step):  # pragma: no cover
+    """Slice function."""
+    raise RuntimeError('This operation is not meant to be called directly.')
+
+
+def apply(fn, *arg_groups):  # pragma: no cover
     """Function application."""
     raise RuntimeError('This operation is not meant to be called directly.')

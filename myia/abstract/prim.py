@@ -1153,6 +1153,24 @@ async def _inf_partial(self, engine, fn, *args):
     ])
 
 
+@standard_prim(P.apply)
+class _ApplyInferrer(Inferrer):
+    async def reroute(self, engine, outref, argrefs):
+        assert len(argrefs) >= 1
+        fnref, *grouprefs = argrefs
+        expanded = []
+        g = outref.node.graph
+        for gref in grouprefs:
+            t = await gref.get()
+            if not isinstance(t, AbstractTuple):
+                raise MyiaTypeError(
+                    'Cannot expand a non-tuple in function application'
+                )
+            for i, _ in enumerate(t.elements):
+                expanded.append(g.apply(P.tuple_getitem, gref.node, i))
+        return engine.ref(g.apply(fnref.node, *expanded), outref.context)
+
+
 @standard_prim(P.embed)
 class _EmbedInferrer(Inferrer):
     async def run(self, engine, outref, argrefs):
