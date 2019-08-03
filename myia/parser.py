@@ -350,14 +350,16 @@ class Parser:
                 true_block, false_block = self.make_condition_blocks(block)
 
                 if mode == 'and':
-                    b1, b2 = true_block, false_block
+                    next_block = true_block
+                    false_block.graph.output = Constant(False)
                 else:
-                    b1, b2 = false_block, true_block
+                    next_block = false_block
+                    true_block.graph.output = Constant(True)
 
-                b1.graph.output = fold(b1, rest, mode)
-                b2.graph.output = test
+                next_block.graph.output = fold(next_block, rest, mode)
 
-                switch = block.make_switch(test, true_block, false_block)
+                switch = block.make_switch(test, true_block, false_block,
+                                           op='switch')
                 return block.graph.apply(switch)
             else:
                 return test
@@ -797,9 +799,9 @@ class Block:
             Constant(symbol_name)
         )
 
-    def make_switch(self, cond, true_block, false_block):
+    def make_switch(self, cond, true_block, false_block, op='user_switch'):
         """Return a subtree that implements a switch operation."""
-        return self.graph.apply(self.operation('user_switch'),
+        return self.graph.apply(self.operation(op),
                                 cond,
                                 true_block.graph,
                                 false_block.graph)

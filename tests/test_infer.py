@@ -1277,6 +1277,25 @@ def test_bool_or(x, y):
 
 
 @infer(
+    (B, B, B),
+    (i64, i64, InferenceError),
+)
+def test_and(x, y):
+    return x and y
+
+
+@infer(
+    (i64, None, i64),
+    (i64, i64, i64),
+)
+def test_and_none(x, y):
+    if x > 0 and y is not None:
+        return x + y
+    else:
+        return x
+
+
+@infer(
     (B, i64, i64, i64),
     (i64, i64, i64, InferenceError),
     (B, i64, f64, InferenceError),
