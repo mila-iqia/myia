@@ -554,10 +554,13 @@ class GraphManager(Partializable):
 
     """
 
-    def __init__(self, *roots, manage=True):
+    def __init__(self, *roots, manage=True, allow_changes=None):
         """Initialize the GraphManager."""
         self.roots = roots
         self.manage = manage
+        if allow_changes is None:
+            allow_changes = self.manage
+        self.allow_changes = allow_changes
         self.reset()
 
     def clear(self):
@@ -850,7 +853,7 @@ class GraphTransaction:
 
     def __init__(self, manager):
         """Initialize a GraphTransaction."""
-        if not manager.manage:
+        if not manager.allow_changes:
             raise ManagerError('Cannot modify graph through this manager')
         self.manager = manager
         self.changes = []
