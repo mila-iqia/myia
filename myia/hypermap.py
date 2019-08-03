@@ -5,11 +5,12 @@ from dataclasses import is_dataclass
 from functools import reduce
 
 from . import operations, abstract
-from .abstract import MyiaTypeError, broaden
+from .abstract import broaden
 from .ir import MetaGraph, Graph
 from .utils import Overload
 from .prim import ops as P
 from .prim.py_implementations import array_map
+from .utils import MyiaTypeError
 
 
 nonleaf_defaults = (

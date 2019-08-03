@@ -11,8 +11,9 @@ from ..abstract import typecheck
 from ..ir import Graph, MetaGraph, GraphCloner, CloneRemapper, new_graph
 from ..dtype import Number, Bool, ExceptionType
 from ..prim import ops as P, Primitive, py_implementations as py
-from ..utils import Namespace, SymbolicKeyInstance, Cons, Empty
-
+from ..utils import Namespace, SymbolicKeyInstance, Cons, Empty, \
+    MyiaTypeError, InferenceError, MyiaShapeError, check_nargs, \
+    infer_trace, type_error_nargs
 
 from .data import (
     ANYTHING,
@@ -37,9 +38,6 @@ from .data import (
     MetaGraphFunction,
     DummyFunction,
     VALUE, TYPE, SHAPE,
-    MyiaTypeError, InferenceError, MyiaShapeError, check_nargs,
-    infer_trace,
-    type_error_nargs,
     listof,
 )
 from .loop import Pending, find_coherent_result, force_pending

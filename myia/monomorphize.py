@@ -9,18 +9,18 @@ from itertools import count, chain
 from dataclasses import dataclass, replace as dc_replace
 from collections import defaultdict
 from .abstract import AbstractFunction, PrimitiveFunction, GraphFunction, \
-    MetaGraphFunction, MyiaTypeError, build_value, AbstractError, \
+    MetaGraphFunction, build_value, AbstractError, \
     BaseGraphInferrer, TrackedInferrer, DummyFunction, \
     AbstractValue, TypedPrimitive, broaden, DEAD, POLY, \
     VirtualReference, Context, Reference, abstract_clone, \
-    abstract_check, concretize_abstract, InferenceError
+    abstract_check, concretize_abstract
 from .abstract.utils import CheckState, CloneState
 from .prim import Primitive
 from .info import About
 from .ir import Graph, Constant, MetaGraph, CloneRemapper, GraphCloner, \
     succ_incoming, new_graph
 from .graph_utils import dfs
-from .utils import overload
+from .utils import overload, MyiaTypeError, InferenceError
 
 
 class Unspecializable(Exception):

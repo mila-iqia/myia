@@ -5,7 +5,7 @@ import numpy as np
 from types import FunctionType
 from dataclasses import dataclass
 
-from myia.abstract import from_value, AbstractJTagged, InferenceError
+from myia.abstract import from_value, AbstractJTagged
 from myia.api import myia
 from myia.pipeline import standard_resources, standard_pipeline, \
     standard_debug_pipeline
@@ -20,6 +20,7 @@ from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
     distribute, dot, reshape, transpose, scalar_cast, hastype
 from myia.prim.py_implementations import py_registry as pyi
 from myia.validate import whitelist, validate_abstract
+from myia.utils import InferenceError
 
 from .common import f64, u64, MA, MB, to_abstract_test, AA, \
     U, make_tree, countdown, sumtree, reducetree

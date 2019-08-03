@@ -8,22 +8,22 @@ from dataclasses import is_dataclass, replace as dc_replace
 
 from .. import dtype
 from ..info import About
-from ..ir import Graph, MetaGraph, GraphGenerationError
+from ..ir import Graph, MetaGraph
 from ..prim import Primitive, ops as P
 from ..utils import Overload, Partializable, is_dataclass_type, \
-    SymbolicKeyInstance, overload, dataclass_methods, ADT
+    SymbolicKeyInstance, overload, dataclass_methods, ADT, \
+    MyiaTypeError, type_error_nargs, infer_trace, InferenceError
 
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
-from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
+from .data import ANYTHING, AbstractScalar, \
     AbstractValue, GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, AbstractExternal, \
     VALUE, TYPE, SHAPE, DATA, DummyFunction, AbstractError, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractDict, type_error_nargs, TypeDispatchError, \
-    AbstractADT, InferenceError, PrimitiveFunction, MetaGraphFunction, \
-    Function, listof, empty
+    AbstractDict, AbstractADT, PrimitiveFunction, \
+    MetaGraphFunction, Function, listof, empty
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind, type_to_abstract, normalize_adt, concretize_abstract
 
@@ -713,11 +713,7 @@ class MetaGraphInferrer(BaseGraphInferrer):
         """Generate the graph for the given args."""
         sig = self.metagraph.make_signature(args)
         if sig not in self.graph_cache:
-            try:
-                g = self.metagraph.generate_graph(sig)
-            except GraphGenerationError as err:
-                types = err.args[0]
-                raise TypeDispatchError(self.metagraph, types)
+            g = self.metagraph.generate_graph(sig)
             g = engine.pipeline.resources.convert(g)
             self.graph_cache[sig] = g
         return self.graph_cache[sig]

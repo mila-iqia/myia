@@ -12,7 +12,7 @@ from ..abstract import AbstractTuple, AbstractClassBase, \
     AbstractDict, AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE, \
     AbstractTaggedUnion, VALUE, ANYTHING, empty
 from ..cconv import closure_convert
-from ..ir import Graph
+from ..ir import Graph, MetaGraph
 from ..opt import lib as optlib, CSE, simplify_types, NodeMap, \
     LocalPassOptimizer, DeadDataElimination, type_to_tag
 from ..prim import vm_registry

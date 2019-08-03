@@ -8,7 +8,8 @@ from typing import List, Tuple
 from types import SimpleNamespace
 
 from myia import abstract
-from myia.abstract import concretize_abstract, from_value
+from myia.abstract import concretize_abstract, from_value, ANYTHING, \
+    Contextless, CONTEXTLESS
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import gadd, zeros_like, grad
@@ -16,8 +17,6 @@ from myia.debug.traceback import print_inference_error
 from myia.dtype import Int, External, Number, EnvType as Env, Nil, Array, \
     i16, i32, i64, u64, f16, f32, f64
 from myia.hypermap import HyperMap, hyper_map
-from myia.abstract import ANYTHING, InferenceError, MyiaTypeError, \
-    Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import \
@@ -29,7 +28,7 @@ from myia.prim.py_implementations import \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
     transpose, make_record, unsafe_static_cast, user_switch, \
     hastag, casttag, tagged
-from myia.utils import newenv
+from myia.utils import newenv, InferenceError, MyiaTypeError
 
 from .common import B, \
     Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \

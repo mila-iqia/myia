@@ -7,12 +7,11 @@ from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
-from myia.abstract import InferenceError
 from myia.prim.py_implementations import \
     hastype, partial, scalar_add, scalar_sub, tagged, \
     scalar_usub, scalar_uadd, switch, array_map, array_reduce, scalar_mul
 from myia.validate import ValidationError
-from myia.utils import overload
+from myia.utils import overload, InferenceError
 from myia.hypermap import hyper_map
 
 from .common import mysum, i64, f64, Point, U, to_abstract_test, \

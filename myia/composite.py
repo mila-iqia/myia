@@ -5,16 +5,15 @@ import operator
 from dataclasses import dataclass
 from functools import reduce
 
-from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
+from .abstract import AbstractArray, SHAPE, ANYTHING, \
     AbstractFunction, GraphFunction, AbstractTuple, \
     AbstractClassBase, build_value, AbstractError, TYPE, AbstractScalar, \
-    AbstractUnion, AbstractTaggedUnion, AbstractDict
+    AbstractUnion, AbstractTaggedUnion, AbstractDict, broaden
 from .abstract.data import check_nargs
 from .debug.label import short_labeler
 from .dtype import Array, Number, Bool, \
     EnvType, u8, u16, i8, i16, f32, f64, Nil
 from .hypermap import HyperMap, hyper_map
-from .abstract import MyiaTypeError, broaden
 from .info import About
 from .ir import Graph, MetaGraph, MultitypeGraph, Constant
 from .prim import ops as P
@@ -24,7 +23,8 @@ from .prim.py_implementations import \
     scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div, \
     scalar_to_array, env_add, scalar_tanh, py_registry, array_reduce, \
     tuple_getitem
-from .utils import newenv, Slice
+from .utils import newenv, Slice, MyiaTypeError, MyiaShapeError, \
+    check_nargs
 
 
 def core(fn=None, **flags):

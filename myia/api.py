@@ -5,10 +5,10 @@ import inspect
 
 from myia import dtype
 
-from .abstract import MyiaTypeError, from_value
+from .abstract import from_value
 from .pipeline import standard_pipeline
 from .utils import keyword_decorator, overload, MyiaInputTypeError, \
-    Cons, Empty
+    Cons, Empty, MyiaTypeError
 from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
     AbstractArray, AbstractScalar, AbstractClassBase
 from .compile.backends import load_backend, Backend
