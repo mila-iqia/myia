@@ -283,7 +283,8 @@ class Parser:
         function_block.mature()
         function_block.graph.debug.name = node.name
         if node.args.kwarg is not None or node.args.kwonlyargs != []:
-            raise NotImplementedError("No support for keyword arguments")
+            raise MyiaSyntaxError("No support for keyword-only arguments",
+                                  self.make_location(node))
 
         # Process default arguments
         nondefaults = [None] * (len(node.args.args) - len(node.args.defaults))
@@ -464,6 +465,18 @@ class Parser:
                 current.append(self.process_node(block, arg))
         if current or not groups:
             groups.append(current)
+
+        if node.keywords:
+            from .abstract import AbstractDict, ANYTHING
+            for k in node.keywords:
+                if k.arg is None:
+                    groups.append(self.process_node(block, k.value))
+            keywords = [k for k in node.keywords if k.arg is not None]
+            op = block.operation('make_dict')
+            keys = [k.arg for k in keywords]
+            values = [self.process_node(block, k.value) for k in keywords]
+            typ = AbstractDict(dict((key, ANYTHING) for key in keys))
+            groups.append(block.graph.apply(op, typ, *values))
 
         if len(groups) == 1:
             args, = groups

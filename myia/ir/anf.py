@@ -90,6 +90,12 @@ class Graph:
                               tracking_id=self.return_.inputs[0])
         self.return_.inputs[0].abstract = AbstractFunction(f)
 
+    @property
+    def parameter_names(self):
+        """Return a list of parameter names."""
+        from ..debug.label import label
+        return [label(p) for p in self.parameters]
+
     def add_parameter(self) -> 'Parameter':
         """Add a new parameter to this graph (appended to the end)."""
         p = Parameter(self)

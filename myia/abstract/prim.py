@@ -1156,16 +1156,46 @@ class _ApplyInferrer(Inferrer):
     async def reroute(self, engine, outref, argrefs):
         assert len(argrefs) >= 1
         fnref, *grouprefs = argrefs
+        fntyp = await fnref.get()
         expanded = []
         g = outref.node.graph
+        kwinserts = []
         for gref in grouprefs:
             t = await gref.get()
-            if not isinstance(t, AbstractTuple):
+            if isinstance(t, AbstractDict):
+                fns = await fntyp.get()
+                graphs = []
+                for fn in fns:
+                    if isinstance(fn, GraphFunction):
+                        graphs.append(fn.graph)
+                    else:
+                        raise MyiaTypeError(
+                            f'{fn} does not take keyword arguments'
+                        )
+                for k in t.entries:
+                    try:
+                        idxs = {graph.parameter_names.index(k)
+                                for graph in graphs}
+                    except ValueError:
+                        raise MyiaTypeError(
+                            'Invalid keyword argument'
+                        )
+                    if len(idxs) > 1:
+                        raise MyiaTypeError(
+                            'Inconsistent keyword argument positions'
+                        )
+                    idx, = idxs
+                    extract = g.apply(P.dict_getitem, gref.node, k)
+                    kwinserts.append((idx, extract))
+            elif isinstance(t, AbstractTuple):
+                for i, _ in enumerate(t.elements):
+                    expanded.append(g.apply(P.tuple_getitem, gref.node, i))
+            else:
                 raise MyiaTypeError(
-                    'Cannot expand a non-tuple in function application'
+                    'Can only expand tuple or dict in function application'
                 )
-            for i, _ in enumerate(t.elements):
-                expanded.append(g.apply(P.tuple_getitem, gref.node, i))
+        for idx, node in kwinserts:
+            expanded.insert(idx, node)
         return engine.ref(g.apply(fnref.node, *expanded), outref.context)
 
 

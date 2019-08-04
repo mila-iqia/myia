@@ -615,3 +615,24 @@ def _v(x, *args):
 def test_varargs_2(x, y):
     argos = (1, 2, 3, 4, 5)
     return _v(x, 1, 2, 3) + _v(y, 5) + _v(*argos, 6, *(4, 5))
+
+
+@specialize((int1, int2),)
+def test_keywords(x, y):
+    def fn(albert, beatrice):
+        return albert - beatrice
+
+    return fn(albert=x, beatrice=y) + fn(beatrice=3, albert=7)
+
+
+@specialize((int1, int2),)
+def test_keywords_2(x, y):
+    def fn1(x, albert, beatrice):
+        return albert * (x - beatrice)
+
+    def fn2(y, albert, beatrice):
+        return y * (albert - beatrice)
+
+    fn = fn1 if x < 0 else fn2
+
+    return fn(5, albert=x, beatrice=y) + fn(9, beatrice=3, albert=7)

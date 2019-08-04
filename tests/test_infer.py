@@ -524,6 +524,58 @@ def test_varargs(*args):
 
 
 @infer(
+    (i64, i64, i64),
+)
+def test_keywords(x, y):
+    def fn(albert, beatrice):
+        return albert - beatrice
+
+    return fn(albert=x, beatrice=y) + fn(beatrice=3, albert=7)
+
+
+@infer(
+    (i64, i64, i64),
+)
+def test_keywords_expand(x, y):
+    def fn(z, albert, beatrice):
+        return albert - beatrice + z
+
+    return fn(4, **{'albert': x, 'beatrice': y})
+
+
+@infer(
+    (i64, i64, InferenceError),
+)
+def test_keywords_bad(x, y):
+    def fn(albert, beatrice):
+        return albert - beatrice
+
+    return fn(albert=x, charles=y)
+
+
+@infer(
+    (i64, i64, InferenceError),
+)
+def test_keywords_bad_2(x, y):
+    def fn1(x, albert, beatrice):
+        return albert * (x - beatrice)
+
+    def fn2(y, beatrice, albert):
+        return y * (albert - beatrice)
+
+    fn = fn1 if x < 0 else fn2
+
+    return fn(5, albert=x, beatrice=y)
+
+
+@infer(
+    (i64, i64, InferenceError),
+)
+def test_keywords_bad_3(x, y):
+    return scalar_add(x=x, y=y)
+
+
+@infer(
     ((i64, i64, i64), i64),
     ((i64, i64, f64), InferenceError),
     ((i64, i64, i64, i64), InferenceError),

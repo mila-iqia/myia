@@ -109,6 +109,14 @@ def test_dict():
         parse(bad)
 
 
+def test_kwonly():
+    def bad(x, *, y):
+        return x + y
+
+    with pytest.raises(MyiaSyntaxError):
+        parse(bad)
+
+
 def test_parametric():
     def f(x, y=6):
         return x + y
