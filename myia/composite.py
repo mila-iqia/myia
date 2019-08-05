@@ -1,6 +1,7 @@
 """Implementations of primitives as graphs."""
 
 
+import operator
 from dataclasses import dataclass
 from functools import reduce
 
@@ -8,6 +9,7 @@ from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
     AbstractClassBase, build_value, AbstractError, TYPE, AbstractScalar, \
     AbstractUnion, AbstractTaggedUnion
+from .abstract.data import check_nargs
 from .debug.label import short_labeler
 from .dtype import Array, Number, Bool, \
     EnvType, u8, u16, i8, i16, f32, f64, Nil
@@ -20,8 +22,9 @@ from .prim.py_implementations import \
     array_map, bool_not, bool_eq, hastype, distribute, shape, \
     broadcast_shape, typeof, scalar_cast, scalar_add, scalar_exp, \
     scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div, \
-    scalar_to_array, env_add, scalar_tanh, py_registry, array_reduce
-from .utils import newenv
+    scalar_to_array, env_add, scalar_tanh, py_registry, array_reduce, \
+    tuple_getitem
+from .utils import newenv, Slice
 
 
 def core(fn=None, **flags):
@@ -381,7 +384,7 @@ def array_iter(xs):
 @core
 def tuple_next(xs):
     """Next tuple."""
-    return xs[0], tail(xs)
+    return xs[0], xs[1:]
 
 
 @core
@@ -390,32 +393,69 @@ def tuple_hasnext(xs):
     return len(xs) > 0
 
 
-class Tail(MetaGraph):
-    """Implementation of tail."""
+class TupleReorganizer(MetaGraph):
+    """Parametrizable MetaGraph to combine or extract tuples."""
+
+    def __init__(self, name, gen):
+        """Initialize a TupleReorganizer."""
+        super().__init__(name)
+        self.gen = gen
+
+    def map_tuples(self, g, params, tups):
+        """Map each element of each tuple to a getitem on the parameter."""
+        rval = []
+        for tup, param in zip(tups, params):
+            if not isinstance(tup, AbstractTuple):
+                raise MyiaTypeError(f'Expected AbstractTuple, not {tup}')
+            rval.append([
+                g.apply(P.tuple_getitem, param, i)
+                for i, elem in enumerate(tup.elements)
+            ])
+        return rval
 
     def generate_graph(self, args):
-        """Generate tail specialized for the given Tuple type.
-
-        tail(x) generates make_tuple(x[1], x[2], ...)
-        """
-        if len(args) != 1:
-            raise MyiaTypeError('tail takes one argument')
-        a, = args
-        if not isinstance(a, AbstractTuple):
-            raise MyiaTypeError('tail requires a Tuple')
-        if len(a.elements) == 0:
-            raise MyiaTypeError('tail requires a non-empty Tuple')
+        """Generate the graph."""
         g = Graph()
-        g.set_flags('core', 'reference')
-        tup = g.add_parameter()
-        tup.debug.name = "tup"
-        elems = [g.apply(P.tuple_getitem, tup, i)
-                 for i in range(1, len(a.elements))]
-        g.output = g.apply(P.make_tuple, *elems)
+        for arg in args:
+            g.add_parameter()
+        g.output = self.gen(self, g, args)
         return g
 
 
-tail = Tail('tail')
+def tuple_reorganizer(fn):
+    """Shortcut to create a new TupleReorganizer from a function."""
+    return TupleReorganizer(name=fn.__name__, gen=fn)
+
+
+@tuple_reorganizer
+def tuple_concat(self, g, args):
+    """Metagraph for tuple concatenation."""
+    tups = self.map_tuples(g, g.parameters, args)
+    return g.apply(P.make_tuple, *reduce(operator.add, tups))
+
+
+@tuple_reorganizer
+def tuple_getslice(self, g, args):
+    """Metagraph for getting a slice from a tuple."""
+    check_nargs('tail', 4, args)
+    tuparg, start, stop, step = args
+    try:
+        start = build_value(start)
+        stop = build_value(stop)
+        step = build_value(step)
+    except ValueError:
+        raise MyiaTypeError('Slice start, stop and step must be static')
+    tup, = self.map_tuples(g, g.parameters[:1], [tuparg])
+    return g.apply(P.make_tuple, *tup[start:stop:step])
+
+
+@core
+def tuple_get(t, item):
+    """Implementation of `tuple.__getitem__`."""
+    if hastype(item, Slice):
+        return tuple_getslice(t, item.start, item.stop, item.step)
+    else:
+        return tuple_getitem(t, item)
 
 
 #################

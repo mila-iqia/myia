@@ -471,6 +471,23 @@ class Parser:
         """Process subscript indexes."""
         return self.process_node(block, node.value, used=False)
 
+    def process_Slice(self, block: 'Block', node: ast.Slice) -> ANFNode:
+        """Process subscript slices."""
+        op = block.operation('slice')
+        if node.lower is None:
+            lower = Constant(None)
+        else:
+            lower = self.process_node(block, node.lower)
+        if node.upper is None:
+            upper = Constant(None)
+        else:
+            upper = self.process_node(block, node.upper)
+        if node.step is None:
+            step = Constant(None)
+        else:
+            step = self.process_node(block, node.step)
+        return block.graph.apply(op, lower, upper, step)
+
     def process_Attribute(self, block: 'Block',
                           node: ast.Attribute) -> ANFNode:
         """Process attributes: `x.y`."""

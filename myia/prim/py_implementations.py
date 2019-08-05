@@ -241,7 +241,8 @@ def typeof(x):
 @register(primops.hastype)
 def hastype(x, t):
     """Implement `hastype`."""
-    from ..abstract import type_to_abstract, TYPE, AbstractScalar
+    from ..abstract import type_to_abstract, TYPE, AbstractScalar, \
+        AbstractClassBase, ANYTHING
     tt = type_to_abstract(t)
     if isinstance(tt, AbstractScalar):
         try:
@@ -249,6 +250,9 @@ def hastype(x, t):
             return issubclass(typ, tt.values[TYPE])
         except KeyError:
             return False
+    elif (isinstance(tt, AbstractClassBase)
+          and all(v is ANYTHING for k, v in tt.attributes.items())):
+        return isinstance(x, tt.tag)
     else:
         raise NotImplementedError(
             'The Python implementation of hastype only support simple types.'

@@ -1,5 +1,6 @@
 """Miscellaneous utilities."""
 
+from dataclasses import dataclass
 import builtins
 import functools
 import sys
@@ -17,6 +18,15 @@ T2 = TypeVar('T2')
 
 class ADT:
     """Base class for an algebraic data type."""
+
+
+@dataclass  # pragma: no cover
+class Slice:
+    """Myia version of a slice."""
+
+    start: object
+    stop: object
+    step: object
 
 
 class TaggedValue:

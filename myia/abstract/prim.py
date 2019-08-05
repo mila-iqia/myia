@@ -8,7 +8,7 @@ from operator import getitem
 
 from .. import dtype
 from ..abstract import typecheck
-from ..ir import Graph, GraphCloner, CloneRemapper, new_graph
+from ..ir import Graph, GraphCloner, CloneRemapper, new_graph, MetaGraph
 from ..dtype import Number, Bool, ExceptionType
 from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance
@@ -34,6 +34,7 @@ from .data import (
     PrimitiveFunction,
     Possibilities,
     GraphFunction,
+    MetaGraphFunction,
     DummyFunction,
     VALUE, TYPE, SHAPE,
     MyiaTypeError, InferenceError, MyiaShapeError, check_nargs,
@@ -248,7 +249,8 @@ class MyiaAttributeError(InferenceError):
 
 
 def _prim_or_graph(afn):
-    # Check that afn represents a single Primitive/Graph and return it.
+    # Check that afn represents a single Primitive/Graph/MetaGraph
+    # and return it.
     assert isinstance(afn, AbstractFunction)
     fn = afn.get_unique()
     if isinstance(fn, PrimitiveFunction):
@@ -256,7 +258,9 @@ def _prim_or_graph(afn):
     if isinstance(fn, GraphFunction):
         assert fn.context == Context.empty()
         fn = fn.graph
-    assert isinstance(fn, (Primitive, Graph))
+    if isinstance(fn, MetaGraphFunction):
+        fn = fn.metagraph
+    assert isinstance(fn, (Primitive, Graph, MetaGraph))
     return fn
 
 

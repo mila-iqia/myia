@@ -9,7 +9,7 @@ from ..monomorphize import monomorphize
 from ..abstract import InferenceEngine
 from ..ir import Graph, clone
 from ..prim import ops as P
-from ..utils import overload, TypeMap
+from ..utils import overload, TypeMap, Slice
 
 from .pipeline import PipelineResource
 
@@ -56,6 +56,7 @@ scalar_object_map = {
     operations.to_array: C.to_array,
     operations.switch: P.switch,
     operations.user_switch: P.user_switch,
+    operations.slice: Slice,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -110,6 +111,7 @@ standard_object_map = {
     operations.to_array: C.to_array,
     operations.switch: P.switch,
     operations.user_switch: P.user_switch,
+    operations.slice: Slice,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -216,7 +218,8 @@ standard_method_map = TypeMap({
     },
     abstract.AbstractTuple: {
         '__len__': P.tuple_len,
-        '__getitem__': P.tuple_getitem,
+        '__add__': C.tuple_concat,
+        '__getitem__': C.tuple_get,
         '__setitem__': P.tuple_setitem,
         '__myia_iter__': P.identity,
         '__myia_next__': C.tuple_next,
