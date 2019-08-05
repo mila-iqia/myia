@@ -9,7 +9,7 @@ from ..monomorphize import monomorphize
 from ..abstract import InferenceEngine
 from ..ir import Graph, clone
 from ..prim import ops as P
-from ..utils import overload, TypeMap
+from ..utils import overload, TypeMap, Slice
 
 from .pipeline import PipelineResource
 
@@ -56,6 +56,11 @@ scalar_object_map = {
     operations.to_array: C.to_array,
     operations.switch: P.switch,
     operations.user_switch: P.user_switch,
+<<<<<<< HEAD
+=======
+    operations.apply: P.apply,
+    operations.slice: Slice,
+>>>>>>> 10bb2037... Add Slice and parser support for slice syntax
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -110,6 +115,7 @@ standard_object_map = {
     operations.to_array: C.to_array,
     operations.switch: P.switch,
     operations.user_switch: P.user_switch,
+    operations.slice: Slice,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,

@@ -19,6 +19,15 @@ class ADT:
     """Base class for an algebraic data type."""
 
 
+@dataclass  # pragma: no cover
+class Slice:
+    """Myia version of a slice."""
+
+    start: object
+    stop: object
+    step: object
+
+
 class TaggedValue:
     """Represents a tagged value for a TaggedUnion."""
 
