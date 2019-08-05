@@ -1602,6 +1602,14 @@ def test_dataclass_method(pt):
     return pt.abs()
 
 
+@infer(
+    (Point(i64, i64), i64),
+    (Point(f64, f64), f64),
+)
+def test_dataclass_property(pt):
+    return pt.absprop
+
+
 @infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
 def test_arithmetic_data_add(pt1, pt2):
     return pt1 + pt2

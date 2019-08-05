@@ -200,6 +200,10 @@ class Point(ArithmeticData):
     def abs(self):
         return (self.x ** 2 + self.y ** 2) ** 0.5
 
+    @property
+    def absprop(self):
+        return self.abs()
+
 
 @dataclass(frozen=True)
 class Point3D(ArithmeticData):
