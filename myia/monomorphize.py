@@ -18,7 +18,7 @@ from .abstract.utils import CheckState, CloneState
 from .prim import Primitive
 from .info import About
 from .ir import Graph, Constant, MetaGraph, CloneRemapper, GraphCloner, \
-    succ_incoming, new_graph
+    succ_incoming
 from .graph_utils import dfs
 from .utils import overload, MyiaTypeError, InferenceError
 
@@ -480,7 +480,7 @@ class Monomorphizer:
                     and not ctx.graph.has_flags('reference')):
                 newgraph = ctx.graph
             else:
-                newgraph = new_graph(ctx.graph, relation=next(_count))
+                newgraph = ctx.graph.make_new(relation=next(_count))
                 newgraph.set_flags(reference=False)
             self.results[ctx] = newgraph
             entry.append(newgraph)

@@ -8,7 +8,7 @@ from operator import getitem
 
 from .. import dtype
 from ..abstract import typecheck
-from ..ir import Graph, MetaGraph, GraphCloner, CloneRemapper, new_graph
+from ..ir import Graph, MetaGraph, GraphCloner, CloneRemapper
 from ..dtype import Number, Bool, ExceptionType
 from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance, Cons, Empty, \
@@ -928,7 +928,7 @@ class _UserSwitchInferrer(Inferrer):
             branch_graph = branch_ref.node.value
             if branch_graph not in xg.scope:
                 return branch_graph
-            rval = new_graph(branch_graph, relation='copy')
+            rval = branch_graph.make_new(relation='copy')
             cast = rval.apply(P.unsafe_static_cast, xref.node, branch_type)
             cl = GraphCloner(
                 *xg.children,

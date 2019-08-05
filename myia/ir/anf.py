@@ -11,8 +11,9 @@ returning a nested function creates a closure.
 """
 
 from typing import Any, Iterable, List, Union, Dict
+from copy import copy
 
-from ..info import NamedDebugInfo
+from ..info import About, NamedDebugInfo
 from ..prim import ops as primops, Primitive
 from ..utils import Named, list_str, repr_
 from ..utils.unify import expandlist, noseq
@@ -115,6 +116,14 @@ class Graph:
         wrapped_inputs = [i if isinstance(i, ANFNode) else self.constant(i)
                           for i in inputs]
         return Apply(wrapped_inputs, self)
+
+    def make_new(self, relation='copy'):
+        """Make a new graph that's about this one."""
+        with About(self.debug, relation):
+            g = type(self)()
+            g.flags = copy(self.flags)
+            g.transforms = copy(self.transforms)
+        return g
 
     #########
     # Flags #
