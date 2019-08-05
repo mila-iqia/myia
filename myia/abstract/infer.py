@@ -626,14 +626,29 @@ class BaseGraphInferrer(Inferrer):
 
     """
 
-    def __init__(self, context):
+    def __init__(self, graph, context):
         """Initialize a BaseGraphInferrer."""
         super().__init__()
+        self._graph = graph
         self.context = context
+        self.graph_cache = {}
+
+    async def normalize_args(self, args):
+        """Return normalized versions of the arguments."""
+        return await self._graph.normalize_args(args)
+
+    def normalize_args_sync(self, args):
+        """Return normalized versions of the arguments."""
+        return self._graph.normalize_args_sync(args)
 
     def get_graph(self, engine, args):
-        """Return the graph to use with the given args."""
-        raise NotImplementedError("Override in subclass")
+        """Generate the graph for the given args."""
+        sig = self._graph.make_signature(args)
+        if sig not in self.graph_cache:
+            g = self._graph.generate_graph(sig)
+            g = engine.pipeline.resources.convert(g)
+            self.graph_cache[sig] = g
+        return self.graph_cache[sig]
 
     def make_context(self, engine, args):
         """Create a Context object using the given args."""
@@ -673,20 +688,8 @@ class GraphInferrer(BaseGraphInferrer):
 
     def __init__(self, graph, context):
         """Initialize a GraphInferrer."""
-        self._graph = graph
         assert context is not None
-        super().__init__(context.filter(graph and graph.parent))
-
-    def normalize_args_sync(self, args):
-        """Broaden args if flag ignore_values is True."""
-        if self._graph.has_flags('ignore_values'):
-            return tuple(_broaden(a) for a in args)
-        else:
-            return args
-
-    def get_graph(self, engine, args):
-        """Return the graph."""
-        return self._graph
+        super().__init__(graph, context.filter(graph and graph.parent))
 
 
 class MetaGraphInferrer(BaseGraphInferrer):
@@ -697,26 +700,7 @@ class MetaGraphInferrer(BaseGraphInferrer):
 
     def __init__(self, metagraph):
         """Initialize a MetaGraphInferrer."""
-        super().__init__(Context.empty())
-        self.metagraph = metagraph
-        self.graph_cache = {}
-
-    async def normalize_args(self, args):
-        """Return normalized versions of the arguments."""
-        return await self.metagraph.normalize_args(args)
-
-    def normalize_args_sync(self, args):
-        """Return normalized versions of the arguments."""
-        return self.metagraph.normalize_args_sync(args)
-
-    def get_graph(self, engine, args):
-        """Generate the graph for the given args."""
-        sig = self.metagraph.make_signature(args)
-        if sig not in self.graph_cache:
-            g = self.metagraph.generate_graph(sig)
-            g = engine.pipeline.resources.convert(g)
-            self.graph_cache[sig] = g
-        return self.graph_cache[sig]
+        super().__init__(metagraph, Context.empty())
 
 
 class PartialInferrer(Inferrer):

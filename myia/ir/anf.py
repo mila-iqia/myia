@@ -125,6 +125,35 @@ class Graph:
             g.transforms = copy(self.transforms)
         return g
 
+    #######################
+    # MetaGraph interface #
+    #######################
+
+    async def normalize_args(self, args):
+        """Return normalized versions of the arguments.
+
+        By default, this returns args unchanged.
+        """
+        return self.normalize_args_sync(args)
+
+    def normalize_args_sync(self, args):
+        """Return normalized versions of the arguments.
+
+        By default, this returns args unchanged.
+        """
+        return args
+
+    def make_signature(self, args):
+        """Return a signature corresponding to the args.
+
+        Each signature corresponds to a graph.
+        """
+        return args
+
+    def generate_graph(self, args):
+        """Generate a Graph for the given abstract arguments."""
+        return self
+
     #########
     # Flags #
     #########
