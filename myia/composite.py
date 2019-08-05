@@ -370,12 +370,6 @@ class SequenceIterator:
 
 
 @core
-def list_iter(xs):
-    """Iterator for List."""
-    return SequenceIterator(0, xs)
-
-
-@core
 def array_iter(xs):
     """Iterator for Array."""
     return SequenceIterator(0, xs)
