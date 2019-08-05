@@ -162,7 +162,8 @@ class Backend:
 
     def convert_value(self, v, t):
         """Convert a value to the appropriate backend representation."""
-        if isinstance(t, abstract.AbstractError) or v is abstract.DEAD:
+        if (isinstance(t, (abstract.AbstractError, abstract.AbstractType))
+                or v is abstract.DEAD):
             return None
         elif isinstance(t, abstract.AbstractScalar):
             if issubclass(t.values[abstract.TYPE],

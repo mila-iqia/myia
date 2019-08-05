@@ -727,7 +727,7 @@ def _opt_fancy_distribute(optimizer, node, equiv):
         return Apply([ct, x], node.graph)
 
 
-@pattern_replacer(primops.scalar_to_array, X)
+@pattern_replacer(primops.scalar_to_array, X, V)
 def _opt_fancy_scalar_to_array(optimizer, node, equiv):
     x = equiv[X]
     ct = Constant(GraphCosmeticPrimitive(f'to_array', on_edge=True))
@@ -763,7 +763,7 @@ def _opt_fancy_sum(optimizer, node, equiv):
         return Apply([ct, x], node.graph)
 
 
-@pattern_replacer(primops.distribute, (primops.scalar_to_array, V), X)
+@pattern_replacer(primops.distribute, (primops.scalar_to_array, V, V2), X)
 def _opt_distributed_constant(optimizer, node, equiv):
     return equiv[V]
 

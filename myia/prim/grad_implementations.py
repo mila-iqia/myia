@@ -19,7 +19,7 @@ from .py_implementations import \
     scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
     array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
     reshape, scalar_cast, typeof, invert_permutation, list_setitem, \
-    tagged, casttag
+    tagged, casttag, unsafe_static_cast
 
 
 parse = standard_pipeline \
@@ -311,7 +311,8 @@ def bprop_hastag(x, t, out, dout):
 @register_bprop(primops.casttag, ignore_values=False)
 def bprop_casttag(x, t, out, dout):
     """Backpropagator for primitive `casttag`."""
-    return (tagged(dout, t), zeros_like(t))
+    return (unsafe_static_cast(tagged(dout, t), typeof(x)),
+            zeros_like(t))
 
 
 @register_bprop(primops.tagged, ignore_values=False)

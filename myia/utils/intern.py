@@ -107,11 +107,15 @@ def deep_eqkey(obj, path=frozenset()):
     cachable = getattr(obj, '__cache_eqkey__', False)
     if cachable:
         cached = getattr(obj, '_eqkey_deepkey', None)
+        if cached is RecursionException:
+            raise RecursionException()
         if cached is not None:
             return cached
 
     oid = id(obj)
     if oid in path:
+        if cachable:
+            obj._eqkey_deepkey = RecursionException
         raise RecursionException()
 
     key = eqkey(obj)
@@ -210,6 +214,9 @@ def hash(obj):
 
 def eq(obj1, obj2):
     """Compare two (possibly self-referential) objects for equality."""
+    if obj1 is obj2:
+        return True
+
     try:
         key1 = deep_eqkey(obj1)
         key2 = deep_eqkey(obj2)

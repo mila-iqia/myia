@@ -2,14 +2,13 @@
 
 import weakref
 from itertools import count
-from functools import reduce
 
 from ..dtype import Int
 from ..ir import Constant
 from ..prim import ops as P
 from ..abstract import abstract_clone, AbstractClassBase, AbstractTuple, \
     AbstractUnion, AbstractTaggedUnion, AbstractScalar, VALUE, TYPE, \
-    AbstractValue, AbstractDict, type_to_abstract
+    AbstractValue, AbstractDict, type_to_abstract, split_type
 from ..utils import is_dataclass_type, overload
 
 
@@ -110,19 +109,11 @@ def simplify_types(root, manager):
 
         elif node.is_apply(P.hastype):
             # hastype(x, type) -> hastag(x, tag)
-            from ..abstract import split_type
             _, x, typ = node.inputs
             real_typ = type_to_abstract(typ.value)
             matches, _ = split_type(x.abstract, real_typ)
-            if isinstance(matches, AbstractUnion):
-                tags = [type_to_tag(poss) for poss in matches.options]
-            else:
-                tags = [type_to_tag(matches)]
-            hastags = [node.graph.apply(P.hastag, x, tag) for tag in tags]
-            new_node = reduce(
-                (lambda x, y: node.graph.apply(P.bool_or, x, y)),
-                hastags
-            )
+            assert not isinstance(matches, AbstractUnion)
+            new_node = node.graph.apply(P.hastag, x, type_to_tag(matches))
 
         elif node.is_apply(P.unsafe_static_cast):
             # unsafe_static_cast(x, type) -> casttag(x, tag)

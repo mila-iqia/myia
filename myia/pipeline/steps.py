@@ -10,13 +10,13 @@ from itertools import count
 from .. import dtype
 from ..abstract import AbstractTuple, AbstractList, AbstractClassBase, \
     AbstractDict, AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE, \
-    AbstractTaggedUnion
+    AbstractTaggedUnion, VALUE, ANYTHING
 from ..cconv import closure_convert
 from ..ir import Graph
 from ..opt import lib as optlib, CSE, simplify_types, NodeMap, \
     LocalPassOptimizer, DeadDataElimination, type_to_tag
 from ..prim import vm_registry
-from ..utils import overload, no_prof, TaggedValue
+from ..utils import overload, no_prof, TaggedValue, MyiaInputTypeError
 from ..validate import validate, whitelist as default_whitelist, \
     validate_abstract as default_validate_abstract
 from ..vm import VM
@@ -481,9 +481,9 @@ class NumpyChecker:
     def check_array(self, arg, t):
         """Checks that arg has elements of the right dtype."""
         if not isinstance(arg, np.ndarray):
-            raise TypeError('Expected ndarray')
+            raise MyiaInputTypeError('Expected ndarray')
         if arg.dtype != dtype.type_to_np_dtype(t):
-            raise TypeError('Wrong dtype')
+            raise MyiaInputTypeError('Wrong dtype')
         return arg
 
 
@@ -498,10 +498,10 @@ class SlowdownWarning(UserWarning):
 @overload(bootstrap=True)
 def convert_arg(self, arg, orig_t: AbstractTuple, backend):
     if not isinstance(arg, tuple):
-        raise TypeError('Expected tuple')
+        raise MyiaInputTypeError('Expected tuple')
     oe = orig_t.elements
     if len(arg) != len(oe):
-        raise TypeError(f'Expected {len(oe)} elements')
+        raise MyiaInputTypeError(f'Expected {len(oe)} elements')
     return tuple(self(x, o, backend)
                  for x, o in zip(arg, oe))
 
@@ -509,7 +509,7 @@ def convert_arg(self, arg, orig_t: AbstractTuple, backend):
 @overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractList, backend):
     if not isinstance(arg, list):
-        raise TypeError('Expected list')
+        raise MyiaInputTypeError('Expected list')
     ot = orig_t.element
     return list(self(x, ot, backend) for x in arg)
 
@@ -517,19 +517,21 @@ def convert_arg(self, arg, orig_t: AbstractList, backend):
 @overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractDict, backend):
     if not isinstance(arg, dict):
-        raise TypeError('Expected dict')
+        raise MyiaInputTypeError('Expected dict')
     types = orig_t.entries
     if len(arg) != len(types):
-        raise TypeError("Dictionary input doesn't have the expected size")
+        raise MyiaInputTypeError(
+            "Dictionary input doesn't have the expected size"
+        )
     if set(arg.keys()) != set(types.keys()):
-        raise TypeError("Mismatched keys for input dictionary.")
+        raise MyiaInputTypeError("Mismatched keys for input dictionary.")
     return tuple(self(arg[k], o, backend) for k, o in orig_t.entries.items())
 
 
 @overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractClassBase, backend):
     if not isinstance(arg, orig_t.tag):
-        raise TypeError(f'Expected {orig_t.tag.__qualname__}')
+        raise MyiaInputTypeError(f'Expected {orig_t.tag.__qualname__}')
     arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
     oe = list(orig_t.attributes.values())
     return tuple(self(x, o, backend)
@@ -561,7 +563,7 @@ def convert_arg(self, arg, orig_t: AbstractUnion, backend):
         return TaggedValue(tag, value)
     else:
         opts = ", ".join(map(str, orig_t.options))
-        raise TypeError(f'Expected one of {opts}, not {arg}')
+        raise MyiaInputTypeError(f'Expected one of {opts}, not {arg}')
 
 
 @overload  # noqa: F811
@@ -569,18 +571,21 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
     t = orig_t.values[TYPE]
     if issubclass(t, dtype.Int):
         if not isinstance(arg, (int, np.integer)):
-            raise TypeError(f'Expected int')
+            raise MyiaInputTypeError(f'Expected int')
     elif issubclass(t, dtype.Float):
         if not isinstance(arg, (float, np.floating)):
-            raise TypeError(f'Expected float')
+            raise MyiaInputTypeError(f'Expected float')
     elif issubclass(t, dtype.Bool):
         if not isinstance(arg, bool):
-            raise TypeError(f'Expected bool')
+            raise MyiaInputTypeError(f'Expected bool')
     elif issubclass(t, dtype.Nil):
         if arg is not None:
-            raise TypeError(f'Expected None')
+            raise MyiaInputTypeError(f'Expected None')
     else:
-        raise TypeError(f'Invalid type: {t}')
+        raise MyiaInputTypeError(f'Invalid type: {t}')
+    expected_value = orig_t.values[VALUE]
+    if expected_value is not ANYTHING and expected_value != arg:
+        raise MyiaInputTypeError(f'Invalid value: {arg}')
     arg = backend.from_scalar(arg, t)
     return arg
 
@@ -710,6 +715,8 @@ class Wrap(PipelineStep):
                 backend = steps.compile.backend
             else:
                 backend = NumpyChecker()
+            if len(args) != len(orig_arg_t):
+                raise MyiaInputTypeError('Wrong number of arguments.')
             args = tuple(convert_arg(arg, ot, backend) for arg, ot in
                          zip(args, orig_arg_t))
             res = fn(*args)

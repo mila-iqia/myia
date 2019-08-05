@@ -7,7 +7,7 @@ from myia import dtype
 
 from .abstract import MyiaTypeError, from_value
 from .pipeline import standard_pipeline
-from .utils import keyword_decorator, overload
+from .utils import keyword_decorator, overload, MyiaInputTypeError
 from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
     AbstractList, AbstractArray, AbstractScalar, AbstractClassBase
 from .compile.backends import load_backend, Backend
@@ -43,6 +43,7 @@ class MyiaFunction:
             'wrap.return_backend': return_backend,
         })
         self._cache = {}
+        self.latest = None
 
     def specialize(self, args):
         """Specialize on the types of the given arguments.
@@ -74,10 +75,16 @@ class MyiaFunction:
 
     def compile(self, args):
         """Returns a function specialized for the given args."""
-        return self.specialize(args)['output']
+        self.latest = self.specialize(args)['output']
+        return self.latest
 
     def __call__(self, *args):
         """Call the function on the given args."""
+        if self.latest:
+            try:
+                return self.latest(*args)
+            except MyiaInputTypeError:
+                pass
         return self.compile(args)(*args)
 
 

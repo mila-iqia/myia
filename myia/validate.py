@@ -118,6 +118,7 @@ whitelist = frozenset({
     P.hastag,
     P.casttag,
     P.tagged,
+    P.unsafe_static_cast,
 })
 
 
