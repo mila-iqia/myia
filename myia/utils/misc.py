@@ -1,5 +1,6 @@
 """Miscellaneous utilities."""
 
+from dataclasses import dataclass
 import builtins
 import functools
 import sys

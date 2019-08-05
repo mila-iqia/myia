@@ -56,11 +56,7 @@ scalar_object_map = {
     operations.to_array: C.to_array,
     operations.switch: P.switch,
     operations.user_switch: P.user_switch,
-<<<<<<< HEAD
-=======
-    operations.apply: P.apply,
     operations.slice: Slice,
->>>>>>> 10bb2037... Add Slice and parser support for slice syntax
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,

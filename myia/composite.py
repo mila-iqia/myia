@@ -9,6 +9,7 @@ from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractList, AbstractTuple, \
     AbstractClassBase, build_value, AbstractError, TYPE, AbstractScalar, \
     AbstractUnion, AbstractTaggedUnion
+from .abstract.data import check_nargs
 from .debug.label import short_labeler
 from .dtype import Array, Number, Bool, \
     EnvType, u8, u16, i8, i16, f32, f64, Nil
@@ -23,7 +24,7 @@ from .prim.py_implementations import \
     scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div, \
     scalar_to_array, env_add, scalar_tanh, py_registry, array_reduce, \
     tuple_getitem
-from .utils import newenv
+from .utils import newenv, Slice
 
 
 def core(fn=None, **flags):
