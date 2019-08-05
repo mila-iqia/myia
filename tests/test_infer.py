@@ -10,7 +10,7 @@ from myia import abstract
 from myia.abstract import concretize_abstract, from_value
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
-from myia.composite import gadd, zeros_like, grad, list_map, tail
+from myia.composite import gadd, zeros_like, grad, list_map
 from myia.debug.traceback import print_inference_error
 from myia.dtype import Int, External, Number, EnvType as Env, Nil, Array, \
     i16, i32, i64, u64, f16, f32, f64
@@ -401,22 +401,6 @@ def test_array_len(xs):
     return P.array_len(xs)
 
 
-@infer(
-    ((i64, f64), (f64,)),
-    ((f64, i64), (i64,)),
-    ((f64, (i64, f64)), ((i64, f64),)),
-    ((), InferenceError),
-    (f64, InferenceError),
-)
-def test_tail_tuple(tup):
-    return tail(tup)
-
-
-@infer(((i64), (f64,), InferenceError))
-def test_tail_tuple_wrong(x, y):
-    return tail(x, y)
-
-
 @infer((i64, f64, i64), (f64, i64, f64))
 def test_tuple_getitem(x, y):
     return (x, y)[0]
@@ -430,6 +414,33 @@ def test_tuple_getitem_negative(x, y):
 @infer((i64, f64, InferenceError))
 def test_tuple_outofbound(x, y):
     return (x, y)[2]
+
+
+@infer(
+    ((i64, f64), (f64,)),
+    ((f64, i64), (i64,)),
+    ((f64, (i64, f64)), ((i64, f64),)),
+    ((), ()),
+    (f64, InferenceError),
+)
+def test_tuple_getslice(tup):
+    return tup[1:]
+
+
+@infer(
+    ((i64, f64, i64), (f64,)),
+    ((f64,), ()),
+)
+def test_tuple_getslice_2(tup):
+    return tup[1:-1]
+
+
+@infer_std(
+    ((i64, i64), (i64,), (i64, i64, i64)),
+    ((i64, i64), i64, InferenceError)
+)
+def test_concat_tuple(x, y):
+    return x + y
 
 
 @infer((i64, f64, InferenceError))
@@ -913,7 +924,7 @@ def test_hastype_2(x):
         elif hastype(x, Tf4):
             return x
         elif hastype(x, Tuple):
-            return f(x[0]) + f(tail(x))
+            return f(x[0]) + f(x[1:])
         elif hastype(x, List):
             return 1.0
         elif hastype(x, Thing_ftup):

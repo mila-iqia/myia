@@ -16,7 +16,7 @@ from myia.abstract import ArrayWrapper
 from myia.compile import load_backend, LoadingError
 
 from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
-    ai32_of, af64_of, MA, D
+    ai32_of, af64_of, MA, D, Thing
 
 
 def test_myia():
@@ -36,7 +36,7 @@ def test_myia():
     with pytest.raises(InferenceError):
         f(10, 20, 30)
     with pytest.raises(InferenceError):
-        f((10, 20), (30, 40))
+        f(Thing(10), Thing(20))
 
 
 def test_myia_specialize_values():

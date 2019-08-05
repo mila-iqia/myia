@@ -222,7 +222,8 @@ standard_method_map = TypeMap({
     },
     abstract.AbstractTuple: {
         '__len__': P.tuple_len,
-        '__getitem__': P.tuple_getitem,
+        '__add__': C.tuple_concat,
+        '__getitem__': C.tuple_get,
         '__setitem__': P.tuple_setitem,
         '__myia_iter__': P.identity,
         '__myia_next__': C.tuple_next,

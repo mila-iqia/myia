@@ -580,3 +580,8 @@ def test_reducetree(t):
 )
 def test_hypermap_tree(t):
     return hyper_map(scalar_add, t, t)
+
+
+@specialize(((int1, int2), (fp1, fp2)),)
+def test_tuple_surgery(xs, ys):
+    return xs[::-1]
