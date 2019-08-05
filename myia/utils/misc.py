@@ -29,7 +29,7 @@ class Slice:
     step: object
 
 
-@dataclass
+@dataclass  # pragma: no cover
 class Cons(ADT):
     """Cons cell for lists.
 
