@@ -319,7 +319,7 @@ def dataclass_methods(dc):
     """Returns a dataclass's method dictionary."""
     return {name: getattr(dc, name)
             for name in dir(dc)
-            if isinstance(getattr(dc, name), (FunctionType,))}
+            if isinstance(getattr(dc, name), (FunctionType, property))}
 
 
 class ErrorPool:

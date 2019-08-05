@@ -302,13 +302,21 @@ async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
             return 'rval', await on_dcattr(data, item_v)
         elif item_v in data.methods:
             method = data.methods[item_v]
-            method = resources.convert(method)
+            isprop = isinstance(method, property)
+            if isprop:
+                method = resources.convert(method.fget)
+            else:
+                method = resources.convert(method)
             inferrer = to_abstract(method, Context.empty(), ref=outref)
             fn = _prim_or_graph(inferrer)
             g = outref.node.graph
             eng = outref.engine
-            ref = eng.ref(g.apply(P.partial, fn, dataref.node),
-                          outref.context)
+            if isprop:
+                ref = eng.ref(g.apply(fn, dataref.node),
+                              outref.context)
+            else:
+                ref = eng.ref(g.apply(P.partial, fn, dataref.node),
+                              outref.context)
             return 'reroute', ref
         else:
             raise InferenceError(f'Unknown field in {data}: {item_v}')
