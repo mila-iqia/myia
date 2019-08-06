@@ -1,7 +1,4 @@
-"""Collection of helpers for the Relay backend.
-
-Most of those should go away as Relay main development progresses.
-"""
+"""Collection of helpers for the Relay backend."""
 
 from tvm import relay
 from tvm.relay import transform
@@ -46,9 +43,7 @@ pass_set = transform.Sequential(
         transform.CanonicalizeOps(),
         transform.CanonicalizeCast(),
         transform.FuseOps(3),
-        # transform.CombineParallelConv2d(),
         transform.AlterOpLayout(),
-        # transform.RewriteAnnotatedOps(???),
     ],
     opt_level=0
 )
