@@ -4,6 +4,7 @@ numpy
 abergeron::tvm
 pytest
 pytest-cov
+pyyaml
 flake8==3.7.7
 pydocstyle==2.1.1
 isort==4.3.21
