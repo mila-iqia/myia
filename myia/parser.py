@@ -253,7 +253,7 @@ class Parser:
 
         self.write_cache = OrderedSet()
         self.read_cache = OrderedSet()
-        return main_block.object
+        return main_block.graph
 
     def process_FunctionDef(self, block: 'Block',
                             node: ast.FunctionDef) -> 'Block':
@@ -266,14 +266,21 @@ class Parser:
 
         """
         function_block = self._process_function(block, node)
-        block.write(node.name, Constant(function_block.object), track=False)
+        block.write(node.name, Constant(function_block.graph), track=False)
         return block
 
     def _process_function(self, block: Optional['Block'],
                           node: ast.FunctionDef) -> Tuple['Block', 'Block']:
         """Process a function definition and return first and final blocks."""
+        from .ir import ParametricGraph
+
+        parametric = bool(node.args.defaults or node.args.vararg)
+
         with DebugInherit(ast=node, location=self.make_location(node)):
-            function_block = Block(self)
+            function_block = Block(
+                self,
+                constructor=ParametricGraph if parametric else Graph
+            )
         if block:
             function_block.preds.append(block)
         else:
@@ -289,18 +296,16 @@ class Parser:
         # Process default arguments
         nondefaults = [None] * (len(node.args.args) - len(node.args.defaults))
         defaults = nondefaults + node.args.defaults
-        defaults_pairs = []
+        defaults_list = []
         for arg, dflt in zip(node.args.args, defaults):
             with DebugInherit(ast=arg, location=self.make_location(arg)):
                 param_node = Parameter(function_block.graph)
             param_node.debug.name = arg.arg
-            if dflt is None:
-                function_block.graph.parameters.append(param_node)
-                function_block.write(arg.arg, param_node, track=False)
-            else:
+            function_block.graph.parameters.append(param_node)
+            function_block.write(arg.arg, param_node, track=False)
+            if dflt:
                 dflt_node = self.process_node(function_block, dflt)
-                defaults_pairs.append((param_node, dflt_node))
-                function_block.write(arg.arg, dflt_node, track=False)
+                defaults_list.append(dflt_node)
 
         # Process varargs
         if node.args.vararg:
@@ -314,20 +319,17 @@ class Parser:
         else:
             vararg_node = None
 
-        # Defaults and varargs produce a ParametricGraph
-        if node.args.defaults or node.args.vararg:
-            from .ir import ParametricGraph
-            obj = ParametricGraph(function_block.graph,
-                                  defaults_pairs, vararg_node)
-        else:
-            obj = function_block.graph
-
-        function_block.object = obj
-        function_block.write(node.name, Constant(obj), track=False)
+        function_block.graph.vararg = bool(vararg_node)
+        graph = function_block.graph
+        function_block.write(node.name, Constant(graph), track=False)
         self.process_statements(function_block, node.body)
         if function_block.graph.return_ is None:
             raise MyiaSyntaxError("Function doesn't return a value",
                                   self.make_location(node))
+
+        if parametric:
+            function_block.graph.return_.inputs[2:] = defaults_list
+
         # TODO: check that if after_block returns?
         return function_block
 
@@ -804,7 +806,7 @@ class Block:
 
     """
 
-    def __init__(self, parser: Parser, **flags) -> None:
+    def __init__(self, parser: Parser, constructor=Graph, **flags) -> None:
         """Construct a basic block.
 
         Constructing a basic block also constructs a corresponding function,
@@ -821,9 +823,8 @@ class Block:
         self.preds: List[Block] = []
         self.phi_nodes: Dict[Parameter, str] = {}
         self.jumps: Dict[Block, Apply] = {}
-        self.graph: Graph = Graph()
+        self.graph: Graph = constructor()
         self.graph.flags.update(flags)
-        self.object = self.graph
 
     def set_phi_arguments(self, phi: Parameter) -> None:
         """Resolve the arguments to a phi node.

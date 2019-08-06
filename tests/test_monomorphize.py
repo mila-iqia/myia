@@ -601,6 +601,18 @@ def test_default_arg(x, y=3, z=6):
 
 
 @specialize(
+    (int1, int2),
+)
+def test_default_closure(x, y):
+    def clos(z=y + y):
+        if x > z:
+            return x - z
+        else:
+            return 0
+    return clos() + clos(x)
+
+
+@specialize(
     (1, 2, 3, 4, 5),
 )
 def test_varargs(x, *args):

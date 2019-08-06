@@ -3,7 +3,7 @@
 
 from .clone import GraphCloner
 from .manager import GraphManager
-from .anf import Parameter
+from .anf import Parameter, Graph
 
 from .. import abstract, parser
 from ..info import About
@@ -100,19 +100,19 @@ class MultitypeGraph(MetaGraph):
         return fn(*args)
 
 
-class ParametricGraph(MetaGraph):
+class ParametricGraph(Graph):
     """Graph with default arguments and varargs."""
 
-    def __init__(self, graph, defaults, vararg):
+    def __init__(self):
         """Initialize a ParametricGraph."""
-        super().__init__(graph.debug.name)
-        self.graph = graph
-        self.defaults = defaults
-        self.vararg = vararg
+        super().__init__()
+        self.vararg = False
 
-    def set_flags(self, *flags, **kwflags):
-        """Set flags on the underlying graph."""
-        self.graph.set_flags(*flags, **kwflags)
+    def make_new(self, relation='copy'):
+        """Make a new graph that's about this one."""
+        g = super().make_new(relation)
+        g.vararg = self.vararg
+        return g
 
     def make_signature(self, args):
         """Create a signature which is the number of arguments."""
@@ -121,31 +121,32 @@ class ParametricGraph(MetaGraph):
     def generate_graph(self, nargs):
         """Generate a valid graph for the given number of arguments."""
         if self.vararg:
-            actual_parameters = self.graph.parameters[:-1]
-            vararg = self.graph.parameters[-1]
+            actual_parameters = self.parameters[:-1]
+            vararg = self.parameters[-1]
         else:
-            actual_parameters = self.graph.parameters
+            actual_parameters = self.parameters
             vararg = None
 
-        diff = nargs - len(actual_parameters)
+        all_defaults = self.return_.inputs[2:]
+
+        diff = nargs - (len(actual_parameters) - len(all_defaults))
         if diff < 0:
             raise MyiaTypeError(f'Not enough arguments for {self}')
 
-        cl = GraphCloner(self.graph, total=True)
-        new_graph = cl[self.graph]
-        mng = GraphManager(manage=False, allow_changes=True)
-        mng.add_graph(new_graph)
-        new_parameters = [cl[p] for p in actual_parameters]
-
-        for param, node in self.defaults[:diff]:
-            with About(param.debug, 'copy'):
-                new_param = Parameter(new_graph)
-            new_parameters.append(new_param)
-            mng.replace(cl[node], new_param)
-
-        nvar = diff - len(self.defaults)
+        nvar = diff - len(all_defaults)
         if nvar > 0 and not vararg:
             raise MyiaTypeError(f'Too many arguments for {self}')
+
+        cl = GraphCloner(self, total=True, graph_repl={self: Graph()})
+        new_graph = cl[self]
+        mng = GraphManager(manage=False, allow_changes=True)
+        mng.add_graph(new_graph)
+        new_parameters = [cl[p] for p in actual_parameters[:nargs]]
+
+        defaulted_params = actual_parameters[nargs:]
+        defaults = all_defaults[-len(defaulted_params):]
+        for param, dflt in zip(defaulted_params, defaults):
+            mng.replace(cl[param], cl[dflt])
 
         if vararg:
             v_parameters = []
@@ -161,8 +162,5 @@ class ParametricGraph(MetaGraph):
             mng.replace(v2, constructed)
 
         mng.set_parameters(new_graph, new_parameters)
-        if mng.free_variables_total[new_graph]:
-            raise Exception(
-                'Graphs with default arguments or varargs cannot be closures'
-            )
+        new_graph.return_.inputs[2:] = []
         return new_graph

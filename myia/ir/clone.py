@@ -213,7 +213,7 @@ class BasicRemapper(GraphRemapper):
     def gen_graph(self, graph):
         """Makes an new empty graph."""
         with About(graph.debug, self.graph_relation):
-            self.graph_repl[graph] = Graph()
+            self.graph_repl[graph] = type(graph)()
 
     def gen_parameter(self, graph, new_graph, p):
         """Makes a new parameter."""

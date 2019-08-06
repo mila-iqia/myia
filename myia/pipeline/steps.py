@@ -113,12 +113,10 @@ def step_parse(self, input, argspec=None):
         graph: A graph.
     """
     g = self.resources.convert(input)
-    if isinstance(g, MetaGraph):
-        assert argspec is not None
-        sig = g.make_signature(argspec)
-        g = g.generate_graph(sig)
-        g = self.resources.convert(g)
-    assert isinstance(g, Graph)
+    sig = g.make_signature(argspec)
+    g = g.generate_graph(sig)
+    g = self.resources.convert(g)
+    assert type(g) is Graph
     return {'graph': g}
 
 

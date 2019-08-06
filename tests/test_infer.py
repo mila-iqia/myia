@@ -501,13 +501,11 @@ def test_default_arg(x, y=3):
     return x + y
 
 
-@pytest.mark.xfail(reason='Closures cannot have default arguments')
-@infer(
-    (i64, i64, i64),
-)
+@infer((i64, i64, i64))
 def test_default_closure(x, y):
-    def clos(z=5):
+    def clos(z=y + y, q=x + x):
         return x + z
+
     return clos(y)
 
 

@@ -71,7 +71,7 @@ class Graph:
         Equal to `self.return_.inputs[1]`, if it exists. Unlike `return_`,
         `output' may be a constant or belong to a different graph.
         """
-        if not self.return_ or len(self.return_.inputs) != 2:
+        if not self.return_ or len(self.return_.inputs) < 2:
             raise Exception('Graph has no output.')
         return self.return_.inputs[1]
 
