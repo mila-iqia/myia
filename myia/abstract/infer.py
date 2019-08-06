@@ -244,7 +244,7 @@ class InferenceEngine:
     @get_inferrer_for.register
     def get_inferrer_for(self, mg: MetaGraphFunction):
         if mg not in self.constructors:
-            self.constructors[mg] = MetaGraphInferrer(mg.metagraph)
+            self.constructors[mg] = GraphInferrer(mg.metagraph, None)
         return self.constructors[mg]
 
     async def execute(self, fn, *args):
@@ -618,7 +618,7 @@ class TrackedInferrer(Inferrer):
         return self.cache[args]
 
 
-class BaseGraphInferrer(Inferrer):
+class GraphInferrer(Inferrer):
     """Base Inferrer for Graph and MetaGraph.
 
     Attributes:
@@ -627,10 +627,13 @@ class BaseGraphInferrer(Inferrer):
     """
 
     def __init__(self, graph, context):
-        """Initialize a BaseGraphInferrer."""
+        """Initialize a GraphInferrer."""
         super().__init__()
         self._graph = graph
-        self.context = context
+        if context is not None:
+            self.context = context.filter(graph and graph.parent)
+        else:
+            self.context = Context.empty()
         self.graph_cache = {}
 
     async def normalize_args(self, args):
@@ -681,26 +684,6 @@ class BaseGraphInferrer(Inferrer):
 
         out = engine.ref(g.return_, context)
         return await engine.get_inferred(out)
-
-
-class GraphInferrer(BaseGraphInferrer):
-    """Inferrer for Graphs."""
-
-    def __init__(self, graph, context):
-        """Initialize a GraphInferrer."""
-        assert context is not None
-        super().__init__(graph, context.filter(graph and graph.parent))
-
-
-class MetaGraphInferrer(BaseGraphInferrer):
-    """Inferrer for MetaGraphs.
-
-    MetaGraphInferrer caches generated graphs.
-    """
-
-    def __init__(self, metagraph):
-        """Initialize a MetaGraphInferrer."""
-        super().__init__(metagraph, Context.empty())
 
 
 class PartialInferrer(Inferrer):

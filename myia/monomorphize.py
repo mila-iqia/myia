@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace as dc_replace
 from collections import defaultdict
 from .abstract import AbstractFunction, PrimitiveFunction, GraphFunction, \
     MetaGraphFunction, build_value, AbstractError, \
-    BaseGraphInferrer, TrackedInferrer, DummyFunction, \
+    GraphInferrer, TrackedInferrer, DummyFunction, \
     AbstractValue, TypedPrimitive, broaden, DEAD, POLY, \
     VirtualReference, Context, Reference, abstract_clone, \
     abstract_check, concretize_abstract
@@ -224,10 +224,8 @@ class Monomorphizer:
             a = AbstractFunction(TypedPrimitive(fn.prim, argvals, outval))
             return _const(fn.prim, a), None, None
 
-        assert isinstance(inf, BaseGraphInferrer)
-
-        if hasattr(inf, 'graph_cache'):
-            concretize_cache(inf.graph_cache)
+        assert isinstance(inf, GraphInferrer)
+        concretize_cache(inf.graph_cache)
 
         ctx = inf.make_context(self.engine, argvals)
         norm_ctx = _normalize_context(ctx)
@@ -277,13 +275,12 @@ class Monomorphizer:
                         a, currinf, broad_argvals, False
                     )
                     eng = self.engine
-                    if hasattr(currinf, 'make_context'):
+                    if isinstance(currinf, GraphInferrer):
                         # Have to check that this graph was processed by
                         # the inferrer. It should have been, but sometimes
                         # it isn't, not sure why. Hopefully a rewrite of the
                         # specializer should fix everything.
-                        if hasattr(currinf, 'graph_cache'):
-                            concretize_cache(currinf.graph_cache)
+                        concretize_cache(currinf.graph_cache)
                         try:
                             g = currinf.get_graph(eng, broad_argvals)
                         except InferenceError:  # pragma: no cover
