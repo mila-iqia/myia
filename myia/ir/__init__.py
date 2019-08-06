@@ -10,7 +10,7 @@ from .manager import (  # noqa
     ManagerError, manage, ParentProxy, GraphManager
 )
 from .metagraph import (  # noqa
-    MetaGraph, MultitypeGraph, ParametricGraph
+    MetaGraph, MultitypeGraph
 )
 from .utils import (  # noqa
     succ_deep, succ_deeper, succ_incoming,

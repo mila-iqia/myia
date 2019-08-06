@@ -12,7 +12,8 @@ from myia.abstract import (
     AbstractJTagged, AbstractError, AbstractFunction, AbstractUnion,
     AbstractTaggedUnion, InferenceLoop, to_abstract, build_value, amerge,
     AbstractClass, Possibilities, PendingFromList, TaggedPossibilities,
-    abstract_clone, broaden, Pending, type_to_abstract, empty, listof
+    abstract_clone, broaden, Pending, type_to_abstract, empty, listof,
+    AbstractKeywordArgument
 )
 from myia.utils import SymbolicKeyInstance, Cons, Empty, InferenceError, \
     MyiaTypeError
@@ -183,6 +184,9 @@ def test_repr():
 
     j1 = AbstractJTagged(to_abstract_test(1))
     assert repr(j1) == f'AbstractJTagged(J(Int[64] = 1))'
+
+    kw1 = AbstractKeywordArgument('bucket', to_abstract_test(1))
+    assert repr(kw1) == f'AbstractKeywordArgument(KW(bucket :: Int[64] = 1))'
 
     ty1 = Ty(f32)
     assert repr(ty1) == 'AbstractType(Ty(Float[32]))'

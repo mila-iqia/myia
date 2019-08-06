@@ -60,6 +60,7 @@ from .data import (  # noqa
     AbstractJTagged,
     AbstractUnion,
     AbstractTaggedUnion,
+    AbstractKeywordArgument,
     AbstractBottom,
     TrackDict,
     Track,

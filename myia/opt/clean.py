@@ -8,7 +8,8 @@ from ..ir import Constant
 from ..prim import ops as P
 from ..abstract import abstract_clone, AbstractClassBase, AbstractTuple, \
     AbstractUnion, AbstractTaggedUnion, AbstractScalar, VALUE, TYPE, \
-    AbstractValue, AbstractDict, AbstractArray, type_to_abstract, split_type
+    AbstractValue, AbstractDict, AbstractArray, type_to_abstract, split_type, \
+    AbstractKeywordArgument
 from ..utils import is_dataclass_type, overload
 
 
@@ -38,6 +39,11 @@ def _reabs(self, a: AbstractUnion):
     return (yield AbstractTaggedUnion)(
         [type_to_tag(opt), self(opt)] for opt in a.options
     )
+
+
+@overload  # noqa: F811
+def _reabs(self, a: AbstractKeywordArgument):
+    return self(a.argument)
 
 
 def simplify_types(root, manager):
@@ -146,6 +152,12 @@ def simplify_types(root, manager):
             new_node = Constant(
                 AbstractArray(node.value.element, node.value.values))
             keep_abstract = False
+
+        elif node.is_apply(P.make_kwarg):
+            new_node = node.inputs[2]
+
+        elif node.is_apply(P.extract_kwarg):
+            new_node = node.inputs[2]
 
         elif node.is_constant(AbstractClassBase):
             # This is a constant that contains a type, used e.g. with hastype.

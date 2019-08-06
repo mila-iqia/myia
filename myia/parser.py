@@ -272,15 +272,8 @@ class Parser:
     def _process_function(self, block: Optional['Block'],
                           node: ast.FunctionDef) -> Tuple['Block', 'Block']:
         """Process a function definition and return first and final blocks."""
-        from .ir import ParametricGraph
-
-        parametric = bool(node.args.defaults or node.args.vararg)
-
         with DebugInherit(ast=node, location=self.make_location(node)):
-            function_block = Block(
-                self,
-                constructor=ParametricGraph if parametric else Graph
-            )
+            function_block = Block(self)
         if block:
             function_block.preds.append(block)
         else:
@@ -289,15 +282,23 @@ class Parser:
 
         function_block.mature()
         function_block.graph.debug.name = node.name
-        if node.args.kwarg is not None or node.args.kwonlyargs != []:
-            raise MyiaSyntaxError("No support for keyword-only arguments",
+        if node.args.kwarg is not None:
+            raise MyiaSyntaxError("No support for **kwargs",
                                   self.make_location(node))
 
-        # Process default arguments
-        nondefaults = [None] * (len(node.args.args) - len(node.args.defaults))
+        # Process arguments and their defaults
+        args = node.args.args
+        nondefaults = [None] * (len(args) - len(node.args.defaults))
         defaults = nondefaults + node.args.defaults
+
+        kwargs = node.args.kwonlyargs
+        kwnondefaults = [None] * (len(kwargs) - len(node.args.kw_defaults))
+        kwdefaults = kwnondefaults + node.args.kw_defaults
+
+        defaults_names = []
         defaults_list = []
-        for arg, dflt in zip(node.args.args, defaults):
+
+        for arg, dflt in zip(args + kwargs, defaults + kwdefaults):
             with DebugInherit(ast=arg, location=self.make_location(arg)):
                 param_node = Parameter(function_block.graph)
             param_node.debug.name = arg.arg
@@ -305,6 +306,7 @@ class Parser:
             function_block.write(arg.arg, param_node, track=False)
             if dflt:
                 dflt_node = self.process_node(function_block, dflt)
+                defaults_names.append(arg.arg)
                 defaults_list.append(dflt_node)
 
         # Process varargs
@@ -319,7 +321,6 @@ class Parser:
         else:
             vararg_node = None
 
-        function_block.graph.vararg = bool(vararg_node)
         graph = function_block.graph
         function_block.write(node.name, Constant(graph), track=False)
         self.process_statements(function_block, node.body)
@@ -327,8 +328,10 @@ class Parser:
             raise MyiaSyntaxError("Function doesn't return a value",
                                   self.make_location(node))
 
-        if parametric:
-            function_block.graph.return_.inputs[2:] = defaults_list
+        function_block.graph.vararg = bool(vararg_node)
+        function_block.graph.defaults = defaults_names
+        function_block.graph.kwonly = len(node.args.kwonlyargs)
+        function_block.graph.return_.inputs[2:] = defaults_list
 
         # TODO: check that if after_block returns?
         return function_block
@@ -806,7 +809,7 @@ class Block:
 
     """
 
-    def __init__(self, parser: Parser, constructor=Graph, **flags) -> None:
+    def __init__(self, parser: Parser, **flags) -> None:
         """Construct a basic block.
 
         Constructing a basic block also constructs a corresponding function,
@@ -823,7 +826,7 @@ class Block:
         self.preds: List[Block] = []
         self.phi_nodes: Dict[Parameter, str] = {}
         self.jumps: Dict[Block, Apply] = {}
-        self.graph: Graph = constructor()
+        self.graph: Graph = Graph()
         self.graph.flags.update(flags)
 
     def set_phi_arguments(self, phi: Parameter) -> None:

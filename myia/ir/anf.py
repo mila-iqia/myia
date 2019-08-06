@@ -51,6 +51,9 @@ class Graph:
         self.debug = NamedDebugInfo(self)
         self.flags = {}
         self.transforms: Dict[str, Union[Graph, Primitive]] = {}
+        self.vararg = False
+        self.defaults = []
+        self.kwonly = 0
         self._manager = None
 
     @property
@@ -121,8 +124,11 @@ class Graph:
         """Make a new graph that's about this one."""
         with About(self.debug, relation):
             g = type(self)()
-            g.flags = copy(self.flags)
-            g.transforms = copy(self.transforms)
+        g.flags = copy(self.flags)
+        g.transforms = copy(self.transforms)
+        g.vararg = self.vararg
+        g.defaults = self.defaults
+        g.kwonly = self.kwonly
         return g
 
     #######################
@@ -148,11 +154,96 @@ class Graph:
 
         Each signature corresponds to a graph.
         """
-        return args
+        from ..abstract.data import AbstractKeywordArgument
+        if args is None:
+            return None
+        nargs = 0
+        keys = []
+        for arg in args:
+            if isinstance(arg, AbstractKeywordArgument):
+                keys.append(arg.key)
+            else:
+                assert not keys
+                nargs += 1
+        return (nargs, *keys)
 
-    def generate_graph(self, args):
+    def generate_graph(self, sig):
         """Generate a Graph for the given abstract arguments."""
-        return self
+        from .clone import GraphCloner
+        from .manager import GraphManager
+        from ..utils import MyiaTypeError
+        from ..prim import ops as P
+
+        if sig is None:
+            return self
+        nargs, *keys = sig
+        if (not self.defaults and not self.vararg
+                and not self.kwonly and not keys):
+            return self
+
+        assert not self.has_flags('parametric_done')
+
+        cl = GraphCloner(self, total=True, graph_repl={self: Graph()})
+        new_graph = cl[self]
+        repl = {}
+
+        max_n_pos = len(self.parameters) - int(self.vararg) - self.kwonly
+        n_pos = min(max_n_pos, nargs)
+
+        new_order = new_graph.parameters[:n_pos]
+
+        n_var = nargs - n_pos
+
+        vararg = None
+        if self.vararg:
+            vararg = new_graph.parameters[-1]
+            v_parameters = []
+            for i in range(n_var):
+                new_param = Parameter(new_graph)
+                new_param.debug.name = f'{vararg.debug.name}[{i}]'
+                v_parameters.append(new_param)
+            new_order += v_parameters
+            constructed = new_graph.apply(
+                P.make_tuple, *v_parameters
+            )
+            repl[vararg] = constructed
+        elif n_var:
+            raise MyiaTypeError(f'Too many arguments')
+
+        if keys:
+            for k in keys:
+                try:
+                    idx = self.parameter_names.index(k)
+                except ValueError:
+                    raise MyiaTypeError(f'Invalid keyword argument: {k}')
+                p = new_graph.parameters[idx]
+                if p in new_order:
+                    raise MyiaTypeError(
+                        f'Multiple values given for argument {k}'
+                    )
+                new_order.append(p)
+                repl[p] = new_graph.apply(P.extract_kwarg, k, p)
+
+        all_defaults = new_graph.return_.inputs[2:]
+        for name, param in zip(new_graph.parameter_names,
+                               new_graph.parameters):
+            if param is not vararg and param not in new_order:
+                try:
+                    idx = self.defaults.index(name)
+                except ValueError:
+                    raise MyiaTypeError(f'Missing argument: {name}')
+                repl[param] = all_defaults[idx]
+
+        mng = GraphManager(manage=False, allow_changes=True)
+        mng.add_graph(new_graph)
+        with mng.transact() as tr:
+            for x, y in repl.items():
+                tr.replace(x, y)
+            tr.set_parameters(new_graph, new_order)
+
+        new_graph.return_.inputs[2:] = []
+        new_graph.set_flags('parametric_done')
+        return new_graph
 
     #########
     # Flags #

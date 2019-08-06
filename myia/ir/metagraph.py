@@ -1,13 +1,7 @@
 """Graph generation from number of arguments or type signatures."""
 
 
-from .clone import GraphCloner
-from .manager import GraphManager
-from .anf import Parameter, Graph
-
 from .. import abstract, parser
-from ..info import About
-from ..prim import ops as P
 from ..utils import MyiaTypeError
 
 
@@ -98,69 +92,3 @@ class MultitypeGraph(MetaGraph):
         types = tuple(abstract.to_abstract(arg) for arg in args)
         fn = self._getfn(types)
         return fn(*args)
-
-
-class ParametricGraph(Graph):
-    """Graph with default arguments and varargs."""
-
-    def __init__(self):
-        """Initialize a ParametricGraph."""
-        super().__init__()
-        self.vararg = False
-
-    def make_new(self, relation='copy'):
-        """Make a new graph that's about this one."""
-        g = super().make_new(relation)
-        g.vararg = self.vararg
-        return g
-
-    def make_signature(self, args):
-        """Create a signature which is the number of arguments."""
-        return len(args)
-
-    def generate_graph(self, nargs):
-        """Generate a valid graph for the given number of arguments."""
-        if self.vararg:
-            actual_parameters = self.parameters[:-1]
-            vararg = self.parameters[-1]
-        else:
-            actual_parameters = self.parameters
-            vararg = None
-
-        all_defaults = self.return_.inputs[2:]
-
-        diff = nargs - (len(actual_parameters) - len(all_defaults))
-        if diff < 0:
-            raise MyiaTypeError(f'Not enough arguments for {self}')
-
-        nvar = diff - len(all_defaults)
-        if nvar > 0 and not vararg:
-            raise MyiaTypeError(f'Too many arguments for {self}')
-
-        cl = GraphCloner(self, total=True, graph_repl={self: Graph()})
-        new_graph = cl[self]
-        mng = GraphManager(manage=False, allow_changes=True)
-        mng.add_graph(new_graph)
-        new_parameters = [cl[p] for p in actual_parameters[:nargs]]
-
-        defaulted_params = actual_parameters[nargs:]
-        defaults = all_defaults[-len(defaulted_params):]
-        for param, dflt in zip(defaulted_params, defaults):
-            mng.replace(cl[param], cl[dflt])
-
-        if vararg:
-            v_parameters = []
-            for i in range(nvar):
-                new_param = Parameter(new_graph)
-                new_param.debug.name = f'{vararg.debug.name}[{i}]'
-                v_parameters.append(new_param)
-            new_parameters += v_parameters
-            constructed = new_graph.apply(
-                P.make_tuple, *v_parameters
-            )
-            v2 = cl[vararg]
-            mng.replace(v2, constructed)
-
-        mng.set_parameters(new_graph, new_parameters)
-        new_graph.return_.inputs[2:] = []
-        return new_graph

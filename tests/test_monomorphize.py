@@ -647,4 +647,12 @@ def test_keywords_2(x, y):
 
     fn = fn1 if x < 0 else fn2
 
-    return fn(5, albert=x, beatrice=y) + fn(9, beatrice=3, albert=7)
+    return fn(5, albert=x, beatrice=y) + fn(9, albert=3, beatrice=7)
+
+
+@specialize((int1, int2),)
+def test_keywords_defaults(x, y):
+    def fn(albert=1, beatrice=10):
+        return albert - beatrice
+
+    return fn(beatrice=13)

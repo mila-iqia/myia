@@ -23,7 +23,7 @@ from .data import ANYTHING, AbstractScalar, \
     VALUE, TYPE, SHAPE, DATA, DummyFunction, AbstractError, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
     AbstractDict, AbstractADT, PrimitiveFunction, \
-    MetaGraphFunction, Function, listof, empty
+    MetaGraphFunction, Function, listof, empty, AbstractKeywordArgument
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind, type_to_abstract, normalize_adt, concretize_abstract
 
@@ -545,11 +545,18 @@ class Inferrer(Partializable):
         """Initialize the Inferrer."""
         self.cache = {}
 
+    def nokw(self, args):
+        """Assert that there are no keyword arguments."""
+        for arg in args:
+            if isinstance(arg, AbstractKeywordArgument):
+                raise MyiaTypeError('Keyword arguments are not allowed here')
+
     async def normalize_args(self, args):
         """Return normalized versions of the arguments.
 
         By default, this returns args unchanged.
         """
+        self.nokw(args)
         return self.normalize_args_sync(args)
 
     def normalize_args_sync(self, args):

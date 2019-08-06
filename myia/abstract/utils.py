@@ -34,6 +34,7 @@ from .data import (
     AbstractJTagged,
     AbstractUnion,
     AbstractTaggedUnion,
+    AbstractKeywordArgument,
     AbstractBottom,
     AbstractError,
     TrackDict,
@@ -471,6 +472,14 @@ def abstract_clone(self, x: AbstractTaggedUnion, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractJTagged, *args):
     return (yield AbstractJTagged)(self(x.element, *args))
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: AbstractKeywordArgument, *args):
+    return (yield AbstractKeywordArgument)(
+        x.key,
+        self(x.argument, *args)
+    )
 
 
 @overload  # noqa: F811

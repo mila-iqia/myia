@@ -606,6 +606,27 @@ class AbstractTaggedUnion(AbstractStructure):
         return pretty_struct(ctx, 'U', [], dict(self.options))
 
 
+class AbstractKeywordArgument(AbstractStructure):
+    """Represents a keyword argument."""
+
+    def __init__(self, key, argument):
+        """Initialize an AbstractKeywordArgument."""
+        super().__init__({})
+        self.key = key
+        self.argument = argument
+
+    def children(self):
+        """Return the argument."""
+        return self.argument,
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, Atom(self.key, self.key), 'argument'))
+
+    def __pretty__(self, ctx):
+        return pretty_struct(ctx, "KW", [], {self.key: self.argument})
+
+
 ##########
 # Tracks #
 ##########

@@ -552,9 +552,9 @@ def test_keywords_bad(x, y):
 
 
 @infer(
-    (i64, i64, InferenceError),
+    (i64, i64, i64),
 )
-def test_keywords_bad_2(x, y):
+def test_keywords_different_order(x, y):
     def fn1(x, albert, beatrice):
         return albert * (x - beatrice)
 
@@ -564,6 +564,22 @@ def test_keywords_bad_2(x, y):
     fn = fn1 if x < 0 else fn2
 
     return fn(5, albert=x, beatrice=y)
+
+
+@infer((i64, i64, i64),)
+def test_keywords_defaults(x, y):
+    def fn(charles, *, albert=1, beatrice=10):
+        return albert - beatrice + charles
+
+    return fn(x, beatrice=y)
+
+
+@infer((i64, i64, InferenceError),)
+def test_redundant_kw(x, y):
+    def fn(albert, beatrice):
+        return albert - beatrice
+
+    return fn(albert=x, **{'albert': y, 'beatrice': y})
 
 
 @infer(

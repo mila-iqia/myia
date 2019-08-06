@@ -30,6 +30,7 @@ from .data import (
     AbstractBottom,
     AbstractUnion,
     AbstractTaggedUnion,
+    AbstractKeywordArgument,
     PartialApplication,
     JTransformedFunction,
     PrimitiveFunction,
@@ -1151,42 +1152,37 @@ async def _inf_partial(self, engine, fn, *args):
     ])
 
 
+@standard_prim(P.make_kwarg)
+async def _inf_make_kwarg(self, engine, key, value):
+    k = key.values[VALUE]
+    assert isinstance(k, str)
+    return AbstractKeywordArgument(k, value)
+
+
+@standard_prim(P.extract_kwarg)
+class _ExtractKwArgInferrer(Inferrer):
+    async def normalize_args(self, args):
+        return args
+
+    async def infer(self, engine, key, kwarg):
+        assert key.values[VALUE] is kwarg.key
+        return kwarg.argument
+
+
 @standard_prim(P.apply)
 class _ApplyInferrer(Inferrer):
     async def reroute(self, engine, outref, argrefs):
         assert len(argrefs) >= 1
         fnref, *grouprefs = argrefs
-        fntyp = await fnref.get()
         expanded = []
         g = outref.node.graph
-        kwinserts = []
         for gref in grouprefs:
             t = await gref.get()
             if isinstance(t, AbstractDict):
-                fns = await fntyp.get()
-                graphs = []
-                for fn in fns:
-                    if isinstance(fn, GraphFunction):
-                        graphs.append(fn.graph)
-                    else:
-                        raise MyiaTypeError(
-                            f'{fn} does not take keyword arguments'
-                        )
                 for k in t.entries:
-                    try:
-                        idxs = {graph.parameter_names.index(k)
-                                for graph in graphs}
-                    except ValueError:
-                        raise MyiaTypeError(
-                            'Invalid keyword argument'
-                        )
-                    if len(idxs) > 1:
-                        raise MyiaTypeError(
-                            'Inconsistent keyword argument positions'
-                        )
-                    idx, = idxs
                     extract = g.apply(P.dict_getitem, gref.node, k)
-                    kwinserts.append((idx, extract))
+                    mkkw = g.apply(P.make_kwarg, k, extract)
+                    expanded.append(mkkw)
             elif isinstance(t, AbstractTuple):
                 for i, _ in enumerate(t.elements):
                     expanded.append(g.apply(P.tuple_getitem, gref.node, i))
@@ -1194,8 +1190,6 @@ class _ApplyInferrer(Inferrer):
                 raise MyiaTypeError(
                     'Can only expand tuple or dict in function application'
                 )
-        for idx, node in kwinserts:
-            expanded.insert(idx, node)
         return engine.ref(g.apply(fnref.node, *expanded), outref.context)
 
 
