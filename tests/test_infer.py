@@ -582,6 +582,16 @@ def test_redundant_kw(x, y):
     return fn(albert=x, **{'albert': y, 'beatrice': y})
 
 
+@infer((i64, i64),)
+def test_defaults_recursive(x):
+    def fact(n=x):
+        if n <= 1:
+            return 1
+        else:
+            return n * fact(n - 1)
+    return fact()
+
+
 @infer(
     (i64, i64, InferenceError),
 )

@@ -336,12 +336,12 @@ def test_fact(x):
 
 @grad_test((4.1,), pipeline=standard_pipeline)
 def test_fact_opt(x):
-    def fact(n):
+    def fact(n=x):
         if n <= 1:
             return 1
         else:
-            return n * fact(n - 1)
-    return fact(x)
+            return n * fact(n=n - 1)
+    return fact()
 
 
 @grad_test((4.0,))

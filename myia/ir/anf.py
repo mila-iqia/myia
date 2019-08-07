@@ -54,6 +54,8 @@ class Graph:
         self.vararg = False
         self.defaults = []
         self.kwonly = 0
+        self.user_graph = None
+        self.sig = None
         self._manager = None
 
     @property
@@ -129,6 +131,8 @@ class Graph:
         g.vararg = self.vararg
         g.defaults = self.defaults
         g.kwonly = self.kwonly
+        g.user_graph = self.user_graph
+        g.sig = self.sig
         return g
 
     #######################
@@ -169,22 +173,26 @@ class Graph:
 
     def generate_graph(self, sig):
         """Generate a Graph for the given abstract arguments."""
-        from .clone import GraphCloner
+        from .clone import clone
         from .manager import GraphManager
         from ..utils import MyiaTypeError
         from ..prim import ops as P
 
         if sig is None:
             return self
+
+        if sig == self.sig:
+            return self
+
+        if self.user_graph:
+            return self.user_graph.generate_graph(sig)
+
         nargs, *keys = sig
         if (not self.defaults and not self.vararg
                 and not self.kwonly and not keys):
             return self
 
-        assert not self.has_flags('parametric_done')
-
-        cl = GraphCloner(self, total=True, graph_repl={self: Graph()})
-        new_graph = cl[self]
+        new_graph = clone(self, total=True)
         repl = {}
 
         max_n_pos = len(self.parameters) - int(self.vararg) - self.kwonly
@@ -242,7 +250,11 @@ class Graph:
             tr.set_parameters(new_graph, new_order)
 
         new_graph.return_.inputs[2:] = []
-        new_graph.set_flags('parametric_done')
+        new_graph.vararg = False
+        new_graph.defaults = []
+        new_graph.kwonly = 0
+        new_graph.user_graph = self
+        new_graph.sig = sig
         return new_graph
 
     #########
