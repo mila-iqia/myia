@@ -61,6 +61,7 @@ from .utils import (
     type_to_abstract,
     type_token,
     typecheck,
+    union_simplify,
 )
 
 abstract_inferrer_constructors = {}
@@ -703,12 +704,11 @@ async def _inf_array_to_scalar(self, engine, a: AbstractArray):
 
 @standard_prim(P.broadcast_shape)
 async def _inf_broadcast_shape(self, engine, xs: _shape_type, ys: _shape_type):
-    from ..prim.py_implementations import broadcast_shape
     shp_x = tuple(x.values[VALUE] for x in xs.elements)
     shp_y = tuple(y.values[VALUE] for y in ys.elements)
     elems = []
     try:
-        res = broadcast_shape(shp_x, shp_y)
+        res = py.broadcast_shape(shp_x, shp_y)
     except ValueError as e:
         raise MyiaShapeError(e.args[0])
     for n in res:
@@ -980,8 +980,6 @@ class _UserSwitchInferrer(Inferrer):
         if groups[ANYTHING]:
             return await self.default(engine, outref, condref, tbref, fbref)
 
-        from .utils import union_simplify
-        from functools import reduce
         tbtyp = union_simplify(groups[True])
         fbtyp = union_simplify(groups[False])
 
