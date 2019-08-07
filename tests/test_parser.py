@@ -122,7 +122,7 @@ def test_parametric():
         return x + y
 
     def j(**kwargs):
-        return x + y
+        return kwargs
 
     assert raw_parse(f).defaults == ['y']
     assert raw_parse(g).vararg == 'args'
