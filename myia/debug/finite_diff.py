@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List
 
 import numpy
 
-from ..utils import overload, smap
+from ..utils import dataclass_fields, overload, smap
 
 
 @smap.variant
@@ -68,8 +68,8 @@ def gen_paths(self, obj: numpy.ndarray, path):
 @overload  # noqa: F811
 def gen_paths(self, obj: object, path):
     if is_dataclass(obj):
-        for name, field in obj.__dataclass_fields__.items():
-            yield from gen_paths(getattr(obj, name), path + (name,))
+        for name, value in dataclass_fields(obj).items():
+            yield from gen_paths(value, path + (name,))
     else:
         yield path
 

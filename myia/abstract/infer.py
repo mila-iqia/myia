@@ -18,6 +18,7 @@ from ..utils import (
     Overload,
     Partializable,
     SymbolicKeyInstance,
+    dataclass_fields,
     dataclass_methods,
     infer_trace,
     is_dataclass_type,
@@ -438,8 +439,8 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
     elif is_dataclass(v):
         assert not isinstance(v, Function)
         new_args = {}
-        for name, field in v.__dataclass_fields__.items():
-            new_args[name] = self(getattr(v, name), context, loop=loop)
+        for name, value in dataclass_fields(v).items():
+            new_args[name] = self(value, context, loop=loop)
         methods = dataclass_methods(type(v))
         rval = AbstractClass(type(v), new_args, methods)
 
@@ -571,8 +572,8 @@ def to_abstract(self, v: typing._GenericAlias, context, ref, loop):
 @overload  # noqa: F811
 def to_abstract(self, v: ADT, context, ref, loop):
     new_args = {}
-    for name, field in v.__dataclass_fields__.items():
-        new_args[name] = self(getattr(v, name), context, loop=loop)
+    for name, value in dataclass_fields(v).items():
+        new_args[name] = self(value, context, loop=loop)
     draft = AbstractADT(type(v), new_args, dataclass_methods(type(v)))
     return normalize_adt(draft)
 
