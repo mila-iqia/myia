@@ -30,7 +30,13 @@ from myia.composite import ArithmeticData
 from myia.dtype import Bool, Nil, Number, f16, f32, f64, i16, i32, i64, u64
 from myia.ir import MultitypeGraph
 from myia.prim.py_implementations import hastype, tagged
-from myia.utils import ADT, EnvInstance, dataclass_methods, overload
+from myia.utils import (
+    ADT,
+    EnvInstance,
+    dataclass_fields,
+    dataclass_methods,
+    overload,
+)
 
 B = Bool
 Bot = AbstractBottom()
@@ -192,8 +198,8 @@ def to_abstract_test(self, t: type):
 def to_abstract_test(self, x: object):
     if is_dataclass(x):
         new_args = {}
-        for name, field in x.__dataclass_fields__.items():
-            new_args[name] = self(getattr(x, name))
+        for name, value in dataclass_fields(x).items():
+            new_args[name] = self(value)
         return AbstractClass(type(x), new_args, dataclass_methods(type(x)))
     elif getattr(x, '__origin__') is dtype.External:
         arg, = x.__args__

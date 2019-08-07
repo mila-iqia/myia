@@ -403,6 +403,12 @@ def dataclass_methods(dc):
             if isinstance(getattr(dc, name), (FunctionType, property))}
 
 
+def dataclass_fields(dc):
+    """Returns a dataclass's fields dictionary."""
+    return {name: getattr(dc, name)
+            for name in dc.__dataclass_fields__}
+
+
 class ErrorPool:
     """Accumulates a list of errors.
 
