@@ -143,7 +143,7 @@ blacklist = ('_backend', '_buffers', '_backward_hooks', '_forward_hooks',
 
 
 @to_abstract.register
-def _to_abstract(self, v: torch.nn.Module, context, ref, loop):
+def _to_abstract(self, v: torch.nn.Module, **kwargs):
     fwd_fn = getattr(type(v), 'forward')
     attrs = {}
     for var_k, var_v in vars(v).items():
@@ -155,10 +155,7 @@ def _to_abstract(self, v: torch.nn.Module, context, ref, loop):
             if var_k not in ('_parameters', '_modules') or \
                     (isinstance(v, torch.nn.Sequential) and
                      var_v != OrderedDict()):
-
-                attrs[var_k] = self(var_v)
-
-            pass
+                attrs[var_k] = self(var_v, **kwargs)
         else:
             pass
             # TODO: maybe make a warning for if user happened
@@ -168,11 +165,10 @@ def _to_abstract(self, v: torch.nn.Module, context, ref, loop):
     # """TODO: Remove these 2 loops (mod and par) once Dict support empty Dict
     if not isinstance(v, torch.nn.Sequential):
         for mod_k, mod_v in v._modules.items():
-            attrs[mod_k] = self(mod_v)
+            attrs[mod_k] = self(mod_v, **kwargs)
 
         for par_k, par_v in v._parameters.items():
-            attrs[par_k] = self(par_v)
-        # """
+            attrs[par_k] = self(par_v, **kwargs)
 
     # TODO: figure out how to delattr so that memory doesn't double
     # for k in attrs:
@@ -209,7 +205,7 @@ def _to_abstract(self, v: torch.nn.Module, context, ref, loop):
 
 
 @to_abstract.register  # noqa: F811
-def _to_abstract(self, v: torch.Tensor, context, ref, loop):
+def _to_abstract(self, v: torch.Tensor, **kwargs):
     return AbstractPyTorchTensor(
         AbstractScalar({
             VALUE: ANYTHING,
@@ -222,7 +218,7 @@ def _to_abstract(self, v: torch.Tensor, context, ref, loop):
 
 
 @to_abstract.register  # noqa: F811
-def _to_abstract(self, v: torch.nn.Parameter, context, ref, loop):
+def _to_abstract(self, v: torch.nn.Parameter, **kwargs):
     # return AbstractPyTorchParameter(
     return AbstractPyTorchTensor(
         AbstractScalar({
@@ -236,7 +232,7 @@ def _to_abstract(self, v: torch.nn.Parameter, context, ref, loop):
 
 
 @to_abstract.register  # noqa: F811
-def _to_abstract(self, v: PyTorchTensorWrapper, context, ref, loop):
+def _to_abstract(self, v: PyTorchTensorWrapper, **kwargs):
     return AbstractPyTorchTensor(
         AbstractScalar({
             VALUE: ANYTHING,

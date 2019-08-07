@@ -347,7 +347,12 @@ class InferenceEngine:
     async def infer_constant(self, ctref):
         """Infer the type of a ref of a Constant node."""
         v = self.pipeline.resources.convert(ctref.node.value)
-        return to_abstract(v, ctref.context, ref=ctref, loop=self.loop)
+        return to_abstract(
+            v,
+            context=ctref.context,
+            node=ctref.node,
+            loop=self.loop
+        )
 
     def abstract_merge(self, *values):
         """Merge a list of AbstractValues together."""
@@ -408,7 +413,7 @@ _number_types = [
 ]
 
 
-def from_value(v, broaden=False):
+def from_value(v, broaden=False, **kwargs):
     """Convert a value to an abstract value.
 
     Arguments:
@@ -416,30 +421,28 @@ def from_value(v, broaden=False):
         broaden: If True, concrete values will be made more abstract, so e.g.
             the value 1234 would become ANYTHING.
     """
-    a = to_abstract(v, None, None)
+    a = to_abstract(v, **kwargs)
     if broaden:
         a = _broaden(a)
     return a
 
 
 @overload.wrapper(bootstrap=True)
-def to_abstract(fn, self, v, context=None, ref=None, loop=None):
+def to_abstract(fn, self, v, **kwargs):
     """Translate the value to an abstract value.
 
     Arguments:
         v: The value to convert.
         context: The context in which the value was found, used if the value
             is a Graph.
-        ref: The reference to the Constant we are converting, if there is one,
+        node: The node for the Constant we are converting, if there is one,
             so that we can generate a tracking_id.
         loop: The InferenceLoop, or None. If not None, scalars ints or floats
             will be given a Pending type so that it can adapt to the types of
             the variables they interact with.
     """
-    ref = ref and ref.node
-
     if fn is not None:
-        rval = fn(self, v, context, ref, loop)
+        rval = fn(self, v, **kwargs)
 
     elif is_dataclass_type(v):
         return AbstractType(type_to_abstract(v))
@@ -448,7 +451,7 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
         assert not isinstance(v, Function)
         new_args = {}
         for name, value in dataclass_fields(v).items():
-            new_args[name] = self(value, context, loop=loop)
+            new_args[name] = self(value, **kwargs)
         methods = dataclass_methods(type(v))
         rval = AbstractClass(type(v), new_args, methods)
 
@@ -474,42 +477,42 @@ def to_abstract(fn, self, v, context=None, ref=None, loop=None):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: AbstractValue, context, ref, loop):
+def to_abstract(self, v: AbstractValue, **kwargs):
     return AbstractType(v)
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: Graph, context=None, ref=None, loop=None):
+def to_abstract(self, v: Graph, context=None, node=None, **kwargs):
     ctx = context or Context.empty()
     return AbstractFunction(
-        GraphFunction(v, ctx, tracking_id=ref)
+        GraphFunction(v, ctx, tracking_id=node)
     )
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: MetaGraph, context, ref, loop):
+def to_abstract(self, v: MetaGraph, node=None, **kwargs):
     return AbstractFunction(
-        MetaGraphFunction(v, Context.empty(), tracking_id=ref)
+        MetaGraphFunction(v, Context.empty(), tracking_id=node)
     )
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: Macro, context, ref, loop):
+def to_abstract(self, v: Macro, **kwargs):
     return AbstractFunction(MacroFunction(v))
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: Primitive, context, ref, loop):
-    return AbstractFunction(PrimitiveFunction(v, tracking_id=ref))
+def to_abstract(self, v: Primitive, node=None, **kwargs):
+    return AbstractFunction(PrimitiveFunction(v, tracking_id=node))
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: SymbolicKeyInstance, context, ref, loop):
+def to_abstract(self, v: SymbolicKeyInstance, **kwargs):
     return AbstractScalar({VALUE: v, TYPE: dtype.SymbolicKeyType})
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: (bool, type(None)), context, ref, loop):
+def to_abstract(self, v: (bool, type(None)), **kwargs):
     typ = dtype.pytype_to_myiatype(type(v))
     return AbstractScalar({
         VALUE: v,
@@ -519,7 +522,7 @@ def to_abstract(self, v: (bool, type(None)), context, ref, loop):
 
 @overload  # noqa: F811
 def to_abstract(self, v: (int, float, np.integer, np.floating),
-                context, ref, loop):
+                loop=None, **kwargs):
     typ = dtype.pytype_to_myiatype(type(v))
     if loop is not None:
         prio = 1 if issubclass(typ, dtype.Float) else 0
@@ -533,31 +536,31 @@ def to_abstract(self, v: (int, float, np.integer, np.floating),
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: tuple, context, ref, loop):
-    return AbstractTuple([self(elem, context, loop=loop)
+def to_abstract(self, v: tuple, **kwargs):
+    return AbstractTuple([self(elem, **kwargs)
                           for elem in v])
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: list, context, ref, loop):
+def to_abstract(self, v: list, **kwargs):
     if v == []:
         return empty
     else:
-        elem_types = [self(elem, context, loop=loop) for elem in v]
+        elem_types = [self(elem, **kwargs) for elem in v]
         elem_type = reduce(amerge, elem_types)
         return listof(_broaden(elem_type))
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: dict, context, ref, loop):
+def to_abstract(self, v: dict, **kwargs):
     if len(v) == 0:
         raise NotImplementedError('No support for empty dicts yet.')
-    entries = dict((k, self(val)) for k, val in v.items())
+    entries = dict((k, self(val, **kwargs)) for k, val in v.items())
     return AbstractDict(entries)
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: np.ndarray, context, ref, loop):
+def to_abstract(self, v: np.ndarray, **kwargs):
     return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,
@@ -568,7 +571,7 @@ def to_abstract(self, v: np.ndarray, context, ref, loop):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: ArrayWrapper, context, ref, loop):
+def to_abstract(self, v: ArrayWrapper, **kwargs):
     return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,
@@ -579,15 +582,15 @@ def to_abstract(self, v: ArrayWrapper, context, ref, loop):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: typing._GenericAlias, context, ref, loop):
+def to_abstract(self, v: typing._GenericAlias, **kwargs):
     return AbstractType(type_to_abstract(v))
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: ADT, context, ref, loop):
+def to_abstract(self, v: ADT, **kwargs):
     new_args = {}
     for name, value in dataclass_fields(v).items():
-        new_args[name] = self(value, context, loop=loop)
+        new_args[name] = self(value, **kwargs)
     draft = AbstractADT(type(v), new_args, dataclass_methods(type(v)))
     return normalize_adt(draft)
 
