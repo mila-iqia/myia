@@ -26,6 +26,8 @@ from ..utils import (
     OrderedSet,
     PossiblyRecursive,
     keyword_decorator,
+    register_serialize,
+    serializable,
 )
 from .loop import Pending
 from .ref import Context, Reference
@@ -35,6 +37,7 @@ ABSENT = Named('ABSENT')
 
 # Represents an unknown value
 ANYTHING = Named('ANYTHING')
+register_serialize(ANYTHING, 'Anything')
 
 # Represents inference problems
 VOID = Named('VOID')
@@ -49,6 +52,7 @@ POLY = Named('POLY')
 #####################
 
 
+@serializable('Possibilities', sequence=True)
 class Possibilities(list):
     """Represents a set of possible values.
 
@@ -64,6 +68,16 @@ class Possibilities(list):
         # equal later on, so we cannot rely on the fact that each option in the
         # list is different.
         super().__init__(OrderedSet(options))
+
+    def _serialize(self):
+        return self
+
+    @classmethod
+    def _construct(cls):
+        p = Possibilities([])
+        data = yield p
+        p[:] = data
+        return p
 
     def __hash__(self):
         return hash(tuple(self))
@@ -198,6 +212,7 @@ class VirtualFunction(Function):
     output: 'AbstractValue'
 
 
+@serializable('TypedPrimitive')
 @dataclass(frozen=True)
 class TypedPrimitive(Function):
     """Represents a Primitive with an explicitly given type signature.
@@ -261,8 +276,22 @@ class AbstractValue(Interned, PossiblyRecursive):
 
 class AbstractAtom(AbstractValue):
     """Base class for abstract values that are not structures."""
+    def _serialize(self):
+        data = dict()
+        for k, v in self.values.items():
+            data[k.name] = v
+        return data
+
+    @classmethod
+    def _construct(cls):
+        tmap = {'TYPE': TYPE, 'VALUE': VALUE, 'SHAPE': SHAPE}
+        obj = cls.empty()
+        data = yield obj
+        obj.values = TrackDict((tmap[k], v) for k, v in data.items())
+        return obj
 
 
+@serializable('AbstractScalar')
 class AbstractScalar(AbstractAtom):
     """Represents a scalar (integer, float, bool, etc.)."""
 
@@ -274,6 +303,7 @@ class AbstractScalar(AbstractAtom):
         return rval
 
 
+@serializable('AbstractType')
 class AbstractType(AbstractAtom):
     """Represents a type as a first class value."""
 
@@ -305,6 +335,7 @@ class AbstractError(AbstractAtom):
         return f'E({self.values[VALUE]})'
 
 
+@serializable('AbstractBottom')
 class AbstractBottom(AbstractAtom):
     """Represents the type of an expression that does not return."""
 
@@ -331,6 +362,7 @@ class AbstractExternal(AbstractAtom):
         return rval
 
 
+@serializable('AbstractFunction')
 class AbstractFunction(AbstractAtom):
     """Represents a function or set of functions.
 

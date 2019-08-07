@@ -6,7 +6,12 @@ from typing import Tuple as TupleT
 
 import numpy
 
-from .utils import EnvInstance, MyiaInputTypeError, SymbolicKeyInstance
+from .utils import (
+    EnvInstance,
+    MyiaInputTypeError,
+    SymbolicKeyInstance,
+    register_serialize,
+)
 
 _type_cache = {}
 
@@ -135,7 +140,6 @@ class Float(Number):
     Instantiate with `Float[nbits]`.  Unsupported values will raise a
     ValueError.
     """
-
     _valid_bits = (16, 32, 64)
 
 
@@ -145,7 +149,6 @@ class Int(Number):
     Instantiate with `Int[nbits]`.  Unsupported values will raise a
     ValueError.
     """
-
     _valid_bits = (8, 16, 32, 64)
 
 
@@ -155,7 +158,6 @@ class UInt(Number):
     Instantiate with `UInt[nbits]`.  Unsupported values will raise a
     ValueError.
     """
-
     _valid_bits = (8, 16, 32, 64)
 
 
@@ -212,6 +214,23 @@ u64 = UInt[64]
 f16 = Float[16]
 f32 = Float[32]
 f64 = Float[64]
+
+
+register_serialize(Bool, 'bool')
+register_serialize(Nil, 'nil')
+register_serialize(SymbolicKeyType, 'symbolic_key_type')
+register_serialize(EnvType, 'env_type')
+register_serialize(i8, 'i8')
+register_serialize(i16, 'i16')
+register_serialize(i32, 'i32')
+register_serialize(i64, 'i64')
+register_serialize(u8, 'u8')
+register_serialize(u16, 'u16')
+register_serialize(u32, 'u32')
+register_serialize(u64, 'u64')
+register_serialize(f16, 'f16')
+register_serialize(f32, 'f32')
+register_serialize(f64, 'f64')
 
 
 DTYPE_TO_MTYPE = dict(

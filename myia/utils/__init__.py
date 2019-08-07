@@ -70,6 +70,7 @@ from .misc import (  # noqa
 from .orderedset import OrderedSet  # noqa
 from .overload import Overload, TypeMap, overload, overload_wrapper  # noqa
 from .partial import Partial, Partializable, partition_keywords  # noqa
+from .serialize import dump, load, register_serialize, serializable  # noqa
 from .trace import (  # noqa
     DoTrace,
     Profiler,

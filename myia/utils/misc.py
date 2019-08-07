@@ -130,7 +130,6 @@ class Named:
     for the string representation.
 
     """
-
     def __init__(self, name):
         """Construct a named object.
 

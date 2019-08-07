@@ -1,10 +1,17 @@
 """Objects and routines to track debug information."""
 
+import threading
 import traceback
 import types
 import weakref
 from contextvars import ContextVar
 from typing import Any, Set
+
+from .utils import serializable
+
+# We use per-thread storage for the about stack.
+_about = threading.local()
+_about.stack = [None]
 
 
 class StackVar:
@@ -87,6 +94,7 @@ class DebugInherit(DebugInfo):
         _about.pop()
 
 
+@serializable('DebugInfo')
 class NamedDebugInfo(DebugInfo):
     """Debug information for an object.
 
@@ -119,6 +127,19 @@ class NamedDebugInfo(DebugInfo):
             # We remove the last entry that corresponds to
             # this line in the code.
             self.trace = traceback.extract_stack()[:-1]
+
+    def _serialize(self):
+        return {'id': self.id,
+                'name': self.debug_name}
+
+    @classmethod
+    def _construct(cls):
+        o = cls()
+        data = yield o
+        assert data is not None
+        o.id_ = data['id']
+        o.name = data['name']
+        return o
 
     @property
     def obj(self):
