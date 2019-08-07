@@ -530,7 +530,8 @@ def to_abstract(self, v: list, context, ref, loop):
     if v == []:
         return empty
     else:
-        elem_type = self(v[0], context, loop=loop)
+        elem_types = [self(elem, context, loop=loop) for elem in v]
+        elem_type = reduce(amerge, elem_types)
         return listof(_broaden(elem_type))
 
 
