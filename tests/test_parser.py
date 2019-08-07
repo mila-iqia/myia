@@ -108,14 +108,6 @@ def test_dict():
         parse(bad)
 
 
-def test_kwargs():
-    def bad(**kwargs):
-        return kwargs['x'] + kwargs['y']
-
-    with pytest.raises(MyiaSyntaxError):
-        parse(bad)
-
-
 def test_parametric():
     def f(x, y=6):
         return x + y
@@ -129,10 +121,14 @@ def test_parametric():
     def i(x, *, y):
         return x + y
 
+    def j(**kwargs):
+        return x + y
+
     assert raw_parse(f).defaults == ['y']
-    assert raw_parse(g).vararg
-    assert raw_parse(h).vararg
+    assert raw_parse(g).vararg == 'args'
+    assert raw_parse(h).vararg == 'args'
     assert raw_parse(i).kwonly == 1
+    assert raw_parse(j).kwarg == 'kwargs'
 
 
 def test_unsupported_AST__error():

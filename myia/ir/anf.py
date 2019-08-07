@@ -52,6 +52,7 @@ class Graph:
         self.flags = {}
         self.transforms: Dict[str, Union[Graph, Primitive]] = {}
         self.vararg = False
+        self.kwarg = False
         self.defaults = []
         self.kwonly = 0
         self.user_graph = None
@@ -129,6 +130,7 @@ class Graph:
         g.flags = copy(self.flags)
         g.transforms = copy(self.transforms)
         g.vararg = self.vararg
+        g.kwarg = self.kwarg
         g.defaults = self.defaults
         g.kwonly = self.kwonly
         g.user_graph = self.user_graph
@@ -175,6 +177,7 @@ class Graph:
         """Generate a Graph for the given abstract arguments."""
         from .clone import clone
         from .manager import GraphManager
+        from ..abstract import AbstractDict, ANYTHING
         from ..utils import MyiaTypeError
         from ..prim import ops as P
 
@@ -188,14 +191,17 @@ class Graph:
             return self.user_graph.generate_graph(sig)
 
         nargs, *keys = sig
-        if (not self.defaults and not self.vararg
+        if (not self.defaults and not self.vararg and not self.kwarg
                 and not self.kwonly and not keys):
             return self
 
         new_graph = clone(self, total=True)
         repl = {}
 
-        max_n_pos = len(self.parameters) - int(self.vararg) - self.kwonly
+        max_n_pos = (len(self.parameters)
+                     - bool(self.vararg)
+                     - bool(self.kwarg)
+                     - self.kwonly)
         n_pos = min(max_n_pos, nargs)
 
         new_order = new_graph.parameters[:n_pos]
@@ -204,11 +210,11 @@ class Graph:
 
         vararg = None
         if self.vararg:
-            vararg = new_graph.parameters[-1]
+            vararg = new_graph.parameters[-1 - bool(self.kwarg)]
             v_parameters = []
             for i in range(n_var):
                 new_param = Parameter(new_graph)
-                new_param.debug.name = f'{vararg.debug.name}[{i}]'
+                new_param.debug.name = f'{self.vararg}[{i}]'
                 v_parameters.append(new_param)
             new_order += v_parameters
             constructed = new_graph.apply(
@@ -218,24 +224,45 @@ class Graph:
         elif n_var:
             raise MyiaTypeError(f'Too many arguments')
 
+        if self.kwarg:
+            kwarg = new_graph.parameters[-1]
+        else:
+            kwarg = None
+
+        kwarg_parts = []
+        kwarg_keys = []
         if keys:
             for k in keys:
                 try:
                     idx = self.parameter_names.index(k)
                 except ValueError:
-                    raise MyiaTypeError(f'Invalid keyword argument: {k}')
-                p = new_graph.parameters[idx]
-                if p in new_order:
-                    raise MyiaTypeError(
-                        f'Multiple values given for argument {k}'
-                    )
-                new_order.append(p)
-                repl[p] = new_graph.apply(P.extract_kwarg, k, p)
+                    if kwarg:
+                        new_param = Parameter(new_graph)
+                        new_param.debug.name = f'{self.kwarg}[{k}]'
+                        kwarg_parts.append(
+                            new_graph.apply(P.extract_kwarg, k, new_param)
+                        )
+                        kwarg_keys.append(k)
+                        new_order.append(new_param)
+                    else:
+                        raise MyiaTypeError(f'Invalid keyword argument: {k}')
+                else:
+                    p = new_graph.parameters[idx]
+                    if p in new_order:
+                        raise MyiaTypeError(
+                            f'Multiple values given for argument {k}'
+                        )
+                    new_order.append(p)
+                    repl[p] = new_graph.apply(P.extract_kwarg, k, p)
+
+        if kwarg:
+            typ = AbstractDict(dict((key, ANYTHING) for key in kwarg_keys))
+            repl[kwarg] = new_graph.apply(P.make_dict, typ, *kwarg_parts)
 
         all_defaults = new_graph.return_.inputs[2:]
         for name, param in zip(new_graph.parameter_names,
                                new_graph.parameters):
-            if param is not vararg and param not in new_order:
+            if param not in (vararg, kwarg) and param not in new_order:
                 try:
                     idx = self.defaults.index(name)
                 except ValueError:
@@ -251,6 +278,7 @@ class Graph:
 
         new_graph.return_.inputs[2:] = []
         new_graph.vararg = False
+        new_graph.kwarg = False
         new_graph.defaults = []
         new_graph.kwonly = 0
         new_graph.user_graph = self

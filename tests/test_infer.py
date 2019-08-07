@@ -592,6 +592,28 @@ def test_defaults_recursive(x):
     return fact()
 
 
+@infer((i64, i64, (i64, i64, i64)),)
+def test_kwarg(x, y):
+    def fn(albert=1, beatrice=10):
+        return albert - beatrice
+
+    def proxy(*args, **kwargs):
+        return fn(*args, **kwargs)
+
+    return proxy(x, beatrice=y), proxy(x, y), proxy(beatrice=x, albert=y)
+
+
+@infer((i64, i64, InferenceError),)
+def test_kwarg_bad(x, y):
+    def fn(albert=1, beatrice=10):
+        return albert - beatrice
+
+    def proxy(*args, **kwargs):
+        return fn(*args, **kwargs)
+
+    return proxy(albert=x, beatrice=y, charles=x + y)
+
+
 @infer(
     (i64, i64, InferenceError),
 )

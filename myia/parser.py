@@ -282,9 +282,6 @@ class Parser:
 
         function_block.mature()
         function_block.graph.debug.name = node.name
-        if node.args.kwarg is not None:
-            raise MyiaSyntaxError("No support for **kwargs",
-                                  self.make_location(node))
 
         # Process arguments and their defaults
         args = node.args.args
@@ -321,6 +318,18 @@ class Parser:
         else:
             vararg_node = None
 
+        # Process kwargs
+        if node.args.kwarg:
+            arg = node.args.kwarg
+            with DebugInherit(ast=arg, location=self.make_location(arg)):
+                kwarg_node = Parameter(function_block.graph)
+            vname = arg.arg
+            kwarg_node.debug.name = vname
+            function_block.graph.parameters.append(kwarg_node)
+            function_block.write(vname, kwarg_node, track=False)
+        else:
+            kwarg_node = None
+
         graph = function_block.graph
         function_block.write(node.name, Constant(graph), track=False)
         self.process_statements(function_block, node.body)
@@ -328,7 +337,8 @@ class Parser:
             raise MyiaSyntaxError("Function doesn't return a value",
                                   self.make_location(node))
 
-        function_block.graph.vararg = bool(vararg_node)
+        function_block.graph.vararg = vararg_node and vararg_node.debug.name
+        function_block.graph.kwarg = kwarg_node and kwarg_node.debug.name
         function_block.graph.defaults = defaults_names
         function_block.graph.kwonly = len(node.args.kwonlyargs)
         function_block.graph.return_.inputs[2:] = defaults_list

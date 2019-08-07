@@ -655,4 +655,15 @@ def test_keywords_defaults(x, y):
     def fn(albert=1, beatrice=10):
         return albert - beatrice
 
-    return fn(beatrice=13)
+    return fn(beatrice=x + y)
+
+
+@specialize((int1, int2),)
+def test_kwarg(x, y):
+    def fn(albert=1, beatrice=10):
+        return albert - beatrice
+
+    def proxy(*args, **kwargs):
+        return fn(*args, **kwargs)
+
+    return proxy(x, beatrice=y), proxy(x, y), proxy(beatrice=x, albert=y)
