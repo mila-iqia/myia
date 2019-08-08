@@ -734,9 +734,9 @@ async def force_through(self, x: Pending, through):
     return await self(await x, through)
 
 
-# @overload  # noqa: F811
-# async def force_through(self, x: object, through):
-#     return x
+@overload  # noqa: F811
+async def force_through(self, x: object, through):
+    return x
 
 
 ############

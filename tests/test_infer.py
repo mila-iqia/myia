@@ -1348,7 +1348,7 @@ def test_scalar_cast(x, t):
 def test_scalar_to_array(x):
     return scalar_to_array(x, AA)
 
-#(af64_of(1, 1, 1), f64)
+
 @infer(
     (ai64_of(), i64),
     (af64_of(), f64),
@@ -1699,6 +1699,9 @@ hyper_map_nobroadcast = HyperMap(broadcast=False)
     (ai64_of(2, 5), af64_of(2, 5), InferenceError),
     (U(i64, (i64, i64)), U(i64, (i64, i64)), U(i64, (i64, i64))),
     (U(i64, (i64, i64)), U(i64, (i64, i64, i64)), InferenceError),
+    ({"x": i64, "y": i64}, {"x": i64, "y": i64}, {"x": i64, "y": i64}),
+    ({"x": i64, "y": i64}, {"x": i64, "y": i64, "z": i64}, InferenceError),
+    ({"x": i64, "y": i64}, {"y": i64, "z": i64}, InferenceError),
 
     # Generic broadcasting tests
     ([f64], f64, [f64]),
@@ -1740,6 +1743,7 @@ def test_hyper_map_nobroadcast(x, y):
     (ai64_of(2, 5), ai64_of(2, 5), ai64_of(2, 5)),
     (ai64_of(2, 1), ai64_of(1, 5), InferenceError),
     (Env, Env, Env),
+    ({"x": i64, "y": i64}, {"x": i64, "y": i64}, {"x": i64, "y": i64}),
 )
 def test_gadd(x, y):
     return gadd(x, y)

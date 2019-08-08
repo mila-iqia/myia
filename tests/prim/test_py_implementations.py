@@ -12,7 +12,8 @@ from myia.prim.py_implementations import setattr as myia_setattr, \
     switch, scalar_to_array, broadcast_shape, scalar_cast, \
     env_getitem, env_setitem, env_add, embed, \
     array_to_scalar, transpose, return_, make_record, \
-    array_getitem, array_setitem, bool_eq, dict_getitem, tuple_getitem
+    array_getitem, array_setitem, bool_eq, dict_getitem, tuple_getitem, \
+    scalar_max
 from myia.utils import newenv
 
 from ..test_lang import parse_compare
@@ -57,6 +58,11 @@ def test_prim_pow(x, y):
 @parse_compare(-2, 2.3, -0.6)
 def test_prim_floor(x):
     return math.floor(x)
+
+
+@parse_compare((2, 7), (4, -6.0), (0, -1), (-3.2, 0.0))
+def test_prim_max(x, y):
+    return scalar_max(x, y)
 
 
 @parse_compare(-2, 2.3, -0.6)

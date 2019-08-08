@@ -1,7 +1,7 @@
 
 import pytest
 from pytest import mark
-from copy import copy, deepcopy
+from copy import copy
 from types import FunctionType
 
 from myia.abstract import from_value, AbstractJTagged
@@ -342,7 +342,7 @@ single_tensor_args = (
     'name,args',
     [(op, single_tensor_args) for op in all_torch_ops__1_tensor_arg]
 )
-@pytest.mark.timeout(5)
+@pytest.mark.timeout(10)
 def test_torch_ops__1_tensor_arg(name, args):
     def fn1(x):
         return getattr(torch, name)(x)
@@ -359,7 +359,7 @@ def test_torch_ops__1_tensor_arg(name, args):
     'name,args',
     [(op, single_tensor_args) for op in all_torch_tensor_ops__1_tensor_arg]
 )
-@pytest.mark.timeout(5)
+@pytest.mark.timeout(10)
 def test_torch_tensor_ops__1_tensor_arg(name, args):
     def fn1(x):
         return getattr(x, name)()

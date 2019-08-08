@@ -60,7 +60,7 @@ def nnvm_bool_not(c, arg):
 def nnvm_distribute(c, v, shp):
     """Implementation of distribute."""
     nv = c.ref(v)
-    assert shp.is_constant()
+    assert shp.is_constant(tuple)
     if shp.value == ():
         shp = (1,)
     else:
@@ -126,7 +126,11 @@ def nnvm_reshape(c, v, shp):
     """Implementation of reshape."""
     nv = c.ref(v)
     assert shp.is_constant(tuple)
-    return sym.reshape(nv, shape=shp.value)
+    if shp.value == ():
+        shp = (1,)
+    else:
+        shp = shp.value
+    return sym.reshape(nv, shape=shp)
 
 
 COMPLEX_MAP = {

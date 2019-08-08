@@ -89,7 +89,6 @@ def simplify_types(root, manager):
             })
             new_node = node.graph.apply(P.tuple_getitem, data, idx_c)
 
-        #TODO: is contents of this elif branch correct
         elif node.is_apply(P.dict_values):
             _, data = node.inputs
             dt = data.abstract

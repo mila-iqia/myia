@@ -241,8 +241,6 @@ def bprop_scalar_to_array(x, t, out, dout):
 def bprop_array_to_scalar(x, out, dout):
     """Backpropagator for primitive `array_to_scalar`."""
     return (scalar_to_array(dout, typeof(x)),)
-    #return (distribute(scalar_to_array(dout, typeof(x)), shape(x)),)
-    #return (reshape(scalar_to_array(dout, typeof(x)), shape(x)),)
 
 
 @register_bprop(primops.dot)

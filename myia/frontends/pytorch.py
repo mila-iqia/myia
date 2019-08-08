@@ -93,7 +93,7 @@ standard_method_map[AbstractPyTorchTensor].update({
 })
 
 
-#TODO: mod_* for other arithmetic besides sub
+# TODO: mod_* for other arithmetic besides sub
 @core
 def mod_sub(self, x):
     """Hypermap subtraction (used for subtracting modules during update)."""
@@ -132,7 +132,7 @@ def _to_abstract(self, v: torch.nn.Module, context, ref, loop):
     for var_k, var_v in vars(v).items():
         if var_k not in blacklist:
 
-            # TODO: Remove "(isinstance(v, torch.nn.Sequential) and" 
+            # TODO: Remove "(isinstance(v, torch.nn.Sequential) and"
             #       once Alias PR ready
             # TODO: Remove rest of if statement once Dict supports empty Dict
             if var_k not in ('_parameters', '_modules') or \

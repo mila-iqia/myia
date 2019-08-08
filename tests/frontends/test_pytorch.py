@@ -95,7 +95,7 @@ def test_module_matmul_fwd(_backend_fixture):
     assert torch.allclose(output, output_expected)
 
 
-# This will be uncomment once debug VM is compatible with PyTorch
+# This will be uncommented once debug VM is compatible with PyTorch
 """
 from myia.pipeline import standard_debug_pipeline
 
@@ -145,7 +145,7 @@ def test_module_matmul_bwd():
     def cost(model, inp, target):
         value = model(inp)
         loss = mse(value, target)
-        return loss.item()
+        return loss
 
     @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
@@ -183,7 +183,7 @@ def test_module_matmul_update(_backend_fixture):
     def cost(model, inp, target):
         value = model(inp)
         loss = mse(value, target)
-        return loss.item()
+        return loss
 
     @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
@@ -258,7 +258,7 @@ def test_module_2_layer_mlp_bwd():
     def cost(model, inp, target):
         value = model(inp)
         loss = mse(value, target)
-        return loss.item()
+        return loss
 
     @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
@@ -344,7 +344,7 @@ def test_module_2_layer_mlp_update__to_device(_backend_fixture):
     def cost(model, inp, target):
         value = model(inp)
         loss = mse(value, target)
-        return loss.item()
+        return loss
 
     @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
@@ -477,7 +477,7 @@ def test_module_2_layer_mlp_seq_bwd():
     def cost(model, inp, target):
         value = model(inp)
         loss = mse(value, target)
-        return loss.item()
+        return loss
 
     @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
@@ -523,7 +523,7 @@ def test_module_linear_seq_bwd():
     def cost(model, inp, target):
         value = model(inp)
         loss = mse(value, target)
-        return loss.item()
+        return loss
 
     @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
@@ -567,7 +567,7 @@ def test_module_2_layer_mlp_seq_update():
     def cost(model, inp, target):
         value = model(inp)
         loss = mse(value, target)
-        return loss.item()
+        return loss
 
     @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):

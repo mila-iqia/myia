@@ -209,10 +209,14 @@ class HyperMap(MetaGraph):
         for a2, isleaf in argmap.values():
             if not isleaf and len(a2.entries) != len(a.entries):
                 raise MyiaTypeError(f'Dict length mismatch: {a} != {a2}')
+            if a.entries.keys() != a2.entries.keys():
+                raise MyiaTypeError(f'Dict keys mismatch: {a} != {a2}')
+
+        print("fnarg", fnarg)
 
         elems = []
-        for i in range(len(a.entries)):
-            args = [arg if isleaf else g.apply(P.dict_getitem, arg, str(i))
+        for k, v in a.entries.items():
+            args = [arg if isleaf else g.apply(P.dict_getitem, arg, k)
                     for arg, (_, isleaf) in argmap.items()]
             if fnarg is None:
                 val = g.apply(self.fn_rec, *args)

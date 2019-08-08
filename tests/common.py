@@ -150,6 +150,11 @@ def to_abstract_test(self, tup: tuple):
 
 
 @overload  # noqa: F811
+def to_abstract_test(self, d: dict):
+    return AbstractDict({k: self(v) for k, v in d.items()})
+
+
+@overload  # noqa: F811
 def to_abstract_test(self, lst: list):
     if lst == []:
         return empty

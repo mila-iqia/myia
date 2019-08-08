@@ -683,7 +683,6 @@ async def _inf_scalar_to_array(self, engine, a: AbstractScalar, t):
 async def _inf_array_to_scalar(self, engine, a: AbstractArray):
     a_shp = a.values[SHAPE]
     if len(a_shp) != 0:
-        #if any(shp != 1 for shp in a_shp):
         raise MyiaShapeError("array_to_scalar requires shape ()")
     return a.element
 

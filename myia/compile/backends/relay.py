@@ -137,6 +137,22 @@ def relay_transpose(c, a, ax):
     return relay.op.transpose(na, axes=ax.value)
 
 
+def relay_reshape(c, v, shp):
+    """Implementation of reshape for Relay."""
+    nv = c.ref(v)
+    assert shp.is_constant(tuple)
+    trim = False
+    if shp.value == ():
+        shp = (1,)
+        trim = True
+    else:
+        shp = shp.value
+    res = relay.op.reshape(nv, newshape=shp)
+    if trim:
+        res = relay.op.take(res, relay.const(0), mode='fast')
+    return res
+
+
 def relay_array_map(c, fn, *array):
     """Implementation of array_map for Relay."""
     assert fn.is_constant(Primitive)
@@ -175,6 +191,7 @@ COMPLEX_MAP = {
     P.partial: relay_partial,
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
+    P.reshape: relay_reshape,
     P.array_map: relay_array_map,
     P.array_reduce: relay_array_reduce,
     P.scalar_to_array: lambda c, x, t: c.ref(x),

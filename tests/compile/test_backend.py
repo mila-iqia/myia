@@ -8,7 +8,7 @@ from myia.compile.backends import load_backend, LoadingError, UnknownBackend, \
     parse_default
 from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import distribute, scalar_to_array, dot, \
-    scalar_add, array_reduce, transpose
+    scalar_add, array_reduce, transpose, reshape
 from myia.api import to_device
 from myia import dtype
 
@@ -264,6 +264,26 @@ def test_distribute3(x):
 @parse_compare(MA(2, 3))
 def test_distribute4(x):
     return distribute(x, (2, 3))
+
+
+@parse_compare(MA(2, 3))
+def test_reshape(x):
+    return reshape(x, (1, 3, 2, 1))
+
+
+@parse_compare(MA(2, 3))
+def test_reshape2(x):
+    return reshape(x, (6,))
+
+
+@parse_compare(MA(1, 3))
+def test_reshape3(x):
+    return reshape(x, (3,))
+
+
+@parse_compare(np.ones((1,)))
+def test_reshape4(x):
+    return reshape(x, ())
 
 
 @parse_compare((MA(2, 3), MB(3, 4)))
