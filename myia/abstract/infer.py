@@ -21,8 +21,9 @@ from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
     VirtualFunction, AbstractFunction, AbstractExternal, \
     VALUE, TYPE, SHAPE, DATA, DummyFunction, AbstractError, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractList, AbstractDict, type_error_nargs, TypeDispatchError, \
-    AbstractADT, InferenceError, PrimitiveFunction, MetaGraphFunction, Function
+    AbstractDict, type_error_nargs, TypeDispatchError, \
+    AbstractADT, InferenceError, PrimitiveFunction, MetaGraphFunction, \
+    Function, listof, empty
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind, type_to_abstract, normalize_adt, concretize_abstract
 
@@ -481,9 +482,11 @@ def to_abstract(self, v: tuple, context, ref, loop):
 
 @overload  # noqa: F811
 def to_abstract(self, v: list, context, ref, loop):
-    if len(v) == 0:
-        raise NotImplementedError('No support for empty lists yet.')
-    return AbstractList(self(v[0], context, loop=loop))
+    if v == []:
+        return empty
+    else:
+        elem_type = self(v[0], context, loop=loop)
+        return listof(_broaden(elem_type))
 
 
 @overload  # noqa: F811

@@ -10,7 +10,7 @@ from contextvars import ContextVar
 
 from ..debug.label import label
 from ..utils import Named, Partializable, Interned, Atom, AttrEK, \
-    PossiblyRecursive, OrderedSet
+    PossiblyRecursive, OrderedSet, dataclass_methods, Cons, Empty
 from ..ir import Graph, MetaGraph
 from ..prim import Primitive
 
@@ -445,35 +445,6 @@ class AbstractArray(AbstractStructure):
         return pretty_join([elem, ' x ', shp])
 
 
-class AbstractList(AbstractStructure):
-    """Represents a list.
-
-    Lists must be homogeneous, hence a single AbstractValue is used to
-    represent every element.
-
-    Attributes:
-        element: AbstractValue representing each element of the list.
-
-    """
-
-    def __init__(self, element, values=None):
-        """Initialize an AbstractList."""
-        super().__init__(values or {})
-        self.element = element
-
-    def children(self):
-        """Return the list element."""
-        return self.element,
-
-    def __eqkey__(self):
-        v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, 'element'))
-
-    def __pretty__(self, ctx):
-        elem = pretty_python_value(self.element, ctx)
-        return pretty_join(['[', elem, ']'])
-
-
 class AbstractDict(AbstractStructure):
     """Represents a dictionary.
 
@@ -767,6 +738,22 @@ class TypeMismatchError(MyiaTypeError):
         super().__init__(message)
         self.expected = expected
         self.got = got
+
+
+##########################
+# List-related utilities #
+##########################
+
+
+empty = AbstractADT(Empty, {}, dataclass_methods(Empty))
+
+
+def listof(t):
+    """Return the type of a list of t."""
+    rval = AbstractADT.new(Cons, {'head': t, 'tail': None},
+                           dataclass_methods(Cons))
+    rval.attributes['tail'] = AbstractUnion.new([empty, rval])
+    return rval.intern()
 
 
 #############################

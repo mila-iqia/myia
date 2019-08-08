@@ -53,7 +53,6 @@ from .data import (  # noqa
     AbstractFunction,
     AbstractTuple,
     AbstractArray,
-    AbstractList,
     AbstractDict,
     AbstractClassBase,
     AbstractClass,
@@ -75,6 +74,8 @@ from .data import (  # noqa
     format_abstract,
     pretty_struct,
     pretty_type,
+    listof,
+    empty,
 )
 
 

@@ -11,7 +11,7 @@ from myia.pipeline import \
     scalar_parse as parse, scalar_debug_compile as compile
 from myia.pipeline.steps import convert_arg, convert_result, NumpyChecker
 from myia.prim.py_implementations import tuple_getitem
-from myia.utils import newenv
+from myia.utils import newenv, TaggedValue
 from myia.abstract import ArrayWrapper
 from myia.compile import load_backend, LoadingError
 
@@ -104,6 +104,11 @@ def test_convert_arg():
     assert _convert(False, Bool) is False
     assert _convert(10, i64) == 10
     assert _convert(1.5, f64) == 1.5
+    assert _convert([], []) == ()
+    with pytest.raises(TypeError):
+        _convert([], [f64])
+    with pytest.raises(TypeError):
+        _convert([1, 2], [])
     with pytest.raises(TypeError):
         _convert(newenv, EnvType)
 
@@ -118,8 +123,11 @@ def test_convert_arg():
     assert list(_convert((pt, pt),
                 (Point(i64, i64), Point(i64, i64)))) == [(1, 2), (1, 2)]
 
-    assert _convert([pt, pt, pt],
-                    [Point(i64, i64)]) == [(1, 2), (1, 2), (1, 2)]
+    li = _convert([1], [i64])
+    assert (isinstance(li, tuple)
+            and li[0] == 1
+            and isinstance(li[1], TaggedValue)
+            and li[1].value == ())
 
     # Arrays
 
@@ -201,11 +209,6 @@ def test_convert_result(_return_backend):
                     (Point(i64, i64), Point(i64, i64)),
                     ((i64, i64), (i64, i64))) == \
         (pt, pt)
-
-    assert _convert([(1, 2), (1, 2), (1, 2)],
-                    [Point(i64, i64)],
-                    [(i64, i64)]) == \
-        [pt, pt, pt]
 
 
 def test_function_arg():
@@ -411,6 +414,10 @@ def test__convert_arg_init_AbstractList(backend_opt):
     assert isinstance(m[1], float)
     assert m[0] == 91.0
     assert m[1] == 51.0
+
+    model2 = []
+    m2 = to_device(model2, b)
+    assert m2 == []
 
 
 def test__convert_arg_init_AbstractClass(backend_opt):

@@ -7,7 +7,7 @@ from hrepr import hrepr
 
 from myia.abstract import (
     AbstractValue, AbstractScalar, AbstractFunction, AbstractTuple,
-    AbstractList, AbstractClassBase, AbstractJTagged, AbstractArray,
+    AbstractClassBase, AbstractJTagged, AbstractArray,
     GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
     MetaGraphFunction, AbstractUnion, VALUE, ANYTHING, JTransformedFunction,
     VirtualFunction, PendingTentative, Possibilities, AbstractTaggedUnion
@@ -785,7 +785,7 @@ def cosmetic_transformer(g):
         _opt_fancy_transpose,
         _opt_fancy_sum,
         _opt_fancy_unsafe_static_cast,
-        # _opt_fancy_scalar_to_array,
+        _opt_fancy_scalar_to_array,
         _opt_fancy_array_to_scalar,
         _opt_fancy_hastag,
         _opt_fancy_casttag,
@@ -1319,25 +1319,6 @@ class _AbstractArray:
                 )
             ],
             before='★A',
-            cls='abstract',
-        )
-
-
-@mixin(AbstractList)
-class _AbstractList:
-    def __hrepr__(self, H, hrepr):
-        return hrepr.stdrepr_iterable(
-            [
-                H.div(
-                    hrepr.stdrepr_object(
-                        '', _clean(self.values).items(), delimiter="↦",
-                        cls='noborder'
-                    ),
-                    hrepr(self.element),
-                    style='display:flex;flex-direction:column;'
-                )
-            ],
-            before='★L',
             cls='abstract',
         )
 

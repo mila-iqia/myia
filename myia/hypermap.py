@@ -4,7 +4,7 @@ import numpy as np
 from dataclasses import is_dataclass
 from functools import reduce
 
-from . import operations, composite as C, abstract
+from . import operations, abstract
 from .abstract import MyiaTypeError, broaden
 from .ir import MetaGraph, Graph
 from .utils import Overload
@@ -14,7 +14,6 @@ from .prim.py_implementations import array_map
 
 nonleaf_defaults = (
     abstract.AbstractArray,
-    abstract.AbstractList,
     abstract.AbstractTuple,
     abstract.AbstractClassBase,
     abstract.AbstractUnion,
@@ -205,21 +204,6 @@ class HyperMap(MetaGraph):
         return g.apply(P.make_tuple, *elems)
 
     @_make.register
-    def _make(self, a: abstract.AbstractList, g, fnarg, argmap):
-        self._name(g, 'L')
-        args = list(argmap.keys())
-        mask = [not isleaf for _, isleaf in argmap.values()]
-        if all(mask):
-            mask = None
-        if fnarg is None:
-            lm = C.ListMap(self.fn_rec, loop_mask=mask)
-            return g.apply(lm, *args)
-        else:
-            fn_rec = g.apply(P.partial, self.fn_rec, fnarg)
-            lm = C.ListMap(loop_mask=mask)
-            return g.apply(lm, fn_rec, *args)
-
-    @_make.register
     def _make(self, a: abstract.AbstractClassBase, g, fnarg, argmap):
         for a2, isleaf in argmap.values():
             if not isleaf:
@@ -291,7 +275,7 @@ class HyperMap(MetaGraph):
         def _is_nonleaf(x):
             return (
                 (isinstance(x, list)
-                 and abstract.AbstractList in self.nonleaf)
+                 and abstract.AbstractClassBase in self.nonleaf)
                 or (isinstance(x, tuple)
                     and abstract.AbstractTuple in self.nonleaf)
                 or (isinstance(x, np.ndarray)

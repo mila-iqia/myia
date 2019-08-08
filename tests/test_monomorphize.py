@@ -5,7 +5,6 @@ from pytest import mark
 from myia.dtype import Number
 from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
-from myia.composite import list_map
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
 from myia.abstract import InferenceError
@@ -298,24 +297,29 @@ def test_array_map_partial(c, xs):
 
 
 @specialize(([fp1, fp2],))
-def test_list_map(xs):
+def test_list_len(xs):
+    return len(xs)
+
+
+@specialize(([fp1, fp2],))
+def test_hyper_map(xs):
     def square(x):
         return x * x
 
-    return list_map(square, xs)
+    return hyper_map(square, xs)
 
 
 @specialize(([fp1, fp2], [int1, int2]))
-def test_list_map_polymorphic(xs, ys):
+def test_hyper_map_polymorphic(xs, ys):
     def square(x):
         return x * x
 
-    return list_map(square, xs), list_map(square, ys)
+    return hyper_map(square, xs), hyper_map(square, ys)
 
 
 @mark.xfail(reason="Cannot specialize f.")
 @specialize((True, [fp1, fp2], [int1, int2]))
-def test_list_map_polymorphic_2(c, xs, ys):
+def test_hyper_map_polymorphic_2(c, xs, ys):
     def square(x):
         return x * x
 
@@ -329,7 +333,7 @@ def test_list_map_polymorphic_2(c, xs, ys):
             return double
 
     f = picker(c)
-    return list_map(f, xs), list_map(f, ys)
+    return hyper_map(f, xs), hyper_map(f, ys)
 
 
 @specialize((int1, int2))
@@ -550,7 +554,7 @@ def test_tagged(c, x, y, z):
     (pt1, int1),
     (pt1, pt2),
 )
-def test_hyper_map(x, y):
+def test_hyper_map_scalar_add(x, y):
     return hyper_map(scalar_add, x, y)
 
 

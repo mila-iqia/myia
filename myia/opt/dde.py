@@ -6,7 +6,7 @@ from collections import defaultdict
 from ..prim import ops as P
 from ..utils import Partializable
 from ..abstract import AbstractFunction, GraphFunction, PartialApplication, \
-    DEAD, PrimitiveFunction, TypedPrimitive
+    DEAD, PrimitiveFunction, TypedPrimitive, AbstractError
 from ..graph_utils import dfs
 from ..ir import Constant, succ_incoming, Graph
 
@@ -206,7 +206,8 @@ class DeadDataElimination(Partializable):
                 continue
             for node, idx in dead:
                 repl = Constant(DEAD)
-                # repl.abstract = AbstractError(DEAD)
                 repl.abstract = node.inputs[idx].abstract
+                if isinstance(repl.abstract, AbstractFunction):
+                    repl.abstract = AbstractError(DEAD)
                 mng.set_edge(node, idx, repl)
         return False  # Pretend there are no changes, for now

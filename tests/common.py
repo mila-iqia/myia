@@ -5,9 +5,9 @@ from dataclasses import dataclass, is_dataclass
 from myia import dtype
 from myia.abstract import VALUE, TYPE, SHAPE, \
     AbstractValue, AbstractScalar, AbstractArray, AbstractDict, \
-    AbstractList, AbstractTuple, AbstractType, AbstractClass, \
+    AbstractTuple, AbstractType, AbstractClass, \
     AbstractJTagged, AbstractUnion, AbstractExternal, ANYTHING, from_value, \
-    AbstractBottom, AbstractTaggedUnion
+    AbstractBottom, AbstractTaggedUnion, listof, empty
 from myia.dtype import Bool, i16, i32, i64, u64, f16, f32, f64, Number, Nil
 from myia.ir import MultitypeGraph
 from myia.utils import overload, EnvInstance, dataclass_methods
@@ -150,9 +150,11 @@ def to_abstract_test(self, tup: tuple):
 
 
 @overload  # noqa: F811
-def to_abstract_test(self, l: list):
-    assert len(l) == 1
-    return AbstractList(self(l[0]))
+def to_abstract_test(self, lst: list):
+    if lst == []:
+        return empty
+    assert len(lst) == 1
+    return listof(self(lst[0]))
 
 
 @overload  # noqa: F811

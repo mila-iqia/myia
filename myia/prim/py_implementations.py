@@ -1,7 +1,6 @@
 """Implementations for the debug VM."""
 
 from copy import copy
-from functools import reduce
 from typing import Callable
 import numpy as np
 import math
@@ -276,12 +275,6 @@ def tuple_getitem(data, item):
     return data[item]
 
 
-@py_register(primops.list_getitem)
-def list_getitem(data, item):
-    """Implement `getitem`."""
-    return data[item]
-
-
 @py_register(primops.dict_getitem)
 def dict_getitem(data, item):
     """Implement `dict_getitem`."""
@@ -295,7 +288,6 @@ def array_getitem(data, item):
 
 
 @vm_register(primops.tuple_getitem)
-@vm_register(primops.list_getitem)
 @vm_register(primops.array_getitem)
 def _vm_getitem(vm, data, item):
     """Implement `getitem`."""
@@ -309,27 +301,11 @@ def tuple_setitem(data, item, value):
                  for i, x in enumerate(data))
 
 
-@register(primops.list_setitem)
-def list_setitem(data, item, value):
-    """Implement `list/array_setitem`."""
-    data2 = copy(data)
-    data2[item] = value
-    return data2
-
-
 @register(primops.array_setitem)
 def array_setitem(data, item, value):
     """Implement `list/array_setitem`."""
     data2 = copy(data)
     data2[item] = value
-    return data2
-
-
-@register(primops.list_append)
-def list_append(data, value):
-    """Implement `list_append`."""
-    data2 = copy(data)
-    data2.append(value)
     return data2
 
 
@@ -355,8 +331,10 @@ def _vm_getattr(vm, data, attr):
         # Don't know how else to retrieve the unwrapped method
         unwrapped = getattr(x.__objclass__, x.__name__)
         return Partial(vm.convert(unwrapped), [x.__self__], vm)
-    elif isinstance(x, BuiltinMethodType) and hasattr(type(data), attr):
+    elif (isinstance(x, BuiltinMethodType)
+          and hasattr(type(data), attr)):  # pragma: no cover
         # This is returned by <list>.__getitem__ and maybe others.
+        # May not be relevant anymore
         x = getattr(type(data), attr)
         return Partial(vm.convert(x), [data], vm)
     elif isinstance(x, MethodType):
@@ -515,26 +493,6 @@ def scalar_cast(x, t):
     return getattr(np, dtype)(x)
 
 
-@py_register(primops.list_map)
-def list_map(f, *lsts):
-    """Implement `list_map` in pure Python."""
-    assert len(set(len(l) for l in lsts)) == 1
-
-    def f_(args):
-        return f(*args)
-    return list(map(f_, zip(*lsts)))
-
-
-@vm_register(primops.list_map)
-def _list_map_vm(vm, f, *lsts):
-    """Implement `list_map` for Myia's VM."""
-    assert len(set(len(l) for l in lsts)) == 1
-
-    def f_(args):
-        return vm.call(f, args)
-    return list(map(f_, zip(*lsts)))
-
-
 @register(primops.identity)
 def identity(x):
     """Implement `identity`."""
@@ -628,7 +586,6 @@ def make_record(typ, *args):
 
 
 @register(primops.tuple_len)
-@register(primops.list_len)
 @register(primops.array_len)
 def _len(x):
     """Implement `len`."""
@@ -645,19 +602,6 @@ def make_list(*xs):
 def make_dict(typ, *values):
     """Implement `make_dict`."""
     return dict(zip(typ.entries.keys(), values))
-
-
-@py_register(primops.list_reduce)
-def list_reduce(fn, lst, dflt):
-    """Implement `list_reduce`."""
-    return reduce(fn, lst, dflt)
-
-
-@vm_register(primops.list_reduce)
-def _list_reduce_vm(vm, fn, lst, dflt):
-    def fn_(a, b):
-        return vm.call(fn, [a, b])
-    return list_reduce(fn_, lst, dflt)
 
 
 @py_register(primops.J)

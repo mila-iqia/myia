@@ -2,7 +2,7 @@
 
 from ..abstract import abstract_clone, AbstractFunction, AbstractJTagged, \
     AbstractArray, ANYTHING, SHAPE, type_token, DEAD
-from ..composite import ListMap, gadd, zeros_like
+from ..composite import gadd, zeros_like
 from ..dtype import Number
 from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone, \
     BasicRemapper
@@ -152,56 +152,6 @@ def bubble_op_tuple_binary(optimizer, node, equiv):
     assert len(xs) == len(ys)
     elems = [(op, x, y) for x, y in zip(xs, ys)]
     return sexp_to_node((P.make_tuple, *elems), node.graph)
-
-
-##############################
-# List-related optimizations #
-##############################
-
-
-@pattern_replacer(P.list_getitem, (P.list_setitem, X, C1, Y), C2)
-def getitem_setitem_list(optimizer, node, equiv):
-    """Simplify getitem over setitem.
-
-    setitem(xs, 0, v)[0] => v
-    setitem(xs, 0, v)[1] => xs[1]
-    """
-    i1 = equiv[C1].value
-    i2 = equiv[C2].value
-    if i1 == i2:
-        return equiv[Y]
-    else:
-        return node.graph.apply(P.list_getitem, equiv[X], i2)
-
-
-_lmadd = M(ListMap(fn_rec=gadd))
-_lmzlk = M(ListMap(fn_rec=zeros_like))
-
-
-lmadd_zero_l = psub(
-    pattern=(_lmadd, (_lmzlk, X), Y),
-    replacement=Y,
-    name='lmadd_zero_l'
-)
-
-
-lmadd_zero_r = psub(
-    pattern=(_lmadd, Y, (_lmzlk, X)),
-    replacement=Y,
-    name='lmadd_zero_r'
-)
-
-
-lmadd_setitem_zero = psub(
-    pattern=(_lmadd, X1, (P.list_setitem, (_lmzlk, X2), X3, X4)),
-    replacement=(P.list_setitem,
-                 X1,
-                 X3,
-                 (gadd,
-                  (P.list_getitem, X1, X3),
-                  X4)),
-    name='lmadd_setitem_zero'
-)
 
 
 ###########################
@@ -723,9 +673,6 @@ def make_inliner(inline_criterion, check_recursive, name):
     def inline(optimizer, node, equiv):
         g = equiv[G].value
         args = equiv[Xs]
-
-        if g.has_flags('forbid_inlining'):
-            return node
 
         if inline_criterion is not None:
             if not inline_criterion(g, node, args):

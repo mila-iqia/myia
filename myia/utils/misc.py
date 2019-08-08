@@ -29,6 +29,77 @@ class Slice:
     step: object
 
 
+@dataclass  # pragma: no cover
+class Cons(ADT):
+    """Cons cell for lists.
+
+    Attributes:
+        head: The first element of the list.
+        tail: The rest of the list.
+
+    """
+
+    head: object
+    tail: 'Cons'
+
+    def _to_list(self):
+        curr = self
+        rval = []
+        while not isinstance(curr, Empty):
+            rval.append(curr.head)
+            curr = curr.tail
+        return rval
+
+    def __len__(self):
+        return 1 + len(self.tail)
+
+    def __getitem__(self, idx):
+        if idx == 0:
+            return self.head
+        else:
+            return self.tail[idx - 1]
+
+    def __iter__(self):
+        return iter(self._to_list())
+
+    def __myia_iter__(self):
+        return self
+
+    def __myia_hasnext__(self):
+        return True
+
+    def __myia_next__(self):
+        return self.head, self.tail
+
+
+@dataclass  # pragma: no cover
+class Empty(ADT):
+    """Empty list."""
+
+    def __iter__(self):
+        return iter(())
+
+    def __len__(self):
+        return 0
+
+    def __getitem__(self, idx):
+        raise Exception('Index out of bounds')
+
+    def __myia_iter__(self):
+        return self
+
+    def __myia_hasnext__(self):
+        return False
+
+
+def list_to_cons(elems):
+    """Convert a list to a linked list using Cons."""
+    rval = Empty()
+    for elem in reversed(elems):
+        rval = Cons(elem, rval)
+    return rval
+
+
 class TaggedValue:
     """Represents a tagged value for a TaggedUnion."""
 

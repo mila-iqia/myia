@@ -72,8 +72,7 @@ def wrap_primitives(graph):
 
 
 nonlinear_ops = (
-    P.return_, P.partial, P.switch, P.make_tuple, P.make_list,
-    P.list_len, P.list_getitem, P.list_setitem, P.list_append, P.bool_and,
+    P.return_, P.partial, P.switch, P.make_tuple, P.bool_and,
     P.tuple_getitem, P.tuple_setitem, P.env_getitem, P.env_setitem, P.env_add,
     P.tagged, P.hastag, P.casttag, P.unsafe_static_cast,
 )
@@ -244,24 +243,6 @@ class CompileGraph:
                     elif fn.value == P.make_tuple:
                         self.add_instr('tuple', *[self.ref(i)
                                                   for i in split.inputs[1:]])
-                    elif fn.value == P.make_list:
-                        self.add_instr('list', *[self.ref(i)
-                                                 for i in split.inputs[1:]])
-                    elif fn.value == P.list_len:
-                        self.add_instr('list_len', self.ref(split.inputs[1]))
-                    elif fn.value == P.list_getitem:
-                        self.add_instr('list_getitem',
-                                       self.ref(split.inputs[1]),
-                                       self.ref(split.inputs[2]))
-                    elif fn.value == P.list_setitem:
-                        self.add_instr('list_setitem',
-                                       self.ref(split.inputs[1]),
-                                       self.ref(split.inputs[2]),
-                                       self.ref(split.inputs[3]))
-                    elif fn.value == P.list_append:
-                        self.add_instr('list_append',
-                                       self.ref(split.inputs[1]),
-                                       self.ref(split.inputs[2]))
                     elif fn.value == P.bool_and:
                         self.add_instr('bool_and',
                                        self.ref(split.inputs[1]),

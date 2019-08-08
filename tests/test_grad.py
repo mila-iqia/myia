@@ -7,7 +7,8 @@ from dataclasses import dataclass
 
 from myia.abstract import from_value, AbstractJTagged, InferenceError
 from myia.api import myia
-from myia.pipeline import standard_resources, standard_pipeline
+from myia.pipeline import standard_resources, standard_pipeline, \
+    standard_debug_pipeline
 from myia.composite import grad, value_and_grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.grad import J as realJ
@@ -373,7 +374,8 @@ def test_pow10(x):
     return v
 
 
-@grad_test(([1.0, 2.0, 3.0, 4.0],),)
+@grad_test(([1.0, 2.0, 3.0, 4.0],),
+           pipeline=standard_debug_pipeline.configure(validate=False))
 def test_list_while(xs):
     y = 1.0
     index = 0
@@ -389,6 +391,15 @@ def test_list_for(xs):
     for x in xs:
         y = y * x
     return y
+
+
+@grad_test(4.5,
+           pipeline=standard_debug_pipeline.configure(validate=False))
+def test_exception(x):
+    if x > 0:
+        return x
+    else:
+        raise Exception("oh no")
 
 
 @grad_test(4.5,)

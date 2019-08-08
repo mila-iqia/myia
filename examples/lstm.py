@@ -72,8 +72,8 @@ def lstm_parameters(*layer_sizes, batch_size, seed=6666):
     b_c = param(R, 1, h)
     b_o = param(R, 1, h)
 
-    s0 = numpy.zeros((batch_size, h), dtype=dtype)
-    c0 = numpy.zeros((batch_size, h), dtype=dtype)
+    s0 = numpy.zeros((1, h), dtype=dtype)
+    c0 = numpy.zeros((1, h), dtype=dtype)
 
     parameters = [(
         W_i, W_f, W_c, W_o,
@@ -193,12 +193,13 @@ def cost(model, x, target):
 
 # @myia(backend_options={'target': device_type})
 @myia(backend='pytorch', backend_options={'device': device_type})
-def step(model, x, y):
+def step(model, lr, x, y):
     """Returns the loss and parameter gradients."""
     # value_and_grad will return cost(model, x, y) and dcost(...)/dmodel.
     # The 'model' argument can be omitted: by default the derivative wrt
     # the first argument is returned.
-    return value_and_grad(cost, 'model')(model, x, y)
+    _cost, dmodel = value_and_grad(cost, 'model')(model, x, y)
+    return _cost, model - (dmodel * lr)
 
 
 def run_helper(epochs, n, batch_size, layer_sizes):
@@ -226,11 +227,10 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         costs = []
         t0 = time.time()
         for inp, target in data:
-            cost, dmodel = step(model, inp, target)
+            cost, model = step(model, lr, inp, target)
             if isinstance(cost, numpy.ndarray):
                 cost = float(cost)
             costs.append(cost)
-            model = model - (lr * dmodel)
         c = sum(costs) / n
         t = time.time() - t0
         print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')

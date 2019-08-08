@@ -9,7 +9,7 @@ from types import GeneratorType, AsyncGeneratorType
 
 from .. import dtype
 from ..utils import overload, is_dataclass_type, dataclass_methods, intern, \
-    ADT
+    ADT, Cons, Empty
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
@@ -26,7 +26,6 @@ from .data import (
     AbstractFunction,
     AbstractTuple,
     AbstractArray,
-    AbstractList,
     AbstractDict,
     AbstractClassBase,
     AbstractClass,
@@ -183,7 +182,13 @@ def pytype_to_abstract(main: tuple, args):
 @overload  # noqa: F811
 def pytype_to_abstract(main: list, args):
     arg, = args
-    return AbstractList(type_to_abstract(arg))
+    argt = type_to_abstract(arg)
+    assert argt is ANYTHING
+    rval = AbstractUnion([
+        type_to_abstract(Empty),
+        type_to_abstract(Cons)
+    ])
+    return rval
 
 
 @overload  # noqa: F811
@@ -430,11 +435,6 @@ def abstract_clone(self, x: AbstractTuple, *args):
         [self(y, *args) for y in x.elements],
         self(x.values, *args)
     )
-
-
-@overload  # noqa: F811
-def abstract_clone(self, x: AbstractList, *args):
-    return (yield AbstractList)(self(x.element, *args), self(x.values, *args))
 
 
 @overload  # noqa: F811
@@ -685,12 +685,6 @@ async def force_through(self, x: AbstractTuple, through):
 
 
 @overload  # noqa: F811
-async def force_through(self, x: AbstractList, through):
-    yield (yield AbstractList)(await self(x.element, through),
-                               await self(x.values, through))
-
-
-@overload  # noqa: F811
 async def force_through(self, x: AbstractArray, through):
     yield (yield type(x))(await self(x.element, through),
                           await self(x.values, through))
@@ -743,6 +737,22 @@ async def force_through(self, x: Pending, through):
 # @overload  # noqa: F811
 # async def force_through(self, x: object, through):
 #     return x
+
+
+############
+# Nobottom #
+############
+
+
+@abstract_check.variant
+def nobottom(self, x: AbstractBottom):
+    """Check whether bottom appears anywhere in this type."""
+    return False
+
+
+@overload  # noqa: F811
+def nobottom(self, x: Pending, *args):
+    return True
 
 
 #########
@@ -963,16 +973,6 @@ def amerge(self, x1: AbstractArray, x2, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(self, x1: AbstractList, x2, forced, bp):
-    args1 = (x1.element, x1.values)
-    args2 = (x2.element, x2.values)
-    merged = self(args1, args2, forced, bp)
-    if forced or merged is args1:
-        return x1
-    return AbstractList(*merged)
-
-
-@overload  # noqa: F811
 def amerge(self, x1: AbstractClassBase, x2, forced, bp):
     args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
     args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
@@ -1076,7 +1076,7 @@ def bind(loop, committed, resolved, pending):
             return None
         if any(is_simple(x) for x in chain([committed], resolved, pending)):
             return 1000
-        elif any(isinstance(x, AbstractBottom) for x in resolved):
+        elif any(not nobottom(x) for x in resolved):
             # Bottom is always lower-priority
             return None
         else:
@@ -1182,13 +1182,22 @@ def split_type(t, model):
 
 def hastype_helper(value, model):
     """Helper to implement hastype."""
-    match, nomatch = split_type(value, model)
-    if match is None:
-        return False
-    elif nomatch is None:
-        return True
+    if isinstance(model, AbstractUnion):
+        results = [hastype_helper(value, opt) for opt in model.options]
+        if any(r is True for r in results):
+            return True
+        elif all(r is False for r in results):
+            return False
+        else:
+            return ANYTHING
     else:
-        return ANYTHING
+        match, nomatch = split_type(value, model)
+        if match is None:
+            return False
+        elif nomatch is None:
+            return True
+        else:
+            return ANYTHING
 
 
 #########################
