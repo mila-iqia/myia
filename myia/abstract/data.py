@@ -77,7 +77,6 @@ class Possibilities(list):
         p = Possibilities([])
         data = yield p
         p[:] = data
-        return p
 
     def __hash__(self):
         return hash(tuple(self))
@@ -288,7 +287,7 @@ class AbstractAtom(AbstractValue):
         obj = cls.empty()
         data = yield obj
         obj.values = TrackDict((tmap[k], v) for k, v in data.items())
-        return obj
+        obj._incomplete = False
 
 
 @serializable('AbstractScalar')

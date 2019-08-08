@@ -137,9 +137,8 @@ class NamedDebugInfo(DebugInfo):
         o = cls()
         data = yield o
         assert data is not None
-        o.id_ = data['id']
+        o._id = data['id']
         o.name = data['name']
-        return o
 
     @property
     def obj(self):

@@ -6,9 +6,20 @@ except ImportError:
 import sys
 from dataclasses import is_dataclass
 
-# Should probably make a subclass of SafeDumper that is less retarded at
-# dealing with represent_data for types (from dtype) and Named(s).
-# Maybe I can hook add_representer(None, ...) for a fallback function.
+
+class MyiaLoader(SafeLoader):
+    """Customize the loader for stuff we want to do."""
+    def construct_document(self, node):
+        self._finalizers = []
+        res = super().construct_document(node)
+        for f in self._finalizers:
+            f()
+        self._finalizers = []
+        return res
+
+    def add_finalizer(self, f):
+        assert callable(f)
+        self._finalizers.append(f)
 
 
 def __serialize__(self, dumper):
@@ -47,7 +58,8 @@ def _make_construct(cls, dc, sequence, scalar):
         try:
             it.send(data)
         except StopIteration as e:
-            return e.value
+            if e.value is not None:
+                loader.add_finalizer(e.value)
     if dc:
         if cls.__dataclass_params__.frozen:
             def _construct(loader, node):  # noqa: F811
@@ -71,18 +83,19 @@ def _make_construct(cls, dc, sequence, scalar):
     return _construct
 
 
-def serializable(tag, *, sequence=False, scalar=False):
+def serializable(tag, *, dc=None, sequence=False, scalar=False):
     """Class decorator to make the wrapped class serializable.
 
     Parameters:
         tag: string, serialization tag, must be unique
+        dc: bool, class is a dataclass (autodetected, but can override)
         sequence: _serialize returns a sequence (tuple or list)
         scalar: _serialize returns a single item.
 
     """
     def wrapper(cls):
-        dc = False
-        if is_dataclass(cls):
+        nonlocal dc
+        if dc is None and is_dataclass(cls):
             dc = True
         setattr(cls, '@SERIAL_TAG', tag)
         if not hasattr(cls, '__serialize__'):
@@ -96,10 +109,21 @@ def serializable(tag, *, sequence=False, scalar=False):
             setattr(cls, '__serialize__', method)
         _construct = _make_construct(cls, dc, sequence, scalar)
         SafeDumper.add_representer(cls, _serialize)
-        SafeLoader.add_constructor(tag, _construct)
+        MyiaLoader.add_constructor(tag, _construct)
         return cls
     return wrapper
 
+
+def _serialize_tuple(dumper, data):
+    return dumper.represent_sequence('tuple', data)
+
+
+def _construct_tuple(loader, node):
+    return tuple(loader.construct_sequence(node))
+
+
+SafeDumper.add_representer(tuple, _serialize_tuple)
+MyiaLoader.add_constructor('tuple', _construct_tuple)
 
 _OBJ_MAP = {}
 _TAG_MAP = {}
@@ -122,7 +146,7 @@ def _construct_unique(loader, node):
 
 
 SafeDumper.add_representer(None, _serialize_unique)
-SafeLoader.add_constructor(None, _construct_unique)
+MyiaLoader.add_constructor(None, _construct_unique)
 
 
 def register_serialize(obj, tag):
@@ -148,7 +172,7 @@ def dump(o, stream=sys.stdout):
 
 
 def load(stream):
-    loader = SafeLoader(stream)
+    loader = MyiaLoader(stream)
     try:
         return loader.get_single_data()
     finally:

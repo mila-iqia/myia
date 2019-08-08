@@ -81,7 +81,6 @@ class Graph:
         g.return_ = data['return']
         g.debug = data['debug']
         g.flags = data['flags']
-        return g
 
     @property
     def abstract(self):
@@ -523,7 +522,11 @@ class Apply(ANFNode):
         a.graph = data['graph']
         a.debug = data['debug']
         a.abstract = data['abstract']
-        return a
+
+        if a.abstract is not None:
+            def _cb():
+                a.abstract = a.abstract.intern()
+            return _cb
 
     def is_apply(self, value: Any = None) -> bool:
         """Return whether self is an Apply."""
@@ -571,6 +574,11 @@ class Parameter(ANFNode):
         p.debug = data['debug']
         p.abstract = data['abstract']
 
+        if p.abstract is not None:
+            def _cb():
+                p.abstract = p.abstract.intern()
+            return _cb
+
     def is_parameter(self):
         """Return whether self is a Parameter."""
         return True
@@ -610,7 +618,11 @@ class Constant(ANFNode):
         c.value = data['value']
         c.debug = data['debug']
         c.abstract = data['abstract']
-        return c
+
+        if c.abstract is not None:
+            def _cb():
+                c.abstract = c.abstract.intern()
+            return _cb
 
     def is_constant(self, cls: Any = object) -> bool:
         """Return whether self is a Constant, with value of given cls."""
