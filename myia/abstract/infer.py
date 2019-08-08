@@ -33,6 +33,7 @@ from .data import (
     AbstractADT,
     AbstractArray,
     AbstractClass,
+    AbstractClassBase,
     AbstractDict,
     AbstractError,
     AbstractExternal,
@@ -315,11 +316,14 @@ class InferenceEngine:
                 f'{fn.values[VALUE]} {fn.values[DATA] or ""}.'
             )
 
-        elif not isinstance(fn, AbstractFunction):
+        elif isinstance(fn, AbstractClassBase):
             g = ref.node.graph
             newfn = g.apply(P.getattr, fn_ref.node, '__call__')
             newcall = g.apply(newfn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
+
+        elif not isinstance(fn, AbstractFunction):
+            raise MyiaTypeError(f'Myia does not know how to call {fn}')
 
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]
