@@ -44,7 +44,8 @@ def get_backend_options(args, backend):
 # TODO: maybe fixture for return_backend=True and return_backend=False
 @pytest.fixture(params=[
     pytest.param('pytorch'),
-    pytest.param('nnvm')
+    pytest.param('nnvm'),
+    # pytest.param('relay'),
 ])
 def _backend_fixture(request):
     return request.param
@@ -589,4 +590,49 @@ def test_module_2_layer_mlp_seq_update():
 
     for p, ep in zip(model.parameters(), expected_model):
         assert torch.allclose(p, ep)
+#"""
+
+
+"""
+# This zeros_like test below is not in test_pytorch_ops because it raises
+# "libc++abi.dylib:" "dmlc::Error" because that pipeline can only use nnvm
+# TODO: eventually, get torch.zeros_like to work with backends besides pt,
+#       and then remove this torch.zeros_like test & use test_pytorch_ops.py
+
+
+class Z(nn.Module):
+    def __init__(self):
+        super(Z, self).__init__()
+
+    def forward(self, input):
+        return torch.zeros_like(input)
+
+
+def test_torch_zeros_like():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+    model = Z()
+
+    inp = torch.Tensor(MA(2, 3, dtype=args.dtype))
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model, inp):
+        return model(inp)
+    output = step(model, inp)
+    assert torch.allclose(output, torch.zeros_like(inp))
+
+    inp = torch.Tensor([2.1])
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model, inp):
+        return model(inp)
+    output = step(model, inp)
+    assert torch.allclose(output, torch.zeros_like(inp))
+
+    inp = torch.Tensor([2.1]).reshape(())
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model, inp):
+        return model(inp)
+    output = step(model, inp)
+    assert torch.allclose(output, torch.zeros_like(inp))
 #"""

@@ -3,6 +3,7 @@ import pytest
 from pytest import mark
 from copy import copy
 from types import FunctionType
+import numpy as np
 
 from myia.abstract import from_value, AbstractJTagged
 from myia.pipeline import standard_resources, standard_pipeline, \
@@ -192,13 +193,14 @@ def _fwd_test(fn, args, pipeline=standard_pipeline,
     # profile.print()
     myia_fn = res['output']
     myia_result = myia_fn(*map(copy, args))
-    if python:
-        # print("ref_result", ref_result)
-        # print("myia_result", myia_result)
+
+    if type(ref_result) == torch.Tensor and type(myia_result) == torch.Tensor:
         assert torch.allclose(ref_result, myia_result, equal_nan=True)
         assert ref_result.shape == myia_result.shape
-
-    return tuple(myia_result.shape)
+        return tuple(myia_result.shape)
+    else:
+        assert np.isclose(ref_result, myia_result)
+        return tuple()
 
 
 def _grad_test(fn, obj, args,
@@ -323,11 +325,6 @@ all_torch_ops__1_tensor_arg = all_torch_tensor_ops__1_tensor_arg = \
         'sum',
         'tanh',
     ]
-"""
-[
-'relu',
-]
-"""
 
 
 single_tensor_args = (
@@ -375,34 +372,42 @@ def test_torch_tensor_ops__1_tensor_arg(name, args):
 all_torch_ops__1_tensor_arg__fwd_only = \
     all_torch_tensor_ops__1_tensor_arg__fwd_only = \
     [
-        'zeros_like',
     ]
+
+
+all_torch_ops__1_tensor_arg__fwd_only.extend([
+    # 'zeros_like',  # zl currently only works with pt backend
+])
+
+
+all_torch_tensor_ops__1_tensor_arg__fwd_only.extend([
+])
 
 '''
 @pytest.mark.parametrize(
     'name,args',
     [(op, single_tensor_args) for op in all_torch_ops__1_tensor_arg__fwd_only]
     )
-@pytest.mark.timeout(5)
+@pytest.mark.timeout(10)
 def test_torch_ops__1_tensor_arg__fwd_only(name, args):
     def fn1(x):
         return getattr(torch, name)(x)
 
-
     if not isinstance(args, tuple):
         args = (args,)
 
-
     for arg in args:
-        out_shape = _fwd_test(fn1, (arg,))
+        _fwd_test(fn1, (arg,))
+#'''
 
 
+'''
 @pytest.mark.parametrize(
     'name,args',
     [(op, single_tensor_args) for op
      in all_torch_tensor_ops__1_tensor_arg__fwd_only]
     )
-@pytest.mark.timeout(5)
+@pytest.mark.timeout(10)
 def test_torch_tensor_ops__1_tensor_arg__fwd_only(name, args):
     def fn1(x):
         return getattr(x, name)()
@@ -411,8 +416,38 @@ def test_torch_tensor_ops__1_tensor_arg__fwd_only(name, args):
         args = (args,)
 
     for arg in args:
-        out_shape = _fwd_test(fn1, (arg,))
+        _fwd_test(fn1, (arg,))
 #'''
+
+
+all_torch_tensor_ops__1_tensor_arg_1D_and_lower__fwd_only = \
+    [
+        'item',
+    ]
+
+
+single_tensor_args__1D_and_lower = (
+    (nn.Parameter(torch.Tensor([2.1]).reshape(()))),
+    (nn.Parameter(torch.Tensor([2.1]))),
+)
+
+
+@pytest.mark.parametrize(
+    'name,args',
+    [(op, single_tensor_args__1D_and_lower) for op
+     in all_torch_tensor_ops__1_tensor_arg_1D_and_lower__fwd_only]
+)
+@pytest.mark.timeout(10)
+def test_torch_item__fwd_only(name, args):
+    def fn1(x):
+        return getattr(x, name)()
+
+    if not isinstance(args, tuple):
+        args = (args,)
+
+    for arg in args:
+        _fwd_test(fn1, (arg,))
+
 
 all_torch_ops__2_args = all_torch_tensor_ops____2_args = \
     [

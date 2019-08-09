@@ -212,8 +212,6 @@ class HyperMap(MetaGraph):
             if a.entries.keys() != a2.entries.keys():
                 raise MyiaTypeError(f'Dict keys mismatch: {a} != {a2}')
 
-        print("fnarg", fnarg)
-
         elems = []
         for k, v in a.entries.items():
             args = [arg if isleaf else g.apply(P.dict_getitem, arg, k)

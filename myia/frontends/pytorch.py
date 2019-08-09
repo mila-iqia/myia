@@ -56,7 +56,7 @@ standard_object_map.update({
     torch.tanh: C.tanh,
 
     torch.nn.functional.linear: linear,
-    # torch.zeros_like: C.zeros_like,
+    # torch.zeros_like: C.zeros_like,  # currently only works with pt backend
 })
 
 
