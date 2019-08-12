@@ -8,3 +8,4 @@ pytest-cov
 flake8==3.7.7
 pytorch::pytorch==1.1.0
 pydocstyle==2.1.1
+isort

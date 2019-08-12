@@ -25,7 +25,7 @@ setup(
     install_requires=['asttokens', 'colorama', 'prettyprinter',
                       'numpy'],
     extras_require={
-        'test': ['flake8', 'pytest', 'codecov',
+        'test': ['flake8', 'pytest', 'codecov', 'isort',
                  'pytest-cov', 'pydocstyle'],
     }
 )
