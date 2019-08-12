@@ -37,6 +37,14 @@ class Graph:
             has no output node (because it won't be known e.g. until the
             function has completed parsing), but it must be set afterwards for
             the graph instance to be valid.
+        vararg (bool): Whether there is an *args argument. This will be the
+            last parameter unless there is a kwarg, in which case it will be
+            the second-to-last.
+        kwarg (bool): Whether there is a *kwargs argument. This will always be
+            the last parameter.
+        defaults: List of parameter names that have default values.
+        kwonly: The number of keyword-only arguments, which are all at the end
+            of the parameters list or immediately before vararg and/or kwarg.
         debug: A NamedDebugInfo object containing debugging information about
             this graph.
         transforms: A dictionary of available transforms for this graph, e.g.
@@ -55,8 +63,8 @@ class Graph:
         self.kwarg = False
         self.defaults = []
         self.kwonly = 0
-        self.user_graph = None
-        self.sig = None
+        self._user_graph = None
+        self._sig = None
         self._manager = None
 
     @property
@@ -133,8 +141,8 @@ class Graph:
         g.kwarg = self.kwarg
         g.defaults = self.defaults
         g.kwonly = self.kwonly
-        g.user_graph = self.user_graph
-        g.sig = self.sig
+        g._user_graph = self._user_graph
+        g._sig = self._sig
         return g
 
     #######################
@@ -184,11 +192,11 @@ class Graph:
         if sig is None:
             return self
 
-        if sig == self.sig:
+        if sig == self._sig:
             return self
 
-        if self.user_graph:
-            return self.user_graph.generate_graph(sig)
+        if self._user_graph:
+            return self._user_graph.generate_graph(sig)
 
         nargs, *keys = sig
         if (not self.defaults and not self.vararg and not self.kwarg
@@ -281,8 +289,8 @@ class Graph:
         new_graph.kwarg = False
         new_graph.defaults = []
         new_graph.kwonly = 0
-        new_graph.user_graph = self
-        new_graph.sig = sig
+        new_graph._user_graph = self
+        new_graph._sig = sig
         return new_graph
 
     #########

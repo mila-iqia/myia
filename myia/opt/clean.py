@@ -179,8 +179,8 @@ def simplify_types(root, manager):
             manager.replace(node, new_node)
 
     for graph in manager.graphs:
-        graph.sig = None
-        graph.user_graph = None
+        graph._sig = None
+        graph._user_graph = None
 
     for node in manager.all_nodes:
         node.abstract = _reabs(node.abstract)
