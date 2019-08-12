@@ -9,7 +9,6 @@ from .abstract import AbstractArray, SHAPE, ANYTHING, \
     AbstractFunction, GraphFunction, AbstractTuple, \
     AbstractClassBase, build_value, AbstractError, TYPE, AbstractScalar, \
     AbstractUnion, AbstractTaggedUnion, AbstractDict, broaden
-from .abstract.data import check_nargs
 from .debug.label import short_labeler
 from .dtype import Array, Number, Bool, \
     EnvType, u8, u16, i8, i16, f32, f64, Nil
