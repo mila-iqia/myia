@@ -269,9 +269,6 @@ def _name_args_helper(name, args):
 # all_torch_ops = dir(torch)
 # all_torch_tensor_ops = dir(torch.Tensor([5.49670]))
 
-# pytest_timeout used so that unmapped ops with infinite call recursion
-# don't take very long time to fail
-pytest_timeout_time = 10
 
 all_torch_ops__1_tensor_arg = all_torch_tensor_ops__1_tensor_arg = \
     [
@@ -296,7 +293,6 @@ single_tensor_args = (
     'name,args',
     [(op, single_tensor_args) for op in all_torch_ops__1_tensor_arg]
 )
-@pytest.mark.timeout(pytest_timeout_time)
 def test_torch_ops__1_tensor_arg(name, args):
     def fn1(x):
         return getattr(torch, name)(x)
@@ -313,7 +309,6 @@ def test_torch_ops__1_tensor_arg(name, args):
     'name,args',
     [(op, single_tensor_args) for op in all_torch_tensor_ops__1_tensor_arg]
 )
-@pytest.mark.timeout(pytest_timeout_time)
 def test_torch_tensor_ops__1_tensor_arg(name, args):
     def fn1(x):
         return getattr(x, name)()
@@ -345,7 +340,6 @@ all_torch_tensor_ops__1_tensor_arg__fwd_only.extend([
     'name,args',
     [(op, single_tensor_args) for op in all_torch_ops__1_tensor_arg__fwd_only]
     )
-@pytest.mark.timeout(pytest_timeout_time)
 def test_torch_ops__1_tensor_arg__fwd_only(name, args):
     def fn1(x):
         return getattr(torch, name)(x)
@@ -364,7 +358,6 @@ def test_torch_ops__1_tensor_arg__fwd_only(name, args):
     [(op, single_tensor_args) for op
      in all_torch_tensor_ops__1_tensor_arg__fwd_only]
     )
-@pytest.mark.timeout(pytest_timeout_time)
 def test_torch_tensor_ops__1_tensor_arg__fwd_only(name, args):
     def fn1(x):
         return getattr(x, name)()
@@ -394,7 +387,6 @@ single_tensor_args__1D_and_lower = (
     [(op, single_tensor_args__1D_and_lower) for op
      in all_torch_tensor_ops__1_tensor_arg_1D_and_lower__fwd_only]
 )
-@pytest.mark.timeout(pytest_timeout_time)
 def test_torch_item__fwd_only(name, args):
     def fn1(x):
         return getattr(x, name)()
