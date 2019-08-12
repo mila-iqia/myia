@@ -2,8 +2,13 @@
 
 from typing import Iterable, Set
 
-from ..graph_utils import EXCLUDE, FOLLOW, NOFOLLOW, dfs as _dfs, \
-    toposort as _toposort
+from ..graph_utils import (
+    EXCLUDE,
+    FOLLOW,
+    NOFOLLOW,
+    dfs as _dfs,
+    toposort as _toposort,
+)
 from .anf import ANFNode
 
 #######################

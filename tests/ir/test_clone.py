@@ -1,11 +1,18 @@
 
 import pytest
-
-from myia.pipeline import scalar_parse as parse
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs
-from myia.ir import Constant, Graph, succ_deeper, succ_incoming, \
-    GraphManager, GraphCloner, clone, Parameter
+from myia.ir import (
+    Constant,
+    Graph,
+    GraphCloner,
+    GraphManager,
+    Parameter,
+    clone,
+    succ_deeper,
+    succ_incoming,
+)
+from myia.pipeline import scalar_parse as parse
 from myia.prim import ops as P
 
 

@@ -1,6 +1,6 @@
 
 import pytest
-from myia.pipeline import PipelineStep, PipelineDefinition, pipeline_function
+from myia.pipeline import PipelineDefinition, PipelineStep, pipeline_function
 from myia.utils import Merge, Reset
 
 

@@ -2,7 +2,6 @@
 
 import weakref
 
-
 _intern_pool = weakref.WeakValueDictionary()
 
 

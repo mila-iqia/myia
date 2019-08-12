@@ -4,23 +4,43 @@ Each primitive is associated to an augmented function, which returns a pair of
 the (augmented) original primitive's output and a backpropagator function.
 """
 
+from . import ops as primops
 from ..abstract import AbstractFunction, GraphFunction
 from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
-from ..info import NamedDebugInfo, About
-from ..ir import Constant, Graph, manage, clone, MetaGraph
+from ..info import About, NamedDebugInfo
+from ..ir import Constant, Graph, MetaGraph, clone, manage
 from ..pipeline import standard_pipeline
 from ..utils import Registry, newenv
-
-from . import ops as primops
-from .py_implementations import \
-    Jinv, J, \
-    scalar_add, scalar_mul, scalar_div, scalar_sub, scalar_usub, \
-    scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
-    array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
-    reshape, scalar_cast, typeof, invert_permutation, \
-    tagged, casttag, unsafe_static_cast, scalar_eq, scalar_gt
-
+from .py_implementations import (
+    J,
+    Jinv,
+    array_reduce,
+    array_to_scalar,
+    casttag,
+    distribute,
+    dot,
+    invert_permutation,
+    reshape,
+    scalar_add,
+    scalar_cast,
+    scalar_div,
+    scalar_eq,
+    scalar_gt,
+    scalar_log,
+    scalar_mul,
+    scalar_pow,
+    scalar_sub,
+    scalar_to_array,
+    scalar_usub,
+    shape,
+    switch,
+    tagged,
+    transpose,
+    tuple_setitem,
+    typeof,
+    unsafe_static_cast,
+)
 
 parse = standard_pipeline \
     .select('parse') \

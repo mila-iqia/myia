@@ -8,10 +8,8 @@ from dataclasses import dataclass
 
 from ..info import About
 from ..utils import Partializable
-
-from .anf import Apply, Constant, Graph, Parameter, ANFNode
+from .anf import ANFNode, Apply, Constant, Graph, Parameter
 from .manager import manage
-
 
 #################
 # Graph cloning #

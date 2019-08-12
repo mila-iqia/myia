@@ -1,16 +1,15 @@
 """Implementations for the debug VM."""
 
+import math
 from copy import copy
 from typing import Callable
-import numpy as np
-import math
 
-from .. import dtype as types, abstract
-from ..dtype import Number, Float, Bool, pytype_to_myiatype
-from ..utils import Registry, TaggedValue
+import numpy as np
 
 from . import ops as primops
-
+from .. import abstract, dtype as types
+from ..dtype import Bool, Float, Number, pytype_to_myiatype
+from ..utils import Registry, TaggedValue
 
 py_registry: Registry[primops.Primitive, Callable] = Registry()
 vm_registry: Registry[primops.Primitive, Callable] = Registry()

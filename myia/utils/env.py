@@ -1,8 +1,8 @@
 """Utilities related to the Env type in Myia."""
 
 
-from dataclasses import dataclass
 import numpy as np
+from dataclasses import dataclass
 
 from .overload import overload
 

@@ -1,16 +1,28 @@
 
 from myia.composite import gadd
 from myia.opt import lib
-from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, tuple_setitem, identity, partial, switch, \
-    distribute, array_reduce, env_getitem, env_setitem, embed, env_add, \
-    scalar_usub, array_map, scalar_to_array, transpose
+from myia.prim.py_implementations import (
+    array_map,
+    array_reduce,
+    distribute,
+    embed,
+    env_add,
+    env_getitem,
+    env_setitem,
+    identity,
+    partial,
+    scalar_add,
+    scalar_mul,
+    scalar_to_array,
+    scalar_usub,
+    switch,
+    transpose,
+    tuple_setitem,
+)
 from myia.utils import newenv
 
-from ..common import to_abstract_test, i64, f64, af64_of, AA
-
+from ..common import AA, af64_of, f64, i64, to_abstract_test
 from .test_opt import _check_opt
-
 
 #######################
 # Tuple optimizations #

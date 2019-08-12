@@ -1,18 +1,29 @@
-import pytest
 import math
 from copy import copy
+
 import numpy as np
-
-from myia.abstract import from_value
-from myia.compile.backends import load_backend, LoadingError, UnknownBackend, \
-    parse_default
-from myia.pipeline import standard_pipeline
-from myia.prim.py_implementations import distribute, scalar_to_array, dot, \
-    scalar_add, array_reduce, transpose, reshape
-from myia.api import to_device
+import pytest
 from myia import dtype
+from myia.abstract import from_value
+from myia.api import to_device
+from myia.compile.backends import (
+    LoadingError,
+    UnknownBackend,
+    load_backend,
+    parse_default,
+)
+from myia.pipeline import standard_pipeline
+from myia.prim.py_implementations import (
+    array_reduce,
+    distribute,
+    dot,
+    reshape,
+    scalar_add,
+    scalar_to_array,
+    transpose,
+)
 
-from ..common import MA, MB, AA
+from ..common import AA, MA, MB
 
 
 @pytest.fixture(params=[

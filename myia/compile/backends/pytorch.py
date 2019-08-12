@@ -1,15 +1,13 @@
 """Linear implementation using pytorch."""
 
+import numpy as np
 import torch
 import torch.utils.dlpack
-import numpy as np
 
 from . import Backend
-from ..transform import CompileGraphs, nonlinear_ops
-
-from ...dtype import Int, UInt, Float, Bool, type_to_np_dtype
+from ...dtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ...prim import Primitive, ops as P
-
+from ..transform import CompileGraphs, nonlinear_ops
 
 _type_map = {
     Int[8]: torch.int8,

@@ -1,41 +1,108 @@
 
-from dataclasses import dataclass
-import pytest
 import operator
-import numpy as np
-
-from typing import List, Tuple
 from types import SimpleNamespace
+from typing import List, Tuple
 
+import numpy as np
+import pytest
+from dataclasses import dataclass
 from myia import abstract
-from myia.abstract import concretize_abstract, from_value, ANYTHING, \
-    Contextless, CONTEXTLESS
+from myia.abstract import (
+    ANYTHING,
+    CONTEXTLESS,
+    Contextless,
+    concretize_abstract,
+    from_value,
+)
 from myia.abstract.prim import UniformPrimitiveInferrer
-from myia.pipeline import standard_pipeline, scalar_pipeline
-from myia.composite import gadd, zeros_like, grad
+from myia.composite import gadd, grad, zeros_like
 from myia.debug.traceback import print_inference_error
-from myia.dtype import Int, External, Number, EnvType as Env, Nil, Array, \
-    i16, i32, i64, u64, f16, f32, f64
+from myia.dtype import (
+    Array,
+    EnvType as Env,
+    External,
+    Int,
+    Nil,
+    Number,
+    f16,
+    f32,
+    f64,
+    i16,
+    i32,
+    i64,
+    u64,
+)
 from myia.hypermap import HyperMap, hyper_map
 from myia.ir import Graph, MultitypeGraph
+from myia.pipeline import scalar_pipeline, standard_pipeline
 from myia.prim import Primitive, ops as P
-from myia.prim.py_implementations import \
-    scalar_add, scalar_mul, scalar_lt, \
-    hastype, typeof, scalar_usub, dot, distribute, shape, array_map, \
-    array_reduce, reshape, partial as myia_partial, identity, \
-    bool_and, bool_or, switch, scalar_to_array, broadcast_shape, \
-    tuple_setitem, scalar_cast, \
-    env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
-    transpose, make_record, unsafe_static_cast, user_switch, \
-    hastag, casttag, tagged
-from myia.utils import newenv, InferenceError, MyiaTypeError
+from myia.prim.py_implementations import (
+    J,
+    Jinv,
+    array_map,
+    array_reduce,
+    array_to_scalar,
+    bool_and,
+    bool_or,
+    broadcast_shape,
+    casttag,
+    distribute,
+    dot,
+    embed,
+    env_getitem,
+    env_setitem,
+    hastag,
+    hastype,
+    identity,
+    make_record,
+    partial as myia_partial,
+    reshape,
+    scalar_add,
+    scalar_cast,
+    scalar_lt,
+    scalar_mul,
+    scalar_to_array,
+    scalar_usub,
+    shape,
+    switch,
+    tagged,
+    transpose,
+    tuple_setitem,
+    typeof,
+    unsafe_static_cast,
+    user_switch,
+)
+from myia.utils import InferenceError, MyiaTypeError, newenv
 
-from .common import B, \
-    Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \
-    ai64_of, ai32_of, af64_of, af32_of, af16_of, S, Ty, JT, Shp, \
-    to_abstract_test, EmptyTuple, U, D, TU, Ex, Bot, AA, \
-    make_tree, countdown, Pair
-
+from .common import (
+    AA,
+    JT,
+    TU,
+    B,
+    Bot,
+    D,
+    EmptyTuple,
+    Ex,
+    Pair,
+    Point,
+    Point3D,
+    S,
+    Shp,
+    Thing,
+    Thing_f,
+    Thing_ftup,
+    Ty,
+    U,
+    af16_of,
+    af32_of,
+    af64_of,
+    ai32_of,
+    ai64_of,
+    countdown,
+    make_tree,
+    mysum,
+    to_abstract_test,
+)
 
 ai64 = Array[i64]
 af64 = Array[f64]

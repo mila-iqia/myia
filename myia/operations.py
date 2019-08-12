@@ -1,18 +1,34 @@
 """Myia operations."""
 
 
+from builtins import bool, getattr, len, setattr  # noqa
 from operator import (  # noqa
-    add, sub, mul, truediv, floordiv, mod, pow, eq, ne, lt, gt, le, ge,
-    pos, neg, not_, and_, or_, matmul, getitem, setitem, is_, is_not
+    add,
+    and_,
+    eq,
+    floordiv,
+    ge,
+    getitem,
+    gt,
+    is_,
+    is_not,
+    le,
+    lt,
+    matmul,
+    mod,
+    mul,
+    ne,
+    neg,
+    not_,
+    or_,
+    pos,
+    pow,
+    setitem,
+    sub,
+    truediv,
 )
 
-from numpy import (  # noqa
-    exp, log, sin, cos, tan
-)
-
-from builtins import (  # noqa
-    bool, getattr, setattr, len
-)
+from numpy import cos, exp, log, sin, tan  # noqa
 
 
 def make_tuple(*elts):  # pragma: no cover

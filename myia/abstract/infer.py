@@ -1,31 +1,71 @@
 """Algorithms for inference."""
 
 import asyncio
-import numpy as np
 import typing
 from functools import reduce
+
+import numpy as np
 from dataclasses import is_dataclass, replace as dc_replace
 
 from .. import dtype
 from ..info import About
 from ..ir import Graph, MetaGraph
 from ..prim import Primitive, ops as P
-from ..utils import Overload, Partializable, is_dataclass_type, \
-    SymbolicKeyInstance, overload, dataclass_methods, ADT, \
-    MyiaTypeError, type_error_nargs, infer_trace, InferenceError
-
-from .loop import Pending, force_pending, InferenceLoop
-from .ref import VirtualReference, Context, EvaluationCache, Reference
-from .data import ANYTHING, AbstractScalar, \
-    AbstractValue, GraphFunction, PartialApplication, \
-    JTransformedFunction, AbstractJTagged, AbstractTuple, \
-    VirtualFunction, AbstractFunction, AbstractExternal, \
-    VALUE, TYPE, SHAPE, DATA, DummyFunction, AbstractError, \
-    TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractDict, AbstractADT, PrimitiveFunction, \
-    MetaGraphFunction, Function, listof, empty, AbstractKeywordArgument
-from .utils import broaden as _broaden, sensitivity_transform, amerge, \
-    bind, type_to_abstract, normalize_adt, concretize_abstract
+from ..utils import (
+    ADT,
+    InferenceError,
+    MyiaTypeError,
+    Overload,
+    Partializable,
+    SymbolicKeyInstance,
+    dataclass_methods,
+    infer_trace,
+    is_dataclass_type,
+    overload,
+    type_error_nargs,
+)
+from .data import (
+    ANYTHING,
+    DATA,
+    SHAPE,
+    TYPE,
+    VALUE,
+    AbstractADT,
+    AbstractArray,
+    AbstractClass,
+    AbstractDict,
+    AbstractError,
+    AbstractExternal,
+    AbstractFunction,
+    AbstractJTagged,
+    AbstractKeywordArgument,
+    AbstractScalar,
+    AbstractTuple,
+    AbstractType,
+    AbstractValue,
+    DummyFunction,
+    Function,
+    GraphFunction,
+    JTransformedFunction,
+    MetaGraphFunction,
+    PartialApplication,
+    PrimitiveFunction,
+    TypedPrimitive,
+    VirtualFunction,
+    empty,
+    listof,
+)
+from .loop import InferenceLoop, Pending, force_pending
+from .ref import Context, EvaluationCache, Reference, VirtualReference
+from .utils import (
+    amerge,
+    bind,
+    broaden as _broaden,
+    concretize_abstract,
+    normalize_adt,
+    sensitivity_transform,
+    type_to_abstract,
+)
 
 
 class ArrayWrapper:

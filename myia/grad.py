@@ -50,13 +50,13 @@ expressions. See `SensRemapper.link_apply` for more information.
 
 from functools import reduce
 
-from .composite import zeros_like, gadd
+from .composite import gadd, zeros_like
 from .info import About
-from .ir import Constant, Graph, BasicRemapper, RemapperSet
+from .ir import BasicRemapper, Constant, Graph, RemapperSet
 from .opt import sexp_to_node
-from .prim import ops as primops, Primitive
+from .prim import Primitive, ops as primops
 from .prim.grad_implementations import augmented_graphs
-from .utils import overload, newenv, OrderedSet
+from .utils import OrderedSet, newenv, overload
 
 
 class GradRemapper(BasicRemapper):

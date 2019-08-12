@@ -1,5 +1,6 @@
 from threading import Thread
-from myia.info import DebugInfo, DebugInherit, NamedDebugInfo, About
+
+from myia.info import About, DebugInfo, DebugInherit, NamedDebugInfo
 
 
 def test_nested_info():

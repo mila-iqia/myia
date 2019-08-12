@@ -1,7 +1,6 @@
 
 from myia.opt import lib
 
-
 tuple_opts = [
     lib.getitem_tuple,
     lib.setitem_tuple,

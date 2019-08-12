@@ -1,18 +1,29 @@
 """User-friendly interfaces to Myia machinery."""
 
-import numpy as np
 import inspect
 
+import numpy as np
 from myia import dtype
 
-from .abstract import from_value
+from .abstract import (
+    TYPE,
+    AbstractArray,
+    AbstractClassBase,
+    AbstractScalar,
+    AbstractTuple,
+    ArrayWrapper,
+    from_value,
+)
+from .compile.backends import Backend, load_backend
 from .pipeline import standard_pipeline
-from .utils import keyword_decorator, overload, MyiaInputTypeError, \
-    Cons, Empty, MyiaTypeError
-from .abstract import TYPE, ArrayWrapper, AbstractTuple, \
-    AbstractArray, AbstractScalar, AbstractClassBase
-from .compile.backends import load_backend, Backend
-
+from .utils import (
+    Cons,
+    Empty,
+    MyiaInputTypeError,
+    MyiaTypeError,
+    keyword_decorator,
+    overload,
+)
 
 #################
 # Top-level API #

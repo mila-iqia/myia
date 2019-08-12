@@ -2,19 +2,28 @@
 
 
 import re
-import prettyprinter as pp
-from prettyprinter.prettyprinter import pretty_python_value
-from typing import Tuple, List
-from dataclasses import dataclass
+from typing import List, Tuple
 
-from ..utils import Named, Interned, Atom, AttrEK, MyiaTypeError, \
-    PossiblyRecursive, OrderedSet, dataclass_methods, Cons, Empty
+import prettyprinter as pp
+from dataclasses import dataclass
+from prettyprinter.prettyprinter import pretty_python_value
+
 from ..ir import Graph, MetaGraph
 from ..prim import Primitive
-
+from ..utils import (
+    Atom,
+    AttrEK,
+    Cons,
+    Empty,
+    Interned,
+    MyiaTypeError,
+    Named,
+    OrderedSet,
+    PossiblyRecursive,
+    dataclass_methods,
+)
 from .loop import Pending
 from .ref import Context
-
 
 # Represents the absence of inferred data
 ABSENT = Named('ABSENT')

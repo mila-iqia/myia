@@ -1,22 +1,40 @@
 
 import numpy as np
-from pytest import mark
-
-from myia.dtype import Number
 from myia.abstract import from_value
-from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
-from myia.prim.py_implementations import \
-    hastype, partial, scalar_add, scalar_sub, tagged, \
-    scalar_usub, scalar_uadd, switch, array_map, array_reduce, scalar_mul
-from myia.validate import ValidationError
-from myia.utils import overload, InferenceError
+from myia.dtype import Number
 from myia.hypermap import hyper_map
+from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
+from myia.prim.py_implementations import (
+    array_map,
+    array_reduce,
+    hastype,
+    partial,
+    scalar_add,
+    scalar_mul,
+    scalar_sub,
+    scalar_uadd,
+    scalar_usub,
+    switch,
+    tagged,
+)
+from myia.utils import InferenceError, overload
+from myia.validate import ValidationError
+from pytest import mark
 
-from .common import mysum, i64, f64, Point, U, to_abstract_test, \
-    make_tree, countdown, sumtree, reducetree
-
+from .common import (
+    Point,
+    U,
+    countdown,
+    f64,
+    i64,
+    make_tree,
+    mysum,
+    reducetree,
+    sumtree,
+    to_abstract_test,
+)
 
 specialize_pipeline = scalar_debug_pipeline \
     .select('parse', 'infer', 'specialize', 'simplify_types',

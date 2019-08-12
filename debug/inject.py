@@ -6,7 +6,7 @@ from buche import buche
 
 # Load custom hrepr methods for Graph etc.
 from . import gprint  # noqa
-from .logword import ibuche, logword, afterword, breakword
+from .logword import afterword, breakword, ibuche, logword
 
 
 def bucheg(graph, **kwargs):

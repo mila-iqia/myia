@@ -5,14 +5,14 @@ testing or debugging.  Don't expect stellar performance from this
 implementation.
 """
 
-from typing import Iterable, Mapping, Any, List
+from typing import Any, Iterable, List, Mapping
 
 from .abstract import to_abstract
-from .ir import Graph, Apply, Constant, Parameter, ANFNode, MetaGraph
-from .prim import Primitive
-from .prim.ops import return_, partial, embed
 from .graph_utils import toposort
-from .utils import TypeMap, is_dataclass_type, SymbolicKeyInstance
+from .ir import ANFNode, Apply, Constant, Graph, MetaGraph, Parameter
+from .prim import Primitive
+from .prim.ops import embed, partial, return_
+from .utils import SymbolicKeyInstance, TypeMap, is_dataclass_type
 
 
 class VMFrame:

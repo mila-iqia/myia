@@ -6,7 +6,6 @@ the notion of successor.
 
 from typing import Any, Callable, Dict, Iterable, List, Set, TypeVar
 
-
 FOLLOW = 'follow'
 NOFOLLOW = 'nofollow'
 EXCLUDE = 'exclude'

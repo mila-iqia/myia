@@ -31,20 +31,20 @@ Block
 """
 
 import ast
-import asttokens
 import inspect
 import textwrap
 import warnings
 from types import FunctionType
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
+import asttokens
+
+from .graph_utils import dfs
 from .info import About, DebugInherit, NamedDebugInfo
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
 from .ir.utils import succ_deeper
 from .prim import ops as primops
-from .utils import ModuleNamespace, ClosureNamespace, OrderedSet
-from .graph_utils import dfs
-
+from .utils import ClosureNamespace, ModuleNamespace, OrderedSet
 
 _parse_cache = {}
 

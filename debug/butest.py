@@ -1,13 +1,14 @@
 
-import os
 import json
-import sys
 import math
-import pytest
+import os
+import sys
 from collections import defaultdict
 from itertools import count
+
+import pytest
+from buche import BucheDb, CodeGlobals, H, Reader, Repl, buche
 from dataclasses import dataclass
-from buche import buche, H, Reader, Repl, CodeGlobals, BucheDb
 
 from .gprint import mcss
 

@@ -1,8 +1,21 @@
 import pytest
-
-from myia.utils.unify import FilterVar, RestrictedVar, Seq, SVar, \
-    Unification, UnificationError, UnionVar, Var, VisitError, \
-    expandlist, noseq, svar, uvar, var, PredicateSet
+from myia.utils.unify import (
+    FilterVar,
+    PredicateSet,
+    RestrictedVar,
+    Seq,
+    SVar,
+    Unification,
+    UnificationError,
+    UnionVar,
+    Var,
+    VisitError,
+    expandlist,
+    noseq,
+    svar,
+    uvar,
+    var,
+)
 
 
 class L(list):

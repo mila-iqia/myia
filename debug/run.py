@@ -28,20 +28,19 @@ Options:
 """
 
 import operator
-from docopt import docopt
 from functools import reduce
-from hrepr import hrepr
 
+from buche import Repl, buche, reader, smart_breakpoint
+from docopt import docopt
+from hrepr import hrepr
 from myia.abstract import InferenceError
+from myia.debug.traceback import print_inference_error
 from myia.opt import lib as optlib
 from myia.utils import merge
-from myia.debug.traceback import print_inference_error
 
-from . import cmd, cfg, typ, steps
 from . import do_inject  # noqa: F401
-from .tools import Options, Not
-from buche import buche, reader, Repl, smart_breakpoint
-
+from . import cfg, cmd, steps, typ
+from .tools import Not, Options
 
 smart_breakpoint()
 

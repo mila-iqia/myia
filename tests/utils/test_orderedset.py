@@ -27,13 +27,12 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
 
+import copy
+import gc
+import pickle
 import sys
-
 import unittest
 import weakref
-import gc
-import copy
-import pickle
 
 from myia.utils.orderedset import OrderedSet
 

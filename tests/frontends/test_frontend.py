@@ -1,8 +1,10 @@
 
 import pytest
-
-from myia.frontends import UnknownFrontend, FrontendLoadingError, \
-    activate_frontend
+from myia.frontends import (
+    FrontendLoadingError,
+    UnknownFrontend,
+    activate_frontend,
+)
 
 
 def test_load_frontend_unknown():

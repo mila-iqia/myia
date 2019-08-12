@@ -1,20 +1,20 @@
 
-import numpy
 import typing
+
+import numpy
 from dataclasses import dataclass
-from numpy import ones as _ones, zeros as _zeros
-from myia.dtype import Array
 from myia.abstract import from_value
 from myia.composite import grad
+from myia.dtype import Array
 from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import array_reduce, scalar_add
 from myia.utils import InferenceError
+from numpy import ones as _ones, zeros as _zeros
 
+from .common import MA, MB, MC, MD
 from .test_compile import parse_compare
 from .test_grad import grad_test
-from .test_infer import infer_std, af64_of, af32_of
-from .common import MA, MB, MC, MD
-
+from .test_infer import af32_of, af64_of, infer_std
 
 MA = MA * 0.1
 MB = MB * 0.1

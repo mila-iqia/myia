@@ -3,15 +3,26 @@
 import weakref
 from itertools import count
 
+from ..abstract import (
+    TYPE,
+    VALUE,
+    AbstractArray,
+    AbstractClassBase,
+    AbstractDict,
+    AbstractKeywordArgument,
+    AbstractScalar,
+    AbstractTaggedUnion,
+    AbstractTuple,
+    AbstractUnion,
+    AbstractValue,
+    abstract_clone,
+    split_type,
+    type_to_abstract,
+)
 from ..dtype import Int
 from ..ir import Constant
 from ..prim import ops as P
-from ..abstract import abstract_clone, AbstractClassBase, AbstractTuple, \
-    AbstractUnion, AbstractTaggedUnion, AbstractScalar, VALUE, TYPE, \
-    AbstractValue, AbstractDict, AbstractArray, type_to_abstract, split_type, \
-    AbstractKeywordArgument
 from ..utils import is_dataclass_type, overload
-
 
 _idx = count()
 _tagmap = weakref.WeakKeyDictionary()

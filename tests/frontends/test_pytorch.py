@@ -1,14 +1,12 @@
 
-import pytest
 import numpy as np
-
+import pytest
 from myia import myia, value_and_grad
 from myia.api import to_device
+from myia.frontends import activate_frontend
 from myia.utils import MyiaTypeError
 
 from ..common import MA
-
-from myia.frontends import activate_frontend
 
 torch = pytest.importorskip("torch")
 nn = torch.nn

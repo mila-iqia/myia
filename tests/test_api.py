@@ -1,21 +1,33 @@
 import numpy as np
-from dataclasses import dataclass
 import pytest
-
+from dataclasses import dataclass
+from myia.abstract import ArrayWrapper
 from myia.api import myia, to_device
 from myia.cconv import closure_convert
+from myia.compile import LoadingError, load_backend
 from myia.dtype import Bool, EnvType
-from myia.abstract import ArrayWrapper
 from myia.ir import clone
-from myia.pipeline import \
-    scalar_parse as parse, scalar_debug_compile as compile
-from myia.pipeline.steps import convert_arg, convert_result, NumpyChecker
+from myia.pipeline import (
+    scalar_debug_compile as compile,
+    scalar_parse as parse,
+)
+from myia.pipeline.steps import NumpyChecker, convert_arg, convert_result
 from myia.prim.py_implementations import tuple_getitem
-from myia.utils import newenv, TaggedValue, InferenceError
-from myia.compile import load_backend, LoadingError
+from myia.utils import InferenceError, TaggedValue, newenv
 
-from .common import Point, Point3D, i64, f64, to_abstract_test, ai64_of, \
-    ai32_of, af64_of, MA, D, Thing
+from .common import (
+    MA,
+    D,
+    Point,
+    Point3D,
+    Thing,
+    af64_of,
+    ai32_of,
+    ai64_of,
+    f64,
+    i64,
+    to_abstract_test,
+)
 
 
 def test_myia():

@@ -1,23 +1,20 @@
 """Linear implementation using NNVM."""
 
-import numpy as np
 from itertools import count
 
 import nnvm.compiler
 import nnvm.symbol as sym
+import numpy as np
 import tvm
 from nnvm.compiler import graph_attr
 from tvm.contrib import graph_runtime
 
 from . import Backend
-
-from ..utils import get_outputs
-from ..transform import CompileGraphs, nonlinear_ops
-
 from ...abstract import AbstractArray
-from ...dtype import type_to_np_dtype, Nil
+from ...dtype import Nil, type_to_np_dtype
 from ...prim import Primitive, ops as P
-
+from ..transform import CompileGraphs, nonlinear_ops
+from ..utils import get_outputs
 
 SIMPLE_MAP = {
     P.scalar_add: sym.elemwise_add,

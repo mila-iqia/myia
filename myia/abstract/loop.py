@@ -1,8 +1,9 @@
 """Asyncio-related code for inference."""
 
 import asyncio
-from contextvars import copy_context
 from collections import deque
+
+from contextvars import copy_context
 
 from .. import dtype
 from ..utils import InferenceError

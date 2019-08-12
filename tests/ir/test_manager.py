@@ -1,11 +1,10 @@
 
-import pytest
-
 from collections import Counter
 
-from myia.pipeline import scalar_parse as parse
+import pytest
 from myia.debug.label import short_labeler
-from myia.ir import manage, GraphManager, GraphCloner, ManagerError
+from myia.ir import GraphCloner, GraphManager, ManagerError, manage
+from myia.pipeline import scalar_parse as parse
 from myia.prim import Primitive
 from myia.utils import OrderedSet
 

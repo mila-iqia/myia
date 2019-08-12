@@ -1,10 +1,10 @@
 
-from buche import buche
-import random
-import hashlib
 import colorsys
+import hashlib
 import os
+import random
 
+from buche import buche
 
 _log = []
 

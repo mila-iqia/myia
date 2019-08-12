@@ -1,23 +1,45 @@
-import pytest
-
-from types import SimpleNamespace
-import numpy as np
 import math
+from types import SimpleNamespace
 
+import numpy as np
+import pytest
 from myia.pipeline import scalar_debug_pipeline
-from myia.prim.py_implementations import setattr as myia_setattr, \
-    tuple_setitem, \
-    shape, reshape, array_map, array_scan, array_reduce, \
-    distribute, dot, partial as myia_partial, identity, _assert_scalar, \
-    switch, scalar_to_array, broadcast_shape, scalar_cast, \
-    env_getitem, env_setitem, env_add, embed, \
-    array_to_scalar, transpose, return_, make_record, \
-    array_getitem, array_setitem, bool_eq, dict_getitem, tuple_getitem, \
-    scalar_max
+from myia.prim.py_implementations import (
+    _assert_scalar,
+    array_getitem,
+    array_map,
+    array_reduce,
+    array_scan,
+    array_setitem,
+    array_to_scalar,
+    bool_eq,
+    broadcast_shape,
+    dict_getitem,
+    distribute,
+    dot,
+    embed,
+    env_add,
+    env_getitem,
+    env_setitem,
+    identity,
+    make_record,
+    partial as myia_partial,
+    reshape,
+    return_,
+    scalar_cast,
+    scalar_max,
+    scalar_to_array,
+    setattr as myia_setattr,
+    shape,
+    switch,
+    transpose,
+    tuple_getitem,
+    tuple_setitem,
+)
 from myia.utils import newenv
 
+from ..common import AA, Point, f16, i64, to_abstract_test
 from ..test_lang import parse_compare
-from ..common import i64, f16, to_abstract_test, Point, AA
 
 
 @parse_compare((2, 7), (4, -6))

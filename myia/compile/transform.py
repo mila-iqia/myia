@@ -1,10 +1,10 @@
 """Transforms a graph into lower-level code."""
 
 from ..abstract import VALUE, to_abstract
-from ..ir import Apply, toposort, Graph, Constant
+from ..ir import Apply, Constant, Graph, toposort
 from ..prim import Primitive, ops as P
-from .vm import FinalVM
 from ..utils import SymbolicKeyInstance
+from .vm import FinalVM
 
 
 def convert_grad(graph):

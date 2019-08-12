@@ -1,11 +1,21 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
+from . import dtype
+from .abstract import (
+    DEAD,
+    POLY,
+    TYPE,
+    VALUE,
+    AbstractClass,
+    AbstractError,
+    AbstractExternal,
+    AbstractJTagged,
+    AbstractScalar,
+    abstract_check,
+)
 from .ir import manage
 from .prim import Primitive, ops as P
-from .utils import overload, ErrorPool
-from .abstract import abstract_check, AbstractClass, AbstractJTagged, \
-    VALUE, TYPE, DEAD, POLY, AbstractError, AbstractExternal, AbstractScalar
-from . import dtype
+from .utils import ErrorPool, overload
 
 
 class ValidationError(Exception):

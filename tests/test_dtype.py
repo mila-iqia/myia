@@ -1,10 +1,19 @@
 
 import pytest
-
-from myia.dtype import Bool, Float, Int, Number, UInt, SymbolicKeyType, \
-    np_dtype_to_type, type_to_np_dtype, Object, pytype_to_myiatype as ptm, \
-    EnvType
-from myia.utils import SymbolicKeyInstance, EnvInstance
+from myia.dtype import (
+    Bool,
+    EnvType,
+    Float,
+    Int,
+    Number,
+    Object,
+    SymbolicKeyType,
+    UInt,
+    np_dtype_to_type,
+    pytype_to_myiatype as ptm,
+    type_to_np_dtype,
+)
+from myia.utils import EnvInstance, SymbolicKeyInstance
 
 
 def test_instantiate():

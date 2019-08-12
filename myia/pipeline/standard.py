@@ -1,17 +1,19 @@
 """Pre-made pipelines."""
 
 
-from ..abstract import Context, AbstractArray
-from ..ir import GraphManager
-from ..prim import py_registry
-from ..abstract import abstract_inferrer_constructors
-from ..pipeline.resources import scalar_object_map, standard_object_map, \
-    standard_method_map, default_convert, ConverterResource, \
-    InferenceResource
-
 from . import steps
+from ..abstract import AbstractArray, Context, abstract_inferrer_constructors
+from ..ir import GraphManager
+from ..pipeline.resources import (
+    ConverterResource,
+    InferenceResource,
+    default_convert,
+    scalar_object_map,
+    standard_method_map,
+    standard_object_map,
+)
+from ..prim import py_registry
 from .pipeline import PipelineDefinition
-
 
 standard_resources = dict(
     manager=GraphManager.partial(),

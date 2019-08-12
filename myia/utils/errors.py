@@ -2,7 +2,6 @@
 
 from contextvars import ContextVar
 
-
 infer_trace = ContextVar('infer_trace')
 infer_trace.set({})
 

@@ -1,6 +1,5 @@
 import pytest
-
-from myia.utils import TypeMap, Overload
+from myia.utils import Overload, TypeMap
 
 
 def test_typemap():
