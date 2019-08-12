@@ -2278,3 +2278,47 @@ def test_is(x, y):
 )
 def test_is_not(x, y):
     return x is not y
+
+
+@infer(
+    (af32_of(1, 3, 4, 5), af32_of(3, 1, 3, 3), Shp(2, 3), Shp(3, 2),
+     Shp(3, 4), u64, af32_of(1, 3, 2, 1)),
+    (af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3), Shp(2, 3), Shp(3, 2),
+     Shp(3, 4), u64, af32_of(2, 3, 2, 1)),
+    (af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3), Shp(2, 3, 4), Shp(3, 2),
+     Shp(3, 4), u64, InferenceError),
+    (af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3), Shp(2, 3), Shp(3, 2, 4),
+     Shp(3, 4), u64, InferenceError),
+    (af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3), Shp(2, 3), Shp(3, 2),
+     Shp(3, 4, 2), u64, InferenceError),
+)
+def test_conv2d(i, w, s, p, d, g):
+    return P.conv2d(i, w, s, p, d, g)
+
+
+@infer(
+    (Shp(1, 3, 4, 5), af32_of(3, 1, 3, 3), af32_of(1, 3, 2, 1), Shp(2, 3),
+     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(1, 3, 4, 5)),
+    (Shp(2, 3, 4, 5), af32_of(3, 1, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
+     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(2, 3, 4, 5)),
+    (Shp(2, 6, 4, 5), af32_of(3, 2, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
+     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(2, 6, 4, 5)),
+    (Shp(2, 1, 4, 5), af32_of(3, 1, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
+     Shp(3, 2), Shp(3, 4), S(1, u64), af32_of(2, 1, 4, 5)),
+)
+def test_conv2d_input_grad(i_s, w, g_o, s, p, d, g):
+    return P.conv2d_input_grad(i_s, w, g_o, s, p, d, g)
+
+
+@infer(
+    (af32_of(1, 3, 4, 5), Shp(3, 1, 3, 3), af32_of(1, 3, 2, 1), Shp(2, 3),
+     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(3, 1, 3, 3)),
+    (af32_of(2, 3, 4, 5), Shp(3, 1, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
+     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(3, 1, 3, 3)),
+    (af32_of(2, 6, 4, 5), Shp(3, 2, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
+     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(3, 2, 3, 3)),
+    (af32_of(2, 1, 4, 5), Shp(3, 1, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
+     Shp(3, 2), Shp(3, 4), S(1, u64), af32_of(3, 1, 3, 3)),
+)
+def test_conv2d_weight_grad(i, w_s, g_o, s, p, d, g):
+    return P.conv2d_weight_grad(i, w_s, g_o, s, p, d, g)

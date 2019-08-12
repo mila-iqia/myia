@@ -634,10 +634,6 @@ class Z(nn.Module):
 
 
 def test_torch_zeros_like():
-    backend = 'pytorch'
-    backend_options = get_backend_options(args, backend)
-
-    torch.manual_seed(123)
     model = Z()
 
     inp = torch.Tensor(MA(2, 3, dtype=args.dtype))
@@ -661,3 +657,347 @@ def test_torch_zeros_like():
     output = step(model, inp)
     assert torch.allclose(output, torch.zeros_like(inp))
 #"""
+
+
+def test_conv2d_fwd():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = torch.randn(1, 1, 3, 3, dtype=getattr(torch, args.dtype),
+                        requires_grad=True)
+    weight = torch.randn(1, 1, 2, 2, dtype=getattr(torch, args.dtype),
+                         requires_grad=True)
+
+    def model(inp, w):
+        return torch.nn.functional.conv2d(inp, w, None, 1, 0, 1, 1)
+
+    pt_out = model(input, weight)
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(inp, w):
+        return model(inp, w)
+    my_out = step(input, weight)
+
+    assert torch.allclose(my_out, pt_out)
+
+
+def test_conv2d_module_grad():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = nn.Parameter(torch.randn(2, 6, 4, 5,
+                                     dtype=getattr(torch, args.dtype),
+                                     requires_grad=True))
+    weight = nn.Parameter(torch.randn(3, 2, 3, 3,
+                                      dtype=getattr(torch, args.dtype),
+                                      requires_grad=True))
+
+    bias = nn.Parameter(torch.randn(3, dtype=getattr(torch, args.dtype),
+                                    requires_grad=True))
+
+    class Conv2dMod(nn.Module):
+        def __init__(self):
+            super(Conv2dMod, self).__init__()
+
+        def forward(self, inp, w, b):
+            return torch.nn.functional.conv2d(
+                inp, w, b, (2, 3), (3, 2), (3, 4), 3)
+
+    def cost(_model, inp, w, b):
+        value = _model(inp, w, b)
+        return torch.sum(value)
+
+    model = Conv2dMod()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(_model, inp, w, b):
+        _cost, dinp, dw, db = value_and_grad(
+            cost, 'inp', 'w', 'b')(_model, inp, w, b)
+        return _cost, dinp, dw, db
+    my_out_cost, my_out_dinp_grad, my_out_dw_grad, my_out_db_grad = step(
+        model, input, weight, bias)
+
+    pt_cost = cost(model, input, weight, bias)
+    if input.grad is not None:
+        input.grad.data.zero_()
+    if weight.grad is not None:
+        weight.grad.data.zero_()
+    if bias.grad is not None:
+        bias.grad.data.zero_()
+
+    pt_cost.backward()
+
+    assert torch.allclose(my_out_dinp_grad, input.grad.data)
+    assert torch.allclose(my_out_dw_grad, weight.grad.data)
+    assert torch.allclose(my_out_db_grad, bias.grad.data)
+
+
+def test_conv2d_module_grad__non_tuple_args():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = nn.Parameter(torch.randn(2, 6, 4, 5,
+                                     dtype=getattr(torch, args.dtype),
+                                     requires_grad=True))
+    weight = nn.Parameter(torch.randn(3, 2, 3, 3,
+                                      dtype=getattr(torch, args.dtype),
+                                      requires_grad=True))
+
+    bias = nn.Parameter(torch.randn(3, dtype=getattr(torch, args.dtype),
+                                    requires_grad=True))
+
+    class Conv2dMod(nn.Module):
+        def __init__(self):
+            super(Conv2dMod, self).__init__()
+
+        def forward(self, inp, w, b):
+            return torch.nn.functional.conv2d(
+                inp, w, b, 2, 3, 4, 3)
+
+    def cost(_model, inp, w, b):
+        value = _model(inp, w, b)
+        return torch.sum(value)
+
+    model = Conv2dMod()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(_model, inp, w, b):
+        _cost, dinp, dw, db = value_and_grad(
+            cost, 'inp', 'w', 'b')(_model, inp, w, b)
+        return _cost, dinp, dw, db
+    my_out_cost, my_out_dinp_grad, my_out_dw_grad, my_out_db_grad = step(
+        model, input, weight, bias)
+
+    pt_cost = cost(model, input, weight, bias)
+    if input.grad is not None:
+        input.grad.data.zero_()
+    if weight.grad is not None:
+        weight.grad.data.zero_()
+    if bias.grad is not None:
+        bias.grad.data.zero_()
+
+    pt_cost.backward()
+
+    assert torch.allclose(my_out_dinp_grad, input.grad.data)
+    assert torch.allclose(my_out_dw_grad, weight.grad.data)
+    assert torch.allclose(my_out_db_grad, bias.grad.data)
+
+
+def test_conv2d_module_grad__group2():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = nn.Parameter(torch.randn(2, 3, 4, 5,
+                                     dtype=getattr(torch, args.dtype),
+                                     requires_grad=True))
+    weight = nn.Parameter(torch.randn(3, 1, 3, 3,
+                                      dtype=getattr(torch, args.dtype),
+                                      requires_grad=True))
+
+    bias = nn.Parameter(torch.randn(3, dtype=getattr(torch, args.dtype),
+                                    requires_grad=True))
+
+    class Conv2dMod(nn.Module):
+        def __init__(self):
+            super(Conv2dMod, self).__init__()
+
+        def forward(self, inp, w, b):
+            return torch.nn.functional.conv2d(
+                inp, w, b, (2, 3), (3, 2), (3, 4), 3)
+
+    def cost(_model, inp, w, b):
+        value = _model(inp, w, b)
+        return torch.sum(value)
+
+    model = Conv2dMod()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(_model, inp, w, b):
+        _cost, dinp, dw, db = value_and_grad(
+            cost, 'inp', 'w', 'b')(_model, inp, w, b)
+        return _cost, dinp, dw, db
+    my_out_cost, my_out_dinp_grad, my_out_dw_grad, my_out_db_grad = step(
+        model, input, weight, bias)
+
+    pt_cost = cost(model, input, weight, bias)
+    if input.grad is not None:
+        input.grad.data.zero_()
+    if weight.grad is not None:
+        weight.grad.data.zero_()
+    if bias.grad is not None:
+        bias.grad.data.zero_()
+
+    pt_cost.backward()
+
+    assert torch.allclose(my_out_dinp_grad, input.grad.data)
+    assert torch.allclose(my_out_dw_grad, weight.grad.data)
+    assert torch.allclose(my_out_db_grad, bias.grad.data)
+
+
+def test_conv2d_module_grad__group3():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = nn.Parameter(torch.randn(2, 1, 4, 5, dtype=getattr(
+        torch, args.dtype), requires_grad=True))
+    weight = nn.Parameter(torch.randn(
+        3, 1, 3, 3, dtype=getattr(torch, args.dtype), requires_grad=True))
+
+    bias = nn.Parameter(torch.randn(3, dtype=getattr(
+        torch, args.dtype), requires_grad=True))
+
+    class Conv2dMod(nn.Module):
+        def __init__(self):
+            super(Conv2dMod, self).__init__()
+
+        def forward(self, inp, w, b):
+            return torch.nn.functional.conv2d(
+                inp, w, b, (2, 3), (3, 2), (3, 4), 1)
+
+    def cost(_model, inp, w, b):
+        value = _model(inp, w, b)
+        return torch.sum(value)
+
+    model = Conv2dMod()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(_model, inp, w, b):
+        _cost, dinp, dw, db = value_and_grad(
+            cost, 'inp', 'w', 'b')(_model, inp, w, b)
+        return _cost, dinp, dw, db
+    my_out_cost, my_out_dinp_grad, my_out_dw_grad, my_out_db_grad = step(
+        model, input, weight, bias)
+
+    pt_cost = cost(model, input, weight, bias)
+    if input.grad is not None:
+        input.grad.data.zero_()
+    if weight.grad is not None:
+        weight.grad.data.zero_()
+    if bias.grad is not None:
+        bias.grad.data.zero_()
+
+    pt_cost.backward()
+
+    assert torch.allclose(my_out_dinp_grad, input.grad.data)
+    assert torch.allclose(my_out_dw_grad, weight.grad.data)
+    assert torch.allclose(my_out_db_grad, bias.grad.data)
+
+
+def test_conv2d_module_grad_no_bias():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = nn.Parameter(torch.randn(2, 6, 4, 5, dtype=getattr(
+        torch, args.dtype), requires_grad=True))
+    weight = nn.Parameter(torch.randn(
+        3, 2, 3, 3, dtype=getattr(torch, args.dtype), requires_grad=True))
+
+    class Conv2dMod(nn.Module):
+        def __init__(self):
+            super(Conv2dMod, self).__init__()
+
+        def forward(self, inp, w):
+            return torch.nn.functional.conv2d(
+                inp, w, None, (2, 3), (3, 2), (3, 4), 3)
+
+    def cost(_model, inp, w):
+        value = _model(inp, w)
+        return torch.sum(value)
+
+    model = Conv2dMod()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(_model, inp, w):
+        _cost, dinp, dw = value_and_grad(cost, 'inp', 'w')(_model, inp, w)
+        return _cost, dinp, dw
+    my_out_cost, my_out_dinp_grad, my_out_dw_grad = step(model, input, weight)
+
+    pt_cost = cost(model, input, weight)
+    if input.grad is not None:
+        input.grad.data.zero_()
+    if weight.grad is not None:
+        weight.grad.data.zero_()
+    pt_cost.backward()
+
+    assert torch.allclose(my_out_dinp_grad, input.grad.data)
+    assert torch.allclose(my_out_dw_grad, weight.grad.data)
+
+
+# TODO: torch.zeros need to be supported in order to support this
+'''
+def test_nn_conv2d_update():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = torch.randn(2,6,4,5, dtype=getattr(torch, args.dtype))
+
+    class Conv2dMod(nn.Module):
+        def __init__(self):
+            super(Conv2dMod, self).__init__()
+
+            self.conv1 = nn.Conv2d(6, 3, (4, 5), (2,3), (3,2), (3,4), 3)
+
+        def forward(self, inp):
+            return self.conv1(inp)
+
+    def cost(model, inp):
+        value = model(inp)
+        return torch.sum(value)
+
+    model = Conv2dMod()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model, inp):
+        _cost, dmodel = value_and_grad(cost, 'model')(model, inp)
+        return _cost, model - dmodel
+    loss, model = step(model, input)
+
+    pt_cost = cost(model, input)
+    """
+    if input.grad is not None:
+        input.grad.data.zero_()
+    if weight.grad is not None:
+        weight.grad.data.zero_()
+    if bias.grad is not None:
+        bias.grad.data.zero_()
+
+    pt_cost.backward()
+    #"""
+
+    #assert torch.allclose(my_out_dinp_grad, input.grad.data)
+    #assert torch.allclose(my_out_dw_grad, weight.grad.data)
+    #assert torch.allclose(my_out_db_grad, bias.grad.data)
+#'''
+
+
+# TODO: Should this eventually be in a different test file?
+#       It's currently here because it needs to have 'torch' imported.
+def test_conv_grad_errors():
+    from myia.compile.backends.pytorch_conv_grad import conv2d_input
+
+    torch.manual_seed(123)
+    input_size = (2, 6, 4, 5)
+    weight = torch.randn(3, 2, 3, 3)
+    grad_output = torch.ones(2, 3, 2, 1)
+    with pytest.raises(ValueError):
+        conv2d_input(None, weight, grad_output, (2, 3), (3, 2), (3, 4), 3)
+    with pytest.raises(ValueError):
+        conv2d_input((2, 2, 6, 4, 5), weight, grad_output,
+                     (2, 3), (3, 2), (3, 4), 3)
+    with pytest.raises(ValueError):
+        conv2d_input(input_size, weight, torch.ones(9, 9, 9, 9),
+                     (2, 3), (3, 2), (3, 4), 3)

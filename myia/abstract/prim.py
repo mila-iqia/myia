@@ -92,7 +92,7 @@ class StandardInferrer(Inferrer):
             if typ is None:
                 pass
             elif isinstance(typ, dtype.TypeMeta):
-                await force_pending(engine.check(typ, type_token(arg)))
+                await force_pending(engine.check(typ, type_token(arg), typ))
             elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
@@ -253,6 +253,14 @@ def _shape_type(engine, shp):
     shp_t = engine.check(AbstractTuple, shp)
     for elem_t in shp_t.elements:
         engine.abstract_merge(dtype.UInt[64], elem_t.values[TYPE])
+    return shp_t
+
+
+def _shape_type_pair(engine, shp):
+    shp_t = _shape_type(engine, shp)
+    if len(shp_t.elements) != 2:
+        raise MyiaTypeError(f'Expected Tuple Length 2, not Tuple Length'
+                            f'{len(shp_t.elements)}')
     return shp_t
 
 
@@ -634,6 +642,69 @@ async def _inf_dot(self, engine, a: AbstractArray, b: AbstractArray):
 
     return type(a)(a.element, {SHAPE: c_shp})
 
+
+@standard_prim(P.conv2d)
+async def _inf_conv2d(self, engine, input: AbstractArray,
+                      weight: AbstractArray, stride: _shape_type_pair,
+                      padding: _shape_type_pair, dilation: _shape_type_pair,
+                      groups: dtype.UInt[64]):
+
+    # TODO: _shape_type should not allow float to be converted to uint
+    # TODO: "groups: UInt[64]" should not allow float to be converted to uint
+
+    h_in, w_in = input.values[SHAPE][2:]
+    kernel_size = weight.values[SHAPE][2:]
+
+    stride = tuple(self.require_constant(e, argnum=f'"2:stride[{edx}]"')
+                   for edx, e in enumerate(stride.elements))
+    padding = tuple(self.require_constant(e, argnum=f'"3:padding[{edx}]"')
+                    for edx, e in enumerate(padding.elements))
+    dilation = tuple(self.require_constant(e, argnum=f'"4:dilation[{edx}]"')
+                     for edx, e in enumerate(dilation.elements))
+
+    N = input.values[SHAPE][0]
+    C_out = weight.values[SHAPE][0]
+
+    # Based on formulae in shape section of:
+    # https://pytorch.org/docs/stable/nn.html#conv2d
+    H_out = ((h_in + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1)
+             // stride[0]) + 1
+    W_out = ((w_in + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1)
+             // stride[1]) + 1
+
+    out_shape = (N, C_out, int(H_out), int(W_out))
+
+    # Checks all elements of input have same dtype as all elements of weight
+    engine.check(AbstractScalar, input.element, weight.element)
+    # ^ TODO: PyTorch also enforces, but might want to change for mixed precis
+
+    return type(weight)(weight.element, {SHAPE: out_shape})
+
+
+@standard_prim(P.conv2d_input_grad)
+async def _inf_conv2d_input_grad(self, engine, input_size: _shape_type,
+                                 weight: AbstractArray,
+                                 grad_output: AbstractArray,
+                                 stride: _shape_type_pair,
+                                 padding: _shape_type_pair,
+                                 dilation: _shape_type_pair,
+                                 groups: dtype.UInt[64]):
+    input_size_tuple = tuple(
+        self.require_constant(i_s, argnum=0) for i_s in input_size.elements)
+    return type(weight)(weight.element, {SHAPE: input_size_tuple})
+
+
+@standard_prim(P.conv2d_weight_grad)
+async def _inf_conv2d_weight_grad(self, engine, input: AbstractArray,
+                                  weight_size: _shape_type,
+                                  grad_output: AbstractArray,
+                                  stride: _shape_type_pair,
+                                  padding: _shape_type_pair,
+                                  dilation: _shape_type_pair,
+                                  groups: dtype.UInt[64]):
+    weight_size_tuple = tuple(
+        self.require_constant(w_s, argnum=0) for w_s in weight_size.elements)
+    return type(input)(input.element, {SHAPE: weight_size_tuple})
 
 ##############
 # Statements #

@@ -15,7 +15,7 @@
 #           pytorch original.                                               #
 #############################################################################
 
-from .. import composite as C
+from .. import composite as C, dtype as D
 from ..composite import core
 from ..hypermap import hyper_map
 from ..ir import MultitypeGraph
@@ -27,6 +27,34 @@ from .pytorch_abstract_types import APT
 
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############
+
+# This is a helper function
+@core
+def _pair(x):
+    if not P.hastype(x, D.TupleT):
+        x = (x, x)
+    return x
+
+
+@core
+def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
+           groups=1):
+    r"""Applies a Conv2d."""
+    # noqa: D202
+    """
+    # This is for later versions of pytorch that support other paddings?
+    if padding_mode != 'zeros':
+        raise Exception("'zeros' is the only padding_mode that is currently
+                        supported.")
+    #"""
+
+    stride = _pair(stride)
+    padding = _pair(padding)
+    dilation = _pair(dilation)
+    ret = P.conv2d(input, weight, stride, padding, dilation, groups)
+    if bias is not None:
+        ret = ret + bias.reshape((1, bias.shape[0], 1, 1))
+    return ret
 
 
 @core
