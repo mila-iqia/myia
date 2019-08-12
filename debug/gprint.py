@@ -63,8 +63,6 @@ except ImportError:
         pass
 
 
-
-
 gcss_path = f'{os.path.dirname(__file__)}/graph.css'
 gcss = open(gcss_path).read()
 
