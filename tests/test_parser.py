@@ -3,6 +3,7 @@ import sys
 import warnings
 
 import pytest
+
 from myia.debug.traceback import myia_warning
 from myia.parser import (
     MyiaDisconnectedCodeWarning,

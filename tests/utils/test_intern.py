@@ -1,6 +1,8 @@
 
-import pytest
 from dataclasses import dataclass
+
+import pytest
+
 from myia.utils import (
     AttrEK,
     IncompleteException,

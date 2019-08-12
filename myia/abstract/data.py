@@ -2,10 +2,10 @@
 
 
 import re
+from dataclasses import dataclass
 from typing import List, Tuple
 
 import prettyprinter as pp
-from dataclasses import dataclass
 from prettyprinter.prettyprinter import pretty_python_value
 
 from ..ir import Graph, MetaGraph

@@ -1,7 +1,6 @@
 """Tools to handle contexts and references in inference."""
 
 import asyncio
-
 from dataclasses import dataclass
 
 from .loop import force_pending

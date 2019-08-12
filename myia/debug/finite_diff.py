@@ -2,10 +2,10 @@
 
 
 import itertools
+from dataclasses import is_dataclass
 from typing import Any, Callable, Dict, List
 
 import numpy
-from dataclasses import is_dataclass
 
 from ..utils import overload, smap
 

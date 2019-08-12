@@ -1,5 +1,6 @@
 
 import pytest
+
 from myia import operations
 from myia.ir import Constant, GraphCloner, isomorphic
 from myia.opt import (

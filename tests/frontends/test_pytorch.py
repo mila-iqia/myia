@@ -1,6 +1,7 @@
 
 import numpy as np
 import pytest
+
 from myia import myia, value_and_grad
 from myia.api import to_device
 from myia.frontends import activate_frontend

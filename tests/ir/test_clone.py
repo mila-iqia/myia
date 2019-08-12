@@ -1,5 +1,6 @@
 
 import pytest
+
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs
 from myia.ir import (

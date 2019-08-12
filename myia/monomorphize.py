@@ -5,10 +5,9 @@ function may be called with.
 """
 
 from collections import defaultdict
+from dataclasses import dataclass, replace as dc_replace
 from itertools import chain, count
 from typing import Optional
-
-from dataclasses import dataclass, replace as dc_replace
 
 from .abstract import (
     DEAD,

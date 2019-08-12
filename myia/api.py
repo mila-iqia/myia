@@ -3,8 +3,8 @@
 import inspect
 
 import numpy as np
-from myia import dtype
 
+from . import dtype
 from .abstract import (
     TYPE,
     AbstractArray,

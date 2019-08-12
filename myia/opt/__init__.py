@@ -1,23 +1,15 @@
 """Optimization submodule."""
 
+from .clean import simplify_types, type_to_tag  # noqa
+from .cse import CSE, cse  # noqa
+from .dde import DeadDataElimination  # noqa
 from .opt import (  # noqa
-    VarNode, sexp_to_node, sexp_to_graph,
-    PatternSubstitutionOptimization,
-    NodeMap, pattern_replacer,
-    LocalPassOptimizer,
     GraphTransform,
-)
-
-from .cse import (  # noqa
-    cse,
-    CSE,
-)
-
-from .clean import (  # noqa
-    type_to_tag, simplify_types
-)
-
-
-from .dde import (  # noqa
-    DeadDataElimination,
+    LocalPassOptimizer,
+    NodeMap,
+    PatternSubstitutionOptimization,
+    VarNode,
+    pattern_replacer,
+    sexp_to_graph,
+    sexp_to_node,
 )

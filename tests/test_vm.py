@@ -1,4 +1,5 @@
 import numpy as np
+
 from myia.composite import list_reduce
 from myia.pipeline import scalar_debug_compile as compile
 from myia.prim.py_implementations import (

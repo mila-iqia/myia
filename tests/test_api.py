@@ -1,6 +1,8 @@
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
-from dataclasses import dataclass
+
 from myia.abstract import ArrayWrapper
 from myia.api import myia, to_device
 from myia.cconv import closure_convert

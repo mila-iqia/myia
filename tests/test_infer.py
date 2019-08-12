@@ -1,11 +1,12 @@
 
 import operator
+from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import List, Tuple
 
 import numpy as np
 import pytest
-from dataclasses import dataclass
+
 from myia import abstract
 from myia.abstract import (
     ANYTHING,

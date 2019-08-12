@@ -1,4 +1,5 @@
 import pytest
+
 from myia.utils import Overload, TypeMap
 
 

@@ -1,6 +1,8 @@
 from copy import copy
 
 import numpy as np
+from pytest import mark
+
 from myia.abstract import from_value
 from myia.pipeline import standard_pipeline
 from myia.prim import ops as P
@@ -12,7 +14,6 @@ from myia.prim.py_implementations import (
     typeof,
 )
 from myia.utils import Profile, no_prof
-from pytest import mark
 
 from .common import Point, make_tree, sumtree, to_abstract_test
 

@@ -1,5 +1,6 @@
 
 import pytest
+
 from myia.dtype import (
     Bool,
     EnvType,

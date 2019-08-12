@@ -1,6 +1,7 @@
+from pytest import mark
+
 from myia.ir import manage
 from myia.pipeline import standard_debug_pipeline
-from pytest import mark
 
 cconv_pipeline = standard_debug_pipeline \
     .select('parse', 'resolve', 'cconv', 'export')

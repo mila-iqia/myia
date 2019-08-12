@@ -2,9 +2,8 @@
 
 
 import operator
-from functools import reduce
-
 from dataclasses import dataclass
+from functools import reduce
 
 from .abstract import (
     ANYTHING,

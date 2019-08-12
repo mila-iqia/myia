@@ -4,6 +4,8 @@ from types import FunctionType
 
 import numpy as np
 import pytest
+from pytest import mark
+
 from myia.abstract import from_value
 from myia.abstract.data import ANYTHING, SHAPE, TYPE, VALUE, AbstractScalar
 from myia.debug.finite_diff import clean_args
@@ -12,7 +14,6 @@ from myia.frontends.pytorch_abstract_types import \
     AbstractPyTorchTensor  # noqa: E402
 from myia.pipeline import standard_pipeline
 from myia.utils import Profile  # , no_prof
-from pytest import mark
 
 from ..common import MA, f32, to_abstract_test
 from ..test_grad import grad_pipeline, grad_wrap

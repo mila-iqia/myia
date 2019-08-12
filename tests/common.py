@@ -1,8 +1,9 @@
 
 import typing
+from dataclasses import dataclass, is_dataclass
 
 import numpy as np
-from dataclasses import dataclass, is_dataclass
+
 from myia import dtype
 from myia.abstract import (
     ANYTHING,

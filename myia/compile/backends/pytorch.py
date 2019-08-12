@@ -4,10 +4,10 @@ import numpy as np
 import torch
 import torch.utils.dlpack
 
-from . import Backend
 from ...dtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ...prim import Primitive, ops as P
 from ..transform import CompileGraphs, nonlinear_ops
+from . import Backend
 
 _type_map = {
     Int[8]: torch.int8,

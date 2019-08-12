@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+
 from myia.pipeline import scalar_debug_pipeline
 from myia.prim.py_implementations import (
     _assert_scalar,

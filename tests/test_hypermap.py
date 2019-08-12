@@ -1,5 +1,6 @@
 
 import numpy
+
 # composite has to be imported before hypermap because of circular import
 # shenanigans
 from myia import composite  # noqa

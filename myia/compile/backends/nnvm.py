@@ -9,12 +9,12 @@ import tvm
 from nnvm.compiler import graph_attr
 from tvm.contrib import graph_runtime
 
-from . import Backend
 from ...abstract import AbstractArray
 from ...dtype import Nil, type_to_np_dtype
 from ...prim import Primitive, ops as P
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
+from . import Backend
 
 SIMPLE_MAP = {
     P.scalar_add: sym.elemwise_add,

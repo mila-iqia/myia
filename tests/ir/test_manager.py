@@ -2,6 +2,7 @@
 from collections import Counter
 
 import pytest
+
 from myia.debug.label import short_labeler
 from myia.ir import GraphCloner, GraphManager, ManagerError, manage
 from myia.pipeline import scalar_parse as parse

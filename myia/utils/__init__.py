@@ -1,45 +1,85 @@
 """General utilities."""
 
-from .env import (  # noqa
-    smap, SymbolicKeyInstance, EnvInstance, newenv
-)
-
+from .env import EnvInstance, SymbolicKeyInstance, newenv, smap  # noqa
 from .errors import (  # noqa
-    infer_trace, InferenceError, MyiaTypeError, MyiaShapeError,
-    type_error_nargs, check_nargs, TypeMismatchError, MyiaInputTypeError,
+    InferenceError,
+    MyiaInputTypeError,
+    MyiaShapeError,
+    MyiaTypeError,
+    TypeMismatchError,
+    check_nargs,
+    infer_trace,
+    type_error_nargs,
 )
-
 from .intern import (  # noqa
-    Interned, InternedMC, EqKey, Atom, AttrEK, ItemEK, eqkey, deep_eqkey,
-    RecursionException, eq, hash, hashrec, eqrec, IncompleteException,
-    PossiblyRecursive, intern,
+    Atom,
+    AttrEK,
+    EqKey,
+    IncompleteException,
+    Interned,
+    InternedMC,
+    ItemEK,
+    PossiblyRecursive,
+    RecursionException,
+    deep_eqkey,
+    eq,
+    eqkey,
+    eqrec,
+    hash,
+    hashrec,
+    intern,
 )
-
 from .merge import (  # noqa
-    DELETE, MergeMode, Merge, Reset, Override,
-    merge, cleanup
+    DELETE,
+    Merge,
+    MergeMode,
+    Override,
+    Reset,
+    cleanup,
+    merge,
 )
-
 from .misc import (  # noqa
-    Cons, Empty, list_to_cons,
-    ADT, Named, MISSING, UNKNOWN, Registry, repr_, list_str, keyword_decorator,
-    Event, Events, NS, Namespace, ModuleNamespace, ClosureNamespace, eprint,
-    is_dataclass_type, dataclass_methods, ErrorPool, TaggedValue, Slice
+    ADT,
+    MISSING,
+    NS,
+    UNKNOWN,
+    ClosureNamespace,
+    Cons,
+    Empty,
+    ErrorPool,
+    Event,
+    Events,
+    ModuleNamespace,
+    Named,
+    Namespace,
+    Registry,
+    Slice,
+    TaggedValue,
+    dataclass_methods,
+    eprint,
+    is_dataclass_type,
+    keyword_decorator,
+    list_str,
+    list_to_cons,
+    repr_,
 )
-
-from .overload import (  # noqa
-    TypeMap, Overload, overload, overload_wrapper
-)
-
-from .partial import (  # noqa
-    partition_keywords, Partial, Partializable
-)
-
-from .profile import Profile, no_prof, print_profile  # noqa
-
-from .unify import (  # noqa
-    Unification, Var, Seq, SVar, UnionVar, RestrictedVar, PredicateSet,
-    FilterVar, var, svar, uvar, expandlist, noseq, VisitError
-)
-
 from .orderedset import OrderedSet  # noqa
+from .overload import Overload, TypeMap, overload, overload_wrapper  # noqa
+from .partial import Partial, Partializable, partition_keywords  # noqa
+from .profile import Profile, no_prof, print_profile  # noqa
+from .unify import (  # noqa
+    FilterVar,
+    PredicateSet,
+    RestrictedVar,
+    Seq,
+    SVar,
+    Unification,
+    UnionVar,
+    Var,
+    VisitError,
+    expandlist,
+    noseq,
+    svar,
+    uvar,
+    var,
+)

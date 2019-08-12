@@ -1,4 +1,5 @@
 import pytest
+
 from myia.utils.unify import (
     FilterVar,
     PredicateSet,

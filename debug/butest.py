@@ -4,11 +4,12 @@ import math
 import os
 import sys
 from collections import defaultdict
+from dataclasses import dataclass
 from itertools import count
 
 import pytest
+
 from buche import BucheDb, CodeGlobals, H, Reader, Repl, buche
-from dataclasses import dataclass
 
 from .gprint import mcss
 

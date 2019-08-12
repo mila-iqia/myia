@@ -1,7 +1,6 @@
 """Pre-made pipelines."""
 
 
-from . import steps
 from ..abstract import AbstractArray, Context, abstract_inferrer_constructors
 from ..ir import GraphManager
 from ..pipeline.resources import (
@@ -13,6 +12,7 @@ from ..pipeline.resources import (
     standard_object_map,
 )
 from ..prim import py_registry
+from . import steps
 from .pipeline import PipelineDefinition
 
 standard_resources = dict(

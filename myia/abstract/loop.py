@@ -2,7 +2,6 @@
 
 import asyncio
 from collections import deque
-
 from contextvars import copy_context
 
 from .. import dtype

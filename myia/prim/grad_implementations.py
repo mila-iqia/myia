@@ -4,7 +4,6 @@ Each primitive is associated to an augmented function, which returns a pair of
 the (augmented) original primitive's output and a backpropagator function.
 """
 
-from . import ops as primops
 from ..abstract import AbstractFunction, GraphFunction
 from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
@@ -12,6 +11,7 @@ from ..info import About, NamedDebugInfo
 from ..ir import Constant, Graph, MetaGraph, clone, manage
 from ..pipeline import standard_pipeline
 from ..utils import Registry, newenv
+from . import ops as primops
 from .py_implementations import (
     J,
     Jinv,

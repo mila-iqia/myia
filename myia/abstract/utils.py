@@ -1,12 +1,12 @@
 """Utilities for abstract values and inference."""
 
 import typing
+from dataclasses import dataclass
 from functools import reduce
 from itertools import chain
 from types import AsyncGeneratorType, GeneratorType
 
 import numpy as np
-from dataclasses import dataclass
 
 from .. import dtype
 from ..utils import (

@@ -2,10 +2,10 @@
 
 import asyncio
 import typing
+from dataclasses import is_dataclass, replace as dc_replace
 from functools import reduce
 
 import numpy as np
-from dataclasses import is_dataclass, replace as dc_replace
 
 from .. import dtype
 from ..info import About

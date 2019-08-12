@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+
 from myia.abstract import (
     ANYTHING as ANY,
     TYPE,

@@ -2,8 +2,9 @@
 from copy import copy
 from types import SimpleNamespace
 
-from myia.pipeline import standard_debug_pipeline
 from pytest import mark
+
+from myia.pipeline import standard_debug_pipeline
 
 from .common import Point, mysum
 

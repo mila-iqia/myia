@@ -1,5 +1,6 @@
 
 import pytest
+
 from myia.pipeline import scalar_parse, scalar_pipeline
 from myia.prim import ops as P
 from myia.prim.py_implementations import make_record, partial

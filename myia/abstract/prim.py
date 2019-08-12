@@ -7,7 +7,6 @@ from functools import reduce
 from operator import getitem
 
 from .. import dtype
-from ..abstract import typecheck
 from ..dtype import Bool, ExceptionType, Number
 from ..ir import CloneRemapper, Graph, GraphCloner, MetaGraph
 from ..prim import Primitive, ops as P, py_implementations as py
@@ -61,6 +60,7 @@ from .utils import (
     sensitivity_transform,
     type_to_abstract,
     type_token,
+    typecheck,
 )
 
 abstract_inferrer_constructors = {}

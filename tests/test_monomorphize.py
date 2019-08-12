@@ -1,5 +1,7 @@
 
 import numpy as np
+from pytest import mark
+
 from myia.abstract import from_value
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
@@ -21,7 +23,6 @@ from myia.prim.py_implementations import (
 )
 from myia.utils import InferenceError, overload
 from myia.validate import ValidationError
-from pytest import mark
 
 from .common import (
     Point,

@@ -1,4 +1,5 @@
 import numpy as np
+
 from myia.compile.backends import LoadingError, load_backend
 
 

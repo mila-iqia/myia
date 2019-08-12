@@ -1,9 +1,11 @@
 
+from dataclasses import dataclass
 from types import FunctionType
 
 import numpy as np
 import pytest
-from dataclasses import dataclass
+from pytest import mark
+
 from myia.abstract import AbstractJTagged, from_value
 from myia.api import myia
 from myia.composite import grad, value_and_grad
@@ -38,7 +40,6 @@ from myia.prim.py_implementations import (
 )
 from myia.utils import InferenceError
 from myia.validate import validate_abstract, whitelist
-from pytest import mark
 
 from .common import (
     AA,

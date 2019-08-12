@@ -1,5 +1,6 @@
 
 import pytest
+
 from myia.frontends import (
     FrontendLoadingError,
     UnknownFrontend,

@@ -4,7 +4,6 @@ import numpy as np
 import tvm
 from tvm import relay
 
-from . import Backend
 from ...abstract import (
     SHAPE,
     TYPE,
@@ -22,6 +21,7 @@ from ...graph_utils import toposort
 from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...utils import overload
+from . import Backend
 from .relay_helpers import build_module, optimize
 
 

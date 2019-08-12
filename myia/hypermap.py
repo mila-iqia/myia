@@ -1,9 +1,9 @@
 """Generate mapping graphs over classes, tuples, arrays, etc."""
 
+from dataclasses import is_dataclass
 from functools import reduce
 
 import numpy as np
-from dataclasses import is_dataclass
 
 from . import abstract, operations
 from .abstract import broaden

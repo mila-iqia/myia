@@ -6,10 +6,10 @@ from typing import Callable
 
 import numpy as np
 
-from . import ops as primops
 from .. import abstract, dtype as types
 from ..dtype import Bool, Float, Number, pytype_to_myiatype
 from ..utils import Registry, TaggedValue
+from . import ops as primops
 
 py_registry: Registry[primops.Primitive, Callable] = Registry()
 vm_registry: Registry[primops.Primitive, Callable] = Registry()
