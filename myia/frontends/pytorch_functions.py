@@ -20,6 +20,8 @@ from .. import composite as C
 from ..composite import core
 from ..ir import MultitypeGraph
 from ..hypermap import hyper_map
+
+# This import is for WIP
 # from ..dtype import Bool, Int
 
 from .pytorch_abstract_types import APT
@@ -68,7 +70,7 @@ def sigmoid(x):
     return (C.tanh(x / 2) + 1) / 2
 
 
-'''
+''' # WIP
 squeeze = MultitypeGraph('squeeze')
 
 
@@ -115,7 +117,7 @@ def __sum(x):
     return P.array_reduce(P.scalar_add, x, ())
 
 
-'''
+''' # WIP
 @_sum.register(APT, Int)
 @core
 def __sum(x, d):

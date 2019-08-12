@@ -199,8 +199,8 @@ def _to_abstract(self, v: torch.Tensor, context, ref, loop):
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
         {SHAPE: tuple(v.shape)},
-        v.requires_grad,
-        v.retain_grad
+        # v.requires_grad,
+        # v.retain_grad
     )
 
 
@@ -213,8 +213,8 @@ def _to_abstract(self, v: torch.nn.Parameter, context, ref, loop):
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
         {SHAPE: tuple(v.shape)},
-        v.requires_grad,
-        v.retain_grad
+        # v.requires_grad,
+        # v.retain_grad
     )
 
 
@@ -226,8 +226,8 @@ def _to_abstract(self, v: PyTorchTensorWrapper, context, ref, loop):
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
         {SHAPE: tuple(v.shape)},
-        v.requires_grad,
-        v.retain_grad
+        # v.requires_grad,
+        # v.retain_grad
     )
 
 ##############################################################################
@@ -242,7 +242,9 @@ def _pt__convert_arg_init(self, arg, orig_t: AbstractPyTorchTensor, backend):
     if isinstance(arg, torch.Tensor):
         arg = PyTorchTensorWrapper(
             backend.from_dlpack(torch.utils.dlpack.to_dlpack(arg)),
-            arg.dtype, arg.shape, backend, arg.requires_grad, arg.retain_grad)
+            arg.dtype, arg.shape, backend,
+            # arg.requires_grad, arg.retain_grad
+        )
     return arg
 
 ##############################################################################

@@ -23,7 +23,7 @@ def test_pytorch_dtype_to_type():
 
 
 # Uncomment this line to print values at specific precision
-torch.set_printoptions(precision=8)
+# torch.set_printoptions(precision=8)
 
 
 def get_backend_options(args, backend):
@@ -590,6 +590,32 @@ def test_module_2_layer_mlp_seq_update():
 
     for p, ep in zip(model.parameters(), expected_model):
         assert torch.allclose(p, ep)
+
+def test_module_2_layer_mlp_seq_hypermap():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
+    model = MLP_2_Layers_Seq(4, 2, 3)
+    target = torch.Tensor([2.5])
+
+    def mse(value, target):
+        diff = value - target
+        return sum(diff * diff)
+
+    def cost(model, inp, target):
+        value = model(inp)
+        loss = mse(value, target)
+        return loss
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model):
+        return model - model
+    model = step(model)
+    test_ends_here
+    delete_this_test_once_full_sequential_update_is_supported
 #"""
 
 

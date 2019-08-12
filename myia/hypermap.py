@@ -207,9 +207,7 @@ class HyperMap(MetaGraph):
     @_make.register
     def _make(self, a: abstract.AbstractDict, g, fnarg, argmap):
         for a2, isleaf in argmap.values():
-            if not isleaf and len(a2.entries) != len(a.entries):
-                raise MyiaTypeError(f'Dict length mismatch: {a} != {a2}')
-            if a.entries.keys() != a2.entries.keys():
+            if not isleaf and a.entries.keys() != a2.entries.keys():
                 raise MyiaTypeError(f'Dict keys mismatch: {a} != {a2}')
 
         elems = []

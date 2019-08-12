@@ -295,12 +295,6 @@ def bprop_Jinv(x, out, dout):
     return (J(dout),)
 
 
-"""
-def bprop_conv(inp, W, out, dout):
-    conv_grad_wrt_inp(W, out, dout), conv_grad_wrt_weight(inp, out, dout)
-#"""
-
-
 @register_augm(primops.switch)
 def __fprop__switch(jcond, jtb, jfb):
     """Backpropagator for primitive `switch`."""

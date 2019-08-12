@@ -5,19 +5,14 @@ from copy import copy
 from types import FunctionType
 import numpy as np
 
-from myia.abstract import from_value, AbstractJTagged
-from myia.pipeline import standard_resources, standard_pipeline, \
-    PipelineDefinition, steps, pipeline_function
-from myia.composite import grad
+from myia.abstract import from_value
+from myia.pipeline import standard_pipeline
 from myia.debug.finite_diff import clean_args
-from myia.grad import J as realJ
-from myia.pipeline.steps import Validator
-from myia.prim import ops as P, Primitive
 from myia.utils import Profile  # , no_prof
-from myia.validate import whitelist, validate_abstract
 from myia.abstract.data import SHAPE, TYPE, VALUE, ANYTHING, AbstractScalar
 
 from ..common import f32, MA, to_abstract_test
+from ..test_grad import grad_wrap, grad_pipeline
 
 torch = pytest.importorskip("torch")
 nn = torch.nn
@@ -29,12 +24,14 @@ activate_frontend('pytorch')
 from myia.frontends.pytorch_abstract_types import \
     AbstractPyTorchTensor  # noqa: E402
 
-compile_pipeline = standard_pipeline
+fwd_compile_pipeline = standard_pipeline
 
 
 # Uncomment this line to print values at specific precision
-torch.set_printoptions(precision=10)
+# torch.set_printoptions(precision=8)
 
+
+""" # This is for if/when tested with backends besides nnvm
 
 def get_backend_options(args, backend):
     device_type = args.dev
@@ -49,7 +46,6 @@ def get_backend_options(args, backend):
 
     return backend_options
 
-
 # TODO: add relay support
 # TODO: maybe fixture for return_backend=True and return_backend=False
 @pytest.fixture(params=[
@@ -59,83 +55,9 @@ def get_backend_options(args, backend):
 def _backend_fixture(request):
     return request.param
 
-
-class Args():
-
-    def __init__(self):
-        # device used
-        self.dev = 'cpu'
-        # backend used
-        self.backend = 'pytorch'
-        # numerical precision
-        self.dtype = 'float32'
-
-
-args = Args()
-
-
-def compare_fwd(*tests, optimize=True, python=True, profile=False):
-    """Decorate a function to parse and run it against pure Python.
-
-    Returns a unit test that will parse the function, and then for
-    each `inputs` tuple in `tests` it will check that the pure Python,
-    undecorated function returns that same output.
-
-    This uses the full myia pipeline.
-
-    Arguments:
-        tests: One or more inputs tuple.
-
-    """
-    fwd_pipeline = compile_pipeline if optimize else \
-        compile_pipeline.configure({'opt.phases.main': []})
-
-    def decorate(fn):
-        def test(args):
-            nonlocal profile
-            if not isinstance(args, tuple):
-                args = (args,)
-
-            _fwd_test(fn, args,
-                      pipeline=fwd_pipeline,
-                      optimize=optimize,
-                      python=python,
-                      profile=profile)
-
-        m = mark.parametrize('args', list(tests))(test)
-        m.__orig__ = fn
-        return m
-    return decorate
-
-
-grad_whitelist = whitelist | {P.J, P.Jinv}
-
-
-@validate_abstract.variant
-def grad_validate_abstract(self, t: AbstractJTagged):
-    pass
-
-
-step_grad_validate = Validator.partial(
-    whitelist=grad_whitelist,
-    validate_abstract=grad_validate_abstract
-)
-
-
-@pipeline_function
-def grad_wrap(self, graph):
-    if isinstance(graph, Primitive):
-        jg = realJ(graph, self.resources)
-        g = grad.make_gf(jg, jg.parameters, wrt=range(len(jg.parameters)),
-                         dbg=jg.debug, sens_param=True)
-    else:
-        g = grad.make_gf(graph, graph.parameters,
-                         wrt=range(len(graph.parameters)),
-                         dbg=graph.debug, sens_param=True,
-                         apply_j=True)
-    return g
-
-
+from myia.pipeline import standard_resources
+from myia.pipeline import PipelineDefinition, steps
+from ..test_grad import step_grad_validate
 grad_pipeline = PipelineDefinition(
     resources=standard_resources,
     steps=dict(
@@ -150,8 +72,7 @@ grad_pipeline = PipelineDefinition(
     )
 )
 
-"""
-backend = args.backend
+backend = _backend_fixture
 backend_options = get_backend_options(args, backend)
 
 standard_pipeline = \
@@ -245,6 +166,40 @@ def _grad_test(fn, obj, args,
             pt_g, my_g, rtol=1e-05, atol=1e-06, equal_nan=True)
 
 
+def compare_fwd(*tests, optimize=True, python=True, profile=False):
+    """Decorate a function to parse and run it against pure Python.
+
+    Returns a unit test that will parse the function, and then for
+    each `inputs` tuple in `tests` it will check that the pure Python,
+    undecorated function returns that same output.
+
+    This uses the full myia pipeline.
+
+    Arguments:
+        tests: One or more inputs tuple.
+
+    """
+    fwd_pipeline = fwd_compile_pipeline if optimize else \
+        fwd_compile_pipeline.configure({'opt.phases.main': []})
+
+    def decorate(fn):
+        def test(args):
+            nonlocal profile
+            if not isinstance(args, tuple):
+                args = (args,)
+
+            _fwd_test(fn, args,
+                      pipeline=fwd_pipeline,
+                      optimize=optimize,
+                      python=python,
+                      profile=profile)
+
+        m = mark.parametrize('args', list(tests))(test)
+        m.__orig__ = fn
+        return m
+    return decorate
+
+
 def compare_bwd(*tests, sens_type=APT_loss, pipeline=grad_pipeline,
                 rel_error=1e-3):
     """Decorate a function to parse and run it against pure Python.
@@ -286,8 +241,8 @@ def compare_fwd_and_bwd(*tests, optimize=True, python=True, profile=False,
 
     """
 
-    fwd_pipeline = compile_pipeline if optimize else \
-        compile_pipeline.configure({'opt.phases.main': []})
+    fwd_pipeline = fwd_compile_pipeline if optimize else \
+        fwd_compile_pipeline.configure({'opt.phases.main': []})
 
     def decorate(fn):
         def test(args):
@@ -305,7 +260,7 @@ def compare_fwd_and_bwd(*tests, optimize=True, python=True, profile=False,
     return decorate
 
 
-'''
+''' # for when test is not product of "name, args"
 def _name_args_helper(name, args):
     return [(name, args) for arg in args]
     #'''
@@ -315,6 +270,9 @@ def _name_args_helper(name, args):
 # all_torch_ops = dir(torch)
 # all_torch_tensor_ops = dir(torch.Tensor([5.49670]))
 
+# pytest_timeout used so that unmapped ops with infinite call recursion
+# don't take very long time to fail
+pytest_timeout_time = 10
 
 all_torch_ops__1_tensor_arg = all_torch_tensor_ops__1_tensor_arg = \
     [
@@ -339,7 +297,7 @@ single_tensor_args = (
     'name,args',
     [(op, single_tensor_args) for op in all_torch_ops__1_tensor_arg]
 )
-@pytest.mark.timeout(10)
+@pytest.mark.timeout(pytest_timeout_time)
 def test_torch_ops__1_tensor_arg(name, args):
     def fn1(x):
         return getattr(torch, name)(x)
@@ -356,7 +314,7 @@ def test_torch_ops__1_tensor_arg(name, args):
     'name,args',
     [(op, single_tensor_args) for op in all_torch_tensor_ops__1_tensor_arg]
 )
-@pytest.mark.timeout(10)
+@pytest.mark.timeout(pytest_timeout_time)
 def test_torch_tensor_ops__1_tensor_arg(name, args):
     def fn1(x):
         return getattr(x, name)()
@@ -388,7 +346,7 @@ all_torch_tensor_ops__1_tensor_arg__fwd_only.extend([
     'name,args',
     [(op, single_tensor_args) for op in all_torch_ops__1_tensor_arg__fwd_only]
     )
-@pytest.mark.timeout(10)
+@pytest.mark.timeout(pytest_timeout_time)
 def test_torch_ops__1_tensor_arg__fwd_only(name, args):
     def fn1(x):
         return getattr(torch, name)(x)
@@ -407,7 +365,7 @@ def test_torch_ops__1_tensor_arg__fwd_only(name, args):
     [(op, single_tensor_args) for op
      in all_torch_tensor_ops__1_tensor_arg__fwd_only]
     )
-@pytest.mark.timeout(10)
+@pytest.mark.timeout(pytest_timeout_time)
 def test_torch_tensor_ops__1_tensor_arg__fwd_only(name, args):
     def fn1(x):
         return getattr(x, name)()
@@ -437,7 +395,7 @@ single_tensor_args__1D_and_lower = (
     [(op, single_tensor_args__1D_and_lower) for op
      in all_torch_tensor_ops__1_tensor_arg_1D_and_lower__fwd_only]
 )
-@pytest.mark.timeout(10)
+@pytest.mark.timeout(pytest_timeout_time)
 def test_torch_item__fwd_only(name, args):
     def fn1(x):
         return getattr(x, name)()
