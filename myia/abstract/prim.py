@@ -8,11 +8,12 @@ from operator import getitem
 
 from .. import dtype
 from ..abstract import typecheck
-from ..ir import Graph, MetaGraph, GraphCloner, CloneRemapper, new_graph
+from ..ir import Graph, MetaGraph, GraphCloner, CloneRemapper
 from ..dtype import Number, Bool, ExceptionType
 from ..prim import ops as P, Primitive, py_implementations as py
-from ..utils import Namespace, SymbolicKeyInstance, Cons, Empty
-
+from ..utils import Namespace, SymbolicKeyInstance, Cons, Empty, \
+    MyiaTypeError, InferenceError, MyiaShapeError, check_nargs, \
+    infer_trace, type_error_nargs
 
 from .data import (
     ANYTHING,
@@ -29,6 +30,7 @@ from .data import (
     AbstractBottom,
     AbstractUnion,
     AbstractTaggedUnion,
+    AbstractKeywordArgument,
     PartialApplication,
     JTransformedFunction,
     PrimitiveFunction,
@@ -37,9 +39,6 @@ from .data import (
     MetaGraphFunction,
     DummyFunction,
     VALUE, TYPE, SHAPE,
-    MyiaTypeError, InferenceError, MyiaShapeError, check_nargs,
-    infer_trace,
-    type_error_nargs,
     listof,
 )
 from .loop import Pending, find_coherent_result, force_pending
@@ -930,7 +929,7 @@ class _UserSwitchInferrer(Inferrer):
             branch_graph = branch_ref.node.value
             if branch_graph not in xg.scope:
                 return branch_graph
-            rval = new_graph(branch_graph, relation='copy')
+            rval = branch_graph.make_new(relation='copy')
             cast = rval.apply(P.unsafe_static_cast, xref.node, branch_type)
             cl = GraphCloner(
                 *xg.children,
@@ -1151,6 +1150,47 @@ async def _inf_partial(self, engine, fn, *args):
     return AbstractFunction(*[
         PartialApplication(fn, list(args)) for fn in fns
     ])
+
+
+@standard_prim(P.make_kwarg)
+async def _inf_make_kwarg(self, engine, key, value):
+    k = key.values[VALUE]
+    assert isinstance(k, str)
+    return AbstractKeywordArgument(k, value)
+
+
+@standard_prim(P.extract_kwarg)
+class _ExtractKwArgInferrer(Inferrer):
+    async def normalize_args(self, args):
+        return args
+
+    async def infer(self, engine, key, kwarg):
+        assert key.values[VALUE] is kwarg.key
+        return kwarg.argument
+
+
+@standard_prim(P.apply)
+class _ApplyInferrer(Inferrer):
+    async def reroute(self, engine, outref, argrefs):
+        assert len(argrefs) >= 1
+        fnref, *grouprefs = argrefs
+        expanded = []
+        g = outref.node.graph
+        for gref in grouprefs:
+            t = await gref.get()
+            if isinstance(t, AbstractDict):
+                for k in t.entries:
+                    extract = g.apply(P.dict_getitem, gref.node, k)
+                    mkkw = g.apply(P.make_kwarg, k, extract)
+                    expanded.append(mkkw)
+            elif isinstance(t, AbstractTuple):
+                for i, _ in enumerate(t.elements):
+                    expanded.append(g.apply(P.tuple_getitem, gref.node, i))
+            else:
+                raise MyiaTypeError(
+                    'Can only expand tuple or dict in function application'
+                )
+        return engine.ref(g.apply(fnref.node, *expanded), outref.context)
 
 
 @standard_prim(P.embed)

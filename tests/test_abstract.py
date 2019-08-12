@@ -7,17 +7,16 @@ import numpy as np
 from myia import dtype as ty
 from myia.prim import ops as P
 from myia.abstract import (
-    ANYTHING, MyiaTypeError,
+    ANYTHING, VALUE, TYPE, DEAD, find_coherent_result_sync,
     AbstractScalar, AbstractTuple as T, AbstractClass as AC,
     AbstractJTagged, AbstractError, AbstractFunction, AbstractUnion,
     AbstractTaggedUnion, InferenceLoop, to_abstract, build_value, amerge,
     AbstractClass, Possibilities, PendingFromList, TaggedPossibilities,
-    VALUE, TYPE, DEAD, find_coherent_result_sync,
-    abstract_clone, broaden,
-    Pending, type_to_abstract,
-    InferenceError, empty, listof
+    abstract_clone, broaden, Pending, type_to_abstract, empty, listof,
+    AbstractKeywordArgument
 )
-from myia.utils import SymbolicKeyInstance, Cons, Empty
+from myia.utils import SymbolicKeyInstance, Cons, Empty, InferenceError, \
+    MyiaTypeError
 from myia.ir import Constant
 
 from .common import Point, to_abstract_test, i16, f32, Ty, af32_of, S, U
@@ -185,6 +184,9 @@ def test_repr():
 
     j1 = AbstractJTagged(to_abstract_test(1))
     assert repr(j1) == f'AbstractJTagged(J(Int[64] = 1))'
+
+    kw1 = AbstractKeywordArgument('bucket', to_abstract_test(1))
+    assert repr(kw1) == f'AbstractKeywordArgument(KW(bucket :: Int[64] = 1))'
 
     ty1 = Ty(f32)
     assert repr(ty1) == 'AbstractType(Ty(Float[32]))'

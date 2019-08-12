@@ -265,7 +265,8 @@ class VM:
             self._call(fn, args)
         elif isinstance(fn, MetaGraph):
             absargs = [to_abstract(arg) for arg in args]
-            g = fn.generate_graph(absargs)
+            sig = fn.make_signature(absargs)
+            g = fn.generate_graph(sig)
             g = self.convert(g)
             self._dispatch_call(node, frame, g, args)
         elif is_dataclass_type(fn):

@@ -5,6 +5,7 @@ from contextvars import copy_context
 from collections import deque
 
 from .. import dtype
+from ..utils import InferenceError
 
 
 class InferenceLoop(asyncio.AbstractEventLoop):
@@ -296,7 +297,6 @@ def find_coherent_result_sync(v, fn):
     this will return that result without resolving which possibility
     v is. Otherwise, an exception is raised.
     """
-    from .data import InferenceError
     if isinstance(v, PendingFromList):
         exc = InferenceError('Nothing matches')
         results = set()

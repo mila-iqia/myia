@@ -7,12 +7,11 @@ from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
-from myia.abstract import InferenceError
 from myia.prim.py_implementations import \
     hastype, partial, scalar_add, scalar_sub, tagged, \
     scalar_usub, scalar_uadd, switch, array_map, array_reduce, scalar_mul
 from myia.validate import ValidationError
-from myia.utils import overload
+from myia.utils import overload, InferenceError
 from myia.hypermap import hyper_map
 
 from .common import mysum, i64, f64, Point, U, to_abstract_test, \
@@ -589,3 +588,82 @@ def test_hypermap_tree(t):
 @specialize(((int1, int2), (fp1, fp2)),)
 def test_tuple_surgery(xs, ys):
     return xs[::-1]
+
+
+@specialize(
+    (int1,),
+    (fp1,),
+    (int1, int2),
+    (int1, int2, int1),
+)
+def test_default_arg(x, y=3, z=6):
+    return x + y + z
+
+
+@specialize(
+    (int1, int2),
+)
+def test_default_closure(x, y):
+    def clos(z=y + y):
+        if x > z:
+            return x - z
+        else:
+            return 0
+    return clos() + clos(x)
+
+
+@specialize(
+    (1, 2, 3, 4, 5),
+)
+def test_varargs(x, *args):
+    return args[1]
+
+
+def _v(x, *args):
+    return x + args[-1]
+
+
+@specialize((int1, int2))
+def test_varargs_2(x, y):
+    argos = (1, 2, 3, 4, 5)
+    return _v(x, 1, 2, 3) + _v(y, 5) + _v(*argos, 6, *(4, 5))
+
+
+@specialize((int1, int2),)
+def test_keywords(x, y):
+    def fn(albert, beatrice):
+        return albert - beatrice
+
+    return fn(albert=x, beatrice=y) + fn(beatrice=3, albert=7)
+
+
+@specialize((int1, int2),)
+def test_keywords_2(x, y):
+    def fn1(x, albert, beatrice):
+        return albert * (x - beatrice)
+
+    def fn2(y, albert, beatrice):
+        return y * (albert - beatrice)
+
+    fn = fn1 if x < 0 else fn2
+
+    return fn(5, albert=x, beatrice=y) + fn(9, albert=3, beatrice=7)
+
+
+@specialize((int1, int2),)
+def test_keywords_defaults(x, y):
+    def fn(albert=1, beatrice=10):
+        return albert - beatrice
+
+    return fn(beatrice=x + y)
+
+
+@specialize((int1, int2),)
+def test_kwarg(x, y):
+    def fn(albert=1, beatrice=10):
+        return albert - beatrice
+
+    def proxy(*args, **kwargs):
+        return fn(*args, **kwargs)
+
+    return proxy(x, beatrice=y), proxy(x, y), proxy(beatrice=x, albert=y)

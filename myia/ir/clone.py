@@ -5,7 +5,6 @@ by graph transformers.
 """
 
 from dataclasses import dataclass
-from copy import copy
 
 from ..info import About
 from ..utils import Partializable
@@ -28,15 +27,6 @@ class _ToLink:
     new_graph: Graph
     node: ANFNode
     new_node: ANFNode
-
-
-def new_graph(g, relation='copy'):
-    """Make an empty Graph that's based on g with the given relation."""
-    with About(g.debug, relation):
-        g2 = Graph()
-        g2.flags = copy(g.flags)
-        g2.transforms = copy(g.transforms)
-    return g2
 
 
 class GraphRemapper(Partializable):
@@ -223,7 +213,7 @@ class BasicRemapper(GraphRemapper):
     def gen_graph(self, graph):
         """Makes an new empty graph."""
         with About(graph.debug, self.graph_relation):
-            self.graph_repl[graph] = Graph()
+            self.graph_repl[graph] = type(graph)()
 
     def gen_parameter(self, graph, new_graph, p):
         """Makes a new parameter."""
@@ -293,7 +283,7 @@ class CloneRemapper(BasicRemapper):
             for p, new_p in zip(graph.parameters, new_params):
                 self.repl[p] = new_p
         elif graph not in self.graph_repl:
-            self.graph_repl[graph] = new_graph(graph, self.graph_relation)
+            self.graph_repl[graph] = graph.make_new(self.graph_relation)
 
     def gen_rogue_parameter(self, graph, new_graph, node):
         """Generate a new parameter."""

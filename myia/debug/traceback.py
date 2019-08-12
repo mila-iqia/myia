@@ -6,10 +6,9 @@ import warnings
 from colorama import Fore, Style
 import prettyprinter as pp
 
-from ..abstract import InferenceError, Reference, data, format_abstract, \
-    pretty_struct
+from ..abstract import Reference, data, format_abstract, pretty_struct
 from ..parser import MyiaSyntaxError, MyiaDisconnectedCodeWarning
-from ..utils import eprint
+from ..utils import InferenceError, eprint
 from ..ir import Graph
 
 from .label import label

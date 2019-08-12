@@ -57,6 +57,7 @@ scalar_object_map = {
     operations.switch: P.switch,
     operations.user_switch: P.user_switch,
     operations.slice: Slice,
+    operations.apply: P.apply,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -112,6 +113,7 @@ standard_object_map = {
     operations.switch: P.switch,
     operations.user_switch: P.user_switch,
     operations.slice: Slice,
+    operations.apply: P.apply,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -270,7 +272,9 @@ standard_method_map = TypeMap({
 @overload
 def default_convert(env, fn: FunctionType):
     """Default converter for Python types."""
-    g = clone(parser.parse(fn))
+    g = parser.parse(fn)
+    if isinstance(g, Graph):
+        g = clone(g)
     env.object_map[fn] = g
     return g
 

@@ -10,7 +10,8 @@ from myia.abstract import (
     AbstractClassBase, AbstractJTagged, AbstractArray,
     GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
     MetaGraphFunction, AbstractUnion, VALUE, ANYTHING, JTransformedFunction,
-    VirtualFunction, PendingTentative, Possibilities, AbstractTaggedUnion
+    VirtualFunction, PendingTentative, Possibilities, AbstractTaggedUnion,
+    AbstractKeywordArgument
 )
 from myia.dtype import Type, Bool, Int, Float, TypeMeta, UInt
 from myia.utils import OrderedSet, UNKNOWN, SymbolicKeyInstance
@@ -1260,6 +1261,26 @@ class _AbstractJTagged:
                 )
             ],
             before='★J',
+            cls='abstract',
+        )
+
+
+@mixin(AbstractKeywordArgument)
+class _AbstractKeywordArgument:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            [
+                H.span(self.key),
+                H.div(
+                    hrepr.stdrepr_object(
+                        '', _clean(self.values).items(), delimiter="↦",
+                        cls='noborder'
+                    ),
+                    hrepr(self.argument),
+                    style='display:flex;flex-direction:column;'
+                )
+            ],
+            before='★KW',
             cls='abstract',
         )
 

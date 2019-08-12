@@ -139,7 +139,7 @@ def parse(func):
         return _parse_cache[func]
     parser = Parser(func)
     graph = parser.parse()
-    graph.flags.update(getattr(func, '_myia_flags', {}))
+    graph.set_flags(**getattr(func, '_myia_flags', {}))
     _parse_cache[func] = graph
     return graph
 
@@ -230,8 +230,8 @@ class Parser:
         tree = asttokens.ASTTokens(src, parse=True).tree
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
-        graph = self._process_function(None, function_def).graph
-        for node in dfs(graph.return_, succ_deeper):
+        main_block = self._process_function(None, function_def)
+        for node in dfs(main_block.graph.return_, succ_deeper):
             if node.is_constant_graph():
                 if node.value.return_ is None:
                     current = node.value.debug
@@ -253,7 +253,7 @@ class Parser:
 
         self.write_cache = OrderedSet()
         self.read_cache = OrderedSet()
-        return graph
+        return main_block.graph
 
     def process_FunctionDef(self, block: 'Block',
                             node: ast.FunctionDef) -> 'Block':
@@ -282,23 +282,67 @@ class Parser:
 
         function_block.mature()
         function_block.graph.debug.name = node.name
-        if node.args.kwarg is not None or node.args.kwonlyargs != []:
-            raise NotImplementedError("No support for keyword arguments")
-        if node.args.vararg:
-            raise NotImplementedError("No support for varargs")
-        for arg in node.args.args:
+
+        # Process arguments and their defaults
+        args = node.args.args
+        nondefaults = [None] * (len(args) - len(node.args.defaults))
+        defaults = nondefaults + node.args.defaults
+
+        kwargs = node.args.kwonlyargs
+        kwnondefaults = [None] * (len(kwargs) - len(node.args.kw_defaults))
+        kwdefaults = kwnondefaults + node.args.kw_defaults
+
+        defaults_names = []
+        defaults_list = []
+
+        for arg, dflt in zip(args + kwargs, defaults + kwdefaults):
             with DebugInherit(ast=arg, location=self.make_location(arg)):
-                anf_node = Parameter(function_block.graph)
-            anf_node.debug.name = arg.arg
-            function_block.graph.parameters.append(anf_node)
-            function_block.write(arg.arg, anf_node, track=False)
-        function_block.write(node.name,
-                             Constant(function_block.graph),
-                             track=False)
+                param_node = Parameter(function_block.graph)
+            param_node.debug.name = arg.arg
+            function_block.graph.parameters.append(param_node)
+            function_block.write(arg.arg, param_node, track=False)
+            if dflt:
+                dflt_node = self.process_node(function_block, dflt)
+                defaults_names.append(arg.arg)
+                defaults_list.append(dflt_node)
+
+        # Process varargs
+        if node.args.vararg:
+            arg = node.args.vararg
+            with DebugInherit(ast=arg, location=self.make_location(arg)):
+                vararg_node = Parameter(function_block.graph)
+            vname = arg.arg
+            vararg_node.debug.name = vname
+            function_block.graph.parameters.append(vararg_node)
+            function_block.write(vname, vararg_node, track=False)
+        else:
+            vararg_node = None
+
+        # Process kwargs
+        if node.args.kwarg:
+            arg = node.args.kwarg
+            with DebugInherit(ast=arg, location=self.make_location(arg)):
+                kwarg_node = Parameter(function_block.graph)
+            vname = arg.arg
+            kwarg_node.debug.name = vname
+            function_block.graph.parameters.append(kwarg_node)
+            function_block.write(vname, kwarg_node, track=False)
+        else:
+            kwarg_node = None
+
+        graph = function_block.graph
+        function_block.write(node.name, Constant(graph), track=False)
         self.process_statements(function_block, node.body)
         if function_block.graph.return_ is None:
             raise MyiaSyntaxError("Function doesn't return a value",
                                   self.make_location(node))
+
+        function_block.graph.vararg = vararg_node and vararg_node.debug.name
+        function_block.graph.kwarg = kwarg_node and kwarg_node.debug.name
+        function_block.graph.defaults = defaults_names
+        function_block.graph.kwonly = len(node.args.kwonlyargs)
+        function_block.graph.return_.inputs[2:] = defaults_list
+
         # TODO: check that if after_block returns?
         return function_block
 
@@ -350,14 +394,16 @@ class Parser:
                 true_block, false_block = self.make_condition_blocks(block)
 
                 if mode == 'and':
-                    b1, b2 = true_block, false_block
+                    next_block = true_block
+                    false_block.graph.output = Constant(False)
                 else:
-                    b1, b2 = false_block, true_block
+                    next_block = false_block
+                    true_block.graph.output = Constant(True)
 
-                b1.graph.output = fold(b1, rest, mode)
-                b2.graph.output = test
+                next_block.graph.output = fold(next_block, rest, mode)
 
-                switch = block.make_switch(test, true_block, false_block)
+                switch = block.make_switch(test, true_block, false_block,
+                                           op='switch')
                 return block.graph.apply(switch)
             else:
                 return test
@@ -422,8 +468,44 @@ class Parser:
     def process_Call(self, block: 'Block', node: ast.Call) -> ANFNode:
         """Process function calls: `f(x)`, etc."""
         func = self.process_node(block, node.func)
-        args = [self.process_node(block, arg) for arg in node.args]
-        return Apply([func] + args, block.graph)
+
+        groups = []
+        current = []
+        for arg in node.args:
+            if isinstance(arg, ast.Starred):
+                groups.append(current)
+                groups.append(self.process_node(block, arg.value))
+                current = []
+            else:
+                current.append(self.process_node(block, arg))
+        if current or not groups:
+            groups.append(current)
+
+        if node.keywords:
+            from .abstract import AbstractDict, ANYTHING
+            for k in node.keywords:
+                if k.arg is None:
+                    groups.append(self.process_node(block, k.value))
+            keywords = [k for k in node.keywords if k.arg is not None]
+            op = block.operation('make_dict')
+            keys = [k.arg for k in keywords]
+            values = [self.process_node(block, k.value) for k in keywords]
+            typ = AbstractDict(dict((key, ANYTHING) for key in keys))
+            groups.append(block.graph.apply(op, typ, *values))
+
+        if len(groups) == 1:
+            args, = groups
+            return Apply([func, *args], block.graph)
+        else:
+            args = []
+            for group in groups:
+                if isinstance(group, list):
+                    args.append(Apply([block.operation('make_tuple'),
+                                       *group], block.graph))
+                else:
+                    args.append(group)
+            return Apply([block.operation('apply'),
+                          func, *args], block.graph)
 
     def process_NameConstant(self, block: 'Block',
                              node: ast.NameConstant) -> ANFNode:
@@ -797,9 +879,9 @@ class Block:
             Constant(symbol_name)
         )
 
-    def make_switch(self, cond, true_block, false_block):
+    def make_switch(self, cond, true_block, false_block, op='user_switch'):
         """Return a subtree that implements a switch operation."""
-        return self.graph.apply(self.operation('user_switch'),
+        return self.graph.apply(self.operation(op),
                                 cond,
                                 true_block.graph,
                                 false_block.graph)

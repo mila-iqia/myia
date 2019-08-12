@@ -5,7 +5,8 @@ from .env import (  # noqa
 )
 
 from .errors import (  # noqa
-    MyiaInputTypeError,
+    infer_trace, InferenceError, MyiaTypeError, MyiaShapeError,
+    type_error_nargs, check_nargs, TypeMismatchError, MyiaInputTypeError,
 )
 
 from .intern import (  # noqa

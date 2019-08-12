@@ -8,7 +8,8 @@ from typing import List, Tuple
 from types import SimpleNamespace
 
 from myia import abstract
-from myia.abstract import concretize_abstract, from_value
+from myia.abstract import concretize_abstract, from_value, ANYTHING, \
+    Contextless, CONTEXTLESS
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.pipeline import standard_pipeline, scalar_pipeline
 from myia.composite import gadd, zeros_like, grad
@@ -16,8 +17,6 @@ from myia.debug.traceback import print_inference_error
 from myia.dtype import Int, External, Number, EnvType as Env, Nil, Array, \
     i16, i32, i64, u64, f16, f32, f64
 from myia.hypermap import HyperMap, hyper_map
-from myia.abstract import ANYTHING, InferenceError, MyiaTypeError, \
-    Contextless, CONTEXTLESS
 from myia.ir import Graph, MultitypeGraph
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import \
@@ -29,7 +28,7 @@ from myia.prim.py_implementations import \
     env_getitem, env_setitem, embed, J, Jinv, array_to_scalar, \
     transpose, make_record, unsafe_static_cast, user_switch, \
     hastag, casttag, tagged
-from myia.utils import newenv
+from myia.utils import newenv, InferenceError, MyiaTypeError
 
 from .common import B, \
     Point, Point3D, Thing, Thing_f, Thing_ftup, mysum, \
@@ -489,6 +488,151 @@ def test_return_closure(w, x, y, z):
             return a * b
         return clos
     return (mul(w)(x), mul(y)(z))
+
+
+@infer(
+    (i64, i64),
+    (f64, f64),
+    (i64, i64, i64),
+    (InferenceError,),
+    (i64, i64, i64, InferenceError),
+)
+def test_default_arg(x, y=3):
+    return x + y
+
+
+@infer((i64, i64, i64))
+def test_default_closure(x, y):
+    def clos(z=y + y, q=x + x):
+        return x + z
+
+    return clos(y)
+
+
+@infer(
+    (0,),
+    (i64, i64, i64),
+    (i64, i64, i64, i64, i64, i64, i64),
+)
+def test_varargs(*args):
+    rval = 0
+    for arg in args:
+        rval = rval + arg
+    return rval
+
+
+@infer(
+    (i64, i64, i64),
+)
+def test_keywords(x, y):
+    def fn(albert, beatrice):
+        return albert - beatrice
+
+    return fn(albert=x, beatrice=y) + fn(beatrice=3, albert=7)
+
+
+@infer(
+    (i64, i64, i64),
+)
+def test_keywords_expand(x, y):
+    def fn(z, albert, beatrice):
+        return albert - beatrice + z
+
+    return fn(4, **{'albert': x, 'beatrice': y})
+
+
+@infer(
+    (i64, i64, InferenceError),
+)
+def test_keywords_bad(x, y):
+    def fn(albert, beatrice):
+        return albert - beatrice
+
+    return fn(albert=x, charles=y)
+
+
+@infer(
+    (i64, i64, i64),
+)
+def test_keywords_different_order(x, y):
+    def fn1(x, albert, beatrice):
+        return albert * (x - beatrice)
+
+    def fn2(y, beatrice, albert):
+        return y * (albert - beatrice)
+
+    fn = fn1 if x < 0 else fn2
+
+    return fn(5, albert=x, beatrice=y)
+
+
+@infer((i64, i64, i64),)
+def test_keywords_defaults(x, y):
+    def fn(charles, *, albert=1, beatrice=10):
+        return albert - beatrice + charles
+
+    return fn(x, beatrice=y)
+
+
+@infer((i64, i64, InferenceError),)
+def test_redundant_kw(x, y):
+    def fn(albert, beatrice):
+        return albert - beatrice
+
+    return fn(albert=x, **{'albert': y, 'beatrice': y})
+
+
+@infer((i64, i64),)
+def test_defaults_recursive(x):
+    def fact(n=x):
+        if n <= 1:
+            return 1
+        else:
+            return n * fact(n - 1)
+    return fact()
+
+
+@infer((i64, i64, (i64, i64, i64)),)
+def test_kwarg(x, y):
+    def fn(albert=1, beatrice=10):
+        return albert - beatrice
+
+    def proxy(*args, **kwargs):
+        return fn(*args, **kwargs)
+
+    return proxy(x, beatrice=y), proxy(x, y), proxy(beatrice=x, albert=y)
+
+
+@infer((i64, i64, InferenceError),)
+def test_kwarg_bad(x, y):
+    def fn(albert=1, beatrice=10):
+        return albert - beatrice
+
+    def proxy(*args, **kwargs):
+        return fn(*args, **kwargs)
+
+    return proxy(albert=x, beatrice=y, charles=x + y)
+
+
+@infer(
+    (i64, i64, InferenceError),
+)
+def test_keywords_bad_3(x, y):
+    return scalar_add(x=x, y=y)
+
+
+@infer(
+    ((i64, i64, i64), i64),
+    ((i64, i64, f64), InferenceError),
+    ((i64, i64, i64, i64), InferenceError),
+    ((i64, i64), InferenceError),
+    (i64, InferenceError),
+)
+def test_apply(args):
+    def _f(x, y, z):
+        return x + y + z
+
+    return _f(*args)
 
 
 @infer(
@@ -1274,6 +1418,25 @@ def test_bool_and(x, y):
 @infer((B, B, B), (i64, B, InferenceError), (B, i64, InferenceError))
 def test_bool_or(x, y):
     return bool_or(x, y)
+
+
+@infer(
+    (B, B, B),
+    (i64, i64, InferenceError),
+)
+def test_and(x, y):
+    return x and y
+
+
+@infer(
+    (i64, None, i64),
+    (i64, i64, i64),
+)
+def test_and_none(x, y):
+    if x > 0 and y is not None:
+        return x + y
+    else:
+        return x
 
 
 @infer(

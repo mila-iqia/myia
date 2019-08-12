@@ -11,8 +11,9 @@ returning a nested function creates a closure.
 """
 
 from typing import Any, Iterable, List, Union, Dict
+from copy import copy
 
-from ..info import NamedDebugInfo
+from ..info import About, NamedDebugInfo
 from ..prim import ops as primops, Primitive
 from ..utils import Named, list_str, repr_
 from ..utils.unify import expandlist, noseq
@@ -36,6 +37,14 @@ class Graph:
             has no output node (because it won't be known e.g. until the
             function has completed parsing), but it must be set afterwards for
             the graph instance to be valid.
+        vararg (bool): Whether there is an *args argument. This will be the
+            last parameter unless there is a kwarg, in which case it will be
+            the second-to-last.
+        kwarg (bool): Whether there is a *kwargs argument. This will always be
+            the last parameter.
+        defaults: List of parameter names that have default values.
+        kwonly: The number of keyword-only arguments, which are all at the end
+            of the parameters list or immediately before vararg and/or kwarg.
         debug: A NamedDebugInfo object containing debugging information about
             this graph.
         transforms: A dictionary of available transforms for this graph, e.g.
@@ -50,6 +59,12 @@ class Graph:
         self.debug = NamedDebugInfo(self)
         self.flags = {}
         self.transforms: Dict[str, Union[Graph, Primitive]] = {}
+        self.vararg = False
+        self.kwarg = False
+        self.defaults = []
+        self.kwonly = 0
+        self._user_graph = None
+        self._sig = None
         self._manager = None
 
     @property
@@ -70,7 +85,7 @@ class Graph:
         Equal to `self.return_.inputs[1]`, if it exists. Unlike `return_`,
         `output' may be a constant or belong to a different graph.
         """
-        if not self.return_ or len(self.return_.inputs) != 2:
+        if not self.return_ or len(self.return_.inputs) < 2:
             raise Exception('Graph has no output.')
         return self.return_.inputs[1]
 
@@ -89,6 +104,12 @@ class Graph:
         f = PrimitiveFunction(primops.return_,
                               tracking_id=self.return_.inputs[0])
         self.return_.inputs[0].abstract = AbstractFunction(f)
+
+    @property
+    def parameter_names(self):
+        """Return a list of parameter names."""
+        from ..debug.label import label
+        return [label(p) for p in self.parameters]
 
     def add_parameter(self) -> 'Parameter':
         """Add a new parameter to this graph (appended to the end)."""
@@ -109,6 +130,168 @@ class Graph:
         wrapped_inputs = [i if isinstance(i, ANFNode) else self.constant(i)
                           for i in inputs]
         return Apply(wrapped_inputs, self)
+
+    def make_new(self, relation='copy'):
+        """Make a new graph that's about this one."""
+        with About(self.debug, relation):
+            g = type(self)()
+        g.flags = copy(self.flags)
+        g.transforms = copy(self.transforms)
+        g.vararg = self.vararg
+        g.kwarg = self.kwarg
+        g.defaults = self.defaults
+        g.kwonly = self.kwonly
+        g._user_graph = self._user_graph
+        g._sig = self._sig
+        return g
+
+    #######################
+    # MetaGraph interface #
+    #######################
+
+    async def normalize_args(self, args):
+        """Return normalized versions of the arguments.
+
+        By default, this returns args unchanged.
+        """
+        return self.normalize_args_sync(args)
+
+    def normalize_args_sync(self, args):
+        """Return normalized versions of the arguments.
+
+        By default, this returns args unchanged.
+        """
+        return args
+
+    def make_signature(self, args):
+        """Return a signature corresponding to the args.
+
+        Each signature corresponds to a graph.
+        """
+        from ..abstract.data import AbstractKeywordArgument
+        if args is None:
+            return None
+        nargs = 0
+        keys = []
+        for arg in args:
+            if isinstance(arg, AbstractKeywordArgument):
+                keys.append(arg.key)
+            else:
+                assert not keys
+                nargs += 1
+        return (nargs, *keys)
+
+    def generate_graph(self, sig):
+        """Generate a Graph for the given abstract arguments."""
+        from .clone import clone
+        from .manager import GraphManager
+        from ..abstract import AbstractDict, ANYTHING
+        from ..utils import MyiaTypeError
+        from ..prim import ops as P
+
+        if sig is None:
+            return self
+
+        if sig == self._sig:
+            return self
+
+        if self._user_graph:
+            return self._user_graph.generate_graph(sig)
+
+        nargs, *keys = sig
+        if (not self.defaults and not self.vararg and not self.kwarg
+                and not self.kwonly and not keys):
+            return self
+
+        new_graph = clone(self, total=True)
+        repl = {}
+
+        max_n_pos = (len(self.parameters)
+                     - bool(self.vararg)
+                     - bool(self.kwarg)
+                     - self.kwonly)
+        n_pos = min(max_n_pos, nargs)
+
+        new_order = new_graph.parameters[:n_pos]
+
+        n_var = nargs - n_pos
+
+        vararg = None
+        if self.vararg:
+            vararg = new_graph.parameters[-1 - bool(self.kwarg)]
+            v_parameters = []
+            for i in range(n_var):
+                new_param = Parameter(new_graph)
+                new_param.debug.name = f'{self.vararg}[{i}]'
+                v_parameters.append(new_param)
+            new_order += v_parameters
+            constructed = new_graph.apply(
+                P.make_tuple, *v_parameters
+            )
+            repl[vararg] = constructed
+        elif n_var:
+            raise MyiaTypeError(f'Too many arguments')
+
+        if self.kwarg:
+            kwarg = new_graph.parameters[-1]
+        else:
+            kwarg = None
+
+        kwarg_parts = []
+        kwarg_keys = []
+        if keys:
+            for k in keys:
+                try:
+                    idx = self.parameter_names.index(k)
+                except ValueError:
+                    if kwarg:
+                        new_param = Parameter(new_graph)
+                        new_param.debug.name = f'{self.kwarg}[{k}]'
+                        kwarg_parts.append(
+                            new_graph.apply(P.extract_kwarg, k, new_param)
+                        )
+                        kwarg_keys.append(k)
+                        new_order.append(new_param)
+                    else:
+                        raise MyiaTypeError(f'Invalid keyword argument: {k}')
+                else:
+                    p = new_graph.parameters[idx]
+                    if p in new_order:
+                        raise MyiaTypeError(
+                            f'Multiple values given for argument {k}'
+                        )
+                    new_order.append(p)
+                    repl[p] = new_graph.apply(P.extract_kwarg, k, p)
+
+        if kwarg:
+            typ = AbstractDict(dict((key, ANYTHING) for key in kwarg_keys))
+            repl[kwarg] = new_graph.apply(P.make_dict, typ, *kwarg_parts)
+
+        all_defaults = new_graph.return_.inputs[2:]
+        for name, param in zip(new_graph.parameter_names,
+                               new_graph.parameters):
+            if param not in (vararg, kwarg) and param not in new_order:
+                try:
+                    idx = self.defaults.index(name)
+                except ValueError:
+                    raise MyiaTypeError(f'Missing argument: {name}')
+                repl[param] = all_defaults[idx]
+
+        mng = GraphManager(manage=False, allow_changes=True)
+        mng.add_graph(new_graph)
+        with mng.transact() as tr:
+            for x, y in repl.items():
+                tr.replace(x, y)
+            tr.set_parameters(new_graph, new_order)
+
+        new_graph.return_.inputs[2:] = []
+        new_graph.vararg = False
+        new_graph.kwarg = False
+        new_graph.defaults = []
+        new_graph.kwonly = 0
+        new_graph._user_graph = self
+        new_graph._sig = sig
+        return new_graph
 
     #########
     # Flags #

@@ -3,8 +3,8 @@ import pytest
 import numpy as np
 
 from myia import myia, value_and_grad
-from myia.abstract import MyiaTypeError
 from myia.api import to_device
+from myia.utils import MyiaTypeError
 
 from ..common import MA
 

@@ -9,7 +9,8 @@ from types import GeneratorType, AsyncGeneratorType
 
 from .. import dtype
 from ..utils import overload, is_dataclass_type, dataclass_methods, intern, \
-    ADT, Cons, Empty
+    ADT, Cons, Empty, MyiaTypeError, TypeMismatchError
+
 
 from .loop import Pending, is_simple, PendingTentative, \
     find_coherent_result_sync
@@ -33,6 +34,7 @@ from .data import (
     AbstractJTagged,
     AbstractUnion,
     AbstractTaggedUnion,
+    AbstractKeywordArgument,
     AbstractBottom,
     AbstractError,
     TrackDict,
@@ -41,8 +43,6 @@ from .data import (
     VALUE,
     TYPE,
     SHAPE,
-    MyiaTypeError,
-    TypeMismatchError,
 )
 
 
@@ -472,6 +472,14 @@ def abstract_clone(self, x: AbstractTaggedUnion, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractJTagged, *args):
     return (yield AbstractJTagged)(self(x.element, *args))
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: AbstractKeywordArgument, *args):
+    return (yield AbstractKeywordArgument)(
+        x.key,
+        self(x.argument, *args)
+    )
 
 
 @overload  # noqa: F811

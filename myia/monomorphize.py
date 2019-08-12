@@ -9,18 +9,18 @@ from itertools import count, chain
 from dataclasses import dataclass, replace as dc_replace
 from collections import defaultdict
 from .abstract import AbstractFunction, PrimitiveFunction, GraphFunction, \
-    MetaGraphFunction, MyiaTypeError, build_value, AbstractError, \
-    BaseGraphInferrer, TrackedInferrer, DummyFunction, \
-    TypedPrimitive, broaden, DEAD, POLY, \
+    MetaGraphFunction, build_value, AbstractError, \
+    GraphInferrer, TrackedInferrer, DummyFunction, \
+    AbstractValue, TypedPrimitive, broaden, DEAD, POLY, \
     VirtualReference, Context, Reference, abstract_clone, \
-    abstract_check, concretize_abstract, InferenceError
+    abstract_check, concretize_abstract
 from .abstract.utils import CheckState, CloneState
 from .prim import Primitive
 from .info import About
 from .ir import Graph, Constant, MetaGraph, CloneRemapper, GraphCloner, \
-    succ_incoming, new_graph
+    succ_incoming
 from .graph_utils import dfs
-from .utils import overload
+from .utils import overload, MyiaTypeError, InferenceError
 
 
 class Unspecializable(Exception):
@@ -81,12 +81,17 @@ def _refmap(self, fn, x: Reference):
 
 @overload  # noqa: F811
 def _refmap(self, fn, x: tuple):
-    return tuple(fn(y) for y in x)
+    return tuple(self(fn, y) for y in x)
 
 
 @overload  # noqa: F811
-def _refmap(self, fn, x: type(None)):
-    return None
+def _refmap(self, fn, x: AbstractValue):
+    return fn(x)
+
+
+@overload  # noqa: F811
+def _refmap(self, fn, x: object):
+    return x
 
 
 def concretize_cache(cache):
@@ -219,10 +224,8 @@ class Monomorphizer:
             a = AbstractFunction(TypedPrimitive(fn.prim, argvals, outval))
             return _const(fn.prim, a), None, None
 
-        assert isinstance(inf, BaseGraphInferrer)
-
-        if hasattr(inf, 'graph_cache'):
-            concretize_cache(inf.graph_cache)
+        assert isinstance(inf, GraphInferrer)
+        concretize_cache(inf.graph_cache)
 
         ctx = inf.make_context(self.engine, argvals)
         norm_ctx = _normalize_context(ctx)
@@ -272,13 +275,12 @@ class Monomorphizer:
                         a, currinf, broad_argvals, False
                     )
                     eng = self.engine
-                    if hasattr(currinf, 'make_context'):
+                    if isinstance(currinf, GraphInferrer):
                         # Have to check that this graph was processed by
                         # the inferrer. It should have been, but sometimes
                         # it isn't, not sure why. Hopefully a rewrite of the
                         # specializer should fix everything.
-                        if hasattr(currinf, 'graph_cache'):
-                            concretize_cache(currinf.graph_cache)
+                        concretize_cache(currinf.graph_cache)
                         try:
                             g = currinf.get_graph(eng, broad_argvals)
                         except InferenceError:  # pragma: no cover
@@ -475,7 +477,7 @@ class Monomorphizer:
                     and not ctx.graph.has_flags('reference')):
                 newgraph = ctx.graph
             else:
-                newgraph = new_graph(ctx.graph, relation=next(_count))
+                newgraph = ctx.graph.make_new(relation=next(_count))
                 newgraph.set_flags(reference=False)
             self.results[ctx] = newgraph
             entry.append(newgraph)

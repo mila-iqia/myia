@@ -8,22 +8,22 @@ from dataclasses import is_dataclass, replace as dc_replace
 
 from .. import dtype
 from ..info import About
-from ..ir import Graph, MetaGraph, GraphGenerationError
+from ..ir import Graph, MetaGraph
 from ..prim import Primitive, ops as P
 from ..utils import Overload, Partializable, is_dataclass_type, \
-    SymbolicKeyInstance, overload, dataclass_methods, ADT
+    SymbolicKeyInstance, overload, dataclass_methods, ADT, \
+    MyiaTypeError, type_error_nargs, infer_trace, InferenceError
 
 from .loop import Pending, force_pending, InferenceLoop
 from .ref import VirtualReference, Context, EvaluationCache, Reference
-from .data import infer_trace, MyiaTypeError, ANYTHING, AbstractScalar, \
+from .data import ANYTHING, AbstractScalar, \
     AbstractValue, GraphFunction, PartialApplication, \
     JTransformedFunction, AbstractJTagged, AbstractTuple, \
     VirtualFunction, AbstractFunction, AbstractExternal, \
     VALUE, TYPE, SHAPE, DATA, DummyFunction, AbstractError, \
     TypedPrimitive, AbstractType, AbstractClass, AbstractArray, \
-    AbstractDict, type_error_nargs, TypeDispatchError, \
-    AbstractADT, InferenceError, PrimitiveFunction, MetaGraphFunction, \
-    Function, listof, empty
+    AbstractDict, AbstractADT, PrimitiveFunction, \
+    MetaGraphFunction, Function, listof, empty, AbstractKeywordArgument
 from .utils import broaden as _broaden, sensitivity_transform, amerge, \
     bind, type_to_abstract, normalize_adt, concretize_abstract
 
@@ -244,7 +244,7 @@ class InferenceEngine:
     @get_inferrer_for.register
     def get_inferrer_for(self, mg: MetaGraphFunction):
         if mg not in self.constructors:
-            self.constructors[mg] = MetaGraphInferrer(mg.metagraph)
+            self.constructors[mg] = GraphInferrer(mg.metagraph, None)
         return self.constructors[mg]
 
     async def execute(self, fn, *args):
@@ -545,11 +545,18 @@ class Inferrer(Partializable):
         """Initialize the Inferrer."""
         self.cache = {}
 
+    def nokw(self, args):
+        """Assert that there are no keyword arguments."""
+        for arg in args:
+            if isinstance(arg, AbstractKeywordArgument):
+                raise MyiaTypeError('Keyword arguments are not allowed here')
+
     async def normalize_args(self, args):
         """Return normalized versions of the arguments.
 
         By default, this returns args unchanged.
         """
+        self.nokw(args)
         return self.normalize_args_sync(args)
 
     def normalize_args_sync(self, args):
@@ -618,7 +625,7 @@ class TrackedInferrer(Inferrer):
         return self.cache[args]
 
 
-class BaseGraphInferrer(Inferrer):
+class GraphInferrer(Inferrer):
     """Base Inferrer for Graph and MetaGraph.
 
     Attributes:
@@ -626,14 +633,32 @@ class BaseGraphInferrer(Inferrer):
 
     """
 
-    def __init__(self, context):
-        """Initialize a BaseGraphInferrer."""
+    def __init__(self, graph, context):
+        """Initialize a GraphInferrer."""
         super().__init__()
-        self.context = context
+        self._graph = graph
+        if context is not None:
+            self.context = context.filter(graph and graph.parent)
+        else:
+            self.context = Context.empty()
+        self.graph_cache = {}
+
+    async def normalize_args(self, args):
+        """Return normalized versions of the arguments."""
+        return await self._graph.normalize_args(args)
+
+    def normalize_args_sync(self, args):
+        """Return normalized versions of the arguments."""
+        return self._graph.normalize_args_sync(args)
 
     def get_graph(self, engine, args):
-        """Return the graph to use with the given args."""
-        raise NotImplementedError("Override in subclass")
+        """Generate the graph for the given args."""
+        sig = self._graph.make_signature(args)
+        if sig not in self.graph_cache:
+            g = self._graph.generate_graph(sig)
+            g = engine.pipeline.resources.convert(g)
+            self.graph_cache[sig] = g
+        return self.graph_cache[sig]
 
     def make_context(self, engine, args):
         """Create a Context object using the given args."""
@@ -666,60 +691,6 @@ class BaseGraphInferrer(Inferrer):
 
         out = engine.ref(g.return_, context)
         return await engine.get_inferred(out)
-
-
-class GraphInferrer(BaseGraphInferrer):
-    """Inferrer for Graphs."""
-
-    def __init__(self, graph, context):
-        """Initialize a GraphInferrer."""
-        self._graph = graph
-        assert context is not None
-        super().__init__(context.filter(graph and graph.parent))
-
-    def normalize_args_sync(self, args):
-        """Broaden args if flag ignore_values is True."""
-        if self._graph.has_flags('ignore_values'):
-            return tuple(_broaden(a) for a in args)
-        else:
-            return args
-
-    def get_graph(self, engine, args):
-        """Return the graph."""
-        return self._graph
-
-
-class MetaGraphInferrer(BaseGraphInferrer):
-    """Inferrer for MetaGraphs.
-
-    MetaGraphInferrer caches generated graphs.
-    """
-
-    def __init__(self, metagraph):
-        """Initialize a MetaGraphInferrer."""
-        super().__init__(Context.empty())
-        self.metagraph = metagraph
-        self.graph_cache = {}
-
-    async def normalize_args(self, args):
-        """Return normalized versions of the arguments."""
-        return await self.metagraph.normalize_args(args)
-
-    def normalize_args_sync(self, args):
-        """Return normalized versions of the arguments."""
-        return self.metagraph.normalize_args_sync(args)
-
-    def get_graph(self, engine, args):
-        """Generate the graph for the given args."""
-        if args not in self.graph_cache:
-            try:
-                g = self.metagraph.generate_graph(args)
-            except GraphGenerationError as err:
-                types = err.args[0]
-                raise TypeDispatchError(self.metagraph, types)
-            g = engine.pipeline.resources.convert(g)
-            self.graph_cache[args] = g
-        return self.graph_cache[args]
 
 
 class PartialInferrer(Inferrer):
