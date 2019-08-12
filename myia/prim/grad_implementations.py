@@ -19,7 +19,7 @@ from .py_implementations import \
     scalar_log, scalar_pow, tuple_setitem, switch, shape, transpose, \
     array_to_scalar, scalar_to_array, distribute, array_reduce, dot, \
     reshape, scalar_cast, typeof, invert_permutation, \
-    tagged, casttag, unsafe_static_cast
+    tagged, casttag, unsafe_static_cast, scalar_eq, scalar_gt
 
 
 parse = standard_pipeline \
@@ -148,6 +148,12 @@ def bprop_scalar_exp(x, out, dout):
     return (dout * out,)
 
 
+@register_bprop(primops.scalar_log)
+def bprop_scalar_log(x, out, dout):
+    """Backpropagator for primitive `scalar_log`."""
+    return (dout / x,)
+
+
 @register_bprop(primops.scalar_tanh)
 def bprop_scalar_tanh(x, out, dout):
     """Backpropagator for primitive `scalar_tanh`."""
@@ -194,6 +200,16 @@ def bprop_scalar_ge(x, y, out, dout):
 def bprop_scalar_le(x, y, out, dout):
     """Backpropagator for primitive `scalar_le`."""
     return (zeros_like(x), zeros_like(y))
+
+
+@register_bprop(primops.scalar_max)
+def bprop_scalar_max(x, y, out, dout):
+    """Backpropagator for primitive `scalar_max`."""
+    ret = switch(scalar_eq(x, y), (dout, dout),
+                 switch(scalar_gt(x, y), (dout, zeros_like(y)),
+                        (zeros_like(x), dout)))
+
+    return (ret[0], ret[1])
 
 
 @register_bprop(primops.scalar_cast)

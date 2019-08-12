@@ -69,6 +69,7 @@ simple_mapping = {
 
     P.distribute: lambda a, shp: a.expand(*shp),
     P.transpose: lambda a, perm: a.permute(*perm),
+    P.reshape: lambda a, shp: a.reshape(shp),
     P.dot: torch.mm,
 
     P.array_to_scalar: pytorch_array_to_scalar

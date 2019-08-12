@@ -8,7 +8,7 @@ from functools import reduce
 from .abstract import AbstractArray, SHAPE, ANYTHING, MyiaShapeError, \
     AbstractFunction, GraphFunction, AbstractTuple, \
     AbstractClassBase, build_value, AbstractError, TYPE, AbstractScalar, \
-    AbstractUnion, AbstractTaggedUnion
+    AbstractUnion, AbstractTaggedUnion, AbstractDict
 from .abstract.data import check_nargs
 from .debug.label import short_labeler
 from .dtype import Array, Number, Bool, \
@@ -623,7 +623,7 @@ def _array_zero(xs):
 zeros_like = HyperMap(
     name='zeros_like',
     nonleaf=(AbstractTuple, AbstractClassBase,
-             AbstractUnion, AbstractTaggedUnion),
+             AbstractUnion, AbstractTaggedUnion, AbstractDict),
     fn_leaf=_leaf_zeros_like
 )
 
@@ -701,13 +701,21 @@ def list_reduce(fn, lst, dftl):
     return res
 
 
+_cast_helper = MultitypeGraph('cast_helper')
+
+
+@_cast_helper.register(Number, Number)
 @core
-def _cast_helper(x, model):
+def _scalar_cast_helper(x, model):
     t = typeof(model)
-    if hastype(model, Array):
-        return scalar_to_array(scalar_cast(x, t.element), typeof(model))
-    else:
-        return scalar_cast(x, t)
+    return scalar_cast(x, t)
+
+
+@_cast_helper.register(Number, Array)
+@core
+def _scalar_to_array_cast_helper(x, model):
+    t = typeof(model)
+    return scalar_to_array(scalar_cast(x, t.element), typeof(model))
 
 
 class GradOperation(MetaGraph):

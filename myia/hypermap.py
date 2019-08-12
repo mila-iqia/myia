@@ -15,6 +15,7 @@ from .prim.py_implementations import array_map
 nonleaf_defaults = (
     abstract.AbstractArray,
     abstract.AbstractTuple,
+    abstract.AbstractDict,
     abstract.AbstractClassBase,
     abstract.AbstractUnion,
     abstract.AbstractTaggedUnion,
@@ -204,6 +205,23 @@ class HyperMap(MetaGraph):
         return g.apply(P.make_tuple, *elems)
 
     @_make.register
+    def _make(self, a: abstract.AbstractDict, g, fnarg, argmap):
+        for a2, isleaf in argmap.values():
+            if not isleaf and a.entries.keys() != a2.entries.keys():
+                raise MyiaTypeError(f'Dict keys mismatch: {a} != {a2}')
+
+        elems = []
+        for k, v in a.entries.items():
+            args = [arg if isleaf else g.apply(P.dict_getitem, arg, k)
+                    for arg, (_, isleaf) in argmap.items()]
+            if fnarg is None:
+                val = g.apply(self.fn_rec, *args)
+            else:
+                val = g.apply(self.fn_rec, fnarg, *args)
+            elems.append(val)
+        return g.apply(P.make_dict, a, *elems)
+
+    @_make.register
     def _make(self, a: abstract.AbstractClassBase, g, fnarg, argmap):
         for a2, isleaf in argmap.values():
             if not isleaf:
@@ -278,6 +296,8 @@ class HyperMap(MetaGraph):
                  and abstract.AbstractClassBase in self.nonleaf)
                 or (isinstance(x, tuple)
                     and abstract.AbstractTuple in self.nonleaf)
+                or (isinstance(x, dict)
+                    and abstract.AbstractDict in self.nonleaf)
                 or (isinstance(x, np.ndarray)
                     and abstract.AbstractArray in self.nonleaf)
                 or (is_dataclass(x)

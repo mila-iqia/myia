@@ -701,6 +701,14 @@ async def force_through(self, x: AbstractClassBase, through):
 
 
 @overload  # noqa: F811
+async def force_through(self, x: AbstractDict, through):
+    yield (yield AbstractDict)(
+        {k: (await self(v, through)) for k, v in x.entries.items()},
+        await self(x.values, through)
+    )
+
+
+@overload  # noqa: F811
 async def force_through(self, x: AbstractUnion, through):
     yield (yield AbstractUnion)(await self(x.options, through))
 
@@ -732,11 +740,6 @@ async def force_through(self, x: TaggedPossibilities, through):
 @overload  # noqa: F811
 async def force_through(self, x: Pending, through):
     return await self(await x, through)
-
-
-# @overload  # noqa: F811
-# async def force_through(self, x: object, through):
-#     return x
 
 
 ############

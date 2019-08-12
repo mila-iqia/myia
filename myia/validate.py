@@ -70,6 +70,7 @@ whitelist = frozenset({
     P.scalar_le,
     P.scalar_ge,
     P.scalar_floor,
+    P.scalar_max,
     P.bool_not,
     P.bool_and,
     P.bool_or,

@@ -27,6 +27,7 @@ SIMPLE_MAP = {
     P.scalar_mod: sym.elemwise_mod,
     P.scalar_pow: sym.elemwise_pow,
     P.scalar_floor: sym.floor,
+    P.scalar_max: sym.broadcast_max,
     P.scalar_uadd: lambda x: x,
     P.scalar_usub: sym.negative,
     P.scalar_exp: sym.exp,
@@ -43,6 +44,8 @@ SIMPLE_MAP = {
     # P.bool_or: sym.logical_or
     P.bool_eq: sym.broadcast_equal,
 
+    P.switch: sym.where,
+
     P.array_to_scalar: lambda x: x
 }
 
@@ -57,8 +60,11 @@ def nnvm_bool_not(c, arg):
 def nnvm_distribute(c, v, shp):
     """Implementation of distribute."""
     nv = c.ref(v)
-    assert shp.is_constant()
-    shp = shp.value
+    assert shp.is_constant(tuple)
+    if shp.value == ():
+        shp = (1,)
+    else:
+        shp = shp.value
     vshp = ashape(v)
     if len(shp) != len(vshp):
         # We need to pad the shape
@@ -116,6 +122,17 @@ def nnvm_transpose(c, a, ax):
     return sym.transpose(na, axes=ax.value)
 
 
+def nnvm_reshape(c, v, shp):
+    """Implementation of reshape."""
+    nv = c.ref(v)
+    assert shp.is_constant(tuple)
+    if shp.value == ():
+        shp = (1,)
+    else:
+        shp = shp.value
+    return sym.reshape(nv, shape=shp)
+
+
 COMPLEX_MAP = {
     P.bool_not: nnvm_bool_not,
     P.distribute: nnvm_distribute,
@@ -124,6 +141,7 @@ COMPLEX_MAP = {
     P.array_reduce: nnvm_array_reduce,
     P.transpose: nnvm_transpose,
     P.scalar_to_array: lambda c, x, t: c.ref(x),
+    P.reshape: nnvm_reshape,
 }
 
 

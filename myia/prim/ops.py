@@ -27,6 +27,7 @@ scalar_mod = Primitive('scalar_mod')
 scalar_pow = Primitive('scalar_pow')
 scalar_trunc = Primitive('scalar_trunc')
 scalar_floor = Primitive('scalar_floor')
+scalar_max = Primitive('scalar_max')
 scalar_uadd = Primitive('scalar_uadd')
 scalar_usub = Primitive('scalar_usub')
 scalar_exp = Primitive('scalar_exp')
@@ -82,6 +83,14 @@ dict_getitem = Primitive('dict_getitem')
 array_getitem = Primitive('array_getitem')
 tuple_setitem = Primitive('tuple_setitem')
 array_setitem = Primitive('array_setitem')
+
+""" # TODO:
+"I am not a fan of having a dict_values primitive: I think it should be a
+macro, but until I add @macro I suppose it'll be simpler to keep it this way."
+- @breuleux
+"""
+dict_values = Primitive('dict_values')
+
 getattr = Primitive('getattr')
 setattr = Primitive('setattr')
 tuple_len = Primitive('tuple_len')

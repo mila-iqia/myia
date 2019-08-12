@@ -8,7 +8,7 @@ from operator import getitem
 
 from .. import dtype
 from ..abstract import typecheck
-from ..ir import Graph, GraphCloner, CloneRemapper, new_graph, MetaGraph
+from ..ir import Graph, MetaGraph, GraphCloner, CloneRemapper, new_graph
 from ..dtype import Number, Bool, ExceptionType
 from ..prim import ops as P, Primitive, py_implementations as py
 from ..utils import Namespace, SymbolicKeyInstance, Cons, Empty
@@ -260,6 +260,7 @@ def _prim_or_graph(afn):
         assert fn.context == Context.empty()
         fn = fn.graph
     if isinstance(fn, MetaGraphFunction):
+        assert fn.context == Context.empty()
         fn = fn.metagraph
     assert isinstance(fn, (Primitive, Graph, MetaGraph))
     return fn
@@ -416,6 +417,7 @@ uniform_prim(P.scalar_mod)(py.scalar_mod)
 uniform_prim(P.scalar_pow)(py.scalar_pow)
 uniform_prim(P.scalar_trunc)(py.scalar_trunc)
 uniform_prim(P.scalar_floor)(py.scalar_floor)
+uniform_prim(P.scalar_max)(py.scalar_max)
 uniform_prim(P.scalar_uadd, infer_value=True)(py.scalar_uadd)
 uniform_prim(P.scalar_usub, infer_value=True)(py.scalar_usub)
 uniform_prim(P.scalar_exp)(py.scalar_exp)
@@ -551,6 +553,11 @@ async def _inf_dict_getitem(self, engine, arg: AbstractDict, idx):
     if idx_v not in arg.entries:
         raise MyiaTypeError(f'Invalid index for indexed dictionary')
     return arg.entries[idx_v]
+
+
+@standard_prim(P.dict_values)
+async def _inf_dict_values(self, engine, arg: AbstractDict):
+    return AbstractTuple(list(arg.entries.values()))
 
 
 @standard_prim(P.tuple_setitem)
