@@ -31,8 +31,7 @@ fwd_compile_pipeline = standard_pipeline
 # torch.set_printoptions(precision=8)
 
 
-""" # This is for if/when tested with backends besides nnvm
-
+""" # This is for if/when tested with backends besides nnvm later
 def get_backend_options(args, backend):
     device_type = args.dev
 
