@@ -577,6 +577,15 @@ def test_default_closure(x, y):
     return clos(y)
 
 
+@infer_std((1,),)
+def test_closure_manager_bug():
+    rval = 0
+    for z in (1, 2, 3, 4):
+        if z == 1:
+            rval = z
+    return rval
+
+
 @infer(
     (0,),
     (i64, i64, i64),
