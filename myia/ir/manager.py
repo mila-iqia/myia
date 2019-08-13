@@ -337,12 +337,12 @@ class UsesStatistic(PerGraphStatistic):
 class GDepTotalStatistic(NestingStatisticGraphWise):
     """Implements `GraphManager.graph_dependencies_total`."""
 
-    def _compute(self, g, path=None):
+    def _compute(self, g):
         if g not in self:
             self[g] = self._compute_nocache(g, set())
         return self[g]
 
-    def _compute_nocache(self, g, path=None):
+    def _compute_nocache(self, g, path):
         if g in path:
             return OrderedSet()
         all_deps = self.manager.graph_dependencies_prox
