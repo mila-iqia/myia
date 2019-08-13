@@ -8,6 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass, replace as dc_replace
 from itertools import chain, count
 from typing import Optional
+from warnings import warn
 
 from .abstract import (
     DEAD,
@@ -306,7 +307,11 @@ class Monomorphizer:
                         concretize_cache(currinf.graph_cache)
                         try:
                             g = currinf.get_graph(eng, broad_argvals)
-                        except InferenceError:  # pragma: no cover
+                        except InferenceError:
+                            return res
+                        except Exception as e:  # pragma: no cover
+                            warn(f'{currinf} failed with a {type(e)}, but it'
+                                 f' should only fail with an InferenceError.')
                             return res
                         else:
                             ctx = currinf.make_context(eng, broad_argvals)
