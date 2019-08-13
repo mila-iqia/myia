@@ -26,6 +26,6 @@ setup(
                       'numpy'],
     extras_require={
         'test': ['flake8', 'pytest', 'codecov', 'isort',
-                 'pytest-cov', 'pydocstyle'],
+                 'pytest-cov', 'pydocstyle', 'docopt'],
     }
 )

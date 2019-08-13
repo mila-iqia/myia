@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from itertools import count
 
 import pytest
-
 from buche import BucheDb, CodeGlobals, H, Reader, Repl, buche
 
 from .gprint import mcss

@@ -30,10 +30,10 @@ Options:
 import operator
 from functools import reduce
 
-from docopt import docopt
-
 from buche import Repl, buche, reader, smart_breakpoint
+from docopt import docopt
 from hrepr import hrepr
+
 from myia.abstract import InferenceError
 from myia.debug.traceback import print_inference_error
 from myia.opt import lib as optlib

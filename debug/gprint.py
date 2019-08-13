@@ -4,6 +4,7 @@ import json
 import os
 
 from hrepr import hrepr
+
 from myia.abstract import (
     ANYTHING,
     VALUE,
