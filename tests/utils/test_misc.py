@@ -1,8 +1,15 @@
-import pytest
 import numpy as np
+import pytest
 
-from myia.utils import Named, smap, Event, Events, NS, SymbolicKeyInstance, \
-    newenv
+from myia.utils import (
+    NS,
+    Event,
+    Events,
+    Named,
+    SymbolicKeyInstance,
+    newenv,
+    smap,
+)
 
 
 def test_named():

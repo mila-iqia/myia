@@ -4,7 +4,6 @@ import numpy
 # composite has to be imported before hypermap because of circular import
 # shenanigans
 from myia import composite  # noqa
-
 from myia.hypermap import HyperMap, hyper_map
 from myia.prim.py_implementations import scalar_add
 

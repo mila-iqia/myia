@@ -1,17 +1,16 @@
 """Generate mapping graphs over classes, tuples, arrays, etc."""
 
-import numpy as np
 from dataclasses import is_dataclass
 from functools import reduce
 
-from . import operations, abstract
+import numpy as np
+
+from . import abstract, operations
 from .abstract import broaden
-from .ir import MetaGraph, Graph
-from .utils import Overload
+from .ir import Graph, MetaGraph
 from .prim import ops as P
 from .prim.py_implementations import array_map
-from .utils import MyiaTypeError
-
+from .utils import MyiaTypeError, Overload
 
 nonleaf_defaults = (
     abstract.AbstractArray,

@@ -1,21 +1,26 @@
 """Main exports for ir submodule."""
 
 from .abstract import Node  # noqa
-from .anf import Graph, ANFNode, Apply, Constant, Parameter, Special  # noqa
+from .anf import ANFNode, Apply, Constant, Graph, Parameter, Special  # noqa
 from .clone import (  # noqa
-    GraphRemapper, BasicRemapper, CloneRemapper, RemapperSet,
-    clone, GraphCloner, transformable_clone,
+    BasicRemapper,
+    CloneRemapper,
+    GraphCloner,
+    GraphRemapper,
+    RemapperSet,
+    clone,
+    transformable_clone,
 )
-from .manager import (  # noqa
-    ManagerError, manage, ParentProxy, GraphManager
-)
-from .metagraph import (  # noqa
-    MetaGraph, MultitypeGraph
-)
+from .manager import GraphManager, ManagerError, ParentProxy, manage  # noqa
+from .metagraph import MetaGraph, MultitypeGraph  # noqa
 from .utils import (  # noqa
-    succ_deep, succ_deeper, succ_incoming,
-    exclude_from_set, freevars_boundary,
-    dfs, toposort,
+    dfs,
+    exclude_from_set,
+    freevars_boundary,
     isomorphic,
-    print_graph
+    print_graph,
+    succ_deep,
+    succ_deeper,
+    succ_incoming,
+    toposort,
 )

@@ -1,8 +1,17 @@
 
-import pytest
 from dataclasses import dataclass
-from myia.utils import Interned, AttrEK, eqrec, hashrec, eq, hash as hsh, \
-    IncompleteException
+
+import pytest
+
+from myia.utils import (
+    AttrEK,
+    IncompleteException,
+    Interned,
+    eq,
+    eqrec,
+    hash as hsh,
+    hashrec,
+)
 
 
 @dataclass

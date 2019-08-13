@@ -4,23 +4,46 @@ Monomorphization creates a separate function for each type signature the
 function may be called with.
 """
 
-from typing import Optional
-from itertools import count, chain
-from dataclasses import dataclass, replace as dc_replace
 from collections import defaultdict
-from .abstract import AbstractFunction, PrimitiveFunction, GraphFunction, \
-    MetaGraphFunction, build_value, AbstractError, \
-    GraphInferrer, TrackedInferrer, DummyFunction, \
-    AbstractValue, TypedPrimitive, broaden, DEAD, POLY, \
-    VirtualReference, Context, Reference, abstract_clone, \
-    abstract_check, concretize_abstract
+from dataclasses import dataclass, replace as dc_replace
+from itertools import chain, count
+from typing import Optional
+
+from .abstract import (
+    DEAD,
+    POLY,
+    AbstractError,
+    AbstractFunction,
+    AbstractValue,
+    Context,
+    DummyFunction,
+    GraphFunction,
+    GraphInferrer,
+    MetaGraphFunction,
+    PrimitiveFunction,
+    Reference,
+    TrackedInferrer,
+    TypedPrimitive,
+    VirtualReference,
+    abstract_check,
+    abstract_clone,
+    broaden,
+    build_value,
+    concretize_abstract,
+)
 from .abstract.utils import CheckState, CloneState
-from .prim import Primitive
-from .info import About
-from .ir import Graph, Constant, MetaGraph, CloneRemapper, GraphCloner, \
-    succ_incoming
 from .graph_utils import dfs
-from .utils import overload, MyiaTypeError, InferenceError
+from .info import About
+from .ir import (
+    CloneRemapper,
+    Constant,
+    Graph,
+    GraphCloner,
+    MetaGraph,
+    succ_incoming,
+)
+from .prim import Primitive
+from .utils import InferenceError, MyiaTypeError, overload
 
 
 class Unspecializable(Exception):

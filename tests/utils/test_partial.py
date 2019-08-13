@@ -1,7 +1,7 @@
 
 import pytest
 
-from myia.utils import merge, Partial, Reset, Override
+from myia.utils import Override, Partial, Reset, merge
 
 
 def test_Partial():

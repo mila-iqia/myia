@@ -1,20 +1,36 @@
 
 import typing
-import numpy as np
 from dataclasses import dataclass, is_dataclass
-from myia import dtype
-from myia.abstract import VALUE, TYPE, SHAPE, \
-    AbstractValue, AbstractScalar, AbstractArray, AbstractDict, \
-    AbstractTuple, AbstractType, AbstractClass, \
-    AbstractJTagged, AbstractUnion, AbstractExternal, ANYTHING, from_value, \
-    AbstractBottom, AbstractTaggedUnion, listof, empty
-from myia.dtype import Bool, i16, i32, i64, u64, f16, f32, f64, Number, Nil
-from myia.ir import MultitypeGraph
-from myia.utils import overload, EnvInstance, dataclass_methods
-from myia.prim.py_implementations import hastype, tagged
-from myia.composite import ArithmeticData
-from myia.utils import ADT
 
+import numpy as np
+
+from myia import dtype
+from myia.abstract import (
+    ANYTHING,
+    SHAPE,
+    TYPE,
+    VALUE,
+    AbstractArray,
+    AbstractBottom,
+    AbstractClass,
+    AbstractDict,
+    AbstractExternal,
+    AbstractJTagged,
+    AbstractScalar,
+    AbstractTaggedUnion,
+    AbstractTuple,
+    AbstractType,
+    AbstractUnion,
+    AbstractValue,
+    empty,
+    from_value,
+    listof,
+)
+from myia.composite import ArithmeticData
+from myia.dtype import Bool, Nil, Number, f16, f32, f64, i16, i32, i64, u64
+from myia.ir import MultitypeGraph
+from myia.prim.py_implementations import hastype, tagged
+from myia.utils import ADT, EnvInstance, dataclass_methods, overload
 
 B = Bool
 Bot = AbstractBottom()

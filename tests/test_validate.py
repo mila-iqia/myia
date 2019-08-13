@@ -1,13 +1,12 @@
 
 import pytest
 
-from myia.pipeline import scalar_pipeline, scalar_parse
+from myia.pipeline import scalar_parse, scalar_pipeline
 from myia.prim import ops as P
 from myia.prim.py_implementations import make_record, partial
-from myia.validate import validate as _validate, ValidationError
+from myia.validate import ValidationError, validate as _validate
 
-from .common import i64, Point, to_abstract_test
-
+from .common import Point, i64, to_abstract_test
 
 Point_a = Point(i64, i64)
 

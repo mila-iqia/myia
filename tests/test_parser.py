@@ -1,13 +1,16 @@
-import pytest
+import re
 import sys
 import warnings
-import re
 
-from myia.pipeline import scalar_parse as parse, scalar_pipeline
-from myia.parser import MyiaSyntaxError, MyiaDisconnectedCodeWarning, \
-    parse as raw_parse
+import pytest
 
 from myia.debug.traceback import myia_warning
+from myia.parser import (
+    MyiaDisconnectedCodeWarning,
+    MyiaSyntaxError,
+    parse as raw_parse,
+)
+from myia.pipeline import scalar_parse as parse, scalar_pipeline
 
 
 def test_undefined():

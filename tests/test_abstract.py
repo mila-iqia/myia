@@ -1,25 +1,51 @@
 
-import pytest
 import asyncio
 import typing
+
 import numpy as np
+import pytest
 
 from myia import dtype as ty
-from myia.prim import ops as P
 from myia.abstract import (
-    ANYTHING, VALUE, TYPE, DEAD, find_coherent_result_sync,
-    AbstractScalar, AbstractTuple as T, AbstractClass as AC,
-    AbstractJTagged, AbstractError, AbstractFunction, AbstractUnion,
-    AbstractTaggedUnion, InferenceLoop, to_abstract, build_value, amerge,
-    AbstractClass, Possibilities, PendingFromList, TaggedPossibilities,
-    abstract_clone, broaden, Pending, type_to_abstract, empty, listof,
-    AbstractKeywordArgument
+    ANYTHING,
+    DEAD,
+    TYPE,
+    VALUE,
+    AbstractClass,
+    AbstractError,
+    AbstractFunction,
+    AbstractJTagged,
+    AbstractKeywordArgument,
+    AbstractScalar,
+    AbstractTaggedUnion,
+    AbstractTuple as T,
+    AbstractUnion,
+    InferenceLoop,
+    Pending,
+    PendingFromList,
+    Possibilities,
+    TaggedPossibilities,
+    abstract_clone,
+    amerge,
+    broaden,
+    build_value,
+    empty,
+    find_coherent_result_sync,
+    listof,
+    to_abstract,
+    type_to_abstract,
 )
-from myia.utils import SymbolicKeyInstance, Cons, Empty, InferenceError, \
-    MyiaTypeError
 from myia.ir import Constant
+from myia.prim import ops as P
+from myia.utils import (
+    Cons,
+    Empty,
+    InferenceError,
+    MyiaTypeError,
+    SymbolicKeyInstance,
+)
 
-from .common import Point, to_abstract_test, i16, f32, Ty, af32_of, S, U
+from .common import Point, S, Ty, U, af32_of, f32, i16, to_abstract_test
 
 
 def test_to_abstract_skey():
@@ -225,8 +251,8 @@ def test_abstract_clone():
     s2 = S(t=ty.Int[64])
     assert upcast(s1, 64) is s2
 
-    a1 = T([s1, AC(object, {'field': s1}, {})])
-    a2 = T([s2, AC(object, {'field': s2}, {})])
+    a1 = T([s1, AbstractClass(object, {'field': s1}, {})])
+    a2 = T([s2, AbstractClass(object, {'field': s2}, {})])
     assert upcast(a1, 64) is a2
 
 

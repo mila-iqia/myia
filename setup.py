@@ -1,7 +1,7 @@
 """Installation script."""
 from os import path
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 HERE = path.abspath(path.dirname(__file__))
 
@@ -25,7 +25,7 @@ setup(
     install_requires=['asttokens', 'colorama', 'prettyprinter',
                       'numpy'],
     extras_require={
-        'test': ['flake8', 'pytest', 'codecov',
-                 'pytest-cov', 'pydocstyle'],
+        'test': ['flake8', 'pytest', 'codecov', 'isort',
+                 'pytest-cov', 'pydocstyle', 'docopt'],
     }
 )

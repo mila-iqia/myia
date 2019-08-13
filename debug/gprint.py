@@ -6,36 +6,62 @@ import os
 from hrepr import hrepr
 
 from myia.abstract import (
-    AbstractValue, AbstractScalar, AbstractFunction, AbstractTuple,
-    AbstractClassBase, AbstractJTagged, AbstractArray,
-    GraphFunction, PartialApplication, TypedPrimitive, PrimitiveFunction,
-    MetaGraphFunction, AbstractUnion, VALUE, ANYTHING, JTransformedFunction,
-    VirtualFunction, PendingTentative, Possibilities, AbstractTaggedUnion,
-    AbstractKeywordArgument
+    ANYTHING,
+    VALUE,
+    AbstractArray,
+    AbstractClassBase,
+    AbstractFunction,
+    AbstractJTagged,
+    AbstractKeywordArgument,
+    AbstractScalar,
+    AbstractTaggedUnion,
+    AbstractTuple,
+    AbstractUnion,
+    AbstractValue,
+    Context,
+    GraphFunction,
+    JTransformedFunction,
+    MetaGraphFunction,
+    PartialApplication,
+    PendingTentative,
+    Possibilities,
+    PrimitiveFunction,
+    Reference,
+    TypedPrimitive,
+    VirtualFunction,
+    VirtualReference,
 )
-from myia.dtype import Type, Bool, Int, Float, TypeMeta, UInt
-from myia.utils import OrderedSet, UNKNOWN, SymbolicKeyInstance
+from myia.debug.label import (
+    CosmeticPrimitive,
+    NodeLabeler,
+    short_labeler,
+    short_relation_symbols,
+)
+from myia.debug.utils import mixin
+from myia.dtype import Bool, Float, Int, Type, TypeMeta, UInt
+from myia.info import About, DebugInfo
+from myia.ir import (
+    ANFNode,
+    Apply,
+    Constant,
+    Graph,
+    GraphCloner,
+    GraphManager,
+    ParentProxy,
+    manage,
+)
+from myia.opt import LocalPassOptimizer, NodeMap, pattern_replacer
+from myia.parser import Location
+from myia.prim import ops as primops
+from myia.utils import NS, UNKNOWN, OrderedSet, Registry, SymbolicKeyInstance
+from myia.utils.unify import FilterVar, SVar, Var, var
+from myia.vm import Closure, VMFrame
 
 try:
     from myia.dtype import JTagged
 except ImportError:
     class JTagged:
         pass
-
-from myia.abstract import Reference, VirtualReference, Context
-from myia.info import DebugInfo, About
-from myia.ir import ANFNode, Apply, Constant, Graph, GraphCloner, \
-    ParentProxy, GraphManager, manage
-from myia.parser import Location
-from myia.prim import ops as primops
-from myia.opt import LocalPassOptimizer, pattern_replacer, NodeMap
-from myia.utils import Registry, NS
-from myia.utils.unify import Var, SVar, var, FilterVar
-from myia.vm import VMFrame, Closure
-
-from myia.debug.label import NodeLabeler, short_labeler, \
-    short_relation_symbols, CosmeticPrimitive
-from myia.debug.utils import mixin
 
 
 gcss_path = f'{os.path.dirname(__file__)}/graph.css'

@@ -3,9 +3,9 @@
 from collections import defaultdict
 
 from .info import About
-from .ir import Graph, Parameter, Constant, manage
-from .prim import ops as P
+from .ir import Constant, Graph, Parameter, manage
 from .opt import sexp_to_node
+from .prim import ops as P
 
 
 def closure_convert(root):

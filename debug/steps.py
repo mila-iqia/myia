@@ -1,18 +1,18 @@
 
-from myia.utils import Partial
 from myia.pipeline.steps import (
-    step_parse as parse,
-    step_resolve as resolve,
-    step_infer as infer,
-    step_specialize as specialize,
-    step_simplify_types as simplify_types,
-    step_opt as opt,
-    step_debug_opt as debug_opt,
-    step_opt2 as opt2,
-    step_validate as validate,
     step_cconv as cconv,
     step_compile as export,
+    step_debug_opt as debug_opt,
+    step_infer as infer,
+    step_opt as opt,
+    step_opt2 as opt2,
+    step_parse as parse,
+    step_resolve as resolve,
+    step_simplify_types as simplify_types,
+    step_specialize as specialize,
+    step_validate as validate,
 )
+from myia.utils import Partial
 
 standard = [
     parse, resolve, infer, specialize,

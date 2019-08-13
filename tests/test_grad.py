@@ -1,29 +1,59 @@
 
+from dataclasses import dataclass
+from types import FunctionType
+
+import numpy as np
 import pytest
 from pytest import mark
-import numpy as np
-from types import FunctionType
-from dataclasses import dataclass
 
-from myia.abstract import from_value, AbstractJTagged
+from myia.abstract import AbstractJTagged, from_value
 from myia.api import myia
-from myia.pipeline import standard_resources, standard_pipeline, \
-    standard_debug_pipeline
 from myia.composite import grad, value_and_grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.grad import J as realJ
-from myia.pipeline import pipeline_function, PipelineDefinition, steps
+from myia.pipeline import (
+    PipelineDefinition,
+    pipeline_function,
+    standard_debug_pipeline,
+    standard_pipeline,
+    standard_resources,
+    steps,
+)
 from myia.pipeline.steps import Validator
-from myia.prim import ops as P, Primitive
-from myia.prim.py_implementations import J, scalar_add, scalar_mul, \
-    array_to_scalar, scalar_to_array, array_map, array_reduce, scalar_div, \
-    distribute, dot, reshape, transpose, scalar_cast, hastype
-from myia.prim.py_implementations import py_registry as pyi
-from myia.validate import whitelist, validate_abstract
+from myia.prim import Primitive, ops as P
+from myia.prim.py_implementations import (
+    J,
+    array_map,
+    array_reduce,
+    array_to_scalar,
+    distribute,
+    dot,
+    hastype,
+    py_registry as pyi,
+    reshape,
+    scalar_add,
+    scalar_cast,
+    scalar_div,
+    scalar_mul,
+    scalar_to_array,
+    transpose,
+)
 from myia.utils import InferenceError
+from myia.validate import validate_abstract, whitelist
 
-from .common import f64, u64, MA, MB, to_abstract_test, AA, \
-    U, make_tree, countdown, sumtree, reducetree
+from .common import (
+    AA,
+    MA,
+    MB,
+    U,
+    countdown,
+    f64,
+    make_tree,
+    reducetree,
+    sumtree,
+    to_abstract_test,
+    u64,
+)
 
 
 @dataclass

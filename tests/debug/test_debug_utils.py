@@ -3,8 +3,8 @@
 
 import pytest
 
-from myia.pipeline import scalar_parse as parse
 from myia.debug.utils import GraphIndex
+from myia.pipeline import scalar_parse as parse
 
 
 def test_GraphIndex():

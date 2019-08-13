@@ -1,8 +1,7 @@
 """Abstract Types for PyTorch Frontend."""
 
+from ..abstract.data import ANYTHING, SHAPE, AbstractArray, AbstractClassBase
 from ..abstract.infer import ArrayWrapper
-from ..abstract.data import AbstractClassBase, AbstractArray, \
-    ANYTHING, SHAPE
 
 
 class AbstractModule(AbstractClassBase):

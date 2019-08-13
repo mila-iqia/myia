@@ -1,8 +1,9 @@
 # Most of the tests ar in test_backend, this is just for pytorch-specific
 # tests that can't be made generic.
 
-import pytest
 import numpy as np
+import pytest
+
 from myia import dtype
 
 try:

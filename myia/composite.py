@@ -5,25 +5,66 @@ import operator
 from dataclasses import dataclass
 from functools import reduce
 
-from .abstract import AbstractArray, SHAPE, ANYTHING, \
-    AbstractFunction, GraphFunction, AbstractTuple, \
-    AbstractClassBase, build_value, AbstractError, TYPE, AbstractScalar, \
-    AbstractUnion, AbstractTaggedUnion, AbstractDict, broaden
+from .abstract import (
+    ANYTHING,
+    SHAPE,
+    TYPE,
+    AbstractArray,
+    AbstractClassBase,
+    AbstractDict,
+    AbstractError,
+    AbstractFunction,
+    AbstractScalar,
+    AbstractTaggedUnion,
+    AbstractTuple,
+    AbstractUnion,
+    GraphFunction,
+    broaden,
+    build_value,
+)
 from .debug.label import short_labeler
-from .dtype import Array, Number, Bool, \
-    EnvType, u8, u16, i8, i16, f32, f64, Nil
+from .dtype import (
+    Array,
+    Bool,
+    EnvType,
+    Nil,
+    Number,
+    f32,
+    f64,
+    i8,
+    i16,
+    u8,
+    u16,
+)
 from .hypermap import HyperMap, hyper_map
 from .info import About
-from .ir import Graph, MetaGraph, MultitypeGraph, Constant
+from .ir import Constant, Graph, MetaGraph, MultitypeGraph
 from .prim import ops as P
-from .prim.py_implementations import \
-    array_map, bool_not, bool_eq, hastype, distribute, shape, \
-    broadcast_shape, typeof, scalar_cast, scalar_add, scalar_exp, \
-    scalar_log, scalar_sin, scalar_cos, scalar_tan, scalar_div, \
-    scalar_to_array, env_add, scalar_tanh, py_registry, array_reduce, \
-    tuple_getitem
-from .utils import newenv, Slice, MyiaTypeError, MyiaShapeError, \
-    check_nargs
+from .prim.py_implementations import (
+    array_map,
+    array_reduce,
+    bool_eq,
+    bool_not,
+    broadcast_shape,
+    distribute,
+    env_add,
+    hastype,
+    py_registry,
+    scalar_add,
+    scalar_cast,
+    scalar_cos,
+    scalar_div,
+    scalar_exp,
+    scalar_log,
+    scalar_sin,
+    scalar_tan,
+    scalar_tanh,
+    scalar_to_array,
+    shape,
+    tuple_getitem,
+    typeof,
+)
+from .utils import MyiaShapeError, MyiaTypeError, Slice, check_nargs, newenv
 
 
 def core(fn=None, **flags):

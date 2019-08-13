@@ -1,21 +1,28 @@
 """Transforms a graph into lower-level code."""
 
+import numpy as np
 import tvm
 from tvm import relay
-import numpy as np
 
-from . import Backend
-
-from ...abstract import AbstractArray, AbstractTuple, AbstractScalar, \
-    AbstractFunction, VirtualFunction, GraphFunction, TypedPrimitive, \
-    PartialApplication, SHAPE, TYPE
-from ...ir import manage
+from ...abstract import (
+    SHAPE,
+    TYPE,
+    AbstractArray,
+    AbstractFunction,
+    AbstractScalar,
+    AbstractTuple,
+    GraphFunction,
+    PartialApplication,
+    TypedPrimitive,
+    VirtualFunction,
+)
+from ...dtype import Bool, Nil, type_to_np_dtype
 from ...graph_utils import toposort
+from ...ir import manage
 from ...prim import Primitive, ops as P
-from ...dtype import type_to_np_dtype, Bool, Nil
 from ...utils import overload
-
-from .relay_helpers import optimize, build_module
+from . import Backend
+from .relay_helpers import build_module, optimize
 
 
 @overload(bootstrap=True)

@@ -1,7 +1,14 @@
 from dataclasses import dataclass
-from myia.dtype import Bool, Int, Float
-from myia.abstract import ANYTHING as ANY, AbstractScalar, AbstractList, \
-    TYPE, VALUE, from_value
+
+from myia.abstract import (
+    ANYTHING as ANY,
+    TYPE,
+    VALUE,
+    AbstractList,
+    AbstractScalar,
+    from_value,
+)
+from myia.dtype import Bool, Float, Int
 
 B = AbstractScalar({VALUE: ANY, TYPE: Bool})
 

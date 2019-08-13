@@ -1,11 +1,10 @@
 """Managing graph modification and information about graphs."""
 
 
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 
-from ..graph_utils import dfs, FOLLOW, EXCLUDE
-from ..utils import Events, Partializable, OrderedSet
-
+from ..graph_utils import EXCLUDE, FOLLOW, dfs
+from ..utils import Events, OrderedSet, Partializable
 from .utils import succ_deeper
 
 

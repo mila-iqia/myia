@@ -1,13 +1,13 @@
 """Miscellaneous utilities."""
 
-from dataclasses import dataclass
 import builtins
 import functools
 import sys
+from dataclasses import dataclass
 from types import FunctionType
 from typing import Any, Dict, List, TypeVar
-from colorama import AnsiToWin32
 
+from colorama import AnsiToWin32
 
 builtins_d = vars(builtins)
 

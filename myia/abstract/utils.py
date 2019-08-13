@@ -1,50 +1,60 @@
 """Utilities for abstract values and inference."""
 
-from dataclasses import dataclass
 import typing
-import numpy as np
+from dataclasses import dataclass
 from functools import reduce
 from itertools import chain
-from types import GeneratorType, AsyncGeneratorType
+from types import AsyncGeneratorType, GeneratorType
+
+import numpy as np
 
 from .. import dtype
-from ..utils import overload, is_dataclass_type, dataclass_methods, intern, \
-    ADT, Cons, Empty, MyiaTypeError, TypeMismatchError
-
-
-from .loop import Pending, is_simple, PendingTentative, \
-    find_coherent_result_sync
-
+from ..utils import (
+    ADT,
+    Cons,
+    Empty,
+    MyiaTypeError,
+    TypeMismatchError,
+    dataclass_methods,
+    intern,
+    is_dataclass_type,
+    overload,
+)
 from .data import (
     ABSENT,
     ANYTHING,
+    SHAPE,
+    TYPE,
+    VALUE,
+    AbstractADT,
+    AbstractArray,
+    AbstractAtom,
+    AbstractBottom,
+    AbstractClass,
+    AbstractClassBase,
+    AbstractDict,
+    AbstractError,
+    AbstractFunction,
+    AbstractJTagged,
+    AbstractKeywordArgument,
+    AbstractScalar,
+    AbstractStructure,
+    AbstractTaggedUnion,
+    AbstractTuple,
+    AbstractUnion,
+    AbstractValue,
+    JTransformedFunction,
+    PartialApplication,
     Possibilities,
     TaggedPossibilities,
-    AbstractAtom,
-    AbstractStructure,
-    AbstractValue,
-    AbstractScalar,
-    AbstractFunction,
-    AbstractTuple,
-    AbstractArray,
-    AbstractDict,
-    AbstractClassBase,
-    AbstractClass,
-    AbstractADT,
-    AbstractJTagged,
-    AbstractUnion,
-    AbstractTaggedUnion,
-    AbstractKeywordArgument,
-    AbstractBottom,
-    AbstractError,
     TrackDict,
-    PartialApplication,
-    JTransformedFunction,
-    VALUE,
-    TYPE,
-    SHAPE,
 )
-
+from .loop import (
+    Pending,
+    PendingTentative,
+    find_coherent_result_sync,
+    is_simple,
+)
 
 ############
 # Building #

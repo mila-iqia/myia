@@ -1,29 +1,37 @@
 """PyTorch Frontend."""
 
-import torch
-import torch.utils.dlpack
-
 import copy
 from collections import OrderedDict
 
+import torch
+import torch.utils.dlpack
+
 from .. import composite as C
-from ..composite import core
-from ..prim import ops as P
-from ..abstract.infer import to_abstract, ArrayWrapper
-from ..abstract.data import AbstractArray, AbstractScalar, \
-    ANYTHING, VALUE, TYPE, SHAPE
-from ..dtype import Int, UInt, Float, Bool, Number
-from ..pipeline.resources import standard_object_map, standard_method_map
-from ..hypermap import hyper_map
+from ..abstract.data import (
+    ANYTHING,
+    SHAPE,
+    TYPE,
+    VALUE,
+    AbstractArray,
+    AbstractScalar,
+)
+from ..abstract.infer import ArrayWrapper, to_abstract
 from ..api import _convert_arg_init
-from ..pipeline.steps import convert_arg, convert_result_array
-from ..prim.py_implementations import scalar_cast, scalar_to_array
+from ..composite import core
+from ..dtype import Bool, Float, Int, Number, UInt
+from ..hypermap import hyper_map
 from ..opt.clean import _reabs
-
-from .pytorch_abstract_types import AbstractModule, AbstractPyTorchTensor, \
-    PyTorchTensorWrapper, APT
-from .pytorch_functions import item, linear, relu, sigmoid, _sum, t, tensor_dim
-
+from ..pipeline.resources import standard_method_map, standard_object_map
+from ..pipeline.steps import convert_arg, convert_result_array
+from ..prim import ops as P
+from ..prim.py_implementations import scalar_cast, scalar_to_array
+from .pytorch_abstract_types import (
+    APT,
+    AbstractModule,
+    AbstractPyTorchTensor,
+    PyTorchTensorWrapper,
+)
+from .pytorch_functions import _sum, item, linear, relu, sigmoid, t, tensor_dim
 
 _type_map = {
     torch.int8: Int[8],

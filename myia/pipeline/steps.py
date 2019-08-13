@@ -4,28 +4,54 @@ The steps are listed in roughly the same order they should be called.
 """
 
 
-import numpy as np
 from itertools import count
 
+import numpy as np
+
 from .. import dtype
-from ..abstract import AbstractTuple, AbstractClassBase, \
-    AbstractDict, AbstractArray, TYPE, AbstractScalar, AbstractUnion, SHAPE, \
-    AbstractTaggedUnion, VALUE, ANYTHING, empty
+from ..abstract import (
+    ANYTHING,
+    SHAPE,
+    TYPE,
+    VALUE,
+    AbstractArray,
+    AbstractClassBase,
+    AbstractDict,
+    AbstractScalar,
+    AbstractTaggedUnion,
+    AbstractTuple,
+    AbstractUnion,
+    ArrayWrapper,
+    empty,
+)
 from ..cconv import closure_convert
-from ..ir import Graph
-from ..opt import lib as optlib, CSE, simplify_types, NodeMap, \
-    LocalPassOptimizer, DeadDataElimination, type_to_tag
-from ..prim import vm_registry
-from ..utils import overload, no_prof, TaggedValue, MyiaInputTypeError, \
-    Cons, Empty
-from ..validate import validate, whitelist as default_whitelist, \
-    validate_abstract as default_validate_abstract
-from ..vm import VM
 from ..compile import load_backend
-from ..abstract import ArrayWrapper
-
-from .pipeline import pipeline_function, PipelineStep
-
+from ..ir import Graph
+from ..opt import (
+    CSE,
+    DeadDataElimination,
+    LocalPassOptimizer,
+    NodeMap,
+    lib as optlib,
+    simplify_types,
+    type_to_tag,
+)
+from ..prim import vm_registry
+from ..utils import (
+    Cons,
+    Empty,
+    MyiaInputTypeError,
+    TaggedValue,
+    no_prof,
+    overload,
+)
+from ..validate import (
+    validate,
+    validate_abstract as default_validate_abstract,
+    whitelist as default_whitelist,
+)
+from ..vm import VM
+from .pipeline import PipelineStep, pipeline_function
 
 #############
 # Optimizer #

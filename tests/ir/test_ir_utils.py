@@ -1,11 +1,24 @@
 
-from myia.pipeline import scalar_parse as parse
 from myia.debug.label import short_labeler
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs as _dfs
-from myia.ir import Apply, Constant, Graph, Parameter, Special, \
-    dfs, exclude_from_set, freevars_boundary, isomorphic, \
-    succ_deep, succ_deeper, succ_incoming, toposort, print_graph
+from myia.ir import (
+    Apply,
+    Constant,
+    Graph,
+    Parameter,
+    Special,
+    dfs,
+    exclude_from_set,
+    freevars_boundary,
+    isomorphic,
+    print_graph,
+    succ_deep,
+    succ_deeper,
+    succ_incoming,
+    toposort,
+)
+from myia.pipeline import scalar_parse as parse
 from tests.test_graph_utils import _check_toposort
 
 

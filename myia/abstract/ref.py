@@ -2,8 +2,8 @@
 
 import asyncio
 from dataclasses import dataclass
-from .loop import force_pending
 
+from .loop import force_pending
 
 ############
 # Contexts #

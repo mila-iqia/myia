@@ -2,17 +2,21 @@
 import pytest
 
 from myia import operations
+from myia.ir import Constant, GraphCloner, isomorphic
+from myia.opt import (
+    LocalPassOptimizer,
+    NodeMap,
+    PatternSubstitutionOptimization as psub,
+    cse,
+    pattern_replacer,
+    sexp_to_graph,
+)
 from myia.pipeline import scalar_pipeline
-from myia.ir import Constant, isomorphic, GraphCloner
-from myia.opt import PatternSubstitutionOptimization as psub, \
-    LocalPassOptimizer, pattern_replacer, sexp_to_graph, \
-    cse, NodeMap
 from myia.prim import Primitive, ops as prim
-from myia.utils import Merge, InferenceError
+from myia.utils import InferenceError, Merge
 from myia.utils.unify import Var, var
 
-from ..common import i64, f64, to_abstract_test
-
+from ..common import f64, i64, to_abstract_test
 
 X = Var('X')
 Y = Var('Y')

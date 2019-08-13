@@ -1,12 +1,13 @@
 """Estimate gradients with finite differences."""
 
 
-from dataclasses import is_dataclass
-from typing import Callable, Dict, List, Any
-import numpy
 import itertools
+from dataclasses import is_dataclass
+from typing import Any, Callable, Dict, List
 
-from ..utils import smap, overload
+import numpy
+
+from ..utils import overload, smap
 
 
 @smap.variant

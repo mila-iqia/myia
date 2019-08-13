@@ -15,16 +15,16 @@
 #           pytorch original.                                               #
 #############################################################################
 
-from ..prim import ops as P
 from .. import composite as C
 from ..composite import core
-from ..ir import MultitypeGraph
 from ..hypermap import hyper_map
+from ..ir import MultitypeGraph
+from ..prim import ops as P
+from .pytorch_abstract_types import APT
 
 # This import is for WIP
 # from ..dtype import Bool, Int
 
-from .pytorch_abstract_types import APT
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############
 

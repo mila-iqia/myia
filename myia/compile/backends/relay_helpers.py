@@ -3,9 +3,9 @@
 Most of those should go away as Relay main development progresses.
 """
 
+import numpy as np
 from tvm import relay
 from tvm.relay import transform
-import numpy as np
 
 
 def _placeholder_body(type):

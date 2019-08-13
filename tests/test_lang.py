@@ -1,12 +1,12 @@
 
 from copy import copy
-from pytest import mark
 from types import SimpleNamespace
+
+from pytest import mark
 
 from myia.pipeline import standard_debug_pipeline
 
-from .common import mysum, Point
-
+from .common import Point, mysum
 
 lang_pipeline = standard_debug_pipeline \
     .select('parse', 'resolve', 'export')

@@ -1,6 +1,5 @@
 
-from myia.utils import merge, cleanup, DELETE, TypeMap, \
-    Merge, Reset, Override
+from myia.utils import DELETE, Merge, Override, Reset, TypeMap, cleanup, merge
 
 
 def test_merge():

@@ -1,9 +1,9 @@
 # Most of the tests ar in test_backend, this is just for relay-specific
 # tests that can't be made generic.
 
+import numpy as np
 import pytest
 
-import numpy as np
 from myia import dtype
 
 try:

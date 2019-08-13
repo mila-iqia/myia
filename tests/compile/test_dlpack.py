@@ -1,5 +1,6 @@
-from myia.compile.backends import load_backend, LoadingError
 import numpy as np
+
+from myia.compile.backends import LoadingError, load_backend
 
 
 def safe_load(name):

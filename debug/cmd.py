@@ -1,8 +1,9 @@
 
+from buche import buche
+
 from myia.ir import ANFNode
 
 from . import steps
-from buche import buche
 
 
 def parse(o):

@@ -1,18 +1,21 @@
-from pytest import mark
 from copy import copy
-import numpy as np
 
+import numpy as np
+from pytest import mark
 
 from myia.abstract import from_value
 from myia.pipeline import standard_pipeline
 from myia.prim import ops as P
-from myia.prim.py_implementations import \
-    typeof, scalar_add, partial, bool_and, tagged
-from myia.utils import no_prof, Profile
+from myia.prim.py_implementations import (
+    bool_and,
+    partial,
+    scalar_add,
+    tagged,
+    typeof,
+)
+from myia.utils import Profile, no_prof
 
-
-from .common import to_abstract_test, make_tree, sumtree, Point
-
+from .common import Point, make_tree, sumtree, to_abstract_test
 
 compile_pipeline = standard_pipeline
 

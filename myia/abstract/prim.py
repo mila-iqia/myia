@@ -1,52 +1,67 @@
 """Inferrers for primitives."""
 
-import operator
 import inspect
-from functools import reduce
+import operator
 from collections import defaultdict
+from functools import reduce
 from operator import getitem
 
 from .. import dtype
-from ..abstract import typecheck
-from ..ir import Graph, MetaGraph, GraphCloner, CloneRemapper
-from ..dtype import Number, Bool, ExceptionType
-from ..prim import ops as P, Primitive, py_implementations as py
-from ..utils import Namespace, SymbolicKeyInstance, Cons, Empty, \
-    MyiaTypeError, InferenceError, MyiaShapeError, check_nargs, \
-    infer_trace, type_error_nargs
-
+from ..dtype import Bool, ExceptionType, Number
+from ..ir import CloneRemapper, Graph, GraphCloner, MetaGraph
+from ..prim import Primitive, ops as P, py_implementations as py
+from ..utils import (
+    Cons,
+    Empty,
+    InferenceError,
+    MyiaShapeError,
+    MyiaTypeError,
+    Namespace,
+    SymbolicKeyInstance,
+    check_nargs,
+    infer_trace,
+    type_error_nargs,
+)
 from .data import (
     ANYTHING,
-    AbstractValue,
-    AbstractScalar,
-    AbstractType,
-    AbstractFunction,
-    AbstractTuple,
-    AbstractArray,
-    AbstractDict,
-    AbstractClassBase,
+    SHAPE,
+    TYPE,
+    VALUE,
     AbstractADT,
-    AbstractJTagged,
+    AbstractArray,
     AbstractBottom,
-    AbstractUnion,
-    AbstractTaggedUnion,
+    AbstractClassBase,
+    AbstractDict,
+    AbstractFunction,
+    AbstractJTagged,
     AbstractKeywordArgument,
-    PartialApplication,
-    JTransformedFunction,
-    PrimitiveFunction,
-    Possibilities,
-    GraphFunction,
-    MetaGraphFunction,
+    AbstractScalar,
+    AbstractTaggedUnion,
+    AbstractTuple,
+    AbstractType,
+    AbstractUnion,
+    AbstractValue,
     DummyFunction,
-    VALUE, TYPE, SHAPE,
+    GraphFunction,
+    JTransformedFunction,
+    MetaGraphFunction,
+    PartialApplication,
+    Possibilities,
+    PrimitiveFunction,
     listof,
 )
+from .infer import Inferrer, to_abstract
 from .loop import Pending, find_coherent_result, force_pending
 from .ref import Context
-from .utils import sensitivity_transform, build_value, \
-    type_token, broaden, type_to_abstract, hastype_helper
-from .infer import Inferrer, to_abstract
-
+from .utils import (
+    broaden,
+    build_value,
+    hastype_helper,
+    sensitivity_transform,
+    type_to_abstract,
+    type_token,
+    typecheck,
+)
 
 abstract_inferrer_constructors = {}
 

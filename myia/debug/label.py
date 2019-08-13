@@ -2,12 +2,12 @@
 
 
 from types import FunctionType
-from ..info import DebugInfo
-from ..ir.anf import ANFNode, Graph
-from ..ir import MetaGraph
-from ..prim import Primitive
-from ..utils import Named, Namespace, EnvInstance, SymbolicKeyInstance
 
+from ..info import DebugInfo
+from ..ir import MetaGraph
+from ..ir.anf import ANFNode, Graph
+from ..prim import Primitive
+from ..utils import EnvInstance, Named, Namespace, SymbolicKeyInstance
 
 short_relation_symbols = {
     'copy': '',

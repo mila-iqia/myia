@@ -3,14 +3,14 @@
 import ast
 import sys
 import warnings
-from colorama import Fore, Style
+
 import prettyprinter as pp
+from colorama import Fore, Style
 
 from ..abstract import Reference, data, format_abstract, pretty_struct
-from ..parser import MyiaSyntaxError, MyiaDisconnectedCodeWarning
-from ..utils import InferenceError, eprint
 from ..ir import Graph
-
+from ..parser import MyiaDisconnectedCodeWarning, MyiaSyntaxError
+from ..utils import InferenceError, eprint
 from .label import label
 
 

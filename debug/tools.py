@@ -1,7 +1,10 @@
 
-from myia.pipeline import \
-    PipelineDefinition, scalar_pipeline, standard_pipeline
-from myia.abstract import from_value, AbstractValue
+from myia.abstract import AbstractValue, from_value
+from myia.pipeline import (
+    PipelineDefinition,
+    scalar_pipeline,
+    standard_pipeline,
+)
 from myia.utils import Merge
 
 from . import steps

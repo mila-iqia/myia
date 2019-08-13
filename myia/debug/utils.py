@@ -5,7 +5,6 @@ from collections import defaultdict
 
 from ..graph_utils import always_include, dfs
 from ..ir.utils import succ_deeper
-
 from .label import short_labeler
 
 

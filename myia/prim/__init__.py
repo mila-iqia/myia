@@ -1,6 +1,4 @@
 """Primitive operations."""
 
 from .ops import Primitive  # noqa
-from .py_implementations import (  # noqa
-    py_registry, vm_registry
-)
+from .py_implementations import py_registry, vm_registry  # noqa

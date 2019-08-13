@@ -5,14 +5,14 @@ Myia is still a work in progress, and this example may change in the future.
 
 
 import time
-import numpy
-from numpy.random import RandomState
 from dataclasses import dataclass
 
-from myia import myia, value_and_grad, ArithmeticData
+import numpy
+from numpy.random import RandomState
+
+from myia import ArithmeticData, myia, value_and_grad
 # The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
-
 
 ###########
 # Options #

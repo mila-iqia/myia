@@ -3,12 +3,19 @@
 
 from collections import defaultdict
 
+from ..abstract import (
+    DEAD,
+    AbstractError,
+    AbstractFunction,
+    GraphFunction,
+    PartialApplication,
+    PrimitiveFunction,
+    TypedPrimitive,
+)
+from ..graph_utils import dfs
+from ..ir import Constant, Graph, succ_incoming
 from ..prim import ops as P
 from ..utils import Partializable
-from ..abstract import AbstractFunction, GraphFunction, PartialApplication, \
-    DEAD, PrimitiveFunction, TypedPrimitive, AbstractError
-from ..graph_utils import dfs
-from ..ir import Constant, succ_incoming, Graph
 
 
 def _flatten_call(fn):

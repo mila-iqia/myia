@@ -1,12 +1,12 @@
 """Graph optimization routines."""
 
-from weakref import WeakKeyDictionary
 from collections import deque
+from weakref import WeakKeyDictionary
 
 from ..ir import ANFNode, Apply, Constant, Graph, Special, manage
 from ..prim import Primitive
-from ..utils.unify import Unification, Var
 from ..utils import OrderedSet
+from ..utils.unify import Unification, Var
 
 
 class VarNode(Special):

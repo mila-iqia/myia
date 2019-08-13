@@ -2,8 +2,7 @@
 
 import operator
 from functools import reduce
-from typing import \
-    Any, Callable, Dict, Iterable, List, Set, TypeVar, Union
+from typing import Any, Callable, Dict, Iterable, List, Set, TypeVar, Union
 
 from . import overload
 

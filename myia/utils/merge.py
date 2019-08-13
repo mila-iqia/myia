@@ -1,9 +1,8 @@
 """Utilities to merge dictionaries and other data structures."""
 
 
+from .misc import MISSING, Named
 from .overload import overload
-from .misc import Named, MISSING
-
 
 # Use in a merge to indicate that a key should be deleted
 DELETE = Named('DELETE')

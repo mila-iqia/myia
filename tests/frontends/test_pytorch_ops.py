@@ -1,28 +1,29 @@
 
-import pytest
-from pytest import mark
 from copy import copy
 from types import FunctionType
+
 import numpy as np
+import pytest
+from pytest import mark
 
 from myia.abstract import from_value
-from myia.pipeline import standard_pipeline
+from myia.abstract.data import ANYTHING, SHAPE, TYPE, VALUE, AbstractScalar
 from myia.debug.finite_diff import clean_args
+from myia.frontends import activate_frontend  # noqa: E402
+from myia.frontends.pytorch_abstract_types import \
+    AbstractPyTorchTensor  # noqa: E402
+from myia.pipeline import standard_pipeline
 from myia.utils import Profile  # , no_prof
-from myia.abstract.data import SHAPE, TYPE, VALUE, ANYTHING, AbstractScalar
 
-from ..common import f32, MA, to_abstract_test
-from ..test_grad import grad_wrap, grad_pipeline
+from ..common import MA, f32, to_abstract_test
+from ..test_grad import grad_pipeline, grad_wrap
 
 torch = pytest.importorskip("torch")
 nn = torch.nn
 F = torch.nn.functional
 
-from myia.frontends import activate_frontend  # noqa: E402
 activate_frontend('pytorch')
 
-from myia.frontends.pytorch_abstract_types import \
-    AbstractPyTorchTensor  # noqa: E402
 
 fwd_compile_pipeline = standard_pipeline
 

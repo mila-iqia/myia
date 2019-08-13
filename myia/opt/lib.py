@@ -1,19 +1,34 @@
 """Library of optimizations."""
 
-from ..abstract import abstract_clone, AbstractFunction, AbstractJTagged, \
-    AbstractArray, ANYTHING, SHAPE, type_token, DEAD
+from ..abstract import (
+    ANYTHING,
+    DEAD,
+    SHAPE,
+    AbstractArray,
+    AbstractFunction,
+    AbstractJTagged,
+    abstract_clone,
+    type_token,
+)
 from ..composite import gadd, zeros_like
 from ..dtype import Number
-from ..ir import Apply, Graph, Constant, GraphCloner, transformable_clone, \
-    BasicRemapper
+from ..ir import (
+    Apply,
+    BasicRemapper,
+    Constant,
+    Graph,
+    GraphCloner,
+    transformable_clone,
+)
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable, overload
-from ..utils.unify import Var, var, SVar
-
-from .opt import \
-    sexp_to_node, pattern_replacer, GraphTransform, \
-    PatternSubstitutionOptimization as psub
-
+from ..utils.unify import SVar, Var, var
+from .opt import (
+    GraphTransform,
+    PatternSubstitutionOptimization as psub,
+    pattern_replacer,
+    sexp_to_node,
+)
 
 #####################
 # Generic variables #

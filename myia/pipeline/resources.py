@@ -1,18 +1,17 @@
 """Pipeline resources."""
 
 import math
-import numpy as np
 from types import FunctionType
 
-from .. import dtype, operations, parser, composite as C, abstract
-from ..monomorphize import monomorphize
+import numpy as np
+
+from .. import abstract, composite as C, dtype, operations, parser
 from ..abstract import InferenceEngine
 from ..ir import Graph, clone
+from ..monomorphize import monomorphize
 from ..prim import ops as P
-from ..utils import overload, TypeMap, Slice
-
+from ..utils import Slice, TypeMap, overload
 from .pipeline import PipelineResource
-
 
 scalar_object_map = {
     operations.add: P.scalar_add,

@@ -4,7 +4,7 @@ import importlib
 import os
 import urllib
 
-from ... import dtype, abstract
+from ... import abstract, dtype
 
 
 class UnknownBackend(Exception):

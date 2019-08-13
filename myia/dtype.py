@@ -2,10 +2,11 @@
 
 
 import typing
-import numpy
 from typing import Tuple as TupleT
-from .utils import SymbolicKeyInstance, EnvInstance
 
+import numpy
+
+from .utils import EnvInstance, SymbolicKeyInstance
 
 _type_cache = {}
 

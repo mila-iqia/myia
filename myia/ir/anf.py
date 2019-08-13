@@ -10,14 +10,13 @@ returning a nested function creates a closure.
 
 """
 
-from typing import Any, Iterable, List, Union, Dict
 from copy import copy
+from typing import Any, Dict, Iterable, List, Union
 
 from ..info import About, NamedDebugInfo
-from ..prim import ops as primops, Primitive
+from ..prim import Primitive, ops as primops
 from ..utils import Named, list_str, repr_
 from ..utils.unify import expandlist, noseq
-
 from .abstract import Node
 
 PARAMETER = Named('PARAMETER')
