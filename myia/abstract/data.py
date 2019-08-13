@@ -275,6 +275,7 @@ class AbstractValue(Interned, PossiblyRecursive):
 
 class AbstractAtom(AbstractValue):
     """Base class for abstract values that are not structures."""
+
     def _serialize(self):
         data = dict()
         for k, v in self.values.items():

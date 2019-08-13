@@ -140,6 +140,7 @@ class Float(Number):
     Instantiate with `Float[nbits]`.  Unsupported values will raise a
     ValueError.
     """
+
     _valid_bits = (16, 32, 64)
 
 
@@ -149,6 +150,7 @@ class Int(Number):
     Instantiate with `Int[nbits]`.  Unsupported values will raise a
     ValueError.
     """
+
     _valid_bits = (8, 16, 32, 64)
 
 
@@ -158,6 +160,7 @@ class UInt(Number):
     Instantiate with `UInt[nbits]`.  Unsupported values will raise a
     ValueError.
     """
+
     _valid_bits = (8, 16, 32, 64)
 
 

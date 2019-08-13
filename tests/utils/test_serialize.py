@@ -6,7 +6,7 @@ from myia.utils import load, dump
 from myia.prim.ops import switch, scalar_add
 from myia.abstract import ANYTHING
 from myia import dtype
-from myia.ir import Constant, Parameter, Apply, Graph, isomorphic
+from myia.ir import Constant, Graph, isomorphic
 
 from ..common import to_abstract_test
 
@@ -52,6 +52,7 @@ def test_same(v):
     s = dumpstr(v)
     v2 = loadstr(s)
     assert v is v2
+
 
 g = Graph()
 p1 = g.add_parameter()

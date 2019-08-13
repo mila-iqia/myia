@@ -1,6 +1,8 @@
+"""Serialization utilities for graphs and their properties."""
+
 try:
     from yaml import CSafeLoader as SafeLoader, CSafeDumper as SafeDumper
-except ImportError:
+except ImportError:  # pragma: no cover
     from yaml import SafeLoader, SafeDumper
 
 import sys
@@ -9,7 +11,9 @@ from dataclasses import is_dataclass
 
 class MyiaLoader(SafeLoader):
     """Customize the loader for stuff we want to do."""
+
     def construct_document(self, node):
+        """Add support for finalizers."""
         self._finalizers = []
         res = super().construct_document(node)
         for f in self._finalizers:
@@ -18,6 +22,7 @@ class MyiaLoader(SafeLoader):
         return res
 
     def add_finalizer(self, f):
+        """Regsiter a finalizer to be run when the loading is finished."""
         assert callable(f)
         self._finalizers.append(f)
 
@@ -162,6 +167,7 @@ def register_serialize(obj, tag):
 
 
 def dump(o, stream=sys.stdout):
+    """Dump the passed-in object to the specified stream."""
     dumper = SafeDumper(stream)
     try:
         dumper.open()
@@ -172,6 +178,7 @@ def dump(o, stream=sys.stdout):
 
 
 def load(stream):
+    """Load one object from the stream."""
     loader = MyiaLoader(stream)
     try:
         return loader.get_single_data()

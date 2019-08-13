@@ -557,6 +557,7 @@ class Parameter(ANFNode):
     they belong to.
 
     """
+
     def __init__(self, graph: Graph) -> None:
         """Construct the parameter."""
         super().__init__([], PARAMETER, graph)
