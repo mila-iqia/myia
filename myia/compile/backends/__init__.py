@@ -5,7 +5,9 @@ import os
 import urllib
 
 from ... import abstract, xtype
+
 from ...utils import TaggedValue
+from ..channel import RPCProcess
 
 
 class UnknownBackend(Exception):
@@ -20,23 +22,23 @@ class LoadingError(Exception):
     """
 
 
-def import_load(pkg, name):
+def channel_load(pkg, name):
     """Helper function for simple backends.
 
     This will return a callable that will load a module, retrieve a
     object from its namespace and return that.
 
     """
-    def loader():
-        mod = importlib.import_module(pkg)
-        return getattr(mod, name)
+    def loader(init_args):
+        proc = RPCProcess(pkg, name, init_args)
+        return ChannelBackend(proc)
     return loader
 
 
 _backends = {
-    'nnvm': import_load('myia.compile.backends.nnvm', 'NNVMBackend'),
-    'relay': import_load('myia.compile.backends.relay', 'RelayBackend'),
-    'pytorch': import_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
+    'nnvm': channel_load('myia.compile.backends.nnvm', 'NNVMBackend'),
+    'relay': channel_load('myia.compile.backends.relay', 'RelayBackend'),
+    'pytorch': channel_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
 }
 
 _active_backends = {}
@@ -108,7 +110,7 @@ def load_backend(name, options=None):
     res = _active_backends.get(key, None)
     if res is None:
         try:
-            res = _backends[name]()(**options)
+            res = _backends[name](options)
             _active_backends[key] = res
         except Exception as e:
             raise LoadingError(name) from e
@@ -130,7 +132,7 @@ def register_backend(name, load_fn):
 class Backend:
     """This is a class interface that all backends must implement."""
 
-    def compile(self, graph, argspec, outspec, pipeline):
+    def compile(self, graph, argspec, outspec):
         """Compile the group of graphs rooted at `graph`.
 
         This function takes in a fully typed graph cluster rooted at
@@ -206,3 +208,31 @@ class Backend:
             return TaggedValue(v.tag, self.to_backend_value(v.value, real_t))
         else:
             raise NotImplementedError(f'from_value for {t}')
+
+
+class ChannelBackend(Backend):
+    """Backend based on a channel to another process."""
+    def __init__(self, proc):
+        self.proc = proc
+
+    def compile(self, graph, argspec, outspec):
+        return self.proc.call_method('compile', graph, argspec, outspec)
+
+    def from_numpy(self, a):
+        return self.proc.call_method('from_numpy', a)
+
+    def to_numpy(self, v):
+        return self.proc.call_method('to_numpy', v)
+
+    def from_scalar(self, s, t):
+        return self.proc.call_method('from_scalar', s, t)
+
+    def to_scalar(self, v):
+        return self.proc.call_method('to_scalar', v)
+
+    def empty_env(self):
+        return self.proc.call_method('empty_env')
+
+    def convert_value(self, v, t):
+        return self.proc.call_method('convert_value', v, t)
+

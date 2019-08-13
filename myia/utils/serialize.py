@@ -9,8 +9,27 @@ import sys
 from dataclasses import is_dataclass
 
 
+class MyiaDumper(SafeDumper):
+    """Customize the dumper."""
+
+    def __init__(self, stream):
+        """Record stream, even for C."""
+        super().__init__(stream, encoding='utf-8',
+                         explicit_end=True, explicit_start=True)
+        self.stream = stream
+
+    def represent(self, data):
+        """Represent and flush."""
+        super().represent(data)
+        self.stream.flush()
+
+
 class MyiaLoader(SafeLoader):
-    """Customize the loader for stuff we want to do."""
+    """Customize the loader."""
+    def __init__(self, stream):
+        stream.read = stream.read1
+        stream.readinto = stream.readinto1
+        super().__init__(stream)
 
     def construct_document(self, node):
         """Add support for finalizers."""
@@ -113,7 +132,7 @@ def serializable(tag, *, dc=None, sequence=False, scalar=False):
                 method = __serialize_scal__
             setattr(cls, '__serialize__', method)
         _construct = _make_construct(cls, dc, sequence, scalar)
-        SafeDumper.add_representer(cls, _serialize)
+        MyiaDumper.add_representer(cls, _serialize)
         MyiaLoader.add_constructor(tag, _construct)
         return cls
     return wrapper
@@ -127,7 +146,7 @@ def _construct_tuple(loader, node):
     return tuple(loader.construct_sequence(node))
 
 
-SafeDumper.add_representer(tuple, _serialize_tuple)
+MyiaDumper.add_representer(tuple, _serialize_tuple)
 MyiaLoader.add_constructor('tuple', _construct_tuple)
 
 _OBJ_MAP = {}
@@ -150,7 +169,7 @@ def _construct_unique(loader, node):
         return obj
 
 
-SafeDumper.add_representer(None, _serialize_unique)
+MyiaDumper.add_representer(None, _serialize_unique)
 MyiaLoader.add_constructor(None, _construct_unique)
 
 
@@ -168,7 +187,7 @@ def register_serialize(obj, tag):
 
 def dump(o, stream=sys.stdout):
     """Dump the passed-in object to the specified stream."""
-    dumper = SafeDumper(stream)
+    dumper = MyiaDumper(stream)
     try:
         dumper.open()
         dumper.represent(o)

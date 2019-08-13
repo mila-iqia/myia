@@ -405,6 +405,23 @@ def step_compile(resources, graph, argspec, outspec):
     return {'output': out}
 
 
+############################
+# Wrap the output function #
+############################
+
+class NumpyChecker:
+    """Dummy backend used for debug mode."""
+
+    def to_backend_value(self, v, t):
+        """Returns v."""
+        return v
+
+    def from_backend_value(self, v, t):
+        """Returns v."""
+        return v
+>>>>>>> First shot at the ChannelBackend
+
+
 class SlowdownWarning(UserWarning):
     """Used to indicate a potential slowdown source."""
 
