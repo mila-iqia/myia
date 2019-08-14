@@ -7,7 +7,7 @@ from functools import reduce
 
 from .. import dtype
 from ..dtype import Bool, ExceptionType, Number
-from ..ir import CloneRemapper, Constant, Graph, GraphCloner
+from ..ir import Constant, Graph
 from ..prim import Primitive, ops as P, py_implementations as py
 from ..utils import (
     InferenceError,
@@ -57,7 +57,6 @@ from .utils import (
     type_to_abstract,
     type_token,
     typecheck,
-    union_simplify,
 )
 
 abstract_inferrer_constructors = {}
@@ -645,164 +644,6 @@ async def _inf_dot(self, engine, a: AbstractArray, b: AbstractArray):
 ##############
 # Statements #
 ##############
-
-
-class _CastRemapper(CloneRemapper):
-
-    def __init__(self,
-                 graphs,
-                 inlines,
-                 manager,
-                 relation,
-                 graph_relation,
-                 clone_constants,
-                 graph_repl,
-                 fv_replacements):
-        """Initialize the GraphCloner."""
-        super().__init__(
-            graphs=graphs,
-            inlines=inlines,
-            manager=manager,
-            relation=relation,
-            graph_repl=graph_repl,
-            graph_relation=graph_relation,
-            clone_constants=clone_constants,
-        )
-        self.fv_replacements = fv_replacements
-
-    def gen_fv(self, g, ng, fv):
-        """Remap the free variables we want to remap."""
-        if fv in self.fv_replacements:
-            new = self.fv_replacements[fv]
-            self.remap_node((g, fv), g, fv, ng, new, link=False)
-
-
-@standard_prim(P.user_switch)
-class _UserSwitchInferrer(Inferrer):
-
-    async def type_trials(self, engine, focus, outref,
-                          opnode, argrefs,
-                          condref, tbref, fbref):
-        """Handle `user_switch(hastype(x, typ), tb, fb)`.
-
-        We want to evaluate tb in a context where x has type typ and fb
-        in a context where it doesn't.
-        """
-        def cond_trial(cg, opt):
-            # For each possible type we make a "cond trial" which replaces the
-            # focus input in the condition function by one that's cast to the
-            # type. We can thus check if the value of the condition depends
-            # directly on the type.
-            return cg.apply(opnode,
-                            *nodes[:focus],
-                            cg.apply(P.unsafe_static_cast, nodes[focus], opt),
-                            *nodes[focus + 1:])
-
-        async def wrap(branch_ref, branch_type):
-            # We transform branch_graph into a new graph which refers to a cast
-            # version of x. We also transform all of the children of x's graph
-            # so that closures called in the branch also refer to the cast
-            # version of x.
-            branch_graph = branch_ref.node.value
-            if branch_graph not in xg.scope:
-                return branch_graph
-            rval = branch_graph.make_new(relation='copy')
-            cast = rval.apply(P.unsafe_static_cast, xref.node, branch_type)
-            cl = GraphCloner(
-                *xg.children,
-                total=False,
-                graph_repl={branch_graph: rval},
-                remapper_class=_CastRemapper.partial(
-                    fv_replacements={xref.node: cast}
-                )
-            )
-            assert rval is cl[branch_graph]
-            engine.mng.add_graph(rval)
-            return rval
-
-        nodes = [ref.node for ref in argrefs]
-        xref = argrefs[focus]
-        fulltype = await xref.get()
-        assert isinstance(fulltype, AbstractUnion)
-
-        xg = xref.node.graph
-        cg = condref.node.graph
-        cond_trials = [cond_trial(cg, t) for t in fulltype.options]
-        results = [await engine.ref(node, condref.context).get()
-                   for node in cond_trials]
-
-        groups = {True: [], False: [], ANYTHING: []}
-
-        for t, result in zip(fulltype.options, results):
-            assert isinstance(result, AbstractScalar)
-            assert result.values[TYPE] is dtype.Bool
-            value = result.values[VALUE]
-            groups[value].append(t)
-
-        if groups[ANYTHING]:
-            return await self.default(engine, outref, condref, tbref, fbref)
-
-        tbtyp = union_simplify(groups[True])
-        fbtyp = union_simplify(groups[False])
-
-        if tbtyp is None:
-            return fbref
-        elif fbtyp is None:
-            return tbref
-        else:
-            g = outref.node.graph
-            new_conds = [g.apply(P.hastype, xref.node, t)
-                         for t in groups[True]]
-            new_cond = reduce(lambda x, y: g.apply(P.bool_or, x, y),
-                              new_conds)
-            new_tb = await wrap(tbref, tbtyp)
-            new_fb = await wrap(fbref, fbtyp)
-            new_node = g.apply(P.switch, new_cond, new_tb, new_fb)
-            return engine.ref(new_node, outref.context)
-
-    async def _find_op(self, engine, condref):
-        """Find a primitive operator to use for the condition."""
-        ctx = condref.context
-        if condref.node.is_apply():
-            opnode, *args = condref.node.inputs
-            opref = engine.ref(opnode, ctx)
-            ops = (await opref.get()).get_sync()
-            if len(ops) == 1:
-                op, = ops
-                argrefs = [engine.ref(a, ctx) for a in args]
-                argtypes = [await arg.get() for arg in argrefs]
-                for i, arg in enumerate(argtypes):
-                    if isinstance(arg, AbstractUnion):
-                        return i + 1, opnode, argrefs
-        return None, None, None
-
-    async def default(self, engine, outref, condref, tbref, fbref):
-        g = outref.node.graph
-        _, cond, tb, fb = outref.node.inputs
-        condt = await condref.get()
-        if not engine.check_predicate(Bool, type_token(condt)):
-            to_bool = engine.pipeline.resources.convert(bool)
-            cond = g.apply(to_bool, cond)
-        newnode = g.apply(P.switch, cond, tb, fb)
-        return engine.ref(newnode, outref.context)
-
-    async def reroute(self, engine, outref, argrefs):
-        condref, tbref, fbref = check_nargs(P.switch, 3, argrefs)
-
-        for branch_ref in [tbref, fbref]:
-            if not branch_ref.node.is_constant_graph():
-                raise MyiaTypeError(
-                    'Branches of switch must be functions when the condition'
-                    ' is hastype on a Union.'
-                )
-
-        focus, opnode, args = await self._find_op(engine, condref)
-        if focus is not None:
-            return await self.type_trials(engine, focus - 1, outref,
-                                          opnode, args, condref,
-                                          tbref, fbref)
-
-        return await self.default(engine, outref, condref, tbref, fbref)
 
 
 @standard_prim(P.switch)

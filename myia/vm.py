@@ -7,6 +7,7 @@ implementation.
 
 from typing import Any, Iterable, List, Mapping
 
+from . import operations
 from .abstract import to_abstract
 from .graph_utils import toposort
 from .ir import ANFNode, Apply, Constant, Graph, MetaGraph, Parameter
@@ -247,9 +248,16 @@ class VM:
         return Closure(graph, clos)
 
     def _dispatch_call(self, node, frame, fn, args):
-        from .macros import getattr_ as macro_getattr
-        if fn in (getattr, macro_getattr):
-            fn = P.record_getitem
+        from . import macros
+        # This map should be removed once the inferrer/monomorphizer is always
+        # run before the DebugVM.
+        _macro_map = {
+            operations.getattr: P.record_getitem,
+            macros.getattr_: P.record_getitem,
+            macros.user_switch: P.switch,
+        }
+        if fn in _macro_map:
+            fn = _macro_map[fn]
         if isinstance(fn, Primitive):
             if fn == return_:
                 raise self._Return(args[0])

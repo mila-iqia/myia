@@ -36,6 +36,7 @@ from myia.dtype import (
 from myia.hypermap import HyperMap, hyper_map
 from myia.ir import Graph, MultitypeGraph
 from myia.macros import grad
+from myia.operations import user_switch
 from myia.pipeline import scalar_pipeline, standard_pipeline
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import (
@@ -72,7 +73,6 @@ from myia.prim.py_implementations import (
     tuple_setitem,
     typeof,
     unsafe_static_cast,
-    user_switch,
 )
 from myia.utils import InferenceError, MyiaTypeError, newenv
 

@@ -112,7 +112,6 @@ dot = Primitive('dot')
 ##############
 
 
-user_switch = Primitive('user_switch')
 switch = Primitive('switch')
 return_ = Primitive('return')
 raise_ = Primitive('raise')

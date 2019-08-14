@@ -90,4 +90,5 @@ from .utils import (  # noqa
     type_to_abstract,
     type_token,
     typecheck,
+    union_simplify,
 )
