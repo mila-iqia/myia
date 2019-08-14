@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from myia import operations
 from myia.utils import (
     NS,
     Event,
@@ -162,3 +163,8 @@ def test_env():
     assert len(e) == 2
     assert e.get(sk1, 0) == 200
     assert e.get(sk2, 0) == 300
+
+
+def test_operation_str():
+    assert str(operations.user_switch) == repr(operations.user_switch)
+    assert str(operations.user_switch) == 'myia.operations.user_switch'
