@@ -472,8 +472,7 @@ def tuple_concat(self, g, args):
 @tuple_reorganizer
 def tuple_getslice(self, g, args):
     """Metagraph for getting a slice from a tuple."""
-    check_nargs('tail', 4, args)
-    tuparg, start, stop, step = args
+    tuparg, start, stop, step = check_nargs('tail', 4, args)
     try:
         start = build_value(start)
         stop = build_value(stop)

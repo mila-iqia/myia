@@ -50,6 +50,7 @@ def check_nargs(ident, expected, args):
     got = len(args)
     if expected is not None and got != expected:
         raise type_error_nargs(ident, expected, got)
+    return args
 
 
 class TypeMismatchError(MyiaTypeError):
