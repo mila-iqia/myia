@@ -62,7 +62,7 @@ def simplify_types(root, manager):
 
     * Replace AbstractClass by AbstractTuple:
       * Class[x: t, ...] => Tuple[t, ...]
-      * getattr(data, attr) => getitem(data, idx)
+      * record_getitem(data, attr) => getitem(data, idx)
       * make_record(cls, *args) => make_tuple(*args)
 
     * Replace AbstractDict by AbstractTuple:
@@ -82,7 +82,7 @@ def simplify_types(root, manager):
         new_node = None
         keep_abstract = True
 
-        if node.is_apply(P.getattr):
+        if node.is_apply(P.record_getitem):
             _, data, item = node.inputs
             dt = data.abstract
             assert isinstance(dt, AbstractClassBase)
@@ -105,12 +105,6 @@ def simplify_types(root, manager):
                 TYPE: Int[64],
             })
             new_node = node.graph.apply(P.tuple_getitem, data, idx_c)
-
-        elif node.is_apply(P.dict_values):
-            _, data = node.inputs
-            dt = data.abstract
-            assert isinstance(dt, AbstractDict)
-            new_node = data
 
         elif node.is_apply(P.make_record):
             mkr, typ, *args = node.inputs

@@ -4,15 +4,12 @@ import inspect
 import operator
 from collections import defaultdict
 from functools import reduce
-from operator import getitem
 
 from .. import dtype
 from ..dtype import Bool, ExceptionType, Number
-from ..ir import CloneRemapper, Graph, GraphCloner, MetaGraph
+from ..ir import CloneRemapper, Constant, Graph, GraphCloner
 from ..prim import Primitive, ops as P, py_implementations as py
 from ..utils import (
-    Cons,
-    Empty,
     InferenceError,
     MyiaShapeError,
     MyiaTypeError,
@@ -32,6 +29,7 @@ from .data import (
     AbstractBottom,
     AbstractClassBase,
     AbstractDict,
+    AbstractExternal,
     AbstractFunction,
     AbstractJTagged,
     AbstractKeywordArgument,
@@ -44,14 +42,12 @@ from .data import (
     DummyFunction,
     GraphFunction,
     JTransformedFunction,
-    MetaGraphFunction,
     PartialApplication,
     Possibilities,
     PrimitiveFunction,
-    listof,
 )
-from .infer import Inferrer, to_abstract
-from .loop import Pending, find_coherent_result, force_pending
+from .infer import Inferrer
+from .loop import force_pending
 from .ref import Context
 from .utils import (
     broaden,
@@ -260,153 +256,6 @@ class MyiaNameError(InferenceError):
     """Raised when a name is not found in scope."""
 
 
-class MyiaAttributeError(InferenceError):
-    """Raised when an attribute is not found in a type or module."""
-
-
-def _prim_or_graph(afn):
-    # Check that afn represents a single Primitive/Graph/MetaGraph
-    # and return it.
-    assert isinstance(afn, AbstractFunction)
-    fn = afn.get_unique()
-    if isinstance(fn, PrimitiveFunction):
-        fn = fn.prim
-    if isinstance(fn, GraphFunction):
-        assert fn.context == Context.empty()
-        fn = fn.graph
-    if isinstance(fn, MetaGraphFunction):
-        assert fn.context == Context.empty()
-        fn = fn.metagraph
-    assert isinstance(fn, (Primitive, Graph, MetaGraph))
-    return fn
-
-
-async def static_getter(engine, data, item, fetch, on_dcattr, chk=None,
-                        dataref=None, outref=None):
-    """Analyze a call to getattr or resolve.
-
-    Arguments:
-        engine: The engine on which the inference operates.
-        data: A ref to the data.
-        item: A ref to the item/attribute.
-        fetch: A function to resolve the item on the data.
-        on_dcattr: A function to resolve an attribute on a dataclass.
-        chk: A function to check the values inferred for the
-            data and item.
-        dataref: The Reference to the data.
-        outref: The Reference to the output.
-
-    Returns:
-        ('rval', value): An AbstractValue representing the result type
-            of the call.
-        ('reroute', ref): A new reference to reroute the call to.
-
-    """
-    resources = engine.pipeline.resources
-
-    data_t = type_token(data)
-    item_v = build_value(item, default=ANYTHING)
-
-    if item_v is ANYTHING:
-        raise InferenceError(
-            'The value of the attribute could not be inferred.'
-        )
-
-    if isinstance(data_t, Pending):
-        case, *args = await find_coherent_result(
-            data_t,
-            lambda t: _resolve_case(resources, t, item_v, chk)
-        )
-    else:
-        case, *args = await _resolve_case(resources, data_t, item_v, chk)
-
-    if case == 'class':
-        # Get field from Class
-        if item_v in data.attributes:
-            return 'rval', await on_dcattr(data, item_v)
-        elif item_v in data.methods:
-            method = data.methods[item_v]
-            isprop = isinstance(method, property)
-            if isprop:
-                method = resources.convert(method.fget)
-            else:
-                method = resources.convert(method)
-            inferrer = to_abstract(method, Context.empty(), ref=outref)
-            fn = _prim_or_graph(inferrer)
-            g = outref.node.graph
-            eng = outref.engine
-            if isprop:
-                ref = eng.ref(g.apply(fn, dataref.node),
-                              outref.context)
-            else:
-                ref = eng.ref(g.apply(P.partial, fn, dataref.node),
-                              outref.context)
-            return 'reroute', ref
-        else:
-            raise InferenceError(f'Unknown field in {data}: {item_v}')
-
-    elif case == 'method':
-        method, = args
-        method = resources.convert(method)
-        inferrer = to_abstract(method, Context.empty(), ref=outref)
-        fn = _prim_or_graph(inferrer)
-        g = outref.node.graph
-        eng = outref.engine
-        ref = eng.ref(g.apply(P.partial, fn, dataref.node),
-                      outref.context)
-        return 'reroute', ref
-
-    elif case == 'no_method':
-        msg = f"object of type {data} has no attribute '{item_v}'"
-        raise MyiaAttributeError(msg)
-
-    else:
-        # Module or static namespace
-        data_v = build_value(data, default=ANYTHING)
-        if data_v is ANYTHING:
-            raise InferenceError(
-                'Could not infer the type or the value of the object'
-                f" on which to resolve the attribute '{item_v}'"
-            )
-        if chk:
-            chk(data_v, item_v)
-        try:
-            raw = fetch(data_v, item_v)
-        except NameError:
-            raise MyiaNameError(f"Cannot resolve name '{item_v}'")
-        except AttributeError as e:
-            raise MyiaAttributeError(str(e))
-        except Exception as e:  # pragma: no cover
-            raise InferenceError(f'Unexpected error in getter: {e!r}')
-        value = resources.convert(raw)
-        return 'rval', to_abstract(value, Context.empty(), ref=outref)
-
-
-async def _resolve_case(resources, data_t, item_v, chk):
-    mmap = resources.method_map
-
-    if isinstance(data_t, type) and issubclass(data_t, AbstractClassBase):
-        return ('class', data_t)
-
-    # Try method map
-    try:
-        mmap_t = mmap[data_t]
-    except KeyError:
-        mmap_t = None
-
-    if mmap_t is not None:
-        # Method call
-        if chk:
-            chk(None, item_v)
-        if item_v in mmap_t:
-            method = mmap_t[item_v]
-            return ('method', method)
-        else:
-            return ('no_method',)
-
-    return ('static',)
-
-
 def _shape_type(engine, shp):
     shp_t = engine.check(AbstractTuple, shp)
     for elem_t in shp_t.elements:
@@ -489,21 +338,6 @@ async def _inf_make_tuple(self, engine, *args):
     return AbstractTuple(args)
 
 
-@standard_prim(P.make_list)
-class _MakeListInferrer(Inferrer):
-    async def reroute(self, engine, outref, argrefs):
-        g = outref.node.graph
-        lst = g.apply(Empty)
-        argtypes = [await arg.get() for arg in argrefs]
-        if argtypes == []:
-            return engine.ref(lst, outref.context)
-        restype = engine.abstract_merge(*argtypes)
-        for arg in reversed(argrefs):
-            lst = g.apply(Cons, arg.node, lst)
-        rval = g.apply(P.unsafe_static_cast, lst, listof(restype))
-        return engine.ref(rval, outref.context)
-
-
 @standard_prim(P.make_dict)
 async def _inf_make_dict(self, engine, _dct: AbstractType, *values):
     dct = _dct.values[VALUE]
@@ -570,11 +404,6 @@ async def _inf_dict_getitem(self, engine, arg: AbstractDict, idx):
     return arg.entries[idx_v]
 
 
-@standard_prim(P.dict_values)
-async def _inf_dict_values(self, engine, arg: AbstractDict):
-    return AbstractTuple(list(arg.entries.values()))
-
-
 @standard_prim(P.tuple_setitem)
 async def _inf_tuple_setitem(self, engine,
                              arg: AbstractTuple,
@@ -587,82 +416,15 @@ async def _inf_tuple_setitem(self, engine,
     return AbstractTuple(new_elts)
 
 
-def _getattr_chk(data_v, item_v):
-    if not isinstance(item_v, str):  # pragma: no cover
-        raise MyiaTypeError(
-            f'Argument to getattr must be a string, not {item_v}.'
-        )
+@standard_prim(P.record_getitem)
+async def _inf_record_getitem(self, engine,
+                              data: AbstractClassBase,
+                              attr: AbstractExternal({TYPE: str})):
+    attr_v = self.require_constant(attr, argnum=2)
+    return data.attributes[attr_v]
 
 
-async def _getattr_on_dcattr(data, item_v):
-    return data.attributes[item_v]
-
-
-@standard_prim(P.getattr)
-class _GetAttrInferrer(Inferrer):
-    async def reroute(self, engine, outref, argrefs):
-        check_nargs(P.getattr, 2, argrefs)
-        r_data, r_item = argrefs
-        data = await r_data.get()
-
-        if isinstance(data, AbstractUnion):
-            g = outref.node.graph
-            currg = g
-            opts = await force_pending(data.options)
-            for i, opt in enumerate(opts):
-                last = (i == len(opts) - 1)
-                if last:
-                    falseg = None
-                    cast = currg.apply(P.unsafe_static_cast, r_data.node, opt)
-                    out = currg.apply(P.getattr, cast, r_item.node)
-                else:
-                    trueg = Graph()
-                    falseg = Graph()
-                    cond = currg.apply(P.hastype, r_data.node, opt)
-                    cast = trueg.apply(P.unsafe_static_cast, r_data.node, opt)
-                    trueg.output = trueg.apply(P.getattr, cast, r_item.node)
-                    engine.mng.add_graph(trueg)
-                    out = currg.apply(P.switch, cond, trueg, falseg)
-                    out = currg.apply(out)
-                if currg is g:
-                    rval = out
-                else:
-                    currg.output = out
-                    engine.mng.add_graph(currg)
-                currg = falseg
-            return engine.ref(rval, outref.context)
-
-        else:
-            item = await r_item.get()
-            policy, newref = await static_getter(
-                engine, data, item,
-                fetch=getattr,
-                on_dcattr=_getattr_on_dcattr,
-                chk=_getattr_chk,
-                outref=outref,
-                dataref=r_data,
-            )
-            return newref if policy == 'reroute' else None
-
-    async def run(self, engine, outref, argrefs):
-        check_nargs(P.getattr, 2, argrefs)
-        r_data, r_item = argrefs
-        data = await r_data.get()
-        item = await r_item.get()
-        policy, rval = await static_getter(
-            engine, data, item,
-            fetch=getattr,
-            on_dcattr=_getattr_on_dcattr,
-            chk=_getattr_chk,
-            outref=outref,
-            dataref=r_data,
-        )
-        assert policy == 'rval'
-        self.cache[(data, item)] = rval
-        return rval
-
-
-# TODO: setattr
+# TODO: record_setitem
 
 
 @standard_prim(P.tuple_len)
@@ -1101,57 +863,30 @@ async def _inf_exception(self, engine, x):
     return AbstractScalar({VALUE: ANYTHING, TYPE: ExceptionType})
 
 
-def _resolve_chk(data_v, item_v):
-    if not isinstance(data_v, Namespace):  # pragma: no cover
-        raise MyiaTypeError(
-            f'data argument to resolve must be Namespace,'
-            f' not {data_v}',
-        )
-    if not isinstance(item_v, str):  # pragma: no cover
-        raise MyiaTypeError(
-            f'item argument to resolve must be a string,'
-            f' not {item_v}.',
-        )
-
-
-async def _resolve_on_dcattr(data, item_v):  # pragma: no cover
-    raise MyiaTypeError('Cannot resolve on Class.')
-
-
 @standard_prim(P.resolve)
 class _ResolveInferrer(Inferrer):
-
     async def reroute(self, engine, outref, argrefs):
-        check_nargs(P.resolve, 2, argrefs)
-        r_data, r_item = argrefs
+        r_data, r_item = check_nargs(P.resolve, 2, argrefs)
         data = await r_data.get()
         item = await r_item.get()
-        policy, newref = await static_getter(
-            engine, data, item,
-            fetch=getitem,
-            on_dcattr=_resolve_on_dcattr,
-            chk=_resolve_chk,
-            outref=outref,
-            dataref=r_data,
-        )
-        return newref if policy == 'reroute' else None
-
-    async def run(self, engine, outref, argrefs):
-        check_nargs(P.resolve, 2, argrefs)
-        r_data, r_item = argrefs
-        data = await r_data.get()
-        item = await r_item.get()
-        policy, rval = await static_getter(
-            engine, data, item,
-            fetch=getitem,
-            on_dcattr=_resolve_on_dcattr,
-            chk=_resolve_chk,
-            outref=outref,
-            dataref=r_data,
-        )
-        assert policy == 'rval'
-        self.cache[(data, item)] = rval
-        return rval
+        data_v = build_value(data)
+        item_v = build_value(item)
+        if not isinstance(data_v, Namespace):  # pragma: no cover
+            raise MyiaTypeError(
+                f'data argument to resolve must be Namespace,'
+                f' not {data_v}',
+            )
+        if not isinstance(item_v, str):  # pragma: no cover
+            raise MyiaTypeError(
+                f'item argument to resolve must be a string,'
+                f' not {item_v}.',
+            )
+        try:
+            resolved = data_v[item_v]
+        except NameError:
+            raise MyiaNameError(f"Cannot resolve name '{item_v}'")
+        node = Constant(resolved)
+        return engine.ref(node, outref.context)
 
 
 @standard_prim(P.partial)
@@ -1178,30 +913,6 @@ class _ExtractKwArgInferrer(Inferrer):
     async def infer(self, engine, key, kwarg):
         assert key.values[VALUE] is kwarg.key
         return kwarg.argument
-
-
-@standard_prim(P.apply)
-class _ApplyInferrer(Inferrer):
-    async def reroute(self, engine, outref, argrefs):
-        assert len(argrefs) >= 1
-        fnref, *grouprefs = argrefs
-        expanded = []
-        g = outref.node.graph
-        for gref in grouprefs:
-            t = await gref.get()
-            if isinstance(t, AbstractDict):
-                for k in t.entries:
-                    extract = g.apply(P.dict_getitem, gref.node, k)
-                    mkkw = g.apply(P.make_kwarg, k, extract)
-                    expanded.append(mkkw)
-            elif isinstance(t, AbstractTuple):
-                for i, _ in enumerate(t.elements):
-                    expanded.append(g.apply(P.tuple_getitem, gref.node, i))
-            else:
-                raise MyiaTypeError(
-                    'Can only expand tuple or dict in function application'
-                )
-        return engine.ref(g.apply(fnref.node, *expanded), outref.context)
 
 
 @standard_prim(P.embed)

@@ -16,7 +16,7 @@ from myia.abstract import (
     from_value,
 )
 from myia.abstract.prim import UniformPrimitiveInferrer
-from myia.composite import gadd, grad, zeros_like
+from myia.composite import gadd, zeros_like
 from myia.debug.traceback import print_inference_error
 from myia.dtype import (
     Array,
@@ -35,6 +35,7 @@ from myia.dtype import (
 )
 from myia.hypermap import HyperMap, hyper_map
 from myia.ir import Graph, MultitypeGraph
+from myia.macros import grad
 from myia.pipeline import scalar_pipeline, standard_pipeline
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import (

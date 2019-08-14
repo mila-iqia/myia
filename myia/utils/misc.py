@@ -447,3 +447,23 @@ def keyword_decorator(deco):
         else:
             return deco(fn, **kwargs)
     return new_deco
+
+
+@keyword_decorator
+def core(fn=None, **flags):
+    """Wrap a graph that defines a core Myia function.
+
+    The following flags can be set:
+        core: (default: True) Indicates that this is a core function
+            (only informative at the moment).
+        ignore_values: (default: False) Make the inferrer ignore argument
+            values for the parameters (leads to less specialization).
+    """
+    flags = {
+        # This is a function defined in Myia's core
+        'core': True,
+        'reference': True,
+        **flags,
+    }
+    fn._myia_flags = flags
+    return fn

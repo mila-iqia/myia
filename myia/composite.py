@@ -5,6 +5,7 @@ import operator
 from dataclasses import dataclass
 from functools import reduce
 
+from . import operations
 from .abstract import (
     ANYTHING,
     SHAPE,
@@ -18,11 +19,9 @@ from .abstract import (
     AbstractTaggedUnion,
     AbstractTuple,
     AbstractUnion,
-    GraphFunction,
     broaden,
     build_value,
 )
-from .debug.label import short_labeler
 from .dtype import (
     Array,
     Bool,
@@ -37,8 +36,7 @@ from .dtype import (
     u16,
 )
 from .hypermap import HyperMap, hyper_map
-from .info import About
-from .ir import Constant, Graph, MetaGraph, MultitypeGraph
+from .ir import Graph, MetaGraph, MultitypeGraph
 from .prim import ops as P
 from .prim.py_implementations import (
     array_map,
@@ -59,7 +57,6 @@ from .prim.py_implementations import (
     scalar_sin,
     scalar_tan,
     scalar_tanh,
-    scalar_to_array,
     shape,
     tuple_getitem,
     typeof,
@@ -164,7 +161,7 @@ class Elemwise(MetaGraph):
             g.output = g.apply(array_map, fn, *transformed)
         else:
             first, *rest = transformed
-            fn = g.apply(P.getattr, first, self.mname)
+            fn = g.apply(operations.getattr, first, self.mname)
             g.output = g.apply(fn, *rest)
         return g
 
@@ -722,7 +719,7 @@ class IsCompare(MetaGraph):
         if a != b:
             g.return_ = g.apply(P.return_, self.do_not)
         else:
-            cmp_fn = g.apply(P.getattr, pa,
+            cmp_fn = g.apply(operations.getattr, pa,
                              "__ne__" if self.do_not else "__eq__")
             g.output = g.apply(cmp_fn, pb)
         return g
@@ -739,154 +736,6 @@ def list_reduce(fn, lst, dftl):
     for elem in lst:
         res = fn(res, elem)
     return res
-
-
-_cast_helper = MultitypeGraph('cast_helper')
-
-
-@_cast_helper.register(Number, Number)
-@core
-def _scalar_cast_helper(x, model):
-    t = typeof(model)
-    return scalar_cast(x, t)
-
-
-@_cast_helper.register(Number, Array)
-@core
-def _scalar_to_array_cast_helper(x, model):
-    t = typeof(model)
-    return scalar_to_array(scalar_cast(x, t.element), typeof(model))
-
-
-class GradOperation(MetaGraph):
-    """Implements the grad(f) operation.
-
-    grad(f)(x, ...) returns df(x, ...)/dx. Derivatives of other inputs are
-    thrown out.
-
-    TODO: This currently will not work on primitives, but it is an easy fix.
-    We just need to know how many parameters f takes.
-    """
-
-    def __init__(self,
-                 name,
-                 return_value=False):
-        """Initialize GradOperation."""
-        super().__init__(name)
-        self.return_value = return_value
-
-    def make_gf(self, jf, orig_params, dbg, wrt,
-                sens_param=False, apply_j=False):
-        """Make the graph for the grad.
-
-        If wrt is an integer, the wrt-th gradient will be returned directly.
-        If it is a tuple of integers, then a tuple of the specified gradients
-        will be returned in the same order (duplicates are allowed).
-
-        If self.return_value is True, a tuple will always be returned and the
-        first element will be the return value of the function. The other
-        elements will be the gradients.
-        """
-        with About(dbg, 'grad'):
-            df = Graph()
-            df.set_flags('core', 'reference')
-
-        if apply_j:
-            jf = df.apply(P.J, jf)
-
-        params = []
-        for orig_p in orig_params:
-            with About(orig_p.debug, 'grad'):
-                params.append(df.add_parameter())
-
-        jparams = [df.apply(P.J, p) for p in params]
-        app = df.apply(jf, *jparams)
-        out = df.apply(P.Jinv, df.apply(P.tuple_getitem, app, 0))
-        bprop = df.apply(P.tuple_getitem, app, 1)
-
-        if sens_param:
-            bprop_arg = df.add_parameter()
-        else:
-            bprop_arg = df.apply(_cast_helper, 1, out)
-
-        if isinstance(wrt, int):
-            direct_return = True
-            wrt = [wrt]
-        else:
-            direct_return = False
-
-        bapp = df.apply(bprop, bprop_arg)
-        elems = []
-        if self.return_value:
-            elems.append(out)
-        for idx in wrt:
-            elems.append(df.apply(P.tuple_getitem, bapp, idx + 1))
-
-        if len(elems) == 1 and direct_return:
-            df.output = elems[0]
-        else:
-            df.output = df.apply(P.make_tuple, *elems)
-        return df
-
-    def generate_graph(self, args):
-        """Generate the graph."""
-        ft, *raw_wrt = args
-        assert isinstance(ft, AbstractFunction)
-        gf = ft.get_unique()
-        assert isinstance(gf, GraphFunction)
-        g = gf.graph
-
-        wrt = []
-        for entry in raw_wrt:
-            value = build_value(entry, default=None)
-            if value is None:
-                raise MyiaTypeError(
-                    'grad must statically know which parameters to use'
-                )
-            elif value == '*':
-                wrt += range(len(g.parameters))
-            elif isinstance(value, str):
-                parameter_names = [short_labeler.name(p)
-                                   for p in g.parameters]
-                try:
-                    wrt.append(parameter_names.index(value))
-                except ValueError:
-                    raise MyiaTypeError(f'No parameter named "{value}""')
-            elif isinstance(value, int):
-                wrt.append(value)
-            else:
-                raise MyiaTypeError(
-                    'The parameters to use for grad must be strings or'
-                    ' integers.'
-                )
-
-        if len(wrt) == 1:
-            wrt = wrt[0]
-        elif len(wrt) == 0:
-            wrt = 0
-
-        dfbuilder = Graph()
-        dfbuilder.set_flags('core', 'reference')
-        dfbuilder.debug.name = f"grad{len(g.parameters)}"
-
-        with About(g.debug, 'copy'):
-            fn = dfbuilder.add_parameter()
-            for arg in args[1:]:
-                # These are dummy parameters
-                dfbuilder.add_parameter()
-
-        with About(g.debug, 'grad_fprop'):
-            jf = dfbuilder.apply(P.J, fn)
-
-        df = self.make_gf(jf, g.parameters, g.debug, wrt=wrt)
-
-        dfbuilder.output = Constant(df)
-
-        return dfbuilder
-
-
-grad = GradOperation('grad')
-value_and_grad = GradOperation('value_and_grad', return_value=True)
 
 
 class ArithmeticData:

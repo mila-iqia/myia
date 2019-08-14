@@ -5,7 +5,7 @@ from types import FunctionType
 
 import numpy as np
 
-from .. import abstract, composite as C, dtype, operations, parser
+from .. import abstract, composite as C, dtype, macros as M, operations, parser
 from ..abstract import InferenceEngine
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
@@ -43,11 +43,11 @@ scalar_object_map = {
     operations.getitem: C.getitem,
     operations.setitem: C.setitem,
     operations.bool: P.identity,
-    operations.getattr: P.getattr,
-    operations.setattr: P.setattr,
+    operations.getattr: M.getattr_,
+    operations.setattr: P.record_setitem,
     operations.len: C._len,
     operations.make_tuple: P.make_tuple,
-    operations.make_list: P.make_list,
+    operations.make_list: M.make_list,
     operations.make_dict: P.make_dict,
     operations.iter: C.iter,
     operations.hasnext: C.hasnext,
@@ -56,7 +56,7 @@ scalar_object_map = {
     operations.switch: P.switch,
     operations.user_switch: P.user_switch,
     operations.slice: Slice,
-    operations.apply: P.apply,
+    operations.apply: M.apply,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -99,11 +99,11 @@ standard_object_map = {
     operations.getitem: C.getitem,
     operations.setitem: C.setitem,
     operations.bool: C.bool,
-    operations.getattr: P.getattr,
-    operations.setattr: P.setattr,
+    operations.getattr: M.getattr_,
+    operations.setattr: P.record_setitem,
     operations.len: C._len,
     operations.make_tuple: P.make_tuple,
-    operations.make_list: P.make_list,
+    operations.make_list: M.make_list,
     operations.make_dict: P.make_dict,
     operations.iter: C.iter,
     operations.hasnext: C.hasnext,
@@ -112,7 +112,7 @@ standard_object_map = {
     operations.switch: P.switch,
     operations.user_switch: P.user_switch,
     operations.slice: Slice,
-    operations.apply: P.apply,
+    operations.apply: M.apply,
     math.floor: P.scalar_floor,
     math.trunc: P.scalar_trunc,
     math.exp: P.scalar_exp,
@@ -228,7 +228,7 @@ standard_method_map = TypeMap({
     },
     abstract.AbstractDict: {
         '__getitem__': P.dict_getitem,
-        'values': P.dict_values,
+        'values': M.dict_values,
     },
     abstract.AbstractArray: {
         '__add__': C.add,

@@ -23,7 +23,7 @@ from ..utils import (
     dataclass_methods,
 )
 from .loop import Pending
-from .ref import Context
+from .ref import Context, Reference
 
 # Represents the absence of inferred data
 ABSENT = Named('ABSENT')
@@ -136,6 +136,18 @@ class MetaGraphFunction(Function):
     metagraph: MetaGraph
     context: Context
     tracking_id: object = None
+
+
+@dataclass(frozen=True)
+class MacroFunction(Function):
+    """Represents a Macro.
+
+    Attributes:
+        macro: The macro
+
+    """
+
+    macro: 'Macro'
 
 
 @dataclass(eq=False)
@@ -706,6 +718,55 @@ def listof(t):
                            dataclass_methods(Cons))
     rval.attributes['tail'] = AbstractUnion.new([empty, rval])
     return rval.intern()
+
+
+##########
+# Macros #
+##########
+
+
+@dataclass
+class MacroInfo:
+    """Contains standard information given to macros."""
+
+    engine: object
+    outref: object
+    argrefs: object
+    graph: object
+    args: object
+
+
+class Macro:
+    """Represents a function that transforms the subgraph it receives."""
+
+    def __init__(self, macro):
+        """Initialize a Macro."""
+        self.macro = macro
+        self.name = macro.__name__
+
+    async def reroute(self, engine, outref, argrefs):
+        """Reroute a node."""
+        info = MacroInfo(
+            engine=engine,
+            outref=outref,
+            argrefs=argrefs,
+            graph=outref.node.graph,
+            args=[argref.node for argref in argrefs]
+        )
+        rval = await self.macro(info)
+        if not isinstance(rval, Reference):
+            rval = engine.ref(rval, outref.context)
+        return rval
+
+    def __str__(self):
+        return f'<Macro {self.name}>'
+
+    __repr__ = __str__
+
+
+def macro(fn):
+    """Create a macro out of a function."""
+    return Macro(macro=fn)
 
 
 #############################

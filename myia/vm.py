@@ -10,7 +10,7 @@ from typing import Any, Iterable, List, Mapping
 from .abstract import to_abstract
 from .graph_utils import toposort
 from .ir import ANFNode, Apply, Constant, Graph, MetaGraph, Parameter
-from .prim import Primitive
+from .prim import Primitive, ops as P
 from .prim.ops import embed, partial, return_
 from .utils import SymbolicKeyInstance, TypeMap, is_dataclass_type
 
@@ -247,6 +247,9 @@ class VM:
         return Closure(graph, clos)
 
     def _dispatch_call(self, node, frame, fn, args):
+        from .macros import getattr_ as macro_getattr
+        if fn in (getattr, macro_getattr):
+            fn = P.record_getitem
         if isinstance(fn, Primitive):
             if fn == return_:
                 raise self._Return(args[0])

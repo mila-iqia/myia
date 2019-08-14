@@ -316,9 +316,9 @@ def array_setitem(data, item, value):
     return data2
 
 
-@vm_register(primops.getattr)
-def _vm_getattr(vm, data, attr):
-    """Implement `getattr`."""
+@vm_register(primops.record_getitem)
+def _vm_record_getitem(vm, data, attr):
+    """Implement `record_getitem`."""
     from types import MethodType, BuiltinMethodType
     from ..vm import Partial
     from ..abstract import type_token
@@ -354,9 +354,9 @@ def _vm_getattr(vm, data, attr):
 py_setattr = setattr
 
 
-@register(primops.setattr)
-def setattr(data, attr, value):
-    """Implement `setattr`."""
+@register(primops.record_setitem)
+def record_setitem(data, attr, value):
+    """Implement `record_setitem`."""
     data2 = copy(data)
     py_setattr(data2, attr, value)
     return data2
@@ -597,12 +597,6 @@ def make_record(typ, *args):
 def _len(x):
     """Implement `len`."""
     return len(x)
-
-
-@register(primops.make_list)
-def make_list(*xs):
-    """Implement `make_list`."""
-    return list(xs)
 
 
 @register(primops.make_dict)

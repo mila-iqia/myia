@@ -7,7 +7,7 @@ from functools import reduce
 
 import numpy as np
 
-from .. import dtype
+from .. import dtype, operations
 from ..info import About
 from ..ir import Graph, MetaGraph
 from ..prim import Primitive, ops as P
@@ -49,6 +49,8 @@ from .data import (
     Function,
     GraphFunction,
     JTransformedFunction,
+    Macro,
+    MacroFunction,
     MetaGraphFunction,
     PartialApplication,
     PrimitiveFunction,
@@ -289,6 +291,12 @@ class InferenceEngine:
             self.constructors[mg] = GraphInferrer(mg.metagraph, None)
         return self.constructors[mg]
 
+    @get_inferrer_for.register
+    def get_inferrer_for(self, m: MacroFunction):
+        if m not in self.constructors:
+            self.constructors[m] = MacroInferrer(m.macro)
+        return self.constructors[m]
+
     async def execute(self, fn, *args):
         """Infer the result of fn(*args)."""
         infs = [self.get_inferrer_for(poss)
@@ -319,7 +327,7 @@ class InferenceEngine:
 
         elif isinstance(fn, AbstractClassBase):
             g = ref.node.graph
-            newfn = g.apply(P.getattr, fn_ref.node, '__call__')
+            newfn = g.apply(operations.getattr, fn_ref.node, '__call__')
             newcall = g.apply(newfn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
 
@@ -483,6 +491,11 @@ def to_abstract(self, v: MetaGraph, context, ref, loop):
     return AbstractFunction(
         MetaGraphFunction(v, Context.empty(), tracking_id=ref)
     )
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: Macro, context, ref, loop):
+    return AbstractFunction(MacroFunction(v))
 
 
 @overload  # noqa: F811
@@ -669,6 +682,19 @@ class TrackedInferrer(Inferrer):
         args = await self.subinf.normalize_args(args)
         self.cache[args] = await self.subinf.run(engine, outref, argrefs)
         return self.cache[args]
+
+
+class MacroInferrer(Inferrer):
+    """Inferrer for Macros."""
+
+    def __init__(self, macro):
+        """Initialize a MacroInferrer."""
+        super().__init__()
+        self.macro = macro
+
+    async def reroute(self, engine, outref, argrefs):
+        """Apply the macro."""
+        return await self.macro.reroute(engine, outref, argrefs)
 
 
 class GraphInferrer(Inferrer):

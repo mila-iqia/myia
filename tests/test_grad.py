@@ -8,9 +8,8 @@ from pytest import mark
 
 from myia.abstract import AbstractJTagged, from_value
 from myia.api import myia
-from myia.composite import grad, value_and_grad
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
-from myia.grad import J as realJ
+from myia.macros import GradOperation, grad
 from myia.pipeline import (
     PipelineDefinition,
     pipeline_function,
@@ -20,7 +19,7 @@ from myia.pipeline import (
     steps,
 )
 from myia.pipeline.steps import Validator
-from myia.prim import Primitive, ops as P
+from myia.prim import ops as P
 from myia.prim.py_implementations import (
     J,
     array_map,
@@ -80,17 +79,14 @@ step_grad_validate = Validator.partial(
 
 
 @pipeline_function
-def grad_wrap(self, graph):
-    if isinstance(graph, Primitive):
-        jg = realJ(graph, self.resources)
-        g = grad.make_gf(jg, jg.parameters, wrt=range(len(jg.parameters)),
-                         dbg=jg.debug, sens_param=True)
-    else:
-        g = grad.make_gf(graph, graph.parameters,
-                         wrt=range(len(graph.parameters)),
-                         dbg=graph.debug, sens_param=True,
-                         apply_j=True)
-    return g
+def grad_wrap(self, graph, argspec):
+    mg = GradOperation(graph,
+                       wrt=['*'],
+                       dout_parameter=True,
+                       always_return_tuple=True)
+    sig = mg.make_signature(argspec)
+    g = mg.generate_graph(sig)
+    return {'graph': g}
 
 
 grad_pipeline = PipelineDefinition(
@@ -604,11 +600,12 @@ def test_grad_interface():
     def grads(x, y):
         return (
             grad(f, 'x')(x, y),
+            grad(f, 'x')(x, y, dout=2),
             grad(f, 0)(x, y),
             grad(f, 'y')(x, y),
             grad(f, 'x', 'y')(x, y),
             grad(f, '*')(x, y),
-            value_and_grad(f)(x, y),
+            grad(f, return_value=True)(x, y),
         )
 
     @myia
@@ -623,12 +620,36 @@ def test_grad_interface():
     def gradbad3(x, y, z):
         return grad(f, z)(x, y)
 
+    @myia
+    def gradbad4(x, y, z):
+        return grad(f, 2)(x, y)
+
+    @myia
+    def gradbad5(x, y, z):
+        return grad(f)(x=x, y=y)
+
+    @myia
+    def gradbad6(x, y, z):
+        return grad(f, 0, '*')(x, y)
+
+    @myia
+    def gradbad7(x, y, z):
+        return grad(f, raturn_velue=True)(x, y)
+
     x, y = 2.0, 3.0
 
     dx = 3 * (x ** 2) * (y ** 4)
     dy = 4 * (y ** 3) * (x ** 3)
 
-    assert grads(x, y) == (dx, dx, dy, (dx, dy), (dx, dy), (f(x, y), dx))
+    assert grads(x, y) == (
+        dx,
+        dx * 2,
+        dx,
+        dy,
+        (dx, dy),
+        (dx, dy),
+        (f(x, y), dx)
+    )
 
     with pytest.raises(InferenceError):
         print(gradbad(x, y))
@@ -638,3 +659,15 @@ def test_grad_interface():
 
     with pytest.raises(InferenceError):
         print(gradbad3(x, y, 0))
+
+    with pytest.raises(InferenceError):
+        print(gradbad4(x, y, 0))
+
+    with pytest.raises(InferenceError):
+        print(gradbad5(x, y, 0))
+
+    with pytest.raises(InferenceError):
+        print(gradbad6(x, y, 0))
+
+    with pytest.raises(InferenceError):
+        print(gradbad7(x, y, 0))

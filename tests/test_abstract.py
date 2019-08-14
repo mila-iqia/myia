@@ -32,6 +32,7 @@ from myia.abstract import (
     empty,
     find_coherent_result_sync,
     listof,
+    macro,
     to_abstract,
     type_to_abstract,
 )
@@ -226,6 +227,12 @@ def test_repr():
     tu1 = AbstractTaggedUnion([[13, s2], [4, to_abstract_test(i16)]])
     assert repr(tu1) == \
         'AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))'
+
+    @macro
+    def mackerel(info):
+        pass
+
+    assert repr(mackerel) == '<Macro mackerel>'
 
 
 def test_repr_recursive():
