@@ -783,7 +783,7 @@ def nobottom(self, x: Pending, *args):
 
 @overload.wrapper(
     bootstrap=True,
-    initial_state=set
+    initial_state=dict
 )
 def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
            accept_pending=True):
@@ -810,65 +810,82 @@ def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
     """
     if x1 is x2:
         return x1
+
     keypair = (id(x1), id(x2))
     if keypair in self.state:
-        return x1
-    else:
-        self.state.add(keypair)
-    while isinstance(x1, Pending) and x1.done() and not forced:
-        x1 = x1.result()
-    while isinstance(x2, Pending) and x2.done():
-        x2 = x2.result()
-    isp1 = isinstance(x1, Pending)
-    isp2 = isinstance(x2, Pending)
-    loop = x1.get_loop() if isp1 else x2.get_loop() if isp2 else None
-    if isinstance(x1, PendingTentative):
-        new_tentative = self(x1.tentative, x2, False, True, bind_pending)
-        assert not isinstance(new_tentative, Pending)
-        x1.tentative = new_tentative
-        return x1
-    if isinstance(x2, PendingTentative):
-        new_tentative = self(x1, x2.tentative, forced,
-                             bind_pending, accept_pending)
-        assert not isinstance(new_tentative, Pending)
-        x2.tentative = new_tentative
-        return new_tentative if forced else x2
-    if (isp1 or isp2) and (not accept_pending or not bind_pending):
-        if forced and isp1:
-            raise MyiaTypeError('Cannot have Pending here.')
-        if isp1:
-            def chk(a):
-                return self(a, x2, forced, bind_pending)
-            return find_coherent_result_sync(x1, chk)
-        if isp2:
-            def chk(a):
-                return self(x1, a, forced, bind_pending)
-            return find_coherent_result_sync(x2, chk)
-    if isp1 and isp2:
-        return bind(loop, x1 if forced else None, [], [x1, x2])
-    elif isp1:
-        return bind(loop, x1 if forced else None, [x2], [x1])
-    elif isp2:
-        return bind(loop, x1 if forced else None, [x1], [x2])
-    elif isinstance(x2, AbstractBottom):  # pragma: no cover
-        return x1
-    elif isinstance(x1, AbstractBottom):
-        if forced:  # pragma: no cover
-            # I am not sure how to trigger this
-            raise TypeMismatchError(x1, x2)
-        return x2
-    elif x1 is ANYTHING:
-        return x1
-    elif x2 is ANYTHING:
-        if forced:
-            raise TypeMismatchError(x1, x2)
-        return x2
-    elif type(x1) is not type(x2) and not isinstance(x1, (int, float, bool)):
-        raise MyiaTypeError(
-            f'Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}'
-        )
-    else:
-        return self.map[type(x1)](self, x1, x2, forced, bind_pending)
+        result = self.state[keypair]
+        if result is ABSENT:
+            # Setting forced=True will set the keypair to x1 (and then check
+            # that x1 and x2 are compatible under forced=True), which lets us
+            # return a result for self-referential data.
+            return amerge(x1, x2, forced=True,
+                          bind_pending=bind_pending,
+                          accept_pending=accept_pending)
+        else:
+            return result
+
+    def helper():
+        nonlocal x1, x2
+        while isinstance(x1, Pending) and x1.done() and not forced:
+            x1 = x1.result()
+        while isinstance(x2, Pending) and x2.done():
+            x2 = x2.result()
+        isp1 = isinstance(x1, Pending)
+        isp2 = isinstance(x2, Pending)
+        loop = x1.get_loop() if isp1 else x2.get_loop() if isp2 else None
+        if isinstance(x1, PendingTentative):
+            new_tentative = self(x1.tentative, x2, False, True, bind_pending)
+            assert not isinstance(new_tentative, Pending)
+            x1.tentative = new_tentative
+            return x1
+        if isinstance(x2, PendingTentative):
+            new_tentative = self(x1, x2.tentative, forced,
+                                 bind_pending, accept_pending)
+            assert not isinstance(new_tentative, Pending)
+            x2.tentative = new_tentative
+            return new_tentative if forced else x2
+        if (isp1 or isp2) and (not accept_pending or not bind_pending):
+            if forced and isp1:
+                raise MyiaTypeError('Cannot have Pending here.')
+            if isp1:
+                def chk(a):
+                    return self(a, x2, forced, bind_pending)
+                return find_coherent_result_sync(x1, chk)
+            if isp2:
+                def chk(a):
+                    return self(x1, a, forced, bind_pending)
+                return find_coherent_result_sync(x2, chk)
+        if isp1 and isp2:
+            return bind(loop, x1 if forced else None, [], [x1, x2])
+        elif isp1:
+            return bind(loop, x1 if forced else None, [x2], [x1])
+        elif isp2:
+            return bind(loop, x1 if forced else None, [x1], [x2])
+        elif isinstance(x2, AbstractBottom):  # pragma: no cover
+            return x1
+        elif isinstance(x1, AbstractBottom):
+            if forced:  # pragma: no cover
+                # I am not sure how to trigger this
+                raise TypeMismatchError(x1, x2)
+            return x2
+        elif x1 is ANYTHING:
+            return x1
+        elif x2 is ANYTHING:
+            if forced:
+                raise TypeMismatchError(x1, x2)
+            return x2
+        elif (type(x1) is not type(x2)
+              and not isinstance(x1, (int, float, bool))):
+            raise MyiaTypeError(
+                f'Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}'
+            )
+        else:
+            return self.map[type(x1)](self, x1, x2, forced, bind_pending)
+
+    self.state[keypair] = x1 if forced else ABSENT
+    rval = helper()
+    self.state[keypair] = rval
+    return rval
 
 
 @overload  # noqa: F811
