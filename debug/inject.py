@@ -1,12 +1,30 @@
 """Utility injecting functionality, only use for debugging."""
 
+import os
 import sys
 
+import breakword
 from buche import buche
 
 # Load custom hrepr methods for Graph etc.
 from . import gprint  # noqa
-from .logword import afterword, breakword, ibuche, logword
+
+_log = []
+
+
+def ibuche(*args, **kwargs):
+    _log.append(args)
+    buche(*args, interactive=True, **kwargs)
+
+
+def _lwlog(*objs):
+    if os.environ.get('BUCHE'):
+        ibuche(*objs)
+    else:
+        print(*objs)
+
+
+breakword.set_default_logger(_lwlog)
 
 
 def bucheg(graph, **kwargs):
@@ -27,9 +45,10 @@ suite = {
     'bucheg': bucheg,
     'ibuche': ibuche,
     'Subgraph': gprint.Subgraph,
-    'logword': logword,
-    'afterword': afterword,
-    'breakword': breakword,
+    'logword': breakword.log,
+    'getword': breakword.word,
+    'afterword': breakword.after,
+    'breakword': breakword.brk,
 }
 
 
