@@ -1025,8 +1025,7 @@ class _UserSwitchInferrer(Inferrer):
         return engine.ref(newnode, outref.context)
 
     async def reroute(self, engine, outref, argrefs):
-        check_nargs(P.switch, 3, argrefs)
-        condref, tbref, fbref = argrefs
+        condref, tbref, fbref = check_nargs(P.switch, 3, argrefs)
 
         for branch_ref in [tbref, fbref]:
             if not branch_ref.node.is_constant_graph():
@@ -1048,8 +1047,7 @@ class _UserSwitchInferrer(Inferrer):
 class _SwitchInferrer(Inferrer):
 
     async def run(self, engine, outref, argrefs):
-        check_nargs(P.switch, 3, argrefs)
-        condref, tbref, fbref = argrefs
+        condref, tbref, fbref = check_nargs(P.switch, 3, argrefs)
 
         cond = await condref.get()
         await force_pending(engine.check(Bool, type_token(cond)))
@@ -1209,8 +1207,7 @@ class _ApplyInferrer(Inferrer):
 @standard_prim(P.embed)
 class _EmbedInferrer(Inferrer):
     async def run(self, engine, outref, argrefs):
-        check_nargs(P.embed, 1, argrefs)
-        xref, = argrefs
+        xref, = check_nargs(P.embed, 1, argrefs)
         x = await xref.get()
         key = SymbolicKeyInstance(xref.node, sensitivity_transform(x))
         return AbstractScalar({
