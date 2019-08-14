@@ -39,6 +39,7 @@ from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import asttokens
 
+from . import operations
 from .graph_utils import dfs
 from .info import About, DebugInherit, NamedDebugInfo
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
@@ -874,7 +875,7 @@ class Block:
     def make_resolve(self, module_name, symbol_name):
         """Return a subtree that resolves a name in a module."""
         return self.graph.apply(
-            primops.resolve,
+            operations.resolve,
             Constant(module_name),
             Constant(symbol_name)
         )

@@ -26,6 +26,7 @@ from .utils import (
     Empty,
     InferenceError,
     MyiaTypeError,
+    Namespace,
     check_nargs,
     core,
 )
@@ -194,6 +195,35 @@ async def getattr_(info):
         except Exception as e:  # pragma: no cover
             raise InferenceError(f'Unexpected error in getter: {e!r}')
         return Constant(raw)
+
+
+class MyiaNameError(InferenceError):
+    """Raised when a name is not found in scope."""
+
+
+@macro
+async def resolve(info):
+    """Perform static name resolution on a Namespace."""
+    r_data, r_item = check_nargs('resolve', 2, info.argrefs)
+    data = await r_data.get()
+    item = await r_item.get()
+    data_v = abstract.build_value(data)
+    item_v = abstract.build_value(item)
+    if not isinstance(data_v, Namespace):  # pragma: no cover
+        raise MyiaTypeError(
+            f'data argument to resolve must be Namespace,'
+            f' not {data_v}',
+        )
+    if not isinstance(item_v, str):  # pragma: no cover
+        raise MyiaTypeError(
+            f'item argument to resolve must be a string,'
+            f' not {item_v}.',
+        )
+    try:
+        resolved = data_v[item_v]
+    except NameError:
+        raise MyiaNameError(f"Cannot resolve name '{item_v}'")
+    return Constant(resolved)
 
 
 @macro

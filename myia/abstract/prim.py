@@ -7,13 +7,11 @@ from functools import reduce
 
 from .. import dtype
 from ..dtype import Bool, ExceptionType, Number
-from ..ir import Constant, Graph
+from ..ir import Graph
 from ..prim import Primitive, ops as P, py_implementations as py
 from ..utils import (
-    InferenceError,
     MyiaShapeError,
     MyiaTypeError,
-    Namespace,
     SymbolicKeyInstance,
     check_nargs,
     infer_trace,
@@ -249,10 +247,6 @@ def uniform_prim(prim, infer_value=False):
         )
         abstract_inferrer_constructors[prim] = xinf
     return deco
-
-
-class MyiaNameError(InferenceError):
-    """Raised when a name is not found in scope."""
 
 
 def _shape_type(engine, shp):
@@ -702,32 +696,6 @@ async def _inf_raise(self, engine, x: ExceptionType):
 @standard_prim(P.exception)
 async def _inf_exception(self, engine, x):
     return AbstractScalar({VALUE: ANYTHING, TYPE: ExceptionType})
-
-
-@standard_prim(P.resolve)
-class _ResolveInferrer(Inferrer):
-    async def reroute(self, engine, outref, argrefs):
-        r_data, r_item = check_nargs(P.resolve, 2, argrefs)
-        data = await r_data.get()
-        item = await r_item.get()
-        data_v = build_value(data)
-        item_v = build_value(item)
-        if not isinstance(data_v, Namespace):  # pragma: no cover
-            raise MyiaTypeError(
-                f'data argument to resolve must be Namespace,'
-                f' not {data_v}',
-            )
-        if not isinstance(item_v, str):  # pragma: no cover
-            raise MyiaTypeError(
-                f'item argument to resolve must be a string,'
-                f' not {item_v}.',
-            )
-        try:
-            resolved = data_v[item_v]
-        except NameError:
-            raise MyiaNameError(f"Cannot resolve name '{item_v}'")
-        node = Constant(resolved)
-        return engine.ref(node, outref.context)
 
 
 @standard_prim(P.partial)

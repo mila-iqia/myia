@@ -123,7 +123,6 @@ raise_ = Primitive('raise')
 
 
 identity = Primitive('identity')
-resolve = Primitive('resolve')
 partial = Primitive('partial')
 J = Primitive('J')
 Jinv = Primitive('Jinv')

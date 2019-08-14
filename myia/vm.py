@@ -11,7 +11,7 @@ from . import operations
 from .abstract import to_abstract
 from .graph_utils import toposort
 from .ir import ANFNode, Apply, Constant, Graph, MetaGraph, Parameter
-from .prim import Primitive, ops as P
+from .prim import Primitive
 from .prim.ops import embed, partial, return_
 from .utils import SymbolicKeyInstance, TypeMap, is_dataclass_type
 
@@ -249,16 +249,19 @@ class VM:
 
     def _dispatch_call(self, node, frame, fn, args):
         from . import macros
+        from .prim import py_implementations as py
         # This map should be removed once the inferrer/monomorphizer is always
         # run before the DebugVM.
         _macro_map = {
-            operations.getattr: P.record_getitem,
-            macros.getattr_: P.record_getitem,
-            macros.user_switch: P.switch,
+            operations.getattr: py._vm_record_getitem,
+            operations.resolve: py._resolve_vm,
+            macros.getattr_: py._vm_record_getitem,
+            macros.user_switch: lambda vm, *args: py.switch(*args),
+            macros.resolve: py._resolve_vm,
         }
         if fn in _macro_map:
-            fn = _macro_map[fn]
-        if isinstance(fn, Primitive):
+            frame.values[node] = _macro_map[fn](self, *args)
+        elif isinstance(fn, Primitive):
             if fn == return_:
                 raise self._Return(args[0])
             elif fn == partial:

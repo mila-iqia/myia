@@ -506,7 +506,6 @@ def identity(x):
     return x
 
 
-@vm_register(primops.resolve)
 def _resolve_vm(vm, data, item):
     """Implement `resolve` for the VM."""
     # There is no Python implementation for this one.
