@@ -308,6 +308,12 @@ def tuple_setitem(data, item, value):
                  for i, x in enumerate(data))
 
 
+@py_register(primops.dict_setitem)
+def dict_setitem(data, item, value):
+    """Implement `dict_setitem`."""
+    return {**data, item: value}
+
+
 @register(primops.array_setitem)
 def array_setitem(data, item, value):
     """Implement `list/array_setitem`."""

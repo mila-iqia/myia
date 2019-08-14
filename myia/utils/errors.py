@@ -36,6 +36,14 @@ class MyiaShapeError(InferenceError):
     """Shape error in a Myia program."""
 
 
+class MyiaAttributeError(InferenceError):
+    """Raised when an attribute is not found in a type or module."""
+
+
+class MyiaNameError(InferenceError):
+    """Raised when a name is not found in scope."""
+
+
 def type_error_nargs(ident, expected, got):
     """Return a MyiaTypeError for number of arguments mismatch."""
     from ..debug.label import label

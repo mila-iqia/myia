@@ -49,6 +49,7 @@ from myia.prim.py_implementations import (
     bool_or,
     broadcast_shape,
     casttag,
+    dict_setitem,
     distribute,
     dot,
     embed,
@@ -59,6 +60,7 @@ from myia.prim.py_implementations import (
     identity,
     make_record,
     partial as myia_partial,
+    record_setitem,
     reshape,
     scalar_add,
     scalar_cast,
@@ -517,6 +519,13 @@ def test_dict_getitem(d):
        (D(x=i64), 2, InferenceError))
 def test_dict_getitem_nonconst(d, i):
     return d[i]
+
+
+@infer((D(x=i64), f64, D(x=f64)),
+       (D(x=i64, y=f32), f64, D(x=f64, y=f32)),
+       (D(z=i64), f64, InferenceError))
+def test_dict_setitem(d, x):
+    return dict_setitem(d, 'x', x)
 
 
 @infer(
@@ -1916,6 +1925,22 @@ def test_dataclass_wrong_field(pt):
 @infer((Thing(i64), i64))
 def test_dataclass_call(thing):
     return thing()
+
+
+@infer((Thing(i64), f64, Thing(f64)))
+def test_record_setitem(thing, x):
+    return record_setitem(thing, 'contents', x)
+
+
+@infer((Point(i64, i64), i64, Point(i64, i64)),
+       (Point(i64, i64), f64, InferenceError))
+def test_record_setitem_2(pt, x):
+    return record_setitem(pt, 'x', x)
+
+
+@infer((Thing(i64), f64, InferenceError))
+def test_record_setitem_wrong_field(thing, x):
+    return record_setitem(thing, 'shfifty_five', x)
 
 
 hyper_map_notuple = HyperMap(

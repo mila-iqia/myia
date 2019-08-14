@@ -10,6 +10,7 @@ from ..dtype import Bool, ExceptionType, Number
 from ..ir import Graph
 from ..prim import Primitive, ops as P, py_implementations as py
 from ..utils import (
+    MyiaAttributeError,
     MyiaShapeError,
     MyiaTypeError,
     SymbolicKeyInstance,
@@ -351,7 +352,7 @@ async def _inf_make_dict(self, engine, _dct: AbstractType, *values):
 
 
 @standard_prim(P.make_record)
-async def infer_type_make_record(self, engine, _cls: AbstractType, *elems):
+async def _inf_make_record(self, engine, _cls: AbstractType, *elems):
     """Infer the return type of make_record."""
     cls = _cls.values[VALUE]
     cls = type_to_abstract(cls)
@@ -389,22 +390,6 @@ async def _inf_tuple_getitem(self, engine,
     return arg.elements[idx_v]
 
 
-@standard_prim(P.dict_getitem)
-async def _inf_dict_getitem(self, engine, arg: AbstractDict, idx):
-    idx_v = idx.values[VALUE]
-    if idx_v is ANYTHING:
-        raise MyiaTypeError(
-            'Dictionaries must be indexed with a constant'
-        )
-    if not isinstance(idx_v, str):
-        raise MyiaTypeError(
-            f'Dictionary indexes must be strings, not {idx_v}.'
-        )
-    if idx_v not in arg.entries:
-        raise MyiaTypeError(f'Invalid index for indexed dictionary')
-    return arg.entries[idx_v]
-
-
 @standard_prim(P.tuple_setitem)
 async def _inf_tuple_setitem(self, engine,
                              arg: AbstractTuple,
@@ -417,6 +402,23 @@ async def _inf_tuple_setitem(self, engine,
     return AbstractTuple(new_elts)
 
 
+@standard_prim(P.dict_getitem)
+async def _inf_dict_getitem(self, engine,
+                            arg: AbstractDict,
+                            idx: AbstractExternal({TYPE: str})):
+    idx_v = self.require_constant(idx, argnum=2, range=set(arg.entries.keys()))
+    return arg.entries[idx_v]
+
+
+@standard_prim(P.dict_setitem)
+async def _inf_dict_setitem(self, engine,
+                            arg: AbstractDict,
+                            idx: AbstractExternal({TYPE: str}),
+                            value):
+    idx_v = self.require_constant(idx, argnum=2, range=set(arg.entries.keys()))
+    return type(arg)({**arg.entries, idx_v: value})
+
+
 @standard_prim(P.record_getitem)
 async def _inf_record_getitem(self, engine,
                               data: AbstractClassBase,
@@ -425,7 +427,24 @@ async def _inf_record_getitem(self, engine,
     return data.attributes[attr_v]
 
 
-# TODO: record_setitem
+@standard_prim(P.record_setitem)
+async def _inf_record_setitem(self, engine,
+                              data: AbstractClassBase,
+                              attr: AbstractExternal({TYPE: str}),
+                              value):
+    attr_v = self.require_constant(attr, argnum=2)
+    if attr_v not in data.attributes:
+        raise MyiaAttributeError(f'Unknown field in {data}: {attr_v}')
+    model = data.user_defined_version()
+    expected = model.attributes[attr_v]
+    if not typecheck(expected, value):
+        raise MyiaTypeError(f'Expected field {attr_v} to have type {expected}')
+    return type(data)(
+        data.tag,
+        {**data.attributes, attr_v: value},
+        data.methods,
+        constructor=data.constructor
+    )
 
 
 @standard_prim(P.tuple_len)

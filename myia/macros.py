@@ -25,6 +25,8 @@ from .utils import (
     Cons,
     Empty,
     InferenceError,
+    MyiaAttributeError,
+    MyiaNameError,
     MyiaTypeError,
     Namespace,
     check_nargs,
@@ -67,10 +69,6 @@ async def apply(info):
                 'Can only expand tuple or dict in function application'
             )
     return g.apply(fnref.node, *expanded)
-
-
-class MyiaAttributeError(InferenceError):
-    """Raised when an attribute is not found in a type or module."""
 
 
 async def _resolve_case(resources, data_t, item_v):
@@ -195,10 +193,6 @@ async def getattr_(info):
         except Exception as e:  # pragma: no cover
             raise InferenceError(f'Unexpected error in getter: {e!r}')
         return Constant(raw)
-
-
-class MyiaNameError(InferenceError):
-    """Raised when a name is not found in scope."""
 
 
 @macro

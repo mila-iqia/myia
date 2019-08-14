@@ -3,7 +3,9 @@
 from .env import EnvInstance, SymbolicKeyInstance, newenv, smap  # noqa
 from .errors import (  # noqa
     InferenceError,
+    MyiaAttributeError,
     MyiaInputTypeError,
+    MyiaNameError,
     MyiaShapeError,
     MyiaTypeError,
     TypeMismatchError,

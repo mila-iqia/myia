@@ -62,12 +62,14 @@ def simplify_types(root, manager):
 
     * Replace AbstractClass by AbstractTuple:
       * Class[x: t, ...] => Tuple[t, ...]
-      * record_getitem(data, attr) => getitem(data, idx)
+      * record_getitem(data, attr) => tuple_getitem(data, idx)
+      * record_setitem(data, attr, value) => tuple_setitem(data, idx, value)
       * make_record(cls, *args) => make_tuple(*args)
 
     * Replace AbstractDict by AbstractTuple:
       * Dict[x: t, ...] => Tuple[t, ...]
-      * dict_getitem(data, item) => getitem(data, idx)
+      * dict_getitem(data, item) => tuple_getitem(data, idx)
+      * dict_setitem(data, item, value) => tuple_setitem(data, idx, value)
       * make_dict(cls, *args) => make_tuple(*args)
 
     * Replace AbstractUnion by AbstractTaggedUnion:
@@ -82,29 +84,43 @@ def simplify_types(root, manager):
         new_node = None
         keep_abstract = True
 
-        if node.is_apply(P.record_getitem):
-            _, data, item = node.inputs
-            dt = data.abstract
-            assert isinstance(dt, AbstractClassBase)
-            idx = list(dt.attributes.keys()).index(item.value)
+        def _mkct(idx):
             idx_c = Constant(idx)
             idx_c.abstract = AbstractScalar({
                 VALUE: idx,
                 TYPE: Int[64],
             })
+            return idx_c
+
+        def _record_makeindex(dt, attr):
+            assert isinstance(dt, AbstractClassBase)
+            idx = list(dt.attributes.keys()).index(attr)
+            return _mkct(idx)
+
+        def _dict_makeindex(dt, attr):
+            assert isinstance(dt, AbstractDict)
+            idx = list(dt.entries.keys()).index(attr)
+            return _mkct(idx)
+
+        if node.is_apply(P.record_getitem):
+            _, data, item = node.inputs
+            idx_c = _record_makeindex(data.abstract, item.value)
             new_node = node.graph.apply(P.tuple_getitem, data, idx_c)
 
         elif node.is_apply(P.dict_getitem):
             _, data, item = node.inputs
-            dt = data.abstract
-            assert isinstance(dt, AbstractDict)
-            idx = list(dt.entries.keys()).index(item.value)
-            idx_c = Constant(idx)
-            idx_c.abstract = AbstractScalar({
-                VALUE: idx,
-                TYPE: Int[64],
-            })
+            idx_c = _dict_makeindex(data.abstract, item.value)
             new_node = node.graph.apply(P.tuple_getitem, data, idx_c)
+
+        elif node.is_apply(P.record_setitem):
+            _, data, item, value = node.inputs
+            idx_c = _record_makeindex(data.abstract, item.value)
+            new_node = node.graph.apply(P.tuple_setitem, data, idx_c, value)
+
+        elif node.is_apply(P.dict_setitem):
+            _, data, item, value = node.inputs
+            idx_c = _dict_makeindex(data.abstract, item.value)
+            new_node = node.graph.apply(P.tuple_setitem, data, idx_c, value)
 
         elif node.is_apply(P.make_record):
             mkr, typ, *args = node.inputs
