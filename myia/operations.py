@@ -31,56 +31,33 @@ from operator import (  # noqa
 from numpy import cos, exp, log, sin, tan  # noqa
 
 
-def make_tuple(*elts):  # pragma: no cover
-    """Tuple builder."""
-    raise RuntimeError('This operation is not meant to be called directly.')
+class MyiaOnlyOperation:
+    """Represents a Myia-only operation."""
+
+    def __init__(self, name):
+        """Initialize a MyiaOnlyOperation."""
+        self.name = name
+
+    def __call__(self):  # pragma: no cover
+        """Call a MyiaOnlyOperation."""
+        raise RuntimeError(
+            f'Myia-only operation {self.name} cannot be called directly.'
+        )
+
+    def __str__(self):
+        return f'myia.operations.{self.name}'
+
+    __repr__ = __str__
 
 
-def make_list(*elts):  # pragma: no cover
-    """List builder."""
-    raise RuntimeError('This operation is not meant to be called directly.')
-
-
-def make_dict(k, v):  # pragma: no cover
-    """Dict builder."""
-    raise RuntimeError('This operation is not meant to be called directly.')
-
-
-def switch(cond, tb, fb):  # pragma: no cover
-    """Switch statement, returns one of the two values."""
-    raise RuntimeError('This operation is not meant to be called directly.')
-
-
-def user_switch(cond, tb, fb):  # pragma: no cover
-    """Switch statement, returns one of the two values."""
-    raise RuntimeError('This operation is not meant to be called directly.')
-
-
-def iter(xs):  # pragma: no cover
-    """Myia iterator function."""
-    raise RuntimeError('This operation is not meant to be called directly.')
-
-
-def next(it):  # pragma: no cover
-    """Myia next function."""
-    raise RuntimeError('This operation is not meant to be called directly.')
-
-
-def hasnext(it):  # pragma: no cover
-    """Myia hasnext function."""
-    raise RuntimeError('This operation is not meant to be called directly.')
-
-
-def to_array(x, t):  # pragma: no cover
-    """Myia to_array function."""
-    raise RuntimeError('This operation is not meant to be called directly.')
-
-
-def slice(start, stop, step):  # pragma: no cover
-    """Slice function."""
-    raise RuntimeError('This operation is not meant to be called directly.')
-
-
-def apply(fn, *arg_groups):  # pragma: no cover
-    """Function application."""
-    raise RuntimeError('This operation is not meant to be called directly.')
+apply = MyiaOnlyOperation('apply')
+hasnext = MyiaOnlyOperation('hasnext')
+iter = MyiaOnlyOperation('iter')
+make_tuple = MyiaOnlyOperation('make_tuple')
+make_list = MyiaOnlyOperation('make_list')
+make_dict = MyiaOnlyOperation('make_dict')
+next = MyiaOnlyOperation('next')
+slice = MyiaOnlyOperation('slice')
+switch = MyiaOnlyOperation('switch')
+to_array = MyiaOnlyOperation('to_array')
+user_switch = MyiaOnlyOperation('user_switch')
