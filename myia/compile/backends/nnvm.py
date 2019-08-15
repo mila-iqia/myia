@@ -12,6 +12,8 @@ from tvm.contrib import graph_runtime
 from ...abstract import AbstractArray
 from ...prim import Primitive, ops as P
 from ...xtype import Nil, type_to_np_dtype
+from ...ir import manage
+
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
 from . import Backend
@@ -377,6 +379,7 @@ class NNVMBackend(Backend):
 
     def compile(self, graph, *others):
         """Compile a graph."""
+        manage(graph)
         return self.compiler.compile_and_link(graph)
 
     def to_numpy(self, v):
