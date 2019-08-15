@@ -5,6 +5,7 @@ import os
 
 from hrepr import hrepr
 
+from myia import operations
 from myia.abstract import (
     ANYTHING,
     VALUE,
@@ -679,7 +680,7 @@ def _opt_fancy_getitem(optimizer, node, equiv):
         return Apply([ct, x], node.graph)
 
 
-@pattern_replacer(primops.resolve, V1, V2)
+@pattern_replacer(operations.resolve, V1, V2)
 def _opt_fancy_resolve(optimizer, node, equiv):
     ns = equiv[V1]
     name = equiv[V2]
