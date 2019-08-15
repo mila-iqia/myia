@@ -479,7 +479,6 @@ class RecursiveStatistic(UsesStatistic):
         return g in reach[g]
 
 
-@serializable('GraphManager')
 class GraphManager(Partializable):
     """Structure to hold information about graphs and modify them.
 
@@ -561,18 +560,6 @@ class GraphManager(Partializable):
             allow_changes = self.manage
         self.allow_changes = allow_changes
         self.reset()
-
-    def _serialize(self):
-        return {'roots': list(self.roots),
-                'manage': self.manage}
-
-    @classmethod
-    def _construct(cls):
-        m = cls()
-        data = yield m
-        m.roots = data['roots']
-        m.manage = data['manage']
-        m.reset()
 
     def clear(self):
         """Clear the manager entirely."""
