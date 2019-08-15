@@ -316,9 +316,9 @@ def array_setitem(data, item, value):
     return data2
 
 
-@vm_register(primops.getattr)
-def _vm_getattr(vm, data, attr):
-    """Implement `getattr`."""
+@vm_register(primops.record_getitem)
+def _vm_record_getitem(vm, data, attr):
+    """Implement `record_getitem`."""
     from types import MethodType, BuiltinMethodType
     from ..vm import Partial
     from ..abstract import type_token
@@ -354,9 +354,9 @@ def _vm_getattr(vm, data, attr):
 py_setattr = setattr
 
 
-@register(primops.setattr)
-def setattr(data, attr, value):
-    """Implement `setattr`."""
+@register(primops.record_setitem)
+def record_setitem(data, attr, value):
+    """Implement `record_setitem`."""
     data2 = copy(data)
     py_setattr(data2, attr, value)
     return data2
@@ -506,7 +506,6 @@ def identity(x):
     return x
 
 
-@vm_register(primops.resolve)
 def _resolve_vm(vm, data, item):
     """Implement `resolve` for the VM."""
     # There is no Python implementation for this one.
@@ -525,12 +524,6 @@ def partial(f, *args):
 @register(primops.switch)
 def switch(c, x, y):
     """Implement `switch`."""
-    return x if c else y
-
-
-@register(primops.user_switch)
-def user_switch(c, x, y):
-    """Implement `user_switch`."""
     return x if c else y
 
 
@@ -597,12 +590,6 @@ def make_record(typ, *args):
 def _len(x):
     """Implement `len`."""
     return len(x)
-
-
-@register(primops.make_list)
-def make_list(*xs):
-    """Implement `make_list`."""
-    return list(xs)
 
 
 @register(primops.make_dict)

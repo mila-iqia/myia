@@ -6,7 +6,7 @@ from collections import OrderedDict
 import torch
 import torch.utils.dlpack
 
-from .. import composite as C
+from .. import composite as C, macros as M
 from ..abstract.data import (
     ANYTHING,
     SHAPE,
@@ -285,7 +285,7 @@ def _convert_result_array(arg, orig_t: AbstractPyTorchTensor, backend):
 ##############################################################################
 
 
-@C._cast_helper.register(Number, APT)
+@M._cast_helper.register(Number, APT)
 @core
 def _pt__cast_helper(x, model):
     t = P.typeof(model)

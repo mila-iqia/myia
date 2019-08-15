@@ -5,6 +5,7 @@ import os
 
 from hrepr import hrepr
 
+from myia import operations
 from myia.abstract import (
     ANYTHING,
     VALUE,
@@ -679,7 +680,7 @@ def _opt_fancy_getitem(optimizer, node, equiv):
         return Apply([ct, x], node.graph)
 
 
-@pattern_replacer(primops.resolve, V1, V2)
+@pattern_replacer(operations.resolve, V1, V2)
 def _opt_fancy_resolve(optimizer, node, equiv):
     ns = equiv[V1]
     name = equiv[V2]
@@ -689,8 +690,8 @@ def _opt_fancy_resolve(optimizer, node, equiv):
         return ct
 
 
-@pattern_replacer(primops.getattr, X, V)
-def _opt_fancy_getattr(optimizer, node, equiv):
+@pattern_replacer(primops.record_getitem, X, V)
+def _opt_fancy_record_getitem(optimizer, node, equiv):
     x = equiv[X]
     v = equiv[V]
     ct = Constant(GraphCosmeticPrimitive(f'{v.value}', on_edge=True))
@@ -806,7 +807,7 @@ def cosmetic_transformer(g):
         _opt_fancy_make_tuple,
         _opt_fancy_getitem,
         _opt_fancy_resolve,
-        _opt_fancy_getattr,
+        _opt_fancy_record_getitem,
         _opt_fancy_array_map,
         _opt_fancy_distribute,
         _opt_fancy_transpose,

@@ -25,12 +25,12 @@ from myia.prim.py_implementations import (
     identity,
     make_record,
     partial as myia_partial,
+    record_setitem,
     reshape,
     return_,
     scalar_cast,
     scalar_max,
     scalar_to_array,
-    setattr as myia_setattr,
     shape,
     switch,
     transpose,
@@ -203,7 +203,7 @@ def test_prim_array_setitem():
 def test_prim_setattr():
     ns = SimpleNamespace(a=1, b=2)
     ns2 = SimpleNamespace(a=1, b=22)
-    assert myia_setattr(ns, 'b', 22) == ns2
+    assert record_setitem(ns, 'b', 22) == ns2
     assert ns != ns2  # test that this is not inplace
 
 

@@ -30,6 +30,7 @@ from .data import (  # noqa
     DummyFunction,
     GraphFunction,
     JTransformedFunction,
+    Macro,
     MetaGraphFunction,
     PartialApplication,
     Possibilities,
@@ -42,6 +43,7 @@ from .data import (  # noqa
     empty,
     format_abstract,
     listof,
+    macro,
     pretty_struct,
     pretty_type,
 )
@@ -88,4 +90,5 @@ from .utils import (  # noqa
     type_to_abstract,
     type_token,
     typecheck,
+    union_simplify,
 )

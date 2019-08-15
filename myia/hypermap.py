@@ -231,7 +231,7 @@ class HyperMap(MetaGraph):
 
         vals = []
         for k in a.attributes.keys():
-            args = [arg if isleaf else g.apply(P.getattr, arg, k)
+            args = [arg if isleaf else g.apply(P.record_getitem, arg, k)
                     for arg, (_, isleaf) in argmap.items()]
             if fnarg is None:
                 val = g.apply(self.fn_rec, *args)

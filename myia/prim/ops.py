@@ -75,7 +75,6 @@ casttag = Primitive('casttag')
 
 
 make_tuple = Primitive('make_tuple')
-make_list = Primitive('make_list')
 make_dict = Primitive('make_dict')
 make_record = Primitive('make_record')
 tuple_getitem = Primitive('tuple_getitem')
@@ -83,16 +82,8 @@ dict_getitem = Primitive('dict_getitem')
 array_getitem = Primitive('array_getitem')
 tuple_setitem = Primitive('tuple_setitem')
 array_setitem = Primitive('array_setitem')
-
-""" # TODO:
-"I am not a fan of having a dict_values primitive: I think it should be a
-macro, but until I add @macro I suppose it'll be simpler to keep it this way."
-- @breuleux
-"""
-dict_values = Primitive('dict_values')
-
-getattr = Primitive('getattr')
-setattr = Primitive('setattr')
+record_getitem = Primitive('record_getitem')
+record_setitem = Primitive('record_setitem')
 tuple_len = Primitive('tuple_len')
 array_len = Primitive('array_len')
 
@@ -121,7 +112,6 @@ dot = Primitive('dot')
 ##############
 
 
-user_switch = Primitive('user_switch')
 switch = Primitive('switch')
 return_ = Primitive('return')
 raise_ = Primitive('raise')
@@ -133,7 +123,6 @@ raise_ = Primitive('raise')
 
 
 identity = Primitive('identity')
-resolve = Primitive('resolve')
 partial = Primitive('partial')
 J = Primitive('J')
 Jinv = Primitive('Jinv')
@@ -142,6 +131,5 @@ env_setitem = Primitive('env_setitem')
 env_getitem = Primitive('env_getitem')
 env_add = Primitive('env_add')
 exception = Primitive('exception')
-apply = Primitive('apply')
 make_kwarg = Primitive('make_kwarg')
 extract_kwarg = Primitive('extract_kwarg')

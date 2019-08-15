@@ -1,5 +1,6 @@
 """Library of optimizations."""
 
+from .. import operations
 from ..abstract import (
     ANYTHING,
     DEAD,
@@ -660,7 +661,7 @@ simplify_partial = psub(
 ###################
 
 
-@pattern_replacer(P.resolve, CNS, C)
+@pattern_replacer(operations.resolve, CNS, C)
 def resolve_globals(optimizer, node, equiv):
     """Resolve global variables."""
     ns = equiv[CNS]

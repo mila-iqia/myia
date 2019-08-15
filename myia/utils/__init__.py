@@ -55,6 +55,7 @@ from .misc import (  # noqa
     Registry,
     Slice,
     TaggedValue,
+    core,
     dataclass_fields,
     dataclass_methods,
     eprint,
