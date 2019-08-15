@@ -130,6 +130,12 @@ def test_swap(x, y):
 ###################
 
 
+@mark.skip(reason='This test requires the inference step')
+@parse_compare(13)
+def test_list(x):
+    return [x, x + 1, x + 2]
+
+
 @parse_compare(2)
 def test_dict(x):
     return {'x': x}
