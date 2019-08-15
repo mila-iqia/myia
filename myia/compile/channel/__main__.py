@@ -4,6 +4,13 @@ from myia.utils.serialize import MyiaDumper, MyiaLoader
 import sys
 import importlib
 
+from .handle import LocalHandle, _dead_handle
+
+
+def _handle_oob(msg):
+    if msg[0] == 'dead_handle':
+        _dead_handle(msg[1])
+
 
 def _rpc_server():
     loader = MyiaLoader(sys.stdin.buffer)
@@ -15,10 +22,17 @@ def _rpc_server():
     iface = cls(**init_args)
 
     while loader.check_data():
-        name, args, kwargs = loader.get_data()
-        meth = getattr(iface, name)
-        res = meth(*args, **kwargs)
-        dumper.represent(res)
+        data = loader.get_data()
+        if isinstance(data, tuple):
+            name, args, kwargs = data
+            meth = getattr(iface, name)
+            res = meth(*args, **kwargs)
+            dumper.represent(res)
+        elif isinstance(data, dict):
+            data = data['oob']
+            _handle_oob(data)
+        else:
+            raise TypeError(f"bad message {data}")
 
 
 _rpc_server()

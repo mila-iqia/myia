@@ -14,6 +14,7 @@ from ...prim import Primitive, ops as P
 from ...xtype import Nil, type_to_np_dtype
 from ...ir import manage
 
+from ..channel import handle
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
 from . import Backend
@@ -380,7 +381,7 @@ class NNVMBackend(Backend):
     def compile(self, graph, *others):
         """Compile a graph."""
         manage(graph)
-        return self.compiler.compile_and_link(graph)
+        return handle(self.compiler.compile_and_link(graph))
 
     def to_numpy(self, v):
         """Make a numpy array from a NNVM array."""
@@ -388,7 +389,7 @@ class NNVMBackend(Backend):
 
     def from_numpy(self, a):
         """Make an NNVM array from a numpy array."""
-        return tvm.ndarray.array(a, self.context)
+        return handle(tvm.ndarray.array(a, self.context))
 
     def to_scalar(self, v):
         """Convert the NNVM array to a scalar."""
@@ -402,4 +403,5 @@ class NNVMBackend(Backend):
         if t == Nil:
             return None
         dt = type_to_np_dtype(t)
-        return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
+        return handle(
+            self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1)))
