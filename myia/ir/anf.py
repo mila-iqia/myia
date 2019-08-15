@@ -71,7 +71,8 @@ class Graph:
         return {'parameters': self.parameters,
                 'return': self.return_,
                 'debug': self.debug,
-                'flags': self.flags}
+                'flags': self.flags,
+                'manager': self._manager}
 
     @classmethod
     def _construct(cls):
@@ -81,6 +82,7 @@ class Graph:
         g.return_ = data['return']
         g.debug = data['debug']
         g.flags = data['flags']
+        g._manager = data['manager']
 
     @property
     def abstract(self):

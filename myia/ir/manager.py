@@ -1,10 +1,9 @@
 """Managing graph modification and information about graphs."""
 
-
 from collections import Counter, defaultdict
 
 from ..graph_utils import EXCLUDE, FOLLOW, dfs
-from ..utils import Events, OrderedSet, Partializable
+from ..utils import Events, OrderedSet, Partializable, serializable
 from .utils import succ_deeper
 
 
@@ -480,6 +479,7 @@ class RecursiveStatistic(UsesStatistic):
         return g in reach[g]
 
 
+@serializable('GraphManager')
 class GraphManager(Partializable):
     """Structure to hold information about graphs and modify them.
 
@@ -561,6 +561,18 @@ class GraphManager(Partializable):
             allow_changes = self.manage
         self.allow_changes = allow_changes
         self.reset()
+
+    def _serialize(self):
+        return {'roots': list(self.roots),
+                'manage': self.manage}
+
+    @classmethod
+    def _construct(cls):
+        m = cls()
+        data = yield m
+        m.roots = data['roots']
+        m.manage = data['manage']
+        m.reset()
 
     def clear(self):
         """Clear the manager entirely."""

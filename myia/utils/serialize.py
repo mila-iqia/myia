@@ -14,8 +14,7 @@ class MyiaDumper(SafeDumper):
 
     def __init__(self, stream):
         """Record stream, even for C."""
-        super().__init__(stream, encoding='utf-8',
-                         explicit_end=True, explicit_start=True)
+        super().__init__(stream, encoding='utf-8', explicit_end=True)
         self.stream = stream
 
     def represent(self, data):
