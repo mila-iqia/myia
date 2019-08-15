@@ -938,10 +938,31 @@ def amerge(self, x1: dtype.TypeMeta, x2, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(self, x1: (dict, TrackDict), x2, forced, bp):
+def amerge(self, x1: TrackDict, x2, forced, bp):
+    keys = {*x1.keys(), *x2.keys()}
+    rval = type(x1)()
+    changes = False
+    for k in keys:
+        if k in x1:
+            v1 = x1[k]
+        else:
+            v1 = k.default()
+            changes = True
+        v2 = x2[k] if k in x2 else k.default()
+        res = k.merge(self, v1, v2, forced, bp)
+        if res is not v1:
+            changes = True
+        if res is not ABSENT:
+            rval[k] = res
+    if forced and changes and rval != x1:
+        raise MyiaTypeError('Cannot merge tracks')
+    return x1 if forced or not changes else rval
+
+
+@overload  # noqa: F811
+def amerge(self, x1: dict, x2, forced, bp):
     if set(x1.keys()) != set(x2.keys()):
-        # This shouldn't be possible at the moment
-        raise AssertionError(f'Keys mismatch')
+        raise MyiaTypeError(f'Keys mismatch')
     changes = False
     rval = type(x1)()
     for k, v in x1.items():
