@@ -60,6 +60,7 @@ def __serialize_seq__(self, dumper):
 def __serialize_scal__(self, dumper):
     scal = self._serialize()
     assert scal is not None
+    assert isinstance(scal, str)
     return dumper.represent_scalar(getattr(self, '@SERIAL_TAG'), scal)
 
 

@@ -8,40 +8,31 @@ import weakref
 
 
 _local_handle_table = {}
-_remote_handle_table = weakref.WeakKeyDictionary()
+_remote_handle_table = weakref.WeakValueDictionary()
 
 
 def _dead_handle(id):
-    _local_handle_table[id]._remove_remote()
+    if id in _local_handle_table:
+        del _local_handle_table[id]
 
 
 def _delete_remote(id, channel):
-    channel._send_ood(('dead_handle', id))
+    channel._send_msg('dead_handle', id)
 
 
 @serializable('channel-lhandle', scalar=True)
 class LocalHandle:
     def __init__(self, value):
-        self.value = weakref.ref(value, self._gone)
+        self.value = value
         self._id = id(value)
         _local_handle_table[self._id] = self
 
-    def _remove_remote(self):
-        del self.strong_value
-
-    def _gone(self, *ignored):
-        del _handle_table[self._id]
-        self._id = None
-        self.value = None
-
     def _serialize(self):
-        assert self._id is not None
-        if not hasattr(self, 'strong_value'):
-            self.strong_value = self.value()
-        return self._id
+        return str(self._id)
 
     @classmethod
     def _construct(self, data):
+        data = int(data)
         res = _remote_handle_table.get(id, None)
         if res is None:
             res = RemoteHandle(data)
@@ -53,14 +44,19 @@ class RemoteHandle:
     def __init__(self, id):
         self._id = id
         _remote_handle_table[id] = self
+        self._finalized = False
 
     def _serialize(self):
-        return self._id
+        return str(self._id)
 
     @classmethod
     def _construct(self, data):
-        handle = _local_handle_table[id]
-        return handle.strong_value
+        data = int(data)
+        handle = _local_handle_table[data]
+        return handle.value
+
+    def __call__(self, *args, **kwargs):
+        return self.channel.call_handle(self, args, kwargs)
 
 
 def handle(value):
@@ -88,13 +84,29 @@ class RPCProcess:
 
     def call_method(self, name, *args, **kwargs):
         self.dumper.represent((name, args, kwargs))
+        return self._read_msg()
+
+    def call_handle(self, handle, args, kwargs):
+        self._send_msg('handle_call', (handle, args, kwargs))
+        return self._read_msg()
+
+    def _fix_handle(self, h):
+        if not h._finalized:
+            weakref.finalize(h, _delete_remote, h._id, self)
+            h.channel = self
+            h._finalized = True
+
+    def _send_msg(self, msg, args):
+        try:
+            self.dumper.represent([msg, args])
+        except BrokenPipeError:
+            pass
+
+    def _read_msg(self):
         res = self.loader.get_data()
         if isinstance(res, RemoteHandle):
-            weakref.finalize(res, _delete_remote, res._id, self)
+            self._fix_handle(res)
         return res
-
-    def _send_oob(self, msg):
-        self.dumper.represent({'oob': msg})
 
     def close(self):
         self.proc.terminate()

@@ -389,7 +389,7 @@ class NNVMBackend(Backend):
 
     def from_numpy(self, a):
         """Make an NNVM array from a numpy array."""
-        return handle(tvm.ndarray.array(a, self.context))
+        return tvm.ndarray.array(a, self.context)
 
     def to_scalar(self, v):
         """Convert the NNVM array to a scalar."""
@@ -405,3 +405,4 @@ class NNVMBackend(Backend):
         dt = type_to_np_dtype(t)
         return handle(
             self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1)))
+
