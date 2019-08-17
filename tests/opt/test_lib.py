@@ -1124,3 +1124,13 @@ def test_incorporate_call_through_switch():
                lib.elim_identity,
                lib.incorporate_call,
                lib.incorporate_call_through_switch)
+
+
+########
+# Misc #
+########
+
+
+def test_opt_repr():
+    assert (repr(lib.inline_trivial)
+            == f'<PatternSubstitutionOptimization inline_trivial>')

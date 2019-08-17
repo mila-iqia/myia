@@ -5,7 +5,7 @@ import os
 
 from hrepr import hrepr
 
-from myia import operations
+from myia import operations, opt
 from myia.abstract import (
     ANYTHING,
     VALUE,
@@ -1078,6 +1078,12 @@ class _Closure:
             ('graph', self.graph),
             ('values', self.values)
         ])
+
+
+@mixin(opt.PatternSubstitutionOptimization)
+class _PatternSubstitutionOptimization:
+    def __hrepr__(self, H, hrepr):
+        return H.span['myia-opt'](H.b('opt '), self.name)
 
 
 #################

@@ -137,6 +137,11 @@ class PatternSubstitutionOptimization:
         else:
             return None
 
+    def __str__(self):
+        return f'<PatternSubstitutionOptimization {self.name}>'
+
+    __repr__ = __str__
+
 
 def pattern_replacer(*pattern, interest=False):
     """Create a PatternSubstitutionOptimization using this function."""
