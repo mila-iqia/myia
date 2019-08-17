@@ -95,3 +95,10 @@
 .noborder.hrepr-titled-h, .noborder.hrepr-titled-v {
     border: none;
 }
+
+.myia-opt {
+    display: inline-block;
+    padding: 2px;
+    color: white;
+    background: firebrick;
+}
