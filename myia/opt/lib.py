@@ -469,7 +469,7 @@ def simplify_array_map(optimizer, node, equiv):
             return xs[idx]
         elif x.is_constant() \
                 and issubclass(type_token(x.abstract), Number):
-            shp = Constant(xs[0].shape)
+            shp = (P.shape, xs[0])
             sexp = (P.distribute, (P.scalar_to_array, x, AA), shp)
             return sexp_to_node(sexp, node.graph)
         else:
