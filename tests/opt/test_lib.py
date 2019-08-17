@@ -15,6 +15,7 @@ from myia.prim.py_implementations import (
     scalar_mul,
     scalar_to_array,
     scalar_usub,
+    shape,
     switch,
     transpose,
     tuple_setitem,
@@ -390,11 +391,12 @@ def test_simplify_array_map_4():
         return array_map(f, xs)
 
     def after(xs):
-        return distribute(scalar_to_array(3, AA), (3, 5))
+        return distribute(scalar_to_array(3, AA), shape(xs))
 
     _check_opt(before, after,
                lib.simplify_array_map,
-               argspec=[af64_of(3, 5)])
+               argspec=[af64_of(3, 5)],
+               argspec_after=False)
 
 
 def test_simplify_array_map_5():
