@@ -52,8 +52,7 @@ from functools import reduce
 
 from .composite import gadd, zeros_like
 from .info import About
-from .ir import BasicRemapper, Constant, Graph, RemapperSet
-from .opt import sexp_to_node
+from .ir import BasicRemapper, Constant, Graph, RemapperSet, sexp_to_node
 from .prim import Primitive, ops as primops
 from .prim.grad_implementations import augmented_graphs
 from .utils import OrderedSet, newenv, overload

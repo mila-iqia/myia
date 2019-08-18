@@ -8,8 +8,5 @@ from .opt import (  # noqa
     LocalPassOptimizer,
     NodeMap,
     PatternSubstitutionOptimization,
-    VarNode,
     pattern_replacer,
-    sexp_to_graph,
-    sexp_to_node,
 )

@@ -1,7 +1,15 @@
 """Main exports for ir submodule."""
 
 from .abstract import Node  # noqa
-from .anf import ANFNode, Apply, Constant, Graph, Parameter, Special  # noqa
+from .anf import (  # noqa
+    ANFNode,
+    Apply,
+    Constant,
+    Graph,
+    Parameter,
+    Special,
+    VarNode,
+)
 from .clone import (  # noqa
     BasicRemapper,
     CloneRemapper,
@@ -19,6 +27,8 @@ from .utils import (  # noqa
     freevars_boundary,
     isomorphic,
     print_graph,
+    sexp_to_graph,
+    sexp_to_node,
     succ_deep,
     succ_deeper,
     succ_incoming,

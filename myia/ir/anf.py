@@ -590,3 +590,11 @@ class Special(ANFNode):
     def __repr__(self) -> str:
         return repr_(self, name=self.debug.debug_name, special=self.special) \
             # pragma: no cover
+
+
+class VarNode(Special):
+    """Graph node that represents a variable."""
+
+    @property
+    def __var__(self):
+        return self.special

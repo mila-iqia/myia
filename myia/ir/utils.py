@@ -9,7 +9,8 @@ from ..graph_utils import (
     dfs as _dfs,
     toposort as _toposort,
 )
-from .anf import ANFNode
+from ..utils import Var
+from .anf import ANFNode, Apply, Constant, Graph, VarNode
 
 #######################
 # Successor functions #
@@ -193,6 +194,53 @@ def isomorphic(g1, g2, equiv=None):
     equiv[(g1, g2)] = rval
 
     return rval
+
+
+########
+# Misc #
+########
+
+
+def sexp_to_node(sexp, graph, multigraph=False):
+    """Convert an s-expression (tuple) to a subgraph.
+
+    Args:
+        sexp: A nested tuple that represents an expression.
+        graph: The graph in which to place the created nodes.
+        multigraph: If multigraph is True and graph is a Var, then
+            every child node will have a fresh Var as its Graph.
+            In short, use multigraph=True to get a subgraph where
+            each node can be in a different graph. Otherwise, all
+            nodes are required to belong to the same graph.
+
+    Returns:
+        An ANFNode equivalent to the given s-expression.
+
+    """
+    if isinstance(sexp, tuple):
+        if multigraph and isinstance(graph, Var):
+            return Apply([sexp_to_node(x, Var('G'), True)
+                          for x in sexp], graph)
+        else:
+            return Apply([sexp_to_node(x, graph, multigraph)
+                          for x in sexp], graph)
+    elif isinstance(sexp, Var):
+        return VarNode(sexp, graph)
+    elif isinstance(sexp, ANFNode):
+        return sexp
+    else:
+        return Constant(sexp)
+
+
+def sexp_to_graph(sexp):
+    """Convert an s-expression to a Graph.
+
+    This converts the s-expression to a subgraph of ANFNodes and then sets that
+    subgraph as the output of a new Graph.
+    """
+    g = Graph()
+    g.output = sexp_to_node(sexp, g)
+    return g
 
 
 def print_graph(g):

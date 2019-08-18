@@ -2,14 +2,13 @@
 import pytest
 
 from myia import operations
-from myia.ir import Constant, GraphCloner, isomorphic
+from myia.ir import Constant, GraphCloner, isomorphic, sexp_to_graph
 from myia.opt import (
     LocalPassOptimizer,
     NodeMap,
     PatternSubstitutionOptimization as psub,
     cse,
     pattern_replacer,
-    sexp_to_graph,
 )
 from myia.pipeline import scalar_pipeline
 from myia.prim import Primitive, ops as prim
