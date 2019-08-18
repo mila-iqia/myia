@@ -672,6 +672,10 @@ class Track:
     def __lt__(self, other):
         return self.name < other.name
 
+    def merge(self, recurse, v1, v2, forced, bp):
+        """Merge two values."""
+        return recurse(v1, v2, forced, bp)
+
     def clone(self, v, recurse):
         """Clone the value associated to this Track in a TrackDict."""
         return recurse(v)
@@ -682,6 +686,9 @@ class Track:
         By default, this amounts to a straight copy.
         """
         return recurse(v, *args)
+
+    def default(self):
+        raise ValueError(f'There is no default for track {self}')
 
 
 class _ValueTrack(Track):
