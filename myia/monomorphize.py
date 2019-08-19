@@ -128,6 +128,8 @@ def concretize_cache(cache):
     for k, v in list(cache.items()):
         kc = _refmap(concretize_abstract, k)
         cache[kc] = v
+        kc2 = _refmap(_no_tracking_id, kc)
+        cache[kc2] = v
 
 
 _count = count(1)
@@ -246,7 +248,7 @@ class Monomorphizer:
 
         if isinstance(fn, PrimitiveFunction):
             a = AbstractFunction(TypedPrimitive(fn.prim, argvals, outval))
-            return _const(fn.prim, a), None, None
+            return _const(fn.prim, a), None
 
         assert isinstance(inf, GraphInferrer)
         concretize_cache(inf.graph_cache)
@@ -256,7 +258,7 @@ class Monomorphizer:
         if norm_ctx not in self.specializations:
             self.specializations[norm_ctx] = ctx
         new_ct = _const(_Placeholder(norm_ctx), None)
-        return new_ct, ctx, norm_ctx
+        return new_ct, norm_ctx
 
     def _find_choices(self, inf):
         if inf not in self.infcaches:
@@ -429,7 +431,7 @@ class Monomorphizer:
 
                 fn = a.get_unique()
                 try:
-                    new_node, ctx, norm_ctx = self.analyze_function(
+                    new_node, norm_ctx = self.analyze_function(
                         a, fn, entry.argvals)
                 except Unspecializable as e:
                     aerr = AbstractError(e.problem, e.data)
@@ -438,11 +440,10 @@ class Monomorphizer:
                     if isinstance(fn, GraphFunction) and entry.argvals is None:
                         self.ctcache[ref.node.value] = norm_ctx
 
-                    if ctx is not None:
-                        todo.append(_TodoEntry(
-                            self.engine.ref(ctx.graph.return_, ctx),
-                            None, None
-                        ))
+                    if norm_ctx is not None:
+                        retref = self.engine.ref(norm_ctx.graph.return_,
+                                                 norm_ctx)
+                        todo.append(_TodoEntry(retref, None, None))
 
             if new_node is not entry.ref.node:
                 if entry.link is None:
