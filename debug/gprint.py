@@ -5,33 +5,8 @@ import os
 
 from hrepr import hrepr
 
-from myia import operations, opt
-from myia.abstract import (
-    ANYTHING,
-    VALUE,
-    AbstractArray,
-    AbstractClassBase,
-    AbstractFunction,
-    AbstractJTagged,
-    AbstractKeywordArgument,
-    AbstractScalar,
-    AbstractTaggedUnion,
-    AbstractTuple,
-    AbstractUnion,
-    AbstractValue,
-    Context,
-    GraphFunction,
-    JTransformedFunction,
-    MetaGraphFunction,
-    PartialApplication,
-    PendingTentative,
-    Possibilities,
-    PrimitiveFunction,
-    Reference,
-    TypedPrimitive,
-    VirtualFunction,
-    VirtualReference,
-)
+from myia import abstract, dtype, info, ir, operations, opt, parser, utils, vm
+from myia.abstract import ANYTHING, VALUE, Possibilities
 from myia.debug.label import (
     CosmeticPrimitive,
     NodeLabeler,
@@ -39,24 +14,13 @@ from myia.debug.label import (
     short_relation_symbols,
 )
 from myia.debug.utils import mixin
-from myia.dtype import Bool, Float, Int, Type, TypeMeta, UInt
-from myia.info import About, DebugInfo
-from myia.ir import (
-    ANFNode,
-    Apply,
-    Constant,
-    Graph,
-    GraphCloner,
-    GraphManager,
-    ParentProxy,
-    manage,
-)
+from myia.dtype import Float, Int, UInt
+from myia.info import About
+from myia.ir import Apply, Constant, GraphCloner, ParentProxy, manage
 from myia.opt import LocalPassOptimizer, NodeMap, pattern_replacer
-from myia.parser import Location
 from myia.prim import ops as primops
-from myia.utils import NS, UNKNOWN, OrderedSet, Registry, SymbolicKeyInstance
-from myia.utils.unify import FilterVar, SVar, Var, var
-from myia.vm import Closure, VMFrame
+from myia.utils import UNKNOWN, Registry
+from myia.utils.unify import SVar, Var, var
 
 try:
     from myia.dtype import JTagged
@@ -821,14 +785,14 @@ def cosmetic_transformer(g):
         # careful=True
     )
     nmap = NodeMap()
-    for opt in spec:
-        nmap.register(getattr(opt, 'interest', None), opt)
-    opt = LocalPassOptimizer(nmap)
-    opt(g)
+    for optim in spec:
+        nmap.register(getattr(optim, 'interest', None), optim)
+    optim = LocalPassOptimizer(nmap)
+    optim(g)
     return g
 
 
-@mixin(Graph)
+@mixin(ir.Graph)
 class _Graph:
     @classmethod
     def __hrepr_resources__(cls, H):
@@ -868,7 +832,7 @@ class _Graph:
 #################
 
 
-@mixin(ANFNode)
+@mixin(ir.ANFNode)
 class _ANFNode:
     @classmethod
     def __hrepr_resources__(cls, H):
@@ -881,7 +845,7 @@ class _ANFNode:
         return H.span['node', f'node-{class_name}'](label)
 
 
-@mixin(Apply)
+@mixin(ir.Apply)
 class _Apply:
     def __hrepr__(self, H, hrepr):
         if len(self.inputs) == 2 and \
@@ -895,7 +859,7 @@ class _Apply:
             return super(Apply, self).__hrepr__(H, hrepr)
 
 
-@mixin(ParentProxy)
+@mixin(ir.ParentProxy)
 class _ParentProxy:
     @classmethod
     def __hrepr_resources__(cls, H):
@@ -913,19 +877,19 @@ class _ParentProxy:
 ########
 
 
-@mixin(NS)
+@mixin(utils.NS)
 class _NS:
     def __hrepr__(self, H, hrepr):
         return hrepr(self.__dict__)
 
 
-@mixin(OrderedSet)
+@mixin(utils.OrderedSet)
 class _OrderedSet:
     def __hrepr__(self, H, hrepr):
         return hrepr(set(self._d.keys()))
 
 
-@mixin(SymbolicKeyInstance)
+@mixin(utils.SymbolicKeyInstance)
 class _SymbolicKeyInstance:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -934,7 +898,7 @@ class _SymbolicKeyInstance:
         )
 
 
-@mixin(VirtualReference)
+@mixin(abstract.VirtualReference)
 class _VirtualReference:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -943,7 +907,7 @@ class _VirtualReference:
         )
 
 
-@mixin(Reference)
+@mixin(abstract.Reference)
 class _Reference:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -952,7 +916,7 @@ class _Reference:
         )
 
 
-@mixin(Context)
+@mixin(abstract.Context)
 class _Context:
     def __hrepr__(self, H, hrepr):
         stack = []
@@ -963,7 +927,7 @@ class _Context:
         return hrepr.stdrepr_object('Context', stack)
 
 
-@mixin(Location)
+@mixin(parser.Location)
 class _Location:
     def __hrepr__(self, H, hrepr):
         return H.div(
@@ -978,7 +942,7 @@ class _Location:
         )
 
 
-@mixin(DebugInfo)
+@mixin(info.DebugInfo)
 class _DebugInfo:
     def __hrepr__(self, H, hrepr):
         exclude = {'save_trace', 'about'}
@@ -989,7 +953,7 @@ class _DebugInfo:
             tr = d.get('trace', None)
             if tr:
                 fr = tr[-3]
-                d['trace'] = Location(
+                d['trace'] = parser.Location(
                     fr.filename, fr.lineno, 0, fr.lineno, 0, None
                 )
             d['name'] = short_labeler.label(info)
@@ -1010,7 +974,7 @@ class _DebugInfo:
         return rval
 
 
-@mixin(GraphManager)
+@mixin(ir.GraphManager)
 class _GraphManager:
     @classmethod
     def __hrepr_resources__(cls, H):
@@ -1055,7 +1019,7 @@ class _GraphManager:
         return pr.__hrepr__(H, hrepr)
 
 
-@mixin(VMFrame)
+@mixin(vm.VMFrame)
 class _VMFrame:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -1071,7 +1035,7 @@ class _VMFrame:
         )
 
 
-@mixin(Closure)
+@mixin(vm.Closure)
 class _Closure:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object('Closure', [
@@ -1091,7 +1055,7 @@ class _PatternSubstitutionOptimization:
 #################
 
 
-@mixin(TypeMeta)
+@mixin(dtype.TypeMeta)
 class _TypeMeta:
     def __hrepr__(cls, H, hrepr):
         return cls.__type_hrepr__(H, hrepr)
@@ -1101,21 +1065,21 @@ class _TypeMeta:
         return H.style(mcss)
 
 
-@mixin(Type)
+@mixin(dtype.Type)
 class _Type:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
         return H.span(str(cls))
 
 
-@mixin(Bool)
+@mixin(dtype.Bool)
 class _Bool:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
         return H.div['myia-type-bool']('b')
 
 
-@mixin(Int)
+@mixin(dtype.Int)
 class _Int:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
@@ -1127,7 +1091,7 @@ class _Int:
             )
 
 
-@mixin(UInt)
+@mixin(dtype.UInt)
 class _UInt:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
@@ -1139,7 +1103,7 @@ class _UInt:
             )
 
 
-@mixin(Float)
+@mixin(dtype.Float)
 class _Float:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
@@ -1156,14 +1120,14 @@ class _Float:
 ################
 
 
-@mixin(Var)
+@mixin(utils.Var)
 class _Var:
     def __hrepr__(self, H, hrepr):
         self.ensure_tag()
         return H.div['myia-var'](f'{self.tag}')
 
 
-@mixin(FilterVar)
+@mixin(utils.FilterVar)
 class _FilterVar:
     def __hrepr__(self, H, hrepr):
         if hrepr.config.short_vars:
@@ -1226,7 +1190,7 @@ class Subgraph:
 #         )
 
 
-@mixin(PendingTentative)
+@mixin(abstract.PendingTentative)
 class _PendingTentative:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -1246,7 +1210,7 @@ def _clean(values):
             if v not in {ANYTHING, UNKNOWN}}
 
 
-@mixin(AbstractValue)
+@mixin(abstract.AbstractValue)
 class _AbstractValue:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -1257,7 +1221,7 @@ class _AbstractValue:
         )
 
 
-@mixin(AbstractScalar)
+@mixin(abstract.AbstractScalar)
 class _AbstractScalar:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -1268,7 +1232,7 @@ class _AbstractScalar:
         )
 
 
-@mixin(AbstractFunction)
+@mixin(abstract.AbstractFunction)
 class _AbstractFunction:
     def __hrepr__(self, H, hrepr):
         v = self.values[VALUE]
@@ -1279,7 +1243,7 @@ class _AbstractFunction:
         )
 
 
-@mixin(AbstractJTagged)
+@mixin(abstract.AbstractJTagged)
 class _AbstractJTagged:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_iterable(
@@ -1298,7 +1262,7 @@ class _AbstractJTagged:
         )
 
 
-@mixin(AbstractKeywordArgument)
+@mixin(abstract.AbstractKeywordArgument)
 class _AbstractKeywordArgument:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_iterable(
@@ -1318,7 +1282,7 @@ class _AbstractKeywordArgument:
         )
 
 
-@mixin(AbstractTuple)
+@mixin(abstract.AbstractTuple)
 class _AbstractTuple:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_iterable(
@@ -1328,7 +1292,7 @@ class _AbstractTuple:
         )
 
 
-@mixin(AbstractUnion)
+@mixin(abstract.AbstractUnion)
 class _AbstractUnion:
     def __hrepr__(self, H, hrepr):
         v = self.options
@@ -1339,7 +1303,7 @@ class _AbstractUnion:
         )
 
 
-@mixin(AbstractTaggedUnion)
+@mixin(abstract.AbstractTaggedUnion)
 class _AbstractTaggedUnion:
     def __hrepr__(self, H, hrepr):
         v = self.options
@@ -1358,7 +1322,7 @@ class _AbstractTaggedUnion:
             )
 
 
-@mixin(AbstractArray)
+@mixin(abstract.AbstractArray)
 class _AbstractArray:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_iterable(
@@ -1377,7 +1341,7 @@ class _AbstractArray:
         )
 
 
-@mixin(AbstractClassBase)
+@mixin(abstract.AbstractClassBase)
 class _AbstractClassBase:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -1388,7 +1352,7 @@ class _AbstractClassBase:
         )
 
 
-@mixin(GraphFunction)
+@mixin(abstract.GraphFunction)
 class _GraphFunction:
     def __hrepr__(self, H, hrepr):
         optkey = ([('tracking_id', self.tracking_id)]
@@ -1402,7 +1366,7 @@ class _GraphFunction:
         )
 
 
-@mixin(PartialApplication)
+@mixin(abstract.PartialApplication)
 class _PartialApplication:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -1412,7 +1376,7 @@ class _PartialApplication:
         )
 
 
-@mixin(TypedPrimitive)
+@mixin(abstract.TypedPrimitive)
 class _TypedPrimitive:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -1424,7 +1388,7 @@ class _TypedPrimitive:
         )
 
 
-@mixin(MetaGraphFunction)
+@mixin(abstract.MetaGraphFunction)
 class _MetaGraphFunction:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -1434,7 +1398,7 @@ class _MetaGraphFunction:
         )
 
 
-@mixin(PrimitiveFunction)
+@mixin(abstract.PrimitiveFunction)
 class _PrimitiveFunction:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -1444,7 +1408,7 @@ class _PrimitiveFunction:
         )
 
 
-@mixin(JTransformedFunction)
+@mixin(abstract.JTransformedFunction)
 class _JTransformedFunction:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
@@ -1454,7 +1418,7 @@ class _JTransformedFunction:
         )
 
 
-@mixin(VirtualFunction)
+@mixin(abstract.VirtualFunction)
 class _VirtualFunction:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
