@@ -686,3 +686,13 @@ def test_kwarg(x, y):
         return fn(*args, **kwargs)
 
     return proxy(x, beatrice=y), proxy(x, y), proxy(beatrice=x, albert=y)
+
+
+@specialize_std((),)
+def test_reference_bug():
+    orig = (4, 1, 6)
+    shp = ()
+    for z in orig:
+        if z != 1:
+            shp = shp + (z,)
+    return shp
