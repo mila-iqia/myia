@@ -358,11 +358,15 @@ sub_usub_map = on_array_map(sub_usub)
 #########################
 
 
+def _elim_distribute_condition(equiv):
+    return equiv[X].shape is not None and equiv[X].shape == equiv[C].value
+
+
 # distribute(x, shp) => x when x.shape == shp
 elim_distribute = psub(
     pattern=(P.distribute, X, C),
     replacement=X,
-    condition=lambda equiv: equiv[X].shape == equiv[C].value,
+    condition=_elim_distribute_condition,
     name='elim_distribute'
 )
 
