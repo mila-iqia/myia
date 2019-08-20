@@ -642,8 +642,8 @@ class Inferrer(Partializable):
             outref: A Reference to the output (could be None)
             argrefs: A tuple of References to the arguments
         """
-        args = tuple([await ref.get() for ref in argrefs])
-        args = await self.normalize_args(args)
+        unnorm_args = tuple([await ref.get() for ref in argrefs])
+        args = await self.normalize_args(unnorm_args)
         if args not in self.cache:
             self.cache[args] = await self.infer(engine, *args)
         return self.cache[args]
