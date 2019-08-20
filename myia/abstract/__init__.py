@@ -1,5 +1,9 @@
 """Abstract data and type/shape inference."""
 
+from .aliasing import (  # noqa
+    generate_getters,
+    setter_from_getter,
+)
 from .data import (  # noqa
     ABSENT,
     ALIASID,
