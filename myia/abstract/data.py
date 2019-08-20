@@ -110,6 +110,7 @@ class Function:
     """Represents a possible function in an AbstractFunction."""
 
 
+@serializable('AbstractFunction', dc=False, construct=False)
 @dataclass(frozen=True)
 class GraphFunction(Function):
     """Represents a Graph in a certain Context.
@@ -125,7 +126,11 @@ class GraphFunction(Function):
     context: Context
     tracking_id: object = None
 
+    def _serialize(self):
+        return self.graph.abstract._serialize()
 
+
+@serializable('PrimitiveFunction')
 @dataclass(frozen=True)
 class PrimitiveFunction(Function):
     """Represents a Primitive.
@@ -168,6 +173,7 @@ class MacroFunction(Function):
     macro: 'Macro'
 
 
+@serializable('PartialApplication')
 @dataclass(eq=False)
 class PartialApplication(Function):
     """Represents a partial application.
@@ -197,6 +203,7 @@ class JTransformedFunction(Function):
     fn: object
 
 
+@serializable('VirtualFunction')
 @dataclass(frozen=True)
 class VirtualFunction(Function):
     """Represents some function with an explicitly given type signature.
@@ -255,6 +262,20 @@ class AbstractValue(Interned, PossiblyRecursive):
         super().__init__()
         self.values = TrackDict(values)
 
+    def _serialize(self):
+        data = dict()
+        for k, v in self.values.items():
+            data[k.name] = v
+        return data
+
+    @classmethod
+    def _construct(cls):
+        tmap = {'TYPE': TYPE, 'VALUE': VALUE, 'SHAPE': SHAPE}
+        obj = cls.empty()
+        data = yield obj
+        obj.values = TrackDict((tmap[k], v) for k, v in data.items())
+        obj._incomplete = False
+
     def xtype(self):
         """Return the type of this AbstractValue."""
         t = self.values.get(TYPE, None)
@@ -275,20 +296,6 @@ class AbstractValue(Interned, PossiblyRecursive):
 
 class AbstractAtom(AbstractValue):
     """Base class for abstract values that are not structures."""
-
-    def _serialize(self):
-        data = dict()
-        for k, v in self.values.items():
-            data[k.name] = v
-        return data
-
-    @classmethod
-    def _construct(cls):
-        tmap = {'TYPE': TYPE, 'VALUE': VALUE, 'SHAPE': SHAPE}
-        obj = cls.empty()
-        data = yield obj
-        obj.values = TrackDict((tmap[k], v) for k, v in data.items())
-        obj._incomplete = False
 
 
 @serializable('AbstractScalar')
@@ -446,6 +453,7 @@ class AbstractStructure(AbstractValue):
     """Base class for abstract values that are structures."""
 
 
+@serializable('AbstractTuple')
 class AbstractTuple(AbstractStructure):
     """Represents a tuple of elements."""
 
@@ -455,6 +463,22 @@ class AbstractTuple(AbstractStructure):
         if elements is not ANYTHING:
             elements = list(elements)
         self.elements = elements
+
+    def _serialize(self):
+        data = super()._serialize()
+        data['elements'] = self.elements
+        return data
+
+    @classmethod
+    def _construct(cls):
+        it = super()._construct()
+        res = next(it)
+        data = yield res
+        res.elements = data.pop('elements')
+        try:
+            it.send(data)
+        except StopIteration:
+            pass
 
     def children(self):
         """Return all elements in the tuple."""
@@ -468,6 +492,7 @@ class AbstractTuple(AbstractStructure):
         return pretty_call(ctx, "", self.elements)
 
 
+@serializable('AbstractArray')
 class AbstractArray(AbstractStructure):
     """Represents an array.
 
@@ -485,6 +510,22 @@ class AbstractArray(AbstractStructure):
         """Initialize an AbstractArray."""
         super().__init__(values)
         self.element = element
+
+    def _serialize(self):
+        data = super()._serialize()
+        data['element'] = self.element
+        return data
+
+    @classmethod
+    def _construct(cls):
+        it = super()._construct()
+        res = next(it)
+        data = yield res
+        res.element = data.pop('element')
+        try:
+            it.send(data)
+        except StopIteration:
+            pass
 
     def children(self):
         """Return the array element."""

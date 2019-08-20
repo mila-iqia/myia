@@ -5,6 +5,7 @@ try:
 except ImportError:  # pragma: no cover
     from yaml import SafeLoader, SafeDumper
 
+import numpy as np
 import sys
 from dataclasses import is_dataclass
 
@@ -90,7 +91,14 @@ def _make_construct(cls, dc, sequence, scalar):
                 data = loader.construct_mapping(node)
                 return cls(**data)
         else:
-            breakpoint()
+            empty_args = dict((k, None)
+                              for k in cls.__dataclass_fields__.keys())
+            def _construct(loader, node):  # noqa: F811
+                res = cls(**empty_args)
+                yield res
+                data = loader.construct_mapping(node)
+                for k, v in data.items():
+                    setattr(res, k, v)
     if sequence:
         def _construct(loader, node):  # noqa: F811
             it = cls._construct()
@@ -107,7 +115,8 @@ def _make_construct(cls, dc, sequence, scalar):
     return _construct
 
 
-def serializable(tag, *, dc=None, sequence=False, scalar=False):
+def serializable(tag, *, dc=None, sequence=False, scalar=False,
+                 construct=True):
     """Class decorator to make the wrapped class serializable.
 
     Parameters:
@@ -115,6 +124,7 @@ def serializable(tag, *, dc=None, sequence=False, scalar=False):
         dc: bool, class is a dataclass (autodetected, but can override)
         sequence: _serialize returns a sequence (tuple or list)
         scalar: _serialize returns a single item.
+        construct: register the deserialization function or not
 
     """
     def wrapper(cls):
@@ -131,9 +141,10 @@ def serializable(tag, *, dc=None, sequence=False, scalar=False):
             if scalar:
                 method = __serialize_scal__
             setattr(cls, '__serialize__', method)
-        _construct = _make_construct(cls, dc, sequence, scalar)
         MyiaDumper.add_representer(cls, _serialize)
-        MyiaLoader.add_constructor(tag, _construct)
+        if construct:
+            _construct = _make_construct(cls, dc, sequence, scalar)
+            MyiaLoader.add_constructor(tag, _construct)
         return cls
     return wrapper
 
@@ -148,6 +159,21 @@ def _construct_tuple(loader, node):
 
 MyiaDumper.add_representer(tuple, _serialize_tuple)
 MyiaLoader.add_constructor('tuple', _construct_tuple)
+
+
+def _serialize_ndarray(dumper, data):
+    return dumper.represent_mapping(
+        'arraydata', {'dtype': data.dtype.str, 'shape': data.shape,
+                      'data': data.tobytes()})
+
+def _construct_ndarray(loader, node):
+    data = loader.construct_mapping(node)
+    res = np.frombuffer(data['data'], dtype=data['dtype'])
+    return res.reshape(data['shape'])
+
+
+MyiaDumper.add_representer(np.ndarray, _serialize_ndarray)
+MyiaLoader.add_constructor('arraydata', _construct_ndarray)
 
 _OBJ_MAP = {}
 _TAG_MAP = {}
