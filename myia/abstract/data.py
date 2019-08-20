@@ -667,6 +667,8 @@ class Track:
     def __str__(self):  # pragma: no cover
         return self.name
 
+    __repr__ = __str__
+
     def __lt__(self, other):
         return self.name < other.name
 
