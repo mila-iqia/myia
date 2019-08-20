@@ -8,7 +8,7 @@ from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ...ir import manage
 
 from ..transform import CompileGraphs, nonlinear_ops
-from . import Backend
+from . import Backend, HandleBackend
 from .pytorch_conv_grad import conv2d_input, conv2d_weight
 
 _type_map = {
@@ -239,7 +239,7 @@ class PyTorchBackend(Backend):
 
     """
 
-    def __init__(self, device='cpu'):
+    def __init__(self, device):
         """Create a PyTorch backend on the given device."""
         if device == 'cuda':
             device = 'cuda:0'
@@ -275,3 +275,10 @@ class PyTorchBackend(Backend):
             return None
         dt = type_to_np_dtype(t)
         return np.asarray(s, dtype=dt)
+
+
+class PyTorchBackendR(HandleBackend):
+    """Pytorch proxy."""
+
+    def __init__(self, device='cpu'):
+        self.real = PyTorchBackend(device)

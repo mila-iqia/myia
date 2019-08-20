@@ -7,7 +7,7 @@ import urllib
 from ... import abstract, xtype
 
 from ...utils import TaggedValue
-from ..channel import RPCProcess
+from ..channel import RPCProcess, handle
 
 
 class UnknownBackend(Exception):
@@ -36,9 +36,10 @@ def channel_load(pkg, name):
 
 
 _backends = {
-    'nnvm': channel_load('myia.compile.backends.nnvm', 'NNVMBackend'),
-    'relay': channel_load('myia.compile.backends.relay', 'RelayBackend'),
-    'pytorch': channel_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
+    'nnvm': channel_load('myia.compile.backends.nnvm', 'NNVMBackendR'),
+    'relay': channel_load('myia.compile.backends.relay', 'RelayBackendR'),
+    'pytorch': channel_load('myia.compile.backends.pytorch',
+                            'PyTorchBackendR'),
 }
 
 _active_backends = {}
@@ -236,3 +237,34 @@ class ChannelBackend(Backend):
     def convert_value(self, v, t):
         return self.proc.call_method('convert_value', v, t)
 
+
+class HandleBackend(Backend):
+    """Proxy for remote process backend."""
+
+    def compile(self, graph, argspec, outspec):
+        """Proxy."""
+        return handle(self.real.compile(graph, argspec, outspec))
+
+    def to_numpy(self, v):
+        """Proxy."""
+        return self.real.to_numpy(v)
+
+    def from_numpy(self, a):
+        """Proxy."""
+        return handle(self.real.from_numpy(a))
+
+    def to_scalar(self, v):
+        """Proxy."""
+        return self.real.to_scalar(v)
+
+    def from_scalar(self, s, t):
+        """Proxy."""
+        return handle(self.real.from_scalar(s, t))
+
+    def empty_env(self):
+        """Proxy."""
+        return handle(self.real.empty_env())
+
+    def convert_value(self, v, t):
+        """Proxy."""
+        return handle(self.real.convert_value(v, t))

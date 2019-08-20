@@ -3,7 +3,9 @@
 from ..abstract import to_abstract
 from ..ir import Apply, Constant, Graph, toposort
 from ..prim import Primitive, ops as P
-from ..utils import SymbolicKeyInstance
+
+from ..utils import SymbolicKeyInstance, overload
+from .channel import handle
 from .vm import FinalVM
 
 
@@ -69,6 +71,16 @@ def wrap_primitives(graph):
                         tr.set_edge(node, key, Constant(g))
 
     return graph
+
+
+@overload(bootstrap=True)
+def wrap_result(self, data: tuple):
+    return tuple(self(d) for d in data)
+
+
+@overload
+def wrap_result(self, data: object):
+    return handle(data)
 
 
 nonlinear_ops = (

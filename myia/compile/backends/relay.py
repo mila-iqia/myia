@@ -19,8 +19,15 @@ from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...utils import overload
 from ...xtype import Bool, Nil, type_to_np_dtype
-from . import Backend
+from ..transform import wrap_result
+
+from . import Backend, HandleBackend
 from .relay_helpers import build_module, optimize
+
+
+@wrap_result.register
+def wrap_result(self, data: relay.backend.interpreter.TupleValue):
+    return tuple(self(d) for d in data)
 
 
 @overload(bootstrap=True)
@@ -269,7 +276,10 @@ class CompileGraph:
         module.entry_func = module.get_global_var(graph.debug.debug_name)
 
         exec = relay.create_executor(mod=module, ctx=context, target=target)
-        return exec.evaluate(module.entry_func)
+        res = exec.evaluate(module.entry_func)
+        def f(*args, **kwargs):
+            return wrap_result(res(*args, **kwargs))
+        return f
 
     def on_parameter(self, node):
         """Convert a parameter node."""
@@ -293,6 +303,8 @@ class CompileGraph:
             if isinstance(type, AbstractTuple):
                 return relay.Tuple([_helper(e, et) for e, et in
                                     zip(value, type.elements)])
+            elif isinstance(type, AbstractType):
+                return value
             else:
                 dtype = type_to_np_dtype(type.xtype())
                 return relay.const(value, dtype=dtype)
@@ -349,7 +361,7 @@ class RelayBackend(Backend):
         device_id: the target device identifier (an int)
     """
 
-    def __init__(self, target='cpu', device_id=0):
+    def __init__(self, target, device_id):
         """Create a Relay backend for the given device."""
         device_id = int(device_id)
         self.context = tvm.ndarray.context(target, device_id)
@@ -387,3 +399,10 @@ class RelayBackend(Backend):
             return ()
         dt = type_to_np_dtype(t)
         return self.from_numpy(np.array(s, dtype=dt, copy=False))
+
+
+class RelayBackendR(HandleBackend):
+    """Relay proxy."""
+
+    def __init__(self, target='cpu', device_id=0):
+        self.real = RelayBackend(target, device_id)

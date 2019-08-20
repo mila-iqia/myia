@@ -3,6 +3,7 @@
 from myia.utils.serialize import MyiaDumper, MyiaLoader
 import sys
 import importlib
+import traceback
 
 from . import LocalHandle, _dead_handle
 
@@ -20,15 +21,23 @@ def _rpc_server():
         data = loader.get_data()
         if isinstance(data, tuple):
             name, args, kwargs = data
-            meth = getattr(iface, name)
-            res = meth(*args, **kwargs)
+            try:
+                meth = getattr(iface, name)
+                res = meth(*args, **kwargs)
+            except Exception as e:
+                traceback.print_exc(file=sys.stderr)
+                res = None
             dumper.represent(res)
         elif isinstance(data, list):
             msg, arg = data
             if msg == 'dead_handle':
                 _dead_handle(arg)
             elif msg == 'handle_call':
-                res = arg[0](*arg[1], **arg[2])
+                try:
+                    res = arg[0](*arg[1], **arg[2])
+                except Exception as e:
+                    traceback.print_exc(file=sys.stderr)
+                    res = None
                 dumper.represent(res)
             else:
                 raise ValueError(f"Unknown message: {msg}")

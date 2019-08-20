@@ -17,7 +17,11 @@ from ...ir import manage
 from ..channel import handle
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
-from . import Backend
+from . import Backend, HandleBackend
+
+nonlinear_ops = list(nonlinear_ops)
+nonlinear_ops.append(P.scalar_cast)
+
 
 SIMPLE_MAP = {
     P.scalar_add: sym.elemwise_add,
@@ -368,7 +372,7 @@ class NNVMBackend(Backend):
 
     """
 
-    def __init__(self, target='cpu', device_id=0):
+    def __init__(self, target, device_id):
         """Create a NNVM backend for the given device."""
         device_id = int(device_id)
         self.context = tvm.ndarray.context(target, device_id)
@@ -381,7 +385,7 @@ class NNVMBackend(Backend):
     def compile(self, graph, *others):
         """Compile a graph."""
         manage(graph)
-        return handle(self.compiler.compile_and_link(graph))
+        return self.compiler.compile_and_link(graph)
 
     def to_numpy(self, v):
         """Make a numpy array from a NNVM array."""
@@ -406,3 +410,10 @@ class NNVMBackend(Backend):
         return handle(
             self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1)))
 
+
+class NNVMBackendR(HandleBackend):
+    """NNVM Proxy."""
+
+    def __init__(self, target='cpu', device_id=0):
+        """Proxy."""
+        self.real = NNVMBackend(target, device_id)

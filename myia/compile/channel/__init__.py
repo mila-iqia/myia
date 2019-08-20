@@ -41,10 +41,13 @@ class LocalHandle:
 
 @serializable('channel-rhandle', scalar=True)
 class RemoteHandle:
+    current_channel = None
+
     def __init__(self, id):
         self._id = id
         _remote_handle_table[id] = self
-        self._finalized = False
+        self.channel = self.current_channel
+        weakref.finalize(self, _delete_remote, self._id, self.channel)
 
     def _serialize(self):
         return str(self._id)
@@ -90,12 +93,6 @@ class RPCProcess:
         self._send_msg('handle_call', (handle, args, kwargs))
         return self._read_msg()
 
-    def _fix_handle(self, h):
-        if not h._finalized:
-            weakref.finalize(h, _delete_remote, h._id, self)
-            h.channel = self
-            h._finalized = True
-
     def _send_msg(self, msg, args):
         try:
             self.dumper.represent([msg, args])
@@ -103,9 +100,11 @@ class RPCProcess:
             pass
 
     def _read_msg(self):
-        res = self.loader.get_data()
-        if isinstance(res, RemoteHandle):
-            self._fix_handle(res)
+        RemoteHandle.current_channel = self
+        try:
+            res = self.loader.get_data()
+        finally:
+            RemoteHandle.current_channel = None
         return res
 
     def close(self):
