@@ -2,6 +2,7 @@
 
 from .data import (  # noqa
     ABSENT,
+    ALIASID,
     ANYTHING,
     DATA,
     DEAD,

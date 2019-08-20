@@ -707,10 +707,24 @@ class _ShapeTrack(Track):
     """Represents the SHAPE track, for arrays."""
 
 
+class _AliasIdTrack(Track):
+    """Represents the ALIASID track."""
+
+    def merge(self, recurse, v1, v2, forced, bp):
+        """Merge two values."""
+        if v1 is ABSENT or v2 is ABSENT:
+            return ABSENT
+        return recurse(v1, v2, forced, bp)
+
+    def default(self):
+        return ABSENT
+
+
 VALUE = _ValueTrack('VALUE')
 TYPE = _TypeTrack('TYPE')
 SHAPE = _ShapeTrack('SHAPE')
 DATA = _ValueTrack('DATA')
+ALIASID = _AliasIdTrack('ALIASID')
 
 
 ##########################
