@@ -553,8 +553,6 @@ def to_abstract(self, v: list, **kwargs):
 
 @overload  # noqa: F811
 def to_abstract(self, v: dict, **kwargs):
-    if len(v) == 0:
-        raise NotImplementedError('No support for empty dicts yet.')
     entries = dict((k, self(val, **kwargs)) for k, val in v.items())
     return AbstractDict(entries)
 
