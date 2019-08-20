@@ -31,7 +31,16 @@ from .pytorch_abstract_types import (
     AbstractPyTorchTensor,
     PyTorchTensorWrapper,
 )
-from .pytorch_functions import _sum, item, linear, relu, sigmoid, t, tensor_dim
+from .pytorch_functions import (
+    _sum,
+    conv2d,
+    item,
+    linear,
+    relu,
+    sigmoid,
+    t,
+    tensor_dim,
+)
 
 _type_map = {
     torch.int8: Int[8],
@@ -56,15 +65,16 @@ def pytorch_dtype_to_type(dtype):
 standard_object_map.update({
     torch.exp: C.exp,
     torch.log: C.log,
+    torch.mm: P.dot,
     torch.relu: relu,
     torch.reshape: P.reshape,
     torch.sigmoid: sigmoid,
     torch.sum: _sum,
     torch.t: t,
     torch.tanh: C.tanh,
-
-    torch.nn.functional.linear: linear,
     # torch.zeros_like: C.zeros_like,  # currently only works with pt backend
+    torch.nn.functional.linear: linear,
+    torch.nn.functional.conv2d: conv2d,
 })
 
 
@@ -91,13 +101,12 @@ standard_method_map[AbstractPyTorchTensor].update({
     'relu': relu,
     'reshape': P.reshape,
     'sigmoid': sigmoid,
+    'shape': property(P.shape),
     'sum': _sum,
     't': t,
     'tanh': C.tanh,
     'view': P.reshape,  # contiguousness is ignored by us for now?
-
-    # I think 'zeros_like' is hidden method of tensor used by bwd
-    'zeros_like': C.zeros_like,
+    'zeros_like': C.zeros_like,  # hidden method used by bwd (I think)
 })
 
 

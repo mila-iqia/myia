@@ -470,6 +470,29 @@ def dot(a, b):
     return np.dot(a, b)
 
 
+@register(primops.conv2d)
+def conv2d(input, weight, stride, padding, dilation, groups):
+    """Implement 2d_convolution."""
+    # TODO
+    raise NotImplementedError()
+
+
+@register(primops.conv2d_input_grad)
+def conv2d_input_grad(input_size, weight, grad_output, stride, padding,
+                      dilation, groups):
+    """Implement conv2d_input_grad."""
+    # TODO
+    raise NotImplementedError()
+
+
+@register(primops.conv2d_weight_grad)
+def conv2d_weight_grad(input, weight_size, grad_output, stride, padding,
+                       dilation, groups):
+    """Implement conv2d_weight_grad."""
+    # TODO
+    raise NotImplementedError()
+
+
 @register(primops.return_)
 def return_(x):
     """Implement `return_`."""

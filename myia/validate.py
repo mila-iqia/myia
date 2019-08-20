@@ -125,6 +125,9 @@ whitelist = frozenset({
     P.casttag,
     P.tagged,
     P.unsafe_static_cast,
+    P.conv2d,
+    P.conv2d_input_grad,
+    P.conv2d_weight_grad,
 })
 
 

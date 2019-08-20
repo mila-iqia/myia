@@ -18,6 +18,8 @@ from .py_implementations import (
     array_reduce,
     array_to_scalar,
     casttag,
+    conv2d_input_grad,
+    conv2d_weight_grad,
     distribute,
     dot,
     invert_permutation,
@@ -228,7 +230,6 @@ def bprop_scalar_max(x, y, out, dout):
     ret = switch(scalar_eq(x, y), (dout, dout),
                  switch(scalar_gt(x, y), (dout, zeros_like(y)),
                         (zeros_like(x), dout)))
-
     return (ret[0], ret[1])
 
 
@@ -270,7 +271,7 @@ def bprop_dot(x, y, out, dout):
             dot(transpose(x, (1, 0)), dout))
 
 
-@register_bprop(primops.reshape)
+@register_bprop(primops.reshape, ignore_values=False)
 def bprop_reshape(xs, shp, out, dout):
     """Backpropagator for primitive `reshape`."""
     return (reshape(dout, shape(xs)),
@@ -313,6 +314,18 @@ def bprop_J(x, out, dout):
 def bprop_Jinv(x, out, dout):
     """Backpropagator for primitive `Jinv`."""
     return (J(dout),)
+
+
+@register_bprop(primops.conv2d, ignore_values=False)
+def bprop_conv2d(input, weight, stride, padding, dilation, groups, out, dout):
+    """Backpropagator for `conv2d`."""
+    gI = conv2d_input_grad(shape(input), weight, dout, stride, padding,
+                           dilation, groups)
+    gW = conv2d_weight_grad(input, shape(weight), dout, stride, padding,
+                            dilation, groups)
+    return (gI, gW,
+            zeros_like(stride), zeros_like(padding), zeros_like(dilation),
+            zeros_like(groups))
 
 
 @register_augm(primops.switch)

@@ -8,6 +8,7 @@ from ...dtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ...prim import Primitive, ops as P
 from ..transform import CompileGraphs, nonlinear_ops
 from . import Backend
+from .pytorch_conv_grad import conv2d_input, conv2d_weight
 
 _type_map = {
     Int[8]: torch.int8,
@@ -70,7 +71,7 @@ simple_mapping = {
     P.reshape: lambda a, shp: a.reshape(shp),
     P.dot: torch.mm,
 
-    P.array_to_scalar: pytorch_array_to_scalar
+    P.array_to_scalar: pytorch_array_to_scalar,
 }
 
 
@@ -148,10 +149,68 @@ def pytorch_array_reduce(op):
         return (res,)
     return _impl, (op.inputs[2],)
 
+#############################################################################
+
+
+def conv2d_wrap(input, weight, stride, padding, dilation, groups):
+    """Wrap of conv2d for pytorch."""
+    groups = groups.item()
+    return (torch.nn.functional.conv2d(
+        input, weight, None, stride, padding, dilation, groups),)
+
+
+def pytorch_conv2d(op):
+    """Implementation of conv2d for pytorch."""
+    return conv2d_wrap, op.inputs[1:]
+
+#############################################################################
+
+
+def conv2d_input_grad_wrap(input_size, weight, grad_output, stride, padding,
+                           dilation, groups):
+    """Wrap of conv2d_input_grad for pytorch."""
+    input_size = tuple(i.item() for i in input_size)
+    stride = tuple(_x.item() for _x in stride)
+    padding = tuple(_x.item() for _x in padding)
+    dilation = tuple(_x.item() for _x in dilation)
+    groups = groups.item()
+    return (conv2d_input(
+        input_size, weight, grad_output, stride, padding, dilation, groups),)
+
+
+def pytorch_conv2d_input_grad(op):
+    """Implementation of conv2d_input_grad for pytorch."""
+    return conv2d_input_grad_wrap, op.inputs[1:]
+
+#############################################################################
+
+
+def conv2d_weight_grad_wrap(input, weight_size, grad_output, stride, padding,
+                            dilation, groups):
+    """Wrap of conv2d_weight_grad for pytorch."""
+    weight_size = tuple(w.item() for w in weight_size)
+    stride = tuple(_x.item() for _x in stride)
+    padding = tuple(_x.item() for _x in padding)
+    dilation = tuple(_x.item() for _x in dilation)
+    groups = groups.item()
+    return (conv2d_weight(
+        input, weight_size, grad_output, stride, padding, dilation, groups),)
+
+
+def pytorch_conv2d_weight_grad(op):
+    """Implementation of conv2d_weight_grad for pytorch."""
+    return conv2d_weight_grad_wrap, op.inputs[1:]
+
+#############################################################################
+
 
 _mapping = {
     P.array_map: pytorch_array_map,
     P.array_reduce: pytorch_array_reduce,
+    P.conv2d: pytorch_conv2d,
+    P.conv2d_input_grad: pytorch_conv2d_input_grad,
+    P.conv2d_weight_grad: pytorch_conv2d_weight_grad,
+
 }
 
 for k, v in simple_mapping.items():

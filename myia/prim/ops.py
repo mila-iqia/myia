@@ -106,6 +106,10 @@ reshape = Primitive('reshape')
 transpose = Primitive('transpose')
 dot = Primitive('dot')
 
+conv2d = Primitive('conv2d')
+conv2d_input_grad = Primitive('conv2d_input_grad')
+conv2d_weight_grad = Primitive('conv2d_weight_grad')
+
 
 ##############
 # Statements #
