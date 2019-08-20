@@ -287,6 +287,10 @@ class CompileGraph:
                         self.add_instr('unsafe_static_cast',
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]))
+                    elif fn.value == P.scalar_cast:
+                        self.add_instr('scalar_cast',
+                                       self.ref(split.inputs[1]),
+                                       split.inputs[2].value)
                     elif fn.value == P.env_getitem:
                         self.add_instr('env_getitem',
                                        self.ref(split.inputs[1]),

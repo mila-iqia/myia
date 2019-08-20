@@ -98,6 +98,16 @@ scalar_mapping = {
 }
 
 
+def pytorch_scalar_cast(op):
+    v = op.inputs[1]
+    assert op.inputs[2].is_constant()
+    dtype = type_to_np_dtype(op.inputs[2].value)
+
+    def _impl(v):
+        return (v.astype(dtype),)
+    return _impl, (v,)
+
+
 def pytorch_array_map(op):
     """Implementation of array_map for pytorch."""
     fn = op.inputs[1]
@@ -204,7 +214,7 @@ _mapping = {
     P.conv2d: pytorch_conv2d,
     P.conv2d_input_grad: pytorch_conv2d_input_grad,
     P.conv2d_weight_grad: pytorch_conv2d_weight_grad,
-
+    P.scalar_cast: pytorch_scalar_cast,
 }
 
 for k, v in simple_mapping.items():
