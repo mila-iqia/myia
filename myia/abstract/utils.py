@@ -1044,6 +1044,16 @@ def amerge(self, x1: AbstractClassBase, x2, forced, bp):
 
 
 @overload  # noqa: F811
+def amerge(self, x1: AbstractDict, x2, forced, bp):
+    args1 = (x1.entries, x1.values)
+    args2 = (x2.entries, x2.values)
+    merged = self(args1, args2, forced, bp)
+    if forced or merged is args1:
+        return x1
+    return type(x1)(*merged)
+
+
+@overload  # noqa: F811
 def amerge(self, x1: AbstractJTagged, x2, forced, bp):
     args1 = x1.element
     args2 = x2.element

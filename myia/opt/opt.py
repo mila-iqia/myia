@@ -87,7 +87,7 @@ class PatternSubstitutionOptimization:
         else:
             return None
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return f'<PatternSubstitutionOptimization {self.name}>'
 
     __repr__ = __str__

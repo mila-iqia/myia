@@ -492,6 +492,7 @@ class GradOperation(MetaGraph):
                 for elem, getter in generate_getters(arg, ROOT):
                     aid = elem.values.get(ALIASID, None)
                     if aid is not None:
+                        assert aid is not ANYTHING
                         aliases[aid].append((i, getter))
         aliases = tuple(sorted((k, tuple(v)) for k, v in aliases.items()))
 

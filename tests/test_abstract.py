@@ -7,6 +7,7 @@ import pytest
 
 from myia import dtype as ty
 from myia.abstract import (
+    ALIASID,
     ANYTHING,
     DEAD,
     TYPE,
@@ -25,6 +26,7 @@ from myia.abstract import (
     PendingFromList,
     Possibilities,
     TaggedPossibilities,
+    TrackDict,
     abstract_clone,
     amerge,
     broaden,
@@ -135,6 +137,16 @@ def test_amerge():
     assert amerge(AbstractError(DEAD),
                   AbstractError(ANYTHING),
                   forced=False) is AbstractError(ANYTHING)
+
+    d1 = {'x': 1}
+    d2 = {'y': 2}
+    with pytest.raises(MyiaTypeError):
+        print(amerge(d1, d2))
+
+    td1 = TrackDict({ALIASID: 1})
+    td2 = TrackDict({})
+    with pytest.raises(MyiaTypeError):
+        print(amerge(td1, td2, forced=True))
 
 
 def test_merge_possibilities():

@@ -440,6 +440,24 @@ def test_dict2(x, y):
     return {'x': x, 'y': y}
 
 
+@infer((i64, i64, f32, D(x=i64, y=f32)))
+def test_dict_merge(c, x, y):
+    if c == 0:
+        return {'x': 1, 'y': 2}
+    elif c == 1:
+        return {'x': 2, 'y': 4}
+    else:
+        return {'x': x, 'y': y}
+
+
+@infer((B, i64, f32, MyiaTypeError))
+def test_dict_incompatible(c, x, y):
+    if c:
+        return {'x': x, 'y': y}
+    else:
+        return {'x': x, 'yy': y}
+
+
 @infer(
     ((), 0),
     ((1,), 1),

@@ -23,6 +23,7 @@ from ..abstract import (
     AbstractUnion,
     ArrayWrapper,
     empty,
+    find_aliases,
 )
 from ..cconv import closure_convert
 from ..compile import load_backend
@@ -732,6 +733,7 @@ class Wrap(PipelineStep):
              outspec,
              orig_argspec=None,
              orig_outspec=None,
+             aliasspec=None,
              simplify_types=False):
         """Convert args to vm format, and output from vm format."""
         if not simplify_types:
@@ -744,6 +746,11 @@ class Wrap(PipelineStep):
         vm_out_t = graph.return_.abstract
 
         def wrapped(*args):
+            if aliasspec:
+                alias_tracker, orig_aid_to_paths = aliasspec
+                _, aid_to_paths = find_aliases(args, alias_tracker)
+                if aid_to_paths != orig_aid_to_paths:
+                    raise MyiaInputTypeError('Incompatible aliasing pattern.')
             steps = self.pipeline.steps
             if hasattr(steps, 'compile'):
                 backend = steps.compile.backend

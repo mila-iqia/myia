@@ -688,7 +688,8 @@ class Track:
         return recurse(v, *args)
 
     def default(self):
-        raise ValueError(f'There is no default for track {self}')
+        """Return the default value for the track."""
+        raise NotImplementedError(f'There is no default for track {self}')
 
 
 class _ValueTrack(Track):
@@ -712,9 +713,8 @@ class _AliasIdTrack(Track):
 
     def merge(self, recurse, v1, v2, forced, bp):
         """Merge two values."""
-        if v1 is ABSENT or v2 is ABSENT:
-            return ABSENT
-        return recurse(v1, v2, forced, bp)
+        # For the time being we don't propagate ALIASID through merge.
+        return ABSENT
 
     def default(self):
         return ABSENT

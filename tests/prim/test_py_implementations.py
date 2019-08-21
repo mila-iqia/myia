@@ -16,6 +16,7 @@ from myia.prim.py_implementations import (
     bool_eq,
     broadcast_shape,
     dict_getitem,
+    dict_setitem,
     distribute,
     dot,
     embed,
@@ -281,6 +282,13 @@ def test_prim_array_reduce():
 
 def test_prim_dict_getitem():
     assert dict_getitem({'x': 2}, 'x') == 2
+
+
+def test_prim_dict_setitem():
+    d = {'x': 2}
+    d2 = dict_setitem(d, 'x', 3)
+    assert d == {'x': 2}
+    assert d2 == {'x': 3}
 
 
 def test_prim_distribute():
