@@ -3,7 +3,7 @@
 from collections import Counter, defaultdict
 
 from ..graph_utils import EXCLUDE, FOLLOW, dfs
-from ..utils import Events, OrderedSet, Partializable, serializable
+from ..utils import Events, OrderedSet, Partializable
 from .utils import succ_deeper
 
 

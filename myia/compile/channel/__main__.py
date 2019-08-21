@@ -1,10 +1,11 @@
 """Entry point for RPC processes."""
 
-from myia.utils.serialize import MyiaDumper, MyiaLoader
-import sys
 import importlib
+import sys
 
-from . import LocalHandle, _dead_handle
+from myia.utils.serialize import MyiaDumper, MyiaLoader
+
+from . import _dead_handle
 
 
 def _rpc_server():

@@ -1,6 +1,5 @@
 """Compilation backends."""
 
-import importlib
 import os
 import urllib
 

@@ -13,11 +13,11 @@ from ...abstract import AbstractArray
 from ...prim import Primitive, ops as P
 from ...xtype import Nil, type_to_np_dtype
 from ...ir import manage
-
-from ..channel import handle
+from ...prim import Primitive, ops as P
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
 from . import Backend, HandleBackend
+from .channel import handle
 
 nonlinear_ops = list(nonlinear_ops)
 nonlinear_ops.append(P.scalar_cast)

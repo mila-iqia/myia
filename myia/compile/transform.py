@@ -3,7 +3,6 @@
 from ..abstract import to_abstract
 from ..ir import Apply, Constant, Graph, toposort
 from ..prim import Primitive, ops as P
-
 from ..utils import SymbolicKeyInstance, overload
 from .channel import handle
 from .vm import FinalVM
@@ -78,7 +77,7 @@ def wrap_result(self, data: tuple):
     return tuple(self(d) for d in data)
 
 
-@overload
+@overload  # noqa: F811
 def wrap_result(self, data: object):
     return handle(data)
 

@@ -5,10 +5,11 @@ try:
 except ImportError:  # pragma: no cover
     from yaml import SafeLoader, SafeDumper
 
-import numpy as np
 import sys
-from dataclasses import is_dataclass
 import traceback
+from dataclasses import is_dataclass
+
+import numpy as np
 
 
 class MyiaDumper(SafeDumper):
@@ -101,12 +102,14 @@ def _make_construct(cls, dc, sequence, scalar):
                 loader.add_finalizer(e.value)
     if dc:
         if cls.__dataclass_params__.frozen:
+
             def _construct(loader, node):  # noqa: F811
                 data = loader.construct_mapping(node)
                 return cls(**data)
         else:
             empty_args = dict((k, None)
                               for k in cls.__dataclass_fields__.keys())
+
             def _construct(loader, node):  # noqa: F811
                 res = cls(**empty_args)
                 yield res
@@ -179,6 +182,7 @@ def _serialize_ndarray(dumper, data):
     return dumper.represent_mapping(
         'arraydata', {'dtype': data.dtype.str, 'shape': data.shape,
                       'data': data.tobytes()})
+
 
 def _construct_ndarray(loader, node):
     data = loader.construct_mapping(node)

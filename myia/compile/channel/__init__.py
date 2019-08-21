@@ -1,11 +1,11 @@
 """RPC channel for multi-process communication."""
-import subprocess
-from myia.utils.serialize import MyiaDumper, MyiaLoader, LoadedError
-from myia.utils import serializable
-import sys
 import os
+import subprocess
+import sys
 import weakref
 
+from myia.utils import serializable
+from myia.utils.serialize import LoadedError, MyiaDumper, MyiaLoader
 
 _local_handle_table = {}
 _remote_handle_table = weakref.WeakValueDictionary()
@@ -78,7 +78,6 @@ class RPCProcess:
             [interpreter, '-m', 'myia.compile.channel'],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            #stderr=subprocess.PIPE,
             env=env)
         self.dumper = MyiaDumper(self.proc.stdin)
         self.loader = MyiaLoader(self.proc.stdout)

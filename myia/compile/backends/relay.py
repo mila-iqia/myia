@@ -9,6 +9,7 @@ from ...abstract import (
     AbstractFunction,
     AbstractScalar,
     AbstractTuple,
+    AbstractType,
     GraphFunction,
     PartialApplication,
     TypedPrimitive,
@@ -20,7 +21,6 @@ from ...prim import Primitive, ops as P
 from ...utils import overload
 from ...xtype import Bool, Nil, type_to_np_dtype
 from ..transform import wrap_result
-
 from . import Backend, HandleBackend
 from .relay_helpers import build_module, optimize
 
@@ -277,6 +277,7 @@ class CompileGraph:
 
         exec = relay.create_executor(mod=module, ctx=context, target=target)
         res = exec.evaluate(module.entry_func)
+
         def f(*args, **kwargs):
             return wrap_result(res(*args, **kwargs))
         return f

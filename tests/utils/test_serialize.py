@@ -2,11 +2,11 @@ import io
 
 import pytest
 
-from myia.utils import load, dump
-from myia.prim.ops import switch, scalar_add
-from myia.abstract import ANYTHING
 from myia import dtype
+from myia.abstract import ANYTHING
 from myia.ir import Constant, Graph, isomorphic
+from myia.prim.ops import scalar_add, switch
+from myia.utils import dump, load
 
 from ..common import to_abstract_test
 
