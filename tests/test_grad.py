@@ -711,6 +711,10 @@ def test_aliasing():
 
 
 def test_aliasing_list():
+    try:
+        import torch
+    except ImportError:
+        pytest.skip('PyTorch not installed')
 
     def g(xs, y):
         res = 0
