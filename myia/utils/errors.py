@@ -29,6 +29,10 @@ class InferenceError(Exception):
         self.traceback_refs = infer_trace.get()
 
 
+class InternalInferenceError(InferenceError):
+    """This kind of error denotes a bug in Myia."""
+
+
 class MyiaTypeError(InferenceError):
     """Type error in a Myia program."""
 
