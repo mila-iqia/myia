@@ -206,6 +206,11 @@ def test_merge_edge_cases():
     assert amerge(a, b) is a
 
 
+@macro
+async def mackerel(info):
+    pass
+
+
 def test_repr():
 
     s1 = to_abstract_test(1)
@@ -242,10 +247,6 @@ def test_repr():
     tu1 = AbstractTaggedUnion([[13, s2], [4, to_abstract_test(i16)]])
     assert repr(tu1) == \
         'AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))'
-
-    @macro
-    async def mackerel(info):
-        pass
 
     assert repr(mackerel) == '<Macro mackerel>'
 

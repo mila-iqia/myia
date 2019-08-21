@@ -23,6 +23,7 @@ from ..utils import (
     OrderedSet,
     PossiblyRecursive,
     dataclass_methods,
+    keyword_decorator,
 )
 from .loop import Pending
 from .ref import Context, Reference
@@ -759,29 +760,36 @@ class MacroInfo:
     argrefs: object
     graph: object
     args: object
+    abstracts: object
 
 
 class Macro:
     """Represents a function that transforms the subgraph it receives."""
 
-    def __init__(self, macro):
+    def __init__(self, macro, *, name=None, infer_args=True):
         """Initialize a Macro."""
-        self.name = macro.__name__
+        self.name = name or macro.__qualname__
         if not inspect.iscoroutinefunction(macro):
             raise TypeError(
                 f"Error defining macro '{self.name}':"
                 f" macro must be a coroutine defined using async def"
             )
         self.macro = macro
+        self.infer_args = infer_args
 
     async def reroute(self, engine, outref, argrefs):
         """Reroute a node."""
+        if self.infer_args:
+            abstracts = [await argref.get() for argref in argrefs]
+        else:
+            abstracts = None
         info = MacroInfo(
             engine=engine,
             outref=outref,
             argrefs=argrefs,
             graph=outref.node.graph,
-            args=[argref.node for argref in argrefs]
+            args=[argref.node for argref in argrefs],
+            abstracts=abstracts,
         )
         rval = await self.macro(info)
         if isinstance(rval, ANFNode):
@@ -800,9 +808,10 @@ class Macro:
     __repr__ = __str__
 
 
-def macro(fn):
+@keyword_decorator
+def macro(fn, **kwargs):
     """Create a macro out of a function."""
-    return Macro(macro=fn)
+    return Macro(fn, **kwargs)
 
 
 #############################
