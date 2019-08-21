@@ -1,6 +1,6 @@
 """RPC channel for multi-process communication."""
 import subprocess
-from myia.utils.serialize import MyiaDumper, MyiaLoader
+from myia.utils.serialize import MyiaDumper, MyiaLoader, LoadedError
 from myia.utils import serializable
 import sys
 import os
@@ -105,6 +105,8 @@ class RPCProcess:
             res = self.loader.get_data()
         finally:
             RemoteHandle.current_channel = None
+        if isinstance(res, LoadedError):
+            raise res
         return res
 
     def close(self):

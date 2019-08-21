@@ -8,6 +8,7 @@ except ImportError:  # pragma: no cover
 import numpy as np
 import sys
 from dataclasses import is_dataclass
+import traceback
 
 
 class MyiaDumper(SafeDumper):
@@ -44,6 +45,19 @@ class MyiaLoader(SafeLoader):
         """Regsiter a finalizer to be run when the loading is finished."""
         assert callable(f)
         self._finalizers.append(f)
+
+
+class LoadedError(Exception):
+    """Represent an error that was serialized."""
+    def __init__(self, message):
+        """An error with a single message."""
+        self.message = message
+
+    def __str__(self):
+        return self.message
+
+    def __repr__(self):
+        return f"LoadedException"
 
 
 def __serialize__(self, dumper):
@@ -182,12 +196,21 @@ _TAG_MAP = {}
 def _serialize_unique(dumper, obj):
     tag = _OBJ_MAP.get(obj, None)
     if tag is None:
-        return dumper.represent_undefined(obj)
+        if isinstance(obj, Exception):
+            return dumper.represent_scalar(
+                'error',
+                '\n'.join(traceback.format_exception(type(obj), obj,
+                                                     obj.__traceback__)))
+        else:
+            return dumper.represent_undefined(obj)
     else:
         return dumper.represent_scalar(tag, '')
 
 
 def _construct_unique(loader, node):
+    if node.tag == 'error':
+        data = loader.construct_scalar(node)
+        return LoadedError(data)
     obj = _TAG_MAP.get(node.tag, None)
     if obj is None:
         return loader.construct_undefined(node)

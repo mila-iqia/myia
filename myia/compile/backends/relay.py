@@ -387,7 +387,7 @@ class RelayBackend(Backend):
 
     def to_scalar(self, v):
         """Convert the TVM array to a scalar."""
-        if isinstance(v, relay.backend.interpreter.TupleValue):
+        if isinstance(v, (relay.backend.interpreter.TupleValue, tuple)):
             assert len(v) == 0
             return None
         else:

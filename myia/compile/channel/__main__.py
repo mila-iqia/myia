@@ -3,7 +3,6 @@
 from myia.utils.serialize import MyiaDumper, MyiaLoader
 import sys
 import importlib
-import traceback
 
 from . import LocalHandle, _dead_handle
 
@@ -25,8 +24,7 @@ def _rpc_server():
                 meth = getattr(iface, name)
                 res = meth(*args, **kwargs)
             except Exception as e:
-                traceback.print_exc(file=sys.stderr)
-                res = None
+                res = e
             dumper.represent(res)
         elif isinstance(data, list):
             msg, arg = data
@@ -36,8 +34,7 @@ def _rpc_server():
                 try:
                     res = arg[0](*arg[1], **arg[2])
                 except Exception as e:
-                    traceback.print_exc(file=sys.stderr)
-                    res = None
+                    res = e
                 dumper.represent(res)
             else:
                 raise ValueError(f"Unknown message: {msg}")
