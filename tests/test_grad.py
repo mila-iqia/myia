@@ -711,10 +711,11 @@ def test_aliasing():
 
 
 def test_aliasing_list():
+    from myia.compile.backends import LoadingError, load_backend
     try:
-        import torch
-    except ImportError:
-        pytest.skip('PyTorch not installed')
+        load_backend('pytorch')
+    except LoadingError:
+        pytest.skip('PyTorch not available')
 
     def g(xs, y):
         res = 0
