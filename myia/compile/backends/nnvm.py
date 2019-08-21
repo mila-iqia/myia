@@ -415,5 +415,5 @@ class NNVMBackendR(HandleBackend):
     """NNVM Proxy."""
 
     def __init__(self, target='cpu', device_id=0):
-        """Proxy."""
+        """Create the real backend."""
         self.real = NNVMBackend(target, device_id)

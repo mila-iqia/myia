@@ -28,7 +28,9 @@ class MyiaDumper(SafeDumper):
 
 class MyiaLoader(SafeLoader):
     """Customize the loader."""
+
     def __init__(self, stream):
+        """Make sure reads don't block."""
         stream.read = stream.read1
         stream.readinto = stream.readinto1
         super().__init__(stream)
@@ -50,6 +52,7 @@ class MyiaLoader(SafeLoader):
 
 class LoadedError(Exception):
     """Represent an error that was serialized."""
+
     def __init__(self, message):
         """An error with a single message."""
         self.message = message

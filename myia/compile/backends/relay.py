@@ -27,6 +27,7 @@ from .relay_helpers import build_module, optimize
 
 @wrap_result.register
 def wrap_result(self, data: relay.backend.interpreter.TupleValue):
+    """Wrap tuples from relay."""
     return tuple(self(d) for d in data)
 
 
@@ -406,4 +407,5 @@ class RelayBackendR(HandleBackend):
     """Relay proxy."""
 
     def __init__(self, target='cpu', device_id=0):
+        """Create the real backend."""
         self.real = RelayBackend(target, device_id)

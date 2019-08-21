@@ -99,6 +99,7 @@ scalar_mapping = {
 
 
 def pytorch_scalar_cast(op):
+    """Implementation of scalar_cast."""
     v = op.inputs[1]
     assert op.inputs[2].is_constant()
     dtype = type_to_np_dtype(op.inputs[2].value)
@@ -291,4 +292,5 @@ class PyTorchBackendR(HandleBackend):
     """Pytorch proxy."""
 
     def __init__(self, device='cpu'):
+        """Create the real backend."""
         self.real = PyTorchBackend(device)

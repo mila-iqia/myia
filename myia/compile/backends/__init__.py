@@ -212,28 +212,37 @@ class Backend:
 
 class ChannelBackend(Backend):
     """Backend based on a channel to another process."""
+
     def __init__(self, proc):
+        """Remote."""
         self.proc = proc
 
     def compile(self, graph, argspec, outspec):
+        """Remote."""
         return self.proc.call_method('compile', graph, argspec, outspec)
 
     def from_numpy(self, a):
+        """Remote."""
         return self.proc.call_method('from_numpy', a)
 
     def to_numpy(self, v):
+        """Remote."""
         return self.proc.call_method('to_numpy', v)
 
     def from_scalar(self, s, t):
+        """Remote."""
         return self.proc.call_method('from_scalar', s, t)
 
     def to_scalar(self, v):
+        """Remote."""
         return self.proc.call_method('to_scalar', v)
 
     def empty_env(self):
+        """Remote."""
         return self.proc.call_method('empty_env')
 
     def convert_value(self, v, t):
+        """Remote."""
         return self.proc.call_method('convert_value', v, t)
 
 
