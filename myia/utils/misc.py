@@ -85,6 +85,9 @@ class Empty(ADT):
     def __myia_iter__(self):
         return self
 
+    def __myia_next__(self):
+        raise Exception('Out of bounds')
+
     def __myia_hasnext__(self):
         return False
 
