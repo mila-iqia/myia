@@ -257,6 +257,7 @@ standard_method_map = TypeMap({
         '__myia_iter__': C.array_iter,
         '__myia_to_array__': P.identity,
         'item': P.array_to_scalar,
+        'shape': property(P.shape),
     },
     dtype.SymbolicKeyType: {
     },
