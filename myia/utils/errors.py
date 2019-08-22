@@ -36,6 +36,10 @@ class MyiaTypeError(InferenceError):
     """Type error in a Myia program."""
 
 
+class MyiaValueError(InferenceError):
+    """Value error in a Myia program."""
+
+
 class MyiaShapeError(InferenceError):
     """Shape error in a Myia program."""
 

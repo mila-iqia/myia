@@ -9,7 +9,7 @@ from typing import List, Tuple
 import prettyprinter as pp
 from prettyprinter.prettyprinter import pretty_python_value
 
-from ..ir import ANFNode, Graph, MetaGraph
+from ..ir import ANFNode, Constant, Graph, MetaGraph
 from ..prim import Primitive
 from ..utils import (
     Atom,
@@ -19,6 +19,7 @@ from ..utils import (
     InferenceError,
     Interned,
     MyiaTypeError,
+    MyiaValueError,
     Named,
     OrderedSet,
     PossiblyRecursive,
@@ -774,8 +775,12 @@ class Macro:
                 f"Error defining macro '{self.name}':"
                 f" macro must be a coroutine defined using async def"
             )
-        self.macro = macro
+        self._macro = macro
         self.infer_args = infer_args
+
+    async def macro(self, info):
+        """Execute the macro proper."""
+        return await self._macro(info)
 
     async def reroute(self, engine, outref, argrefs):
         """Reroute a node."""
@@ -812,6 +817,58 @@ class Macro:
 def macro(fn, **kwargs):
     """Create a macro out of a function."""
     return Macro(fn, **kwargs)
+
+
+import traceback
+class MacroError(InferenceError):
+    """Wrap an error raised inside a macro."""
+
+    def __init__(self, error):
+        tb = traceback.format_exception(
+            type(error),
+            error,
+            error.__traceback__,
+            limit=7
+        )
+        del tb[1]
+        tb = "".join(tb)
+        super().__init__(None, refs=[], pytb=tb)
+
+
+class MyiaStatic(Macro):
+    """Represents a function that can be run at compile time.
+
+    This simpler, but less powerful than Macro.
+    """
+
+    async def macro(self, info):
+        from .utils import build_value
+        def bv(x, ref):
+            try:
+                return build_value(x)
+            except ValueError:
+                raise MyiaValueError(
+                    'Arguments to a myia_static function must be constant',
+                    refs=[ref]
+                )
+        posargs = []
+        kwargs = {}
+        for ref, arg in zip(info.argrefs, info.abstracts):
+            if isinstance(arg, AbstractKeywordArgument):
+                kwargs[arg.key] = bv(arg.argument, ref)
+            else:
+                posargs.append(bv(arg, ref))
+        try:
+            rval = self._macro(*posargs, **kwargs)
+        except Exception as e:
+            raise MacroError(e)
+        return Constant(rval)
+
+
+@keyword_decorator
+def myia_static(fn, **kwargs):
+    """Create a function that can be run by the inferrer at compile time."""
+    return MyiaStatic(fn, **kwargs)
 
 
 #############################

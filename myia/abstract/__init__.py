@@ -39,6 +39,7 @@ from .data import (  # noqa
     JTransformedFunction,
     Macro,
     MetaGraphFunction,
+    MyiaStatic,
     PartialApplication,
     Possibilities,
     PrimitiveFunction,
@@ -51,6 +52,7 @@ from .data import (  # noqa
     format_abstract,
     listof,
     macro,
+    myia_static,
     pretty_struct,
     pretty_type,
 )
