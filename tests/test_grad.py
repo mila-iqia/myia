@@ -776,3 +776,14 @@ def test_aliasing_other():
 
     res2 = f({'a': a, 'b': Point3D(b, a, d)}, e)
     _chk(res2, {'a': o * 2, 'b': Point3D(o, o * 2, o)})
+
+
+def test_bad_bprop_def():
+    from myia.prim.grad_implementations import register_bprop
+    from myia.prim import Primitive
+    from myia.utils import InternalInferenceError
+
+    with pytest.raises(InternalInferenceError):
+        @register_bprop(Primitive('nonsense'))
+        def _bprop_nonsense(x, y, dout):
+            return dout + x + y
