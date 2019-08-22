@@ -37,6 +37,11 @@ def _rpc_server():
                 except Exception as e:
                     res = e
                 dumper.represent(res)
+            elif msg == 'send_obj':
+                try:
+                    dumper.represent(arg)
+                except Exception as e:
+                    dumper.represent(e)
             else:
                 raise ValueError(f"Unknown message: {msg}")
         else:

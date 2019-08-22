@@ -77,6 +77,12 @@ class RemoteHandle:
         handle = _local_handle_table[data]
         return handle.value
 
+    def bring(self):
+        """Bring the remote object over.
+
+        This may not work for every objet type."""
+        return self.channel._bring_object(self)
+
     def __call__(self, *args, **kwargs):
         """Call the remote object associated with this handle."""
         return self.channel.call_handle(self, args, kwargs)
@@ -126,6 +132,10 @@ class RPCProcess:
     def call_handle(self, handle, args, kwargs):
         """Call the object associated with a handle."""
         self._send_msg('handle_call', (handle, args, kwargs))
+        return self._read_msg()
+
+    def _bring_object(self, obj):
+        self._send_msg('send_obj', obj)
         return self._read_msg()
 
     def _send_msg(self, msg, args):
