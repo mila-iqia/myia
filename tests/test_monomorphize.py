@@ -696,3 +696,12 @@ def test_reference_bug():
         if z != 1:
             shp = shp + (z,)
     return shp
+
+
+@specialize((int1,),)
+def test_fib(n):
+    a = 1
+    b = 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a

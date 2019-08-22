@@ -810,3 +810,31 @@ class ArithmeticData:
     @core
     def __rpow__(self, x):
         return hyper_map(pow, x, self)
+
+
+@dataclass
+class Range:  # pragma: no cover
+    """Implement a Range in Myia."""
+    start: object
+    stop: object
+    step: object
+
+    def __myia_iter__(self):
+        return self
+
+    def __myia_next__(self):
+        return self.start, Range(self.start + self.step, self.stop, self.step)
+
+    def __myia_hasnext__(self):
+        return self.start < self.stop
+
+
+@core
+def range_(start, stop=None, step=None):
+    """Myia implementation of the standard range function."""
+    if stop is None:
+        stop = start
+        start = 0
+    if step is None:
+        step = 1
+    return Range(start, stop, step)

@@ -67,6 +67,7 @@ scalar_object_map = {
     math.tan: P.scalar_tan,
     sum: C.sum,
     Exception: P.exception,
+    range: C.range_,
 }
 
 
@@ -140,6 +141,7 @@ standard_object_map = {
     np.sum: C.sum,
     sum: C.sum,
     Exception: P.exception,
+    range: C.range_,
 }
 
 standard_method_map = TypeMap({
