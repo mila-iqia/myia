@@ -196,6 +196,34 @@ def _construct_ndarray(loader, node):
 MyiaDumper.add_representer(np.ndarray, _serialize_ndarray)
 MyiaLoader.add_constructor('arraydata', _construct_ndarray)
 
+
+def register_npscalar(tag, cls):
+    def _serialize(dumper, data):
+        return dumper.represent_scalar(tag, repr(data))
+
+    def _construct(loader, node):
+        return cls(loader.construct_scalar(node))
+
+    MyiaDumper.add_representer(cls, _serialize)
+    MyiaLoader.add_constructor(tag, _construct)
+
+
+register_npscalar('float16', np.float16)
+register_npscalar('float32', np.float32)
+register_npscalar('float64', np.float64)
+register_npscalar('float128', np.float128)
+
+register_npscalar('int8', np.int8)
+register_npscalar('int16', np.int16)
+register_npscalar('int32', np.int32)
+register_npscalar('int64', np.int64)
+
+register_npscalar('uint8', np.uint8)
+register_npscalar('uint16', np.uint16)
+register_npscalar('uint32', np.uint32)
+register_npscalar('uint64', np.uint64)
+
+
 _OBJ_MAP = {}
 _TAG_MAP = {}
 
