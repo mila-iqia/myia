@@ -8,8 +8,8 @@ import prettyprinter as pp
 from colorama import Fore, Style
 
 from ..abstract import Reference, data, format_abstract, pretty_struct
-from ..ir import Graph
-from ..parser import MyiaDisconnectedCodeWarning, MyiaSyntaxError
+from ..ir import ANFNode, Graph
+from ..parser import Location, MyiaDisconnectedCodeWarning, MyiaSyntaxError
 from ..utils import InferenceError, eprint
 from .label import label
 
@@ -21,7 +21,7 @@ def skip_node(node):
 
 def _get_call(ref):
     ctx = ref.context
-    g = ctx.graph
+    g = ctx.graph or ref.node.graph
     while g and g.has_flags('auxiliary') \
             and ctx.parent and ctx.parent.graph:
         ctx = ctx.parent
@@ -29,15 +29,30 @@ def _get_call(ref):
     return g, ctx.argkey
 
 
-def _get_loc(ref):
-    node = ref.node
+def _get_loc(node):
     if node.is_constant_graph():
         node = node.value
-    return node.debug.find('location')
+    loc = node.debug.find('location')
+    genfn = None
+    if loc is None:
+        tr = node.debug.find('trace', skip={'copy', 'equiv'})
+        if tr:
+            idx = len(tr) - 3
+            while idx >= 0:
+                fr = tr[idx]
+                if 'myia/myia/ir' in fr.filename:
+                    idx -= 1
+                    continue
+                loc = Location(
+                    fr.filename, fr.lineno, 0, fr.lineno, 0, None
+                )
+                genfn = fr.name
+                break
+    return loc, genfn
 
 
 def _get_stack(error):
-    refs = [*error.traceback_refs.values()]
+    refs = [*error.traceback_refs.values()] + error.refs
     stack = []
     for ref in refs:
         if isinstance(ref, Reference):
@@ -45,14 +60,20 @@ def _get_stack(error):
             if g.has_flags('core'):
                 continue
             loctype = 'direct'
-            loc = _get_loc(ref)
+            loc, genfn = _get_loc(ref.node)
+        elif isinstance(ref, ANFNode):
+            g = ref.graph
+            args = None
+            loctype = 'direct'
+            loc, genfn = _get_loc(ref)
         else:
             g, args = ref
             loctype = None
             loc = None
+            genfn = None
         if loc and skip_node(loc.node):
             continue
-        stack.append((g, args, loctype, loc))
+        stack.append((g, args, loctype, loc, genfn))
     return stack
 
 
@@ -80,6 +101,8 @@ def _pretty_graphfunc(x, ctx):
 
 
 def _format_call(fn, args):
+    if args is None:
+        return label(fn)
     if isinstance(fn, Graph):
         kwargs = {label(p): arg for p, arg in zip(fn.parameters, args)}
         args = []
@@ -130,15 +153,19 @@ def _print_lines(lines, l1, c1, l2, c2, label='', mode=None, color='RED'):
 def print_inference_error(error):
     """Print an InferenceError's traceback."""
     stack = _get_stack(error)
-    for fn, args, loctype, loc in stack:
+    for fn, args, loctype, loc, genfn in stack:
         eprint('=' * 80)
         if loc is not None:
             eprint(f'{loc.filename}:{loc.line}')
-        eprint('in', _format_call(fn, args))
+        gen = f'via code generated in {genfn}:' if genfn else ''
+        eprint('in', _format_call(fn, args), gen)
         if loc is not None:
             _show_location(loc, '')
     eprint('~' * 80)
-    eprint(f'{type(error).__name__}: {error.message}')
+    if error.pytb:
+        eprint(error.pytb)
+    else:
+        eprint(f'{type(error).__name__}: {error.message}')
 
 
 def print_myia_syntax_error(error):

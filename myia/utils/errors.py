@@ -20,11 +20,12 @@ class InferenceError(Exception):
 
     """
 
-    def __init__(self, message, refs=[]):
+    def __init__(self, message, refs=[], pytb=None):
         """Initialize an InferenceError."""
         super().__init__(message, refs)
         self.message = message
         self.refs = refs
+        self.pytb = pytb
         self.traceback_refs = infer_trace.get()
 
 
