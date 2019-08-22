@@ -68,6 +68,8 @@ scalar_object_map = {
     sum: C.sum,
     Exception: P.exception,
     range: C.range_,
+    zip: C.zip_,
+    enumerate: C.enumerate_,
 }
 
 
@@ -142,6 +144,8 @@ standard_object_map = {
     sum: C.sum,
     Exception: P.exception,
     range: C.range_,
+    zip: C.zip_,
+    enumerate: C.enumerate_,
 }
 
 standard_method_map = TypeMap({

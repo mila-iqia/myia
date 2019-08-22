@@ -677,6 +677,7 @@ class IsCompare(MetaGraph):
                 comparison.
 
         """
+        super().__init__('IsCompare')
         self.do_not = do_not
 
     def normalize_args_sync(self, args):
@@ -838,3 +839,36 @@ def range_(start, stop=None, step=None):
     if step is None:
         step = 1
     return Range(start, stop, step)
+
+
+@dataclass
+class Zip2:
+    """Implement zip with two arguments."""
+    iter1: object
+    iter2: object
+
+    def __len__(self):
+        return len(self.iter1)
+
+    def __myia_iter__(self):
+        return self
+
+    def __myia_next__(self):
+        nxt1, iter1 = next(self.iter1)
+        nxt2, iter2 = next(self.iter2)
+        return (nxt1, nxt2), Zip2(iter1, iter2)
+
+    def __myia_hasnext__(self):
+        return hasnext(self.iter1) and hasnext(self.iter2)
+
+
+@core
+def zip_(seq1, seq2):
+    """Myia implementation of the standard zip function."""
+    return Zip2(iter(seq1), iter(seq2))
+
+
+@core
+def enumerate_(seq):
+    """Myia implementation of the standard enumerate function."""
+    return zip_(range(len(seq)), seq)
