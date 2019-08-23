@@ -21,6 +21,7 @@ from myia.abstract import (
     AbstractTaggedUnion,
     AbstractTuple as T,
     AbstractUnion,
+    Context,
     InferenceLoop,
     Pending,
     PendingFromList,
@@ -39,6 +40,7 @@ from myia.abstract import (
     type_to_abstract,
 )
 from myia.ir import Constant
+from myia.pipeline import standard_pipeline
 from myia.prim import ops as P
 from myia.utils import (
     Cons,
@@ -351,6 +353,13 @@ def test_type_to_abstract():
             is U(type_to_abstract(Empty),
                  type_to_abstract(Cons)))
     assert type_to_abstract(typing.Tuple) is T(ANYTHING)
+
+
+def test_get_resolved():
+    eng = standard_pipeline.make().resources.inferrer.engine
+    ref = eng.ref(Constant(123), Context.empty())
+    with pytest.raises(InternalInferenceError):
+        ref.get_resolved()
 
 
 def test_bad_macro():
