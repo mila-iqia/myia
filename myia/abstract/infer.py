@@ -14,6 +14,7 @@ from ..prim import Primitive, ops as P
 from ..utils import (
     ADT,
     InferenceError,
+    InternalInferenceError,
     MyiaTypeError,
     Overload,
     Partializable,
@@ -167,10 +168,20 @@ class InferenceEngine:
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
         if node.is_constant_graph():
-            context = context.filter(node.value.parent)
+            graph = node.value.parent
         else:
-            context = context.filter(node.graph)
-        return Reference(self, node, context)
+            graph = node.graph
+        new_context = context.filter(graph)
+        ref = Reference(self, node, new_context)
+        if new_context.graph is not graph:
+            raise InternalInferenceError(
+                f"Trying to access node '{ref.node}' of function '{graph}'"
+                f" from function '{context.graph}', but it is not visible"
+                " in that scope. This typically indicates either a bug"
+                " in a macro or a bug in Myia.",
+                refs=[ref]
+            )
+        return ref
 
     async def compute_ref(self, ref):
         """Compute the value associated to the Reference."""
@@ -186,8 +197,14 @@ class InferenceEngine:
         elif node.is_apply():
             return await self.infer_apply(ref)
 
-        else:
-            raise AssertionError(f'Missing information for {ref.node}', ref)
+        else:  # pragma: no cover
+            # The check in the `ref` method should catch most of the situations
+            # that would otherwise end up here, so this might be inaccessible.
+            raise InternalInferenceError(
+                f'Type information for {ref.node} is unavailable.'
+                f' This indicates either a bug in a macro or a bug in Myia.',
+                refs=[ref]
+            )
 
     def get_inferred(self, ref):
         """Get a Future for the value associated to the Reference.

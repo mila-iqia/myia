@@ -44,6 +44,7 @@ from myia.utils import (
     Cons,
     Empty,
     InferenceError,
+    InternalInferenceError,
     MyiaTypeError,
     SymbolicKeyInstance,
 )
@@ -350,3 +351,28 @@ def test_type_to_abstract():
             is U(type_to_abstract(Empty),
                  type_to_abstract(Cons)))
     assert type_to_abstract(typing.Tuple) is T(ANYTHING)
+
+
+def test_bad_macro():
+    from myia import myia
+    from myia.ir import Graph
+    from myia.prim import ops as P
+
+    @macro
+    async def bad(info):
+        badg = Graph()
+        badg.debug.name = 'badg'
+        p = badg.add_parameter()
+        p.debug.name = 'parameter'
+        badg.output = badg.apply(P.scalar_add, p, p)
+        # The return value of the macro can't directly refer to badg.output
+        # because that node can only be accessed from the scope of a call to
+        # badg. The error raised by Myia should reflect this.
+        return info.graph.apply(P.transpose, badg.output)
+
+    @myia
+    def salmon(x, y):
+        return bad(x + y)
+
+    with pytest.raises(InternalInferenceError):
+        salmon(12, 13)
