@@ -679,6 +679,17 @@ def test_keywords_defaults(x, y):
     return fn(x, beatrice=y)
 
 
+@infer((i64, i64, i64),)
+def test_keywords_shadow(x, y):
+    # It used to be that the beatrice arg would be renamed barbara
+    # because of the assignment.
+    def fn(albert, beatrice):
+        barbara = beatrice
+        return albert - barbara
+
+    return fn(albert=x, beatrice=y)
+
+
 @infer((i64, i64, InferenceError),)
 def test_redundant_kw(x, y):
     def fn(albert, beatrice):

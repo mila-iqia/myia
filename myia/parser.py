@@ -622,7 +622,8 @@ class Parser:
 
             if isinstance(targ, ast.Name):
                 # CASE: x = value
-                anf_node.debug.name = targ.id
+                if anf_node.debug.name is None:
+                    anf_node.debug.name = targ.id
                 if anf_node.is_constant_graph():
                     if anf_node.value.debug.name is None:
                         anf_node.value.debug.name = targ.id
