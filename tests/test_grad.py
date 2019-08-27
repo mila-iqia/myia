@@ -8,6 +8,7 @@ from pytest import mark
 
 from myia.abstract import AbstractJTagged, from_value, ndarray_aliasable
 from myia.api import myia
+from myia.composite import gadd
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.macros import GradOperation, grad
 from myia.pipeline import (
@@ -28,6 +29,7 @@ from myia.prim.py_implementations import (
     distribute,
     dot,
     hastype,
+    partial,
     py_registry as pyi,
     reshape,
     scalar_add,
@@ -591,6 +593,22 @@ def test_freegraph_outside_grad():
     assert _runwith(f, 5.0, 8.0) == 25.0
 
 
+def test_grad_prim():
+    @myia
+    def peach(x, y):
+        return grad(scalar_mul)(x, y)
+
+    assert peach(4.0, 52.0) == 52.0
+
+
+def test_grad_metagraph():
+    @myia
+    def apple(x, y):
+        return grad(gadd)(x, y)
+
+    assert apple(4.0, 52.0) == 1.0
+
+
 def test_grad_interface():
     def f(x, y):
         a = x ** 3
@@ -637,6 +655,20 @@ def test_grad_interface():
     def gradbad7(x, y, z):
         return grad(f, raturn_velue=True)(x, y)
 
+    @myia
+    def gradbad8(x, y):
+        def klojure(q):
+            return q + y
+        return grad(klojure)(x)
+
+    @myia
+    def gradbad9(x, y):
+        return grad(x)(y)
+
+    @myia
+    def gradbad10(x, y):
+        return grad(partial(f, x))(y)
+
     x, y = 2.0, 3.0
 
     dx = 3 * (x ** 2) * (y ** 4)
@@ -672,6 +704,15 @@ def test_grad_interface():
 
     with pytest.raises(InferenceError):
         print(gradbad7(x, y, 0))
+
+    with pytest.raises(InferenceError):
+        print(gradbad8(x, y))
+
+    with pytest.raises(InferenceError):
+        print(gradbad9(x, y))
+
+    with pytest.raises(InferenceError):
+        print(gradbad10(x, y))
 
 
 def test_aliasing():
