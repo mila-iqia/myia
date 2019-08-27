@@ -397,9 +397,10 @@ class Monomorphizer:
             ref = self.engine.get_actual_ref(entry.ref)
             a = concretize_abstract(ref.get_resolved())
             if entry.link is not None:
-                ct = _build(a)
-                if ct is not None:
-                    ref = self.engine.ref(ct, ref.context)
+                with About(ref.node.debug, 'equiv'):
+                    ct = _build(a)
+                    if ct is not None:
+                        ref = self.engine.ref(ct, ref.context)
 
             new_node = ref.node
 
@@ -430,20 +431,22 @@ class Monomorphizer:
                     or ref.node.is_constant(Primitive):
 
                 fn = a.get_unique()
-                try:
-                    new_node, norm_ctx = self.analyze_function(
-                        a, fn, entry.argvals)
-                except Unspecializable as e:
-                    aerr = AbstractError(e.problem, e.data)
-                    new_node = _const(e.problem, aerr)
-                else:
-                    if isinstance(fn, GraphFunction) and entry.argvals is None:
-                        self.ctcache[ref.node.value] = norm_ctx
+                with About(ref.node.debug, 'equiv'):
+                    try:
+                        new_node, norm_ctx = self.analyze_function(
+                            a, fn, entry.argvals)
+                    except Unspecializable as e:
+                        aerr = AbstractError(e.problem, e.data)
+                        new_node = _const(e.problem, aerr)
+                    else:
+                        if (isinstance(fn, GraphFunction)
+                                and entry.argvals is None):
+                            self.ctcache[ref.node.value] = norm_ctx
 
-                    if norm_ctx is not None:
-                        retref = self.engine.ref(norm_ctx.graph.return_,
-                                                 norm_ctx)
-                        todo.append(_TodoEntry(retref, None, None))
+                        if norm_ctx is not None:
+                            retref = self.engine.ref(norm_ctx.graph.return_,
+                                                     norm_ctx)
+                            todo.append(_TodoEntry(retref, None, None))
 
             if new_node is not entry.ref.node:
                 if entry.link is None:

@@ -31,6 +31,7 @@ short_relation_symbols = {
     'grad_fprop': '▶',
     'grad_bprop': '◀',
     'grad_sens': '∇',
+    'opt': '',
 }
 
 

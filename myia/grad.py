@@ -55,7 +55,7 @@ from .info import About
 from .ir import BasicRemapper, Constant, Graph, RemapperSet, sexp_to_node
 from .prim import Primitive, ops as primops
 from .prim.grad_implementations import augmented_graphs
-from .utils import OrderedSet, newenv, overload
+from .utils import InternalInferenceError, OrderedSet, newenv, overload
 
 
 class GradRemapper(BasicRemapper):
@@ -156,7 +156,8 @@ class FPropRemapper(GradRemapper):
 
     def gen_constant(self, g, ng, ct):
         """Constants are wrapped with a call to J."""
-        self.repl[(g, ct)] = sexp_to_node((primops.J, ct), ng)
+        with About(ct.debug, self.relation):
+            self.repl[(g, ct)] = sexp_to_node((primops.J, ct), ng)
 
     def gen_constant_graph(self, g, ng, ct):
         """Constant graphs map to their remapped versions.
@@ -477,14 +478,19 @@ def _grad(mng, root):
 
 
 @overload
-def J(prim: Primitive, resources):
+def J(prim: Primitive, resources, node):
     """Implement J on a Primitive."""
+    if prim not in augmented_graphs:
+        raise InternalInferenceError(  # pragma: no cover
+            f"Missing a backpropagator for primitive '{prim}'",
+            refs=[node]
+        )
     g = augmented_graphs[prim]
     return resources.convert(g)
 
 
 @overload  # noqa: F811
-def J(graph: Graph, resources):
+def J(graph: Graph, resources, node):
     """Implement J on a Graph."""
     if graph.transforms.get('grad', None):
         return graph.transforms['grad']
@@ -494,7 +500,7 @@ def J(graph: Graph, resources):
 
 
 @overload  # noqa: F811
-def J(other: object, resources):
+def J(other: object, resources, node):
     """We do not implement J on non-functions here."""
     name = type(other).__qualname__
     raise NotImplementedError(f'J(::{name}) not implemented')
