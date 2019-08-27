@@ -9,7 +9,6 @@ from typing import List, Tuple
 import prettyprinter as pp
 from prettyprinter.prettyprinter import pretty_python_value
 
-from ..info import About
 from ..ir import ANFNode, Graph, MetaGraph
 from ..prim import Primitive
 from ..utils import (
@@ -784,8 +783,7 @@ class Macro:
             graph=outref.node.graph,
             args=[argref.node for argref in argrefs]
         )
-        with About(outref.node.debug, f'macro:{self.name}'):
-            rval = await self.macro(info)
+        rval = await self.macro(info)
         if isinstance(rval, ANFNode):
             rval = engine.ref(rval, outref.context)
         if not isinstance(rval, Reference):
