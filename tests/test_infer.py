@@ -34,7 +34,7 @@ from myia.dtype import (
     u64,
 )
 from myia.hypermap import HyperMap, hyper_map
-from myia.ir import Graph, MultitypeGraph
+from myia.ir import Graph, MetaGraph, MultitypeGraph
 from myia.macros import grad
 from myia.operations import user_switch
 from myia.pipeline import scalar_pipeline, standard_pipeline
@@ -1710,6 +1710,19 @@ def _mystery2(x, y):
 )
 def test_multitype_2(x, y):
     return mystery(x, y)
+
+
+class _BadMG(MetaGraph):
+    def generate_graph(self, sig):
+        return None
+
+
+_bmg = _BadMG('badmg')
+
+
+@infer((i64, InferenceError))
+def test_bad_metagraph(x):
+    return _bmg(x)
 
 
 # TODO: add back

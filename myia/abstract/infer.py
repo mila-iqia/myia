@@ -750,6 +750,11 @@ class GraphInferrer(Inferrer):
         sig = self._graph.make_signature(args)
         if sig not in self.graph_cache:
             g = self._graph.generate_graph(sig)
+            if not isinstance(g, Graph):
+                raise InternalInferenceError(
+                    f"The 'generate_graph' method on '{self._graph}' "
+                    f"returned {g}, but it must always return a Graph."
+                )
             g = engine.pipeline.resources.convert(g)
             self.graph_cache[sig] = g
         return self.graph_cache[sig]
