@@ -5,7 +5,7 @@ import typing
 import numpy as np
 import pytest
 
-from myia import dtype as ty
+from myia import dtype as ty, myia
 from myia.abstract import (
     ALIASID,
     ANYTHING,
@@ -244,7 +244,7 @@ def test_repr():
         'AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))'
 
     @macro
-    def mackerel(info):
+    async def mackerel(info):
         pass
 
     assert repr(mackerel) == '<Macro mackerel>'
@@ -363,7 +363,6 @@ def test_get_resolved():
 
 
 def test_bad_macro():
-    from myia import myia
     from myia.ir import Graph
     from myia.prim import ops as P
 
@@ -385,3 +384,23 @@ def test_bad_macro():
 
     with pytest.raises(InternalInferenceError):
         salmon(12, 13)
+
+
+def test_bad_macro_2():
+    with pytest.raises(TypeError):
+        @macro
+        def bigmac(info):
+            return info.args[0]
+
+
+def test_bad_macro_3():
+    @macro
+    async def macncheese(info):
+        return None
+
+    @myia
+    def pasta(x, y):
+        return macncheese(x + y)
+
+    with pytest.raises(InferenceError):
+        pasta(12, 13)
