@@ -185,7 +185,7 @@ def inferrer_decorator(pipeline):
                 if _is_exc_type(expected_out):
                     try:
                         out()
-                    except expected_out as e:
+                    except expected_out:
                         pass
                     else:
                         raise Exception(
