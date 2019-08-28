@@ -10,7 +10,7 @@ from colorama import Fore, Style
 from ..abstract import Reference, data, format_abstract, pretty_struct
 from ..ir import ANFNode, Graph
 from ..parser import Location, MyiaDisconnectedCodeWarning, MyiaSyntaxError
-from ..utils import InferenceError, eprint
+from ..utils import InferenceError
 from .label import label
 
 
@@ -111,17 +111,18 @@ def _format_call(fn, args):
     return format_abstract(_PBlock(label(fn), ' :: ', args, kwargs))
 
 
-def _show_location(loc, label, mode=None, color='RED'):
+def _show_location(loc, label, mode=None, color='RED', file=sys.stderr):
     with open(loc.filename, 'r') as contents:
         lines = contents.read().split('\n')
         _print_lines(lines, loc.line, loc.column,
                      loc.line_end, loc.column_end,
-                     label, mode, color)
+                     label, mode, color, file=file)
 
 
-def _print_lines(lines, l1, c1, l2, c2, label='', mode=None, color='RED'):
+def _print_lines(lines, l1, c1, l2, c2, label='',
+                 mode=None, color='RED', file=sys.stderr):
     if mode is None:
-        if sys.stderr.isatty():
+        if file.isatty():
             mode = 'color'
     for ln in range(l1, l2 + 1):
         line = lines[ln - 1]
@@ -142,42 +143,43 @@ def _print_lines(lines, l1, c1, l2, c2, label='', mode=None, color='RED'):
             prefix = trimmed[:start]
             hl = trimmed[start:end]
             rest = trimmed[end:]
-            eprint(f'{ln}: {prefix}{getattr(Fore, color)}{Style.BRIGHT}'
-                   f'{hl}{Style.RESET_ALL}{rest}')
+            print(f'{ln}: {prefix}{getattr(Fore, color)}{Style.BRIGHT}'
+                  f'{hl}{Style.RESET_ALL}{rest}',
+                  file=file)
         else:
-            eprint(f'{ln}: {trimmed}')
+            print(f'{ln}: {trimmed}', file=file)
             prefix = ' ' * (start + 2 + len(str(ln)))
-            eprint(prefix + '^' * (end - start) + label)
+            print(prefix + '^' * (end - start) + label, file=file)
 
 
-def print_inference_error(error):
+def print_inference_error(error, file=sys.stderr):
     """Print an InferenceError's traceback."""
     stack = _get_stack(error)
     for fn, args, loctype, loc, genfn in stack:
-        eprint('=' * 80)
+        print('=' * 80, file=file)
         if loc is not None:
-            eprint(f'{loc.filename}:{loc.line}')
+            print(f'{loc.filename}:{loc.line}', file=file)
         gen = f'via code generated in {genfn}:' if genfn else ''
-        eprint('in', _format_call(fn, args), gen)
+        print('in', _format_call(fn, args), gen, file=file)
         if loc is not None:
-            _show_location(loc, '')
-    eprint('~' * 80)
+            _show_location(loc, '', file=file)
+    print('~' * 80, file=file)
     if error.pytb:
-        eprint(error.pytb)
+        print(error.pytb, file=file)
     else:
-        eprint(f'{type(error).__name__}: {error.message}')
+        print(f'{type(error).__name__}: {error.message}', file=file)
 
 
-def print_myia_syntax_error(error):
+def print_myia_syntax_error(error, file=sys.stderr):
     """Print MyiaSyntaxError's location."""
     loc = error.loc
-    eprint('=' * 80)
+    print('=' * 80, file=file)
     if loc is not None:
-        eprint(f'{loc.filename}:{loc.line}')
+        print(f'{loc.filename}:{loc.line}', file=file)
     if loc is not None:
-        _show_location(loc, '')
-    eprint('~' * 80)
-    eprint(f'{type(error).__name__}: {error}')
+        _show_location(loc, '', file=file)
+    print('~' * 80, file=file)
+    print(f'{type(error).__name__}: {error}', file=file)
 
 
 _previous_excepthook = sys.excepthook
@@ -196,17 +198,17 @@ def myia_excepthook(exc_type, exc_value, tb):
 sys.excepthook = myia_excepthook
 
 
-def print_myia_warning(warning):
+def print_myia_warning(warning, file=sys.stderr):
     """Print Myia Warning's location."""
     msg = warning.args[0]
     loc = warning.loc
-    eprint('=' * 80)
+    print('=' * 80, file=file)
     if loc is not None:
-        eprint(f'{loc.filename}:{loc.line}')
+        print(f'{loc.filename}:{loc.line}', file=file)
     if loc is not None:
-        _show_location(loc, '', None, 'MAGENTA')
-    eprint('~' * 80)
-    eprint(f'{warning.__class__.__name__}: {msg}')
+        _show_location(loc, '', None, 'MAGENTA', file=file)
+    print('~' * 80, file=file)
+    print(f'{warning.__class__.__name__}: {msg}', file=file)
 
 
 _previous_warning = warnings.showwarning
