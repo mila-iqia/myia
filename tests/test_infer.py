@@ -17,7 +17,6 @@ from myia.abstract import (
 )
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.composite import gadd, zeros_like
-from myia.debug.traceback import print_inference_error
 from myia.dtype import (
     Array,
     EnvType as Env,
@@ -187,20 +186,13 @@ def inferrer_decorator(pipeline):
                     try:
                         out()
                     except expected_out as e:
-                        if issubclass(expected_out, InferenceError):
-                            print_inference_error(e)
-                        else:
-                            pass
+                        pass
                     else:
                         raise Exception(
                             f'Expected {expected_out}, got: (see stdout).'
                         )
                 else:
-                    try:
-                        assert out() == expected_out
-                    except InferenceError as e:
-                        print_inference_error(e)
-                        raise
+                    assert out() == expected_out
 
             m = pytest.mark.parametrize('spec', list(tests))(run_test)
             m.__orig__ = fn
