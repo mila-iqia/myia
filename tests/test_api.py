@@ -357,6 +357,7 @@ def test_raise():
         raise Exception('Expected an exception')
 
 
+
 def test_return_backend():
     @myia(return_backend=True)
     def f(a):

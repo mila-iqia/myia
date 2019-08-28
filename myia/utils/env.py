@@ -78,7 +78,7 @@ class EnvInstance:
     def _construct(cls):
         res = cls([])
         data = yield res
-        self._contents.update(data)
+        res._contents.update(data)
 
     def get(self, key, default):
         """Get the sensitivity list for the given key."""

@@ -44,6 +44,7 @@ VOID = Named('VOID')
 
 # Represents specialization problems
 DEAD = Named('DEAD')
+register_serialize(DEAD, 'DEAD')
 POLY = Named('POLY')
 
 
@@ -280,7 +281,7 @@ class AbstractValue(Interned, PossiblyRecursive):
 
     @classmethod
     def _construct(cls):
-        tmap = {'TYPE': TYPE, 'VALUE': VALUE, 'SHAPE': SHAPE}
+        tmap = {'TYPE': TYPE, 'VALUE': VALUE, 'SHAPE': SHAPE, 'DATA': DATA}
         obj = cls.empty()
         data = yield obj
         obj.values = TrackDict((tmap[k], v) for k, v in data.items())

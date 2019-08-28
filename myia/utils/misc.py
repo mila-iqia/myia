@@ -5,6 +5,10 @@ import functools
 from dataclasses import dataclass
 from typing import Any, Dict, List, TypeVar
 
+from colorama import AnsiToWin32
+
+from .serialize import serializable
+
 builtins_d = vars(builtins)
 
 
@@ -105,6 +109,7 @@ def list_to_cons(elems):
     return rval
 
 
+@serializable('TaggedValue')
 class TaggedValue:
     """Represents a tagged value for a TaggedUnion."""
 
@@ -112,6 +117,17 @@ class TaggedValue:
         """Initialize a TaggedValue."""
         self.tag = tag
         self.value = value
+
+    def _serialize(self):
+        return {'tag': self.tag,
+                'value': self.value}
+
+    @classmethod
+    def _construct(cls):
+        res = cls(None, None)
+        data = yield res
+        res.tag = data['tag']
+        res.value = data['value']
 
     def has(self, tag):
         """Return whether this TaggedValue has the given tag."""

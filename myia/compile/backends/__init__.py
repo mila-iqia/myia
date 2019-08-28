@@ -142,9 +142,9 @@ class Backend:
         """
         raise NotImplementedError('compile')
 
-    def from_numpy(self, a):
-        """Convert a numpy ndarray to a backend value."""
-        raise NotImplementedError("from_numpy")
+    def empty_env(self):
+        """Value for empty environement."""
+        return ()
 
     def to_numpy(self, v):
         """Convert a backend value to a numpy.ndarray."""
@@ -200,7 +200,7 @@ class Backend:
                 assert len(v._contents) == 0
                 return self.empty_env()
             else:
-                raise NotImplementedError(f'from_value for {t}')
+                raise NotImplementedError(f'to_backend_value for {t}')
         elif isinstance(t, abstract.AbstractTuple):
             return tuple(self.to_backend_value(v, t)
                          for v, t in zip(v, t.elements))
@@ -208,7 +208,7 @@ class Backend:
             real_t = t.options.get(v.tag)
             return TaggedValue(v.tag, self.to_backend_value(v.value, real_t))
         else:
-            raise NotImplementedError(f'from_value for {t}')
+            raise NotImplementedError(f'to_backend_value for {t}')
 
 
 class ChannelBackend(Backend):
@@ -223,29 +223,13 @@ class ChannelBackend(Backend):
         graph = convert_grad(graph)
         return self.proc.call_method('compile', graph, argspec, outspec)
 
-    def from_numpy(self, a):
+    def from_backend_value(self, v, t):
         """Remote."""
-        return self.proc.call_method('from_numpy', a)
+        return self.proc.call_method('from_backend_value', v, t)
 
-    def to_numpy(self, v):
+    def to_backend_value(self, v, t):
         """Remote."""
-        return self.proc.call_method('to_numpy', v)
-
-    def from_scalar(self, s, t):
-        """Remote."""
-        return self.proc.call_method('from_scalar', s, t)
-
-    def to_scalar(self, v):
-        """Remote."""
-        return self.proc.call_method('to_scalar', v)
-
-    def empty_env(self):
-        """Remote."""
-        return self.proc.call_method('empty_env')
-
-    def convert_value(self, v, t):
-        """Remote."""
-        return self.proc.call_method('convert_value', v, t)
+        return self.proc.call_method('to_backend_value', v, t)
 
 
 class HandleBackend(Backend):
@@ -255,26 +239,10 @@ class HandleBackend(Backend):
         """Proxy."""
         return handle(self.real.compile(graph, argspec, outspec))
 
-    def to_numpy(self, v):
-        """Proxy."""
-        return self.real.to_numpy(v)
+    def from_backend_value(self, v, t):
+        """Remote."""
+        return self.real.from_backend_value(v, t)
 
-    def from_numpy(self, a):
-        """Proxy."""
-        return handle(self.real.from_numpy(a))
-
-    def to_scalar(self, v):
-        """Proxy."""
-        return self.real.to_scalar(v)
-
-    def from_scalar(self, s, t):
-        """Proxy."""
-        return handle(self.real.from_scalar(s, t))
-
-    def empty_env(self):
-        """Proxy."""
-        return handle(self.real.empty_env())
-
-    def convert_value(self, v, t):
-        """Proxy."""
-        return handle(self.real.convert_value(v, t))
+    def to_backend_value(self, v, t):
+        """Remote."""
+        return handle(self.real.to_backend_value(v, t))

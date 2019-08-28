@@ -236,6 +236,8 @@ def _serialize_unique(dumper, obj):
                 'error',
                 '\n'.join(traceback.format_exception(type(obj), obj,
                                                      obj.__traceback__)))
+        elif hasattr(obj, '_serialize_replace'):
+            return dumper.represent_data(obj._serialize_replace())
         else:
             return dumper.represent_undefined(obj)
     else:

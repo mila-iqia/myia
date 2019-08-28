@@ -25,6 +25,11 @@ def convert_grad(graph):
                 counter += 1
             node.value = key_map[node.value]
             node.abstract = to_abstract(node.value)
+        if node.is_constant(Primitive):
+            if node.value is P.env_setitem:
+                node.abstract = None
+            if node.value is P.env_getitem:
+                node.abstract = None
 
     return graph
 
