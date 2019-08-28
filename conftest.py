@@ -6,7 +6,6 @@ from myia.debug import traceback as myia_tr
 from myia.parser import MyiaSyntaxError
 from myia.utils import InferenceError
 
-
 if os.environ.get('BUCHE'):
     from debug import do_inject  # noqa
     from debug.butest import *  # noqa
