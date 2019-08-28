@@ -188,9 +188,9 @@ _previous_excepthook = sys.excepthook
 def myia_excepthook(exc_type, exc_value, tb):
     """Print out InferenceError and MyiaSyntaxError specially."""
     if isinstance(exc_value, InferenceError):
-        print_inference_error(exc_value)
+        print_inference_error(exc_value, file=sys.stderr)
     elif isinstance(exc_value, MyiaSyntaxError):
-        print_myia_syntax_error(exc_value)
+        print_myia_syntax_error(exc_value, file=sys.stderr)
     else:
         _previous_excepthook(exc_type, exc_value, tb)
 
@@ -220,7 +220,7 @@ def myia_warning(message, category, filename, lineno, file, line):
         # message is actually a MyiaDisconnectedCodeWarning object,
         # even though this parameter of myia_warning is called message
         # (in order to match parameter names of overrided showwarning)
-        print_myia_warning(message)
+        print_myia_warning(message, file=sys.stderr)
     else:
         _previous_warning(message, category, filename, lineno, file, line)
 

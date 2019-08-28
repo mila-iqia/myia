@@ -379,18 +379,6 @@ class ClosureNamespace(Namespace):
             raise UnboundLocalError(name)
 
 
-stderr = AnsiToWin32(sys.stderr).stream
-
-
-def eprint(*things):
-    """Print to stderr."""
-    # Turns off AnsiToWin32 for pytest stderr capture
-    if sys.stderr.isatty():
-        print(*things, file=stderr)  # pragma: no cover
-    else:
-        print(*things, file=sys.stderr)
-
-
 def is_dataclass_type(cls):
     """Returns whether cls is a dataclass."""
     return isinstance(cls, type) and hasattr(cls, '__dataclass_fields__')
