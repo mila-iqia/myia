@@ -68,15 +68,6 @@ def test_myia_specialize_values():
     assert ft is not ff
 
 
-def test_myia_return_backend():
-    @myia(return_backend=True)
-    def f(x, y):
-        return x + y
-
-    # Only tests that it returns something and it works
-    assert f(10, 20) is not None
-
-
 def test_myia_struct_arg():
     @myia
     def f(pt):
@@ -188,24 +179,12 @@ def test_convert_arg():
         _convert(1.0, to_abstract_test('x'))
 
 
-@pytest.fixture(params=[
-    pytest.param(True),
-    pytest.param(False)
-])
-def _return_backend(request):
-    return request.param
-
-
-def test_convert_result(_return_backend):
-
-    backend = NumpyChecker()
+def test_convert_result():
 
     def _convert(data, typ1, typ2):
         return convert_result(data,
                               to_abstract_test(typ1),
-                              to_abstract_test(typ2),
-                              backend,
-                              _return_backend)
+                              to_abstract_test(typ2))
 
     # Leaves
 

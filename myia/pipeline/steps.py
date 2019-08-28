@@ -634,18 +634,16 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
 
 
 @overload(bootstrap=True)
-def convert_result(self, res, orig_t, vm_t: AbstractClassBase, backend,
-                   return_backend):
+def convert_result(self, res, orig_t, vm_t: AbstractClassBase):
     oe = orig_t.attributes.values()
     ve = vm_t.attributes.values()
-    tup = tuple(self(getattr(res, attr), o, v, backend, return_backend)
+    tup = tuple(self(getattr(res, attr), o, v)
                 for attr, o, v in zip(orig_t.attributes, oe, ve))
     return orig_t.constructor(*tup)
 
 
 @overload  # noqa: F811
-def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
-                   return_backend):
+def convert_result(self, res, orig_t, vm_t: AbstractTuple):
     # If the EraseClass opt was applied, orig_t may be Class
     orig_is_class = isinstance(orig_t, AbstractClassBase)
     if orig_is_class:
@@ -653,7 +651,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
             rval = []
             while res:
                 value = self(res[0], orig_t.attributes['head'],
-                             vm_t.elements[0], backend, return_backend)
+                             vm_t.elements[0])
                 rval.append(value)
                 res = res[1].value
             return rval
@@ -665,7 +663,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
     else:
         oe = orig_t.elements
     ve = vm_t.elements
-    tup = tuple(self(x, o, v, backend, return_backend)
+    tup = tuple(self(x, o, v)
                 for x, o, v in zip(res, oe, ve))
     if orig_is_class:
         return orig_t.constructor(*tup)
@@ -676,43 +674,29 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
 
 
 @overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractScalar, backend,
-                   return_backend):
-    ret = backend.to_scalar(arg)
+def convert_result(self, arg, orig_t, vm_t: AbstractScalar):
     if orig_t.values[TYPE] == dtype.String:
         ret = _strmap_tag[ret]
     return ret
 
 
 @overload
-def convert_result_array(arg, orig_t: AbstractArray, backend):
-    return backend.to_numpy(arg)
+def convert_result_array(arg, orig_t: AbstractArray):
+    return arg
 
 
 @overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractArray, backend,
-                   return_backend):
-    if return_backend:
-        a = ArrayWrapper(
-            arg,
-            dtype.type_to_np_dtype(orig_t.element.dtype()),
-            orig_t.values[SHAPE],
-            backend
-        )
-    else:
-        a = convert_result_array(arg, orig_t, backend)
-    return a
+def convert_result(self, arg, orig_t, vm_t: AbstractArray)
+    return convert_result_array(arg, orig_t)
 
 
 @overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractTaggedUnion, backend,
-                   return_backend):
+def convert_result(self, arg, orig_t, vm_t: AbstractTaggedUnion):
     assert isinstance(orig_t, AbstractUnion)
     for typ in orig_t.options:
         tag = type_to_tag(typ)
         if tag == arg.tag:
-            return self(arg.value, typ,
-                        vm_t.options.get(tag), backend, return_backend)
+            return self(arg.value, typ, vm_t.options.get(tag))
     else:
         raise AssertionError(f'Badly formed TaggedValue')
 
@@ -773,8 +757,8 @@ class Wrap(PipelineStep):
             args = tuple(convert_arg(arg, ot, backend) for arg, ot in
                          zip(args, orig_arg_t))
             res = fn(*args)
-            res = convert_result(res, orig_out_t, vm_out_t, backend,
-                                 self.return_backend)
+            res = backend.to_value(res, vm_out_t)
+            res = convert_result(res, orig_out_t, vm_out_t)
             return res
 
         return {'output': wrapped}
