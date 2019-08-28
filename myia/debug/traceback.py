@@ -51,30 +51,27 @@ def _get_loc(node):
     return loc, genfn
 
 
-def _get_stack(error):
-    refs = [*error.traceback_refs.values()] + error.refs
-    stack = []
-    for ref in refs:
-        if isinstance(ref, Reference):
-            g, args = _get_call(ref)
-            if g.has_flags('core'):
-                continue
-            loctype = 'direct'
-            loc, genfn = _get_loc(ref.node)
-        elif isinstance(ref, ANFNode):
-            g = ref.graph
-            args = None
-            loctype = 'direct'
-            loc, genfn = _get_loc(ref)
-        else:
-            g, args = ref
-            loctype = None
-            loc = None
-            genfn = None
-        if loc and skip_node(loc.node):
-            continue
-        stack.append((g, args, loctype, loc, genfn))
-    return stack
+def _get_info(x):
+    skip = False
+    if isinstance(x, Reference):
+        g, args = _get_call(x)
+        if g and g.has_flags('core'):
+            skip = True
+        loctype = 'direct'
+        loc, genfn = _get_loc(x.node)
+    elif isinstance(x, ANFNode):
+        g = x.graph
+        args = None
+        loctype = 'direct'
+        loc, genfn = _get_loc(x)
+    else:
+        g, args = x
+        loctype = None
+        loc = None
+        genfn = None
+    if loc and skip_node(loc.node):
+        skip = True
+    return (g, args, loctype, loc, genfn, skip)
 
 
 class _PBlock:
@@ -152,17 +149,30 @@ def _print_lines(lines, l1, c1, l2, c2, label='',
             print(prefix + '^' * (end - start) + label, file=file)
 
 
+def skip_ref(ref):
+    """Return whether display for a ref should be skipped."""
+    fn, args, loctype, loc, genfn, skip = _get_info(ref)
+    return skip
+
+
+def print_ref(ref, file=sys.stderr):
+    """Print a ref's location."""
+    fn, args, loctype, loc, genfn, skip = _get_info(ref)
+    if loc is not None:
+        print(f'{loc.filename}:{loc.line}', file=file)
+    gen = f'via code generated in {genfn}:' if genfn else ''
+    print('in', _format_call(fn, args), gen, file=file)
+    if loc is not None:
+        _show_location(loc, '', file=file)
+
+
 def print_inference_error(error, file=sys.stderr):
     """Print an InferenceError's traceback."""
-    stack = _get_stack(error)
-    for fn, args, loctype, loc, genfn in stack:
-        print('=' * 80, file=file)
-        if loc is not None:
-            print(f'{loc.filename}:{loc.line}', file=file)
-        gen = f'via code generated in {genfn}:' if genfn else ''
-        print('in', _format_call(fn, args), gen, file=file)
-        if loc is not None:
-            _show_location(loc, '', file=file)
+    refs = [*error.traceback_refs.values()] + error.refs
+    for ref in refs:
+        if not skip_ref(ref):
+            print('=' * 80, file=file)
+            print_ref(ref, file=file)
     print('~' * 80, file=file)
     if error.pytb:
         print(error.pytb, file=file)
