@@ -82,6 +82,7 @@ class Possibilities(list):
         return hash(tuple(self))
 
 
+@serializable('TaggedPossibilites', sequence=True)
 class TaggedPossibilities(list):
     """Represents a set of possible tag/type combos.
 
@@ -93,6 +94,15 @@ class TaggedPossibilities(list):
         """Initialize TaggedPossibilities."""
         opts = [[tag, typ] for tag, typ in sorted(set(map(tuple, options)))]
         super().__init__(opts)
+
+    def _serialize(self):
+        return self
+
+    @classmethod
+    def _construct(cls):
+        res = cls([])
+        data = yield res
+        res[:] = data
 
     def get(self, tag):
         """Get the type associated to the tag."""
@@ -323,6 +333,7 @@ class AbstractType(AbstractAtom):
         return pretty_join(['Ty(', t, ')'])
 
 
+@serializable('AbstractError')
 class AbstractError(AbstractAtom):
     """This represents some kind of problem in the computation.
 
@@ -687,6 +698,7 @@ class AbstractUnion(AbstractStructure):
         return pretty_call(ctx, "U", self.options)
 
 
+@serializable('AbstractTaggedUnion')
 class AbstractTaggedUnion(AbstractStructure):
     """Represents a tagged union.
 
@@ -702,6 +714,22 @@ class AbstractTaggedUnion(AbstractStructure):
             self.options = options
         else:
             self.options = TaggedPossibilities(options)
+
+    def _serialize(self):
+        data = super()._serialize()
+        data['options'] = self.options
+        return data
+
+    @classmethod
+    def _construct(self):
+        it = super()._construct()
+        res = next(it)
+        data = yield res
+        res.options = data.pop('options')
+        try:
+            it.send(data)
+        except StopIteration:
+            pass
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)

@@ -263,6 +263,13 @@ class PyTorchBackend(Backend):
         manage(graph)
         return self.compiler.compile_and_link(graph)
 
+    def to_value(self, v):
+        """Return a CPU value."""
+        if isinstance(v, torch.Tensor):
+            return self.to_numpy(v)
+        else:
+            return v
+
     def to_numpy(self, v):
         """Make a numpy array from a torch tensor."""
         if v.is_cuda:

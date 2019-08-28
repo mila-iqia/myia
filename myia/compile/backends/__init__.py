@@ -7,6 +7,7 @@ from ... import abstract, xtype
 
 from ...utils import TaggedValue
 from ..channel import RPCProcess, handle
+from ..transform import convert_grad
 
 
 class UnknownBackend(Exception):
@@ -219,6 +220,7 @@ class ChannelBackend(Backend):
 
     def compile(self, graph, argspec, outspec):
         """Remote."""
+        graph = convert_grad(graph)
         return self.proc.call_method('compile', graph, argspec, outspec)
 
     def from_numpy(self, a):
