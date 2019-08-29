@@ -634,15 +634,6 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
 
 
 @overload(bootstrap=True)
-def convert_result(self, res, orig_t, vm_t: AbstractClassBase):
-    oe = orig_t.attributes.values()
-    ve = vm_t.attributes.values()
-    tup = tuple(self(getattr(res, attr), o, v)
-                for attr, o, v in zip(orig_t.attributes, oe, ve))
-    return orig_t.constructor(*tup)
-
-
-@overload  # noqa: F811
 def convert_result(self, res, orig_t, vm_t: AbstractTuple):
     # If the EraseClass opt was applied, orig_t may be Class
     orig_is_class = isinstance(orig_t, AbstractClassBase)

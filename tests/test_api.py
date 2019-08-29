@@ -196,9 +196,7 @@ def test_convert_result():
     # Tuple -> Class conversion
 
     pt = Point(1, 2)
-    assert _convert(pt, Point(i64, i64), Point(i64, i64)) == pt
     assert _convert((1, 2), Point(i64, i64), (i64, i64)) == pt
-
     assert _convert(((1, 2), (1, 2)),
                     (Point(i64, i64), Point(i64, i64)),
                     ((i64, i64), (i64, i64))) == \
