@@ -16,7 +16,7 @@ from typing import Any, Dict, Iterable, List, Union
 from ..info import About, NamedDebugInfo
 from ..prim import Primitive, ops as primops
 from ..utils import Named, list_str, repr_
-from ..utils.unify import expandlist, noseq
+from ..utils.unify import Unification, expandlist, noseq
 from .abstract import Node
 
 PARAMETER = Named('PARAMETER')
@@ -471,6 +471,13 @@ class ANFNode(Node):
     def is_special(self, cls: Any = object) -> bool:
         """Return whether self is a Special, with value of given cls."""
         return False
+
+    def match(self, node):
+        """Return whether the node matches the sexp or node."""
+        from .utils import sexp_to_node
+        if not isinstance(node, ANFNode):
+            node = sexp_to_node(node, self.graph)
+        return Unification().unify(self, node)
 
 
 class Apply(ANFNode):

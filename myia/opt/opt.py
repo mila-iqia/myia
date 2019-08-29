@@ -3,6 +3,7 @@
 from collections import deque
 from weakref import WeakKeyDictionary
 
+from ..info import About
 from ..ir import Apply, Graph, manage, sexp_to_node
 from ..prim import Primitive
 from ..utils import OrderedSet
@@ -210,7 +211,8 @@ class LocalPassOptimizer:
         while loop:
             loop = False
             for transformer in self.node_map.get(n):
-                new = transformer(self.optimizer, n)
+                with About(n.debug, 'opt', transformer.name):
+                    new = transformer(self.optimizer, n)
                 if new is True:
                     changes = True
                     continue

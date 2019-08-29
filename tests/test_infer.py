@@ -17,7 +17,6 @@ from myia.abstract import (
 )
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.composite import gadd, zeros_like
-from myia.debug.traceback import print_inference_error
 from myia.dtype import (
     Array,
     EnvType as Env,
@@ -34,7 +33,7 @@ from myia.dtype import (
     u64,
 )
 from myia.hypermap import HyperMap, hyper_map
-from myia.ir import Graph, MultitypeGraph
+from myia.ir import Graph, MetaGraph, MultitypeGraph
 from myia.macros import grad
 from myia.operations import user_switch
 from myia.pipeline import scalar_pipeline, standard_pipeline
@@ -186,21 +185,14 @@ def inferrer_decorator(pipeline):
                 if _is_exc_type(expected_out):
                     try:
                         out()
-                    except expected_out as e:
-                        if issubclass(expected_out, InferenceError):
-                            print_inference_error(e)
-                        else:
-                            pass
+                    except expected_out:
+                        pass
                     else:
                         raise Exception(
                             f'Expected {expected_out}, got: (see stdout).'
                         )
                 else:
-                    try:
-                        assert out() == expected_out
-                    except InferenceError as e:
-                        print_inference_error(e)
-                        raise
+                    assert out() == expected_out
 
             m = pytest.mark.parametrize('spec', list(tests))(run_test)
             m.__orig__ = fn
@@ -677,6 +669,17 @@ def test_keywords_defaults(x, y):
         return albert - beatrice + charles
 
     return fn(x, beatrice=y)
+
+
+@infer((i64, i64, i64),)
+def test_keywords_shadow(x, y):
+    # It used to be that the beatrice arg would be renamed barbara
+    # because of the assignment.
+    def fn(albert, beatrice):
+        barbara = beatrice
+        return albert - barbara
+
+    return fn(albert=x, beatrice=y)
 
 
 @infer((i64, i64, InferenceError),)
@@ -1699,6 +1702,19 @@ def _mystery2(x, y):
 )
 def test_multitype_2(x, y):
     return mystery(x, y)
+
+
+class _BadMG(MetaGraph):
+    def generate_graph(self, sig):
+        return None
+
+
+_bmg = _BadMG('badmg')
+
+
+@infer((i64, InferenceError))
+def test_bad_metagraph(x):
+    return _bmg(x)
 
 
 # TODO: add back

@@ -2,12 +2,9 @@
 
 import builtins
 import functools
-import sys
 from dataclasses import dataclass
 from types import FunctionType
 from typing import Any, Dict, List, TypeVar
-
-from colorama import AnsiToWin32
 
 builtins_d = vars(builtins)
 
@@ -377,18 +374,6 @@ class ClosureNamespace(Namespace):
             return d[name].cell_contents
         except ValueError:
             raise UnboundLocalError(name)
-
-
-stderr = AnsiToWin32(sys.stderr).stream
-
-
-def eprint(*things):
-    """Print to stderr."""
-    # Turns off AnsiToWin32 for pytest stderr capture
-    if sys.stderr.isatty():
-        print(*things, file=stderr)  # pragma: no cover
-    else:
-        print(*things, file=sys.stderr)
 
 
 def is_dataclass_type(cls):

@@ -1,6 +1,7 @@
 """Data structures to represent data in an abstract way, for inference."""
 
 
+import inspect
 import re
 from dataclasses import dataclass
 from typing import List, Tuple
@@ -8,13 +9,14 @@ from typing import List, Tuple
 import prettyprinter as pp
 from prettyprinter.prettyprinter import pretty_python_value
 
-from ..ir import Graph, MetaGraph
+from ..ir import ANFNode, Graph, MetaGraph
 from ..prim import Primitive
 from ..utils import (
     Atom,
     AttrEK,
     Cons,
     Empty,
+    InferenceError,
     Interned,
     MyiaTypeError,
     Named,
@@ -764,8 +766,13 @@ class Macro:
 
     def __init__(self, macro):
         """Initialize a Macro."""
-        self.macro = macro
         self.name = macro.__name__
+        if not inspect.iscoroutinefunction(macro):
+            raise TypeError(
+                f"Error defining macro '{self.name}':"
+                f" macro must be a coroutine defined using async def"
+            )
+        self.macro = macro
 
     async def reroute(self, engine, outref, argrefs):
         """Reroute a node."""
@@ -777,8 +784,14 @@ class Macro:
             args=[argref.node for argref in argrefs]
         )
         rval = await self.macro(info)
-        if not isinstance(rval, Reference):
+        if isinstance(rval, ANFNode):
             rval = engine.ref(rval, outref.context)
+        if not isinstance(rval, Reference):
+            raise InferenceError(
+                f"Macro '{self.name}' returned {rval}, but it must always "
+                f"return an ANFNode (Apply, Constant or Parameter) or a "
+                f"Reference."
+            )
         return rval
 
     def __str__(self):

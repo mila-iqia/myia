@@ -1,25 +1,42 @@
 """Objects and routines to track debug information."""
 
-import threading
 import traceback
 import types
 import weakref
+from contextvars import ContextVar
 from typing import Any, Set
 
-# We use per-thread storage for the about stack.
-_about = threading.local()
-_about.stack = [None]
+
+class StackVar:
+    """ContextVar that represents a stack."""
+
+    def __init__(self, name):
+        """Initialize a StackVar."""
+        self.var = ContextVar(name, default=(None, None))
+        self.var.set((None, None))
+
+    def push(self, x):
+        """Push a new value on the stack."""
+        self.var.set((x, self.var.get()))
+
+    def pop(self):
+        """Remove the top element of the stack and return it."""
+        curr, prev = self.var.get()
+        assert prev is not None
+        self.var.set(prev)
+        return curr
+
+    def top(self):
+        """Return the top element of the stack."""
+        return self.var.get()[0]
 
 
-def _stack():
-    if not hasattr(_about, 'stack'):
-        _about.stack = [None]
-    return _about.stack
+_about = StackVar('_about')
 
 
 def current_info():
     """Return the `DebugInfo` for the current context."""
-    return _stack()[-1]
+    return _about.top()
 
 
 class DebugInfo(types.SimpleNamespace):
@@ -62,12 +79,12 @@ class DebugInherit(DebugInfo):
         Any `DebugInfo` created within the context of
         `with self: ...` will inherit all attributes of `self`.
         """
-        _stack().append(self)
+        _about.push(self)
 
     def __exit__(self, type, value, tb):
         """Exit the context of this `DebugInherit`."""
-        assert _stack()[-1] is self
-        _stack().pop()
+        assert current_info() is self
+        _about.pop()
 
 
 class NamedDebugInfo(DebugInfo):
@@ -127,14 +144,17 @@ class NamedDebugInfo(DebugInfo):
         self.name = f'_{prefix}{self.id}'
         return self.name
 
-    def find(self, prop):
+    def find(self, prop, skip=set()):
         """Find a property in self or in self.about.debug."""
-        if hasattr(self, prop):
-            return getattr(self, prop)
-        elif self.about is not None:
-            return self.about.debug.find(prop)
-        else:
-            return None
+        curr = self
+        while curr is not None:
+            rel = curr.about and curr.about.relation
+            if hasattr(curr, prop) and rel not in skip:
+                return getattr(curr, prop)
+            if not curr.about:
+                break
+            curr = curr.about.debug
+        return None
 
 
 class About:
@@ -154,20 +174,20 @@ class About:
 
     """
 
-    def __init__(self, debug: DebugInfo, relation: str) -> None:
+    def __init__(self, debug: DebugInfo, relation: str, *args) -> None:
         """Initialize an About."""
         if not isinstance(debug, DebugInfo):
             raise TypeError('debug argument to About must be a DebugInfo.') \
                 # pragma: no cover
         self.debug = debug
         self.relation = relation
+        self.args = args
 
     def __enter__(self):
         """Enter the context of this `About`."""
-        _stack().append(DebugInherit(about=self))
+        _about.push(DebugInherit(about=self))
 
     def __exit__(self, type, value, tb):
         """Exit the context of this `About`."""
-        top = _stack()[-1]
+        top = _about.pop()
         assert isinstance(top, DebugInfo) and top.about is self
-        _stack().pop()

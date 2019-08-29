@@ -5,7 +5,7 @@ import typing
 import numpy as np
 import pytest
 
-from myia import dtype as ty
+from myia import dtype as ty, myia
 from myia.abstract import (
     ALIASID,
     ANYTHING,
@@ -21,6 +21,7 @@ from myia.abstract import (
     AbstractTaggedUnion,
     AbstractTuple as T,
     AbstractUnion,
+    Context,
     InferenceLoop,
     Pending,
     PendingFromList,
@@ -39,11 +40,13 @@ from myia.abstract import (
     type_to_abstract,
 )
 from myia.ir import Constant
+from myia.pipeline import standard_pipeline
 from myia.prim import ops as P
 from myia.utils import (
     Cons,
     Empty,
     InferenceError,
+    InternalInferenceError,
     MyiaTypeError,
     SymbolicKeyInstance,
 )
@@ -241,7 +244,7 @@ def test_repr():
         'AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))'
 
     @macro
-    def mackerel(info):
+    async def mackerel(info):
         pass
 
     assert repr(mackerel) == '<Macro mackerel>'
@@ -350,3 +353,54 @@ def test_type_to_abstract():
             is U(type_to_abstract(Empty),
                  type_to_abstract(Cons)))
     assert type_to_abstract(typing.Tuple) is T(ANYTHING)
+
+
+def test_get_resolved():
+    eng = standard_pipeline.make().resources.inferrer.engine
+    ref = eng.ref(Constant(123), Context.empty())
+    with pytest.raises(InternalInferenceError):
+        ref.get_resolved()
+
+
+def test_bad_macro():
+    from myia.ir import Graph
+    from myia.prim import ops as P
+
+    @macro
+    async def bad(info):
+        badg = Graph()
+        badg.debug.name = 'badg'
+        p = badg.add_parameter()
+        p.debug.name = 'parameter'
+        badg.output = badg.apply(P.scalar_add, p, p)
+        # The return value of the macro can't directly refer to badg.output
+        # because that node can only be accessed from the scope of a call to
+        # badg. The error raised by Myia should reflect this.
+        return info.graph.apply(P.transpose, badg.output)
+
+    @myia
+    def salmon(x, y):
+        return bad(x + y)
+
+    with pytest.raises(InternalInferenceError):
+        salmon(12, 13)
+
+
+def test_bad_macro_2():
+    with pytest.raises(TypeError):
+        @macro
+        def bigmac(info):
+            return info.args[0]
+
+
+def test_bad_macro_3():
+    @macro
+    async def macncheese(info):
+        return None
+
+    @myia
+    def pasta(x, y):
+        return macncheese(x + y)
+
+    with pytest.raises(InferenceError):
+        pasta(12, 13)

@@ -4,13 +4,16 @@ Each primitive is associated to an augmented function, which returns a pair of
 the (augmented) original primitive's output and a backpropagator function.
 """
 
+from .. import operations
 from ..abstract import AbstractFunction, GraphFunction
 from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import About, NamedDebugInfo
 from ..ir import Constant, Graph, MetaGraph, clone, manage
+from ..opt.lib import Xs
+from ..parser import operations_ns
 from ..pipeline import standard_pipeline
-from ..utils import Registry, newenv
+from ..utils import InternalInferenceError, Registry, newenv
 from . import ops as primops
 from .py_implementations import (
     J,
@@ -52,6 +55,10 @@ parse = standard_pipeline \
 _flags = {'ignore_values': True, 'core': True, 'reference': True}
 
 
+_is_mktuple = ((operations.resolve, operations_ns, 'make_tuple'), Xs)
+_is_raise = (primops.raise_, Xs)
+
+
 def bprop_to_augm(prim, fn, flags):
     """Given a function for the bprop, make the augmented function."""
     info = NamedDebugInfo(prim=prim, name=prim.name)
@@ -60,11 +67,20 @@ def bprop_to_augm(prim, fn, flags):
     bprop.flags.update(_flags)
     bprop.debug.name = None
     bprop.debug.about = About(info, 'grad_bprop')  # type: ignore
-    bprop.output = bprop.apply(
-        primops.make_tuple,
-        newenv,
-        *bprop.output.inputs[1:]
-    )
+    if bprop.output.match(_is_raise):
+        pass
+    elif bprop.output.match(_is_mktuple):
+        bprop.output = bprop.apply(
+            primops.make_tuple,
+            newenv,
+            *bprop.output.inputs[1:]
+        )
+    else:
+        raise InternalInferenceError(
+            f'The backpropagator for {prim} is not defined properly. '
+            f'It should return a tuple literal.',
+            refs=[bprop.return_]
+        )
 
     *args, out_param, dout = bprop.parameters
 

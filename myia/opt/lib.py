@@ -1015,7 +1015,7 @@ def expand_J(optimizer, node, equiv):
     from ..grad import J as Jimpl
     arg = equiv[C].value
     try:
-        newg = Jimpl(arg, optimizer.resources)
+        newg = Jimpl(arg, optimizer.resources, node)
     except NotImplementedError:
         return None
     return Constant(newg)

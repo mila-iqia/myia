@@ -3,6 +3,7 @@
 from .env import EnvInstance, SymbolicKeyInstance, newenv, smap  # noqa
 from .errors import (  # noqa
     InferenceError,
+    InternalInferenceError,
     MyiaAttributeError,
     MyiaInputTypeError,
     MyiaNameError,
@@ -60,7 +61,6 @@ from .misc import (  # noqa
     core,
     dataclass_fields,
     dataclass_methods,
-    eprint,
     is_dataclass_type,
     keyword_decorator,
     list_str,

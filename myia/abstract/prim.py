@@ -633,7 +633,6 @@ async def _inf_transpose(self, engine,
             raise MyiaShapeError(
                 'The second argument of transpose must be a permutation of'
                 ' all of the array\'s axes.',
-                refs=[permutation]
             )
 
         shp = tuple(a_shp[i] for i in perm)

@@ -622,7 +622,8 @@ class Parser:
 
             if isinstance(targ, ast.Name):
                 # CASE: x = value
-                anf_node.debug.name = targ.id
+                if anf_node.debug.name is None:
+                    anf_node.debug.name = targ.id
                 if anf_node.is_constant_graph():
                     if anf_node.value.debug.name is None:
                         anf_node.value.debug.name = targ.id
@@ -891,7 +892,7 @@ class Block:
         """Return a subtree that resolves a name in the operations module."""
         return self.make_resolve(operations_ns, symbol_name)
 
-    def read(self, varnum: str) -> ANFNode:
+    def read(self, varnum: str, resolve_globals=True) -> ANFNode:
         """Read a variable.
 
         If this name has defined given in one of the previous statements, it
@@ -910,15 +911,21 @@ class Block:
             self.parser.read_cache.add((self, varnum, self.variables[varnum]))
             return _fresh(self.variables[varnum])
         if self.matured:
-            if len(self.preds) == 1:
-                return self.preds[0].read(varnum)
-            elif not self.preds:
+            def _resolve():
+                if not resolve_globals:
+                    return None
                 cn = self.parser.closure_namespace
                 if varnum in cn:
                     return self.make_resolve(cn, varnum)
                 else:
                     ns = self.parser.global_namespace
                     return self.make_resolve(ns, varnum)
+
+            if len(self.preds) == 1:
+                result = self.preds[0].read(varnum, resolve_globals=False)
+                return result or _resolve()
+            if not self.preds:
+                return _resolve()
         # TODO: point to the original definition
         with About(NamedDebugInfo(name=varnum), 'phi'):
             phi = Parameter(self.graph)

@@ -3,6 +3,7 @@
 import asyncio
 from dataclasses import dataclass
 
+from ..utils import InternalInferenceError
 from .loop import force_pending
 
 ############
@@ -116,7 +117,19 @@ class Reference(AbstractReference):
 
     def get_resolved(self):
         """Get the value if resolved. Error out if not."""
-        return self.engine.cache.cache[self].result()
+        c = self.engine.cache.cache
+        if self in c:
+            fut = c[self]
+            if fut.done():
+                return fut.result()
+        word = 'computed' if self in c else 'seen'
+        raise InternalInferenceError(
+            f'Trying to resolve a reference for {self.node} in function'
+            f' {self.node.graph}, but it was not {word} by the'
+            f' inferrer. This is a bug in the compiler, not'
+            f' in your code, so please report it.',
+            refs=[self]
+        )
 
     def __hash__(self):
         return self._hash

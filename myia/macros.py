@@ -431,9 +431,27 @@ async def grad(info):
             else:
                 raise MyiaTypeError(f'Invalid argument to grad, {arg}')
 
+    if not isinstance(fn, abstract.AbstractFunction):
+        raise MyiaTypeError(
+            f"'grad' takes a function as its argument, not {fn}."
+        )
+
     fn = fn.get_unique()
-    assert isinstance(fn, abstract.GraphFunction)
-    return Constant(GradOperation(fn.graph, wrt, **flags))
+    if isinstance(fn, abstract.GraphFunction):
+        arg = fn.graph
+        if arg.parent is not None:
+            raise MyiaTypeError(
+                f"'grad' does not work on closures ('grad' was given argument"
+                f" '{arg}', which is a closure with parent '{arg.parent}'.)"
+            )
+    elif isinstance(fn, abstract.MetaGraphFunction):
+        arg = fn.metagraph
+    elif isinstance(fn, abstract.PrimitiveFunction):
+        arg = fn.prim
+    else:
+        raise MyiaTypeError(f"'grad' cannot handle {fn}")
+
+    return Constant(GradOperation(arg, wrt, **flags))
 
 
 _cast_helper = MultitypeGraph('cast_helper')
