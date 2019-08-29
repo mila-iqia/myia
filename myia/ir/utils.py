@@ -201,7 +201,7 @@ def isomorphic(g1, g2, equiv=None):
 ########
 
 
-def sexp_to_node(sexp, graph, multigraph=False):
+def sexp_to_node(sexp, graph, multigraph=False, sub=None):
     """Convert an s-expression (tuple) to a subgraph.
 
     Args:
@@ -212,6 +212,7 @@ def sexp_to_node(sexp, graph, multigraph=False):
             In short, use multigraph=True to get a subgraph where
             each node can be in a different graph. Otherwise, all
             nodes are required to belong to the same graph.
+        sub: Substitutions to make.
 
     Returns:
         An ANFNode equivalent to the given s-expression.
@@ -219,11 +220,13 @@ def sexp_to_node(sexp, graph, multigraph=False):
     """
     if isinstance(sexp, tuple):
         if multigraph and isinstance(graph, Var):
-            return Apply([sexp_to_node(x, Var('G'), True)
+            return Apply([sexp_to_node(x, Var('G'), True, sub)
                           for x in sexp], graph)
         else:
-            return Apply([sexp_to_node(x, graph, multigraph)
+            return Apply([sexp_to_node(x, graph, multigraph, sub)
                           for x in sexp], graph)
+    elif sub and sexp in sub:
+        return sub[sexp]
     elif isinstance(sexp, Var):
         return VarNode(sexp, graph)
     elif isinstance(sexp, ANFNode):
