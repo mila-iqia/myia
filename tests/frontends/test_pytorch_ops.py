@@ -13,7 +13,6 @@ from myia.frontends import activate_frontend  # noqa: E402
 from myia.frontends.pytorch_abstract_types import \
     AbstractPyTorchTensor  # noqa: E402
 from myia.pipeline import standard_pipeline
-from myia.utils import Profile  # , no_prof
 
 from ..common import MA, f32, to_abstract_test
 from ..test_grad import grad_pipeline, grad_wrap
@@ -103,15 +102,11 @@ APT_0d_loss = AbstractPyTorchTensor(
 
 
 def _fwd_test(fn, args, pipeline=standard_pipeline,
-              optimize=True, python=True, profile=False):
+              optimize=True, python=True):
     if python:
         ref_result = fn(*map(copy, args))
     argspec = tuple(from_value(arg, broaden=True) for arg in args)
-    if profile is True:
-        profile = Profile()
-    # res = pipeline.run(input=fn, argspec=argspec, profile=profile)
     res = pipeline.run(input=fn, argspec=argspec)
-    # profile.print()
     myia_fn = res['output']
     myia_result = myia_fn(*map(copy, args))
 
@@ -166,7 +161,7 @@ def _grad_test(fn, obj, args,
             pt_g, my_g, rtol=1e-05, atol=1e-06, equal_nan=True)
 
 
-def compare_fwd(*tests, optimize=True, python=True, profile=False):
+def compare_fwd(*tests, optimize=True, python=True):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -184,15 +179,13 @@ def compare_fwd(*tests, optimize=True, python=True, profile=False):
 
     def decorate(fn):
         def test(args):
-            nonlocal profile
             if not isinstance(args, tuple):
                 args = (args,)
 
             _fwd_test(fn, args,
                       pipeline=fwd_pipeline,
                       optimize=optimize,
-                      python=python,
-                      profile=profile)
+                      python=python)
 
         m = mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
@@ -227,7 +220,7 @@ def compare_bwd(*tests, sens_type=APT_loss, pipeline=grad_pipeline,
     return decorate
 
 
-def compare_fwd_and_bwd(*tests, optimize=True, python=True, profile=False,
+def compare_fwd_and_bwd(*tests, optimize=True, python=True,
                         sens_type=APT_0d_loss, pipeline=grad_pipeline,
                         rel_error=1e-3):
     """Decorate a function to parse and run it against pure Python.
@@ -249,8 +242,7 @@ def compare_fwd_and_bwd(*tests, optimize=True, python=True, profile=False,
             if not isinstance(args, tuple):
                 args = (args,)
             out_shape = _fwd_test(fn, args, pipeline=fwd_pipeline,
-                                  optimize=optimize, python=python,
-                                  profile=profile)
+                                  optimize=optimize, python=python)
             _grad_test(fn, fn, args, pipeline=pipeline,
                        rel_error=rel_error, sens_type=out_shape)
 

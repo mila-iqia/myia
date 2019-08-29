@@ -13,14 +13,14 @@ from myia.prim.py_implementations import (
     tagged,
     typeof,
 )
-from myia.utils import Profile, no_prof
+from myia.utils import Profiler, trace_noop
 
 from .common import Point, make_tree, sumtree, to_abstract_test
 
 compile_pipeline = standard_pipeline
 
 
-def parse_compare(*tests, optimize=True, python=True, profile=no_prof,
+def parse_compare(*tests, optimize=True, python=True, profile=trace_noop,
                   justeq=False):
     """Decorate a function to parse and run it against pure Python.
 
@@ -46,9 +46,9 @@ def parse_compare(*tests, optimize=True, python=True, profile=no_prof,
                 ref_result = fn(*map(copy, args))
             argspec = tuple(from_value(arg, broaden=True) for arg in args)
             if profile is True:
-                profile = Profile()
-            res = pipeline.run(input=fn, argspec=argspec, profile=profile)
-            profile.print()
+                profile = Profiler()
+            with profile:
+                res = pipeline.run(input=fn, argspec=argspec)
             myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))
             if python:

@@ -43,8 +43,8 @@ from ..utils import (
     Empty,
     MyiaInputTypeError,
     TaggedValue,
-    no_prof,
     overload,
+    tracer,
 )
 from ..validate import (
     validate,
@@ -97,30 +97,29 @@ class Optimizer(PipelineStep):
         if len(self.phases) == 1:
             self.run_only_once = True
 
-    def step(self, graph, argspec=None, outspec=None, profile=no_prof):
+    def step(self, graph, argspec=None, outspec=None):
         """Optimize the graph using the given patterns."""
-        with profile:
-            counter = count(1)
-            changes = True
-            while changes:
-                with profile.lap(next(counter)):
-                    changes = False
-                    nn = iter(self.names)
-                    for opt in self.phases:
-                        with profile.step(next(nn)):
-                            if opt == 'renormalize':
-                                assert argspec is not None
-                                graph = self.resources.inferrer.renormalize(
-                                    graph, argspec, outspec
-                                )
-                            elif opt(graph):
-                                changes = True
-                    if self.run_only_once:
-                        break
-            with profile.step('keep_roots'):
-                self.resources.manager.keep_roots(graph)
-            res = {'graph': graph}
-            return res
+        counter = count(1)
+        changes = True
+        while changes:
+            with tracer(f'lap{next(counter)}'):
+                changes = False
+                nn = iter(self.names)
+                for opt in self.phases:
+                    with tracer(next(nn)):
+                        if opt == 'renormalize':
+                            assert argspec is not None
+                            graph = self.resources.inferrer.renormalize(
+                                graph, argspec, outspec
+                            )
+                        elif opt(graph):
+                            changes = True
+                if self.run_only_once:
+                    break
+        with tracer('keep_roots'):
+            self.resources.manager.keep_roots(graph)
+        res = {'graph': graph}
+        return res
 
 
 #########

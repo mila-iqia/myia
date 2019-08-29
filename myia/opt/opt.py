@@ -6,7 +6,7 @@ from weakref import WeakKeyDictionary
 from ..info import About
 from ..ir import Apply, Graph, manage, sexp_to_node
 from ..prim import Primitive
-from ..utils import OrderedSet
+from ..utils import OrderedSet, tracer
 from ..utils.unify import Unification, Var
 
 
@@ -211,8 +211,18 @@ class LocalPassOptimizer:
         while loop:
             loop = False
             for transformer in self.node_map.get(n):
+                tracer().emit_attempt_opt(
+                    opt=transformer,
+                    node=n,
+                )
                 with About(n.debug, 'opt', transformer.name):
                     new = transformer(self.optimizer, n)
+                if new is not None:
+                    tracer().emit_opt(
+                        opt=transformer,
+                        node=n,
+                        new_node=new
+                    )
                 if new is True:
                     changes = True
                     continue
