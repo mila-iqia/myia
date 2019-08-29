@@ -70,8 +70,7 @@ class Graph:
     def _serialize(self):
         return {'parameters': self.parameters,
                 'return': self.return_,
-                'debug': self.debug,
-                'flags': self.flags}
+                'debug': self.debug}
 
     @classmethod
     def _construct(cls):
@@ -80,7 +79,6 @@ class Graph:
         g.parameters = data['parameters']
         g.return_ = data['return']
         g.debug = data['debug']
-        g.flags = data['flags']
 
     @property
     def abstract(self):

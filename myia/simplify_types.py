@@ -86,6 +86,12 @@ def _reabs(self, a: AbstractDict):
 
 
 @overload  # noqa: F811
+def _reabs(self, a: AbstractArray):
+d    breakpoint()
+    return (yield AbstractArray)(self(a.element), a.values)
+
+
+@overload  # noqa: F811
 def _reabs(self, a: AbstractUnion):
     return (yield AbstractTaggedUnion)(
         [type_to_tag(opt), self(opt)] for opt in a.options
