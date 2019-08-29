@@ -12,6 +12,7 @@ from .abstract import (
     AbstractScalar,
     AbstractTuple,
     ArrayWrapper,
+    find_aliases,
     from_value,
 )
 from .compile.backends import Backend, load_backend
@@ -45,9 +46,10 @@ class MyiaFunction:
     """
 
     def __init__(self, fn, specialize_values=[], return_backend=False,
-                 backend=None, backend_options=None):
+                 backend=None, backend_options=None, alias_tracker=None):
         """Initialize a MyiaFunction."""
         self.fn = fn
+        self.alias_tracker = alias_tracker
         self.specialize_values = set(specialize_values)
         self.pip = standard_pipeline.configure({
             'compile.backend': backend,
@@ -71,17 +73,20 @@ class MyiaFunction:
                 f'Wrong number of arguments: expected {n1}, got {n2}'
             )
 
+        alias_map, aid_to_paths = find_aliases(args, self.alias_tracker)
         argspec = tuple(
             from_value(
                 arg,
-                broaden=name not in self.specialize_values)
+                broaden=name not in self.specialize_values,
+                alias_map=alias_map)
             for arg, name in zip(args, argnames)
         )
 
         if argspec not in self._cache:
             self._cache[argspec] = self.pip.run(
                 input=self.fn,
-                argspec=argspec
+                argspec=argspec,
+                aliasspec=(self.alias_tracker, aid_to_paths),
             )
         return self._cache[argspec]
 
@@ -102,7 +107,7 @@ class MyiaFunction:
 
 @keyword_decorator
 def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
-         return_backend=False):
+         return_backend=False, alias_tracker=None):
     """Create a function using Myia's runtime.
 
     `@myia` can be used as a simple decorator. If custom options are needed,
@@ -126,7 +131,8 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
     """
     return MyiaFunction(fn, specialize_values, backend=backend,
                         backend_options=backend_options,
-                        return_backend=return_backend)
+                        return_backend=return_backend,
+                        alias_tracker=alias_tracker)
 
 
 ######################################################################

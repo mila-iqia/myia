@@ -26,6 +26,7 @@ from ..utils import (
     type_error_nargs,
 )
 from .data import (
+    ALIASID,
     ANYTHING,
     DATA,
     SHAPE,
@@ -558,13 +559,16 @@ def to_abstract(self, v: dict, **kwargs):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: np.ndarray, **kwargs):
+def to_abstract(self, v: np.ndarray, alias_map={}, **kwargs):
+    tracks = {SHAPE: v.shape}
+    if id(v) in alias_map:
+        tracks[ALIASID] = alias_map[id(v)]
     return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: dtype.np_dtype_to_type(str(v.dtype)),
         }),
-        {SHAPE: v.shape}
+        tracks
     )
 
 
@@ -642,8 +646,8 @@ class Inferrer(Partializable):
             outref: A Reference to the output (could be None)
             argrefs: A tuple of References to the arguments
         """
-        args = tuple([await ref.get() for ref in argrefs])
-        args = await self.normalize_args(args)
+        unnorm_args = tuple([await ref.get() for ref in argrefs])
+        args = await self.normalize_args(unnorm_args)
         if args not in self.cache:
             self.cache[args] = await self.infer(engine, *args)
         return self.cache[args]

@@ -1,7 +1,14 @@
 """Abstract data and type/shape inference."""
 
+from .aliasing import (  # noqa
+    find_aliases,
+    generate_getters,
+    ndarray_aliasable,
+    setter_from_getter,
+)
 from .data import (  # noqa
     ABSENT,
+    ALIASID,
     ANYTHING,
     DATA,
     DEAD,

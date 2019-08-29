@@ -885,6 +885,8 @@ def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
     self.state[keypair] = x1 if forced else ABSENT
     rval = helper()
     self.state[keypair] = rval
+    if forced:
+        assert rval is x1
     return rval
 
 
@@ -936,10 +938,31 @@ def amerge(self, x1: dtype.TypeMeta, x2, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(self, x1: (dict, TrackDict), x2, forced, bp):
+def amerge(self, x1: TrackDict, x2, forced, bp):
+    keys = {*x1.keys(), *x2.keys()}
+    rval = type(x1)()
+    changes = False
+    for k in keys:
+        if k in x1:
+            v1 = x1[k]
+        else:
+            v1 = k.default()
+            changes = True
+        v2 = x2[k] if k in x2 else k.default()
+        res = k.merge(self, v1, v2, forced, bp)
+        if res is not v1:
+            changes = True
+        if res is not ABSENT:
+            rval[k] = res
+    if forced and changes and rval != x1:
+        raise MyiaTypeError('Cannot merge tracks')
+    return x1 if forced or not changes else rval
+
+
+@overload  # noqa: F811
+def amerge(self, x1: dict, x2, forced, bp):
     if set(x1.keys()) != set(x2.keys()):
-        # This shouldn't be possible at the moment
-        raise AssertionError(f'Keys mismatch')
+        raise MyiaTypeError(f'Keys mismatch')
     changes = False
     rval = type(x1)()
     for k, v in x1.items():
@@ -1021,6 +1044,16 @@ def amerge(self, x1: AbstractClassBase, x2, forced, bp):
 
 
 @overload  # noqa: F811
+def amerge(self, x1: AbstractDict, x2, forced, bp):
+    args1 = (x1.entries, x1.values)
+    args2 = (x2.entries, x2.values)
+    merged = self(args1, args2, forced, bp)
+    if forced or merged is args1:
+        return x1
+    return type(x1)(*merged)
+
+
+@overload  # noqa: F811
 def amerge(self, x1: AbstractJTagged, x2, forced, bp):
     args1 = x1.element
     args2 = x2.element
@@ -1091,8 +1124,8 @@ def bind(loop, committed, resolved, pending):
         resolved.append(result)
         if not pending:
             v = amergeall()
-            if rval is not None and not rval.done():
-                rval.set_result(v)
+            if merged is not None and not merged.done():
+                merged.set_result(v)
 
     for p in pending:
         p.add_done_callback(resolve)
@@ -1121,8 +1154,8 @@ def bind(loop, committed, resolved, pending):
             return -1000
 
     if any(is_simple(x) for x in chain(resolved, pending)):
-        # rval = None because we will not make a new Pending
-        rval = None
+        # merged = None because we will not make a new Pending
+        merged = None
 
         if pending:
             p, *rest = pending
@@ -1131,23 +1164,29 @@ def bind(loop, committed, resolved, pending):
                 p.tie(p2)
 
         if resolved:
-            return resolved[0]
+            rval = resolved[0]
         else:
             for p in pending:
                 if is_simple(p):
-                    return p
-            raise AssertionError('unreachable')
+                    rval = p
+                    break
+            else:
+                raise AssertionError('unreachable')
 
     else:
-        rval = loop.create_pending(
+        merged = loop.create_pending(
             resolve=premature_resolve,
             priority=priority,
         )
-        rval.equiv.update(resolved)
+        merged.equiv.update(resolved)
         for p in pending:
-            rval.tie(p)
+            merged.tie(p)
+        rval = merged
 
+    if committed is None:
         return rval
+    else:
+        return committed
 
 
 ###########################

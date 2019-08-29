@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from pytest import mark
 
-from myia.abstract import AbstractJTagged, from_value
+from myia.abstract import AbstractJTagged, from_value, ndarray_aliasable
 from myia.api import myia
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.macros import GradOperation, grad
@@ -37,13 +37,14 @@ from myia.prim.py_implementations import (
     scalar_to_array,
     transpose,
 )
-from myia.utils import InferenceError
+from myia.utils import InferenceError, MyiaInputTypeError
 from myia.validate import validate_abstract, whitelist
 
 from .common import (
     AA,
     MA,
     MB,
+    Point3D,
     U,
     countdown,
     f64,
@@ -671,3 +672,107 @@ def test_grad_interface():
 
     with pytest.raises(InferenceError):
         print(gradbad7(x, y, 0))
+
+
+def test_aliasing():
+
+    def _chk(x, y):
+        x1, x2, (x3, x4) = x
+        y1, y2, (y3, y4) = y
+        np.testing.assert_allclose(x1, y1)
+        np.testing.assert_allclose(x2, y2)
+        np.testing.assert_allclose(x3, y3)
+        np.testing.assert_allclose(x4, y4)
+
+    def g(x, y):
+        a, b, (c, d) = x
+        return sum(a + b + c + d + y)
+
+    @myia(alias_tracker=ndarray_aliasable)
+    def f(x, y):
+        return grad(g)(x, y)
+
+    o = np.ones((1, 3))
+
+    a = o * 3
+    b = o * 4
+    c = o * 5
+    d = o * 6
+    e = o * 7
+
+    res1 = f((a, b, (c, d)), e)
+    _chk(res1, (o, o, (o, o)))
+
+    res2 = f((a, a, (a, a)), a)
+    _chk(res2, (5 * o, 5 * o, (5 * o, 5 * o)))
+
+    res3 = f((a, b, (b, a)), a)
+    _chk(res3, (3 * o, 2 * o, (2 * o, 3 * o)))
+
+
+def test_aliasing_list():
+    from myia.compile.backends import LoadingError, load_backend
+    try:
+        load_backend('pytorch')
+    except LoadingError:
+        pytest.skip('PyTorch not available')
+
+    def g(xs, y):
+        res = 0
+        for x in xs:
+            res = res + x
+        return sum(res)
+
+    @myia(backend='pytorch', alias_tracker=ndarray_aliasable)
+    def f(xs, y):
+        return grad(g)(xs, y)
+
+    o = np.ones((1, 3))
+
+    a = o * 3
+    b = o * 4
+    c = o * 5
+    d = o * 6
+    e = o * 7
+
+    res1 = f([a, b, c, d], e)
+    for x in res1:
+        np.testing.assert_allclose(x, o)
+
+    with pytest.raises(MyiaInputTypeError):
+        print(f([a, b, c, a], e))
+
+    with pytest.raises(MyiaInputTypeError):
+        print(f([a, b, c, d], a))
+
+
+def test_aliasing_other():
+
+    def _chk(x, y):
+        np.testing.assert_allclose(x['a'], y['a'])
+        np.testing.assert_allclose(x['b'].x, y['b'].x)
+        np.testing.assert_allclose(x['b'].y, y['b'].y)
+        np.testing.assert_allclose(x['b'].z, y['b'].z)
+
+    def g(x, y):
+        a = x['a']
+        pt = x['b']
+        return sum(a + pt.x + pt.y + pt.z + y)
+
+    @myia(alias_tracker=ndarray_aliasable)
+    def f(xs, y):
+        return grad(g)(xs, y)
+
+    o = np.ones((1, 3))
+
+    a = o * 3
+    b = o * 4
+    c = o * 5
+    d = o * 6
+    e = o * 7
+
+    res1 = f({'a': a, 'b': Point3D(b, c, d)}, e)
+    _chk(res1, {'a': o, 'b': Point3D(o, o, o)})
+
+    res2 = f({'a': a, 'b': Point3D(b, a, d)}, e)
+    _chk(res2, {'a': o * 2, 'b': Point3D(o, o * 2, o)})

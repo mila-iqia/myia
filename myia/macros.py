@@ -4,10 +4,22 @@ A macro transforms a subgraph into another. It is run during inference, which
 means it has access to type information.
 """
 
+from collections import defaultdict
 from functools import reduce
 
 from . import abstract, operations
-from .abstract import ANYTHING, TYPE, VALUE, macro, type_token, union_simplify
+from .abstract import (
+    ALIASID,
+    ANYTHING,
+    TYPE,
+    VALUE,
+    generate_getters,
+    macro,
+    setter_from_getter,
+    type_token,
+    union_simplify,
+)
+from .composite import gadd
 from .dtype import Array, Bool, Number
 from .info import About, DebugInfo
 from .ir import (
@@ -18,6 +30,7 @@ from .ir import (
     MetaGraph,
     MultitypeGraph,
     Parameter,
+    sexp_to_node,
 )
 from .prim import ops as P
 from .prim.py_implementations import scalar_cast, scalar_to_array, typeof
@@ -25,7 +38,10 @@ from .utils import (
     Cons,
     Empty,
     InferenceError,
+    MyiaAttributeError,
+    MyiaNameError,
     MyiaTypeError,
+    Named,
     Namespace,
     check_nargs,
     core,
@@ -67,10 +83,6 @@ async def apply(info):
                 'Can only expand tuple or dict in function application'
             )
     return g.apply(fnref.node, *expanded)
-
-
-class MyiaAttributeError(InferenceError):
-    """Raised when an attribute is not found in a type or module."""
 
 
 async def _resolve_case(resources, data_t, item_v):
@@ -195,10 +207,6 @@ async def getattr_(info):
         except Exception as e:  # pragma: no cover
             raise InferenceError(f'Unexpected error in getter: {e!r}')
         return Constant(raw)
-
-
-class MyiaNameError(InferenceError):
-    """Raised when a name is not found in scope."""
 
 
 @macro
@@ -445,6 +453,9 @@ def _scalar_to_array_cast_helper(x, model):
     return scalar_to_array(scalar_cast(x, t.element), typeof(model))
 
 
+ROOT = Named('ROOT')
+
+
 class GradOperation(MetaGraph):
     """Implements the grad(f) operation.
 
@@ -458,7 +469,7 @@ class GradOperation(MetaGraph):
                  return_value=False,
                  always_return_tuple=False,
                  dout_parameter=False,
-                 apply_j=True):
+                 sum_aliases=True):
         """Initialize GradOperation."""
         super().__init__('grad')
         self.fn = fn
@@ -466,7 +477,7 @@ class GradOperation(MetaGraph):
         self.return_value = return_value
         self.always_return_tuple = always_return_tuple
         self.dout_parameter = dout_parameter
-        self.apply_j = apply_j
+        self.sum_aliases = sum_aliases
 
     def make_signature(self, args):
         """Make the signature.
@@ -475,6 +486,16 @@ class GradOperation(MetaGraph):
         generated from self.fn and the second a boolean saying whether there is
         a dout argument or not.
         """
+        aliases = defaultdict(list)
+        if self.sum_aliases:
+            for i, arg in enumerate(args):
+                for elem, getter in generate_getters(arg, ROOT):
+                    aid = elem.values.get(ALIASID, None)
+                    if aid is not None:
+                        assert aid is not ANYTHING
+                        aliases[aid].append((i, getter))
+        aliases = tuple(sorted((k, tuple(v)) for k, v in aliases.items()))
+
         if (len(args) > 0
                 and isinstance(args[-1], abstract.AbstractKeywordArgument)
                 and args[-1].key == 'dout'):
@@ -493,7 +514,7 @@ class GradOperation(MetaGraph):
             sig = self.fn.make_signature(args)
         else:
             sig = (len(args),)
-        return sig, dout
+        return sig, dout, aliases
 
     def generate_graph(self, sig):
         """Make the graph for the grad.
@@ -506,7 +527,7 @@ class GradOperation(MetaGraph):
         first element will be the return value of the function. The other
         elements will be the gradients.
         """
-        gsig, dout = sig
+        gsig, dout, aliases = sig
         if isinstance(self.fn, (Graph, MetaGraph)):
             g = self.fn.generate_graph(gsig)
             dbg = g.debug
@@ -551,9 +572,7 @@ class GradOperation(MetaGraph):
             df = Graph()
             df.set_flags('core', 'reference')
 
-        jf = g
-        if self.apply_j:
-            jf = df.apply(P.J, jf)
+        jf = df.apply(P.J, g)
 
         params = []
         for orig_p in orig_parameters:
@@ -580,11 +599,24 @@ class GradOperation(MetaGraph):
             direct_return = False
 
         bapp = df.apply(bprop, bprop_arg)
-        elems = []
-        if self.return_value:
-            elems.append(out)
-        for idx in wrt:
-            elems.append(df.apply(P.tuple_getitem, bapp, idx + 1))
+        all_results = [df.apply(P.tuple_getitem, bapp, idx + 1)
+                       for idx in range(nargs)]
+
+        adjusted = {i: all_results[i] for i in range(nargs)}
+        for aid, equivs in aliases:
+            contribs = []
+            for i, entry in equivs:
+                node = sexp_to_node(entry, df, sub={ROOT: all_results[i]})
+                contribs.append(node)
+            combined = reduce(lambda x, y: df.apply(gadd, x, y), contribs)
+
+            for i, entry in equivs:
+                setter = setter_from_getter(entry, combined)
+                node = sexp_to_node(setter, df, sub={ROOT: adjusted[i]})
+                adjusted[i] = node
+
+        elems = [out] if self.return_value else []
+        elems += [adjusted[idx] for idx in wrt]
 
         if len(elems) == 1 and direct_return:
             df.output = elems[0]

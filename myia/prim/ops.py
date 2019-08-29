@@ -75,16 +75,20 @@ casttag = Primitive('casttag')
 
 
 make_tuple = Primitive('make_tuple')
-make_dict = Primitive('make_dict')
-make_record = Primitive('make_record')
 tuple_getitem = Primitive('tuple_getitem')
-dict_getitem = Primitive('dict_getitem')
-array_getitem = Primitive('array_getitem')
 tuple_setitem = Primitive('tuple_setitem')
-array_setitem = Primitive('array_setitem')
+tuple_len = Primitive('tuple_len')
+
+make_dict = Primitive('make_dict')
+dict_getitem = Primitive('dict_getitem')
+dict_setitem = Primitive('dict_setitem')
+
+make_record = Primitive('make_record')
 record_getitem = Primitive('record_getitem')
 record_setitem = Primitive('record_setitem')
-tuple_len = Primitive('tuple_len')
+
+array_getitem = Primitive('array_getitem')
+array_setitem = Primitive('array_setitem')
 array_len = Primitive('array_len')
 
 

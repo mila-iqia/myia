@@ -672,6 +672,10 @@ class Track:
     def __lt__(self, other):
         return self.name < other.name
 
+    def merge(self, recurse, v1, v2, forced, bp):
+        """Merge two values."""
+        return recurse(v1, v2, forced, bp)
+
     def clone(self, v, recurse):
         """Clone the value associated to this Track in a TrackDict."""
         return recurse(v)
@@ -682,6 +686,10 @@ class Track:
         By default, this amounts to a straight copy.
         """
         return recurse(v, *args)
+
+    def default(self):
+        """Return the default value for the track."""
+        raise NotImplementedError(f'There is no default for track {self}')
 
 
 class _ValueTrack(Track):
@@ -700,10 +708,23 @@ class _ShapeTrack(Track):
     """Represents the SHAPE track, for arrays."""
 
 
+class _AliasIdTrack(Track):
+    """Represents the ALIASID track."""
+
+    def merge(self, recurse, v1, v2, forced, bp):
+        """Merge two values."""
+        # For the time being we don't propagate ALIASID through merge.
+        return ABSENT
+
+    def default(self):
+        return ABSENT
+
+
 VALUE = _ValueTrack('VALUE')
 TYPE = _TypeTrack('TYPE')
 SHAPE = _ShapeTrack('SHAPE')
 DATA = _ValueTrack('DATA')
+ALIASID = _AliasIdTrack('ALIASID')
 
 
 ##########################
