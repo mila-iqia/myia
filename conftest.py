@@ -35,6 +35,9 @@ def _resolve(call):
         args = eval(f'({args[:-1]},)')
     elif ':' in call:
         path, *args = call.split(':')
+    else:
+        path = call
+        args = ()
     modname, field = path.rsplit('.', 1)
     mod = __import__(modname, fromlist=[field])
     fn = getattr(mod, field)
