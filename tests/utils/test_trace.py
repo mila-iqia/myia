@@ -2,7 +2,14 @@
 from collections import defaultdict
 from itertools import count
 
-from myia.utils import DoTrace, Profiler, TraceExplorer, TraceListener, tracer
+from myia.utils import (
+    DoTrace,
+    Profiler,
+    TraceExplorer,
+    TraceListener,
+    listener,
+    tracer,
+)
 
 
 def day():
@@ -137,6 +144,19 @@ def test_dotrace():
     with DoTrace(handlers, focus='breakfast/**/'):
         day()
     assert log == ['banana', 'apple']
+
+
+def test_listener():
+    log = []
+
+    @listener('fruit', 'sleep/**')
+    def do_log(_event, **kwargs):
+        log.append(_event)
+
+    with do_log():
+        day()
+
+    assert log == ['fruit', 'fruit', 'enter', 'dream', 'dream', 'exit']
 
 
 def test_repr():

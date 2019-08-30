@@ -5,6 +5,7 @@ from collections import defaultdict
 from contextvars import ContextVar
 from copy import copy
 from dataclasses import dataclass
+from functools import wraps
 from time import perf_counter
 
 
@@ -324,3 +325,13 @@ class Profiler(TraceListener):
                 if len(v) > 1:
                     tot = sum(x.total for x in v)
                     print(f'{k:20}{_unit(tot)}')
+
+
+def listener(*patterns):
+    """Create a listener for one or more patterns on a tracer."""
+    def deco(fn):
+        @wraps(fn)
+        def new_fn(**kwargs):
+            return DoTrace({pattern: fn for pattern in patterns}, **kwargs)
+        return new_fn
+    return deco

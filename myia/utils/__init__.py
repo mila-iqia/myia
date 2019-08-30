@@ -78,6 +78,7 @@ from .trace import (  # noqa
     TraceListener,
     Tracer,
     glob_to_regex,
+    listener,
     tracer,
 )
 from .unify import (  # noqa
