@@ -49,9 +49,9 @@ class Tracer:
         for path, fn in self.listeners:
             if path.fullmatch(curpath):
                 fn(**kwargs,
-                   event_name=name,
-                   stack=self.stack,
-                   curpath=curpath)
+                   _event=name,
+                   _stack=self.stack,
+                   _curpath=curpath)
 
     def on(self, pattern, fn):
         """Register a function to trigger on a certain pattern.
@@ -88,7 +88,7 @@ class Tracer:
         elif attr.startswith('on_'):
             attr = attr[3:]
             return lambda fn: self.on(attr, fn)
-        else:
+        else:  # pragma: no cover
             return getattr(super(), attr)
 
 
@@ -110,11 +110,11 @@ class TracerContextManager:
     def __enter__(self):
         self.tr.stack.append(self)
         self.tr.curpath += f'/{self.name}'
-        self.tr.emit('enter', tracer_context=self, **self.kwargs)
+        self.tr.emit('enter', _context=self, **self.kwargs)
         return self
 
     def __exit__(self, *_):
-        self.tr.emit('exit', tracer_context=self, **self.results)
+        self.tr.emit('exit', _context=self, **self.results)
         self.tr.stack.pop()
         self.tr.curpath = ''.join(f'/{x.name}' for x in self.tr.stack)
 
@@ -165,7 +165,7 @@ class TraceListener:
 
     def post(self):
         """Do things after the process is completed."""
-        raise NotImplementedError()
+        pass
 
     def __enter__(self):
         self.tracer = copy(_tracer.get())
@@ -178,44 +178,28 @@ class TraceListener:
         self.post()
 
 
-class _TraceNoop:
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        pass
-
-
-trace_noop = _TraceNoop()
-
-
 class TraceExplorer(TraceListener):
     """Print out all distinct events and their arguments."""
 
     def __init__(self, focus=None):
         """Initialize a TraceExplorer."""
         super().__init__(focus)
-        self.names = defaultdict(lambda: defaultdict(set))
+        self.paths = defaultdict(lambda: defaultdict(set))
 
     def install(self, tracer):
         """Install the TraceExplorer."""
         patt = self.focus or '**'
         tracer.on(patt, self._log_keys)
 
-    def _log_keys(self,
-                  curpath=None,
-                  event_name=None,
-                  stack=None,
-                  tracer_context=None,
-                  **kwargs):
-        d = self.names[curpath]
+    def _log_keys(self, _curpath=None, **kwargs):
+        d = self.paths[_curpath]
         for k, v in kwargs.items():
-            d[k].add(type(v))
+            if not k.startswith('_'):
+                d[k].add(type(v))
 
     def post(self):
         """Print the events and their arguments."""
-        for path, keys in self.names.items():
+        for path, keys in self.paths.items():
             print(path)
             for key in sorted(keys):
                 typenames = {v.__qualname__ for v in keys[key]}
@@ -300,18 +284,18 @@ class Profiler(TraceListener):
         self.overhead = 0
         self.print_results = print_results
 
-    def on_enter(self, stack=None, **kwargs):
+    def on_enter(self, _stack=None, **kwargs):
         """Executed when a block is entered."""
         d = self.hierarchical
-        for part in stack:
+        for part in _stack:
             d.setdefault(part.name, ProfileResults(part.name))
             d = d[part.name]
         d.start = perf_counter()
 
-    def on_exit(self, stack=None, **kwargs):
+    def on_exit(self, _stack=None, **kwargs):
         """Executed when a block is exited."""
         d = self.hierarchical
-        for part in stack:
+        for part in _stack:
             d = d[part.name]
         d.end = perf_counter()
         d.total = d.end - d.start
