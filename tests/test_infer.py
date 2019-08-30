@@ -1354,6 +1354,14 @@ def test_infinite_mutual_recursion(x):
     return ping()
 
 
+@infer(([i64], InferenceError))
+def test_recursive_build(xs):
+    rval = ()
+    for x in xs:
+        rval = (x, rval)
+    return rval
+
+
 @infer(
     (af16_of(2, 3), Shp(2, 3)),
     (af16_of(2, ANYTHING), (S(2, u64), u64)),
