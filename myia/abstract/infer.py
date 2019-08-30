@@ -239,7 +239,7 @@ class InferenceEngine:
             ref = self.reference_map[ref]
         return ref
 
-    def run_coroutine(self, coro, throw=True):
+    def run_coroutine(self, coro):
         """Run an async function using this inferrer's loop."""
         errs_before = len(self.errors)
         try:
@@ -249,14 +249,7 @@ class InferenceEngine:
             for err in self.errors[errs_before:]:
                 err.engine = self
             if errs_before < len(self.errors):
-                if throw:  # pragma: no cover
-                    for err in self.errors:
-                        if isinstance(err, InferenceError):
-                            raise err
-                    else:
-                        raise err
-                else:
-                    return None  # pragma: no cover
+                raise self.errors[errs_before]
             return fut.result()
         finally:
             for task in asyncio.all_tasks(self.loop):

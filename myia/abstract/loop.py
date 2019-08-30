@@ -96,7 +96,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         errors, self._errors = self._errors, []
         errors += [fut.exception()
                    for fut in futs if fut.done() and fut.exception()]
-        if any(fut for fut in futs if not fut.done()):
+        if not errors and any(fut for fut in futs if not fut.done()):
             exc = self.errtype(
                 f'Could not run inference to completion.'
                 ' There might be an infinite loop in the program'
