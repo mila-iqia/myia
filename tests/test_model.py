@@ -105,11 +105,6 @@ def test_forward_specialize(model, x):
     return model.apply(x)
 
 
-@parse_compare((make_model(), MC(3, 6)), profile=True)
-def test_forward_profile(model, x):
-    return model.apply(x)
-
-
 @infer_std(
     (make_model(), MC(3, 6), MC(3, 8), make_model()),
     (make_model(), MC(3, 6), MC(3, 9), InferenceError),
