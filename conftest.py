@@ -5,37 +5,53 @@ from io import StringIO
 from myia.debug import traceback as myia_tr
 from myia.info import DebugInherit
 from myia.parser import MyiaSyntaxError
-from myia.utils import InferenceError
+from myia.utils import InferenceError, Profiler
 
 if os.environ.get('BUCHE'):
     from debug import do_inject  # noqa
     from debug.butest import *  # noqa
 
 
-_tracer_class = None
-_trace_nodes = False
+_context_managers = []
 
 
 def pytest_addoption(parser):
     parser.addoption('--gpu', action='store_true', dest="gpu",
-                     default=False, help="enable gpu tests")
+                     default=False, help="Enable GPU tests")
     parser.addoption('-T', action='store', dest="tracer",
-                     default=None, help="set a Myia tracer")
+                     default=None, help="Set a Myia tracer")
+    parser.addoption('--mprof', action='store_true', dest="mprof",
+                     default=False, help="Use the Myia profiler")
     parser.addoption('--trace-nodes', action='store_true', dest="trace_nodes",
-                     default=False, help="save trace when creating Myia nodes")
+                     default=False, help="Save trace when creating Myia nodes")
+    parser.addoption('-D', action='store_true', dest="do_inject",
+                     default=False, help="Import Myia debug functions")
+
+
+def _resolve(call):
+    if '(' in call:
+        path, args = call.split('(', 1)
+        assert args.endswith(')')
+        args = eval(f'({args[:-1]},)')
+    elif ':' in call:
+        path, *args = call.split(':')
+    modname, field = path.rsplit('.', 1)
+    mod = __import__(modname, fromlist=[field])
+    fn = getattr(mod, field)
+    return fn, args
 
 
 def pytest_configure(config):
-    global _tracer_class
-    global _trace_nodes
     if not config.option.gpu:
         setattr(config.option, 'markexpr', 'not gpu')
+    if config.option.do_inject:
+        from debug import do_inject  # noqa
     if config.option.tracer:
-        modname, field = config.option.tracer.rsplit('.', 1)
-        mod = __import__(modname, fromlist=[field])
-        _tracer_class = getattr(mod, field)
+        _context_managers.append(_resolve(config.option.tracer))
+    if config.option.mprof:
+        _context_managers.append((Profiler, ()))
     if config.option.trace_nodes:
-        _trace_nodes = DebugInherit(save_trace=True)
+        _context_managers.append(((lambda: DebugInherit(save_trace=True)), ()))
 
 
 class StringIOTTY(StringIO):
@@ -75,15 +91,12 @@ _prev = globals().get('pytest_runtest_setup', None)
 def pytest_runtest_setup(item):
     if _prev is not None:
         _prev(item)
-    if _tracer_class:
-        item._tracer = _tracer_class()
-        item._tracer.__enter__()
-    if _trace_nodes:
-        _trace_nodes.__enter__()
+    item._ctxms = [fn(*args) for fn, args in _context_managers]
+    for cm in item._ctxms:
+        cm.__enter__()
 
 
 def pytest_runtest_teardown(item):
-    if hasattr(item, '_tracer'):
-        item._tracer.__exit__(None, None, None)
-    if _trace_nodes:
-        _trace_nodes.__exit__()
+    if hasattr(item, '_ctxms'):
+        for cm in item._ctxms:
+            cm.__exit__(None, None, None)
