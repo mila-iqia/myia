@@ -3,6 +3,7 @@ import os
 from io import StringIO
 
 from myia.debug import traceback as myia_tr
+from myia.info import DebugInherit
 from myia.parser import MyiaSyntaxError
 from myia.utils import InferenceError
 
@@ -12,6 +13,7 @@ if os.environ.get('BUCHE'):
 
 
 _tracer_class = None
+_trace_nodes = False
 
 
 def pytest_addoption(parser):
@@ -19,16 +21,21 @@ def pytest_addoption(parser):
                      default=False, help="enable gpu tests")
     parser.addoption('-T', action='store', dest="tracer",
                      default=None, help="set a Myia tracer")
+    parser.addoption('--trace-nodes', action='store_true', dest="trace_nodes",
+                     default=False, help="save trace when creating Myia nodes")
 
 
 def pytest_configure(config):
     global _tracer_class
+    global _trace_nodes
     if not config.option.gpu:
         setattr(config.option, 'markexpr', 'not gpu')
     if config.option.tracer:
         modname, field = config.option.tracer.rsplit('.', 1)
         mod = __import__(modname, fromlist=[field])
         _tracer_class = getattr(mod, field)
+    if config.option.trace_nodes:
+        _trace_nodes = DebugInherit(save_trace=True)
 
 
 class StringIOTTY(StringIO):
@@ -71,8 +78,12 @@ def pytest_runtest_setup(item):
     if _tracer_class:
         item._tracer = _tracer_class()
         item._tracer.__enter__()
+    if _trace_nodes:
+        _trace_nodes.__enter__()
 
 
 def pytest_runtest_teardown(item):
     if hasattr(item, '_tracer'):
         item._tracer.__exit__(None, None, None)
+    if _trace_nodes:
+        _trace_nodes.__exit__()
