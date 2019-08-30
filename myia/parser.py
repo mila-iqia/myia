@@ -614,33 +614,32 @@ class Parser:
         block.graph.return_ = return_
         return block
 
+    def _assign(self, block, targ, anf_node):
+        if isinstance(targ, ast.Name):
+            # CASE: x = value
+            if anf_node.debug.name is None:
+                anf_node.debug.name = targ.id
+            if anf_node.is_constant_graph():
+                if anf_node.value.debug.name is None:
+                    anf_node.value.debug.name = targ.id
+            block.write(targ.id, anf_node)
+
+        elif isinstance(targ, ast.Tuple):
+            # CASE: x, y = value
+            for i, elt in enumerate(targ.elts):
+                op = block.operation('getitem')
+                new_node = Apply([op, anf_node, Constant(i)], block.graph)
+                self._assign(block, elt, new_node)
+
+        else:
+            raise NotImplementedError(targ)
+
+
     def process_Assign(self, block: 'Block', node: ast.Assign) -> 'Block':
         """Process an assignment."""
         anf_node = self.process_node(block, node.value)
-
-        def write(targ, anf_node):
-
-            if isinstance(targ, ast.Name):
-                # CASE: x = value
-                if anf_node.debug.name is None:
-                    anf_node.debug.name = targ.id
-                if anf_node.is_constant_graph():
-                    if anf_node.value.debug.name is None:
-                        anf_node.value.debug.name = targ.id
-                block.write(targ.id, anf_node)
-
-            elif isinstance(targ, ast.Tuple):
-                # CASE: x, y = value
-                for i, elt in enumerate(targ.elts):
-                    op = block.operation('getitem')
-                    new_node = Apply([op, anf_node, Constant(i)], block.graph)
-                    write(elt, new_node)
-
-            else:
-                raise NotImplementedError(node.targets)  # pragma: no cover
-
         for targ in node.targets:
-            write(targ, anf_node)
+            self._assign(block, targ, anf_node)
 
         return block
 
@@ -762,10 +761,11 @@ class Parser:
         # app = next(it); target = app[0]; it = app[1]
         app = body_block.graph.apply(op_next, it)
         target = body_block.graph.apply(op_getitem, app, 0)
-        target.debug.name = node.target.id
+        direct = isinstance(node.target, ast.Name)
+        target.debug.name = node.target.id if direct else '*value'
         it2 = body_block.graph.apply(op_getitem, app, 1)
         # We link the variable name to the target
-        body_block.write(node.target.id, target)
+        self._assign(body_block, node.target, target)
         # We set some debug data on all iterator variables
         it_debug_data = About(target.debug, 'iterator')
         it.debug.about = it_debug_data
