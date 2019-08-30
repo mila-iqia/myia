@@ -11,14 +11,24 @@ if os.environ.get('BUCHE'):
     from debug.butest import *  # noqa
 
 
+_tracer_class = None
+
+
 def pytest_addoption(parser):
     parser.addoption('--gpu', action='store_true', dest="gpu",
                      default=False, help="enable gpu tests")
+    parser.addoption('-T', action='store', dest="tracer",
+                     default=None, help="set a Myia tracer")
 
 
 def pytest_configure(config):
+    global _tracer_class
     if not config.option.gpu:
         setattr(config.option, 'markexpr', 'not gpu')
+    if config.option.tracer:
+        modname, field = config.option.tracer.rsplit('.', 1)
+        mod = __import__(modname, fromlist=[field])
+        _tracer_class = getattr(mod, field)
 
 
 class StringIOTTY(StringIO):
@@ -49,3 +59,20 @@ def pytest_collection_modifyitems(config, items):
         if not hasattr(typ, '_repr_failure'):
             typ._repr_failure = typ.repr_failure
             typ.repr_failure = myia_repr_failure
+
+
+# That hook may have been defined in debug.butest
+_prev = globals().get('pytest_runtest_setup', None)
+
+
+def pytest_runtest_setup(item):
+    if _prev is not None:
+        _prev(item)
+    if _tracer_class:
+        item._tracer = _tracer_class()
+        item._tracer.__enter__()
+
+
+def pytest_runtest_teardown(item):
+    if hasattr(item, '_tracer'):
+        item._tracer.__exit__(None, None, None)
