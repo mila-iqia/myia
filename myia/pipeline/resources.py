@@ -325,10 +325,9 @@ class _Unconverted:
 class ConverterResource(PipelineResource):
     """Convert a Python object into an object that can be in a Myia graph."""
 
-    def __init__(self, pipeline_init, object_map, converter):
+    def __init__(self, pipeline_init, object_map):
         """Initialize a Converter."""
         super().__init__(pipeline_init)
-        self.converter = converter
         self.object_map = {}
         for k, v in object_map.items():
             self.object_map[k] = _Unconverted(v)
@@ -361,10 +360,10 @@ class ConverterResource(PipelineResource):
         try:
             v = self.object_map[value]
             if isinstance(v, _Unconverted):
-                v = self.converter(self, v.value)
+                v = default_convert(self, v.value)
                 self.object_map[value] = v
         except (TypeError, KeyError):
-            v = self.converter(self, value)
+            v = default_convert(self, value)
 
         if isinstance(v, Graph):
             self.resources.manager.add_graph(v)

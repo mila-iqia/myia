@@ -6,7 +6,6 @@ from ..ir import GraphManager
 from ..pipeline.resources import (
     ConverterResource,
     InferenceResource,
-    default_convert,
     scalar_object_map,
     standard_method_map,
     standard_object_map,
@@ -21,7 +20,6 @@ standard_resources = dict(
     method_map=standard_method_map,
     convert=ConverterResource.partial(
         object_map=standard_object_map,
-        converter=default_convert
     ),
     inferrer=InferenceResource.partial(
         constructors=abstract_inferrer_constructors,
