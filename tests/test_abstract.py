@@ -200,8 +200,8 @@ def test_merge_edge_cases():
     b = AbstractJTagged(123)
     assert amerge(a, b) is a
 
-    a = AbstractClass(object, {'x': ANYTHING, 'y': ANYTHING}, {})
-    b = AbstractClass(object, {'x': 123, 'y': ANYTHING}, {})
+    a = AbstractClass(object, {'x': ANYTHING, 'y': ANYTHING})
+    b = AbstractClass(object, {'x': 123, 'y': ANYTHING})
     assert amerge(a, b) is a
 
 
@@ -266,8 +266,8 @@ def test_abstract_clone():
     s2 = S(t=ty.Int[64])
     assert upcast(s1, 64) is s2
 
-    a1 = T([s1, AbstractClass(object, {'field': s1}, {})])
-    a2 = T([s2, AbstractClass(object, {'field': s2}, {})])
+    a1 = T([s1, AbstractClass(object, {'field': s1})])
+    a2 = T([s2, AbstractClass(object, {'field': s2})])
     assert upcast(a1, 64) is a2
 
 

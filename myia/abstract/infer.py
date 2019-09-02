@@ -21,7 +21,6 @@ from ..utils import (
     Partializable,
     SymbolicKeyInstance,
     dataclass_fields,
-    dataclass_methods,
     infer_trace,
     is_dataclass_type,
     overload,
@@ -456,8 +455,7 @@ def to_abstract(fn, self, v, **kwargs):
         new_args = {}
         for name, value in dataclass_fields(v).items():
             new_args[name] = self(value, **kwargs)
-        methods = dataclass_methods(type(v))
-        rval = AbstractClass(type(v), new_args, methods)
+        rval = AbstractClass(type(v), new_args)
 
     elif isinstance(v, dtype.TypeMeta):
         rval = AbstractType(v)
@@ -590,7 +588,7 @@ def to_abstract(self, v: ADT, **kwargs):
     new_args = {}
     for name, value in dataclass_fields(v).items():
         new_args[name] = self(value, **kwargs)
-    draft = AbstractADT(type(v), new_args, dataclass_methods(type(v)))
+    draft = AbstractADT(type(v), new_args)
     return normalize_adt(draft)
 
 

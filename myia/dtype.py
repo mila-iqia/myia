@@ -155,6 +155,18 @@ class UInt(Number):
     _valid_bits = (8, 16, 32, 64)
 
 
+class Tuple(Object):
+    """Type of a Python tuple."""
+
+
+class Dict(Object):
+    """Type of a Python dict."""
+
+
+class NDArray(Object):
+    """Type of a Numpy array."""
+
+
 class SymbolicKeyType(Object):
     """Type of a SymbolicKeyInstance."""
 

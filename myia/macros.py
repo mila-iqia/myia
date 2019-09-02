@@ -84,12 +84,8 @@ async def apply(info):
     return g.apply(fnref.node, *expanded)
 
 
-async def _resolve_case(resources, data_t, item_v):
+async def _resolve_case(resources, data, data_t, item_v):
     mmap = resources.method_map
-
-    if (isinstance(data_t, type)
-            and issubclass(data_t, abstract.AbstractClassBase)):
-        return ('class', data_t)
 
     # Try method map
     try:
@@ -102,8 +98,13 @@ async def _resolve_case(resources, data_t, item_v):
         if item_v in mmap_t:
             method = mmap_t[item_v]
             return ('method', method)
+        elif isinstance(data, abstract.AbstractClassBase):
+            return ('class', data_t)
         else:
             return ('no_method',)
+
+    if isinstance(data, abstract.AbstractClassBase):
+        return ('class', data_t)
 
     return ('static',)
 
@@ -162,10 +163,10 @@ async def getattr_(info):
     if isinstance(data_t, Pending):
         case, *args = await find_coherent_result(
             data_t,
-            lambda t: _resolve_case(resources, t, attr_v)
+            lambda t: _resolve_case(resources, data, t, attr_v)
         )
     else:
-        case, *args = await _resolve_case(resources, data_t, attr_v)
+        case, *args = await _resolve_case(resources, data, data_t, attr_v)
 
     def process_method(method):
         if isinstance(method, property):
@@ -177,8 +178,8 @@ async def getattr_(info):
         # Get field from Class
         if attr_v in data.attributes:
             return g.apply(P.record_getitem, r_data.node, attr_v)
-        elif attr_v in data.methods:
-            return process_method(data.methods[attr_v])
+        elif hasattr(data_t, attr_v):
+            return process_method(getattr(data_t, attr_v))
         else:
             raise InferenceError(f'Unknown field in {data}: {attr_v}')
 

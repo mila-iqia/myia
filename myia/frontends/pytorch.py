@@ -128,7 +128,11 @@ blacklist = ('_backend', '_buffers', '_backward_hooks', '_forward_hooks',
 
 @to_abstract.register
 def _to_abstract(self, v: torch.nn.Module, **kwargs):
-    fwd_fn = getattr(type(v), 'forward')
+    from ..pipeline.resources import standard_method_map
+    standard_method_map[type(v)] = {
+        '__call__': getattr(type(v), 'forward'),
+        '__sub__': mod_sub,
+    }
     attrs = {}
     for var_k, var_v in vars(v).items():
         if var_k not in blacklist:
@@ -172,8 +176,7 @@ def _to_abstract(self, v: torch.nn.Module, **kwargs):
                 setattr(v, k, a)
         return v
 
-    return AbstractModule(v.__class__, attrs, {'__call__': fwd_fn,
-                          '__sub__': mod_sub}, constructor=new_module)
+    return AbstractModule(v.__class__, attrs, constructor=new_module)
 
 
 @to_abstract.register  # noqa: F811

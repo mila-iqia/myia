@@ -377,7 +377,6 @@ async def _inf_make_record(self, engine, _cls: AbstractType, *elems):
             name: wrap(elem) if wrap else elem
             for (name, _), elem in zip(expected, elems)
         },
-        cls.methods,
         constructor=cls.constructor
     )
 
@@ -442,7 +441,6 @@ async def _inf_record_setitem(self, engine,
     return type(data)(
         data.tag,
         {**data.attributes, attr_v: value},
-        data.methods,
         constructor=data.constructor
     )
 

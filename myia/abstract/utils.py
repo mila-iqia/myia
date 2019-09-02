@@ -15,7 +15,6 @@ from ..utils import (
     Empty,
     MyiaTypeError,
     TypeMismatchError,
-    dataclass_methods,
     intern,
     is_dataclass_type,
     overload,
@@ -154,9 +153,9 @@ def type_to_abstract(self, t: type):
                       else self(field.type)
                       for name, field in fields.items()}
         if issubclass(t, ADT):
-            return AbstractADT(t, attributes, dataclass_methods(t))
+            return AbstractADT(t, attributes)
         else:
-            return AbstractClass(t, attributes, dataclass_methods(t))
+            return AbstractClass(t, attributes)
 
     elif t is object:
         return ANYTHING
@@ -236,6 +235,12 @@ def pytype_to_abstract(main: bool, args):
 def type_token(x):
     """Build a type from an abstract value."""
     if isinstance(x, AbstractScalar):
+        return x.dtype()
+    elif isinstance(x, AbstractTuple):
+        return x.dtype()
+    elif isinstance(x, AbstractDict):
+        return x.dtype()
+    elif isinstance(x, AbstractClassBase):
         return x.dtype()
     else:
         return type(x)
@@ -463,8 +468,7 @@ def abstract_clone(self, x: AbstractClassBase, *args):
     return (yield type(x))(
         x.tag,
         {k: self(v, *args) for k, v in x.attributes.items()},
-        x.methods,
-        self(x.values, *args),
+        values=self(x.values, *args),
         constructor=x.constructor
     )
 
@@ -713,8 +717,7 @@ async def force_through(self, x: AbstractClassBase, through):
     yield (yield type(x))(
         x.tag,
         {k: (await self(v, through)) for k, v in x.attributes.items()},
-        x.methods,
-        await self(x.values, through)
+        values=await self(x.values, through)
     )
 
 
@@ -1035,12 +1038,13 @@ def amerge(self, x1: AbstractArray, x2, forced, bp):
 
 @overload  # noqa: F811
 def amerge(self, x1: AbstractClassBase, x2, forced, bp):
-    args1 = (x1.tag, x1.attributes, x1.methods, x1.values)
-    args2 = (x2.tag, x2.attributes, x2.methods, x2.values)
+    args1 = (x1.tag, x1.attributes, x1.values)
+    args2 = (x2.tag, x2.attributes, x2.values)
     merged = self(args1, args2, forced, bp)
     if forced or merged is args1:
         return x1
-    return type(x1)(*merged)
+    tag, attrs, values = merged
+    return type(x1)(tag, attrs, values=values)
 
 
 @overload  # noqa: F811
@@ -1299,7 +1303,6 @@ def _normalize_adt_helper(x, done, tag_to_adt):
             adt = AbstractADT.new(
                 x.tag,
                 {k: AbstractUnion.new([]) for k in x.attributes},
-                x.methods
             )
             tag_to_adt = {**tag_to_adt, x.tag: adt}
         else:
