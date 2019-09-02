@@ -5,7 +5,7 @@ import typing
 import numpy as np
 import pytest
 
-from myia import dtype as ty, myia
+from myia import dtype as ty
 from myia.abstract import (
     ALIASID,
     ANYTHING,
@@ -35,7 +35,6 @@ from myia.abstract import (
     empty,
     find_coherent_result_sync,
     listof,
-    macro,
     to_abstract,
     type_to_abstract,
 )
@@ -206,11 +205,6 @@ def test_merge_edge_cases():
     assert amerge(a, b) is a
 
 
-@macro
-async def mackerel(info):
-    pass
-
-
 def test_repr():
 
     s1 = to_abstract_test(1)
@@ -247,8 +241,6 @@ def test_repr():
     tu1 = AbstractTaggedUnion([[13, s2], [4, to_abstract_test(i16)]])
     assert repr(tu1) == \
         'AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))'
-
-    assert repr(mackerel) == '<Macro mackerel>'
 
 
 def test_repr_recursive():
@@ -361,47 +353,3 @@ def test_get_resolved():
     ref = eng.ref(Constant(123), Context.empty())
     with pytest.raises(InternalInferenceError):
         ref.get_resolved()
-
-
-def test_bad_macro():
-    from myia.ir import Graph
-    from myia.prim import ops as P
-
-    @macro
-    async def bad(info):
-        badg = Graph()
-        badg.debug.name = 'badg'
-        p = badg.add_parameter()
-        p.debug.name = 'parameter'
-        badg.output = badg.apply(P.scalar_add, p, p)
-        # The return value of the macro can't directly refer to badg.output
-        # because that node can only be accessed from the scope of a call to
-        # badg. The error raised by Myia should reflect this.
-        return info.graph.apply(P.transpose, badg.output)
-
-    @myia
-    def salmon(x, y):
-        return bad(x + y)
-
-    with pytest.raises(InternalInferenceError):
-        salmon(12, 13)
-
-
-def test_bad_macro_2():
-    with pytest.raises(TypeError):
-        @macro
-        def bigmac(info):
-            return info.args[0]
-
-
-def test_bad_macro_3():
-    @macro
-    async def macncheese(info):
-        return None
-
-    @myia
-    def pasta(x, y):
-        return macncheese(x + y)
-
-    with pytest.raises(InferenceError):
-        pasta(12, 13)

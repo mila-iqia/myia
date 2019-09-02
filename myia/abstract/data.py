@@ -3,6 +3,7 @@
 
 import inspect
 import re
+import traceback
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -767,20 +768,14 @@ class MacroInfo:
 class Macro:
     """Represents a function that transforms the subgraph it receives."""
 
-    def __init__(self, macro, *, name=None, infer_args=True):
+    def __init__(self, *, name, infer_args=True):
         """Initialize a Macro."""
-        self.name = name or macro.__qualname__
-        if not inspect.iscoroutinefunction(macro):
-            raise TypeError(
-                f"Error defining macro '{self.name}':"
-                f" macro must be a coroutine defined using async def"
-            )
-        self._macro = macro
+        self.name = name
         self.infer_args = infer_args
 
     async def macro(self, info):
         """Execute the macro proper."""
-        return await self._macro(info)
+        raise NotImplementedError(self.name)
 
     async def reroute(self, engine, outref, argrefs):
         """Reroute a node."""
@@ -813,17 +808,36 @@ class Macro:
     __repr__ = __str__
 
 
+class StandardMacro(Macro):
+    """Represents a function that transforms the subgraph it receives."""
+
+    def __init__(self, macro, *, name=None, infer_args=True):
+        """Initialize a Macro."""
+        super().__init__(name=name or macro.__qualname__,
+                         infer_args=infer_args)
+        if not inspect.iscoroutinefunction(macro):
+            raise TypeError(
+                f"Error defining macro '{self.name}':"
+                f" macro must be a coroutine defined using async def"
+            )
+        self._macro = macro
+
+    async def macro(self, info):
+        """Execute the macro proper."""
+        return await self._macro(info)
+
+
 @keyword_decorator
 def macro(fn, **kwargs):
     """Create a macro out of a function."""
-    return Macro(fn, **kwargs)
+    return StandardMacro(fn, **kwargs)
 
 
-import traceback
 class MacroError(InferenceError):
     """Wrap an error raised inside a macro."""
 
     def __init__(self, error):
+        """Initialize a MacroError."""
         tb = traceback.format_exception(
             type(error),
             error,
@@ -838,11 +852,19 @@ class MacroError(InferenceError):
 class MyiaStatic(Macro):
     """Represents a function that can be run at compile time.
 
-    This simpler, but less powerful than Macro.
+    This is simpler, but less powerful than Macro.
     """
 
+    def __init__(self, macro, *, name=None):
+        """Initialize a MyiaStatic."""
+        super().__init__(name=name or macro.__qualname__,
+                         infer_args=True)
+        self._macro = macro
+
     async def macro(self, info):
+        """Execute the macro."""
         from .utils import build_value
+
         def bv(x, ref):
             try:
                 return build_value(x)

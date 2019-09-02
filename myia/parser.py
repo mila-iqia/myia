@@ -634,7 +634,6 @@ class Parser:
         else:
             raise NotImplementedError(targ)
 
-
     def process_Assign(self, block: 'Block', node: ast.Assign) -> 'Block':
         """Process an assignment."""
         anf_node = self.process_node(block, node.value)

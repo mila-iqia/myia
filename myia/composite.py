@@ -816,6 +816,7 @@ class ArithmeticData:
 @dataclass
 class Range:  # pragma: no cover
     """Implement a Range in Myia."""
+
     start: object
     stop: object
     step: object
@@ -842,8 +843,9 @@ def range_(start, stop=None, step=None):
 
 
 @dataclass
-class Zip2:
+class Zip2:  # pragma: no cover
     """Implement zip with two arguments."""
+
     iter1: object
     iter2: object
 
