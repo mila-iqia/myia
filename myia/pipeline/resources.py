@@ -5,7 +5,7 @@ from types import FunctionType
 
 import numpy as np
 
-from .. import abstract, composite as C, dtype, macros as M, operations, parser
+from .. import composite as C, dtype, macros as M, operations, parser
 from ..abstract import InferenceEngine
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
@@ -241,7 +241,7 @@ standard_method_map = TypeMap({
         '__getitem__': P.dict_getitem,
         'values': M.dict_values,
     },
-    abstract.AbstractArray: {
+    dtype.NDArray: {
         '__add__': C.add,
         '__sub__': C.sub,
         '__mul__': C.mul,
@@ -336,7 +336,7 @@ class ConverterResource(PipelineResource):
             bool: dtype.Bool,
             int: dtype.Int,
             float: dtype.Float,
-            np.ndarray: abstract.AbstractArray,
+            np.ndarray: dtype.NDArray,
             np.int8: dtype.Int,
             np.int16: dtype.Int,
             np.int32: dtype.Int,

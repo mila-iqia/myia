@@ -469,9 +469,8 @@ async def _inf_array_len(self, engine, xs: AbstractArray):
 @standard_prim(P.scalar_to_array)
 async def _inf_scalar_to_array(self, engine, a: AbstractScalar, t):
     tp = t.values[VALUE]
-    tp = type(tp)
-    assert issubclass(tp, AbstractArray)
-    return tp(a, {SHAPE: ()})
+    assert isinstance(tp, AbstractArray)
+    return AbstractArray(a, {SHAPE: (), TYPE: tp.dtype()})
 
 
 @standard_prim(P.array_to_scalar)
@@ -553,12 +552,17 @@ async def _inf_array_map(self, engine, fn: AbstractFunction, *arrays):
             raise MyiaShapeError("Expect same shapes for array_map")
 
     for arr in arrays:
-        if type(arrays[0]) != type(arr):
+        if arrays[0].dtype() != arr.dtype():
             raise MyiaTypeError(
-                f'Expect array of type {type(arrays[0])} '
-                f'to have same type as array of type {type(arr)}')
+                f'Expect array of type {arrays[0].dtype()} '
+                f'to have same type as array of type {arr.dtype()}')
 
-    return type(arrays[0])(result, {SHAPE: tuple(rshape)})
+    return type(arrays[0])(
+        result, {
+            SHAPE: tuple(rshape),
+            TYPE: arrays[0].dtype(),
+        }
+    )
 
 
 # TODO: array_scan
@@ -587,7 +591,7 @@ async def _inf_array_reduce(self, engine,
             )
 
     res = await engine.execute(fn, a.element, a.element)
-    return type(a)(res, {SHAPE: shp_v})
+    return type(a)(res, {SHAPE: shp_v, TYPE: a.dtype()})
 
 
 @standard_prim(P.distribute)
@@ -602,7 +606,7 @@ async def _inf_distribute(self, engine, a: AbstractArray, _shp: _shape_type):
     for vs, s in zip(a_shp, shp):
         if vs != s and vs not in (1, ANYTHING) and s not in (1, ANYTHING):
             raise MyiaShapeError("Cannot change shape when distributing")
-    return type(a)(a.element, {SHAPE: shp})
+    return type(a)(a.element, {SHAPE: shp, TYPE: a.dtype()})
 
 
 @standard_prim(P.reshape)
@@ -616,7 +620,7 @@ async def _inf_reshape(self, engine, a: AbstractArray, _shp: _shape_type):
             prod(shp) != prod(a_shp)):
         raise MyiaShapeError("Cannot change the total number of elements "
                              "in reshape")
-    return type(a)(a.element, {SHAPE: shp})
+    return type(a)(a.element, {SHAPE: shp, TYPE: a.dtype()})
 
 
 @standard_prim(P.transpose)
@@ -634,7 +638,7 @@ async def _inf_transpose(self, engine,
             )
 
         shp = tuple(a_shp[i] for i in perm)
-    return type(a)(a.element, {SHAPE: shp})
+    return type(a)(a.element, {SHAPE: shp, TYPE: a.dtype()})
 
 
 @standard_prim(P.dot)
@@ -651,12 +655,12 @@ async def _inf_dot(self, engine, a: AbstractArray, b: AbstractArray):
     engine.abstract_merge(a.element, b.element)
     c_shp = (a_shp[0], b_shp[1])
 
-    if type(a) != type(b):
+    if a.dtype() != b.dtype():
         raise MyiaTypeError(
-            f'Expect array of type {type(a)} '
-            f'to have same type as array of type {type(b)}')
+            f'Expect array of type {a.dtype()} '
+            f'to have same type as array of type {b.dtype()}')
 
-    return type(a)(a.element, {SHAPE: c_shp})
+    return type(a)(a.element, {SHAPE: c_shp, TYPE: a.dtype()})
 
 
 @standard_prim(P.conv2d)
@@ -694,7 +698,8 @@ async def _inf_conv2d(self, engine, input: AbstractArray,
     engine.check(AbstractScalar, input.element, weight.element)
     # ^ TODO: PyTorch also enforces, but might want to change for mixed precis
 
-    return type(weight)(weight.element, {SHAPE: out_shape})
+    return type(weight)(weight.element, {SHAPE: out_shape,
+                                         TYPE: weight.dtype()})
 
 
 @standard_prim(P.conv2d_input_grad)
@@ -707,7 +712,8 @@ async def _inf_conv2d_input_grad(self, engine, input_size: _shape_type,
                                  groups: dtype.UInt[64]):
     input_size_tuple = tuple(
         self.require_constant(i_s, argnum=0) for i_s in input_size.elements)
-    return type(weight)(weight.element, {SHAPE: input_size_tuple})
+    return type(weight)(weight.element, {SHAPE: input_size_tuple,
+                                         TYPE: weight.dtype()})
 
 
 @standard_prim(P.conv2d_weight_grad)
@@ -720,7 +726,8 @@ async def _inf_conv2d_weight_grad(self, engine, input: AbstractArray,
                                   groups: dtype.UInt[64]):
     weight_size_tuple = tuple(
         self.require_constant(w_s, argnum=0) for w_s in weight_size.elements)
-    return type(input)(input.element, {SHAPE: weight_size_tuple})
+    return type(input)(input.element, {SHAPE: weight_size_tuple,
+                                       TYPE: input.dtype()})
 
 ##############
 # Statements #

@@ -6,12 +6,11 @@ import numpy as np
 import pytest
 from pytest import mark
 
-from myia.abstract import from_value
+from myia.abstract import AbstractArray, from_value
 from myia.abstract.data import ANYTHING, SHAPE, TYPE, VALUE, AbstractScalar
 from myia.debug.finite_diff import clean_args
 from myia.frontends import activate_frontend  # noqa: E402
-from myia.frontends.pytorch_abstract_types import \
-    AbstractPyTorchTensor  # noqa: E402
+from myia.frontends.pytorch_abstract_types import PyTorchTensor  # noqa: E402
 from myia.pipeline import standard_pipeline
 
 from ..common import MA, f32, to_abstract_test
@@ -95,10 +94,14 @@ def pt_fn_grads(fn, *args, **kwargs):
         output, args, torch.ones(output.shape))
 
 
-APT_loss = AbstractPyTorchTensor(
-    AbstractScalar({TYPE: f32, VALUE: ANYTHING}), {SHAPE: (1,)})
-APT_0d_loss = AbstractPyTorchTensor(
-    AbstractScalar({TYPE: f32, VALUE: ANYTHING}), {SHAPE: ()})
+APT_loss = AbstractArray(
+    AbstractScalar({TYPE: f32, VALUE: ANYTHING}),
+    {SHAPE: (1,), TYPE: PyTorchTensor}
+)
+APT_0d_loss = AbstractArray(
+    AbstractScalar({TYPE: f32, VALUE: ANYTHING}),
+    {SHAPE: (), TYPE: PyTorchTensor}
+)
 
 
 def _fwd_test(fn, args, pipeline=standard_pipeline,
@@ -132,8 +135,10 @@ def _grad_test(fn, obj, args,
     elif sens_type == (1,):
         sens_type = APT_loss
     else:
-        sens_type = AbstractPyTorchTensor(
-            AbstractScalar({TYPE: f32, VALUE: ANYTHING}), {SHAPE: sens_type})
+        sens_type = AbstractArray(
+            AbstractScalar({TYPE: f32, VALUE: ANYTHING}),
+            {SHAPE: sens_type, TYPE: PyTorchTensor}
+        )
 
     pipeline = standard_pipeline
     pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)

@@ -5,7 +5,7 @@ from collections import OrderedDict
 
 import torch
 
-from .. import composite as C, macros as M
+from .. import composite as C
 from ..abstract.data import (
     ANYTHING,
     SHAPE,
@@ -16,14 +16,12 @@ from ..abstract.data import (
 )
 from ..abstract.infer import to_abstract
 from ..composite import core
-from ..dtype import Bool, Float, Int, Number, UInt
+from ..dtype import Bool, Float, Int, NDArray, UInt
 from ..hypermap import hyper_map
-from ..opt.clean import _reabs
 from ..pipeline.resources import standard_method_map, standard_object_map
 from ..pipeline.steps import convert_arg, convert_result_array
 from ..prim import ops as P
-from ..prim.py_implementations import scalar_cast, scalar_to_array
-from .pytorch_abstract_types import APT, AbstractModule, AbstractPyTorchTensor
+from .pytorch_abstract_types import AbstractModule, PyTorchTensor
 from .pytorch_functions import _sum, conv2d, item, linear, relu, sigmoid
 
 _type_map = {
@@ -62,22 +60,9 @@ standard_object_map.update({
 })
 
 
-C.exp.register(APT)(C.array_exp)
-C.log.register(APT)(C.array_log)
-C.tanh.register(APT)(C.array_tanh)
-
-
-@C._leaf_zeros_like.register(APT)
-@core
-def _array_zero(xs):
-    scalar_zero = P.scalar_cast(0, C.typeof(xs).element)
-    return P.distribute(C.to_array(scalar_zero, C.typeof(xs)),
-                        P.shape(xs))
-
-
-standard_method_map[AbstractPyTorchTensor] = \
-    standard_method_map[AbstractArray].copy()
-standard_method_map[AbstractPyTorchTensor].update({
+standard_method_map[PyTorchTensor] = \
+    standard_method_map[NDArray].copy()
+standard_method_map[PyTorchTensor].update({
     'dim': C.ndim,
     'exp': C.exp,
     'item': item,
@@ -181,55 +166,51 @@ def _to_abstract(self, v: torch.nn.Module, **kwargs):
 
 @to_abstract.register  # noqa: F811
 def _to_abstract(self, v: torch.Tensor, **kwargs):
-    return AbstractPyTorchTensor(
+    return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
-        {SHAPE: tuple(v.shape)},
+        {SHAPE: tuple(v.shape), TYPE: PyTorchTensor},
     )
 
 
 @to_abstract.register  # noqa: F811
 def _to_abstract(self, v: torch.nn.Parameter, **kwargs):
-    return AbstractPyTorchTensor(
+    return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
-        {SHAPE: tuple(v.shape)},
+        {SHAPE: tuple(v.shape), TYPE: PyTorchTensor},
     )
 
-##############################################################################
 
+@to_abstract.register  # noqa: F811
+def _to_abstract(self, v: PyTorchTensorWrapper, **kwargs):
+    return AbstractArray(
+        AbstractScalar({
+            VALUE: ANYTHING,
+            TYPE: pytorch_dtype_to_type(v.dtype),
+        }),
+        {SHAPE: tuple(v.shape), TYPE: PyTorchTensor},
+    )
 
-@convert_arg.register
-def _convert_arg(self, arg, orig_t: AbstractPyTorchTensor):
-    et = orig_t.element
-    assert isinstance(et, AbstractScalar)
-    et = et.values[TYPE]
-    assert issubclass(et, Number)
-    if isinstance(arg, torch.Tensor):
-        arg = arg.detach().numpy()
-    return arg
-
-##############################################################################
-
-
-@convert_result_array.register
-def _convert_result_array(arg, orig_t: AbstractPyTorchTensor):
-    return torch.from_numpy(arg)
 
 ##############################################################################
 
 
-@M._cast_helper.register(Number, APT)
-@core
-def _pt__cast_helper(x, model):
-    t = P.typeof(model)
-    return scalar_to_array(scalar_cast(x, t.element), P.typeof(model))
+# @convert_arg.register
+# def _convert_arg(self, arg, orig_t: AbstractPyTorchTensor):
+#     et = orig_t.element
+#     assert isinstance(et, AbstractScalar)
+#     et = et.values[TYPE]
+#     assert issubclass(et, Number)
+#     if isinstance(arg, torch.Tensor):
+#         arg = arg.detach().numpy()
+#     return arg
 
 
-@_reabs.register
-def _pt__reabs(self, a: AbstractPyTorchTensor):
-    return (yield AbstractArray)(self(a.element), a.values)
+# @convert_result_array.register
+# def _convert_result_array(arg, orig_t: PyTorchTensor):
+#     return torch.from_numpy(arg)

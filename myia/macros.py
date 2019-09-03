@@ -13,6 +13,7 @@ from .abstract import (
     ANYTHING,
     TYPE,
     VALUE,
+    AbstractArray,
     generate_getters,
     macro,
     setter_from_getter,
@@ -20,7 +21,7 @@ from .abstract import (
     union_simplify,
 )
 from .composite import gadd
-from .dtype import Array, Bool, Number
+from .dtype import Bool, Number
 from .info import About, DebugInfo
 from .ir import (
     CloneRemapper,
@@ -461,11 +462,11 @@ def _scalar_cast_helper(x, model):
     return scalar_cast(x, t)
 
 
-@_cast_helper.register(Number, Array)
+@_cast_helper.register(Number, AbstractArray)
 @core
 def _scalar_to_array_cast_helper(x, model):
     t = typeof(model)
-    return scalar_to_array(scalar_cast(x, t.element), typeof(model))
+    return scalar_to_array(scalar_cast(x, t.element), t)
 
 
 ROOT = Named('ROOT')

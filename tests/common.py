@@ -35,7 +35,8 @@ from myia.utils import ADT, EnvInstance, dataclass_fields, overload
 B = Bool
 Bot = AbstractBottom()
 EmptyTuple = typing.Tuple[()]
-AA = AbstractArray(ANYTHING, {SHAPE: ANYTHING})
+AA = AbstractArray(ANYTHING, {SHAPE: ANYTHING, TYPE: ANYTHING})
+AN = AbstractArray(ANYTHING, {SHAPE: ANYTHING, TYPE: dtype.NDArray})
 
 
 ###########################
@@ -47,7 +48,7 @@ def arr_of(t, shp, value):
     return AbstractArray(AbstractScalar({
         VALUE: value,
         TYPE: t,
-    }), {SHAPE: shp})
+    }), {SHAPE: shp, TYPE: dtype.NDArray})
 
 
 def ai64_of(*shp, value=ANYTHING):
@@ -144,7 +145,7 @@ def to_abstract_test(self, x: np.ndarray):
             VALUE: ANYTHING,
             TYPE: dtype.np_dtype_to_type(str(x.dtype)),
         }),
-        {SHAPE: x.shape}
+        {SHAPE: x.shape, TYPE: dtype.NDArray}
     )
 
 

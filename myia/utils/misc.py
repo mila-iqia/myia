@@ -3,7 +3,6 @@
 import builtins
 import functools
 from dataclasses import dataclass
-from types import FunctionType
 from typing import Any, Dict, List, TypeVar
 
 builtins_d = vars(builtins)

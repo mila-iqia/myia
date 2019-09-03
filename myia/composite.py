@@ -23,19 +23,7 @@ from .abstract import (
     build_value,
     myia_static,
 )
-from .dtype import (
-    Array,
-    Bool,
-    EnvType,
-    Nil,
-    Number,
-    f32,
-    f64,
-    i8,
-    i16,
-    u8,
-    u16,
-)
+from .dtype import Bool, EnvType, Nil, Number, f32, f64, i8, i16, u8, u16
 from .hypermap import HyperMap, hyper_map
 from .ir import Graph, MetaGraph, MultitypeGraph
 from .prim import ops as P
@@ -116,7 +104,7 @@ class Elemwise(MetaGraph):
 
     def make_signature(self, args):
         """Create the signature: whether arguments are arrays, and shapes."""
-        return tuple((type(arg), arg.values[SHAPE])
+        return tuple((arg.dtype(), arg.values[SHAPE])
                      if isinstance(arg, AbstractArray) else (None, False)
                      for arg in args)
 
@@ -129,7 +117,9 @@ class Elemwise(MetaGraph):
         is_array_op = len(shapes) > 0
         if is_array_op:
             array_types = [t for t, _ in sig if t is not None]
-            array_type = array_types[0](ANYTHING, {SHAPE: ANYTHING})
+            array_type = AbstractArray(
+                ANYTHING, {SHAPE: ANYTHING, TYPE: array_types[0]}
+            )
         params = []
         for i, (t, _) in enumerate(sig):
             p = g.add_parameter()
@@ -537,42 +527,42 @@ def array_usub(xs):
     return array_map(usub, xs)
 
 
-@exp.register(Array)
+@exp.register(AbstractArray)
 @core
 def array_exp(xs):
     """Implementation of `array_exp`."""
     return array_map(scalar_exp, xs)
 
 
-@log.register(Array)
+@log.register(AbstractArray)
 @core
 def array_log(xs):
     """Implementation of `array_log`."""
     return array_map(scalar_log, xs)
 
 
-@sin.register(Array)
+@sin.register(AbstractArray)
 @core
 def array_sin(xs):
     """Implementation of `array_sin`."""
     return array_map(scalar_sin, xs)
 
 
-@cos.register(Array)
+@cos.register(AbstractArray)
 @core
 def array_cos(xs):
     """Implementation of `array_cos`."""
     return array_map(scalar_cos, xs)
 
 
-@tan.register(Array)
+@tan.register(AbstractArray)
 @core
 def array_tan(xs):
     """Implementation of `array_tan`."""
     return array_map(scalar_tan, xs)
 
 
-@tanh.register(Array)
+@tanh.register(AbstractArray)
 @core
 def array_tanh(xs):
     """Implementation of `array_tanh`."""
@@ -677,7 +667,7 @@ def _scalar_zero(x):
     return scalar_cast(0, typeof(x))
 
 
-@_leaf_zeros_like.register(Array)
+@_leaf_zeros_like.register(AbstractArray)
 @core
 def _array_zero(xs):
     scalar_zero = scalar_cast(0, typeof(xs).element)

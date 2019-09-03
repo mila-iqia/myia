@@ -16,11 +16,11 @@
 #############################################################################
 
 from .. import composite as C, dtype as D
+from ..abstract import AbstractArray
 from ..composite import core
 from ..hypermap import hyper_map
 from ..ir import MultitypeGraph
 from ..prim import ops as P
-from .pytorch_abstract_types import APT
 
 # This import is for WIP
 # from ..dtype import Bool, Int
@@ -138,7 +138,7 @@ def _softmax(x, d, dt):
 _sum = MultitypeGraph('_sum')
 
 
-@_sum.register(APT)
+@_sum.register(AbstractArray)
 @core
 def __sum(x):
 

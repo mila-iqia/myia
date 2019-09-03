@@ -1,6 +1,12 @@
 """Abstract Types for PyTorch Frontend."""
 
-from ..abstract.data import ANYTHING, SHAPE, AbstractArray, AbstractClassBase
+from ..abstract.data import AbstractClassBase
+from ..abstract.infer import ArrayWrapper
+from ..dtype import Object
+
+
+class PyTorchTensor(Object):
+    """Type of an AbstractArray that behaves like a PyTorch Tensor."""
 
 
 class AbstractModule(AbstractClassBase):
@@ -17,14 +23,3 @@ class AbstractModule(AbstractClassBase):
         (especially for pytorch modules and their contents).
         """
         return self
-
-
-class AbstractPyTorchTensor(AbstractArray):
-    """Represents a PyTorch Tensor."""
-
-    def __init__(self, element, values):
-        """Initialize an AbstractPyTorchTensor."""
-        super().__init__(element, values)
-
-
-APT = AbstractPyTorchTensor(ANYTHING, {SHAPE: ANYTHING})

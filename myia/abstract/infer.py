@@ -561,7 +561,7 @@ def to_abstract(self, v: dict, **kwargs):
 
 @overload  # noqa: F811
 def to_abstract(self, v: np.ndarray, alias_map={}, **kwargs):
-    tracks = {SHAPE: v.shape}
+    tracks = {SHAPE: v.shape, TYPE: dtype.NDArray}
     if id(v) in alias_map:
         tracks[ALIASID] = alias_map[id(v)]
     return AbstractArray(

@@ -2,10 +2,7 @@
 
 from .. import operations
 from ..abstract import (
-    ANYTHING,
     DEAD,
-    SHAPE,
-    AbstractArray,
     AbstractFunction,
     AbstractJTagged,
     abstract_clone,
@@ -81,9 +78,6 @@ def M(mg):
 def primset_var(*prims):
     """Create a variable that matches a Primitive node."""
     return var(lambda node: node.is_constant() and node.value in prims)
-
-
-AA = AbstractArray(ANYTHING, {SHAPE: ANYTHING})
 
 
 ###############################
@@ -415,18 +409,20 @@ def unfuse_composite(optimizer, node, equiv):
     """
     # This has to be defined inline because of circular imports
     class UnfuseRemapper(BasicRemapper):
-        def __init__(self, g, shape):
+        def __init__(self, g, reference):
             super().__init__(
                 graphs=g.graphs_used.keys() | {g},
                 relation='unfused'
             )
-            self.shape = shape
+            self.reference = reference
 
         def asarray(self, ng, i):
             if i.is_constant():
-                return ng.apply(P.distribute, ng.apply(P.scalar_to_array, i,
-                                                       AA),
-                                self.shape)
+                typ = (self.reference.abstract
+                       or ng.apply(P.typeof, self.reference))
+                return ng.apply(P.distribute,
+                                ng.apply(P.scalar_to_array, i, typ),
+                                ng.apply(P.shape, self.reference))
             else:
                 return i
 
@@ -444,7 +440,7 @@ def unfuse_composite(optimizer, node, equiv):
 
     g = equiv[G].value
     xs = equiv[Xs]
-    r = UnfuseRemapper(g, xs[0].shape)
+    r = UnfuseRemapper(g, xs[0])
     r.run()
     ng = r.get_graph(g)
     return node.graph.apply(ng, *xs)
@@ -481,7 +477,8 @@ def simplify_array_map(optimizer, node, equiv):
         elif x.is_constant() \
                 and issubclass(type_token(x.abstract), Number):
             shp = (P.shape, xs[0])
-            sexp = (P.distribute, (P.scalar_to_array, x, AA), shp)
+            typ = xs[0].abstract or (P.typeof, xs[0])
+            sexp = (P.distribute, (P.scalar_to_array, x, typ), shp)
             return sexp_to_node(sexp, node.graph)
         else:
             # Raise a semi-rare exception that won't hide bugs
