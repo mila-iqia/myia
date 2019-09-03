@@ -1,4 +1,16 @@
 """Utility functions for graph compilation and code generation."""
+from dataclasses import dataclass
+from ..abstract import AbstractValue
+from .backends import Backend
+
+
+@dataclass(frozen=True)
+class BackendValue:
+    """Class that represents a value in a backend."""
+    value: object
+    orig_t: AbstractValue
+    vm_t: AbstractValue
+    backend: Backend
 
 
 def get_outputs(lst, uses, seen):

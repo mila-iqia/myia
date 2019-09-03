@@ -5,6 +5,7 @@ import os
 import urllib
 
 from ... import abstract, dtype
+from ...utils import TaggedValue
 
 
 class UnknownBackend(Exception):
@@ -37,6 +38,8 @@ _backends = {
     'relay': import_load('myia.compile.backends.relay', 'RelayBackend'),
     'pytorch': import_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
 }
+
+_active_backends = {}
 
 
 def get_default():
@@ -101,10 +104,14 @@ def load_backend(name, options=None):
         options = {}
     if name not in _backends:
         raise UnknownBackend(name)
-    try:
-        res = _backends[name]()(**options)
-    except Exception as e:
-        raise LoadingError(name) from e
+    key = (name, tuple(sorted(list(options.items()))))
+    res = _active_backends.get(key, None)
+    if res is None:
+        try:
+            res = _backends[name]()(**options)
+            _active_backends[key] = res
+        except Exception as e:
+            raise LoadingError(name) from e
     return res
 
 
@@ -170,12 +177,18 @@ class Backend:
             return tuple(self.to_value(ve, te)
                          for ve, te in zip(v, t.elements))
         elif isinstance(t, abstract.AbstractTaggedUnion):
-            return Taggedvalue(v.tag, self.to_value(v, t.get(v.tag)))
+            return TaggedValue(v.tag, self.to_value(v, t.get(v.tag)))
         else:
             raise RuntimeError(f"Don't know what to do for {t}")
 
     def from_value(self, v, t):
         """Convert an intermediate value to a backend value."""
+        from ..utils import BackendValue
+        from ...abstract import typecheck
+        if (isinstance(v, BackendValue) and
+            v.backend is self and
+                typecheck(t, v.vm_t)):
+            return v.value
         if (isinstance(t, (abstract.AbstractError, abstract.AbstractType))
                 or v is abstract.DEAD):
             return None
@@ -189,12 +202,12 @@ class Backend:
                 assert len(v._contents) == 0
                 return self.empty_env()
             else:
-                raise NotImplementedError(f'convert_value for {t}')
+                raise NotImplementedError(f'from_value for {t}')
         elif isinstance(t, abstract.AbstractTuple):
             return tuple(self.from_value(v, t)
                          for v, t in zip(v, t.elements))
         else:
-            raise NotImplementedError(f'convert_value for {t}')
+            raise NotImplementedError(f'from_value for {t}')
 
     def check_array(self, v, t):
         """Check array value for type and element dtype.

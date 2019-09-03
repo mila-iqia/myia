@@ -11,6 +11,7 @@ from .. import dtype, operations
 from ..info import About
 from ..ir import Graph, MetaGraph
 from ..prim import Primitive, ops as P
+from ..compile import BackendValue
 from ..utils import (
     ADT,
     InferenceError,
@@ -73,24 +74,6 @@ from .utils import (
     sensitivity_transform,
     type_to_abstract,
 )
-
-
-class ArrayWrapper:
-    """Wrap array so that it remains on accelerator device.
-
-    Attributes:
-        array: The array that is inside ArrayWrapper.
-        dtype: The dtype of the array that is inside ArrayWrapper.
-        shape: The shape of the array that is inside ArrayWrapper.
-
-    """
-
-    def __init__(self, array, dtype, shape, backend):
-        """Initialize the ArrayWrapper."""
-        self.array = array
-        self.dtype = dtype
-        self.shape = shape
-        self.backend = backend
 
 
 class InferenceEngine:
@@ -593,14 +576,8 @@ def to_abstract(self, v: np.ndarray, alias_map={}, **kwargs):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: ArrayWrapper, **kwargs):
-    return AbstractArray(
-        AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: dtype.np_dtype_to_type(str(v.dtype)),
-        }),
-        {SHAPE: v.shape}
-    )
+def to_abstract(self, v: BackendValue, **kwargs):
+    return v.orig_t
 
 
 @overload  # noqa: F811

@@ -3,7 +3,6 @@
 The steps are listed in roughly the same order they should be called.
 """
 
-
 from itertools import count
 
 import numpy as np
@@ -11,7 +10,6 @@ import numpy as np
 from .. import dtype
 from ..abstract import (
     ANYTHING,
-    SHAPE,
     TYPE,
     VALUE,
     AbstractArray,
@@ -21,12 +19,12 @@ from ..abstract import (
     AbstractTaggedUnion,
     AbstractTuple,
     AbstractUnion,
-    ArrayWrapper,
     empty,
     find_aliases,
+    typecheck,
 )
 from ..cconv import closure_convert
-from ..compile import load_backend
+from ..compile import load_backend, BackendValue
 from ..ir import Graph
 from ..opt import (
     CSE,
@@ -46,6 +44,7 @@ from ..utils import (
     MyiaInputTypeError,
     TaggedValue,
     overload,
+    overload_wrapper,
     tracer,
 )
 from ..validate import (
@@ -523,7 +522,17 @@ class SlowdownWarning(UserWarning):
 # Converts args while running model #
 #####################################
 
-@overload(bootstrap=True)
+
+@overload_wrapper(bootstrap=True)
+def convert_arg(fn, self, arg, orig_t):
+    if isinstance(arg, BackendValue):
+        if not typecheck(orig_t, arg.orig_t):
+            raise MyiaInputTypeError("Bad type for backend value.")
+        return arg
+    return fn(self, arg, orig_t)
+
+
+@overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractTuple):
     if not isinstance(arg, tuple):
         raise MyiaInputTypeError('Expected tuple')
@@ -740,7 +749,9 @@ class Wrap(PipelineStep):
             args = tuple(backend.from_value(convert_arg(arg, ot), vt)
                          for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
             res = fn(*args)
-            if not self.return_backend:
+            if self.return_backend:
+                res = BackendValue(res, orig_out_t, vm_out_t, backend)
+            else:
                 res = backend.to_value(res, vm_out_t)
                 res = convert_result(res, orig_out_t, vm_out_t)
             return res

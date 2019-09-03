@@ -57,7 +57,6 @@ from .data import (  # noqa
     pretty_type,
 )
 from .infer import (  # noqa
-    ArrayWrapper,
     GraphInferrer,
     InferenceEngine,
     Inferrer,
