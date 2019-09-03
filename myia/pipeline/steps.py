@@ -24,7 +24,7 @@ from ..abstract import (
     typecheck,
 )
 from ..cconv import closure_convert
-from ..compile import load_backend, BackendValue
+from ..compile import BackendValue, load_backend
 from ..ir import Graph
 from ..opt import (
     CSE,

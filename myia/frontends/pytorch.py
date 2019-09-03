@@ -16,7 +16,6 @@ from ..abstract.data import (
     AbstractScalar,
 )
 from ..abstract.infer import to_abstract
-from ..api import _convert_arg_init
 from ..composite import core
 from ..dtype import Bool, Float, Int, Number, UInt
 from ..hypermap import hyper_map
@@ -221,23 +220,6 @@ def _to_abstract(self, v: PyTorchTensorWrapper, **kwargs):
         # v.requires_grad,
         # v.retain_grad
     )
-
-##############################################################################
-
-
-@_convert_arg_init.register
-def _pt__convert_arg_init(self, arg, orig_t: AbstractPyTorchTensor, backend):
-    et = orig_t.element
-    assert isinstance(et, AbstractScalar)
-    et = et.values[TYPE]
-    assert issubclass(et, Number)
-    if isinstance(arg, torch.Tensor):
-        arg = PyTorchTensorWrapper(
-            backend.from_dlpack(torch.utils.dlpack.to_dlpack(arg)),
-            arg.dtype, arg.shape, backend,
-            # arg.requires_grad, arg.retain_grad
-        )
-    return arg
 
 ##############################################################################
 

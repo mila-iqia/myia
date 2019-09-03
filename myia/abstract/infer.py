@@ -8,10 +8,10 @@ from functools import reduce
 import numpy as np
 
 from .. import dtype, operations
+from ..compile import BackendValue
 from ..info import About
 from ..ir import Graph, MetaGraph
 from ..prim import Primitive, ops as P
-from ..compile import BackendValue
 from ..utils import (
     ADT,
     InferenceError,

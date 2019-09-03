@@ -2,19 +2,12 @@
 
 import inspect
 
-from .abstract import (
-    find_aliases,
-    from_value,
-)
+from .abstract import find_aliases, from_value
 from .compile.backends import Backend, load_backend
 from .compile.utils import BackendValue
 from .pipeline import standard_pipeline
 from .pipeline.steps import convert_arg, convert_result
-from .utils import (
-    MyiaInputTypeError,
-    MyiaTypeError,
-    keyword_decorator,
-)
+from .utils import MyiaInputTypeError, MyiaTypeError, keyword_decorator
 
 #################
 # Top-level API #
