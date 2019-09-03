@@ -160,11 +160,27 @@ class Backend:
         """An empty grad environment for the backend."""
         return ()
 
-    def convert_value(self, v, t):
-        """Convert a value to the appropriate backend representation."""
+    def to_value(self, v, t):
+        """Convert a backend value to an intermediate value."""
+        if isinstance(t, abstract.AbstractScalar):
+            return self.to_scalar(v)
+        elif isinstance(t, abstract.AbstractArray):
+            return self.to_numpy(v)
+        elif isinstance(t, abstract.AbstractTuple):
+            return tuple(self.to_value(ve, te)
+                         for ve, te in zip(v, t.elements))
+        elif isinstance(t, abstract.AbstractTaggedUnion):
+            return Taggedvalue(v.tag, self.to_value(v, t.get(v.tag)))
+        else:
+            raise RuntimeError(f"Don't know what to do for {t}")
+
+    def from_value(self, v, t):
+        """Convert an intermediate value to a backend value."""
         if (isinstance(t, (abstract.AbstractError, abstract.AbstractType))
                 or v is abstract.DEAD):
             return None
+        if isinstance(t, abstract.AbstractArray):
+            return self.from_numpy(v)
         elif isinstance(t, abstract.AbstractScalar):
             if issubclass(t.values[abstract.TYPE],
                           (dtype.Number, dtype.Bool, dtype.Nil)):
@@ -175,7 +191,7 @@ class Backend:
             else:
                 raise NotImplementedError(f'convert_value for {t}')
         elif isinstance(t, abstract.AbstractTuple):
-            return tuple(self.convert_value(v, t)
+            return tuple(self.from_value(v, t)
                          for v, t in zip(v, t.elements))
         else:
             raise NotImplementedError(f'convert_value for {t}')
