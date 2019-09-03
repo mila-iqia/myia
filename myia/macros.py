@@ -86,25 +86,26 @@ async def apply(info):
 
 async def _resolve_case(resources, data, data_t, item_v):
     mmap = resources.method_map
+    is_cls = isinstance(data, abstract.AbstractClassBase)
 
     # Try method map
     try:
         mmap_t = data_t and mmap[data_t]
     except KeyError:
-        mmap_t = None
+        mmap_t = {} if is_cls else None
 
     if mmap_t is not None:
         # Method call
         if item_v in mmap_t:
             method = mmap_t[item_v]
             return ('method', method)
-        elif isinstance(data, abstract.AbstractClassBase):
-            return ('class', data_t)
+        elif is_cls:
+            if item_v in data.attributes:
+                return ('field', item_v)
+            elif hasattr(data_t, item_v):
+                return ('method', getattr(data_t, item_v))
         else:
             return ('no_method',)
-
-    if isinstance(data, abstract.AbstractClassBase):
-        return ('class', data_t)
 
     return ('static',)
 
@@ -171,24 +172,16 @@ async def getattr_(info):
     else:
         case, *args = await _resolve_case(resources, data, data_t, attr_v)
 
-    def process_method(method):
+    if case == 'field':
+        # Get field from Class
+        return g.apply(P.record_getitem, r_data.node, attr_v)
+
+    elif case == 'method':
+        method, = args
         if isinstance(method, property):
             return g.apply(method.fget, r_data.node)
         else:
             return g.apply(P.partial, method, r_data.node)
-
-    if case == 'class':
-        # Get field from Class
-        if attr_v in data.attributes:
-            return g.apply(P.record_getitem, r_data.node, attr_v)
-        elif hasattr(data_t, attr_v):
-            return process_method(getattr(data_t, attr_v))
-        else:
-            raise InferenceError(f'Unknown field in {data}: {attr_v}')
-
-    elif case == 'method':
-        method, = args
-        return process_method(method)
 
     elif case == 'no_method':
         msg = f"object of type {data} has no attribute '{attr_v}'"
