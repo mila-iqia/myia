@@ -11,7 +11,7 @@ import numpy
 from numpy.random import RandomState
 
 from myia import ArithmeticData, myia, value_and_grad
-from myia.api import to_device
+from myia.api import to_device, from_device
 # The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
 
@@ -169,10 +169,8 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         t0 = time.time()
         for inp, target in data:
             cost, model = step(model, inp, target, lr)
-            cost = cost.array
-            if isinstance(cost, numpy.ndarray):
-                cost = float(cost)
             costs.append(cost)
+        costs = [float(from_device(c)) for c in costs]
         c = sum(costs) / n
         t = time.time() - t0
         print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')
