@@ -24,6 +24,7 @@ from myia.dtype import (
     Int,
     Nil,
     Number,
+    String,
     f16,
     f32,
     f64,
@@ -2381,3 +2382,24 @@ def test_conv2d_input_grad(i_s, w, g_o, s, p, d, g):
 )
 def test_conv2d_weight_grad(i, w_s, g_o, s, p, d, g):
     return P.conv2d_weight_grad(i, w_s, g_o, s, p, d, g)
+
+
+@infer_std(("idk", i64), ("hey", 2), (String, i64))
+def test_string_eq(s):
+    x = 2
+    if s == 'idk':
+        x = x + 1
+    return x
+
+
+@infer_std(("idk", 2), ("hey", i64), (String, i64))
+def test_string_ne(s):
+    x = 2
+    if s != 'idk':
+        x = x + 1
+    return x
+
+
+@infer_std(('hey', 'hey'), (String, String))
+def test_string_return(s):
+    return s

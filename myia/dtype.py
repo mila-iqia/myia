@@ -102,6 +102,10 @@ class Bool(Object):
     """Boolean values."""
 
 
+class String(Object):
+    """String values."""
+
+
 class Number(Object):
     """Numerical values.
 
@@ -194,7 +198,8 @@ DTYPE_TO_MTYPE = dict(
     float16=Float[16],
     float32=Float[32],
     float64=Float[64],
-    bool=Bool)
+    bool=Bool,
+)
 
 
 def np_dtype_to_type(dtype):
@@ -217,6 +222,7 @@ def type_to_np_dtype(type):
 _simple_types = {
     type(None): Nil,
     bool: Bool,
+    str: String,
     int: Int[64],
     float: Float[64],
     numpy.int8: Int[8],

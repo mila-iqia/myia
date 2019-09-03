@@ -19,7 +19,7 @@ from ..abstract import (
     split_type,
     type_to_abstract,
 )
-from ..dtype import Int
+from ..dtype import Int, String
 from ..ir import Constant
 from ..prim import ops as P
 from ..utils import is_dataclass_type, overload
@@ -35,9 +35,32 @@ def type_to_tag(t):
     return _tagmap[t]
 
 
+_tagmap_str = {}
+_strmap_tag = {}
+
+
+def str_to_tag(t):
+    """Return the numeric tag associated to the given type."""
+    if t not in _tagmap_str:
+        s = len(_tagmap_str)
+        _tagmap_str[t] = s
+        _strmap_tag[s] = t
+    return _tagmap_str[t]
+
+
 @abstract_clone.variant
 def _reabs(self, a: AbstractClassBase):
     return (yield AbstractTuple)(self(x) for x in a.attributes.values())
+
+
+@overload  # noqa: F811
+def _reabs(self, a: AbstractScalar):
+    if a.values[TYPE] == String:
+        v = a.values[VALUE]
+        if isinstance(v, str):
+            v = str_to_tag(v)
+        a = AbstractScalar({**a.values, VALUE: v, TYPE: Int[64]})
+    return a
 
 
 @overload  # noqa: F811
@@ -168,6 +191,10 @@ def simplify_types(root, manager):
                 tag = type_to_tag(x.abstract)
                 new_node = node.graph.apply(P.tagged, x, tag)
 
+        elif node.is_apply(P.string_eq):
+            new_node = node.graph.apply(P.scalar_eq,
+                                        node.inputs[1], node.inputs[2])
+
         elif (node.is_constant(AbstractArray) and
                 type(node.value) is not AbstractArray):
             new_node = Constant(
@@ -184,6 +211,9 @@ def simplify_types(root, manager):
             # This is a constant that contains a type, used e.g. with hastype.
             new_node = Constant(_reabs(node.value))
             keep_abstract = False
+
+        elif node.is_constant(str):
+            new_node = Constant(str_to_tag(node.value))
 
         elif node.is_constant(AbstractDict):
             # This is a constant that contains a type, used e.g. with hastype.

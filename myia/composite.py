@@ -58,6 +58,7 @@ from .prim.py_implementations import (
     scalar_tan,
     scalar_tanh,
     shape,
+    string_eq,
     tuple_getitem,
     typeof,
 )
@@ -219,6 +220,12 @@ def scalar_floordiv(x, y):
 def bool_ne(x, y):
     """Implementation of `bool_ne`."""
     return bool_not(bool_eq(x, y))
+
+
+@core
+def string_ne(x, y):
+    """Implementation of `string_ne`."""
+    return bool_not(string_eq(x, y))
 
 
 exp = MultitypeGraph('exp')

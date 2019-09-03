@@ -157,8 +157,6 @@ def test_convert_arg():
     with pytest.raises(TypeError):
         _convert(10, f64)
     with pytest.raises(TypeError):
-        _convert("blah", to_abstract_test("blah"))
-    with pytest.raises(TypeError):
         _convert(1.5, i64)
     with pytest.raises(TypeError):
         _convert(10, (i64, i64))
@@ -184,6 +182,10 @@ def test_convert_arg():
         _convert({'x': 2.0, 'y': 1}, D(x=i64))
     with pytest.raises(TypeError):
         _convert({'y': 2.0}, D(x=i64))
+    with pytest.raises(TypeError):
+        _convert('x', 1.0)
+    with pytest.raises(TypeError):
+        _convert(1.0, to_abstract_test('x'))
 
 
 @pytest.fixture(params=[

@@ -7,7 +7,7 @@ from typing import Callable
 import numpy as np
 
 from .. import abstract, dtype as types
-from ..dtype import Bool, Float, Number, pytype_to_myiatype
+from ..dtype import Bool, Float, Number, String, pytype_to_myiatype
 from ..utils import Registry, TaggedValue
 from . import ops as primops
 
@@ -235,6 +235,12 @@ def bool_eq(x: Bool, y: Bool) -> Bool:
     """Implement `bool_eq`."""
     assert x is True or x is False
     assert y is True or y is False
+    return x == y
+
+
+@register(primops.string_eq)
+def string_eq(x: String, y: String) -> Bool:
+    """Implement `string_eq`."""
     return x == y
 
 

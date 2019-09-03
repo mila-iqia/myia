@@ -269,7 +269,7 @@ class PyTorchBackend(Backend):
 
     def to_scalar(self, v):
         """Convert a torch tensor to a scalar."""
-        if (v is None) or (v is True) or (v is False):
+        if (v is None) or (v is True) or (v is False) or (isinstance(v, str)):
             return v
         else:
             return v.item()

@@ -148,13 +148,16 @@ standard_method_map = TypeMap({
         '__ne__': C.nil_ne,
         '__bool__': C.nil_bool,
     },
-
     dtype.Bool: {
         '__and__': P.bool_and,
         '__or__': P.bool_or,
         '__eq__': P.bool_eq,
         '__ne__': C.bool_ne,
         '__bool__': P.identity,
+    },
+    dtype.String: {
+        '__eq__': P.string_eq,
+        '__ne__': C.string_ne,
     },
     dtype.Int: {
         '__add__': P.scalar_add,

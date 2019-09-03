@@ -337,6 +337,12 @@ elim_identity = psub(
     name='elim_identity'
 )
 
+not_eq = psub(
+    pattern=(P.bool_not, (P.scalar_eq, X, Y)),
+    replacement=(P.scalar_ne, X, Y),
+    name='not_eq'
+)
+
 multiply_by_zero_l_map = on_array_map(multiply_by_zero_l)
 multiply_by_zero_r_map = on_array_map(multiply_by_zero_r)
 multiply_by_one_l_map = on_array_map(multiply_by_one_l)
@@ -351,6 +357,7 @@ usub_sink_div_r_map = on_array_map(usub_sink_div_r)
 divdiv_to_mul_map = on_array_map(divdiv_to_mul)
 add_usub_map = on_array_map(add_usub)
 sub_usub_map = on_array_map(sub_usub)
+not_eq_map = on_array_map(not_eq)
 
 
 #########################
