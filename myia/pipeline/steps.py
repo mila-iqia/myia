@@ -750,7 +750,12 @@ class Wrap(PipelineStep):
                          for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
             res = fn(*args)
             if self.return_backend:
-                res = BackendValue(res, orig_out_t, vm_out_t, backend)
+                if isinstance(orig_out_t, AbstractTuple):
+                    res = tuple(BackendValue(r, ot, vt, backend)
+                                for r, ot, vt in zip(res, orig_out_t.elements,
+                                                     vm_out_t.elements))
+                else:
+                    res = BackendValue(res, orig_out_t, vm_out_t, backend)
             else:
                 res = backend.to_value(res, vm_out_t)
                 res = convert_result(res, orig_out_t, vm_out_t)
