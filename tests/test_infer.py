@@ -1354,6 +1354,14 @@ def test_infinite_mutual_recursion(x):
     return ping()
 
 
+@infer(([i64], InferenceError))
+def test_recursive_build(xs):
+    rval = ()
+    for x in xs:
+        rval = (x, rval)
+    return rval
+
+
 @infer(
     (af16_of(2, 3), Shp(2, 3)),
     (af16_of(2, ANYTHING), (S(2, u64), u64)),
@@ -1416,6 +1424,22 @@ def test_reshape(v, shp):
 )
 def test_transpose(v, perm):
     return transpose(v, perm)
+
+
+@infer(
+    (af16_of(6, 7), af16_of(7, 6)),
+    (af16_of(6, 7, 8), af16_of(8, 7, 6)),
+)
+def test_transpose_method(v):
+    return v.T
+
+
+@infer(
+    (af16_of(6, 7), 2),
+    (af16_of(6, 7, 8), 3),
+)
+def test_ndim(v):
+    return v.ndim
 
 
 @infer(

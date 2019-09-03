@@ -696,3 +696,23 @@ def test_reference_bug():
         if z != 1:
             shp = shp + (z,)
     return shp
+
+
+@specialize((int1,),)
+def test_fib(n):
+    a = 1
+    b = 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a
+
+
+@specialize_no_validate(
+    ([11, 22, 33], [44, 55, 66]),
+    ((11, 22, 33), (44, 55, 66)),
+)
+def test_zip_enumerate(xs, ys):
+    rval = 0
+    for i, (x, y) in enumerate(zip(xs, ys)):
+        rval = rval + i + x + y
+    return rval

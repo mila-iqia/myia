@@ -21,6 +21,7 @@ from .abstract import (
     AbstractUnion,
     broaden,
     build_value,
+    myia_static,
 )
 from .dtype import (
     Array,
@@ -572,6 +573,25 @@ def array_tanh(xs):
 
 
 @core
+def ndim(arr):
+    """Return the number of dimensions of an array."""
+    return len(shape(arr))
+
+
+@myia_static
+def _revperm(n):
+    return tuple(reversed(range(n)))
+
+
+@core
+def transpose(arr, permutation=None):
+    """Transpose an array."""
+    if permutation is None:
+        permutation = _revperm(ndim(arr))
+    return P.transpose(arr, permutation)
+
+
+@core
 def nil_eq(a, b):
     """Implementation of `equal` (only use with Nil types)."""
     if hastype(a, Nil) and hastype(b, Nil):
@@ -677,6 +697,7 @@ class IsCompare(MetaGraph):
                 comparison.
 
         """
+        super().__init__('IsCompare')
         self.do_not = do_not
 
     def normalize_args_sync(self, args):
@@ -810,3 +831,66 @@ class ArithmeticData:
     @core
     def __rpow__(self, x):
         return hyper_map(pow, x, self)
+
+
+@dataclass
+class Range:  # pragma: no cover
+    """Implement a Range in Myia."""
+
+    start: object
+    stop: object
+    step: object
+
+    def __myia_iter__(self):
+        return self
+
+    def __myia_next__(self):
+        return self.start, Range(self.start + self.step, self.stop, self.step)
+
+    def __myia_hasnext__(self):
+        return self.start < self.stop
+
+
+@core
+def range_(start, stop=None, step=None):
+    """Myia implementation of the standard range function."""
+    if stop is None:
+        stop = start
+        start = 0
+    if step is None:
+        step = 1
+    return Range(start, stop, step)
+
+
+@dataclass
+class Zip2:  # pragma: no cover
+    """Implement zip with two arguments."""
+
+    iter1: object
+    iter2: object
+
+    def __len__(self):
+        return len(self.iter1)
+
+    def __myia_iter__(self):
+        return self
+
+    def __myia_next__(self):
+        nxt1, iter1 = next(self.iter1)
+        nxt2, iter2 = next(self.iter2)
+        return (nxt1, nxt2), Zip2(iter1, iter2)
+
+    def __myia_hasnext__(self):
+        return hasnext(self.iter1) and hasnext(self.iter2)
+
+
+@core
+def zip_(seq1, seq2):
+    """Myia implementation of the standard zip function."""
+    return Zip2(iter(seq1), iter(seq2))
+
+
+@core
+def enumerate_(seq):
+    """Myia implementation of the standard enumerate function."""
+    return zip_(range(len(seq)), seq)

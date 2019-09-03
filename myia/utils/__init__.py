@@ -9,6 +9,7 @@ from .errors import (  # noqa
     MyiaNameError,
     MyiaShapeError,
     MyiaTypeError,
+    MyiaValueError,
     TypeMismatchError,
     check_nargs,
     infer_trace,

@@ -182,15 +182,3 @@ def __sum(x, d, kd):
     """Remove a dim (of length 1)."""
     raise NotImplementedError()
 #'''
-
-
-@core
-def t(a):
-    """Map of 't' pytorch method."""
-    return P.transpose(a, (1, 0))
-
-
-@core
-def tensor_dim(t):
-    """Map of 'dim' pytorch method."""
-    return len(P.shape(t))

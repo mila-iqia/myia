@@ -3,13 +3,14 @@
 
 import inspect
 import re
+import traceback
 from dataclasses import dataclass
 from typing import List, Tuple
 
 import prettyprinter as pp
 from prettyprinter.prettyprinter import pretty_python_value
 
-from ..ir import ANFNode, Graph, MetaGraph
+from ..ir import ANFNode, Constant, Graph, MetaGraph
 from ..prim import Primitive
 from ..utils import (
     Atom,
@@ -19,10 +20,12 @@ from ..utils import (
     InferenceError,
     Interned,
     MyiaTypeError,
+    MyiaValueError,
     Named,
     OrderedSet,
     PossiblyRecursive,
     dataclass_methods,
+    keyword_decorator,
 )
 from .loop import Pending
 from .ref import Context, Reference
@@ -759,29 +762,34 @@ class MacroInfo:
     argrefs: object
     graph: object
     args: object
+    abstracts: object
 
 
 class Macro:
     """Represents a function that transforms the subgraph it receives."""
 
-    def __init__(self, macro):
+    def __init__(self, *, name, infer_args=True):
         """Initialize a Macro."""
-        self.name = macro.__name__
-        if not inspect.iscoroutinefunction(macro):
-            raise TypeError(
-                f"Error defining macro '{self.name}':"
-                f" macro must be a coroutine defined using async def"
-            )
-        self.macro = macro
+        self.name = name
+        self.infer_args = infer_args
+
+    async def macro(self, info):
+        """Execute the macro proper."""
+        raise NotImplementedError(self.name)
 
     async def reroute(self, engine, outref, argrefs):
         """Reroute a node."""
+        if self.infer_args:
+            abstracts = [await argref.get() for argref in argrefs]
+        else:
+            abstracts = None
         info = MacroInfo(
             engine=engine,
             outref=outref,
             argrefs=argrefs,
             graph=outref.node.graph,
-            args=[argref.node for argref in argrefs]
+            args=[argref.node for argref in argrefs],
+            abstracts=abstracts,
         )
         rval = await self.macro(info)
         if isinstance(rval, ANFNode):
@@ -800,9 +808,89 @@ class Macro:
     __repr__ = __str__
 
 
-def macro(fn):
+class StandardMacro(Macro):
+    """Represents a function that transforms the subgraph it receives."""
+
+    def __init__(self, macro, *, name=None, infer_args=True):
+        """Initialize a Macro."""
+        super().__init__(name=name or macro.__qualname__,
+                         infer_args=infer_args)
+        if not inspect.iscoroutinefunction(macro):
+            raise TypeError(
+                f"Error defining macro '{self.name}':"
+                f" macro must be a coroutine defined using async def"
+            )
+        self._macro = macro
+
+    async def macro(self, info):
+        """Execute the macro proper."""
+        return await self._macro(info)
+
+
+@keyword_decorator
+def macro(fn, **kwargs):
     """Create a macro out of a function."""
-    return Macro(macro=fn)
+    return StandardMacro(fn, **kwargs)
+
+
+class MacroError(InferenceError):
+    """Wrap an error raised inside a macro."""
+
+    def __init__(self, error):
+        """Initialize a MacroError."""
+        tb = traceback.format_exception(
+            type(error),
+            error,
+            error.__traceback__,
+            limit=7
+        )
+        del tb[1]
+        tb = "".join(tb)
+        super().__init__(None, refs=[], pytb=tb)
+
+
+class MyiaStatic(Macro):
+    """Represents a function that can be run at compile time.
+
+    This is simpler, but less powerful than Macro.
+    """
+
+    def __init__(self, macro, *, name=None):
+        """Initialize a MyiaStatic."""
+        super().__init__(name=name or macro.__qualname__,
+                         infer_args=True)
+        self._macro = macro
+
+    async def macro(self, info):
+        """Execute the macro."""
+        from .utils import build_value
+
+        def bv(x, ref):
+            try:
+                return build_value(x)
+            except ValueError:
+                raise MyiaValueError(
+                    'Arguments to a myia_static function must be constant',
+                    refs=[ref]
+                )
+        posargs = []
+        kwargs = {}
+        for ref, arg in zip(info.argrefs, info.abstracts):
+            if isinstance(arg, AbstractKeywordArgument):
+                kwargs[arg.key] = bv(arg.argument, ref)
+            else:
+                posargs.append(bv(arg, ref))
+        try:
+            rval = self._macro(*posargs, **kwargs)
+        except Exception as e:
+            raise MacroError(e)
+        return Constant(rval)
+
+
+@keyword_decorator
+def myia_static(fn, **kwargs):
+    """Create a function that can be run by the inferrer at compile time."""
+    return MyiaStatic(fn, **kwargs)
 
 
 #############################

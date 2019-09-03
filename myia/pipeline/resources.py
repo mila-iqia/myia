@@ -67,6 +67,9 @@ scalar_object_map = {
     math.tan: P.scalar_tan,
     sum: C.sum,
     Exception: P.exception,
+    range: C.range_,
+    zip: C.zip_,
+    enumerate: C.enumerate_,
 }
 
 
@@ -140,6 +143,9 @@ standard_object_map = {
     np.sum: C.sum,
     sum: C.sum,
     Exception: P.exception,
+    range: C.range_,
+    zip: C.zip_,
+    enumerate: C.enumerate_,
 }
 
 standard_method_map = TypeMap({
@@ -257,6 +263,9 @@ standard_method_map = TypeMap({
         '__myia_iter__': C.array_iter,
         '__myia_to_array__': P.identity,
         'item': P.array_to_scalar,
+        'shape': property(P.shape),
+        'T': property(C.transpose),
+        'ndim': property(C.ndim),
     },
     dtype.SymbolicKeyType: {
     },

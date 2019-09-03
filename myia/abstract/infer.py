@@ -109,6 +109,7 @@ class InferenceEngine:
                  pipeline,
                  *,
                  constructors,
+                 max_stack_depth=50,
                  context_class=Context):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop(InferenceError)
@@ -117,6 +118,7 @@ class InferenceEngine:
         self._constructors = constructors
         self.errors = []
         self.context_class = context_class
+        self.max_stack_depth = max_stack_depth
         self.reset()
 
     def reset(self):
@@ -919,6 +921,18 @@ async def _run_trace(inf, engine, outref, argrefs):
         outref=outref,
         argrefs=argrefs
     )
+    if len(infer_trace.get()) > engine.max_stack_depth:
+        raise InferenceError(
+            'Stack overflow encountered during abstract evaluation.'
+            ' This does not necessarily mean there would be a stack'
+            ' overflow at runtime, but it means the inferrer cannot'
+            ' find a stable typing for the program.'
+            ' For example, trying to convert a list of unknown length'
+            ' to a tuple would cause a stack overflow here because'
+            ' the return type of that function is the union over N'
+            ' of all tuples of length N and the inferrer is trying'
+            ' to enumerate that infinite union.'
+        )
     tracer().emit_call(**tracer_args)
     result = await inf.run(engine, outref, argrefs)
     tracer().emit_return(**tracer_args, result=result)
