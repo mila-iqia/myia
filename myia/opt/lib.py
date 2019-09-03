@@ -1,12 +1,7 @@
 """Library of optimizations."""
 
 from .. import operations
-from ..abstract import (
-    DEAD,
-    AbstractFunction,
-    AbstractJTagged,
-    abstract_clone,
-)
+from ..abstract import DEAD, AbstractFunction, AbstractJTagged, abstract_clone
 from ..composite import gadd, zeros_like
 from ..dtype import Number
 from ..ir import (
