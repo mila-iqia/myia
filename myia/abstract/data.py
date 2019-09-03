@@ -507,9 +507,8 @@ class AbstractClassBase(AbstractStructure):
     Attributes:
         tag: A pointer to the original Python class
         attributes: Maps each field name to a corresponding AbstractValue.
-        methods: Maps method names to corresponding functions, which will
-            be parsed and converted by the engine when necessary, with the
-            instance as the first argument.
+        constructor: A function to use to build a Python instance.
+            Defaults to the tag.
 
     """
 
