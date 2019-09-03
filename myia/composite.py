@@ -21,6 +21,7 @@ from .abstract import (
     AbstractUnion,
     broaden,
     build_value,
+    myia_static,
 )
 from .dtype import (
     Array,
@@ -569,6 +570,25 @@ def array_tan(xs):
 def array_tanh(xs):
     """Implementation of `array_tanh`."""
     return array_map(scalar_tanh, xs)
+
+
+@core
+def ndim(arr):
+    """Return the number of dimensions of an array."""
+    return len(shape(arr))
+
+
+@myia_static
+def _revperm(n):
+    return tuple(reversed(range(n)))
+
+
+@core
+def transpose(arr, permutation=None):
+    """Transpose an array."""
+    if permutation is None:
+        permutation = _revperm(ndim(arr))
+    return P.transpose(arr, permutation)
 
 
 @core

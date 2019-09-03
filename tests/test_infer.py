@@ -1427,6 +1427,22 @@ def test_transpose(v, perm):
 
 
 @infer(
+    (af16_of(6, 7), af16_of(7, 6)),
+    (af16_of(6, 7, 8), af16_of(8, 7, 6)),
+)
+def test_transpose_method(v):
+    return v.T
+
+
+@infer(
+    (af16_of(6, 7), 2),
+    (af16_of(6, 7, 8), 3),
+)
+def test_ndim(v):
+    return v.ndim
+
+
+@infer(
     (af32_of(3, 4), af32_of(3, 4)),
     (ai64_of(3, 4, 5), ai64_of(3, 4, 5)),
     (i64, InferenceError),

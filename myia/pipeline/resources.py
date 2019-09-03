@@ -264,6 +264,8 @@ standard_method_map = TypeMap({
         '__myia_to_array__': P.identity,
         'item': P.array_to_scalar,
         'shape': property(P.shape),
+        'T': property(C.transpose),
+        'ndim': property(C.ndim),
     },
     dtype.SymbolicKeyType: {
     },
