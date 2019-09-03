@@ -35,8 +35,10 @@ from ..opt import (
     NodeMap,
     lib as optlib,
     simplify_types,
+    str_to_tag,
     type_to_tag,
 )
+from ..opt.clean import _strmap_tag
 from ..prim import vm_registry
 from ..utils import (
     Cons,
@@ -301,6 +303,7 @@ step_opt = Optimizer.partial(
             optlib.multiply_by_zero_r,
             optlib.add_zero_l,
             optlib.add_zero_r,
+            optlib.not_eq,
             optlib.multiply_by_one_l_map,
             optlib.multiply_by_one_r_map,
             optlib.multiply_by_zero_l_map,
@@ -314,6 +317,7 @@ step_opt = Optimizer.partial(
             optlib.usub_sink_div_r_map,
             optlib.add_usub_map,
             optlib.sub_usub_map,
+            optlib.not_eq_map,
 
             # Array simplifications
             optlib.elim_distribute,
@@ -614,11 +618,17 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
     elif issubclass(t, dtype.Nil):
         if arg is not None:
             raise MyiaInputTypeError(f'Expected None')
+    elif issubclass(t, dtype.String):
+        if not isinstance(arg, str):
+            raise MyiaInputTypeError(f'Expected string')
     else:
         raise MyiaInputTypeError(f'Invalid type: {t}')
     expected_value = orig_t.values[VALUE]
     if expected_value is not ANYTHING and expected_value != arg:
         raise MyiaInputTypeError(f'Invalid value: {arg}')
+    if issubclass(t, dtype.String):
+        arg = str_to_tag(arg)
+        t = dtype.Int[64]
     arg = backend.from_scalar(arg, t)
     return arg
 
@@ -668,7 +678,10 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
 @overload  # noqa: F811
 def convert_result(self, arg, orig_t, vm_t: AbstractScalar, backend,
                    return_backend):
-    return backend.to_scalar(arg)
+    ret = backend.to_scalar(arg)
+    if orig_t.values[TYPE] == dtype.String:
+        ret = _strmap_tag[ret]
+    return ret
 
 
 @overload

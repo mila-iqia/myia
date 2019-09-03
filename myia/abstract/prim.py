@@ -6,7 +6,7 @@ from collections import defaultdict
 from functools import reduce
 
 from .. import dtype
-from ..dtype import Bool, ExceptionType, Number
+from ..dtype import Bool, ExceptionType, Number, String
 from ..ir import Graph
 from ..prim import Primitive, ops as P, py_implementations as py
 from ..utils import (
@@ -28,7 +28,6 @@ from .data import (
     AbstractBottom,
     AbstractClassBase,
     AbstractDict,
-    AbstractExternal,
     AbstractFunction,
     AbstractJTagged,
     AbstractKeywordArgument,
@@ -309,6 +308,7 @@ uniform_prim(P.bool_not, infer_value=True)(py.bool_not)
 uniform_prim(P.bool_and, infer_value=True)(py.bool_and)
 uniform_prim(P.bool_or, infer_value=True)(py.bool_or)
 uniform_prim(P.bool_eq, infer_value=True)(py.bool_eq)
+uniform_prim(P.string_eq, infer_value=True)(py.string_eq)
 
 
 ######################
@@ -405,7 +405,7 @@ async def _inf_tuple_setitem(self, engine,
 @standard_prim(P.dict_getitem)
 async def _inf_dict_getitem(self, engine,
                             arg: AbstractDict,
-                            idx: AbstractExternal({TYPE: str})):
+                            idx: String):
     idx_v = self.require_constant(idx, argnum=2, range=set(arg.entries.keys()))
     return arg.entries[idx_v]
 
@@ -413,7 +413,7 @@ async def _inf_dict_getitem(self, engine,
 @standard_prim(P.dict_setitem)
 async def _inf_dict_setitem(self, engine,
                             arg: AbstractDict,
-                            idx: AbstractExternal({TYPE: str}),
+                            idx: String,
                             value):
     idx_v = self.require_constant(idx, argnum=2, range=set(arg.entries.keys()))
     return type(arg)({**arg.entries, idx_v: value})
@@ -422,7 +422,7 @@ async def _inf_dict_setitem(self, engine,
 @standard_prim(P.record_getitem)
 async def _inf_record_getitem(self, engine,
                               data: AbstractClassBase,
-                              attr: AbstractExternal({TYPE: str})):
+                              attr: String):
     attr_v = self.require_constant(attr, argnum=2)
     return data.attributes[attr_v]
 
@@ -430,7 +430,7 @@ async def _inf_record_getitem(self, engine,
 @standard_prim(P.record_setitem)
 async def _inf_record_setitem(self, engine,
                               data: AbstractClassBase,
-                              attr: AbstractExternal({TYPE: str}),
+                              attr: String,
                               value):
     attr_v = self.require_constant(attr, argnum=2)
     if attr_v not in data.attributes:

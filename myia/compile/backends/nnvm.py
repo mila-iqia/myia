@@ -227,9 +227,9 @@ class NNVMConverter:
 
     def make_constant(self, val, nnvm_type):
         """Make a utility constant that is not part of the graph."""
-        key = (val, type)
+        key = (val, nnvm_type)
         if key not in self.constant_vars:
-            name = f"_cst{val}{type}"
+            name = f"_cst{val}{nnvm_type}"
             self.constants[name] = nnvm_val([val], dtype=nnvm_type,
                                             ctx=self.context)
             self.constant_vars[key] = sym.Variable(name)

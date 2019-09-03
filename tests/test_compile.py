@@ -201,3 +201,22 @@ def test_tagged(c, x, y, z):
         return tagged(y)
     else:
         return tagged(z)
+
+
+@parse_compare(('hey', 2), ('idk', 5))
+def test_string_eq(s, x):
+    if s == 'idk':
+        x = x + 1
+    return x
+
+
+@parse_compare(('hey', 2), ('idk', 5))
+def test_string_ne(s, x):
+    if s != 'idk':
+        x = x + 1
+    return x
+
+
+@parse_compare(('hey',), justeq=True)
+def test_string_return(s):
+    return s

@@ -138,15 +138,8 @@ def to_abstract_test(self, x: (bool, int, float, str,
 
 
 @overload  # noqa: F811
-def to_abstract_test(self, x: str):
-    return AbstractExternal({
-        VALUE: x,
-        TYPE: type(x),
-    })
-
-
-@overload  # noqa: F811
-def to_abstract_test(self, x: (dtype.Number, dtype.Bool, dtype.EnvType)):
+def to_abstract_test(self, x: (dtype.Number, dtype.String,
+                               dtype.Bool, dtype.EnvType)):
     return AbstractScalar({VALUE: ANYTHING, TYPE: x})
 
 
