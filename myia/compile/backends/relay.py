@@ -28,7 +28,7 @@ from .relay_helpers import build_module, optimize
 @overload(bootstrap=True)
 def to_relay_type(self, a: AbstractScalar):
     """Convert a myia abstract to a Relay type."""
-    tp = a.dtype()
+    tp = a.xtype()
     if issubclass(tp, Bool):
         return relay.ty.TensorType((), 'bool')
     elif issubclass(tp, Nil):
@@ -44,7 +44,7 @@ def to_relay_type(self, a: AbstractTuple):
 
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractArray):
-    tp = a.element.dtype()
+    tp = a.element.xtype()
     return relay.ty.TensorType(a.values[SHAPE], type_to_np_dtype(tp))
 
 

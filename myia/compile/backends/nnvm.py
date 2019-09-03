@@ -49,7 +49,7 @@ SIMPLE_MAP = {
 
 def nnvm_bool_not(c, arg):
     """Implementation of boolean not."""
-    t = arg.abstract.dtype()
+    t = arg.abstract.xtype()
     zero = c.make_constant(0, nnvm_type=type_to_np_dtype(t))
     return sym.broadcast_equal(zero, c.ref(arg))
 
@@ -243,7 +243,7 @@ class NNVMConverter:
             """Associate name with n."""
             self.eqv[n] = sym.Variable(name)
             if isinstance(t, AbstractArray):
-                te = t.element.dtype()
+                te = t.element.xtype()
                 self.types[name] = type_to_np_dtype(te)
                 self.shapes[name] = ashape(n)
             elif n.is_constant_graph():  # pragma: no cover
@@ -251,14 +251,14 @@ class NNVMConverter:
                 self.types[name] = 'int64'
                 self.shapes[name] = (1,)
             else:
-                te = t.dtype()
+                te = t.xtype()
                 self.types[name] = type_to_np_dtype(te)
                 self.shapes[name] = (1,)
 
         t = n.abstract
         if n.is_constant() and not n.is_constant_graph():
             name = f"cst{next(self.c)}"
-            te = t.dtype()
+            te = t.xtype()
             self.constants[name] = nnvm_val([n.value],
                                             dtype=type_to_np_dtype(te),
                                             ctx=self.context)

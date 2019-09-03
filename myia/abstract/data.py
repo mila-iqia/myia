@@ -241,7 +241,7 @@ class AbstractValue(Interned, PossiblyRecursive):
         super().__init__()
         self.values = TrackDict(values)
 
-    def dtype(self):
+    def xtype(self):
         """Return the type of this AbstractValue."""
         t = self.values.get(TYPE, None)
         if isinstance(t, Pending) and t.done():

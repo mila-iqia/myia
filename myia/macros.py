@@ -174,7 +174,7 @@ async def getattr_(info):
             currg = falseg
         return rval
 
-    data_t = data.dtype()
+    data_t = data.xtype()
     attr_v = build_value(attr, default=ANYTHING)
     g = info.outref.node.graph
 

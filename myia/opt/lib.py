@@ -469,7 +469,7 @@ def simplify_array_map(optimizer, node, equiv):
             idx = g.parameters.index(x)
             return xs[idx]
         elif x.is_constant() \
-                and issubclass(x.abstract.dtype(), Number):
+                and issubclass(x.abstract.xtype(), Number):
             shp = (P.shape, xs[0])
             typ = xs[0].abstract or (P.typeof, xs[0])
             sexp = (P.distribute, (P.scalar_to_array, x, typ), shp)

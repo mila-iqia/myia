@@ -371,7 +371,7 @@ class InferenceEngine:
         """
         if isinstance(predicate, dtype.TypeMeta):
             if isinstance(x, AbstractValue):
-                x = x.dtype()
+                x = x.xtype()
                 if x is None:
                     return False
             return issubclass(x, predicate)

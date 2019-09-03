@@ -91,7 +91,7 @@ class StandardInferrer(Inferrer):
             if typ is None:
                 pass
             elif isinstance(typ, dtype.TypeMeta):
-                await force_pending(engine.check(typ, arg.dtype(), typ))
+                await force_pending(engine.check(typ, arg.xtype(), typ))
             elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
@@ -471,7 +471,7 @@ async def _inf_array_len(self, engine, xs: AbstractArray):
 async def _inf_scalar_to_array(self, engine, a: AbstractScalar, t):
     tp = t.values[VALUE]
     assert isinstance(tp, AbstractArray)
-    return AbstractArray(a, {SHAPE: (), TYPE: tp.dtype()})
+    return AbstractArray(a, {SHAPE: (), TYPE: tp.xtype()})
 
 
 @standard_prim(P.array_to_scalar)
@@ -553,15 +553,15 @@ async def _inf_array_map(self, engine, fn: AbstractFunction, *arrays):
             raise MyiaShapeError("Expect same shapes for array_map")
 
     for arr in arrays:
-        if arrays[0].dtype() != arr.dtype():
+        if arrays[0].xtype() != arr.xtype():
             raise MyiaTypeError(
-                f'Expect array of type {arrays[0].dtype()} '
-                f'to have same type as array of type {arr.dtype()}')
+                f'Expect array of type {arrays[0].xtype()} '
+                f'to have same type as array of type {arr.xtype()}')
 
     return type(arrays[0])(
         result, {
             SHAPE: tuple(rshape),
-            TYPE: arrays[0].dtype(),
+            TYPE: arrays[0].xtype(),
         }
     )
 
@@ -592,7 +592,7 @@ async def _inf_array_reduce(self, engine,
             )
 
     res = await engine.execute(fn, a.element, a.element)
-    return type(a)(res, {SHAPE: shp_v, TYPE: a.dtype()})
+    return type(a)(res, {SHAPE: shp_v, TYPE: a.xtype()})
 
 
 @standard_prim(P.distribute)
@@ -607,7 +607,7 @@ async def _inf_distribute(self, engine, a: AbstractArray, _shp: _shape_type):
     for vs, s in zip(a_shp, shp):
         if vs != s and vs not in (1, ANYTHING) and s not in (1, ANYTHING):
             raise MyiaShapeError("Cannot change shape when distributing")
-    return type(a)(a.element, {SHAPE: shp, TYPE: a.dtype()})
+    return type(a)(a.element, {SHAPE: shp, TYPE: a.xtype()})
 
 
 @standard_prim(P.reshape)
@@ -621,7 +621,7 @@ async def _inf_reshape(self, engine, a: AbstractArray, _shp: _shape_type):
             prod(shp) != prod(a_shp)):
         raise MyiaShapeError("Cannot change the total number of elements "
                              "in reshape")
-    return type(a)(a.element, {SHAPE: shp, TYPE: a.dtype()})
+    return type(a)(a.element, {SHAPE: shp, TYPE: a.xtype()})
 
 
 @standard_prim(P.transpose)
@@ -639,7 +639,7 @@ async def _inf_transpose(self, engine,
             )
 
         shp = tuple(a_shp[i] for i in perm)
-    return type(a)(a.element, {SHAPE: shp, TYPE: a.dtype()})
+    return type(a)(a.element, {SHAPE: shp, TYPE: a.xtype()})
 
 
 @standard_prim(P.dot)
@@ -656,12 +656,12 @@ async def _inf_dot(self, engine, a: AbstractArray, b: AbstractArray):
     engine.abstract_merge(a.element, b.element)
     c_shp = (a_shp[0], b_shp[1])
 
-    if a.dtype() != b.dtype():
+    if a.xtype() != b.xtype():
         raise MyiaTypeError(
-            f'Expect array of type {a.dtype()} '
-            f'to have same type as array of type {b.dtype()}')
+            f'Expect array of type {a.xtype()} '
+            f'to have same type as array of type {b.xtype()}')
 
-    return type(a)(a.element, {SHAPE: c_shp, TYPE: a.dtype()})
+    return type(a)(a.element, {SHAPE: c_shp, TYPE: a.xtype()})
 
 
 @standard_prim(P.conv2d)
@@ -700,7 +700,7 @@ async def _inf_conv2d(self, engine, input: AbstractArray,
     # ^ TODO: PyTorch also enforces, but might want to change for mixed precis
 
     return type(weight)(weight.element, {SHAPE: out_shape,
-                                         TYPE: weight.dtype()})
+                                         TYPE: weight.xtype()})
 
 
 @standard_prim(P.conv2d_input_grad)
@@ -714,7 +714,7 @@ async def _inf_conv2d_input_grad(self, engine, input_size: _shape_type,
     input_size_tuple = tuple(
         self.require_constant(i_s, argnum=0) for i_s in input_size.elements)
     return type(weight)(weight.element, {SHAPE: input_size_tuple,
-                                         TYPE: weight.dtype()})
+                                         TYPE: weight.xtype()})
 
 
 @standard_prim(P.conv2d_weight_grad)
@@ -728,7 +728,7 @@ async def _inf_conv2d_weight_grad(self, engine, input: AbstractArray,
     weight_size_tuple = tuple(
         self.require_constant(w_s, argnum=0) for w_s in weight_size.elements)
     return type(input)(input.element, {SHAPE: weight_size_tuple,
-                                       TYPE: input.dtype()})
+                                       TYPE: input.xtype()})
 
 ##############
 # Statements #
@@ -742,7 +742,7 @@ class _SwitchInferrer(Inferrer):
         condref, tbref, fbref = check_nargs(P.switch, 3, argrefs)
 
         cond = await condref.get()
-        await force_pending(engine.check(Bool, cond.dtype()))
+        await force_pending(engine.check(Bool, cond.xtype()))
 
         v = cond.values[VALUE]
         if v is True:
@@ -767,7 +767,7 @@ async def _inf_scalar_cast(self, engine,
                            scalar: Number,
                            typ: AbstractType):
     a = type_to_abstract(typ.values[VALUE])
-    t = a.dtype()
+    t = a.xtype()
     engine.check(Number, t)
     values = {**scalar.values, TYPE: t}
     return AbstractScalar(values)

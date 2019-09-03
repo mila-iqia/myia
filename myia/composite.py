@@ -104,7 +104,7 @@ class Elemwise(MetaGraph):
 
     def make_signature(self, args):
         """Create the signature: whether arguments are arrays, and shapes."""
-        return tuple((arg.dtype(), arg.values[SHAPE])
+        return tuple((arg.xtype(), arg.values[SHAPE])
                      if isinstance(arg, AbstractArray) else (None, False)
                      for arg in args)
 

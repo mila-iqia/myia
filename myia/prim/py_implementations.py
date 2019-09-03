@@ -338,7 +338,7 @@ def _vm_record_getitem(vm, data, attr):
     try:
         x = getattr(data, attr)
     except AttributeError:
-        t = typeof(data).dtype()
+        t = typeof(data).xtype()
         mmap = vm.convert.resources.method_map[t]
         if attr in mmap:
             return Partial(vm.convert(mmap[attr]), [data], vm)

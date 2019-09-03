@@ -580,7 +580,7 @@ def convert_arg(self, arg, orig_t: AbstractArray):
     assert isinstance(et, AbstractScalar)
     et = et.values[TYPE]
     assert issubclass(et, dtype.Number)
-    t = orig_t.dtype()
+    t = orig_t.xtype()
     arg = convert_arg_array[t](arg, t, et, orig_t)
     arg_dtype = dtype.np_dtype_to_type(str(arg.dtype))
     if arg_dtype != et:
@@ -682,7 +682,7 @@ def convert_result_array(arg, orig_t: dtype.NDArray):
 
 @overload  # noqa: F811
 def convert_result(self, arg, orig_t, vm_t: AbstractArray):
-    t = orig_t.dtype()
+    t = orig_t.xtype()
     return convert_result_array[t](arg, t)
 
 
