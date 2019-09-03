@@ -70,7 +70,17 @@ from .misc import (  # noqa
 from .orderedset import OrderedSet  # noqa
 from .overload import Overload, TypeMap, overload, overload_wrapper  # noqa
 from .partial import Partial, Partializable, partition_keywords  # noqa
-from .profile import Profile, no_prof, print_profile  # noqa
+from .trace import (  # noqa
+    DoTrace,
+    Profiler,
+    ProfileResults,
+    TraceExplorer,
+    TraceListener,
+    Tracer,
+    glob_to_regex,
+    listener,
+    tracer,
+)
 from .unify import (  # noqa
     FilterVar,
     PredicateSet,

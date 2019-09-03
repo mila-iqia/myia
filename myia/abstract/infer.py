@@ -24,6 +24,7 @@ from ..utils import (
     infer_trace,
     is_dataclass_type,
     overload,
+    tracer,
     type_error_nargs,
 )
 from .data import (
@@ -187,15 +188,18 @@ class InferenceEngine:
         """Compute the value associated to the Reference."""
         node = ref.node
 
+        tracer().emit('request_ref', engine=self, reference=ref)
+
         if node.is_constant():
             inferred = ref.node.abstract
             if (inferred is not None
                     and not isinstance(inferred, AbstractFunction)):
-                return inferred
-            return await self.infer_constant(ref)
+                result = inferred
+            else:
+                result = await self.infer_constant(ref)
 
         elif node.is_apply():
-            return await self.infer_apply(ref)
+            result = await self.infer_apply(ref)
 
         else:  # pragma: no cover
             # The check in the `ref` method should catch most of the situations
@@ -205,6 +209,10 @@ class InferenceEngine:
                 f' This indicates either a bug in a macro or a bug in Myia.',
                 refs=[ref]
             )
+
+        tracer().emit('compute_ref', engine=self, reference=ref,
+                      result=result)
+        return result
 
     def get_inferred(self, ref):
         """Get a Future for the value associated to the Reference.
@@ -231,7 +239,7 @@ class InferenceEngine:
             ref = self.reference_map[ref]
         return ref
 
-    def run_coroutine(self, coro, throw=True):
+    def run_coroutine(self, coro):
         """Run an async function using this inferrer's loop."""
         errs_before = len(self.errors)
         try:
@@ -241,14 +249,7 @@ class InferenceEngine:
             for err in self.errors[errs_before:]:
                 err.engine = self
             if errs_before < len(self.errors):
-                if throw:  # pragma: no cover
-                    for err in self.errors:
-                        if isinstance(err, InferenceError):
-                            raise err
-                    else:
-                        raise err
-                else:
-                    return None  # pragma: no cover
+                raise self.errors[errs_before]
             return fut.result()
         finally:
             for task in asyncio.all_tasks(self.loop):
@@ -759,18 +760,13 @@ class GraphInferrer(Inferrer):
             self.graph_cache[sig] = g
         return self.graph_cache[sig]
 
-    def make_context(self, engine, args):
+    def make_context(self, engine, args, normalize=True):
         """Create a Context object using the given args."""
-        args = self.normalize_args_sync(args)
-        _, ctx = self._make_argkey_and_context(engine, args)
-        return ctx
-
-    def _make_argkey_and_context(self, engine, argvals):
-        assert argvals is not None
-        g = self.get_graph(engine, argvals)
-        argkey = tuple(argvals)
+        if normalize:
+            args = self.normalize_args_sync(args)
+        g = self.get_graph(engine, args)
         # Update current context using the fetched properties.
-        return argkey, self.context.add(g, argkey)
+        return self.context.add(g, tuple(args))
 
     async def infer(self, engine, *args):
         """Infer the abstract result given the abstract arguments."""
@@ -780,11 +776,16 @@ class GraphInferrer(Inferrer):
         if len(args) != nargs:
             raise type_error_nargs(self, nargs, len(args))
 
-        argkey, context = self._make_argkey_and_context(engine, args)
+        # args were already normalized by run()
+        context = self.make_context(engine, args, normalize=False)
+        tracer().emit_infer_context(
+            engine=engine,
+            context=context,
+        )
 
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
-        for p, arg in zip(g.parameters, argkey):
+        for p, arg in zip(g.parameters, context.argkey):
             ref = engine.ref(p, context)
             engine.cache.set_value(ref, arg)
 
@@ -828,7 +829,8 @@ class PartialInferrer(Inferrer):
                             continue
             break
         if collapse:
-            new_node = outref.node.graph.apply(fn, *args)
+            with About(outref.node.debug, 'equiv'):
+                new_node = outref.node.graph.apply(fn, *args)
             return engine.ref(new_node, ctx)
         else:
             return None
@@ -910,8 +912,21 @@ class JInferrer(Inferrer):
         return self.cache[args]
 
 
-async def _inf_helper(engine, inf, outref, argrefs, p):
+async def _run_trace(inf, engine, outref, argrefs):
+    tracer_args = dict(
+        engine=engine,
+        inferrer=inf,
+        outref=outref,
+        argrefs=argrefs
+    )
+    tracer().emit_call(**tracer_args)
     result = await inf.run(engine, outref, argrefs)
+    tracer().emit_return(**tracer_args, result=result)
+    return result
+
+
+async def _inf_helper(engine, inf, outref, argrefs, p):
+    result = await _run_trace(inf, engine, outref, argrefs)
     p.set_result(result)
 
 
@@ -933,7 +948,7 @@ async def execute_inferrers(engine, inferrers, outref, argrefs):
 
     if len(inferrers) == 1:
         inf, = inferrers
-        return await inf.run(engine, outref, argrefs)
+        return await _run_trace(inf, engine, outref, argrefs)
 
     else:
         pending = []

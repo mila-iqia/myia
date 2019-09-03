@@ -13,15 +13,13 @@ from myia.prim.py_implementations import (
     tagged,
     typeof,
 )
-from myia.utils import Profile, no_prof
 
 from .common import Point, make_tree, sumtree, to_abstract_test
 
 compile_pipeline = standard_pipeline
 
 
-def parse_compare(*tests, optimize=True, python=True, profile=no_prof,
-                  justeq=False):
+def parse_compare(*tests, optimize=True, python=True, justeq=False):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -39,16 +37,12 @@ def parse_compare(*tests, optimize=True, python=True, profile=no_prof,
 
     def decorate(fn):
         def test(args):
-            nonlocal profile
             if not isinstance(args, tuple):
                 args = (args,)
             if python:
                 ref_result = fn(*map(copy, args))
             argspec = tuple(from_value(arg, broaden=True) for arg in args)
-            if profile is True:
-                profile = Profile()
-            res = pipeline.run(input=fn, argspec=argspec, profile=profile)
-            profile.print()
+            res = pipeline.run(input=fn, argspec=argspec)
             myia_fn = res['output']
             myia_result = myia_fn(*map(copy, args))
             if python:

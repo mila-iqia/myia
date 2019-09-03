@@ -10,7 +10,7 @@ from ..abstract import InferenceEngine
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
 from ..prim import ops as P
-from ..utils import Slice, TypeMap, overload
+from ..utils import Slice, TypeMap, overload, tracer
 from .pipeline import PipelineResource
 
 scalar_object_map = {
@@ -376,18 +376,29 @@ class InferenceResource(PipelineResource):
 
     def infer(self, graph, argspec, outspec=None, clear=False):
         """Perform inference."""
-        if clear:
-            self.engine.reset()
-        return self.engine.run(
-            graph,
-            argspec=tuple(arg['abstract'] if isinstance(arg, dict)
-                          else arg for arg in argspec),
-            outspec=outspec,
-        )
+        with tracer('infer',
+                    graph=graph,
+                    argspec=argspec,
+                    outspec=outspec) as tr:
+            if clear:
+                self.engine.reset()
+            rval = self.engine.run(
+                graph,
+                argspec=tuple(arg['abstract'] if isinstance(arg, dict)
+                              else arg for arg in argspec),
+                outspec=outspec,
+            )
+            tr.set_results(output=rval)
+            return rval
 
     def monomorphize(self, context):
         """Perform monomorphization."""
-        return monomorphize(self.engine, context, reuse_existing=True)
+        with tracer('monomorphize',
+                    engine=self.engine,
+                    context=context) as tr:
+            rval = monomorphize(self.engine, context, reuse_existing=True)
+            tr.set_results(output=rval)
+            return rval
 
     def renormalize(self, graph, argspec, outspec=None):
         """Perform inference and specialization."""

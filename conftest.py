@@ -3,22 +3,58 @@ import os
 from io import StringIO
 
 from myia.debug import traceback as myia_tr
+from myia.info import DebugInherit
 from myia.parser import MyiaSyntaxError
-from myia.utils import InferenceError
+from myia.utils import InferenceError, Profiler
 
 if os.environ.get('BUCHE'):
     from debug import do_inject  # noqa
     from debug.butest import *  # noqa
 
 
+_context_managers = []
+
+
 def pytest_addoption(parser):
     parser.addoption('--gpu', action='store_true', dest="gpu",
-                     default=False, help="enable gpu tests")
+                     default=False, help="Enable GPU tests")
+    parser.addoption('-T', action='store', dest="tracer",
+                     default=None, help="Set a Myia tracer")
+    parser.addoption('--mprof', action='store_true', dest="mprof",
+                     default=False, help="Use the Myia profiler")
+    parser.addoption('--trace-nodes', action='store_true', dest="trace_nodes",
+                     default=False, help="Save trace when creating Myia nodes")
+    parser.addoption('-D', action='store_true', dest="do_inject",
+                     default=False, help="Import Myia debug functions")
+
+
+def _resolve(call):
+    if '(' in call:
+        path, args = call.split('(', 1)
+        assert args.endswith(')')
+        args = eval(f'({args[:-1]},)')
+    elif ':' in call:
+        path, *args = call.split(':')
+    else:
+        path = call
+        args = ()
+    modname, field = path.rsplit('.', 1)
+    mod = __import__(modname, fromlist=[field])
+    fn = getattr(mod, field)
+    return fn, args
 
 
 def pytest_configure(config):
     if not config.option.gpu:
         setattr(config.option, 'markexpr', 'not gpu')
+    if config.option.do_inject:
+        from debug import do_inject  # noqa
+    if config.option.tracer:
+        _context_managers.append(_resolve(config.option.tracer))
+    if config.option.mprof:
+        _context_managers.append((Profiler, ()))
+    if config.option.trace_nodes:
+        _context_managers.append(((lambda: DebugInherit(save_trace=True)), ()))
 
 
 class StringIOTTY(StringIO):
@@ -49,3 +85,21 @@ def pytest_collection_modifyitems(config, items):
         if not hasattr(typ, '_repr_failure'):
             typ._repr_failure = typ.repr_failure
             typ.repr_failure = myia_repr_failure
+
+
+# That hook may have been defined in debug.butest
+_prev = globals().get('pytest_runtest_setup', None)
+
+
+def pytest_runtest_setup(item):
+    if _prev is not None:
+        _prev(item)
+    item._ctxms = [fn(*args) for fn, args in _context_managers]
+    for cm in item._ctxms:
+        cm.__enter__()
+
+
+def pytest_runtest_teardown(item):
+    if hasattr(item, '_ctxms'):
+        for cm in item._ctxms:
+            cm.__exit__(None, None, None)

@@ -113,7 +113,7 @@ class Reference(AbstractReference):
 
     def get_sync(self):
         """Get the value (synchronous)."""
-        return self.engine.run_coroutine(self.get(), throw=True)
+        return self.engine.run_coroutine(self.get())
 
     def get_resolved(self):
         """Get the value if resolved. Error out if not."""
