@@ -524,18 +524,17 @@ class SlowdownWarning(UserWarning):
 #####################################
 
 @overload(bootstrap=True)
-def convert_arg(self, arg, orig_t: AbstractTuple, backend):
+def convert_arg(self, arg, orig_t: AbstractTuple):
     if not isinstance(arg, tuple):
         raise MyiaInputTypeError('Expected tuple')
     oe = orig_t.elements
     if len(arg) != len(oe):
         raise MyiaInputTypeError(f'Expected {len(oe)} elements')
-    return tuple(self(x, o, backend)
-                 for x, o in zip(arg, oe))
+    return tuple(self(x, o) for x, o in zip(arg, oe))
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractDict, backend):
+def convert_arg(self, arg, orig_t: AbstractDict):
     if not isinstance(arg, dict):
         raise MyiaInputTypeError('Expected dict')
     types = orig_t.entries
@@ -545,11 +544,11 @@ def convert_arg(self, arg, orig_t: AbstractDict, backend):
         )
     if set(arg.keys()) != set(types.keys()):
         raise MyiaInputTypeError("Mismatched keys for input dictionary.")
-    return tuple(self(arg[k], o, backend) for k, o in orig_t.entries.items())
+    return tuple(self(arg[k], o) for k, o in orig_t.entries.items())
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractClassBase, backend):
+def convert_arg(self, arg, orig_t: AbstractClassBase):
     if orig_t.tag is Empty:
         if arg != []:
             raise MyiaInputTypeError(f'Expected empty list')
@@ -560,7 +559,7 @@ def convert_arg(self, arg, orig_t: AbstractClassBase, backend):
         if not isinstance(arg, list):
             raise MyiaInputTypeError(f'Expected list')
         ot = orig_t.attributes['head']
-        li = list(self(x, ot, backend) for x in arg)
+        li = list(self(x, ot) for x in arg)
         rval = TaggedValue(type_to_tag(empty), ())
         for elem in reversed(li):
             rval = TaggedValue(type_to_tag(orig_t), (elem, rval))
@@ -570,30 +569,24 @@ def convert_arg(self, arg, orig_t: AbstractClassBase, backend):
             raise MyiaInputTypeError(f'Expected {orig_t.tag.__qualname__}')
         arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
         oe = list(orig_t.attributes.values())
-        res = tuple(self(x, o, backend)
-                    for x, o in zip(arg, oe))
+        res = tuple(self(x, o) for x, o in zip(arg, oe))
         return res
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractArray, backend):
+def convert_arg(self, arg, orig_t: AbstractArray):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
     et = et.values[TYPE]
     assert issubclass(et, dtype.Number)
-    if isinstance(arg, ArrayWrapper):
-        arg = arg.array
-    if isinstance(arg, np.ndarray):
-        arg = backend.from_numpy(arg)
-    backend.check_array(arg, et)
     return arg
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractUnion, backend):
+def convert_arg(self, arg, orig_t: AbstractUnion):
     for opt in orig_t.options:
         try:
-            value = self(arg, opt, backend)
+            value = self(arg, opt)
             tag = type_to_tag(opt)
         except TypeError:
             continue
@@ -604,7 +597,7 @@ def convert_arg(self, arg, orig_t: AbstractUnion, backend):
 
 
 @overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractScalar, backend):
+def convert_arg(self, arg, orig_t: AbstractScalar):
     t = orig_t.values[TYPE]
     if issubclass(t, dtype.Int):
         if not isinstance(arg, (int, np.integer)):
@@ -628,8 +621,6 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
         raise MyiaInputTypeError(f'Invalid value: {arg}')
     if issubclass(t, dtype.String):
         arg = str_to_tag(arg)
-        t = dtype.Int[64]
-    arg = backend.from_scalar(arg, t)
     return arg
 
 
@@ -677,7 +668,7 @@ def convert_result_array(arg, orig_t: AbstractArray):
 
 
 @overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractArray)
+def convert_result(self, arg, orig_t, vm_t: AbstractArray):
     return convert_result_array(arg, orig_t)
 
 
@@ -730,6 +721,7 @@ class Wrap(PipelineStep):
         fn = output
         orig_arg_t = orig_argspec or argspec
         orig_out_t = orig_outspec or outspec
+        vm_arg_t = graph.abstract.get_sync()[0].args
         vm_out_t = graph.return_.abstract
 
         def wrapped(*args):
@@ -745,11 +737,12 @@ class Wrap(PipelineStep):
                 backend = NumpyChecker()
             if len(args) != len(orig_arg_t):
                 raise MyiaInputTypeError('Wrong number of arguments.')
-            args = tuple(convert_arg(arg, ot, backend) for arg, ot in
-                         zip(args, orig_arg_t))
+            args = tuple(backend.from_value(convert_arg(arg, ot), vt)
+                         for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
             res = fn(*args)
-            res = backend.to_value(res, vm_out_t)
-            res = convert_result(res, orig_out_t, vm_out_t)
+            if not self.return_backend:
+                res = backend.to_value(res, vm_out_t)
+                res = convert_result(res, orig_out_t, vm_out_t)
             return res
 
         return {'output': wrapped}
