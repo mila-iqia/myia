@@ -53,7 +53,6 @@ from .utils import (
     hastype_helper,
     sensitivity_transform,
     type_to_abstract,
-    type_token,
     typecheck,
 )
 
@@ -92,7 +91,7 @@ class StandardInferrer(Inferrer):
             if typ is None:
                 pass
             elif isinstance(typ, dtype.TypeMeta):
-                await force_pending(engine.check(typ, type_token(arg), typ))
+                await force_pending(engine.check(typ, arg.dtype(), typ))
             elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
@@ -741,7 +740,7 @@ class _SwitchInferrer(Inferrer):
         condref, tbref, fbref = check_nargs(P.switch, 3, argrefs)
 
         cond = await condref.get()
-        await force_pending(engine.check(Bool, type_token(cond)))
+        await force_pending(engine.check(Bool, cond.dtype()))
 
         v = cond.values[VALUE]
         if v is True:
@@ -766,7 +765,7 @@ async def _inf_scalar_cast(self, engine,
                            scalar: Number,
                            typ: AbstractType):
     a = type_to_abstract(typ.values[VALUE])
-    t = type_token(a)
+    t = a.dtype()
     engine.check(Number, t)
     values = {**scalar.values, TYPE: t}
     return AbstractScalar(values)

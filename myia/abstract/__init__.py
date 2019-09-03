@@ -96,7 +96,6 @@ from .utils import (  # noqa
     sensitivity_transform,
     split_type,
     type_to_abstract,
-    type_token,
     typecheck,
     union_simplify,
 )

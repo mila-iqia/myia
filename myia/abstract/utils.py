@@ -240,22 +240,6 @@ def pytype_to_abstract(main: AbstractArray, args):
     )
 
 
-def type_token(x):
-    """Build a type from an abstract value."""
-    if isinstance(x, AbstractScalar):
-        return x.dtype()
-    elif isinstance(x, AbstractTuple):
-        return x.dtype()
-    elif isinstance(x, AbstractDict):
-        return x.dtype()
-    elif isinstance(x, AbstractClassBase):
-        return x.dtype()
-    elif isinstance(x, AbstractArray):
-        return x.dtype()
-    else:
-        return type(x)
-
-
 ############
 # Checking #
 ############

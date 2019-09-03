@@ -333,13 +333,12 @@ def _vm_record_getitem(vm, data, attr):
     """Implement `record_getitem`."""
     from types import MethodType, BuiltinMethodType
     from ..vm import Partial
-    from ..abstract import type_token
     # I don't know how else to get a reference to this type
     method_wrapper_type = type((0).__add__)
     try:
         x = getattr(data, attr)
     except AttributeError:
-        t = type_token(typeof(data))
+        t = typeof(data).dtype()
         mmap = vm.convert.resources.method_map[t]
         if attr in mmap:
             return Partial(vm.convert(mmap[attr]), [data], vm)

@@ -17,7 +17,6 @@ from .abstract import (
     generate_getters,
     macro,
     setter_from_getter,
-    type_token,
     union_simplify,
 )
 from .composite import gadd
@@ -90,7 +89,7 @@ async def _resolve_case(resources, data, data_t, item_v):
 
     # Try method map
     try:
-        mmap_t = mmap[data_t]
+        mmap_t = data_t and mmap[data_t]
     except KeyError:
         mmap_t = None
 
@@ -113,8 +112,8 @@ async def _resolve_case(resources, data, data_t, item_v):
 @macro
 async def getattr_(info):
     """Get an attribute from an object."""
-    from .abstract import type_token, build_value, ANYTHING, \
-        find_coherent_result, Pending
+    from .abstract import build_value, ANYTHING, find_coherent_result, \
+        Pending
 
     r_data, r_attr = check_nargs('getattr', 2, info.argrefs)
     data, attr = info.abstracts
@@ -147,7 +146,10 @@ async def getattr_(info):
             currg = falseg
         return rval
 
-    data_t = type_token(data)
+    try:
+        data_t = data.dtype()
+    except KeyError:
+        data_t = None
     attr_v = build_value(attr, default=ANYTHING)
     g = info.outref.node.graph
 
@@ -365,7 +367,7 @@ async def user_switch(info):
     async def default():
         _, cond, tb, fb = info.outref.node.inputs
         condt = await condref.get()
-        if not engine.check_predicate(Bool, type_token(condt)):
+        if not engine.check_predicate(Bool, condt.dtype()):
             to_bool = engine.pipeline.resources.convert(bool)
             cond = g.apply(to_bool, cond)
         return g.apply(P.switch, cond, tb, fb)
