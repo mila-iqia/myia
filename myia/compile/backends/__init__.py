@@ -206,6 +206,9 @@ class Backend:
         elif isinstance(t, abstract.AbstractTuple):
             return tuple(self.from_value(v, t)
                          for v, t in zip(v, t.elements))
+        elif isinstance(t, abstract.AbstractTaggedUnion):
+            real_t = t.options.get(v.tag)
+            return TaggedValue(v.tag, self.from_value(v.value, real_t))
         else:
             raise NotImplementedError(f'from_value for {t}')
 

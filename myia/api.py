@@ -145,4 +145,4 @@ def to_device(value, backend, backend_options=None, *, orig_t=None, vm_t=None):
 def from_device(value):
     """Move value from target accelerator hardware."""
     res = value.backend.to_value(value.value, value.vm_t)
-    return convert_result(res, value.orig_t)
+    return convert_result(res, value.orig_t, value.vm_t)
