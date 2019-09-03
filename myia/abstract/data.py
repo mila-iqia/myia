@@ -248,6 +248,10 @@ class AbstractValue(Interned, PossiblyRecursive):
             t = t.result()
         return t
 
+    def xvalue(self):
+        """Return the value of this AbstractValue."""
+        return self.values[VALUE]
+
     def __eqkey__(self):
         return Atom(self, tuple(sorted(self.values.items())))
 
@@ -453,6 +457,10 @@ class AbstractArray(AbstractStructure):
     def children(self):
         """Return the array element."""
         return self.element,
+
+    def xshape(self):
+        """Return the shape of this array."""
+        return self.values[SHAPE]
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
