@@ -33,12 +33,12 @@ from ..opt import (
     DeadDataElimination,
     LocalPassOptimizer,
     NodeMap,
-    _strmap_tag,
     lib as optlib,
     simplify_types,
     str_to_tag,
     type_to_tag,
 )
+from ..opt.clean import _strmap_tag
 from ..prim import vm_registry
 from ..utils import (
     Cons,
@@ -621,14 +621,14 @@ def convert_arg(self, arg, orig_t: AbstractScalar, backend):
     elif issubclass(t, dtype.String):
         if not isinstance(arg, str):
             raise MyiaInputTypeError(f'Expected string')
-        arg = str_to_tag(arg)
-        t = dtype.Int[64]
     else:
         raise MyiaInputTypeError(f'Invalid type: {t}')
-    if not issubclass(orig_t.values[TYPE], dtype.String):
-        expected_value = orig_t.values[VALUE]
-        if expected_value is not ANYTHING and expected_value != arg:
-            raise MyiaInputTypeError(f'Invalid value: {arg}')
+    expected_value = orig_t.values[VALUE]
+    if expected_value is not ANYTHING and expected_value != arg:
+        raise MyiaInputTypeError(f'Invalid value: {arg}')
+    if issubclass(t, dtype.String):
+        arg = str_to_tag(arg)
+        t = dtype.Int[64]
     arg = backend.from_scalar(arg, t)
     return arg
 
@@ -679,8 +679,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple, backend,
 def convert_result(self, arg, orig_t, vm_t: AbstractScalar, backend,
                    return_backend):
     ret = backend.to_scalar(arg)
-    if orig_t.values[TYPE] == dtype.String and \
-            vm_t.values[TYPE] == dtype.Int[64]:
+    if orig_t.values[TYPE] == dtype.String:
         ret = _strmap_tag[ret]
     return ret
 
