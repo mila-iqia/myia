@@ -14,6 +14,9 @@ from .abstract import (
     TYPE,
     VALUE,
     AbstractArray,
+    Pending,
+    build_value,
+    find_coherent_result,
     generate_getters,
     macro,
     setter_from_getter,
@@ -115,9 +118,6 @@ async def _resolve_case(resources, data, data_t, item_v):
 @macro
 async def getattr_(info):
     """Get an attribute from an object."""
-    from .abstract import build_value, ANYTHING, find_coherent_result, \
-        Pending
-
     r_data, r_attr = check_nargs('getattr', 2, info.argrefs)
     data, attr = info.abstracts
 
