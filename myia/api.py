@@ -6,7 +6,7 @@ from .abstract import find_aliases, from_value
 from .compile.backends import Backend, load_backend
 from .compile.utils import BackendValue
 from .pipeline import standard_pipeline
-from .pipeline.steps import convert_arg, convert_result
+from .pipeline.steps import convert_arg
 from .utils import MyiaInputTypeError, MyiaTypeError, keyword_decorator
 
 #################
@@ -133,9 +133,3 @@ def to_device(value, backend, backend_options=None, *, orig_t=None, vm_t=None):
         vm_t = from_value(value, broaden=True)
     value = backend.from_value(value, vm_t)
     return BackendValue(value, orig_t, vm_t, backend)
-
-
-def from_device(value):
-    """Move value from target accelerator hardware."""
-    res = value.backend.to_value(value.value, value.vm_t)
-    return convert_result(res, value.orig_t, value.vm_t)

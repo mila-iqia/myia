@@ -14,6 +14,12 @@ class BackendValue:
     vm_t: AbstractValue
     backend: Backend
 
+    def from_device(self):
+        """Get a python value for this backend value."""
+        from ..pipeline.steps import convert_result
+        res = self.backend.to_value(self.value, self.vm_t)
+        return convert_result(res, self.orig_t, self.vm_t)
+
 
 def get_outputs(lst, uses, seen):
     """Return the list of nodes whose values are required beyond this segment.
