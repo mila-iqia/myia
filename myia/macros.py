@@ -174,10 +174,7 @@ async def getattr_(info):
             currg = falseg
         return rval
 
-    try:
-        data_t = data.dtype()
-    except KeyError:
-        data_t = None
+    data_t = data.dtype()
     attr_v = build_value(attr, default=ANYTHING)
     g = info.outref.node.graph
 
