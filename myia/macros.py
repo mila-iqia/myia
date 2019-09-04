@@ -328,7 +328,8 @@ async def user_switch(info):
 
         xg = xref.node.graph
         cg = condref.node.graph
-        cond_trials = [cond_trial(cg, t) for t in fulltype.options]
+        cond_trials = [cond_trial(cg, t) for t in
+                       await force_pending(fulltype.options)]
         results = [await engine.ref(node, condref.context).get()
                    for node in cond_trials]
 
