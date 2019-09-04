@@ -4,7 +4,6 @@ from copy import copy
 import numpy as np
 import pytest
 
-from myia import dtype
 from myia.abstract import from_value
 from myia.api import to_device
 from myia.compile.backends import (
@@ -124,26 +123,6 @@ def test_backend_error():
         load_backend(name)
 
     del _backends[name]
-
-
-def test_dlpack(backend_opt):
-    backend = backend_opt.pip.steps.compile.backend
-    v = MA(4, 3)
-    nv = backend.from_numpy(v)
-    dv = backend.to_dlpack(nv)
-    nv2 = backend.from_dlpack(dv)
-    v2 = backend.to_numpy(nv2)
-    assert (v == v2).all()
-
-
-def test_check_array_errors(backend_opt):
-    backend = backend_opt.pip.steps.compile.backend
-    with pytest.raises(Exception):
-        backend.check_array(MA(1, 2), dtype.Float[64])
-
-    bv = backend.from_numpy(MA(1, 2))
-    with pytest.raises(Exception):
-        backend.check_array(bv, dtype.Float[32])
 
 
 @parse_compare((2, 3))

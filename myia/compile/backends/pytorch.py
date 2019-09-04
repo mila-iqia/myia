@@ -2,7 +2,6 @@
 
 import numpy as np
 import torch
-import torch.utils.dlpack
 
 from ...dtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ...prim import Primitive, ops as P
@@ -280,21 +279,3 @@ class PyTorchBackend(Backend):
             return None
         dt = type_to_np_dtype(t)
         return np.asarray(s, dtype=dt)
-
-    def to_dlpack(self, v):
-        """Make a dlpack capsule from a torch tensor."""
-        return torch.utils.dlpack.to_dlpack(v)
-
-    def from_dlpack(self, dlp):
-        """Make a torch tensor from a dlpack capsule."""
-        v = torch.utils.dlpack.from_dlpack(dlp)
-        return v.to(self.device)
-
-    def check_array(self, v, t):
-        """Check if the value is a torch tensor of the right dtype."""
-        if not isinstance(v, torch.Tensor):
-            raise TypeError("Expected torch.Tensor")
-        if v.device != self.device:
-            raise RuntimeError("Tensor on wrong device.")
-        if v.dtype != type_to_pytorch_type(t):
-            raise TypeError("Wrong dtype")

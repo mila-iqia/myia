@@ -4,7 +4,6 @@ import copy
 from collections import OrderedDict
 
 import torch
-import torch.utils.dlpack
 
 from .. import composite as C, macros as M
 from ..abstract.data import (
@@ -15,8 +14,7 @@ from ..abstract.data import (
     AbstractArray,
     AbstractScalar,
 )
-from ..abstract.infer import ArrayWrapper, to_abstract
-from ..api import _convert_arg_init
+from ..abstract.infer import to_abstract
 from ..composite import core
 from ..dtype import Bool, Float, Int, Number, UInt
 from ..hypermap import hyper_map
@@ -25,12 +23,7 @@ from ..pipeline.resources import standard_method_map, standard_object_map
 from ..pipeline.steps import convert_arg, convert_result_array
 from ..prim import ops as P
 from ..prim.py_implementations import scalar_cast, scalar_to_array
-from .pytorch_abstract_types import (
-    APT,
-    AbstractModule,
-    AbstractPyTorchTensor,
-    PyTorchTensorWrapper,
-)
+from .pytorch_abstract_types import APT, AbstractModule, AbstractPyTorchTensor
 from .pytorch_functions import _sum, conv2d, item, linear, relu, sigmoid
 
 _type_map = {
@@ -173,18 +166,6 @@ def _to_abstract(self, v: torch.nn.Module, **kwargs):
         #       P.S. We tried copy.copy(v) and it is not sufficiently deep.
         v = copy.deepcopy(v)
         for k, a in zip(names, args):
-            if isinstance(a, ArrayWrapper):
-                # Pre_conversion from backend to PyTorch seems to only be
-                # necessary when _convert_arg_init of to_device builds
-                # via constructors with args that are ArrayWrappers
-                # (and the backend used is not PyTorch).
-                # (backend is checked via whether a.array is a torch.Tensor)
-                if not isinstance(a.array, torch.Tensor):
-                    a = torch.utils.dlpack.from_dlpack(
-                        a.backend.to_dlpack(a.array))
-                else:
-                    a = a.array
-
             if isinstance(getattr(v, k), torch.nn.Parameter):
                 setattr(v, k, torch.nn.Parameter(a))
             else:
@@ -203,80 +184,38 @@ def _to_abstract(self, v: torch.Tensor, **kwargs):
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
         {SHAPE: tuple(v.shape)},
-        # v.requires_grad,
-        # v.retain_grad
     )
 
 
 @to_abstract.register  # noqa: F811
 def _to_abstract(self, v: torch.nn.Parameter, **kwargs):
-    # return AbstractPyTorchParameter(
     return AbstractPyTorchTensor(
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
         {SHAPE: tuple(v.shape)},
-        # v.requires_grad,
-        # v.retain_grad
     )
-
-
-@to_abstract.register  # noqa: F811
-def _to_abstract(self, v: PyTorchTensorWrapper, **kwargs):
-    return AbstractPyTorchTensor(
-        AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: pytorch_dtype_to_type(v.dtype),
-        }),
-        {SHAPE: tuple(v.shape)},
-        # v.requires_grad,
-        # v.retain_grad
-    )
-
-##############################################################################
-
-
-@_convert_arg_init.register
-def _pt__convert_arg_init(self, arg, orig_t: AbstractPyTorchTensor, backend):
-    et = orig_t.element
-    assert isinstance(et, AbstractScalar)
-    et = et.values[TYPE]
-    assert issubclass(et, Number)
-    if isinstance(arg, torch.Tensor):
-        arg = PyTorchTensorWrapper(
-            backend.from_dlpack(torch.utils.dlpack.to_dlpack(arg)),
-            arg.dtype, arg.shape, backend,
-            # arg.requires_grad, arg.retain_grad
-        )
-    return arg
 
 ##############################################################################
 
 
 @convert_arg.register
-def _convert_arg(self, arg, orig_t: AbstractPyTorchTensor, backend):
+def _convert_arg(self, arg, orig_t: AbstractPyTorchTensor):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
     et = et.values[TYPE]
     assert issubclass(et, Number)
-    if isinstance(arg, ArrayWrapper):
-        arg = arg.array
     if isinstance(arg, torch.Tensor):
-        arg = backend.from_dlpack(torch.utils.dlpack.to_dlpack(arg))
-    backend.check_array(arg, et)
+        arg = arg.detach().numpy()
     return arg
 
 ##############################################################################
 
 
 @convert_result_array.register
-def _convert_result_array(arg, orig_t: AbstractPyTorchTensor, backend):
-    if not isinstance(arg, torch.Tensor):
-        arg = torch.utils.dlpack.from_dlpack(backend.to_dlpack(arg))
-        if tuple(arg.shape) != orig_t.values[SHAPE]:
-            arg = arg.reshape(orig_t.values[SHAPE])
-    return arg
+def _convert_result_array(arg, orig_t: AbstractPyTorchTensor):
+    return torch.from_numpy(arg)
 
 ##############################################################################
 

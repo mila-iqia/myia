@@ -389,24 +389,3 @@ class RelayBackend(Backend):
             return ()
         dt = type_to_np_dtype(t)
         return self.from_numpy(np.array(s, dtype=dt, copy=False))
-
-    def to_dlpack(self, v):
-        """Make a dlpack capsule from an TVM array."""
-        return v.to_dlpack()
-
-    def from_dlpack(self, v):
-        """Make an TVM array from a dlpack capsule."""
-        t = tvm.ndarray.from_dlpack(v)
-        if t.context != self.context:
-            # This may do a copy but we will need it
-            t = tvm.ndarray.array(t, self.context)
-        return t
-
-    def check_array(self, v, t):
-        """Check if value is an TVM array for this context."""
-        if not isinstance(v, tvm.ndarray.NDArray):
-            raise TypeError("Expected NNVM array")
-        if v.context != self.context:
-            raise RuntimeError("Array on wrong context.")
-        if v.dtype != type_to_np_dtype(t):
-            raise TypeError("Wrong dtype")

@@ -2,29 +2,12 @@
 
 import inspect
 
-import numpy as np
-
-from . import dtype
-from .abstract import (
-    TYPE,
-    AbstractArray,
-    AbstractClassBase,
-    AbstractScalar,
-    AbstractTuple,
-    ArrayWrapper,
-    find_aliases,
-    from_value,
-)
+from .abstract import find_aliases, from_value
 from .compile.backends import Backend, load_backend
+from .compile.utils import BackendValue
 from .pipeline import standard_pipeline
-from .utils import (
-    Cons,
-    Empty,
-    MyiaInputTypeError,
-    MyiaTypeError,
-    keyword_decorator,
-    overload,
-)
+from .pipeline.steps import convert_arg
+from .utils import MyiaInputTypeError, MyiaTypeError, keyword_decorator
 
 #################
 # Top-level API #
@@ -135,60 +118,18 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
                         alias_tracker=alias_tracker)
 
 
-######################################################################
-# Converts args to initialize model on target accelerator hardware   #
-# Note: not to be conflated with weight initialization distributions #
-######################################################################
-
-@overload(bootstrap=True)
-def _convert_arg_init(self, arg, orig_t: AbstractTuple, backend):
-    oe = orig_t.elements
-    return tuple(self(x, o, backend) for x, o in zip(arg, oe))
-
-
-@overload  # noqa: F811
-def _convert_arg_init(self, arg, orig_t: AbstractClassBase, backend):
-    if orig_t.tag is Empty:
-        return []
-    elif orig_t.tag is Cons:
-        ot = orig_t.attributes['head']
-        return [self(x, ot, backend) for x in arg]
-    else:
-        arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
-        oe = list(orig_t.attributes.values())
-        return orig_t.constructor(*(self(x, o, backend)
-                                    for x, o in zip(arg, oe)))
-
-
-@overload  # noqa: F811
-def _convert_arg_init(self, arg, orig_t: AbstractArray, backend):
-    et = orig_t.element
-    assert isinstance(et, AbstractScalar)
-    et = et.values[TYPE]
-    assert issubclass(et, dtype.Number)
-    if isinstance(arg, np.ndarray):
-        arg = ArrayWrapper(
-            backend.from_numpy(arg), arg.dtype, arg.shape, backend
-        )
-    return arg
-
-
-@overload  # noqa: F811
-def _convert_arg_init(self, arg, orig_t: AbstractScalar, backend):
-    return arg
-
-
 #############################################
-# Move model to target accelerator hardware #
+# Move value to target accelerator hardware #
 #############################################
 
-def to_device(model, backend, backend_options=None):
-    """Move model to target accelerator hardware (using selected backend)."""
+def to_device(value, backend, backend_options=None, *, orig_t=None, vm_t=None):
+    """Move value to target accelerator hardware (using selected backend)."""
     if not isinstance(backend, Backend):
         backend = load_backend(backend, backend_options)
-    model = _convert_arg_init(
-        model,
-        from_value(model, broaden=True),
-        backend
-    )
-    return model
+    if orig_t is None:
+        orig_t = from_value(value, broaden=True)
+    value = convert_arg(value, orig_t)
+    if vm_t is None:
+        vm_t = from_value(value, broaden=True)
+    value = backend.to_backend_value(value, vm_t)
+    return BackendValue(value, orig_t, vm_t, backend)

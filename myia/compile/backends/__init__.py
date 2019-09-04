@@ -5,6 +5,7 @@ import os
 import urllib
 
 from ... import abstract, dtype
+from ...utils import TaggedValue
 
 
 class UnknownBackend(Exception):
@@ -37,6 +38,8 @@ _backends = {
     'relay': import_load('myia.compile.backends.relay', 'RelayBackend'),
     'pytorch': import_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
 }
+
+_active_backends = {}
 
 
 def get_default():
@@ -101,10 +104,14 @@ def load_backend(name, options=None):
         options = {}
     if name not in _backends:
         raise UnknownBackend(name)
-    try:
-        res = _backends[name]()(**options)
-    except Exception as e:
-        raise LoadingError(name) from e
+    key = (name, tuple(sorted(list(options.items()))))
+    res = _active_backends.get(key, None)
+    if res is None:
+        try:
+            res = _backends[name]()(**options)
+            _active_backends[key] = res
+        except Exception as e:
+            raise LoadingError(name) from e
     return res
 
 
@@ -148,23 +155,41 @@ class Backend:
         """Convert the backend value to a python scalar."""
         raise NotImplementedError('to_scalar')
 
-    def from_dlpack(self, dlp):
-        """Convert a value from a DLpack PyCapsule to a backend value."""
-        raise NotImplementedError('from_dlpack')
-
-    def to_dlpack(self, v):
-        """Convert a backend-specific tensor to a DLpack PyCapsule."""
-        raise NotImplementedError('to_dlpack')
-
     def empty_env(self):
         """An empty grad environment for the backend."""
         return ()
 
-    def convert_value(self, v, t):
-        """Convert a value to the appropriate backend representation."""
+    def from_backend_value(self, v, t):
+        """Convert a backend value to an intermediate value."""
+        if isinstance(t, abstract.AbstractScalar):
+            return self.to_scalar(v)
+        elif isinstance(t, abstract.AbstractArray):
+            res = self.to_numpy(v)
+            # Some backends will use 1d instead of 0d for internal reasons.
+            if res.shape != t.values[abstract.SHAPE]:
+                res = res.reshape(t.values[abstract.SHAPE])
+            return res
+        elif isinstance(t, abstract.AbstractTuple):
+            return tuple(self.from_backend_value(ve, te)
+                         for ve, te in zip(v, t.elements))
+        elif isinstance(t, abstract.AbstractTaggedUnion):
+            return TaggedValue(v.tag, self.from_backend_value(
+                v.value, t.options.get(v.tag)))
+        else:
+            raise NotImplementedError(f"Don't know what to do for {t}")
+
+    def to_backend_value(self, v, t):
+        """Convert an intermediate value to a backend value."""
+        from ..utils import BackendValue
+        if (isinstance(v, BackendValue) and
+            v.backend is self and
+                abstract.typecheck(t, v.vm_t)):
+            return v.value
         if (isinstance(t, (abstract.AbstractError, abstract.AbstractType))
                 or v is abstract.DEAD):
             return None
+        if isinstance(t, abstract.AbstractArray):
+            return self.from_numpy(v)
         elif isinstance(t, abstract.AbstractScalar):
             if issubclass(t.values[abstract.TYPE],
                           (dtype.Number, dtype.Bool, dtype.Nil)):
@@ -173,16 +198,12 @@ class Backend:
                 assert len(v._contents) == 0
                 return self.empty_env()
             else:
-                raise NotImplementedError(f'convert_value for {t}')
+                raise NotImplementedError(f'from_value for {t}')
         elif isinstance(t, abstract.AbstractTuple):
-            return tuple(self.convert_value(v, t)
+            return tuple(self.to_backend_value(v, t)
                          for v, t in zip(v, t.elements))
+        elif isinstance(t, abstract.AbstractTaggedUnion):
+            real_t = t.options.get(v.tag)
+            return TaggedValue(v.tag, self.to_backend_value(v.value, real_t))
         else:
-            raise NotImplementedError(f'convert_value for {t}')
-
-    def check_array(self, v, t):
-        """Check array value for type and element dtype.
-
-        This must raise exceptions describing the problem encountered.
-        """
-        raise NotImplementedError('check_array')
+            raise NotImplementedError(f'from_value for {t}')
