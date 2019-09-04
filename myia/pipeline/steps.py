@@ -22,7 +22,7 @@ from ..abstract import (
     typecheck,
 )
 from ..cconv import closure_convert
-from ..compile import BackendValue, load_backend
+from ..compile import BackendValue
 from ..ir import Graph
 from ..opt import (
     CSE,
@@ -35,11 +35,11 @@ from ..opt import (
     type_to_tag,
 )
 from ..opt.clean import _strmap_tag
-from ..prim import vm_registry
 from ..utils import (
     Cons,
     Empty,
     MyiaInputTypeError,
+    Partializable,
     TaggedValue,
     overload,
     overload_wrapper,
@@ -50,8 +50,6 @@ from ..validate import (
     validate_abstract as default_validate_abstract,
     whitelist as default_whitelist,
 )
-from ..vm import VM
-from .pipeline import PipelineStep, pipeline_function
 
 #############
 # Optimizer #
@@ -61,7 +59,7 @@ from .pipeline import PipelineStep, pipeline_function
 # Optimizer is used for multiple steps
 
 
-class Optimizer(PipelineStep):
+class Optimizer(Partializable):
     """Pipeline step to optimize a graph.
 
     Inputs:
@@ -71,52 +69,52 @@ class Optimizer(PipelineStep):
         graph: The optimized graph.
     """
 
-    def __init__(self,
-                 pipeline_init,
-                 phases,
-                 run_only_once=False):
+    def __init__(self, phases, run_only_once=False):
         """Initialize an Optimizer."""
-        super().__init__(pipeline_init)
         self.run_only_once = run_only_once
-        self.phases = []
-        self.names = []
-        for name, spec in phases.items():
+        self.phases = phases
+
+    def __call__(self, resources, graph, argspec=None, outspec=None):
+        """Optimize the graph using the given patterns."""
+        final_phases = []
+        names = []
+        for name, spec in self.phases.items():
             if spec == 'renormalize':
                 pass
             elif isinstance(spec, list):
                 nmap = NodeMap()
                 for opt in spec:
                     nmap.register(getattr(opt, 'interest', None), opt)
-                spec = LocalPassOptimizer(nmap, optimizer=self)
+                spec = LocalPassOptimizer(nmap, resources=resources)
             else:
-                spec = spec(optimizer=self)
-            self.names.append(name)
-            self.phases.append(spec)
+                spec = spec(resources=resources)
+            names.append(name)
+            final_phases.append(spec)
 
-        if len(self.phases) == 1:
-            self.run_only_once = True
+        if len(final_phases) == 1:
+            run_only_once = True
+        else:
+            run_only_once = self.run_only_once
 
-    def step(self, graph, argspec=None, outspec=None):
-        """Optimize the graph using the given patterns."""
         counter = count(1)
         changes = True
         while changes:
             with tracer(f'lap{next(counter)}'):
                 changes = False
-                nn = iter(self.names)
-                for opt in self.phases:
+                nn = iter(names)
+                for opt in final_phases:
                     with tracer(next(nn)):
                         if opt == 'renormalize':
                             assert argspec is not None
-                            graph = self.resources.inferrer.renormalize(
+                            graph = resources.inferrer.renormalize(
                                 graph, argspec, outspec
                             )
                         elif opt(graph):
                             changes = True
-                if self.run_only_once:
+                if run_only_once:
                     break
         with tracer('keep_roots'):
-            self.resources.manager.keep_roots(graph)
+            resources.manager.keep_roots(graph)
         res = {'graph': graph}
         return res
 
@@ -126,8 +124,7 @@ class Optimizer(PipelineStep):
 #########
 
 
-@pipeline_function
-def step_parse(self, input, argspec=None):
+def step_parse(resources, input, argspec=None):
     """Assert that input is a Graph, and set it as the 'graph' key.
 
     Inputs:
@@ -137,10 +134,10 @@ def step_parse(self, input, argspec=None):
     Outputs:
         graph: A graph.
     """
-    g = self.resources.convert(input)
+    g = resources.convert(input)
     sig = g.make_signature(argspec)
     g = g.generate_graph(sig)
-    g = self.resources.convert(g)
+    g = resources.convert(g)
     assert type(g) is Graph
     return {'graph': g}
 
@@ -163,8 +160,7 @@ step_resolve = Optimizer.partial(
 #########
 
 
-@pipeline_function
-def step_infer(self, graph, argspec):
+def step_infer(resources, graph, argspec):
     """Infer types, shapes, values, etc. for the graph.
 
     Inputs:
@@ -175,16 +171,10 @@ def step_infer(self, graph, argspec):
         outspec: Inference results for the graph's output.
         inference_context: The Context for the root graph.
     """
-    try:
-        res, context = self.resources.inferrer.infer(graph, argspec)
-        return {'outspec': res,
-                'argspec': argspec,
-                'inference_context': context}
-    except Exception as exc:
-        # We still want to keep the inferrer around even
-        # if an error occurred.
-        return {'error': exc,
-                'error_step': self}
+    res, context = resources.inferrer.infer(graph, argspec)
+    return {'outspec': res,
+            'argspec': argspec,
+            'inference_context': context}
 
 
 ##############
@@ -192,8 +182,7 @@ def step_infer(self, graph, argspec):
 ##############
 
 
-@pipeline_function
-def step_specialize(self, graph, inference_context):
+def step_specialize(resources, graph, inference_context):
     """Specialize the graph according to argument types.
 
     Inputs:
@@ -203,7 +192,7 @@ def step_specialize(self, graph, inference_context):
     Outputs:
         graph: The specialized graph.
     """
-    new_graph = self.resources.inferrer.monomorphize(inference_context)
+    new_graph = resources.inferrer.monomorphize(inference_context)
     return {'graph': new_graph}
 
 
@@ -212,8 +201,7 @@ def step_specialize(self, graph, inference_context):
 ####################
 
 
-@pipeline_function
-def step_simplify_types(self, graph, argspec, outspec):
+def step_simplify_types(resources, graph, argspec, outspec):
     """Replace the Class type by Tuple type.
 
     This should be run on the specialized graph.
@@ -224,10 +212,10 @@ def step_simplify_types(self, graph, argspec, outspec):
     Outputs:
         graph: The prepared graph.
     """
-    mng = self.resources.manager
+    mng = resources.manager
     simplify_types(graph, mng)
     new_argspec = tuple(p.abstract for p in graph.parameters)
-    graph = self.resources.inferrer.renormalize(graph, new_argspec)
+    graph = resources.inferrer.renormalize(graph, new_argspec)
     new_outspec = graph.output.abstract
     return {'graph': graph,
             'orig_argspec': argspec,
@@ -392,7 +380,9 @@ step_opt2 = Optimizer.partial(
 ############
 
 
-class Validator(PipelineStep):
+def step_validate(resources, graph, argspec=None, outspec=None,
+                  whitelist=default_whitelist,
+                  validate_abstract=default_validate_abstract):
     """Pipeline step to validate a graph prior to compilation.
 
     Inputs:
@@ -401,28 +391,13 @@ class Validator(PipelineStep):
     Outputs:
         None.
     """
-
-    def __init__(self,
-                 pipeline_init,
-                 whitelist=default_whitelist,
-                 validate_abstract=default_validate_abstract):
-        """Initialize a Validator."""
-        super().__init__(pipeline_init)
-        self.whitelist = whitelist
-        self.validate_abstract = validate_abstract
-
-    def step(self, graph, argspec=None, outspec=None):
-        """Validate the graph."""
-        graph = self.resources.inferrer.renormalize(
-            graph, argspec, outspec
-        )
-        validate(graph,
-                 whitelist=self.whitelist,
-                 validate_abstract=self.validate_abstract)
-        return {'graph': graph}
-
-
-step_validate = Validator.partial()
+    graph = resources.inferrer.renormalize(
+        graph, argspec, outspec
+    )
+    validate(graph,
+             whitelist=whitelist,
+             validate_abstract=validate_abstract)
+    return {'graph': graph}
 
 
 ######################
@@ -430,8 +405,7 @@ step_validate = Validator.partial()
 ######################
 
 
-@pipeline_function
-def step_cconv(self, graph):
+def step_cconv(graph):
     """Closure convert the graph.
 
     Inputs:
@@ -449,51 +423,19 @@ def step_cconv(self, graph):
 ###############
 
 
-class CompileStep(PipelineStep):
-    """Step to compile a graph to a configurable backend.
+def step_compile(resources, graph, argspec, outspec):
+    """Compile the set of graphs.
 
     Inputs:
         graph: a graph (must be typed)
+        argspec: The argument types
+        outspec: The output type
 
     Outputs:
         output: a callable
-
     """
-
-    def __init__(self, pipeline_init, backend=None, backend_options=None):
-        """Initialize a CompileStep.
-
-        Arguments:
-            backend: (str) the name of the backend to use
-            backend_options: (dict) options for the backend
-
-        """
-        super().__init__(pipeline_init)
-        self.backend = load_backend(backend, backend_options)
-
-    def step(self, graph, argspec, outspec):
-        """Compile the set of graphs."""
-        out = self.backend.compile(graph, argspec, outspec, self.pipeline)
-        return {'output': out}
-
-
-step_compile = CompileStep.partial()
-
-
-############################
-# Wrap the output function #
-############################
-
-class NumpyChecker:
-    """Dummy backend used for debug mode."""
-
-    def to_backend_value(self, v, t):
-        """Returns v."""
-        return v
-
-    def from_backend_value(self, v, t):
-        """Returns v."""
-        return v
+    out = resources.backend.compile(graph, argspec, outspec)
+    return {'output': out}
 
 
 class SlowdownWarning(UserWarning):
@@ -694,8 +636,18 @@ def convert_result(self, arg, orig_t, vm_t: AbstractTaggedUnion):
         raise AssertionError(f'Badly formed TaggedValue')
 
 
-class Wrap(PipelineStep):
+def step_wrap(resources,
+              graph,
+              output,
+              argspec,
+              outspec,
+              orig_argspec=None,
+              orig_outspec=None,
+              aliasspec=None,
+              simplify_types=False):
     """Pipeline step to export a callable.
+
+    Convert args to vm format, and output from vm format.
 
     Inputs:
         graph: The graph to wrap into a callable.
@@ -709,64 +661,40 @@ class Wrap(PipelineStep):
     Outputs:
         output: wrapped callable.
     """
+    if not simplify_types:
+        raise AssertionError(
+            'OutputWrapper step requires the simplify_types step'
+        )
+    fn = output
+    orig_arg_t = orig_argspec or argspec
+    orig_out_t = orig_outspec or outspec
+    vm_out_t = graph.return_.abstract
 
-    def __init__(self, pipeline_init, return_backend=False):
-        """Initialize the Wrap."""
-        super().__init__(pipeline_init)
-        self.return_backend = return_backend
-
-    def step(self,
-             graph,
-             output,
-             argspec,
-             outspec,
-             orig_argspec=None,
-             orig_outspec=None,
-             aliasspec=None,
-             simplify_types=False):
-        """Convert args to vm format, and output from vm format."""
-        if not simplify_types:
-            raise AssertionError(
-                'OutputWrapper step requires the simplify_types step'
-            )
-        fn = output
-        orig_arg_t = orig_argspec or argspec
-        orig_out_t = orig_outspec or outspec
-        vm_arg_t = graph.abstract.get_sync()[0].args
-        vm_out_t = graph.return_.abstract
-
-        def wrapped(*args):
-            if aliasspec:
-                alias_tracker, orig_aid_to_paths = aliasspec
-                _, aid_to_paths = find_aliases(args, alias_tracker)
-                if aid_to_paths != orig_aid_to_paths:
-                    raise MyiaInputTypeError('Incompatible aliasing pattern.')
-            steps = self.pipeline.steps
-            if hasattr(steps, 'compile'):
-                backend = steps.compile.backend
+    def wrapped(*args):
+        if aliasspec:
+            alias_tracker, orig_aid_to_paths = aliasspec
+            _, aid_to_paths = find_aliases(args, alias_tracker)
+            if aid_to_paths != orig_aid_to_paths:
+                raise MyiaInputTypeError('Incompatible aliasing pattern.')
+        backend = resources.backend.backend
+        if len(args) != len(orig_arg_t):
+            raise MyiaInputTypeError('Wrong number of arguments.')
+        args = tuple(backend.to_backend_value(convert_arg(arg, ot), vt)
+                     for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
+        res = fn(*args)
+        if resources.return_backend:
+            if isinstance(orig_out_t, AbstractTuple):
+                res = tuple(BackendValue(r, ot, vt, backend)
+                            for r, ot, vt in zip(res, orig_out_t.elements,
+                                                    vm_out_t.elements))
             else:
-                backend = NumpyChecker()
-            if len(args) != len(orig_arg_t):
-                raise MyiaInputTypeError('Wrong number of arguments.')
-            args = tuple(backend.to_backend_value(convert_arg(arg, ot), vt)
-                         for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
-            res = fn(*args)
-            if self.return_backend:
-                if isinstance(orig_out_t, AbstractTuple):
-                    res = tuple(BackendValue(r, ot, vt, backend)
-                                for r, ot, vt in zip(res, orig_out_t.elements,
-                                                     vm_out_t.elements))
-                else:
-                    res = BackendValue(res, orig_out_t, vm_out_t, backend)
-            else:
-                res = backend.from_backend_value(res, vm_out_t)
-                res = convert_result(res, orig_out_t, vm_out_t)
-            return res
+                res = BackendValue(res, orig_out_t, vm_out_t, backend)
+        else:
+            res = backend.from_backend_value(res, vm_out_t)
+            res = convert_result(res, orig_out_t, vm_out_t)
+        return res
 
-        return {'output': wrapped}
-
-
-step_wrap = Wrap.partial()
+    return {'output': wrapped}
 
 
 ################
@@ -774,29 +702,6 @@ step_wrap = Wrap.partial()
 ################
 
 
-class DebugVMExporter(PipelineStep):
-    """Pipeline step to export a callable.
-
-    Inputs:
-        graph: The graph to wrap into a callable.
-
-    Outputs:
-        output: The callable.
-    """
-
-    def __init__(self, pipeline_init, implementations):
-        """Initialize an DebugVMExporter."""
-        super().__init__(pipeline_init)
-        self.vm = VM(self.pipeline.resources.convert,
-                     self.pipeline.resources.manager,
-                     self.pipeline.resources.py_implementations,
-                     implementations)
-
-    def step(self, graph):
-        """Make a Python callable out of the graph."""
-        return {'output': self.vm.export(graph)}
-
-
-step_debug_export = DebugVMExporter.partial(
-    implementations=vm_registry
-)
+def step_debug_export(resources, graph):
+    """Make a Python callable out of the graph."""
+    return {'output': resources.debug_vm.vm.export(graph)}

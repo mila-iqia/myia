@@ -1,16 +1,18 @@
 """Pre-made pipelines."""
 
 
-from ..abstract import AbstractArray, Context, abstract_inferrer_constructors
+from ..abstract import Context, abstract_inferrer_constructors
 from ..ir import GraphManager
 from ..pipeline.resources import (
+    BackendResource,
     ConverterResource,
+    DebugVMResource,
     InferenceResource,
     scalar_object_map,
     standard_method_map,
     standard_object_map,
 )
-from ..prim import py_registry
+from ..prim import py_registry, vm_registry
 from . import steps
 from .pipeline import PipelineDefinition
 
@@ -25,7 +27,11 @@ standard_resources = dict(
         constructors=abstract_inferrer_constructors,
         context_class=Context,
     ),
-    array_class=AbstractArray
+    backend=BackendResource.partial(),
+    debug_vm=DebugVMResource.partial(
+        implementations=vm_registry,
+    ),
+    return_backend=False,
 )
 
 
@@ -72,7 +78,9 @@ standard_debug_pipeline = PipelineDefinition(
         export=steps.step_debug_export,
         wrap=steps.step_wrap,
     )
-)
+).configure({
+    'backend.name': False
+})
 
 
 scalar_debug_pipeline = standard_debug_pipeline.configure({

@@ -90,12 +90,12 @@ def cse(root, manager):
 class CSE(Partializable):
     """Common subexpression elimination."""
 
-    def __init__(self, optimizer, report_changes=True):
+    def __init__(self, resources, report_changes=True):
         """Initialize CSE."""
-        self.optimizer = optimizer
+        self.resources = resources
         self.report_changes = report_changes
 
     def __call__(self, root):
         """Apply CSE on root."""
-        chg = cse(root, self.optimizer.resources.manager)
+        chg = cse(root, self.resources.manager)
         return chg and self.report_changes

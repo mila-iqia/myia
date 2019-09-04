@@ -7,11 +7,19 @@ import numpy as np
 
 from .. import composite as C, macros as M, operations, parser, xtype
 from ..abstract import InferenceEngine
+from ..compile import load_backend
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
 from ..prim import ops as P
-from ..utils import Slice, TypeMap, overload, tracer
-from .pipeline import PipelineResource
+from ..utils import (
+    MyiaInputTypeError,
+    Partializable,
+    Slice,
+    TypeMap,
+    overload,
+    tracer,
+)
+from ..vm import VM
 
 scalar_object_map = {
     operations.add: P.scalar_add,
@@ -322,12 +330,12 @@ class _Unconverted:
         self.value = value
 
 
-class ConverterResource(PipelineResource):
+class ConverterResource(Partializable):
     """Convert a Python object into an object that can be in a Myia graph."""
 
-    def __init__(self, pipeline_init, object_map):
+    def __init__(self, resources, object_map):
         """Initialize a Converter."""
-        super().__init__(pipeline_init)
+        self.resources = resources
         self.object_map = {}
         for k, v in object_map.items():
             self.object_map[k] = _Unconverted(v)
@@ -370,20 +378,16 @@ class ConverterResource(PipelineResource):
         return v
 
 
-class InferenceResource(PipelineResource):
+class InferenceResource(Partializable):
     """Performs inference and monomorphization."""
 
-    def __init__(self,
-                 pipeline_init,
-                 constructors,
-                 context_class):
+    def __init__(self, resources, constructors, context_class):
         """Initialize an InferenceResource."""
-        super().__init__(pipeline_init)
-        self.manager = self.resources.manager
+        self.manager = resources.manager
         self.context_class = context_class
         self.constructors = constructors
         self.engine = InferenceEngine(
-            self.pipeline,
+            resources,
             constructors=self.constructors,
             context_class=self.context_class,
         )
@@ -418,3 +422,64 @@ class InferenceResource(PipelineResource):
         """Perform inference and specialization."""
         _, context = self.infer(graph, argspec, outspec, clear=True)
         return self.monomorphize(context)
+
+
+class NumpyChecker:
+    """Dummy backend used for debug mode."""
+
+    def from_numpy(self, n):
+        """Returns n."""
+        return n
+
+    def to_numpy(self, n):
+        """Returns n."""
+        return n
+
+    def from_scalar(self, s, dt):
+        """Returns s."""
+        return s
+
+    def to_scalar(self, s):
+        """Returns s."""
+        return s
+
+    def check_array(self, arg, t):
+        """Checks that arg has elements of the right dtype."""
+        if not isinstance(arg, np.ndarray):
+            raise MyiaInputTypeError('Expected ndarray')
+        if arg.dtype != xtype.type_to_np_dtype(t):
+            raise MyiaInputTypeError('Wrong dtype')
+        return arg
+
+
+class BackendResource(Partializable):
+    """Contains the backend."""
+
+    def __init__(self, resources, name=None, options=None):
+        """Initialize a BackendResource.
+
+        Arguments:
+            name: (str) the name of the backend to use
+            options: (dict) options for the backend
+
+        """
+        self.resources = resources
+        if name is False:
+            self.backend = NumpyChecker()
+        else:
+            self.backend = load_backend(name, options)
+
+    def compile(self, graph, argspec, outspec):
+        """Compile the graph."""
+        return self.backend.compile(graph, argspec, outspec, self.resources)
+
+
+class DebugVMResource(Partializable):
+    """Contains the DebugVM."""
+
+    def __init__(self, resources, implementations):
+        """Initialize a DebugVMResource."""
+        self.vm = VM(resources.convert,
+                     resources.manager,
+                     resources.py_implementations,
+                     implementations)

@@ -361,7 +361,7 @@ class RelayBackend(Backend):
                                f"'{target}' on device {device_id}")
         self.compiler = compiler
 
-    def compile(self, graph, argspec, outspec, pipeline):
+    def compile(self, graph, argspec, outspec, resources):
         """Compiler a graph."""
         return self.compiler.run(graph, self.context, self.target)
 

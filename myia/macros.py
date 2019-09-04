@@ -185,7 +185,7 @@ async def getattr_(info):
             f'Argument to getattr must be a string, not {attr_v}.'
         )
 
-    resources = info.engine.pipeline.resources
+    resources = info.engine.resources
     if isinstance(data_t, Pending):
         case, *args = await find_coherent_result(
             data_t,

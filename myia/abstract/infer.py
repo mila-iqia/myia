@@ -79,7 +79,7 @@ class InferenceEngine:
     """Infer various properties about nodes in graphs.
 
     Attributes:
-        pipeline: The Pipeline we are running.
+        resources: The compiler resources.
         constructors: As an argument to __init__, a map from primitives
             to inferrer classes, which will be instantiated automatically
             by the InferenceEngine.
@@ -88,15 +88,15 @@ class InferenceEngine:
     """
 
     def __init__(self,
-                 pipeline,
+                 resources,
                  *,
                  constructors,
                  max_stack_depth=50,
                  context_class=Context):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop(InferenceError)
-        self.pipeline = pipeline
-        self.mng = self.pipeline.resources.manager
+        self.resources = resources
+        self.mng = self.resources.manager
         self._constructors = constructors
         self.errors = []
         self.context_class = context_class
@@ -349,7 +349,7 @@ class InferenceEngine:
 
     async def infer_constant(self, ctref):
         """Infer the type of a ref of a Constant node."""
-        v = self.pipeline.resources.convert(ctref.node.value)
+        v = self.resources.convert(ctref.node.value)
         return to_abstract(
             v,
             context=ctref.context,
@@ -737,7 +737,7 @@ class GraphInferrer(Inferrer):
                     f"The 'generate_graph' method on '{self._graph}' "
                     f"returned {g}, but it must always return a Graph."
                 )
-            g = engine.pipeline.resources.convert(g)
+            g = engine.resources.convert(g)
             self.graph_cache[sig] = g
         return self.graph_cache[sig]
 

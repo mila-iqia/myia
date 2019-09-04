@@ -66,7 +66,7 @@ class PatternSubstitutionOptimization:
                 interest = None
         self.interest = interest
 
-    def __call__(self, optimizer, node):
+    def __call__(self, resources, node):
         """Return a replacement for the node, if the pattern matches.
 
         The replacement will be instantiated in the graph of the root of the
@@ -82,7 +82,7 @@ class PatternSubstitutionOptimization:
         equiv = self.unif.unify(node, self.pattern)
         if equiv is not None:
             if callable(self.replacement):
-                return self.replacement(optimizer, node, equiv)
+                return self.replacement(resources, node, equiv)
             elif self.condition is None or self.condition(equiv):
                 return self.unif.reify(self.replacement, equiv)
         else:
@@ -156,10 +156,10 @@ class NodeMap:
 class LocalPassOptimizer:
     """Apply a set of local optimizations in bfs order."""
 
-    def __init__(self, node_map, optimizer=None):
+    def __init__(self, node_map, resources=None):
         """Initialize a LocalPassOptimizer."""
         self.node_map = node_map
-        self.optimizer = optimizer
+        self.resources = resources
 
     def __call__(self, graph):
         """Apply optimizations on given graphs in node order.
@@ -168,8 +168,8 @@ class LocalPassOptimizer:
         bfs manner while avoiding parts of the graph that are dropped
         due to optimizations.
         """
-        if self.optimizer is not None:
-            mng = self.optimizer.resources.manager
+        if self.resources is not None:
+            mng = self.resources.manager
             mng.add_graph(graph)
         else:
             mng = manage(graph)
@@ -216,7 +216,7 @@ class LocalPassOptimizer:
                     node=n,
                 )
                 with About(n.debug, 'opt', transformer.name):
-                    new = transformer(self.optimizer, n)
+                    new = transformer(self.resources, n)
                 if new is not None:
                     tracer().emit_opt(
                         opt=transformer,

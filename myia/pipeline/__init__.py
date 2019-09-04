@@ -1,12 +1,9 @@
 """Contains Myia's pipeline definitions, steps, resources, etc."""
 
 
-from .pipeline import (  # noqa
+from .pipeline import (  # noqa; PipelineResource,; PipelineStep,; pipeline_function,
     Pipeline,
     PipelineDefinition,
-    PipelineResource,
-    PipelineStep,
-    pipeline_function,
 )
 from .standard import (  # noqa
     scalar_debug_compile,

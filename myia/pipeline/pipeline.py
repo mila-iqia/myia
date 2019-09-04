@@ -1,10 +1,10 @@
 """Tools to generate and configure Myia's operation pipeline."""
 
+from types import FunctionType
+
 from ..utils import (
     NS,
-    Merge,
     Partial,
-    Partializable,
     merge,
     partition_keywords,
     tracer,
@@ -137,16 +137,23 @@ class PipelineDefinition:
         """
         new_data = {**self.steps, **self.resources}
         changes = {**changes, **kwchanges}
+        inactive = set()
         for path, delta in changes.items():
             if isinstance(delta, bool) and path in self.step_names:
-                delta = Merge(pipeline_init={'active': delta})
+                if not delta:
+                    inactive.add(path)
+                continue
             top, *parts = path.split('.')
             for part in reversed(parts):
                 delta = {part: delta}
-            new_data[top] = merge(new_data[top], delta, mode='override')
+            old = new_data[top]
+            if isinstance(old, FunctionType):
+                old = Partial(old)
+            new_data[top] = merge(old, delta, mode='override')
         return PipelineDefinition(
             resources={k: new_data[k] for k in self.resources},
-            steps={k: new_data[k] for k in self.step_names}
+            steps={k: new_data[k] for k in self.step_names
+                   if k not in inactive}
         )
 
     def select(self, *names):
@@ -202,11 +209,14 @@ class Pipeline:
         def convert(x, name):
             if isinstance(x, Partial):
                 try:
-                    x = x.partial(
-                        pipeline_init={'pipeline': self, 'name': name}
-                    )
+                    x = x.partial(resources=self.resources)
                 except TypeError:
                     pass
+                x = x()
+            return x
+
+        def convert2(x):
+            if isinstance(x, Partial) and not isinstance(x.func, FunctionType):
                 x = x()
             return x
 
@@ -214,11 +224,13 @@ class Pipeline:
         self.resources = NS()
         self.steps = NS()
         self._seq = []
+        self._step_names = []
         for k, v in defn.resources.items():
             self.resources[k] = convert(v, None)
         for k, v in defn.steps.items():
-            v = convert(v, k)
+            v = convert2(v)
             self.steps[k] = v
+            self._step_names.append(k)
             self._seq.append(v)
 
     def __getitem__(self, item):
@@ -247,25 +259,32 @@ class _PipelineSlice:
         Errors are put in the 'error' key of the result, and the step
         at which an error happened is put in the 'error_step' key.
         """
+        args['resources'] = self.pipeline.resources
         with tracer('compile'):
-            for step in self.pipeline._seq[self.slice]:
+            steps = self.pipeline._seq[self.slice]
+            step_names = self.pipeline._step_names[self.slice]
+            for name, step in zip(step_names, steps):
                 if 'error' in args:
                     break
-                if step.active:
-                    with tracer(f'step_{step.name}', step=step, **args) as tr:
-                        valid_args, rest = partition_keywords(step.step, args)
-                        try:
-                            results = step.step(**valid_args)
-                            if (not isinstance(results, dict) and
-                                    len(valid_args) == 1):
-                                field_name, = valid_args.keys()
-                                results = {field_name: results}
-                            args = {**args, **results}
-                            tr.set_results(**args)
-                        except Exception as e:
-                            tracer().emit_error(error=e)
-                            args['error'] = e
-                            args['error_step'] = step
+                if isinstance(step, (FunctionType, Partial)):
+                    fn = step
+                else:
+                    fn = step.__call__
+                with tracer(f'step_{name}', step=step, **args) as tr:
+                    _fn = fn.func if isinstance(fn, Partial) else fn
+                    valid_args, rest = partition_keywords(_fn, args)
+                    try:
+                        results = fn(**valid_args)
+                        if (not isinstance(results, dict) and
+                                len(valid_args) == 1):
+                            field_name, = valid_args.keys()
+                            results = {field_name: results}
+                        args = {**args, **results}
+                        tr.set_results(**args)
+                    except Exception as e:
+                        tracer().emit_error(error=e)
+                        args['error'] = e
+                        args['error_step'] = step
             return args
 
     def __call__(self, **args):
@@ -273,42 +292,3 @@ class _PipelineSlice:
         if 'error' in results:
             raise results['error']
         return results
-
-
-class PipelineResource(Partializable):
-    """Resource in a Pipeline."""
-
-    def __init__(self, pipeline_init):
-        """Initialize a PipelineStep."""
-        self.active = pipeline_init.get('active', True)
-        self.name = pipeline_init['name']
-        self.pipeline = pipeline_init['pipeline']
-        self.steps = self.pipeline.steps
-        self.resources = self.pipeline.resources
-
-
-class PipelineStep(PipelineResource):
-    """Step in a Pipeline."""
-
-    def step(self, **kwargs):
-        """Execute this step only.
-
-        The received arguments come from the previous step.
-        """
-        raise NotImplementedError()
-
-    def __call__(self, **args):
-        """Execute the pipeline all the way up to this step."""
-        return self.pipeline[:self.name](**args)
-
-
-def pipeline_function(fn):
-    """Create a pipeline step from a function.
-
-    The provided function must receive `self` as its first argument, and
-    then the pipeline fields it needs (the variable names are inspected
-    by the pipeline to determine what values to give this step).
-    """
-    class PipelineStepFunction(PipelineStep):
-        step = fn
-    return PipelineStepFunction.partial()

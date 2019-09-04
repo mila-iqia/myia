@@ -45,9 +45,9 @@ def _subslices(seq):
 class DeadDataElimination(Partializable):
     """Eliminate expressions that compute unretrieved data."""
 
-    def __init__(self, optimizer=None):
+    def __init__(self, resources=None):
         """Initialize a DeadDataElimination."""
-        self.optimizer = optimizer
+        self.resources = resources
 
     def output_structure(self, graph):
         """Yield the output structure for the graph.

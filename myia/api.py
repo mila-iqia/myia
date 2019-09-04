@@ -35,9 +35,9 @@ class MyiaFunction:
         self.alias_tracker = alias_tracker
         self.specialize_values = set(specialize_values)
         self.pip = standard_pipeline.configure({
-            'compile.backend': backend,
-            'compile.backend_options': backend_options,
-            'wrap.return_backend': return_backend,
+            'backend.name': backend,
+            'backend.options': backend_options,
+            'return_backend': return_backend,
         })
         self._cache = {}
         self.latest = None

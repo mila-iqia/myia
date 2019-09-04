@@ -13,13 +13,12 @@ from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.macros import GradOperation, grad
 from myia.pipeline import (
     PipelineDefinition,
-    pipeline_function,
     standard_debug_pipeline,
     standard_pipeline,
     standard_resources,
     steps,
 )
-from myia.pipeline.steps import Validator
+from myia.pipeline.steps import step_validate
 from myia.prim import ops as P
 from myia.prim.py_implementations import (
     J,
@@ -39,7 +38,7 @@ from myia.prim.py_implementations import (
     scalar_to_array,
     transpose,
 )
-from myia.utils import InferenceError, MyiaInputTypeError
+from myia.utils import InferenceError, MyiaInputTypeError, Partial
 from myia.validate import validate_abstract, whitelist
 
 from .common import (
@@ -75,14 +74,14 @@ def grad_validate_abstract(self, t: AbstractJTagged):
     pass
 
 
-step_grad_validate = Validator.partial(
+step_grad_validate = Partial(
+    step_validate,
     whitelist=grad_whitelist,
     validate_abstract=grad_validate_abstract
 )
 
 
-@pipeline_function
-def grad_wrap(self, graph, argspec):
+def grad_wrap(graph, argspec):
     mg = GradOperation(graph,
                        wrt=['*'],
                        dout_parameter=True,
