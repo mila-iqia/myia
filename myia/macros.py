@@ -14,12 +14,15 @@ from .abstract import (
     TYPE,
     VALUE,
     AbstractArray,
+    AbstractClassBase,
     Pending,
     build_value,
     find_coherent_result,
+    force_pending,
     generate_getters,
     macro,
     setter_from_getter,
+    type_to_abstract,
     union_simplify,
 )
 from .composite import gadd
@@ -49,6 +52,28 @@ from .utils import (
     check_nargs,
     core,
 )
+
+
+@macro
+async def isinstance_(info):
+    """Map isinstance to hastype."""
+    r_data, r_type = check_nargs('isinstance', 2, info.argrefs)
+    ts = build_value(await r_type.get(), default=ANYTHING)
+    if not isinstance(ts, tuple):
+        ts = (ts,)
+    for t in ts:
+        if not isinstance(t, type):
+            if not (isinstance(t, AbstractClassBase)
+                    and t.user_defined_version() is t):
+                raise MyiaTypeError(
+                    'isinstance expects a Python type'
+                    ' or a tuple of Python types'
+                )
+    hastypes = [info.graph.apply(P.hastype, r_data.node,
+                                 Constant(type_to_abstract(t)))
+                for t in ts]
+    return reduce(lambda x, y: info.graph.apply(P.bool_or, x, y),
+                  hastypes)
 
 
 @macro
