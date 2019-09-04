@@ -18,7 +18,6 @@ from myia.pipeline import (
     standard_resources,
     steps,
 )
-from myia.pipeline.steps import step_validate
 from myia.prim import ops as P
 from myia.prim.py_implementations import (
     J,
@@ -38,7 +37,7 @@ from myia.prim.py_implementations import (
     scalar_to_array,
     transpose,
 )
-from myia.utils import InferenceError, MyiaInputTypeError, Partial
+from myia.utils import InferenceError, MyiaInputTypeError
 from myia.validate import validate_abstract, whitelist
 
 from .common import (
@@ -74,13 +73,6 @@ def grad_validate_abstract(self, t: AbstractJTagged):
     pass
 
 
-step_grad_validate = Partial(
-    step_validate,
-    whitelist=grad_whitelist,
-    validate_abstract=grad_validate_abstract
-)
-
-
 def grad_wrap(graph, argspec):
     mg = GradOperation(graph,
                        wrt=['*'],
@@ -99,9 +91,12 @@ grad_pipeline = PipelineDefinition(
         infer=steps.step_infer,
         specialize=steps.step_specialize,
         opt=steps.step_debug_opt,
-        validate=step_grad_validate,
+        validate=steps.step_validate,
         export=steps.step_debug_export,
     )
+).configure(
+    operation_whitelist=grad_whitelist,
+    validate_abstract=grad_validate_abstract
 )
 
 

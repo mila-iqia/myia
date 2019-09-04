@@ -13,10 +13,37 @@ from ..pipeline.resources import (
     standard_object_map,
 )
 from ..prim import py_registry, vm_registry
+from ..utils import Partial, Partializable
+from ..validate import (
+    validate_abstract as default_validate_abstract,
+    whitelist as default_whitelist,
+)
 from . import steps
 from .pipeline import PipelineDefinition
 
-standard_resources = dict(
+
+class Resources(Partializable):
+    def __init__(self, **members):
+        self._members = members
+        self._inst = {}
+
+    def __getattr__(self, attr):
+        if attr in self._inst:
+            return self._inst[attr]
+
+        if attr in self._members:
+            inst = self._members[attr]
+            if isinstance(inst, Partial):
+                try:
+                    inst = inst.partial(resources=self)
+                except TypeError:
+                    pass
+                inst = inst()
+            self._inst[attr] = inst
+            return inst
+
+
+standard_resources = Resources.partial(
     manager=GraphManager.partial(),
     py_implementations=py_registry,
     method_map=standard_method_map,
@@ -31,6 +58,8 @@ standard_resources = dict(
     debug_vm=DebugVMResource.partial(
         implementations=vm_registry,
     ),
+    operation_whitelist=default_whitelist,
+    validate_abstract=default_validate_abstract,
     return_backend=False,
 )
 

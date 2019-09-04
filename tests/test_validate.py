@@ -35,13 +35,13 @@ def validate(g):
 
 pip = scalar_pipeline \
     .select('parse', 'infer', 'specialize', 'validate') \
-    .configure({'validate.whitelist': test_whitelist})
+    .configure({'operation_whitelist': test_whitelist})
 
 
 pip_ec = scalar_pipeline \
     .select('parse', 'infer', 'specialize',
             'simplify_types', 'validate') \
-    .configure({'validate.whitelist': test_whitelist})
+    .configure({'operation_whitelist': test_whitelist})
 
 
 def run(pip, fn, types):

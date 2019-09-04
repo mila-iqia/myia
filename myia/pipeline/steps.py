@@ -45,11 +45,7 @@ from ..utils import (
     overload_wrapper,
     tracer,
 )
-from ..validate import (
-    validate,
-    validate_abstract as default_validate_abstract,
-    whitelist as default_whitelist,
-)
+from ..validate import validate
 
 #############
 # Optimizer #
@@ -380,9 +376,7 @@ step_opt2 = Optimizer.partial(
 ############
 
 
-def step_validate(resources, graph, argspec=None, outspec=None,
-                  whitelist=default_whitelist,
-                  validate_abstract=default_validate_abstract):
+def step_validate(resources, graph, argspec=None, outspec=None):
     """Pipeline step to validate a graph prior to compilation.
 
     Inputs:
@@ -395,8 +389,8 @@ def step_validate(resources, graph, argspec=None, outspec=None,
         graph, argspec, outspec
     )
     validate(graph,
-             whitelist=whitelist,
-             validate_abstract=validate_abstract)
+             whitelist=resources.operation_whitelist,
+             validate_abstract=resources.validate_abstract)
     return {'graph': graph}
 
 

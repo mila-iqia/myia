@@ -2,13 +2,7 @@
 
 from types import FunctionType
 
-from ..utils import (
-    NS,
-    Partial,
-    merge,
-    partition_keywords,
-    tracer,
-)
+from ..utils import NS, Partial, merge, partition_keywords, tracer
 
 
 class PipelineDefinition:
@@ -135,25 +129,18 @@ class PipelineDefinition:
         update will be appended to the previous, but you can use
         `Override([a, b, c])` to replace the old list.
         """
-        new_data = {**self.steps, **self.resources}
-        changes = {**changes, **kwchanges}
-        inactive = set()
+        new_data = {'steps': self.steps, 'resources': self.resources}
+        changes = {(f'steps.{k}' if k.split('.', 1)[0] in self.step_names
+                    else f'resources.{k}'): v
+                   for k, v in {**changes, **kwchanges}.items()}
         for path, delta in changes.items():
-            if isinstance(delta, bool) and path in self.step_names:
-                if not delta:
-                    inactive.add(path)
-                continue
             top, *parts = path.split('.')
             for part in reversed(parts):
                 delta = {part: delta}
-            old = new_data[top]
-            if isinstance(old, FunctionType):
-                old = Partial(old)
-            new_data[top] = merge(old, delta, mode='override')
+            new_data[top] = merge(new_data[top], delta, mode='override')
         return PipelineDefinition(
-            resources={k: new_data[k] for k in self.resources},
-            steps={k: new_data[k] for k in self.step_names
-                   if k not in inactive}
+            resources=new_data['resources'],
+            steps={k: v for k, v in new_data['steps'].items() if v}
         )
 
     def select(self, *names):
@@ -206,29 +193,15 @@ class Pipeline:
 
     def __init__(self, defn):
         """Initialize a Pipeline from a PipelineDefinition."""
-        def convert(x, name):
-            if isinstance(x, Partial):
-                try:
-                    x = x.partial(resources=self.resources)
-                except TypeError:
-                    pass
-                x = x()
-            return x
-
-        def convert2(x):
-            if isinstance(x, Partial) and not isinstance(x.func, FunctionType):
-                x = x()
-            return x
-
         self.defn = defn
-        self.resources = NS()
         self.steps = NS()
         self._seq = []
         self._step_names = []
-        for k, v in defn.resources.items():
-            self.resources[k] = convert(v, None)
+        self.resources = defn.resources()
         for k, v in defn.steps.items():
-            v = convert2(v)
+            if isinstance(v, Partial):
+                if not isinstance(v.func, FunctionType):
+                    v = v()
             self.steps[k] = v
             self._step_names.append(k)
             self._seq.append(v)
