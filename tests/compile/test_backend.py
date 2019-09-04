@@ -48,8 +48,8 @@ class BackendOption:
         except LoadingError as e:
             pytest.skip(f"Can't load {backend}: {e.__cause__}")
         self.pip = standard_pipeline.configure({
-            'backend.name': backend,
-            'backend.options': backend_options
+            'RRR.backend.name': backend,
+            'RRR.backend.options': backend_options
         }).make()
         self.backend = load_backend(backend, backend_options)
 

@@ -197,7 +197,7 @@ class Pipeline:
         self.steps = NS()
         self._seq = []
         self._step_names = []
-        self.resources = defn.resources()
+        self.resources = None #defn.resources()
         for k, v in defn.steps.items():
             if isinstance(v, Partial):
                 if not isinstance(v.func, FunctionType):
@@ -232,7 +232,7 @@ class _PipelineSlice:
         Errors are put in the 'error' key of the result, and the step
         at which an error happened is put in the 'error_step' key.
         """
-        args['resources'] = self.pipeline.resources
+        # args['RES'] = self.pipeline.resources
         with tracer('compile'):
             steps = self.pipeline._seq[self.slice]
             step_names = self.pipeline._step_names[self.slice]

@@ -100,7 +100,7 @@ def test_module_matmul_fwd(_backend_fixture):
 from myia.pipeline import standard_debug_pipeline
 
 pt_debug_pipeline = standard_debug_pipeline \
-    .select('parse', 'resolve', 'infer', 'export')
+    .select('RRR', 'parse', 'resolve', 'infer', 'export')
 
 def test_module_matmul_fwd__debug():
 

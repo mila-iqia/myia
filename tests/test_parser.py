@@ -94,7 +94,7 @@ def test_forward_reference():
 
     # No resolve
     parse2 = scalar_pipeline \
-        .select('parse') \
+        .select('RRR', 'parse') \
         .make_transformer('input', 'graph')
 
     parse2(g)

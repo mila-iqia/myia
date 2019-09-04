@@ -39,7 +39,7 @@ from myia.abstract import (
     type_to_abstract,
 )
 from myia.ir import Constant
-from myia.pipeline import standard_pipeline
+from myia.pipeline import standard_resources
 from myia.prim import ops as P
 from myia.utils import (
     Cons,
@@ -349,7 +349,8 @@ def test_type_to_abstract():
 
 
 def test_get_resolved():
-    eng = standard_pipeline.make().resources.inferrer.engine
+    # eng = standard_pipeline.make().resources.inferrer.engine
+    eng = standard_resources().inferrer.engine
     ref = eng.ref(Constant(123), Context.empty())
     with pytest.raises(InternalInferenceError):
         ref.get_resolved()

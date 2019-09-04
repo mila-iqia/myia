@@ -398,7 +398,7 @@ def test_scalar_cast():
 
 
 def test_env():
-    pip1 = scalar_debug_pipeline.select('parse', 'export')
+    pip1 = scalar_debug_pipeline.select('RRR', 'parse', 'export')
     pip2 = scalar_debug_pipeline
 
     def f(x, y):

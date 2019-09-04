@@ -42,6 +42,9 @@ class Resources(Partializable):
             self._inst[attr] = inst
             return inst
 
+    def __call__(self):
+        return {'resources': self}
+
 
 standard_resources = Resources.partial(
     manager=GraphManager.partial(),
@@ -70,8 +73,10 @@ standard_resources = Resources.partial(
 
 
 standard_pipeline = PipelineDefinition(
-    resources=standard_resources,
+    # resources=standard_resources,
+    resources=Resources,
     steps=dict(
+        RRR=standard_resources,
         parse=steps.step_parse,
         resolve=steps.step_resolve,
         infer=steps.step_infer,
@@ -88,13 +93,15 @@ standard_pipeline = PipelineDefinition(
 
 
 scalar_pipeline = standard_pipeline.configure({
-    'convert.object_map': scalar_object_map,
+    'RRR.convert.object_map': scalar_object_map,
 })
 
 
 standard_debug_pipeline = PipelineDefinition(
-    resources=standard_resources,
+    # resources=standard_resources,
+    resources=Resources,
     steps=dict(
+        RRR=standard_resources,
         parse=steps.step_parse,
         resolve=steps.step_resolve,
         infer=steps.step_infer,
@@ -108,12 +115,12 @@ standard_debug_pipeline = PipelineDefinition(
         wrap=steps.step_wrap,
     )
 ).configure({
-    'backend.name': False
+    'RRR.backend.name': False
 })
 
 
 scalar_debug_pipeline = standard_debug_pipeline.configure({
-    'convert.object_map': scalar_object_map
+    'RRR.convert.object_map': scalar_object_map
 })
 
 
@@ -123,10 +130,10 @@ scalar_debug_pipeline = standard_debug_pipeline.configure({
 
 
 scalar_parse = scalar_pipeline \
-    .select('parse', 'resolve') \
+    .select('RRR', 'parse', 'resolve') \
     .make_transformer('input', 'graph')
 
 
 scalar_debug_compile = scalar_debug_pipeline \
-    .select('parse', 'resolve', 'export') \
+    .select('RRR', 'parse', 'resolve', 'export') \
     .make_transformer('input', 'output')

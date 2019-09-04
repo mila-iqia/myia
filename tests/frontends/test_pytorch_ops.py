@@ -75,14 +75,14 @@ backend_options = get_backend_options(args, backend)
 
 standard_pipeline = \
 standard_pipeline.configure({
-            'backend.name': backend,
-            'backend.options': backend_options,
+            'RRR.backend.name': backend,
+            'RRR.backend.options': backend_options,
         })
 
 grad_pipeline = \
 grad_pipeline.configure({
-            'backend.name': backend,
-            'backend.options': backend_options,
+            'RRR.backend.name': backend,
+            'RRR.backend.options': backend_options,
         })
 #"""
 

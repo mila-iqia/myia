@@ -4,7 +4,7 @@ from myia.ir import manage
 from myia.pipeline import standard_debug_pipeline
 
 cconv_pipeline = standard_debug_pipeline \
-    .select('parse', 'resolve', 'cconv', 'export')
+    .select('RRR', 'parse', 'resolve', 'cconv', 'export')
 
 
 def check_no_free_variables(root):
