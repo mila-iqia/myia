@@ -412,12 +412,3 @@ class NNVMBackend(Backend):
             # This may do a copy but we will need it
             t = tvm.ndarray.array(t, self.context)
         return t
-
-    def check_array(self, v, t):
-        """Check if value is an NNVM array for this context."""
-        if not isinstance(v, tvm.ndarray.NDArray):
-            raise TypeError("Expected NNVM array")
-        if v.context != self.context:
-            raise RuntimeError("Array on wrong context.")
-        if v.dtype != type_to_np_dtype(t):
-            raise TypeError("Wrong dtype")

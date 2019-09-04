@@ -289,12 +289,3 @@ class PyTorchBackend(Backend):
         """Make a torch tensor from a dlpack capsule."""
         v = torch.utils.dlpack.from_dlpack(dlp)
         return v.to(self.device)
-
-    def check_array(self, v, t):
-        """Check if the value is a torch tensor of the right dtype."""
-        if not isinstance(v, torch.Tensor):
-            raise TypeError("Expected torch.Tensor")
-        if v.device != self.device:
-            raise RuntimeError("Tensor on wrong device.")
-        if v.dtype != type_to_pytorch_type(t):
-            raise TypeError("Wrong dtype")

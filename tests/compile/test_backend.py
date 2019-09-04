@@ -136,16 +136,6 @@ def test_dlpack(backend_opt):
     assert (v == v2).all()
 
 
-def test_check_array_errors(backend_opt):
-    backend = backend_opt.pip.steps.compile.backend
-    with pytest.raises(Exception):
-        backend.check_array(MA(1, 2), dtype.Float[64])
-
-    bv = backend.from_numpy(MA(1, 2))
-    with pytest.raises(Exception):
-        backend.check_array(bv, dtype.Float[32])
-
-
 @parse_compare((2, 3))
 def test_add(x, y):
     return x + y

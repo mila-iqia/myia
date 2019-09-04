@@ -184,7 +184,7 @@ class Backend:
             return TaggedValue(v.tag, self.to_value(v.value,
                                                     t.options.get(v.tag)))
         else:
-            assert False, f"Don't know what to do for {t}"
+            assert False, f"Don't know what to do for {t}"  # pragma: no cover
 
     def from_value(self, v, t):
         """Convert an intermediate value to a backend value."""
@@ -217,9 +217,3 @@ class Backend:
         else:
             raise NotImplementedError(f'from_value for {t}')
 
-    def check_array(self, v, t):
-        """Check array value for type and element dtype.
-
-        This must raise exceptions describing the problem encountered.
-        """
-        raise NotImplementedError('check_array')
