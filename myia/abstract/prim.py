@@ -99,6 +99,8 @@ class StandardInferrer(Inferrer):
                     )
             elif callable(typ):
                 await force_pending(engine.check(typ, arg))
+            else:
+                raise AssertionError(f'Invalid annotation: {typ}')
         return await self._infer(self, engine, *args)
 
     def require_constant(self, a, *, argnum, range=None):
