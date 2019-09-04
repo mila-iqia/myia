@@ -604,6 +604,21 @@ class Parser:
         block.raises(self.process_node(block, node.exc))
         return block
 
+    def process_Assert(self, block: 'Block', node: ast.Assert) -> 'Block':
+        """Process an assert statement."""
+        cond = self.process_node(block, node.test)
+        msg = (self.process_node(block, node.msg)
+               if node.msg else Constant("Assertion failed"))
+        true_block, false_block = self.make_condition_blocks(block)
+        block.cond(cond, true_block, false_block)
+        false_block.raises(
+            false_block.graph.apply(
+                false_block.operation('Exception'),
+                msg
+            )
+        )
+        return true_block
+
     def _assign(self, block, targ, anf_node):
         if isinstance(targ, ast.Name):
             # CASE: x = value

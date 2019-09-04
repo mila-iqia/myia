@@ -137,18 +137,15 @@ def test_parametric():
 def test_unsupported_AST__error():
     def a1():
         pass
+        return None
     with pytest.raises(MyiaSyntaxError):
         parse(a1)
 
     def a2():
         import builtins  # noqa: F401
+        return None
     with pytest.raises(MyiaSyntaxError):
         parse(a2)
-
-    def a3():
-        assert False
-    with pytest.raises(MyiaSyntaxError):
-        parse(a3)
 
 
 def test_disconnected_from_output__warning():
@@ -325,30 +322,6 @@ def test_unsupported_AST__error__format(capsys):
 
     assert match is not None
     #########################################################################
-
-    def a3():
-        assert True
-        return 1
-    try:
-        parse(a3)
-    except MyiaSyntaxError:
-        sys.excepthook(*sys.exc_info())
-
-    out, err = capsys.readouterr()
-
-    reg_pattern = r"========================================" + \
-        r"========================================\n" + \
-        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
-        r"(.+?): assert True\n" + \
-        r"(.+?)  \^\^\^\^\^\^\^\^\^\^\^\n" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaSyntaxError: Assert not supported"
-
-    regex = re.compile(reg_pattern)
-    match = re.match(regex, err)
-
-    assert match is not None
 
 
 def test_disconnected_from_output__warning__format(capsys):
