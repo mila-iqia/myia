@@ -13,6 +13,7 @@ from ..monomorphize import monomorphize
 from ..prim import ops as P
 from ..utils import (
     MyiaInputTypeError,
+    Partial,
     Partializable,
     Slice,
     TypeMap,
@@ -483,3 +484,33 @@ class DebugVMResource(Partializable):
                      resources.manager,
                      resources.py_implementations,
                      implementations)
+
+
+class Resources(Partializable):
+    """Defines a set of resources shared by the steps of a Pipeline."""
+
+    def __init__(self, **members):
+        """Initialize the Resources."""
+        self._members = members
+        self._inst = {}
+
+    def __getattr__(self, attr):
+        if attr in self._inst:
+            return self._inst[attr]
+
+        if attr in self._members:
+            inst = self._members[attr]
+            if isinstance(inst, Partial):
+                try:
+                    inst = inst.partial(resources=self)
+                except TypeError:
+                    pass
+                inst = inst()
+            self._inst[attr] = inst
+            return inst
+
+        raise AttributeError(f'No resource named {attr}.')
+
+    def __call__(self):
+        """Run the Resources as a pipeline step."""
+        return {'resources': self}

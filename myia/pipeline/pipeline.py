@@ -12,16 +12,13 @@ class PipelineDefinition:
     Call `make()` to instantiate a Pipeline that can be executed.
 
     Attributes:
-        resources: An ensemble of common resources, pooled by the whole
-            pipeline.
-        steps: A sequence of steps. Each step should be a Partial on a
-            PipelineStep.
+        steps: A sequence of steps. Each step should be a callable or
+            a Partial.
 
     """
 
-    def __init__(self, *, resources=None, steps):
+    def __init__(self, **steps):
         """Initialize a PipelineDefinition."""
-        self.resources = resources or {}
         self.steps = steps
         self.step_names = list(steps.keys())
 
@@ -77,10 +74,7 @@ class PipelineDefinition:
         steps = list(self.steps.items())
         index = self.index(step) or 0
         steps[index:index] = new_steps.items()
-        return PipelineDefinition(
-            resources=self.resources,
-            steps=dict(steps)
-        )
+        return PipelineDefinition(**dict(steps))
 
     def insert_after(self, step=None, **new_steps):
         """Insert new steps after the given step.
@@ -95,26 +89,12 @@ class PipelineDefinition:
         else:
             index = self.index(step)
             steps[index + 1:index + 1] = new_steps.items()
-        return PipelineDefinition(
-            resources=self.resources,
-            steps=dict(steps)
-        )
-
-    def configure_resources(self, **resources):
-        """Change resources or define new resources.
-
-        This returns a new PipelineDefinition.
-        """
-        return PipelineDefinition(
-            resources=merge(self.resources, resources, mode='override'),
-            steps=self.steps
-        )
+        return PipelineDefinition(**dict(steps))
 
     def configure(self, changes={}, **kwchanges):
-        """Configure existing resources and steps.
+        """Configure existing steps.
 
-        To add new steps, use `insert_before` or `insert_after`. To add new
-        resources, use `configure_resources`.
+        To add new steps, use `insert_before` or `insert_after`.
 
         This returns a new PipelineDefinition.
 
@@ -129,18 +109,16 @@ class PipelineDefinition:
         update will be appended to the previous, but you can use
         `Override([a, b, c])` to replace the old list.
         """
-        new_data = {'steps': self.steps, 'resources': self.resources}
-        changes = {(f'steps.{k}' if k.split('.', 1)[0] in self.step_names
-                    else f'resources.{k}'): v
-                   for k, v in {**changes, **kwchanges}.items()}
+        new_data = dict(self.steps)
+        changes = {**changes, **kwchanges}
         for path, delta in changes.items():
             top, *parts = path.split('.')
             for part in reversed(parts):
                 delta = {part: delta}
-            new_data[top] = merge(new_data[top], delta, mode='override')
+            if delta is not True:
+                new_data[top] = merge(new_data[top], delta, mode='override')
         return PipelineDefinition(
-            resources=new_data['resources'],
-            steps={k: v for k, v in new_data['steps'].items() if v}
+            **{k: v for k, v in new_data.items() if v is not False}
         )
 
     def select(self, *names):
@@ -150,8 +128,7 @@ class PipelineDefinition:
         definition, so pipeline steps can be reordered this way.
         """
         return PipelineDefinition(
-            resources=self.resources,
-            steps={name: self.steps[name] for name in names}
+            **{name: self.steps[name] for name in names}
         )
 
     def make(self):
@@ -179,8 +156,7 @@ class PipelineDefinition:
         """Return a pipeline that only contains a subset of the steps."""
         steps = list(self.steps.items())
         return PipelineDefinition(
-            resources=self.resources,
-            steps=dict(steps[self.getslice(item)])
+            **dict(steps[self.getslice(item)])
         )
 
 
@@ -188,7 +164,7 @@ class Pipeline:
     """Sequence of connected processing steps.
 
     Created from a PipelineDefinition. Each step processes the output of the
-    previous step. A Pipeline also defines common resources for all the steps.
+    previous step.
     """
 
     def __init__(self, defn):
@@ -197,7 +173,6 @@ class Pipeline:
         self.steps = NS()
         self._seq = []
         self._step_names = []
-        self.resources = None #defn.resources()
         for k, v in defn.steps.items():
             if isinstance(v, Partial):
                 if not isinstance(v.func, FunctionType):
@@ -232,7 +207,6 @@ class _PipelineSlice:
         Errors are put in the 'error' key of the result, and the step
         at which an error happened is put in the 'error_step' key.
         """
-        # args['RES'] = self.pipeline.resources
         with tracer('compile'):
             steps = self.pipeline._seq[self.slice]
             step_names = self.pipeline._step_names[self.slice]
