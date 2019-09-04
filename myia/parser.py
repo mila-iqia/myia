@@ -619,6 +619,10 @@ class Parser:
         )
         return true_block
 
+    def process_Pass(self, block: 'Block', node: ast.Pass) -> 'Block':
+        """Process a pass statement."""
+        return block
+
     def _assign(self, block, targ, anf_node):
         if isinstance(targ, ast.Name):
             # CASE: x = value

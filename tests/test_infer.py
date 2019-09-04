@@ -2131,6 +2131,15 @@ def test_unsafe_static_cast_error(x, y):
     return unsafe_static_cast(x, y)
 
 
+@infer((i32, i32))
+def test_pass(x):
+    if x < 0:
+        x = -x
+    else:
+        pass
+    return x
+
+
 @infer(
     (i32, i32),
     (1, i64),
