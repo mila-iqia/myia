@@ -4,7 +4,6 @@ import copy
 from collections import OrderedDict
 
 import torch
-import torch.utils.dlpack
 
 from .. import composite as C, macros as M
 from ..abstract.data import (

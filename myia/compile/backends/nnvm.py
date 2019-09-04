@@ -400,15 +400,3 @@ class NNVMBackend(Backend):
             return None
         dt = type_to_np_dtype(t)
         return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
-
-    def to_dlpack(self, v):
-        """Make a dlpack capsule from an NNVM array."""
-        return v.to_dlpack()
-
-    def from_dlpack(self, v):
-        """Make an NNVM array from a dlpack capsule."""
-        t = tvm.ndarray.from_dlpack(v)
-        if t.context != self.context:
-            # This may do a copy but we will need it
-            t = tvm.ndarray.array(t, self.context)
-        return t

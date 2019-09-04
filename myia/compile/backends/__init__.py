@@ -155,14 +155,6 @@ class Backend:
         """Convert the backend value to a python scalar."""
         raise NotImplementedError('to_scalar')
 
-    def from_dlpack(self, dlp):
-        """Convert a value from a DLpack PyCapsule to a backend value."""
-        raise NotImplementedError('from_dlpack')
-
-    def to_dlpack(self, v):
-        """Convert a backend-specific tensor to a DLpack PyCapsule."""
-        raise NotImplementedError('to_dlpack')
-
     def empty_env(self):
         """An empty grad environment for the backend."""
         return ()

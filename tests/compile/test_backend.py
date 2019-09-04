@@ -125,16 +125,6 @@ def test_backend_error():
     del _backends[name]
 
 
-def test_dlpack(backend_opt):
-    backend = backend_opt.pip.steps.compile.backend
-    v = MA(4, 3)
-    nv = backend.from_numpy(v)
-    dv = backend.to_dlpack(nv)
-    nv2 = backend.from_dlpack(dv)
-    v2 = backend.to_numpy(nv2)
-    assert (v == v2).all()
-
-
 @parse_compare((2, 3))
 def test_add(x, y):
     return x + y
