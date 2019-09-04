@@ -159,7 +159,7 @@ class Backend:
         """An empty grad environment for the backend."""
         return ()
 
-    def to_value(self, v, t):
+    def from_backend_value(self, v, t):
         """Convert a backend value to an intermediate value."""
         if isinstance(t, abstract.AbstractScalar):
             return self.to_scalar(v)
@@ -170,21 +170,20 @@ class Backend:
                 res = res.reshape(t.values[abstract.SHAPE])
             return res
         elif isinstance(t, abstract.AbstractTuple):
-            return tuple(self.to_value(ve, te)
+            return tuple(self.from_backend_value(ve, te)
                          for ve, te in zip(v, t.elements))
         elif isinstance(t, abstract.AbstractTaggedUnion):
-            return TaggedValue(v.tag, self.to_value(v.value,
-                                                    t.options.get(v.tag)))
+            return TaggedValue(v.tag, self.from_backend_value(
+                v.value, t.options.get(v.tag)))
         else:
             raise NotImplementedError(f"Don't know what to do for {t}")
 
-    def from_value(self, v, t):
+    def to_backend_value(self, v, t):
         """Convert an intermediate value to a backend value."""
         from ..utils import BackendValue
-        from ...abstract import typecheck
         if (isinstance(v, BackendValue) and
             v.backend is self and
-                typecheck(t, v.vm_t)):
+                abstract.typecheck(t, v.vm_t)):
             return v.value
         if (isinstance(t, (abstract.AbstractError, abstract.AbstractType))
                 or v is abstract.DEAD):
@@ -201,10 +200,10 @@ class Backend:
             else:
                 raise NotImplementedError(f'from_value for {t}')
         elif isinstance(t, abstract.AbstractTuple):
-            return tuple(self.from_value(v, t)
+            return tuple(self.to_backend_value(v, t)
                          for v, t in zip(v, t.elements))
         elif isinstance(t, abstract.AbstractTaggedUnion):
             real_t = t.options.get(v.tag)
-            return TaggedValue(v.tag, self.from_value(v.value, real_t))
+            return TaggedValue(v.tag, self.to_backend_value(v.value, real_t))
         else:
             raise NotImplementedError(f'from_value for {t}')

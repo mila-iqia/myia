@@ -131,5 +131,5 @@ def to_device(value, backend, backend_options=None, *, orig_t=None, vm_t=None):
     value = convert_arg(value, orig_t)
     if vm_t is None:
         vm_t = from_value(value, broaden=True)
-    value = backend.from_value(value, vm_t)
+    value = backend.to_backend_value(value, vm_t)
     return BackendValue(value, orig_t, vm_t, backend)

@@ -17,8 +17,14 @@ class BackendValue:
     def from_device(self):
         """Get a python value for this backend value."""
         from ..pipeline.steps import convert_result
-        res = self.backend.to_value(self.value, self.vm_t)
+        res = self.backend.from_backend_value(self.value, self.vm_t)
         return convert_result(res, self.orig_t, self.vm_t)
+
+    def __getattr__(self, name):  # pragma: no cover
+        raise AttributeError(
+            "You attempted to get an attribute on a BackendValue. This is "
+            "most likely an error. If you want access to the python object, "
+            "call .from_device() on this object.")
 
 
 def get_outputs(lst, uses, seen):

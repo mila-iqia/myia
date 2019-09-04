@@ -490,11 +490,11 @@ step_compile = CompileStep.partial()
 class NumpyChecker:
     """Dummy backend used for debug mode."""
 
-    def from_value(self, v, t):
+    def to_backend_value(self, v, t):
         """Returns v."""
         return v
 
-    def to_value(self, v, t):
+    def from_backend_value(self, v, t):
         """Returns v."""
         return v
 
@@ -742,7 +742,7 @@ class Wrap(PipelineStep):
                 backend = NumpyChecker()
             if len(args) != len(orig_arg_t):
                 raise MyiaInputTypeError('Wrong number of arguments.')
-            args = tuple(backend.from_value(convert_arg(arg, ot), vt)
+            args = tuple(backend.to_backend_value(convert_arg(arg, ot), vt)
                          for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
             res = fn(*args)
             if self.return_backend:
@@ -753,7 +753,7 @@ class Wrap(PipelineStep):
                 else:
                     res = BackendValue(res, orig_out_t, vm_out_t, backend)
             else:
-                res = backend.to_value(res, vm_out_t)
+                res = backend.from_backend_value(res, vm_out_t)
                 res = convert_result(res, orig_out_t, vm_out_t)
             return res
 
