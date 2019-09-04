@@ -104,6 +104,8 @@ async def _resolve_case(resources, data, data_t, item_v):
                 return ('field', item_v)
             elif hasattr(data_t, item_v):
                 return ('method', getattr(data_t, item_v))
+            else:
+                return ('no_method',)
         else:
             return ('no_method',)
 
