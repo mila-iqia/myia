@@ -12,6 +12,7 @@ from ..abstract import (
     ANYTHING,
     TYPE,
     VALUE,
+    SHAPE,
     AbstractArray,
     AbstractClassBase,
     AbstractDict,
@@ -489,29 +490,13 @@ step_compile = CompileStep.partial()
 class NumpyChecker:
     """Dummy backend used for debug mode."""
 
-    def from_numpy(self, n):
-        """Returns n."""
-        return n
+    def from_value(self, v, t):
+        """Returns v."""
+        return v
 
-    def to_numpy(self, n):
-        """Returns n."""
-        return n
-
-    def from_scalar(self, s, dt):
-        """Returns s."""
-        return s
-
-    def to_scalar(self, s):
-        """Returns s."""
-        return s
-
-    def check_array(self, arg, t):
-        """Checks that arg has elements of the right dtype."""
-        if not isinstance(arg, np.ndarray):
-            raise MyiaInputTypeError('Expected ndarray')
-        if arg.dtype != dtype.type_to_np_dtype(t):
-            raise MyiaInputTypeError('Wrong dtype')
-        return arg
+    def to_value(self, v, t):
+        """Returns v."""
+        return v
 
 
 class SlowdownWarning(UserWarning):
@@ -588,6 +573,17 @@ def convert_arg(self, arg, orig_t: AbstractArray):
     assert isinstance(et, AbstractScalar)
     et = et.values[TYPE]
     assert issubclass(et, dtype.Number)
+    if not isinstance(arg, np.ndarray):
+        raise MyiaInputTypeError(f"Expected array but got {arg}.")
+    if arg.dtype != dtype.type_to_np_dtype(et):
+        raise MyiaInputTypeError(
+            f"Expected array of type {dtype.type_to_np_dtype(et)}, "
+            f"but got {arg.dtype}.")
+    shp = orig_t.values[SHAPE]
+    if (shp is not ANYTHING and
+            arg.shape != shp):
+        raise MyiaInputTypeError(
+            f"Expected array with shape {shp}, but got {arg.shape}.")
     return arg
 
 

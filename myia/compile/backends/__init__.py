@@ -172,12 +172,17 @@ class Backend:
         if isinstance(t, abstract.AbstractScalar):
             return self.to_scalar(v)
         elif isinstance(t, abstract.AbstractArray):
-            return self.to_numpy(v)
+            res = self.to_numpy(v)
+            # Some backends will use 1d instead of 0d for internal reasons.
+            if res.shape != t.values[abstract.SHAPE]:
+                res = res.reshape(t.values[abstract.SHAPE])
+            return res
         elif isinstance(t, abstract.AbstractTuple):
             return tuple(self.to_value(ve, te)
                          for ve, te in zip(v, t.elements))
         elif isinstance(t, abstract.AbstractTaggedUnion):
-            return TaggedValue(v.tag, self.to_value(v, t.get(v.tag)))
+            return TaggedValue(v.tag, self.to_value(v.value,
+                                                    t.options.get(v.tag)))
         else:
             raise RuntimeError(f"Don't know what to do for {t}")
 

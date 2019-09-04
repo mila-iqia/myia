@@ -27,8 +27,7 @@ from ..prim.py_implementations import scalar_cast, scalar_to_array
 from .pytorch_abstract_types import (
     APT,
     AbstractModule,
-    AbstractPyTorchTensor,
-    PyTorchTensorWrapper,
+    AbstractPyTorchTensor
 )
 from .pytorch_functions import _sum, conv2d, item, linear, relu, sigmoid
 
@@ -190,35 +189,17 @@ def _to_abstract(self, v: torch.Tensor, **kwargs):
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
         {SHAPE: tuple(v.shape)},
-        # v.requires_grad,
-        # v.retain_grad
     )
 
 
 @to_abstract.register  # noqa: F811
 def _to_abstract(self, v: torch.nn.Parameter, **kwargs):
-    # return AbstractPyTorchParameter(
     return AbstractPyTorchTensor(
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
         {SHAPE: tuple(v.shape)},
-        # v.requires_grad,
-        # v.retain_grad
-    )
-
-
-@to_abstract.register  # noqa: F811
-def _to_abstract(self, v: PyTorchTensorWrapper, **kwargs):
-    return AbstractPyTorchTensor(
-        AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: pytorch_dtype_to_type(v.dtype),
-        }),
-        {SHAPE: tuple(v.shape)},
-        # v.requires_grad,
-        # v.retain_grad
     )
 
 ##############################################################################

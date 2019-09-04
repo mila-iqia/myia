@@ -1,10 +1,7 @@
-from dataclasses import dataclass
-
 import numpy as np
 import pytest
 
-from myia.abstract import ArrayWrapper
-from myia.api import myia, to_device
+from myia.api import myia, to_device, from_device
 from myia.cconv import closure_convert
 from myia.compile import LoadingError, load_backend
 from myia.dtype import Bool, EnvType
@@ -97,10 +94,8 @@ def test_myia_dict_field():
 
 def test_convert_arg():
 
-    backend = NumpyChecker()
-
     def _convert(data, typ):
-        return convert_arg(data, to_abstract_test(typ), backend)
+        return convert_arg(data, to_abstract_test(typ))
 
     # Leaves
 
