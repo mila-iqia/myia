@@ -1140,7 +1140,7 @@ def test_hastype_2(x):
     return f(x)
 
 
-@infer(
+@infer_std(
     (i64, i64),
     (f64, f64),
     ((i64, i64), i64),
@@ -1158,10 +1158,10 @@ def test_isinstance(x):
             else:
                 return f(x[0]) + f(x[1:])
         elif isinstance(x, list):
-            if isinstance(x, Empty):
-                return 0
-            else:
+            if x:
                 return f(x.head) + f(x.tail)
+            else:
+                return 0
         elif isinstance(x, Point):
             return f(x.x) * f(x.y)
         else:

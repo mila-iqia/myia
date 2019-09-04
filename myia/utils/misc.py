@@ -46,6 +46,9 @@ class Cons(ADT):
             curr = curr.tail
         return rval
 
+    def __bool__(self):
+        return True
+
     def __len__(self):
         return 1 + len(self.tail)
 
@@ -74,6 +77,9 @@ class Empty(ADT):
 
     def __iter__(self):
         return iter(())
+
+    def __bool__(self):
+        return False
 
     def __len__(self):
         return 0

@@ -352,10 +352,10 @@ async def user_switch(info):
         assert isinstance(fulltype, abstract.AbstractUnion)
 
         xg = xref.node.graph
-        cg = condref.node.graph
+        cg = cond.graph
         cond_trials = [cond_trial(cg, t) for t in
                        await force_pending(fulltype.options)]
-        results = [await engine.ref(node, condref.context).get()
+        results = [await engine.ref(node, ctx).get()
                    for node in cond_trials]
 
         groups = {True: [], False: [], ANYTHING: []}
@@ -386,11 +386,7 @@ async def user_switch(info):
             return g.apply(P.switch, new_cond, new_tb, new_fb)
 
     async def default():
-        _, cond, tb, fb = info.outref.node.inputs
-        condt = await condref.get()
-        if not engine.check_predicate(Bool, condt.dtype()):
-            to_bool = engine.pipeline.resources.convert(bool)
-            cond = g.apply(to_bool, cond)
+        _, _, tb, fb = info.outref.node.inputs
         return g.apply(P.switch, cond, tb, fb)
 
     for branch_ref in [tbref, fbref]:
@@ -400,9 +396,16 @@ async def user_switch(info):
                 ' is hastype on a Union.'
             )
 
+    cond = condref.node
     ctx = condref.context
-    if condref.node.is_apply():
-        opnode, *args = condref.node.inputs
+
+    condt = await condref.get()
+    if not engine.check_predicate(Bool, condt):
+        to_bool = engine.pipeline.resources.convert(bool)
+        cond = cond.graph.apply(to_bool, cond)
+
+    if cond.is_apply():
+        opnode, *args = cond.inputs
         opref = engine.ref(opnode, ctx)
         ops = (await opref.get()).get_sync()
         if len(ops) == 1:

@@ -243,7 +243,7 @@ class AbstractValue(Interned, PossiblyRecursive):
 
     def dtype(self):
         """Return the type of this AbstractValue."""
-        t = self.values[TYPE]
+        t = self.values.get(TYPE, None)
         if isinstance(t, Pending) and t.done():
             t = t.result()
         return t
