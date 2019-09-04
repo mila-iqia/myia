@@ -1,21 +1,19 @@
 import numpy as np
 import pytest
 
-from myia.api import myia, to_device, from_device
+from myia.api import myia, to_device
 from myia.cconv import closure_convert
-from myia.compile import LoadingError, load_backend
 from myia.dtype import Bool, EnvType
 from myia.ir import clone
 from myia.pipeline import (
     scalar_debug_compile as compile,
     scalar_parse as parse,
 )
-from myia.pipeline.steps import NumpyChecker, convert_arg, convert_result
+from myia.pipeline.steps import convert_arg, convert_result
 from myia.prim.py_implementations import tuple_getitem
 from myia.utils import InferenceError, TaggedValue, newenv
 
 from .common import (
-    MA,
     D,
     Point,
     Point3D,
@@ -367,4 +365,4 @@ def test_return_backend():
     def f(a):
         return a
 
-    a = f(33)
+    f(33)

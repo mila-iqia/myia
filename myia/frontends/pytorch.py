@@ -24,11 +24,7 @@ from ..pipeline.resources import standard_method_map, standard_object_map
 from ..pipeline.steps import convert_arg, convert_result_array
 from ..prim import ops as P
 from ..prim.py_implementations import scalar_cast, scalar_to_array
-from .pytorch_abstract_types import (
-    APT,
-    AbstractModule,
-    AbstractPyTorchTensor
-)
+from .pytorch_abstract_types import APT, AbstractModule, AbstractPyTorchTensor
 from .pytorch_functions import _sum, conv2d, item, linear, relu, sigmoid
 
 _type_map = {

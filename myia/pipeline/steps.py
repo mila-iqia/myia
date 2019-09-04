@@ -10,9 +10,9 @@ import numpy as np
 from .. import dtype
 from ..abstract import (
     ANYTHING,
+    SHAPE,
     TYPE,
     VALUE,
-    SHAPE,
     AbstractArray,
     AbstractClassBase,
     AbstractDict,
@@ -663,8 +663,8 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple):
 @overload  # noqa: F811
 def convert_result(self, arg, orig_t, vm_t: AbstractScalar):
     if orig_t.values[TYPE] == dtype.String:
-        ret = _strmap_tag[ret]
-    return ret
+        arg = _strmap_tag[arg]
+    return arg
 
 
 @overload

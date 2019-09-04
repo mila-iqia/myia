@@ -216,4 +216,3 @@ class Backend:
             return TaggedValue(v.tag, self.from_value(v.value, real_t))
         else:
             raise NotImplementedError(f'from_value for {t}')
-

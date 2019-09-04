@@ -4,7 +4,6 @@ from copy import copy
 import numpy as np
 import pytest
 
-from myia import dtype
 from myia.abstract import from_value
 from myia.api import to_device
 from myia.compile.backends import (
