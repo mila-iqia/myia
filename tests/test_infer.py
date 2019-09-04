@@ -139,18 +139,18 @@ def _to_i64(x: Number) -> Int[64]:
 
 
 infer_pipeline = scalar_pipeline.select(
-    'RRR', 'parse', 'infer'
+    'resources', 'parse', 'infer'
 ).configure({
-    'RRR.py_implementations': pyimpl_test,
-    'RRR.inferrer.constructors': abstract_inferrer_cons_test,
+    'resources.py_implementations': pyimpl_test,
+    'resources.inferrer.constructors': abstract_inferrer_cons_test,
 })
 
 
 infer_pipeline_std = standard_pipeline.select(
-    'RRR', 'parse', 'infer'
+    'resources', 'parse', 'infer'
 ).configure({
-    'RRR.py_implementations': pyimpl_test,
-    'RRR.inferrer.constructors': abstract_inferrer_cons_test,
+    'resources.py_implementations': pyimpl_test,
+    'resources.inferrer.constructors': abstract_inferrer_cons_test,
 })
 
 

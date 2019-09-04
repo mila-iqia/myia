@@ -48,7 +48,7 @@ from .py_implementations import (
 )
 
 parse = standard_pipeline \
-    .select('RRR', 'parse') \
+    .select('resources', 'parse') \
     .make_transformer('input', 'graph')
 
 

@@ -38,7 +38,7 @@ from .common import (
 )
 
 specialize_pipeline = scalar_debug_pipeline \
-    .select('RRR', 'parse', 'infer', 'specialize', 'simplify_types',
+    .select('resources', 'parse', 'infer', 'specialize', 'simplify_types',
             'opt2', 'validate', 'export', 'wrap') \
     .configure({
         'opt2.phases.main': [],
@@ -46,7 +46,7 @@ specialize_pipeline = scalar_debug_pipeline \
 
 
 specialize_pipeline_std = standard_debug_pipeline \
-    .select('RRR', 'parse', 'infer', 'specialize', 'simplify_types',
+    .select('resources', 'parse', 'infer', 'specialize', 'simplify_types',
             'opt', 'opt2', 'validate', 'export', 'wrap')
 
 

@@ -34,14 +34,14 @@ def validate(g):
 
 
 pip = scalar_pipeline \
-    .select('RRR', 'parse', 'infer', 'specialize', 'validate') \
-    .configure({'RRR.operation_whitelist': test_whitelist})
+    .select('resources', 'parse', 'infer', 'specialize', 'validate') \
+    .configure({'resources.operation_whitelist': test_whitelist})
 
 
 pip_ec = scalar_pipeline \
-    .select('RRR', 'parse', 'infer', 'specialize',
+    .select('resources', 'parse', 'infer', 'specialize',
             'simplify_types', 'validate') \
-    .configure({'RRR.operation_whitelist': test_whitelist})
+    .configure({'resources.operation_whitelist': test_whitelist})
 
 
 def run(pip, fn, types):

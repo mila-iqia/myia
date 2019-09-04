@@ -84,7 +84,7 @@ def grad_wrap(graph, argspec):
 
 
 grad_pipeline = PipelineDefinition(
-    RRR=standard_resources,
+    resources=standard_resources,
     parse=steps.step_parse,
     resolve=steps.step_resolve,
     infer=steps.step_infer,
@@ -93,8 +93,8 @@ grad_pipeline = PipelineDefinition(
     validate=steps.step_validate,
     export=steps.step_debug_export,
 ).configure({
-    'RRR.operation_whitelist': grad_whitelist,
-    'RRR.validate_abstract': grad_validate_abstract
+    'resources.operation_whitelist': grad_whitelist,
+    'resources.validate_abstract': grad_validate_abstract
 })
 
 

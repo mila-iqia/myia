@@ -2,7 +2,7 @@
 
 from types import FunctionType
 
-from ..utils import NS, Partial, merge, partition_keywords, tracer
+from ..utils import Partial, merge, partition_keywords, tracer
 
 
 class PipelineDefinition:
@@ -113,13 +113,15 @@ class PipelineDefinition:
         changes = {**changes, **kwchanges}
         for path, delta in changes.items():
             top, *parts = path.split('.')
+            if top not in new_data:
+                raise KeyError(f'There is no step named {top}')
             for part in reversed(parts):
                 delta = {part: delta}
-            if delta is not True:
+            if delta is False:
+                del new_data[top]
+            else:
                 new_data[top] = merge(new_data[top], delta, mode='override')
-        return PipelineDefinition(
-            **{k: v for k, v in new_data.items() if v is not False}
-        )
+        return PipelineDefinition(**new_data)
 
     def select(self, *names):
         """Define a pipeline with the listed steps.
@@ -170,7 +172,7 @@ class Pipeline:
     def __init__(self, defn):
         """Initialize a Pipeline from a PipelineDefinition."""
         self.defn = defn
-        self.steps = NS()
+        self.steps = {}
         self._seq = []
         self._step_names = []
         for k, v in defn.steps.items():

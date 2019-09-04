@@ -48,7 +48,7 @@ standard_resources = Resources.partial(
 
 
 standard_pipeline = PipelineDefinition(
-    RRR=standard_resources,
+    resources=standard_resources,
     parse=steps.step_parse,
     resolve=steps.step_resolve,
     infer=steps.step_infer,
@@ -64,12 +64,12 @@ standard_pipeline = PipelineDefinition(
 
 
 scalar_pipeline = standard_pipeline.configure({
-    'RRR.convert.object_map': scalar_object_map,
+    'resources.convert.object_map': scalar_object_map,
 })
 
 
 standard_debug_pipeline = PipelineDefinition(
-    RRR=standard_resources,
+    resources=standard_resources,
     parse=steps.step_parse,
     resolve=steps.step_resolve,
     infer=steps.step_infer,
@@ -82,12 +82,12 @@ standard_debug_pipeline = PipelineDefinition(
     export=steps.step_debug_export,
     wrap=steps.step_wrap,
 ).configure({
-    'RRR.backend.name': False
+    'resources.backend.name': False
 })
 
 
 scalar_debug_pipeline = standard_debug_pipeline.configure({
-    'RRR.convert.object_map': scalar_object_map
+    'resources.convert.object_map': scalar_object_map
 })
 
 
@@ -97,10 +97,10 @@ scalar_debug_pipeline = standard_debug_pipeline.configure({
 
 
 scalar_parse = scalar_pipeline \
-    .select('RRR', 'parse', 'resolve') \
+    .select('resources', 'parse', 'resolve') \
     .make_transformer('input', 'graph')
 
 
 scalar_debug_compile = scalar_debug_pipeline \
-    .select('RRR', 'parse', 'resolve', 'export') \
+    .select('resources', 'parse', 'resolve', 'export') \
     .make_transformer('input', 'output')
