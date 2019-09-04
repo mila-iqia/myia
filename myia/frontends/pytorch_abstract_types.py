@@ -1,7 +1,6 @@
 """Abstract Types for PyTorch Frontend."""
 
 from ..abstract.data import AbstractClassBase
-from ..abstract.infer import ArrayWrapper
 from ..dtype import Object
 
 

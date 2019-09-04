@@ -19,7 +19,7 @@ from ..composite import core
 from ..dtype import Bool, Float, Int, NDArray, UInt
 from ..hypermap import hyper_map
 from ..pipeline.resources import standard_method_map, standard_object_map
-from ..pipeline.steps import convert_arg, convert_result_array
+from ..pipeline.steps import convert_arg_array, convert_result_array
 from ..prim import ops as P
 from .pytorch_abstract_types import AbstractModule, PyTorchTensor
 from .pytorch_functions import _sum, conv2d, item, linear, relu, sigmoid
@@ -186,31 +186,13 @@ def _to_abstract(self, v: torch.nn.Parameter, **kwargs):
     )
 
 
-@to_abstract.register  # noqa: F811
-def _to_abstract(self, v: PyTorchTensorWrapper, **kwargs):
-    return AbstractArray(
-        AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: pytorch_dtype_to_type(v.dtype),
-        }),
-        {SHAPE: tuple(v.shape), TYPE: PyTorchTensor},
-    )
+@convert_arg_array.register
+def _convert_arg_array(arg, t: PyTorchTensor, et, orig_t):
+    if isinstance(arg, torch.Tensor):
+        arg = arg.detach().numpy()
+    return arg
 
 
-##############################################################################
-
-
-# @convert_arg.register
-# def _convert_arg(self, arg, orig_t: AbstractPyTorchTensor):
-#     et = orig_t.element
-#     assert isinstance(et, AbstractScalar)
-#     et = et.values[TYPE]
-#     assert issubclass(et, Number)
-#     if isinstance(arg, torch.Tensor):
-#         arg = arg.detach().numpy()
-#     return arg
-
-
-# @convert_result_array.register
-# def _convert_result_array(arg, orig_t: PyTorchTensor):
-#     return torch.from_numpy(arg)
+@convert_result_array.register
+def _convert_result_array(arg, orig_t: PyTorchTensor):
+    return torch.from_numpy(arg)

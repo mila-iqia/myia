@@ -181,9 +181,8 @@ class Backend:
     def to_backend_value(self, v, t):
         """Convert an intermediate value to a backend value."""
         from ..utils import BackendValue
-        if (isinstance(v, BackendValue) and
-            v.backend is self and
-                abstract.typecheck(t, v.vm_t)):
+        if isinstance(v, BackendValue):
+            assert v.backend is self
             return v.value
         if (isinstance(t, (abstract.AbstractError, abstract.AbstractType))
                 or v is abstract.DEAD):

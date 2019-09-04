@@ -567,12 +567,8 @@ def convert_arg(self, arg, orig_t: AbstractClassBase):
         return res
 
 
-@overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractArray):
-    et = orig_t.element
-    assert isinstance(et, AbstractScalar)
-    et = et.values[TYPE]
-    assert issubclass(et, dtype.Number)
+@overload
+def convert_arg_array(arg, t: dtype.NDArray, et, orig_t):
     if not isinstance(arg, np.ndarray):
         raise MyiaInputTypeError(f"Expected array but got {arg}.")
     if arg.dtype != dtype.type_to_np_dtype(et):
@@ -585,6 +581,16 @@ def convert_arg(self, arg, orig_t: AbstractArray):
         raise MyiaInputTypeError(
             f"Expected array with shape {shp}, but got {arg.shape}.")
     return arg
+
+
+@overload  # noqa: F811
+def convert_arg(self, arg, orig_t: AbstractArray):
+    et = orig_t.element
+    assert isinstance(et, AbstractScalar)
+    et = et.values[TYPE]
+    assert issubclass(et, dtype.Number)
+    t = orig_t.dtype()
+    return convert_arg_array[t](arg, t, et, orig_t)
 
 
 @overload  # noqa: F811
@@ -668,13 +674,14 @@ def convert_result(self, arg, orig_t, vm_t: AbstractScalar):
 
 
 @overload
-def convert_result_array(arg, orig_t: AbstractArray):
+def convert_result_array(arg, orig_t: dtype.NDArray):
     return arg
 
 
 @overload  # noqa: F811
 def convert_result(self, arg, orig_t, vm_t: AbstractArray):
-    return convert_result_array(arg, orig_t)
+    t = orig_t.dtype()
+    return convert_result_array[t](arg, t)
 
 
 @overload  # noqa: F811
