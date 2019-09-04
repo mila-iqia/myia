@@ -137,6 +137,8 @@ def test_convert_arg():
     assert _convert(imat, ai32_of(5, 8)) is imat
     with pytest.raises(TypeError):
         _convert(imat, ai64_of(5, 8))
+    with pytest.raises(TypeError):
+        _convert(imat, ai32_of(4, 8))
 
     # Misc errors
 
@@ -172,6 +174,10 @@ def test_convert_arg():
         _convert('x', 1.0)
     with pytest.raises(TypeError):
         _convert(1.0, to_abstract_test('x'))
+
+    v = to_device(22, None)
+    with pytest.raises(TypeError):
+        _convert(v, f64)
 
 
 def test_convert_result():
@@ -356,97 +362,9 @@ def test_raise():
         raise Exception('Expected an exception')
 
 
-#####################################################
-# Test convert_arg_init functions used by to_device #
-#####################################################
+def test_return_backend():
+    @myia(return_backend=True)
+    def f(a):
+        return a
 
-device_type = 'cpu'
-# device_type = 'cuda'  # Uncomment to run on the gpu
-
-
-@pytest.fixture(params=[
-    pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
-    pytest.param(('relay', {'target': 'cpu', 'device_id': 0}), id='relay-cpu'),
-    pytest.param(('pytorch', {'device': 'cpu'}), id='pytorch-cpu')])
-def backend_opt(request):
-    name, options = request.param
-    try:
-        b = load_backend(name, options)
-    except LoadingError as e:
-        pytest.skip(f"Can't load {name}: {e.__cause__}")
-    return b
-
-
-def test__convert_arg_init_AbstractTuple(backend_opt):
-    b = backend_opt
-
-    model = (9, 5.0)
-    m = to_device(model, b)
-
-    assert isinstance(m, tuple)
-    assert isinstance(m[0], int)
-    assert isinstance(m[1], float)
-    assert m[0] == 9
-    assert m[1] == 5.0
-
-
-def test__convert_arg_init_AbstractList(backend_opt):
-    b = backend_opt
-
-    model = [91.0, 51.0]
-    m = to_device(model, b)
-
-    assert isinstance(m, list)
-    assert isinstance(m[0], float)
-    assert isinstance(m[1], float)
-    assert m[0] == 91.0
-    assert m[1] == 51.0
-
-    model2 = []
-    m2 = to_device(model2, b)
-    assert m2 == []
-
-
-def test__convert_arg_init_AbstractClass(backend_opt):
-    b = backend_opt
-
-    @dataclass(frozen=True)
-    class A():
-
-        s: 'scalar number'
-
-        def apply(self, input):
-            """Apply the layer."""
-            return (input, self.s)
-
-    model = A(2.0)
-    m = to_device(model, b)
-
-    assert isinstance(m, A)
-    assert isinstance(m.s, float)
-    assert m.s == 2.0
-
-
-def test__convert_arg_init_AbstractArray(backend_opt):
-    b = backend_opt
-    m = to_device(MA(2, 3), b)
-
-    assert isinstance(m, ArrayWrapper)
-    np.testing.assert_allclose(b.to_numpy(m.array), MA(2, 3))
-
-
-def test__convert_arg_init_AbstractScalar(backend_opt):
-    b = backend_opt
-
-    model1 = 3.0
-    m1 = to_device(model1, b)
-    assert isinstance(m1, float)
-    assert m1 == 3.0
-
-    model2 = 14
-    m2 = to_device(model2, b)
-    assert isinstance(m2, int)
-    assert m2 == 14
-
-
-#####################################################
+    a = f(33)

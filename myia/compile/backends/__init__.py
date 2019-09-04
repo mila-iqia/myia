@@ -184,7 +184,7 @@ class Backend:
             return TaggedValue(v.tag, self.to_value(v.value,
                                                     t.options.get(v.tag)))
         else:
-            raise RuntimeError(f"Don't know what to do for {t}")
+            assert False, f"Don't know what to do for {t}"
 
     def from_value(self, v, t):
         """Convert an intermediate value to a backend value."""
