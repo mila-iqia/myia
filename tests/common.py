@@ -30,18 +30,13 @@ from myia.composite import ArithmeticData
 from myia.dtype import Bool, Nil, Number, f16, f32, f64, i16, i32, i64, u64
 from myia.ir import MultitypeGraph
 from myia.prim.py_implementations import hastype, tagged
-from myia.utils import (
-    ADT,
-    EnvInstance,
-    dataclass_fields,
-    dataclass_methods,
-    overload,
-)
+from myia.utils import ADT, EnvInstance, dataclass_fields, overload
 
 B = Bool
 Bot = AbstractBottom()
 EmptyTuple = typing.Tuple[()]
-AA = AbstractArray(ANYTHING, {SHAPE: ANYTHING})
+AA = AbstractArray(ANYTHING, {SHAPE: ANYTHING, TYPE: ANYTHING})
+AN = AbstractArray(ANYTHING, {SHAPE: ANYTHING, TYPE: dtype.NDArray})
 
 
 ###########################
@@ -53,7 +48,7 @@ def arr_of(t, shp, value):
     return AbstractArray(AbstractScalar({
         VALUE: value,
         TYPE: t,
-    }), {SHAPE: shp})
+    }), {SHAPE: shp, TYPE: dtype.NDArray})
 
 
 def ai64_of(*shp, value=ANYTHING):
@@ -150,7 +145,7 @@ def to_abstract_test(self, x: np.ndarray):
             VALUE: ANYTHING,
             TYPE: dtype.np_dtype_to_type(str(x.dtype)),
         }),
-        {SHAPE: x.shape}
+        {SHAPE: x.shape, TYPE: dtype.NDArray}
     )
 
 
@@ -193,7 +188,7 @@ def to_abstract_test(self, x: object):
         new_args = {}
         for name, value in dataclass_fields(x).items():
             new_args[name] = self(value)
-        return AbstractClass(type(x), new_args, dataclass_methods(type(x)))
+        return AbstractClass(type(x), new_args)
     elif getattr(x, '__origin__') is dtype.External:
         arg, = x.__args__
         return AbstractExternal({VALUE: ANYTHING, TYPE: arg})

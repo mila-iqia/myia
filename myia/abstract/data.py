@@ -10,6 +10,7 @@ from typing import List, Tuple
 import prettyprinter as pp
 from prettyprinter.prettyprinter import pretty_python_value
 
+from .. import dtype
 from ..ir import ANFNode, Constant, Graph, MetaGraph
 from ..prim import Primitive
 from ..utils import (
@@ -24,7 +25,6 @@ from ..utils import (
     Named,
     OrderedSet,
     PossiblyRecursive,
-    dataclass_methods,
     keyword_decorator,
 )
 from .loop import Pending
@@ -241,6 +241,13 @@ class AbstractValue(Interned, PossiblyRecursive):
         super().__init__()
         self.values = TrackDict(values)
 
+    def dtype(self):
+        """Return the type of this AbstractValue."""
+        t = self.values[TYPE]
+        if isinstance(t, Pending) and t.done():
+            t = t.result()
+        return t
+
     def __eqkey__(self):
         return Atom(self, tuple(sorted(self.values.items())))
 
@@ -254,13 +261,6 @@ class AbstractAtom(AbstractValue):
 
 class AbstractScalar(AbstractAtom):
     """Represents a scalar (integer, float, bool, etc.)."""
-
-    def dtype(self):
-        """Return the type of this scalar."""
-        t = self.values[TYPE]
-        if isinstance(t, Pending) and t.done():
-            t = t.result()
-        return t
 
     def __pretty__(self, ctx):
         rval = pretty_type(self.values[TYPE])
@@ -413,9 +413,9 @@ class AbstractStructure(AbstractValue):
 class AbstractTuple(AbstractStructure):
     """Represents a tuple of elements."""
 
-    def __init__(self, elements, values=None):
+    def __init__(self, elements, values={}):
         """Initialize an AbstractTuple."""
-        super().__init__(values or {})
+        super().__init__({TYPE: dtype.Tuple, **values})
         if elements is not ANYTHING:
             elements = list(elements)
         self.elements = elements
@@ -479,9 +479,9 @@ class AbstractDict(AbstractStructure):
 
     """
 
-    def __init__(self, entries, values=None):
+    def __init__(self, entries, values={}):
         """Initalize an AbstractDict."""
-        super().__init__(values or {})
+        super().__init__({TYPE: dtype.Dict, **values})
         self.entries = entries
 
     def children(self):
@@ -507,19 +507,17 @@ class AbstractClassBase(AbstractStructure):
     Attributes:
         tag: A pointer to the original Python class
         attributes: Maps each field name to a corresponding AbstractValue.
-        methods: Maps method names to corresponding functions, which will
-            be parsed and converted by the engine when necessary, with the
-            instance as the first argument.
+        constructor: A function to use to build a Python instance.
+            Defaults to the tag.
 
     """
 
-    def __init__(self, tag, attributes, methods, values={}, *,
+    def __init__(self, tag, attributes, *, values={},
                  constructor=None):
         """Initialize an AbstractClass."""
-        super().__init__(values)
+        super().__init__({TYPE: tag, **values})
         self.tag = tag
         self.attributes = attributes
-        self.methods = methods
         if constructor is None:
             constructor = tag
         self.constructor = constructor
@@ -737,13 +735,12 @@ ALIASID = _AliasIdTrack('ALIASID')
 ##########################
 
 
-empty = AbstractADT(Empty, {}, dataclass_methods(Empty))
+empty = AbstractADT(Empty, {})
 
 
 def listof(t):
     """Return the type of a list of t."""
-    rval = AbstractADT.new(Cons, {'head': t, 'tail': None},
-                           dataclass_methods(Cons))
+    rval = AbstractADT.new(Cons, {'head': t, 'tail': None})
     rval.attributes['tail'] = AbstractUnion.new([empty, rval])
     return rval.intern()
 

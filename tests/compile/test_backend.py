@@ -23,7 +23,7 @@ from myia.prim.py_implementations import (
     transpose,
 )
 
-from ..common import AA, MA, MB
+from ..common import AN, MA, MB
 
 
 @pytest.fixture(params=[
@@ -229,7 +229,7 @@ def test_bool_eq(x, y):
 
 @parse_compare((2,))
 def test_to_array(x):
-    return scalar_to_array(x, AA)
+    return scalar_to_array(x, AN)
 
 
 @parse_compare((False,), (True,))
@@ -239,12 +239,12 @@ def test_bool_not(x,):
 
 @parse_compare((2,))
 def test_distribute(x):
-    return distribute(scalar_to_array(x, AA), (2, 3))
+    return distribute(scalar_to_array(x, AN), (2, 3))
 
 
 @parse_compare((2,))
 def test_distribute2(x):
-    return distribute(scalar_to_array(x, AA), (1,))
+    return distribute(scalar_to_array(x, AN), (1,))
 
 
 @parse_compare(np.ones((1, 3)), np.ones((3,)))

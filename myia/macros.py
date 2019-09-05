@@ -13,14 +13,17 @@ from .abstract import (
     ANYTHING,
     TYPE,
     VALUE,
+    AbstractArray,
+    Pending,
+    build_value,
+    find_coherent_result,
     generate_getters,
     macro,
     setter_from_getter,
-    type_token,
     union_simplify,
 )
 from .composite import gadd
-from .dtype import Array, Bool, Number
+from .dtype import Bool, Number
 from .info import About, DebugInfo
 from .ir import (
     CloneRemapper,
@@ -84,24 +87,28 @@ async def apply(info):
     return g.apply(fnref.node, *expanded)
 
 
-async def _resolve_case(resources, data_t, item_v):
+async def _resolve_case(resources, data, data_t, item_v):
     mmap = resources.method_map
-
-    if (isinstance(data_t, type)
-            and issubclass(data_t, abstract.AbstractClassBase)):
-        return ('class', data_t)
+    is_cls = isinstance(data, abstract.AbstractClassBase)
 
     # Try method map
     try:
-        mmap_t = mmap[data_t]
+        mmap_t = data_t and mmap[data_t]
     except KeyError:
-        mmap_t = None
+        mmap_t = {} if is_cls else None
 
     if mmap_t is not None:
         # Method call
         if item_v in mmap_t:
             method = mmap_t[item_v]
             return ('method', method)
+        elif is_cls:
+            if item_v in data.attributes:
+                return ('field', item_v)
+            elif hasattr(data_t, item_v):
+                return ('method', getattr(data_t, item_v))
+            else:
+                return ('no_method',)
         else:
             return ('no_method',)
 
@@ -111,9 +118,6 @@ async def _resolve_case(resources, data_t, item_v):
 @macro
 async def getattr_(info):
     """Get an attribute from an object."""
-    from .abstract import type_token, build_value, ANYTHING, \
-        find_coherent_result, Pending
-
     r_data, r_attr = check_nargs('getattr', 2, info.argrefs)
     data, attr = info.abstracts
 
@@ -145,7 +149,10 @@ async def getattr_(info):
             currg = falseg
         return rval
 
-    data_t = type_token(data)
+    try:
+        data_t = data.dtype()
+    except KeyError:
+        data_t = None
     attr_v = build_value(attr, default=ANYTHING)
     g = info.outref.node.graph
 
@@ -162,29 +169,21 @@ async def getattr_(info):
     if isinstance(data_t, Pending):
         case, *args = await find_coherent_result(
             data_t,
-            lambda t: _resolve_case(resources, t, attr_v)
+            lambda t: _resolve_case(resources, data, t, attr_v)
         )
     else:
-        case, *args = await _resolve_case(resources, data_t, attr_v)
+        case, *args = await _resolve_case(resources, data, data_t, attr_v)
 
-    def process_method(method):
+    if case == 'field':
+        # Get field from Class
+        return g.apply(P.record_getitem, r_data.node, attr_v)
+
+    elif case == 'method':
+        method, = args
         if isinstance(method, property):
             return g.apply(method.fget, r_data.node)
         else:
             return g.apply(P.partial, method, r_data.node)
-
-    if case == 'class':
-        # Get field from Class
-        if attr_v in data.attributes:
-            return g.apply(P.record_getitem, r_data.node, attr_v)
-        elif attr_v in data.methods:
-            return process_method(data.methods[attr_v])
-        else:
-            raise InferenceError(f'Unknown field in {data}: {attr_v}')
-
-    elif case == 'method':
-        method, = args
-        return process_method(method)
 
     elif case == 'no_method':
         msg = f"object of type {data} has no attribute '{attr_v}'"
@@ -363,7 +362,7 @@ async def user_switch(info):
     async def default():
         _, cond, tb, fb = info.outref.node.inputs
         condt = await condref.get()
-        if not engine.check_predicate(Bool, type_token(condt)):
+        if not engine.check_predicate(Bool, condt.dtype()):
             to_bool = engine.pipeline.resources.convert(bool)
             cond = g.apply(to_bool, cond)
         return g.apply(P.switch, cond, tb, fb)
@@ -460,11 +459,11 @@ def _scalar_cast_helper(x, model):
     return scalar_cast(x, t)
 
 
-@_cast_helper.register(Number, Array)
+@_cast_helper.register(Number, AbstractArray)
 @core
 def _scalar_to_array_cast_helper(x, model):
     t = typeof(model)
-    return scalar_to_array(scalar_cast(x, t.element), typeof(model))
+    return scalar_to_array(scalar_cast(x, t.element), t)
 
 
 ROOT = Named('ROOT')

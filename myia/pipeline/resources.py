@@ -5,7 +5,7 @@ from types import FunctionType
 
 import numpy as np
 
-from .. import abstract, composite as C, dtype, macros as M, operations, parser
+from .. import composite as C, dtype, macros as M, operations, parser
 from ..abstract import InferenceEngine
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
@@ -228,7 +228,7 @@ standard_method_map = TypeMap({
         '__bool__': C.float_bool,
         '__myia_to_array__': P.scalar_to_array,
     },
-    abstract.AbstractTuple: {
+    dtype.Tuple: {
         '__len__': P.tuple_len,
         '__add__': C.tuple_concat,
         '__getitem__': C.tuple_get,
@@ -237,11 +237,11 @@ standard_method_map = TypeMap({
         '__myia_next__': C.tuple_next,
         '__myia_hasnext__': C.tuple_hasnext,
     },
-    abstract.AbstractDict: {
+    dtype.Dict: {
         '__getitem__': P.dict_getitem,
         'values': M.dict_values,
     },
-    abstract.AbstractArray: {
+    dtype.NDArray: {
         '__add__': C.add,
         '__sub__': C.sub,
         '__mul__': C.mul,
@@ -336,7 +336,7 @@ class ConverterResource(PipelineResource):
             bool: dtype.Bool,
             int: dtype.Int,
             float: dtype.Float,
-            np.ndarray: abstract.AbstractArray,
+            np.ndarray: dtype.NDArray,
             np.int8: dtype.Int,
             np.int16: dtype.Int,
             np.int32: dtype.Int,
@@ -344,7 +344,8 @@ class ConverterResource(PipelineResource):
             np.float16: dtype.Float,
             np.float32: dtype.Float,
             np.float64: dtype.Float,
-            tuple: abstract.AbstractTuple,
+            tuple: dtype.Tuple,
+            dict: dtype.Dict,
         }
         mmap = self.resources.method_map
         for t1, t2 in type_map.items():

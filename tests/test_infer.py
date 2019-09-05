@@ -79,7 +79,7 @@ from myia.prim.py_implementations import (
 from myia.utils import InferenceError, MyiaTypeError, newenv
 
 from .common import (
-    AA,
+    AN,
     JT,
     TU,
     B,
@@ -1642,7 +1642,7 @@ def test_scalar_cast(x, t):
     ((i64,), InferenceError)
 )
 def test_scalar_to_array(x):
-    return scalar_to_array(x, AA)
+    return scalar_to_array(x, AN)
 
 
 @infer(

@@ -61,7 +61,6 @@ from .misc import (  # noqa
     TaggedValue,
     core,
     dataclass_fields,
-    dataclass_methods,
     is_dataclass_type,
     keyword_decorator,
     list_str,

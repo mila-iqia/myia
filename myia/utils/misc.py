@@ -3,7 +3,6 @@
 import builtins
 import functools
 from dataclasses import dataclass
-from types import FunctionType
 from typing import Any, Dict, List, TypeVar
 
 builtins_d = vars(builtins)
@@ -382,13 +381,6 @@ class ClosureNamespace(Namespace):
 def is_dataclass_type(cls):
     """Returns whether cls is a dataclass."""
     return isinstance(cls, type) and hasattr(cls, '__dataclass_fields__')
-
-
-def dataclass_methods(dc):
-    """Returns a dataclass's method dictionary."""
-    return {name: getattr(dc, name)
-            for name in dir(dc)
-            if isinstance(getattr(dc, name), (FunctionType, property))}
 
 
 def dataclass_fields(dc):

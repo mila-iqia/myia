@@ -7,7 +7,6 @@ from ..abstract import (
     ANYTHING,
     TYPE,
     VALUE,
-    AbstractArray,
     AbstractClassBase,
     AbstractDict,
     AbstractKeywordArgument,
@@ -195,12 +194,6 @@ def simplify_types(root, manager):
         elif node.is_apply(P.string_eq):
             new_node = node.graph.apply(P.scalar_eq,
                                         node.inputs[1], node.inputs[2])
-
-        elif (node.is_constant(AbstractArray) and
-                type(node.value) is not AbstractArray):
-            new_node = Constant(
-                AbstractArray(node.value.element, node.value.values))
-            keep_abstract = False
 
         elif node.is_apply(P.make_kwarg):
             new_node = node.inputs[2]

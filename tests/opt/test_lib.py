@@ -19,10 +19,11 @@ from myia.prim.py_implementations import (
     switch,
     transpose,
     tuple_setitem,
+    typeof,
 )
 from myia.utils import newenv
 
-from ..common import AA, af64_of, f64, i64, to_abstract_test
+from ..common import af64_of, f64, i64, to_abstract_test
 from .test_opt import _check_opt
 
 #######################
@@ -384,6 +385,7 @@ def test_simplify_array_map_3():
 
 
 def test_simplify_array_map_4():
+    arr_t = af64_of(3, 5)
 
     def before(xs):
         def f(x):
@@ -391,11 +393,11 @@ def test_simplify_array_map_4():
         return array_map(f, xs)
 
     def after(xs):
-        return distribute(scalar_to_array(3, AA), shape(xs))
+        return distribute(scalar_to_array(3, arr_t), shape(xs))
 
     _check_opt(before, after,
                lib.simplify_array_map,
-               argspec=[af64_of(3, 5)],
+               argspec=[arr_t],
                argspec_after=False)
 
 
@@ -443,14 +445,14 @@ def test_unfuse_composite_constant():
         return array_map(p1, x)
 
     def after(x):
-        def up1(x):
-            return array_map(scalar_add, x,
-                             distribute(scalar_to_array(1, AA), (2, 3)))
+        def up1(x2):
+            return array_map(scalar_add, x2,
+                             distribute(scalar_to_array(1, typeof(x)),
+                                        shape(x)))
         return up1(x)
 
     _check_opt(before, after,
-               lib.unfuse_composite,
-               argspec=[af64_of(2, 3)])
+               lib.unfuse_composite)
 
 
 ######################
