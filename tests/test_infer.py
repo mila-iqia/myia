@@ -1170,6 +1170,11 @@ def test_isinstance(x):
     return f(x)
 
 
+@infer_std((i64, InferenceError))
+def test_isinstance_bad(x):
+    return isinstance(x, (int, 3))
+
+
 @infer_std(
     (U(i64, (i64, i64)), i64),
     (U(i64, (f64, i64)), InferenceError),
