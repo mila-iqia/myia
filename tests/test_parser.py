@@ -134,6 +134,14 @@ def test_parametric():
     assert raw_parse(j).kwarg == 'kwargs'
 
 
+def test_fn_param_same_name():
+    def a(a):
+        return a + 1
+
+    fa = raw_parse(a)
+    assert fa.output.inputs[1] is fa.parameters[0]
+
+
 def test_unsupported_AST__error():
     def a1():
         import builtins  # noqa: F401

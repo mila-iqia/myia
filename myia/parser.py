@@ -284,6 +284,11 @@ class Parser:
         function_block.mature()
         function_block.graph.debug.name = node.name
 
+        # Use the same priority as python where an argument with the
+        # same name will mask the function.
+        graph = function_block.graph
+        function_block.write(node.name, Constant(graph), track=False)
+
         # Process arguments and their defaults
         args = node.args.args
         nondefaults = [None] * (len(args) - len(node.args.defaults))
@@ -331,8 +336,6 @@ class Parser:
         else:
             kwarg_node = None
 
-        graph = function_block.graph
-        function_block.write(node.name, Constant(graph), track=False)
         self.process_statements(function_block, node.body)
         if function_block.graph.return_ is None:
             raise MyiaSyntaxError("Function doesn't return a value",
