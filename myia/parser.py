@@ -596,22 +596,31 @@ class Parser:
 
     def process_Return(self, block: 'Block', node: ast.Return) -> 'Block':
         """Process a return statement."""
-        inputs = [Constant(primops.return_),
-                  self.process_node(block, node.value)]
-        return_ = Apply(inputs, block.graph)
-        assert block.graph.return_ is None
-        block.graph.return_ = return_
+        block.returns(self.process_node(block, node.value))
         return block
 
     def process_Raise(self, block: 'Block', node: ast.Raise) -> 'Block':
         """Process a raise statement."""
-        inputs = [Constant(primops.raise_),
-                  self.process_node(block, node.exc)]
-        raise_ = Apply(inputs, block.graph)
-        inputs = [Constant(primops.return_), raise_]
-        return_ = Apply(inputs, block.graph)
-        assert block.graph.return_ is None
-        block.graph.return_ = return_
+        block.raises(self.process_node(block, node.exc))
+        return block
+
+    def process_Assert(self, block: 'Block', node: ast.Assert) -> 'Block':
+        """Process an assert statement."""
+        cond = self.process_node(block, node.test)
+        msg = (self.process_node(block, node.msg)
+               if node.msg else Constant("Assertion failed"))
+        true_block, false_block = self.make_condition_blocks(block)
+        block.cond(cond, true_block, false_block)
+        false_block.raises(
+            false_block.graph.apply(
+                false_block.operation('Exception'),
+                msg
+            )
+        )
+        return true_block
+
+    def process_Pass(self, block: 'Block', node: ast.Pass) -> 'Block':
+        """Process a pass statement."""
         return block
 
     def _assign(self, block, targ, anf_node):
@@ -984,4 +993,15 @@ class Block:
         """
         assert self.graph.return_ is None
         switch = self.make_switch(cond, true, false)
-        self.graph.output = self.graph.apply(switch)
+        self.returns(self.graph.apply(switch))
+
+    def raises(self, exc):
+        """Raise an exception in this block."""
+        inputs = [Constant(primops.raise_), exc]
+        raise_ = Apply(inputs, self.graph)
+        self.returns(raise_)
+
+    def returns(self, value):
+        """Return a value in this block."""
+        assert self.graph.return_ is None
+        self.graph.output = value

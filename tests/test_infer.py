@@ -2132,6 +2132,35 @@ def test_unsafe_static_cast_error(x, y):
 
 
 @infer((i32, i32))
+def test_pass(x):
+    if x < 0:
+        x = -x
+    else:
+        pass
+    return x
+
+
+@infer(
+    (i32, i32),
+    (1, i64),
+    (-1, Bot),
+)
+def test_assert(x):
+    assert x >= 0
+    return x ** 0.5
+
+
+@infer(
+    (i32, i32),
+    (1, i64),
+    (-1, Bot),
+)
+def test_assert_msg(x):
+    assert x >= 0, 'x must be positive'
+    return x ** 0.5
+
+
+@infer((i32, i32))
 def test_raise(x):
     if x >= 0:
         return x ** 0.5
