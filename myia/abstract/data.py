@@ -242,7 +242,7 @@ class AbstractValue(Interned, PossiblyRecursive):
         self.values = TrackDict(values)
 
     def dtype(self):
-        """Return the type of this scalar."""
+        """Return the type of this AbstractValue."""
         t = self.values[TYPE]
         if isinstance(t, Pending) and t.done():
             t = t.result()

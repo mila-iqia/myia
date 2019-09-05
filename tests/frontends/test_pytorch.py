@@ -1001,3 +1001,12 @@ def test_conv_grad_errors():
     with pytest.raises(ValueError):
         conv2d_input(input_size, weight, torch.ones(9, 9, 9, 9),
                      (2, 3), (3, 2), (3, 4), 3)
+
+
+def test_switch_input_types():
+    @myia
+    def f(x):
+        return x * x
+
+    f(torch.ones((2, 2)))
+    f(np.ones((2, 2)))

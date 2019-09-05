@@ -570,16 +570,7 @@ def convert_arg(self, arg, orig_t: AbstractClassBase):
 @overload
 def convert_arg_array(arg, t: dtype.NDArray, et, orig_t):
     if not isinstance(arg, np.ndarray):
-        raise MyiaInputTypeError(f"Expected array but got {arg}.")
-    if arg.dtype != dtype.type_to_np_dtype(et):
-        raise MyiaInputTypeError(
-            f"Expected array of type {dtype.type_to_np_dtype(et)}, "
-            f"but got {arg.dtype}.")
-    shp = orig_t.values[SHAPE]
-    if (shp is not ANYTHING and
-            arg.shape != shp):
-        raise MyiaInputTypeError(
-            f"Expected array with shape {shp}, but got {arg.shape}.")
+        raise MyiaInputTypeError(f"Expected numpy.ndarray but got {arg}.")
     return arg
 
 
@@ -590,7 +581,18 @@ def convert_arg(self, arg, orig_t: AbstractArray):
     et = et.values[TYPE]
     assert issubclass(et, dtype.Number)
     t = orig_t.dtype()
-    return convert_arg_array[t](arg, t, et, orig_t)
+    arg = convert_arg_array[t](arg, t, et, orig_t)
+    arg_dtype = dtype.np_dtype_to_type(str(arg.dtype))
+    if arg_dtype != et:
+        raise MyiaInputTypeError(
+            f"Expected array of type {et}, but got {arg_dtype}."
+        )
+    shp = orig_t.values[SHAPE]
+    if (shp is not ANYTHING and arg.shape != shp):
+        raise MyiaInputTypeError(
+            f"Expected array with shape {shp}, but got {arg.shape}."
+        )
+    return arg
 
 
 @overload  # noqa: F811
