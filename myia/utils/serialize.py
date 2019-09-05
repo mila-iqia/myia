@@ -198,6 +198,7 @@ MyiaLoader.add_constructor('arraydata', _construct_ndarray)
 
 
 def register_npscalar(tag, cls):
+    """Regsiter serialization functions for numpy scalars."""
     def _serialize(dumper, data):
         return dumper.represent_scalar(tag, repr(data))
 

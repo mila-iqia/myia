@@ -80,7 +80,8 @@ class RemoteHandle:
     def bring(self):
         """Bring the remote object over.
 
-        This may not work for every objet type."""
+        This may not work for every objet type.
+        """
         return self.channel._bring_object(self)
 
     def __call__(self, *args, **kwargs):

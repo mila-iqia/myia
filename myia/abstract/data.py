@@ -281,7 +281,8 @@ class AbstractValue(Interned, PossiblyRecursive):
 
     @classmethod
     def _construct(cls):
-        tmap = {'TYPE': TYPE, 'VALUE': VALUE, 'SHAPE': SHAPE, 'DATA': DATA}
+        tmap = {'TYPE': TYPE, 'VALUE': VALUE, 'SHAPE': SHAPE, 'DATA': DATA,
+                'ALIASID': ALIASID}
         obj = cls.empty()
         data = yield obj
         obj.values = TrackDict((tmap[k], v) for k, v in data.items())

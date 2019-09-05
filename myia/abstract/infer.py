@@ -579,11 +579,6 @@ def to_abstract(self, v: np.ndarray, alias_map={}, **kwargs):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: BackendValue, **kwargs):
-    return v.orig_t
-
-
-@overload  # noqa: F811
 def to_abstract(self, v: typing._GenericAlias, **kwargs):
     return AbstractType(type_to_abstract(v))
 

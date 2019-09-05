@@ -142,10 +142,6 @@ class Backend:
         """
         raise NotImplementedError('compile')
 
-    def empty_env(self):
-        """Value for empty environement."""
-        return ()
-
     def to_numpy(self, v):
         """Convert a backend value to a numpy.ndarray."""
         raise NotImplementedError("to_numpy")

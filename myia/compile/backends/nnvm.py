@@ -17,7 +17,6 @@ from ...prim import Primitive, ops as P
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
 from . import Backend, HandleBackend
-from .channel import handle
 
 nonlinear_ops = list(nonlinear_ops)
 nonlinear_ops.append(P.scalar_cast)
@@ -407,8 +406,7 @@ class NNVMBackend(Backend):
         if t == Nil:
             return None
         dt = type_to_np_dtype(t)
-        return handle(
-            self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1)))
+        return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
 
 
 class NNVMBackendR(HandleBackend):

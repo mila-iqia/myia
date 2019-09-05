@@ -5,8 +5,6 @@ import functools
 from dataclasses import dataclass
 from typing import Any, Dict, List, TypeVar
 
-from colorama import AnsiToWin32
-
 from .serialize import serializable
 
 builtins_d = vars(builtins)
