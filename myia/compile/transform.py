@@ -1,6 +1,6 @@
 """Transforms a graph into lower-level code."""
 
-from ..abstract import VALUE, to_abstract
+from ..abstract import to_abstract
 from ..ir import Apply, Constant, Graph, toposort
 from ..prim import Primitive, ops as P
 from ..utils import SymbolicKeyInstance
@@ -41,7 +41,7 @@ def wrap_primitives(graph):
         if (prim, typ) not in prim_graphs:
             g = Graph()
             args = []
-            tp = list(typ.values[VALUE])[0]
+            tp = list(typ.xvalue())[0]
             for t in tp.args:
                 p = g.add_parameter()
                 p.abstract = t

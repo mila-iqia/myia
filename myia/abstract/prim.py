@@ -113,7 +113,7 @@ class StandardInferrer(Inferrer):
             range (optional): A range or collection in which the argument
                 must lie.
         """
-        v = a.values[VALUE]
+        v = a.xvalue()
         if v is ANYTHING:
             raise MyiaTypeError(
                 f'Argument {argnum} to {self.prim} must be constant.'
@@ -173,7 +173,7 @@ class WithImplInferrer(Inferrer):
         if not self.infer_value:
             outval = ANYTHING
         else:
-            values = [arg.values[VALUE] for arg in args]
+            values = [arg.xvalue() for arg in args]
             if any(v is ANYTHING for v in values):
                 outval = ANYTHING
             else:
@@ -221,7 +221,7 @@ class UniformPrimitiveInferrer(WithImplInferrer):
         outtype = self.outtype
         if any(not isinstance(arg, AbstractScalar) for arg in args):
             raise MyiaTypeError(f'Expected scalar as argument to {self.prim}')
-        ts = [arg.values[TYPE] for arg in args]
+        ts = [arg.xtype() for arg in args]
         for typ, indexes in self.typemap.items():
             # Each group is merged using check
             selection = [ts[i] for i in indexes]
@@ -253,7 +253,7 @@ def uniform_prim(prim, infer_value=False):
 def _shape_type(engine, shp):
     shp_t = engine.check(AbstractTuple, shp)
     for elem_t in shp_t.elements:
-        engine.abstract_merge(dtype.UInt[64], elem_t.values[TYPE])
+        engine.abstract_merge(dtype.UInt[64], elem_t.xtype())
     return shp_t
 
 
@@ -324,7 +324,7 @@ async def _inf_typeof(self, engine, value):
 
 @standard_prim(P.hastype)
 async def _inf_hastype(self, engine, value, model: AbstractType):
-    a = type_to_abstract(model.values[VALUE])
+    a = type_to_abstract(model.xvalue())
     return AbstractScalar({
         VALUE: hastype_helper(value, a),
         TYPE: dtype.Bool,
@@ -343,7 +343,7 @@ async def _inf_make_tuple(self, engine, *args):
 
 @standard_prim(P.make_dict)
 async def _inf_make_dict(self, engine, _dct: AbstractType, *values):
-    dct = _dct.values[VALUE]
+    dct = _dct.xvalue()
     assert len(dct.entries) == len(values)
     for t, elem in zip(dct.entries.values(), values):
         assert typecheck(t, elem)
@@ -355,7 +355,7 @@ async def _inf_make_dict(self, engine, _dct: AbstractType, *values):
 @standard_prim(P.make_record)
 async def _inf_make_record(self, engine, _cls: AbstractType, *elems):
     """Infer the return type of make_record."""
-    cls = _cls.values[VALUE]
+    cls = _cls.xvalue()
     cls = type_to_abstract(cls)
     expected = list(cls.attributes.items())
     if len(expected) != len(elems):
@@ -469,14 +469,14 @@ async def _inf_array_len(self, engine, xs: AbstractArray):
 
 @standard_prim(P.scalar_to_array)
 async def _inf_scalar_to_array(self, engine, a: AbstractScalar, t):
-    tp = t.values[VALUE]
+    tp = t.xvalue()
     assert isinstance(tp, AbstractArray)
     return AbstractArray(a, {SHAPE: (), TYPE: tp.xtype()})
 
 
 @standard_prim(P.array_to_scalar)
 async def _inf_array_to_scalar(self, engine, a: AbstractArray):
-    a_shp = a.values[SHAPE]
+    a_shp = a.xshape()
     if len(a_shp) != 0:
         raise MyiaShapeError("array_to_scalar requires shape ()")
     return a.element
@@ -484,8 +484,8 @@ async def _inf_array_to_scalar(self, engine, a: AbstractArray):
 
 @standard_prim(P.broadcast_shape)
 async def _inf_broadcast_shape(self, engine, xs: _shape_type, ys: _shape_type):
-    shp_x = tuple(x.values[VALUE] for x in xs.elements)
-    shp_y = tuple(y.values[VALUE] for y in ys.elements)
+    shp_x = tuple(x.xvalue() for x in xs.elements)
+    shp_y = tuple(y.xvalue() for y in ys.elements)
     elems = []
     try:
         res = py.broadcast_shape(shp_x, shp_y)
@@ -501,7 +501,7 @@ async def _inf_broadcast_shape(self, engine, xs: _shape_type, ys: _shape_type):
 
 @standard_prim(P.invert_permutation)
 async def _inf_invert_permutation(self, engine, perm: _shape_type):
-    v = [x.values[VALUE] for x in perm.elements]
+    v = [x.xvalue() for x in perm.elements]
     return AbstractTuple(
         [perm.elements[i] if i in v else AbstractScalar({
             VALUE: ANYTHING,
@@ -512,7 +512,7 @@ async def _inf_invert_permutation(self, engine, perm: _shape_type):
 
 @standard_prim(P.shape)
 async def _inf_shape(self, engine, a: AbstractArray):
-    shp = await force_pending(a.values[SHAPE])
+    shp = await force_pending(a.xshape())
     values = [
         AbstractScalar({
             VALUE: entry,
@@ -533,7 +533,7 @@ async def _inf_array_map(self, engine, fn: AbstractFunction, *arrays):
     subargs = [a.element for a in arrays]
     result = await engine.execute(fn, *subargs)
 
-    shapes = [a.values[SHAPE] for a in arrays]
+    shapes = [a.xshape() for a in arrays]
     shape0, *rest = shapes
     if any(len(s) != len(shape0) for s in rest):  # pragma: no cover
         # check_immediate above is checking this for us, although
@@ -575,7 +575,7 @@ async def _inf_array_reduce(self, engine,
                             a: AbstractArray,
                             shp: _shape_type):
 
-    shp_i = await force_pending(a.values[SHAPE])
+    shp_i = await force_pending(a.xshape())
     shp_v = build_value(shp, default=ANYTHING)
     if shp_v == ANYTHING:
         raise AssertionError(
@@ -597,8 +597,8 @@ async def _inf_array_reduce(self, engine,
 
 @standard_prim(P.distribute)
 async def _inf_distribute(self, engine, a: AbstractArray, _shp: _shape_type):
-    shp = tuple(x.values[VALUE] for x in _shp.elements)
-    a_shp = await force_pending(a.values[SHAPE])
+    shp = tuple(x.xvalue() for x in _shp.elements)
+    a_shp = await force_pending(a.xshape())
     delta = len(shp) - len(a_shp)
     if delta < 0:
         raise MyiaShapeError("Cannot distribute to smaller shape")
@@ -615,7 +615,7 @@ async def _inf_reshape(self, engine, a: AbstractArray, _shp: _shape_type):
     shp = build_value(_shp, default=ANYTHING)
     if shp == ANYTHING:
         shp = (ANYTHING,) * len(_shp.elements)
-    a_shp = await force_pending(a.values[SHAPE])
+    a_shp = await force_pending(a.xshape())
     if (all(s is not ANYTHING for s in shp) and
         all(s is not ANYTHING for s in a_shp) and
             prod(shp) != prod(a_shp)):
@@ -631,7 +631,7 @@ async def _inf_transpose(self, engine,
     if perm == ANYTHING:
         shp = (ANYTHING,) * len(permutation.elements)
     else:
-        a_shp = await force_pending(a.values[SHAPE])
+        a_shp = await force_pending(a.xshape())
         if list(sorted(perm)) != list(range(len(a_shp))):
             raise MyiaShapeError(
                 'The second argument of transpose must be a permutation of'
@@ -644,8 +644,8 @@ async def _inf_transpose(self, engine,
 
 @standard_prim(P.dot)
 async def _inf_dot(self, engine, a: AbstractArray, b: AbstractArray):
-    a_shp = a.values[SHAPE]
-    b_shp = b.values[SHAPE]
+    a_shp = a.xshape()
+    b_shp = b.xshape()
     if len(a_shp) != 2 or len(b_shp) != 2:
         raise MyiaShapeError("dot needs matrix inputs")
     if (a_shp[1] != b_shp[0] and
@@ -673,8 +673,8 @@ async def _inf_conv2d(self, engine, input: AbstractArray,
     # TODO: _shape_type should not allow float to be converted to uint
     # TODO: "groups: UInt[64]" should not allow float to be converted to uint
 
-    h_in, w_in = input.values[SHAPE][2:]
-    kernel_size = weight.values[SHAPE][2:]
+    h_in, w_in = input.xshape()[2:]
+    kernel_size = weight.xshape()[2:]
 
     stride = tuple(self.require_constant(e, argnum=f'"2:stride[{edx}]"')
                    for edx, e in enumerate(stride.elements))
@@ -683,8 +683,8 @@ async def _inf_conv2d(self, engine, input: AbstractArray,
     dilation = tuple(self.require_constant(e, argnum=f'"4:dilation[{edx}]"')
                      for edx, e in enumerate(dilation.elements))
 
-    N = input.values[SHAPE][0]
-    C_out = weight.values[SHAPE][0]
+    N = input.xshape()[0]
+    C_out = weight.xshape()[0]
 
     # Based on formulae in shape section of:
     # https://pytorch.org/docs/stable/nn.html#conv2d
@@ -744,7 +744,7 @@ class _SwitchInferrer(Inferrer):
         cond = await condref.get()
         await force_pending(engine.check(Bool, cond.xtype()))
 
-        v = cond.values[VALUE]
+        v = cond.xvalue()
         if v is True:
             return await tbref.get()
         elif v is False:
@@ -766,7 +766,7 @@ class _SwitchInferrer(Inferrer):
 async def _inf_scalar_cast(self, engine,
                            scalar: Number,
                            typ: AbstractType):
-    a = type_to_abstract(typ.values[VALUE])
+    a = type_to_abstract(typ.xvalue())
     t = a.xtype()
     engine.check(Number, t)
     values = {**scalar.values, TYPE: t}
@@ -804,7 +804,7 @@ async def _inf_partial(self, engine, fn, *args):
 
 @standard_prim(P.make_kwarg)
 async def _inf_make_kwarg(self, engine, key, value):
-    k = key.values[VALUE]
+    k = key.xvalue()
     assert isinstance(k, str)
     return AbstractKeywordArgument(k, value)
 
@@ -815,7 +815,7 @@ class _ExtractKwArgInferrer(Inferrer):
         return args
 
     async def infer(self, engine, key, kwarg):
-        assert key.values[VALUE] is kwarg.key
+        assert key.xvalue() is kwarg.key
         return kwarg.argument
 
 
@@ -836,7 +836,7 @@ async def _inf_env_getitem(self, engine,
                            env: dtype.EnvType,
                            key: dtype.SymbolicKeyType,
                            dflt):
-    expected = key.values[VALUE].abstract
+    expected = key.xvalue().abstract
     engine.abstract_merge(expected, dflt)
     return expected
 
@@ -846,7 +846,7 @@ async def _inf_env_setitem(self, engine,
                            env: dtype.EnvType,
                            key: dtype.SymbolicKeyType,
                            value):
-    expected = key.values[VALUE].abstract
+    expected = key.xvalue().abstract
     engine.abstract_merge(expected, value)
     return AbstractScalar({
         VALUE: ANYTHING,
@@ -864,7 +864,7 @@ async def _inf_env_add(self, engine, env1, env2):
 
 @standard_prim(P.unsafe_static_cast)
 async def _inf_unsafe_static_cast(self, engine, x, typ: AbstractType):
-    return typ.values[VALUE]
+    return typ.xvalue()
 
 
 @standard_prim(P.tagged)

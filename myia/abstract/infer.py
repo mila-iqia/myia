@@ -318,14 +318,14 @@ class InferenceEngine:
 
         if isinstance(fn, AbstractType):
             g = ref.node.graph
-            newfn = g.apply(P.partial, P.make_record, fn.values[VALUE])
+            newfn = g.apply(P.partial, P.make_record, fn.xvalue())
             newcall = g.apply(newfn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
 
         elif isinstance(fn, AbstractError):
             raise MyiaTypeError(
                 f'Trying to call a function with type '
-                f'{fn.values[VALUE]} {fn.values[DATA] or ""}.'
+                f'{fn.xvalue()} {fn.values[DATA] or ""}.'
             )
 
         elif isinstance(fn, AbstractClassBase):

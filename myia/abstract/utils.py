@@ -556,7 +556,7 @@ def _is_broad(self, x: object, *args):
 
 @overload  # noqa: F811
 def _is_broad(self, x: (AbstractScalar, AbstractFunction), *args):
-    return self(x.values[VALUE], *args)
+    return self(x.xvalue(), *args)
 
 
 ###########
@@ -994,8 +994,8 @@ def amerge(self, x1: AbstractScalar, x2, forced, bp):
 
 @overload  # noqa: F811
 def amerge(self, x1: AbstractError, x2, forced, bp):
-    e1 = x1.values[VALUE]
-    e2 = x2.values[VALUE]
+    e1 = x1.xvalue()
+    e2 = x2.xvalue()
     e = self(e1, e2, forced, bp)
     if forced or e is e1:
         return x1

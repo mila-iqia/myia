@@ -152,7 +152,7 @@ def __sum(x, d):
     """Remove a dim (of length 1)."""
     raise Exception("NotImplementedError (in pytorch_functions.py)")
 
-    orig_shp = x.values[SHAPE]
+    orig_shp = x.xshape()
 
     """ # Hardcoded example of function
     array_squash = P.array_reduce(P.scalar_add, x, (2, 1))

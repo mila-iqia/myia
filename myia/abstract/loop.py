@@ -157,11 +157,11 @@ def is_simple(x):
     Simple data can be forced more easily because it won't cause problems
     if we find more values to merge along.
     """
-    from .data import AbstractScalar, TYPE
+    from .data import AbstractScalar
     if isinstance(x, Pending):
         return x.is_simple()
     if isinstance(x, AbstractScalar):
-        return is_simple(x.values[TYPE])
+        return is_simple(x.xtype())
     elif isinstance(x, dtype.TypeMeta):
         return True
     else:

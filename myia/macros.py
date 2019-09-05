@@ -11,8 +11,6 @@ from . import abstract, operations
 from .abstract import (
     ALIASID,
     ANYTHING,
-    TYPE,
-    VALUE,
     AbstractArray,
     AbstractClassBase,
     Pending,
@@ -359,8 +357,8 @@ async def user_switch(info):
 
         for t, result in zip(fulltype.options, results):
             assert isinstance(result, abstract.AbstractScalar)
-            assert result.values[TYPE] is Bool
-            value = result.values[VALUE]
+            assert result.xtype() is Bool
+            value = result.xvalue()
             groups[value].append(t)
 
         if groups[ANYTHING]:

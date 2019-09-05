@@ -4,8 +4,6 @@ from . import dtype
 from .abstract import (
     DEAD,
     POLY,
-    TYPE,
-    VALUE,
     AbstractClass,
     AbstractError,
     AbstractExternal,
@@ -30,7 +28,7 @@ def validate_abstract(self, a: (AbstractClass, AbstractJTagged), uses):
 
 @overload  # noqa: F811
 def validate_abstract(self, a: AbstractError, uses):
-    kind = a.values[VALUE]
+    kind = a.xvalue()
     if kind is DEAD:
         return True
     elif kind is POLY:
@@ -43,7 +41,7 @@ def validate_abstract(self, a: AbstractError, uses):
 
 @overload  # noqa: F811
 def validate_abstract(self, a: AbstractScalar, uses):
-    if not issubclass(a.values[TYPE],
+    if not issubclass(a.xtype(),
                       (dtype.Number, dtype.Bool, dtype.Nil,
                        dtype.EnvType, dtype.SymbolicKeyType)):
         raise ValidationError(

@@ -10,9 +10,6 @@ import numpy as np
 from .. import dtype
 from ..abstract import (
     ANYTHING,
-    SHAPE,
-    TYPE,
-    VALUE,
     AbstractArray,
     AbstractClassBase,
     AbstractDict,
@@ -578,7 +575,7 @@ def convert_arg_array(arg, t: dtype.NDArray, et, orig_t):
 def convert_arg(self, arg, orig_t: AbstractArray):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
-    et = et.values[TYPE]
+    et = et.xtype()
     assert issubclass(et, dtype.Number)
     t = orig_t.xtype()
     arg = convert_arg_array[t](arg, t, et, orig_t)
@@ -587,7 +584,7 @@ def convert_arg(self, arg, orig_t: AbstractArray):
         raise MyiaInputTypeError(
             f"Expected array of type {et}, but got {arg_dtype}."
         )
-    shp = orig_t.values[SHAPE]
+    shp = orig_t.xshape()
     if (shp is not ANYTHING and arg.shape != shp):
         raise MyiaInputTypeError(
             f"Expected array with shape {shp}, but got {arg.shape}."
@@ -611,7 +608,7 @@ def convert_arg(self, arg, orig_t: AbstractUnion):
 
 @overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractScalar):
-    t = orig_t.values[TYPE]
+    t = orig_t.xtype()
     if issubclass(t, dtype.Int):
         if not isinstance(arg, (int, np.integer)):
             raise MyiaInputTypeError(f'Expected int')
@@ -629,7 +626,7 @@ def convert_arg(self, arg, orig_t: AbstractScalar):
             raise MyiaInputTypeError(f'Expected string')
     else:
         raise MyiaInputTypeError(f'Invalid type: {t}')
-    expected_value = orig_t.values[VALUE]
+    expected_value = orig_t.xvalue()
     if expected_value is not ANYTHING and expected_value != arg:
         raise MyiaInputTypeError(f'Invalid value: {arg}')
     if issubclass(t, dtype.String):
@@ -670,7 +667,7 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple):
 
 @overload  # noqa: F811
 def convert_result(self, arg, orig_t, vm_t: AbstractScalar):
-    if orig_t.values[TYPE] == dtype.String:
+    if orig_t.xtype() == dtype.String:
         arg = _strmap_tag[arg]
     return arg
 

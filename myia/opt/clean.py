@@ -55,8 +55,8 @@ def _reabs(self, a: AbstractClassBase):
 
 @overload  # noqa: F811
 def _reabs(self, a: AbstractScalar):
-    if a.values[TYPE] == String:
-        v = a.values[VALUE]
+    if a.xtype() == String:
+        v = a.xvalue()
         if v is not ANYTHING:
             v = str_to_tag(v)
         a = AbstractScalar({**a.values, VALUE: v, TYPE: Int[64]})

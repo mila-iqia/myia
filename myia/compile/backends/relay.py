@@ -5,8 +5,6 @@ import tvm
 from tvm import relay
 
 from ...abstract import (
-    SHAPE,
-    TYPE,
     AbstractArray,
     AbstractFunction,
     AbstractScalar,
@@ -45,7 +43,7 @@ def to_relay_type(self, a: AbstractTuple):
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractArray):
     tp = a.element.xtype()
-    return relay.ty.TensorType(a.values[SHAPE], type_to_np_dtype(tp))
+    return relay.ty.TensorType(a.xshape(), type_to_np_dtype(tp))
 
 
 @overload  # noqa: F811
@@ -296,7 +294,7 @@ class CompileGraph:
                 return relay.Tuple([_helper(e, et) for e, et in
                                     zip(value, type.elements)])
             else:
-                dtype = type_to_np_dtype(type.values[TYPE])
+                dtype = type_to_np_dtype(type.xtype())
                 return relay.const(value, dtype=dtype)
         if isinstance(node.value, (Primitive, AbstractArray)):
             # This is a hack for list_map and friends

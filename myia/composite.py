@@ -104,7 +104,7 @@ class Elemwise(MetaGraph):
 
     def make_signature(self, args):
         """Create the signature: whether arguments are arrays, and shapes."""
-        return tuple((arg.xtype(), arg.values[SHAPE])
+        return tuple((arg.xtype(), arg.xshape())
                      if isinstance(arg, AbstractArray) else (None, False)
                      for arg in args)
 
@@ -720,9 +720,9 @@ class IsCompare(MetaGraph):
 
         valid_types = (Bool, Nil)
         if ((not isinstance(a, AbstractScalar))
-            or (a.values[TYPE] not in valid_types)) \
+            or (a.xtype() not in valid_types)) \
                 and ((not isinstance(b, AbstractScalar))
-                     or (b.values[TYPE] not in valid_types)):
+                     or (b.xtype() not in valid_types)):
             if not self.do_not:
                 raise MyiaTypeError(
                     f'The operator "is" must have at ' +

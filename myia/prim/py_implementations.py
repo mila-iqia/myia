@@ -253,13 +253,13 @@ def typeof(x):
 @register(primops.hastype)
 def hastype(x, t):
     """Implement `hastype`."""
-    from ..abstract import type_to_abstract, TYPE, AbstractScalar, \
+    from ..abstract import type_to_abstract, AbstractScalar, \
         AbstractClassBase, ANYTHING
     tt = type_to_abstract(t)
     if isinstance(tt, AbstractScalar):
         try:
             typ = pytype_to_myiatype(type(x))
-            return issubclass(typ, tt.values[TYPE])
+            return issubclass(typ, tt.xtype())
         except KeyError:
             return False
     elif (isinstance(tt, AbstractClassBase)
