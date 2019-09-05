@@ -6,11 +6,11 @@ import numpy
 from numpy import ones as _ones, zeros as _zeros
 
 from myia.abstract import from_value
-from myia.dtype import Array
 from myia.macros import grad
 from myia.pipeline import standard_pipeline
 from myia.prim.py_implementations import array_reduce, scalar_add
 from myia.utils import InferenceError
+from myia.xtype import Array
 
 from .common import MA, MB, MC, MD
 from .test_compile import parse_compare

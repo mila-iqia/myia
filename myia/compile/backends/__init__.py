@@ -4,7 +4,7 @@ import importlib
 import os
 import urllib
 
-from ... import abstract, dtype
+from ... import abstract, xtype
 from ...utils import TaggedValue
 
 
@@ -191,9 +191,9 @@ class Backend:
             return self.from_numpy(v)
         elif isinstance(t, abstract.AbstractScalar):
             if issubclass(t.values[abstract.TYPE],
-                          (dtype.Number, dtype.Bool, dtype.Nil)):
+                          (xtype.Number, xtype.Bool, xtype.Nil)):
                 return self.from_scalar(v, t.values[abstract.TYPE])
-            elif issubclass(t.values[abstract.TYPE], dtype.EnvType):
+            elif issubclass(t.values[abstract.TYPE], xtype.EnvType):
                 assert len(v._contents) == 0
                 return self.empty_env()
             else:

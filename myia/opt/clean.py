@@ -19,10 +19,10 @@ from ..abstract import (
     split_type,
     type_to_abstract,
 )
-from ..dtype import Int, String
 from ..ir import Constant
 from ..prim import ops as P
 from ..utils import is_dataclass_type, overload
+from ..xtype import Int, String
 
 _idx = count()
 _tagmap = weakref.WeakKeyDictionary()

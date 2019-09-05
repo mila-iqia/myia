@@ -5,8 +5,7 @@ import operator
 from collections import defaultdict
 from functools import reduce
 
-from .. import dtype
-from ..dtype import Bool, ExceptionType, Number, String
+from .. import xtype
 from ..ir import Graph
 from ..prim import Primitive, ops as P, py_implementations as py
 from ..utils import (
@@ -18,6 +17,7 @@ from ..utils import (
     infer_trace,
     type_error_nargs,
 )
+from ..xtype import Bool, ExceptionType, Number, String
 from .data import (
     ANYTHING,
     SHAPE,
@@ -90,7 +90,7 @@ class StandardInferrer(Inferrer):
             typ = self.typemap.get(i)
             if typ is None:
                 pass
-            elif isinstance(typ, dtype.TypeMeta):
+            elif isinstance(typ, xtype.TypeMeta):
                 await force_pending(engine.check(typ, arg.xtype(), typ))
             elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):
@@ -253,7 +253,7 @@ def uniform_prim(prim, infer_value=False):
 def _shape_type(engine, shp):
     shp_t = engine.check(AbstractTuple, shp)
     for elem_t in shp_t.elements:
-        engine.abstract_merge(dtype.UInt[64], elem_t.xtype())
+        engine.abstract_merge(xtype.UInt[64], elem_t.xtype())
     return shp_t
 
 
@@ -327,7 +327,7 @@ async def _inf_hastype(self, engine, value, model: AbstractType):
     a = type_to_abstract(model.xvalue())
     return AbstractScalar({
         VALUE: hastype_helper(value, a),
-        TYPE: dtype.Bool,
+        TYPE: xtype.Bool,
     })
 
 
@@ -384,7 +384,7 @@ async def _inf_make_record(self, engine, _cls: AbstractType, *elems):
 
 @standard_prim(P.tuple_getitem)
 async def _inf_tuple_getitem(self, engine,
-                             arg: AbstractTuple, idx: dtype.Int[64]):
+                             arg: AbstractTuple, idx: xtype.Int[64]):
     nelems = len(arg.elements)
     idx_v = self.require_constant(idx, argnum=2, range=range(-nelems, nelems))
     return arg.elements[idx_v]
@@ -393,7 +393,7 @@ async def _inf_tuple_getitem(self, engine,
 @standard_prim(P.tuple_setitem)
 async def _inf_tuple_setitem(self, engine,
                              arg: AbstractTuple,
-                             idx: dtype.Int[64],
+                             idx: xtype.Int[64],
                              value: AbstractValue):
     nelems = len(arg.elements)
     idx_v = self.require_constant(idx, argnum=2, range=range(-nelems, nelems))
@@ -450,7 +450,7 @@ async def _inf_record_setitem(self, engine,
 async def _inf_tuple_len(self, engine, xs: AbstractTuple):
     return AbstractScalar({
         VALUE: len(xs.elements),
-        TYPE: dtype.Int[64],
+        TYPE: xtype.Int[64],
     })
 
 
@@ -458,7 +458,7 @@ async def _inf_tuple_len(self, engine, xs: AbstractTuple):
 async def _inf_array_len(self, engine, xs: AbstractArray):
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.Int[64],
+        TYPE: xtype.Int[64],
     })
 
 
@@ -494,7 +494,7 @@ async def _inf_broadcast_shape(self, engine, xs: _shape_type, ys: _shape_type):
     for n in res:
         elems.append(AbstractScalar({
             VALUE: n,
-            TYPE: dtype.UInt[64],
+            TYPE: xtype.UInt[64],
         }))
     return AbstractTuple(elems)
 
@@ -505,7 +505,7 @@ async def _inf_invert_permutation(self, engine, perm: _shape_type):
     return AbstractTuple(
         [perm.elements[i] if i in v else AbstractScalar({
             VALUE: ANYTHING,
-            TYPE: dtype.UInt[64],
+            TYPE: xtype.UInt[64],
         }) for i in range(len(v))]
     )
 
@@ -516,7 +516,7 @@ async def _inf_shape(self, engine, a: AbstractArray):
     values = [
         AbstractScalar({
             VALUE: entry,
-            TYPE: dtype.UInt[64],
+            TYPE: xtype.UInt[64],
         })
         for entry in shp
     ]
@@ -668,7 +668,7 @@ async def _inf_dot(self, engine, a: AbstractArray, b: AbstractArray):
 async def _inf_conv2d(self, engine, input: AbstractArray,
                       weight: AbstractArray, stride: _shape_type_pair,
                       padding: _shape_type_pair, dilation: _shape_type_pair,
-                      groups: dtype.UInt[64]):
+                      groups: xtype.UInt[64]):
 
     # TODO: _shape_type should not allow float to be converted to uint
     # TODO: "groups: UInt[64]" should not allow float to be converted to uint
@@ -695,7 +695,7 @@ async def _inf_conv2d(self, engine, input: AbstractArray,
 
     out_shape = (N, C_out, int(H_out), int(W_out))
 
-    # Checks all elements of input have same dtype as all elements of weight
+    # Checks all elements of input have same xtype as all elements of weight
     engine.check(AbstractScalar, input.element, weight.element)
     # ^ TODO: PyTorch also enforces, but might want to change for mixed precis
 
@@ -710,7 +710,7 @@ async def _inf_conv2d_input_grad(self, engine, input_size: _shape_type,
                                  stride: _shape_type_pair,
                                  padding: _shape_type_pair,
                                  dilation: _shape_type_pair,
-                                 groups: dtype.UInt[64]):
+                                 groups: xtype.UInt[64]):
     input_size_tuple = tuple(
         self.require_constant(i_s, argnum=0) for i_s in input_size.elements)
     return type(weight)(weight.element, {SHAPE: input_size_tuple,
@@ -724,7 +724,7 @@ async def _inf_conv2d_weight_grad(self, engine, input: AbstractArray,
                                   stride: _shape_type_pair,
                                   padding: _shape_type_pair,
                                   dilation: _shape_type_pair,
-                                  groups: dtype.UInt[64]):
+                                  groups: xtype.UInt[64]):
     weight_size_tuple = tuple(
         self.require_constant(w_s, argnum=0) for w_s in weight_size.elements)
     return type(input)(input.element, {SHAPE: weight_size_tuple,
@@ -827,14 +827,14 @@ class _EmbedInferrer(Inferrer):
         key = SymbolicKeyInstance(xref.node, sensitivity_transform(x))
         return AbstractScalar({
             VALUE: key,
-            TYPE: dtype.SymbolicKeyType,
+            TYPE: xtype.SymbolicKeyType,
         })
 
 
 @standard_prim(P.env_getitem)
 async def _inf_env_getitem(self, engine,
-                           env: dtype.EnvType,
-                           key: dtype.SymbolicKeyType,
+                           env: xtype.EnvType,
+                           key: xtype.SymbolicKeyType,
                            dflt):
     expected = key.xvalue().abstract
     engine.abstract_merge(expected, dflt)
@@ -843,14 +843,14 @@ async def _inf_env_getitem(self, engine,
 
 @standard_prim(P.env_setitem)
 async def _inf_env_setitem(self, engine,
-                           env: dtype.EnvType,
-                           key: dtype.SymbolicKeyType,
+                           env: xtype.EnvType,
+                           key: xtype.SymbolicKeyType,
                            value):
     expected = key.xvalue().abstract
     engine.abstract_merge(expected, value)
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.EnvType,
+        TYPE: xtype.EnvType,
     })
 
 
@@ -858,7 +858,7 @@ async def _inf_env_setitem(self, engine,
 async def _inf_env_add(self, engine, env1, env2):
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.EnvType,
+        TYPE: xtype.EnvType,
     })
 
 
@@ -881,7 +881,7 @@ async def _inf_tagged(self, engine, x, *rest):
 
 @standard_prim(P.hastag)
 async def _inf_hastag(self, engine,
-                      x: AbstractTaggedUnion, tag: dtype.Int[64]):
+                      x: AbstractTaggedUnion, tag: xtype.Int[64]):
     opts = await force_pending(x.options)
     self.require_constant(
         tag, argnum=2,
@@ -889,13 +889,13 @@ async def _inf_hastag(self, engine,
     )
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.Bool,
+        TYPE: xtype.Bool,
     })
 
 
 @standard_prim(P.casttag)
 async def _inf_casttag(self, engine,
-                       x: AbstractTaggedUnion, tag: dtype.Int[64]):
+                       x: AbstractTaggedUnion, tag: xtype.Int[64]):
     opts = await force_pending(x.options)
     tag_v = self.require_constant(
         tag, argnum=2,

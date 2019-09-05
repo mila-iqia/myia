@@ -10,7 +10,7 @@ from typing import List, Tuple
 import prettyprinter as pp
 from prettyprinter.prettyprinter import pretty_python_value
 
-from .. import dtype
+from .. import xtype
 from ..ir import ANFNode, Constant, Graph, MetaGraph
 from ..prim import Primitive
 from ..utils import (
@@ -419,7 +419,7 @@ class AbstractTuple(AbstractStructure):
 
     def __init__(self, elements, values={}):
         """Initialize an AbstractTuple."""
-        super().__init__({TYPE: dtype.Tuple, **values})
+        super().__init__({TYPE: xtype.Tuple, **values})
         if elements is not ANYTHING:
             elements = list(elements)
         self.elements = elements
@@ -489,7 +489,7 @@ class AbstractDict(AbstractStructure):
 
     def __init__(self, entries, values={}):
         """Initalize an AbstractDict."""
-        super().__init__({TYPE: dtype.Dict, **values})
+        super().__init__({TYPE: xtype.Dict, **values})
         self.entries = entries
 
     def children(self):

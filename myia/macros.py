@@ -24,7 +24,6 @@ from .abstract import (
     union_simplify,
 )
 from .composite import gadd
-from .dtype import Bool, Number
 from .info import About, DebugInfo
 from .ir import (
     CloneRemapper,
@@ -50,6 +49,7 @@ from .utils import (
     check_nargs,
     core,
 )
+from .xtype import Bool, Number
 
 
 @macro

@@ -17,22 +17,6 @@ from myia.abstract import (
 )
 from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.composite import gadd, zeros_like
-from myia.dtype import (
-    Array,
-    EnvType as Env,
-    External,
-    Int,
-    Nil,
-    Number,
-    String,
-    f16,
-    f32,
-    f64,
-    i16,
-    i32,
-    i64,
-    u64,
-)
 from myia.hypermap import HyperMap, hyper_map
 from myia.ir import Graph, MetaGraph, MultitypeGraph
 from myia.macros import grad
@@ -77,6 +61,22 @@ from myia.prim.py_implementations import (
     unsafe_static_cast,
 )
 from myia.utils import InferenceError, MyiaTypeError, newenv
+from myia.xtype import (
+    Array,
+    EnvType as Env,
+    External,
+    Int,
+    Nil,
+    Number,
+    String,
+    f16,
+    f32,
+    f64,
+    i16,
+    i32,
+    i64,
+    u64,
+)
 
 from .common import (
     AN,

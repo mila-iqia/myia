@@ -15,7 +15,7 @@
 #           pytorch original.                                               #
 #############################################################################
 
-from .. import composite as C, dtype as D
+from .. import composite as C, xtype as D
 from ..abstract import AbstractArray
 from ..composite import core
 from ..hypermap import hyper_map
@@ -23,7 +23,7 @@ from ..ir import MultitypeGraph
 from ..prim import ops as P
 
 # This import is for WIP
-# from ..dtype import Bool, Int
+# from ..xtype import Bool, Int
 
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############

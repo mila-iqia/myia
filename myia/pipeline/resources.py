@@ -5,7 +5,7 @@ from types import FunctionType
 
 import numpy as np
 
-from .. import composite as C, dtype, macros as M, operations, parser
+from .. import composite as C, macros as M, operations, parser, xtype
 from ..abstract import InferenceEngine
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
@@ -151,23 +151,23 @@ standard_object_map = {
 }
 
 standard_method_map = TypeMap({
-    dtype.Nil: {
+    xtype.Nil: {
         '__eq__': C.nil_eq,
         '__ne__': C.nil_ne,
         '__bool__': C.nil_bool,
     },
-    dtype.Bool: {
+    xtype.Bool: {
         '__and__': P.bool_and,
         '__or__': P.bool_or,
         '__eq__': P.bool_eq,
         '__ne__': C.bool_ne,
         '__bool__': P.identity,
     },
-    dtype.String: {
+    xtype.String: {
         '__eq__': P.string_eq,
         '__ne__': C.string_ne,
     },
-    dtype.Int: {
+    xtype.Int: {
         '__add__': P.scalar_add,
         '__sub__': P.scalar_sub,
         '__mul__': P.scalar_mul,
@@ -188,7 +188,7 @@ standard_method_map = TypeMap({
         '__bool__': C.int_bool,
         '__myia_to_array__': P.scalar_to_array,
     },
-    dtype.UInt: {
+    xtype.UInt: {
         '__add__': P.scalar_add,
         '__sub__': P.scalar_sub,
         '__mul__': P.scalar_mul,
@@ -209,7 +209,7 @@ standard_method_map = TypeMap({
         '__bool__': C.int_bool,
         '__myia_to_array__': P.scalar_to_array,
     },
-    dtype.Float: {
+    xtype.Float: {
         '__add__': P.scalar_add,
         '__sub__': P.scalar_sub,
         '__mul__': P.scalar_mul,
@@ -230,7 +230,7 @@ standard_method_map = TypeMap({
         '__bool__': C.float_bool,
         '__myia_to_array__': P.scalar_to_array,
     },
-    dtype.Tuple: {
+    xtype.Tuple: {
         '__len__': P.tuple_len,
         '__add__': C.tuple_concat,
         '__getitem__': C.tuple_get,
@@ -239,11 +239,11 @@ standard_method_map = TypeMap({
         '__myia_next__': C.tuple_next,
         '__myia_hasnext__': C.tuple_hasnext,
     },
-    dtype.Dict: {
+    xtype.Dict: {
         '__getitem__': P.dict_getitem,
         'values': M.dict_values,
     },
-    dtype.NDArray: {
+    xtype.NDArray: {
         '__add__': C.add,
         '__sub__': C.sub,
         '__mul__': C.mul,
@@ -272,9 +272,9 @@ standard_method_map = TypeMap({
         'T': property(C.transpose),
         'ndim': property(C.ndim),
     },
-    dtype.SymbolicKeyType: {
+    xtype.SymbolicKeyType: {
     },
-    dtype.EnvType: {
+    xtype.EnvType: {
     },
 })
 
@@ -311,7 +311,7 @@ def default_convert(env, seq: (tuple, list)):
 
 
 @overload  # noqa: F811
-def default_convert(env, x: (object, type, dtype.TypeMeta)):
+def default_convert(env, x: (object, type, xtype.TypeMeta)):
     return x
 
 
@@ -335,19 +335,19 @@ class ConverterResource(PipelineResource):
         for prim, impl in self.resources.py_implementations.items():
             self.object_map[impl] = prim
         type_map = {
-            bool: dtype.Bool,
-            int: dtype.Int,
-            float: dtype.Float,
-            np.ndarray: dtype.NDArray,
-            np.int8: dtype.Int,
-            np.int16: dtype.Int,
-            np.int32: dtype.Int,
-            np.int64: dtype.Int,
-            np.float16: dtype.Float,
-            np.float32: dtype.Float,
-            np.float64: dtype.Float,
-            tuple: dtype.Tuple,
-            dict: dtype.Dict,
+            bool: xtype.Bool,
+            int: xtype.Int,
+            float: xtype.Float,
+            np.ndarray: xtype.NDArray,
+            np.int8: xtype.Int,
+            np.int16: xtype.Int,
+            np.int32: xtype.Int,
+            np.int64: xtype.Int,
+            np.float16: xtype.Float,
+            np.float32: xtype.Float,
+            np.float64: xtype.Float,
+            tuple: xtype.Tuple,
+            dict: xtype.Dict,
         }
         mmap = self.resources.method_map
         for t1, t2 in type_map.items():

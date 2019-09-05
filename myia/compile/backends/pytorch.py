@@ -3,8 +3,8 @@
 import numpy as np
 import torch
 
-from ...dtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ...prim import Primitive, ops as P
+from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ..transform import CompileGraphs, nonlinear_ops
 from . import Backend
 from .pytorch_conv_grad import conv2d_input, conv2d_weight

@@ -1,6 +1,6 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
-from . import dtype
+from . import xtype
 from .abstract import (
     DEAD,
     POLY,
@@ -42,8 +42,8 @@ def validate_abstract(self, a: AbstractError, uses):
 @overload  # noqa: F811
 def validate_abstract(self, a: AbstractScalar, uses):
     if not issubclass(a.xtype(),
-                      (dtype.Number, dtype.Bool, dtype.Nil,
-                       dtype.EnvType, dtype.SymbolicKeyType)):
+                      (xtype.Number, xtype.Bool, xtype.Nil,
+                       xtype.EnvType, xtype.SymbolicKeyType)):
         raise ValidationError(
             f'Illegal type in the graph: {a}'
         )   # pragma: no cover

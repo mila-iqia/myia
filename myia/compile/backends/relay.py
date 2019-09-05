@@ -14,11 +14,11 @@ from ...abstract import (
     TypedPrimitive,
     VirtualFunction,
 )
-from ...dtype import Bool, Nil, type_to_np_dtype
 from ...graph_utils import toposort
 from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...utils import overload
+from ...xtype import Bool, Nil, type_to_np_dtype
 from . import Backend
 from .relay_helpers import build_module, optimize
 

@@ -23,7 +23,6 @@ from .abstract import (
     build_value,
     myia_static,
 )
-from .dtype import Bool, EnvType, Nil, Number, f32, f64, i8, i16, u8, u16
 from .hypermap import HyperMap, hyper_map
 from .ir import Graph, MetaGraph, MultitypeGraph
 from .prim import ops as P
@@ -52,6 +51,7 @@ from .prim.py_implementations import (
     typeof,
 )
 from .utils import MyiaShapeError, MyiaTypeError, Slice, check_nargs, newenv
+from .xtype import Bool, EnvType, Nil, Number, f32, f64, i8, i16, u8, u16
 
 
 def core(fn=None, **flags):

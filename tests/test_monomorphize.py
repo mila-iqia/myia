@@ -5,7 +5,6 @@ from pytest import mark
 from myia.abstract import from_value
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
-from myia.dtype import Number
 from myia.hypermap import hyper_map
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.prim.py_implementations import (
@@ -23,6 +22,7 @@ from myia.prim.py_implementations import (
 )
 from myia.utils import InferenceError, overload
 from myia.validate import ValidationError
+from myia.xtype import Number
 
 from .common import (
     Point,

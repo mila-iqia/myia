@@ -3,7 +3,6 @@ import pytest
 
 from myia.api import myia, to_device
 from myia.cconv import closure_convert
-from myia.dtype import Bool, EnvType
 from myia.ir import clone
 from myia.pipeline import (
     scalar_debug_compile as compile,
@@ -12,6 +11,7 @@ from myia.pipeline import (
 from myia.pipeline.steps import convert_arg, convert_result
 from myia.prim.py_implementations import tuple_getitem
 from myia.utils import InferenceError, TaggedValue, newenv
+from myia.xtype import Bool, EnvType
 
 from .common import (
     D,

@@ -3,7 +3,6 @@
 from .. import operations
 from ..abstract import DEAD, AbstractFunction, AbstractJTagged, abstract_clone
 from ..composite import gadd, zeros_like
-from ..dtype import Number
 from ..ir import (
     Apply,
     BasicRemapper,
@@ -15,6 +14,7 @@ from ..ir import (
 from ..prim import Primitive, ops as P
 from ..utils import Namespace, Partializable, overload
 from ..utils.unify import SVar, Var, var
+from ..xtype import Number
 from .opt import (
     GraphTransform,
     PatternSubstitutionOptimization as psub,

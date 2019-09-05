@@ -6,9 +6,9 @@ from typing import Callable
 
 import numpy as np
 
-from .. import abstract, dtype as types
-from ..dtype import Bool, Float, Number, String, pytype_to_myiatype
+from .. import abstract, xtype as types
 from ..utils import Registry, TaggedValue
+from ..xtype import Bool, Float, Number, String, pytype_to_myiatype
 from . import ops as primops
 
 py_registry: Registry[primops.Primitive, Callable] = Registry()

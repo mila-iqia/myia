@@ -5,7 +5,7 @@ import typing
 import numpy as np
 import pytest
 
-from myia import dtype as ty
+from myia import xtype as ty
 from myia.abstract import (
     ALIASID,
     ANYTHING,
