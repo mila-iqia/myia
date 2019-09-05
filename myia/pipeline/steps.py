@@ -662,6 +662,7 @@ def step_wrap(resources,
     fn = output
     orig_arg_t = orig_argspec or argspec
     orig_out_t = orig_outspec or outspec
+    vm_arg_t = graph.abstract.get_sync()[0].args
     vm_out_t = graph.return_.abstract
 
     def wrapped(*args):
@@ -680,7 +681,7 @@ def step_wrap(resources,
             if isinstance(orig_out_t, AbstractTuple):
                 res = tuple(BackendValue(r, ot, vt, backend)
                             for r, ot, vt in zip(res, orig_out_t.elements,
-                                                    vm_out_t.elements))
+                                                 vm_out_t.elements))
             else:
                 res = BackendValue(res, orig_out_t, vm_out_t, backend)
         else:

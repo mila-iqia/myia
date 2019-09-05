@@ -12,7 +12,6 @@ from ..ir import Graph, clone
 from ..monomorphize import monomorphize
 from ..prim import ops as P
 from ..utils import (
-    MyiaInputTypeError,
     Partial,
     Partializable,
     Slice,
@@ -428,29 +427,13 @@ class InferenceResource(Partializable):
 class NumpyChecker:
     """Dummy backend used for debug mode."""
 
-    def from_numpy(self, n):
-        """Returns n."""
-        return n
+    def to_backend_value(self, v, t):
+        """Returns v."""
+        return v
 
-    def to_numpy(self, n):
-        """Returns n."""
-        return n
-
-    def from_scalar(self, s, dt):
-        """Returns s."""
-        return s
-
-    def to_scalar(self, s):
-        """Returns s."""
-        return s
-
-    def check_array(self, arg, t):
-        """Checks that arg has elements of the right dtype."""
-        if not isinstance(arg, np.ndarray):
-            raise MyiaInputTypeError('Expected ndarray')
-        if arg.dtype != xtype.type_to_np_dtype(t):
-            raise MyiaInputTypeError('Wrong dtype')
-        return arg
+    def from_backend_value(self, v, t):
+        """Returns v."""
+        return v
 
 
 class BackendResource(Partializable):

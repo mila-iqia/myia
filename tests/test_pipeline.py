@@ -15,16 +15,6 @@ class OpStep(Partializable):
         return {'value': self.op(self.param, value)}
 
 
-# class OpResourceStep(PipelineStep):
-
-#     def __init__(self, pipeline_init, op):
-#         super().__init__(pipeline_init)
-#         self.op = op
-
-#     def step(self, value):
-#         return {'value': self.op(self.resources.param, value)}
-
-
 def double_step(value):
     return value * 2
 
