@@ -14,16 +14,16 @@ from myia.debug.label import (
     short_relation_symbols,
 )
 from myia.debug.utils import mixin
-from myia.dtype import Float, Int, UInt
 from myia.info import About
 from myia.ir import Apply, Constant, GraphCloner, ParentProxy, manage
 from myia.opt import LocalPassOptimizer, NodeMap, pattern_replacer
 from myia.prim import ops as primops
 from myia.utils import UNKNOWN, Registry
 from myia.utils.unify import SVar, Var, var
+from myia.xtype import Float, Int, UInt
 
 try:
-    from myia.dtype import JTagged
+    from myia.xtype import JTagged
 except ImportError:
     class JTagged:
         pass
