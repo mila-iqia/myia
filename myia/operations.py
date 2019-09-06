@@ -1,7 +1,7 @@
 """Myia operations."""
 
 
-from builtins import bool, getattr, len, setattr  # noqa
+from builtins import bool, getattr, hasattr, len, setattr  # noqa
 from operator import (  # noqa
     add,
     and_,
