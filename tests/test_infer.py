@@ -1276,6 +1276,26 @@ class data:
 
 
 @infer(
+    (i64, False),
+    (Point(i64, i64), True),
+)
+def test_hasattr(x):
+    return hasattr(x, 'x')
+
+
+@infer_std(
+    (i64, i64),
+    (Point(i64, i64), i64),
+    (U(i64, Point(i64, i64)), i64),
+)
+def test_hasattr_cond(x):
+    if hasattr(x, 'x'):
+        return x.x
+    else:
+        return x
+
+
+@infer(
     (i64, i64, (i64, i64)),
     (i64, f64, InferenceError),
 )

@@ -160,44 +160,8 @@ async def _resolve_case(resources, data, data_t, item_v):
     return ('static',)
 
 
-@macro
-async def getattr_(info):
-    """Get an attribute from an object."""
-    r_data, r_attr = check_nargs('getattr', 2, info.argrefs)
-    data, attr = info.abstracts
-
-    if isinstance(data, abstract.AbstractUnion):
-        g = info.graph
-        currg = g
-        opts = await abstract.force_pending(data.options)
-        for i, opt in enumerate(opts):
-            last = (i == len(opts) - 1)
-            if last:
-                falseg = None
-                cast = currg.apply(P.unsafe_static_cast, r_data.node, opt)
-                out = currg.apply(operations.getattr, cast, r_attr.node)
-            else:
-                trueg = Graph()
-                falseg = Graph()
-                cond = currg.apply(P.hastype, r_data.node, opt)
-                cast = trueg.apply(P.unsafe_static_cast, r_data.node, opt)
-                trueg.output = trueg.apply(operations.getattr, cast,
-                                           r_attr.node)
-                info.engine.mng.add_graph(trueg)
-                out = currg.apply(P.switch, cond, trueg, falseg)
-                out = currg.apply(out)
-            if currg is g:
-                rval = out
-            else:
-                currg.output = out
-                info.engine.mng.add_graph(currg)
-            currg = falseg
-        return rval
-
+async def _attr_case(info, data, attr_v):
     data_t = data.xtype()
-    attr_v = build_value(attr, default=ANYTHING)
-    g = info.outref.node.graph
-
     if attr_v is ANYTHING:
         raise InferenceError(
             'The value of the attribute could not be inferred.'
@@ -209,12 +173,75 @@ async def getattr_(info):
 
     resources = info.engine.resources
     if isinstance(data_t, Pending):
-        case, *args = await find_coherent_result(
+        return await find_coherent_result(
             data_t,
             lambda t: _resolve_case(resources, data, t, attr_v)
         )
     else:
-        case, *args = await _resolve_case(resources, data, data_t, attr_v)
+        return await _resolve_case(resources, data, data_t, attr_v)
+
+
+async def _union_make(info, op):
+    # Helper for hasattr/getattr on unions.
+    # op(x :: U(T1, T2, T3), attr) becomes:
+    # (op(T1(x), attr) if hastype(x, T1)
+    #  else (op(T2(x), attr) if hastype(x, T2)
+    #        else op(T3(x), attr)))
+    r_data, r_attr = info.argrefs
+    data, attr = info.abstracts
+    currg = info.graph
+    opts = await abstract.force_pending(data.options)
+    for i, opt in enumerate(opts):
+        last = (i == len(opts) - 1)
+        if last:
+            falseg = None
+            cast = currg.apply(P.unsafe_static_cast, r_data.node, opt)
+            out = currg.apply(op, cast, r_attr.node)
+        else:
+            trueg = Graph()
+            falseg = Graph()
+            cond = currg.apply(P.hastype, r_data.node, opt)
+            cast = trueg.apply(P.unsafe_static_cast, r_data.node, opt)
+            trueg.output = trueg.apply(op, cast, r_attr.node)
+            info.engine.mng.add_graph(trueg)
+            out = currg.apply(P.switch, cond, trueg, falseg)
+            out = currg.apply(out)
+        if currg is info.graph:
+            rval = out
+        else:
+            currg.output = out
+            info.engine.mng.add_graph(currg)
+        currg = falseg
+    return rval
+
+
+@macro
+async def hasattr_(info):
+    """Check that an object has an attribute."""
+    r_data, r_attr = check_nargs('hasattr', 2, info.argrefs)
+    data, attr = info.abstracts
+
+    if isinstance(data, abstract.AbstractUnion):
+        return await _union_make(info, operations.hasattr)
+
+    attr_v = build_value(attr, default=ANYTHING)
+    case, *_ = await _attr_case(info, data, attr_v)
+
+    return Constant(case == 'field' or case == 'method')
+
+
+@macro
+async def getattr_(info):
+    """Get an attribute from an object."""
+    r_data, r_attr = check_nargs('getattr', 2, info.argrefs)
+    data, attr = info.abstracts
+    g = info.graph
+
+    if isinstance(data, abstract.AbstractUnion):
+        return await _union_make(info, operations.getattr)
+
+    attr_v = build_value(attr, default=ANYTHING)
+    case, *args = await _attr_case(info, data, attr_v)
 
     if case == 'field':
         # Get field from Class
