@@ -4,7 +4,7 @@ from dataclasses import dataclass, is_dataclass
 
 import numpy as np
 
-from myia import dtype
+from myia import xtype
 from myia.abstract import (
     ANYTHING,
     SHAPE,
@@ -27,16 +27,16 @@ from myia.abstract import (
     listof,
 )
 from myia.composite import ArithmeticData
-from myia.dtype import Bool, Nil, Number, f16, f32, f64, i16, i32, i64, u64
 from myia.ir import MultitypeGraph
 from myia.prim.py_implementations import hastype, tagged
 from myia.utils import ADT, EnvInstance, dataclass_fields, overload
+from myia.xtype import Bool, Nil, Number, f16, f32, f64, i16, i32, i64, u64
 
 B = Bool
 Bot = AbstractBottom()
 EmptyTuple = typing.Tuple[()]
 AA = AbstractArray(ANYTHING, {SHAPE: ANYTHING, TYPE: ANYTHING})
-AN = AbstractArray(ANYTHING, {SHAPE: ANYTHING, TYPE: dtype.NDArray})
+AN = AbstractArray(ANYTHING, {SHAPE: ANYTHING, TYPE: xtype.NDArray})
 
 
 ###########################
@@ -48,7 +48,7 @@ def arr_of(t, shp, value):
     return AbstractArray(AbstractScalar({
         VALUE: value,
         TYPE: t,
-    }), {SHAPE: shp, TYPE: dtype.NDArray})
+    }), {SHAPE: shp, TYPE: xtype.NDArray})
 
 
 def ai64_of(*shp, value=ANYTHING):
@@ -93,7 +93,7 @@ def JT(a):
 def S(x=ANYTHING, t=None):
     return AbstractScalar({
         VALUE: x,
-        TYPE: t or dtype.pytype_to_myiatype(type(x)),
+        TYPE: t or xtype.pytype_to_myiatype(type(x)),
     })
 
 
@@ -128,13 +128,13 @@ def to_abstract_test(self, x: (bool, int, float, str,
                                type(None), EnvInstance)):
     return AbstractScalar({
         VALUE: x,
-        TYPE: dtype.pytype_to_myiatype(type(x)),
+        TYPE: xtype.pytype_to_myiatype(type(x)),
     })
 
 
 @overload  # noqa: F811
-def to_abstract_test(self, x: (dtype.Number, dtype.String,
-                               dtype.Bool, dtype.EnvType)):
+def to_abstract_test(self, x: (xtype.Number, xtype.String,
+                               xtype.Bool, xtype.EnvType)):
     return AbstractScalar({VALUE: ANYTHING, TYPE: x})
 
 
@@ -143,9 +143,9 @@ def to_abstract_test(self, x: np.ndarray):
     return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,
-            TYPE: dtype.np_dtype_to_type(str(x.dtype)),
+            TYPE: xtype.np_dtype_to_type(str(x.dtype)),
         }),
-        {SHAPE: x.shape, TYPE: dtype.NDArray}
+        {SHAPE: x.shape, TYPE: xtype.NDArray}
     )
 
 
@@ -189,7 +189,7 @@ def to_abstract_test(self, x: object):
         for name, value in dataclass_fields(x).items():
             new_args[name] = self(value)
         return AbstractClass(type(x), new_args)
-    elif getattr(x, '__origin__') is dtype.External:
+    elif getattr(x, '__origin__') is xtype.External:
         arg, = x.__args__
         return AbstractExternal({VALUE: ANYTHING, TYPE: arg})
     else:

@@ -5,7 +5,7 @@ import os
 
 from hrepr import hrepr
 
-from myia import abstract, dtype, info, ir, operations, opt, parser, utils, vm
+from myia import abstract, info, ir, operations, opt, parser, utils, vm, xtype
 from myia.abstract import ANYTHING, VALUE, Possibilities
 from myia.debug.label import (
     CosmeticPrimitive,
@@ -1055,7 +1055,7 @@ class _PatternSubstitutionOptimization:
 #################
 
 
-@mixin(dtype.TypeMeta)
+@mixin(xtype.TypeMeta)
 class _TypeMeta:
     def __hrepr__(cls, H, hrepr):
         return cls.__type_hrepr__(H, hrepr)
@@ -1065,21 +1065,21 @@ class _TypeMeta:
         return H.style(mcss)
 
 
-@mixin(dtype.Type)
+@mixin(xtype.Type)
 class _Type:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
         return H.span(str(cls))
 
 
-@mixin(dtype.Bool)
+@mixin(xtype.Bool)
 class _Bool:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
         return H.div['myia-type-bool']('b')
 
 
-@mixin(dtype.Int)
+@mixin(xtype.Int)
 class _Int:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
@@ -1091,7 +1091,7 @@ class _Int:
             )
 
 
-@mixin(dtype.UInt)
+@mixin(xtype.UInt)
 class _UInt:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):
@@ -1103,7 +1103,7 @@ class _UInt:
             )
 
 
-@mixin(dtype.Float)
+@mixin(xtype.Float)
 class _Float:
     @classmethod
     def __type_hrepr__(cls, H, hrepr):

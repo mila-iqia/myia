@@ -16,12 +16,12 @@ from ..abstract.data import (
 )
 from ..abstract.infer import to_abstract
 from ..composite import core
-from ..dtype import Bool, Float, Int, NDArray, UInt
 from ..hypermap import hyper_map
 from ..pipeline.resources import standard_method_map, standard_object_map
 from ..pipeline.steps import convert_arg_array, convert_result_array
 from ..prim import ops as P
 from ..utils import MyiaInputTypeError
+from ..xtype import Bool, Float, Int, NDArray, UInt
 from .pytorch_abstract_types import AbstractModule, PyTorchTensor
 from .pytorch_functions import _sum, conv2d, item, linear, relu, sigmoid
 

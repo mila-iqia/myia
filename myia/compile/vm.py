@@ -1,6 +1,6 @@
 """Implementation of a prototype optimized VM in python."""
 
-from .. import dtype
+from .. import xtype
 from ..utils import TaggedValue
 
 
@@ -220,7 +220,7 @@ class FinalVM:
         """
         a = self.backend.to_scalar(self._ref(a))
         b = self.backend.to_scalar(self._ref(b))
-        self._push(self.backend.from_scalar(a and b, dtype.Bool))
+        self._push(self.backend.from_scalar(a and b, xtype.Bool))
 
     def inst_tuple_getitem(self, t, idx):
         """Get a item from a tuple.
@@ -268,7 +268,7 @@ class FinalVM:
         """
         x = self._ref(x)
         tag = self.backend.to_scalar(self._ref(tag))
-        res = self.backend.from_scalar(x.has(tag), dtype.Bool)
+        res = self.backend.from_scalar(x.has(tag), xtype.Bool)
         self._push(res)
 
     def inst_casttag(self, x, tag):

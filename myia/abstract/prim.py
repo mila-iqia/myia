@@ -5,8 +5,7 @@ import operator
 from collections import defaultdict
 from functools import reduce
 
-from .. import dtype
-from ..dtype import Bool, ExceptionType, Number, String
+from .. import xtype
 from ..ir import Graph
 from ..prim import Primitive, ops as P, py_implementations as py
 from ..utils import (
@@ -18,6 +17,7 @@ from ..utils import (
     infer_trace,
     type_error_nargs,
 )
+from ..xtype import Bool, ExceptionType, Number, String
 from .data import (
     ANYTHING,
     SHAPE,
@@ -90,8 +90,8 @@ class StandardInferrer(Inferrer):
             typ = self.typemap.get(i)
             if typ is None:
                 pass
-            elif isinstance(typ, dtype.TypeMeta):
-                await force_pending(engine.check(typ, arg.dtype(), typ))
+            elif isinstance(typ, xtype.TypeMeta):
+                await force_pending(engine.check(typ, arg.xtype(), typ))
             elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                 if not isinstance(arg, typ):
                     raise MyiaTypeError(
@@ -113,7 +113,7 @@ class StandardInferrer(Inferrer):
             range (optional): A range or collection in which the argument
                 must lie.
         """
-        v = a.values[VALUE]
+        v = a.xvalue()
         if v is ANYTHING:
             raise MyiaTypeError(
                 f'Argument {argnum} to {self.prim} must be constant.'
@@ -173,7 +173,7 @@ class WithImplInferrer(Inferrer):
         if not self.infer_value:
             outval = ANYTHING
         else:
-            values = [arg.values[VALUE] for arg in args]
+            values = [arg.xvalue() for arg in args]
             if any(v is ANYTHING for v in values):
                 outval = ANYTHING
             else:
@@ -221,7 +221,7 @@ class UniformPrimitiveInferrer(WithImplInferrer):
         outtype = self.outtype
         if any(not isinstance(arg, AbstractScalar) for arg in args):
             raise MyiaTypeError(f'Expected scalar as argument to {self.prim}')
-        ts = [arg.values[TYPE] for arg in args]
+        ts = [arg.xtype() for arg in args]
         for typ, indexes in self.typemap.items():
             # Each group is merged using check
             selection = [ts[i] for i in indexes]
@@ -253,7 +253,7 @@ def uniform_prim(prim, infer_value=False):
 def _shape_type(engine, shp):
     shp_t = engine.check(AbstractTuple, shp)
     for elem_t in shp_t.elements:
-        engine.abstract_merge(dtype.UInt[64], elem_t.values[TYPE])
+        engine.abstract_merge(xtype.UInt[64], elem_t.xtype())
     return shp_t
 
 
@@ -324,10 +324,10 @@ async def _inf_typeof(self, engine, value):
 
 @standard_prim(P.hastype)
 async def _inf_hastype(self, engine, value, model: AbstractType):
-    a = type_to_abstract(model.values[VALUE])
+    a = type_to_abstract(model.xvalue())
     return AbstractScalar({
         VALUE: hastype_helper(value, a),
-        TYPE: dtype.Bool,
+        TYPE: xtype.Bool,
     })
 
 
@@ -343,7 +343,7 @@ async def _inf_make_tuple(self, engine, *args):
 
 @standard_prim(P.make_dict)
 async def _inf_make_dict(self, engine, _dct: AbstractType, *values):
-    dct = _dct.values[VALUE]
+    dct = _dct.xvalue()
     assert len(dct.entries) == len(values)
     for t, elem in zip(dct.entries.values(), values):
         assert typecheck(t, elem)
@@ -355,7 +355,7 @@ async def _inf_make_dict(self, engine, _dct: AbstractType, *values):
 @standard_prim(P.make_record)
 async def _inf_make_record(self, engine, _cls: AbstractType, *elems):
     """Infer the return type of make_record."""
-    cls = _cls.values[VALUE]
+    cls = _cls.xvalue()
     cls = type_to_abstract(cls)
     expected = list(cls.attributes.items())
     if len(expected) != len(elems):
@@ -384,7 +384,7 @@ async def _inf_make_record(self, engine, _cls: AbstractType, *elems):
 
 @standard_prim(P.tuple_getitem)
 async def _inf_tuple_getitem(self, engine,
-                             arg: AbstractTuple, idx: dtype.Int[64]):
+                             arg: AbstractTuple, idx: xtype.Int[64]):
     nelems = len(arg.elements)
     idx_v = self.require_constant(idx, argnum=2, range=range(-nelems, nelems))
     return arg.elements[idx_v]
@@ -393,7 +393,7 @@ async def _inf_tuple_getitem(self, engine,
 @standard_prim(P.tuple_setitem)
 async def _inf_tuple_setitem(self, engine,
                              arg: AbstractTuple,
-                             idx: dtype.Int[64],
+                             idx: xtype.Int[64],
                              value: AbstractValue):
     nelems = len(arg.elements)
     idx_v = self.require_constant(idx, argnum=2, range=range(-nelems, nelems))
@@ -450,7 +450,7 @@ async def _inf_record_setitem(self, engine,
 async def _inf_tuple_len(self, engine, xs: AbstractTuple):
     return AbstractScalar({
         VALUE: len(xs.elements),
-        TYPE: dtype.Int[64],
+        TYPE: xtype.Int[64],
     })
 
 
@@ -458,7 +458,7 @@ async def _inf_tuple_len(self, engine, xs: AbstractTuple):
 async def _inf_array_len(self, engine, xs: AbstractArray):
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.Int[64],
+        TYPE: xtype.Int[64],
     })
 
 
@@ -469,14 +469,14 @@ async def _inf_array_len(self, engine, xs: AbstractArray):
 
 @standard_prim(P.scalar_to_array)
 async def _inf_scalar_to_array(self, engine, a: AbstractScalar, t):
-    tp = t.values[VALUE]
+    tp = t.xvalue()
     assert isinstance(tp, AbstractArray)
-    return AbstractArray(a, {SHAPE: (), TYPE: tp.dtype()})
+    return AbstractArray(a, {SHAPE: (), TYPE: tp.xtype()})
 
 
 @standard_prim(P.array_to_scalar)
 async def _inf_array_to_scalar(self, engine, a: AbstractArray):
-    a_shp = a.values[SHAPE]
+    a_shp = a.xshape()
     if len(a_shp) != 0:
         raise MyiaShapeError("array_to_scalar requires shape ()")
     return a.element
@@ -484,8 +484,8 @@ async def _inf_array_to_scalar(self, engine, a: AbstractArray):
 
 @standard_prim(P.broadcast_shape)
 async def _inf_broadcast_shape(self, engine, xs: _shape_type, ys: _shape_type):
-    shp_x = tuple(x.values[VALUE] for x in xs.elements)
-    shp_y = tuple(y.values[VALUE] for y in ys.elements)
+    shp_x = tuple(x.xvalue() for x in xs.elements)
+    shp_y = tuple(y.xvalue() for y in ys.elements)
     elems = []
     try:
         res = py.broadcast_shape(shp_x, shp_y)
@@ -494,29 +494,29 @@ async def _inf_broadcast_shape(self, engine, xs: _shape_type, ys: _shape_type):
     for n in res:
         elems.append(AbstractScalar({
             VALUE: n,
-            TYPE: dtype.UInt[64],
+            TYPE: xtype.UInt[64],
         }))
     return AbstractTuple(elems)
 
 
 @standard_prim(P.invert_permutation)
 async def _inf_invert_permutation(self, engine, perm: _shape_type):
-    v = [x.values[VALUE] for x in perm.elements]
+    v = [x.xvalue() for x in perm.elements]
     return AbstractTuple(
         [perm.elements[i] if i in v else AbstractScalar({
             VALUE: ANYTHING,
-            TYPE: dtype.UInt[64],
+            TYPE: xtype.UInt[64],
         }) for i in range(len(v))]
     )
 
 
 @standard_prim(P.shape)
 async def _inf_shape(self, engine, a: AbstractArray):
-    shp = await force_pending(a.values[SHAPE])
+    shp = await force_pending(a.xshape())
     values = [
         AbstractScalar({
             VALUE: entry,
-            TYPE: dtype.UInt[64],
+            TYPE: xtype.UInt[64],
         })
         for entry in shp
     ]
@@ -533,7 +533,7 @@ async def _inf_array_map(self, engine, fn: AbstractFunction, *arrays):
     subargs = [a.element for a in arrays]
     result = await engine.execute(fn, *subargs)
 
-    shapes = [a.values[SHAPE] for a in arrays]
+    shapes = [a.xshape() for a in arrays]
     shape0, *rest = shapes
     if any(len(s) != len(shape0) for s in rest):  # pragma: no cover
         # check_immediate above is checking this for us, although
@@ -553,15 +553,15 @@ async def _inf_array_map(self, engine, fn: AbstractFunction, *arrays):
             raise MyiaShapeError("Expect same shapes for array_map")
 
     for arr in arrays:
-        if arrays[0].dtype() != arr.dtype():
+        if arrays[0].xtype() != arr.xtype():
             raise MyiaTypeError(
-                f'Expect array of type {arrays[0].dtype()} '
-                f'to have same type as array of type {arr.dtype()}')
+                f'Expect array of type {arrays[0].xtype()} '
+                f'to have same type as array of type {arr.xtype()}')
 
     return type(arrays[0])(
         result, {
             SHAPE: tuple(rshape),
-            TYPE: arrays[0].dtype(),
+            TYPE: arrays[0].xtype(),
         }
     )
 
@@ -575,7 +575,7 @@ async def _inf_array_reduce(self, engine,
                             a: AbstractArray,
                             shp: _shape_type):
 
-    shp_i = await force_pending(a.values[SHAPE])
+    shp_i = await force_pending(a.xshape())
     shp_v = build_value(shp, default=ANYTHING)
     if shp_v == ANYTHING:
         raise AssertionError(
@@ -592,13 +592,13 @@ async def _inf_array_reduce(self, engine,
             )
 
     res = await engine.execute(fn, a.element, a.element)
-    return type(a)(res, {SHAPE: shp_v, TYPE: a.dtype()})
+    return type(a)(res, {SHAPE: shp_v, TYPE: a.xtype()})
 
 
 @standard_prim(P.distribute)
 async def _inf_distribute(self, engine, a: AbstractArray, _shp: _shape_type):
-    shp = tuple(x.values[VALUE] for x in _shp.elements)
-    a_shp = await force_pending(a.values[SHAPE])
+    shp = tuple(x.xvalue() for x in _shp.elements)
+    a_shp = await force_pending(a.xshape())
     delta = len(shp) - len(a_shp)
     if delta < 0:
         raise MyiaShapeError("Cannot distribute to smaller shape")
@@ -607,7 +607,7 @@ async def _inf_distribute(self, engine, a: AbstractArray, _shp: _shape_type):
     for vs, s in zip(a_shp, shp):
         if vs != s and vs not in (1, ANYTHING) and s not in (1, ANYTHING):
             raise MyiaShapeError("Cannot change shape when distributing")
-    return type(a)(a.element, {SHAPE: shp, TYPE: a.dtype()})
+    return type(a)(a.element, {SHAPE: shp, TYPE: a.xtype()})
 
 
 @standard_prim(P.reshape)
@@ -615,13 +615,13 @@ async def _inf_reshape(self, engine, a: AbstractArray, _shp: _shape_type):
     shp = build_value(_shp, default=ANYTHING)
     if shp == ANYTHING:
         shp = (ANYTHING,) * len(_shp.elements)
-    a_shp = await force_pending(a.values[SHAPE])
+    a_shp = await force_pending(a.xshape())
     if (all(s is not ANYTHING for s in shp) and
         all(s is not ANYTHING for s in a_shp) and
             prod(shp) != prod(a_shp)):
         raise MyiaShapeError("Cannot change the total number of elements "
                              "in reshape")
-    return type(a)(a.element, {SHAPE: shp, TYPE: a.dtype()})
+    return type(a)(a.element, {SHAPE: shp, TYPE: a.xtype()})
 
 
 @standard_prim(P.transpose)
@@ -631,7 +631,7 @@ async def _inf_transpose(self, engine,
     if perm == ANYTHING:
         shp = (ANYTHING,) * len(permutation.elements)
     else:
-        a_shp = await force_pending(a.values[SHAPE])
+        a_shp = await force_pending(a.xshape())
         if list(sorted(perm)) != list(range(len(a_shp))):
             raise MyiaShapeError(
                 'The second argument of transpose must be a permutation of'
@@ -639,13 +639,13 @@ async def _inf_transpose(self, engine,
             )
 
         shp = tuple(a_shp[i] for i in perm)
-    return type(a)(a.element, {SHAPE: shp, TYPE: a.dtype()})
+    return type(a)(a.element, {SHAPE: shp, TYPE: a.xtype()})
 
 
 @standard_prim(P.dot)
 async def _inf_dot(self, engine, a: AbstractArray, b: AbstractArray):
-    a_shp = a.values[SHAPE]
-    b_shp = b.values[SHAPE]
+    a_shp = a.xshape()
+    b_shp = b.xshape()
     if len(a_shp) != 2 or len(b_shp) != 2:
         raise MyiaShapeError("dot needs matrix inputs")
     if (a_shp[1] != b_shp[0] and
@@ -656,25 +656,25 @@ async def _inf_dot(self, engine, a: AbstractArray, b: AbstractArray):
     engine.abstract_merge(a.element, b.element)
     c_shp = (a_shp[0], b_shp[1])
 
-    if a.dtype() != b.dtype():
+    if a.xtype() != b.xtype():
         raise MyiaTypeError(
-            f'Expect array of type {a.dtype()} '
-            f'to have same type as array of type {b.dtype()}')
+            f'Expect array of type {a.xtype()} '
+            f'to have same type as array of type {b.xtype()}')
 
-    return type(a)(a.element, {SHAPE: c_shp, TYPE: a.dtype()})
+    return type(a)(a.element, {SHAPE: c_shp, TYPE: a.xtype()})
 
 
 @standard_prim(P.conv2d)
 async def _inf_conv2d(self, engine, input: AbstractArray,
                       weight: AbstractArray, stride: _shape_type_pair,
                       padding: _shape_type_pair, dilation: _shape_type_pair,
-                      groups: dtype.UInt[64]):
+                      groups: xtype.UInt[64]):
 
     # TODO: _shape_type should not allow float to be converted to uint
     # TODO: "groups: UInt[64]" should not allow float to be converted to uint
 
-    h_in, w_in = input.values[SHAPE][2:]
-    kernel_size = weight.values[SHAPE][2:]
+    h_in, w_in = input.xshape()[2:]
+    kernel_size = weight.xshape()[2:]
 
     stride = tuple(self.require_constant(e, argnum=f'"2:stride[{edx}]"')
                    for edx, e in enumerate(stride.elements))
@@ -683,8 +683,8 @@ async def _inf_conv2d(self, engine, input: AbstractArray,
     dilation = tuple(self.require_constant(e, argnum=f'"4:dilation[{edx}]"')
                      for edx, e in enumerate(dilation.elements))
 
-    N = input.values[SHAPE][0]
-    C_out = weight.values[SHAPE][0]
+    N = input.xshape()[0]
+    C_out = weight.xshape()[0]
 
     # Based on formulae in shape section of:
     # https://pytorch.org/docs/stable/nn.html#conv2d
@@ -695,12 +695,12 @@ async def _inf_conv2d(self, engine, input: AbstractArray,
 
     out_shape = (N, C_out, int(H_out), int(W_out))
 
-    # Checks all elements of input have same dtype as all elements of weight
+    # Checks all elements of input have same xtype as all elements of weight
     engine.check(AbstractScalar, input.element, weight.element)
     # ^ TODO: PyTorch also enforces, but might want to change for mixed precis
 
     return type(weight)(weight.element, {SHAPE: out_shape,
-                                         TYPE: weight.dtype()})
+                                         TYPE: weight.xtype()})
 
 
 @standard_prim(P.conv2d_input_grad)
@@ -710,11 +710,11 @@ async def _inf_conv2d_input_grad(self, engine, input_size: _shape_type,
                                  stride: _shape_type_pair,
                                  padding: _shape_type_pair,
                                  dilation: _shape_type_pair,
-                                 groups: dtype.UInt[64]):
+                                 groups: xtype.UInt[64]):
     input_size_tuple = tuple(
         self.require_constant(i_s, argnum=0) for i_s in input_size.elements)
     return type(weight)(weight.element, {SHAPE: input_size_tuple,
-                                         TYPE: weight.dtype()})
+                                         TYPE: weight.xtype()})
 
 
 @standard_prim(P.conv2d_weight_grad)
@@ -724,11 +724,11 @@ async def _inf_conv2d_weight_grad(self, engine, input: AbstractArray,
                                   stride: _shape_type_pair,
                                   padding: _shape_type_pair,
                                   dilation: _shape_type_pair,
-                                  groups: dtype.UInt[64]):
+                                  groups: xtype.UInt[64]):
     weight_size_tuple = tuple(
         self.require_constant(w_s, argnum=0) for w_s in weight_size.elements)
     return type(input)(input.element, {SHAPE: weight_size_tuple,
-                                       TYPE: input.dtype()})
+                                       TYPE: input.xtype()})
 
 ##############
 # Statements #
@@ -742,9 +742,9 @@ class _SwitchInferrer(Inferrer):
         condref, tbref, fbref = check_nargs(P.switch, 3, argrefs)
 
         cond = await condref.get()
-        await force_pending(engine.check(Bool, cond.dtype()))
+        await force_pending(engine.check(Bool, cond.xtype()))
 
-        v = cond.values[VALUE]
+        v = cond.xvalue()
         if v is True:
             return await tbref.get()
         elif v is False:
@@ -766,8 +766,8 @@ class _SwitchInferrer(Inferrer):
 async def _inf_scalar_cast(self, engine,
                            scalar: Number,
                            typ: AbstractType):
-    a = type_to_abstract(typ.values[VALUE])
-    t = a.dtype()
+    a = type_to_abstract(typ.xvalue())
+    t = a.xtype()
     engine.check(Number, t)
     values = {**scalar.values, TYPE: t}
     return AbstractScalar(values)
@@ -804,7 +804,7 @@ async def _inf_partial(self, engine, fn, *args):
 
 @standard_prim(P.make_kwarg)
 async def _inf_make_kwarg(self, engine, key, value):
-    k = key.values[VALUE]
+    k = key.xvalue()
     assert isinstance(k, str)
     return AbstractKeywordArgument(k, value)
 
@@ -815,7 +815,7 @@ class _ExtractKwArgInferrer(Inferrer):
         return args
 
     async def infer(self, engine, key, kwarg):
-        assert key.values[VALUE] is kwarg.key
+        assert key.xvalue() is kwarg.key
         return kwarg.argument
 
 
@@ -827,30 +827,30 @@ class _EmbedInferrer(Inferrer):
         key = SymbolicKeyInstance(xref.node, sensitivity_transform(x))
         return AbstractScalar({
             VALUE: key,
-            TYPE: dtype.SymbolicKeyType,
+            TYPE: xtype.SymbolicKeyType,
         })
 
 
 @standard_prim(P.env_getitem)
 async def _inf_env_getitem(self, engine,
-                           env: dtype.EnvType,
-                           key: dtype.SymbolicKeyType,
+                           env: xtype.EnvType,
+                           key: xtype.SymbolicKeyType,
                            dflt):
-    expected = key.values[VALUE].abstract
+    expected = key.xvalue().abstract
     engine.abstract_merge(expected, dflt)
     return expected
 
 
 @standard_prim(P.env_setitem)
 async def _inf_env_setitem(self, engine,
-                           env: dtype.EnvType,
-                           key: dtype.SymbolicKeyType,
+                           env: xtype.EnvType,
+                           key: xtype.SymbolicKeyType,
                            value):
-    expected = key.values[VALUE].abstract
+    expected = key.xvalue().abstract
     engine.abstract_merge(expected, value)
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.EnvType,
+        TYPE: xtype.EnvType,
     })
 
 
@@ -858,13 +858,13 @@ async def _inf_env_setitem(self, engine,
 async def _inf_env_add(self, engine, env1, env2):
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.EnvType,
+        TYPE: xtype.EnvType,
     })
 
 
 @standard_prim(P.unsafe_static_cast)
 async def _inf_unsafe_static_cast(self, engine, x, typ: AbstractType):
-    return typ.values[VALUE]
+    return typ.xvalue()
 
 
 @standard_prim(P.tagged)
@@ -881,7 +881,7 @@ async def _inf_tagged(self, engine, x, *rest):
 
 @standard_prim(P.hastag)
 async def _inf_hastag(self, engine,
-                      x: AbstractTaggedUnion, tag: dtype.Int[64]):
+                      x: AbstractTaggedUnion, tag: xtype.Int[64]):
     opts = await force_pending(x.options)
     self.require_constant(
         tag, argnum=2,
@@ -889,13 +889,13 @@ async def _inf_hastag(self, engine,
     )
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.Bool,
+        TYPE: xtype.Bool,
     })
 
 
 @standard_prim(P.casttag)
 async def _inf_casttag(self, engine,
-                       x: AbstractTaggedUnion, tag: dtype.Int[64]):
+                       x: AbstractTaggedUnion, tag: xtype.Int[64]):
     opts = await force_pending(x.options)
     tag_v = self.require_constant(
         tag, argnum=2,

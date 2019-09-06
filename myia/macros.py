@@ -11,8 +11,6 @@ from . import abstract, operations
 from .abstract import (
     ALIASID,
     ANYTHING,
-    TYPE,
-    VALUE,
     AbstractArray,
     AbstractClassBase,
     Pending,
@@ -26,7 +24,6 @@ from .abstract import (
     union_simplify,
 )
 from .composite import gadd
-from .dtype import Bool, Number
 from .info import About, DebugInfo
 from .ir import (
     CloneRemapper,
@@ -52,6 +49,7 @@ from .utils import (
     check_nargs,
     core,
 )
+from .xtype import Bool, Number
 
 
 @macro
@@ -174,7 +172,7 @@ async def getattr_(info):
             currg = falseg
         return rval
 
-    data_t = data.dtype()
+    data_t = data.xtype()
     attr_v = build_value(attr, default=ANYTHING)
     g = info.outref.node.graph
 
@@ -359,8 +357,8 @@ async def user_switch(info):
 
         for t, result in zip(fulltype.options, results):
             assert isinstance(result, abstract.AbstractScalar)
-            assert result.values[TYPE] is Bool
-            value = result.values[VALUE]
+            assert result.xtype() is Bool
+            value = result.xvalue()
             groups[value].append(t)
 
         if groups[ANYTHING]:

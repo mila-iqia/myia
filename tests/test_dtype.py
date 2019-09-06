@@ -1,7 +1,8 @@
 
 import pytest
 
-from myia.dtype import (
+from myia.utils import EnvInstance, SymbolicKeyInstance
+from myia.xtype import (
     Bool,
     EnvType,
     Float,
@@ -14,7 +15,6 @@ from myia.dtype import (
     pytype_to_myiatype as ptm,
     type_to_np_dtype,
 )
-from myia.utils import EnvInstance, SymbolicKeyInstance
 
 
 def test_instantiate():

@@ -5,8 +5,6 @@ import tvm
 from tvm import relay
 
 from ...abstract import (
-    SHAPE,
-    TYPE,
     AbstractArray,
     AbstractFunction,
     AbstractScalar,
@@ -16,11 +14,11 @@ from ...abstract import (
     TypedPrimitive,
     VirtualFunction,
 )
-from ...dtype import Bool, Nil, type_to_np_dtype
 from ...graph_utils import toposort
 from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...utils import overload
+from ...xtype import Bool, Nil, type_to_np_dtype
 from . import Backend
 from .relay_helpers import build_module, optimize
 
@@ -28,7 +26,7 @@ from .relay_helpers import build_module, optimize
 @overload(bootstrap=True)
 def to_relay_type(self, a: AbstractScalar):
     """Convert a myia abstract to a Relay type."""
-    tp = a.dtype()
+    tp = a.xtype()
     if issubclass(tp, Bool):
         return relay.ty.TensorType((), 'bool')
     elif issubclass(tp, Nil):
@@ -44,8 +42,8 @@ def to_relay_type(self, a: AbstractTuple):
 
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractArray):
-    tp = a.element.dtype()
-    return relay.ty.TensorType(a.values[SHAPE], type_to_np_dtype(tp))
+    tp = a.element.xtype()
+    return relay.ty.TensorType(a.xshape(), type_to_np_dtype(tp))
 
 
 @overload  # noqa: F811
@@ -296,7 +294,7 @@ class CompileGraph:
                 return relay.Tuple([_helper(e, et) for e, et in
                                     zip(value, type.elements)])
             else:
-                dtype = type_to_np_dtype(type.values[TYPE])
+                dtype = type_to_np_dtype(type.xtype())
                 return relay.const(value, dtype=dtype)
         if isinstance(node.value, (Primitive, AbstractArray)):
             # This is a hack for list_map and friends

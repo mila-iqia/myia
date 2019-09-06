@@ -23,7 +23,6 @@ from .abstract import (
     build_value,
     myia_static,
 )
-from .dtype import Bool, EnvType, Nil, Number, f32, f64, i8, i16, u8, u16
 from .hypermap import HyperMap, hyper_map
 from .ir import Graph, MetaGraph, MultitypeGraph
 from .prim import ops as P
@@ -52,6 +51,7 @@ from .prim.py_implementations import (
     typeof,
 )
 from .utils import MyiaShapeError, MyiaTypeError, Slice, check_nargs, newenv
+from .xtype import Bool, EnvType, Nil, Number, f32, f64, i8, i16, u8, u16
 
 
 def core(fn=None, **flags):
@@ -104,7 +104,7 @@ class Elemwise(MetaGraph):
 
     def make_signature(self, args):
         """Create the signature: whether arguments are arrays, and shapes."""
-        return tuple((arg.dtype(), arg.values[SHAPE])
+        return tuple((arg.xtype(), arg.xshape())
                      if isinstance(arg, AbstractArray) else (None, False)
                      for arg in args)
 
@@ -720,9 +720,9 @@ class IsCompare(MetaGraph):
 
         valid_types = (Bool, Nil)
         if ((not isinstance(a, AbstractScalar))
-            or (a.values[TYPE] not in valid_types)) \
+            or (a.xtype() not in valid_types)) \
                 and ((not isinstance(b, AbstractScalar))
-                     or (b.values[TYPE] not in valid_types)):
+                     or (b.xtype() not in valid_types)):
             if not self.do_not:
                 raise MyiaTypeError(
                     f'The operator "is" must have at ' +

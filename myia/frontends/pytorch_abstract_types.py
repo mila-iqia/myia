@@ -1,7 +1,7 @@
 """Abstract Types for PyTorch Frontend."""
 
 from ..abstract.data import AbstractClassBase
-from ..dtype import Object
+from ..xtype import Object
 
 
 class PyTorchTensor(Object):

@@ -6,9 +6,9 @@ from typing import Callable
 
 import numpy as np
 
-from .. import abstract, dtype as types
-from ..dtype import Bool, Float, Number, String, pytype_to_myiatype
+from .. import abstract, xtype as types
 from ..utils import Registry, TaggedValue
+from ..xtype import Bool, Float, Number, String, pytype_to_myiatype
 from . import ops as primops
 
 py_registry: Registry[primops.Primitive, Callable] = Registry()
@@ -253,13 +253,13 @@ def typeof(x):
 @register(primops.hastype)
 def hastype(x, t):
     """Implement `hastype`."""
-    from ..abstract import type_to_abstract, TYPE, AbstractScalar, \
+    from ..abstract import type_to_abstract, AbstractScalar, \
         AbstractClassBase, ANYTHING
     tt = type_to_abstract(t)
     if isinstance(tt, AbstractScalar):
         try:
             typ = pytype_to_myiatype(type(x))
-            return issubclass(typ, tt.values[TYPE])
+            return issubclass(typ, tt.xtype())
         except KeyError:
             return False
     elif (isinstance(tt, AbstractClassBase)
@@ -338,7 +338,7 @@ def _vm_record_getitem(vm, data, attr):
     try:
         x = getattr(data, attr)
     except AttributeError:
-        t = typeof(data).dtype()
+        t = typeof(data).xtype()
         mmap = vm.convert.resources.method_map[t]
         if attr in mmap:
             return Partial(vm.convert(mmap[attr]), [data], vm)

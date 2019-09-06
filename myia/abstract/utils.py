@@ -8,7 +8,7 @@ from types import AsyncGeneratorType, GeneratorType
 
 import numpy as np
 
-from .. import dtype
+from .. import xtype
 from ..utils import (
     ADT,
     Cons,
@@ -122,7 +122,7 @@ _default_type_params = {
 
 
 @overload(bootstrap=True)
-def type_to_abstract(self, t: dtype.TypeMeta):
+def type_to_abstract(self, t: xtype.TypeMeta):
     """Convert a type to an AbstractValue.
 
     If the value is already an AbstractValue, returns it directly.
@@ -136,8 +136,8 @@ def type_to_abstract(self, t: AbstractValue):
 
 
 @overload  # noqa: F811
-def type_to_abstract(self, t: (dtype.Number, dtype.Bool, dtype.EnvType,
-                               dtype.SymbolicKeyType, dtype.Nil)):
+def type_to_abstract(self, t: (xtype.Number, xtype.Bool, xtype.EnvType,
+                               xtype.SymbolicKeyType, xtype.Nil)):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: t,
@@ -205,14 +205,14 @@ def pytype_to_abstract(main: np.ndarray, args):
     arg, = args
     arg = type_to_abstract(arg)
     shp = ANYTHING
-    return AbstractArray(arg, {SHAPE: shp, TYPE: dtype.NDArray})
+    return AbstractArray(arg, {SHAPE: shp, TYPE: xtype.NDArray})
 
 
 @overload  # noqa: F811
 def pytype_to_abstract(main: int, args):
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.Int[64],
+        TYPE: xtype.Int[64],
     })
 
 
@@ -220,7 +220,7 @@ def pytype_to_abstract(main: int, args):
 def pytype_to_abstract(main: float, args):
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.Float[64],
+        TYPE: xtype.Float[64],
     })
 
 
@@ -228,7 +228,7 @@ def pytype_to_abstract(main: float, args):
 def pytype_to_abstract(main: bool, args):
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.Bool,
+        TYPE: xtype.Bool,
     })
 
 
@@ -556,7 +556,7 @@ def _is_broad(self, x: object, *args):
 
 @overload  # noqa: F811
 def _is_broad(self, x: (AbstractScalar, AbstractFunction), *args):
-    return self(x.values[VALUE], *args)
+    return self(x.xvalue(), *args)
 
 
 ###########
@@ -631,7 +631,7 @@ def sensitivity_transform(self, x: AbstractFunction):
     """
     return AbstractScalar({
         VALUE: ANYTHING,
-        TYPE: dtype.EnvType,
+        TYPE: xtype.EnvType,
     })
 
 
@@ -925,7 +925,7 @@ def amerge(self, x1: TaggedPossibilities, x2, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(self, x1: dtype.TypeMeta, x2, forced, bp):
+def amerge(self, x1: xtype.TypeMeta, x2, forced, bp):
     if issubclass(x2, x1):
         return x1
     elif not forced and issubclass(x1, x2):
@@ -994,8 +994,8 @@ def amerge(self, x1: AbstractScalar, x2, forced, bp):
 
 @overload  # noqa: F811
 def amerge(self, x1: AbstractError, x2, forced, bp):
-    e1 = x1.values[VALUE]
-    e2 = x2.values[VALUE]
+    e1 = x1.xvalue()
+    e2 = x2.xvalue()
     e = self(e1, e2, forced, bp)
     if forced or e is e1:
         return x1

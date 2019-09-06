@@ -432,10 +432,10 @@ class ANFNode(Node):
     @property
     def shape(self):
         """Return the node's shape."""
-        from ..abstract import AbstractArray, SHAPE
+        from ..abstract import AbstractArray
         a = self.abstract
         if a is not None and isinstance(a, AbstractArray):
-            return a.values[SHAPE]
+            return a.xshape()
         else:
             return None
 

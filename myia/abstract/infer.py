@@ -7,7 +7,7 @@ from functools import reduce
 
 import numpy as np
 
-from .. import dtype, operations
+from .. import operations, xtype
 from ..compile import BackendValue
 from ..info import About
 from ..ir import Graph, MetaGraph
@@ -318,14 +318,14 @@ class InferenceEngine:
 
         if isinstance(fn, AbstractType):
             g = ref.node.graph
-            newfn = g.apply(P.partial, P.make_record, fn.values[VALUE])
+            newfn = g.apply(P.partial, P.make_record, fn.xvalue())
             newcall = g.apply(newfn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
 
         elif isinstance(fn, AbstractError):
             raise MyiaTypeError(
                 f'Trying to call a function with type '
-                f'{fn.values[VALUE]} {fn.values[DATA] or ""}.'
+                f'{fn.xvalue()} {fn.values[DATA] or ""}.'
             )
 
         elif isinstance(fn, AbstractClassBase):
@@ -365,13 +365,13 @@ class InferenceEngine:
         """Returns whether the predicate applies on x.
 
         A predicate can be:
-            * A Myia type (dtype.Int[64] etc.)
+            * A Myia type (xtype.Int[64] etc.)
             * A Python class
             * A callable that returns a boolean
         """
-        if isinstance(predicate, dtype.TypeMeta):
+        if isinstance(predicate, xtype.TypeMeta):
             if isinstance(x, AbstractValue):
-                x = x.dtype()
+                x = x.xtype()
                 if x is None:
                     return False
             return issubclass(x, predicate)
@@ -414,9 +414,9 @@ class InferenceEngine:
 
 
 _number_types = [
-    dtype.Int[8], dtype.Int[16], dtype.Int[32], dtype.Int[64],
-    dtype.UInt[8], dtype.UInt[16], dtype.UInt[32], dtype.UInt[64],
-    dtype.Float[16], dtype.Float[32], dtype.Float[64],
+    xtype.Int[8], xtype.Int[16], xtype.Int[32], xtype.Int[64],
+    xtype.UInt[8], xtype.UInt[16], xtype.UInt[32], xtype.UInt[64],
+    xtype.Float[16], xtype.Float[32], xtype.Float[64],
 ]
 
 
@@ -461,19 +461,19 @@ def to_abstract(fn, self, v, **kwargs):
             new_args[name] = self(value, **kwargs)
         rval = AbstractClass(type(v), new_args)
 
-    elif isinstance(v, dtype.TypeMeta):
+    elif isinstance(v, xtype.TypeMeta):
         rval = AbstractType(v)
 
     else:
         try:
-            typ = dtype.pytype_to_myiatype(type(v))
+            typ = xtype.pytype_to_myiatype(type(v))
         except KeyError:
             rval = AbstractExternal({
                 VALUE: v,
                 TYPE: type(v),
             })
         else:
-            assert issubclass(typ, (dtype.External, dtype.EnvType))
+            assert issubclass(typ, (xtype.External, xtype.EnvType))
             rval = AbstractScalar({
                 VALUE: v,
                 TYPE: typ,
@@ -514,12 +514,12 @@ def to_abstract(self, v: Primitive, node=None, **kwargs):
 
 @overload  # noqa: F811
 def to_abstract(self, v: SymbolicKeyInstance, **kwargs):
-    return AbstractScalar({VALUE: v, TYPE: dtype.SymbolicKeyType})
+    return AbstractScalar({VALUE: v, TYPE: xtype.SymbolicKeyType})
 
 
 @overload  # noqa: F811
 def to_abstract(self, v: (bool, type(None), str), **kwargs):
-    typ = dtype.pytype_to_myiatype(type(v))
+    typ = xtype.pytype_to_myiatype(type(v))
     return AbstractScalar({
         VALUE: v,
         TYPE: typ,
@@ -529,9 +529,9 @@ def to_abstract(self, v: (bool, type(None), str), **kwargs):
 @overload  # noqa: F811
 def to_abstract(self, v: (int, float, np.integer, np.floating),
                 loop=None, **kwargs):
-    typ = dtype.pytype_to_myiatype(type(v))
+    typ = xtype.pytype_to_myiatype(type(v))
     if loop is not None:
-        prio = 1 if issubclass(typ, dtype.Float) else 0
+        prio = 1 if issubclass(typ, xtype.Float) else 0
         typ = loop.create_pending_from_list(
             _number_types, typ, lambda: prio
         )
@@ -565,13 +565,13 @@ def to_abstract(self, v: dict, **kwargs):
 
 @overload  # noqa: F811
 def to_abstract(self, v: np.ndarray, alias_map={}, **kwargs):
-    tracks = {SHAPE: v.shape, TYPE: dtype.NDArray}
+    tracks = {SHAPE: v.shape, TYPE: xtype.NDArray}
     if id(v) in alias_map:
         tracks[ALIASID] = alias_map[id(v)]
     return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,
-            TYPE: dtype.np_dtype_to_type(str(v.dtype)),
+            TYPE: xtype.np_dtype_to_type(str(v.dtype)),
         }),
         tracks
     )

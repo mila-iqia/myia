@@ -7,12 +7,9 @@ from itertools import count
 
 import numpy as np
 
-from .. import dtype
+from .. import xtype
 from ..abstract import (
     ANYTHING,
-    SHAPE,
-    TYPE,
-    VALUE,
     AbstractArray,
     AbstractClassBase,
     AbstractDict,
@@ -568,7 +565,7 @@ def convert_arg(self, arg, orig_t: AbstractClassBase):
 
 
 @overload
-def convert_arg_array(arg, t: dtype.NDArray, et, orig_t):
+def convert_arg_array(arg, t: xtype.NDArray, et, orig_t):
     if not isinstance(arg, np.ndarray):
         raise MyiaInputTypeError(f"Expected numpy.ndarray but got {arg}.")
     return arg
@@ -578,16 +575,16 @@ def convert_arg_array(arg, t: dtype.NDArray, et, orig_t):
 def convert_arg(self, arg, orig_t: AbstractArray):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
-    et = et.values[TYPE]
-    assert issubclass(et, dtype.Number)
-    t = orig_t.dtype()
+    et = et.xtype()
+    assert issubclass(et, xtype.Number)
+    t = orig_t.xtype()
     arg = convert_arg_array[t](arg, t, et, orig_t)
-    arg_dtype = dtype.np_dtype_to_type(str(arg.dtype))
+    arg_dtype = xtype.np_dtype_to_type(str(arg.dtype))
     if arg_dtype != et:
         raise MyiaInputTypeError(
             f"Expected array of type {et}, but got {arg_dtype}."
         )
-    shp = orig_t.values[SHAPE]
+    shp = orig_t.xshape()
     if (shp is not ANYTHING and arg.shape != shp):
         raise MyiaInputTypeError(
             f"Expected array with shape {shp}, but got {arg.shape}."
@@ -611,28 +608,28 @@ def convert_arg(self, arg, orig_t: AbstractUnion):
 
 @overload  # noqa: F811
 def convert_arg(self, arg, orig_t: AbstractScalar):
-    t = orig_t.values[TYPE]
-    if issubclass(t, dtype.Int):
+    t = orig_t.xtype()
+    if issubclass(t, xtype.Int):
         if not isinstance(arg, (int, np.integer)):
             raise MyiaInputTypeError(f'Expected int')
-    elif issubclass(t, dtype.Float):
+    elif issubclass(t, xtype.Float):
         if not isinstance(arg, (float, np.floating)):
             raise MyiaInputTypeError(f'Expected float')
-    elif issubclass(t, dtype.Bool):
+    elif issubclass(t, xtype.Bool):
         if not isinstance(arg, bool):
             raise MyiaInputTypeError(f'Expected bool')
-    elif issubclass(t, dtype.Nil):
+    elif issubclass(t, xtype.Nil):
         if arg is not None:
             raise MyiaInputTypeError(f'Expected None')
-    elif issubclass(t, dtype.String):
+    elif issubclass(t, xtype.String):
         if not isinstance(arg, str):
             raise MyiaInputTypeError(f'Expected string')
     else:
         raise MyiaInputTypeError(f'Invalid type: {t}')
-    expected_value = orig_t.values[VALUE]
+    expected_value = orig_t.xvalue()
     if expected_value is not ANYTHING and expected_value != arg:
         raise MyiaInputTypeError(f'Invalid value: {arg}')
-    if issubclass(t, dtype.String):
+    if issubclass(t, xtype.String):
         arg = str_to_tag(arg)
     return arg
 
@@ -670,19 +667,19 @@ def convert_result(self, res, orig_t, vm_t: AbstractTuple):
 
 @overload  # noqa: F811
 def convert_result(self, arg, orig_t, vm_t: AbstractScalar):
-    if orig_t.values[TYPE] == dtype.String:
+    if orig_t.xtype() == xtype.String:
         arg = _strmap_tag[arg]
     return arg
 
 
 @overload
-def convert_result_array(arg, orig_t: dtype.NDArray):
+def convert_result_array(arg, orig_t: xtype.NDArray):
     return arg
 
 
 @overload  # noqa: F811
 def convert_result(self, arg, orig_t, vm_t: AbstractArray):
-    t = orig_t.dtype()
+    t = orig_t.xtype()
     return convert_result_array[t](arg, t)
 
 

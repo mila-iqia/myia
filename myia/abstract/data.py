@@ -10,7 +10,7 @@ from typing import List, Tuple
 import prettyprinter as pp
 from prettyprinter.prettyprinter import pretty_python_value
 
-from .. import dtype
+from .. import xtype
 from ..ir import ANFNode, Constant, Graph, MetaGraph
 from ..prim import Primitive
 from ..utils import (
@@ -241,12 +241,16 @@ class AbstractValue(Interned, PossiblyRecursive):
         super().__init__()
         self.values = TrackDict(values)
 
-    def dtype(self):
+    def xtype(self):
         """Return the type of this AbstractValue."""
         t = self.values.get(TYPE, None)
         if isinstance(t, Pending) and t.done():
             t = t.result()
         return t
+
+    def xvalue(self):
+        """Return the value of this AbstractValue."""
+        return self.values[VALUE]
 
     def __eqkey__(self):
         return Atom(self, tuple(sorted(self.values.items())))
@@ -415,7 +419,7 @@ class AbstractTuple(AbstractStructure):
 
     def __init__(self, elements, values={}):
         """Initialize an AbstractTuple."""
-        super().__init__({TYPE: dtype.Tuple, **values})
+        super().__init__({TYPE: xtype.Tuple, **values})
         if elements is not ANYTHING:
             elements = list(elements)
         self.elements = elements
@@ -454,6 +458,10 @@ class AbstractArray(AbstractStructure):
         """Return the array element."""
         return self.element,
 
+    def xshape(self):
+        """Return the shape of this array."""
+        return self.values[SHAPE]
+
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
         return AttrEK(self, (v, 'element'))
@@ -481,7 +489,7 @@ class AbstractDict(AbstractStructure):
 
     def __init__(self, entries, values={}):
         """Initalize an AbstractDict."""
-        super().__init__({TYPE: dtype.Dict, **values})
+        super().__init__({TYPE: xtype.Dict, **values})
         self.entries = entries
 
     def children(self):

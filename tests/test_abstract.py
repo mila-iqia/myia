@@ -5,7 +5,7 @@ import typing
 import numpy as np
 import pytest
 
-from myia import dtype as ty
+from myia import xtype as ty
 from myia.abstract import (
     ALIASID,
     ANYTHING,
@@ -256,7 +256,7 @@ def test_repr_recursive():
 @abstract_clone.variant
 def upcast(self, x: AbstractScalar, nbits):
     return AbstractScalar({
-        VALUE: x.values[VALUE],
+        VALUE: x.xvalue(),
         TYPE: ty.Int[nbits],
     })
 
