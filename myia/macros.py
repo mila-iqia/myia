@@ -36,7 +36,7 @@ from .ir import (
     sexp_to_node,
 )
 from .prim import ops as P
-from .prim.py_implementations import scalar_cast, scalar_to_array, typeof
+from .prim.py_implementations import scalar_cast, scalar_to_array
 from .utils import (
     Cons,
     Empty,
@@ -46,6 +46,7 @@ from .utils import (
     MyiaTypeError,
     Named,
     Namespace,
+    SymbolicKeyInstance,
     check_nargs,
     core,
 )
@@ -94,6 +95,22 @@ async def isinstance_(info):
                 for t in ts]
     return reduce(lambda x, y: info.graph.apply(P.bool_or, x, y),
                   hastypes)
+
+
+@macro
+async def typeof(info):
+    """Return a constant with the type of the input."""
+    data, = check_nargs('typeof', 1, info.abstracts)
+    return Constant(data)
+
+
+@macro
+async def embed(info):
+    """Return a constant that embeds the identity of the input node."""
+    xref, = check_nargs('embed', 1, info.argrefs)
+    x, = info.abstracts
+    key = SymbolicKeyInstance(xref.node, abstract.sensitivity_transform(x))
+    return Constant(key)
 
 
 @macro

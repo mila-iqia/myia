@@ -12,7 +12,6 @@ from ..utils import (
     MyiaAttributeError,
     MyiaShapeError,
     MyiaTypeError,
-    SymbolicKeyInstance,
     check_nargs,
     infer_trace,
     type_error_nargs,
@@ -51,7 +50,6 @@ from .utils import (
     broaden,
     build_value,
     hastype_helper,
-    sensitivity_transform,
     type_to_abstract,
     typecheck,
 )
@@ -315,11 +313,6 @@ uniform_prim(P.string_eq, infer_value=True)(py.string_eq)
 ######################
 # Type introspection #
 ######################
-
-
-@standard_prim(P.typeof)
-async def _inf_typeof(self, engine, value):
-    return AbstractType(value)
 
 
 @standard_prim(P.hastype)
@@ -817,18 +810,6 @@ class _ExtractKwArgInferrer(Inferrer):
     async def infer(self, engine, key, kwarg):
         assert key.xvalue() is kwarg.key
         return kwarg.argument
-
-
-@standard_prim(P.embed)
-class _EmbedInferrer(Inferrer):
-    async def run(self, engine, outref, argrefs):
-        xref, = check_nargs(P.embed, 1, argrefs)
-        x = await xref.get()
-        key = SymbolicKeyInstance(xref.node, sensitivity_transform(x))
-        return AbstractScalar({
-            VALUE: key,
-            TYPE: xtype.SymbolicKeyType,
-        })
 
 
 @standard_prim(P.env_getitem)

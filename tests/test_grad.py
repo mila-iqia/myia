@@ -26,7 +26,6 @@ from myia.prim.py_implementations import (
     array_to_scalar,
     distribute,
     dot,
-    hastype,
     partial,
     py_registry as pyi,
     reshape,
@@ -527,7 +526,7 @@ def test_transpose2(x, y, axis1, axis2):
     argspec=(U(f64, (f64, f64)),)
 )
 def test_union(x):
-    if hastype(x, f64):
+    if isinstance(x, float):
         return x * x * x
     else:
         a, b = x

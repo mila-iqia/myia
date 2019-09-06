@@ -1,11 +1,21 @@
 import math
+from math import (
+    cos as math_cos,
+    exp as math_exp,
+    log as math_log,
+    sin as math_sin,
+    tan as math_tan,
+    tanh as math_tanh,
+    trunc as math_trunc,
+)
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from myia.abstract import ANYTHING
-from myia.pipeline import scalar_debug_pipeline
+from myia.operations import embed
+from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.prim.py_implementations import (
     _assert_scalar,
     array_getitem,
@@ -20,7 +30,6 @@ from myia.prim.py_implementations import (
     dict_setitem,
     distribute,
     dot,
-    embed,
     env_add,
     env_getitem,
     env_setitem,
@@ -60,12 +69,14 @@ def test_prim_mul(x, y):
     return x * y
 
 
-@parse_compare((2.0, 7.0), (4.0, -6.0), (-11, 2))
+@parse_compare((2.0, 7.0), (4.0, -6.0), (-11, 2),
+               pipeline=standard_debug_pipeline)
 def test_prim_truediv(x, y):
     return x / y
 
 
-@parse_compare((2, 7), (4, -6), (-11, 2), (-11.0, 2.0), (0, -1))
+@parse_compare((2, 7), (4, -6), (-11, 2), (-11.0, 2.0), (0, -1),
+               pipeline=standard_debug_pipeline)
 def test_prim_floordiv(x, y):
     return x // y
 
@@ -80,7 +91,7 @@ def test_prim_pow(x, y):
     return x ** y
 
 
-@parse_compare(-2, 2.3, -0.6)
+@parse_compare(-2, 2.3, -0.6, pipeline=scalar_debug_pipeline)
 def test_prim_floor(x):
     return math.floor(x)
 
@@ -92,7 +103,7 @@ def test_prim_max(x, y):
 
 @parse_compare(-2, 2.3, -0.6)
 def test_prim_trunc(x):
-    return math.trunc(x)
+    return math_trunc(x)
 
 
 @parse_compare(2, -6)
@@ -107,32 +118,32 @@ def test_prim_usub(x):
 
 @parse_compare(13, 0, -3)
 def test_prim_exp(x):
-    return math.exp(x)
+    return math_exp(x)
 
 
 @parse_compare(13, 1)
 def test_prim_log(x):
-    return math.log(x)
+    return math_log(x)
 
 
 @parse_compare(13, -3)
 def test_prim_sin(x):
-    return math.sin(x)
+    return math_sin(x)
 
 
 @parse_compare(13, -3)
 def test_prim_cos(x):
-    return math.cos(x)
+    return math_cos(x)
 
 
 @parse_compare(13, -3)
 def test_prim_tan(x):
-    return math.tan(x)
+    return math_tan(x)
 
 
 @parse_compare(-0.1, 0.3)
 def test_prim_tanh(x):
-    return math.tanh(x)
+    return math_tanh(x)
 
 
 @parse_compare((2, 7), (4, -6))
@@ -400,8 +411,6 @@ def test_scalar_cast():
 
 
 def test_env():
-    pip1 = scalar_debug_pipeline.select('resources', 'parse', 'export')
-    pip2 = scalar_debug_pipeline
 
     def f(x, y):
         e1 = env_setitem(newenv, embed(x), 100)
@@ -417,10 +426,9 @@ def test_env():
 
         return (a, b, c)
 
-    res = pip1.run(input=f)['output'](3, 4)
-    assert res == (110, 20, 0)
-
-    res = pip2.run(input=f,
-                   argspec=(to_abstract_test(i64),
-                            to_abstract_test(i64)))['output'](3, 4)
+    res = scalar_debug_pipeline.run(
+        input=f,
+        argspec=(to_abstract_test(i64),
+                 to_abstract_test(i64))
+    )['output'](3, 4)
     assert res == (110, 20, 0)

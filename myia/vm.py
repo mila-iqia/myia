@@ -7,13 +7,11 @@ implementation.
 
 from typing import Any, Iterable, List, Mapping
 
-from . import operations
-from .abstract import to_abstract
 from .graph_utils import toposort
-from .ir import ANFNode, Apply, Constant, Graph, MetaGraph, Parameter
+from .ir import ANFNode, Apply, Constant, Graph, Parameter
 from .prim import Primitive
-from .prim.ops import embed, partial, return_
-from .utils import SymbolicKeyInstance, TypeMap, is_dataclass_type
+from .prim.ops import partial, return_
+from .utils import TypeMap, is_dataclass_type
 
 
 class VMFrame:
@@ -248,41 +246,19 @@ class VM:
         return Closure(graph, clos)
 
     def _dispatch_call(self, node, frame, fn, args):
-        from . import macros
-        from .prim import py_implementations as py
-        # This map should be removed once the inferrer/monomorphizer is always
-        # run before the DebugVM.
-        _macro_map = {
-            operations.getattr: py._vm_record_getitem,
-            operations.resolve: py._resolve_vm,
-            macros.getattr_: py._vm_record_getitem,
-            macros.user_switch: lambda vm, *args: py.switch(*args),
-            macros.resolve: py._resolve_vm,
-        }
-        if fn in _macro_map:
-            frame.values[node] = _macro_map[fn](self, *args)
-        elif isinstance(fn, Primitive):
+        if isinstance(fn, Primitive):
             if fn == return_:
                 raise self._Return(args[0])
             elif fn == partial:
                 partial_fn, *partial_args = args
                 res = Partial(partial_fn, partial_args, self)
                 frame.values[node] = res
-            elif fn == embed:
-                _, x = node.inputs
-                frame.values[node] = SymbolicKeyInstance(x, node.abstract)
             else:
                 frame.values[node] = self.implementations[fn](self, *args)
         elif isinstance(fn, Partial):
             self._dispatch_call(node, frame, fn.fn, fn.args + tuple(args))
         elif isinstance(fn, (Graph, Closure)):
             self._call(fn, args)
-        elif isinstance(fn, MetaGraph):
-            absargs = [to_abstract(arg) for arg in args]
-            sig = fn.make_signature(absargs)
-            g = fn.generate_graph(sig)
-            g = self.convert(g)
-            self._dispatch_call(node, frame, g, args)
         elif is_dataclass_type(fn):
             frame.values[node] = fn(*args)
         else:

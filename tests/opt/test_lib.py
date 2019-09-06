@@ -1,11 +1,11 @@
 
 from myia.composite import gadd
+from myia.operations import embed, typeof
 from myia.opt import lib
 from myia.prim.py_implementations import (
     array_map,
     array_reduce,
     distribute,
-    embed,
     env_add,
     env_getitem,
     env_setitem,
@@ -19,7 +19,6 @@ from myia.prim.py_implementations import (
     switch,
     transpose,
     tuple_setitem,
-    typeof,
 )
 from myia.utils import newenv
 

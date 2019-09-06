@@ -1,24 +1,25 @@
 import numpy as np
 
-from myia.composite import list_reduce
-from myia.pipeline import scalar_debug_compile as compile
+from myia.pipeline import (
+    scalar_debug_compile as compile,
+    standard_debug_pipeline,
+)
 from myia.prim.py_implementations import (
     array_map,
     array_reduce,
     array_scan,
     scalar_usub,
 )
-from myia.utils import list_to_cons
 
 from .test_lang import parse_compare
 
 
-@parse_compare((2, 3), (2.0, 3.0))
+@parse_compare((2, 3), (2.0, 3.0), pipeline=standard_debug_pipeline)
 def test_vm_floordiv(x, y):
     return x // y
 
 
-@parse_compare((2, 3), (2.0, 3.0))
+@parse_compare((2, 3), (2.0, 3.0), pipeline=standard_debug_pipeline)
 def test_vm_truediv(x, y):
     return x / y
 
@@ -100,16 +101,3 @@ def test_vm_array_reduce():
     a = np.ones((2, 3))
     res = f(a)
     assert (res == a.sum(axis=0)).all()
-
-
-def test_vm_list_reduce():
-    @compile
-    def f(x):
-        def add(x, y):
-            return x + y
-
-        return list_reduce(add, x, 4)
-
-    a = list_to_cons([1, 2, 3])
-    res = f(a)
-    assert res == 10

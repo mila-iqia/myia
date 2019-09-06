@@ -202,18 +202,20 @@ def test_convert_result():
         (pt, pt)
 
 
+@pytest.mark.xfail(reason="Cannot pass a function as an argument.")
 def test_function_arg():
     """Give a Python function as an argument."""
     def square(x):
         return x * x
 
-    @compile
+    @myia
     def f(fn, x, y):
         return fn(x + y)
 
     assert f(square, 10, 5) == 225
 
 
+@pytest.mark.xfail(reason="Cannot pass a function as an argument.")
 def test_function_in_tuple():
     """Give a tuple of functions as an argument."""
     def square(x):
@@ -222,7 +224,7 @@ def test_function_in_tuple():
     def double(x):
         return x + x
 
-    @compile
+    @myia
     def f(fns, x, y):
         f0, f1 = fns
         return f1(f0(x + y))

@@ -61,7 +61,6 @@ string_eq = Primitive('string_eq')
 ##########
 
 
-typeof = Primitive('typeof')
 hastype = Primitive('hastype')
 tagged = Primitive('tagged')
 unsafe_static_cast = Primitive('unsafe_static_cast')
@@ -135,7 +134,6 @@ identity = Primitive('identity')
 partial = Primitive('partial')
 J = Primitive('J')
 Jinv = Primitive('Jinv')
-embed = Primitive('embed')
 env_setitem = Primitive('env_setitem')
 env_getitem = Primitive('env_getitem')
 env_add = Primitive('env_add')

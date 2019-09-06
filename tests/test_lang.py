@@ -1,18 +1,18 @@
 
 from copy import copy
-from types import SimpleNamespace
 
 from pytest import mark
 
-from myia.pipeline import standard_debug_pipeline
+from myia.abstract import from_value
+from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 
 from .common import Point, mysum
 
-lang_pipeline = standard_debug_pipeline \
+lang_pipeline = scalar_debug_pipeline \
     .select('resources', 'parse', 'resolve', 'export')
 
 
-def parse_compare(*tests):
+def parse_compare(*tests, pipeline=lang_pipeline):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -29,7 +29,8 @@ def parse_compare(*tests):
             if not isinstance(args, tuple):
                 args = (args,)
             py_result = fn(*map(copy, args))
-            myia_fn = lang_pipeline.run(input=fn)['output']
+            argspec = tuple(from_value(arg, broaden=True) for arg in args)
+            myia_fn = pipeline.run(input=fn, argspec=argspec)['output']
             myia_result = myia_fn(*map(copy, args))
             assert py_result == myia_result
 
@@ -151,17 +152,17 @@ def test_getitem(x):
     return x[1]
 
 
-@parse_compare((SimpleNamespace(x=5, y=2)))
+@parse_compare((Point(x=5, y=2)), pipeline=scalar_debug_pipeline)
 def test_getattr(pt):
     return pt.x
 
 
-@parse_compare((SimpleNamespace(x=5, y=2)))
+@parse_compare((Point(x=5, y=2)), pipeline=scalar_debug_pipeline)
 def test_getattr_function(pt):
     return getattr(pt, 'x')
 
 
-@parse_compare((2, 3))
+@parse_compare((2, 3), pipeline=scalar_debug_pipeline)
 def test_method(x, y):
     return x.__add__(y)
 
@@ -317,7 +318,7 @@ def test_if_return_in_while(x):
 #################
 
 
-@parse_compare(((1, 2, 3, 4),))
+@parse_compare(((1, 2, 3, 4),), pipeline=standard_debug_pipeline)
 def test_for(xs):
     result = 0
     for x in xs:
@@ -485,7 +486,7 @@ def test_rec1(x):
 #############
 
 
-@parse_compare((2, 3, 4))
+@parse_compare((2, 3, 4), pipeline=scalar_debug_pipeline)
 def test_multitype(x, y, z):
     return mysum(x) * mysum(x, y) * mysum(x, y, z)
 

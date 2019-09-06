@@ -3,6 +3,7 @@ import numpy as np
 from pytest import mark
 
 from myia.abstract import from_value
+from myia.composite import list_reduce
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
 from myia.hypermap import hyper_map
@@ -10,7 +11,6 @@ from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.prim.py_implementations import (
     array_map,
     array_reduce,
-    hastype,
     partial,
     scalar_add,
     scalar_mul,
@@ -22,7 +22,6 @@ from myia.prim.py_implementations import (
 )
 from myia.utils import InferenceError, overload
 from myia.validate import ValidationError
-from myia.xtype import Number
 
 from .common import (
     Point,
@@ -67,7 +66,7 @@ def _eq(x: object, y):
 
 
 def specializer_decorator(pipeline):
-    def specialize(*arglists, abstract=None):
+    def specialize(*arglists, abstract=None, validate=True):
 
         def decorate(fn):
             def run_test(args):
@@ -76,7 +75,10 @@ def specializer_decorator(pipeline):
                     args = args.args
                 else:
                     exc = None
-                pip = pipeline.make()
+                pdef = pipeline
+                if not validate:
+                    pdef = pdef.configure(validate=False)
+                pip = pdef.make()
                 if abstract is None:
                     argspec = tuple(from_value(arg, broaden=True)
                                     for arg in args)
@@ -121,9 +123,6 @@ def specializer_decorator(pipeline):
 
 specialize = specializer_decorator(specialize_pipeline)
 specialize_std = specializer_decorator(specialize_pipeline_std)
-specialize_no_validate = specializer_decorator(
-    specialize_pipeline.configure(validate=False)
-)
 
 
 int1 = 13
@@ -238,11 +237,11 @@ def test_pow10(x):
 
 
 @specialize((int1, fp1))
-def test_hastype(x, y):
+def test_isinstance(x, y):
     def helper(x):
-        if hastype(x, i64):
+        if isinstance(x, int):
             return x
-        elif hastype(x, f64):
+        elif isinstance(x, float):
             return x
         else:
             return (x,)
@@ -509,43 +508,43 @@ def test_partial_outside_scope(x, y):
     return g(x)(y)
 
 
-@specialize(
+@specialize_std(
     (int1,),
     ([int1, int2],),
     TypeError((int1, int2),),
     abstract=(U(i64, [i64]),)
 )
 def test_union(x):
-    if hastype(x, i64):
+    if isinstance(x, int):
         return x
     else:
         return x[0]
 
 
-@specialize(
+@specialize_std(
     (int1, int2),
     ([int1, int2], int1),
     TypeError((int1, int2), int1),
     abstract=(U(i64, f64, [i64]), i64)
 )
 def test_union_nested(x, y):
-    if hastype(x, i64):
+    if isinstance(x, int):
         return x
-    elif hastype(x, f64):
+    elif isinstance(x, float):
         return y
     else:
         return x[0]
 
 
-@specialize(
+@specialize_std(
     (int1, int2),
     ([int1, int2], int1),
     TypeError((int1, int2), int1),
     abstract=(U(i64, f64, [i64]), i64)
 )
 def test_union_nested_2(x, y):
-    if hastype(x, Number):
-        if hastype(x, i64):
+    if isinstance(x, (int, float)):
+        if isinstance(x, int):
             return x
         else:
             return y
@@ -581,7 +580,7 @@ def test_hyper_map_ct(x):
     return hyper_map(scalar_add, x, 1)
 
 
-@specialize(
+@specialize_std(
     (make_tree(3, 1),),
     (countdown(10),)
 )
@@ -589,7 +588,7 @@ def test_sumtree(t):
     return sumtree(t)
 
 
-@specialize(
+@specialize_std(
     (make_tree(3, 1),),
     (countdown(10),)
 )
@@ -597,14 +596,15 @@ def test_reducetree(t):
     return reducetree(scalar_mul, t, 1)
 
 
-@specialize_no_validate(
+@specialize(
     (make_tree(3, 1),),
+    validate=False
 )
 def test_hypermap_tree(t):
     return hyper_map(scalar_add, t, t)
 
 
-@specialize(((int1, int2), (fp1, fp2)),)
+@specialize_std(((int1, int2), (fp1, fp2)),)
 def test_tuple_surgery(xs, ys):
     return xs[::-1]
 
@@ -707,12 +707,21 @@ def test_fib(n):
     return a
 
 
-@specialize_no_validate(
+@specialize_std(
     ([11, 22, 33], [44, 55, 66]),
     ((11, 22, 33), (44, 55, 66)),
+    validate=False
 )
 def test_zip_enumerate(xs, ys):
     rval = 0
     for i, (x, y) in enumerate(zip(xs, ys)):
         rval = rval + i + x + y
     return rval
+
+
+@specialize_std(([int1, int2],))
+def test_list_reduce(xs):
+    def add(x, y):
+        return x + y
+
+    return list_reduce(add, xs, 4)

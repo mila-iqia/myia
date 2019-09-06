@@ -51,7 +51,9 @@ class MyiaOnlyOperation:
 
 
 apply = MyiaOnlyOperation('apply')
+embed = MyiaOnlyOperation('embed')
 hasnext = MyiaOnlyOperation('hasnext')
+hastype = MyiaOnlyOperation('hastype')
 iter = MyiaOnlyOperation('iter')
 make_tuple = MyiaOnlyOperation('make_tuple')
 make_list = MyiaOnlyOperation('make_list')
@@ -61,4 +63,5 @@ resolve = MyiaOnlyOperation('resolve')
 slice = MyiaOnlyOperation('slice')
 switch = MyiaOnlyOperation('switch')
 to_array = MyiaOnlyOperation('to_array')
+typeof = MyiaOnlyOperation('typeof')
 user_switch = MyiaOnlyOperation('user_switch')

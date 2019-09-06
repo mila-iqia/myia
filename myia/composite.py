@@ -22,6 +22,7 @@ from .abstract import (
 )
 from .hypermap import HyperMap, hyper_map
 from .ir import Graph, MetaGraph, MultitypeGraph
+from .operations import hastype, typeof
 from .prim import ops as P, py_implementations as py
 from .prim.py_implementations import (
     array_map,
@@ -30,7 +31,6 @@ from .prim.py_implementations import (
     bool_not,
     distribute,
     env_add,
-    hastype,
     scalar_add,
     scalar_cast,
     scalar_cos,
@@ -43,7 +43,6 @@ from .prim.py_implementations import (
     shape,
     string_eq,
     tuple_getitem,
-    typeof,
 )
 from .utils import MyiaTypeError, Slice, check_nargs, core, newenv
 from .xtype import Bool, EnvType, Nil, Number, f32, f64, i8, i16, u8, u16

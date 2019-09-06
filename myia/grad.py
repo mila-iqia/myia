@@ -50,6 +50,7 @@ expressions. See `SensRemapper.link_apply` for more information.
 
 from functools import reduce
 
+from . import operations
 from .composite import gadd, zeros_like
 from .info import About
 from .ir import BasicRemapper, Constant, Graph, RemapperSet, sexp_to_node
@@ -399,7 +400,7 @@ class SensRemapper(GradRemapper):
             sexp = (primops.env_getitem,
                     self.get(g, child),
                     # This represents the node's "key" into the env.
-                    (primops.embed, jinv),
+                    (operations.embed, jinv),
                     # This is the default, if there is no entry for this key.
                     (zeros_like, jinv))
             contribs.append(sexp)
@@ -440,7 +441,7 @@ class SensRemapper(GradRemapper):
             fv_sens = ng.apply(
                 primops.env_setitem,
                 fv_sens,
-                ng.apply(primops.embed, self.get_jinv(fv)),
+                ng.apply(operations.embed, self.get_jinv(fv)),
                 sens
             )
         in_sens = [self.get(g, p) for p in g.parameters]

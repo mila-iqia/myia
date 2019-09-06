@@ -19,8 +19,8 @@ from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.composite import gadd, zeros_like
 from myia.hypermap import HyperMap, hyper_map
 from myia.ir import Graph, MetaGraph, MultitypeGraph
-from myia.macros import grad
-from myia.operations import user_switch
+from myia.macros import embed, grad, typeof
+from myia.operations import hastype, user_switch
 from myia.pipeline import scalar_pipeline, standard_pipeline
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import (
@@ -36,11 +36,9 @@ from myia.prim.py_implementations import (
     dict_setitem,
     distribute,
     dot,
-    embed,
     env_getitem,
     env_setitem,
     hastag,
-    hastype,
     identity,
     make_record,
     partial as myia_partial,
@@ -57,7 +55,6 @@ from myia.prim.py_implementations import (
     tagged,
     transpose,
     tuple_setitem,
-    typeof,
     unsafe_static_cast,
 )
 from myia.utils import InferenceError, MyiaTypeError, newenv
@@ -332,7 +329,7 @@ def test_while(x, y):
     return rval
 
 
-@infer(
+@infer_std(
     ([i64], i64, i64),
     ([i64], f64, InferenceError),
     (i64, i64, InferenceError),
@@ -488,7 +485,7 @@ def test_tuple_outofbound(x, y):
     return (x, y)[2]
 
 
-@infer(
+@infer_std(
     ((i64, f64), (f64,)),
     ((f64, i64), (i64,)),
     ((f64, (i64, f64)), ((i64, f64),)),
@@ -499,7 +496,7 @@ def test_tuple_getslice(tup):
     return tup[1:]
 
 
-@infer(
+@infer_std(
     ((i64, f64, i64), (f64,)),
     ((f64,), ()),
 )
@@ -520,14 +517,14 @@ def test_tuple_outofbound_negative(x, y):
     return (x, y)[-3]
 
 
-@infer((D(x=i64), i64),
-       (D(y=f32), InferenceError))
+@infer_std((D(x=i64), i64),
+           (D(y=f32), InferenceError))
 def test_dict_getitem(d):
     return d['x']
 
 
-@infer((D(x=i64), Ex(ANYTHING, t=str), InferenceError),
-       (D(x=i64), 2, InferenceError))
+@infer_std((D(x=i64), Ex(ANYTHING, t=str), InferenceError),
+           (D(x=i64), 2, InferenceError))
 def test_dict_getitem_nonconst(d, i):
     return d[i]
 
@@ -607,7 +604,7 @@ def test_closure_manager_bug():
     return rval
 
 
-@infer(
+@infer_std(
     (0,),
     (i64, i64, i64),
     (i64, i64, i64, i64, i64, i64, i64),
@@ -1093,7 +1090,7 @@ def test_typeof(x):
 Tf4 = Tuple[f64, f64, f64, f64]
 
 
-@infer(
+@infer_std(
     (i64, i64),
     (f64, i64),
     (ai64_of(2, 5), 0.0),
@@ -1656,14 +1653,14 @@ def test_switch_switch(x, y):
     return switch(f(y), 1, 2)
 
 
-@infer(
+@infer_std(
     (i64, i64, InferenceError),
 )
 def test_user_switch_hastype(x, y):
     return user_switch(hastype(x, i64), y + 1, y + 2)
 
 
-@infer((B, i64, i64))
+@infer_std((B, i64, i64))
 def test_closure_in_data(c, x):
     def f(x):
         return x * x
@@ -2238,7 +2235,7 @@ def test_raise_multiple(x):
         return x
 
 
-@infer((i32, Bot), (f64, f64), (U(i32, i64), i64))
+@infer_std((i32, Bot), (f64, f64), (U(i32, i64), i64))
 def test_raise_hastype(x):
     if hastype(x, i32):
         raise Exception("What a terrible type")

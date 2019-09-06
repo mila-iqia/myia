@@ -1,6 +1,6 @@
 """Library of optimizations."""
 
-from .. import operations
+from .. import macros, operations
 from ..abstract import DEAD, AbstractFunction, AbstractJTagged, abstract_clone
 from ..composite import gadd, zeros_like
 from ..ir import (
@@ -413,7 +413,7 @@ def unfuse_composite(resources, node, equiv):
         def asarray(self, ng, i):
             if i.is_constant():
                 typ = (self.reference.abstract
-                       or ng.apply(P.typeof, self.reference))
+                       or ng.apply(macros.typeof, self.reference))
                 return ng.apply(P.distribute,
                                 ng.apply(P.scalar_to_array, i, typ),
                                 ng.apply(P.shape, self.reference))
@@ -471,7 +471,7 @@ def simplify_array_map(resources, node, equiv):
         elif x.is_constant() \
                 and issubclass(x.abstract.xtype(), Number):
             shp = (P.shape, xs[0])
-            typ = xs[0].abstract or (P.typeof, xs[0])
+            typ = xs[0].abstract or (macros.typeof, xs[0])
             sexp = (P.distribute, (P.scalar_to_array, x, typ), shp)
             return sexp_to_node(sexp, node.graph)
         else:

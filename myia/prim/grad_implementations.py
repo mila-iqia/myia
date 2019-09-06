@@ -10,6 +10,7 @@ from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import About, NamedDebugInfo
 from ..ir import Constant, Graph, MetaGraph, clone, manage
+from ..operations import typeof
 from ..opt.lib import Xs
 from ..parser import operations_ns
 from ..pipeline import standard_pipeline
@@ -43,7 +44,6 @@ from .py_implementations import (
     tagged,
     transpose,
     tuple_setitem,
-    typeof,
     unsafe_static_cast,
 )
 
