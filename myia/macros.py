@@ -49,7 +49,29 @@ from .utils import (
     check_nargs,
     core,
 )
-from .xtype import Bool, Number
+from .xtype import Bool, Nil, NotImplementedType, Number
+
+
+@macro
+async def is_(info):
+    """Implement the is operator."""
+    anode, bnode = info.args
+    a, b = info.abstracts
+    at = a.xtype()
+    bt = b.xtype()
+    if at is Nil or bt is Nil:
+        return Constant(at is bt)
+    elif at is NotImplementedType or bt is NotImplementedType:
+        return Constant(at is bt)
+    elif at is Bool and bt is Bool:
+        return info.graph.apply(P.bool_eq, anode, bnode)
+    elif at is Bool or bt is Bool:
+        return Constant(False)
+    else:
+        raise MyiaTypeError(
+            f'The operator "is" is only implemented for booleans ' +
+            f'and singletons such as None or NotImplemented.'
+        )
 
 
 @macro

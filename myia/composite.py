@@ -15,7 +15,6 @@ from .abstract import (
     AbstractDict,
     AbstractError,
     AbstractFunction,
-    AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
     AbstractUnion,
@@ -682,69 +681,10 @@ zeros_like = HyperMap(
 )
 
 
-class IsCompare(MetaGraph):
-    """Implementation of Is Compare (i.e. 'is' and 'is not')."""
-
-    def __init__(self, do_not=False):
-        """Initialize the is_compare.
-
-        Arguments:
-            do_not: If True, this graph becomes a negative ("is not")
-                comparison. If False, this graph remains a psotive ("is")
-                comparison.
-
-        """
-        super().__init__('IsCompare')
-        self.do_not = do_not
-
-    def normalize_args_sync(self, args):
-        """Return broadened arguments."""
-        return tuple(broaden(a) for a in args)
-
-    def generate_graph(self, args):
-        """Make the graph for the IsCompare.
-
-        This requires that least one argument of
-        comparison be a Bool or None.
-
-        Generate Boolean Compare if False and
-        Equal_To (and not Equal_To) compare if True.
-        """
-        assert len(args) == 2
-        a, b = args
-        g = Graph()
-        g.debug.name = "is_not" if self.do_not else "is_"
-        g.set_flags('core', 'reference')
-        pa = g.add_parameter()
-        pb = g.add_parameter()
-
-        valid_types = (Bool, Nil)
-        if ((not isinstance(a, AbstractScalar))
-            or (a.xtype() not in valid_types)) \
-                and ((not isinstance(b, AbstractScalar))
-                     or (b.xtype() not in valid_types)):
-            if not self.do_not:
-                raise MyiaTypeError(
-                    f'The operator "is" must have at ' +
-                    f'least one argument be a Bool or None'
-                )
-            else:
-                raise MyiaTypeError(
-                    f'The operator "is not" must have at ' +
-                    f'least one argument be a Bool or None'
-                )
-
-        if a != b:
-            g.return_ = g.apply(P.return_, self.do_not)
-        else:
-            cmp_fn = g.apply(operations.getattr, pa,
-                             "__ne__" if self.do_not else "__eq__")
-            g.output = g.apply(cmp_fn, pb)
-        return g
-
-
-is_ = IsCompare()
-is_not = IsCompare(do_not=True)
+@core
+def is_not(x, y):
+    """Implementation of the `is not` operator."""
+    return not (x is y)
 
 
 @core
