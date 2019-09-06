@@ -518,7 +518,8 @@ def to_abstract(self, v: SymbolicKeyInstance, **kwargs):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: (bool, type(None), str), **kwargs):
+def to_abstract(self, v: (bool, type(None),
+                          str, type(NotImplemented)), **kwargs):
     typ = xtype.pytype_to_myiatype(type(v))
     return AbstractScalar({
         VALUE: v,
