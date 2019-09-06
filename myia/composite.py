@@ -8,9 +8,8 @@ from functools import reduce
 from . import operations
 from .abstract import (
     ANYTHING,
-    SHAPE,
-    TYPE,
     AbstractArray,
+    AbstractBottom,
     AbstractClassBase,
     AbstractDict,
     AbstractError,
@@ -18,23 +17,20 @@ from .abstract import (
     AbstractTaggedUnion,
     AbstractTuple,
     AbstractUnion,
-    broaden,
     build_value,
     myia_static,
 )
 from .hypermap import HyperMap, hyper_map
 from .ir import Graph, MetaGraph, MultitypeGraph
-from .prim import ops as P
+from .prim import ops as P, py_implementations as py
 from .prim.py_implementations import (
     array_map,
     array_reduce,
     bool_eq,
     bool_not,
-    broadcast_shape,
     distribute,
     env_add,
     hastype,
-    py_registry,
     scalar_add,
     scalar_cast,
     scalar_cos,
@@ -49,7 +45,7 @@ from .prim.py_implementations import (
     tuple_getitem,
     typeof,
 )
-from .utils import MyiaShapeError, MyiaTypeError, Slice, check_nargs, newenv
+from .utils import MyiaTypeError, Slice, check_nargs, newenv
 from .xtype import Bool, EnvType, Nil, Number, f32, f64, i8, i16, u8, u16
 
 
@@ -79,7 +75,7 @@ def core(fn=None, **flags):
         return deco(fn)
 
 
-class Elemwise(MetaGraph):
+class Elemwise(HyperMap):
     """Generate a graph for an elemwise operation.
 
     * If any argument is an array:
@@ -89,85 +85,51 @@ class Elemwise(MetaGraph):
     """
 
     def __init__(self, mname, scalar_op=None, infer_value=False, name=None):
-        """Initialize Elemwise."""
-        super().__init__(name or mname)
+        """Initialize an Elemwise."""
+        super().__init__(
+            fn_leaf=scalar_op or self,
+            infer_value=infer_value,
+            name=name,
+            broadcast=True,
+            nonleaf=(AbstractArray,)
+        )
         self.mname = mname
-        self.scalar_op = scalar_op
-        self.infer_value = infer_value
-
-    def normalize_args_sync(self, args):
-        """If infer_value is False, return broadened arguments."""
-        if not self.infer_value:
-            args = tuple(broaden(a) for a in args)
-        return args
 
     def make_signature(self, args):
-        """Create the signature: whether arguments are arrays, and shapes."""
-        return tuple((arg.xtype(), arg.xshape())
-                     if isinstance(arg, AbstractArray) else (None, False)
-                     for arg in args)
+        """This erases type information that isn't useful.
 
-    def generate_graph(self, sig):
-        """Generate the graph."""
-        g = Graph()
-        g.set_flags('core', 'reference')
-        g.debug.name = self.mname
-        shapes = [x for _, x in sig if x is not False]
-        is_array_op = len(shapes) > 0
-        if is_array_op:
-            array_types = [t for t, _ in sig if t is not None]
-            array_type = AbstractArray(
-                ANYTHING, {SHAPE: ANYTHING, TYPE: array_types[0]}
-            )
-        params = []
-        for i, (t, _) in enumerate(sig):
-            p = g.add_parameter()
-            p.debug.name = f'x{i + 1}'
-            if is_array_op and t is None:
-                p = g.apply(to_array, p, array_type)
-            params.append(p)
+        The only information kept is whether an arg is an array or not, and its
+        shape/type/etc. (not its dtype). Other information is thrown away
+        because it is not relevant to graph generation.
+        """
+        def chg(arg):
+            if isinstance(arg, AbstractArray):
+                return AbstractArray(
+                    AbstractBottom(),
+                    arg.values
+                )
+            else:
+                return AbstractBottom()
+        return tuple(chg(arg) for arg in args)
 
-        if is_array_op:
-            try:
-                final_shape = reduce(broadcast_shape, shapes)
-            except ValueError as e:
-                raise MyiaShapeError(e.args[0])
-            if any(dim is ANYTHING for dim in final_shape):
-                # We will need to get the shapes dynamically
-                def _build(a, b):
-                    return g.apply(broadcast_shape, a, b)
-                argshapes = [g.apply(shape, p) for p in params]
-                final_shape = reduce(_build, argshapes)
+    def make_leaf(self, g, fnarg, argmap):
+        """Generate a call at leaf level.
 
-        transformed = []
-        for (_, sh), p in zip(sig, params):
-            if is_array_op:
-                sh = sh or ()
-                if final_shape != sh:
-                    p = g.apply(distribute, p, final_shape)
-            transformed.append(p)
-
-        if is_array_op:
-            fn = self.scalar_op or self
-            g.output = g.apply(array_map, fn, *transformed)
-        else:
-            first, *rest = transformed
-            fn = g.apply(operations.getattr, first, self.mname)
-            g.output = g.apply(fn, *rest)
-        return g
-
-    def __call__(self, *args):
-        """Python version of Elemwise's functionality."""
-        return array_map(py_registry[self.scalar_op], *args)
+        This does not use self.fn_leaf.
+        """
+        assert fnarg is None
+        first, *rest = argmap.keys()
+        fn = g.apply(operations.getattr, first, self.mname)
+        return g.apply(fn, *rest)
 
 
-add = Elemwise('__add__', P.scalar_add, name='add')
-sub = Elemwise('__sub__', P.scalar_sub, name='sub')
-mul = Elemwise('__mul__', P.scalar_mul, name='mul')
+add = Elemwise('__add__', py.scalar_add, name='add')
+sub = Elemwise('__sub__', py.scalar_sub, name='sub')
+mul = Elemwise('__mul__', py.scalar_mul, name='mul')
 truediv = Elemwise('__truediv__', name='truediv')
 floordiv = Elemwise('__floordiv__', name='floordiv')
-mod = Elemwise('__mod__', P.scalar_mod, name='mod')
-pow = Elemwise('__pow__', P.scalar_pow, name='pow')
+mod = Elemwise('__mod__', py.scalar_mod, name='mod')
+pow = Elemwise('__pow__', py.scalar_pow, name='pow')
 
 
 @core
@@ -262,12 +224,12 @@ def _tanh(x):
     return scalar_tanh(x)
 
 
-eq = Elemwise('__eq__', P.scalar_eq, infer_value=True, name='eq')
-lt = Elemwise('__lt__', P.scalar_lt, infer_value=True, name='lt')
-gt = Elemwise('__gt__', P.scalar_gt, infer_value=True, name='gt')
-ne = Elemwise('__ne__', P.scalar_ne, infer_value=True, name='ne')
-le = Elemwise('__le__', P.scalar_le, infer_value=True, name='le')
-ge = Elemwise('__ge__', P.scalar_ge, infer_value=True, name='ge')
+eq = Elemwise('__eq__', py.scalar_eq, infer_value=True, name='eq')
+lt = Elemwise('__lt__', py.scalar_lt, infer_value=True, name='lt')
+gt = Elemwise('__gt__', py.scalar_gt, infer_value=True, name='gt')
+ne = Elemwise('__ne__', py.scalar_ne, infer_value=True, name='ne')
+le = Elemwise('__le__', py.scalar_le, infer_value=True, name='le')
+ge = Elemwise('__ge__', py.scalar_ge, infer_value=True, name='ge')
 
 
 @core
