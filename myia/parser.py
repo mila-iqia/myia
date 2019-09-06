@@ -140,7 +140,11 @@ def parse(func):
         return _parse_cache[func]
     parser = Parser(func)
     graph = parser.parse()
-    graph.set_flags(**getattr(func, '_myia_flags', {}))
+    flags = getattr(func, '_myia_flags', {})
+    if 'name' in flags:
+        graph.debug.name = flags['name']
+        del flags['name']
+    graph.set_flags(**flags)
     _parse_cache[func] = graph
     return graph
 
