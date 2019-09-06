@@ -125,7 +125,8 @@ def TU(**opts):
 @overload(bootstrap=True)
 def to_abstract_test(self, x: (bool, int, float, str,
                                np.floating, np.integer,
-                               type(None), EnvInstance)):
+                               type(None), type(NotImplemented),
+                               EnvInstance)):
     return AbstractScalar({
         VALUE: x,
         TYPE: xtype.pytype_to_myiatype(type(x)),

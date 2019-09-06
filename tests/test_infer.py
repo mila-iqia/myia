@@ -2412,6 +2412,8 @@ def test_grad_reduce(xs, ys):
     (f64, f64, MyiaTypeError),
     (B, B, B),
     (None, None, True),
+    (None, NotImplemented, False),
+    (NotImplemented, NotImplemented, True),
 )
 def test_is(x, y):
     return x is y
@@ -2423,6 +2425,8 @@ def test_is(x, y):
     (f64, f64, MyiaTypeError),
     (B, B, B),
     (None, None, False),
+    (None, NotImplemented, True),
+    (NotImplemented, NotImplemented, False),
 )
 def test_is_not(x, y):
     return x is not y
