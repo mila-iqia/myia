@@ -11,14 +11,7 @@ from ..compile import load_backend
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
 from ..prim import ops as P
-from ..utils import (
-    Partial,
-    Partializable,
-    Slice,
-    TypeMap,
-    overload,
-    tracer,
-)
+from ..utils import Partial, Partializable, Slice, TypeMap, overload, tracer
 from ..vm import VM
 
 scalar_object_map = {
