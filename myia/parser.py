@@ -854,6 +854,7 @@ class Block:
         self.phi_nodes: Dict[Parameter, str] = {}
         self.jumps: Dict[Block, Apply] = {}
         self.graph: Graph = Graph()
+        self.graph.set_flags(reference=True)
         self.graph.flags.update(flags)
 
     def set_phi_arguments(self, phi: Parameter) -> None:
