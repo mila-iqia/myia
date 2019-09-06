@@ -1,14 +1,8 @@
 """Tools to generate and configure Myia's operation pipeline."""
 
-from ..utils import (
-    NS,
-    Merge,
-    Partial,
-    Partializable,
-    merge,
-    partition_keywords,
-    tracer,
-)
+from types import FunctionType
+
+from ..utils import Partial, merge, partition_keywords, tracer
 
 
 class PipelineDefinition:
@@ -18,16 +12,13 @@ class PipelineDefinition:
     Call `make()` to instantiate a Pipeline that can be executed.
 
     Attributes:
-        resources: An ensemble of common resources, pooled by the whole
-            pipeline.
-        steps: A sequence of steps. Each step should be a Partial on a
-            PipelineStep.
+        steps: A sequence of steps. Each step should be a callable or
+            a Partial.
 
     """
 
-    def __init__(self, *, resources=None, steps):
+    def __init__(self, **steps):
         """Initialize a PipelineDefinition."""
-        self.resources = resources or {}
         self.steps = steps
         self.step_names = list(steps.keys())
 
@@ -83,10 +74,7 @@ class PipelineDefinition:
         steps = list(self.steps.items())
         index = self.index(step) or 0
         steps[index:index] = new_steps.items()
-        return PipelineDefinition(
-            resources=self.resources,
-            steps=dict(steps)
-        )
+        return PipelineDefinition(**dict(steps))
 
     def insert_after(self, step=None, **new_steps):
         """Insert new steps after the given step.
@@ -101,26 +89,12 @@ class PipelineDefinition:
         else:
             index = self.index(step)
             steps[index + 1:index + 1] = new_steps.items()
-        return PipelineDefinition(
-            resources=self.resources,
-            steps=dict(steps)
-        )
-
-    def configure_resources(self, **resources):
-        """Change resources or define new resources.
-
-        This returns a new PipelineDefinition.
-        """
-        return PipelineDefinition(
-            resources=merge(self.resources, resources, mode='override'),
-            steps=self.steps
-        )
+        return PipelineDefinition(**dict(steps))
 
     def configure(self, changes={}, **kwchanges):
-        """Configure existing resources and steps.
+        """Configure existing steps.
 
-        To add new steps, use `insert_before` or `insert_after`. To add new
-        resources, use `configure_resources`.
+        To add new steps, use `insert_before` or `insert_after`.
 
         This returns a new PipelineDefinition.
 
@@ -135,19 +109,19 @@ class PipelineDefinition:
         update will be appended to the previous, but you can use
         `Override([a, b, c])` to replace the old list.
         """
-        new_data = {**self.steps, **self.resources}
+        new_data = dict(self.steps)
         changes = {**changes, **kwchanges}
         for path, delta in changes.items():
-            if isinstance(delta, bool) and path in self.step_names:
-                delta = Merge(pipeline_init={'active': delta})
             top, *parts = path.split('.')
+            if top not in new_data:
+                raise KeyError(f'There is no step named {top}')
             for part in reversed(parts):
                 delta = {part: delta}
-            new_data[top] = merge(new_data[top], delta, mode='override')
-        return PipelineDefinition(
-            resources={k: new_data[k] for k in self.resources},
-            steps={k: new_data[k] for k in self.step_names}
-        )
+            if delta is False:
+                del new_data[top]
+            else:
+                new_data[top] = merge(new_data[top], delta, mode='override')
+        return PipelineDefinition(**new_data)
 
     def select(self, *names):
         """Define a pipeline with the listed steps.
@@ -156,8 +130,7 @@ class PipelineDefinition:
         definition, so pipeline steps can be reordered this way.
         """
         return PipelineDefinition(
-            resources=self.resources,
-            steps={name: self.steps[name] for name in names}
+            **{name: self.steps[name] for name in names}
         )
 
     def make(self):
@@ -185,8 +158,7 @@ class PipelineDefinition:
         """Return a pipeline that only contains a subset of the steps."""
         steps = list(self.steps.items())
         return PipelineDefinition(
-            resources=self.resources,
-            steps=dict(steps[self.getslice(item)])
+            **dict(steps[self.getslice(item)])
         )
 
 
@@ -194,31 +166,21 @@ class Pipeline:
     """Sequence of connected processing steps.
 
     Created from a PipelineDefinition. Each step processes the output of the
-    previous step. A Pipeline also defines common resources for all the steps.
+    previous step.
     """
 
     def __init__(self, defn):
         """Initialize a Pipeline from a PipelineDefinition."""
-        def convert(x, name):
-            if isinstance(x, Partial):
-                try:
-                    x = x.partial(
-                        pipeline_init={'pipeline': self, 'name': name}
-                    )
-                except TypeError:
-                    pass
-                x = x()
-            return x
-
         self.defn = defn
-        self.resources = NS()
-        self.steps = NS()
+        self.steps = {}
         self._seq = []
-        for k, v in defn.resources.items():
-            self.resources[k] = convert(v, None)
+        self._step_names = []
         for k, v in defn.steps.items():
-            v = convert(v, k)
+            if isinstance(v, Partial):
+                if not isinstance(v.func, FunctionType):
+                    v = v()
             self.steps[k] = v
+            self._step_names.append(k)
             self._seq.append(v)
 
     def __getitem__(self, item):
@@ -248,24 +210,30 @@ class _PipelineSlice:
         at which an error happened is put in the 'error_step' key.
         """
         with tracer('compile'):
-            for step in self.pipeline._seq[self.slice]:
+            steps = self.pipeline._seq[self.slice]
+            step_names = self.pipeline._step_names[self.slice]
+            for name, step in zip(step_names, steps):
                 if 'error' in args:
                     break
-                if step.active:
-                    with tracer(f'step_{step.name}', step=step, **args) as tr:
-                        valid_args, rest = partition_keywords(step.step, args)
-                        try:
-                            results = step.step(**valid_args)
-                            if (not isinstance(results, dict) and
-                                    len(valid_args) == 1):
-                                field_name, = valid_args.keys()
-                                results = {field_name: results}
-                            args = {**args, **results}
-                            tr.set_results(**args)
-                        except Exception as e:
-                            tracer().emit_error(error=e)
-                            args['error'] = e
-                            args['error_step'] = step
+                if isinstance(step, (FunctionType, Partial)):
+                    fn = step
+                else:
+                    fn = step.__call__
+                with tracer(f'step_{name}', step=step, **args) as tr:
+                    _fn = fn.func if isinstance(fn, Partial) else fn
+                    valid_args, rest = partition_keywords(_fn, args)
+                    try:
+                        results = fn(**valid_args)
+                        if (not isinstance(results, dict) and
+                                len(valid_args) == 1):
+                            field_name, = valid_args.keys()
+                            results = {field_name: results}
+                        args = {**args, **results}
+                        tr.set_results(**args)
+                    except Exception as e:
+                        tracer().emit_error(error=e)
+                        args['error'] = e
+                        args['error_step'] = step
             return args
 
     def __call__(self, **args):
@@ -273,42 +241,3 @@ class _PipelineSlice:
         if 'error' in results:
             raise results['error']
         return results
-
-
-class PipelineResource(Partializable):
-    """Resource in a Pipeline."""
-
-    def __init__(self, pipeline_init):
-        """Initialize a PipelineStep."""
-        self.active = pipeline_init.get('active', True)
-        self.name = pipeline_init['name']
-        self.pipeline = pipeline_init['pipeline']
-        self.steps = self.pipeline.steps
-        self.resources = self.pipeline.resources
-
-
-class PipelineStep(PipelineResource):
-    """Step in a Pipeline."""
-
-    def step(self, **kwargs):
-        """Execute this step only.
-
-        The received arguments come from the previous step.
-        """
-        raise NotImplementedError()
-
-    def __call__(self, **args):
-        """Execute the pipeline all the way up to this step."""
-        return self.pipeline[:self.name](**args)
-
-
-def pipeline_function(fn):
-    """Create a pipeline step from a function.
-
-    The provided function must receive `self` as its first argument, and
-    then the pipeline fields it needs (the variable names are inspected
-    by the pipeline to determine what values to give this step).
-    """
-    class PipelineStepFunction(PipelineStep):
-        step = fn
-    return PipelineStepFunction.partial()

@@ -24,20 +24,22 @@ V = var(lambda n: n.is_constant())
 
 parse = scalar_pipeline \
     .configure({
-        'convert.object_map': Merge({
+        'resources.convert.object_map': Merge({
             operations.getitem: prim.tuple_getitem,
             operations.user_switch: prim.switch
         })
     }) \
-    .select('parse', 'resolve') \
+    .select('resources', 'parse', 'resolve') \
     .make_transformer('input', 'graph')
 
 
 specialize = scalar_pipeline \
     .configure({
-        'convert.object_map': Merge({operations.getitem: prim.tuple_getitem})
+        'resources.convert.object_map': Merge({
+            operations.getitem: prim.tuple_getitem
+        })
     }) \
-    .select('parse', 'resolve', 'infer', 'specialize')
+    .select('resources', 'parse', 'resolve', 'infer', 'specialize')
 
 
 # We will optimize patterns of these fake primitives
@@ -400,7 +402,7 @@ def opt_newg_bad(optimizer, node, equiv):
 def test_type_tracking():
 
     pip = scalar_pipeline \
-        .select('parse', 'infer', 'specialize',
+        .select('resources', 'parse', 'infer', 'specialize',
                 'simplify_types', 'opt', 'validate') \
         .configure({
             'opt.phases.main': [opt_ok1, opt_ok2, opt_err1, opt_err2],
@@ -435,7 +437,7 @@ def test_type_tracking():
 def test_type_tracking_newgraph():
 
     pip = scalar_pipeline \
-        .select('parse', 'infer', 'specialize',
+        .select('resources', 'parse', 'infer', 'specialize',
                 'simplify_types', 'opt', 'validate') \
         .configure({
             'opt.phases.main': [opt_newg, opt_newg_bad],

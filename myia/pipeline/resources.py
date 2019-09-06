@@ -7,11 +7,12 @@ import numpy as np
 
 from .. import composite as C, macros as M, operations, parser, xtype
 from ..abstract import InferenceEngine
+from ..compile import load_backend
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
 from ..prim import ops as P
-from ..utils import Slice, TypeMap, overload, tracer
-from .pipeline import PipelineResource
+from ..utils import Partial, Partializable, Slice, TypeMap, overload, tracer
+from ..vm import VM
 
 scalar_object_map = {
     operations.add: P.scalar_add,
@@ -322,13 +323,12 @@ class _Unconverted:
         self.value = value
 
 
-class ConverterResource(PipelineResource):
+class ConverterResource(Partializable):
     """Convert a Python object into an object that can be in a Myia graph."""
 
-    def __init__(self, pipeline_init, object_map, converter):
+    def __init__(self, resources, object_map):
         """Initialize a Converter."""
-        super().__init__(pipeline_init)
-        self.converter = converter
+        self.resources = resources
         self.object_map = {}
         for k, v in object_map.items():
             self.object_map[k] = _Unconverted(v)
@@ -361,30 +361,26 @@ class ConverterResource(PipelineResource):
         try:
             v = self.object_map[value]
             if isinstance(v, _Unconverted):
-                v = self.converter(self, v.value)
+                v = default_convert(self, v.value)
                 self.object_map[value] = v
         except (TypeError, KeyError):
-            v = self.converter(self, value)
+            v = default_convert(self, value)
 
         if isinstance(v, Graph):
             self.resources.manager.add_graph(v)
         return v
 
 
-class InferenceResource(PipelineResource):
+class InferenceResource(Partializable):
     """Performs inference and monomorphization."""
 
-    def __init__(self,
-                 pipeline_init,
-                 constructors,
-                 context_class):
+    def __init__(self, resources, constructors, context_class):
         """Initialize an InferenceResource."""
-        super().__init__(pipeline_init)
-        self.manager = self.resources.manager
+        self.manager = resources.manager
         self.context_class = context_class
         self.constructors = constructors
         self.engine = InferenceEngine(
-            self.pipeline,
+            resources,
             constructors=self.constructors,
             context_class=self.context_class,
         )
@@ -419,3 +415,78 @@ class InferenceResource(PipelineResource):
         """Perform inference and specialization."""
         _, context = self.infer(graph, argspec, outspec, clear=True)
         return self.monomorphize(context)
+
+
+class NumpyChecker:
+    """Dummy backend used for debug mode."""
+
+    def to_backend_value(self, v, t):
+        """Returns v."""
+        return v
+
+    def from_backend_value(self, v, t):
+        """Returns v."""
+        return v
+
+
+class BackendResource(Partializable):
+    """Contains the backend."""
+
+    def __init__(self, resources, name=None, options=None):
+        """Initialize a BackendResource.
+
+        Arguments:
+            name: (str) the name of the backend to use
+            options: (dict) options for the backend
+
+        """
+        self.resources = resources
+        if name is False:
+            self.backend = NumpyChecker()
+        else:
+            self.backend = load_backend(name, options)
+
+    def compile(self, graph, argspec, outspec):
+        """Compile the graph."""
+        return self.backend.compile(graph, argspec, outspec, self.resources)
+
+
+class DebugVMResource(Partializable):
+    """Contains the DebugVM."""
+
+    def __init__(self, resources, implementations):
+        """Initialize a DebugVMResource."""
+        self.vm = VM(resources.convert,
+                     resources.manager,
+                     resources.py_implementations,
+                     implementations)
+
+
+class Resources(Partializable):
+    """Defines a set of resources shared by the steps of a Pipeline."""
+
+    def __init__(self, **members):
+        """Initialize the Resources."""
+        self._members = members
+        self._inst = {}
+
+    def __getattr__(self, attr):
+        if attr in self._inst:
+            return self._inst[attr]
+
+        if attr in self._members:
+            inst = self._members[attr]
+            if isinstance(inst, Partial):
+                try:
+                    inst = inst.partial(resources=self)
+                except TypeError:
+                    pass
+                inst = inst()
+            self._inst[attr] = inst
+            return inst
+
+        raise AttributeError(f'No resource named {attr}.')
+
+    def __call__(self):
+        """Run the Resources as a pipeline step."""
+        return {'resources': self}

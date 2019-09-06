@@ -13,13 +13,11 @@ from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.macros import GradOperation, grad
 from myia.pipeline import (
     PipelineDefinition,
-    pipeline_function,
     standard_debug_pipeline,
     standard_pipeline,
     standard_resources,
     steps,
 )
-from myia.pipeline.steps import Validator
 from myia.prim import ops as P
 from myia.prim.py_implementations import (
     J,
@@ -75,14 +73,7 @@ def grad_validate_abstract(self, t: AbstractJTagged):
     pass
 
 
-step_grad_validate = Validator.partial(
-    whitelist=grad_whitelist,
-    validate_abstract=grad_validate_abstract
-)
-
-
-@pipeline_function
-def grad_wrap(self, graph, argspec):
+def grad_wrap(graph, argspec):
     mg = GradOperation(graph,
                        wrt=['*'],
                        dout_parameter=True,
@@ -94,16 +85,17 @@ def grad_wrap(self, graph, argspec):
 
 grad_pipeline = PipelineDefinition(
     resources=standard_resources,
-    steps=dict(
-        parse=steps.step_parse,
-        resolve=steps.step_resolve,
-        infer=steps.step_infer,
-        specialize=steps.step_specialize,
-        opt=steps.step_debug_opt,
-        validate=step_grad_validate,
-        export=steps.step_debug_export,
-    )
-)
+    parse=steps.step_parse,
+    resolve=steps.step_resolve,
+    infer=steps.step_infer,
+    specialize=steps.step_specialize,
+    opt=steps.step_debug_opt,
+    validate=steps.step_validate,
+    export=steps.step_debug_export,
+).configure({
+    'resources.operation_whitelist': grad_whitelist,
+    'resources.validate_abstract': grad_validate_abstract
+})
 
 
 def test_GradTester():

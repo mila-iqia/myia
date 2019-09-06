@@ -928,7 +928,7 @@ async def _inf_Jinv(self, engine, x):
                 g = f.graph
                 primal = g and g.transforms.get('primal', None)
                 if primal:
-                    primal = engine.pipeline.resources.convert(primal)
+                    primal = engine.resources.convert(primal)
                     if isinstance(primal, Graph):
                         if primal.parent:
                             # The primal for a closure can't be used

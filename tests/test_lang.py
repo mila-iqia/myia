@@ -9,7 +9,7 @@ from myia.pipeline import standard_debug_pipeline
 from .common import Point, mysum
 
 lang_pipeline = standard_debug_pipeline \
-    .select('parse', 'resolve', 'export')
+    .select('resources', 'parse', 'resolve', 'export')
 
 
 def parse_compare(*tests):

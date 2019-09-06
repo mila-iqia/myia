@@ -1,48 +1,31 @@
 
 import pytest
 
-from myia.pipeline import PipelineDefinition, PipelineStep, pipeline_function
-from myia.utils import Merge, Reset
+from myia.pipeline import PipelineDefinition, Resources
+from myia.utils import Merge, Partializable, Reset
 
 
-class OpStep(PipelineStep):
+class OpStep(Partializable):
 
-    def __init__(self, pipeline_init, op, param=0):
-        super().__init__(pipeline_init)
+    def __init__(self, op, param=0):
         self.op = op
         self.param = param
 
-    def step(self, value):
+    def __call__(self, value):
         return {'value': self.op(self.param, value)}
 
 
-class OpResourceStep(PipelineStep):
-
-    def __init__(self, pipeline_init, op):
-        super().__init__(pipeline_init)
-        self.op = op
-
-    def step(self, value):
-        return {'value': self.op(self.resources.param, value)}
-
-
-@pipeline_function
-def double_step(self, value):
+def double_step(value):
     return value * 2
 
 
 @pytest.fixture
 def op_pipeline():
     return PipelineDefinition(
-        resources=dict(
-            param=2
-        ),
-        steps=dict(
-            addp=OpStep.partial(op=lambda p, x: p + x, param=1),
-            mulp=OpResourceStep.partial(op=lambda p, x: p * x),
-            neg=OpStep.partial(op=lambda p, x: -x),
-            square=OpStep.partial(op=lambda p, x: x * x),
-        )
+        addp=OpStep.partial(op=lambda p, x: p + x, param=1),
+        mulp=OpStep.partial(op=lambda p, x: p * x, param=2),
+        neg=OpStep.partial(op=lambda p, x: -x),
+        square=OpStep.partial(op=lambda p, x: x * x),
     )
 
 
@@ -70,11 +53,6 @@ def test_Pipeline(op_pipeline):
 
     pip = pdef.make()
     assert pip(value=3) == {'value': 64}
-
-    assert pip.steps.addp(value=3) == {'value': 4}
-    assert pip.steps.mulp(value=3) == {'value': 8}
-    assert pip.steps.neg(value=3) == {'value': -8}
-    assert pip.steps.square(value=3) == {'value': 64}
 
     assert pip['addp'](value=3) == {'value': 4}
     assert pip['mulp'](value=3) == {'value': 8}
@@ -116,23 +94,14 @@ def test_Pipeline_configure(op_pipeline):
     pip = pdef.configure(mulp=False).make()
     assert pip(value=3) == {'value': 16}
 
-    pip = pdef.configure(mulp=False).configure(mulp=True).make()
-    assert pip(value=3) == {'value': 64}
+    with pytest.raises(KeyError):
+        pip = pdef.configure(mulp=False).configure(mulp=True).make()
 
     pip = pdef.configure(mulp=False).configure(addp=False).make()
     assert pip(value=3) == {'value': 9}
 
-    pip = pdef.configure(param=3).make()
-    assert pip(value=3) == {'value': 144}
-
     with pytest.raises(KeyError):
         pdef.configure(quack=[1, 2])
-
-    pdef2 = pdef.configure_resources(quack=[1, 2])
-    assert pdef2.make().resources.quack == [1, 2]
-    assert pdef2.configure(quack=Merge([3])).make().resources.quack \
-        == [1, 2, 3]
-    assert pdef2.configure(quack=[3]).make().resources.quack == [3]
 
 
 def test_Pipeline_insert(op_pipeline):
@@ -174,3 +143,14 @@ def test_Pipeline_select(op_pipeline):
 
     pip = pdef.select('square', 'mulp').make()
     assert pip(value=3) == {'value': 18}
+
+
+def test_Resources():
+    r = Resources(
+        quack=1,
+        sandal=OpStep.partial(op=lambda p, x: p + x, param=3)
+    )
+    assert r.quack == 1
+    assert r.sandal.param == 3
+    with pytest.raises(AttributeError):
+        r.unknown

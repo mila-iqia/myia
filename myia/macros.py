@@ -185,7 +185,7 @@ async def getattr_(info):
             f'Argument to getattr must be a string, not {attr_v}.'
         )
 
-    resources = info.engine.pipeline.resources
+    resources = info.engine.resources
     if isinstance(data_t, Pending):
         case, *args = await find_coherent_result(
             data_t,
@@ -396,7 +396,7 @@ async def user_switch(info):
 
     condt = await condref.get()
     if not engine.check_predicate(Bool, condt):
-        to_bool = engine.pipeline.resources.convert(bool)
+        to_bool = engine.resources.convert(bool)
         cond = cond.graph.apply(to_bool, cond)
 
     if cond.is_apply():

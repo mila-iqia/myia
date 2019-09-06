@@ -80,7 +80,7 @@ def primset_var(*prims):
 
 
 @pattern_replacer(P.tuple_getitem, (P.tuple_setitem, X, C1, Y), C2)
-def getitem_setitem_tuple(optimizer, node, equiv):
+def getitem_setitem_tuple(resources, node, equiv):
     """Simplify getitem over setitem.
 
     setitem(xs, 0, v)[0] => v
@@ -95,7 +95,7 @@ def getitem_setitem_tuple(optimizer, node, equiv):
 
 
 @pattern_replacer(P.tuple_getitem, (P.make_tuple, Xs), C)
-def getitem_tuple(optimizer, node, equiv):
+def getitem_tuple(resources, node, equiv):
     """Match a constant index in an explicit tuple.
 
     (a, b, c, ...)[0] => a
@@ -108,7 +108,7 @@ def getitem_tuple(optimizer, node, equiv):
 
 
 @pattern_replacer(P.tuple_setitem, (P.make_tuple, Xs), C, Z)
-def setitem_tuple(optimizer, node, equiv):
+def setitem_tuple(resources, node, equiv):
     """Match a constant setitem in an explicit tuple.
 
     setitem((a, b, c, ...), 0, z) => (z, b, c, ...)
@@ -123,7 +123,7 @@ def setitem_tuple(optimizer, node, equiv):
 
 
 @pattern_replacer(P.tuple_setitem, C1, C2, Z)
-def setitem_tuple_ct(optimizer, node, equiv):
+def setitem_tuple_ct(resources, node, equiv):
     """Match a constant setitem in an explicit tuple.
 
     setitem((a, b, c, ...), 0, z) => (z, b, c, ...)
@@ -145,7 +145,7 @@ _BubbleBinary = primset_var(P.scalar_add)
 
 
 @pattern_replacer(_BubbleBinary, (P.make_tuple, Xs), (P.make_tuple, Ys))
-def bubble_op_tuple_binary(optimizer, node, equiv):
+def bubble_op_tuple_binary(resources, node, equiv):
     """Replace F((x, y, ...), (a, b, ...)) => (F(x, a), F(y, b), ...).
 
     Only works for a specific list of Fs.
@@ -376,7 +376,7 @@ elim_array_reduce = psub(
 
 
 @pattern_replacer(P.transpose, X, C)
-def elim_transpose(optimizer, node, equiv):
+def elim_transpose(resources, node, equiv):
     """Remove transposes that correspond to identity."""
     axes = equiv[C].value
     if axes == tuple(range(len(axes))):
@@ -386,7 +386,7 @@ def elim_transpose(optimizer, node, equiv):
 
 
 @pattern_replacer(P.transpose, (P.transpose, X, C1), C2)
-def merge_transposes(optimizer, node, equiv):
+def merge_transposes(resources, node, equiv):
     """Merge transpose operations into a single transpose."""
     axes1 = equiv[C1].value
     axes2 = equiv[C2].value
@@ -396,7 +396,7 @@ def merge_transposes(optimizer, node, equiv):
 
 
 @pattern_replacer(P.array_map, G, Xs)
-def unfuse_composite(optimizer, node, equiv):
+def unfuse_composite(resources, node, equiv):
     """Tranform array_map on a graph to a graph of array_maps.
 
     This must be applied to scalar-only graphs.
@@ -441,7 +441,7 @@ def unfuse_composite(optimizer, node, equiv):
 
 
 @pattern_replacer(P.array_map, G, Xs)
-def simplify_array_map(optimizer, node, equiv):
+def simplify_array_map(resources, node, equiv):
     """Simplify array_map on certain graphs.
 
     If the graph cannot be eliminated, it is marked with the flag
@@ -506,7 +506,7 @@ def simplify_array_map(optimizer, node, equiv):
 
 
 @pattern_replacer(P.env_getitem, (P.env_setitem, X, C1, Y), C2, Z)
-def cancel_env_set_get(optimizer, node, equiv):
+def cancel_env_set_get(resources, node, equiv):
     """Simplify combinations of env_get/setitem.
 
     * get(set(env, k1, v), k2, dflt) =>
@@ -664,11 +664,11 @@ simplify_partial = psub(
 
 
 @pattern_replacer(operations.resolve, CNS, C)
-def resolve_globals(optimizer, node, equiv):
+def resolve_globals(resources, node, equiv):
     """Resolve global variables."""
     ns = equiv[CNS]
     x = equiv[C]
-    res = optimizer.resources.convert(ns.value[x.value])
+    res = resources.convert(ns.value[x.value])
     return Constant(res)
 
 
@@ -688,7 +688,7 @@ def make_inliner(inline_criterion, check_recursive, name):
         name: The name of the optimization.
     """
     @pattern_replacer(G, Xs, interest=Graph)
-    def inline(optimizer, node, equiv):
+    def inline(resources, node, equiv):
         g = equiv[G].value
         args = equiv[Xs]
 
@@ -758,7 +758,7 @@ inline = make_inliner(inline_criterion=None,
 
 
 @pattern_replacer('just', G, interest=None)
-def replace_applicator(optimizer, node, equiv):
+def replace_applicator(resources, node, equiv):
     """Replace a function that applies another by the other function.
 
     For example, `lambda x, y: f(x, y)` is replaced by f.
@@ -810,7 +810,7 @@ def specialize_transform(graph, args):
 
 
 @pattern_replacer(G, Xs, interest=Graph)
-def specialize_on_graph_arguments(optimizer, node, equiv):
+def specialize_on_graph_arguments(resources, node, equiv):
     """Specialize a call on constant graph arguments."""
     g = equiv[G].value
     xs = equiv[Xs]
@@ -846,7 +846,7 @@ def getitem_transform(graph, idx):
 
 
 @pattern_replacer(P.tuple_getitem, (G, Xs), C)
-def incorporate_getitem(optimizer, node, equiv):
+def incorporate_getitem(resources, node, equiv):
     """Incorporate a getitem into a call.
 
     For example:
@@ -861,7 +861,7 @@ def incorporate_getitem(optimizer, node, equiv):
 
 
 @pattern_replacer(P.tuple_getitem, ((P.switch, X, G1, G2), Xs), C)
-def incorporate_getitem_through_switch(optimizer, node, equiv):
+def incorporate_getitem_through_switch(resources, node, equiv):
     """Incorporate a getitem into both branches.
 
     Example:
@@ -901,7 +901,7 @@ def env_getitem_transform(graph, key, default):
 
 
 @pattern_replacer(P.env_getitem, (G, Xs), C, Y)
-def incorporate_env_getitem(optimizer, node, equiv):
+def incorporate_env_getitem(resources, node, equiv):
     """Incorporate an env_getitem into a call."""
     g = equiv[G].value
     key = equiv[C].value
@@ -912,7 +912,7 @@ def incorporate_env_getitem(optimizer, node, equiv):
 
 
 @pattern_replacer(P.env_getitem, ((P.switch, X, G1, G2), Xs), C, Y)
-def incorporate_env_getitem_through_switch(optimizer, node, equiv):
+def incorporate_env_getitem_through_switch(resources, node, equiv):
     """Incorporate an env_getitem into both branches."""
     g1 = equiv[G1].value
     g2 = equiv[G2].value
@@ -941,7 +941,7 @@ def call_output_transform(graph, nargs):
 
 
 @pattern_replacer((G, Xs), Ys, interest=Apply)
-def incorporate_call(optimizer, node, equiv):
+def incorporate_call(resources, node, equiv):
     """Incorporate a call into the graph that returns the function.
 
     Example:
@@ -959,7 +959,7 @@ def incorporate_call(optimizer, node, equiv):
 
 
 @pattern_replacer(((P.switch, X, G1, G2), Xs), Ys, interest=Apply)
-def incorporate_call_through_switch(optimizer, node, equiv):
+def incorporate_call_through_switch(resources, node, equiv):
     """Incorporate a call to both branches.
 
     Example:
@@ -1005,7 +1005,7 @@ elim_jinv_j = psub(
 
 
 @pattern_replacer(P.J, C)
-def expand_J(optimizer, node, equiv):
+def expand_J(resources, node, equiv):
     """Replaces a call to J(f) by the graph for J(f).
 
     This will not replace J(x) when x is not a constant graph.
@@ -1013,7 +1013,7 @@ def expand_J(optimizer, node, equiv):
     from ..grad import J as Jimpl
     arg = equiv[C].value
     try:
-        newg = Jimpl(arg, optimizer.resources, node)
+        newg = Jimpl(arg, resources, node)
     except NotImplementedError:
         return None
     return Constant(newg)
@@ -1032,13 +1032,13 @@ def _jelim_retype_helper(self, f: AbstractFunction):
 class JElim(Partializable):
     """Eliminate J, iff it is only applied to non-functions."""
 
-    def __init__(self, optimizer):
+    def __init__(self, resources):
         """Initialize JElim."""
-        self.optimizer = optimizer
+        self.resources = resources
 
     def __call__(self, root):
         """Apply JElim on root."""
-        mng = self.optimizer.resources.manager
+        mng = self.resources.manager
         mng.keep_roots(root)
         nodes = []
         typesubs = []
