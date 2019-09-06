@@ -45,34 +45,8 @@ from .prim.py_implementations import (
     tuple_getitem,
     typeof,
 )
-from .utils import MyiaTypeError, Slice, check_nargs, newenv
+from .utils import MyiaTypeError, Slice, check_nargs, core, newenv
 from .xtype import Bool, EnvType, Nil, Number, f32, f64, i8, i16, u8, u16
-
-
-def core(fn=None, **flags):
-    """Wrap a graph that defines a core Myia function.
-
-    The following flags can be set:
-        core: (default: True) Indicates that this is a core function
-            (only informative at the moment).
-        ignore_values: (default: False) Make the inferrer ignore argument
-            values for the parameters (leads to less specialization).
-    """
-    flags = {
-        # This is a function defined in Myia's core
-        'core': True,
-        'reference': True,
-        **flags,
-    }
-
-    def deco(fn):
-        fn._myia_flags = flags
-        return fn
-
-    if fn is None:
-        return deco
-    else:
-        return deco(fn)
 
 
 class Elemwise(HyperMap):
@@ -118,9 +92,59 @@ class Elemwise(HyperMap):
         This does not use self.fn_leaf.
         """
         assert fnarg is None
-        first, *rest = argmap.keys()
-        fn = g.apply(operations.getattr, first, self.mname)
-        return g.apply(fn, *rest)
+        if self.mname is None:
+            return super().make_leaf(g, fnarg, argmap)
+        else:
+            first, *rest = argmap.keys()
+            fn = g.apply(operations.getattr, first, self.mname)
+            return g.apply(fn, *rest)
+
+
+def dunder_method_protocol(name):
+    """Define a function that calls a certain method (unary)."""
+    attr = f'__{name}__'
+
+    @core(name=name)
+    def protocol(data):
+        return getattr(data, attr)()
+
+    return protocol
+
+
+def dunder_method_protocol_2(name):
+    """Define a function that calls a certain method (binary)."""
+    attr = f'__{name}__'
+
+    @core(name=name)
+    def protocol(data, x):
+        return getattr(data, attr)(x)
+
+    return protocol
+
+
+def dunder_method_protocol_3(name):
+    """Define a function that calls a certain method (ternary)."""
+    attr = f'__{name}__'
+
+    @core(name=name)
+    def protocol(data, x, y):
+        return getattr(data, attr)(x, y)
+
+    return protocol
+
+
+def arrayify(name, op):
+    """Create an array_map over the op."""
+    @core(name=name)
+    def arrayified(xs):
+        return array_map(op, xs)
+
+    return arrayified
+
+
+#########################
+# Arithmetic operations #
+#########################
 
 
 add = Elemwise('__add__', py.scalar_add, name='add')
@@ -130,147 +154,19 @@ truediv = Elemwise('__truediv__', name='truediv')
 floordiv = Elemwise('__floordiv__', name='floordiv')
 mod = Elemwise('__mod__', py.scalar_mod, name='mod')
 pow = Elemwise('__pow__', py.scalar_pow, name='pow')
-
-
-@core
-def floor(x):
-    """Implementation of `floor`."""
-    return x.__floor__()
-
-
-@core
-def trunc(x):
-    """Implementation of `trunc`."""
-    return x.__trunc__()
-
-
-@core
-def uadd(x):
-    """Implementation of `uadd`."""
-    return x.__pos__()
-
-
-@core
-def usub(x):
-    """Implementation of `usub`."""
-    return x.__neg__()
-
-
-@core
-def scalar_truediv(x, y):
-    """Implementation of `scalar_truediv`."""
-    return x.__truediv__(y)
-
-
-@core
-def scalar_floordiv(x, y):
-    """Implementation of `scalar_floordiv`."""
-    return x.__floordiv__(y)
-
-
-@core
-def bool_ne(x, y):
-    """Implementation of `bool_ne`."""
-    return bool_not(bool_eq(x, y))
-
-
-@core
-def string_ne(x, y):
-    """Implementation of `string_ne`."""
-    return bool_not(string_eq(x, y))
-
-
-exp = MultitypeGraph('exp')
-log = MultitypeGraph('log')
-sin = MultitypeGraph('sin')
-cos = MultitypeGraph('cos')
-tan = MultitypeGraph('tan')
-tanh = MultitypeGraph('tanh')
-
-
-@exp.register(Number)
-@core
-def _exp(x):
-    return scalar_exp(x)
-
-
-@log.register(Number)
-@core
-def _log(x):
-    return scalar_log(x)
-
-
-@sin.register(Number)
-@core
-def _sin(x):
-    return scalar_sin(x)
-
-
-@cos.register(Number)
-@core
-def _cos(x):
-    return scalar_cos(x)
-
-
-@tan.register(Number)
-@core
-def _tan(x):
-    return scalar_tan(x)
-
-
-@tanh.register(Number)
-@core
-def _tanh(x):
-    return scalar_tanh(x)
-
-
-eq = Elemwise('__eq__', py.scalar_eq, infer_value=True, name='eq')
-lt = Elemwise('__lt__', py.scalar_lt, infer_value=True, name='lt')
-gt = Elemwise('__gt__', py.scalar_gt, infer_value=True, name='gt')
-ne = Elemwise('__ne__', py.scalar_ne, infer_value=True, name='ne')
-le = Elemwise('__le__', py.scalar_le, infer_value=True, name='le')
-ge = Elemwise('__ge__', py.scalar_ge, infer_value=True, name='ge')
-
-
-@core
-def bool(x):
-    """Implementation of `bool`."""
-    return x.__bool__()
-
-
-@core
-def not_(x):
-    """Implementation of `not`."""
-    return bool_not(bool(x))
-
-
-@core
-def and_(x, y):
-    """Implementation of `and` (`&`)."""
-    return x.__and__(y)
-
-
-@core
-def or_(x, y):
-    """Implementation of `or` (`|`)."""
-    return x.__or__(y)
-
-
-@core
-def matmul(x, y):
-    """Implementation of `matmul` (`@`)."""
-    return x.__matmul__(y)
-
-
-##################
-# Scalar methods #
-##################
-
-
-@core
-def int_bool(x):
-    """Implementation of `int_bool`."""
-    return x != 0
+exp = Elemwise(None, scalar_exp, name='exp')
+log = Elemwise(None, scalar_log, name='log')
+sin = Elemwise(None, scalar_sin, name='sin')
+cos = Elemwise(None, scalar_cos, name='cos')
+tan = Elemwise(None, scalar_tan, name='tan')
+tanh = Elemwise(None, scalar_tanh, name='tanh')
+uadd = dunder_method_protocol('pos')
+usub = dunder_method_protocol('neg')
+floor = dunder_method_protocol('floor')
+trunc = dunder_method_protocol('trunc')
+scalar_truediv = dunder_method_protocol_2('truediv')
+scalar_floordiv = dunder_method_protocol_2('floordiv')
+matmul = dunder_method_protocol_2('matmul')
 
 
 @core
@@ -295,15 +191,79 @@ def int_truediv(x, y):
 
 
 @core
-def float_bool(x):
-    """Implementation of `float_bool`."""
-    return x != 0.0
-
-
-@core
 def float_floordiv(x, y):
     """Implementation of `float_floordiv`."""
     return floor(x / y)
+
+
+###############
+# Comparisons #
+###############
+
+
+@core
+def not_(x):
+    """Implementation of `not`."""
+    return bool_not(bool(x))
+
+
+@core
+def is_not(x, y):
+    """Implementation of the `is not` operator."""
+    return not (x is y)
+
+
+@core
+def bool_ne(x, y):
+    """Implementation of `bool_ne`."""
+    return bool_not(bool_eq(x, y))
+
+
+@core
+def string_ne(x, y):
+    """Implementation of `string_ne`."""
+    return bool_not(string_eq(x, y))
+
+
+eq = Elemwise('__eq__', py.scalar_eq, infer_value=True, name='eq')
+lt = Elemwise('__lt__', py.scalar_lt, infer_value=True, name='lt')
+gt = Elemwise('__gt__', py.scalar_gt, infer_value=True, name='gt')
+ne = Elemwise('__ne__', py.scalar_ne, infer_value=True, name='ne')
+le = Elemwise('__le__', py.scalar_le, infer_value=True, name='le')
+ge = Elemwise('__ge__', py.scalar_ge, infer_value=True, name='ge')
+bool = dunder_method_protocol('bool')
+and_ = dunder_method_protocol_2('and')
+or_ = dunder_method_protocol_2('or')
+
+
+@core
+def nil_eq(a, b):
+    """Implementation of `equal` (only use with Nil types)."""
+    return a is None and b is None
+
+
+@core
+def nil_ne(a, b):
+    """Implementation of `not_equal` (only use with Nil types)."""
+    return not nil_eq(a, b)
+
+
+@core
+def nil_bool(x):
+    """Converting Nil (None) to Bool returns False."""
+    return False
+
+
+@core
+def int_bool(x):
+    """Implementation of `int_bool`."""
+    return x != 0
+
+
+@core
+def float_bool(x):
+    """Implementation of `float_bool`."""
+    return x != 0.0
 
 
 #############
@@ -311,40 +271,12 @@ def float_floordiv(x, y):
 #############
 
 
-@core
-def _len(data):
-    """Implementation of `len`."""
-    return data.__len__()
-
-
-@core
-def getitem(data, item):
-    """Implementation of `getitem`."""
-    return data.__getitem__(item)
-
-
-@core
-def setitem(data, item, value):
-    """Implementation of `setitem`."""
-    return data.__setitem__(item, value)
-
-
-@core
-def iter(xs):
-    """Implementation of `iter`."""
-    return xs.__myia_iter__()
-
-
-@core
-def next(it):
-    """Implementation of `next`."""
-    return it.__myia_next__()
-
-
-@core
-def hasnext(it):
-    """Implementation of `hasnext`."""
-    return it.__myia_hasnext__()
+_len = dunder_method_protocol('len')
+getitem = dunder_method_protocol_2('getitem')
+setitem = dunder_method_protocol_3('setitem')
+iter = dunder_method_protocol('myia_iter')
+next = dunder_method_protocol('myia_next')
+hasnext = dunder_method_protocol('myia_hasnext')
 
 
 @dataclass(frozen=True)
@@ -452,82 +384,18 @@ def tuple_get(t, item):
 # Array methods #
 #################
 
+
+to_array = dunder_method_protocol_2('myia_to_array')
+array_floor = arrayify('array_floor', floor)
+array_trunc = arrayify('array_trunc', trunc)
+array_uadd = arrayify('array_uadd', uadd)
+array_usub = arrayify('array_usub', usub)
+
+
 @core
 def sum(x):
     """Implementation of `sum`."""
     return array_reduce(scalar_add, x, ())
-
-
-@core
-def to_array(x, t):
-    """Implementation of `to_array`."""
-    return x.__myia_to_array__(t)
-
-
-@core
-def array_floor(xs):
-    """Implementation of `array_floor`."""
-    return array_map(floor, xs)
-
-
-@core
-def array_trunc(xs):
-    """Implementation of `array_trunc`."""
-    return array_map(trunc, xs)
-
-
-@core
-def array_uadd(xs):
-    """Implementation of `array_uadd`."""
-    return array_map(uadd, xs)
-
-
-@core
-def array_usub(xs):
-    """Implementation of `array_usub`."""
-    return array_map(usub, xs)
-
-
-@exp.register(AbstractArray)
-@core
-def array_exp(xs):
-    """Implementation of `array_exp`."""
-    return array_map(scalar_exp, xs)
-
-
-@log.register(AbstractArray)
-@core
-def array_log(xs):
-    """Implementation of `array_log`."""
-    return array_map(scalar_log, xs)
-
-
-@sin.register(AbstractArray)
-@core
-def array_sin(xs):
-    """Implementation of `array_sin`."""
-    return array_map(scalar_sin, xs)
-
-
-@cos.register(AbstractArray)
-@core
-def array_cos(xs):
-    """Implementation of `array_cos`."""
-    return array_map(scalar_cos, xs)
-
-
-@tan.register(AbstractArray)
-@core
-def array_tan(xs):
-    """Implementation of `array_tan`."""
-    return array_map(scalar_tan, xs)
-
-
-@tanh.register(AbstractArray)
-@core
-def array_tanh(xs):
-    """Implementation of `array_tanh`."""
-    return array_map(scalar_tanh, xs)
 
 
 @core
@@ -549,25 +417,9 @@ def transpose(arr, permutation=None):
     return P.transpose(arr, permutation)
 
 
-@core
-def nil_eq(a, b):
-    """Implementation of `equal` (only use with Nil types)."""
-    if hastype(a, Nil) and hastype(b, Nil):
-        return True
-    else:
-        return False
-
-
-@core
-def nil_ne(a, b):
-    """Implementation of `not_equal` (only use with Nil types)."""
-    return not nil_eq(a, b)
-
-
-@core
-def nil_bool(x):
-    """Converting Nil (None) to Bool returns False."""
-    return False
+########
+# gadd #
+########
 
 
 _leaf_add = MultitypeGraph('gadd')
@@ -593,6 +445,11 @@ def _nil_add(x, y):
 
 gadd = HyperMap(name='gadd', fn_leaf=_leaf_add,
                 broadcast=False, trust_union_match=True)
+
+
+##############
+# zeros_like #
+##############
 
 
 _leaf_zeros_like = MultitypeGraph('zeros_like')
@@ -643,19 +500,9 @@ zeros_like = HyperMap(
 )
 
 
-@core
-def is_not(x, y):
-    """Implementation of the `is not` operator."""
-    return not (x is y)
-
-
-@core
-def list_reduce(fn, lst, dftl):
-    """Implementation of list_reduce."""
-    res = dftl
-    for elem in lst:
-        res = fn(res, elem)
-    return res
+##################
+# ArithmeticData #
+##################
 
 
 class ArithmeticData:
@@ -730,6 +577,20 @@ class ArithmeticData:
     @core
     def __rpow__(self, x):
         return hyper_map(pow, x, self)
+
+
+#################
+# Miscellaneous #
+#################
+
+
+@core
+def list_reduce(fn, lst, dftl):
+    """Implementation of list_reduce."""
+    res = dftl
+    for elem in lst:
+        res = fn(res, elem)
+    return res
 
 
 @dataclass
