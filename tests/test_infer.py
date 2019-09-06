@@ -1141,6 +1141,41 @@ def test_hastype_2(x):
 
 
 @infer_std(
+    (i64, i64),
+    (f64, f64),
+    ((i64, i64), i64),
+    ((i64, f64), InferenceError),
+    ([f64], f64),
+    (Point(i64, i64), i64),
+)
+def test_isinstance(x):
+    def f(x):
+        if isinstance(x, (int, float)):
+            return x
+        elif isinstance(x, tuple):
+            if len(x) == 0:
+                return 0
+            else:
+                return f(x[0]) + f(x[1:])
+        elif isinstance(x, list):
+            if x:
+                return f(x.head) + f(x.tail)
+            else:
+                return 0
+        elif isinstance(x, Point):
+            return f(x.x) * f(x.y)
+        else:
+            return None
+
+    return f(x)
+
+
+@infer_std((i64, InferenceError))
+def test_isinstance_bad(x):
+    return isinstance(x, (int, 3))
+
+
+@infer_std(
     (U(i64, (i64, i64)), i64),
     (U(i64, (f64, i64)), InferenceError),
     (U(i64, f64), InferenceError),

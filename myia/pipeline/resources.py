@@ -70,6 +70,7 @@ scalar_object_map = {
     range: C.range_,
     zip: C.zip_,
     enumerate: C.enumerate_,
+    isinstance: M.isinstance_,
 }
 
 
@@ -146,6 +147,7 @@ standard_object_map = {
     range: C.range_,
     zip: C.zip_,
     enumerate: C.enumerate_,
+    isinstance: M.isinstance_,
 }
 
 standard_method_map = TypeMap({

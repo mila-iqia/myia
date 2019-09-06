@@ -14,12 +14,15 @@ from .abstract import (
     TYPE,
     VALUE,
     AbstractArray,
+    AbstractClassBase,
     Pending,
     build_value,
     find_coherent_result,
+    force_pending,
     generate_getters,
     macro,
     setter_from_getter,
+    type_to_abstract,
     union_simplify,
 )
 from .composite import gadd
@@ -49,6 +52,28 @@ from .utils import (
     check_nargs,
     core,
 )
+
+
+@macro
+async def isinstance_(info):
+    """Map isinstance to hastype."""
+    r_data, r_type = check_nargs('isinstance', 2, info.argrefs)
+    ts = build_value(await r_type.get(), default=ANYTHING)
+    if not isinstance(ts, tuple):
+        ts = (ts,)
+    for t in ts:
+        if not isinstance(t, type):
+            if not (isinstance(t, AbstractClassBase)
+                    and t.user_defined_version() is t):
+                raise MyiaTypeError(
+                    'isinstance expects a Python type'
+                    ' or a tuple of Python types'
+                )
+    hastypes = [info.graph.apply(P.hastype, r_data.node,
+                                 Constant(type_to_abstract(t)))
+                for t in ts]
+    return reduce(lambda x, y: info.graph.apply(P.bool_or, x, y),
+                  hastypes)
 
 
 @macro
@@ -149,10 +174,7 @@ async def getattr_(info):
             currg = falseg
         return rval
 
-    try:
-        data_t = data.dtype()
-    except KeyError:
-        data_t = None
+    data_t = data.dtype()
     attr_v = build_value(attr, default=ANYTHING)
     g = info.outref.node.graph
 
@@ -327,9 +349,10 @@ async def user_switch(info):
         assert isinstance(fulltype, abstract.AbstractUnion)
 
         xg = xref.node.graph
-        cg = condref.node.graph
-        cond_trials = [cond_trial(cg, t) for t in fulltype.options]
-        results = [await engine.ref(node, condref.context).get()
+        cg = cond.graph
+        cond_trials = [cond_trial(cg, t) for t in
+                       await force_pending(fulltype.options)]
+        results = [await engine.ref(node, ctx).get()
                    for node in cond_trials]
 
         groups = {True: [], False: [], ANYTHING: []}
@@ -360,11 +383,7 @@ async def user_switch(info):
             return g.apply(P.switch, new_cond, new_tb, new_fb)
 
     async def default():
-        _, cond, tb, fb = info.outref.node.inputs
-        condt = await condref.get()
-        if not engine.check_predicate(Bool, condt.dtype()):
-            to_bool = engine.pipeline.resources.convert(bool)
-            cond = g.apply(to_bool, cond)
+        _, _, tb, fb = info.outref.node.inputs
         return g.apply(P.switch, cond, tb, fb)
 
     for branch_ref in [tbref, fbref]:
@@ -374,9 +393,16 @@ async def user_switch(info):
                 ' is hastype on a Union.'
             )
 
+    cond = condref.node
     ctx = condref.context
-    if condref.node.is_apply():
-        opnode, *args = condref.node.inputs
+
+    condt = await condref.get()
+    if not engine.check_predicate(Bool, condt):
+        to_bool = engine.pipeline.resources.convert(bool)
+        cond = cond.graph.apply(to_bool, cond)
+
+    if cond.is_apply():
+        opnode, *args = cond.inputs
         opref = engine.ref(opnode, ctx)
         ops = (await opref.get()).get_sync()
         if len(ops) == 1:

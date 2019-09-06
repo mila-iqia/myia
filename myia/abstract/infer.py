@@ -370,6 +370,10 @@ class InferenceEngine:
             * A callable that returns a boolean
         """
         if isinstance(predicate, dtype.TypeMeta):
+            if isinstance(x, AbstractValue):
+                x = x.dtype()
+                if x is None:
+                    return False
             return issubclass(x, predicate)
         elif isinstance(predicate, type):
             return isinstance(x, predicate)
