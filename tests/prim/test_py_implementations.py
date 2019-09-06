@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from myia.abstract import ANYTHING
 from myia.pipeline import scalar_debug_pipeline
 from myia.prim.py_implementations import (
     _assert_scalar,
@@ -379,6 +380,7 @@ def test_broadcast_shape():
         ((2, 3), (2, 4), ValueError),
         ((), (1, 2, 3, 4, 5), (1, 2, 3, 4, 5)),
         ((1, 2, 3, 4, 5), (), (1, 2, 3, 4, 5)),
+        ((2, ANYTHING, 4), (ANYTHING, 3, ANYTHING), (2, 3, 4)),
     ]
     for shpx, shpy, result in tests:
         try:

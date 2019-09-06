@@ -45,6 +45,7 @@ class HyperMap(MetaGraph):
                  broadcast=True,
                  nonleaf=nonleaf_defaults,
                  trust_union_match=False,
+                 infer_value=False,
                  name=None):
         """Initialize a HyperMap."""
         if name is None:
@@ -58,6 +59,7 @@ class HyperMap(MetaGraph):
         self.fn_rec = fn_rec or self
         self.broadcast = broadcast
         self.trust_union_match = trust_union_match
+        self.infer_value = infer_value
         self.nonleaf = nonleaf
         self._through = (*nonleaf,
                          abstract.Possibilities,
@@ -71,7 +73,9 @@ class HyperMap(MetaGraph):
 
     def normalize_args_sync(self, args):
         """Return broadened arguments."""
-        return tuple(broaden(a) for a in args)
+        if not self.infer_value:
+            args = tuple(broaden(a) for a in args)
+        return tuple(args)
 
     def _name(self, graph, info):
         graph.debug.name = f'{self.name}[{info}]'
@@ -245,12 +249,16 @@ class HyperMap(MetaGraph):
         original = a.user_defined_version()
         return g.apply(P.make_record, original, *vals)
 
+    def make_leaf(self, g, fnarg, argmap):
+        """Generate the expression for a leaf."""
+        if fnarg is None:
+            fnarg = self.fn_leaf
+        return g.apply(fnarg, *argmap.keys())
+
     def _generate_helper(self, g, fnarg, argmap):
         nonleafs = [a for a, isleaf in argmap.values() if not isleaf]
         if not nonleafs:
-            if fnarg is None:
-                fnarg = self.fn_leaf
-            return g.apply(fnarg, *argmap.keys())
+            return self.make_leaf(g, fnarg, argmap)
         else:
             types = set(type(a) for a in nonleafs)
             if len(types) != 1:
@@ -275,16 +283,6 @@ class HyperMap(MetaGraph):
             argmap[g.add_parameter()] = (a, self._is_leaf(a))
         g.output = self._generate_helper(g, fnarg, argmap)
         return g
-
-    def __eq__(self, hm):
-        return (isinstance(hm, HyperMap)
-                and self.fn_leaf == hm.fn_leaf
-                and self._rec == hm._rec
-                and self.nonleaf == hm.nonleaf
-                and self.broadcast == hm.broadcast)
-
-    def __hash__(self):
-        return hash((self.fn_leaf, self._rec, self.nonleaf, self.broadcast))
 
     def __call__(self, *all_args):
         """Python implementation of HyperMap's functionality."""
