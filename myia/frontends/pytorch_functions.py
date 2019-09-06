@@ -17,10 +17,10 @@
 
 from .. import composite as C, xtype as D
 from ..abstract import AbstractArray
-from ..composite import core
 from ..hypermap import hyper_map
 from ..ir import MultitypeGraph
 from ..prim import ops as P
+from ..utils import core
 
 # This import is for WIP
 # from ..xtype import Bool, Int
