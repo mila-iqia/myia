@@ -396,7 +396,7 @@ async def user_switch(info):
 
     condt = await condref.get()
     if not engine.check_predicate(Bool, condt):
-        to_bool = engine.pipeline.resources.convert(bool)
+        to_bool = engine.resources.convert(bool)
         cond = cond.graph.apply(to_bool, cond)
 
     if cond.is_apply():
