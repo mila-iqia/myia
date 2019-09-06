@@ -98,6 +98,10 @@ class Nil(Object):
     """Type of None."""
 
 
+class NotImplementedType(Object):
+    """Type of NotImplemented."""
+
+
 class Bool(Object):
     """Boolean values."""
 
@@ -233,6 +237,7 @@ def type_to_np_dtype(type):
 
 _simple_types = {
     type(None): Nil,
+    type(NotImplemented): NotImplementedType,
     bool: Bool,
     str: String,
     int: Int[64],
