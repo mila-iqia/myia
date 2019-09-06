@@ -656,9 +656,6 @@ class Inferrer(Partializable):
         """Run inference on a tuple of abstract arguments."""
         raise NotImplementedError()
 
-    def __repr__(self):
-        return f'{type(self)}'
-
 
 class TrackedInferrer(Inferrer):
     """Wrap another inferrer to track a subset of uses.
@@ -756,7 +753,7 @@ class GraphInferrer(Inferrer):
         nargs = len(g.parameters)
 
         if len(args) != nargs:
-            raise type_error_nargs(self, nargs, len(args))
+            raise type_error_nargs(self._graph, nargs, len(args))
 
         # args were already normalized by run()
         context = self.make_context(engine, args, normalize=False)
