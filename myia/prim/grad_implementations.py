@@ -10,15 +10,13 @@ from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import About, NamedDebugInfo
 from ..ir import Constant, Graph, MetaGraph, clone, manage
-from ..operations import typeof
+from ..operations import J, Jinv, typeof
 from ..opt.lib import Xs
 from ..parser import operations_ns
 from ..pipeline import standard_pipeline
 from ..utils import InternalInferenceError, Registry, newenv
 from . import ops as primops
 from .py_implementations import (
-    J,
-    Jinv,
     array_reduce,
     array_to_scalar,
     casttag,

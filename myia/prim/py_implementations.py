@@ -284,9 +284,6 @@ def array_setitem(data, item, value):
     return data2
 
 
-py_setattr = setattr
-
-
 @register(primops.shape)
 def shape(array):
     """Implement `shape`."""
@@ -516,18 +513,6 @@ def broadcast_shape(shpx, shpy):
 def invert_permutation(perm):
     """Implement `invert_permutation`."""
     return tuple(perm.index(i) for i in range(len(perm)))
-
-
-@py_register(primops.J)
-def J(x):
-    """Implement `J`."""
-    raise NotImplementedError()
-
-
-@py_register(primops.Jinv)
-def Jinv(x):
-    """Implement `Jinv`."""
-    raise NotImplementedError()
 
 
 @register(primops.env_setitem)

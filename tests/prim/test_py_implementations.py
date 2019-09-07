@@ -8,7 +8,6 @@ from math import (
     tanh as math_tanh,
     trunc as math_trunc,
 )
-from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -46,7 +45,7 @@ from myia.prim.py_implementations import (
 )
 from myia.utils import newenv
 
-from ..common import AA, Point, f16, i64, to_abstract_test
+from ..common import AA, f16, i64, to_abstract_test
 from ..test_lang import parse_compare
 
 

@@ -10,8 +10,8 @@ from myia.utils import (
     Events,
     Named,
     SymbolicKeyInstance,
-    newenv,
     list_to_cons,
+    newenv,
     smap,
 )
 

@@ -50,6 +50,8 @@ class MyiaOnlyOperation:
     __repr__ = __str__
 
 
+J = MyiaOnlyOperation('J')
+Jinv = MyiaOnlyOperation('Jinv')
 apply = MyiaOnlyOperation('apply')
 embed = MyiaOnlyOperation('embed')
 hasnext = MyiaOnlyOperation('hasnext')

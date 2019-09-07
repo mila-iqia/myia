@@ -19,8 +19,8 @@ from myia.pipeline import (
     steps,
 )
 from myia.prim import ops as P
+from myia.prim.ops import J
 from myia.prim.py_implementations import (
-    J,
     array_map,
     array_reduce,
     array_to_scalar,

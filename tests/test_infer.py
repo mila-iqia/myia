@@ -20,12 +20,10 @@ from myia.composite import gadd, zeros_like
 from myia.hypermap import HyperMap, hyper_map
 from myia.ir import Graph, MetaGraph, MultitypeGraph
 from myia.macros import embed, grad, typeof
-from myia.operations import hastype, user_switch
+from myia.operations import J, Jinv, hastype, user_switch
 from myia.pipeline import scalar_pipeline, standard_pipeline
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import (
-    J,
-    Jinv,
     array_map,
     array_reduce,
     array_to_scalar,
