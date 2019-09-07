@@ -546,13 +546,6 @@ def make_record(typ, *args):
     return typ.constructor(*args)
 
 
-@register(primops.tuple_len)
-@register(primops.array_len)
-def _len(x):
-    """Implement `len`."""
-    return len(x)
-
-
 @register(primops.make_dict)
 def make_dict(typ, *values):
     """Implement `make_dict`."""

@@ -77,7 +77,6 @@ casttag = Primitive('casttag')
 make_tuple = Primitive('make_tuple')
 tuple_getitem = Primitive('tuple_getitem')
 tuple_setitem = Primitive('tuple_setitem')
-tuple_len = Primitive('tuple_len')
 
 make_dict = Primitive('make_dict')
 dict_getitem = Primitive('dict_getitem')
@@ -89,7 +88,6 @@ record_setitem = Primitive('record_setitem')
 
 array_getitem = Primitive('array_getitem')
 array_setitem = Primitive('array_setitem')
-array_len = Primitive('array_len')
 
 
 ##########

@@ -439,22 +439,6 @@ async def _inf_record_setitem(self, engine,
     )
 
 
-@standard_prim(P.tuple_len)
-async def _inf_tuple_len(self, engine, xs: AbstractTuple):
-    return AbstractScalar({
-        VALUE: len(xs.elements),
-        TYPE: xtype.Int[64],
-    })
-
-
-@standard_prim(P.array_len)
-async def _inf_array_len(self, engine, xs: AbstractArray):
-    return AbstractScalar({
-        VALUE: ANYTHING,
-        TYPE: xtype.Int[64],
-    })
-
-
 ##########
 # Arrays #
 ##########

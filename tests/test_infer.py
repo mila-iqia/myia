@@ -452,22 +452,13 @@ def test_dict_incompatible(c, x, y):
     ((), 0),
     ((1,), 1),
     ((i64, f64), 2),
-    ([f64], InferenceError),
-    (af64_of(2, 5), InferenceError),
+    ([f64], i64),
+    (af64_of(12, 5), np.uint64(12)),
+    (af64_of(), InferenceError),
     (i64, InferenceError),
 )
-def test_tuple_len(xs):
-    return P.tuple_len(xs)
-
-
-@infer(
-    ((i64, f64), InferenceError),
-    ([f64], InferenceError),
-    (af64_of(2, 5), i64),
-    (i64, InferenceError),
-)
-def test_array_len(xs):
-    return P.array_len(xs)
+def test_len(xs):
+    return len(xs)
 
 
 @infer((i64, f64, i64), (f64, i64, f64))

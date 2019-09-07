@@ -326,6 +326,26 @@ async def dict_values(info):
     return info.graph.apply(P.make_tuple, *getters)
 
 
+@macro
+async def tuple_len(info):
+    """Implement len(tuple)."""
+    a, = check_nargs('tuple_len', 1, info.abstracts)
+    assert isinstance(a, abstract.AbstractTuple)
+    return Constant(len(a.elements))
+
+
+@macro
+async def array_len(info):
+    """Implement len(array)."""
+    a, = check_nargs('array_len', 1, info.abstracts)
+    assert isinstance(a, abstract.AbstractArray)
+    shp = a.xshape()
+    if len(shp) < 1:
+        raise MyiaTypeError('0d arrays have no len')
+    shp_expr = info.graph.apply(P.shape, info.args[0])
+    return info.graph.apply(P.tuple_getitem, shp_expr, 0)
+
+
 class _CastRemapper(CloneRemapper):
 
     def __init__(self,

@@ -240,7 +240,7 @@ standard_method_map = TypeMap({
         '__myia_to_array__': P.scalar_to_array,
     },
     xtype.Tuple: {
-        '__len__': P.tuple_len,
+        '__len__': M.tuple_len,
         '__add__': C.tuple_concat,
         '__getitem__': C.tuple_get,
         '__setitem__': P.tuple_setitem,
@@ -271,7 +271,7 @@ standard_method_map = TypeMap({
         '__le__': C.le,
         '__ge__': C.ge,
         '__matmul__': P.dot,
-        '__len__': P.array_len,
+        '__len__': M.array_len,
         '__getitem__': P.array_getitem,
         '__setitem__': P.array_setitem,
         '__myia_iter__': C.array_iter,
