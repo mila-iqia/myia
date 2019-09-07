@@ -256,12 +256,6 @@ def tuple_getitem(data, item):
     return data[item]
 
 
-@py_register(primops.dict_getitem)
-def dict_getitem(data, item):
-    """Implement `dict_getitem`."""
-    return data[item]
-
-
 @py_register(primops.array_getitem)
 def array_getitem(data, item):
     """Implement `getitem`."""
@@ -282,12 +276,6 @@ def tuple_setitem(data, item, value):
                  for i, x in enumerate(data))
 
 
-@py_register(primops.dict_setitem)
-def dict_setitem(data, item, value):
-    """Implement `dict_setitem`."""
-    return {**data, item: value}
-
-
 @register(primops.array_setitem)
 def array_setitem(data, item, value):
     """Implement `list/array_setitem`."""
@@ -297,14 +285,6 @@ def array_setitem(data, item, value):
 
 
 py_setattr = setattr
-
-
-@register(primops.record_setitem)
-def record_setitem(data, attr, value):
-    """Implement `record_setitem`."""
-    data2 = copy(data)
-    py_setattr(data2, attr, value)
-    return data2
 
 
 @register(primops.shape)
@@ -536,20 +516,6 @@ def broadcast_shape(shpx, shpy):
 def invert_permutation(perm):
     """Implement `invert_permutation`."""
     return tuple(perm.index(i) for i in range(len(perm)))
-
-
-@register(primops.make_record)
-def make_record(typ, *args):
-    """Implement `make_record`."""
-    from ..abstract import type_to_abstract
-    typ = type_to_abstract(typ)
-    return typ.constructor(*args)
-
-
-@register(primops.make_dict)
-def make_dict(typ, *values):
-    """Implement `make_dict`."""
-    return dict(zip(typ.entries.keys(), values))
 
 
 @py_register(primops.J)

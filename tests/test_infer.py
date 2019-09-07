@@ -33,16 +33,13 @@ from myia.prim.py_implementations import (
     bool_or,
     broadcast_shape,
     casttag,
-    dict_setitem,
     distribute,
     dot,
     env_getitem,
     env_setitem,
     hastag,
     identity,
-    make_record,
     partial as myia_partial,
-    record_setitem,
     reshape,
     scalar_add,
     scalar_cast,
@@ -524,7 +521,7 @@ def test_dict_getitem_nonconst(d, i):
        (D(x=i64, y=f32), f64, D(x=f64, y=f32)),
        (D(z=i64), f64, InferenceError))
 def test_dict_setitem(d, x):
-    return dict_setitem(d, 'x', x)
+    return P.dict_setitem(d, 'x', x)
 
 
 @infer(
@@ -2016,7 +2013,7 @@ def test_dataclass_bad_inst(x, y, z):
 
 @infer((Ty(ANYTHING), i64, i64, InferenceError))
 def test_dataclass_bad_inst2(cls, x, y):
-    return make_record(cls, x, y)
+    return P.make_record(cls, x, y)
 
 
 @infer((Point(i64, i64), InferenceError))
@@ -2031,18 +2028,18 @@ def test_dataclass_call(thing):
 
 @infer((Thing(i64), f64, Thing(f64)))
 def test_record_setitem(thing, x):
-    return record_setitem(thing, 'contents', x)
+    return P.record_setitem(thing, 'contents', x)
 
 
 @infer((Point(i64, i64), i64, Point(i64, i64)),
        (Point(i64, i64), f64, InferenceError))
 def test_record_setitem_2(pt, x):
-    return record_setitem(pt, 'x', x)
+    return P.record_setitem(pt, 'x', x)
 
 
 @infer((Thing(i64), f64, InferenceError))
 def test_record_setitem_wrong_field(thing, x):
-    return record_setitem(thing, 'shfifty_five', x)
+    return P.record_setitem(thing, 'shfifty_five', x)
 
 
 hyper_map_notuple = HyperMap(

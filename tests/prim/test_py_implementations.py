@@ -26,17 +26,13 @@ from myia.prim.py_implementations import (
     array_to_scalar,
     bool_eq,
     broadcast_shape,
-    dict_getitem,
-    dict_setitem,
     distribute,
     dot,
     env_add,
     env_getitem,
     env_setitem,
     identity,
-    make_record,
     partial as myia_partial,
-    record_setitem,
     reshape,
     return_,
     scalar_cast,
@@ -213,13 +209,6 @@ def test_prim_array_setitem():
     assert not np.all(L == L2)  # test that this is not inplace
 
 
-def test_prim_setattr():
-    ns = SimpleNamespace(a=1, b=2)
-    ns2 = SimpleNamespace(a=1, b=22)
-    assert record_setitem(ns, 'b', 22) == ns2
-    assert ns != ns2  # test that this is not inplace
-
-
 def test_prim_shape():
     v = np.empty((2, 3))
     assert shape(v) == (2, 3)
@@ -292,17 +281,6 @@ def test_prim_array_reduce():
         assert (res == value).all()
 
 
-def test_prim_dict_getitem():
-    assert dict_getitem({'x': 2}, 'x') == 2
-
-
-def test_prim_dict_setitem():
-    d = {'x': 2}
-    d2 = dict_setitem(d, 'x', 3)
-    assert d == {'x': 2}
-    assert d2 == {'x': 3}
-
-
 def test_prim_distribute():
     assert (distribute(1, (2, 3)) == np.ones((2, 3))).all()
 
@@ -351,10 +329,6 @@ def test_prim_identity():
     for x in (1, 1.7, True, False, [1, 2, 3], (4, 5)):
         assert identity(x) is x
         assert return_(x) is x
-
-
-def test_prim_make_record():
-    assert make_record(Point, 1, 2) == Point(1, 2)
 
 
 def test_prim_switch():

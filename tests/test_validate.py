@@ -3,7 +3,7 @@ import pytest
 
 from myia.pipeline import scalar_parse, scalar_pipeline
 from myia.prim import ops as P
-from myia.prim.py_implementations import make_record, partial
+from myia.prim.py_implementations import partial
 from myia.validate import ValidationError, validate as _validate
 
 from .common import Point, i64, to_abstract_test
@@ -123,11 +123,11 @@ def test_clean():
 
     @valid_after_ec(i64, i64)
     def f1(x, y):
-        return make_record(Point, x, y)
+        return P.make_record(Point, x, y)
 
     @valid_after_ec(i64, i64)
     def f2(x, y):
-        return partial(make_record, Point, x)(y)
+        return partial(P.make_record, Point, x)(y)
 
     @valid_after_ec((Point_a, Point_a))
     def f3(xs):
@@ -138,11 +138,11 @@ def test_clean():
     @valid_after_ec(i64, i64)
     def f4(x, y):
         def f():
-            return partial(make_record, Point)
+            return partial(P.make_record, Point)
         return f()(x, y)
 
     @valid_after_ec(i64, i64)
     def f5(x, y):
         def f(x):
-            return partial(make_record, Point, x)
+            return partial(P.make_record, Point, x)
         return f(x)(y)

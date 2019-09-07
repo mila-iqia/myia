@@ -137,7 +137,7 @@ def test_list(x):
     return [x, x + 1, x + 2]
 
 
-@parse_compare(2)
+@parse_compare(2, pipeline=scalar_debug_pipeline)
 def test_dict(x):
     return {'x': x}
 
