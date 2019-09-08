@@ -11,7 +11,7 @@ from ..compile import load_backend
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
 from ..prim import ops as P
-from ..utils import Partial, Partializable, Slice, TypeMap, overload, tracer
+from ..utils import Partial, Partializable, Slice, overload, tracer
 from ..vm import VM
 
 scalar_object_map = {
@@ -163,7 +163,8 @@ standard_object_map = {
     isinstance: M.isinstance_,
 }
 
-standard_method_map = TypeMap({
+
+standard_method_map = {
     xtype.Nil: {
         '__eq__': C.nil_eq,
         '__ne__': C.nil_ne,
@@ -180,16 +181,12 @@ standard_method_map = TypeMap({
         '__eq__': P.string_eq,
         '__ne__': C.string_ne,
     },
-    xtype.Int: {
+    xtype.Number: {
         '__add__': P.scalar_add,
         '__sub__': P.scalar_sub,
         '__mul__': P.scalar_mul,
-        '__floordiv__': C.int_floordiv,
-        '__truediv__': C.int_truediv,
         '__mod__': P.scalar_mod,
         '__pow__': P.scalar_pow,
-        '__floor__': P.identity,
-        '__trunc__': P.identity,
         '__pos__': P.scalar_uadd,
         '__neg__': P.scalar_usub,
         '__eq__': P.scalar_eq,
@@ -198,48 +195,28 @@ standard_method_map = TypeMap({
         '__gt__': P.scalar_gt,
         '__le__': P.scalar_le,
         '__ge__': P.scalar_ge,
+    },
+    xtype.Int: {
+        '__floordiv__': C.int_floordiv,
+        '__truediv__': C.int_truediv,
+        '__floor__': P.identity,
+        '__trunc__': P.identity,
         '__bool__': C.int_bool,
         '__myia_to_array__': P.scalar_to_array,
     },
     xtype.UInt: {
-        '__add__': P.scalar_add,
-        '__sub__': P.scalar_sub,
-        '__mul__': P.scalar_mul,
         '__floordiv__': P.scalar_div,
         '__truediv__': C.int_truediv,
-        '__mod__': P.scalar_mod,
-        '__pow__': P.scalar_pow,
         '__floor__': P.identity,
         '__trunc__': P.identity,
-        '__pos__': P.scalar_uadd,
-        '__neg__': P.scalar_usub,
-        '__eq__': P.scalar_eq,
-        '__ne__': P.scalar_ne,
-        '__lt__': P.scalar_lt,
-        '__gt__': P.scalar_gt,
-        '__le__': P.scalar_le,
-        '__ge__': P.scalar_ge,
         '__bool__': C.int_bool,
         '__myia_to_array__': P.scalar_to_array,
     },
     xtype.Float: {
-        '__add__': P.scalar_add,
-        '__sub__': P.scalar_sub,
-        '__mul__': P.scalar_mul,
         '__floordiv__': C.float_floordiv,
         '__truediv__': P.scalar_div,
-        '__mod__': P.scalar_mod,
-        '__pow__': P.scalar_pow,
         '__floor__': P.scalar_floor,
         '__trunc__': P.scalar_trunc,
-        '__pos__': P.scalar_uadd,
-        '__neg__': P.scalar_usub,
-        '__eq__': P.scalar_eq,
-        '__ne__': P.scalar_ne,
-        '__lt__': P.scalar_lt,
-        '__gt__': P.scalar_gt,
-        '__le__': P.scalar_le,
-        '__ge__': P.scalar_ge,
         '__bool__': C.float_bool,
         '__myia_to_array__': P.scalar_to_array,
     },
@@ -285,11 +262,7 @@ standard_method_map = TypeMap({
         'T': property(C.transpose),
         'ndim': property(C.ndim),
     },
-    xtype.SymbolicKeyType: {
-    },
-    xtype.EnvType: {
-    },
-})
+}
 
 
 #####################
@@ -346,27 +319,6 @@ class ConverterResource(Partializable):
             self.object_map[k] = _Unconverted(v)
         for prim, impl in self.resources.py_implementations.items():
             self.object_map[impl] = prim
-        type_map = {
-            bool: xtype.Bool,
-            int: xtype.Int,
-            float: xtype.Float,
-            np.ndarray: xtype.NDArray,
-            np.int8: xtype.Int,
-            np.int16: xtype.Int,
-            np.int32: xtype.Int,
-            np.int64: xtype.Int,
-            np.float16: xtype.Float,
-            np.float32: xtype.Float,
-            np.float64: xtype.Float,
-            tuple: xtype.Tuple,
-            dict: xtype.Dict,
-        }
-        mmap = self.resources.method_map
-        for t1, t2 in type_map.items():
-            for name, prim in mmap[t2].items():
-                method = getattr(t1, name, None)
-                if method is not None:
-                    self.object_map[method] = _Unconverted(prim)
 
     def __call__(self, value):
         """Convert a value."""

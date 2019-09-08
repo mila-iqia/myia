@@ -153,18 +153,19 @@ async def _resolve_case(resources, data, data_t, item_v):
     mmap = resources.method_map
     is_cls = isinstance(data, abstract.AbstractClassBase)
 
-    # Try method map
-    try:
-        mmap_t = data_t and mmap[data_t]
-    except KeyError:
-        mmap_t = {} if is_cls else None
+    if data_t is None or data_t is type:
+        mro = ()
+    else:
+        mro = data_t.mro()
 
-    if mmap_t is not None:
-        # Method call
-        if item_v in mmap_t:
-            method = mmap_t[item_v]
-            return ('method', method)
-        elif is_cls:
+    for t in mro:
+        if t in mmap:
+            mmap_t = mmap[t]
+            if item_v in mmap_t:
+                method = mmap_t[item_v]
+                return ('method', method)
+    else:
+        if is_cls:
             if item_v in data.attributes:
                 return ('field', item_v)
             elif hasattr(data_t, item_v):
@@ -172,9 +173,7 @@ async def _resolve_case(resources, data, data_t, item_v):
             else:
                 return ('no_method',)
         else:
-            return ('no_method',)
-
-    return ('static',)
+            return ('static',)
 
 
 async def _attr_case(info, data, attr_v):
@@ -280,8 +279,8 @@ async def getattr_(info):
         data_v = build_value(data, default=ANYTHING)
         if data_v is ANYTHING:
             raise InferenceError(
-                'Could not infer the type or the value of the object'
-                f" on which to resolve the attribute '{attr_v}'"
+                f"Could not resolve attribute '{attr_v}' on "
+                f"object of type {data}."
             )
         try:
             raw = getattr(data_v, attr_v)
