@@ -45,15 +45,15 @@ def pytorch_dtype_to_type(dtype):
 
 
 standard_object_map.update({
-    torch.exp: C.exp,
-    torch.log: C.log,
+    torch.exp: C.array_exp,
+    torch.log: C.array_log,
     torch.mm: P.dot,
     torch.relu: relu,
     torch.reshape: P.reshape,
     torch.sigmoid: sigmoid,
     torch.sum: _sum,
     torch.t: C.transpose,
-    torch.tanh: C.tanh,
+    torch.tanh: C.array_tanh,
     # torch.zeros_like: C.zeros_like,  # currently only works with pt backend
     torch.nn.functional.linear: linear,
     torch.nn.functional.conv2d: conv2d,
@@ -64,16 +64,16 @@ standard_method_map[PyTorchTensor] = \
     standard_method_map[NDArray].copy()
 standard_method_map[PyTorchTensor].update({
     'dim': C.ndim,
-    'exp': C.exp,
+    'exp': C.array_exp,
     'item': item,
-    'log': C.log,
+    'log': C.array_log,
     'relu': relu,
     'reshape': P.reshape,
     'sigmoid': sigmoid,
     'shape': property(P.shape),
     'sum': _sum,
     't': C.transpose,
-    'tanh': C.tanh,
+    'tanh': C.array_tanh,
     'view': P.reshape,  # contiguousness is ignored by us for now?
     'zeros_like': C.zeros_like,  # hidden method used by bwd (I think)
 })
