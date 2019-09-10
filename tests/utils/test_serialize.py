@@ -14,13 +14,13 @@ parametrize = pytest.mark.parametrize
 
 
 def dumpstr(o):
-    stream = io.StringIO()
+    stream = io.BytesIO()
     dump(o, stream)
     return stream.getvalue()
 
 
 def loadstr(s):
-    stream = io.StringIO(s)
+    stream = io.BytesIO(s)
     return load(stream)
 
 
