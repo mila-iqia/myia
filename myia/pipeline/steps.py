@@ -30,11 +30,13 @@ from ..opt import (
     LocalPassOptimizer,
     NodeMap,
     lib as optlib,
+)
+from ..simplify_types import (
+    _strmap_tag,
     simplify_types,
     str_to_tag,
     type_to_tag,
 )
-from ..opt.clean import _strmap_tag
 from ..utils import (
     Cons,
     Empty,

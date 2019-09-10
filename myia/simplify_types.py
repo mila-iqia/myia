@@ -3,7 +3,7 @@
 import weakref
 from itertools import count
 
-from ..abstract import (
+from .abstract import (
     ANYTHING,
     TYPE,
     VALUE,
