@@ -29,12 +29,11 @@ from .compile import BackendValue
 from .ir import Constant
 from .prim import ops as P
 from .utils import Cons, Empty, MyiaInputTypeError, TaggedValue, overload
-from .xtype import Int, String
+from .xtype import Int, NDArray, String
 
 ####################
 # Tags and symbols #
 ####################
-
 
 _idx = count()
 _tagmap = weakref.WeakKeyDictionary()
@@ -83,6 +82,11 @@ def _reabs(self, a: AbstractScalar):
 @overload  # noqa: F811
 def _reabs(self, a: AbstractDict):
     return (yield AbstractTuple)(self(x) for x in a.entries.values())
+
+
+@overload  # noqa: F811
+def _reabs(self, a: AbstractArray):
+    return (yield AbstractArray)(self(a.element), {**a.values, TYPE: NDArray})
 
 
 @overload  # noqa: F811
