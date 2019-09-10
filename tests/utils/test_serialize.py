@@ -2,7 +2,7 @@ import io
 
 import pytest
 
-from myia import dtype
+from myia import xtype
 from myia.abstract import ANYTHING
 from myia.ir import Constant, Graph, isomorphic
 from myia.prim.ops import scalar_add, switch
@@ -43,10 +43,10 @@ def test_roundtrip(v):
     22,
     switch,
     ANYTHING,
-    dtype.Bool,
-    dtype.i8,
-    dtype.u64,
-    dtype.f32,
+    xtype.Bool,
+    xtype.i8,
+    xtype.u64,
+    xtype.f32,
 ])
 def test_same(v):
     s = dumpstr(v)

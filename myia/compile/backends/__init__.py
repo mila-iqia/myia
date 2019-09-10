@@ -4,7 +4,6 @@ import os
 import urllib
 
 from ... import abstract, xtype
-
 from ...utils import TaggedValue
 from ..channel import RPCProcess, handle
 from ..transform import convert_grad
