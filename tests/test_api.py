@@ -10,8 +10,8 @@ from myia.pipeline import (
 )
 from myia.pipeline.steps import convert_arg, convert_result
 from myia.prim.py_implementations import tuple_getitem
-from myia.utils import InferenceError, TaggedValue, newenv
-from myia.xtype import Bool, EnvType
+from myia.utils import InferenceError, TaggedValue
+from myia.xtype import Bool
 
 from .common import (
     D,
@@ -106,8 +106,6 @@ def test_convert_arg():
         _convert([], [f64])
     with pytest.raises(TypeError):
         _convert([1, 2], [])
-    with pytest.raises(TypeError):
-        _convert(newenv, EnvType)
 
     # Class -> Tuple conversion
 

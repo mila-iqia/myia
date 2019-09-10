@@ -3,10 +3,12 @@
 import weakref
 from itertools import count
 
+from . import xtype
 from .abstract import (
     ANYTHING,
     TYPE,
     VALUE,
+    AbstractArray,
     AbstractClassBase,
     AbstractDict,
     AbstractKeywordArgument,
@@ -16,13 +18,28 @@ from .abstract import (
     AbstractUnion,
     AbstractValue,
     abstract_clone,
+    empty,
+    from_value,
     split_type,
     type_to_abstract,
+    typecheck,
 )
-from ..ir import Constant
-from ..prim import ops as P
-from ..utils import is_dataclass_type, overload
-from ..xtype import Int, String
+from .ir import Constant
+from .prim import ops as P
+from .utils import (
+    Cons,
+    Empty,
+    MyiaInputTypeError,
+    TaggedValue,
+    is_dataclass_type,
+    overload,
+)
+from .xtype import Int, String
+
+####################
+# Tags and symbols #
+####################
+
 
 _idx = count()
 _tagmap = weakref.WeakKeyDictionary()
@@ -46,6 +63,11 @@ def str_to_tag(t):
         _tagmap_str[t] = s
         _strmap_tag[s] = t
     return _tagmap_str[t]
+
+
+#########
+# Reabs #
+#########
 
 
 @abstract_clone.variant
@@ -78,6 +100,11 @@ def _reabs(self, a: AbstractUnion):
 @overload  # noqa: F811
 def _reabs(self, a: AbstractKeywordArgument):
     return self(a.argument)
+
+
+##################
+# Simplify types #
+##################
 
 
 def simplify_types(root, manager):
@@ -229,3 +256,164 @@ def simplify_types(root, manager):
 
     for node in manager.all_nodes:
         node.abstract = _reabs(node.abstract)
+
+
+########################
+# Convert to canonical #
+########################
+
+
+@overload(bootstrap=True)
+def to_canonical(self, arg, orig_t: AbstractTuple):
+    if not isinstance(arg, tuple):
+        raise MyiaInputTypeError('Expected tuple')
+    oe = orig_t.elements
+    if len(arg) != len(oe):
+        raise MyiaInputTypeError(f'Expected {len(oe)} elements')
+    return tuple(self(x, o) for x, o in zip(arg, oe))
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractDict):
+    if not isinstance(arg, dict):
+        raise MyiaInputTypeError('Expected dict')
+    types = orig_t.entries
+    if len(arg) != len(types):
+        raise MyiaInputTypeError(
+            "Dictionary input doesn't have the expected size"
+        )
+    if set(arg.keys()) != set(types.keys()):
+        raise MyiaInputTypeError("Mismatched keys for input dictionary.")
+    return tuple(self(arg[k], o) for k, o in orig_t.entries.items())
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractClassBase):
+    if orig_t.tag is Empty:
+        if arg != []:
+            raise MyiaInputTypeError(f'Expected empty list')
+        return ()
+    elif orig_t.tag is Cons:
+        if arg == []:
+            raise MyiaInputTypeError(f'Expected non-empty list')
+        if not isinstance(arg, list):
+            raise MyiaInputTypeError(f'Expected list')
+        ot = orig_t.attributes['head']
+        li = list(self(x, ot) for x in arg)
+        rval = TaggedValue(type_to_tag(empty), ())
+        for elem in reversed(li):
+            rval = TaggedValue(type_to_tag(orig_t), (elem, rval))
+        return rval.value
+    else:
+        if not isinstance(arg, orig_t.tag):
+            raise MyiaInputTypeError(f'Expected {orig_t.tag.__qualname__}')
+        arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
+        oe = list(orig_t.attributes.values())
+        res = tuple(self(x, o) for x, o in zip(arg, oe))
+        return res
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractArray):
+    et = orig_t.element
+    assert isinstance(et, AbstractScalar)
+    et = et.xtype()
+    assert issubclass(et, xtype.Number)
+    t = orig_t.xtype()
+    arg = self[t](arg, t)
+    arg_dtype = xtype.np_dtype_to_type(str(arg.dtype))
+    if arg_dtype != et:
+        raise MyiaInputTypeError(
+            f"Expected array of type {et}, but got {arg_dtype}."
+        )
+    shp = orig_t.xshape()
+    if (shp is not ANYTHING and arg.shape != shp):
+        raise MyiaInputTypeError(
+            f"Expected array with shape {shp}, but got {arg.shape}."
+        )
+    return arg
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractUnion):
+    for opt in orig_t.options:
+        try:
+            value = self(arg, opt)
+            tag = type_to_tag(opt)
+        except TypeError:
+            continue
+        return TaggedValue(tag, value)
+    else:
+        opts = ", ".join(map(str, orig_t.options))
+        raise MyiaInputTypeError(f'Expected one of {opts}, not {arg}')
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractScalar):
+    if not typecheck(orig_t, from_value(arg)):
+        raise MyiaInputTypeError(
+            f'Scalar has wrong type: expected {orig_t}, got {arg}'
+        )
+    if issubclass(orig_t.xtype(), xtype.String):
+        arg = str_to_tag(arg)
+    return arg
+
+
+#####################
+# Convert to output #
+#####################
+
+
+@overload(bootstrap=True)
+def from_canonical(self, res, orig_t, vm_t: AbstractTuple):
+    # If the EraseClass opt was applied, orig_t may be Class
+    orig_is_class = isinstance(orig_t, AbstractClassBase)
+    if orig_is_class:
+        if orig_t.tag in (Empty, Cons):
+            rval = []
+            while res:
+                value = self(res[0], orig_t.attributes['head'],
+                             vm_t.elements[0])
+                rval.append(value)
+                res = res[1].value
+            return rval
+    orig_is_dict = isinstance(orig_t, AbstractDict)
+    if orig_is_class:
+        oe = orig_t.attributes.values()
+    elif orig_is_dict:
+        oe = orig_t.entries.values()
+    else:
+        oe = orig_t.elements
+    ve = vm_t.elements
+    tup = tuple(self(x, o, v)
+                for x, o, v in zip(res, oe, ve))
+    if orig_is_class:
+        return orig_t.constructor(*tup)
+    elif orig_is_dict:
+        return dict(zip(orig_t.entries.keys(), tup))
+    else:
+        return tup
+
+
+@overload  # noqa: F811
+def from_canonical(self, arg, orig_t, vm_t: AbstractScalar):
+    if orig_t.xtype() == xtype.String:
+        arg = _strmap_tag[arg]
+    return arg
+
+
+@overload  # noqa: F811
+def from_canonical(self, arg, orig_t, vm_t: AbstractArray):
+    t = vm_t.xtype()
+    return self[t](arg, orig_t, t)
+
+
+@overload  # noqa: F811
+def from_canonical(self, arg, orig_t, vm_t: AbstractTaggedUnion):
+    assert isinstance(orig_t, AbstractUnion)
+    for typ in orig_t.options:
+        tag = type_to_tag(typ)
+        if tag == arg.tag:
+            return self(arg.value, typ, vm_t.options.get(tag))
+    else:
+        raise AssertionError(f'Badly formed TaggedValue')
