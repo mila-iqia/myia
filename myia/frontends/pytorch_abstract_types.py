@@ -1,7 +1,5 @@
 """Abstract Types for PyTorch Frontend."""
 
-import torch
-
 from ..abstract.data import AbstractClassBase
 from ..utils import MyiaInputTypeError
 from ..xtype import Object
@@ -13,6 +11,7 @@ class PyTorchTensor(Object):
     @classmethod
     def to_numpy(self, x):
         """Convert torch Tensor x to numpy."""
+        import torch
         if not isinstance(x, torch.Tensor):
             raise MyiaInputTypeError(f"Expected torch.Tensor but got {x}.")
         return x.detach().numpy()
@@ -20,6 +19,7 @@ class PyTorchTensor(Object):
     @classmethod
     def from_numpy(self, x):
         """Convert numpy array x to a torch Tensor."""
+        import torch
         return torch.from_numpy(x)
 
 
