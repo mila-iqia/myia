@@ -133,6 +133,8 @@ class RPCProcess:
         self.loader = MyiaLoader(self.proc.stdout)
         self.dumper.open()
         self.dumper.represent((module, cls, init_args))
+        resp = self._read_msg()
+        assert resp == 'ready'
 
     def call_method(self, name, *args, **kwargs):
         """Call a method on the remote object."""

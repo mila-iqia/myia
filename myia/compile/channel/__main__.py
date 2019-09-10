@@ -13,9 +13,14 @@ def _rpc_server():
     dumper = MyiaDumper(sys.stdout.buffer)
     dumper.open()
     pkg, name, init_args = loader.get_data()
-    mod = importlib.import_module(pkg)
-    cls = getattr(mod, name)
-    iface = cls(**init_args)
+    try:
+        mod = importlib.import_module(pkg)
+        cls = getattr(mod, name)
+        iface = cls(**init_args)
+        dumper.represent('ready')
+    except Exception as e:
+        dumper.represent(e)
+        return 1
 
     while loader.check_data():
         data = loader.get_data()
@@ -48,4 +53,4 @@ def _rpc_server():
             raise TypeError(f"bad data {data}")
 
 
-_rpc_server()
+sys.exit(_rpc_server())
