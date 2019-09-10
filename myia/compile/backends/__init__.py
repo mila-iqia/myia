@@ -37,12 +37,14 @@ def channel_load(pkg, name):
 def relay_nnvm_defaults(target='cpu', device_id=0):
     return dict(target=target, device_id=device_id)
 
+
 def pytorch_default(device='cpu:0'):
     if device == 'cuda':
         device = 'cuda:0'
     if device == 'cpu':
         device = 'cpu:0'
     return dict(device=device)
+
 
 _backends = {
     'nnvm': (channel_load('myia.compile.backends.nnvm', 'NNVMBackendR'),
@@ -130,7 +132,7 @@ def load_backend(name, options=None):
     return res
 
 
-def register_backend(name, load_fn, default_fn):
+def register_backend(name, load_fn, defaults_fn):
     """Register a new backend.
 
     This is to allow third party libraries to register their own
@@ -141,9 +143,9 @@ def register_backend(name, load_fn, default_fn):
         load_fn: function that will load the backend.  This must
                  return a callable that will take keyword arguemnts
                  for options.
-        default_fn: function that takes the same default arguments as
-                    load_fn and maps them to canonical and/or default
-                    values.
+        defaults_fn: function that takes the same default arguments as
+                     load_fn and maps them to canonical and/or default
+                     values.
 
     """
     assert name not in _backends
