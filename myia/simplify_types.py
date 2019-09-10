@@ -11,7 +11,6 @@ from .abstract import (
     AbstractArray,
     AbstractClassBase,
     AbstractDict,
-    AbstractFunction,
     AbstractKeywordArgument,
     AbstractScalar,
     AbstractTaggedUnion,
