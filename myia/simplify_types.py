@@ -274,6 +274,7 @@ def to_canonical(self, arg, orig_t: AbstractTuple):
     Returns:
         A version of the argument where classes/dicts become tuples
         and unions are properly tagged.
+
     """
     if not isinstance(arg, tuple):
         raise MyiaInputTypeError('Expected tuple')
@@ -375,66 +376,47 @@ def to_canonical(self, arg, orig_t: AbstractScalar):
 
 
 @overload(bootstrap=True)
-def from_canonical(self, res, orig_t, vm_t: AbstractTuple):
-    """Convert an argument back from the canonical representation.
+def from_canonical(self, res, orig_t: AbstractClassBase):
+    if orig_t.tag in (Empty, Cons):
+        rval = []
+        while res:
+            value = self(res[0], orig_t.attributes['head'])
+            rval.append(value)
+            res = res[1].value
+        return rval
+    tup = tuple(self(x, o) for x, o in zip(res, orig_t.attributes.values()))
+    return orig_t.constructor(*tup)
 
-    Arguments:
-        res: The canonical argument to convert.
-        orig_t: The original type of the argument as returned by to_abstract.
-        vm_t: The canonical type as computed by simplify_types from orig_t.
 
-    Returns:
-        An argument where tuples are converted to the classes/dicts they
-        came from and unions are untagged.
-    """
-    # If the EraseClass opt was applied, orig_t may be Class
-    orig_is_class = isinstance(orig_t, AbstractClassBase)
-    if orig_is_class:
-        if orig_t.tag in (Empty, Cons):
-            rval = []
-            while res:
-                value = self(res[0], orig_t.attributes['head'],
-                             vm_t.elements[0])
-                rval.append(value)
-                res = res[1].value
-            return rval
-    orig_is_dict = isinstance(orig_t, AbstractDict)
-    if orig_is_class:
-        oe = orig_t.attributes.values()
-    elif orig_is_dict:
-        oe = orig_t.entries.values()
-    else:
-        oe = orig_t.elements
-    ve = vm_t.elements
-    tup = tuple(self(x, o, v)
-                for x, o, v in zip(res, oe, ve))
-    if orig_is_class:
-        return orig_t.constructor(*tup)
-    elif orig_is_dict:
-        return dict(zip(orig_t.entries.keys(), tup))
-    else:
-        return tup
+@overload
+def from_canonical(self, res, orig_t: AbstractDict):
+    tup = tuple(self(x, o) for x, o in zip(res, orig_t.entries.values()))
+    return dict(zip(orig_t.entries.keys(), tup))
+
+
+@overload
+def from_canonical(self, res, orig_t: AbstractTuple):
+    return tuple(self(x, o) for x, o in zip(res, orig_t.elements))
 
 
 @overload  # noqa: F811
-def from_canonical(self, arg, orig_t, vm_t: AbstractScalar):
+def from_canonical(self, arg, orig_t: AbstractScalar):
     if orig_t.xtype() == xtype.String:
         arg = _strmap_tag[arg]
     return arg
 
 
 @overload  # noqa: F811
-def from_canonical(self, arg, orig_t, vm_t: AbstractArray):
-    t = vm_t.xtype()
-    return self[t](arg, orig_t, t)
+def from_canonical(self, arg, orig_t: AbstractArray):
+    t = orig_t.xtype()
+    return self[t](arg, t)
 
 
 @overload  # noqa: F811
-def from_canonical(self, arg, orig_t, vm_t: AbstractTaggedUnion):
-    assert isinstance(orig_t, AbstractUnion)
+def from_canonical(self, arg, orig_t: AbstractUnion):
     for typ in orig_t.options:
         tag = type_to_tag(typ)
         if tag == arg.tag:
-            return self(arg.value, typ, vm_t.options.get(tag))
+            return self(arg.value, typ)
     else:
         raise AssertionError(f'Badly formed TaggedValue')

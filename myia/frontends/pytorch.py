@@ -194,5 +194,5 @@ def _convert_arg(self, arg, t: PyTorchTensor):
 
 
 @convert_result.register
-def _convert_result(self, arg, orig_t, vm_t: PyTorchTensor):
+def _convert_result(self, arg, orig_t: PyTorchTensor):
     return torch.from_numpy(arg)

@@ -18,7 +18,7 @@ class BackendValue:
         """Get a python value for this backend value."""
         from ..pipeline.steps import convert_result
         res = self.backend.from_backend_value(self.value, self.vm_t)
-        return convert_result(res, self.orig_t, self.vm_t)
+        return convert_result(res, self.orig_t)
 
     def __getattr__(self, name):  # pragma: no cover
         raise AttributeError(

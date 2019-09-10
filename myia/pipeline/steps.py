@@ -428,6 +428,7 @@ def convert_arg(fn, self, arg, orig_t):
     Returns:
         A version of the argument where classes/dicts become tuples
         and unions are properly tagged.
+
     """
     if isinstance(arg, BackendValue):
         if not typecheck(orig_t, arg.orig_t):
@@ -444,7 +445,7 @@ def convert_arg(self, arg, t: xtype.NDArray):
 
 
 @from_canonical.variant
-def convert_result(self, arg, orig_t, vm_t: xtype.NDArray):
+def convert_result(self, arg, orig_t: xtype.NDArray):
     """Convert an argument back from the canonical representation.
 
     Arguments:
@@ -455,6 +456,7 @@ def convert_result(self, arg, orig_t, vm_t: xtype.NDArray):
     Returns:
         An argument where tuples are converted to the classes/dicts they
         came from and unions are untagged.
+
     """
     return arg
 
@@ -515,7 +517,7 @@ def step_wrap(resources,
                 res = BackendValue(res, orig_out_t, vm_out_t, backend)
         else:
             res = backend.from_backend_value(res, vm_out_t)
-            res = convert_result(res, orig_out_t, vm_out_t)
+            res = convert_result(res, orig_out_t)
         return res
 
     return {'output': wrapped}

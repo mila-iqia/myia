@@ -178,25 +178,22 @@ def test_convert_arg():
 
 def test_convert_result():
 
-    def _convert(data, typ1, typ2):
-        return convert_result(data,
-                              to_abstract_test(typ1),
-                              to_abstract_test(typ2))
+    def _convert(data, typ):
+        return convert_result(data, to_abstract_test(typ))
 
     # Leaves
 
-    assert _convert(True, Bool, Bool) is True
-    assert _convert(False, Bool, Bool) is False
-    assert _convert(10, i64, i64) == 10
-    assert _convert(1.5, f64, f64) == 1.5
+    assert _convert(True, Bool) is True
+    assert _convert(False, Bool) is False
+    assert _convert(10, i64) == 10
+    assert _convert(1.5, f64) == 1.5
 
     # Tuple -> Class conversion
 
     pt = Point(1, 2)
-    assert _convert((1, 2), Point(i64, i64), (i64, i64)) == pt
+    assert _convert((1, 2), Point(i64, i64)) == pt
     assert _convert(((1, 2), (1, 2)),
-                    (Point(i64, i64), Point(i64, i64)),
-                    ((i64, i64), (i64, i64))) == \
+                    (Point(i64, i64), Point(i64, i64))) == \
         (pt, pt)
 
 
