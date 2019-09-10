@@ -11,10 +11,12 @@ from .abstract import (
     AbstractArray,
     AbstractClassBase,
     AbstractDict,
+    AbstractFunction,
     AbstractKeywordArgument,
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
+    AbstractType,
     AbstractUnion,
     AbstractValue,
     abstract_clone,
@@ -27,14 +29,7 @@ from .abstract import (
 from .compile import BackendValue
 from .ir import Constant
 from .prim import ops as P
-from .utils import (
-    Cons,
-    Empty,
-    MyiaInputTypeError,
-    TaggedValue,
-    is_dataclass_type,
-    overload,
-)
+from .utils import Cons, Empty, MyiaInputTypeError, TaggedValue, overload
 from .xtype import Int, String
 
 ####################
@@ -229,22 +224,9 @@ def simplify_types(root, manager):
         elif node.is_apply(P.extract_kwarg):
             new_node = node.inputs[2]
 
-        elif node.is_constant(AbstractClassBase):
-            # This is a constant that contains a type, used e.g. with hastype.
-            new_node = Constant(_reabs(node.value))
+        elif node.is_constant((str, AbstractValue)):
+            new_node = Constant(to_canonical(node.value, node.abstract))
             keep_abstract = False
-
-        elif node.is_constant(str):
-            new_node = Constant(str_to_tag(node.value))
-
-        elif node.is_constant(AbstractDict):
-            # This is a constant that contains a type, used e.g. with hastype.
-            new_node = Constant(_reabs(node.value))
-            keep_abstract = False
-
-        elif node.is_constant() and is_dataclass_type(node.value):
-            raise NotImplementedError()
-            # new_node = Constant(P.make_tuple)
 
         if new_node is not None:
             if keep_abstract:
@@ -377,6 +359,11 @@ def to_canonical(self, arg, orig_t: AbstractScalar):
     if issubclass(orig_t.xtype(), xtype.String):
         arg = str_to_tag(arg)
     return arg
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractType):
+    return _reabs(arg)
 
 
 #####################
