@@ -19,13 +19,11 @@ from myia.abstract.prim import UniformPrimitiveInferrer
 from myia.composite import gadd, zeros_like
 from myia.hypermap import HyperMap, hyper_map
 from myia.ir import Graph, MetaGraph, MultitypeGraph
-from myia.macros import grad
-from myia.operations import user_switch
+from myia.macros import embed, grad, typeof
+from myia.operations import J, Jinv, hastype, user_switch
 from myia.pipeline import scalar_pipeline, standard_pipeline
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import (
-    J,
-    Jinv,
     array_map,
     array_reduce,
     array_to_scalar,
@@ -33,18 +31,13 @@ from myia.prim.py_implementations import (
     bool_or,
     broadcast_shape,
     casttag,
-    dict_setitem,
     distribute,
     dot,
-    embed,
     env_getitem,
     env_setitem,
     hastag,
-    hastype,
     identity,
-    make_record,
     partial as myia_partial,
-    record_setitem,
     reshape,
     scalar_add,
     scalar_cast,
@@ -57,7 +50,6 @@ from myia.prim.py_implementations import (
     tagged,
     transpose,
     tuple_setitem,
-    typeof,
     unsafe_static_cast,
 )
 from myia.utils import InferenceError, MyiaTypeError, newenv
@@ -332,7 +324,7 @@ def test_while(x, y):
     return rval
 
 
-@infer(
+@infer_std(
     ([i64], i64, i64),
     ([i64], f64, InferenceError),
     (i64, i64, InferenceError),
@@ -455,22 +447,13 @@ def test_dict_incompatible(c, x, y):
     ((), 0),
     ((1,), 1),
     ((i64, f64), 2),
-    ([f64], InferenceError),
-    (af64_of(2, 5), InferenceError),
+    ([f64], i64),
+    (af64_of(12, 5), np.uint64(12)),
+    (af64_of(), InferenceError),
     (i64, InferenceError),
 )
-def test_tuple_len(xs):
-    return P.tuple_len(xs)
-
-
-@infer(
-    ((i64, f64), InferenceError),
-    ([f64], InferenceError),
-    (af64_of(2, 5), i64),
-    (i64, InferenceError),
-)
-def test_array_len(xs):
-    return P.array_len(xs)
+def test_len(xs):
+    return len(xs)
 
 
 @infer((i64, f64, i64), (f64, i64, f64))
@@ -488,7 +471,7 @@ def test_tuple_outofbound(x, y):
     return (x, y)[2]
 
 
-@infer(
+@infer_std(
     ((i64, f64), (f64,)),
     ((f64, i64), (i64,)),
     ((f64, (i64, f64)), ((i64, f64),)),
@@ -499,7 +482,7 @@ def test_tuple_getslice(tup):
     return tup[1:]
 
 
-@infer(
+@infer_std(
     ((i64, f64, i64), (f64,)),
     ((f64,), ()),
 )
@@ -520,14 +503,14 @@ def test_tuple_outofbound_negative(x, y):
     return (x, y)[-3]
 
 
-@infer((D(x=i64), i64),
-       (D(y=f32), InferenceError))
+@infer_std((D(x=i64), i64),
+           (D(y=f32), InferenceError))
 def test_dict_getitem(d):
     return d['x']
 
 
-@infer((D(x=i64), Ex(ANYTHING, t=str), InferenceError),
-       (D(x=i64), 2, InferenceError))
+@infer_std((D(x=i64), Ex(ANYTHING, t=str), InferenceError),
+           (D(x=i64), 2, InferenceError))
 def test_dict_getitem_nonconst(d, i):
     return d[i]
 
@@ -536,7 +519,7 @@ def test_dict_getitem_nonconst(d, i):
        (D(x=i64, y=f32), f64, D(x=f64, y=f32)),
        (D(z=i64), f64, InferenceError))
 def test_dict_setitem(d, x):
-    return dict_setitem(d, 'x', x)
+    return P.dict_setitem(d, 'x', x)
 
 
 @infer(
@@ -607,7 +590,7 @@ def test_closure_manager_bug():
     return rval
 
 
-@infer(
+@infer_std(
     (0,),
     (i64, i64, i64),
     (i64, i64, i64, i64, i64, i64, i64),
@@ -1093,7 +1076,7 @@ def test_typeof(x):
 Tf4 = Tuple[f64, f64, f64, f64]
 
 
-@infer(
+@infer_std(
     (i64, i64),
     (f64, i64),
     (ai64_of(2, 5), 0.0),
@@ -1656,14 +1639,14 @@ def test_switch_switch(x, y):
     return switch(f(y), 1, 2)
 
 
-@infer(
+@infer_std(
     (i64, i64, InferenceError),
 )
 def test_user_switch_hastype(x, y):
     return user_switch(hastype(x, i64), y + 1, y + 2)
 
 
-@infer((B, i64, i64))
+@infer_std((B, i64, i64))
 def test_closure_in_data(c, x):
     def f(x):
         return x * x
@@ -2028,7 +2011,7 @@ def test_dataclass_bad_inst(x, y, z):
 
 @infer((Ty(ANYTHING), i64, i64, InferenceError))
 def test_dataclass_bad_inst2(cls, x, y):
-    return make_record(cls, x, y)
+    return P.make_record(cls, x, y)
 
 
 @infer((Point(i64, i64), InferenceError))
@@ -2043,18 +2026,18 @@ def test_dataclass_call(thing):
 
 @infer((Thing(i64), f64, Thing(f64)))
 def test_record_setitem(thing, x):
-    return record_setitem(thing, 'contents', x)
+    return P.record_setitem(thing, 'contents', x)
 
 
 @infer((Point(i64, i64), i64, Point(i64, i64)),
        (Point(i64, i64), f64, InferenceError))
 def test_record_setitem_2(pt, x):
-    return record_setitem(pt, 'x', x)
+    return P.record_setitem(pt, 'x', x)
 
 
 @infer((Thing(i64), f64, InferenceError))
 def test_record_setitem_wrong_field(thing, x):
-    return record_setitem(thing, 'shfifty_five', x)
+    return P.record_setitem(thing, 'shfifty_five', x)
 
 
 hyper_map_notuple = HyperMap(
@@ -2238,7 +2221,7 @@ def test_raise_multiple(x):
         return x
 
 
-@infer((i32, Bot), (f64, f64), (U(i32, i64), i64))
+@infer_std((i32, Bot), (f64, f64), (U(i32, i64), i64))
 def test_raise_hastype(x):
     if hastype(x, i32):
         raise Exception("What a terrible type")

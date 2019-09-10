@@ -4,10 +4,13 @@ import pytest
 from myia import operations
 from myia.utils import (
     NS,
+    Cons,
+    Empty,
     Event,
     Events,
     Named,
     SymbolicKeyInstance,
+    list_to_cons,
     newenv,
     smap,
 )
@@ -165,6 +168,33 @@ def test_env():
     assert e.get(sk2, 0) == 300
 
 
+def test_env_add():
+    skx = SymbolicKeyInstance('x', 1)
+    sky = SymbolicKeyInstance('y', 2)
+
+    ex = newenv.set(skx, 10)
+    ey = newenv.set(sky, 20)
+    exy = newenv.set(skx, 7).set(sky, 8)
+
+    new = ex.add(ey)
+    assert new.get(skx, 0) == 10
+    assert new.get(sky, 0) == 20
+
+    new = ey.add(ex)
+    assert new.get(skx, 0) == 10
+    assert new.get(sky, 0) == 20
+
+    new = exy.add(ex)
+    assert new.get(skx, 0) == 17
+    assert new.get(sky, 0) == 8
+
+
 def test_operation_str():
     assert str(operations.user_switch) == repr(operations.user_switch)
     assert str(operations.user_switch) == 'myia.operations.user_switch'
+
+
+def test_list_to_cons():
+    li = [1, 2, 3]
+    li_c = Cons(1, Cons(2, Cons(3, Empty())))
+    assert list_to_cons(li) == li_c

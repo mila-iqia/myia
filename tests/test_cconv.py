@@ -1,9 +1,9 @@
 from pytest import mark
 
 from myia.ir import manage
-from myia.pipeline import standard_debug_pipeline
+from myia.pipeline import scalar_debug_pipeline
 
-cconv_pipeline = standard_debug_pipeline \
+cconv_pipeline = scalar_debug_pipeline \
     .select('resources', 'parse', 'resolve', 'cconv', 'export')
 
 

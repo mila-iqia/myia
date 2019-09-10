@@ -6,15 +6,9 @@ from pytest import mark
 from myia.abstract import from_value
 from myia.pipeline import standard_pipeline
 from myia.prim import ops as P
-from myia.prim.py_implementations import (
-    bool_and,
-    partial,
-    scalar_add,
-    tagged,
-    typeof,
-)
+from myia.prim.py_implementations import bool_and, partial, scalar_add, tagged
 
-from .common import Point, make_tree, sumtree, to_abstract_test
+from .common import Point, make_tree, sumtree
 
 compile_pipeline = standard_pipeline
 
@@ -161,8 +155,8 @@ def test_switch_nontail():
         a = P.switch(x > y, f1, f2)()
         return a * a
 
-    i64 = typeof(1)
-    argspec = (to_abstract_test(i64), to_abstract_test(i64))
+    i64 = from_value(1, broaden=True)
+    argspec = (i64, i64)
     myia_fn = compile_pipeline.run(input=fn,
                                    argspec=argspec)['output']
 

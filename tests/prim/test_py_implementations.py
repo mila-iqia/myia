@@ -1,11 +1,20 @@
 import math
-from types import SimpleNamespace
+from math import (
+    cos as math_cos,
+    exp as math_exp,
+    log as math_log,
+    sin as math_sin,
+    tan as math_tan,
+    tanh as math_tanh,
+    trunc as math_trunc,
+)
 
 import numpy as np
 import pytest
 
 from myia.abstract import ANYTHING
-from myia.pipeline import scalar_debug_pipeline
+from myia.operations import embed
+from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.prim.py_implementations import (
     _assert_scalar,
     array_getitem,
@@ -16,18 +25,13 @@ from myia.prim.py_implementations import (
     array_to_scalar,
     bool_eq,
     broadcast_shape,
-    dict_getitem,
-    dict_setitem,
     distribute,
     dot,
-    embed,
     env_add,
     env_getitem,
     env_setitem,
     identity,
-    make_record,
     partial as myia_partial,
-    record_setitem,
     reshape,
     return_,
     scalar_cast,
@@ -41,7 +45,7 @@ from myia.prim.py_implementations import (
 )
 from myia.utils import newenv
 
-from ..common import AA, Point, f16, i64, to_abstract_test
+from ..common import AA, f16, i64, to_abstract_test
 from ..test_lang import parse_compare
 
 
@@ -60,12 +64,14 @@ def test_prim_mul(x, y):
     return x * y
 
 
-@parse_compare((2.0, 7.0), (4.0, -6.0), (-11, 2))
+@parse_compare((2.0, 7.0), (4.0, -6.0), (-11, 2),
+               pipeline=standard_debug_pipeline)
 def test_prim_truediv(x, y):
     return x / y
 
 
-@parse_compare((2, 7), (4, -6), (-11, 2), (-11.0, 2.0), (0, -1))
+@parse_compare((2, 7), (4, -6), (-11, 2), (-11.0, 2.0), (0, -1),
+               pipeline=standard_debug_pipeline)
 def test_prim_floordiv(x, y):
     return x // y
 
@@ -80,7 +86,7 @@ def test_prim_pow(x, y):
     return x ** y
 
 
-@parse_compare(-2, 2.3, -0.6)
+@parse_compare(-2, 2.3, -0.6, pipeline=scalar_debug_pipeline)
 def test_prim_floor(x):
     return math.floor(x)
 
@@ -92,7 +98,7 @@ def test_prim_max(x, y):
 
 @parse_compare(-2, 2.3, -0.6)
 def test_prim_trunc(x):
-    return math.trunc(x)
+    return math_trunc(x)
 
 
 @parse_compare(2, -6)
@@ -107,32 +113,32 @@ def test_prim_usub(x):
 
 @parse_compare(13, 0, -3)
 def test_prim_exp(x):
-    return math.exp(x)
+    return math_exp(x)
 
 
 @parse_compare(13, 1)
 def test_prim_log(x):
-    return math.log(x)
+    return math_log(x)
 
 
 @parse_compare(13, -3)
 def test_prim_sin(x):
-    return math.sin(x)
+    return math_sin(x)
 
 
 @parse_compare(13, -3)
 def test_prim_cos(x):
-    return math.cos(x)
+    return math_cos(x)
 
 
 @parse_compare(13, -3)
 def test_prim_tan(x):
-    return math.tan(x)
+    return math_tan(x)
 
 
 @parse_compare(-0.1, 0.3)
 def test_prim_tanh(x):
-    return math.tanh(x)
+    return math_tanh(x)
 
 
 @parse_compare((2, 7), (4, -6))
@@ -200,13 +206,6 @@ def test_prim_array_setitem():
     L2 = np.array([1, 22, 3, 4])
     assert np.all(array_setitem(L, 1, 22) == L2)
     assert not np.all(L == L2)  # test that this is not inplace
-
-
-def test_prim_setattr():
-    ns = SimpleNamespace(a=1, b=2)
-    ns2 = SimpleNamespace(a=1, b=22)
-    assert record_setitem(ns, 'b', 22) == ns2
-    assert ns != ns2  # test that this is not inplace
 
 
 def test_prim_shape():
@@ -281,17 +280,6 @@ def test_prim_array_reduce():
         assert (res == value).all()
 
 
-def test_prim_dict_getitem():
-    assert dict_getitem({'x': 2}, 'x') == 2
-
-
-def test_prim_dict_setitem():
-    d = {'x': 2}
-    d2 = dict_setitem(d, 'x', 3)
-    assert d == {'x': 2}
-    assert d2 == {'x': 3}
-
-
 def test_prim_distribute():
     assert (distribute(1, (2, 3)) == np.ones((2, 3))).all()
 
@@ -340,10 +328,6 @@ def test_prim_identity():
     for x in (1, 1.7, True, False, [1, 2, 3], (4, 5)):
         assert identity(x) is x
         assert return_(x) is x
-
-
-def test_prim_make_record():
-    assert make_record(Point, 1, 2) == Point(1, 2)
 
 
 def test_prim_switch():
@@ -400,8 +384,6 @@ def test_scalar_cast():
 
 
 def test_env():
-    pip1 = scalar_debug_pipeline.select('resources', 'parse', 'export')
-    pip2 = scalar_debug_pipeline
 
     def f(x, y):
         e1 = env_setitem(newenv, embed(x), 100)
@@ -417,10 +399,9 @@ def test_env():
 
         return (a, b, c)
 
-    res = pip1.run(input=f)['output'](3, 4)
-    assert res == (110, 20, 0)
-
-    res = pip2.run(input=f,
-                   argspec=(to_abstract_test(i64),
-                            to_abstract_test(i64)))['output'](3, 4)
+    res = scalar_debug_pipeline.run(
+        input=f,
+        argspec=(to_abstract_test(i64),
+                 to_abstract_test(i64))
+    )['output'](3, 4)
     assert res == (110, 20, 0)

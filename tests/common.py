@@ -28,9 +28,9 @@ from myia.abstract import (
 )
 from myia.composite import ArithmeticData
 from myia.ir import MultitypeGraph
-from myia.prim.py_implementations import hastype, tagged
+from myia.prim.py_implementations import tagged
 from myia.utils import ADT, EnvInstance, dataclass_fields, overload
-from myia.xtype import Bool, Nil, Number, f16, f32, f64, i16, i32, i64, u64
+from myia.xtype import Bool, f16, f32, f64, i16, i32, i64, u64
 
 B = Bool
 Bot = AbstractBottom()
@@ -273,18 +273,18 @@ def countdown(n):
 
 
 def sumtree(t):
-    if hastype(t, Number):
+    if isinstance(t, (int, float)):
         return t
-    elif hastype(t, Nil):
+    elif t is None:
         return 0
     else:
         return sumtree(t.left) + sumtree(t.right)
 
 
 def reducetree(fn, t, init):
-    if hastype(t, Number):
+    if isinstance(t, (int, float)):
         return t
-    elif hastype(t, Nil):
+    elif t is None:
         return init
     else:
         return fn(reducetree(fn, t.left, init),

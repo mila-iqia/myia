@@ -19,14 +19,13 @@ from myia.pipeline import (
     steps,
 )
 from myia.prim import ops as P
+from myia.prim.ops import J
 from myia.prim.py_implementations import (
-    J,
     array_map,
     array_reduce,
     array_to_scalar,
     distribute,
     dot,
-    hastype,
     partial,
     py_registry as pyi,
     reshape,
@@ -527,7 +526,7 @@ def test_transpose2(x, y, axis1, axis2):
     argspec=(U(f64, (f64, f64)),)
 )
 def test_union(x):
-    if hastype(x, f64):
+    if isinstance(x, float):
         return x * x * x
     else:
         a, b = x

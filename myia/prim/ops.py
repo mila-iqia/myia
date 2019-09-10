@@ -61,7 +61,6 @@ string_eq = Primitive('string_eq')
 ##########
 
 
-typeof = Primitive('typeof')
 hastype = Primitive('hastype')
 tagged = Primitive('tagged')
 unsafe_static_cast = Primitive('unsafe_static_cast')
@@ -78,7 +77,6 @@ casttag = Primitive('casttag')
 make_tuple = Primitive('make_tuple')
 tuple_getitem = Primitive('tuple_getitem')
 tuple_setitem = Primitive('tuple_setitem')
-tuple_len = Primitive('tuple_len')
 
 make_dict = Primitive('make_dict')
 dict_getitem = Primitive('dict_getitem')
@@ -90,7 +88,6 @@ record_setitem = Primitive('record_setitem')
 
 array_getitem = Primitive('array_getitem')
 array_setitem = Primitive('array_setitem')
-array_len = Primitive('array_len')
 
 
 ##########
@@ -135,7 +132,6 @@ identity = Primitive('identity')
 partial = Primitive('partial')
 J = Primitive('J')
 Jinv = Primitive('Jinv')
-embed = Primitive('embed')
 env_setitem = Primitive('env_setitem')
 env_getitem = Primitive('env_getitem')
 env_add = Primitive('env_add')

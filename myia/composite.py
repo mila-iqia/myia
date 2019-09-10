@@ -22,6 +22,7 @@ from .abstract import (
 )
 from .hypermap import HyperMap, hyper_map
 from .ir import Graph, MetaGraph, MultitypeGraph
+from .operations import hastype, typeof
 from .prim import ops as P, py_implementations as py
 from .prim.py_implementations import (
     array_map,
@@ -30,7 +31,6 @@ from .prim.py_implementations import (
     bool_not,
     distribute,
     env_add,
-    hastype,
     scalar_add,
     scalar_cast,
     scalar_cos,
@@ -43,7 +43,6 @@ from .prim.py_implementations import (
     shape,
     string_eq,
     tuple_getitem,
-    typeof,
 )
 from .utils import MyiaTypeError, Slice, check_nargs, core, newenv
 from .xtype import Bool, EnvType, Nil, Number, f32, f64, i8, i16, u8, u16
@@ -147,26 +146,41 @@ def arrayify(name, op):
 #########################
 
 
-add = Elemwise('__add__', py.scalar_add, name='add')
-sub = Elemwise('__sub__', py.scalar_sub, name='sub')
-mul = Elemwise('__mul__', py.scalar_mul, name='mul')
-truediv = Elemwise('__truediv__', name='truediv')
-floordiv = Elemwise('__floordiv__', name='floordiv')
-mod = Elemwise('__mod__', py.scalar_mod, name='mod')
-pow = Elemwise('__pow__', py.scalar_pow, name='pow')
-exp = Elemwise(None, scalar_exp, name='exp')
-log = Elemwise(None, scalar_log, name='log')
-sin = Elemwise(None, scalar_sin, name='sin')
-cos = Elemwise(None, scalar_cos, name='cos')
-tan = Elemwise(None, scalar_tan, name='tan')
-tanh = Elemwise(None, scalar_tanh, name='tanh')
+array_add = Elemwise('__add__', py.scalar_add, name='add')
+array_sub = Elemwise('__sub__', py.scalar_sub, name='sub')
+array_mul = Elemwise('__mul__', py.scalar_mul, name='mul')
+array_truediv = Elemwise('__truediv__', name='truediv')
+array_floordiv = Elemwise('__floordiv__', name='floordiv')
+array_mod = Elemwise('__mod__', py.scalar_mod, name='mod')
+array_pow = Elemwise('__pow__', py.scalar_pow, name='pow')
+array_exp = Elemwise(None, scalar_exp, name='exp')
+array_log = Elemwise(None, scalar_log, name='log')
+array_sin = Elemwise(None, scalar_sin, name='sin')
+array_cos = Elemwise(None, scalar_cos, name='cos')
+array_tan = Elemwise(None, scalar_tan, name='tan')
+array_tanh = Elemwise(None, scalar_tanh, name='tanh')
 uadd = dunder_method_protocol('pos')
 usub = dunder_method_protocol('neg')
 floor = dunder_method_protocol('floor')
 trunc = dunder_method_protocol('trunc')
-scalar_truediv = dunder_method_protocol_2('truediv')
-scalar_floordiv = dunder_method_protocol_2('floordiv')
+truediv = dunder_method_protocol_2('truediv')
+floordiv = dunder_method_protocol_2('floordiv')
 matmul = dunder_method_protocol_2('matmul')
+
+
+add = array_add
+sub = array_sub
+mul = array_mul
+truediv = array_truediv
+floordiv = array_floordiv
+mod = array_mod
+pow = array_pow
+exp = array_exp
+log = array_log
+sin = array_sin
+cos = array_cos
+tan = array_tan
+tanh = array_tanh
 
 
 @core
@@ -225,15 +239,23 @@ def string_ne(x, y):
     return bool_not(string_eq(x, y))
 
 
-eq = Elemwise('__eq__', py.scalar_eq, infer_value=True, name='eq')
-lt = Elemwise('__lt__', py.scalar_lt, infer_value=True, name='lt')
-gt = Elemwise('__gt__', py.scalar_gt, infer_value=True, name='gt')
-ne = Elemwise('__ne__', py.scalar_ne, infer_value=True, name='ne')
-le = Elemwise('__le__', py.scalar_le, infer_value=True, name='le')
-ge = Elemwise('__ge__', py.scalar_ge, infer_value=True, name='ge')
+array_eq = Elemwise('__eq__', py.scalar_eq, infer_value=True, name='eq')
+array_lt = Elemwise('__lt__', py.scalar_lt, infer_value=True, name='lt')
+array_gt = Elemwise('__gt__', py.scalar_gt, infer_value=True, name='gt')
+array_ne = Elemwise('__ne__', py.scalar_ne, infer_value=True, name='ne')
+array_le = Elemwise('__le__', py.scalar_le, infer_value=True, name='le')
+array_ge = Elemwise('__ge__', py.scalar_ge, infer_value=True, name='ge')
 bool = dunder_method_protocol('bool')
 and_ = dunder_method_protocol_2('and')
 or_ = dunder_method_protocol_2('or')
+
+
+eq = array_eq
+lt = array_lt
+gt = array_gt
+ne = array_ne
+le = array_le
+ge = array_ge
 
 
 @core

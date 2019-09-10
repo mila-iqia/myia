@@ -36,7 +36,7 @@ from .ir import (
     sexp_to_node,
 )
 from .prim import ops as P
-from .prim.py_implementations import scalar_cast, scalar_to_array, typeof
+from .prim.py_implementations import scalar_cast, scalar_to_array
 from .utils import (
     Cons,
     Empty,
@@ -46,6 +46,7 @@ from .utils import (
     MyiaTypeError,
     Named,
     Namespace,
+    SymbolicKeyInstance,
     check_nargs,
     core,
 )
@@ -97,6 +98,22 @@ async def isinstance_(info):
 
 
 @macro
+async def typeof(info):
+    """Return a constant with the type of the input."""
+    data, = check_nargs('typeof', 1, info.abstracts)
+    return Constant(data)
+
+
+@macro
+async def embed(info):
+    """Return a constant that embeds the identity of the input node."""
+    xref, = check_nargs('embed', 1, info.argrefs)
+    x, = info.abstracts
+    key = SymbolicKeyInstance(xref.node, abstract.sensitivity_transform(x))
+    return Constant(key)
+
+
+@macro
 async def make_list(info):
     """Create a list using Cons and Empty."""
     g = info.graph
@@ -136,18 +153,19 @@ async def _resolve_case(resources, data, data_t, item_v):
     mmap = resources.method_map
     is_cls = isinstance(data, abstract.AbstractClassBase)
 
-    # Try method map
-    try:
-        mmap_t = data_t and mmap[data_t]
-    except KeyError:
-        mmap_t = {} if is_cls else None
+    if data_t is None or data_t is type:
+        mro = ()
+    else:
+        mro = data_t.mro()
 
-    if mmap_t is not None:
-        # Method call
-        if item_v in mmap_t:
-            method = mmap_t[item_v]
-            return ('method', method)
-        elif is_cls:
+    for t in mro:
+        if t in mmap:
+            mmap_t = mmap[t]
+            if item_v in mmap_t:
+                method = mmap_t[item_v]
+                return ('method', method)
+    else:
+        if is_cls:
             if item_v in data.attributes:
                 return ('field', item_v)
             elif hasattr(data_t, item_v):
@@ -155,9 +173,7 @@ async def _resolve_case(resources, data, data_t, item_v):
             else:
                 return ('no_method',)
         else:
-            return ('no_method',)
-
-    return ('static',)
+            return ('static',)
 
 
 async def _attr_case(info, data, attr_v):
@@ -263,8 +279,8 @@ async def getattr_(info):
         data_v = build_value(data, default=ANYTHING)
         if data_v is ANYTHING:
             raise InferenceError(
-                'Could not infer the type or the value of the object'
-                f" on which to resolve the attribute '{attr_v}'"
+                f"Could not resolve attribute '{attr_v}' on "
+                f"object of type {data}."
             )
         try:
             raw = getattr(data_v, attr_v)
@@ -307,6 +323,26 @@ async def dict_values(info):
     getters = [info.graph.apply(P.dict_getitem, dref.node, k)
                for k in typ.entries]
     return info.graph.apply(P.make_tuple, *getters)
+
+
+@macro
+async def tuple_len(info):
+    """Implement len(tuple)."""
+    a, = check_nargs('tuple_len', 1, info.abstracts)
+    assert isinstance(a, abstract.AbstractTuple)
+    return Constant(len(a.elements))
+
+
+@macro
+async def array_len(info):
+    """Implement len(array)."""
+    a, = check_nargs('array_len', 1, info.abstracts)
+    assert isinstance(a, abstract.AbstractArray)
+    shp = a.xshape()
+    if len(shp) < 1:
+        raise MyiaTypeError('0d arrays have no len')
+    shp_expr = info.graph.apply(P.shape, info.args[0])
+    return info.graph.apply(P.tuple_getitem, shp_expr, 0)
 
 
 class _CastRemapper(CloneRemapper):

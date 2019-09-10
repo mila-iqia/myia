@@ -8,7 +8,7 @@ import numpy as np
 
 from .. import abstract, xtype as types
 from ..utils import Registry, TaggedValue
-from ..xtype import Bool, Float, Number, String, pytype_to_myiatype
+from ..xtype import Bool, Float, Number, String
 from . import ops as primops
 
 py_registry: Registry[primops.Primitive, Callable] = Registry()
@@ -244,38 +244,6 @@ def string_eq(x: String, y: String) -> Bool:
     return x == y
 
 
-@register(primops.typeof)
-def typeof(x):
-    """Implement typeof."""
-    return abstract.from_value(x, broaden=True)
-
-
-@register(primops.hastype)
-def hastype(x, t):
-    """Implement `hastype`."""
-    from ..abstract import type_to_abstract, AbstractScalar, \
-        AbstractClassBase, ANYTHING
-    tt = type_to_abstract(t)
-    if isinstance(tt, AbstractScalar):
-        try:
-            typ = pytype_to_myiatype(type(x))
-            return issubclass(typ, tt.xtype())
-        except KeyError:
-            return False
-    elif (isinstance(tt, AbstractClassBase)
-          and all(v is ANYTHING for k, v in tt.attributes.items())):
-        return isinstance(x, tt.tag)
-    else:
-        raise NotImplementedError(
-            'The Python implementation of hastype only support simple types.'
-        )
-        # from ..abstract import hastype_helper, ANYTHING
-        # v = hastype_helper(typeof(x), type_to_abstract(t))
-        # if v is ANYTHING:
-        #     raise AssertionError()
-        # return v
-
-
 @register(primops.make_tuple)
 def make_tuple(*args):
     """Implement `make_tuple`."""
@@ -285,12 +253,6 @@ def make_tuple(*args):
 @py_register(primops.tuple_getitem)
 def tuple_getitem(data, item):
     """Implement `getitem`."""
-    return data[item]
-
-
-@py_register(primops.dict_getitem)
-def dict_getitem(data, item):
-    """Implement `dict_getitem`."""
     return data[item]
 
 
@@ -314,62 +276,11 @@ def tuple_setitem(data, item, value):
                  for i, x in enumerate(data))
 
 
-@py_register(primops.dict_setitem)
-def dict_setitem(data, item, value):
-    """Implement `dict_setitem`."""
-    return {**data, item: value}
-
-
 @register(primops.array_setitem)
 def array_setitem(data, item, value):
     """Implement `list/array_setitem`."""
     data2 = copy(data)
     data2[item] = value
-    return data2
-
-
-@vm_register(primops.record_getitem)
-def _vm_record_getitem(vm, data, attr):
-    """Implement `record_getitem`."""
-    from types import MethodType, BuiltinMethodType
-    from ..vm import Partial
-    # I don't know how else to get a reference to this type
-    method_wrapper_type = type((0).__add__)
-    try:
-        x = getattr(data, attr)
-    except AttributeError:
-        t = typeof(data).xtype()
-        mmap = vm.convert.resources.method_map[t]
-        if attr in mmap:
-            return Partial(vm.convert(mmap[attr]), [data], vm)
-        else:
-            raise  # pragma: no cover
-    if isinstance(x, method_wrapper_type):
-        # This is returned by <int>.__add__ and the like.
-        # Don't know how else to retrieve the unwrapped method
-        unwrapped = getattr(x.__objclass__, x.__name__)
-        return Partial(vm.convert(unwrapped), [x.__self__], vm)
-    elif (isinstance(x, BuiltinMethodType)
-          and hasattr(type(data), attr)):  # pragma: no cover
-        # This is returned by <list>.__getitem__ and maybe others.
-        # May not be relevant anymore
-        x = getattr(type(data), attr)
-        return Partial(vm.convert(x), [data], vm)
-    elif isinstance(x, MethodType):
-        # This is a method made from a user function
-        return Partial(vm.convert(x.__func__), [x.__self__], vm)
-    else:
-        return vm.convert(x)
-
-
-py_setattr = setattr
-
-
-@register(primops.record_setitem)
-def record_setitem(data, attr, value):
-    """Implement `record_setitem`."""
-    data2 = copy(data)
-    py_setattr(data2, attr, value)
     return data2
 
 
@@ -540,13 +451,6 @@ def identity(x):
     return x
 
 
-def _resolve_vm(vm, data, item):
-    """Implement `resolve` for the VM."""
-    # There is no Python implementation for this one.
-    value = data[item]
-    return vm.convert(value)
-
-
 @py_register(primops.partial)
 def partial(f, *args):
     """Implement `partial`."""
@@ -609,45 +513,6 @@ def broadcast_shape(shpx, shpy):
 def invert_permutation(perm):
     """Implement `invert_permutation`."""
     return tuple(perm.index(i) for i in range(len(perm)))
-
-
-@register(primops.make_record)
-def make_record(typ, *args):
-    """Implement `make_record`."""
-    from ..abstract import type_to_abstract
-    typ = type_to_abstract(typ)
-    return typ.constructor(*args)
-
-
-@register(primops.tuple_len)
-@register(primops.array_len)
-def _len(x):
-    """Implement `len`."""
-    return len(x)
-
-
-@register(primops.make_dict)
-def make_dict(typ, *values):
-    """Implement `make_dict`."""
-    return dict(zip(typ.entries.keys(), values))
-
-
-@py_register(primops.J)
-def J(x):
-    """Implement `J`."""
-    raise NotImplementedError()
-
-
-@py_register(primops.Jinv)
-def Jinv(x):
-    """Implement `Jinv`."""
-    raise NotImplementedError()
-
-
-@register(primops.embed)
-def embed(node):
-    """Placeholder for the implementation of `embed`."""
-    raise NotImplementedError()
 
 
 @register(primops.env_setitem)
