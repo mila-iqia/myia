@@ -133,7 +133,11 @@ class RPCProcess:
         self.loader = MyiaLoader(self.proc.stdout)
         self.dumper.open()
         self.dumper.represent((module, cls, init_args))
-        resp = self._read_msg()
+        try:
+            resp = self._read_msg()
+        except Exception:
+            os.waitpid(-1, os.WNOHANG)
+            raise
         assert resp == 'ready'
 
     def call_method(self, name, *args, **kwargs):

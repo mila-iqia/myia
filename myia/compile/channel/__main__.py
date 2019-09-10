@@ -51,6 +51,7 @@ def _rpc_server():
                 raise ValueError(f"Unknown message: {msg}")
         else:
             raise TypeError(f"bad data {data}")
+    return 0
 
 
 sys.exit(_rpc_server())
