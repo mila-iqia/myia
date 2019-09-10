@@ -407,7 +407,7 @@ class RelayBackend(Backend):
 class RelayBackendR(HandleBackend):
     """Relay proxy."""
 
-    def __init__(self, target='cpu', device_id=0):
+    def __init__(self, target, device_id):
         """Create the real backend."""
         set_title_suffix(f'Myia backend: [relay-{target}:{device_id}]')
         self.real = RelayBackend(target, device_id)

@@ -252,8 +252,6 @@ class PyTorchBackend(Backend):
 
     def __init__(self, device):
         """Create a PyTorch backend on the given device."""
-        if device == 'cuda':
-            device = 'cuda:0'
         self.device = torch.device(device)
         self.compiler = CompileGraphs(lambda lst: pytorch_convert(lst, self),
                                       nonlinear_ops, self, split_linear=True)
@@ -291,7 +289,7 @@ class PyTorchBackend(Backend):
 class PyTorchBackendR(HandleBackend):
     """Pytorch proxy."""
 
-    def __init__(self, device='cpu'):
+    def __init__(self, device):
         """Create the real backend."""
         set_title_suffix(f'Myia backend: [pytorch-{device}]')
         self.real = PyTorchBackend(device)

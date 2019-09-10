@@ -34,11 +34,23 @@ def channel_load(pkg, name):
     return loader
 
 
+def relay_nnvm_defaults(target='cpu', device_id=0):
+    return dict(target=target, device_id=device_id)
+
+def pytorch_default(device='cpu:0'):
+    if device == 'cuda':
+        device = 'cuda:0'
+    if device == 'cpu':
+        device = 'cpu:0'
+    return dict(device=device)
+
 _backends = {
-    'nnvm': channel_load('myia.compile.backends.nnvm', 'NNVMBackendR'),
-    'relay': channel_load('myia.compile.backends.relay', 'RelayBackendR'),
-    'pytorch': channel_load('myia.compile.backends.pytorch',
-                            'PyTorchBackendR'),
+    'nnvm': (channel_load('myia.compile.backends.nnvm', 'NNVMBackendR'),
+             relay_nnvm_defaults),
+    'relay': (channel_load('myia.compile.backends.relay', 'RelayBackendR'),
+              relay_nnvm_defaults),
+    'pytorch': (channel_load('myia.compile.backends.pytorch',
+                             'PyTorchBackendR'), pytorch_default)
 }
 
 _active_backends = {}
@@ -106,27 +118,36 @@ def load_backend(name, options=None):
         options = {}
     if name not in _backends:
         raise UnknownBackend(name)
+    options = _backends[name][1](**options)
     key = (name, tuple(sorted(list(options.items()))))
     res = _active_backends.get(key, None)
     if res is None:
         try:
-            res = _backends[name](options)
+            res = _backends[name][0](options)
             _active_backends[key] = res
         except Exception as e:
             raise LoadingError(name) from e
     return res
 
 
-def register_backend(name, load_fn):
+def register_backend(name, load_fn, default_fn):
     """Register a new backend.
 
     This is to allow third party libraries to register their own
     backends if loaded by the user.  Built-in backends are
     preregistered.
 
+    Arguments:
+        load_fn: function that will load the backend.  This must
+                 return a callable that will take keyword arguemnts
+                 for options.
+        default_fn: function that takes the same default arguments as
+                    load_fn and maps them to canonical and/or default
+                    values.
+
     """
     assert name not in _backends
-    _backends[name] = load_fn
+    _backends[name] = (load_fn, defaults_fn)
 
 
 class Backend:

@@ -412,7 +412,7 @@ class NNVMBackend(Backend):
 class NNVMBackendR(HandleBackend):
     """NNVM Proxy."""
 
-    def __init__(self, target='cpu', device_id=0):
+    def __init__(self, target, device_id):
         """Create the real backend."""
         set_title_suffix(f'Myia backend: [nnvm-{target}:{device_id}]')
         self.real = NNVMBackend(target, device_id)

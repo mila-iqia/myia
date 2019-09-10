@@ -117,7 +117,7 @@ def test_backend_error():
     def f(opts):
         raise ValueError('test')
 
-    register_backend(name, f)
+    register_backend(name, f, f)
 
     with pytest.raises(LoadingError):
         load_backend(name)
