@@ -230,8 +230,6 @@ class VM:
         assert isinstance(graph, Graph)
 
         assert graph in self._vars
-        # if graph not in self._vars:
-        #     self._acquire_graph(graph)
 
         if len(args) != len(graph.parameters):
             raise RuntimeError("Call with wrong number of arguments")
