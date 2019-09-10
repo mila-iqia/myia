@@ -13,6 +13,7 @@ from ...abstract import AbstractArray
 from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...xtype import Nil, type_to_np_dtype
+from ..channel import set_title_suffix
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
 from . import Backend, HandleBackend
@@ -413,4 +414,5 @@ class NNVMBackendR(HandleBackend):
 
     def __init__(self, target='cpu', device_id=0):
         """Create the real backend."""
+        set_title_suffix(f'Myia backend: [nnvm-{target}:{device_id}]')
         self.real = NNVMBackend(target, device_id)

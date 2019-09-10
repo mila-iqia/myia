@@ -101,6 +101,15 @@ def handle(value):
     return h
 
 
+def set_title_suffix(suffix):
+    """Adds a suffix to the process title (if setproctitle is available)."""
+    try:
+        import setproctitle
+        setproctitle.setproctitle(setproctitle.getproctitle() + ' ' + suffix)
+    except ImportError:
+        pass
+
+
 class RPCProcess:
     """Object that represents a remote class in another process."""
 

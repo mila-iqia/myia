@@ -6,6 +6,7 @@ import torch
 from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
+from ..channel import set_title_suffix
 from ..transform import CompileGraphs, nonlinear_ops
 from . import Backend, HandleBackend
 from .pytorch_conv_grad import conv2d_input, conv2d_weight
@@ -292,4 +293,5 @@ class PyTorchBackendR(HandleBackend):
 
     def __init__(self, device='cpu'):
         """Create the real backend."""
+        set_title_suffix(f'Myia backend: [pytorch-{device}]')
         self.real = PyTorchBackend(device)

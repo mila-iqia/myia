@@ -20,6 +20,7 @@ from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...utils import overload
 from ...xtype import Bool, Nil, type_to_np_dtype
+from ..channel import set_title_suffix
 from ..transform import wrap_result
 from . import Backend, HandleBackend
 from .relay_helpers import build_module, optimize
@@ -408,4 +409,5 @@ class RelayBackendR(HandleBackend):
 
     def __init__(self, target='cpu', device_id=0):
         """Create the real backend."""
+        set_title_suffix(f'Myia backend: [relay-{target}:{device_id}]')
         self.real = RelayBackend(target, device_id)
