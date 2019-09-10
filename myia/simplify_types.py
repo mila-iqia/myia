@@ -265,6 +265,16 @@ def simplify_types(root, manager):
 
 @overload(bootstrap=True)
 def to_canonical(self, arg, orig_t: AbstractTuple):
+    """Check and convert an argument to the canonical representation.
+
+    Arguments:
+        arg: The argument to convert.
+        orig_t: The type of the argument as returned by to_abstract.
+
+    Returns:
+        A version of the argument where classes/dicts become tuples
+        and unions are properly tagged.
+    """
     if not isinstance(arg, tuple):
         raise MyiaInputTypeError('Expected tuple')
     oe = orig_t.elements
@@ -366,6 +376,17 @@ def to_canonical(self, arg, orig_t: AbstractScalar):
 
 @overload(bootstrap=True)
 def from_canonical(self, res, orig_t, vm_t: AbstractTuple):
+    """Convert an argument back from the canonical representation.
+
+    Arguments:
+        res: The canonical argument to convert.
+        orig_t: The original type of the argument as returned by to_abstract.
+        vm_t: The canonical type as computed by simplify_types from orig_t.
+
+    Returns:
+        An argument where tuples are converted to the classes/dicts they
+        came from and unions are untagged.
+    """
     # If the EraseClass opt was applied, orig_t may be Class
     orig_is_class = isinstance(orig_t, AbstractClassBase)
     if orig_is_class:
