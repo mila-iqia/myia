@@ -18,7 +18,7 @@ from ..abstract.infer import to_abstract
 from ..hypermap import hyper_map
 from ..pipeline.standard import standard_method_map, standard_object_map
 from ..prim import ops as P
-from ..utils import MyiaInputTypeError, core
+from ..utils import core
 from ..xtype import Bool, Float, Int, NDArray, UInt
 from .pytorch_abstract_types import AbstractModule, PyTorchTensor
 from .pytorch_functions import _sum, conv2d, item, linear, relu, sigmoid

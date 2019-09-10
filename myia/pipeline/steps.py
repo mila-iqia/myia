@@ -5,10 +5,7 @@ The steps are listed in roughly the same order they should be called.
 
 from itertools import count
 
-import numpy as np
-
-from .. import xtype
-from ..abstract import AbstractTuple, find_aliases, typecheck
+from ..abstract import AbstractTuple, find_aliases
 from ..cconv import closure_convert
 from ..compile import BackendValue
 from ..ir import Graph
@@ -20,7 +17,7 @@ from ..opt import (
     lib as optlib,
 )
 from ..simplify_types import from_canonical, simplify_types, to_canonical
-from ..utils import MyiaInputTypeError, Partializable, overload, tracer
+from ..utils import MyiaInputTypeError, Partializable, tracer
 from ..validate import validate
 
 #############

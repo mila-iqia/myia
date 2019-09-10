@@ -284,7 +284,7 @@ def to_canonical(fn, self, arg, orig_t):
     return fn(self, arg, orig_t)
 
 
-@overload
+@overload  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractTuple):
     if not isinstance(arg, tuple):
         raise MyiaInputTypeError('Expected tuple')
@@ -397,13 +397,13 @@ def from_canonical(self, res, orig_t: AbstractClassBase):
     return orig_t.constructor(*tup)
 
 
-@overload
+@overload  # noqa: F811
 def from_canonical(self, res, orig_t: AbstractDict):
     tup = tuple(self(x, o) for x, o in zip(res, orig_t.entries.values()))
     return dict(zip(orig_t.entries.keys(), tup))
 
 
-@overload
+@overload  # noqa: F811
 def from_canonical(self, res, orig_t: AbstractTuple):
     return tuple(self(x, o) for x, o in zip(res, orig_t.elements))
 

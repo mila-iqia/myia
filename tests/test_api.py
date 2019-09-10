@@ -9,7 +9,7 @@ from myia.pipeline import (
     scalar_parse as parse,
 )
 from myia.prim.py_implementations import tuple_getitem
-from myia.simplify_types import to_canonical, from_canonical
+from myia.simplify_types import from_canonical, to_canonical
 from myia.utils import InferenceError, TaggedValue
 from myia.xtype import Bool
 
