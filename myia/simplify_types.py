@@ -24,6 +24,7 @@ from .abstract import (
     type_to_abstract,
     typecheck,
 )
+from .compile import BackendValue
 from .ir import Constant
 from .prim import ops as P
 from .utils import (
@@ -263,8 +264,8 @@ def simplify_types(root, manager):
 ########################
 
 
-@overload(bootstrap=True)
-def to_canonical(self, arg, orig_t: AbstractTuple):
+@overload.wrapper(bootstrap=True)
+def to_canonical(fn, self, arg, orig_t):
     """Check and convert an argument to the canonical representation.
 
     Arguments:
@@ -276,6 +277,15 @@ def to_canonical(self, arg, orig_t: AbstractTuple):
         and unions are properly tagged.
 
     """
+    if isinstance(arg, BackendValue):
+        if not typecheck(orig_t, arg.orig_t):
+            raise MyiaInputTypeError("Bad type for backend value.")
+        return arg
+    return fn(self, arg, orig_t)
+
+
+@overload
+def to_canonical(self, arg, orig_t: AbstractTuple):
     if not isinstance(arg, tuple):
         raise MyiaInputTypeError('Expected tuple')
     oe = orig_t.elements
@@ -330,8 +340,7 @@ def to_canonical(self, arg, orig_t: AbstractArray):
     assert isinstance(et, AbstractScalar)
     et = et.xtype()
     assert issubclass(et, xtype.Number)
-    t = orig_t.xtype()
-    arg = self[t](arg, t)
+    arg = orig_t.xtype().to_numpy(arg)
     arg_dtype = xtype.np_dtype_to_type(str(arg.dtype))
     if arg_dtype != et:
         raise MyiaInputTypeError(
@@ -408,8 +417,7 @@ def from_canonical(self, arg, orig_t: AbstractScalar):
 
 @overload  # noqa: F811
 def from_canonical(self, arg, orig_t: AbstractArray):
-    t = orig_t.xtype()
-    return self[t](arg, t)
+    return orig_t.xtype().from_numpy(arg)
 
 
 @overload  # noqa: F811

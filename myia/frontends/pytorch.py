@@ -17,7 +17,6 @@ from ..abstract.data import (
 from ..abstract.infer import to_abstract
 from ..hypermap import hyper_map
 from ..pipeline.standard import standard_method_map, standard_object_map
-from ..pipeline.steps import convert_arg, convert_result
 from ..prim import ops as P
 from ..utils import MyiaInputTypeError, core
 from ..xtype import Bool, Float, Int, NDArray, UInt
@@ -184,15 +183,3 @@ def _to_abstract(self, v: torch.nn.Parameter, **kwargs):
         }),
         {SHAPE: tuple(v.shape), TYPE: PyTorchTensor},
     )
-
-
-@convert_arg.register
-def _convert_arg(self, arg, t: PyTorchTensor):
-    if not isinstance(arg, torch.Tensor):
-        raise MyiaInputTypeError(f"Expected torch.Tensor but got {arg}.")
-    return arg.detach().numpy()
-
-
-@convert_result.register
-def _convert_result(self, arg, orig_t: PyTorchTensor):
-    return torch.from_numpy(arg)

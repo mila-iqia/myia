@@ -417,50 +417,6 @@ class SlowdownWarning(UserWarning):
 #####################################
 
 
-@to_canonical.variant_wrapper
-def convert_arg(fn, self, arg, orig_t):
-    """Check and convert an argument to the canonical representation.
-
-    Arguments:
-        arg: The argument to convert.
-        orig_t: The type of the argument as returned by to_abstract.
-
-    Returns:
-        A version of the argument where classes/dicts become tuples
-        and unions are properly tagged.
-
-    """
-    if isinstance(arg, BackendValue):
-        if not typecheck(orig_t, arg.orig_t):
-            raise MyiaInputTypeError("Bad type for backend value.")
-        return arg
-    return fn(self, arg, orig_t)
-
-
-@overload  # noqa: F811
-def convert_arg(self, arg, t: xtype.NDArray):
-    if not isinstance(arg, np.ndarray):
-        raise MyiaInputTypeError(f"Expected numpy.ndarray but got {arg}.")
-    return arg
-
-
-@from_canonical.variant
-def convert_result(self, arg, orig_t: xtype.NDArray):
-    """Convert an argument back from the canonical representation.
-
-    Arguments:
-        res: The canonical argument to convert.
-        orig_t: The original type of the argument as returned by to_abstract.
-        vm_t: The canonical type as computed by simplify_types from orig_t.
-
-    Returns:
-        An argument where tuples are converted to the classes/dicts they
-        came from and unions are untagged.
-
-    """
-    return arg
-
-
 def step_wrap(resources,
               graph,
               output,
@@ -505,7 +461,7 @@ def step_wrap(resources,
         backend = resources.backend.backend
         if len(args) != len(orig_arg_t):
             raise MyiaInputTypeError('Wrong number of arguments.')
-        args = tuple(backend.to_backend_value(convert_arg(arg, ot), vt)
+        args = tuple(backend.to_backend_value(to_canonical(arg, ot), vt)
                      for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
         res = fn(*args)
         if resources.return_backend:
@@ -517,7 +473,7 @@ def step_wrap(resources,
                 res = BackendValue(res, orig_out_t, vm_out_t, backend)
         else:
             res = backend.from_backend_value(res, vm_out_t)
-            res = convert_result(res, orig_out_t)
+            res = from_canonical(res, orig_out_t)
         return res
 
     return {'output': wrapped}

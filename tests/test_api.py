@@ -8,8 +8,8 @@ from myia.pipeline import (
     scalar_debug_compile as compile,
     scalar_parse as parse,
 )
-from myia.pipeline.steps import convert_arg, convert_result
 from myia.prim.py_implementations import tuple_getitem
+from myia.simplify_types import to_canonical, from_canonical
 from myia.utils import InferenceError, TaggedValue
 from myia.xtype import Bool
 
@@ -90,10 +90,10 @@ def test_myia_dict_field():
     assert v == 2
 
 
-def test_convert_arg():
+def test_to_canonical():
 
     def _convert(data, typ):
-        return convert_arg(data, to_abstract_test(typ))
+        return to_canonical(data, to_abstract_test(typ))
 
     # Leaves
 
@@ -176,10 +176,10 @@ def test_convert_arg():
         _convert(v, f64)
 
 
-def test_convert_result():
+def test_from_canonical():
 
     def _convert(data, typ):
-        return convert_result(data, to_abstract_test(typ))
+        return from_canonical(data, to_abstract_test(typ))
 
     # Leaves
 

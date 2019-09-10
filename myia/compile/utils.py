@@ -16,9 +16,9 @@ class BackendValue:
 
     def from_device(self):
         """Get a python value for this backend value."""
-        from ..pipeline.steps import convert_result
+        from ..simplify_types import from_canonical
         res = self.backend.from_backend_value(self.value, self.vm_t)
-        return convert_result(res, self.orig_t)
+        return from_canonical(res, self.orig_t)
 
     def __getattr__(self, name):  # pragma: no cover
         raise AttributeError(

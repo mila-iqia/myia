@@ -6,7 +6,7 @@ from typing import Tuple as TupleT
 
 import numpy
 
-from .utils import EnvInstance, SymbolicKeyInstance
+from .utils import EnvInstance, MyiaInputTypeError, SymbolicKeyInstance
 
 _type_cache = {}
 
@@ -169,6 +169,18 @@ class Dict(Object):
 
 class NDArray(Object):
     """Type of a Numpy array."""
+
+    @classmethod
+    def to_numpy(self, x):
+        """Convert ndarray x to an ndarray."""
+        if not isinstance(x, numpy.ndarray):
+            raise MyiaInputTypeError(f"Expected numpy.ndarray but got {x}.")
+        return x
+
+    @classmethod
+    def from_numpy(self, x):
+        """Convert ndarray x to an ndarray."""
+        return x
 
 
 class SymbolicKeyType(Object):
