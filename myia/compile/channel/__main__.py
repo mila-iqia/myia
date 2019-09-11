@@ -11,6 +11,8 @@ from . import _dead_handle
 def _rpc_server():
     loader = MyiaLoader(sys.stdin.buffer)
     dumper = MyiaDumper(sys.stdout.buffer)
+    # Try to prevent other libs from using stdout
+    sys.stdout = sys.stderr
     dumper.open()
     pkg, name, init_args = loader.get_data()
     try:
