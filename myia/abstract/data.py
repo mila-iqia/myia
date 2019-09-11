@@ -121,7 +121,6 @@ class Function:
     """Represents a possible function in an AbstractFunction."""
 
 
-@serializable('AbstractFunction', dc=False, construct=False)
 @dataclass(frozen=True)
 class GraphFunction(Function):
     """Represents a Graph in a certain Context.
@@ -137,8 +136,8 @@ class GraphFunction(Function):
     context: Context
     tracking_id: object = None
 
-    def _serialize(self):
-        return self.graph.abstract._serialize()
+    def _serialize_replace(self):
+        return self.graph.abstract
 
 
 @serializable('PrimitiveFunction')

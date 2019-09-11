@@ -413,7 +413,7 @@ def step_compile(resources, graph, argspec, outspec):
 def _to_backend(arg, backend, vt):
     if isinstance(arg, BackendValue):
         if arg.backend is not backend:
-            raise ValueError("Value from wrong backend")
+            raise ValueError("Value from wrong backend")  # pragma: no cover
         return arg.value
     else:
         return backend.to_backend_value(arg, vt)

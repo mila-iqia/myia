@@ -10,7 +10,6 @@ from ...abstract import (
     AbstractScalar,
     AbstractTuple,
     AbstractType,
-    GraphFunction,
     PartialApplication,
     TypedPrimitive,
     VirtualFunction,
@@ -20,7 +19,6 @@ from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...utils import overload
 from ...xtype import Bool, Nil, type_to_np_dtype
-from ..channel import set_title_suffix
 from ..transform import wrap_result
 from . import Backend, HandleBackend
 from .relay_helpers import build_module, optimize
@@ -73,11 +71,6 @@ def to_relay_type(self, a: (VirtualFunction, TypedPrimitive)):
 def to_relay_type(self, a: PartialApplication):
     tp = self(a.fn)
     return relay.ty.FuncType(tp.arg_types[len(a.args):], tp.ret_type)
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: GraphFunction):
-    return self(a.graph.abstract)
 
 
 @overload  # noqa: F811
@@ -409,5 +402,4 @@ class RelayBackendR(HandleBackend):
 
     def __init__(self, target, device_id):
         """Create the real backend."""
-        set_title_suffix(f'Myia backend: [relay-{target}:{device_id}]')
         self.real = RelayBackend(target, device_id)

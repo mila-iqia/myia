@@ -41,14 +41,9 @@ def _rpc_server():
             elif msg == 'handle_call':
                 try:
                     res = arg[0](*arg[1], **arg[2])
-                except Exception as e:
+                except Exception as e:  # pragma: no cover
                     res = e
                 dumper.represent(res)
-            elif msg == 'send_obj':
-                try:
-                    dumper.represent(arg)
-                except Exception as e:
-                    dumper.represent(e)
             else:
                 raise ValueError(f"Unknown message: {msg}")
         else:

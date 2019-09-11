@@ -10,5 +10,4 @@ script:
   - if [[ $TEST_SUITE == "static" ]]; then flake8 && pydocstyle myia && isort -c -df; fi
   - if [[ $TEST_SUITE == "unit" ]]; then pytest tests --cov=./; fi
 after_success:
-  - if [[ $TEST_SUITE == "unit" ]]; then ls .coverage.*; fi
   - if [[ $TEST_SUITE == "unit" ]]; then codecov; fi

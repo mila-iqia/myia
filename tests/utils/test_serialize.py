@@ -49,6 +49,17 @@ def test_same(v):
     assert v is v2
 
 
+def test_dump_undefined():
+    with pytest.raises(Exception):
+        dumpload(object())
+
+
+def test_exception():
+    e2 = dumpload(Exception("this is bad"))
+    assert e2.message == "Exception: this is bad\n"
+    assert repr(e2) == 'LoadedException'
+
+
 g = Graph()
 p1 = g.add_parameter()
 p1.abstract = to_abstract_test(2)

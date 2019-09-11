@@ -77,13 +77,6 @@ class RemoteHandle:
         handle = _local_handle_table[data]
         return handle.value
 
-    def bring(self):
-        """Bring the remote object over.
-
-        This may not work for every objet type.
-        """
-        return self.channel._bring_object(self)
-
     def __call__(self, *args, **kwargs):
         """Call the remote object associated with this handle."""
         return self.channel.call_handle(self, args, kwargs)
@@ -99,15 +92,6 @@ def handle(value):
     if h is None:
         h = LocalHandle(value)
     return h
-
-
-def set_title_suffix(suffix):
-    """Adds a suffix to the process title (if setproctitle is available)."""
-    try:
-        import setproctitle
-        setproctitle.setproctitle(setproctitle.getproctitle() + ' ' + suffix)
-    except ImportError:
-        pass
 
 
 class RPCProcess:
@@ -151,15 +135,8 @@ class RPCProcess:
         self._send_msg('handle_call', (handle, args, kwargs))
         return self._read_msg()
 
-    def _bring_object(self, obj):
-        self._send_msg('send_obj', obj)
-        return self._read_msg()
-
     def _send_msg(self, msg, args):
-        try:
-            self.dumper.represent([msg, args])
-        except BrokenPipeError:
-            pass
+        self.dumper.represent([msg, args])
 
     def _read_msg(self):
         RemoteHandle.current_channel = self
@@ -170,11 +147,3 @@ class RPCProcess:
         if isinstance(res, LoadedError):
             raise res
         return res
-
-    def close(self):
-        """Close the remote process and dispose of resources."""
-        self.proc.terminate()
-        self.dumper.close()
-        self.loader.close()
-        self.dumper.dispose()
-        self.loader.dispose()

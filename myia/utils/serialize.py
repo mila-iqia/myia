@@ -36,11 +36,12 @@ class MyiaLoader(SafeLoader):
         stream = os.fdopen(fd, 'rb', buffering=0, closefd=False)
         super().__init__(stream)
 
-    def determine_encoding(self):
-        """The python version of pyyaml really wants a file.
+    def determine_encoding(self):  # pragma: no cover
+        """This is a workaround for the python version of pyyaml
 
-        Since we have a stream, and we know some things, we can do
-        some workarounds
+        It really wants to read from the stream when creating the
+        loader object to figure out the encoding.  We just statically
+        figure it out here instead.
         """
         self.raw_decode = codecs.utf_8_decode
         self.encoding = 'utf-8'
@@ -262,7 +263,7 @@ def _construct_unique(loader, node):
         return LoadedError(data)
     obj = _TAG_MAP.get(node.tag, None)
     if obj is None:
-        return loader.construct_undefined(node)
+        return loader.construct_undefined(node)  # pragma: no cover
     else:
         return obj
 

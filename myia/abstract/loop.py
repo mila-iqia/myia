@@ -198,10 +198,8 @@ class Pending(asyncio.Future):
         return False
 
     def _serialize_replace(self):
-        if self.done():
-            return self.result()
-        else:
-            raise RuntimeError("Can't serialize unfinished Pending.")
+        assert self.done()
+        return self.result()
 
     def force_resolve(self):
         """Force a resolution."""
