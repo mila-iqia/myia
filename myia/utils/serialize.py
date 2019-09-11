@@ -37,7 +37,7 @@ class MyiaLoader(SafeLoader):
         super().__init__(stream)
 
     def determine_encoding(self):  # pragma: no cover
-        """This is a workaround for the python version of pyyaml
+        """This is a workaround for the python version of pyyaml.
 
         It really wants to read from the stream when creating the
         loader object to figure out the encoding.  We just statically
