@@ -13,9 +13,9 @@ node ('gpu') {
     junit 'test-report.xml'
   }
   stage ('Coverage') {
-    sh script: 'coverage combine -a .coverage.*'
-    sh script: 'coverage report -m'
-    sh script: 'coverage xml'
+    sh script: '$HOME/miniconda/bin/coverage combine -a .coverage.*'
+    sh script: '$HOME/miniconda/bin/coverage report -m'
+    sh script: '$HOME/miniconda/bin/coverage xml'
     withCredentials([string(credentialsId: 'myia_codecov', variable: 'CODECOV_TOKEN')]) {
       sh script: 'curl -s https://codecov.io/bash | bash -s -- -ZK'
     }
