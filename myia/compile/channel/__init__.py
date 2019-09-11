@@ -128,9 +128,10 @@ class RPCProcess:
             [interpreter, '-m', 'myia.compile.channel'],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
+            bufsize=0,
             env=env)
-        self.dumper = MyiaDumper(self.proc.stdin)
-        self.loader = MyiaLoader(self.proc.stdout)
+        self.dumper = MyiaDumper(self.proc.stdin.fileno())
+        self.loader = MyiaLoader(self.proc.stdout.fileno())
         self.dumper.open()
         self.dumper.represent((module, cls, init_args))
         try:

@@ -5,7 +5,8 @@ try:
 except ImportError:  # pragma: no cover
     from yaml import SafeLoader, SafeDumper
 
-import sys
+import codecs
+import os
 import traceback
 from dataclasses import is_dataclass
 
@@ -15,8 +16,9 @@ import numpy as np
 class MyiaDumper(SafeDumper):
     """Customize the dumper."""
 
-    def __init__(self, stream):
+    def __init__(self, fd):
         """Record stream, even for C."""
+        stream = os.fdopen(fd, 'wb', buffering=0, closefd=False)
         super().__init__(stream, encoding='utf-8', explicit_end=True)
         self.stream = stream
 
@@ -29,11 +31,20 @@ class MyiaDumper(SafeDumper):
 class MyiaLoader(SafeLoader):
     """Customize the loader."""
 
-    def __init__(self, stream):
+    def __init__(self, fd):
         """Make sure reads don't block."""
-        stream.read = stream.read1
-        stream.readinto = stream.readinto1
+        stream = os.fdopen(fd, 'rb', buffering=0, closefd=False)
         super().__init__(stream)
+
+    def determine_encoding(self):
+        """The python version of pyyaml really wants a file.
+
+        Since we have a stream, and we know some things, we can do
+        some workarounds
+        """
+        self.raw_decode = codecs.utf_8_decode
+        self.encoding = 'utf-8'
+        self.raw_buffer = b""
 
     def construct_document(self, node):
         """Add support for finalizers."""
@@ -272,9 +283,9 @@ def register_serialize(obj, tag):
     _TAG_MAP[tag] = obj
 
 
-def dump(o, stream=sys.stdout):
+def dump(o, fd):
     """Dump the passed-in object to the specified stream."""
-    dumper = MyiaDumper(stream)
+    dumper = MyiaDumper(fd)
     try:
         dumper.open()
         dumper.represent(o)
@@ -283,9 +294,9 @@ def dump(o, stream=sys.stdout):
         dumper.dispose()
 
 
-def load(stream):
+def load(fd):
     """Load one object from the stream."""
-    loader = MyiaLoader(stream)
+    loader = MyiaLoader(fd)
     try:
         return loader.get_single_data()
     finally:

@@ -1,4 +1,4 @@
-import io
+import tempfile
 
 import pytest
 
@@ -13,15 +13,12 @@ from ..common import to_abstract_test
 parametrize = pytest.mark.parametrize
 
 
-def dumpstr(o):
-    stream = io.BytesIO()
-    dump(o, stream)
-    return stream.getvalue()
-
-
-def loadstr(s):
-    stream = io.BytesIO(s)
-    return load(stream)
+def dumpload(o):
+    f = tempfile.TemporaryFile()
+    pos = f.tell()
+    dump(o, f.fileno())
+    f.seek(pos)
+    return load(f.fileno())
 
 
 @parametrize('v', [
@@ -31,8 +28,7 @@ def loadstr(s):
     (22,),
 ])
 def test_roundtrip(v):
-    s = dumpstr(v)
-    v2 = loadstr(s)
+    v2 = dumpload(v)
     assert v is not v2
     assert v == v2
 
@@ -49,8 +45,7 @@ def test_roundtrip(v):
     xtype.f32,
 ])
 def test_same(v):
-    s = dumpstr(v)
-    v2 = loadstr(s)
+    v2 = dumpload(v)
     assert v is v2
 
 
@@ -75,8 +70,7 @@ g.return_.inputs[0].abstract = None
     mid,
 ])
 def test_anfnode(node):
-    s = dumpstr(node)
-    node2 = loadstr(s)
+    node2 = dumpload(node)
     assert type(node) is type(node2)
     assert len(node.inputs) == len(node2.inputs)
     # more inputs assert?
@@ -91,8 +85,7 @@ def test_anfnode(node):
 
 
 def test_graph():
-    s = dumpstr(g)
-    g2 = loadstr(s)
+    g2 = dumpload(g)
 
     assert g is not g2
     assert isinstance(g2, Graph)

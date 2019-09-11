@@ -2,13 +2,12 @@
 
 import os
 import urllib
+import weakref
 
 from ... import abstract, xtype
 from ...utils import TaggedValue
 from ..channel import RPCProcess, handle
 from ..transform import convert_grad
-
-import weakref
 
 
 class UnknownBackend(Exception):
