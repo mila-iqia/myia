@@ -8,6 +8,7 @@ node ('gpu') {
   try {
     stage ('Test') {
       sh script: '$HOME/miniconda/bin/pytest --cov-report=term-missing --cov-report=xml  --cov=./ --gpu --junit-xml test-report.xml'
+      sh script: 'ls .coverage.*'
     }
   } finally {
     junit 'test-report.xml'
