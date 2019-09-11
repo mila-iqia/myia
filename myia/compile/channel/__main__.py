@@ -45,8 +45,8 @@ def _rpc_server():
                     res = e
                 dumper.represent(res)
             else:
-                raise ValueError(f"Unknown message: {msg}")
-        else:
+                raise ValueError(f"Unknown message: {msg}")  # pragma: no cover
+        else:  # pragma: no cover
             raise TypeError(f"bad data {data}")
     return 0
 
