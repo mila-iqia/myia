@@ -136,7 +136,7 @@ class RPCProcess:
         try:
             resp = self._read_msg()
         except Exception:
-            os.waitpid(-1, os.WNOHANG)
+            os.waitpid(-1, 0)
             raise
         assert resp == 'ready'
 

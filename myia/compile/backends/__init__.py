@@ -8,6 +8,8 @@ from ...utils import TaggedValue
 from ..channel import RPCProcess, handle
 from ..transform import convert_grad
 
+import weakref
+
 
 class UnknownBackend(Exception):
     """Indicates that the backend name is not recognized."""
@@ -55,7 +57,7 @@ _backends = {
                              'PyTorchBackendR'), pytorch_default)
 }
 
-_active_backends = {}
+_active_backends = weakref.WeakValueDictionary()
 
 
 def get_default():
@@ -229,12 +231,18 @@ class Backend:
             raise NotImplementedError(f'to_backend_value for {t}')
 
 
+def _close_and_wait(stream):
+    stream.close()
+    os.waitpid(-1, 0)
+
+
 class ChannelBackend(Backend):
     """Backend based on a channel to another process."""
 
     def __init__(self, proc):
         """Remote."""
         self.proc = proc
+        weakref.finalize(proc, _close_and_wait, proc.proc.stdin)
 
     def compile(self, graph, argspec, outspec):
         """Remote."""
