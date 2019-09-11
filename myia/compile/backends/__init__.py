@@ -37,10 +37,12 @@ def channel_load(pkg, name):
 
 
 def relay_nnvm_defaults(target='cpu', device_id=0):
+    """Format options for nnvm/relay."""
     return dict(target=target, device_id=device_id)
 
 
 def pytorch_default(device='cpu:0'):
+    """Format options for pytorch."""
     if device == 'cuda':
         device = 'cuda:0'
     if device == 'cpu':
