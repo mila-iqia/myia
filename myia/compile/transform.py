@@ -79,6 +79,11 @@ def wrap_primitives(graph):
 
 @overload(bootstrap=True)
 def wrap_result(self, data: tuple):
+    """Function to wrap final results in a handle.
+
+    This leaves first-level tuples alone so that we support multiple
+    value returns more naturally.
+    """
     return tuple(self(d) for d in data)
 
 

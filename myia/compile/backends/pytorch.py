@@ -7,7 +7,7 @@ from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ..transform import CompileGraphs, nonlinear_ops
-from . import Backend, HandleBackend
+from . import ConcreteBackend, HandleBackend
 from .pytorch_conv_grad import conv2d_input, conv2d_weight
 
 _type_map = {
@@ -241,7 +241,7 @@ def pytorch_convert(lst, backend):
     return impl, inputs, [op]
 
 
-class PyTorchBackend(Backend):
+class PyTorchBackend(ConcreteBackend):
     """Backend to run using pytorch.
 
     Backend options:
@@ -285,9 +285,6 @@ class PyTorchBackend(Backend):
         return np.asarray(s, dtype=dt)
 
 
-class PyTorchBackendR(HandleBackend):
+def PyTorchBackendR(device):
     """Pytorch proxy."""
-
-    def __init__(self, device):
-        """Create the real backend."""
-        self.real = PyTorchBackend(device)
+    return HandleBackend(PyTorchBackend(device))

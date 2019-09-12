@@ -22,7 +22,7 @@ class LoadingError(Exception):
     """
 
 
-def channel_load(pkg, name):
+def channel_loader(pkg, name):
     """Helper function for simple backends.
 
     This will return a callable that will load a module, retrieve a
@@ -50,12 +50,12 @@ def pytorch_default(device='cpu:0'):
 
 
 _backends = {
-    'nnvm': (channel_load('myia.compile.backends.nnvm', 'NNVMBackendR'),
+    'nnvm': (channel_loader('myia.compile.backends.nnvm', 'NNVMBackendR'),
              relay_nnvm_defaults),
-    'relay': (channel_load('myia.compile.backends.relay', 'RelayBackendR'),
+    'relay': (channel_loader('myia.compile.backends.relay', 'RelayBackendR'),
               relay_nnvm_defaults),
-    'pytorch': (channel_load('myia.compile.backends.pytorch',
-                             'PyTorchBackendR'), pytorch_default)
+    'pytorch': (channel_loader('myia.compile.backends.pytorch',
+                               'PyTorchBackendR'), pytorch_default)
 }
 
 _active_backends = weakref.WeakValueDictionary()
@@ -167,6 +167,22 @@ class Backend:
         """
         raise NotImplementedError('compile')
 
+    def from_backend_value(self, v, t):
+        """Convert a backend value to an intermediate value."""
+        raise NotImplementedError('from_backend_value')
+
+    def to_backend_value(self, v, t):
+        """Convert an intermediate value to a backend value."""
+        raise NotImplementedError('to_backend_value')
+
+
+class ConcreteBackend(Backend):
+    """This is a collection of helpers to define a backend."""
+
+    def from_numpy(self, v):
+        """Convert a numpy.ndarray to a backend value."""
+        raise NotImplementedError("from_numpy")
+
     def to_numpy(self, v):
         """Convert a backend value to a numpy.ndarray."""
         raise NotImplementedError("to_numpy")
@@ -257,6 +273,10 @@ class ChannelBackend(Backend):
 
 class HandleBackend(Backend):
     """Proxy for remote process backend."""
+
+    def __init__(self, real):
+        """Set the proxied backend."""
+        self.real = real
 
     def compile(self, graph, argspec, outspec):
         """Proxy."""

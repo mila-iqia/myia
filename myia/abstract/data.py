@@ -273,18 +273,13 @@ class AbstractValue(Interned, PossiblyRecursive):
         self.values = TrackDict(values)
 
     def _serialize(self):
-        data = dict()
-        for k, v in self.values.items():
-            data[k.name] = v
-        return data
+        return self.values
 
     @classmethod
     def _construct(cls):
-        tmap = {'TYPE': TYPE, 'VALUE': VALUE, 'SHAPE': SHAPE, 'DATA': DATA,
-                'ALIASID': ALIASID}
         obj = cls.empty()
         data = yield obj
-        obj.values = TrackDict((tmap[k], v) for k, v in data.items())
+        obj.values = data
         obj._incomplete = False
 
     def xtype(self):
@@ -834,10 +829,15 @@ class _AliasIdTrack(Track):
 
 
 VALUE = _ValueTrack('VALUE')
+register_serialize(VALUE, 'VALUE')
 TYPE = _TypeTrack('TYPE')
+register_serialize(TYPE, 'TYPE')
 SHAPE = _ShapeTrack('SHAPE')
+register_serialize(SHAPE, 'SHAPE')
 DATA = _ValueTrack('DATA')
+register_serialize(DATA, 'DATA')
 ALIASID = _AliasIdTrack('ALIASID')
+register_serialize(ALIASID, 'ALIASID')
 
 
 ##########################

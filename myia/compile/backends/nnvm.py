@@ -15,7 +15,7 @@ from ...prim import Primitive, ops as P
 from ...xtype import Nil, type_to_np_dtype
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
-from . import Backend, HandleBackend
+from . import ConcreteBackend, HandleBackend
 
 nonlinear_ops = list(nonlinear_ops)
 nonlinear_ops.append(P.scalar_cast)
@@ -361,7 +361,7 @@ converter = NNVMConverter(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 nnvm_convert = converter.convert
 
 
-class NNVMBackend(Backend):
+class NNVMBackend(ConcreteBackend):
     """Backend to compile for NNVM.
 
     Backend options:
@@ -408,9 +408,6 @@ class NNVMBackend(Backend):
         return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
 
 
-class NNVMBackendR(HandleBackend):
+def NNVMBackendR(target, device_id):
     """NNVM Proxy."""
-
-    def __init__(self, target, device_id):
-        """Create the real backend."""
-        self.real = NNVMBackend(target, device_id)
+    return HandleBackend(NNVMBackend(target, device_id))

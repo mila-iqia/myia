@@ -20,7 +20,7 @@ from ...prim import Primitive, ops as P
 from ...utils import overload
 from ...xtype import Bool, Nil, type_to_np_dtype
 from ..transform import wrap_result
-from . import Backend, HandleBackend
+from . import ConcreteBackend, HandleBackend
 from .relay_helpers import build_module, optimize
 
 
@@ -349,7 +349,7 @@ class CompileGraph:
 compiler = CompileGraph()
 
 
-class RelayBackend(Backend):
+class RelayBackend(ConcreteBackend):
     """Backend based on Relay.
 
     Backend options:
@@ -397,9 +397,6 @@ class RelayBackend(Backend):
         return self.from_numpy(np.array(s, dtype=dt, copy=False))
 
 
-class RelayBackendR(HandleBackend):
+def RelayBackendR(target, device_id):
     """Relay proxy."""
-
-    def __init__(self, target, device_id):
-        """Create the real backend."""
-        self.real = RelayBackend(target, device_id)
+    return HandleBackend(RelayBackend(target, device_id))
