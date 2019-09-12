@@ -3,26 +3,38 @@
 import weakref
 from itertools import count
 
-from ..abstract import (
+from . import xtype
+from .abstract import (
     ANYTHING,
     TYPE,
     VALUE,
+    AbstractArray,
     AbstractClassBase,
     AbstractDict,
     AbstractKeywordArgument,
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
+    AbstractType,
     AbstractUnion,
     AbstractValue,
     abstract_clone,
+    empty,
+    from_value,
     split_type,
     type_to_abstract,
+    typecheck,
 )
-from ..ir import Constant
-from ..prim import ops as P
-from ..utils import is_dataclass_type, overload
-from ..xtype import Int, String
+from .compile import BackendValue
+from .ir import Constant
+from .prim import ops as P
+from .utils import Cons, Empty, MyiaInputTypeError, TaggedValue, overload
+from .xtype import Int, String
+
+####################
+# Tags and symbols #
+####################
+
 
 _idx = count()
 _tagmap = weakref.WeakKeyDictionary()
@@ -46,6 +58,11 @@ def str_to_tag(t):
         _tagmap_str[t] = s
         _strmap_tag[s] = t
     return _tagmap_str[t]
+
+
+#########
+# Reabs #
+#########
 
 
 @abstract_clone.variant
@@ -78,6 +95,11 @@ def _reabs(self, a: AbstractUnion):
 @overload  # noqa: F811
 def _reabs(self, a: AbstractKeywordArgument):
     return self(a.argument)
+
+
+##################
+# Simplify types #
+##################
 
 
 def simplify_types(root, manager):
@@ -201,22 +223,9 @@ def simplify_types(root, manager):
         elif node.is_apply(P.extract_kwarg):
             new_node = node.inputs[2]
 
-        elif node.is_constant(AbstractClassBase):
-            # This is a constant that contains a type, used e.g. with hastype.
-            new_node = Constant(_reabs(node.value))
+        elif node.is_constant((str, AbstractValue)):
+            new_node = Constant(to_canonical(node.value, node.abstract))
             keep_abstract = False
-
-        elif node.is_constant(str):
-            new_node = Constant(str_to_tag(node.value))
-
-        elif node.is_constant(AbstractDict):
-            # This is a constant that contains a type, used e.g. with hastype.
-            new_node = Constant(_reabs(node.value))
-            keep_abstract = False
-
-        elif node.is_constant() and is_dataclass_type(node.value):
-            raise NotImplementedError()
-            # new_node = Constant(P.make_tuple)
 
         if new_node is not None:
             if keep_abstract:
@@ -229,3 +238,179 @@ def simplify_types(root, manager):
 
     for node in manager.all_nodes:
         node.abstract = _reabs(node.abstract)
+
+
+########################
+# Convert to canonical #
+########################
+
+
+@overload.wrapper(bootstrap=True)
+def to_canonical(fn, self, arg, orig_t):
+    """Check and convert an argument to the canonical representation.
+
+    Arguments:
+        arg: The argument to convert.
+        orig_t: The type of the argument as returned by to_abstract.
+
+    Returns:
+        A version of the argument where classes/dicts become tuples
+        and unions are properly tagged.
+
+    """
+    if isinstance(arg, BackendValue):
+        if not typecheck(orig_t, arg.orig_t):
+            raise MyiaInputTypeError("Bad type for backend value.")
+        return arg
+    return fn(self, arg, orig_t)
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractTuple):
+    if not isinstance(arg, tuple):
+        raise MyiaInputTypeError('Expected tuple')
+    oe = orig_t.elements
+    if len(arg) != len(oe):
+        raise MyiaInputTypeError(f'Expected {len(oe)} elements')
+    return tuple(self(x, o) for x, o in zip(arg, oe))
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractDict):
+    if not isinstance(arg, dict):
+        raise MyiaInputTypeError('Expected dict')
+    types = orig_t.entries
+    if len(arg) != len(types):
+        raise MyiaInputTypeError(
+            "Dictionary input doesn't have the expected size"
+        )
+    if set(arg.keys()) != set(types.keys()):
+        raise MyiaInputTypeError("Mismatched keys for input dictionary.")
+    return tuple(self(arg[k], o) for k, o in orig_t.entries.items())
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractClassBase):
+    if orig_t.tag is Empty:
+        if arg != []:
+            raise MyiaInputTypeError(f'Expected empty list')
+        return ()
+    elif orig_t.tag is Cons:
+        if arg == []:
+            raise MyiaInputTypeError(f'Expected non-empty list')
+        if not isinstance(arg, list):
+            raise MyiaInputTypeError(f'Expected list')
+        ot = orig_t.attributes['head']
+        li = list(self(x, ot) for x in arg)
+        rval = TaggedValue(type_to_tag(empty), ())
+        for elem in reversed(li):
+            rval = TaggedValue(type_to_tag(orig_t), (elem, rval))
+        return rval.value
+    else:
+        if not isinstance(arg, orig_t.tag):
+            raise MyiaInputTypeError(f'Expected {orig_t.tag.__qualname__}')
+        arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
+        oe = list(orig_t.attributes.values())
+        res = tuple(self(x, o) for x, o in zip(arg, oe))
+        return res
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractArray):
+    et = orig_t.element
+    assert isinstance(et, AbstractScalar)
+    et = et.xtype()
+    assert issubclass(et, xtype.Number)
+    arg = orig_t.xtype().to_numpy(arg)
+    arg_dtype = xtype.np_dtype_to_type(str(arg.dtype))
+    if arg_dtype != et:
+        raise MyiaInputTypeError(
+            f"Expected array of type {et}, but got {arg_dtype}."
+        )
+    shp = orig_t.xshape()
+    if (shp is not ANYTHING and arg.shape != shp):
+        raise MyiaInputTypeError(
+            f"Expected array with shape {shp}, but got {arg.shape}."
+        )
+    return arg
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractUnion):
+    for opt in orig_t.options:
+        try:
+            value = self(arg, opt)
+            tag = type_to_tag(opt)
+        except TypeError:
+            continue
+        return TaggedValue(tag, value)
+    else:
+        opts = ", ".join(map(str, orig_t.options))
+        raise MyiaInputTypeError(f'Expected one of {opts}, not {arg}')
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractScalar):
+    if not typecheck(orig_t, from_value(arg)):
+        raise MyiaInputTypeError(
+            f'Scalar has wrong type: expected {orig_t}, got {arg}'
+        )
+    if issubclass(orig_t.xtype(), xtype.String):
+        arg = str_to_tag(arg)
+    return arg
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractType):
+    return _reabs(arg)
+
+
+#####################
+# Convert to output #
+#####################
+
+
+@overload(bootstrap=True)
+def from_canonical(self, res, orig_t: AbstractClassBase):
+    if orig_t.tag in (Empty, Cons):
+        rval = []
+        while res:
+            value = self(res[0], orig_t.attributes['head'])
+            rval.append(value)
+            res = res[1].value
+        return rval
+    tup = tuple(self(x, o) for x, o in zip(res, orig_t.attributes.values()))
+    return orig_t.constructor(*tup)
+
+
+@overload  # noqa: F811
+def from_canonical(self, res, orig_t: AbstractDict):
+    tup = tuple(self(x, o) for x, o in zip(res, orig_t.entries.values()))
+    return dict(zip(orig_t.entries.keys(), tup))
+
+
+@overload  # noqa: F811
+def from_canonical(self, res, orig_t: AbstractTuple):
+    return tuple(self(x, o) for x, o in zip(res, orig_t.elements))
+
+
+@overload  # noqa: F811
+def from_canonical(self, arg, orig_t: AbstractScalar):
+    if orig_t.xtype() == xtype.String:
+        arg = _strmap_tag[arg]
+    return arg
+
+
+@overload  # noqa: F811
+def from_canonical(self, arg, orig_t: AbstractArray):
+    return orig_t.xtype().from_numpy(arg)
+
+
+@overload  # noqa: F811
+def from_canonical(self, arg, orig_t: AbstractUnion):
+    for typ in orig_t.options:
+        tag = type_to_tag(typ)
+        if tag == arg.tag:
+            return self(arg.value, typ)
+    else:
+        raise AssertionError(f'Badly formed TaggedValue')

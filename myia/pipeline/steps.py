@@ -5,22 +5,7 @@ The steps are listed in roughly the same order they should be called.
 
 from itertools import count
 
-import numpy as np
-
-from .. import xtype
-from ..abstract import (
-    ANYTHING,
-    AbstractArray,
-    AbstractClassBase,
-    AbstractDict,
-    AbstractScalar,
-    AbstractTaggedUnion,
-    AbstractTuple,
-    AbstractUnion,
-    empty,
-    find_aliases,
-    typecheck,
-)
+from ..abstract import AbstractTuple, find_aliases
 from ..cconv import closure_convert
 from ..compile import BackendValue
 from ..ir import Graph
@@ -30,21 +15,9 @@ from ..opt import (
     LocalPassOptimizer,
     NodeMap,
     lib as optlib,
-    simplify_types,
-    str_to_tag,
-    type_to_tag,
 )
-from ..opt.clean import _strmap_tag
-from ..utils import (
-    Cons,
-    Empty,
-    MyiaInputTypeError,
-    Partializable,
-    TaggedValue,
-    overload,
-    overload_wrapper,
-    tracer,
-)
+from ..simplify_types import from_canonical, simplify_types, to_canonical
+from ..utils import MyiaInputTypeError, Partializable, tracer
 from ..validate import validate
 
 #############
@@ -441,195 +414,6 @@ class SlowdownWarning(UserWarning):
 #####################################
 
 
-@overload_wrapper(bootstrap=True)
-def convert_arg(fn, self, arg, orig_t):
-    if isinstance(arg, BackendValue):
-        if not typecheck(orig_t, arg.orig_t):
-            raise MyiaInputTypeError("Bad type for backend value.")
-        return arg
-    return fn(self, arg, orig_t)
-
-
-@overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractTuple):
-    if not isinstance(arg, tuple):
-        raise MyiaInputTypeError('Expected tuple')
-    oe = orig_t.elements
-    if len(arg) != len(oe):
-        raise MyiaInputTypeError(f'Expected {len(oe)} elements')
-    return tuple(self(x, o) for x, o in zip(arg, oe))
-
-
-@overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractDict):
-    if not isinstance(arg, dict):
-        raise MyiaInputTypeError('Expected dict')
-    types = orig_t.entries
-    if len(arg) != len(types):
-        raise MyiaInputTypeError(
-            "Dictionary input doesn't have the expected size"
-        )
-    if set(arg.keys()) != set(types.keys()):
-        raise MyiaInputTypeError("Mismatched keys for input dictionary.")
-    return tuple(self(arg[k], o) for k, o in orig_t.entries.items())
-
-
-@overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractClassBase):
-    if orig_t.tag is Empty:
-        if arg != []:
-            raise MyiaInputTypeError(f'Expected empty list')
-        return ()
-    elif orig_t.tag is Cons:
-        if arg == []:
-            raise MyiaInputTypeError(f'Expected non-empty list')
-        if not isinstance(arg, list):
-            raise MyiaInputTypeError(f'Expected list')
-        ot = orig_t.attributes['head']
-        li = list(self(x, ot) for x in arg)
-        rval = TaggedValue(type_to_tag(empty), ())
-        for elem in reversed(li):
-            rval = TaggedValue(type_to_tag(orig_t), (elem, rval))
-        return rval.value
-    else:
-        if not isinstance(arg, orig_t.tag):
-            raise MyiaInputTypeError(f'Expected {orig_t.tag.__qualname__}')
-        arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
-        oe = list(orig_t.attributes.values())
-        res = tuple(self(x, o) for x, o in zip(arg, oe))
-        return res
-
-
-@overload
-def convert_arg_array(arg, t: xtype.NDArray, et, orig_t):
-    if not isinstance(arg, np.ndarray):
-        raise MyiaInputTypeError(f"Expected numpy.ndarray but got {arg}.")
-    return arg
-
-
-@overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractArray):
-    et = orig_t.element
-    assert isinstance(et, AbstractScalar)
-    et = et.xtype()
-    assert issubclass(et, xtype.Number)
-    t = orig_t.xtype()
-    arg = convert_arg_array[t](arg, t, et, orig_t)
-    arg_dtype = xtype.np_dtype_to_type(str(arg.dtype))
-    if arg_dtype != et:
-        raise MyiaInputTypeError(
-            f"Expected array of type {et}, but got {arg_dtype}."
-        )
-    shp = orig_t.xshape()
-    if (shp is not ANYTHING and arg.shape != shp):
-        raise MyiaInputTypeError(
-            f"Expected array with shape {shp}, but got {arg.shape}."
-        )
-    return arg
-
-
-@overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractUnion):
-    for opt in orig_t.options:
-        try:
-            value = self(arg, opt)
-            tag = type_to_tag(opt)
-        except TypeError:
-            continue
-        return TaggedValue(tag, value)
-    else:
-        opts = ", ".join(map(str, orig_t.options))
-        raise MyiaInputTypeError(f'Expected one of {opts}, not {arg}')
-
-
-@overload  # noqa: F811
-def convert_arg(self, arg, orig_t: AbstractScalar):
-    t = orig_t.xtype()
-    if issubclass(t, xtype.Int):
-        if not isinstance(arg, (int, np.integer)):
-            raise MyiaInputTypeError(f'Expected int')
-    elif issubclass(t, xtype.Float):
-        if not isinstance(arg, (float, np.floating)):
-            raise MyiaInputTypeError(f'Expected float')
-    elif issubclass(t, xtype.Bool):
-        if not isinstance(arg, bool):
-            raise MyiaInputTypeError(f'Expected bool')
-    elif issubclass(t, xtype.Nil):
-        if arg is not None:
-            raise MyiaInputTypeError(f'Expected None')
-    elif issubclass(t, xtype.String):
-        if not isinstance(arg, str):
-            raise MyiaInputTypeError(f'Expected string')
-    else:
-        raise MyiaInputTypeError(f'Invalid type: {t}')
-    expected_value = orig_t.xvalue()
-    if expected_value is not ANYTHING and expected_value != arg:
-        raise MyiaInputTypeError(f'Invalid value: {arg}')
-    if issubclass(t, xtype.String):
-        arg = str_to_tag(arg)
-    return arg
-
-
-@overload(bootstrap=True)
-def convert_result(self, res, orig_t, vm_t: AbstractTuple):
-    # If the EraseClass opt was applied, orig_t may be Class
-    orig_is_class = isinstance(orig_t, AbstractClassBase)
-    if orig_is_class:
-        if orig_t.tag in (Empty, Cons):
-            rval = []
-            while res:
-                value = self(res[0], orig_t.attributes['head'],
-                             vm_t.elements[0])
-                rval.append(value)
-                res = res[1].value
-            return rval
-    orig_is_dict = isinstance(orig_t, AbstractDict)
-    if orig_is_class:
-        oe = orig_t.attributes.values()
-    elif orig_is_dict:
-        oe = orig_t.entries.values()
-    else:
-        oe = orig_t.elements
-    ve = vm_t.elements
-    tup = tuple(self(x, o, v)
-                for x, o, v in zip(res, oe, ve))
-    if orig_is_class:
-        return orig_t.constructor(*tup)
-    elif orig_is_dict:
-        return dict(zip(orig_t.entries.keys(), tup))
-    else:
-        return tup
-
-
-@overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractScalar):
-    if orig_t.xtype() == xtype.String:
-        arg = _strmap_tag[arg]
-    return arg
-
-
-@overload
-def convert_result_array(arg, orig_t: xtype.NDArray):
-    return arg
-
-
-@overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractArray):
-    t = orig_t.xtype()
-    return convert_result_array[t](arg, t)
-
-
-@overload  # noqa: F811
-def convert_result(self, arg, orig_t, vm_t: AbstractTaggedUnion):
-    assert isinstance(orig_t, AbstractUnion)
-    for typ in orig_t.options:
-        tag = type_to_tag(typ)
-        if tag == arg.tag:
-            return self(arg.value, typ, vm_t.options.get(tag))
-    else:
-        raise AssertionError(f'Badly formed TaggedValue')
-
-
 def step_wrap(resources,
               graph,
               output,
@@ -674,7 +458,7 @@ def step_wrap(resources,
         backend = resources.backend.backend
         if len(args) != len(orig_arg_t):
             raise MyiaInputTypeError('Wrong number of arguments.')
-        args = tuple(backend.to_backend_value(convert_arg(arg, ot), vt)
+        args = tuple(backend.to_backend_value(to_canonical(arg, ot), vt)
                      for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
         res = fn(*args)
         if resources.return_backend:
@@ -686,7 +470,7 @@ def step_wrap(resources,
                 res = BackendValue(res, orig_out_t, vm_out_t, backend)
         else:
             res = backend.from_backend_value(res, vm_out_t)
-            res = convert_result(res, orig_out_t, vm_out_t)
+            res = from_canonical(res, orig_out_t)
         return res
 
     return {'output': wrapped}

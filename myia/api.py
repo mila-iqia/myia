@@ -6,7 +6,7 @@ from .abstract import find_aliases, from_value
 from .compile.backends import Backend, load_backend
 from .compile.utils import BackendValue
 from .pipeline import standard_pipeline
-from .pipeline.steps import convert_arg
+from .simplify_types import to_canonical
 from .utils import MyiaInputTypeError, MyiaTypeError, keyword_decorator
 
 #################
@@ -128,7 +128,7 @@ def to_device(value, backend, backend_options=None, *, orig_t=None, vm_t=None):
         backend = load_backend(backend, backend_options)
     if orig_t is None:
         orig_t = from_value(value, broaden=True)
-    value = convert_arg(value, orig_t)
+    value = to_canonical(value, orig_t)
     if vm_t is None:
         vm_t = from_value(value, broaden=True)
     value = backend.to_backend_value(value, vm_t)

@@ -8,10 +8,10 @@ from myia.pipeline import (
     scalar_debug_compile as compile,
     scalar_parse as parse,
 )
-from myia.pipeline.steps import convert_arg, convert_result
 from myia.prim.py_implementations import tuple_getitem
-from myia.utils import InferenceError, TaggedValue, newenv
-from myia.xtype import Bool, EnvType
+from myia.simplify_types import from_canonical, to_canonical
+from myia.utils import InferenceError, TaggedValue
+from myia.xtype import Bool
 
 from .common import (
     D,
@@ -90,10 +90,10 @@ def test_myia_dict_field():
     assert v == 2
 
 
-def test_convert_arg():
+def test_to_canonical():
 
     def _convert(data, typ):
-        return convert_arg(data, to_abstract_test(typ))
+        return to_canonical(data, to_abstract_test(typ))
 
     # Leaves
 
@@ -106,8 +106,6 @@ def test_convert_arg():
         _convert([], [f64])
     with pytest.raises(TypeError):
         _convert([1, 2], [])
-    with pytest.raises(TypeError):
-        _convert(newenv, EnvType)
 
     # Class -> Tuple conversion
 
@@ -178,27 +176,24 @@ def test_convert_arg():
         _convert(v, f64)
 
 
-def test_convert_result():
+def test_from_canonical():
 
-    def _convert(data, typ1, typ2):
-        return convert_result(data,
-                              to_abstract_test(typ1),
-                              to_abstract_test(typ2))
+    def _convert(data, typ):
+        return from_canonical(data, to_abstract_test(typ))
 
     # Leaves
 
-    assert _convert(True, Bool, Bool) is True
-    assert _convert(False, Bool, Bool) is False
-    assert _convert(10, i64, i64) == 10
-    assert _convert(1.5, f64, f64) == 1.5
+    assert _convert(True, Bool) is True
+    assert _convert(False, Bool) is False
+    assert _convert(10, i64) == 10
+    assert _convert(1.5, f64) == 1.5
 
     # Tuple -> Class conversion
 
     pt = Point(1, 2)
-    assert _convert((1, 2), Point(i64, i64), (i64, i64)) == pt
+    assert _convert((1, 2), Point(i64, i64)) == pt
     assert _convert(((1, 2), (1, 2)),
-                    (Point(i64, i64), Point(i64, i64)),
-                    ((i64, i64), (i64, i64))) == \
+                    (Point(i64, i64), Point(i64, i64))) == \
         (pt, pt)
 
 
