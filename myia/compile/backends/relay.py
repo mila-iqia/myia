@@ -189,6 +189,12 @@ def relay_array_reduce(c, fn, array, shape):
         raise NotImplementedError(f"reduce with {fn}")
 
 
+def relay_tuple_getitem(c, t, idx):
+    """Implementation of tuple_getitem for Relay."""
+    assert idx.is_constant(int)
+    return relay.expr.TupleGetItem(c.ref(t), idx.value)
+
+
 COMPLEX_MAP = {
     P.partial: relay_partial,
     P.distribute: relay_distribute,
@@ -197,6 +203,7 @@ COMPLEX_MAP = {
     P.array_map: relay_array_map,
     P.array_reduce: relay_array_reduce,
     P.scalar_to_array: lambda c, x, t: c.ref(x),
+    P.tuple_getitem: relay_tuple_getitem,
 }
 
 
