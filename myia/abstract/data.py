@@ -273,13 +273,13 @@ class AbstractValue(Interned, PossiblyRecursive):
         self.values = TrackDict(values)
 
     def _serialize(self):
-        return self.values
+        return dict(self.values)
 
     @classmethod
     def _construct(cls):
         obj = cls.empty()
         data = yield obj
-        obj.values = data
+        obj.values = TrackDict(data)
         obj._incomplete = False
 
     def xtype(self):

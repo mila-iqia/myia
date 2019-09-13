@@ -12,9 +12,11 @@ from ..utils import Named, register_serialize
 
 class Primitive(Named):
     """Base class for primitives."""
+
     def __init__(self, name):
+        """Initialize are register for serialization."""
         super().__init__(name)
-        register_serialize(f'prim-{name}', self)
+        register_serialize(self, f'prim-{name}')
 
 
 ##############
