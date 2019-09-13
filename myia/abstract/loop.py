@@ -197,6 +197,10 @@ class Pending(asyncio.Future):
         """
         return False
 
+    def _serialize_replace(self):
+        assert self.done()
+        return self.result()
+
     def force_resolve(self):
         """Force a resolution."""
         self.set_result(self._resolve())

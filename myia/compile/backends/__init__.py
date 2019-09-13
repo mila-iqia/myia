@@ -1,11 +1,13 @@
 """Compilation backends."""
 
-import importlib
 import os
 import urllib
+import weakref
 
 from ... import abstract, xtype
 from ...utils import TaggedValue
+from ..channel import RPCProcess, handle
+from ..transform import convert_grad
 
 
 class UnknownBackend(Exception):
@@ -20,26 +22,43 @@ class LoadingError(Exception):
     """
 
 
-def import_load(pkg, name):
+def channel_loader(pkg, name):
     """Helper function for simple backends.
 
     This will return a callable that will load a module, retrieve a
     object from its namespace and return that.
 
     """
-    def loader():
-        mod = importlib.import_module(pkg)
-        return getattr(mod, name)
+    def loader(init_args):
+        proc = RPCProcess(pkg, name, init_args)
+        return ChannelBackend(proc)
     return loader
 
 
+def relay_nnvm_defaults(target='cpu', device_id=0):
+    """Format options for nnvm/relay."""
+    return dict(target=target, device_id=device_id)
+
+
+def pytorch_default(device='cpu:0'):
+    """Format options for pytorch."""
+    if device == 'cuda':
+        device = 'cuda:0'
+    if device == 'cpu':
+        device = 'cpu:0'
+    return dict(device=device)
+
+
 _backends = {
-    'nnvm': import_load('myia.compile.backends.nnvm', 'NNVMBackend'),
-    'relay': import_load('myia.compile.backends.relay', 'RelayBackend'),
-    'pytorch': import_load('myia.compile.backends.pytorch', 'PyTorchBackend'),
+    'nnvm': (channel_loader('myia.compile.backends.nnvm', 'NNVMBackendR'),
+             relay_nnvm_defaults),
+    'relay': (channel_loader('myia.compile.backends.relay', 'RelayBackendR'),
+              relay_nnvm_defaults),
+    'pytorch': (channel_loader('myia.compile.backends.pytorch',
+                               'PyTorchBackendR'), pytorch_default)
 }
 
-_active_backends = {}
+_active_backends = weakref.WeakValueDictionary()
 
 
 def get_default():
@@ -104,33 +123,42 @@ def load_backend(name, options=None):
         options = {}
     if name not in _backends:
         raise UnknownBackend(name)
+    options = _backends[name][1](**options)
     key = (name, tuple(sorted(list(options.items()))))
     res = _active_backends.get(key, None)
     if res is None:
         try:
-            res = _backends[name]()(**options)
+            res = _backends[name][0](options)
             _active_backends[key] = res
         except Exception as e:
             raise LoadingError(name) from e
     return res
 
 
-def register_backend(name, load_fn):
+def register_backend(name, load_fn, defaults_fn):
     """Register a new backend.
 
     This is to allow third party libraries to register their own
     backends if loaded by the user.  Built-in backends are
     preregistered.
 
+    Arguments:
+        load_fn: function that will load the backend.  This must
+                 return a callable that will take keyword arguemnts
+                 for options.
+        defaults_fn: function that takes the same default arguments as
+                     load_fn and maps them to canonical and/or default
+                     values.
+
     """
     assert name not in _backends
-    _backends[name] = load_fn
+    _backends[name] = (load_fn, defaults_fn)
 
 
 class Backend:
     """This is a class interface that all backends must implement."""
 
-    def compile(self, graph, argspec, outspec, pipeline):
+    def compile(self, graph, argspec, outspec):
         """Compile the group of graphs rooted at `graph`.
 
         This function takes in a fully typed graph cluster rooted at
@@ -139,8 +167,20 @@ class Backend:
         """
         raise NotImplementedError('compile')
 
-    def from_numpy(self, a):
-        """Convert a numpy ndarray to a backend value."""
+    def from_backend_value(self, v, t):
+        """Convert a backend value to an intermediate value."""
+        raise NotImplementedError('from_backend_value')
+
+    def to_backend_value(self, v, t):
+        """Convert an intermediate value to a backend value."""
+        raise NotImplementedError('to_backend_value')
+
+
+class ConcreteBackend(Backend):
+    """This is a collection of helpers to define a backend."""
+
+    def from_numpy(self, v):
+        """Convert a numpy.ndarray to a backend value."""
         raise NotImplementedError("from_numpy")
 
     def to_numpy(self, v):
@@ -180,10 +220,6 @@ class Backend:
 
     def to_backend_value(self, v, t):
         """Convert an intermediate value to a backend value."""
-        from ..utils import BackendValue
-        if isinstance(v, BackendValue):
-            assert v.backend is self
-            return v.value
         if (isinstance(t, (abstract.AbstractError, abstract.AbstractType))
                 or v is abstract.DEAD):
             return None
@@ -197,7 +233,7 @@ class Backend:
                 assert len(v._contents) == 0
                 return self.empty_env()
             else:
-                raise NotImplementedError(f'from_value for {t}')
+                raise NotImplementedError(f'to_backend_value for {t}')
         elif isinstance(t, abstract.AbstractTuple):
             return tuple(self.to_backend_value(v, t)
                          for v, t in zip(v, t.elements))
@@ -205,4 +241,51 @@ class Backend:
             real_t = t.options.get(v.tag)
             return TaggedValue(v.tag, self.to_backend_value(v.value, real_t))
         else:
-            raise NotImplementedError(f'from_value for {t}')
+            raise NotImplementedError(f'to_backend_value for {t}')
+
+
+def _close_and_wait(stream):
+    stream.close()
+    os.waitpid(-1, 0)
+
+
+class ChannelBackend(Backend):
+    """Backend based on a channel to another process."""
+
+    def __init__(self, proc):
+        """Remote."""
+        self.proc = proc
+        weakref.finalize(proc, _close_and_wait, proc.proc.stdin)
+
+    def compile(self, graph, argspec, outspec):
+        """Remote."""
+        graph = convert_grad(graph)
+        return self.proc.call_method('compile', graph, argspec, outspec)
+
+    def from_backend_value(self, v, t):
+        """Remote."""
+        return self.proc.call_method('from_backend_value', v, t)
+
+    def to_backend_value(self, v, t):
+        """Remote."""
+        return self.proc.call_method('to_backend_value', v, t)
+
+
+class HandleBackend(Backend):
+    """Proxy for remote process backend."""
+
+    def __init__(self, real):
+        """Set the proxied backend."""
+        self.real = real
+
+    def compile(self, graph, argspec, outspec):
+        """Proxy."""
+        return handle(self.real.compile(graph, argspec, outspec))
+
+    def from_backend_value(self, v, t):
+        """Remote."""
+        return self.real.from_backend_value(v, t)
+
+    def to_backend_value(self, v, t):
+        """Remote."""
+        return handle(self.real.to_backend_value(v, t))

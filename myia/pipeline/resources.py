@@ -386,7 +386,7 @@ class BackendResource(Partializable):
 
     def compile(self, graph, argspec, outspec):
         """Compile the graph."""
-        return self.backend.compile(graph, argspec, outspec, self.resources)
+        return self.backend.compile(graph, argspec, outspec)
 
 
 class DebugVMResource(Partializable):

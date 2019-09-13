@@ -44,14 +44,13 @@ def backend_opt(request):
 class BackendOption:
     def __init__(self, backend, backend_options):
         try:
-            load_backend(backend)
+            self.backend = load_backend(backend, backend_options)
         except LoadingError as e:
             pytest.skip(f"Can't load {backend}: {e.__cause__}")
         self.pip = standard_pipeline.configure({
             'resources.backend.name': backend,
             'resources.backend.options': backend_options
         }).make()
-        self.backend = load_backend(backend, backend_options)
 
     def convert_args(self, args):
         return tuple(to_device(arg, self.backend) for arg in args)
@@ -114,10 +113,13 @@ def test_backend_error():
     from myia.compile.backends import _backends, register_backend
     name = '__testing_name000_'
 
+    def format():
+        return {}
+
     def f():
         raise ValueError('test')
 
-    register_backend(name, f)
+    register_backend(name, f, format)
 
     with pytest.raises(LoadingError):
         load_backend(name)

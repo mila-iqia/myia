@@ -8,7 +8,6 @@ from functools import reduce
 import numpy as np
 
 from .. import operations, xtype
-from ..compile import BackendValue
 from ..info import About
 from ..ir import Graph, MetaGraph
 from ..prim import Primitive, ops as P
@@ -576,11 +575,6 @@ def to_abstract(self, v: np.ndarray, alias_map={}, **kwargs):
         }),
         tracks
     )
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: BackendValue, **kwargs):
-    return v.orig_t
 
 
 @overload  # noqa: F811

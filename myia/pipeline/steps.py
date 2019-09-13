@@ -405,13 +405,18 @@ def step_compile(resources, graph, argspec, outspec):
     return {'output': out}
 
 
-class SlowdownWarning(UserWarning):
-    """Used to indicate a potential slowdown source."""
-
-
 #####################################
 # Converts args while running model #
 #####################################
+
+
+def _to_backend(arg, backend, vt):
+    if isinstance(arg, BackendValue):
+        if arg.backend is not backend:
+            raise ValueError("Value from wrong backend")  # pragma: no cover
+        return arg.value
+    else:
+        return backend.to_backend_value(arg, vt)
 
 
 def step_wrap(resources,
@@ -458,7 +463,7 @@ def step_wrap(resources,
         backend = resources.backend.backend
         if len(args) != len(orig_arg_t):
             raise MyiaInputTypeError('Wrong number of arguments.')
-        args = tuple(backend.to_backend_value(to_canonical(arg, ot), vt)
+        args = tuple(_to_backend(to_canonical(arg, ot), backend, vt)
                      for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
         res = fn(*args)
         if resources.return_backend:

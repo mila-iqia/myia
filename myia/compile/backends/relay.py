@@ -9,7 +9,7 @@ from ...abstract import (
     AbstractFunction,
     AbstractScalar,
     AbstractTuple,
-    GraphFunction,
+    AbstractType,
     PartialApplication,
     TypedPrimitive,
     VirtualFunction,
@@ -19,8 +19,15 @@ from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...utils import overload
 from ...xtype import Bool, Nil, type_to_np_dtype
-from . import Backend
+from ..transform import wrap_result
+from . import ConcreteBackend, HandleBackend
 from .relay_helpers import build_module, optimize
+
+
+@wrap_result.register
+def wrap_result(self, data: relay.backend.interpreter.TupleValue):
+    """Wrap tuples from relay."""
+    return tuple(self(d) for d in data)
 
 
 @overload(bootstrap=True)
@@ -64,11 +71,6 @@ def to_relay_type(self, a: (VirtualFunction, TypedPrimitive)):
 def to_relay_type(self, a: PartialApplication):
     tp = self(a.fn)
     return relay.ty.FuncType(tp.arg_types[len(a.args):], tp.ret_type)
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: GraphFunction):
-    return self(a.graph.abstract)
 
 
 @overload  # noqa: F811
@@ -269,7 +271,11 @@ class CompileGraph:
         module.entry_func = module.get_global_var(graph.debug.debug_name)
 
         exec = relay.create_executor(mod=module, ctx=context, target=target)
-        return exec.evaluate(module.entry_func)
+        res = exec.evaluate(module.entry_func)
+
+        def f(*args, **kwargs):
+            return wrap_result(res(*args, **kwargs))
+        return f
 
     def on_parameter(self, node):
         """Convert a parameter node."""
@@ -293,6 +299,8 @@ class CompileGraph:
             if isinstance(type, AbstractTuple):
                 return relay.Tuple([_helper(e, et) for e, et in
                                     zip(value, type.elements)])
+            elif isinstance(type, AbstractType):
+                return value
             else:
                 dtype = type_to_np_dtype(type.xtype())
                 return relay.const(value, dtype=dtype)
@@ -341,7 +349,7 @@ class CompileGraph:
 compiler = CompileGraph()
 
 
-class RelayBackend(Backend):
+class RelayBackend(ConcreteBackend):
     """Backend based on Relay.
 
     Backend options:
@@ -349,7 +357,7 @@ class RelayBackend(Backend):
         device_id: the target device identifier (an int)
     """
 
-    def __init__(self, target='cpu', device_id=0):
+    def __init__(self, target, device_id):
         """Create a Relay backend for the given device."""
         device_id = int(device_id)
         self.context = tvm.ndarray.context(target, device_id)
@@ -361,7 +369,7 @@ class RelayBackend(Backend):
                                f"'{target}' on device {device_id}")
         self.compiler = compiler
 
-    def compile(self, graph, argspec, outspec, resources):
+    def compile(self, graph, argspec, outspec):
         """Compiler a graph."""
         return self.compiler.run(graph, self.context, self.target)
 
@@ -375,7 +383,7 @@ class RelayBackend(Backend):
 
     def to_scalar(self, v):
         """Convert the TVM array to a scalar."""
-        if isinstance(v, relay.backend.interpreter.TupleValue):
+        if isinstance(v, (relay.backend.interpreter.TupleValue, tuple)):
             assert len(v) == 0
             return None
         else:
@@ -387,3 +395,8 @@ class RelayBackend(Backend):
             return ()
         dt = type_to_np_dtype(t)
         return self.from_numpy(np.array(s, dtype=dt, copy=False))
+
+
+def RelayBackendR(target, device_id):
+    """Relay proxy."""
+    return HandleBackend(RelayBackend(target, device_id))

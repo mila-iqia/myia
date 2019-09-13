@@ -3,10 +3,11 @@
 import numpy as np
 import torch
 
+from ...ir import manage
 from ...prim import Primitive, ops as P
 from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ..transform import CompileGraphs, nonlinear_ops
-from . import Backend
+from . import ConcreteBackend, HandleBackend
 from .pytorch_conv_grad import conv2d_input, conv2d_weight
 
 _type_map = {
@@ -94,6 +95,17 @@ scalar_mapping = {
     P.bool_eq: torch.eq,
     P.bool_not: lambda a: ~a,
 }
+
+
+def pytorch_scalar_cast(op):
+    """Implementation of scalar_cast."""
+    v = op.inputs[1]
+    assert op.inputs[2].is_constant()
+    dtype = type_to_np_dtype(op.inputs[2].value)
+
+    def _impl(v):
+        return (v.astype(dtype),)
+    return _impl, (v,)
 
 
 def pytorch_array_map(op):
@@ -202,7 +214,7 @@ _mapping = {
     P.conv2d: pytorch_conv2d,
     P.conv2d_input_grad: pytorch_conv2d_input_grad,
     P.conv2d_weight_grad: pytorch_conv2d_weight_grad,
-
+    P.scalar_cast: pytorch_scalar_cast,
 }
 
 for k, v in simple_mapping.items():
@@ -229,7 +241,7 @@ def pytorch_convert(lst, backend):
     return impl, inputs, [op]
 
 
-class PyTorchBackend(Backend):
+class PyTorchBackend(ConcreteBackend):
     """Backend to run using pytorch.
 
     Backend options:
@@ -237,16 +249,15 @@ class PyTorchBackend(Backend):
 
     """
 
-    def __init__(self, device='cpu'):
+    def __init__(self, device):
         """Create a PyTorch backend on the given device."""
-        if device == 'cuda':
-            device = 'cuda:0'
         self.device = torch.device(device)
         self.compiler = CompileGraphs(lambda lst: pytorch_convert(lst, self),
                                       nonlinear_ops, self, split_linear=True)
 
     def compile(self, graph, *others):
         """Compile a graph."""
+        manage(graph)
         return self.compiler.compile_and_link(graph)
 
     def to_numpy(self, v):
@@ -272,3 +283,8 @@ class PyTorchBackend(Backend):
             return None
         dt = type_to_np_dtype(t)
         return np.asarray(s, dtype=dt)
+
+
+def PyTorchBackendR(device):
+    """Pytorch proxy."""
+    return HandleBackend(PyTorchBackend(device))

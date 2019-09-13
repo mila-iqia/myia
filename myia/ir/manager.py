@@ -1,6 +1,5 @@
 """Managing graph modification and information about graphs."""
 
-
 from collections import Counter, defaultdict
 
 from ..graph_utils import EXCLUDE, FOLLOW, dfs

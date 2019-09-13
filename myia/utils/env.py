@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .overload import overload
+from .serialize import serializable
 
 
 def require_same(fns, objs):
@@ -58,6 +59,7 @@ def _add(self, x: object, y):
     return x + y
 
 
+@serializable('Env')
 class EnvInstance:
     """Environment mapping keys to values.
 
@@ -68,6 +70,15 @@ class EnvInstance:
     def __init__(self, _contents={}):
         """Initialize a EnvType."""
         self._contents = dict(_contents)
+
+    def _serialize(self):
+        return self._contents
+
+    @classmethod
+    def _construct(cls):
+        res = cls([])
+        data = yield res
+        res._contents.update(data)
 
     def get(self, key, default):
         """Get the sensitivity list for the given key."""

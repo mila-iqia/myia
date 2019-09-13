@@ -86,7 +86,8 @@ class FinalVM:
 
     def __call__(self, *args):
         """Shortcut to eval()."""
-        return self.eval(args)
+        from .transform import wrap_result
+        return wrap_result(self.eval(args))
 
     def eval(self, args):
         """Evalute the code for this vm with the passed-in arguments."""
@@ -290,6 +291,11 @@ class FinalVM:
            type: the type to static cast to (ignored)
         """
         self._push(self._ref(x))
+
+    def inst_scalar_cast(self, x, type):
+        """Cast a scalar."""
+        v = self.backend.to_scalar(self._ref(x))
+        self._push(self.backend.from_scalar(v, type))
 
     def inst_env_getitem(self, env, idx, default):
         """Get an item from a grad environment."""

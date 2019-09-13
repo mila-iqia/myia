@@ -26,6 +26,8 @@ from ..utils import (
     OrderedSet,
     PossiblyRecursive,
     keyword_decorator,
+    register_serialize,
+    serializable,
 )
 from .loop import Pending
 from .ref import Context, Reference
@@ -35,12 +37,14 @@ ABSENT = Named('ABSENT')
 
 # Represents an unknown value
 ANYTHING = Named('ANYTHING')
+register_serialize(ANYTHING, 'Anything')
 
 # Represents inference problems
 VOID = Named('VOID')
 
 # Represents specialization problems
 DEAD = Named('DEAD')
+register_serialize(DEAD, 'DEAD')
 POLY = Named('POLY')
 
 
@@ -49,6 +53,7 @@ POLY = Named('POLY')
 #####################
 
 
+@serializable('Possibilities', sequence=True)
 class Possibilities(list):
     """Represents a set of possible values.
 
@@ -65,10 +70,20 @@ class Possibilities(list):
         # list is different.
         super().__init__(OrderedSet(options))
 
+    def _serialize(self):
+        return self
+
+    @classmethod
+    def _construct(cls):
+        p = Possibilities([])
+        data = yield p
+        p[:] = data
+
     def __hash__(self):
         return hash(tuple(self))
 
 
+@serializable('TaggedPossibilities', sequence=True)
 class TaggedPossibilities(list):
     """Represents a set of possible tag/type combos.
 
@@ -80,6 +95,15 @@ class TaggedPossibilities(list):
         """Initialize TaggedPossibilities."""
         opts = [[tag, typ] for tag, typ in sorted(set(map(tuple, options)))]
         super().__init__(opts)
+
+    def _serialize(self):
+        return self
+
+    @classmethod
+    def _construct(cls):
+        res = cls([])
+        data = yield res
+        res[:] = data
 
     def get(self, tag):
         """Get the type associated to the tag."""
@@ -112,7 +136,11 @@ class GraphFunction(Function):
     context: Context
     tracking_id: object = None
 
+    def _serialize_replace(self):
+        return self.graph.abstract
 
+
+@serializable('PrimitiveFunction')
 @dataclass(frozen=True)
 class PrimitiveFunction(Function):
     """Represents a Primitive.
@@ -155,6 +183,7 @@ class MacroFunction(Function):
     macro: 'Macro'
 
 
+@serializable('PartialApplication')
 @dataclass(eq=False)
 class PartialApplication(Function):
     """Represents a partial application.
@@ -184,6 +213,7 @@ class JTransformedFunction(Function):
     fn: object
 
 
+@serializable('VirtualFunction')
 @dataclass(frozen=True)
 class VirtualFunction(Function):
     """Represents some function with an explicitly given type signature.
@@ -198,6 +228,7 @@ class VirtualFunction(Function):
     output: 'AbstractValue'
 
 
+@serializable('TypedPrimitive')
 @dataclass(frozen=True)
 class TypedPrimitive(Function):
     """Represents a Primitive with an explicitly given type signature.
@@ -241,6 +272,16 @@ class AbstractValue(Interned, PossiblyRecursive):
         super().__init__()
         self.values = TrackDict(values)
 
+    def _serialize(self):
+        return dict(self.values)
+
+    @classmethod
+    def _construct(cls):
+        obj = cls.empty()
+        data = yield obj
+        obj.values = TrackDict(data)
+        obj._incomplete = False
+
     def xtype(self):
         """Return the type of this AbstractValue."""
         t = self.values.get(TYPE, None)
@@ -263,6 +304,7 @@ class AbstractAtom(AbstractValue):
     """Base class for abstract values that are not structures."""
 
 
+@serializable('AbstractScalar')
 class AbstractScalar(AbstractAtom):
     """Represents a scalar (integer, float, bool, etc.)."""
 
@@ -274,6 +316,7 @@ class AbstractScalar(AbstractAtom):
         return rval
 
 
+@serializable('AbstractType')
 class AbstractType(AbstractAtom):
     """Represents a type as a first class value."""
 
@@ -286,6 +329,7 @@ class AbstractType(AbstractAtom):
         return pretty_join(['Ty(', t, ')'])
 
 
+@serializable('AbstractError')
 class AbstractError(AbstractAtom):
     """This represents some kind of problem in the computation.
 
@@ -305,6 +349,7 @@ class AbstractError(AbstractAtom):
         return f'E({self.values[VALUE]})'
 
 
+@serializable('AbstractBottom')
 class AbstractBottom(AbstractAtom):
     """Represents the type of an expression that does not return."""
 
@@ -331,6 +376,7 @@ class AbstractExternal(AbstractAtom):
         return rval
 
 
+@serializable('AbstractFunction')
 class AbstractFunction(AbstractAtom):
     """Represents a function or set of functions.
 
@@ -414,6 +460,7 @@ class AbstractStructure(AbstractValue):
     """Base class for abstract values that are structures."""
 
 
+@serializable('AbstractTuple')
 class AbstractTuple(AbstractStructure):
     """Represents a tuple of elements."""
 
@@ -423,6 +470,22 @@ class AbstractTuple(AbstractStructure):
         if elements is not ANYTHING:
             elements = list(elements)
         self.elements = elements
+
+    def _serialize(self):
+        data = super()._serialize()
+        data['elements'] = self.elements
+        return data
+
+    @classmethod
+    def _construct(cls):
+        it = super()._construct()
+        res = next(it)
+        data = yield res
+        res.elements = data.pop('elements')
+        try:
+            it.send(data)
+        except StopIteration:
+            pass
 
     def children(self):
         """Return all elements in the tuple."""
@@ -436,6 +499,7 @@ class AbstractTuple(AbstractStructure):
         return pretty_call(ctx, "", self.elements)
 
 
+@serializable('AbstractArray')
 class AbstractArray(AbstractStructure):
     """Represents an array.
 
@@ -453,6 +517,22 @@ class AbstractArray(AbstractStructure):
         """Initialize an AbstractArray."""
         super().__init__(values)
         self.element = element
+
+    def _serialize(self):
+        data = super()._serialize()
+        data['element'] = self.element
+        return data
+
+    @classmethod
+    def _construct(cls):
+        it = super()._construct()
+        res = next(it)
+        data = yield res
+        res.element = data.pop('element')
+        try:
+            it.send(data)
+        except StopIteration:
+            pass
 
     def children(self):
         """Return the array element."""
@@ -614,6 +694,7 @@ class AbstractUnion(AbstractStructure):
         return pretty_call(ctx, "U", self.options)
 
 
+@serializable('AbstractTaggedUnion')
 class AbstractTaggedUnion(AbstractStructure):
     """Represents a tagged union.
 
@@ -629,6 +710,22 @@ class AbstractTaggedUnion(AbstractStructure):
             self.options = options
         else:
             self.options = TaggedPossibilities(options)
+
+    def _serialize(self):
+        data = super()._serialize()
+        data['options'] = self.options
+        return data
+
+    @classmethod
+    def _construct(self):
+        it = super()._construct()
+        res = next(it)
+        data = yield res
+        res.options = data.pop('options')
+        try:
+            it.send(data)
+        except StopIteration:
+            pass
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
@@ -732,10 +829,15 @@ class _AliasIdTrack(Track):
 
 
 VALUE = _ValueTrack('VALUE')
+register_serialize(VALUE, 'VALUE')
 TYPE = _TypeTrack('TYPE')
+register_serialize(TYPE, 'TYPE')
 SHAPE = _ShapeTrack('SHAPE')
+register_serialize(SHAPE, 'SHAPE')
 DATA = _ValueTrack('DATA')
+register_serialize(DATA, 'DATA')
 ALIASID = _AliasIdTrack('ALIASID')
+register_serialize(ALIASID, 'ALIASID')
 
 
 ##########################

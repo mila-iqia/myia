@@ -7,11 +7,16 @@ subclass.
 """
 
 
-from ..utils import Named
+from ..utils import Named, register_serialize
 
 
 class Primitive(Named):
     """Base class for primitives."""
+
+    def __init__(self, name):
+        """Initialize are register for serialization."""
+        super().__init__(name)
+        register_serialize(self, f'prim-{name}')
 
 
 ##############

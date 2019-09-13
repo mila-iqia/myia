@@ -3,7 +3,8 @@
 from ..abstract import to_abstract
 from ..ir import Apply, Constant, Graph, toposort
 from ..prim import Primitive, ops as P
-from ..utils import SymbolicKeyInstance
+from ..utils import SymbolicKeyInstance, overload
+from .channel import handle
 from .vm import FinalVM
 
 
@@ -24,6 +25,11 @@ def convert_grad(graph):
                 counter += 1
             node.value = key_map[node.value]
             node.abstract = to_abstract(node.value)
+        if node.is_constant(Primitive):
+            if node.value is P.env_setitem:
+                node.abstract = None
+            if node.value is P.env_getitem:
+                node.abstract = None
 
     return graph
 
@@ -69,6 +75,21 @@ def wrap_primitives(graph):
                         tr.set_edge(node, key, Constant(g))
 
     return graph
+
+
+@overload(bootstrap=True)
+def wrap_result(self, data: tuple):
+    """Function to wrap final results in a handle.
+
+    This leaves first-level tuples alone so that we support multiple
+    value returns more naturally.
+    """
+    return tuple(self(d) for d in data)
+
+
+@overload  # noqa: F811
+def wrap_result(self, data: object):
+    return handle(data)
 
 
 nonlinear_ops = (
@@ -275,6 +296,10 @@ class CompileGraph:
                         self.add_instr('unsafe_static_cast',
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]))
+                    elif fn.value == P.scalar_cast:
+                        self.add_instr('scalar_cast',
+                                       self.ref(split.inputs[1]),
+                                       split.inputs[2].value)
                     elif fn.value == P.env_getitem:
                         self.add_instr('env_getitem',
                                        self.ref(split.inputs[1]),

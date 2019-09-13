@@ -1,7 +1,7 @@
 """Utility functions for graph compilation and code generation."""
 from dataclasses import dataclass
 
-from ..abstract import AbstractValue
+from ..abstract import AbstractValue, to_abstract
 from .backends import Backend
 
 
@@ -25,6 +25,11 @@ class BackendValue:
             "You attempted to get an attribute on a BackendValue. This is "
             "most likely an error. If you want access to the python object, "
             "call .from_device() on this object.")
+
+
+@to_abstract.register
+def _to_abstract(self, v: BackendValue, **kwargs):
+    return v.orig_t
 
 
 def get_outputs(lst, uses, seen):
