@@ -73,11 +73,6 @@ def to_relay_type(self, a: PartialApplication):
     return relay.ty.FuncType(tp.arg_types[len(a.args):], tp.ret_type)
 
 
-@overload  # noqa: F811
-def to_relay_type(self, a: object):
-    raise ValueError("Unknown type:", a)
-
-
 def ashape(node):
     """Make sure shape isn't None, that makes relay crash later."""
     shp = node.shape

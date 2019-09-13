@@ -3,13 +3,10 @@
 
 import pytest
 
-try:
-    from myia.compile.backends import nnvm
-except ImportError:
-    pytestmark = pytest.mark.skip(f"Can't import nnvm")
+from myia.compile import load_backend
 
 
 @pytest.mark.gpu
 def test_nnvm_backend_bad_device():
-    with pytest.raises(RuntimeError):
-        nnvm.NNVMBackend(target='cuda', device_id=31)
+    with pytest.raises(Exception):
+        load_backend('nnvm', dict(target="cuda", device_id=31))
