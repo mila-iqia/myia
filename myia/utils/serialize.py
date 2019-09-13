@@ -57,7 +57,7 @@ class MyiaLoader(SafeLoader):
         return res
 
     def add_finalizer(self, f):
-        """Regsiter a finalizer to be run when the loading is finished."""
+        """Register a finalizer to be run when the loading is finished."""
         assert callable(f)
         self._finalizers.append(f)
 
