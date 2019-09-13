@@ -68,6 +68,10 @@ class Graph:
         self._manager = None
 
     def _serialize(self):
+        assert self.vararg == False
+        assert self.kwarg == False
+        assert self.defaults == []
+        assert self.kwonly == 0
         return {'parameters': self.parameters,
                 'return': self.return_,
                 'debug': self.debug}

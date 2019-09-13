@@ -7,24 +7,14 @@ subclass.
 """
 
 
-from ..utils import Named, serializable
+from ..utils import Named, register_serialize
 
 
-@serializable('prim', scalar=True)
 class Primitive(Named):
     """Base class for primitives."""
-
-    def _serialize(self):
-        return self.name
-
-    @classmethod
-    def _construct(cls, data):
-        g = globals()
-        p = g.get(data, None)
-        if p is None:
-            p = g[data + '_']
-        assert isinstance(p, Primitive)
-        return p
+    def __init__(self, name):
+        super().__init__(name)
+        register_serialize(f'prim-{name}', self)
 
 
 ##############

@@ -1,6 +1,5 @@
 """Objects and routines to track debug information."""
 
-import threading
 import traceback
 import types
 import weakref
@@ -8,10 +7,6 @@ from contextvars import ContextVar
 from typing import Any, Set
 
 from .utils import serializable
-
-# We use per-thread storage for the about stack.
-_about = threading.local()
-_about.stack = [None]
 
 
 class StackVar:
