@@ -282,14 +282,14 @@ class CompileGraph:
 
         add_functions(self.module, function_map)
 
-        self.module = optimize(self.module)
+        # Maybe make a function that calls the right graph instead?
+        self.module["main"] = self.module[self.graph_map[g]]
 
-        self.module.entry_func = self.module.get_global_var(
-            graph.debug.debug_name)
+        self.module = optimize(self.module)
 
         exec = relay.create_executor(mod=self.module, ctx=context,
                                      target=target)
-        res = exec.evaluate(self.module.entry_func)
+        res = exec.evaluate(self.module["main"])
 
         def f(*args, **kwargs):
             return wrap_result(res(*args, **kwargs))
