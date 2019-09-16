@@ -15,25 +15,155 @@
 #           pytorch original.                                               #
 #############################################################################
 
-from .. import composite as C, xtype as D
-from ..abstract import AbstractArray
+import operator
+from functools import reduce
+
+import torch
+
+from .. import composite as C
+from ..abstract import build_value, macro, myia_static
 from ..hypermap import hyper_map
-from ..ir import MultitypeGraph
+from ..ir import Constant
 from ..prim import ops as P
 from ..utils import core
-
-# This import is for WIP
-# from ..xtype import Bool, Int
-
+from ..xtype import TupleT, f32, i64, u64
+from .pytorch_abstract_types import APT, pytorch_dtype_to_type
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############
 
-# This is a helper function
+
+# HELPER FUNCTIONS ##########################################################
+
+@myia_static
+def _pt_dtype_to_my_dtype(dtype):
+    return pytorch_dtype_to_type(dtype)
+
+
+@macro
+async def _dim_explicit(info):
+    a_shp_abs, dim_abs = [await arg.get() for arg in info.argrefs]
+    a_shp = build_value(a_shp_abs)
+    dim = build_value(dim_abs)
+    if dim == -1:
+        dim = len(a_shp) - 1
+    return Constant(dim)
+
+
+@myia_static
+def _build_rev_tuple(shp):
+    t = ()
+    for d in range(len(shp)):
+        t = t + (d,)
+    return t[::-1]
+
+
+@core
+def all_max(x):
+    """Performs `torch.max` over all dimensions of `input`."""
+    t = _build_rev_tuple(x.shape)
+    for axis in t:
+        x, _ = x.max(axis, False)
+    return x
+
+
+@core
+def _ensure_u64(x):
+    assert (P.hastype(x, i64) or P.hastype(x, u64))
+    assert x >= 0
+    return P.scalar_cast(x, u64)
+
+
 @core
 def _pair(x):
-    if not P.hastype(x, D.TupleT):
+    if not P.hastype(x, TupleT):
         x = (x, x)
+    x = (_ensure_u64(x[0]), x[1])
+    x = (x[0], _ensure_u64(x[1]))
     return x
+
+
+@macro
+async def _shp_squeeze(info):
+    o_shp_abs, dim_abs, keepdim_abs = [await arg.get() for arg in info.argrefs]
+    orig_shp = build_value(o_shp_abs)
+    dim = build_value(dim_abs)
+    keepdim = build_value(keepdim_abs)
+
+    final_shape = ()
+    skip = False
+
+    if keepdim:
+        final_shape = orig_shp
+    else:
+        if dim is not None:
+            if orig_shp[dim] != 1:
+                final_shape = orig_shp
+                skip = True
+        if not skip:
+            new_shape = ()
+            if dim is None:
+                for _x in orig_shp:
+                    if _x != 1:
+                        new_shape = new_shape + (_x,)
+            else:
+                i = 0
+                for _x in orig_shp:
+                    if _x == 1 and dim == i:
+                        new_shape = new_shape
+                    else:
+                        new_shape = new_shape + (_x,)
+                    i = i + 1
+            final_shape = new_shape
+    return Constant(final_shape)
+
+
+@macro
+async def _shp_explicit(info):
+    a_shp_abs, shp_abs = [await arg.get() for arg in info.argrefs]
+    a_shp = build_value(a_shp_abs)
+    shp = build_value(shp_abs)
+
+    def prod(_x):
+        return reduce(operator.mul, _x, 1)
+
+    unk_count = 0
+    for s in shp:
+        if s < -1:
+            e_msg = "New shape cannot contain value less than -1 in reshape"
+            raise ValueError(e_msg)
+        if s == -1:
+            unk_count = unk_count + 1
+
+    if unk_count > 1:
+        e_msg = "New shape can only contain 1 unknown (-1) dim in reshape"
+        raise ValueError(e_msg)
+
+    if (prod(a_shp) % prod(shp) != 0 if unk_count == 1
+            else prod(shp) != prod(a_shp)):
+        e_msg = "Cannot change the total number of elements in reshape"
+        raise ValueError(e_msg)
+
+    known_unk_dim = int(abs(prod(a_shp) / prod(shp)))
+    shp_explicit = ()
+    for s in shp:
+        if s == -1:
+            shp_explicit = shp_explicit + (known_unk_dim, )
+        else:
+            shp_explicit = shp_explicit + (s, )
+
+    return Constant(shp_explicit)
+
+
+# ACTUAL FUNCTIONS ##########################################################
+
+@core
+def argmax(self, dim=None, keepdim=False):
+    """Map of 'argmax' pytorch method."""
+    x = self
+    dim = _dim_explicit(x.shape, dim)
+    ret = P.argmax(x, dim)
+    final_shape = _shp_squeeze(ret.shape, dim, keepdim)
+    return P.reshape(ret, final_shape)
 
 
 @core
@@ -51,10 +181,17 @@ def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
     stride = _pair(stride)
     padding = _pair(padding)
     dilation = _pair(dilation)
+    groups = _ensure_u64(groups)
     ret = P.conv2d(input, weight, stride, padding, dilation, groups)
     if bias is not None:
         ret = ret + bias.reshape((1, bias.shape[0], 1, 1))
     return ret
+
+
+@core
+def gather(self, dim, index):
+    """Map of 'gather' pytorch method."""
+    return P.gather(self, dim, index)
 
 
 @core
@@ -81,9 +218,80 @@ def linear(input, weight, bias=None):
 
 
 @core
+def log_softmax(self, dim=None, dtype=None):
+    """Map of 'log_softmax' pytorch method."""
+    x = self
+    dim = _dim_explicit(x.shape, dim)
+
+    if dtype is not None:
+        x = P.array_cast(x, _pt_dtype_to_my_dtype(dtype))
+
+    maxes = torch.max(x, dim, keepdim=True)[0]
+    lse_stable = torch.log(torch.sum(torch.exp(x - maxes), dim, keepdim=True))
+    return x - maxes - lse_stable
+
+
+@core
 def item(x):
     """Map of 'item' pytorch method."""
     return P.array_to_scalar(x.reshape(()))
+
+
+# TODO 2_array_compare_max also; will probably need multitype graph
+@core
+def _max(self, dim=None, keepdim=False):
+    """Map of 'max' pytorch method."""
+    x = self
+    if dim is None:
+        return all_max(x)
+
+    dim = _dim_explicit(x.shape, dim)
+
+    ret_max = P.array_max(x, dim)
+    ret_argmax = P.argmax(x, dim)
+    final_shape = _shp_squeeze(ret_max.shape, dim, keepdim)
+
+    return (P.reshape(ret_max, final_shape),
+            P.reshape(ret_argmax, final_shape))
+
+
+@core
+def max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode,
+               return_indices):
+    r"""Applies a max_pool2d."""
+    kernel_size = _pair(kernel_size)
+    stride = _pair(stride)
+    padding = _pair(padding)
+    dilation = _pair(dilation)
+
+    ret = P.max_pool2d(input, kernel_size, stride, padding, dilation,
+                       ceil_mode)
+    if not return_indices:
+        ret = ret[0]
+    return ret
+
+
+# TODO:
+# F.nll_loss(input, target, weight=None, size_average=None, ignore_index=-100,
+# reduce=None, reduction='mean')
+# Is current implementation numerically stable?
+# Should not be hardcoded to f32 in scalar_cast,
+# but need dtype attr implementation for xtype.NDArray to get dtype of out.
+@core
+def nll_loss(logs, targets, reduction='mean'):
+    """Map of 'nll_loss' pytorch method."""
+    out = -torch.gather(
+        logs,
+        1,
+        targets.reshape((logs.shape[0], 1))).reshape((logs.shape[0],))
+
+    if reduction == 'none':
+        out = out
+    elif reduction == 'mean':
+        out = torch.sum(out) / P.scalar_cast(logs.shape[0], f32)
+    elif reduction == 'sum':
+        out = torch.sum(out)
+    return out
 
 
 @core
@@ -93,92 +301,118 @@ def relu(x):
 
 
 @core
+def reshape(x, shp):
+    """Reshape that allow unknown dim (-1)."""
+    return P.reshape(x, _shp_explicit(x.shape, shp))
+
+
+@core
 def sigmoid(x):
     """Sigmoid activation function."""
     return (C.tanh(x / 2) + 1) / 2
 
 
-''' # WIP
-squeeze = MultitypeGraph('squeeze')
-
-
-@squeeze.register(APT)
 @core
-def _squeeze(x):
-    """Remove a dim (of length 1)."""
-    raise NotImplementedError()
+def squeeze(self, dim=None):
+    """Map of 'squeeze' pytorch method."""
+    final_shape = _shp_squeeze(self.shape, dim, False)
+    return self.reshape(final_shape)
 
 
-@squeeze.register(APT, Int)
 @core
-def _squeeze(x, d):
-    """Remove a dim (of length 1)."""
-    raise NotImplementedError()
+def softmax(self, dim=None, dtype=None):
+    """Map of 'softmax' pytorch method."""
+    x = self
+    dim = _dim_explicit(x.shape, dim)
+
+    if dtype is not None:
+        x = P.array_cast(x, _pt_dtype_to_my_dtype(dtype))
+
+    maxes = torch.max(x, dim, keepdim=True)[0]
+    x_exp = torch.exp(x - maxes)
+    x_exp_sum = torch.sum(x_exp, dim, keepdim=True)
+    return x_exp / x_exp_sum
 
 
-softmax = MultitypeGraph('softmax')
-
-
-@softmax.register(APT, Int)
+# TODO: sum with tuple dim (reduce over multiple chosen dims)
 @core
-def _softmax(x, d):
-    """Remove a dim (of length 1)."""
-    raise NotImplementedError()
+def _sum(self, dim=None, keepdim=False, *, dtype=None):
+    """Map of 'sum' pytorch method."""
+    x = self
+    dim = _dim_explicit(x.shape, dim)
+
+    if dtype is not None:
+        x = P.array_cast(x, _pt_dtype_to_my_dtype(dtype))
+
+    if dim is None:
+        return P.array_reduce(P.scalar_add, x, ())
+    else:
+        return C.array_reduce_dim(P.scalar_add, x, dim, keepdim)
 
 
-#def softmax(self: Tensor, dim: _int, dtype: _dtype) -> Tensor: ...
-#TODO: how to specify that the 3rd argument of softmax is a dtype
-@softmax.register(APT, Int, )
 @core
-def _softmax(x, d, dt):
-    """Remove a dim (of length 1)."""
-    raise NotImplementedError()
-#'''
+def scatter(self, dim, index, src):
+    r"""Map of 'scatter' pytorch method.
 
-_sum = MultitypeGraph('_sum')
-
-
-@_sum.register(AbstractArray)
-@core
-def __sum(x):
-
-    return P.array_reduce(P.scalar_add, x, ())
-
-
-''' # WIP
-@_sum.register(APT, Int)
-@core
-def __sum(x, d):
-    """Remove a dim (of length 1)."""
-    raise Exception("NotImplementedError (in pytorch_functions.py)")
-
-    orig_shp = x.xshape()
-
-    """ # Hardcoded example of function
-    array_squash = P.array_reduce(P.scalar_add, x, (2, 1))
-    array_reduced = array_squash.reshape((2,))
+    None
     """
-
+    # TODO: Need dtype attr for xtype.NDArray to support nonpytorch scalar src
     """
-    array_squash = P.array_reduce(
-        P.scalar_add, x, orig_shp[:d]+(1,)+orig_shp[d+1:])
-    array_reduced = array_squash.reshape(orig_shp[:d]+orig_shp[d+1:])
-    #"""
-
-    """
-    orig_shp = list(orig_shp)
-    orig_shp[d] = 1
-    array_squash = P.array_reduce(P.scalar_add, x, tuple(orig_shp))
-    del orig_shp[d]
-    array_reduced = array_squash.reshape(tuple(orig_shp))
-    #"""
-
-    return array_reduced
+    if not P.hastype(src, APT):
+        src = P.scalar_to_array(P.scalar_cast(src, self.dtype), APT)
+    # """
+    if len(src.shape) == 0:
+        src = P.distribute(src, index.shape)
+    return P.scatter(self, dim, index, src)
 
 
-@_sum.register(APT, Int, Bool)
 @core
-def __sum(x, d, kd):
-    """Remove a dim (of length 1)."""
-    raise NotImplementedError()
-#'''
+def scatter_add(self, dim, index, src):
+    """Map of 'scatter_add' pytorch method."""
+    return P.scatter_add(self, dim, index, src)
+
+
+@core
+def t(a):
+    """Map of 't' pytorch method."""
+    return P.transpose(a, (1, 0))
+
+
+@core
+def tensor_dim(t):
+    """Map of 'dim' pytorch method."""
+    return len(P.shape(t))
+
+
+@myia_static
+def _transpose_dims(a_dims, dim0, dim1):
+    dims = ()
+    for d in range(a_dims):
+        if d == dim0:
+            dims = dims + (dim1,)
+        elif d == dim1:
+            dims = dims + (dim0,)
+        else:
+            dims = dims + (d,)
+    return dims
+
+
+@core
+def transpose(a, dim0, dim1):
+    """Map of 'transpose' pytorch method."""
+    dims = _transpose_dims(len(a.shape), dim0, dim1)
+    return P.transpose(a, dims)
+
+
+@core
+def zeros(*shp, dtype=None):
+    """Map of 'dim' pytorch method."""
+    if dtype is not None:
+        dtype = _pt_dtype_to_my_dtype(dtype)
+    else:
+        dtype = f32
+
+    if len(shp) == 1:
+        if isinstance(shp[0], tuple):
+            shp = shp[0]
+    return P.distribute(P.scalar_to_array(P.scalar_cast(0.0, dtype), APT), shp)

@@ -968,6 +968,10 @@ class MyiaStatic(Macro):
                          infer_args=True)
         self._macro = macro
 
+    def __call__(self, *args):
+        """Call self.macro via __call__."""
+        return self._macro(*args)
+
     async def macro(self, info):
         """Execute the macro."""
         from .utils import build_value

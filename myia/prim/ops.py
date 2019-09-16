@@ -70,6 +70,7 @@ hastype = Primitive('hastype')
 tagged = Primitive('tagged')
 unsafe_static_cast = Primitive('unsafe_static_cast')
 scalar_cast = Primitive('scalar_cast')
+array_cast = Primitive('array_cast')
 hastag = Primitive('hastag')
 casttag = Primitive('casttag')
 
@@ -111,11 +112,18 @@ array_reduce = Primitive('array_reduce')
 distribute = Primitive('distribute')
 reshape = Primitive('reshape')
 transpose = Primitive('transpose')
-dot = Primitive('dot')
 
+gather = Primitive('gather')
+scatter = Primitive('scatter')
+scatter_add = Primitive('scatter_add')
+argmax = Primitive('argmax')
+array_max = Primitive('array_max')
+dot = Primitive('dot')
 conv2d = Primitive('conv2d')
 conv2d_input_grad = Primitive('conv2d_input_grad')
 conv2d_weight_grad = Primitive('conv2d_weight_grad')
+max_pool2d = Primitive('max_pool2d')
+max_pool2d_grad = Primitive('max_pool2d_grad')
 
 
 ##############

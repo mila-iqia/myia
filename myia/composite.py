@@ -8,6 +8,7 @@ from functools import reduce
 from . import operations
 from .abstract import (
     ANYTHING,
+    SHAPE,
     AbstractArray,
     AbstractBottom,
     AbstractClassBase,
@@ -25,12 +26,14 @@ from .ir import Graph, MetaGraph, MultitypeGraph
 from .operations import hastype, typeof
 from .prim import ops as P, py_implementations as py
 from .prim.py_implementations import (
+    array_getitem,
     array_map,
     array_reduce,
     bool_eq,
     bool_not,
     distribute,
     env_add,
+    reshape,
     scalar_add,
     scalar_cast,
     scalar_cos,
@@ -406,6 +409,73 @@ def tuple_get(t, item):
 # Array methods #
 #################
 
+def _dim_explicit(dim, dim_size):
+    if dim < 0:
+        dim = dim_size + dim
+    assert dim >= 0
+    return dim
+
+
+@myia_static
+def _build_slices(a_shp, item):
+    begin = ()
+    end = ()
+    stride = ()
+    remove_dims = ()
+    for adx, a in enumerate(a_shp):
+        if adx < len(item):
+            i = item[adx]
+            if isinstance(i, (slice, Slice)):
+                begin = begin + (0 if i.start is None
+                                 else _dim_explicit(i.start, a),)
+                end = end + (a if i.stop is None
+                             else _dim_explicit(i.stop, a),)
+                stride = stride + (1 if i.step is None else i.step,)
+                remove_dims = remove_dims + (False,)
+            else:
+                begin = begin + (_dim_explicit(i, a),)
+                end = end + (_dim_explicit(i, a) + 1,)
+                stride = stride + (1,)
+                remove_dims = remove_dims + (True,)
+        else:
+            begin = begin + (0,)
+            end = end + (a,)
+            stride = stride + (1,)
+            remove_dims = remove_dims + (False,)
+    return begin, end, stride, remove_dims
+
+
+@core
+def array_getitem_wrap(array, item):
+    """Implementation of `array_getitem`."""
+    if isinstance(item, tuple):
+        begin, end, stride, remove_dims = _build_slices(array.shape, item)
+    else:
+        begin, end, stride, remove_dims = _build_slices(array.shape, (item,))
+    ret = array_getitem(array, begin, end, stride)
+    final_shape = ()
+    for o, r in zip(ret.shape, remove_dims):
+        if not r:
+            final_shape = final_shape + (o,)
+    ret = reshape(ret, final_shape)
+    return ret
+
+
+# TODO: NotImplementedError: <_ast.Subscript object at 0x*>
+#       when trying to use it via fronteng. e.g. x[0] = y
+'''
+from typing import Tuple
+from .prim.py_implementations import array_setitem
+@core
+def array_setitem_wrap(array, item, value):
+    """Implementation of `array_setitem`."""
+    if hastype(item, Tuple):
+        begin, end, stride, _ = _build_slices(array.shape, item)
+    else:
+        begin, end, stride, _ = _build_slices(array.shape, (item,))
+    return array_setitem(array, begin, end, stride, value)
+# '''
+
 
 to_array = dunder_method_protocol_2('myia_to_array')
 array_floor = arrayify('array_floor', floor)
@@ -525,6 +595,54 @@ zeros_like = HyperMap(
 ##################
 # ArithmeticData #
 ##################
+
+
+class ArrayReduceDim(MetaGraph):
+    """MetaGraph to reduce array over specified dim(s)."""
+
+    def __init__(self, name="ArrayReduceDim"):
+        """Initialize a ArrayReduceDim."""
+        super().__init__(name)
+
+    def generate_graph(self, args):
+        """Generate the graph."""
+        g = Graph()
+        for arg in args:
+            g.add_parameter()
+        x = g.parameters[1]
+        orig_shp = g.apply(P.shape, x)
+        try:
+            dim = build_value(args[2])
+        except ValueError:
+            raise MyiaTypeError("Dimension reduction must be known at "
+                                "compile time.")
+        if not isinstance(dim, tuple):
+            dim = (dim,)
+        new_shp_unsqueezed = orig_shp
+        for d in dim:
+            new_shp_unsqueezed = g.apply(P.tuple_setitem, new_shp_unsqueezed,
+                                         d, 1)
+        array_squash = g.apply(
+            P.array_reduce, g.parameters[0], x, new_shp_unsqueezed)
+        try:
+            keepdim = build_value(args[3])
+        except ValueError:
+            raise MyiaTypeError("Keepdim must be known at "
+                                "compile time.")
+        g_output = array_squash
+        if not keepdim:
+            f_s = []
+            for i in range(len(args[1].values[SHAPE])):
+                if i not in dim:
+                    f_s.append(g.apply(P.tuple_getitem, orig_shp, i))
+            final_shape = g.apply(P.make_tuple, *f_s)
+            array_reduced = g.apply(P.reshape, array_squash, final_shape)
+            g_output = array_reduced
+        g.output = g_output
+        return g
+
+
+array_reduce_dim = ArrayReduceDim()
 
 
 class ArithmeticData:

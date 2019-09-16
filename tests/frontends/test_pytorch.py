@@ -512,8 +512,8 @@ def test_module_linear_seq_bwd():
     torch.manual_seed(123)
 
     inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
-    #model = Linear_Seq(4, 2, 3)
-    model = MLP_2_Layers_Seq(4, 2, 3)
+    model = Linear_Seq(4, 2, 3)
+    #model = MLP_2_Layers_Seq(4, 2, 3)
     target = torch.Tensor([2.5])
 
     def mse(value, target):
@@ -524,6 +524,8 @@ def test_module_linear_seq_bwd():
         value = model(inp)
         loss = mse(value, target)
         return loss
+
+    pt_cost = cost(model, inp, target)
 
     @myia(backend=backend, backend_options=backend_options)
     def step(model, inp, target):
@@ -543,9 +545,11 @@ def test_module_linear_seq_bwd():
         torch.Tensor([-7.69495678, -6.02438641, -9.53780556])
     ]
 
-    # print()
-    # for n, g in grad.named_parameters():
-    #     print("g", n, g)
+    for n, g in model.named_parameters():
+        print("g pt", n, g)
+
+    for n, g in grad.named_parameters():
+        print("g my", n, g)
 
     for g, eg in zip(grad.parameters(), expected_grads):
         assert torch.allclose(g, eg)
@@ -948,7 +952,6 @@ def test_nn_conv2d_update():
     class Conv2dMod(nn.Module):
         def __init__(self):
             super(Conv2dMod, self).__init__()
-
             self.conv1 = nn.Conv2d(6, 3, (4, 5), (2,3), (3,2), (3,4), 3)
 
         def forward(self, inp):
@@ -960,11 +963,13 @@ def test_nn_conv2d_update():
 
     model = Conv2dMod()
 
+    #"""
     @myia(backend=backend, backend_options=backend_options)
     def step(model, inp):
         _cost, dmodel = value_and_grad(cost, 'model')(model, inp)
         return _cost, model - dmodel
     loss, model = step(model, input)
+    #"""
 
     pt_cost = cost(model, input)
     """
@@ -982,6 +987,127 @@ def test_nn_conv2d_update():
     #assert torch.allclose(my_out_dw_grad, weight.grad.data)
     #assert torch.allclose(my_out_db_grad, bias.grad.data)
 #'''
+
+'''
+def test_nn_conv2d_fwd():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = torch.randn(2,6,4,5, dtype=getattr(torch, args.dtype))
+
+    class Conv2dMod(nn.Module):
+        def __init__(self):
+            super(Conv2dMod, self).__init__()
+            self.conv1 = nn.Conv2d(6, 3, (4, 5), (2,3), (3,2), (3,4), 3)
+
+        def forward(self, inp):
+            return self.conv1(inp)
+
+    def cost(model, inp):
+        value = model(inp)
+        return torch.sum(value)
+
+    model = Conv2dMod()
+
+    #"""
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model, inp):
+    #def step(inp):
+        return model(inp)
+    #out = step(input)
+    out = step(model, input)
+    #loss, model = step(model, input)
+    #"""
+
+    #pt_cost = cost(model, input)
+    pt_cost = model(input)
+    """
+    if input.grad is not None:
+        input.grad.data.zero_()
+    if weight.grad is not None:
+        weight.grad.data.zero_()
+    if bias.grad is not None:
+        bias.grad.data.zero_()
+
+    pt_cost.backward()
+    #"""
+
+    #assert torch.allclose(my_out_dinp_grad, input.grad.data)
+    #assert torch.allclose(my_out_dw_grad, weight.grad.data)
+    #assert torch.allclose(my_out_db_grad, bias.grad.data)
+#'''
+
+
+def test_nn_max_pool2d_fwd():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = torch.randn(2, 4, 3, 5, dtype=getattr(torch, args.dtype))
+
+    class MP2dMod(nn.Module):
+        def __init__(self):
+            super(MP2dMod, self).__init__()
+            self.mp1 = nn.MaxPool2d((3, 2), stride=(2, 1))
+
+        def forward(self, inp):
+            return self.mp1(inp)
+
+    def cost(model, inp):
+        value = model(inp)
+        return torch.sum(value)
+
+    model = MP2dMod()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(inp):
+        return model(inp)
+    my_out = step(input)
+
+    pt_out = model(input)
+
+    assert torch.allclose(my_out, pt_out)
+
+
+def test_nn_max_pool2d_update():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = torch.randn(2, 4, 3, 5, dtype=getattr(torch, args.dtype),
+                        requires_grad=True)
+
+    class MP2dMod(nn.Module):
+        def __init__(self):
+            super(MP2dMod, self).__init__()
+            self.mp1 = nn.MaxPool2d((3, 2), stride=(2, 1))
+
+        def forward(self, inp):
+            return self.mp1(inp)
+
+    def cost(model, inp):
+        value = model(inp)
+        return torch.sum(value)
+
+    model = MP2dMod()
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(inp):
+        _cost, d_inp = value_and_grad(cost, 'inp')(model, inp)
+        return _cost, d_inp
+    loss, my_out_dinp_grad = step(input)
+
+    pt_cost = cost(model, input)
+    if input.grad is not None:
+        input.grad.data.zero_()
+
+    pt_cost.backward()
+
+    assert torch.allclose(my_out_dinp_grad, input.grad.data)
 
 
 # TODO: Should this eventually be in a different test file?
@@ -1001,6 +1127,64 @@ def test_conv_grad_errors():
     with pytest.raises(ValueError):
         conv2d_input(input_size, weight, torch.ones(9, 9, 9, 9),
                      (2, 3), (3, 2), (3, 4), 3)
+
+
+# TODO: Should this eventually be in a different test file?
+#       It's currently here because it needs to have 'torch' imported.
+def test_shp_explicit_errors():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    input = torch.ones(2, 3)
+
+    def f1(x):
+        return torch.reshape(x, (-2,))
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step1(inp):
+        return f1(inp)
+
+    with pytest.raises(ValueError):
+        ret1 = step1(input)  # noqa: F841
+
+    def f2(x):
+        return torch.reshape(x, (-1, -1))
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step2(inp):
+        return f2(inp)
+
+    with pytest.raises(ValueError):
+        ret2 = step2(input)  # noqa: F841
+
+    def f3(x):
+        return torch.reshape(x, (2, 2))
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step3(inp):
+        return f3(inp)
+
+    with pytest.raises(ValueError):
+        ret3 = step3(input)  # noqa: F841
+
+
+# TODO: Should this eventually be in a different test file?
+#       It's currently here because it needs to have 'torch' imported.
+def test_sum_keepdim_error():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    input = torch.ones(2, 3)
+
+    def f1(x, kd):
+        return torch.sum(x, (1,), kd)
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step1(inp, kd):
+        return f1(inp, kd)
+
+    with pytest.raises(MyiaTypeError):
+        ret1 = step1(input, True)  # noqa: F841
 
 
 def test_switch_input_types():

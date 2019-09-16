@@ -1,8 +1,16 @@
 """Abstract Types for PyTorch Frontend."""
 
-from ..abstract.data import AbstractClassBase
+from ..abstract.data import (
+    ANYTHING,
+    SHAPE,
+    TYPE,
+    VALUE,
+    AbstractArray,
+    AbstractClassBase,
+    AbstractScalar,
+)
 from ..utils import MyiaInputTypeError
-from ..xtype import Object
+from ..xtype import Bool, Float, Int, Object, UInt
 
 
 class PyTorchTensor(Object):
@@ -37,3 +45,28 @@ class AbstractModule(AbstractClassBase):
         (especially for pytorch modules and their contents).
         """
         return self
+
+
+def pytorch_dtype_to_type(dtype):
+    """Map a pytorch dtype to a myia type."""
+    import torch
+    _type_map = {
+        torch.int8: Int[8],
+        torch.int16: Int[16],
+        torch.int32: Int[32],
+        torch.int64: Int[64],
+        torch.uint8: UInt[8],
+        torch.float16: Float[16],
+        torch.float32: Float[32],
+        torch.float64: Float[64],
+        torch.uint8: Bool,
+    }
+    if dtype not in _type_map:
+        raise TypeError(f"Unsupported dtype {dtype}")
+    return _type_map[dtype]
+
+
+APT = AbstractArray(
+    AbstractScalar({TYPE: ANYTHING, VALUE: ANYTHING}),
+    {SHAPE:  ANYTHING, TYPE: PyTorchTensor}
+)

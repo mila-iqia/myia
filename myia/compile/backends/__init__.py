@@ -89,7 +89,8 @@ def parse_default():
     Returns name and options from the environement or builtin default.
     See the documentation of get_default() for the backend string syntax.
     """
-    backend_spec = os.environ.get('MYIA_BACKEND', 'nnvm')
+    backend_spec = os.environ.get('MYIA_BACKEND', 'pytorch')
+    # backend_spec = os.environ.get('MYIA_BACKEND', 'nnvm')
     backend, *opts = backend_spec.split('?', maxsplit=1)
     if len(opts) == 1:
         opts = urllib.parse.parse_qs(opts[0], keep_blank_values=True,

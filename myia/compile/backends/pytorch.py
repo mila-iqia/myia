@@ -59,7 +59,7 @@ simple_mapping = {
     P.bool_eq: lambda a, b: a == b,
     P.bool_not: lambda a: ~a,
 
-    P.distribute: lambda a, shp: a.expand(*shp),
+    P.distribute: lambda a, shp: a.expand(*shp) if shp != () else a,
     P.transpose: lambda a, perm: a.permute(*perm),
     P.reshape: lambda a, shp: a.reshape(shp),
     P.dot: torch.mm,
@@ -71,6 +71,7 @@ simple_mapping = {
 scalar_mapping = {
     P.scalar_add: lambda a, b: a + b,
     P.scalar_sub: lambda a, b: a - b,
+    P.scalar_max: torch.max,
     P.scalar_mul: lambda a, b: a * b,
     P.scalar_div: lambda a, b: a / b,
     P.scalar_mod: lambda a, b: a % b,
@@ -94,6 +95,8 @@ scalar_mapping = {
     P.bool_or: lambda a, b: a | b,
     P.bool_eq: torch.eq,
     P.bool_not: lambda a: ~a,
+
+    P.switch: torch.where,
 }
 
 
@@ -106,6 +109,16 @@ def pytorch_scalar_cast(op):
     def _impl(v):
         return (v.astype(dtype),)
     return _impl, (v,)
+
+
+def pytorch_array_cast(op):
+    """Implementation of array_cast for pytorch."""
+    t = op.inputs[2]
+    dt = _type_map[t.value]
+
+    def _impl(x):
+        return (x.to(dtype=dt),)
+    return _impl, op.inputs[1:2]
 
 
 def pytorch_array_map(op):
@@ -153,68 +166,148 @@ def pytorch_array_reduce(op):
         return (res,)
     return _impl, (op.inputs[2],)
 
-#############################################################################
+
+def pytorch_array_getitem(op):
+    """Implementation of array_getitem for pytorch."""
+    def _impl(array, begin, end, strides):
+        idx = tuple(slice(b, e, s) for b, e, s in zip(begin, end, strides))
+        return (array[idx],)
+    return _impl, op.inputs[1:]
 
 
-def conv2d_wrap(input, weight, stride, padding, dilation, groups):
-    """Wrap of conv2d for pytorch."""
-    groups = groups.item()
-    return (torch.nn.functional.conv2d(
-        input, weight, None, stride, padding, dilation, groups),)
+def pytorch_array_setitem(op):
+    """Implementation of array_setitem for pytorch."""
+    def _impl(array, begin, end, strides, value):
+        idx = tuple(slice(b, e, s) for b, e, s in zip(begin, end, strides))
+        ret = array.clone()
+        ret[idx] = value
+        return (ret,)
+    return _impl, op.inputs[1:]
+
+
+def pytorch_argmax(op):
+    """Implementation of argmax for pytorch."""
+    def _impl(x, dim):
+        if dim is not None:
+            dim = dim.item()
+        return (torch.argmax(x, dim, keepdim=True),)
+    return _impl, op.inputs[1:]
+
+
+def pytorch_array_max(op):
+    """Implementation of array_max for pytorch."""
+    def _impl(x, dim):
+        dim = dim.item()
+        return (torch.max(x, dim, keepdim=True)[0],)
+    return _impl, op.inputs[1:]
+
+
+def pytorch_gather(op):
+    """Implementation of gather for pytorch."""
+    def _impl(x, dim, index):
+        if dim is not None:
+            dim = dim.item()
+        return (torch.gather(x, dim, index),)
+    return _impl, op.inputs[1:]
+
+
+def pytorch_scatter(op):
+    """Implementation of scatter for pytorch."""
+    def _impl(x, dim, index, src):
+        if dim is not None:
+            dim = dim.item()
+        return (torch.scatter(x, dim, index, src),)
+    return _impl, op.inputs[1:]
+
+
+def pytorch_scatter_add(op):
+    """Implementation of scatter_add for pytorch."""
+    def _impl(x, dim, index, src):
+        if dim is not None:
+            dim = dim.item()
+        return (torch.scatter_add(x, dim, index, src),)
+    return _impl, op.inputs[1:]
 
 
 def pytorch_conv2d(op):
     """Implementation of conv2d for pytorch."""
-    return conv2d_wrap, op.inputs[1:]
-
-#############################################################################
-
-
-def conv2d_input_grad_wrap(input_size, weight, grad_output, stride, padding,
-                           dilation, groups):
-    """Wrap of conv2d_input_grad for pytorch."""
-    input_size = tuple(i.item() for i in input_size)
-    stride = tuple(_x.item() for _x in stride)
-    padding = tuple(_x.item() for _x in padding)
-    dilation = tuple(_x.item() for _x in dilation)
-    groups = groups.item()
-    return (conv2d_input(
-        input_size, weight, grad_output, stride, padding, dilation, groups),)
+    def _impl(input, weight, stride, padding, dilation, groups):
+        groups = groups.item()
+        return (torch.nn.functional.conv2d(
+            input, weight, None, stride, padding, dilation, groups),)
+    return _impl, op.inputs[1:]
 
 
 def pytorch_conv2d_input_grad(op):
     """Implementation of conv2d_input_grad for pytorch."""
-    return conv2d_input_grad_wrap, op.inputs[1:]
-
-#############################################################################
-
-
-def conv2d_weight_grad_wrap(input, weight_size, grad_output, stride, padding,
-                            dilation, groups):
-    """Wrap of conv2d_weight_grad for pytorch."""
-    weight_size = tuple(w.item() for w in weight_size)
-    stride = tuple(_x.item() for _x in stride)
-    padding = tuple(_x.item() for _x in padding)
-    dilation = tuple(_x.item() for _x in dilation)
-    groups = groups.item()
-    return (conv2d_weight(
-        input, weight_size, grad_output, stride, padding, dilation, groups),)
+    def _impl(input_size, weight, grad_output, stride, padding,
+              dilation, groups):
+        input_size = tuple(i.item() for i in input_size)
+        stride = tuple(_x.item() for _x in stride)
+        padding = tuple(_x.item() for _x in padding)
+        dilation = tuple(_x.item() for _x in dilation)
+        groups = groups.item()
+        return (conv2d_input(
+            input_size, weight, grad_output, stride,
+            padding, dilation, groups),)
+    return _impl, op.inputs[1:]
 
 
 def pytorch_conv2d_weight_grad(op):
     """Implementation of conv2d_weight_grad for pytorch."""
-    return conv2d_weight_grad_wrap, op.inputs[1:]
+    def _impl(input, weight_size, grad_output, stride, padding,
+              dilation, groups):
+        weight_size = tuple(w.item() for w in weight_size)
+        stride = tuple(_x.item() for _x in stride)
+        padding = tuple(_x.item() for _x in padding)
+        dilation = tuple(_x.item() for _x in dilation)
+        groups = groups.item()
+        return (conv2d_weight(
+            input, weight_size, grad_output, stride,
+            padding, dilation, groups),)
+    return _impl, op.inputs[1:]
 
-#############################################################################
+
+def pytorch_max_pool2d(op):
+    """Implementation of max_pool2d for pytorch."""
+    def _impl(input, kernel_size, stride, padding, dilation, ceil_mode):
+        return (torch.nn.functional.max_pool2d(
+            input, kernel_size, stride, padding, dilation,
+            ceil_mode.item(), True),)
+    return _impl, op.inputs[1:]
+
+
+def pytorch_max_pool2d_grad(op):
+    """Implementation of max_pool2d grad for pytorch."""
+    def _impl(input, kernel_size, stride, padding, dilation, ceil_mode, dout):
+        input.requires_grad_(requires_grad=True)
+        output = torch.nn.functional.max_pool2d(
+            input, kernel_size, stride, padding, dilation,
+            ceil_mode.item(), False)
+        grads = torch.autograd.grad(
+            output, input, dout,
+            allow_unused=True)
+        return (grads[0],)
+    return _impl, op.inputs[1:]
 
 
 _mapping = {
+    P.array_cast: pytorch_array_cast,
     P.array_map: pytorch_array_map,
     P.array_reduce: pytorch_array_reduce,
+    P.array_getitem: pytorch_array_getitem,
+    P.array_setitem: pytorch_array_setitem,
     P.conv2d: pytorch_conv2d,
     P.conv2d_input_grad: pytorch_conv2d_input_grad,
     P.conv2d_weight_grad: pytorch_conv2d_weight_grad,
     P.scalar_cast: pytorch_scalar_cast,
+    P.max_pool2d: pytorch_max_pool2d,
+    P.max_pool2d_grad: pytorch_max_pool2d_grad,
+    P.gather: pytorch_gather,
+    P.scatter: pytorch_scatter,
+    P.scatter_add: pytorch_scatter_add,
+    P.argmax: pytorch_argmax,
+    P.array_max: pytorch_array_max,
 }
 
 for k, v in simple_mapping.items():

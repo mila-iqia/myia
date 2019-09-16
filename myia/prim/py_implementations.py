@@ -207,6 +207,41 @@ def scalar_ge(x: Number, y: Number) -> Bool:
     return x >= y
 
 
+@register(primops.gather)
+def gather(x, dim, index):
+    """Implement scatter."""
+    # TODO
+    raise NotImplementedError()
+
+
+@register(primops.scatter)
+def scatter(x, dim, index, src):
+    """Implement scatter."""
+    # TODO
+    raise NotImplementedError()
+
+
+@register(primops.scatter_add)
+def scatter_add(x, dim, index, src):
+    """Implement scatter."""
+    # TODO
+    raise NotImplementedError()
+
+
+@register(primops.argmax)
+def argmax(x, axis):
+    """Implement argmax."""
+    # TODO
+    raise NotImplementedError()
+
+
+@register(primops.array_max)
+def array_max(x, axis):
+    """Implement array_max."""
+    # TODO
+    raise NotImplementedError()
+
+
 @register(primops.bool_not)
 def bool_not(x: Bool) -> Bool:
     """Implement `bool_not`."""
@@ -256,14 +291,14 @@ def tuple_getitem(data, item):
     return data[item]
 
 
-@py_register(primops.array_getitem)
-def array_getitem(data, item):
-    """Implement `getitem`."""
-    return data[item]
+@register(primops.array_getitem)
+def array_getitem(data, begin, end, strides):
+    """Implement `array_getitem`."""
+    idx = tuple(slice(b, e, s) for b, e, s in zip(begin, end, strides))
+    return data[idx]
 
 
 @vm_register(primops.tuple_getitem)
-@vm_register(primops.array_getitem)
 def _vm_getitem(vm, data, item):
     """Implement `getitem`."""
     return vm.convert(data[item])
@@ -276,11 +311,12 @@ def tuple_setitem(data, item, value):
                  for i, x in enumerate(data))
 
 
-@register(primops.array_setitem)
-def array_setitem(data, item, value):
-    """Implement `list/array_setitem`."""
+@py_register(primops.array_setitem)
+def array_setitem(data, begin, end, strides, value):
+    """Implement `array_setitem`."""
+    idx = tuple(slice(b, e, s) for b, e, s in zip(begin, end, strides))
     data2 = copy(data)
-    data2[item] = value
+    data2[idx] = value
     return data2
 
 
@@ -415,6 +451,21 @@ def conv2d_weight_grad(input, weight_size, grad_output, stride, padding,
     raise NotImplementedError()
 
 
+@register(primops.max_pool2d)
+def max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode):
+    """Implement max_pool2d."""
+    # TODO
+    raise NotImplementedError()
+
+
+@register(primops.max_pool2d_grad)
+def max_pool2d_grad(input, kernel_size, stride, padding, dilation, ceil_mode,
+                    dout):
+    """Implement max_pool2d."""
+    # TODO
+    raise NotImplementedError()
+
+
 @register(primops.return_)
 def return_(x):
     """Implement `return_`."""
@@ -443,6 +494,18 @@ def scalar_cast(x, t):
     assert issubclass(t, types.Number)
     dtype = types.type_to_np_dtype(t)
     return getattr(np, dtype)(x)
+
+
+@register(primops.array_cast)
+def array_cast(x, t):
+    """Implement `array_cast`."""
+    from ..abstract import type_to_abstract
+    t = type_to_abstract(t)
+    assert isinstance(t, abstract.AbstractScalar)
+    t = t.values[abstract.TYPE]
+    assert issubclass(t, types.Number)
+    dtype = types.type_to_np_dtype(t)
+    return x.astype(dtype)
 
 
 @register(primops.identity)

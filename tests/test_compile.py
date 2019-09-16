@@ -6,9 +6,16 @@ from pytest import mark
 from myia.abstract import from_value
 from myia.pipeline import standard_pipeline
 from myia.prim import ops as P
-from myia.prim.py_implementations import bool_and, partial, scalar_add, tagged
+from myia.prim.py_implementations import (
+    array_getitem,
+    array_setitem,
+    bool_and,
+    partial,
+    scalar_add,
+    tagged,
+)
 
-from .common import Point, make_tree, sumtree
+from .common import MA, MB, Point, make_tree, sumtree
 
 compile_pipeline = standard_pipeline
 
@@ -214,3 +221,13 @@ def test_string_ne(s, x):
 @parse_compare(('hey',), justeq=True)
 def test_string_return(s):
     return s
+
+
+@parse_compare((MA(4, 5)))
+def test_array_getitem(x):
+    return array_getitem(x, (0, 1), (3, 5), (2, 3))
+
+
+@parse_compare((MA(4, 5), MB(2, 2)))
+def test_array_setitem(x, v):
+    return array_setitem(x, (0, 1), (3, 5), (2, 3), v)

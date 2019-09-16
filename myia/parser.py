@@ -578,6 +578,12 @@ class Parser:
             step = self.process_node(block, node.step)
         return block.graph.apply(op, lower, upper, step)
 
+    def process_ExtSlice(self, block: 'Block', node: ast.ExtSlice) -> ANFNode:
+        """Process extended subscript slices."""
+        op = block.operation('make_tuple')
+        slices = [self.process_node(block, dim) for dim in node.dims]
+        return block.graph.apply(op, *slices)
+
     def process_Attribute(self, block: 'Block',
                           node: ast.Attribute) -> ANFNode:
         """Process attributes: `x.y`."""

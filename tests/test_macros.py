@@ -64,6 +64,15 @@ def static_add(x, y):
     return x + y
 
 
+@myia_static
+def static_blah(x, y):
+    return static_add(x, y)
+
+
+def test_myia_static_in_myia_static():
+    static_blah(1, 2)
+
+
 def test_myia_static():
     @myia
     def get_fourth(xs):

@@ -1,6 +1,7 @@
 """PyTorch Frontend."""
 
 import copy
+import types
 from collections import OrderedDict
 
 import torch
@@ -19,43 +20,61 @@ from ..hypermap import hyper_map
 from ..pipeline.standard import standard_method_map, standard_object_map
 from ..prim import ops as P
 from ..utils import core
-from ..xtype import Bool, Float, Int, NDArray, UInt
-from .pytorch_abstract_types import AbstractModule, PyTorchTensor
-from .pytorch_functions import _sum, conv2d, item, linear, relu, sigmoid
-
-_type_map = {
-    torch.int8: Int[8],
-    torch.int16: Int[16],
-    torch.int32: Int[32],
-    torch.int64: Int[64],
-    torch.uint8: UInt[8],
-    torch.float16: Float[16],
-    torch.float32: Float[32],
-    torch.float64: Float[64],
-    torch.uint8: Bool,
-}
-
-
-def pytorch_dtype_to_type(dtype):
-    """Map a pytorch dtype to a myia type."""
-    if dtype not in _type_map:
-        raise TypeError(f"Unsupported dtype {dtype}")
-    return _type_map[dtype]
-
+from ..xtype import NDArray
+from .pytorch_abstract_types import (
+    AbstractModule,
+    PyTorchTensor,
+    pytorch_dtype_to_type,
+)
+from .pytorch_functions import (
+    _max,
+    _sum,
+    argmax,
+    conv2d,
+    gather,
+    item,
+    linear,
+    log_softmax,
+    max_pool2d,
+    nll_loss,
+    relu,
+    reshape,
+    scatter,
+    scatter_add,
+    sigmoid,
+    softmax,
+    squeeze,
+    t,
+    transpose,
+    zeros,
+)
 
 standard_object_map.update({
-    torch.exp: C.array_exp,
-    torch.log: C.array_log,
+    torch.argmax: argmax,
+    torch.exp: C.exp,
+    torch.gather: gather,
+    torch.log: C.log,
+    torch.log_softmax: log_softmax,
+    torch.max: _max,
     torch.mm: P.dot,
     torch.relu: relu,
-    torch.reshape: P.reshape,
+    torch.reshape: reshape,
+    torch.scatter: scatter,
+    torch.scatter_add: scatter_add,
     torch.sigmoid: sigmoid,
+    torch.softmax: softmax,
+    torch.squeeze: squeeze,
     torch.sum: _sum,
-    torch.t: C.transpose,
-    torch.tanh: C.array_tanh,
+    torch.t: t,
+    torch.tanh: C.tanh,
+    torch.transpose: transpose,
     # torch.zeros_like: C.zeros_like,  # currently only works with pt backend
-    torch.nn.functional.linear: linear,
     torch.nn.functional.conv2d: conv2d,
+    torch.nn.functional.linear: linear,
+    torch.nn.functional.max_pool2d: max_pool2d,
+    torch.nn.functional.nll_loss: nll_loss,
+
+    torch.zeros: zeros,
 })
 
 
@@ -63,16 +82,26 @@ standard_method_map[PyTorchTensor] = \
     standard_method_map[NDArray].copy()
 standard_method_map[PyTorchTensor].update({
     'dim': C.ndim,
-    'exp': C.array_exp,
+    'argmax': argmax,
+    'exp': C.exp,
+    'gather': gather,
     'item': item,
-    'log': C.array_log,
+    'log': C.log,
+    'log_softmax': log_softmax,
+    'max': _max,
+    'permute': P.transpose,
     'relu': relu,
-    'reshape': P.reshape,
+    'reshape': reshape,
+    'scatter': scatter,
+    'scatter_add': scatter_add,
     'sigmoid': sigmoid,
     'shape': property(P.shape),
+    'softmax': softmax,
+    'squeeze': squeeze,
     'sum': _sum,
-    't': C.transpose,
-    'tanh': C.array_tanh,
+    't': t,
+    'transpose': transpose,
+    'tanh': C.tanh,
     'view': P.reshape,  # contiguousness is ignored by us for now?
     'zeros_like': C.zeros_like,  # hidden method used by bwd (I think)
 })
@@ -102,12 +131,16 @@ def mod_sub(self, x):
 # TODO: should all of these actually be blacklisted (not used).
 # Curently blacklists all constructors except '_parameters' and '_modules'.
 # 'training' should probably be removed from blacklist in next PR.
+"""
 blacklist = ('_backend', '_buffers', '_backward_hooks', '_forward_hooks',
              '_forward_pre_hooks', '_state_dict_hooks',
              '_load_state_dict_pre_hooks',
 
              'training'
              )
+             """
+blacklist = set(dir(torch.nn.Module()) + ["__constants__"])
+blacklist.add('reset_parameters')
 
 
 @to_abstract.register
@@ -117,17 +150,19 @@ def _to_abstract(self, v: torch.nn.Module, **kwargs):
         '__call__': getattr(type(v), 'forward'),
         '__sub__': mod_sub,
     }
-    attrs = {}
-    for var_k, var_v in vars(v).items():
-        if var_k not in blacklist:
+    fields = {}
+    for var_k in dir(v):
+        if (var_k not in blacklist) or (var_k in ('_parameters', '_modules')):
+            var_v = getattr(v, var_k)
+            if not isinstance(var_v, types.MethodType):
+                # TODO: Remove "(isinstance(v, torch.nn.Sequential) and"
+                #       once Alias PR ready
+                # TODO: Remove rest of if statement once Dict support empty Dic
+                if var_k not in ('_parameters', '_modules') or \
+                        (isinstance(v, torch.nn.Sequential) and
+                         var_v != OrderedDict()):
 
-            # TODO: Remove "(isinstance(v, torch.nn.Sequential) and"
-            #       once Alias PR ready
-            # TODO: Remove rest of if statement once Dict supports empty Dict
-            if var_k not in ('_parameters', '_modules') or \
-                    (isinstance(v, torch.nn.Sequential) and
-                     var_v != OrderedDict()):
-                attrs[var_k] = self(var_v, **kwargs)
+                    fields[var_k] = self(var_v, **kwargs)
         else:
             pass
             # TODO: maybe make a warning for if user happened
@@ -137,16 +172,19 @@ def _to_abstract(self, v: torch.nn.Module, **kwargs):
     # """TODO: Remove these 2 loops (mod and par) once Dict support empty Dict
     if not isinstance(v, torch.nn.Sequential):
         for mod_k, mod_v in v._modules.items():
-            attrs[mod_k] = self(mod_v, **kwargs)
+            fields[mod_k] = self(mod_v, **kwargs)
 
         for par_k, par_v in v._parameters.items():
-            attrs[par_k] = self(par_v, **kwargs)
+            fields[par_k] = self(par_v, **kwargs)
+        # """
 
     # TODO: figure out how to delattr so that memory doesn't double
-    # for k in attrs:
+    # for k in fields:
     #     delattr(v, k)
+    # for k in methods:
+    #     delattr(type(v), k)
 
-    names = list(attrs.keys())
+    names = list(fields.keys())
 
     def new_module(*args):
         nonlocal v
@@ -160,7 +198,7 @@ def _to_abstract(self, v: torch.nn.Module, **kwargs):
                 setattr(v, k, a)
         return v
 
-    return AbstractModule(v.__class__, attrs, constructor=new_module)
+    return AbstractModule(v.__class__, fields, constructor=new_module)
 
 
 @to_abstract.register  # noqa: F811

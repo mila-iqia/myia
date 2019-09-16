@@ -17,6 +17,7 @@ from myia.operations import embed
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.prim.py_implementations import (
     _assert_scalar,
+    array_cast,
     array_getitem,
     array_map,
     array_reduce,
@@ -186,9 +187,9 @@ def test_prim_tuple_getitem(data, item):
     return tuple_getitem(data, item)
 
 
-@parse_compare((np.array([1, 2, 3]), 0), (np.array([4, -6, 7]), 2))
-def test_prim_array_getitem(data, item):
-    return array_getitem(data, item)
+def test_prim_array_getitem():
+    assert array_getitem(np.array([1, 2, 3]), (0,), (1,), (1,)) == [1]
+    assert array_getitem(np.array([4, -6, 7]), (2,), (3,), (1,)) == [7]
 
 
 def test_prim_bool_eq():
@@ -204,7 +205,7 @@ def test_prim_tuple_setitem():
 def test_prim_array_setitem():
     L = np.array([1, 2, 3, 4])
     L2 = np.array([1, 22, 3, 4])
-    assert np.all(array_setitem(L, 1, 22) == L2)
+    assert np.all(array_setitem(L, (1,), (2,), (1,), 22) == L2)
     assert not np.all(L == L2)  # test that this is not inplace
 
 
@@ -381,6 +382,13 @@ def test_broadcast_shape():
 def test_scalar_cast():
     assert isinstance(scalar_cast(1.5, i64), np.int64)
     assert isinstance(scalar_cast(1.5, f16), np.float16)
+
+
+def test_array_cast():
+    assert isinstance(array_cast(np.array([1.5, 1.7]), i64), np.ndarray)
+    assert (array_cast(np.array([1.5, 1.7]), i64)).dtype == np.dtype(np.int64)
+    assert isinstance(array_cast(np.array([1.5, 1.7]), f16), np.ndarray)
+    assert (array_cast(np.array([1.5, 1.]), f16)).dtype == np.dtype(np.float16)
 
 
 def test_env():
