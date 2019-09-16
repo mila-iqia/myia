@@ -41,7 +41,6 @@ def _explore(self, v: object, vseq, path):
         for k, x in dataclass_fields(v).items():
             yield from self(x, vseq, (*path, k))
 
-
 def ndarray_aliasable(v, vseq, path):
     """Aliasing policy whereas all numpy.ndarray are aliasable.
 
@@ -56,21 +55,21 @@ def ndarray_aliasable(v, vseq, path):
 
 
 def find_aliases(obj, aliasable=ndarray_aliasable):
-    """Find aliased data in obj.
+    """
+    Find aliased data in obj.
 
-    Arguments:
-        ndarray_aliasable: A function with signature
-                ((v, vseq, path) -> True/False/"X")
-            Arguments:
-                v: The potentially aliasable value
-                vseq: The sequence of objects containing v
-                path: The sequence of indexes on the path to v
-            Returns:
-                True: v is aliasable
-                False: v is not aliasable
-                "X": v is aliasable, but it is located in a place where the
-                    aliasing data cannot be used
+    :param ndarray_aliasable: A function with signature
+       ((v, vseq, path) -> True/False/"X")
 
+       where:
+
+          v: The potentially aliasable value
+          vseq: The sequence of objects containing v
+          path: The sequence of indexes on the path to v
+
+    :return: True: v is aliasable, False: v is not aliasable, "X": v is 
+       aliasable, but it is located in a place where the aliasing data
+       cannot be used.
     """
     if aliasable is None:
         return {}, {}
