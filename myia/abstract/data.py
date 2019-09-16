@@ -141,7 +141,6 @@ class GraphFunction(Function):
         return self.graph.abstract
 
 
-@serializable('PrimitiveFunction')
 @dataclass(frozen=True)
 class PrimitiveFunction(Function):
     """Represents a Primitive.

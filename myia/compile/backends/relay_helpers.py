@@ -26,9 +26,8 @@ def _placeholder_body(type):
             ret_type=type.ret_type)
 
 
-def build_module(funcs):
+def add_functions(mod, funcs):
     """Workaround for type checker and mutually recursive functions."""
-    mod = relay.Module({})
     for gv in funcs:
         func = funcs[gv]
         body = _placeholder_body(func.ret_type)
@@ -36,8 +35,6 @@ def build_module(funcs):
 
     for gv in funcs:
         mod[gv] = funcs[gv]
-
-    return mod
 
 
 pass_set = transform.Sequential(

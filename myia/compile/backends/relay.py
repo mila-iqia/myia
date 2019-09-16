@@ -10,6 +10,7 @@ from ...abstract import (
     AbstractScalar,
     AbstractTuple,
     AbstractType,
+    AbstractTaggedUnion,
     PartialApplication,
     TypedPrimitive,
     VirtualFunction,
@@ -21,7 +22,7 @@ from ...utils import overload
 from ...xtype import Bool, Nil, type_to_np_dtype
 from ..transform import wrap_result
 from . import ConcreteBackend, HandleBackend
-from .relay_helpers import build_module, optimize
+from .relay_helpers import add_functions, optimize
 
 
 @wrap_result.register
@@ -31,7 +32,7 @@ def wrap_result(self, data: relay.backend.interpreter.TupleValue):
 
 
 @overload(bootstrap=True)
-def to_relay_type(self, a: AbstractScalar):
+def to_relay_type(self, a: AbstractScalar, mod):
     """Convert a myia abstract to a Relay type."""
     tp = a.xtype()
     if issubclass(tp, Bool):
@@ -116,7 +117,7 @@ SIMPLE_MAP = {
 
 def relay_partial(c, fn, *args):
     """Implementation of partial for Relay."""
-    ty = to_relay_type(fn.abstract)
+    ty = to_relay_type(fn.abstract, c.module)
     rargs = [relay.var("") for a in ty.arg_types]
     fn = relay.Function(rargs, relay.Call(c.ref(fn), rargs))
     binds = {}
@@ -256,6 +257,12 @@ class CompileGraph:
         """Convert the graph into a relay callable."""
         mng = manage(graph)
 
+        self.module = relay.Module({})
+
+        # Analyze and create a global union type of all the possible types
+        # and then use it for all union values.
+
+        self.module._myia_adt_map = {}
         function_map = {}
         self.node_map = {}
         self.graph_map = {}
@@ -266,14 +273,16 @@ class CompileGraph:
         for g in mng.graphs:
             function_map[self.graph_map[g]] = self.convert_func(g)
 
-        module = build_module(function_map)
+        add_functions(self.module, function_map)
 
-        module = optimize(module)
+        self.module = optimize(self.module)
 
-        module.entry_func = module.get_global_var(graph.debug.debug_name)
+        self.module.entry_func = self.module.get_global_var(
+            graph.debug.debug_name)
 
-        exec = relay.create_executor(mod=module, ctx=context, target=target)
-        res = exec.evaluate(module.entry_func)
+        exec = relay.create_executor(mod=self.module, ctx=context,
+                                     target=target)
+        res = exec.evaluate(self.module.entry_func)
 
         def f(*args, **kwargs):
             return wrap_result(res(*args, **kwargs))
@@ -283,7 +292,7 @@ class CompileGraph:
         """Convert a parameter node."""
         return relay.var(
             node.debug.debug_name,
-            type_annotation=to_relay_type(node.abstract))
+            type_annotation=to_relay_type(node.abstract, self.module))
 
     def on_apply(self, node):
         """Convert an Apply node."""
@@ -345,7 +354,8 @@ class CompileGraph:
                 self.node_map[node] = self.on_constant(node)
 
         return relay.Function(params, self.ref(graph.output),
-                              ret_type=to_relay_type(graph.output.abstract))
+                              ret_type=to_relay_type(graph.output.abstract,
+                                                     self.module))
 
 
 compiler = CompileGraph()

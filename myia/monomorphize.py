@@ -67,6 +67,14 @@ def _fix_type(self, a: GraphFunction, spc):
         return DummyFunction()
 
 
+@overload
+def _fix_type(self, a: PrimitiveFunction, spc):
+    try:
+        return spc.analyze_function(None, a, None)[0].abstract.get_unique()
+    except Unspecializable:
+        return a
+
+
 @abstract_check.variant(
     initial_state=lambda: CheckState({}, '_no_track')
 )
