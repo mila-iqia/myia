@@ -268,6 +268,7 @@ standard_resources = Resources.partial(
     method_map=standard_method_map,
     convert=ConverterResource.partial(
         object_map=standard_object_map,
+        use_universe=False,
     ),
     inferrer=InferenceResource.partial(
         constructors=inferrer_registry,

@@ -27,7 +27,7 @@ from ..vm import VM
 @overload
 def default_convert(env, fn: FunctionType):
     """Default converter for Python types."""
-    g = parser.parse(fn)
+    g = parser.parse(fn, use_universe=env.use_universe)
     if isinstance(g, Graph):
         g = clone(g)
     env.object_map[fn] = g
@@ -90,10 +90,11 @@ class _Unconverted:
 class ConverterResource(Partializable):
     """Convert a Python object into an object that can be in a Myia graph."""
 
-    def __init__(self, resources, object_map):
+    def __init__(self, resources, object_map, use_universe):
         """Initialize a Converter."""
         self.resources = resources
         self.object_map = {}
+        self.use_universe = use_universe
         for k, v in object_map.items():
             seen = set()
             while v in object_map:
