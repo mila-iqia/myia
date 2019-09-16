@@ -188,6 +188,10 @@ class Parser:
         # Cache of all nodes that are read
         self.read_cache = OrderedSet()
 
+    def new_block(self, **kwargs) -> 'Block':
+        """Create a new block."""
+        return Block(self, **kwargs)
+
     def make_location(self, node) -> Location:
         """Create a Location from an AST node."""
         if isinstance(node, (list, tuple)):
@@ -215,12 +219,12 @@ class Parser:
     def make_condition_blocks(self, block):
         """Make two blocks for an if statement or expression."""
         with About(block.graph.debug, 'if_true'):
-            true_block = Block(self, auxiliary=True)
+            true_block = self.new_block(auxiliary=True)
         true_block.preds.append(block)
         true_block.mature()
 
         with About(block.graph.debug, 'if_false'):
-            false_block = Block(self, auxiliary=True)
+            false_block = self.new_block(auxiliary=True)
         false_block.preds.append(block)
         false_block.mature()
 
@@ -278,7 +282,7 @@ class Parser:
                           node: ast.FunctionDef) -> Tuple['Block', 'Block']:
         """Process a function definition and return first and final blocks."""
         with DebugInherit(ast=node, location=self.make_location(node)):
-            function_block = Block(self)
+            function_block = self.new_block()
         if block:
             function_block.preds.append(block)
         else:
@@ -446,7 +450,7 @@ class Parser:
 
     def process_Lambda(self, block: 'Block', node: ast.Lambda) -> ANFNode:
         """Process lambda: `lambda x, y: x + y`."""
-        function_block = Block(self)
+        function_block = self.new_block()
         function_block.preds.append(block)
         function_block.mature()
 
@@ -693,7 +697,7 @@ class Parser:
 
         # Create the continuation
         with About(block.graph.debug, 'if_after'):
-            after_block = Block(self, auxiliary=True)
+            after_block = self.new_block(auxiliary=True)
 
         # Process the first branch
         true_end = self.process_statements(true_block, node.body)
@@ -720,11 +724,11 @@ class Parser:
 
         """
         with About(block.graph.debug, 'while_header'):
-            header_block = Block(self, auxiliary=True)
+            header_block = self.new_block(auxiliary=True)
         with About(block.graph.debug, 'while_body'):
-            body_block = Block(self, auxiliary=True)
+            body_block = self.new_block(auxiliary=True)
         with About(block.graph.debug, 'while_after'):
-            after_block = Block(self, auxiliary=True)
+            after_block = self.new_block(auxiliary=True)
         body_block.preds.append(header_block)
         after_block.preds.append(header_block)
         block.jump(header_block)
@@ -768,14 +772,14 @@ class Parser:
 
         # Checks hasnext on the iterator.
         with About(block.graph.debug, 'for_header'):
-            header_block = Block(self, auxiliary=True)
+            header_block = self.new_block(auxiliary=True)
         # We explicitly add the iterator as the first argument
         it = header_block.graph.add_parameter()
         cond = header_block.apply(op_hasnext, it)
 
         # Body of the iterator.
         with About(block.graph.debug, 'for_body'):
-            body_block = Block(self, auxiliary=True)
+            body_block = self.new_block(auxiliary=True)
         body_block.preds.append(header_block)
         # app = next(it); target = app[0]; it = app[1]
         app = body_block.apply(op_next, it)
@@ -793,7 +797,7 @@ class Parser:
 
         # This is the block after for
         with About(block.graph.debug, 'for_after'):
-            after_block = Block(self, auxiliary=True)
+            after_block = self.new_block(auxiliary=True)
         after_block.preds.append(header_block)
 
         block.jump(header_block, init)
@@ -899,7 +903,7 @@ class Block:
 
     def make_resolve(self, module_name, symbol_name):
         """Return a subtree that resolves a name in a module."""
-        return self.apply(
+        return self.graph.apply(
             operations.resolve,
             Constant(module_name),
             Constant(symbol_name)
