@@ -377,13 +377,13 @@ class Parser:
         func = block._resolve_ast_type(node.op)
         left = self.process_node(block, node.left)
         right = self.process_node(block, node.right)
-        return Apply([func, left, right], block.graph)
+        return block.apply(func, left, right)
 
     def process_UnaryOp(self, block: 'Block', node: ast.UnaryOp) -> ANFNode:
         """Process unary operators: `+a`, `-a`, etc."""
         func = block._resolve_ast_type(node.op)
         operand = self.process_node(block, node.operand)
-        return Apply([func, operand], block.graph)
+        return block.apply(func, operand)
 
     def process_Compare(self, block: 'Block', node: ast.Compare) -> ANFNode:
         """Process comparison operators: `a == b`, `a > b`, etc."""
@@ -391,7 +391,7 @@ class Parser:
         assert len(ops) == 1
         left = self.process_node(block, node.left)
         right = self.process_node(block, node.comparators[0])
-        return Apply([ops[0], left, right], block.graph)
+        return block.apply(ops[0], left, right)
 
     def process_BoolOp(self, block: 'Block', node: ast.BinOp) -> ANFNode:
         """Process boolean operators: `a and b`, `a or b`."""
@@ -412,7 +412,7 @@ class Parser:
 
                 switch = block.make_switch(test, true_block, false_block,
                                            op='switch')
-                return block.graph.apply(switch)
+                return block.apply(switch)
             else:
                 return test
 
@@ -442,7 +442,7 @@ class Parser:
         fg.output = fb
 
         switch = block.make_switch(cond, true_block, false_block)
-        return block.graph.apply(switch)
+        return block.apply(switch)
 
     def process_Lambda(self, block: 'Block', node: ast.Lambda) -> ANFNode:
         """Process lambda: `lambda x, y: x + y`."""
@@ -499,21 +499,20 @@ class Parser:
             keys = [k.arg for k in keywords]
             values = [self.process_node(block, k.value) for k in keywords]
             typ = AbstractDict(dict((key, ANYTHING) for key in keys))
-            groups.append(block.graph.apply(op, typ, *values))
+            groups.append(block.apply(op, typ, *values))
 
         if len(groups) == 1:
             args, = groups
-            return Apply([func, *args], block.graph)
+            return block.apply(func, *args)
         else:
             args = []
             for group in groups:
                 if isinstance(group, list):
-                    args.append(Apply([block.operation('make_tuple'),
-                                       *group], block.graph))
+                    args.append(block.apply(block.operation('make_tuple'),
+                                            *group))
                 else:
                     args.append(group)
-            return Apply([block.operation('apply'),
-                          func, *args], block.graph)
+            return block.apply(block.operation('apply'), func, *args)
 
     def process_NameConstant(self, block: 'Block',
                              node: ast.NameConstant) -> ANFNode:
@@ -527,13 +526,13 @@ class Parser:
         if len(elts) == 0:
             return Constant(())
         else:
-            return block.graph.apply(op, *elts)
+            return block.apply(op, *elts)
 
     def process_List(self, block: 'Block', node: ast.List) -> ANFNode:
         """Process list literals."""
         op = block.operation('make_list')
         elts = [self.process_node(block, e) for e in node.elts]
-        return block.graph.apply(op, *elts)
+        return block.apply(op, *elts)
 
     def process_Dict(self, block: 'Block', node: ast.Dict) -> ANFNode:
         """Process dict literals."""
@@ -547,7 +546,7 @@ class Parser:
         keys = [k.value for k in keys]
         values = [self.process_node(block, v) for v in node.values]
         typ = AbstractDict(dict((key, ANYTHING) for key in keys))
-        return block.graph.apply(op, typ, *values)
+        return block.apply(op, typ, *values)
 
     def process_Subscript(self, block: 'Block',
                           node: ast.Subscript) -> ANFNode:
@@ -555,7 +554,7 @@ class Parser:
         op = block.operation('getitem')
         value = self.process_node(block, node.value)
         slice = self.process_node(block, node.slice)
-        return Apply([op, value, slice], block.graph)
+        return block.apply(op, value, slice)
 
     def process_Index(self, block: 'Block', node: ast.Index) -> ANFNode:
         """Process subscript indexes."""
@@ -576,7 +575,7 @@ class Parser:
             step = Constant(None)
         else:
             step = self.process_node(block, node.step)
-        return block.graph.apply(op, lower, upper, step)
+        return block.apply(op, lower, upper, step)
 
     def process_ExtSlice(self, block: 'Block', node: ast.ExtSlice) -> ANFNode:
         """Process extended subscript slices."""
@@ -589,7 +588,7 @@ class Parser:
         """Process attributes: `x.y`."""
         op = block.operation('getattr')
         value = self.process_node(block, node.value)
-        return Apply([op, value, Constant(node.attr)], block.graph)
+        return block.apply(op, value, Constant(node.attr))
 
     # Statement implementations
 
@@ -625,7 +624,7 @@ class Parser:
         true_block, false_block = self.make_condition_blocks(block)
         block.cond(cond, true_block, false_block)
         false_block.raises(
-            false_block.graph.apply(
+            false_block.apply(
                 false_block.operation('Exception'),
                 msg
             )
@@ -650,7 +649,7 @@ class Parser:
             # CASE: x, y = value
             for i, elt in enumerate(targ.elts):
                 op = block.operation('getitem')
-                new_node = Apply([op, anf_node, Constant(i)], block.graph)
+                new_node = block.apply(op, anf_node, Constant(i))
                 self._assign(block, elt, new_node)
 
         else:
@@ -765,26 +764,25 @@ class Parser:
         op_hasnext = block.operation('myia_hasnext')
 
         # Initialization of the iterator, only done once
-        init = block.graph.apply(op_iter,
-                                 self.process_node(block, node.iter))
+        init = block.apply(op_iter, self.process_node(block, node.iter))
 
         # Checks hasnext on the iterator.
         with About(block.graph.debug, 'for_header'):
             header_block = Block(self, auxiliary=True)
         # We explicitly add the iterator as the first argument
         it = header_block.graph.add_parameter()
-        cond = header_block.graph.apply(op_hasnext, it)
+        cond = header_block.apply(op_hasnext, it)
 
         # Body of the iterator.
         with About(block.graph.debug, 'for_body'):
             body_block = Block(self, auxiliary=True)
         body_block.preds.append(header_block)
         # app = next(it); target = app[0]; it = app[1]
-        app = body_block.graph.apply(op_next, it)
-        target = body_block.graph.apply(op_getitem, app, 0)
+        app = body_block.apply(op_next, it)
+        target = body_block.apply(op_getitem, app, 0)
         direct = isinstance(node.target, ast.Name)
         target.debug.name = node.target.id if direct else '*value'
-        it2 = body_block.graph.apply(op_getitem, app, 1)
+        it2 = body_block.apply(op_getitem, app, 1)
         # We link the variable name to the target
         self._assign(body_block, node.target, target)
         # We set some debug data on all iterator variables
@@ -895,9 +893,13 @@ class Block:
     def _resolve_ast_type(self, op):
         return self.make_resolve(*ast_map[type(op)])
 
+    def apply(self, fn, *args):
+        """Create an application of fn on args."""
+        return self.graph.apply(fn, *args)
+
     def make_resolve(self, module_name, symbol_name):
         """Return a subtree that resolves a name in a module."""
-        return self.graph.apply(
+        return self.apply(
             operations.resolve,
             Constant(module_name),
             Constant(symbol_name)
@@ -905,10 +907,10 @@ class Block:
 
     def make_switch(self, cond, true_block, false_block, op='user_switch'):
         """Return a subtree that implements a switch operation."""
-        return self.graph.apply(self.operation(op),
-                                cond,
-                                true_block.graph,
-                                false_block.graph)
+        return self.apply(self.operation(op),
+                          cond,
+                          true_block.graph,
+                          false_block.graph)
 
     def operation(self, symbol_name):
         """Return a subtree that resolves a name in the operations module."""
@@ -987,7 +989,7 @@ class Block:
 
         """
         assert self.graph.return_ is None
-        jump = self.graph.apply(target.graph, *args)
+        jump = self.apply(target.graph, *args)
         self.jumps[target] = jump
         target.preds.append(self)
         self.graph.output = jump
@@ -1007,7 +1009,7 @@ class Block:
         """
         assert self.graph.return_ is None
         switch = self.make_switch(cond, true, false)
-        self.returns(self.graph.apply(switch))
+        self.returns(self.apply(switch))
 
     def raises(self, exc):
         """Raise an exception in this block."""
