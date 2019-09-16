@@ -202,8 +202,8 @@ def test_disconnected_from_output__warning():
 
 def test_no_return__format(capsys):
     def f():
-        '''
-        '''
+        pass
+
     try:
         parse(f)
     except MyiaSyntaxError:
@@ -216,10 +216,8 @@ def test_no_return__format(capsys):
         r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
         r"(.+?): def f\(\):\n" + \
         r"(.+?)  \^\^\^\^\^\^\^\^\n" + \
-        r"(.+?):     '''\n" + \
-        r"(.+?)  \^\^\^\^\^\^\^\n" + \
-        r"(.+?):     '''\n" + \
-        r"(.+?)  \^\^\^\^\^\^\^\n" + \
+        r"(.+?):     pass\n" + \
+        r"(.+?)  \^\^\^\^\^\^\^\^\n" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
         r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
         r"MyiaSyntaxError: Function doesn't return a value"
