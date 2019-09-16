@@ -1,6 +1,5 @@
 
 from myia.pipeline.steps import (
-    step_cconv as cconv,
     step_compile as export,
     step_debug_opt as debug_opt,
     step_infer as infer,
@@ -16,12 +15,12 @@ from myia.utils import Partial
 
 standard = [
     parse, resolve, infer, specialize,
-    simplify_types, opt, opt2, validate, cconv, export
+    simplify_types, opt, opt2, validate, export
 ]
 
 _debug_opt = [
     parse, resolve, infer, specialize,
-    simplify_types, debug_opt, opt2, validate, cconv, export
+    simplify_types, debug_opt, opt2, validate, export
 ]
 
 _bang_parse = standard[:standard.index(parse) + 1]
@@ -32,7 +31,6 @@ _bang_simplify_types = standard[:standard.index(simplify_types) + 1]
 _bang_opt = standard[:standard.index(opt) + 1]
 _bang_opt2 = standard[:standard.index(opt2) + 1]
 _bang_validate = standard[:standard.index(validate) + 1]
-_bang_cconv = standard[:standard.index(cconv) + 1]
 _bang_export = standard[:standard.index(export) + 1]
 
 _bang_debug_opt = _debug_opt[:_debug_opt.index(debug_opt) + 1]

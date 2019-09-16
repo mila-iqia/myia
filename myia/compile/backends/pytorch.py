@@ -9,6 +9,8 @@ from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ..transform import CompileGraphs, nonlinear_ops
 from . import ConcreteBackend, HandleBackend
 from .pytorch_conv_grad import conv2d_input, conv2d_weight
+from ..cconv import closure_convert
+
 
 _type_map = {
     Int[8]: torch.int8,
@@ -374,6 +376,7 @@ class PyTorchBackend(ConcreteBackend):
     def compile(self, graph, *others):
         """Compile a graph."""
         manage(graph)
+        graph = closure_convert(graph)
         return self.compiler.compile_and_link(graph)
 
     def to_numpy(self, v):

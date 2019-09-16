@@ -68,7 +68,6 @@ mdbg show x:hibou --pipeline '!opt' --types i64,i64 -O inline
 ```
 
 The `!opt` pipeline is the same as `parse,resolve,infer,specialize,opt`.
-There is also a `cconv` step.
 
 
 ## Custom operations

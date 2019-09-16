@@ -16,6 +16,8 @@ from ...xtype import Nil, type_to_np_dtype
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
 from . import ConcreteBackend, HandleBackend
+from ..cconv import closure_convert
+
 
 nonlinear_ops = list(nonlinear_ops)
 nonlinear_ops.append(P.scalar_cast)
@@ -381,6 +383,7 @@ class NNVMBackend(ConcreteBackend):
     def compile(self, graph, *others):
         """Compile a graph."""
         manage(graph)
+        graph = closure_convert(graph)
         return self.compiler.compile_and_link(graph)
 
     def to_numpy(self, v):
