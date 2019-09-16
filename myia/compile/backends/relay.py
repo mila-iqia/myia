@@ -44,34 +44,39 @@ def to_relay_type(self, a: AbstractScalar, mod):
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: AbstractTuple):
-    return relay.ty.TupleType([self(e) for e in a.elements])
+def to_relay_type(self, a: AbstractTuple, mod):
+    return relay.ty.TupleType([self(e, mod) for e in a.elements])
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: AbstractArray):
+def to_relay_type(self, a: AbstractArray, mod):
     tp = a.element.xtype()
     return relay.ty.TensorType(a.xshape(), type_to_np_dtype(tp))
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: AbstractFunction):
-    sings = list(self(sing) for sing in a.get_sync())
+def to_relay_type(self, a: AbstractFunction, mod):
+    sings = list(self(sing, mod) for sing in a.get_sync())
     for sing in sings[1:]:
         assert sing == sings[0]
     return sings[0]
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: (VirtualFunction, TypedPrimitive)):
-    return relay.ty.FuncType([self(aa) for aa in a.args],
-                             self(a.output))
+def to_relay_type(self, a: (VirtualFunction, TypedPrimitive), mod):
+    return relay.ty.FuncType([self(aa, mod) for aa in a.args],
+                             self(a.output, mod))
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: PartialApplication):
-    tp = self(a.fn)
+def to_relay_type(self, a: PartialApplication, mod):
+    tp = self(a.fn, mod)
     return relay.ty.FuncType(tp.arg_types[len(a.args):], tp.ret_type)
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: AbstractTaggedUnion, mod):
+    return mod._myia_union_type()
 
 
 def ashape(node):
@@ -258,6 +263,8 @@ class CompileGraph:
         mng = manage(graph)
 
         self.module = relay.Module({})
+        self.union_type = relay.GlobalTypeVar('$_union_adt')
+        self.build_union_adt(mng)
 
         # Analyze and create a global union type of all the possible types
         # and then use it for all union values.
@@ -287,6 +294,20 @@ class CompileGraph:
         def f(*args, **kwargs):
             return wrap_result(res(*args, **kwargs))
         return f
+
+    def build_union_adt(self, mng):
+        """Build an ADT to represent union types."""
+        self.tag_map = dict()
+        for node in mng.all_nodes:
+            if isinstance(node.abstract, AbstractTaggedUnion):
+                for opt in node.abstract.options:
+                    if opt[0] not in self.tag_map:
+                        t = to_relay_type(opt[1])
+                        self.tag_map[opt[0]] = relay.adt.Constructor(
+                            "c{opt[0]}", [t], self.union_type)
+        self.module[self.union_type] = relay.adt.TypeData(
+            self.union_type, [], list(self.tag_map.values()))
+        self.module._myia_union_type = self.union_type
 
     def on_parameter(self, node):
         """Convert a parameter node."""
