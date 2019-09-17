@@ -275,15 +275,17 @@ class CompileGraph:
         self.graph_map = {}
 
         for g in mng.graphs:
-            self.graph_map[g] = relay.GlobalVar(g.debug.debug_name)
+            if g.parent is None:
+                self.graph_map[g] = relay.GlobalVar(g.debug.debug_name)
 
         for g in mng.graphs:
-            function_map[self.graph_map[g]] = self.convert_func(g)
+            if g.parent is None:
+                function_map[self.graph_map[g]] = self.convert_func(g)
 
         add_functions(self.module, function_map)
 
         # Maybe make a function that calls the right graph instead?
-        self.module["main"] = self.module[self.graph_map[g]]
+        self.module["main"] = self.module[self.graph_map[graph]]
 
         self.module = optimize(self.module)
 
@@ -344,7 +346,11 @@ class CompileGraph:
 
     def on_graph(self, node):
         """Convert a graph constant."""
-        return self.graph_map[node.value]
+        if node.value.parent is None:
+            return self.graph_map[node.value]
+        if node not in self.node_map:
+            self.node_map[node] = self.convert_func(node.value)
+        return self.node_map[node]
 
     def ref(self, node):
         """Return the value for a node."""
