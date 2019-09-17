@@ -20,7 +20,7 @@ from ...ir import manage
 from ...operations import Primitive, primitives as P
 from ...utils import overload
 from ...xtype import Bool, Nil, type_to_np_dtype
-from ..transform import wrap_result
+from ..transform import wrap_result, get_prim_graph
 from . import ConcreteBackend, HandleBackend
 from .relay_helpers import add_functions, optimize
 
@@ -358,15 +358,12 @@ class CompileGraph:
             if isinstance(type, AbstractTuple):
                 return relay.Tuple([_helper(e, et) for e, et in
                                     zip(value, type.elements)])
-            elif isinstance(type, AbstractType):
-                return value
             else:
                 dtype = type_to_np_dtype(type.xtype())
                 return relay.const(value, dtype=dtype)
-        if isinstance(node.value, (Primitive, AbstractArray)):
-            # This is a hack for list_map and friends
-            # And also for scalar_to_array
-            return None
+        if node.is_constant(Primitive):
+            return self.convert_func(
+                get_prim_graph({}, node.value, node.abstract))
         return _helper(node.value, node.abstract)
 
     def on_graph(self, node):

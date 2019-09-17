@@ -34,6 +34,25 @@ def convert_grad(graph):
     return graph
 
 
+def get_prim_graph(cache, prim, typ):
+    """Make a graph that wraps a primitive."""
+    if (prim, typ) not in cache:
+        g = Graph()
+        args = []
+        tp = list(typ.xvalue())[0]
+        for t in tp.args:
+            p = g.add_parameter()
+            p.abstract = t
+            args.append(p)
+        primct = Constant(prim)
+        primct.abstract = typ
+        out = g.apply(primct, *args)
+        out.abstract = tp.output
+        g.output = out
+        cache[(prim, typ)] = g
+    return cache[(prim, typ)]
+
+
 def wrap_primitives(graph):
     """Helper function to wrap primitives.
 
@@ -42,23 +61,6 @@ def wrap_primitives(graph):
     mng = graph.manager
 
     prim_graphs = {}
-
-    def get_prim_graph(prim, typ):
-        if (prim, typ) not in prim_graphs:
-            g = Graph()
-            args = []
-            tp = list(typ.xvalue())[0]
-            for t in tp.args:
-                p = g.add_parameter()
-                p.abstract = t
-                args.append(p)
-            primct = Constant(prim)
-            primct.abstract = typ
-            out = g.apply(primct, *args)
-            out.abstract = tp.output
-            g.output = out
-            prim_graphs[(prim, typ)] = g
-        return prim_graphs[(prim, typ)]
 
     with mng.transact() as tr:
         cts = {ct for cts in mng.constants.values() for ct in cts}
@@ -71,7 +73,7 @@ def wrap_primitives(graph):
                             node.inputs[0].value in (P.array_map,
                                                      P.array_reduce)):
                             continue
-                        g = get_prim_graph(ct.value, ct.abstract)
+                        g = get_prim_graph(prim_graphs, ct.value, ct.abstract)
                         tr.set_edge(node, key, Constant(g))
 
     return graph
