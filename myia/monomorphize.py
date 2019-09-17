@@ -75,6 +75,12 @@ def _fix_type(self, a: PrimitiveFunction, spc):
         return a
 
 
+@overload
+def _fix_type(self, a: TypedPrimitive, spc):
+    return TypedPrimitive(a.prim, tuple(self(ar, spc) for ar in a.args),
+                          self(a.output, spc))
+
+
 @abstract_check.variant(
     initial_state=lambda: CheckState({}, '_no_track')
 )
