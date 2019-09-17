@@ -10,7 +10,7 @@ from ..abstract.data import (
     AbstractScalar,
 )
 from ..utils import MyiaInputTypeError
-from ..xtype import Bool, Float, Int, Object, UInt
+from ..xtype import Float, Int, Object, UInt
 
 
 class PyTorchTensor(Object):
@@ -59,7 +59,6 @@ def pytorch_dtype_to_type(dtype):
         torch.float16: Float[16],
         torch.float32: Float[32],
         torch.float64: Float[64],
-        torch.uint8: Bool,
     }
     if dtype not in _type_map:
         raise TypeError(f"Unsupported dtype {dtype}")
@@ -68,5 +67,5 @@ def pytorch_dtype_to_type(dtype):
 
 APT = AbstractArray(
     AbstractScalar({TYPE: ANYTHING, VALUE: ANYTHING}),
-    {SHAPE:  ANYTHING, TYPE: PyTorchTensor}
+    {SHAPE: ANYTHING, TYPE: PyTorchTensor}
 )

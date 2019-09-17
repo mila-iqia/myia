@@ -25,7 +25,7 @@ from ..abstract import build_value, macro, myia_static
 from ..hypermap import hyper_map
 from ..ir import Constant
 from ..prim import ops as P
-from ..utils import core
+from ..utils import MyiaValueError, core
 from ..xtype import TupleT, f32, i64, u64
 from .pytorch_abstract_types import APT, pytorch_dtype_to_type
 
@@ -130,18 +130,18 @@ async def _shp_explicit(info):
     for s in shp:
         if s < -1:
             e_msg = "New shape cannot contain value less than -1 in reshape"
-            raise ValueError(e_msg)
+            raise MyiaValueError(e_msg)
         if s == -1:
             unk_count = unk_count + 1
 
     if unk_count > 1:
         e_msg = "New shape can only contain 1 unknown (-1) dim in reshape"
-        raise ValueError(e_msg)
+        raise MyiaValueError(e_msg)
 
     if (prod(a_shp) % prod(shp) != 0 if unk_count == 1
             else prod(shp) != prod(a_shp)):
         e_msg = "Cannot change the total number of elements in reshape"
-        raise ValueError(e_msg)
+        raise MyiaValueError(e_msg)
 
     known_unk_dim = int(abs(prod(a_shp) / prod(shp)))
     shp_explicit = ()

@@ -65,12 +65,6 @@ def nnvm_distribute(c, v, shp):
     nv = c.ref(v)
     assert shp.is_constant(tuple)
     shp = (1,) if shp.value == () else shp.value
-    """
-    if shp.value == ():
-        shp = (1,)
-    else:
-        shp = shp.value
-    # """
     vshp = ashape(v)
     if len(shp) != len(vshp):
         # We need to pad the shape

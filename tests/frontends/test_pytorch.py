@@ -5,7 +5,7 @@ import pytest
 from myia import myia, value_and_grad
 from myia.api import to_device
 from myia.frontends import activate_frontend
-from myia.utils import MyiaTypeError
+from myia.utils import MyiaTypeError, MyiaValueError
 
 from ..common import MA
 
@@ -1144,7 +1144,7 @@ def test_shp_explicit_errors():
     def step1(inp):
         return f1(inp)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(MyiaValueError):
         ret1 = step1(input)  # noqa: F841
 
     def f2(x):
@@ -1154,7 +1154,7 @@ def test_shp_explicit_errors():
     def step2(inp):
         return f2(inp)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(MyiaValueError):
         ret2 = step2(input)  # noqa: F841
 
     def f3(x):
@@ -1164,7 +1164,7 @@ def test_shp_explicit_errors():
     def step3(inp):
         return f3(inp)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(MyiaValueError):
         ret3 = step3(input)  # noqa: F841
 
 

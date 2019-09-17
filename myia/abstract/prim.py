@@ -659,7 +659,7 @@ async def _inf_transpose(self, engine,
 async def _inf_gather(self, engine, input, dim, index):
     return type(input)(
         input.element,
-        {SHAPE: index.values[SHAPE], TYPE: input.xtype()}
+        {SHAPE: index.xshape(), TYPE: input.xtype()}
     )
 
 
@@ -676,12 +676,12 @@ async def _inf_scatter_add(self, engine, input, dim, index, src):
 @standard_prim(P.argmax)
 async def _inf_argmax(self, engine, input, dim):
     shp = ()
-    if dim.values[VALUE] is None:
+    if dim.xvalue() is None:
         pass
     else:
-        shp_inp = input.values[SHAPE]
+        shp_inp = input.xshape()
         for sdx, s in enumerate(shp_inp):
-            if sdx == dim.values[VALUE]:
+            if sdx == dim.xvalue():
                 shp = shp + (1,)
             else:
                 shp = shp + (s,)
@@ -694,9 +694,9 @@ async def _inf_argmax(self, engine, input, dim):
 @standard_prim(P.array_max)
 async def _inf_array_max(self, engine, input, dim):
     shp = ()
-    shp_inp = input.values[SHAPE]
+    shp_inp = input.xshape()
     for sdx, s in enumerate(shp_inp):
-        if sdx == dim.values[VALUE]:
+        if sdx == dim.xvalue():
             shp = shp + (1,)
         else:
             shp = shp + (s,)
@@ -798,7 +798,7 @@ async def _inf_max_pool2d(self, engine, input, kernel_size, stride, padding,
 
     # TODO: _shape_type should not allow float to be converted to uint
 
-    h_in, w_in = input.values[SHAPE][2:]
+    h_in, w_in = input.xshape()[2:]
 
     kernel_size = tuple(self.require_constant(
                         e, argnum=f'"1:kernel_size[{edx}]"')
@@ -810,8 +810,8 @@ async def _inf_max_pool2d(self, engine, input, kernel_size, stride, padding,
     dilation = tuple(self.require_constant(e, argnum=f'"4:dilation[{edx}]"')
                      for edx, e in enumerate(dilation.elements))
 
-    N = input.values[SHAPE][0]
-    C_out = input.values[SHAPE][1]
+    N = input.xshape()[0]
+    C_out = input.xshape()[1]
 
     # Based on formulae in shape section of:
     # https://pytorch.org/docs/stable/nn.html#torch.nn.MaxPool2d
