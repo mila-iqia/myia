@@ -3,6 +3,8 @@
 import numpy as np
 import tvm
 from tvm import relay
+from tvm.relay import adt
+from tvm.relay.backend import interpreter
 
 from ...abstract import (
     AbstractArray,
@@ -18,15 +20,17 @@ from ...abstract import (
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import overload
+from ...utils import overload, TaggedValue
 from ...xtype import Bool, Nil, type_to_np_dtype
 from ..transform import wrap_result, get_prim_graph
 from . import ConcreteBackend, HandleBackend
 from .relay_helpers import add_functions, optimize
 
+relay_from_scalar = tvm.get_global_func('relay.from_scalar')
+
 
 @wrap_result.register
-def wrap_result(self, data: relay.backend.interpreter.TupleValue):
+def wrap_result(self, data: interpreter.TupleValue):
     """Wrap tuples from relay."""
     return tuple(self(d) for d in data)
 
@@ -201,6 +205,24 @@ def relay_tuple_getitem(c, t, idx):
     return relay.expr.TupleGetItem(c.ref(t), idx.value)
 
 
+def relay_casttag(c, x, tag):
+    assert tag.is_constant(int)
+    v = relay.Var("v")
+    rtag = c.tag_map[tag.value]
+    clause = adt.Clause(adt.PatternConstructor(rtag, [adt.PatternVar(v)]), v)
+    return adt.Match(c.ref(x), [clause], complete=False)
+
+
+def relay_hastag(c, x, tag):
+    assert tag.is_constant(int)
+    rtag = c.tag_map[tag.value]
+    v = relay.Var("v")
+    t_clause = adt.Clause(adt.PatternConstructor(rtag, [adt.PatternVar(v)]),
+                          relay.const(True))
+    f_clause = adt.Clause(adt.PatternWildcard(), relay.const(False))
+    return adt.Match(c.ref(x), [t_clause, f_clause])
+
+
 COMPLEX_MAP = {
     P.partial: relay_partial,
     P.distribute: relay_distribute,
@@ -210,6 +232,8 @@ COMPLEX_MAP = {
     P.array_reduce: relay_array_reduce,
     P.scalar_to_array: lambda c, x, t: c.ref(x),
     P.tuple_getitem: relay_tuple_getitem,
+    P.casttag: relay_casttag,
+    P.hastag: relay_hastag,
 }
 
 
@@ -289,6 +313,7 @@ class CompileGraph:
 
         self.module = relay.Module({})
         self.union_type = relay.GlobalTypeVar('$_union_adt')
+        self.module._myia_union_type = self.union_type
         self.build_union_adt(mng)
 
         # Analyze and create a global union type of all the possible types
@@ -318,8 +343,21 @@ class CompileGraph:
                                      target=target)
         res = exec.evaluate(self.module["main"])
 
-        def f(*args, **kwargs):
-            return wrap_result(res(*args, **kwargs))
+        def _conv(value, type):
+            if isinstance(type, AbstractTuple):
+                return interpreter.TupleValue(*[_conv(e, et) for e, et in
+                                                zip(value, type.elements)])
+            if isinstance(type, AbstractTaggedUnion):
+                ctr = self.tag_map[value.tag]
+                conv_val = _conv(value.value, type.options.get(value.tag))
+                return interpreter.ConstructorValue(ctr.tag, [conv_val], None)
+            dtype = type_to_np_dtype(type.xtype())
+            return relay_from_scalar(value, dtype)
+
+        types = [p.abstract for p in graph.parameters]
+        def f(*args):
+            args = tuple(_conv(arg, typ) for arg, typ in zip(args, types))
+            return wrap_result(res(*args))
         return f
 
     def build_union_adt(self, mng):
@@ -330,11 +368,10 @@ class CompileGraph:
                 for opt in node.abstract.options:
                     if opt[0] not in self.tag_map:
                         t = to_relay_type(opt[1], self.module)
-                        self.tag_map[opt[0]] = relay.adt.Constructor(
-                            "c{opt[0]}", [t], self.union_type)
-        self.module[self.union_type] = relay.adt.TypeData(
+                        self.tag_map[opt[0]] = adt.Constructor(
+                            f"c{opt[0]}", [t], self.union_type)
+        self.module[self.union_type] = adt.TypeData(
             self.union_type, [], list(self.tag_map.values()))
-        self.module._myia_union_type = self.union_type
 
     def on_parameter(self, node):
         """Convert a parameter node."""
@@ -352,19 +389,25 @@ class CompileGraph:
         return relay.Call(self.ref(node.inputs[0]),
                           [self.ref(i) for i in node.inputs[1:]])
 
+    def make_const(self, value, type):
+        """Convert to a relay value."""
+        if isinstance(type, AbstractTuple):
+            return relay.Tuple([self.make_const(e, et) for e, et in
+                                zip(value, type.elements)])
+        if isinstance(type, AbstractTaggedUnion):
+            ctr = self.tag_map[value.tag]
+            return ctr(self.make_const(value.value,
+                                       type.options.get(value.tag)))
+        else:
+            dtype = type_to_np_dtype(type.xtype())
+            return relay.const(value, dtype=dtype)
+
     def on_constant(self, node):
         """Convert a constant node."""
-        def _helper(value, type):
-            if isinstance(type, AbstractTuple):
-                return relay.Tuple([_helper(e, et) for e, et in
-                                    zip(value, type.elements)])
-            else:
-                dtype = type_to_np_dtype(type.xtype())
-                return relay.const(value, dtype=dtype)
         if node.is_constant(Primitive):
             return self.convert_func(
                 get_prim_graph({}, node.value, node.abstract))
-        return _helper(node.value, node.abstract)
+        return self.make_const(node.value, node.abstract)
 
     def on_graph(self, node):
         """Convert a graph constant."""
@@ -435,7 +478,7 @@ class RelayBackend(ConcreteBackend):
 
     def to_scalar(self, v):
         """Convert the TVM array to a scalar."""
-        if isinstance(v, (relay.backend.interpreter.TupleValue, tuple)):
+        if isinstance(v, (interpreter.TupleValue, tuple)):
             assert len(v) == 0
             return None
         else:
