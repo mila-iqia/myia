@@ -248,6 +248,31 @@ class RelayMapper:
 MAP = RelayMapper(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 
 
+class NodeVisitor:
+    """Visitor for node enumeration."""
+    def _visit_array_map(self, node):
+        return node.inputs[2:]
+
+    def _visit_array_reduce(self, node):
+        return node.inputs[2:]
+
+    def _visit_scalar_to_array(self, node):
+        return [node.inputs[1]]
+
+    def __call__(self, node):
+        """Don't visit called primitives."""
+        if node.inputs:
+            if node.inputs[0].is_constant(Primitive):
+                prim = node.inputs[0].value
+                visit = getattr(self, f'_visit_{prim}', None)
+                if visit is None:
+                    return node.inputs[1:]
+                return visit(node)
+            else:
+                return node.inputs
+        return []
+
+
 class CompileGraph:
     """Step to convert a myia graph to a relay graph.
 
@@ -363,16 +388,7 @@ class CompileGraph:
 
         params = [self.ref(p) for p in graph.parameters]
 
-        def visit_noprimfunc(node):
-            """Don't visit called primitives."""
-            if node.inputs:
-                if node.inputs[0].is_constant(Primitive):
-                    return node.inputs[1:]
-                else:
-                    return node.inputs
-            return []
-
-        for node in toposort(graph.output, visit_noprimfunc):
+        for node in toposort(graph.output, NodeVisitor()):
             if node.is_apply():
                 self.node_map[node] = self.on_apply(node)
             elif node.is_constant_graph():
