@@ -329,7 +329,7 @@ class CompileGraph:
             if isinstance(node.abstract, AbstractTaggedUnion):
                 for opt in node.abstract.options:
                     if opt[0] not in self.tag_map:
-                        t = to_relay_type(opt[1])
+                        t = to_relay_type(opt[1], self.module)
                         self.tag_map[opt[0]] = relay.adt.Constructor(
                             "c{opt[0]}", [t], self.union_type)
         self.module[self.union_type] = relay.adt.TypeData(
