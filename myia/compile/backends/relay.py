@@ -21,7 +21,7 @@ from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
 from ...utils import overload, TaggedValue
-from ...xtype import Bool, Nil, type_to_np_dtype
+from ...xtype import Bool, Nil, type_to_np_dtype, Number
 from ..transform import wrap_result, get_prim_graph
 from . import ConcreteBackend, HandleBackend
 from .relay_helpers import add_functions, optimize
@@ -347,12 +347,21 @@ class CompileGraph:
             if isinstance(type, AbstractTuple):
                 return interpreter.TupleValue(*[_conv(e, et) for e, et in
                                                 zip(value, type.elements)])
-            if isinstance(type, AbstractTaggedUnion):
+            elif isinstance(type, AbstractTaggedUnion):
                 ctr = self.tag_map[value.tag]
                 conv_val = _conv(value.value, type.options.get(value.tag))
                 return interpreter.ConstructorValue(ctr.tag, [conv_val], None)
-            dtype = type_to_np_dtype(type.xtype())
-            return relay_from_scalar(value, dtype)
+            elif isinstance(type, AbstractScalar):
+                xt = type.xtype()
+                if issubclass(xt, (Number, Bool)):
+                    dtype = type_to_np_dtype(xt)
+                    return relay_from_scalar(value, dtype)
+                elif xt is Nil:
+                    return interpreter.TupleValue()
+                else:
+                    raise ValueError(f"unsupported scalar {xt}")
+            else:
+                raise ValueError(f"unsupported {type}")
 
         types = [p.abstract for p in graph.parameters]
         def f(*args):
