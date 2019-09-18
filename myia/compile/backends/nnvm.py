@@ -12,7 +12,6 @@ from tvm.contrib import graph_runtime
 from ...abstract import AbstractArray
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...xtype import Nil, type_to_np_dtype
 from ..cconv import closure_convert
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
@@ -363,6 +362,10 @@ nnvm_convert = converter.convert
 class NNVMInputConverter(Converter):
     """Convert values to NNVM."""
 
+    def __init__(self, context):
+        """Set the context."""
+        self.context = context
+
     def convert_array(self, a, t):
         """Make an NNVM array from a numpy array."""
         return tvm.ndarray.array(a, self.context)
@@ -403,7 +406,7 @@ class NNVMBackend(Backend):
         self.compiler = CompileGraphs(
             lambda l: converter.convert(l, context=self.context),
             nonlinear_ops, self)
-        self.to_backend_value = NNVMInputConverter()
+        self.to_backend_value = NNVMInputConverter(self.context)
         self.from_backend_value = NNVMOutputConverter()
 
     def compile(self, graph, *others):

@@ -67,7 +67,7 @@ def _fix_type(self, a: GraphFunction, spc):
         return DummyFunction()
 
 
-@overload
+@overload  # noqa: F811
 def _fix_type(self, a: PrimitiveFunction, spc):
     try:
         return spc.analyze_function(None, a, None)[0].abstract.get_unique()
@@ -75,7 +75,7 @@ def _fix_type(self, a: PrimitiveFunction, spc):
         return a
 
 
-@overload
+@overload  # noqa: F811
 def _fix_type(self, a: TypedPrimitive, spc):
     return TypedPrimitive(a.prim, tuple(self(ar, spc) for ar in a.args),
                           self(a.output, spc))

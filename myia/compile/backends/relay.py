@@ -1,6 +1,5 @@
 """Transforms a graph into lower-level code."""
 
-import numpy as np
 import tvm
 from tvm import relay
 from tvm.relay import adt
@@ -12,7 +11,6 @@ from ...abstract import (
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
-    AbstractType,
     PartialApplication,
     TypedPrimitive,
     VirtualFunction,
@@ -20,10 +18,9 @@ from ...abstract import (
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import TaggedValue, overload
-from ...xtype import Bool, Nil, Number, type_to_np_dtype
+from ...xtype import Bool, Nil, type_to_np_dtype
 from ..transform import get_prim_graph, wrap_result
-from . import ConcreteBackend, HandleBackend
+from . import Backend, Converter, HandleBackend
 from .channel import handle
 from .relay_helpers import add_functions, optimize
 

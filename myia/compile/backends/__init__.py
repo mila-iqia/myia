@@ -222,7 +222,7 @@ class Converter:
             elif issubclass(t.xtype(), xtype.Nil):
                 return self.convert_nil(v, t.xtype())
             elif issubclass(t.xtype(), xtype.EnvType):
-                return self.convert_env(c, t.xtype())
+                return self.convert_env(v, t.xtype())
             else:
                 raise NotImplementedError(f'convert for scalar {t.xtype()}')
         elif isinstance(t, abstract.AbstractTuple):
