@@ -366,7 +366,8 @@ def to_canonical(self, arg, orig_t: AbstractUnion):
 def to_canonical(self, arg, orig_t: AbstractHandle):
     if not isinstance(arg, HandleInstance):
         raise MyiaInputTypeError(f'Expected handle')
-    return HandleInstance(self(arg.initial, orig_t.element))
+    arg.state = self(arg.state, orig_t.element)
+    return arg
 
 
 @overload  # noqa: F811
@@ -433,9 +434,8 @@ def from_canonical(self, arg, orig_t: AbstractArray):
 
 @overload  # noqa: F811
 def from_canonical(self, arg, orig_t: AbstractHandle):
-    # TODO: IMPORTANT: this should ignore arg.initial and fetch the actual
-    # value from the universe
-    return HandleInstance(self(arg.initial, orig_t.element))
+    arg.state = self(arg.state, orig_t.element)
+    return arg
 
 
 @overload  # noqa: F811

@@ -651,7 +651,7 @@ class AbstractJTagged(AbstractWrapper):
         return pretty_call(ctx, "J", self.element)
 
 
-class AbstractHandle(AbstractStructure):
+class AbstractHandle(AbstractWrapper):
     """Represents a value (non-function) transformed through J."""
 
     def __init__(self, element, values={}):
