@@ -18,16 +18,18 @@ from ...abstract import (
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
+from ...utils import TaggedValue, overload
 from ...xtype import Bool, Nil, type_to_np_dtype
 from ..transform import get_prim_graph, wrap_result
 from . import Backend, Converter, HandleBackend
-from .channel import handle
+from ..channel import handle
 from .relay_helpers import add_functions, optimize
 
 relay_from_scalar = tvm.get_global_func('relay.from_scalar')
 
 union_type = relay.GlobalTypeVar('$_union_adt')
 tag_map = {}
+rev_tag_map = {}
 
 
 def get_relay_ctr(tag, t):
@@ -35,6 +37,7 @@ def get_relay_ctr(tag, t):
     if tag not in tag_map:
         rt = to_relay_type(t)
         tag_map[tag] = adt.Constructor(f"c{tag}", [rt], union_type)
+        rev_tag_map[tag_map[tag]] = tag
     return tag_map[tag]
 
 
@@ -218,7 +221,7 @@ def relay_casttag(c, x, tag):
     """Implementation of casttag for Relay."""
     assert tag.is_constant(int)
     v = relay.Var("v")
-    rtag = c.tag_map[tag.value]
+    rtag = tag_map[tag.value]
     clause = adt.Clause(adt.PatternConstructor(rtag, [adt.PatternVar(v)]), v)
     return adt.Match(c.ref(x), [clause], complete=False)
 
@@ -226,7 +229,7 @@ def relay_casttag(c, x, tag):
 def relay_hastag(c, x, tag):
     """Implementation of hastag for Relay."""
     assert tag.is_constant(int)
-    rtag = c.tag_map[tag.value]
+    rtag = tag_map[tag.value]
     v = relay.Var("v")
     t_clause = adt.Clause(adt.PatternConstructor(rtag, [adt.PatternVar(v)]),
                           relay.const(True))
@@ -237,7 +240,7 @@ def relay_hastag(c, x, tag):
 def relay_tagged(c, x, tag):
     """Implementation of tagged for Relay."""
     assert tag.is_constant(int)
-    rtag = c.tag_map[tag.value]
+    rtag = tag_map[tag.value]
     return rtag(c.ref(x))
 
 
@@ -366,7 +369,6 @@ class CompileGraph:
 
     def build_union_adt(self, mng):
         """Build an ADT to represent union types."""
-        self.tag_map = dict()
         for node in mng.all_nodes:
             if isinstance(node.abstract, AbstractTaggedUnion):
                 for opt in node.abstract.options:
@@ -396,7 +398,7 @@ class CompileGraph:
             return relay.Tuple([self.make_const(e, et) for e, et in
                                 zip(value, type.elements)])
         if isinstance(type, AbstractTaggedUnion):
-            ctr = self.tag_map[value.tag]
+            ctr = tag_map[value.tag]
             return ctr(self.make_const(value.value,
                                        type.options.get(value.tag)))
         else:
@@ -472,12 +474,13 @@ class RelayInputConverter(Converter):
         return interpreter.TupleValue()
 
     def convert_tuple(self, v, t):
-        return interpreter.TupleValue(*[self.convert(e, et) for e, et in
+        return interpreter.TupleValue(*[self(e, et) for e, et in
                                         zip(v, t.elements)])
 
     def convert_tagged(self, v, t):
-        ctr = self.tag_map[v.tag]
-        conv_val = self.convert(v.value, t.options.get(v.tag))
+        real_t = t.options.get(v.tag)
+        ctr = get_relay_ctr(v.tag, real_t)
+        conv_val = self.convert(v.value, real_t)
         return interpreter.ConstructorValue(ctr.tag, [conv_val], None)
 
 
@@ -493,9 +496,17 @@ class RelayOutputConverter(Converter):
         assert len(v) == 0
         return None
 
+    def convert_bool(self, v, t):
+        return v.asnumpy().item()
+
     def convert_scalar(self, v, t):
         """Convert the TVM array to a scalar."""
         return v.asnumpy().item()
+
+    def convert_tagged(self, v, t):
+        tag = rev_tag_map[v.constructor]
+        conv_val = self(v.fields[0], t.options.get(tag))
+        return TaggedValue(tag, conv_val)
 
 
 class RelayBackend(Backend):

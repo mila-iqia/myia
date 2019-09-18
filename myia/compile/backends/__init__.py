@@ -202,15 +202,15 @@ class Converter:
 
     def convert_tuple(self, v, t):
         """Convert a tuple."""
-        return tuple((self.convert(v, t)
-                      for v, t in zip(v, t.elements)), t)
+        return tuple(self(v, t)
+                     for v, t in zip(v, t.elements))
 
     def convert_tagged(self, v, t):
         """Convert a union value."""
         real_t = t.options.get(v.tag)
-        return TaggedValue(v.tag, self.convert(v.value, real_t))
+        return TaggedValue(v.tag, self(v.value, real_t))
 
-    def convert(self, v, t):
+    def __call__(self, v, t):
         """Convert a value."""
         if isinstance(t, abstract.AbstractArray):
             return self.convert_array(v, t)
