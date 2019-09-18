@@ -11,6 +11,7 @@ from .abstract import (
     AbstractArray,
     AbstractClassBase,
     AbstractDict,
+    AbstractHandle,
     AbstractKeywordArgument,
     AbstractScalar,
     AbstractTaggedUnion,
@@ -29,7 +30,7 @@ from .classes import Cons, Empty
 from .compile import BackendValue
 from .ir import Constant
 from .operations import primitives as P
-from .utils import MyiaInputTypeError, TaggedValue, overload
+from .utils import HandleInstance, MyiaInputTypeError, TaggedValue, overload
 from .xtype import Int, NDArray, String
 
 ####################
@@ -362,6 +363,13 @@ def to_canonical(self, arg, orig_t: AbstractUnion):
 
 
 @overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractHandle):
+    if not isinstance(arg, HandleInstance):
+        raise MyiaInputTypeError(f'Expected handle')
+    return HandleInstance(self(arg.initial, orig_t.element))
+
+
+@overload  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractScalar):
     if not typecheck(orig_t, from_value(arg)):
         raise MyiaInputTypeError(
@@ -421,6 +429,13 @@ def from_canonical(self, arg, orig_t: AbstractScalar):
 @overload  # noqa: F811
 def from_canonical(self, arg, orig_t: AbstractArray):
     return orig_t.xtype().from_numpy(arg)
+
+
+@overload  # noqa: F811
+def from_canonical(self, arg, orig_t: AbstractHandle):
+    # TODO: IMPORTANT: this should ignore arg.initial and fetch the actual
+    # value from the universe
+    return HandleInstance(self(arg.initial, orig_t.element))
 
 
 @overload  # noqa: F811

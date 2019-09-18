@@ -651,6 +651,17 @@ class AbstractJTagged(AbstractWrapper):
         return pretty_call(ctx, "J", self.element)
 
 
+class AbstractHandle(AbstractStructure):
+    """Represents a value (non-function) transformed through J."""
+
+    def __init__(self, element, values={}):
+        """Initialize an AbstractHandle."""
+        super().__init__(element, values)
+
+    def __pretty__(self, ctx):
+        return pretty_call(ctx, "H", self.element)
+
+
 class AbstractUnion(AbstractStructure):
     """Represents the union of several possible abstract types.
 
@@ -955,6 +966,7 @@ __all__ = [
     'AbstractError',
     'AbstractExternal',
     'AbstractFunction',
+    'AbstractHandle',
     'AbstractJTagged',
     'AbstractKeywordArgument',
     'AbstractScalar',
