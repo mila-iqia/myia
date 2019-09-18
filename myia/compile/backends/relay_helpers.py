@@ -5,7 +5,12 @@ Most of those should go away as Relay main development progresses.
 
 import numpy as np
 from tvm import relay
-from tvm.relay import transform
+from tvm.relay import transform, adt
+
+union_type = relay.GlobalTypeVar('$_union_adt')
+empty_union = adt.Constructor("c_empty", [], union_type)
+tag_map = {} #{None: empty_union}
+rev_tag_map = {}
 
 
 def _placeholder_body(type):
@@ -24,6 +29,11 @@ def _placeholder_body(type):
             params,
             _placeholder_body(type.ret_type),
             ret_type=type.ret_type)
+    elif isinstance(type, relay.TypeCall):
+        if type.func == union_type:
+            return empty_union()
+        else:
+            raise ValueError(f"Can't build value for union: {type.func}")
     else:
         raise ValueError(f"Can't build value of type {type}")
 

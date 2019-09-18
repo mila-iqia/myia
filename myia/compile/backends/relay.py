@@ -23,13 +23,9 @@ from ...xtype import Bool, Nil, type_to_np_dtype
 from ..transform import get_prim_graph, wrap_result
 from . import Backend, Converter, HandleBackend
 from ..channel import handle
-from .relay_helpers import add_functions, optimize
+from .relay_helpers import add_functions, optimize, union_type, tag_map, rev_tag_map
 
 relay_from_scalar = tvm.get_global_func('relay.from_scalar')
-
-union_type = relay.GlobalTypeVar('$_union_adt')
-tag_map = {}
-rev_tag_map = {}
 
 
 def get_relay_ctr(tag, t):
@@ -339,7 +335,6 @@ class CompileGraph:
         # Analyze and create a global union type of all the possible types
         # and then use it for all union values.
 
-        self.module._myia_adt_map = {}
         function_map = {}
         self.node_map = {}
         self.graph_map = {}
@@ -480,7 +475,7 @@ class RelayInputConverter(Converter):
     def convert_tagged(self, v, t):
         real_t = t.options.get(v.tag)
         ctr = get_relay_ctr(v.tag, real_t)
-        conv_val = self.convert(v.value, real_t)
+        conv_val = self(v.value, real_t)
         return interpreter.ConstructorValue(ctr.tag, [conv_val], None)
 
 
