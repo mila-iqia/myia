@@ -31,9 +31,9 @@ relay_from_scalar = tvm.get_global_func('relay.from_scalar')
 
 
 @wrap_result.register
-def wrap_result(self, data: interpreter.TupleValue):
+def wrap_result(data: interpreter.TupleValue):
     """Wrap tuples from relay."""
-    return tuple(self(d) for d in data)
+    return tuple(handle(d) for d in data)
 
 
 @overload(bootstrap=True)

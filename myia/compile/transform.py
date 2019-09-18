@@ -79,18 +79,18 @@ def wrap_primitives(graph):
     return graph
 
 
-@overload(bootstrap=True)
-def wrap_result(self, data: tuple):
+@overload
+def wrap_result(data: tuple):
     """Function to wrap final results in a handle.
 
     This leaves first-level tuples alone so that we support multiple
     value returns more naturally.
     """
-    return tuple(self(d) for d in data)
+    return tuple(handle(d) for d in data)
 
 
 @overload  # noqa: F811
-def wrap_result(self, data: object):
+def wrap_result(data: object):
     return handle(data)
 
 
