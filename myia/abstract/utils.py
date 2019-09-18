@@ -25,6 +25,7 @@ from .data import (
     AbstractTuple,
     AbstractUnion,
     AbstractValue,
+    AbstractWrapper,
     JTransformedFunction,
     PartialApplication,
     Possibilities,
@@ -308,7 +309,7 @@ def abstract_clone(self, x: AbstractDict, *args):
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractArray, *args):
+def abstract_clone(self, x: AbstractWrapper, *args):
     return (yield type(x))(self(x.element, *args), self(x.values, *args))
 
 
@@ -330,11 +331,6 @@ def abstract_clone(self, x: AbstractUnion, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractTaggedUnion, *args):
     return (yield AbstractTaggedUnion)(self(x.options, *args))
-
-
-@overload  # noqa: F811
-def abstract_clone(self, x: AbstractJTagged, *args):
-    return (yield AbstractJTagged)(self(x.element, *args))
 
 
 @overload  # noqa: F811
