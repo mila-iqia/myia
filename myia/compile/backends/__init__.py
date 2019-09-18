@@ -176,72 +176,61 @@ class Backend:
         raise NotImplementedError('to_backend_value')
 
 
-class ConcreteBackend(Backend):
-    """This is a collection of helpers to define a backend."""
+class Converter:
+    """Converts values between representations for backends."""
 
-    def from_numpy(self, v):
-        """Convert a numpy.ndarray to a backend value."""
-        raise NotImplementedError("from_numpy")
+    def convert_array(self, v, t):
+        """Converts array values."""
+        raise NotImplementedError("convert_numpy")
 
-    def to_numpy(self, v):
-        """Convert a backend value to a numpy.ndarray."""
-        raise NotImplementedError("to_numpy")
+    def convert_scalar(self, v, t):
+        """Convert numeric scalars."""
+        raise NotImplementedError("convert_scalar")
 
-    def from_scalar(self, s, t):
-        """Convert the python scalar to a backend value with explicit type."""
-        raise NotImplementedError('from_scalar')
+    def convert_nil(self, v, t):
+        """Convert Nil values."""
+        return None
 
-    def to_scalar(self, v):
-        """Convert the backend value to a python scalar."""
-        raise NotImplementedError('to_scalar')
+    def convert_bool(self, v, t):
+        """Convert boolean values."""
+        return v
 
-    def empty_env(self):
-        """An empty grad environment for the backend."""
+    def convert_env(self, v, t):
+        """Convert a grad env."""
+        assert len(v) == 0
         return ()
 
-    def from_backend_value(self, v, t):
-        """Convert a backend value to an intermediate value."""
-        if isinstance(t, abstract.AbstractScalar):
-            return self.to_scalar(v)
-        elif isinstance(t, abstract.AbstractArray):
-            res = self.to_numpy(v)
-            # Some backends will use 1d instead of 0d for internal reasons.
-            if res.shape != t.values[abstract.SHAPE]:
-                res = res.reshape(t.values[abstract.SHAPE])
-            return res
-        elif isinstance(t, abstract.AbstractTuple):
-            return tuple(self.from_backend_value(ve, te)
-                         for ve, te in zip(v, t.elements))
-        elif isinstance(t, abstract.AbstractTaggedUnion):
-            return TaggedValue(v.tag, self.from_backend_value(
-                v.value, t.options.get(v.tag)))
-        else:
-            raise NotImplementedError(f"Don't know what to do for {t}")
+    def convert_tuple(self, v, t):
+        """Convert a tuple."""
+        return tuple((self.convert(v, t)
+                      for v, t in zip(v, t.elements)), t)
 
-    def to_backend_value(self, v, t):
-        """Convert an intermediate value to a backend value."""
-        if (isinstance(t, (abstract.AbstractError, abstract.AbstractType))
-                or v is abstract.DEAD):
-            return None
+    def convert_tagged(self, v, t):
+        """Convert a union value."""
+        real_t = t.options.get(v.tag)
+        return TaggedValue(v.tag, self.convert(v.value, real_t))
+
+    def convert(self, v, t):
+        """Convert a value."""
         if isinstance(t, abstract.AbstractArray):
-            return self.from_numpy(v)
+            return self.convert_array(v, t)
         elif isinstance(t, abstract.AbstractScalar):
-            if issubclass(t.values[abstract.TYPE],
-                          (xtype.Number, xtype.Bool, xtype.Nil)):
-                return self.from_scalar(v, t.values[abstract.TYPE])
-            elif issubclass(t.values[abstract.TYPE], xtype.EnvType):
-                assert len(v._contents) == 0
-                return self.empty_env()
+            if issubclass(t.xtype(), xtype.Number):
+                return self.convert_scalar(v, t.xtype())
+            elif issubclass(t.xtype(), xtype.Bool):
+                return self.convert_bool(v, t.xtype())
+            elif issubclass(t.xtype(), xtype.Nil):
+                return self.convert_nil(v, t.xtype())
+            elif issubclass(t.xtype(), xtype.EnvType):
+                return self.convert_env(c, t.xtype())
             else:
-                raise NotImplementedError(f'to_backend_value for {t}')
+                raise NotImplementedError(f'convert for scalar {t.xtype()}')
         elif isinstance(t, abstract.AbstractTuple):
-            return tuple(self.to_backend_value(v, t)
-                         for v, t in zip(v, t.elements))
+            return self.convert_tuple(v, t)
         elif isinstance(t, abstract.AbstractTaggedUnion):
-            real_t = t.options.get(v.tag)
-            return TaggedValue(v.tag, self.to_backend_value(v.value, real_t))
+            return self.convert_tagged(v, t)
         else:
-            raise NotImplementedError(f'to_backend_value for {t}')
+            raise NotImplementedError(f'convert for {t}')
 
 
 def _close_and_wait(stream):

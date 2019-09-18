@@ -6,11 +6,10 @@ import torch
 from ...ir import manage
 from ...operations import Primitive, primitives as P
 from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
-from ..transform import CompileGraphs, nonlinear_ops
-from . import ConcreteBackend, HandleBackend
-from .pytorch_conv_grad import conv2d_input, conv2d_weight
 from ..cconv import closure_convert
-
+from ..transform import CompileGraphs, nonlinear_ops
+from . import Backend, Converter, HandleBackend
+from .pytorch_conv_grad import conv2d_input, conv2d_weight
 
 _type_map = {
     Int[8]: torch.int8,
@@ -359,7 +358,36 @@ def pytorch_convert(lst, backend):
     return impl, inputs, [op]
 
 
-class PyTorchBackend(ConcreteBackend):
+class PyTorchInputConverter(Converter):
+    """Converts values to pytorch."""
+
+    def convert_array(self, a, t):
+        """Make a torch tensor from a numpy array."""
+        return torch.from_numpy(a).to(self.device)
+
+    def convert_scalar(self, s, t):
+        """Convert a scalar to a torch tensor."""
+        if s is None:
+            return None
+        dt = type_to_np_dtype(t)
+        return np.asarray(s, dtype=dt)
+
+
+class PyTorchOutputConverter(Converter):
+    """Convert value from pytorch."""
+
+    def convert_array(self, v, t):
+        """Make a numpy array from a torch tensor."""
+        if v.is_cuda:
+            v = v.cpu()
+        return v.detach().numpy()
+
+    def convert_scalar(self, v, t):
+        """Convert a torch tensor to a scalar."""
+        return v.item()
+
+
+class PyTorchBackend(Backend):
     """Backend to run using pytorch.
 
     Backend options:
@@ -372,36 +400,14 @@ class PyTorchBackend(ConcreteBackend):
         self.device = torch.device(device)
         self.compiler = CompileGraphs(lambda lst: pytorch_convert(lst, self),
                                       nonlinear_ops, self, split_linear=True)
+        self.to_backend_value = PyTorchInputConverter()
+        self.from_backend_value = PyTorchOutputConverter()
 
     def compile(self, graph, *others):
         """Compile a graph."""
         manage(graph)
         graph = closure_convert(graph)
         return self.compiler.compile_and_link(graph)
-
-    def to_numpy(self, v):
-        """Make a numpy array from a torch tensor."""
-        if v.is_cuda:
-            v = v.cpu()
-        return v.detach().numpy()
-
-    def from_numpy(self, a):
-        """Make a torch tensor from a numpy array."""
-        return torch.from_numpy(a).to(self.device)
-
-    def to_scalar(self, v):
-        """Convert a torch tensor to a scalar."""
-        if (v is None) or (v is True) or (v is False) or (isinstance(v, str)):
-            return v
-        else:
-            return v.item()
-
-    def from_scalar(self, s, t):
-        """Convert a scalar to a torch tensor."""
-        if s is None:
-            return None
-        dt = type_to_np_dtype(t)
-        return np.asarray(s, dtype=dt)
 
 
 def PyTorchBackendR(device):

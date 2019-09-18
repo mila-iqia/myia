@@ -13,11 +13,10 @@ from ...abstract import AbstractArray
 from ...ir import manage
 from ...operations import Primitive, primitives as P
 from ...xtype import Nil, type_to_np_dtype
+from ..cconv import closure_convert
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
-from . import ConcreteBackend, HandleBackend
-from ..cconv import closure_convert
-
+from . import Backend, Converter, HandleBackend
 
 nonlinear_ops = list(nonlinear_ops)
 nonlinear_ops.append(P.scalar_cast)
@@ -361,7 +360,32 @@ converter = NNVMConverter(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 nnvm_convert = converter.convert
 
 
-class NNVMBackend(ConcreteBackend):
+class NNVMInputConverter(Converter):
+    """Convert values to NNVM."""
+
+    def convert_array(self, a, t):
+        """Make an NNVM array from a numpy array."""
+        return tvm.ndarray.array(a, self.context)
+
+    def convert_scalar(self, s, t):
+        """Convert the scalar to an NNVM array."""
+        dt = type_to_np_dtype(t)
+        return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
+
+
+class NNVMOutputConverter(Converter):
+    """Convert values from NNVM."""
+
+    def convert_array(self, v, t):
+        """Make a numpy array from a NNVM array."""
+        return v.asnumpy()
+
+    def convert_scalar(self, v, t):
+        """Convert the NNVM array to a scalar."""
+        return v.asnumpy().item()
+
+
+class NNVMBackend(Backend):
     """Backend to compile for NNVM.
 
     Backend options:
@@ -379,34 +403,14 @@ class NNVMBackend(ConcreteBackend):
         self.compiler = CompileGraphs(
             lambda l: converter.convert(l, context=self.context),
             nonlinear_ops, self)
+        self.to_backend_value = NNVMInputConverter()
+        self.from_backend_value = NNVMOutputConverter()
 
     def compile(self, graph, *others):
         """Compile a graph."""
         manage(graph)
         graph = closure_convert(graph)
         return self.compiler.compile_and_link(graph)
-
-    def to_numpy(self, v):
-        """Make a numpy array from a NNVM array."""
-        return v.asnumpy()
-
-    def from_numpy(self, a):
-        """Make an NNVM array from a numpy array."""
-        return tvm.ndarray.array(a, self.context)
-
-    def to_scalar(self, v):
-        """Convert the NNVM array to a scalar."""
-        if v is None:
-            return v
-        else:
-            return v.asnumpy().item()
-
-    def from_scalar(self, s, t):
-        """Convert the scalar to an NNVM array."""
-        if t == Nil:
-            return None
-        dt = type_to_np_dtype(t)
-        return self.from_numpy(np.array(s, dtype=dt, copy=False, ndmin=1))
 
 
 def NNVMBackendR(target, device_id):

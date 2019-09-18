@@ -24,6 +24,8 @@ def _placeholder_body(type):
             params,
             _placeholder_body(type.ret_type),
             ret_type=type.ret_type)
+    else:
+        raise ValueError(f"Can't build value of type {type}")
 
 
 def add_functions(mod, funcs):

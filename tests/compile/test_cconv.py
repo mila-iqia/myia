@@ -1,8 +1,8 @@
 from pytest import mark
 
+from myia.compile import closure_convert
 from myia.ir import manage
 from myia.pipeline import scalar_debug_pipeline
-from myia.compile import closure_convert
 
 
 def step_cconv(graph):

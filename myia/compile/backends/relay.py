@@ -10,9 +10,9 @@ from ...abstract import (
     AbstractArray,
     AbstractFunction,
     AbstractScalar,
+    AbstractTaggedUnion,
     AbstractTuple,
     AbstractType,
-    AbstractTaggedUnion,
     PartialApplication,
     TypedPrimitive,
     VirtualFunction,
@@ -20,10 +20,11 @@ from ...abstract import (
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import overload, TaggedValue
-from ...xtype import Bool, Nil, type_to_np_dtype, Number
-from ..transform import wrap_result, get_prim_graph
+from ...utils import TaggedValue, overload
+from ...xtype import Bool, Nil, Number, type_to_np_dtype
+from ..transform import get_prim_graph, wrap_result
 from . import ConcreteBackend, HandleBackend
+from .channel import handle
 from .relay_helpers import add_functions, optimize
 
 relay_from_scalar = tvm.get_global_func('relay.from_scalar')
@@ -206,6 +207,7 @@ def relay_tuple_getitem(c, t, idx):
 
 
 def relay_casttag(c, x, tag):
+    """Implementation of casttag for Relay."""
     assert tag.is_constant(int)
     v = relay.Var("v")
     rtag = c.tag_map[tag.value]
@@ -214,6 +216,7 @@ def relay_casttag(c, x, tag):
 
 
 def relay_hastag(c, x, tag):
+    """Implementation of hastag for Relay."""
     assert tag.is_constant(int)
     rtag = c.tag_map[tag.value]
     v = relay.Var("v")
