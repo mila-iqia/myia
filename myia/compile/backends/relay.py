@@ -226,6 +226,13 @@ def relay_hastag(c, x, tag):
     return adt.Match(c.ref(x), [t_clause, f_clause])
 
 
+def relay_tagged(c, x, tag):
+    """Implementation of tagged for Relay."""
+    assert tag.is_constant(int)
+    rtag = c.tag_map[tag.value]
+    return rtag(c.ref(x))
+
+
 COMPLEX_MAP = {
     P.partial: relay_partial,
     P.distribute: relay_distribute,
@@ -237,6 +244,7 @@ COMPLEX_MAP = {
     P.tuple_getitem: relay_tuple_getitem,
     P.casttag: relay_casttag,
     P.hastag: relay_hastag,
+    P.tagged: relay_tagged,
 }
 
 
