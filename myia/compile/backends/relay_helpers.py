@@ -12,6 +12,15 @@ empty_union = adt.Constructor("empty", [], union_type)
 tag_map = {}
 rev_tag_map = {}
 
+env_val = relay.GlobalTypeVar('$_env_val')
+env_val_map = {}
+rev_env_val_map = {}
+
+env_type = relay.GlobalTypeVar('$_env_adt')
+empty_env = adt.Constructor("empty_env", [], env_type)
+cons_env = adt.Constructor("cons_env", [relay.ty.scalar_type('int32'),
+                                        env_val(), env_type()], env_type)
+
 
 def _placeholder_body(type):
     if isinstance(type, relay.TensorType):
@@ -32,6 +41,8 @@ def _placeholder_body(type):
     elif isinstance(type, relay.TypeCall):
         if type.func == union_type:
             return empty_union()
+        elif type.func == env_type:
+            return empty_env()
         else:
             raise ValueError(f"Can't build value for union: {type.func}")
     else:

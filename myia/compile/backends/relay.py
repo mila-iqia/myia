@@ -49,6 +49,15 @@ def get_union_ctr(tag, t):
     return tag_map[tag]
 
 
+def get_env_val_ctr(t):
+    if t not in env_val_map:
+        rt = to_relay_type(t)
+        env_val_map[t] = [
+            adt.Constructor(f"v{len(env_val_map)}", [rt], env_val)]
+        rev_env_val_map[env_val_map[t]] = t
+    return env_val_map[t]
+
+
 @wrap_result.register
 def wrap_result(data: interpreter.TupleValue):
     """Wrap tuples from relay."""
@@ -251,6 +260,42 @@ def relay_tagged(c, x, tag):
     return rtag(c.ref(x))
 
 
+def define_env_update(module, val_t):
+    gv = relay.GlobalVar(f"$_update_env<{val_t}>")
+
+    ctr = get_env_val_stuff(val_t)
+ 
+    env = relay.Var("env", env_type())
+    key = relay.Var("key", relay.ty.scalar_type('int32'))
+    val = relay.Var("val", to_relay_type(val_t))
+
+    k = relay.Var("k")
+    v = relay.Var("v")
+    r = relay.Var("r")
+
+    empty_clause = adt.Clause(
+        adt.PatternConstructor(empty_env, []),
+        cons_env(key, ctr(val), env))
+    cons_clause = adt.Clause(
+        adt.PatternConstructor(cons_env, [adt.PatternVar(k),
+                                          adt.PatternVar(v),
+                                          adt.PatternVar(r)]),
+        relay.If(relay.equal(key, k),
+                 cons_env(key, ctr(val), env),
+                 cons_env(k, v, relay.Call(gv, [r, key, val]))))
+    body = adt.Match(env, [empty_clause, cons_clause])
+    fn = relay.Function([env, key, val], body, env_type())
+    mod[gv] = fn
+    return gv
+
+
+def relay_env_setitem(c, env, key, x):
+    """Implementation of env_setitem for Relay."""
+    assert key.is_constant(int)
+    ctr = c.env_map[key.value]
+    # Make a relay function to search for the key ...
+
+
 COMPLEX_MAP = {
     P.partial: relay_partial,
     P.distribute: relay_distribute,
@@ -379,7 +424,7 @@ class CompileGraph:
         mng = manage(graph)
 
         self.module = relay.Module({})
-        self.build_union_adt(mng)
+        self.build_adts(mng)
         self.make_const = RelayConstantConverter(context)
 
         # Analyze and create a global union type of all the possible types
@@ -412,14 +457,23 @@ class CompileGraph:
             return wrap_result(res(*args))
         return f
 
-    def build_union_adt(self, mng):
-        """Build an ADT to represent union types."""
+    def build_adts(self, mng):
+        """Build ADTs to represent union types and envs."""
+        self.env_map = {}
         for node in mng.all_nodes:
             if isinstance(node.abstract, AbstractTaggedUnion):
                 for opt in node.abstract.options:
                     get_union_ctr(*opt)
+            elif node.is_apply(P.env_setitem):
+                assert node.inputs[2].is_constant(int)
+                t = to_relay_type(node.inputs[3].abstract)
+                key = node.inputs[2].value
+                self.env_map[key] = adt.Constructor(
+                    f"s{key}", [t, env_type()], env_type)
         self.module[union_type] = adt.TypeData(
             union_type, [], list(tag_map.values()))
+        #self.module[env_type] = adt.TypeData(
+        #    env_type, [a], [empty_env, cons_env])
 
     def on_parameter(self, node):
         """Convert a parameter node."""
