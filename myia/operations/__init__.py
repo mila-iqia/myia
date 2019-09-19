@@ -913,6 +913,11 @@ typeof = Operation(
     defaults='myia.operations.macro_typeof'
 )
 
+universal = Operation(
+    name='universal',
+    defaults='myia.operations.macro_universal'
+)
+
 universe_getitem = Operation(
     name='universe_getitem',
     defaults='myia.operations.prim_universe_getitem'

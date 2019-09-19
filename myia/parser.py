@@ -927,7 +927,9 @@ class Block:
         """Create an application of fn on args."""
         if self.use_universe:
             tget = self.operation('tuple_getitem')
-            pair = self.graph.apply(fn, self.universe, *args)
+            usl = self.operation('universal')
+            ufn = self.graph.apply(usl, fn)
+            pair = self.graph.apply(ufn, self.universe, *args)
             self.universe = self.graph.apply(tget, pair, 0)
             return self.graph.apply(tget, pair, 1)
         else:
