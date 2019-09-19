@@ -23,7 +23,7 @@ def _rpc_server():
         iface = cls(**init_args)
         dumper.represent('ready')
     except Exception as e:
-        if do_pm:
+        if do_pm:  # pragma: no cover
             import rpdb
             rpdb.post_mortem()
         dumper.represent(e)
@@ -37,7 +37,7 @@ def _rpc_server():
                 meth = getattr(iface, name)
                 res = meth(*args, **kwargs)
             except Exception as e:
-                if do_pm:
+                if do_pm:  # pragma: no cover
                     import rpdb
                     rpdb.post_mortem()
                 res = e
@@ -50,7 +50,7 @@ def _rpc_server():
                 try:
                     res = arg[0](*arg[1], **arg[2])
                 except Exception as e:  # pragma: no cover
-                    if do_pm:
+                    if do_pm:  # pragma: no cover
                         import rpdb
                         rpdb.post_mortem()
                     res = e
