@@ -1026,9 +1026,12 @@ class Block:
         """
         assert self.graph.return_ is None
         jump = self.apply(target.graph, *args)
-        self.jumps[target] = jump
+        jump_call = jump
+        if self.use_universe:
+            jump_call = jump.inputs[1]
+        self.jumps[target] = jump_call
         target.preds.append(self)
-        self.graph.output = jump
+        self.returns(jump)
 
     def cond(self, cond: ANFNode, true: 'Block', false: 'Block') -> Apply:
         """Perform a conditional jump.
