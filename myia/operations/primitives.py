@@ -189,6 +189,11 @@ invert_permutation = BackendPrimitive(
     defaults='myia.operations.prim_invert_permutation'
 )
 
+ioprint = BackendPrimitive(
+    name='ioprint',
+    defaults='myia.operations.prim_ioprint'
+)
+
 make_dict = InferencePrimitive(
     name='make_dict',
     defaults='myia.operations.prim_make_dict'
