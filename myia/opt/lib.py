@@ -488,6 +488,42 @@ def simplify_array_map(resources, node, equiv):
             return True
 
 
+##################################
+# Universe-related optimizations #
+##################################
+
+
+@pattern_replacer(P.universe_getitem, (P.universe_setitem, X1, Y, X2), Z)
+def cancel_universe_set_get(resources, node, equiv):
+    """Simplify combinations of universe_get/setitem.
+
+    * get(set(universe, k1, v), k2, dflt) =>
+        * v                       when k1 == k2
+        * get(universe, k2, dflt) when k1 != k2
+    """
+    key1 = equiv[Y]
+    key2 = equiv[Z]
+    if key1 is key2:
+        # Provably the same key
+        return equiv[X2]
+    elif (key1.abstract and key2.abstract
+          and key1.abstract is not key2.abstract):
+        # We can prove they must be different keys, because they have
+        # different types.
+        sexp = (P.universe_getitem, equiv[X1], key2)
+        return sexp_to_node(sexp, node.graph)
+    else:
+        # They may or may not be the same key, so we do nothing.
+        return node
+
+
+cancel_universe_double_set = psub(
+    pattern=(P.universe_setitem, (P.universe_setitem, X1, Y, X2), Y, X3),
+    replacement=(P.universe_setitem, X1, Y, X3),
+    name='cancel_universe_double_set'
+)
+
+
 #############################
 # Env-related optimizations #
 #############################
