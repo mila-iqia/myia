@@ -15,6 +15,7 @@ from myia.abstract import (
     AbstractClass,
     AbstractDict,
     AbstractExternal,
+    AbstractHandle,
     AbstractJTagged,
     AbstractScalar,
     AbstractTaggedUnion,
@@ -90,6 +91,10 @@ def JT(a):
     return AbstractJTagged(to_abstract_test(a))
 
 
+def H(a):
+    return AbstractHandle(to_abstract_test(a))
+
+
 def S(x=ANYTHING, t=None):
     return AbstractScalar({
         VALUE: x,
@@ -136,7 +141,8 @@ def to_abstract_test(self, x: (bool, int, float, str,
 
 @overload  # noqa: F811
 def to_abstract_test(self, x: (xtype.Number, xtype.String,
-                               xtype.Bool, xtype.EnvType)):
+                               xtype.Bool, xtype.EnvType,
+                               xtype.UniverseType)):
     return AbstractScalar({VALUE: ANYTHING, TYPE: x})
 
 
