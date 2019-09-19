@@ -5,11 +5,11 @@ Most of those should go away as Relay main development progresses.
 
 import numpy as np
 from tvm import relay
-from tvm.relay import transform, adt
+from tvm.relay import adt, transform
 
 union_type = relay.GlobalTypeVar('$_union_adt')
-empty_union = adt.Constructor("c_empty", [], union_type)
-tag_map = {} #{None: empty_union}
+empty_union = adt.Constructor("empty", [], union_type)
+tag_map = {}
 rev_tag_map = {}
 
 

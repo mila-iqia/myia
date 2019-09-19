@@ -20,15 +20,27 @@ from ...ir import manage
 from ...operations import Primitive, primitives as P
 from ...utils import TaggedValue, overload
 from ...xtype import Bool, Nil, type_to_np_dtype
+from ..channel import handle
 from ..transform import get_prim_graph, wrap_result
 from . import Backend, Converter, HandleBackend
-from ..channel import handle
-from .relay_helpers import add_functions, optimize, union_type, tag_map, rev_tag_map
+from .relay_helpers import (
+    add_functions,
+    cons_env,
+    empty_env,
+    env_type,
+    env_val,
+    env_val_map,
+    optimize,
+    rev_env_val_map,
+    rev_tag_map,
+    tag_map,
+    union_type,
+)
 
 relay_from_scalar = tvm.get_global_func('relay.from_scalar')
 
 
-def get_relay_ctr(tag, t):
+def get_union_ctr(tag, t):
     """Get the relay constructor for a tag."""
     if tag not in tag_map:
         rt = to_relay_type(t)
@@ -48,11 +60,11 @@ def to_relay_type(self, a: AbstractScalar):
     """Convert a myia abstract to a Relay type."""
     tp = a.xtype()
     if issubclass(tp, Bool):
-        return relay.ty.TensorType((), 'bool')
+        return relay.ty.scalar_type('bool')
     elif issubclass(tp, Nil):
         return relay.ty.TupleType([])
     else:
-        return relay.ty.TensorType((), type_to_np_dtype(tp))
+        return relay.ty.scalar_type(type_to_np_dtype(tp))
 
 
 @overload  # noqa: F811
@@ -226,9 +238,8 @@ def relay_hastag(c, x, tag):
     """Implementation of hastag for Relay."""
     assert tag.is_constant(int)
     rtag = tag_map[tag.value]
-    v = relay.Var("v")
-    t_clause = adt.Clause(adt.PatternConstructor(rtag, [adt.PatternVar(v)]),
-                          relay.const(True))
+    t_clause = adt.Clause(adt.PatternConstructor(
+        rtag, [adt.PatternWildcard()]), relay.const(True))
     f_clause = adt.Clause(adt.PatternWildcard(), relay.const(False))
     return adt.Match(c.ref(x), [t_clause, f_clause])
 
@@ -315,6 +326,44 @@ class NodeVisitor:
         return []
 
 
+class RelayConstantConverter(Converter):
+    """Convert values to Relay constants."""
+
+    def __init__(self, context):
+        """Set the context."""
+        self.context = context
+
+    def convert_array(self, v, t):
+        """Make a TVM array from a numpy array."""
+        return relay.const(tvm.ndarray.array(v, self.context))
+
+    def convert_scalar(self, v, t):
+        """Convert the scalar to a TVM array."""
+        return relay.const(v, type_to_np_dtype(t))
+
+    def convert_bool(self, v, t):
+        """Convert the scalar to a TVM array."""
+        return relay.const(v, type_to_np_dtype(t))
+
+    def convert_nil(self, v, t):
+        """Convert Nil to Relay."""
+        return relay.Tuple([])
+
+    def convert_env(self, v, t):
+        assert len(v) == 0
+        return relay.Tuple([])
+
+    def convert_tuple(self, v, t):
+        return relay.Tuple(*[self(e, et) for e, et in
+                             zip(v, t.elements)])
+
+    def convert_tagged(self, v, t):
+        real_t = t.options.get(v.tag)
+        ctr = get_union_ctr(v.tag, real_t)
+        conv_val = self(v.value, real_t)
+        return ctr(conv_val)
+
+
 class CompileGraph:
     """Step to convert a myia graph to a relay graph.
 
@@ -331,6 +380,7 @@ class CompileGraph:
 
         self.module = relay.Module({})
         self.build_union_adt(mng)
+        self.make_const = RelayConstantConverter(context)
 
         # Analyze and create a global union type of all the possible types
         # and then use it for all union values.
@@ -367,7 +417,7 @@ class CompileGraph:
         for node in mng.all_nodes:
             if isinstance(node.abstract, AbstractTaggedUnion):
                 for opt in node.abstract.options:
-                    get_relay_ctr(*opt)
+                    get_union_ctr(*opt)
         self.module[union_type] = adt.TypeData(
             union_type, [], list(tag_map.values()))
 
@@ -474,7 +524,7 @@ class RelayInputConverter(Converter):
 
     def convert_tagged(self, v, t):
         real_t = t.options.get(v.tag)
-        ctr = get_relay_ctr(v.tag, real_t)
+        ctr = get_union_ctr(v.tag, real_t)
         conv_val = self(v.value, real_t)
         return interpreter.ConstructorValue(ctr.tag, [conv_val], None)
 
