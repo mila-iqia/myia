@@ -47,6 +47,8 @@ def _resolve(call):
 def pytest_configure(config):
     if not config.option.gpu:
         setattr(config.option, 'markexpr', 'not gpu')
+    if config.option.usepdb:
+        os.environ['MYIA_PYTEST_USE_PDB'] = "1"
     if config.option.do_inject:
         from debug import do_inject  # noqa
     if config.option.tracer:
