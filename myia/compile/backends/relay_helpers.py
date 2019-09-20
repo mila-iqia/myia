@@ -47,9 +47,10 @@ def get_myia_tag(ctr):
 env_val = relay.GlobalTypeVar('$_env_val')
 
 env_type = relay.GlobalTypeVar('$_env_adt')
+a = relay.ty.TypeVar("a")
 empty_env = adt.Constructor("empty_env", [], env_type)
 cons_env = adt.Constructor("cons_env", [relay.ty.scalar_type('int64'),
-                                        env_val(), env_type()], env_type)
+                                        a, env_type(a)], env_type)
 
 
 class TypeHelper:
@@ -60,6 +61,7 @@ class TypeHelper:
 
     def initialize(self, mod, mng):
         """Add stub types to the module."""
+        mod[env_type] = adt.TypeData(env_type, [a], [empty_env, cons_env])
         for node in mng.all_nodes:
             if isinstance(node.abstract, AbstractTaggedUnion):
                 for opt in node.abstract.options:
@@ -71,7 +73,6 @@ class TypeHelper:
         """Fill in stub type definitions."""
         mod[env_val] = adt.TypeData(
             env_val, [], list(m['ctr'] for m in self.env_val_map.values()))
-        mod[env_type] = adt.TypeData(env_type, [], [empty_env, cons_env])
         for m in self.env_val_map.values():
             for k, v in m.items():
                 if k == 'ctr':
@@ -82,9 +83,9 @@ class TypeHelper:
         t = broaden(t)
         rt = to_relay_type(t)
         if t not in self.env_val_map:
+            name = f"v{len(self.env_val_map)}"
             self.env_val_map[t] = {
-                'ctr': adt.Constructor(f"v{len(self.env_val_map)}",
-                                       [rt], env_val)
+                'ctr': adt.Constructor(name, [rt], env_val)
             }
         return self.env_val_map[t], rt
 
@@ -93,7 +94,7 @@ class TypeHelper:
         m, rt = self._get_env_val_map(val_t)
         res = m.get('env_update', None)
         if res is None:
-            res = self._make_env_update(m, val_t, rt)
+            res = self._make_env_update(m, rt)
         return res[0]
 
     def get_env_find(self, val_t):
@@ -101,15 +102,14 @@ class TypeHelper:
         m, rt = self._get_env_val_map(val_t)
         res = m.get('env_find', None)
         if res is None:
-            res = self._make_env_find(m, val_t, rt)
+            res = self._make_env_find(m, rt)
         return res[0]
 
-    def _make_env_update(self, m, val_t, rval_t):
-        gv = relay.GlobalVar(f"$_env_update<{val_t}>")
-
+    def _make_env_update(self, m, rval_t):
         ctr = m['ctr']
+        gv = relay.GlobalVar(f"$_env_update<{ctr.name_hint}>")
 
-        env = relay.Var("env", env_type())
+        env = relay.Var("env", env_type(env_val()))
         key = relay.Var("key", relay.ty.scalar_type('int64'))
         val = relay.Var("val", rval_t)
 
@@ -128,16 +128,15 @@ class TypeHelper:
                      cons_env(key, ctr(val), env),
                      cons_env(k, v, relay.Call(gv, [r, key, val]))))
         body = adt.Match(env, [empty_clause, cons_clause])
-        fn = relay.Function([env, key, val], body, env_type())
+        fn = relay.Function([env, key, val], body, env_type(env_val()))
         m['env_update'] = (gv, fn)
         return gv, fn
 
-    def _make_env_find(self, m, val_t, rval_t):
-        gv = relay.GlobalVar(f"$_env_find<{val_t}>")
-
+    def _make_env_find(self, m, rval_t):
         ctr = m['ctr']
+        gv = relay.GlobalVar(f"$_env_find<{ctr.name_hint}>")
 
-        env = relay.Var("env", env_type())
+        env = relay.Var("env", env_type(env_val()))
         key = relay.Var("key", relay.ty.scalar_type('int64'))
         dft = relay.Var("dft", rval_t)
 
@@ -176,7 +175,7 @@ def to_relay_type(self, a: AbstractScalar):
     elif issubclass(tp, Nil):
         return relay.ty.TupleType([])
     elif issubclass(tp, EnvType):
-        return env_type()
+        return env_type(env_val())
     else:
         return relay.ty.scalar_type(type_to_np_dtype(tp))
 
