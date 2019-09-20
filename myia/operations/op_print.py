@@ -7,7 +7,7 @@ print_handle = HandleInstance(0)
 
 
 @core(universal=True)
-def print(U, *entries):
+def impl_print(U, *entries):
     """Implementation for 'print'."""
     for entry in entries:
         iostate0 = universe_getitem(U, print_handle)
@@ -19,6 +19,6 @@ def print(U, *entries):
 __operation_defaults__ = {
     'name': 'print',
     'registered_name': 'print',
-    'mapping': print,
-    'python_implementation': None,
+    'mapping': impl_print,
+    'python_implementation': print,
 }
