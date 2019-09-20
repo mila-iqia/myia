@@ -236,7 +236,7 @@ class RelayMapper:
         self.mapping[prim] = fn
 
     def register_simple(self, map):
-        """Register simple conversions (1:1 map to nnvm ops)."""
+        """Register simple conversions (1:1 map to relay ops)."""
         for k, v in map.items():
             self.register(k, lambda c, *args, v=v: v(*[c.ref(a)
                                                        for a in args]))

@@ -23,7 +23,6 @@ from myia.debug import traceback  # noqa
 dtype = 'float32'
 
 backend = 'pytorch'
-# backend = 'nnvm'  # Uncomment to use nnvm backend
 # backend = 'relay'  # Uncomment to use relay backend
 
 device_type = 'cpu'
@@ -31,7 +30,6 @@ device_type = 'cpu'
 
 backend_options_dict = {
     'pytorch': {'device': device_type},
-    'nnvm': {'target': device_type, 'device_id': 0},
     'relay': {'target': device_type, 'device_id': 0}
 }
 

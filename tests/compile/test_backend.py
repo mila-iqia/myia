@@ -66,12 +66,6 @@ def _run_backend(self, fn, args, result=None, abstract=None,
 
 run_backend = _run_backend.configure(
     backend=Multiple(
-        pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}),
-                     id='nnvm-cpu',
-                     marks=pytest.mark.nnvm),
-        pytest.param(('nnvm', {'target': 'cuda', 'device_id': 0}),
-                     id='nnvm-cuda',
-                     marks=[pytest.mark.nnvm, pytest.mark.gpu]),
         pytest.param(('relay', {'target': 'cpu', 'device_id': 0}),
                      id='relay-cpu',
                      marks=pytest.mark.relay),

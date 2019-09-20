@@ -30,7 +30,6 @@ def get_backend_options(args, backend):
 
     backend_options_dict = {
         'pytorch': {'device': device_type},
-        'nnvm': {'target': device_type, 'device_id': 0},
         'relay': {'target': device_type, 'device_id': 0}
     }
 
@@ -39,12 +38,9 @@ def get_backend_options(args, backend):
     return backend_options
 
 
-# TODO: add relay support
-# TODO: maybe fixture for return_backend=True and return_backend=False
 @pytest.fixture(params=[
     pytest.param('pytorch'),
-    pytest.param('nnvm'),
-    # pytest.param('relay'),
+    pytest.param('relay'),
 ])
 def _backend_fixture(request):
     return request.param

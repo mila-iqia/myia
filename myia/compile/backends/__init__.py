@@ -35,8 +35,8 @@ def channel_loader(pkg, name):
     return loader
 
 
-def relay_nnvm_defaults(target='cpu', device_id=0):
-    """Format options for nnvm/relay."""
+def relay_defaults(target='cpu', device_id=0):
+    """Format options for relay."""
     return dict(target=target, device_id=device_id)
 
 
@@ -50,10 +50,8 @@ def pytorch_default(device='cpu:0'):
 
 
 _backends = {
-    'nnvm': (channel_loader('myia.compile.backends.nnvm', 'NNVMBackendR'),
-             relay_nnvm_defaults),
     'relay': (channel_loader('myia.compile.backends.relay', 'RelayBackendR'),
-              relay_nnvm_defaults),
+              relay_defaults),
     'pytorch': (channel_loader('myia.compile.backends.pytorch',
                                'PyTorchBackendR'), pytorch_default)
 }
@@ -89,7 +87,7 @@ def parse_default():
     Returns name and options from the environement or builtin default.
     See the documentation of get_default() for the backend string syntax.
     """
-    backend_spec = os.environ.get('MYIA_BACKEND', 'pytorch')
+    backend_spec = os.environ.get('MYIA_BACKEND', 'relay')
     backend, *opts = backend_spec.split('?', maxsplit=1)
     if len(opts) == 1:
         opts = urllib.parse.parse_qs(opts[0], keep_blank_values=True,
