@@ -29,16 +29,24 @@ class MyiaFunction:
     """
 
     def __init__(self, fn, specialize_values=[], return_backend=False,
-                 backend=None, backend_options=None, alias_tracker=None):
+                 backend=None, backend_options=None, alias_tracker=None,
+                 universal=False):
         """Initialize a MyiaFunction."""
         self.fn = fn
         self.alias_tracker = alias_tracker
         self.specialize_values = set(specialize_values)
-        self.pip = standard_pipeline.configure({
-            'resources.backend.name': backend,
-            'resources.backend.options': backend_options,
-            'resources.return_backend': return_backend,
-        })
+        if universal:
+            from .pipeline import standard_debug_pipeline
+            self.pip = standard_debug_pipeline.configure({
+                'validate': False,
+                'resources.universal': True,
+            })
+        else:
+            self.pip = standard_pipeline.configure({
+                'resources.backend.name': backend,
+                'resources.backend.options': backend_options,
+                'resources.return_backend': return_backend,
+            })
         self._cache = {}
         self.latest = None
 
@@ -90,7 +98,7 @@ class MyiaFunction:
 
 @keyword_decorator
 def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
-         return_backend=False, alias_tracker=None):
+         return_backend=False, alias_tracker=None, universal=False):
     """Create a function using Myia's runtime.
 
     `@myia` can be used as a simple decorator. If custom options are needed,
@@ -115,7 +123,8 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
     return MyiaFunction(fn, specialize_values, backend=backend,
                         backend_options=backend_options,
                         return_backend=return_backend,
-                        alias_tracker=alias_tracker)
+                        alias_tracker=alias_tracker,
+                        universal=universal)
 
 
 #############################################

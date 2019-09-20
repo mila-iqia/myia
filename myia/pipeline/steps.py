@@ -5,7 +5,7 @@ The steps are listed in roughly the same order they should be called.
 
 from itertools import count
 
-from ..abstract import AbstractTuple, find_aliases, nobottom
+from ..abstract import AbstractTuple, find_aliases, nobottom, type_to_abstract
 from ..compile import BackendValue
 from ..ir import Graph
 from ..opt import (
@@ -15,9 +15,17 @@ from ..opt import (
     NodeMap,
     lib as optlib,
 )
+from ..parser import parse
 from ..simplify_types import from_canonical, simplify_types, to_canonical
-from ..utils import InferenceError, MyiaInputTypeError, Partializable, tracer
+from ..utils import (
+    InferenceError,
+    MyiaInputTypeError,
+    Partializable,
+    new_universe,
+    tracer,
+)
 from ..validate import validate
+from ..xtype import UniverseType
 
 #############
 # Optimizer #
@@ -102,7 +110,10 @@ def step_parse(resources, input, argspec=None):
     Outputs:
         graph: A graph.
     """
-    g = resources.convert(input)
+    if callable(input):
+        g = parse(input, use_universe=resources.universal)
+    else:
+        g = resources.convert(input)
     sig = g.make_signature(argspec)
     g = g.generate_graph(sig)
     g = resources.convert(g)
@@ -139,13 +150,21 @@ def step_infer(resources, graph, argspec):
         outspec: Inference results for the graph's output.
         inference_context: The Context for the root graph.
     """
-    res, context = resources.inferrer.infer(graph, argspec)
-    if not nobottom(res):
+    orig_argspec = argspec
+    if resources.universal:
+        argspec = (type_to_abstract(UniverseType), *argspec)
+    outspec, context = resources.inferrer.infer(graph, argspec)
+    if not nobottom(outspec):
         raise InferenceError(
             'There is no condition in which the program succeeds'
         )
-    return {'outspec': res,
+    orig_outspec = outspec
+    if resources.universal:
+        orig_outspec = outspec.elements[1]
+    return {'outspec': outspec,
             'argspec': argspec,
+            'orig_argspec': orig_argspec,
+            'orig_outspec': orig_outspec,
             'inference_context': context}
 
 
@@ -190,9 +209,7 @@ def step_simplify_types(resources, graph, argspec, outspec):
     graph = resources.inferrer.renormalize(graph, new_argspec)
     new_outspec = graph.output.abstract
     return {'graph': graph,
-            'orig_argspec': argspec,
             'argspec': new_argspec,
-            'orig_outspec': outspec,
             'outspec': new_outspec,
             'simplify_types': True}
 
@@ -452,7 +469,11 @@ def step_wrap(resources,
             raise MyiaInputTypeError('Wrong number of arguments.')
         args = tuple(_to_backend(to_canonical(arg, ot), backend, vt)
                      for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
-        res = fn(*args)
+        if resources.universal:
+            unv, res = fn(new_universe, *args)
+            unv.commit()
+        else:
+            res = fn(*args)
         if resources.return_backend:
             if isinstance(orig_out_t, AbstractTuple):
                 res = tuple(BackendValue(r, ot, vt, backend)

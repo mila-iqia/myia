@@ -281,6 +281,7 @@ standard_resources = Resources.partial(
     operation_whitelist=default_whitelist,
     validate_abstract=default_validate_abstract,
     return_backend=False,
+    universal=False,
 )
 
 

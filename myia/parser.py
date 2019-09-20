@@ -888,7 +888,7 @@ class Block:
             self.universe.debug.name = 'U'
         else:
             self.universe = False
-        self.graph.set_flags(reference=True)
+        self.graph.set_flags(reference=True, universal=self.use_universe)
         self.graph.flags.update(flags)
 
     def set_phi_arguments(self, phi: Parameter) -> None:
