@@ -15,19 +15,14 @@ from ..channel import handle
 from ..transform import get_prim_graph, wrap_result
 from . import Backend, Converter, HandleBackend
 from .relay_helpers import (
-    add_env_types,
+    TypeHelper,
     add_functions,
     dead_value,
     empty_env,
-    get_env_find,
-    get_env_update,
     get_union_ctr,
+    get_myia_tag,
     optimize,
-    rev_tag_map,
-    setup_env_val,
-    tag_map,
     to_relay_type,
-    union_type,
 )
 
 relay_from_scalar = tvm.get_global_func('relay.from_scalar')
@@ -164,8 +159,8 @@ def relay_tuple_getitem(c, t, idx):
 def relay_casttag(c, x, tag):
     """Implementation of casttag for Relay."""
     assert tag.is_constant(int)
+    rtag = get_union_ctr(tag.value, x.abstract.options.get(tag.value))
     v = relay.Var("v")
-    rtag = tag_map[tag.value]
     clause = adt.Clause(adt.PatternConstructor(rtag, [adt.PatternVar(v)]), v)
     return adt.Match(c.ref(x), [clause], complete=False)
 
@@ -173,7 +168,7 @@ def relay_casttag(c, x, tag):
 def relay_hastag(c, x, tag):
     """Implementation of hastag for Relay."""
     assert tag.is_constant(int)
-    rtag = tag_map[tag.value]
+    rtag = get_union_ctr(tag.value, x.abstract.options.get(tag.value))
     t_clause = adt.Clause(adt.PatternConstructor(
         rtag, [adt.PatternWildcard()]), relay.const(True))
     f_clause = adt.Clause(adt.PatternWildcard(), relay.const(False))
@@ -183,19 +178,19 @@ def relay_hastag(c, x, tag):
 def relay_tagged(c, x, tag):
     """Implementation of tagged for Relay."""
     assert tag.is_constant(int)
-    rtag = tag_map[tag.value]
+    rtag = get_union_ctr(tag.value, None)
     return rtag(c.ref(x))
 
 
 def relay_env_setitem(c, env, key, x):
     """Implementation of env_setitem for Relay."""
-    gv = get_env_update(x.abstract)
+    gv = c.types.get_env_update(x.abstract)
     return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(x)])
 
 
 def relay_env_getitem(c, env, key, dft):
     """Implementation of env_getitem for Relay."""
-    gv = get_env_find(dft.abstract)
+    gv = c.types.get_env_find(dft.abstract)
     return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(dft)])
 
 
@@ -347,7 +342,8 @@ class CompileGraph:
         mng = manage(graph)
 
         self.module = relay.Module({})
-        self.build_adts(mng)
+        self.types = TypeHelper()
+        self.types.initialize(self.module, mng)
         self.make_const = RelayConstantConverter(context)
 
         # Analyze and create a global union type of all the possible types
@@ -365,6 +361,7 @@ class CompileGraph:
             if g.parent is None:
                 function_map[self.graph_map[g]] = self.convert_func(g)
 
+        self.types.finalize(self.module)
         add_functions(self.module, function_map)
 
         # Maybe make a function that calls the right graph instead?
@@ -379,19 +376,6 @@ class CompileGraph:
         def f(*args):
             return wrap_result(res(*args))
         return f
-
-    def build_adts(self, mng):
-        """Build ADTs to represent union types and envs."""
-        self.env_map = {}
-        for node in mng.all_nodes:
-            if isinstance(node.abstract, AbstractTaggedUnion):
-                for opt in node.abstract.options:
-                    get_union_ctr(*opt)
-            elif node.is_apply(P.env_setitem):
-                setup_env_val(node.inputs[3].abstract)
-        self.module[union_type] = adt.TypeData(
-            union_type, [], list(tag_map.values()))
-        add_env_types(self.module)
 
     def on_parameter(self, node):
         """Convert a parameter node."""
@@ -508,7 +492,7 @@ class RelayOutputConverter(Converter):
         return v.asnumpy().item()
 
     def convert_tagged(self, v, t):
-        tag = rev_tag_map[v.constructor]
+        tag = get_myia_tag(v.constructor)
         conv_val = self(v.fields[0], t.options.get(tag))
         return TaggedValue(tag, conv_val)
 
