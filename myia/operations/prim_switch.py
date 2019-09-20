@@ -2,7 +2,6 @@
 
 from .. import operations
 from ..lib import (
-    ANYTHING,
     Inferrer,
     check_nargs,
     force_pending,
@@ -24,23 +23,20 @@ def pyimpl_switch(c, x, y):
 class _SwitchInferrer(Inferrer):
     """Infer the return type of primitive `switch`."""
 
-    async def run(self, engine, outref, argrefs):
+    async def reroute(self, engine, outref, argrefs):
         condref, tbref, fbref = check_nargs(P.switch, 3, argrefs)
-
         cond = await condref.get()
         await force_pending(engine.check(Bool, cond.xtype()))
-
         v = cond.xvalue()
         if v is True:
-            return await tbref.get()
+            return tbref
         elif v is False:
-            return await fbref.get()
-        elif v is ANYTHING:
-            tb = await tbref.get()
-            fb = await fbref.get()
-            return engine.abstract_merge(tb, fb)
+            return fbref
         else:
-            raise AssertionError(f"Invalid condition value for switch: {v}")
+            return None
+
+    async def infer(self, engine, cond: Bool, tb, fb):
+        return engine.abstract_merge(tb, fb)
 
 
 @wrap_grad_transform(P.switch)
