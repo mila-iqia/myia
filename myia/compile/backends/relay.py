@@ -5,9 +5,7 @@ from tvm import relay
 from tvm.relay import adt
 from tvm.relay.backend import interpreter
 
-from ...abstract import (
-    AbstractTaggedUnion,
-)
+from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
@@ -17,18 +15,19 @@ from ..channel import handle
 from ..transform import get_prim_graph, wrap_result
 from . import Backend, Converter, HandleBackend
 from .relay_helpers import (
-    add_functions,
-    env_type,
-    empty_env,
-    optimize,
-    union_type,
-    to_relay_type,
-    get_union_ctr,
-    tag_map,
-    rev_tag_map,
-    get_env_update,
     add_env_types,
+    add_functions,
+    dead_value,
+    empty_env,
+    get_env_find,
+    get_env_update,
+    get_union_ctr,
+    optimize,
+    rev_tag_map,
     setup_env_val,
+    tag_map,
+    to_relay_type,
+    union_type,
 )
 
 relay_from_scalar = tvm.get_global_func('relay.from_scalar')
@@ -190,9 +189,21 @@ def relay_tagged(c, x, tag):
 
 def relay_env_setitem(c, env, key, x):
     """Implementation of env_setitem for Relay."""
-    assert key.is_constant(int)
     gv = get_env_update(x.abstract)
     return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(x)])
+
+
+def relay_env_getitem(c, env, key, dft):
+    """Implementation of env_getitem for Relay."""
+    gv = get_env_find(dft.abstract)
+    return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(dft)])
+
+
+def relay_unsafe_static_cast(c, val, ty):
+    """Implementation of unsafe_static_cast for Relay."""
+    assert ty.is_constant(AbstractTaggedUnion)
+    assert isinstance(val.abstract, AbstractTaggedUnion)
+    return c.ref(val)
 
 
 COMPLEX_MAP = {
@@ -207,6 +218,9 @@ COMPLEX_MAP = {
     P.casttag: relay_casttag,
     P.hastag: relay_hastag,
     P.tagged: relay_tagged,
+    P.env_setitem: relay_env_setitem,
+    P.env_getitem: relay_env_getitem,
+    P.unsafe_static_cast: relay_unsafe_static_cast,
 }
 
 
@@ -256,6 +270,9 @@ class NodeVisitor:
     def _visit_scalar_to_array(self, node):
         return [node.inputs[1]]
 
+    def _visit_unsafe_static_cast(self, node):
+        return [node.inputs[1]]
+
     def __call__(self, node):
         """Don't visit called primitives."""
         if node.inputs:
@@ -293,19 +310,26 @@ class RelayConstantConverter(Converter):
         """Convert Nil to Relay."""
         return relay.Tuple([])
 
+    def convert_dead(self, v, t):
+        """Convert a dead value to Relay."""
+        return dead_value(t)
+
     def convert_env(self, v, t):
         assert len(v) == 0
         return empty_env()
 
     def convert_tuple(self, v, t):
-        return relay.Tuple(*[self(e, et) for e, et in
-                             zip(v, t.elements)])
+        return relay.Tuple([self(e, et) for e, et in
+                            zip(v, t.elements)])
 
     def convert_tagged(self, v, t):
         real_t = t.options.get(v.tag)
         ctr = get_union_ctr(v.tag, real_t)
         conv_val = self(v.value, real_t)
         return ctr(conv_val)
+
+    def convert_type(self, v, t):
+        return to_relay_type(v)
 
 
 class CompileGraph:

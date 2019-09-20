@@ -9,6 +9,7 @@ from tvm.relay import adt, transform
 
 from ...abstract import (
     AbstractArray,
+    AbstractError,
     AbstractFunction,
     AbstractScalar,
     AbstractTaggedUnion,
@@ -16,9 +17,10 @@ from ...abstract import (
     PartialApplication,
     TypedPrimitive,
     VirtualFunction,
+    broaden,
 )
-from ...xtype import Bool, Nil, type_to_np_dtype
 from ...utils import overload
+from ...xtype import Bool, EnvType, Nil, type_to_np_dtype
 
 union_type = relay.GlobalTypeVar('$_union_adt')
 empty_union = adt.Constructor("empty", [], union_type)
@@ -41,6 +43,7 @@ rev_env_val_map = {}
 
 
 def get_env_val_map(t):
+    t = broaden(t)
     if t not in env_val_map:
         rt = to_relay_type(t)
         env_val_map[t] = {
@@ -55,10 +58,16 @@ def get_env_update(val_t):
     return m['env_update'][0]
 
 
+def get_env_find(val_t):
+    m = get_env_val_map(val_t)
+    return m['env_find'][0]
+
+
 env_type = relay.GlobalTypeVar('$_env_adt')
 empty_env = adt.Constructor("empty_env", [], env_type)
-cons_env = adt.Constructor("cons_env", [relay.ty.scalar_type('int32'),
+cons_env = adt.Constructor("cons_env", [relay.ty.scalar_type('int64'),
                                         env_val(), env_type()], env_type)
+
 
 def add_env_types(mod):
     """Add types and functions to a relay module."""
@@ -80,6 +89,8 @@ def to_relay_type(self, a: AbstractScalar):
         return relay.ty.scalar_type('bool')
     elif issubclass(tp, Nil):
         return relay.ty.TupleType([])
+    elif issubclass(tp, EnvType):
+        return env_type()
     else:
         return relay.ty.scalar_type(type_to_np_dtype(tp))
 
@@ -118,6 +129,18 @@ def to_relay_type(self, a: PartialApplication):
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractTaggedUnion):
     return union_type()
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: AbstractError):
+    return relay.ty.scalar_type('uint16')
+
+
+def dead_value(t):
+    """Make a value of the specified type."""
+    if isinstance(t, AbstractError):
+        return relay.const(0xDEAD, 'uint16')
+    return _placeholder_body(to_relay_type(t))
 
 
 def _placeholder_body(type):
@@ -185,14 +208,15 @@ def optimize(mod):
 def setup_env_val(val_t):
     """Build and cache all the functions that go with a type."""
     make_env_update(val_t)
+    make_env_find(val_t)
 
 
 def make_env_update(val_t):
     """Define a function to update a grad env."""
-    gv = relay.GlobalVar(f"$_update_env<{val_t}>")
+    gv = relay.GlobalVar(f"$_env_update<{val_t}>")
 
     m = get_env_val_map(val_t)
-    upd = m.get('update_env', None)
+    upd = m.get('env_update', None)
 
     if upd is not None:
         return upd
@@ -200,7 +224,7 @@ def make_env_update(val_t):
     ctr = m['ctr']
 
     env = relay.Var("env", env_type())
-    key = relay.Var("key", relay.ty.scalar_type('int32'))
+    key = relay.Var("key", relay.ty.scalar_type('int64'))
     val = relay.Var("val", to_relay_type(val_t))
 
     k = relay.Var("k")
@@ -219,7 +243,50 @@ def make_env_update(val_t):
                  cons_env(k, v, relay.Call(gv, [r, key, val]))))
     body = adt.Match(env, [empty_clause, cons_clause])
     fn = relay.Function([env, key, val], body, env_type())
-    m['update_env'] = (gv, fn)
+    m['env_update'] = (gv, fn)
+    return gv, fn
+
+
+def make_env_find(val_t):
+    """Define a function to get a value from a grad env."""
+    gv = relay.GlobalVar(f"$_env_find<{val_t}>")
+
+    m = get_env_val_map(val_t)
+    rval_t = to_relay_type(val_t)
+    find = m.get('env_find', None)
+
+    if find is not None:
+        return find
+
+    ctr = m['ctr']
+
+    env = relay.Var("env", env_type())
+    key = relay.Var("key", relay.ty.scalar_type('int64'))
+    dft = relay.Var("dft", rval_t)
+
+    k = relay.Var("k")
+    v = relay.Var("v")
+    r = relay.Var("r")
+    x = relay.Var("x")
+
+    extract_clause = adt.Clause(
+        adt.PatternConstructor(ctr, [adt.PatternVar(x)]),
+        x)
+
+    empty_clause = adt.Clause(
+        adt.PatternConstructor(empty_env, []),
+        dft)
+    cons_clause = adt.Clause(
+        adt.PatternConstructor(cons_env, [adt.PatternVar(k),
+                                          adt.PatternVar(v),
+                                          adt.PatternVar(r)]),
+
+        relay.If(relay.equal(key, k),
+                 adt.Match(v, [extract_clause], complete=False),
+                 relay.Call(gv, [r, key, dft])))
+    body = adt.Match(env, [empty_clause, cons_clause])
+    fn = relay.Function([env, key, dft], body, rval_t)
+    m['env_find'] = (gv, fn)
     return gv, fn
 
 

@@ -191,6 +191,10 @@ class Converter:
         """Convert Nil values."""
         return None
 
+    def covnert_dead(self, v, t):
+        """Convert dead values."""
+        return None
+
     def convert_bool(self, v, t):
         """Convert boolean values."""
         return v
@@ -210,9 +214,15 @@ class Converter:
         real_t = t.options.get(v.tag)
         return TaggedValue(v.tag, self(v.value, real_t))
 
+    def convert_type(self, v, t):
+        """Convert a type value."""
+        return None
+
     def __call__(self, v, t):
         """Convert a value."""
-        if isinstance(t, abstract.AbstractArray):
+        if v is abstract.DEAD:
+            return self.convert_dead(v, t)
+        elif isinstance(t, abstract.AbstractArray):
             return self.convert_array(v, t)
         elif isinstance(t, abstract.AbstractScalar):
             if issubclass(t.xtype(), xtype.Number):
@@ -229,6 +239,8 @@ class Converter:
             return self.convert_tuple(v, t)
         elif isinstance(t, abstract.AbstractTaggedUnion):
             return self.convert_tagged(v, t)
+        elif isinstance(t, abstract.AbstractType):
+            return self.convert_type(v, t)
         else:
             raise NotImplementedError(f'convert for {t}')
 
