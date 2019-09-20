@@ -241,6 +241,7 @@ register_serialize(u64, 'u64')
 register_serialize(f16, 'f16')
 register_serialize(f32, 'f32')
 register_serialize(f64, 'f64')
+register_serialize(UniverseType, 'universe_type')
 
 
 DTYPE_TO_MTYPE = dict(
