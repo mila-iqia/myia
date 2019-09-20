@@ -6,110 +6,38 @@ from tvm.relay import adt
 from tvm.relay.backend import interpreter
 
 from ...abstract import (
-    AbstractArray,
-    AbstractFunction,
-    AbstractScalar,
     AbstractTaggedUnion,
-    AbstractTuple,
-    PartialApplication,
-    TypedPrimitive,
-    VirtualFunction,
 )
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import TaggedValue, overload
-from ...xtype import Bool, Nil, type_to_np_dtype
+from ...utils import TaggedValue
+from ...xtype import type_to_np_dtype
 from ..channel import handle
 from ..transform import get_prim_graph, wrap_result
 from . import Backend, Converter, HandleBackend
 from .relay_helpers import (
     add_functions,
-    cons_env,
-    empty_env,
     env_type,
-    env_val,
-    env_val_map,
+    empty_env,
     optimize,
-    rev_env_val_map,
-    rev_tag_map,
-    tag_map,
     union_type,
+    to_relay_type,
+    get_union_ctr,
+    tag_map,
+    rev_tag_map,
+    get_env_update,
+    add_env_types,
+    setup_env_val,
 )
 
 relay_from_scalar = tvm.get_global_func('relay.from_scalar')
-
-
-def get_union_ctr(tag, t):
-    """Get the relay constructor for a tag."""
-    if tag not in tag_map:
-        rt = to_relay_type(t)
-        tag_map[tag] = adt.Constructor(f"c{tag}", [rt], union_type)
-        rev_tag_map[tag_map[tag]] = tag
-    return tag_map[tag]
-
-
-def get_env_val_ctr(t):
-    if t not in env_val_map:
-        rt = to_relay_type(t)
-        env_val_map[t] = [
-            adt.Constructor(f"v{len(env_val_map)}", [rt], env_val)]
-        rev_env_val_map[env_val_map[t]] = t
-    return env_val_map[t]
 
 
 @wrap_result.register
 def wrap_result(data: interpreter.TupleValue):
     """Wrap tuples from relay."""
     return tuple(handle(d) for d in data)
-
-
-@overload(bootstrap=True)
-def to_relay_type(self, a: AbstractScalar):
-    """Convert a myia abstract to a Relay type."""
-    tp = a.xtype()
-    if issubclass(tp, Bool):
-        return relay.ty.scalar_type('bool')
-    elif issubclass(tp, Nil):
-        return relay.ty.TupleType([])
-    else:
-        return relay.ty.scalar_type(type_to_np_dtype(tp))
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: AbstractTuple):
-    return relay.ty.TupleType([self(e) for e in a.elements])
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: AbstractArray):
-    tp = a.element.xtype()
-    return relay.ty.TensorType(a.xshape(), type_to_np_dtype(tp))
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: AbstractFunction):
-    sings = list(self(sing) for sing in a.get_sync())
-    for sing in sings[1:]:
-        assert sing == sings[0]
-    return sings[0]
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: (VirtualFunction, TypedPrimitive)):
-    return relay.ty.FuncType([self(aa) for aa in a.args],
-                             self(a.output))
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: PartialApplication):
-    tp = self(a.fn)
-    return relay.ty.FuncType(tp.arg_types[len(a.args):], tp.ret_type)
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: AbstractTaggedUnion):
-    return union_type()
 
 
 def ashape(node):
@@ -260,40 +188,11 @@ def relay_tagged(c, x, tag):
     return rtag(c.ref(x))
 
 
-def define_env_update(module, val_t):
-    gv = relay.GlobalVar(f"$_update_env<{val_t}>")
-
-    ctr = get_env_val_stuff(val_t)
- 
-    env = relay.Var("env", env_type())
-    key = relay.Var("key", relay.ty.scalar_type('int32'))
-    val = relay.Var("val", to_relay_type(val_t))
-
-    k = relay.Var("k")
-    v = relay.Var("v")
-    r = relay.Var("r")
-
-    empty_clause = adt.Clause(
-        adt.PatternConstructor(empty_env, []),
-        cons_env(key, ctr(val), env))
-    cons_clause = adt.Clause(
-        adt.PatternConstructor(cons_env, [adt.PatternVar(k),
-                                          adt.PatternVar(v),
-                                          adt.PatternVar(r)]),
-        relay.If(relay.equal(key, k),
-                 cons_env(key, ctr(val), env),
-                 cons_env(k, v, relay.Call(gv, [r, key, val]))))
-    body = adt.Match(env, [empty_clause, cons_clause])
-    fn = relay.Function([env, key, val], body, env_type())
-    mod[gv] = fn
-    return gv
-
-
 def relay_env_setitem(c, env, key, x):
     """Implementation of env_setitem for Relay."""
     assert key.is_constant(int)
-    ctr = c.env_map[key.value]
-    # Make a relay function to search for the key ...
+    gv = get_env_update(x.abstract)
+    return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(x)])
 
 
 COMPLEX_MAP = {
@@ -396,7 +295,7 @@ class RelayConstantConverter(Converter):
 
     def convert_env(self, v, t):
         assert len(v) == 0
-        return relay.Tuple([])
+        return empty_env()
 
     def convert_tuple(self, v, t):
         return relay.Tuple(*[self(e, et) for e, et in
@@ -465,15 +364,10 @@ class CompileGraph:
                 for opt in node.abstract.options:
                     get_union_ctr(*opt)
             elif node.is_apply(P.env_setitem):
-                assert node.inputs[2].is_constant(int)
-                t = to_relay_type(node.inputs[3].abstract)
-                key = node.inputs[2].value
-                self.env_map[key] = adt.Constructor(
-                    f"s{key}", [t, env_type()], env_type)
+                setup_env_val(node.inputs[3].abstract)
         self.module[union_type] = adt.TypeData(
             union_type, [], list(tag_map.values()))
-        #self.module[env_type] = adt.TypeData(
-        #    env_type, [a], [empty_env, cons_env])
+        add_env_types(self.module)
 
     def on_parameter(self, node):
         """Convert a parameter node."""
@@ -490,19 +384,6 @@ class CompileGraph:
                 return conv(self, *node.inputs[1:])
         return relay.Call(self.ref(node.inputs[0]),
                           [self.ref(i) for i in node.inputs[1:]])
-
-    def make_const(self, value, type):
-        """Convert to a relay value."""
-        if isinstance(type, AbstractTuple):
-            return relay.Tuple([self.make_const(e, et) for e, et in
-                                zip(value, type.elements)])
-        if isinstance(type, AbstractTaggedUnion):
-            ctr = tag_map[value.tag]
-            return ctr(self.make_const(value.value,
-                                       type.options.get(value.tag)))
-        else:
-            dtype = type_to_np_dtype(type.xtype())
-            return relay.const(value, dtype=dtype)
 
     def on_constant(self, node):
         """Convert a constant node."""
@@ -570,7 +451,7 @@ class RelayInputConverter(Converter):
 
     def convert_env(self, v, t):
         assert len(v) == 0
-        return interpreter.TupleValue()
+        return interpreter.ConstructorValue(empty_env.tag, [], None)
 
     def convert_tuple(self, v, t):
         return interpreter.TupleValue(*[self(e, et) for e, et in
