@@ -572,6 +572,10 @@ class GraphInferrer(Inferrer):
         out = engine.ref(g.return_, context)
         return await engine.get_inferred(out)
 
+    async def reroute(self, engine, outref, argrefs):
+        """Inline the Graph/MetaGraph if it has the appropriate flag."""
+        return await self._graph.reroute(engine, outref, argrefs)
+
 
 class PartialInferrer(Inferrer):
     """Inferrer for partial application.

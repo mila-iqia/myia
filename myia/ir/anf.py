@@ -310,6 +310,10 @@ class Graph:
         new_graph._sig = sig
         return new_graph
 
+    async def reroute(self, engine, outref, argrefs):
+        """No rerouting."""
+        return None
+
     #########
     # Flags #
     #########

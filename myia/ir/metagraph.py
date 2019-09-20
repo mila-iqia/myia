@@ -52,6 +52,10 @@ class MetaGraph:
         """Generate a Graph for the given abstract arguments."""
         raise NotImplementedError('Override generate_graph in subclass.')
 
+    async def reroute(self, engine, outref, argrefs):
+        """By default, MetaGraphs do not reroute."""
+        return None
+
     def __str__(self):
         return self.name
 
