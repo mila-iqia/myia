@@ -4,8 +4,11 @@ Each primitive is associated to an augmented function, which returns a pair of
 the (augmented) original primitive's output and a backpropagator function.
 """
 
+import operator
+from functools import reduce
+
 from .. import operations
-from ..abstract import AbstractFunction, GraphFunction
+from ..abstract import AbstractFunction, GraphFunction, myia_static
 from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import About, NamedDebugInfo
@@ -16,7 +19,7 @@ from ..parser import operations_ns
 from ..pipeline import standard_pipeline
 from ..utils import InternalInferenceError, Registry, newenv
 from . import ops as primops
-from .py_implementations import (  # array_cast,
+from .py_implementations import (
     argmax,
     array_reduce,
     array_setitem,
@@ -254,12 +257,58 @@ def bprop_scalar_max(x, y, out, dout):
     return (ret[0], ret[1])
 
 
+def prod(iterable):
+    """Return the product of the elements of the iterator."""
+    return reduce(operator.mul, iterable, 1)
+
+
+@myia_static
+def _dim_permute(d, xs):
+    n = ()
+    for _s in range(len(xs)):
+        if _s not in d:
+            n = n + (_s,)
+    n = n + d
+    return n
+
+
+@myia_static
+def _dim_reshape(d, xs):
+    end = -len(d)
+    ns = xs[:end] + (prod(xs[end:]),)
+    return ns
+
+
+@myia_static
+def _last_dim(x):
+    return len(x) - 1
+
+
 @register_bprop(primops.array_max)
 def bprop_array_max(x, axis, out, dout):
     """Backpropagator for primitive `array_max`."""
     z = zeros_like(x)
     am = argmax(x, axis)
-    z = scatter(z, axis, am, dout)
+
+    n = _dim_permute(axis, shape(x))
+    z = transpose(z, n)
+    zs1 = shape(z)
+    ns = _dim_reshape(axis, shape(z))
+    z = reshape(z, ns)
+
+    n_am = _dim_permute(axis, shape(am))
+    am = transpose(am, n_am)
+    ns_am = _dim_reshape(axis, shape(am))
+    am = reshape(am, ns_am)
+
+    n_dout = _dim_permute(axis, shape(dout))
+    dout = transpose(dout, n_dout)
+    ns_dout = _dim_reshape(axis, shape(dout))
+    dout = reshape(dout, ns_dout)
+
+    z = scatter(z, _last_dim(shape(z)), am, dout)
+    z = reshape(z, zs1)
+    z = transpose(z, invert_permutation(n))
     return (z, zeros_like(axis))
 
 

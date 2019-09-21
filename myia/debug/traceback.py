@@ -55,8 +55,6 @@ def _get_info(x):
     skip = False
     if isinstance(x, Reference):
         g, args = _get_call(x)
-        if g and g.has_flags('core'):
-            skip = True
         loctype = 'direct'
         loc, genfn = _get_loc(x.node)
     elif isinstance(x, ANFNode):

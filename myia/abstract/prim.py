@@ -515,12 +515,19 @@ async def _inf_broadcast_shape(self, engine, xs: _shape_type, ys: _shape_type):
 @standard_prim(P.invert_permutation)
 async def _inf_invert_permutation(self, engine, perm: _shape_type):
     v = [x.xvalue() for x in perm.elements]
-    return AbstractTuple(
-        [perm.elements[i] if i in v else AbstractScalar({
+    rval = AbstractTuple([
+        AbstractScalar({
+            VALUE: v.index(i),
+            TYPE: xtype.UInt[64],
+        })
+        if i in v
+        else AbstractScalar({
             VALUE: ANYTHING,
             TYPE: xtype.UInt[64],
-        }) for i in range(len(v))]
-    )
+        })
+        for i in range(len(v))
+    ])
+    return rval
 
 
 @standard_prim(P.shape)
@@ -656,7 +663,8 @@ async def _inf_transpose(self, engine,
 
 
 @standard_prim(P.gather)
-async def _inf_gather(self, engine, input, dim, index):
+async def _inf_gather(self, engine, input: AbstractArray, dim: xtype.UInt[64],
+                      index: AbstractArray):
     return type(input)(
         input.element,
         {SHAPE: index.xshape(), TYPE: input.xtype()}
@@ -664,27 +672,29 @@ async def _inf_gather(self, engine, input, dim, index):
 
 
 @standard_prim(P.scatter)
-async def _inf_scatter(self, engine, input, dim, index, src):
+async def _inf_scatter(self, engine, input: AbstractArray,
+                       dim: xtype.UInt[64], index: AbstractArray,
+                       src: AbstractArray):
     return input
 
 
 @standard_prim(P.scatter_add)
-async def _inf_scatter_add(self, engine, input, dim, index, src):
+async def _inf_scatter_add(self, engine, input: AbstractArray,
+                           dim: xtype.UInt[64], index: AbstractArray,
+                           src: AbstractArray):
     return input
 
 
 @standard_prim(P.argmax)
-async def _inf_argmax(self, engine, input, dim):
+async def _inf_argmax(self, engine, input: AbstractArray, dim: _shape_type):
     shp = ()
-    if dim.xvalue() is None:
-        pass
-    else:
-        shp_inp = input.xshape()
-        for sdx, s in enumerate(shp_inp):
-            if sdx == dim.xvalue():
-                shp = shp + (1,)
-            else:
-                shp = shp + (s,)
+    shp_inp = input.xshape()
+    dim = tuple(self.require_constant(e, argnum=f'"1:dim[{edx}]"')
+                for edx, e in enumerate(dim.elements))
+    shp = list(shp_inp)
+    for d in dim:
+        shp[d] = 1
+    shp = tuple(shp)
     return type(input)(
         AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Int[64]}),
         {SHAPE: shp, TYPE: input.xtype()}
@@ -692,14 +702,15 @@ async def _inf_argmax(self, engine, input, dim):
 
 
 @standard_prim(P.array_max)
-async def _inf_array_max(self, engine, input, dim):
+async def _inf_array_max(self, engine, input: AbstractArray, dim: _shape_type):
     shp = ()
     shp_inp = input.xshape()
-    for sdx, s in enumerate(shp_inp):
-        if sdx == dim.xvalue():
-            shp = shp + (1,)
-        else:
-            shp = shp + (s,)
+    dim = tuple(self.require_constant(e, argnum=f'"1:dim[{edx}]"')
+                for edx, e in enumerate(dim.elements))
+    shp = list(shp_inp)
+    for d in dim:
+        shp[d] = 1
+    shp = tuple(shp)
     return type(input)(input.element, {SHAPE: shp, TYPE: input.xtype()})
 
 
@@ -793,10 +804,15 @@ async def _inf_conv2d_weight_grad(self, engine, input: AbstractArray,
 
 
 @standard_prim(P.max_pool2d)
-async def _inf_max_pool2d(self, engine, input, kernel_size, stride, padding,
-                          dilation, ceil_mode):
+async def _inf_max_pool2d(self, engine, input: AbstractArray,
+                          kernel_size: _shape_type_pair,
+                          stride: _shape_type_pair, padding: _shape_type_pair,
+                          dilation: _shape_type_pair, ceil_mode: xtype.Bool):
 
     # TODO: _shape_type should not allow float to be converted to uint
+    # TODO: support ceil_mode == True
+
+    assert ceil_mode.xvalue() is False
 
     h_in, w_in = input.xshape()[2:]
 
@@ -831,8 +847,13 @@ async def _inf_max_pool2d(self, engine, input, kernel_size, stride, padding,
 
 
 @standard_prim(P.max_pool2d_grad)
-async def _inf_max_pool2d_grad(self, engine, input, kernel_size, stride,
-                               padding, dilation, ceil_mode, dout):
+async def _inf_max_pool2d_grad(self, engine, input: AbstractArray,
+                               kernel_size: _shape_type_pair,
+                               stride: _shape_type_pair,
+                               padding: _shape_type_pair,
+                               dilation: _shape_type_pair,
+                               ceil_mode: xtype.Bool,
+                               dout: AbstractArray):
     return input
 
 

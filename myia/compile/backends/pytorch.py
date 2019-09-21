@@ -188,17 +188,40 @@ def pytorch_array_setitem(op):
 def pytorch_argmax(op):
     """Implementation of argmax for pytorch."""
     def _impl(x, dim):
-        if dim is not None:
-            dim = dim.item()
-        return (torch.argmax(x, dim, keepdim=True),)
+        dim = tuple(sorted(dim))
+        n = ()
+        for _s in range(len(x.shape)):
+            if _s not in dim:
+                n = n + (_s,)
+        n = n + dim
+        x = x.permute(n)
+        ns = x.shape[0:-len(dim)] + (-1,)
+        r = torch.argmax(x.reshape(ns), -1, keepdim=False)
+        rl = list(r.shape)
+        for _sd in dim:
+            rl.insert(_sd, 1)
+        rf = tuple(rl)
+        return (torch.reshape(r, rf),)
     return _impl, op.inputs[1:]
 
 
 def pytorch_array_max(op):
     """Implementation of array_max for pytorch."""
     def _impl(x, dim):
-        dim = dim.item()
-        return (torch.max(x, dim, keepdim=True)[0],)
+        dim = tuple(sorted(dim))
+        n = ()
+        for _s in range(len(x.shape)):
+            if _s not in dim:
+                n = n + (_s,)
+        n = n + dim
+        x = x.permute(n)
+        ns = x.shape[0:-len(dim)] + (-1,)
+        r = torch.max(x.reshape(ns), -1, keepdim=False)[0]
+        rl = list(r.shape)
+        for _sd in dim:
+            rl.insert(_sd, 1)
+        rf = tuple(rl)
+        return (torch.reshape(r, rf),)
     return _impl, op.inputs[1:]
 
 

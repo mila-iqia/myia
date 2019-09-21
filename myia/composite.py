@@ -410,6 +410,7 @@ def tuple_get(t, item):
 #################
 
 def _dim_explicit(dim, dim_size):
+    print(123)
     if dim < 0:
         dim = dim_size + dim
     assert dim >= 0
@@ -459,22 +460,6 @@ def array_getitem_wrap(array, item):
             final_shape = final_shape + (o,)
     ret = reshape(ret, final_shape)
     return ret
-
-
-# TODO: NotImplementedError: <_ast.Subscript object at 0x*>
-#       when trying to use it via fronteng. e.g. x[0] = y
-'''
-from typing import Tuple
-from .prim.py_implementations import array_setitem
-@core
-def array_setitem_wrap(array, item, value):
-    """Implementation of `array_setitem`."""
-    if hastype(item, Tuple):
-        begin, end, stride, _ = _build_slices(array.shape, item)
-    else:
-        begin, end, stride, _ = _build_slices(array.shape, (item,))
-    return array_setitem(array, begin, end, stride, value)
-# '''
 
 
 to_array = dunder_method_protocol_2('myia_to_array')

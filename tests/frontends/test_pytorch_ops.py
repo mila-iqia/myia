@@ -525,13 +525,14 @@ def test_torch_functional_log_softmax(x, y):
     return torch.nn.functional.log_softmax(x, y)
 
 
-@compare_fwd_and_bwd((nn.Parameter(torch.Tensor(MA(2, 3)))))
+@compare_fwd_and_bwd((nn.Parameter(torch.randn(2, 4, 3))))
 def test_torch_tensor_max_1_arg(x):
     return torch.max(x)
 
 
-@compare_fwd_and_bwd((nn.Parameter(torch.Tensor(MA(2, 3))), 1, True),
-                     (nn.Parameter(torch.Tensor(MA(2, 3))), 0, True),
+@compare_fwd_and_bwd((nn.Parameter(torch.randn(2, 4, 3)), -1, True),
+                     (nn.Parameter(torch.randn(2, 4, 3)), 1, True),
+                     (nn.Parameter(torch.randn(4)), 0, True),
                      broad_specs=(True, False, False))
 def test_torch_tensor_max_3_arg(x, y, z):
     return torch.max(x, y, z)[0]
@@ -546,7 +547,7 @@ def test_torch_tensor_max_3_arg(x, y, z):
                                   False, True))
 def test_torch_max_pool2d(x, ri):
     return torch.nn.functional.max_pool2d(x, (2, 2), (1, 1),
-                                          0, 1, True, ri)
+                                          0, 1, False, ri)
 
 
 @compare_fwd((nn.Parameter(torch.randn(2, 4, 3, 5)), True),
@@ -558,7 +559,7 @@ def test_torch_max_pool2d(x, ri):
                           False, True))
 def test_torch_max_pool2d_return_indices(x, ri):
     return torch.nn.functional.max_pool2d(x, (2, 2), (1, 1),
-                                          0, 1, True, ri)
+                                          0, 1, False, ri)
 
 
 @compare_fwd_and_bwd((nn.Parameter(torch.Tensor(MA(2, 3))),

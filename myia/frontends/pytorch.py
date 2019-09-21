@@ -51,9 +51,9 @@ from .pytorch_functions import (
 
 standard_object_map.update({
     torch.argmax: argmax,
-    torch.exp: C.exp,
+    torch.exp: C.array_exp,
     torch.gather: gather,
-    torch.log: C.log,
+    torch.log: C.array_log,
     torch.log_softmax: log_softmax,
     torch.max: _max,
     torch.mm: P.dot,
@@ -66,7 +66,7 @@ standard_object_map.update({
     torch.squeeze: squeeze,
     torch.sum: _sum,
     torch.t: t,
-    torch.tanh: C.tanh,
+    torch.tanh: C.array_tanh,
     torch.transpose: transpose,
     # torch.zeros_like: C.zeros_like,  # currently only works with pt backend
     torch.nn.functional.conv2d: conv2d,
@@ -83,10 +83,10 @@ standard_method_map[PyTorchTensor] = \
 standard_method_map[PyTorchTensor].update({
     'dim': C.ndim,
     'argmax': argmax,
-    'exp': C.exp,
+    'exp': C.array_exp,
     'gather': gather,
     'item': item,
-    'log': C.log,
+    'log': C.array_log,
     'log_softmax': log_softmax,
     'max': _max,
     'permute': P.transpose,
@@ -101,7 +101,7 @@ standard_method_map[PyTorchTensor].update({
     'sum': _sum,
     't': t,
     'transpose': transpose,
-    'tanh': C.tanh,
+    'tanh': C.array_tanh,
     'view': P.reshape,  # contiguousness is ignored by us for now?
     'zeros_like': C.zeros_like,  # hidden method used by bwd (I think)
 })
@@ -116,30 +116,8 @@ def mod_sub(self, x):
 ##############################################################################
 
 
-# # This might end up as an alternative to blacklist of Module constructors.
-# # I.e. get the list of constructors from a dummy pytorch module.
-# class DummyModule(nn.Module):
-#     def __init__(self):
-#         super(Model, self).__init__()
-
-#     def forward(self, x):
-#        return 9
-
-# dummy_module =  DummyModule()
-
-
-# TODO: should all of these actually be blacklisted (not used).
-# Curently blacklists all constructors except '_parameters' and '_modules'.
-# 'training' should probably be removed from blacklist in next PR.
-"""
-blacklist = ('_backend', '_buffers', '_backward_hooks', '_forward_hooks',
-             '_forward_pre_hooks', '_state_dict_hooks',
-             '_load_state_dict_pre_hooks',
-
-             'training'
-             )
-             """
-blacklist = set(dir(torch.nn.Module()) + ["__constants__"])
+blacklist = set(dir(torch.nn.Module()))
+blacklist.add('__constants__')
 blacklist.add('reset_parameters')
 
 

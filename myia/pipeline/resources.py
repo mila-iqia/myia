@@ -228,7 +228,6 @@ standard_method_map = {
         '__matmul__': P.dot,
         '__len__': M.array_len,
         '__getitem__': C.array_getitem_wrap,
-        # '__setitem__': C.array_setitem_wrap,
         '__myia_iter__': C.array_iter,
         '__myia_to_array__': P.identity,
         'item': P.array_to_scalar,

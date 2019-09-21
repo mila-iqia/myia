@@ -49,21 +49,26 @@ async def _dim_explicit(info):
     return Constant(dim)
 
 
+@macro
+async def _dim_tuple_explicit(info):
+    a_shp_abs, dim_abs = [await arg.get() for arg in info.argrefs]
+    a_shp = build_value(a_shp_abs)
+    dim = build_value(dim_abs)
+    shp_explicit = ()
+    for s in dim:
+        if s == -1:
+            shp_explicit = shp_explicit + (len(a_shp) - 1,)
+        else:
+            shp_explicit = shp_explicit + (s,)
+    return Constant(shp_explicit)
+
+
 @myia_static
-def _build_rev_tuple(shp):
+def _build_fwd_tuple(shp):
     t = ()
     for d in range(len(shp)):
         t = t + (d,)
-    return t[::-1]
-
-
-@core
-def all_max(x):
-    """Performs `torch.max` over all dimensions of `input`."""
-    t = _build_rev_tuple(x.shape)
-    for axis in t:
-        x, _ = x.max(axis, False)
-    return x
+    return t
 
 
 @core
@@ -160,9 +165,16 @@ async def _shp_explicit(info):
 def argmax(self, dim=None, keepdim=False):
     """Map of 'argmax' pytorch method."""
     x = self
-    dim = _dim_explicit(x.shape, dim)
+    dim_orig = dim
+    if dim is None:
+        dim = _build_fwd_tuple(x.shape)
+    elif isinstance(dim, int):
+        dim = (dim,)
+    dim = _dim_tuple_explicit(x.shape, dim)
     ret = P.argmax(x, dim)
-    final_shape = _shp_squeeze(ret.shape, dim, keepdim)
+    final_shape = _shp_squeeze(ret.shape,
+                               _dim_explicit(x.shape, dim_orig),
+                               keepdim)
     return P.reshape(ret, final_shape)
 
 
@@ -242,22 +254,30 @@ def item(x):
 def _max(self, dim=None, keepdim=False):
     """Map of 'max' pytorch method."""
     x = self
+    dim_orig = dim
     if dim is None:
-        return all_max(x)
+        dim = _build_fwd_tuple(x.shape)
+    elif isinstance(dim, int):
+        dim = (dim,)
 
-    dim = _dim_explicit(x.shape, dim)
+    dim = _dim_tuple_explicit(x.shape, dim)
 
     ret_max = P.array_max(x, dim)
     ret_argmax = P.argmax(x, dim)
-    final_shape = _shp_squeeze(ret_max.shape, dim, keepdim)
-
-    return (P.reshape(ret_max, final_shape),
-            P.reshape(ret_argmax, final_shape))
+    if dim_orig is None:
+        final_shape = ()
+        return P.reshape(ret_max, final_shape)
+    else:
+        final_shape = _shp_squeeze(ret_max.shape,
+                                   _dim_explicit(x.shape, dim_orig),
+                                   keepdim)
+        return (P.reshape(ret_max, final_shape),
+                P.reshape(ret_argmax, final_shape))
 
 
 @core
-def max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode,
-               return_indices):
+def max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode=False,
+               return_indices=False):
     r"""Applies a max_pool2d."""
     kernel_size = _pair(kernel_size)
     stride = _pair(stride)
