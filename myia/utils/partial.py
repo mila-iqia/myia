@@ -96,3 +96,11 @@ class Partializable:
     def partial(cls, **kwargs):
         """Return a Partial on this class constructor."""
         return Partial(cls, **kwargs)
+
+
+__consolidate__ = True
+__all__ = [
+    'Partial',
+    'Partializable',
+    'partition_keywords',
+]

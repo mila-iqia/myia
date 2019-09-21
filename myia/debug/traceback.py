@@ -235,3 +235,15 @@ def myia_warning(message, category, filename, lineno, file, line):
 
 warnings.showwarning = myia_warning
 warnings.filterwarnings('always', category=MyiaDisconnectedCodeWarning)
+
+
+__all__ = [
+    'myia_excepthook',
+    'myia_warning',
+    'print_inference_error',
+    'print_myia_syntax_error',
+    'print_myia_warning',
+    'print_ref',
+    'skip_node',
+    'skip_ref',
+]

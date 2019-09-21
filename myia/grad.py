@@ -51,12 +51,21 @@ expressions. See `SensRemapper.link_apply` for more information.
 from functools import reduce
 
 from . import operations
-from .composite import gadd, zeros_like
-from .info import About
-from .ir import BasicRemapper, Constant, Graph, RemapperSet, sexp_to_node
-from .prim import Primitive, ops as primops
-from .prim.grad_implementations import augmented_graphs
+from .debug.label import short_labeler, short_relation_symbols as syms
+from .info import About, NamedDebugInfo
+from .ir import (
+    BasicRemapper,
+    Constant,
+    Graph,
+    RemapperSet,
+    clone,
+    manage,
+    sexp_to_node,
+)
+from .operations import Primitive, gadd, primitives as P, zeros_like
+from .parser import operations_ns
 from .utils import InternalInferenceError, OrderedSet, newenv, overload
+from .utils.variables import Xs
 
 
 class GradRemapper(BasicRemapper):
@@ -158,7 +167,7 @@ class FPropRemapper(GradRemapper):
     def gen_constant(self, g, ng, ct):
         """Constants are wrapped with a call to J."""
         with About(ct.debug, self.relation):
-            self.repl[(g, ct)] = sexp_to_node((primops.J, ct), ng)
+            self.repl[(g, ct)] = sexp_to_node((P.J, ct), ng)
 
     def gen_constant_graph(self, g, ng, ct):
         """Constant graphs map to their remapped versions.
@@ -195,7 +204,7 @@ class FPropRemapper(GradRemapper):
         assert not link.node.is_parameter()
         app = self.remappers['grad_fprop_app'].get(link.graph, link.node)
         link.new_node.inputs = sexp_to_node(
-            (primops.tuple_getitem, app, 0),
+            (P.tuple_getitem, app, 0),
             link.new_graph
         ).inputs
 
@@ -207,7 +216,7 @@ class FPropRemapper(GradRemapper):
         ng.set_flags('reference')
         out = self.get(g, g.output)
         bprop = self.remappers['grad_sens'].get_graph(g)
-        ng.output = ng.apply(primops.make_tuple, out, bprop)
+        ng.output = ng.apply(P.make_tuple, out, bprop)
 
     def get_jinv(self, node):
         """Generate Jinv(B:node)."""
@@ -220,7 +229,7 @@ class FPropRemapper(GradRemapper):
                     ng = self.get_graph(node.parent)
                     ct = Constant(self.get_graph(node))
                     with About(node.debug, 'equiv'):
-                        new_node = ng.apply(primops.Jinv, ct)
+                        new_node = ng.apply(P.Jinv, ct)
             else:
                 if node.graph not in self.graphs:
                     new_node = node
@@ -228,7 +237,7 @@ class FPropRemapper(GradRemapper):
                     ng = self.get_graph(node.graph)
                     node2 = self.get(None, node)
                     with About(node.debug, 'equiv'):
-                        new_node = ng.apply(primops.Jinv, node2)
+                        new_node = ng.apply(P.Jinv, node2)
             self.repl[node, 'jinv'] = new_node
         return self.repl[node, 'jinv']
 
@@ -248,7 +257,7 @@ class BPropRemapper(SlaveRemapper):
         """
         app = self.remappers['grad_fprop_app'].get(link.graph, link.node)
         link.new_node.inputs = sexp_to_node(
-            (primops.tuple_getitem, app, 1),
+            (P.tuple_getitem, app, 1),
             link.new_graph
         ).inputs
 
@@ -367,7 +376,7 @@ class SensRemapper(GradRemapper):
                     # We need to call identity because we need to modify
                     # new_node's inputs at the end of the function, we can't
                     # simply replace it.
-                    sexp = (primops.identity, ng.parameters[0])
+                    sexp = (P.identity, ng.parameters[0])
                     contribs.append(sexp)
                 else:
                     # If the application is e.g. z = f(x, y), BPropAppRemapper
@@ -376,7 +385,7 @@ class SensRemapper(GradRemapper):
                     # get element 0, 1 or 2 of that tuple and add that to our
                     # contribs list.
                     src = self.remappers['grad_bprop_app'].get(g, user)
-                    sexp = (primops.tuple_getitem, src, key)
+                    sexp = (P.tuple_getitem, src, key)
                     contribs.append(sexp)
 
         # This is equivalent to the original node. Note that we aren't really
@@ -397,7 +406,7 @@ class SensRemapper(GradRemapper):
 
         for child in children:
             assert (g, child) in self.repl
-            sexp = (primops.env_getitem,
+            sexp = (P.env_getitem,
                     self.get(g, child),
                     # This represents the node's "key" into the env.
                     (operations.embed, jinv),
@@ -439,13 +448,13 @@ class SensRemapper(GradRemapper):
             # NOTE: If sens is an application of zeros_like, it would be
             # possible to skip adding it to the env.
             fv_sens = ng.apply(
-                primops.env_setitem,
+                P.env_setitem,
                 fv_sens,
                 ng.apply(operations.embed, self.get_jinv(fv)),
                 sens
             )
         in_sens = [self.get(g, p) for p in g.parameters]
-        ng.output = ng.apply(primops.make_tuple,
+        ng.output = ng.apply(P.make_tuple,
                              fv_sens,
                              *in_sens)
         if len(ng.parameters) == 0:
@@ -479,19 +488,25 @@ def _grad(mng, root):
 
 
 @overload
-def J(prim: Primitive, resources, node):
+def Jimpl(prim: Primitive, resources, node):
     """Implement J on a Primitive."""
-    if prim not in augmented_graphs:
-        raise InternalInferenceError(  # pragma: no cover
+    try:
+        g = resources.grad_implementations[prim]
+        err = False
+    except KeyError:  # pragma: no cover
+        err = True
+    if g is None:
+        err = True
+    if err:
+        raise InternalInferenceError(
             f"Missing a backpropagator for primitive '{prim}'",
             refs=[node]
         )
-    g = augmented_graphs[prim]
     return resources.convert(g)
 
 
 @overload  # noqa: F811
-def J(graph: Graph, resources, node):
+def Jimpl(graph: Graph, resources, node):
     """Implement J on a Graph."""
     if graph.transforms.get('grad', None):
         return graph.transforms['grad']
@@ -501,7 +516,118 @@ def J(graph: Graph, resources, node):
 
 
 @overload  # noqa: F811
-def J(other: object, resources, node):
+def Jimpl(other: object, resources, node):
     """We do not implement J on non-functions here."""
     name = type(other).__qualname__
     raise NotImplementedError(f'J(::{name}) not implemented')
+
+
+###############################
+# Helpers to define gradients #
+###############################
+
+
+default_grad_flags = {
+    'ignore_values': True,
+    'core': True,
+    'reference': True,
+}
+
+
+_is_mktuple = ((operations.resolve, operations_ns, 'make_tuple'), Xs)
+_is_raise = (P.raise_, Xs)
+
+
+def _make_grad_transform(prim, fn, flags):
+    """Given a function for the bprop, make the augmented function."""
+    from .pipeline import standard_parse
+    info = NamedDebugInfo(prim=prim, name=prim.name)
+
+    bprop = clone(standard_parse(fn))
+    bprop.flags.update(default_grad_flags)
+    bprop.debug.name = None
+    bprop.debug.about = About(info, 'grad_bprop')  # type: ignore
+    if bprop.output.match(_is_raise):
+        pass
+    elif bprop.output.match(_is_mktuple):
+        bprop.output = bprop.apply(
+            P.make_tuple,
+            newenv,
+            *bprop.output.inputs[1:]
+        )
+    else:
+        raise InternalInferenceError(
+            f'The backpropagator for {prim} is not defined properly. '
+            f'It should return a tuple literal.',
+            refs=[bprop.return_]
+        )
+
+    *args, out_param, dout = bprop.parameters
+
+    with About(info, 'grad_fprop'):
+        outer = Graph()
+        outer.flags.update(default_grad_flags)
+        outer.flags.update(flags)
+        outer.transforms['primal'] = prim
+        outer.output = Constant(None)
+
+    mng = manage(bprop, outer)
+
+    transf_args = []
+    for p in args:
+        with About(p.debug, 'grad_fprop'):
+            outer_p = outer.add_parameter()
+        with About(p.debug, 'equiv'):
+            transf_p = outer.apply(P.Jinv, outer_p)
+        mng.replace(p, transf_p)
+        transf_args.append(transf_p)
+
+    with About(out_param.debug, 'equiv'):
+        out_value = outer.apply(prim, *transf_args)
+
+    mng.replace(out_param, out_value)
+
+    with About(out_param.debug, 'grad_sens'):
+        new_dout = bprop.add_parameter()
+        mng.replace(dout, new_dout)
+        # We remove all parameters except new_dout
+        bprop.parameters = [new_dout]
+
+    result = outer.apply(P.J, out_value)
+    outer.output = outer.apply(
+        P.make_tuple,
+        result,
+        bprop
+    )
+    return clone(outer)
+
+
+def wrap_grad_transform(prim):
+    """Wrap the grad transform for prim."""
+    from .pipeline import standard_parse
+
+    def deco(fn):
+        g = standard_parse(fn)
+        for g2 in manage(g, weak=True).graphs:
+            name = short_labeler.name(g2)
+            name = name.replace('__fprop__', syms['grad_fprop'])
+            g2.debug.name = name.replace('__bprop__', syms['grad_bprop'])
+            g2.flags.update(default_grad_flags)
+        g.transforms['primal'] = prim
+        return g
+    return deco
+
+
+def bprop_to_grad_transform(prim, **flags):
+    """Create the grad transform of a function from a bprop function."""
+    def deco(fn):
+        return _make_grad_transform(prim, fn, flags)
+    return deco
+
+
+__consolidate__ = True
+__all__ = [
+    'Jimpl',
+    'bprop_to_grad_transform',
+    'wrap_grad_transform',
+]

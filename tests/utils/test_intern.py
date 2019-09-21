@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from myia.utils import (
+from myia.utils.intern import (
     AttrEK,
     IncompleteException,
     Interned,

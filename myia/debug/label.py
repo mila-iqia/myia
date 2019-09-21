@@ -6,7 +6,7 @@ from types import FunctionType
 from ..info import DebugInfo
 from ..ir import MetaGraph
 from ..ir.anf import ANFNode, Graph
-from ..prim import Primitive
+from ..operations import Primitive
 from ..utils import EnvInstance, Named, Namespace, SymbolicKeyInstance
 
 short_relation_symbols = {
@@ -178,3 +178,12 @@ def label(x, labeler=default_labeler):
         return labeler.name(x, True)
     else:
         return repr(x)
+
+
+__all__ = [
+    'CosmeticPrimitive',
+    'NodeLabeler',
+    'default_labeler',
+    'label',
+    'short_labeler',
+]

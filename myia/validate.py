@@ -12,7 +12,7 @@ from .abstract import (
     abstract_check,
 )
 from .ir import manage
-from .prim import Primitive, ops as P
+from .operations import Primitive, primitives as P
 from .utils import ErrorPool, overload
 
 
@@ -183,3 +183,11 @@ def validate(root, whitelist=whitelist, validate_abstract=validate_abstract):
     primitive must belong to the whitelist.
     """
     Validator(root, whitelist, validate_abstract)
+
+
+__all__ = [
+    'ValidationError',
+    'Validator',
+    'validate',
+    'validate_abstract',
+]

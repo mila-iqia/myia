@@ -279,3 +279,18 @@ def print_graph(g):
     print(f"  return %{g.output.debug.debug_name}", file=buf)
     print("}", file=buf)
     return buf.getvalue()
+
+
+__all__ = [
+    'dfs',
+    'exclude_from_set',
+    'freevars_boundary',
+    'isomorphic',
+    'print_graph',
+    'sexp_to_graph',
+    'sexp_to_node',
+    'succ_deep',
+    'succ_deeper',
+    'succ_incoming',
+    'toposort',
+]

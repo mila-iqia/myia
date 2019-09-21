@@ -489,3 +489,9 @@ def step_wrap(resources,
 def step_debug_export(resources, graph):
     """Make a Python callable out of the graph."""
     return {'output': resources.debug_vm.vm.export(graph)}
+
+
+__consolidate__ = True
+__all__ = [
+    'Optimizer',
+]

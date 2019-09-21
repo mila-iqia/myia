@@ -302,3 +302,16 @@ def load(fd):
         return loader.get_single_data()
     finally:
         loader.dispose()
+
+
+__consolidate__ = True
+__all__ = [
+    'LoadedError',
+    'MyiaDumper',
+    'MyiaLoader',
+    'dump',
+    'load',
+    'register_npscalar',
+    'register_serialize',
+    'serializable',
+]

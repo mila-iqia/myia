@@ -44,7 +44,7 @@ from .graph_utils import dfs
 from .info import About, DebugInherit, NamedDebugInfo
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
 from .ir.utils import succ_deeper
-from .prim import ops as primops
+from .operations import primitives as primops
 from .utils import ClosureNamespace, ModuleNamespace, OrderedSet
 
 _parse_cache = {}
@@ -759,10 +759,10 @@ class Parser:
         A for loop will generate 3 functions: The test, the body, and the
         continuation.
         """
-        op_iter = block.operation('iter')
-        op_next = block.operation('next')
+        op_iter = block.operation('myia_iter')
+        op_next = block.operation('myia_next')
         op_getitem = block.operation('getitem')
-        op_hasnext = block.operation('hasnext')
+        op_hasnext = block.operation('myia_hasnext')
 
         # Initialization of the iterator, only done once
         init = block.graph.apply(op_iter,
@@ -1019,3 +1019,14 @@ class Block:
         """Return a value in this block."""
         assert self.graph.return_ is None
         self.graph.output = value
+
+
+__consolidate__ = True
+__all__ = [
+    'Block',
+    'Location',
+    'MyiaDisconnectedCodeWarning',
+    'MyiaSyntaxError',
+    'Parser',
+    'parse',
+]

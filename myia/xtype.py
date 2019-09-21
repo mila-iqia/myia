@@ -318,3 +318,39 @@ class External(typing.Generic[T]):
     """Represents a type external to Myia (essentially invalid)."""
 
     obj: T
+
+
+__all__ = [
+    'Bool',
+    'Dict',
+    'EnvType',
+    'ExceptionType',
+    'External',
+    'Float',
+    'Int',
+    'NDArray',
+    'Nil',
+    'NotImplementedType',
+    'Number',
+    'Object',
+    'String',
+    'SymbolicKeyType',
+    'Tuple',
+    'Type',
+    'TypeMeta',
+    'UInt',
+    'f16',
+    'f32',
+    'f64',
+    'i16',
+    'i32',
+    'i64',
+    'i8',
+    'np_dtype_to_type',
+    'pytype_to_myiatype',
+    'type_to_np_dtype',
+    'u16',
+    'u32',
+    'u64',
+    'u8',
+]

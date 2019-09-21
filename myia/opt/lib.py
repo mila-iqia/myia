@@ -1,8 +1,7 @@
 """Library of optimizations."""
 
-from .. import macros, operations
+from .. import operations
 from ..abstract import DEAD, AbstractFunction, AbstractJTagged, abstract_clone
-from ..composite import gadd, zeros_like
 from ..ir import (
     Apply,
     BasicRemapper,
@@ -11,9 +10,32 @@ from ..ir import (
     GraphCloner,
     transformable_clone,
 )
-from ..prim import Primitive, ops as P
-from ..utils import Namespace, Partializable, overload
-from ..utils.unify import SVar, Var, var
+from ..operations import Primitive, primitives as P
+from ..operations.macro_typeof import typeof
+from ..operations.op_gadd import gadd
+from ..operations.op_zeros_like import zeros_like
+from ..utils import Partializable, overload
+from ..utils.unify import Var, var
+from ..utils.variables import (
+    C1,
+    C2,
+    CNS,
+    G1,
+    G2,
+    X1,
+    X2,
+    X3,
+    X4,
+    X5,
+    C,
+    G,
+    X,
+    Xs,
+    Y,
+    Ys,
+    Z,
+    constvar,
+)
 from ..xtype import Number
 from .opt import (
     GraphTransform,
@@ -22,43 +44,9 @@ from .opt import (
     sexp_to_node,
 )
 
-#####################
-# Generic variables #
-#####################
-
-
-X = Var('X')
-Y = Var('Y')
-Z = Var('Z')
-X1 = Var('X1')
-Y1 = Var('Y1')
-X2 = Var('X2')
-Y2 = Var('Y2')
-X3 = Var('X3')
-X4 = Var('X4')
-X5 = Var('X5')
-
-
-def _is_c(n):
-    return n.is_constant()
-
-
-def _is_cg(n):
-    return n.is_constant_graph()
-
-
-C = var(_is_c)
-C1 = var(_is_c)
-C2 = var(_is_c)
-CNS = var(lambda x: x.is_constant(Namespace))
-G = var(_is_cg)
-G1 = var(_is_cg)
-G2 = var(_is_cg)
-NIL = var(lambda x: x.is_constant() and x.value == ())
-
-Xs = SVar(Var())
-Ys = SVar(Var())
-Cs = SVar(var(_is_c))
+######################
+# Specific variables #
+######################
 
 
 def M(mg):
@@ -214,7 +202,7 @@ def _transform(pattern: Var):
 @overload  # noqa: F811
 def _transform(pattern: (int, float)):
     return (P.distribute, (P.scalar_to_array, pattern, _ArrayType),
-            var(_is_c))
+            constvar())
 
 
 def on_array_map(orig):
@@ -413,7 +401,7 @@ def unfuse_composite(resources, node, equiv):
         def asarray(self, ng, i):
             if i.is_constant():
                 typ = (self.reference.abstract
-                       or ng.apply(macros.typeof, self.reference))
+                       or ng.apply(typeof, self.reference))
                 return ng.apply(P.distribute,
                                 ng.apply(P.scalar_to_array, i, typ),
                                 ng.apply(P.shape, self.reference))
@@ -471,7 +459,7 @@ def simplify_array_map(resources, node, equiv):
         elif x.is_constant() \
                 and issubclass(x.abstract.xtype(), Number):
             shp = (P.shape, xs[0])
-            typ = xs[0].abstract or (macros.typeof, xs[0])
+            typ = xs[0].abstract or (typeof, xs[0])
             sexp = (P.distribute, (P.scalar_to_array, x, typ), shp)
             return sexp_to_node(sexp, node.graph)
         else:
@@ -1010,7 +998,7 @@ def expand_J(resources, node, equiv):
 
     This will not replace J(x) when x is not a constant graph.
     """
-    from ..grad import J as Jimpl
+    from ..grad import Jimpl
     arg = equiv[C].value
     try:
         newg = Jimpl(arg, resources, node)
@@ -1060,3 +1048,6 @@ class JElim(Partializable):
             node.abstract = newtype
 
         return len(nodes) > 0
+
+
+__all__ = []

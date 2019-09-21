@@ -1,0 +1,10 @@
+
+from myia.operations import OPERATION
+
+from ..multitest import infer, mt, run_debug
+
+
+@mt(
+)
+def test_OPERATION(ARGUMENTS):
+    return OPERATION(ARGUMENTS)

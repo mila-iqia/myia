@@ -1,9 +1,8 @@
 
 import pytest
 
+from myia.operations import partial, primitives as P
 from myia.pipeline import scalar_parse, scalar_pipeline
-from myia.prim import ops as P
-from myia.prim.py_implementations import partial
 from myia.validate import ValidationError, validate as _validate
 
 from .common import Point, i64, to_abstract_test

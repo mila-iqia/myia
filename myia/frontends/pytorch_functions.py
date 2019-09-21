@@ -20,11 +20,11 @@ from functools import reduce
 
 import torch
 
-from .. import composite as C
+from .. import operations
 from ..abstract import build_value, macro, myia_static
 from ..hypermap import hyper_map
 from ..ir import Constant
-from ..prim import ops as P
+from ..operations import primitives as P
 from ..utils import MyiaValueError, core
 from ..xtype import TupleT, f32, i64, u64
 from .pytorch_abstract_types import APT, pytorch_dtype_to_type
@@ -40,20 +40,18 @@ def _pt_dtype_to_my_dtype(dtype):
 
 
 @macro
-async def _dim_explicit(info):
-    a_shp_abs, dim_abs = [await arg.get() for arg in info.argrefs]
-    a_shp = build_value(a_shp_abs)
-    dim = build_value(dim_abs)
+async def _dim_explicit(info, a_shp_ref, dim_ref):
+    a_shp = build_value(await a_shp_ref.get())
+    dim = build_value(await dim_ref.get())
     if dim == -1:
         dim = len(a_shp) - 1
     return Constant(dim)
 
 
 @macro
-async def _dim_tuple_explicit(info):
-    a_shp_abs, dim_abs = [await arg.get() for arg in info.argrefs]
-    a_shp = build_value(a_shp_abs)
-    dim = build_value(dim_abs)
+async def _dim_tuple_explicit(info, a_shp_ref, dim_ref):
+    a_shp = build_value(await a_shp_ref.get())
+    dim = build_value(await dim_ref.get())
     shp_explicit = ()
     for s in dim:
         if s == -1:
@@ -88,11 +86,10 @@ def _pair(x):
 
 
 @macro
-async def _shp_squeeze(info):
-    o_shp_abs, dim_abs, keepdim_abs = [await arg.get() for arg in info.argrefs]
-    orig_shp = build_value(o_shp_abs)
-    dim = build_value(dim_abs)
-    keepdim = build_value(keepdim_abs)
+async def _shp_squeeze(info, o_shp_ref, dim_ref, keepdim_ref):
+    orig_shp = build_value(await o_shp_ref.get())
+    dim = build_value(await dim_ref.get())
+    keepdim = build_value(await keepdim_ref.get())
 
     final_shape = ()
     skip = False
@@ -123,10 +120,9 @@ async def _shp_squeeze(info):
 
 
 @macro
-async def _shp_explicit(info):
-    a_shp_abs, shp_abs = [await arg.get() for arg in info.argrefs]
-    a_shp = build_value(a_shp_abs)
-    shp = build_value(shp_abs)
+async def _shp_explicit(info, a_shp_ref, shp_ref):
+    a_shp = build_value(await a_shp_ref.get())
+    shp = build_value(await shp_ref.get())
 
     def prod(_x):
         return reduce(operator.mul, _x, 1)
@@ -329,7 +325,7 @@ def reshape(x, shp):
 @core
 def sigmoid(x):
     """Sigmoid activation function."""
-    return (C.tanh(x / 2) + 1) / 2
+    return (operations.array_tanh(x / 2) + 1) / 2
 
 
 @core
@@ -367,7 +363,7 @@ def _sum(self, dim=None, keepdim=False, *, dtype=None):
     if dim is None:
         return P.array_reduce(P.scalar_add, x, ())
     else:
-        return C.array_reduce_dim(P.scalar_add, x, dim, keepdim)
+        return operations.array_reduce_dim(P.scalar_add, x, dim, keepdim)
 
 
 @core
@@ -390,12 +386,6 @@ def scatter(self, dim, index, src):
 def scatter_add(self, dim, index, src):
     """Map of 'scatter_add' pytorch method."""
     return P.scatter_add(self, dim, index, src)
-
-
-@core
-def t(a):
-    """Map of 't' pytorch method."""
-    return P.transpose(a, (1, 0))
 
 
 @core
@@ -436,3 +426,18 @@ def zeros(*shp, dtype=None):
         if isinstance(shp[0], tuple):
             shp = shp[0]
     return P.distribute(P.scalar_to_array(P.scalar_cast(0.0, dtype), APT), shp)
+
+
+def __sum(x, d, kd):
+    """Remove a dim (of length 1)."""
+    raise NotImplementedError()
+
+
+__all__ = [
+    'conv2d',
+    'item',
+    'linear',
+    'relu',
+    'sigmoid',
+    'zeros',
+]

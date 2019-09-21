@@ -613,3 +613,24 @@ class Unification:
             return self.visit(lambda u: self.reify(u, equiv), v)
         except VisitError:
             return v
+
+
+__consolidate__ = True
+__all__ = [
+    'FilterVar',
+    'PredicateSet',
+    'RestrictedVar',
+    'SVar',
+    'Seq',
+    'Unification',
+    'UnificationError',
+    'UnionVar',
+    'Var',
+    'VisitError',
+    'default_visit',
+    'expandlist',
+    'noseq',
+    'svar',
+    'uvar',
+    'var',
+]

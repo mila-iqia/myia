@@ -1,11 +1,5 @@
 """Optimization submodule."""
 
-from .cse import CSE, cse  # noqa
-from .dde import DeadDataElimination  # noqa
-from .opt import (  # noqa
-    GraphTransform,
-    LocalPassOptimizer,
-    NodeMap,
-    PatternSubstitutionOptimization,
-    pattern_replacer,
-)
+from .cse import *  # noqa
+from .dde import *  # noqa
+from .opt import *  # noqa

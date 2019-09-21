@@ -46,3 +46,9 @@ def get_outputs(lst, uses, seen):
         if n.is_apply() and any(u[0] not in seen for u in uses[n]):
             outputs.append(n)
     return outputs
+
+
+__all__ = [
+    'BackendValue',
+    'get_outputs',
+]

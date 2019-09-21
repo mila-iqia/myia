@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from ...ir import manage
-from ...prim import Primitive, ops as P
+from ...operations import Primitive, primitives as P
 from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ..transform import CompileGraphs, nonlinear_ops
 from . import ConcreteBackend, HandleBackend
@@ -404,3 +404,9 @@ class PyTorchBackend(ConcreteBackend):
 def PyTorchBackendR(device):
     """Pytorch proxy."""
     return HandleBackend(PyTorchBackend(device))
+
+
+__all__ = [
+    'PyTorchBackend',
+    'PyTorchBackendR',
+]

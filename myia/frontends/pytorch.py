@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 import torch
 
-from .. import composite as C
+from .. import operations
 from ..abstract.data import (
     ANYTHING,
     SHAPE,
@@ -17,8 +17,8 @@ from ..abstract.data import (
 )
 from ..abstract.infer import to_abstract
 from ..hypermap import hyper_map
+from ..operations import primitives as P
 from ..pipeline.standard import standard_method_map, standard_object_map
-from ..prim import ops as P
 from ..utils import core
 from ..xtype import NDArray
 from .pytorch_abstract_types import (
@@ -44,16 +44,15 @@ from .pytorch_functions import (
     sigmoid,
     softmax,
     squeeze,
-    t,
     transpose,
     zeros,
 )
 
 standard_object_map.update({
     torch.argmax: argmax,
-    torch.exp: C.array_exp,
+    torch.exp: operations.array_exp,
     torch.gather: gather,
-    torch.log: C.array_log,
+    torch.log: operations.array_log,
     torch.log_softmax: log_softmax,
     torch.max: _max,
     torch.mm: P.dot,
@@ -65,8 +64,8 @@ standard_object_map.update({
     torch.softmax: softmax,
     torch.squeeze: squeeze,
     torch.sum: _sum,
-    torch.t: t,
-    torch.tanh: C.array_tanh,
+    torch.t: operations.t,
+    torch.tanh: operations.array_tanh,
     torch.transpose: transpose,
     # torch.zeros_like: C.zeros_like,  # currently only works with pt backend
     torch.nn.functional.conv2d: conv2d,
@@ -81,12 +80,12 @@ standard_object_map.update({
 standard_method_map[PyTorchTensor] = \
     standard_method_map[NDArray].copy()
 standard_method_map[PyTorchTensor].update({
-    'dim': C.ndim,
+    'dim': operations.ndim,
     'argmax': argmax,
-    'exp': C.array_exp,
+    'exp': operations.array_exp,
     'gather': gather,
     'item': item,
-    'log': C.array_log,
+    'log': operations.array_log,
     'log_softmax': log_softmax,
     'max': _max,
     'permute': P.transpose,
@@ -95,15 +94,15 @@ standard_method_map[PyTorchTensor].update({
     'scatter': scatter,
     'scatter_add': scatter_add,
     'sigmoid': sigmoid,
-    'shape': property(P.shape),
+    'shape': property(operations.shape),
     'softmax': softmax,
     'squeeze': squeeze,
     'sum': _sum,
-    't': t,
+    't': operations.t,
     'transpose': transpose,
-    'tanh': C.array_tanh,
+    'tanh': operations.array_tanh,
     'view': P.reshape,  # contiguousness is ignored by us for now?
-    'zeros_like': C.zeros_like,  # hidden method used by bwd (I think)
+    'zeros_like': operations.zeros_like,  # hidden method used by bwd (I think)
 })
 
 
@@ -111,7 +110,7 @@ standard_method_map[PyTorchTensor].update({
 @core
 def mod_sub(self, x):
     """Hypermap subtraction (used for subtracting modules during update)."""
-    return hyper_map(C.sub, self, x)
+    return hyper_map(operations.sub, self, x)
 
 ##############################################################################
 
@@ -123,7 +122,6 @@ blacklist.add('reset_parameters')
 
 @to_abstract.register
 def _to_abstract(self, v: torch.nn.Module, **kwargs):
-    from ..pipeline.resources import standard_method_map
     standard_method_map[type(v)] = {
         '__call__': getattr(type(v), 'forward'),
         '__sub__': mod_sub,
@@ -199,3 +197,8 @@ def _to_abstract(self, v: torch.nn.Parameter, **kwargs):
         }),
         {SHAPE: tuple(v.shape), TYPE: PyTorchTensor},
     )
+
+
+__all__ = [
+    'pytorch_dtype_to_type',
+]

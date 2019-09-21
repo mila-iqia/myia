@@ -309,3 +309,12 @@ def overload_wrapper(wrapper, *, bootstrap=False, initial_state=None,
 
 
 overload.wrapper = overload_wrapper
+
+
+__consolidate__ = True
+__all__ = [
+    'Overload',
+    'TypeMap',
+    'overload',
+    'overload_wrapper',
+]

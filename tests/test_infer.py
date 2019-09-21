@@ -12,18 +12,17 @@ from myia.abstract import (
     ANYTHING,
     CONTEXTLESS,
     Contextless,
+    UniformPrimitiveInferrer,
     concretize_abstract,
     from_value,
 )
-from myia.abstract.prim import UniformPrimitiveInferrer
-from myia.composite import gadd, sum, zeros_like
 from myia.hypermap import HyperMap, hyper_map
 from myia.ir import Graph, MetaGraph, MultitypeGraph
-from myia.macros import embed, grad, typeof
-from myia.operations import J, Jinv, hastype, user_switch
-from myia.pipeline import scalar_pipeline, standard_pipeline
-from myia.prim import Primitive, ops as P
-from myia.prim.py_implementations import (
+from myia.operations import (
+    J,
+    Jinv,
+    Operation,
+    Primitive,
     array_cast,
     array_map,
     array_reduce,
@@ -34,11 +33,18 @@ from myia.prim.py_implementations import (
     casttag,
     distribute,
     dot,
+    embed,
     env_getitem,
     env_setitem,
+    gadd,
+    grad,
     hastag,
+    hastype,
     identity,
+    nil_eq,
+    nil_ne,
     partial as myia_partial,
+    primitives as P,
     reshape,
     scalar_add,
     scalar_cast,
@@ -51,8 +57,12 @@ from myia.prim.py_implementations import (
     tagged,
     transpose,
     tuple_setitem,
+    typeof,
     unsafe_static_cast,
+    user_switch,
+    zeros_like,
 )
+from myia.pipeline import scalar_pipeline, standard_pipeline
 from myia.utils import InferenceError, MyiaTypeError, newenv
 from myia.xtype import (
     Array,
@@ -1593,6 +1603,24 @@ def test_bool_or(x, y):
     return bool_or(x, y)
 
 
+@infer_std((B, False), (None, True))
+def test_nil_eq(x):
+    return nil_eq(None, x)
+
+
+@infer_std((B, True), (None, False))
+def test_nil_ne(x):
+    return nil_ne(None, x)
+
+
+@infer_std((i64, 0))
+def test_bool_ne(x):
+    if None:
+        return x
+    else:
+        return 0
+
+
 @infer(
     (B, B, B),
     (i64, i64, InferenceError),
@@ -2525,3 +2553,11 @@ def test_string_ne(s):
 @infer_std(('hey', 'hey'), (String, String))
 def test_string_return(s):
     return s
+
+
+bad_op = Operation('bad_op')
+
+
+@infer_std((i64, InferenceError))
+def test_bad_operation(x):
+    return bad_op(x)

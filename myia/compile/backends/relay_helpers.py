@@ -62,3 +62,9 @@ def optimize(mod):
     function while optimizing.
     """
     return pass_set(mod)
+
+
+__all__ = [
+    'build_module',
+    'optimize',
+]

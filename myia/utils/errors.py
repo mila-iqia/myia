@@ -32,6 +32,10 @@ class InternalInferenceError(InferenceError):
     """This kind of error denotes a bug in Myia."""
 
 
+class MyiaConversionError(InferenceError):
+    """Error converting an object in a Myia program."""
+
+
 class MyiaTypeError(InferenceError):
     """Type error in a Myia program."""
 
@@ -82,3 +86,21 @@ class TypeMismatchError(MyiaTypeError):
 
 class MyiaInputTypeError(TypeError):
     """Represents a type error on an input to a Myia function."""
+
+
+__consolidate__ = True
+__all__ = [
+    'InferenceError',
+    'InternalInferenceError',
+    'MyiaAttributeError',
+    'MyiaConversionError',
+    'MyiaInputTypeError',
+    'MyiaNameError',
+    'MyiaShapeError',
+    'MyiaTypeError',
+    'MyiaValueError',
+    'TypeMismatchError',
+    'check_nargs',
+    'infer_trace',
+    'type_error_nargs',
+]

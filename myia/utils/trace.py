@@ -335,3 +335,17 @@ def listener(*patterns):
             return DoTrace({pattern: fn for pattern in patterns}, **kwargs)
         return new_fn
     return deco
+
+
+__consolidate__ = True
+__all__ = [
+    'DoTrace',
+    'ProfileResults',
+    'Profiler',
+    'TraceExplorer',
+    'TraceListener',
+    'Tracer',
+    'TracerContextManager',
+    'listener',
+    'tracer',
+]

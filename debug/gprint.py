@@ -15,9 +15,10 @@ from myia.debug.label import (
 )
 from myia.debug.utils import mixin
 from myia.info import About
-from myia.ir import Apply, Constant, GraphCloner, ParentProxy, manage
+from myia.ir import Apply, Constant, GraphCloner, manage
+from myia.ir.manager import ParentProxy
+from myia.operations import primitives as primops
 from myia.opt import LocalPassOptimizer, NodeMap, pattern_replacer
-from myia.prim import ops as primops
 from myia.utils import UNKNOWN, Registry
 from myia.utils.unify import SVar, Var, var
 from myia.xtype import Float, Int, UInt
@@ -859,7 +860,7 @@ class _Apply:
             return super(Apply, self).__hrepr__(H, hrepr)
 
 
-@mixin(ir.ParentProxy)
+@mixin(ParentProxy)
 class _ParentProxy:
     @classmethod
     def __hrepr_resources__(cls, H):

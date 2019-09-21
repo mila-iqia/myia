@@ -25,10 +25,11 @@ from .abstract import (
     type_to_abstract,
     typecheck,
 )
+from .classes import Cons, Empty
 from .compile import BackendValue
 from .ir import Constant
-from .prim import ops as P
-from .utils import Cons, Empty, MyiaInputTypeError, TaggedValue, overload
+from .operations import primitives as P
+from .utils import MyiaInputTypeError, TaggedValue, overload
 from .xtype import Int, NDArray, String
 
 ####################
@@ -430,3 +431,13 @@ def from_canonical(self, arg, orig_t: AbstractUnion):
             return self(arg.value, typ)
     else:
         raise AssertionError(f'Badly formed TaggedValue')
+
+
+__consolidate__ = True
+__all__ = [
+    'from_canonical',
+    'simplify_types',
+    'str_to_tag',
+    'to_canonical',
+    'type_to_tag',
+]

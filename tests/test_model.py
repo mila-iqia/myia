@@ -6,9 +6,8 @@ import numpy
 from numpy import ones as _ones, zeros as _zeros
 
 from myia.abstract import from_value
-from myia.macros import grad
+from myia.operations import array_reduce, grad, scalar_add
 from myia.pipeline import standard_pipeline
-from myia.prim.py_implementations import array_reduce, scalar_add
 from myia.utils import InferenceError
 from myia.xtype import Array
 

@@ -307,3 +307,17 @@ def intern(inst):
         return inst
     else:
         return existing
+
+
+__consolidate__ = True
+__all__ = [
+    'Atom',
+    'AttrEK',
+    'EqKey',
+    'Interned',
+    'ItemEK',
+    'PossiblyRecursive',
+    'eqrec',
+    'hashrec',
+    'intern',
+]

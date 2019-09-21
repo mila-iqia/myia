@@ -3,12 +3,10 @@ import numpy as np
 from pytest import mark
 
 from myia.abstract import from_value
-from myia.composite import list_reduce
 from myia.debug.label import short_labeler as lbl
 from myia.debug.traceback import print_inference_error
 from myia.hypermap import hyper_map
-from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
-from myia.prim.py_implementations import (
+from myia.operations import (
     array_map,
     array_reduce,
     partial,
@@ -20,6 +18,7 @@ from myia.prim.py_implementations import (
     switch,
     tagged,
 )
+from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.utils import InferenceError, overload
 from myia.validate import ValidationError
 
@@ -717,6 +716,13 @@ def test_zip_enumerate(xs, ys):
     for i, (x, y) in enumerate(zip(xs, ys)):
         rval = rval + i + x + y
     return rval
+
+
+def list_reduce(fn, lst, dftl):
+    res = dftl
+    for elem in lst:
+        res = fn(res, elem)
+    return res
 
 
 @specialize_std(([int1, int2],))

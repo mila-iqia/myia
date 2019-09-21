@@ -12,8 +12,7 @@ from myia.compile.backends import (
     load_backend,
     parse_default,
 )
-from myia.pipeline import standard_pipeline
-from myia.prim.py_implementations import (
+from myia.operations import (
     array_reduce,
     distribute,
     dot,
@@ -22,6 +21,7 @@ from myia.prim.py_implementations import (
     scalar_to_array,
     transpose,
 )
+from myia.pipeline import standard_pipeline
 
 from ..common import AN, MA, MB
 

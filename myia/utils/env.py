@@ -106,3 +106,12 @@ class EnvInstance:
 
 
 newenv = EnvInstance()
+
+
+__consolidate__ = True
+__all__ = [
+    'EnvInstance',
+    'SymbolicKeyInstance',
+    'newenv',
+    'smap',
+]

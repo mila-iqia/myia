@@ -147,3 +147,9 @@ class OrderedSet:
 
     def __contains__(self, x):
         return x in self._d
+
+
+__consolidate__ = True
+__all__ = [
+    'OrderedSet',
+]

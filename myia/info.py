@@ -206,3 +206,13 @@ class About:
         """Exit the context of this `About`."""
         top = _about.pop()
         assert isinstance(top, DebugInfo) and top.about is self
+
+
+__consolidate__ = True
+__all__ = [
+    'About',
+    'DebugInfo',
+    'DebugInherit',
+    'NamedDebugInfo',
+    'current_info',
+]

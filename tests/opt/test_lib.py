@@ -1,14 +1,13 @@
 
-from myia.composite import gadd
-from myia.operations import embed, typeof
-from myia.opt import lib
-from myia.prim.py_implementations import (
+from myia.operations import (
     array_map,
     array_reduce,
     distribute,
+    embed,
     env_add,
     env_getitem,
     env_setitem,
+    gadd,
     identity,
     partial,
     scalar_add,
@@ -20,6 +19,7 @@ from myia.prim.py_implementations import (
     transpose,
     tuple_setitem,
 )
+from myia.opt import lib
 from myia.utils import newenv
 
 from ..common import af64_of, f64, i64, to_abstract_test
@@ -437,6 +437,7 @@ def test_simplify_array_map_6():
 
 
 def test_unfuse_composite_constant():
+    from myia.operations.macro_typeof import typeof
 
     def before(x):
         def p1(x):

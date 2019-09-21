@@ -13,8 +13,8 @@ exclude_lines =
     @abstractmethod
     @compile
     @core
-    @register_augm
-    @register_bprop
+    @wrap_grad_transform
+    @bprop_to_grad_transform
     pragma: no cover
     AssertionError
     NotImplementedError

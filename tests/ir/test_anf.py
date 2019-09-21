@@ -2,7 +2,7 @@
 import pytest
 
 from myia.ir.anf import PARAMETER, Apply, Constant, Graph, Parameter
-from myia.prim import ops as primops
+from myia.operations import primitives as primops
 
 
 def test_incoming():

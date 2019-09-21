@@ -92,3 +92,11 @@ class MultitypeGraph(MetaGraph):
         types = tuple(abstract.to_abstract(arg) for arg in args)
         fn = self._getfn(types)
         return fn(*args)
+
+
+__consolidate__ = True
+__all__ = [
+    'MetaGraph',
+    'MultitypeGraph',
+    'TypeDispatchError',
+]

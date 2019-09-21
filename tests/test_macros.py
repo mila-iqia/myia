@@ -17,10 +17,10 @@ def test_repr():
 
 def test_bad_macro():
     from myia.ir import Graph
-    from myia.prim import ops as P
+    from myia.operations import primitives as P
 
     @macro
-    async def bad(info):
+    async def bad(info, x):
         badg = Graph()
         badg.debug.name = 'badg'
         p = badg.add_parameter()
@@ -41,14 +41,16 @@ def test_bad_macro():
 
 def test_bad_macro_2():
     with pytest.raises(TypeError):
+        # Should be async def
         @macro
         def bigmac(info):
-            return info.args[0]
+            return info.nodes()[0]
 
 
 def test_bad_macro_3():
     @macro
-    async def macncheese(info):
+    async def macncheese(info, x):
+        # Should return a node
         return None
 
     @myia
@@ -57,6 +59,14 @@ def test_bad_macro_3():
 
     with pytest.raises(InferenceError):
         pasta(12, 13)
+
+
+def test_bad_macro_4():
+    with pytest.raises(TypeError):
+        # Cannot define default arguments
+        @macro
+        async def bigmac(info, x=None):
+            return info.nodes()[0]
 
 
 @myia_static

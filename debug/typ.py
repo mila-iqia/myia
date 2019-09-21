@@ -4,11 +4,10 @@ from myia.abstract import (
     ANYTHING as ANY,
     TYPE,
     VALUE,
-    AbstractList,
     AbstractScalar,
     from_value,
 )
-from myia.dtype import Bool, Float, Int
+from myia.xtype import Bool, Float, Int
 
 B = AbstractScalar({VALUE: ANY, TYPE: Bool})
 
@@ -19,14 +18,6 @@ i64 = AbstractScalar({VALUE: ANY, TYPE: Int[64]})
 f16 = AbstractScalar({VALUE: ANY, TYPE: Float[16]})
 f32 = AbstractScalar({VALUE: ANY, TYPE: Float[32]})
 f64 = AbstractScalar({VALUE: ANY, TYPE: Float[64]})
-
-li16 = AbstractList(i16)
-li32 = AbstractList(i32)
-li64 = AbstractList(i64)
-
-lf16 = AbstractList(f16)
-lf32 = AbstractList(f32)
-lf64 = AbstractList(f64)
 
 
 @dataclass(frozen=True)
@@ -42,4 +33,3 @@ class Point:
 
 
 pt = from_value(Point(1, 2), broaden=True)
-lpt = AbstractList(pt)

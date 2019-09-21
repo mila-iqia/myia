@@ -4,16 +4,16 @@ import numpy as np
 from pytest import mark
 
 from myia.abstract import from_value
-from myia.pipeline import standard_pipeline
-from myia.prim import ops as P
-from myia.prim.py_implementations import (
+from myia.operations import (
     array_getitem,
     array_setitem,
     bool_and,
     partial,
+    primitives as P,
     scalar_add,
     tagged,
 )
+from myia.pipeline import standard_pipeline
 
 from .common import MA, MB, Point, make_tree, sumtree
 

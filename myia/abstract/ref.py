@@ -202,3 +202,15 @@ class EvaluationCache:
         fut = asyncio.Future(loop=self.loop)
         fut.set_result(value)
         self.cache[key] = fut
+
+
+__consolidate__ = True
+__all__ = [
+    'AbstractReference',
+    'CONTEXTLESS',
+    'Context',
+    'Contextless',
+    'EvaluationCache',
+    'Reference',
+    'VirtualReference',
+]

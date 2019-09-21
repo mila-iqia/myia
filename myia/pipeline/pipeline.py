@@ -241,3 +241,9 @@ class _PipelineSlice:
         if 'error' in results:
             raise results['error']
         return results
+
+
+__all__ = [
+    'Pipeline',
+    'PipelineDefinition',
+]

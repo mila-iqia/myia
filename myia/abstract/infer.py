@@ -8,11 +8,11 @@ from functools import reduce
 import numpy as np
 
 from .. import operations, xtype
+from ..classes import ADT
 from ..info import About
 from ..ir import Graph, MetaGraph
-from ..prim import Primitive, ops as P
+from ..operations import Primitive, primitives as P
 from ..utils import (
-    ADT,
     InferenceError,
     InternalInferenceError,
     MyiaTypeError,
@@ -47,6 +47,7 @@ from .data import (
     AbstractTuple,
     AbstractType,
     AbstractValue,
+    AnnotationBasedChecker,
     DummyFunction,
     Function,
     GraphFunction,
@@ -110,10 +111,7 @@ class InferenceEngine:
             keytransform=self.get_actual_ref
         )
         self.reference_map = {}
-        self.constructors = {
-            prim: cons()
-            for prim, cons in self._constructors.items()
-        }
+        self.constructors = {}
 
     def run(self, graph, *, argspec, outspec=None):
         """Run the inferrer on a graph given initial values.
@@ -254,6 +252,9 @@ class InferenceEngine:
 
     @get_inferrer_for.register
     def get_inferrer_for(self, pf: PrimitiveFunction):
+        if pf.prim not in self.constructors:
+            cons = self._constructors[pf.prim]
+            self.constructors[pf.prim] = cons()
         return self.constructors[pf.prim]
 
     @get_inferrer_for.register
@@ -885,6 +886,119 @@ class JInferrer(Inferrer):
         return self.cache[args]
 
 
+class StandardInferrer(Inferrer):
+    """Generic inferrer for primitives.
+
+    Arguments:
+        infer: The inference function. Its arguments and type annotations
+            will be inspected and checked automatically.
+    """
+
+    def __init__(self, prim, infer):
+        """Initialize a StandardInferrer."""
+        super().__init__()
+        self.prim = prim
+        self._infer = infer
+        self.checker = AnnotationBasedChecker(prim, infer, 2)
+
+    async def infer(self, engine, *args):
+        """Infer the abstract result given the abstract arguments."""
+        infer_trace.set({**infer_trace.get(), self.prim: (self.prim, args)})
+        await self.checker.check(engine, args)
+        return await self._infer(self, engine, *args)
+
+    def require_constant(self, a, *, argnum, range=None):
+        """Returns the constant associated to abstract argument a.
+
+        If a is not a constant, raises a MyiaTypeError.
+
+        Arguments:
+            argnum (int): Which argument we are checking.
+            range (optional): A range or collection in which the argument
+                must lie.
+        """
+        v = a.xvalue()
+        if v is ANYTHING:
+            raise MyiaTypeError(
+                f'Argument {argnum} to {self.prim} must be constant.'
+            )
+        if range is not None and v not in range:
+            raise MyiaTypeError(
+                f'Argument {argnum} to {self.prim} is out of range.'
+                f' It should lie in {range}'
+            )
+        return v
+
+
+def standard_prim(prim):
+    """Decorator to define and register a StandardInferrer."""
+    def deco(fn):
+        if isinstance(fn, type):
+            return fn.partial()
+        else:
+            return StandardInferrer.partial(prim=prim, infer=fn)
+    return deco
+
+
+class UniformPrimitiveInferrer(Inferrer):
+    """Inferrer derived from an implementation, requiring uniform types.
+
+    If multiple arguments are AbstractScalars, they will all be required
+    to have the same type, e.g. all Int[64] or all Float[32].
+
+    Arguments:
+        impl: The implementation.
+        infer_value: Whether to do constant propagation through this
+            implementation.
+    """
+
+    def __init__(self, prim, impl, infer_value=False):
+        """Initialize a UniformPrimitiveInferrer."""
+        super().__init__()
+        self.prim = prim
+        self.impl = impl
+        self.infer_value = infer_value
+        self.checker = AnnotationBasedChecker(prim, impl, 0, False)
+
+    def normalize_args_sync(self, args):
+        """If infer_value is False, return broadened arguments."""
+        if not self.infer_value:
+            args = tuple(_broaden(a) for a in args)
+        return args
+
+    async def infer(self, engine, *args):
+        """Infer the abstract result given the abstract arguments."""
+        infer_trace.set({**infer_trace.get(), self.prim: (self.prim, args)})
+        if any(not isinstance(arg, AbstractScalar) for arg in args):
+            raise MyiaTypeError(f'Expected scalar as argument to {self.prim}')
+        ts = [arg.xtype() for arg in args]
+        outtype = await self.checker.check(engine, ts, uniform=True)
+        return self.run_impl(engine, args, outtype)
+
+    def run_impl(self, engine, args, outtype):
+        """Run the implementation on abstract data.
+
+        If infer_value is False, this returns an AbstractScalar with value
+        ANYTHING.
+
+        Arguments: engine: The InferenceEngine args: The abstract arguments
+            outtype: The output type to give to the result
+        """
+        if not self.infer_value:
+            outval = ANYTHING
+        else:
+            values = [arg.xvalue() for arg in args]
+            if any(v is ANYTHING for v in values):
+                outval = ANYTHING
+            else:
+                outval = self.impl(*values)
+
+        return AbstractScalar({
+            VALUE: outval,
+            TYPE: outtype,
+        })
+
+
 async def _run_trace(inf, engine, outref, argrefs):
     tracer_args = dict(
         engine=engine,
@@ -948,3 +1062,22 @@ async def execute_inferrers(engine, inferrers, outref, argrefs):
             )
 
         return bind(engine.loop, None, [], pending)
+
+
+__consolidate__ = True
+__all__ = [
+    'GraphInferrer',
+    'InferenceEngine',
+    'Inferrer',
+    'JInferrer',
+    'MacroInferrer',
+    'PartialInferrer',
+    'StandardInferrer',
+    'TrackedInferrer',
+    'UniformPrimitiveInferrer',
+    'VirtualInferrer',
+    'execute_inferrers',
+    'from_value',
+    'standard_prim',
+    'to_abstract',
+]

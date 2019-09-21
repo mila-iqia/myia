@@ -43,7 +43,7 @@ from .ir import (
     MetaGraph,
     succ_incoming,
 )
-from .prim import Primitive
+from .operations import Primitive
 from .utils import InferenceError, MyiaTypeError, overload
 
 
@@ -678,3 +678,11 @@ def monomorphize(engine, root_context, reuse_existing=True):
     """Monomorphize all graphs starting with the given root context."""
     mono = Monomorphizer(engine, reuse_existing=reuse_existing)
     return mono.run(root_context)
+
+
+__all__ = [
+    'Monomorphizer',
+    'Unspecializable',
+    'concretize_cache',
+    'monomorphize',
+]

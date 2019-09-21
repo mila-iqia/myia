@@ -20,3 +20,9 @@ class Node(ABC):
     def incoming(self) -> Iterable['Node']:
         """Return nodes used as inputs."""
         pass
+
+
+__consolidate__ = True
+__all__ = [
+    'Node',
+]

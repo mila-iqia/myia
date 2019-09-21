@@ -13,10 +13,7 @@ import numpy as np
 import pytest
 
 from myia.abstract import ANYTHING
-from myia.operations import embed
-from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
-from myia.prim.py_implementations import (
-    _assert_scalar,
+from myia.operations import (
     array_cast,
     array_getitem,
     array_map,
@@ -28,6 +25,7 @@ from myia.prim.py_implementations import (
     broadcast_shape,
     distribute,
     dot,
+    embed,
     env_add,
     env_getitem,
     env_setitem,
@@ -44,7 +42,8 @@ from myia.prim.py_implementations import (
     tuple_getitem,
     tuple_setitem,
 )
-from myia.utils import newenv
+from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
+from myia.utils import assert_scalar, newenv
 
 from ..common import AA, f16, i64, to_abstract_test
 from ..test_lang import parse_compare
@@ -314,15 +313,15 @@ def test_prim_partial(x):
 
 
 def test_assert_scalar():
-    _assert_scalar(0)
-    _assert_scalar(1.0, 2.0)
-    _assert_scalar(np.ones(()))
+    assert_scalar(0)
+    assert_scalar(1.0, 2.0)
+    assert_scalar(np.ones(()))
     # with pytest.raises(TypeError):
-    #     _assert_scalar(1, 1.0)
+    #     assert_scalar(1, 1.0)
     with pytest.raises(TypeError):
-        _assert_scalar(np.ones((2, 2)))
+        assert_scalar(np.ones((2, 2)))
     with pytest.raises(TypeError):
-        _assert_scalar((1, 2), (3, 4))
+        assert_scalar((1, 2), (3, 4))
 
 
 def test_prim_identity():
@@ -413,3 +412,12 @@ def test_env():
                  to_abstract_test(i64))
     )['output'](3, 4)
     assert res == (110, 20, 0)
+
+
+def test_call_operation():
+    from myia.operations import Operation, scalar_pow
+    assert scalar_pow(2, 10) == 1024
+
+    bad_op = Operation('bad_op')
+    with pytest.raises(RuntimeError):
+        bad_op(123)
