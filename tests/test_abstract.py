@@ -38,12 +38,11 @@ from myia.abstract import (
     to_abstract,
     type_to_abstract,
 )
+from myia.classes import Cons, Empty
 from myia.ir import Constant
+from myia.operations import primitives as P
 from myia.pipeline import standard_resources
-from myia.prim import ops as P
 from myia.utils import (
-    Cons,
-    Empty,
     InferenceError,
     InternalInferenceError,
     MyiaTypeError,

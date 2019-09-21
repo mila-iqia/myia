@@ -61,3 +61,9 @@ class GraphIndex:
     def __getitem__(self, key):
         v, = self._index[key]
         return v
+
+
+__all__ = [
+    'GraphIndex',
+    'mixin',
+]

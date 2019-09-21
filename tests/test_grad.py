@@ -8,26 +8,17 @@ from pytest import mark
 
 from myia.abstract import AbstractJTagged, from_value, ndarray_aliasable
 from myia.api import myia
-from myia.composite import gadd
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
-from myia.macros import GradOperation, grad
-from myia.pipeline import (
-    PipelineDefinition,
-    standard_debug_pipeline,
-    standard_pipeline,
-    standard_resources,
-    steps,
-)
-from myia.prim import ops as P
-from myia.prim.ops import J
-from myia.prim.py_implementations import (
+from myia.operations import (
     array_map,
     array_reduce,
     array_to_scalar,
     distribute,
     dot,
+    gadd,
+    grad,
     partial,
-    py_registry as pyi,
+    primitives as P,
     reshape,
     scalar_add,
     scalar_cast,
@@ -35,6 +26,16 @@ from myia.prim.py_implementations import (
     scalar_mul,
     scalar_to_array,
     transpose,
+)
+from myia.operations.macro_grad import GradOperation
+from myia.operations.primitives import J
+from myia.pipeline import (
+    PipelineDefinition,
+    py_registry as pyi,
+    standard_debug_pipeline,
+    standard_pipeline,
+    standard_resources,
+    steps,
 )
 from myia.utils import InferenceError, MyiaInputTypeError
 from myia.validate import validate_abstract, whitelist
@@ -660,6 +661,10 @@ def test_grad_interface():
     def gradbad10(x, y):
         return grad(partial(f, x))(y)
 
+    @myia
+    def gradbad11(x, y):
+        return grad(P.scalar_mod)(x, y)
+
     x, y = 2.0, 3.0
 
     dx = 3 * (x ** 2) * (y ** 4)
@@ -704,6 +709,9 @@ def test_grad_interface():
 
     with pytest.raises(InferenceError):
         print(gradbad10(x, y))
+
+    with pytest.raises(InferenceError):
+        print(gradbad11(x, y))
 
 
 def test_aliasing():
@@ -811,11 +819,11 @@ def test_aliasing_other():
 
 
 def test_bad_bprop_def():
-    from myia.prim.grad_implementations import register_bprop
-    from myia.prim import Primitive
+    from myia.lib import bprop_to_grad_transform
+    from myia.operations import Primitive
     from myia.utils import InternalInferenceError
 
     with pytest.raises(InternalInferenceError):
-        @register_bprop(Primitive('nonsense'))
+        @bprop_to_grad_transform(Primitive('nonsense'))
         def _bprop_nonsense(x, y, dout):
             return dout + x + y

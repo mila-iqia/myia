@@ -477,3 +477,15 @@ def transformable_clone(graph, relation='transform'):
     cl = GraphCloner(inline=(graph, newg, newg.parameters))
     newg.output = cl[graph.output]
     return newg
+
+
+__consolidate__ = True
+__all__ = [
+    'BasicRemapper',
+    'CloneRemapper',
+    'GraphCloner',
+    'GraphRemapper',
+    'RemapperSet',
+    'clone',
+    'transformable_clone',
+]

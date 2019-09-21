@@ -11,7 +11,7 @@ from tvm.contrib import graph_runtime
 
 from ...abstract import AbstractArray
 from ...ir import manage
-from ...prim import Primitive, ops as P
+from ...operations import Primitive, primitives as P
 from ...xtype import Nil, type_to_np_dtype
 from ..transform import CompileGraphs, nonlinear_ops
 from ..utils import get_outputs
@@ -409,3 +409,9 @@ class NNVMBackend(ConcreteBackend):
 def NNVMBackendR(target, device_id):
     """NNVM Proxy."""
     return HandleBackend(NNVMBackend(target, device_id))
+
+
+__all__ = [
+    'NNVMBackend',
+    'NNVMBackendR',
+]

@@ -4,7 +4,7 @@ from dataclasses import dataclass, is_dataclass
 
 import numpy as np
 
-from myia import xtype
+from myia import ArithmeticData, xtype
 from myia.abstract import (
     ANYTHING,
     SHAPE,
@@ -26,10 +26,10 @@ from myia.abstract import (
     from_value,
     listof,
 )
-from myia.composite import ArithmeticData
+from myia.classes import ADT
 from myia.ir import MultitypeGraph
-from myia.prim.py_implementations import tagged
-from myia.utils import ADT, EnvInstance, dataclass_fields, overload
+from myia.operations import tagged
+from myia.utils import EnvInstance, dataclass_fields, overload
 from myia.xtype import Bool, f16, f32, f64, i16, i32, i64, u64
 
 B = Bool

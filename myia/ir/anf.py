@@ -14,7 +14,7 @@ from copy import copy
 from typing import Any, Dict, Iterable, List, Union
 
 from ..info import About, NamedDebugInfo
-from ..prim import Primitive, ops as primops
+from ..operations import Primitive, primitives as primops
 from ..utils import Named, list_str, repr_, serializable
 from ..utils.unify import Unification, expandlist, noseq
 from .abstract import Node
@@ -204,7 +204,7 @@ class Graph:
         from .manager import GraphManager
         from ..abstract import AbstractDict, ANYTHING
         from ..utils import MyiaTypeError
-        from ..prim import ops as P
+        from ..operations import primitives as P
 
         if sig is None:
             return self
@@ -682,3 +682,15 @@ class VarNode(Special):
     @property
     def __var__(self):
         return self.special
+
+
+__consolidate__ = True
+__all__ = [
+    'ANFNode',
+    'Apply',
+    'Constant',
+    'Graph',
+    'Parameter',
+    'Special',
+    'VarNode',
+]

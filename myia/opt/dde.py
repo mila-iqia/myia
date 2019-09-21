@@ -14,7 +14,7 @@ from ..abstract import (
 )
 from ..graph_utils import dfs
 from ..ir import Constant, Graph, succ_incoming
-from ..prim import ops as P
+from ..operations import primitives as P
 from ..utils import Partializable
 
 
@@ -218,3 +218,8 @@ class DeadDataElimination(Partializable):
                     repl.abstract = AbstractError(DEAD)
                 mng.set_edge(node, idx, repl)
         return False  # Pretend there are no changes, for now
+
+
+__all__ = [
+    'DeadDataElimination',
+]

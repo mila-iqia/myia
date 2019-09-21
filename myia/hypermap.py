@@ -8,8 +8,7 @@ import numpy as np
 from . import abstract, operations
 from .abstract import broaden
 from .ir import Graph, MetaGraph
-from .prim import ops as P
-from .prim.py_implementations import array_map
+from .operations import array_map, primitives as P
 from .utils import MyiaTypeError, Overload
 
 nonleaf_defaults = (
@@ -151,7 +150,7 @@ class HyperMap(MetaGraph):
         if currg.return_ is None:
             currg.output = currg.apply(
                 P.raise_,
-                currg.apply(P.exception, "Type mismatch.")
+                currg.apply(P.make_exception, "Type mismatch.")
             )
             currg.debug.name = 'type_error'
 
@@ -175,7 +174,7 @@ class HyperMap(MetaGraph):
             fnarg = self.fn_leaf
 
         if len(argmap) > 1 and self.broadcast:
-            args = [g.apply(operations.to_array, arg, t)
+            args = [g.apply(operations.myia_to_array, arg, t)
                     if isleaf else arg
                     for arg, (a, isleaf) in argmap.items()]
             first, *rest = args
@@ -356,4 +355,63 @@ class HyperMap(MetaGraph):
             raise AssertionError('Should be unreachable')
 
 
+class Elemwise(HyperMap):
+    """Generate a graph for an elemwise operation.
+
+    * If any argument is an array:
+      * All scalar arguments are converted to arrays using scalar_to_array.
+      * The arguments are all broadcasted and array_map is called on them.
+    * Otherwise, we return getattr(arg1, mname)(arg2, ...)
+    """
+
+    def __init__(self, mname, scalar_op=None, infer_value=False, name=None):
+        """Initialize an Elemwise."""
+        super().__init__(
+            fn_leaf=scalar_op or self,
+            infer_value=infer_value,
+            name=name,
+            broadcast=True,
+            nonleaf=(abstract.AbstractArray,)
+        )
+        self.mname = mname
+
+    def make_signature(self, args):
+        """This erases type information that isn't useful.
+
+        The only information kept is whether an arg is an array or not, and its
+        shape/type/etc. (not its dtype). Other information is thrown away
+        because it is not relevant to graph generation.
+        """
+        def chg(arg):
+            if isinstance(arg, abstract.AbstractArray):
+                return abstract.AbstractArray(
+                    abstract.AbstractBottom(),
+                    arg.values
+                )
+            else:
+                return abstract.AbstractBottom()
+        return tuple(chg(arg) for arg in args)
+
+    def make_leaf(self, g, fnarg, argmap):
+        """Generate a call at leaf level.
+
+        This does not use self.fn_leaf.
+        """
+        assert fnarg is None
+        if self.mname is None:
+            return super().make_leaf(g, fnarg, argmap)
+        else:
+            first, *rest = argmap.keys()
+            fn = g.apply(operations.getattr, first, self.mname)
+            return g.apply(fn, *rest)
+
+
 hyper_map = HyperMap()
+
+
+__consolidate__ = True
+__all__ = [
+    'Elemwise',
+    'HyperMap',
+    'hyper_map',
+]

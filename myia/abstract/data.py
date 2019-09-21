@@ -4,6 +4,7 @@
 import inspect
 import re
 import traceback
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -11,13 +12,12 @@ import prettyprinter as pp
 from prettyprinter.prettyprinter import pretty_python_value
 
 from .. import xtype
+from ..classes import Cons, Empty
 from ..ir import ANFNode, Constant, Graph, MetaGraph
-from ..prim import Primitive
+from ..operations import Primitive
 from ..utils import (
     Atom,
     AttrEK,
-    Cons,
-    Empty,
     InferenceError,
     Interned,
     MyiaTypeError,
@@ -25,11 +25,12 @@ from ..utils import (
     Named,
     OrderedSet,
     PossiblyRecursive,
+    check_nargs,
     keyword_decorator,
     register_serialize,
     serializable,
 )
-from .loop import Pending
+from .loop import Pending, force_pending
 from .ref import Context, Reference
 
 # Represents the absence of inferred data
@@ -855,9 +856,96 @@ def listof(t):
     return rval.intern()
 
 
+###################
+# Other utilities #
+###################
+
+
+def u64tup_typecheck(engine, tup):
+    """Verify that tup is a tuple of uint64."""
+    tup_t = engine.check(AbstractTuple, tup)
+    for elem_t in tup_t.elements:
+        engine.abstract_merge(xtype.UInt[64], elem_t.xtype())
+    return tup_t
+
+
+def u64pair_typecheck(engine, shp):
+    """Verify that tup is a pair of uint64."""
+    tup_t = u64tup_typecheck(engine, shp)
+    if len(tup_t.elements) != 2:
+        raise MyiaTypeError(f'Expected Tuple Length 2, not Tuple Length'
+                            f'{len(tup_t.elements)}')
+    return tup_t
+
+
+def i64tup_typecheck(engine, tup):
+    """Verify that tup is a tuple of int64."""
+    tup_t = engine.check(AbstractTuple, tup)
+    for elem_t in tup_t.elements:
+        engine.abstract_merge(xtype.Int[64], elem_t.xtype())
+    return tup_t
+
+
 ##########
 # Macros #
 ##########
+
+
+class AnnotationBasedChecker:
+    """Utility class to check args based on a function signature."""
+
+    def __init__(self, name, fn, nstdargs, allow_varargs=True):
+        """Initialize an AnnotationBasedChecker."""
+        self.name = name
+        data = inspect.getfullargspec(fn)
+        if (data.varkw is not None
+                or data.defaults is not None
+                or data.kwonlyargs
+                or data.kwonlydefaults is not None
+                or data.varargs and not allow_varargs):
+            raise TypeError(
+                f'Function {fn} must only have positional arguments'
+                f' and no defaults.'
+            )
+        self.data = data
+        self.nargs = None if data.varargs else len(data.args) - nstdargs
+        self.typemap = defaultdict(list)
+        for i, arg in enumerate(data.args):
+            if arg in data.annotations:
+                self.typemap[data.annotations[arg]].append(i - nstdargs)
+        self.outtype = data.annotations.get('return', None)
+
+    async def check(self, engine, argrefs, uniform=False):
+        """Check that the argrefs match the function signature."""
+        check_nargs(self.name, self.nargs, argrefs)
+        outtype = self.outtype
+
+        async def _force_abstract(x):
+            return (await x.get()) if isinstance(x, Reference) else x
+
+        for typ, indexes in self.typemap.items():
+            args = [await _force_abstract(argrefs[i]) for i in indexes]
+
+            if uniform:
+                res = engine.check(typ, *args)
+                if typ == self.outtype:
+                    outtype = res
+                continue
+
+            for arg in args:
+                if isinstance(typ, xtype.TypeMeta):
+                    await force_pending(engine.check(typ, arg.xtype(), typ))
+                elif isinstance(typ, type) and issubclass(typ, AbstractValue):
+                    if not isinstance(arg, typ):
+                        raise MyiaTypeError(
+                            f'Wrong type {arg} != {typ} for {self.name}'
+                        )
+                elif callable(typ):
+                    await force_pending(engine.check(typ, arg))
+                else:
+                    raise AssertionError(f'Invalid annotation: {typ}')
+
+        return outtype
 
 
 @dataclass
@@ -868,17 +956,39 @@ class MacroInfo:
     outref: object
     argrefs: object
     graph: object
-    args: object
-    abstracts: object
+
+    async def abstracts(self):
+        """Return all the abstract values for the arguments."""
+        return [await ref.get() for ref in self.argrefs]
+
+    def nodes(self):
+        """Return all the graph nodes for the arguments."""
+        return [ref.node for ref in self.argrefs]
+
+    async def build_all(self, *refs):
+        """Get constant values from a list of references."""
+        return [await self.build(ref) for ref in refs]
+
+    async def build(self, ref, ab=None):
+        """Get a constant value from a reference."""
+        from .utils import build_value
+        if ab is None:
+            ab = await ref.get()
+        try:
+            return build_value(ab)
+        except ValueError:
+            raise MyiaValueError(
+                'Arguments to a myia_static function must be constant',
+                refs=[ref]
+            )
 
 
 class Macro:
     """Represents a function that transforms the subgraph it receives."""
 
-    def __init__(self, *, name, infer_args=True):
+    def __init__(self, *, name):
         """Initialize a Macro."""
         self.name = name
-        self.infer_args = infer_args
 
     async def macro(self, info):
         """Execute the macro proper."""
@@ -886,17 +996,11 @@ class Macro:
 
     async def reroute(self, engine, outref, argrefs):
         """Reroute a node."""
-        if self.infer_args:
-            abstracts = [await argref.get() for argref in argrefs]
-        else:
-            abstracts = None
         info = MacroInfo(
             engine=engine,
             outref=outref,
             argrefs=argrefs,
             graph=outref.node.graph,
-            args=[argref.node for argref in argrefs],
-            abstracts=abstracts,
         )
         rval = await self.macro(info)
         if isinstance(rval, ANFNode):
@@ -918,20 +1022,21 @@ class Macro:
 class StandardMacro(Macro):
     """Represents a function that transforms the subgraph it receives."""
 
-    def __init__(self, macro, *, name=None, infer_args=True):
+    def __init__(self, macro, *, name=None):
         """Initialize a Macro."""
-        super().__init__(name=name or macro.__qualname__,
-                         infer_args=infer_args)
+        super().__init__(name=name or macro.__qualname__)
         if not inspect.iscoroutinefunction(macro):
             raise TypeError(
                 f"Error defining macro '{self.name}':"
                 f" macro must be a coroutine defined using async def"
             )
+        self.checker = AnnotationBasedChecker(self.name, macro, 1)
         self._macro = macro
 
     async def macro(self, info):
         """Execute the macro proper."""
-        return await self._macro(info)
+        await self.checker.check(info.engine, info.argrefs)
+        return await self._macro(info, *info.argrefs)
 
 
 @keyword_decorator
@@ -964,8 +1069,7 @@ class MyiaStatic(Macro):
 
     def __init__(self, macro, *, name=None):
         """Initialize a MyiaStatic."""
-        super().__init__(name=name or macro.__qualname__,
-                         infer_args=True)
+        super().__init__(name=name or macro.__qualname__)
         self._macro = macro
 
     def __call__(self, *args):
@@ -974,23 +1078,13 @@ class MyiaStatic(Macro):
 
     async def macro(self, info):
         """Execute the macro."""
-        from .utils import build_value
-
-        def bv(x, ref):
-            try:
-                return build_value(x)
-            except ValueError:
-                raise MyiaValueError(
-                    'Arguments to a myia_static function must be constant',
-                    refs=[ref]
-                )
         posargs = []
         kwargs = {}
-        for ref, arg in zip(info.argrefs, info.abstracts):
+        for ref, arg in zip(info.argrefs, await info.abstracts()):
             if isinstance(arg, AbstractKeywordArgument):
-                kwargs[arg.key] = bv(arg.argument, ref)
+                kwargs[arg.key] = await info.build(ref, ab=arg.argument)
             else:
-                posargs.append(bv(arg, ref))
+                posargs.append(await info.build(ref, ab=arg))
         try:
             rval = self._macro(*posargs, **kwargs)
         except Exception as e:
@@ -1065,3 +1159,68 @@ def _pretty_avalue(a, ctx):
     except Exception:  # pragma: no cover
         # Pytest fails badly without this failsafe.
         return f'<{a.__class__.__qualname__}: error in printing>'
+
+
+__all__ = [
+    'ABSENT',
+    'ALIASID',
+    'ANYTHING',
+    'DATA',
+    'DEAD',
+    'POLY',
+    'SHAPE',
+    'TYPE',
+    'VALUE',
+    'VOID',
+    'AbstractADT',
+    'AbstractArray',
+    'AbstractAtom',
+    'AbstractBottom',
+    'AbstractClass',
+    'AbstractClassBase',
+    'AbstractDict',
+    'AbstractError',
+    'AbstractExternal',
+    'AbstractFunction',
+    'AbstractJTagged',
+    'AbstractKeywordArgument',
+    'AbstractScalar',
+    'AbstractStructure',
+    'AbstractTaggedUnion',
+    'AbstractTuple',
+    'AbstractType',
+    'AbstractUnion',
+    'AbstractValue',
+    'AnnotationBasedChecker',
+    'DummyFunction',
+    'Function',
+    'GraphFunction',
+    'JTransformedFunction',
+    'Macro',
+    'MacroError',
+    'MacroFunction',
+    'MacroInfo',
+    'MetaGraphFunction',
+    'MyiaStatic',
+    'PartialApplication',
+    'Possibilities',
+    'PrimitiveFunction',
+    'StandardMacro',
+    'TaggedPossibilities',
+    'Track',
+    'TrackDict',
+    'TypedPrimitive',
+    'VirtualFunction',
+    'empty',
+    'format_abstract',
+    'i64tup_typecheck',
+    'listof',
+    'macro',
+    'myia_static',
+    'pretty_call',
+    'pretty_join',
+    'pretty_struct',
+    'pretty_type',
+    'u64pair_typecheck',
+    'u64tup_typecheck',
+]

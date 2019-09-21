@@ -1,0 +1,18 @@
+"""Implementation of the 'OPERATION' macro."""
+
+from .. import lib, operations, xtype
+from ..lib import MyiaTypeError, macro
+
+
+@macro
+async def OPERATION(info, ARGUMENTS):
+    """Macro implementation for 'OPERATION'."""
+    pass
+
+
+__operation_defaults__ = {
+    'name': 'OPERATION',
+    'registered_name': 'OPERATION',
+    'mapping': OPERATION,
+    'python_implementation': None,
+}

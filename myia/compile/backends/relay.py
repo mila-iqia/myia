@@ -16,7 +16,7 @@ from ...abstract import (
 )
 from ...graph_utils import toposort
 from ...ir import manage
-from ...prim import Primitive, ops as P
+from ...operations import Primitive, primitives as P
 from ...utils import overload
 from ...xtype import Bool, Nil, type_to_np_dtype
 from ..transform import wrap_result
@@ -395,3 +395,9 @@ class RelayBackend(ConcreteBackend):
 def RelayBackendR(target, device_id):
     """Relay proxy."""
     return HandleBackend(RelayBackend(target, device_id))
+
+
+__all__ = [
+    'RelayBackend',
+    'RelayBackendR',
+]

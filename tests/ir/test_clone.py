@@ -13,8 +13,8 @@ from myia.ir import (
     succ_deeper,
     succ_incoming,
 )
+from myia.operations import primitives as P
 from myia.pipeline import scalar_parse as parse
-from myia.prim import ops as P
 
 
 def test_clone_simple():

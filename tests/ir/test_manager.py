@@ -5,8 +5,8 @@ import pytest
 
 from myia.debug.label import short_labeler
 from myia.ir import GraphCloner, GraphManager, ManagerError, manage
+from myia.operations import Primitive
 from myia.pipeline import scalar_parse as parse
-from myia.prim import Primitive
 from myia.utils import OrderedSet
 
 swap1 = Primitive('swap1')

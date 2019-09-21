@@ -3,6 +3,7 @@ import pytest
 
 from myia import operations
 from myia.ir import Constant, GraphCloner, isomorphic, sexp_to_graph
+from myia.operations import Primitive, primitives as prim
 from myia.opt import (
     LocalPassOptimizer,
     NodeMap,
@@ -11,7 +12,6 @@ from myia.opt import (
     pattern_replacer,
 )
 from myia.pipeline import scalar_pipeline
-from myia.prim import Primitive, ops as prim
 from myia.utils import InferenceError, Merge
 from myia.utils.unify import Var, var
 

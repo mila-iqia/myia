@@ -2,8 +2,9 @@
 
 import builtins
 import functools
-from dataclasses import dataclass
 from typing import Any, Dict, List, TypeVar
+
+import numpy as np
 
 from .serialize import serializable
 
@@ -12,99 +13,6 @@ builtins_d = vars(builtins)
 
 T1 = TypeVar('T1')
 T2 = TypeVar('T2')
-
-
-class ADT:
-    """Base class for an algebraic data type."""
-
-
-@dataclass  # pragma: no cover
-class Slice:
-    """Myia version of a slice."""
-
-    start: object
-    stop: object
-    step: object
-
-
-@dataclass  # pragma: no cover
-class Cons(ADT):
-    """Cons cell for lists.
-
-    Attributes:
-        head: The first element of the list.
-        tail: The rest of the list.
-
-    """
-
-    head: object
-    tail: 'Cons'
-
-    def _to_list(self):
-        curr = self
-        rval = []
-        while not isinstance(curr, Empty):
-            rval.append(curr.head)
-            curr = curr.tail
-        return rval
-
-    def __bool__(self):
-        return True
-
-    def __len__(self):
-        return 1 + len(self.tail)
-
-    def __getitem__(self, idx):
-        if idx == 0:
-            return self.head
-        else:
-            return self.tail[idx - 1]
-
-    def __iter__(self):
-        return iter(self._to_list())
-
-    def __myia_iter__(self):
-        return self
-
-    def __myia_hasnext__(self):
-        return True
-
-    def __myia_next__(self):
-        return self.head, self.tail
-
-
-@dataclass  # pragma: no cover
-class Empty(ADT):
-    """Empty list."""
-
-    def __iter__(self):
-        return iter(())
-
-    def __bool__(self):
-        return False
-
-    def __len__(self):
-        return 0
-
-    def __getitem__(self, idx):
-        raise Exception('Index out of bounds')
-
-    def __myia_iter__(self):
-        return self
-
-    def __myia_next__(self):
-        raise Exception('Out of bounds')
-
-    def __myia_hasnext__(self):
-        return False
-
-
-def list_to_cons(elems):
-    """Convert a list to a linked list using Cons."""
-    rval = Empty()
-    for elem in reversed(elems):
-        rval = Cons(elem, rval)
-    return rval
 
 
 @serializable('TaggedValue')
@@ -166,9 +74,10 @@ MISSING = Named('MISSING')
 class Registry(Dict[T1, T2]):
     """Associates primitives to implementations."""
 
-    def __init__(self) -> None:
+    def __init__(self, default_field=None) -> None:
         """Initialize a Registry."""
         super().__init__()
+        self.default_field = default_field
 
     def register(self, prim):
         """Register a primitive."""
@@ -177,6 +86,44 @@ class Registry(Dict[T1, T2]):
             self[prim] = fn
             return fn
         return deco
+
+    def __missing__(self, prim):
+        if self.default_field and isinstance(prim, HasDefaults):
+            dflt = prim.defaults()
+            return dflt[self.default_field]
+        raise KeyError(prim)
+
+
+class HasDefaults:
+    """Object that can return a defaults dictionary.
+
+    The defaults can be given as a dictionary or as a path to a module.
+    """
+
+    def __init__(self, name, defaults, defaults_field):
+        """Initialize a HasDefaults."""
+        self.name = name
+        self.defaults_field = defaults_field
+        if isinstance(defaults, dict):
+            self._defaults = defaults
+        elif isinstance(defaults, str):
+            self._defaults = None
+            self._defaults_location = defaults
+        else:
+            ty = type(self).__qualname__
+            raise TypeError(
+                f'{ty} defaults must be a dict or the qualified name'
+                ' of a module.'
+            )
+
+    def defaults(self):
+        """Return defaults for this object."""
+        if self._defaults is None:
+            defaults = resolve_from_path(self._defaults_location)
+            if not isinstance(defaults, dict):
+                defaults = getattr(defaults, self.defaults_field)
+            self._defaults = defaults
+        return self._defaults
 
 
 def repr_(obj: Any, **kwargs: Any):
@@ -467,3 +414,50 @@ def core(fn=None, **flags):
     }
     fn._myia_flags = flags
     return fn
+
+
+def resolve_from_path(path):
+    """Resolve a module or object from a path of the form x.y.z."""
+    modname, field = path.rsplit('.', 1)
+    mod = __import__(modname, fromlist=[field])
+    return getattr(mod, field)
+
+
+def assert_scalar(*args):
+    """Assert that the arguments are all scalars."""
+    # TODO: These checks should be stricter, e.g. require that all args
+    # have exactly the same type, but right now there is some mixing between
+    # numpy types and int/float.
+    for x in args:
+        if isinstance(x, np.ndarray):
+            if x.shape != ():
+                msg = f'Expected scalar, not array with shape {x.shape}'
+                raise TypeError(msg)
+        elif not isinstance(x, (int, float, np.number)):
+            raise TypeError(f'Expected scalar, not {type(x)}')
+
+
+__consolidate__ = True
+__all__ = [
+    'ClosureNamespace',
+    'ErrorPool',
+    'Event',
+    'Events',
+    'HasDefaults',
+    'MISSING',
+    'ModuleNamespace',
+    'NS',
+    'Named',
+    'Namespace',
+    'Registry',
+    'TaggedValue',
+    'UNKNOWN',
+    'assert_scalar',
+    'core',
+    'dataclass_fields',
+    'is_dataclass_type',
+    'keyword_decorator',
+    'list_str',
+    'repr_',
+    'resolve_from_path',
+]

@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from .info import About
 from .ir import Constant, Graph, Parameter, manage, sexp_to_node
-from .prim import ops as P
+from .operations import primitives as P
 
 
 def closure_convert(root):
@@ -64,3 +64,9 @@ def closure_convert(root):
                             tr.set_edge(node, i, rg[inp.value])
 
     return root
+
+
+__consolidate__ = True
+__all__ = [
+    'closure_convert',
+]

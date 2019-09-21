@@ -1,7 +1,7 @@
 """Utilities to merge dictionaries and other data structures."""
 
 
-from .misc import MISSING, Named
+from .misc import MISSING, Named, Registry
 from .overload import overload
 
 # Use in a merge to indicate that a key should be deleted
@@ -112,9 +112,13 @@ def merge(__call__, a, b, mode=MergeMode.mode):
 @overload  # noqa: F811
 def merge(d1: dict, d2, mode):
     if mode == 'reset':
+        assert not isinstance(d1, Registry)
         return type(d1)(d2)
 
-    rval = type(d1)()
+    if isinstance(d1, Registry):
+        rval = Registry(default_field=d1.default_field)
+    else:
+        rval = type(d1)()
     for k, v in d1.items():
         if k in d2:
             v2 = d2[k]
@@ -158,3 +162,15 @@ def merge(xs: set, ys, mode):
         return xs | ys
     else:
         return ys
+
+
+__consolidate__ = True
+__all__ = [
+    'DELETE',
+    'Merge',
+    'MergeMode',
+    'Override',
+    'Reset',
+    'cleanup',
+    'merge',
+]

@@ -361,3 +361,8 @@ class FinalVM:
         outs = fn(*(self._ref(a) for a in args))
         for o in outs:
             self._push(o)
+
+
+__all__ = [
+    'FinalVM',
+]

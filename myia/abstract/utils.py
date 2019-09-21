@@ -9,10 +9,8 @@ from types import AsyncGeneratorType, GeneratorType
 import numpy as np
 
 from .. import xtype
+from ..classes import ADT, Cons, Empty
 from ..utils import (
-    ADT,
-    Cons,
-    Empty,
     MyiaTypeError,
     TypeMismatchError,
     intern,
@@ -1328,3 +1326,29 @@ def _finalize_adt(self, x: AbstractUnion):
     else:
         yield None
         return self(x)
+
+
+__consolidate__ = True
+__all__ = [
+    'CheckState',
+    'CloneState',
+    'abstract_check',
+    'abstract_clone',
+    'amerge',
+    'bind',
+    'broaden',
+    'build_value',
+    'collapse_options',
+    'concretize_abstract',
+    'force_through',
+    'hastype_helper',
+    'nobottom',
+    'normalize_adt',
+    'pytype_to_abstract',
+    'sensitivity_transform',
+    'split_type',
+    'tentative',
+    'type_to_abstract',
+    'typecheck',
+    'union_simplify',
+]

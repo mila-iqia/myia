@@ -1,0 +1,40 @@
+"""Definitions for the primitive `OPERATION`."""
+
+from .. import lib, xtype
+from ..lib import bprop_to_grad_transform, standard_prim
+from . import primitives as P
+
+
+def pyimpl_OPERATION(ARGUMENTS):
+    """Implement `OPERATION`."""
+    # TODO
+
+
+@standard_prim(P.OPERATION)
+async def infer_OPERATION(self, engine, ARGUMENTS):
+    """Infer the return type of primitive `OPERATION`."""
+    # TODO
+
+
+@bprop_to_grad_transform(P.OPERATION)
+def bprop_OPERATION(ARGUMENTS, out, dout):
+    """Backpropagator for OPERATION."""
+    return "TODO",
+
+
+__operation_defaults__ = {
+    'name': 'OPERATION',
+    'registered_name': 'OPERATION',
+    'mapping': P.OPERATION,
+    'python_implementation': pyimpl_OPERATION,
+}
+
+
+__primitive_defaults__ = {
+    'name': 'OPERATION',
+    'registered_name': 'OPERATION',
+    'type': 'backend',
+    'python_implementation': pyimpl_OPERATION,
+    'inferrer_constructor': infer_OPERATION,
+    'grad_transform': bprop_OPERATION,
+}

@@ -99,3 +99,9 @@ class CSE(Partializable):
         """Apply CSE on root."""
         chg = cse(root, self.resources.manager)
         return chg and self.report_changes
+
+
+__all__ = [
+    'CSE',
+    'cse',
+]

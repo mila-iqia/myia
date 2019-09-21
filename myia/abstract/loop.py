@@ -327,3 +327,16 @@ async def force_pending(v):
         return await v
     else:
         return v
+
+
+__consolidate__ = True
+__all__ = [
+    'InferenceLoop',
+    'Pending',
+    'PendingFromList',
+    'PendingTentative',
+    'find_coherent_result',
+    'find_coherent_result_sync',
+    'force_pending',
+    'is_simple',
+]

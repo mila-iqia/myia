@@ -2,15 +2,15 @@ import numpy as np
 import pytest
 
 from myia import operations
+from myia.classes import Cons, Empty
 from myia.utils import (
     NS,
-    Cons,
-    Empty,
     Event,
     Events,
+    HasDefaults,
     Named,
+    Registry,
     SymbolicKeyInstance,
-    list_to_cons,
     newenv,
     smap,
 )
@@ -197,4 +197,26 @@ def test_operation_str():
 def test_list_to_cons():
     li = [1, 2, 3]
     li_c = Cons(1, Cons(2, Cons(3, Empty())))
-    assert list_to_cons(li) == li_c
+    assert Cons.from_list(li) == li_c
+
+
+cantaloup = NS(
+    apple={'banana': 456}
+)
+
+
+def test_registry():
+    r = Registry(default_field='banana')
+    a = HasDefaults('a', {'banana': 123}, defaults_field=None)
+    b = HasDefaults('b', {'banana': 123}, defaults_field=None)
+    c = HasDefaults('c',
+                    'tests.utils.test_misc.cantaloup',
+                    defaults_field='apple')
+    r.register(a)(2)
+    assert r[a] == 2
+    assert r[b] == 123
+    assert r[c] == 456
+    with pytest.raises(TypeError):
+        print(HasDefaults('d', 123, defaults_field='apple'))
+    with pytest.raises(KeyError):
+        print(r['xyz'])

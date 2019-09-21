@@ -2,7 +2,7 @@
 
 from ..abstract import to_abstract
 from ..ir import Apply, Constant, Graph, toposort
-from ..prim import Primitive, ops as P
+from ..operations import Primitive, primitives as P
 from ..utils import SymbolicKeyInstance, overload
 from .channel import handle
 from .vm import FinalVM
@@ -403,3 +403,12 @@ class CompileGraphs:
         res = FinalVM(self.instrs, self.transform.backend)
         self._reset()
         return res
+
+
+__all__ = [
+    'CompileGraph',
+    'CompileGraphs',
+    'convert_grad',
+    'wrap_primitives',
+    'wrap_result',
+]

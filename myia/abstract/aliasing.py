@@ -6,8 +6,9 @@ from dataclasses import is_dataclass
 
 import numpy as np
 
-from ..prim import ops as P
-from ..utils import ADT, MyiaInputTypeError, dataclass_fields, overload
+from ..classes import ADT
+from ..operations import primitives as P
+from ..utils import MyiaInputTypeError, dataclass_fields, overload
 from . import data as ab
 
 
@@ -142,3 +143,12 @@ def setter_from_getter(getter, value):
         return setter_from_getter(elem, (setters[oper], elem, i, value))
     else:
         return value
+
+
+__consolidate__ = True
+__all__ = [
+    'find_aliases',
+    'generate_getters',
+    'ndarray_aliasable',
+    'setter_from_getter',
+]

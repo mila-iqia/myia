@@ -5,7 +5,7 @@ import pytest
 from myia import xtype
 from myia.abstract import ANYTHING
 from myia.ir import Constant, Graph, isomorphic
-from myia.prim.ops import scalar_add, switch
+from myia.operations.primitives import scalar_add, switch
 from myia.utils import dump, load
 
 from ..common import to_abstract_test

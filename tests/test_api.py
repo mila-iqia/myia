@@ -4,11 +4,11 @@ import pytest
 from myia.api import myia, to_device
 from myia.cconv import closure_convert
 from myia.ir import clone
+from myia.operations import tuple_getitem
 from myia.pipeline import (
     scalar_debug_compile as compile,
     scalar_parse as parse,
 )
-from myia.prim.py_implementations import tuple_getitem
 from myia.simplify_types import from_canonical, to_canonical
 from myia.utils import InferenceError, TaggedValue
 from myia.xtype import Bool

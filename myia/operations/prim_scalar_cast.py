@@ -1,0 +1,60 @@
+"""Definitions for the primitive `scalar_cast`."""
+
+import numpy as np
+
+from .. import lib, xtype
+from ..lib import (
+    TYPE,
+    AbstractScalar,
+    bprop_to_grad_transform,
+    standard_prim,
+    type_to_abstract,
+)
+from ..operations import typeof
+from . import primitives as P
+
+
+def pyimpl_scalar_cast(x, t):
+    """Implement `scalar_cast`."""
+    t = type_to_abstract(t)
+    assert isinstance(t, AbstractScalar)
+    t = t.values[TYPE]
+    assert issubclass(t, xtype.Number)
+    dtype = xtype.type_to_np_dtype(t)
+    return getattr(np, dtype)(x)
+
+
+@standard_prim(P.scalar_cast)
+async def infer_scalar_cast(self, engine,
+                            scalar: xtype.Number,
+                            typ: lib.AbstractType):
+    """Infer the return type of primitive `scalar_cast`."""
+    a = lib.type_to_abstract(typ.xvalue())
+    t = a.xtype()
+    engine.check(xtype.Number, t)
+    values = {**scalar.values, TYPE: t}
+    return lib.AbstractScalar(values)
+
+
+@bprop_to_grad_transform(P.scalar_cast)
+def bprop_scalar_cast(x, t, out, dout):
+    """Backpropagator for primitive `scalar_cast`."""
+    return (P.scalar_cast(dout, typeof(x)), t)
+
+
+__operation_defaults__ = {
+    'name': 'scalar_cast',
+    'registered_name': 'scalar_cast',
+    'mapping': P.scalar_cast,
+    'python_implementation': pyimpl_scalar_cast,
+}
+
+
+__primitive_defaults__ = {
+    'name': 'scalar_cast',
+    'registered_name': 'scalar_cast',
+    'type': 'backend',
+    'python_implementation': pyimpl_scalar_cast,
+    'inferrer_constructor': infer_scalar_cast,
+    'grad_transform': bprop_scalar_cast,
+}

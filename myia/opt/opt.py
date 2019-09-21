@@ -5,7 +5,7 @@ from weakref import WeakKeyDictionary
 
 from ..info import About
 from ..ir import Apply, Graph, manage, sexp_to_node
-from ..prim import Primitive
+from ..operations import Primitive
 from ..utils import OrderedSet, tracer
 from ..utils.unify import Unification, Var
 
@@ -263,3 +263,12 @@ class GraphTransform:
         if args not in cache:
             cache[args] = self.compute(graph, *args)
         return cache[args]
+
+
+__all__ = [
+    'GraphTransform',
+    'LocalPassOptimizer',
+    'NodeMap',
+    'PatternSubstitutionOptimization',
+    'pattern_replacer',
+]

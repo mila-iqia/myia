@@ -897,3 +897,12 @@ class GraphTransaction:
     def __exit__(self, type, value, tb):
         if type is None:
             self.commit()
+
+
+__consolidate__ = True
+__all__ = [
+    'GraphManager',
+    'GraphTransaction',
+    'ManagerError',
+    'manage',
+]

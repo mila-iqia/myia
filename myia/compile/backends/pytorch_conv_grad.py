@@ -321,3 +321,9 @@ def conv3d_weight(input, weight_size, grad_output, stride, padding, dilation,
             2, 0, weight_size[2]).narrow(3, 0, weight_size[3]).narrow(
                 4, 0, weight_size[4])
 #'''
+
+
+__all__ = [
+    'conv2d_input',
+    'conv2d_weight',
+]

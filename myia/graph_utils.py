@@ -102,3 +102,11 @@ def toposort(root: T,
         done.add(node)
         yield node
         todo.pop()
+
+
+__consolidate__ = True
+__all__ = [
+    'always_include',
+    'dfs',
+    'toposort',
+]

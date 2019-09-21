@@ -1,0 +1,18 @@
+"""Implementation of the 'OPERATION' operation."""
+
+from .. import lib, operations, xtype
+from ..lib import MyiaTypeError, core
+
+
+@core
+def OPERATION(ARGUMENTS):
+    """Implementation for 'OPERATION'."""
+    pass
+
+
+__operation_defaults__ = {
+    'name': 'OPERATION',
+    'registered_name': 'OPERATION',
+    'mapping': OPERATION,
+    'python_implementation': None,
+}

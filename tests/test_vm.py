@@ -1,14 +1,9 @@
 import numpy as np
 
+from myia.operations import array_map, array_reduce, array_scan, scalar_usub
 from myia.pipeline import (
     scalar_debug_compile as compile,
     standard_debug_pipeline,
-)
-from myia.prim.py_implementations import (
-    array_map,
-    array_reduce,
-    array_scan,
-    scalar_usub,
 )
 
 from .test_lang import parse_compare

@@ -9,8 +9,8 @@ from typing import Any, Iterable, List, Mapping
 
 from .graph_utils import toposort
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
-from .prim import Primitive
-from .prim.ops import partial, return_
+from .operations import Primitive
+from .operations.primitives import partial, return_
 from .utils import TypeMap, is_dataclass_type
 
 
@@ -203,6 +203,13 @@ class VM:
                         yield v
         return succ
 
+    def _vmimpl(self, prim):
+        try:
+            return self.implementations[prim]
+        except KeyError:
+            fn = self.py_implementations[prim]
+            return lambda _, *args: fn(*args)
+
     def call(self, fn, args):
         """Call the `fn` object.
 
@@ -210,7 +217,7 @@ class VM:
         of an apply.
         """
         if isinstance(fn, Primitive):
-            return self.implementations[fn](self, *args)
+            return self._vmimpl(fn)(self, *args)
 
         elif isinstance(fn, Graph):
             return self.evaluate(fn, args)
@@ -253,7 +260,7 @@ class VM:
                 res = Partial(partial_fn, partial_args, self)
                 frame.values[node] = res
             else:
-                frame.values[node] = self.implementations[fn](self, *args)
+                frame.values[node] = self._vmimpl(fn)(self, *args)
         elif isinstance(fn, Partial):
             self._dispatch_call(node, frame, fn.fn, fn.args + tuple(args))
         elif isinstance(fn, (Graph, Closure)):
@@ -283,3 +290,10 @@ class VM:
 
         else:
             raise AssertionError("Unknown node type")  # pragma: no cover
+
+
+__all__ = [
+    'Closure',
+    'Partial',
+    'VM',
+]
