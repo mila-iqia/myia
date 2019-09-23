@@ -19,8 +19,8 @@ from .relay_helpers import (
     add_functions,
     dead_value,
     empty_env,
-    get_union_ctr,
     get_myia_tag,
+    get_union_ctr,
     optimize,
     to_relay_type,
 )
@@ -256,6 +256,7 @@ MAP = RelayMapper(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 
 class NodeVisitor:
     """Visitor for node enumeration."""
+
     def _visit_array_map(self, node):
         return node.inputs[2:]
 

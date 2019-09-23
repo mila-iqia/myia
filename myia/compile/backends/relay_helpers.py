@@ -55,6 +55,7 @@ cons_env = adt.Constructor("cons_env", [relay.ty.scalar_type('int64'),
 
 class TypeHelper:
     """Class to help manage and generate helper types."""
+
     def __init__(self):
         """Initialize the caches."""
         self.env_val_map = {}
@@ -291,7 +292,12 @@ def optimize(mod):
 
 
 __all__ = [
-    'build_module',
+    'TypeHelper',
+    'add_functions',
+    'dead_value',
+    'empty_env',
+    'get_myia_tag',
+    'get_union_ctr',
     'optimize',
+    'to_relay_type',
 ]
-
