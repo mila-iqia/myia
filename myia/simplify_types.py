@@ -101,6 +101,11 @@ def _reabs(self, a: AbstractKeywordArgument):
     return self(a.argument)
 
 
+@overload  # noqa: F811
+def _reabs(self, a: AbstractType):
+    return a
+
+
 ##################
 # Simplify types #
 ##################
@@ -266,6 +271,8 @@ def to_canonical(fn, self, arg, orig_t):
         if not typecheck(orig_t, arg.orig_t):
             raise MyiaInputTypeError("Bad type for backend value.")
         return arg
+    if fn is None:
+        raise AssertionError(f'to_canonical not defined for {orig_t}')
     return fn(self, arg, orig_t)
 
 
@@ -367,6 +374,11 @@ def to_canonical(self, arg, orig_t: AbstractScalar):
 @overload  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractType):
     return _reabs(arg)
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractKeywordArgument):
+    return arg
 
 
 #####################

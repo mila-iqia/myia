@@ -4,8 +4,11 @@ Each primitive is associated to an augmented function, which returns a pair of
 the (augmented) original primitive's output and a backpropagator function.
 """
 
+import operator
+from functools import reduce
+
 from .. import operations
-from ..abstract import AbstractFunction, GraphFunction
+from ..abstract import AbstractFunction, GraphFunction, myia_static
 from ..composite import zeros_like
 from ..debug.label import short_labeler, short_relation_symbols as syms
 from ..info import About, NamedDebugInfo
@@ -17,14 +20,18 @@ from ..pipeline import standard_pipeline
 from ..utils import InternalInferenceError, Registry, newenv
 from . import ops as primops
 from .py_implementations import (
+    argmax,
     array_reduce,
+    array_setitem,
     array_to_scalar,
     casttag,
     conv2d_input_grad,
     conv2d_weight_grad,
     distribute,
     dot,
+    gather,
     invert_permutation,
+    max_pool2d_grad,
     reshape,
     scalar_add,
     scalar_cast,
@@ -37,10 +44,13 @@ from .py_implementations import (
     scalar_sub,
     scalar_to_array,
     scalar_usub,
+    scatter,
+    scatter_add,
     shape,
     switch,
     tagged,
     transpose,
+    tuple_getitem,
     tuple_setitem,
     unsafe_static_cast,
 )
@@ -247,10 +257,82 @@ def bprop_scalar_max(x, y, out, dout):
     return (ret[0], ret[1])
 
 
+def prod(iterable):
+    """Return the product of the elements of the iterator."""
+    return reduce(operator.mul, iterable, 1)
+
+
+@myia_static
+def _dim_permute(d, xs):
+    n = ()
+    for _s in range(len(xs)):
+        if _s not in d:
+            n = n + (_s,)
+    n = n + d
+    return n
+
+
+@myia_static
+def _dim_reshape(d, xs):
+    end = -len(d)
+    ns = xs[:end] + (prod(xs[end:]),)
+    return ns
+
+
+@myia_static
+def _last_dim(x):
+    return len(x) - 1
+
+
+@register_bprop(primops.array_max)
+def bprop_array_max(x, axis, out, dout):
+    """Backpropagator for primitive `array_max`."""
+    z = zeros_like(x)
+    am = argmax(x, axis)
+
+    n = _dim_permute(axis, shape(x))
+    z = transpose(z, n)
+    zs1 = shape(z)
+    ns = _dim_reshape(axis, shape(z))
+    z = reshape(z, ns)
+
+    n_am = _dim_permute(axis, shape(am))
+    am = transpose(am, n_am)
+    ns_am = _dim_reshape(axis, shape(am))
+    am = reshape(am, ns_am)
+
+    n_dout = _dim_permute(axis, shape(dout))
+    dout = transpose(dout, n_dout)
+    ns_dout = _dim_reshape(axis, shape(dout))
+    dout = reshape(dout, ns_dout)
+
+    z = scatter(z, _last_dim(shape(z)), am, dout)
+    z = reshape(z, zs1)
+    z = transpose(z, invert_permutation(n))
+    return (z, zeros_like(axis))
+
+
+@register_bprop(primops.argmax)
+def bprop_argmax(x, axis, out, dout):
+    """Backpropagator for primitive `scalar_max`."""
+    return (zeros_like(x), zeros_like(axis))
+
+
 @register_bprop(primops.scalar_cast)
 def bprop_scalar_cast(x, t, out, dout):
     """Backpropagator for primitive `scalar_cast`."""
     return (scalar_cast(dout, typeof(x)), t)
+
+
+# TODO: Need dtype attr implementation for xtype.NDArray to get dtype of x.
+#       dtype attr/method will go in xtype.NDArray dict in standard_method_map
+#       in myia.pipeline.resources
+'''
+@register_bprop(primops.array_cast)
+def bprop_array_cast(x, t, out, dout):
+    """Backpropagator for primitive `array_cast`."""
+    return (array_cast(dout, x.dtype), t)
+# '''
 
 
 @register_bprop(primops.tuple_getitem, ignore_values=False)
@@ -276,6 +358,13 @@ def bprop_scalar_to_array(x, t, out, dout):
 def bprop_array_to_scalar(x, out, dout):
     """Backpropagator for primitive `array_to_scalar`."""
     return (scalar_to_array(dout, typeof(x)),)
+
+
+@register_bprop(primops.array_getitem, ignore_values=False)
+def bprop_array_getitem(data, begin, end, strides, out, dout):
+    """Backpropagator for primitive `array_getitem`."""
+    return (array_setitem(zeros_like(data), begin, end, strides, dout),
+            zeros_like(begin), zeros_like(end), zeros_like(strides))
 
 
 @register_bprop(primops.dot)
@@ -330,6 +419,29 @@ def bprop_Jinv(x, out, dout):
     return (J(dout),)
 
 
+@register_bprop(primops.gather)
+def bprop_gather(x, dim, index, out, dout):
+    """Backpropagator for primitive `gather`."""
+    z = zeros_like(x)
+    z = scatter_add(z, dim, index, dout)
+    return (z, zeros_like(dim), zeros_like(index))
+
+
+@register_bprop(primops.scatter)
+def bprop_scatter(x, dim, index, src, out, dout):
+    """Backpropagator for primitive `scatter`."""
+    x_grad = scatter(dout, dim, index, zeros_like(src))
+    src_grad = gather(dout, dim, index)
+    return (x_grad, zeros_like(dim), zeros_like(index), src_grad)
+
+
+@register_bprop(primops.scatter_add)
+def bprop_scatter_add(x, dim, index, src, out, dout):
+    """Backpropagator for primitive `scatter_add`."""
+    src_grad = gather(dout, dim, index)
+    return (dout, zeros_like(dim), zeros_like(index), src_grad)
+
+
 @register_bprop(primops.conv2d, ignore_values=False)
 def bprop_conv2d(input, weight, stride, padding, dilation, groups, out, dout):
     """Backpropagator for `conv2d`."""
@@ -340,6 +452,15 @@ def bprop_conv2d(input, weight, stride, padding, dilation, groups, out, dout):
     return (gI, gW,
             zeros_like(stride), zeros_like(padding), zeros_like(dilation),
             zeros_like(groups))
+
+
+@register_bprop(primops.max_pool2d)
+def bprop_max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode,
+                     out, dout):
+    """Backpropagator for `max_pool2d`."""
+    gI = max_pool2d_grad(input, kernel_size, stride, padding, dilation,
+                         ceil_mode, tuple_getitem(dout, 0))
+    return (gI,)
 
 
 @register_augm(primops.switch)
@@ -505,6 +626,7 @@ class ArrayReduceGradient(MetaGraph):
         fn = jf.get_unique()
         assert isinstance(fn, GraphFunction) and fn.graph.parent is None
         assert fn.graph.transforms['primal'] is primops.scalar_add
+
         return bprop_to_augm(primops.array_reduce, bprop_sum, {})
 
 

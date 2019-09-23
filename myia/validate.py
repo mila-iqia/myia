@@ -113,13 +113,21 @@ whitelist = frozenset({
     # P.J,
     # P.Jinv,
     P.scalar_cast,
+    P.array_cast,
     P.hastag,
     P.casttag,
     P.tagged,
     P.unsafe_static_cast,
+    P.gather,
+    P.scatter,
+    P.scatter_add,
+    P.argmax,
+    P.array_max,
     P.conv2d,
     P.conv2d_input_grad,
     P.conv2d_weight_grad,
+    P.max_pool2d,
+    P.max_pool2d_grad,
 })
 
 

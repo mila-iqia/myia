@@ -16,7 +16,7 @@ from myia.abstract import (
     from_value,
 )
 from myia.abstract.prim import UniformPrimitiveInferrer
-from myia.composite import gadd, zeros_like
+from myia.composite import gadd, sum, zeros_like
 from myia.hypermap import HyperMap, hyper_map
 from myia.ir import Graph, MetaGraph, MultitypeGraph
 from myia.macros import embed, grad, typeof
@@ -24,6 +24,7 @@ from myia.operations import J, Jinv, hastype, user_switch
 from myia.pipeline import scalar_pipeline, standard_pipeline
 from myia.prim import Primitive, ops as P
 from myia.prim.py_implementations import (
+    array_cast,
     array_map,
     array_reduce,
     array_to_scalar,
@@ -92,6 +93,7 @@ from .common import (
     af16_of,
     af32_of,
     af64_of,
+    ai16_of,
     ai32_of,
     ai64_of,
     countdown,
@@ -1674,6 +1676,19 @@ def test_scalar_cast(x, t):
 
 
 @infer(
+    (ai64_of(2, 3), Ty(to_abstract_test(i64)), ai64_of(2, 3)),
+    (ai64_of(2, 3), Ty(to_abstract_test(i16)), ai16_of(2, 3)),
+    (af64_of(2, 3), Ty(to_abstract_test(i16)), ai16_of(2, 3)),
+    (af16_of(2, 3), Ty(to_abstract_test(f32)), af32_of(2, 3)),
+    (af16_of(2, 3), Ty(ANYTHING), InferenceError),
+    (af16_of(2, 3), Ty(to_abstract_test(B)), InferenceError),
+    (B, Ty(to_abstract_test(f32)), InferenceError),
+)
+def test_array_cast(x, t):
+    return array_cast(x, t)
+
+
+@infer(
     (i64, ai64_of()),
     (f64, af64_of()),
     (af64_of(9, 7), InferenceError),
@@ -2392,9 +2407,21 @@ def test_grad(x, y):
     (f32, f32),
     (f64, f64),
 )
-def test_grad_cast(x):
+def test_grad_scalar_cast(x):
     def f(x):
         return scalar_cast(x, f16)
+
+    return grad(f)(x)
+
+
+@infer_std(
+    (ai64_of(2, 3), ai64_of(2, 3)),
+    (af32_of(2, 3), af32_of(2, 3)),
+    (af64_of(2, 3), af64_of(2, 3)),
+)
+def test_grad_array_cast(x):
+    def f(x):
+        return sum(array_cast(x, f16))
 
     return grad(f)(x)
 

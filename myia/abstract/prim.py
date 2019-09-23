@@ -263,6 +263,13 @@ def _shape_type_pair(engine, shp):
     return shp_t
 
 
+def _stride_type(engine, shp):
+    shp_t = engine.check(AbstractTuple, shp)
+    for elem_t in shp_t.elements:
+        engine.abstract_merge(xtype.Int[64], elem_t.values[TYPE])
+    return shp_t
+
+
 def prod(iterable):
     """Return the product of the elements of the iterator."""
     return reduce(operator.mul, iterable, 1)
@@ -444,6 +451,35 @@ async def _inf_record_setitem(self, engine,
 ##########
 
 
+def _ceildiv(x, y):
+    return -(-x // y)
+
+
+@standard_prim(P.array_getitem)
+async def _inf_array_getitem(self, engine, a: AbstractArray,
+                             begin: _shape_type, end: _shape_type,
+                             strides: _stride_type):
+
+    begin = tuple(self.require_constant(e, argnum=f'"1:begin[{edx}]"')
+                  for edx, e in enumerate(begin.elements))
+    end = tuple(self.require_constant(e, argnum=f'"2:end[{edx}]"')
+                for edx, e in enumerate(end.elements))
+    strides = tuple(self.require_constant(e, argnum=f'"3:strides[{edx}]"')
+                    for edx, e in enumerate(strides.elements))
+
+    shp_before_stride = map(operator.sub, end, begin)
+    shp = tuple(map(_ceildiv, shp_before_stride, map(abs, strides)))
+
+    return type(a)(a.element, {SHAPE: shp, TYPE: a.xtype()})
+
+
+@standard_prim(P.array_setitem)
+async def _inf_array_setitem(self, engine, a: AbstractArray,
+                             begin: _shape_type, end: _shape_type,
+                             strides: _stride_type, value: AbstractArray):
+    return a
+
+
 @standard_prim(P.scalar_to_array)
 async def _inf_scalar_to_array(self, engine, a: AbstractScalar, t):
     tp = t.xvalue()
@@ -479,12 +515,19 @@ async def _inf_broadcast_shape(self, engine, xs: _shape_type, ys: _shape_type):
 @standard_prim(P.invert_permutation)
 async def _inf_invert_permutation(self, engine, perm: _shape_type):
     v = [x.xvalue() for x in perm.elements]
-    return AbstractTuple(
-        [perm.elements[i] if i in v else AbstractScalar({
+    rval = AbstractTuple([
+        AbstractScalar({
+            VALUE: v.index(i),
+            TYPE: xtype.UInt[64],
+        })
+        if i in v
+        else AbstractScalar({
             VALUE: ANYTHING,
             TYPE: xtype.UInt[64],
-        }) for i in range(len(v))]
-    )
+        })
+        for i in range(len(v))
+    ])
+    return rval
 
 
 @standard_prim(P.shape)
@@ -619,6 +662,58 @@ async def _inf_transpose(self, engine,
     return type(a)(a.element, {SHAPE: shp, TYPE: a.xtype()})
 
 
+@standard_prim(P.gather)
+async def _inf_gather(self, engine, input: AbstractArray, dim: xtype.UInt[64],
+                      index: AbstractArray):
+    return type(input)(
+        input.element,
+        {SHAPE: index.xshape(), TYPE: input.xtype()}
+    )
+
+
+@standard_prim(P.scatter)
+async def _inf_scatter(self, engine, input: AbstractArray,
+                       dim: xtype.UInt[64], index: AbstractArray,
+                       src: AbstractArray):
+    return input
+
+
+@standard_prim(P.scatter_add)
+async def _inf_scatter_add(self, engine, input: AbstractArray,
+                           dim: xtype.UInt[64], index: AbstractArray,
+                           src: AbstractArray):
+    return input
+
+
+@standard_prim(P.argmax)
+async def _inf_argmax(self, engine, input: AbstractArray, dim: _shape_type):
+    shp = ()
+    shp_inp = input.xshape()
+    dim = tuple(self.require_constant(e, argnum=f'"1:dim[{edx}]"')
+                for edx, e in enumerate(dim.elements))
+    shp = list(shp_inp)
+    for d in dim:
+        shp[d] = 1
+    shp = tuple(shp)
+    return type(input)(
+        AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Int[64]}),
+        {SHAPE: shp, TYPE: input.xtype()}
+    )
+
+
+@standard_prim(P.array_max)
+async def _inf_array_max(self, engine, input: AbstractArray, dim: _shape_type):
+    shp = ()
+    shp_inp = input.xshape()
+    dim = tuple(self.require_constant(e, argnum=f'"1:dim[{edx}]"')
+                for edx, e in enumerate(dim.elements))
+    shp = list(shp_inp)
+    for d in dim:
+        shp[d] = 1
+    shp = tuple(shp)
+    return type(input)(input.element, {SHAPE: shp, TYPE: input.xtype()})
+
+
 @standard_prim(P.dot)
 async def _inf_dot(self, engine, a: AbstractArray, b: AbstractArray):
     a_shp = a.xshape()
@@ -707,6 +802,61 @@ async def _inf_conv2d_weight_grad(self, engine, input: AbstractArray,
     return type(input)(input.element, {SHAPE: weight_size_tuple,
                                        TYPE: input.xtype()})
 
+
+@standard_prim(P.max_pool2d)
+async def _inf_max_pool2d(self, engine, input: AbstractArray,
+                          kernel_size: _shape_type_pair,
+                          stride: _shape_type_pair, padding: _shape_type_pair,
+                          dilation: _shape_type_pair, ceil_mode: xtype.Bool):
+
+    # TODO: _shape_type should not allow float to be converted to uint
+    # TODO: support ceil_mode == True
+
+    assert ceil_mode.xvalue() is False
+
+    h_in, w_in = input.xshape()[2:]
+
+    kernel_size = tuple(self.require_constant(
+                        e, argnum=f'"1:kernel_size[{edx}]"')
+                        for edx, e in enumerate(kernel_size.elements))
+    stride = tuple(self.require_constant(e, argnum=f'"2:stride[{edx}]"')
+                   for edx, e in enumerate(stride.elements))
+    padding = tuple(self.require_constant(e, argnum=f'"3:padding[{edx}]"')
+                    for edx, e in enumerate(padding.elements))
+    dilation = tuple(self.require_constant(e, argnum=f'"4:dilation[{edx}]"')
+                     for edx, e in enumerate(dilation.elements))
+
+    N = input.xshape()[0]
+    C_out = input.xshape()[1]
+
+    # Based on formulae in shape section of:
+    # https://pytorch.org/docs/stable/nn.html#torch.nn.MaxPool2d
+    H_out = ((h_in + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1)
+             // stride[0]) + 1
+    W_out = ((w_in + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1)
+             // stride[1]) + 1
+
+    out_shape = (N, C_out, int(H_out), int(W_out))
+
+    return AbstractTuple([
+        type(input)(input.element, {SHAPE: out_shape, TYPE: input.xtype()}),
+        type(input)(AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Int[64]}),
+                    {SHAPE: out_shape, TYPE: input.xtype()}
+                    )
+    ])
+
+
+@standard_prim(P.max_pool2d_grad)
+async def _inf_max_pool2d_grad(self, engine, input: AbstractArray,
+                               kernel_size: _shape_type_pair,
+                               stride: _shape_type_pair,
+                               padding: _shape_type_pair,
+                               dilation: _shape_type_pair,
+                               ceil_mode: xtype.Bool,
+                               dout: AbstractArray):
+    return input
+
+
 ##############
 # Statements #
 ##############
@@ -748,6 +898,16 @@ async def _inf_scalar_cast(self, engine,
     engine.check(Number, t)
     values = {**scalar.values, TYPE: t}
     return AbstractScalar(values)
+
+
+@standard_prim(P.array_cast)
+async def _inf_array_cast(self, engine,
+                          a: AbstractArray,
+                          typ: AbstractType):
+    t = (type_to_abstract(typ.xvalue())).xtype()
+    engine.check(Number, t)
+    e_values = {**a.element.values, TYPE: t}
+    return AbstractArray(AbstractScalar(e_values), a.values)
 
 
 @standard_prim(P.identity)

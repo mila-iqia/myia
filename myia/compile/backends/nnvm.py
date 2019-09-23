@@ -48,7 +48,8 @@ SIMPLE_MAP = {
 
     P.switch: sym.where,
 
-    P.array_to_scalar: lambda x: x
+    P.array_to_scalar: lambda x: x,
+    P.array_getitem: sym.strided_slice,
 }
 
 
@@ -63,10 +64,7 @@ def nnvm_distribute(c, v, shp):
     """Implementation of distribute."""
     nv = c.ref(v)
     assert shp.is_constant(tuple)
-    if shp.value == ():
-        shp = (1,)
-    else:
-        shp = shp.value
+    shp = (1,) if shp.value == () else shp.value
     vshp = ashape(v)
     if len(shp) != len(vshp):
         # We need to pad the shape
