@@ -292,9 +292,12 @@ class Monomorphizer:
         if len(choices) == 1:
             choice, = choices
             argrefs = [VirtualReference(v) for v in choice]
-            res = self.engine.run_coroutine(
-                inf.run(self.engine, None, argrefs)
-            )
+            try:
+                res = self.engine.run_coroutine(
+                    inf.run(self.engine, None, argrefs)
+                )
+            except InferenceError:
+                return None, None
             self.infcaches[inf] = {choice: res}
             return choice, res
         else:
