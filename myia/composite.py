@@ -410,7 +410,6 @@ def tuple_get(t, item):
 #################
 
 def _dim_explicit(dim, dim_size):
-    print(123)
     if dim < 0:
         dim = dim_size + dim
     assert dim >= 0
