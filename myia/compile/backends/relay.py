@@ -201,6 +201,15 @@ def relay_unsafe_static_cast(c, val, ty):
     return c.ref(val)
 
 
+def relay_array_getitem(c, a, start, stop, strides):
+    """Implementation of array_getitem for Relay."""
+    assert start.is_constant(tuple)
+    assert stop.is_constant(tuple)
+    assert strides.is_constant(tuple)
+    return relay.op.transform.strided_slice(c.ref(a), start.value, stop.value,
+                                            strides.value)
+
+
 COMPLEX_MAP = {
     P.partial: relay_partial,
     P.distribute: relay_distribute,
@@ -216,6 +225,7 @@ COMPLEX_MAP = {
     P.env_setitem: relay_env_setitem,
     P.env_getitem: relay_env_getitem,
     P.unsafe_static_cast: relay_unsafe_static_cast,
+    P.array_getitem: relay_array_getitem,
 }
 
 
