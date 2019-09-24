@@ -1,10 +1,7 @@
 import numpy as np
 
 from myia.operations import array_map, array_reduce, array_scan, scalar_usub
-from myia.pipeline import (
-    scalar_debug_compile as compile,
-    standard_debug_pipeline,
-)
+from myia.pipeline import scalar_debug_compile as compile
 
 from .multitest import mt
 from .test_lang import run_debug

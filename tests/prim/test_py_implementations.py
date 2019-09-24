@@ -42,7 +42,7 @@ from myia.operations import (
     tuple_getitem,
     tuple_setitem,
 )
-from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
+from myia.pipeline import scalar_debug_pipeline
 from myia.utils import assert_scalar, newenv
 
 from ..common import AA, f16, i64, to_abstract_test

@@ -14,7 +14,6 @@ from myia.pipeline import standard_pipeline
 from .common import MA, MB, Point, make_tree, sumtree
 from .multitest import mt, run
 
-
 run_no_opt = run.configure(
     pipeline=standard_pipeline.configure({'opt.phases.main': []})
 )

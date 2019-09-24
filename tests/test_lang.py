@@ -1,7 +1,7 @@
 
 from pytest import mark
 
-from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
+from myia.pipeline import scalar_debug_pipeline
 
 from .common import Point, mysum
 from .multitest import mt, run, run_debug
@@ -386,7 +386,7 @@ def test_closure(x):
 
 
 def test_closure_recur():
-    # This cannot run with parse_compare since we need to reference the
+    # This cannot run with run_lang since we need to reference the
     # top-level function
 
     def f(x, y):
