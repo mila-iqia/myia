@@ -2,6 +2,8 @@
 import os
 from io import StringIO
 
+import pytest
+
 from myia.debug import traceback as myia_tr
 from myia.info import DebugInherit
 from myia.parser import MyiaSyntaxError
@@ -45,8 +47,6 @@ def _resolve(call):
 
 
 def pytest_configure(config):
-    if not config.option.gpu:
-        setattr(config.option, 'markexpr', 'not gpu')
     if config.option.usepdb:
         os.environ['MYIA_PYTEST_USE_PDB'] = "1"
     if config.option.do_inject:
@@ -96,6 +96,11 @@ _prev = globals().get('pytest_runtest_setup', None)
 def pytest_runtest_setup(item):
     if _prev is not None:
         _prev(item)
+
+    gpu = any(mark for mark in item.iter_markers(name="gpu"))
+    if gpu and not item.config.option.gpu:
+        pytest.skip("GPU tests are not enabled. Use --gpu to enable them.")
+
     item._ctxms = [fn(*args) for fn, args in _context_managers]
     for cm in item._ctxms:
         cm.__enter__()
