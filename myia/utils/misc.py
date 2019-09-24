@@ -104,6 +104,10 @@ class HasDefaults:
         """Initialize a HasDefaults."""
         self.name = name
         self.defaults_field = defaults_field
+        self.set_defaults(defaults)
+
+    def set_defaults(self, defaults):
+        """Set the defaults."""
         if isinstance(defaults, dict):
             self._defaults = defaults
         elif isinstance(defaults, str):
