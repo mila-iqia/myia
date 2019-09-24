@@ -11,10 +11,11 @@ from myia.pipeline import standard_pipeline
 from myia.utils import InferenceError
 from myia.xtype import Array
 
-from .common import MA, MB, MC, MD
+from .common import MA, MB, MC, MD, af32_of, af64_of
+from .multitest import mt
 from .test_compile import parse_compare
 from .test_grad import grad_test
-from .test_infer import af32_of, af64_of, infer_std
+from .test_infer import infer_standard
 
 MA = MA * 0.1
 MB = MB * 0.1
@@ -89,11 +90,15 @@ def cost(model, x, y):
     return (array_reduce(scalar_add, diff ** 2, ())).item()
 
 
-@infer_std(
-    (make_model(), MC(3, 6), af64_of(3, 8)),
-    (make_model('float32'), MC(3, 6), InferenceError),
-    (make_model('float32'), MC(3, 6, dtype='float32'), af32_of(3, 8)),
-    (make_model(), MC(3, 9), InferenceError),
+@mt(
+    infer_standard(make_model(), MC(3, 6),
+                   result=af64_of(3, 8)),
+    infer_standard(make_model('float32'), MC(3, 6),
+                   result=InferenceError),
+    infer_standard(make_model('float32'), MC(3, 6, dtype='float32'),
+                   result=af32_of(3, 8)),
+    infer_standard(make_model(), MC(3, 9),
+                   result=InferenceError),
 )
 def test_forward_infer(model, x):
     return model.apply(x)
@@ -104,14 +109,17 @@ def test_forward_specialize(model, x):
     return model.apply(x)
 
 
-@infer_std(
-    (make_model(), MC(3, 6), MC(3, 8), make_model()),
-    (make_model(), MC(3, 6), MC(3, 9), InferenceError),
-    (make_model('float32'), MC(3, 6), MC(3, 8), InferenceError),
-    (make_model('float32'),
-     MC(3, 6, dtype='float32'),
-     MC(3, 8, dtype='float32'),
-     make_model('float32')),
+@mt(
+    infer_standard(make_model(), MC(3, 6), MC(3, 8),
+                   result=make_model()),
+    infer_standard(make_model(), MC(3, 6), MC(3, 9),
+                   result=InferenceError),
+    infer_standard(make_model('float32'), MC(3, 6), MC(3, 8),
+                   result=InferenceError),
+    infer_standard(make_model('float32'),
+                   MC(3, 6, dtype='float32'),
+                   MC(3, 8, dtype='float32'),
+                   result=make_model('float32')),
 )
 def test_backward_infer(model, x, y):
     return grad(cost)(model, x, y)

@@ -152,26 +152,15 @@ infer_pipeline_std = standard_pipeline.select(
 )
 
 
-def inferrer_decorator(pipeline):
-    def deco(*entries):
-        mtentries = []
-        for entry in entries:
-            *args, result = entry
-            mtentry = mt_infer(*args, result=result, pipeline=pipeline)
-            mtentries.append(mtentry)
-        return mt(*mtentries)
-    return deco
-
-
-infer = inferrer_decorator(infer_pipeline)
-infer_std = inferrer_decorator(infer_pipeline_std)
+infer_standard = mt_infer.configure(pipeline=infer_pipeline_std)
+infer_scalar = mt_infer.configure(pipeline=infer_pipeline)
 
 
 type_signature_arith_bin = [
-    (i64, i64, i64),
-    (f64, f64, f64),
-    (i64, f64, InferenceError),
-    (B, B, InferenceError),
+    infer_scalar(i64, i64, result=i64),
+    infer_scalar(f64, f64, result=f64),
+    infer_scalar(i64, f64, result=InferenceError),
+    infer_scalar(B, B, result=InferenceError),
 ]
 
 
@@ -182,85 +171,91 @@ def test_contextless():
     assert C.add(Graph(), []) is C
 
 
-@infer((i64, i64),
-       (89, 89))
+@mt(
+    infer_scalar(i64, result=i64),
+    infer_scalar(89, result=89),
+)
 def test_identity(x):
     return x
 
 
-@infer((i64,))
+@infer_scalar(result=i64)
 def test_constants_int():
     return 2 * 8
 
 
-@infer((f64,))
+@infer_scalar(result=f64)
 def test_constants_float():
     return 1.5 * 8.0
 
 
-@infer((f64,))
+@infer_scalar(result=f64)
 def test_constants_intxfloat():
     return 8 * 1.5
 
 
-@infer((f64,))
+@infer_scalar(result=f64)
 def test_constants_floatxint():
     return 1.5 * 8
 
 
-@infer((f64,))
+@infer_scalar(result=f64)
 def test_constants_floatxint2():
     return (8 * 7) + 4.0
 
 
-@infer(*type_signature_arith_bin)
+@mt(*type_signature_arith_bin)
 def test_prim_mul(x, y):
     return x * y
 
 
-@infer(
-    (i64, i64, i64, i64),
-    (f64, f64, f64, f64),
+@mt(
+    infer_scalar(i64, i64, i64, result=i64),
+    infer_scalar(f64, f64, f64, result=f64),
     # Three different inconsistent patterns below
-    (f64, f64, i64, InferenceError),
-    (i64, f64, f64, InferenceError),
-    (f64, f64, i64, InferenceError),
+    infer_scalar(f64, f64, i64, result=InferenceError),
+    infer_scalar(i64, f64, f64, result=InferenceError),
+    infer_scalar(f64, f64, i64, result=InferenceError),
     # Test too few/too many arguments below
-    (i64, InferenceError),
-    (i64, i64, i64, i64, InferenceError),
+    infer_scalar(i64, result=InferenceError),
+    infer_scalar(i64, i64, i64, i64, result=InferenceError),
 )
 def test_prim_tern(x, y, z):
     return _tern(x, y, z)
 
 
-@infer((i64, i64), (f64, f64), (B, InferenceError))
+@mt(
+    infer_scalar(i64, result=i64),
+    infer_scalar(f64, result=f64),
+    infer_scalar(B, result=InferenceError)
+)
 def test_prim_usub(x):
     return -x
 
 
-@infer_std(
-    (i64, InferenceError),
-    (f32, f32),
-    (f64, f64),
-    (af64_of(2, 5), af64_of(2, 5)),
-    (B, InferenceError)
+@mt(
+    infer_standard(i64, result=InferenceError),
+    infer_standard(f32, result=f32),
+    infer_standard(f64, result=f64),
+    infer_standard(af64_of(2, 5), result=af64_of(2, 5)),
+    infer_standard(B, result=InferenceError)
 )
 def test_prim_log(x):
     return np.log(x)
 
 
-@infer(
-    (B, f64, f64, f64),
-    (B, f64, i64, InferenceError),
-    (True, f64, i64, f64),
-    (False, f64, i64, i64),
+@mt(
+    infer_scalar(B, f64, f64, result=f64),
+    infer_scalar(B, f64, i64, result=InferenceError),
+    infer_scalar(True, f64, i64, result=f64),
+    infer_scalar(False, f64, i64, result=i64),
     # Note: scalar_pipeline will not convert i64 to bool,
     # so the following is an InferenceError even though it
     # will work with the standard_pipeline
-    (i64, f64, f64, InferenceError),
-    (True, 7, 4, i64),
-    (False, 7, 4, i64),
-    (B, 7, 4, i64),
+    infer_scalar(i64, f64, f64, result=InferenceError),
+    infer_scalar(True, 7, 4, result=i64),
+    infer_scalar(False, 7, 4, result=i64),
+    infer_scalar(B, 7, 4, result=i64),
 )
 def test_if(c, x, y):
     if c:
@@ -269,7 +264,7 @@ def test_if(c, x, y):
         return y * y
 
 
-@infer(*type_signature_arith_bin)
+@mt(*type_signature_arith_bin)
 def test_if2(x, y):
     if x > y:
         return x
@@ -277,11 +272,11 @@ def test_if2(x, y):
         return y
 
 
-@infer(
-    (i64, i64, i64),
-    (i64, f64, f64),
-    (f64, f64, f64),
-    (1_000_000, 3, i64)
+@mt(
+    infer_scalar(i64, i64, result=i64),
+    infer_scalar(i64, f64, result=f64),
+    infer_scalar(f64, f64, result=f64),
+    infer_scalar(1_000_000, 3, result=i64)
 )
 def test_while(x, y):
     rval = y
@@ -291,12 +286,12 @@ def test_while(x, y):
     return rval
 
 
-@infer_std(
-    ([i64], i64, i64),
-    ([i64], f64, InferenceError),
-    (i64, i64, InferenceError),
-    ((i64, i64, i64), i64, i64),
-    ((i64, f64, i64), i64, InferenceError),
+@mt(
+    infer_standard([i64], i64, result=i64),
+    infer_standard([i64], f64, result=InferenceError),
+    infer_standard(i64, i64, result=InferenceError),
+    infer_standard((i64, i64, i64), i64, result=i64),
+    infer_standard((i64, f64, i64), i64, result=InferenceError),
 )
 def test_for(xs, y):
     rval = y
@@ -305,7 +300,7 @@ def test_for(xs, y):
     return rval
 
 
-@infer((i64, f64, (i64, f64)))
+@infer_scalar(i64, f64, result=(i64, f64))
 def test_nullary_closure(x, y):
     def make(z):
         def inner():
@@ -316,7 +311,7 @@ def test_nullary_closure(x, y):
     return a(), b()
 
 
-@infer((i64, f64, (i64, f64)))
+@infer_scalar(i64, f64, result=(i64, f64))
 def test_merge_point(x, y):
     def mul2():
         return scalar_mul
@@ -324,75 +319,80 @@ def test_merge_point(x, y):
     return m(x, x), m(y, y)
 
 
-@infer((i64, InferenceError))
+@infer_scalar(i64, result=InferenceError)
 def test_not_enough_args_prim(x):
     return scalar_mul(x)
 
 
-@infer((i64, i64, i64, InferenceError))
+@infer_scalar(i64, i64, i64, result=InferenceError)
 def test_too_many_args_prim(x, y, z):
     return scalar_mul(x, y, z)
 
 
-@infer((i64, InferenceError))
+@infer_scalar(i64, result=InferenceError)
 def test_not_enough_args(x):
     def g(x, y):
         return x * y
     return g(x)
 
 
-@infer((i64, i64, InferenceError))
+@infer_scalar(i64, i64, result=InferenceError)
 def test_too_many_args(x, y):
     def g(x):
         return x * x
     return g(x, y)
 
 
-@infer((i64, f64, (i64, f64)),
-       ((i64, i64), f64, ((i64, i64), f64)))
+@mt(
+    infer_scalar(i64, f64, result=(i64, f64)),
+    infer_scalar((i64, i64), f64, result=((i64, i64), f64))
+)
 def test_tup(x, y):
     return (x, y)
 
 
-@infer((i64, i64, [i64]),
-       (i64, f64, InferenceError),
-       ([i64], [i64], [[i64]]),
-       # ([ai64_of(8, 3)], [ai64_of(4, 3)], [[ai64_of(ANYTHING, 3)]]),
-       (ai64_of(4, 7), ai64_of(4, 7), [ai64_of(4, 7)]),
-       (ai64_of(4, 7), ai64_of(9, 7), [ai64_of(ANYTHING, 7)]))
+@mt(
+    infer_scalar(i64, i64, result=[i64]),
+    infer_scalar(i64, f64, result=InferenceError),
+    infer_scalar([i64], [i64], result=[[i64]]),
+    # infer_scalar([ai64_of(8, 3)], [ai64_of(4, 3)],
+    #              result=[[ai64_of(ANYTHING, 3)]]),
+    infer_scalar(ai64_of(4, 7), ai64_of(4, 7), result=[ai64_of(4, 7)]),
+    infer_scalar(ai64_of(4, 7), ai64_of(9, 7), result=[ai64_of(ANYTHING, 7)])
+)
 def test_list(x, y):
     return [x, y]
 
 
-@infer((i64, i64, [i64]),
-       (f64, f64, [f64]),
-       ([f64], [f64], InferenceError),
-       (i64, f64, InferenceError))
+@mt(
+    infer_scalar(i64, i64, result=[i64]),
+    infer_scalar(f64, f64, result=[f64]),
+    infer_scalar([f64], [f64], result=InferenceError),
+    infer_scalar(i64, f64, result=InferenceError)
+)
 def test_list_and_scalar(x, y):
     return [x, y, 3]
 
 
-@infer(([],))
+@infer_scalar(result=[])
 def test_list_empty():
     return []
 
 
-@infer(
-    (1, D(x=1),),
-    (f32, D(x=f32),),
+@mt(
+    infer_scalar(1, result=D(x=1)),
+    infer_scalar(f32, result=D(x=f32)),
 )
 def test_dict(x):
     return {'x': x}
 
 
-@infer(
-    (i64, f32, D(x=i64, y=f32)),
-)
+@infer_scalar(i64, f32, result=D(x=i64, y=f32))
 def test_dict2(x, y):
     return {'x': x, 'y': y}
 
 
-@infer((i64, i64, f32, D(x=i64, y=f32)))
+@infer_scalar(i64, i64, f32, result=D(x=i64, y=f32))
 def test_dict_merge(c, x, y):
     if c == 0:
         return {'x': 1, 'y': 2}
@@ -402,7 +402,7 @@ def test_dict_merge(c, x, y):
         return {'x': x, 'y': y}
 
 
-@infer((B, i64, f32, MyiaTypeError))
+@infer_scalar(B, i64, f32, result=MyiaTypeError)
 def test_dict_incompatible(c, x, y):
     if c:
         return {'x': x, 'y': y}
@@ -410,116 +410,128 @@ def test_dict_incompatible(c, x, y):
         return {'x': x, 'yy': y}
 
 
-@infer(
-    ((), 0),
-    ((1,), 1),
-    ((i64, f64), 2),
-    ([f64], i64),
-    (af64_of(12, 5), np.uint64(12)),
-    (af64_of(), InferenceError),
-    (i64, InferenceError),
+@mt(
+    infer_scalar((), result=0),
+    infer_scalar((1,), result=1),
+    infer_scalar((i64, f64), result=2),
+    infer_scalar([f64], result=i64),
+    infer_scalar(af64_of(12, 5), result=np.uint64(12)),
+    infer_scalar(af64_of(), result=InferenceError),
+    infer_scalar(i64, result=InferenceError),
 )
 def test_len(xs):
     return len(xs)
 
 
-@infer((i64, f64, i64), (f64, i64, f64))
+@mt(
+    infer_scalar(i64, f64, result=i64),
+    infer_scalar(f64, i64, result=f64),
+)
 def test_tuple_getitem(x, y):
     return (x, y)[0]
 
 
-@infer((i64, f64, f64), (f64, i64, i64))
+@mt(
+    infer_scalar(i64, f64, result=f64),
+    infer_scalar(f64, i64, result=i64),
+)
 def test_tuple_getitem_negative(x, y):
     return (x, y)[-1]
 
 
-@infer((i64, f64, InferenceError))
+@infer_scalar(i64, f64, result=InferenceError)
 def test_tuple_outofbound(x, y):
     return (x, y)[2]
 
 
-@infer_std(
-    ((i64, f64), (f64,)),
-    ((f64, i64), (i64,)),
-    ((f64, (i64, f64)), ((i64, f64),)),
-    ((), ()),
-    (f64, InferenceError),
+@mt(
+    infer_standard((i64, f64), result=(f64,)),
+    infer_standard((f64, i64), result=(i64,)),
+    infer_standard((f64, (i64, f64)), result=((i64, f64),)),
+    infer_standard((), result=()),
+    infer_standard(f64, result=InferenceError),
 )
 def test_tuple_getslice(tup):
     return tup[1:]
 
 
-@infer_std(
-    ((i64, f64, i64), (f64,)),
-    ((f64,), ()),
+@mt(
+    infer_standard((i64, f64, i64), result=(f64,)),
+    infer_standard((f64,), result=()),
 )
 def test_tuple_getslice_2(tup):
     return tup[1:-1]
 
 
-@infer_std(
-    ((i64, i64), (i64,), (i64, i64, i64)),
-    ((i64, i64), i64, InferenceError)
+@mt(
+    infer_standard((i64, i64), (i64,), result=(i64, i64, i64)),
+    infer_standard((i64, i64), i64, result=InferenceError)
 )
 def test_concat_tuple(x, y):
     return x + y
 
 
-@infer((i64, f64, InferenceError))
+@infer_scalar(i64, f64, result=InferenceError)
 def test_tuple_outofbound_negative(x, y):
     return (x, y)[-3]
 
 
-@infer_std((D(x=i64), i64),
-           (D(y=f32), InferenceError))
+@mt(
+    infer_standard(D(x=i64), result=i64),
+    infer_standard(D(y=f32), result=InferenceError)
+)
 def test_dict_getitem(d):
     return d['x']
 
 
-@infer_std((D(x=i64), Ex(ANYTHING, t=str), InferenceError),
-           (D(x=i64), 2, InferenceError))
+@mt(
+    infer_standard(D(x=i64), Ex(ANYTHING, t=str), result=InferenceError),
+    infer_standard(D(x=i64), 2, result=InferenceError)
+)
 def test_dict_getitem_nonconst(d, i):
     return d[i]
 
 
-@infer((D(x=i64), f64, D(x=f64)),
-       (D(x=i64, y=f32), f64, D(x=f64, y=f32)),
-       (D(z=i64), f64, InferenceError))
+@mt(
+    infer_scalar(D(x=i64), f64, result=D(x=f64)),
+    infer_scalar(D(x=i64, y=f32), f64, result=D(x=f64, y=f32)),
+    infer_scalar(D(z=i64), f64, result=InferenceError)
+)
 def test_dict_setitem(d, x):
     return P.dict_setitem(d, 'x', x)
 
 
-@infer(
-    ((i64, i64), 1, f64, (i64, f64)),
-    ((i64, i64, f64), 1, f64, (i64, f64, f64)),
-    ((i64,), 1, f64, InferenceError),
-    ((i64,), 0.0, f64, InferenceError),
-    ((i64,), i64, f64, InferenceError),
+@mt(
+    infer_scalar((i64, i64), 1, f64, result=(i64, f64)),
+    infer_scalar((i64, i64, f64), 1, f64, result=(i64, f64, f64)),
+    infer_scalar((i64,), 1, f64, result=InferenceError),
+    infer_scalar((i64,), 0.0, f64, result=InferenceError),
+    infer_scalar((i64,), i64, f64, result=InferenceError),
 )
 def test_tuple_setitem(xs, idx, x):
     return tuple_setitem(xs, idx, x)
 
 
-@infer((i64, f64, (i64, f64)))
+@infer_scalar(i64, f64, result=(i64, f64))
 def test_multitype_function(x, y):
     def mul(a, b):
         return a * b
     return (mul(x, x), mul(y, y))
 
 
-@infer(*type_signature_arith_bin)
+@mt(*type_signature_arith_bin)
 def test_closure(x, y):
     def mul(a):
         return a * x
     return mul(x) + mul(y)
 
 
-@infer(
-    (i64, i64, i64, i64, (i64, i64)),
-    (f64, f64, f64, f64, (f64, f64)),
-    (i64, i64, f64, f64, (i64, f64)),
-    (i64, f64, f64, f64, InferenceError),
-    (i64, i64, i64, f64, InferenceError),
+@mt(
+    infer_scalar(i64, i64, i64, i64, result=(i64, i64)),
+    infer_scalar(f64, f64, f64, f64, result=(f64, f64)),
+    infer_scalar(i64, i64, f64, f64, result=(i64, f64)),
+    infer_scalar(i64, f64, f64, f64, result=InferenceError),
+    infer_scalar(i64, i64, i64, f64, result=InferenceError),
 )
 def test_return_closure(w, x, y, z):
     def mul(a):
@@ -529,18 +541,18 @@ def test_return_closure(w, x, y, z):
     return (mul(w)(x), mul(y)(z))
 
 
-@infer(
-    (i64, i64),
-    (f64, f64),
-    (i64, i64, i64),
-    (InferenceError,),
-    (i64, i64, i64, InferenceError),
+@mt(
+    infer_scalar(i64, result=i64),
+    infer_scalar(f64, result=f64),
+    infer_scalar(i64, i64, result=i64),
+    infer_scalar(result=InferenceError,),
+    infer_scalar(i64, i64, i64, result=InferenceError),
 )
 def test_default_arg(x, y=3):
     return x + y
 
 
-@infer((i64, i64, i64))
+@infer_scalar(i64, i64, result=i64)
 def test_default_closure(x, y):
     def clos(z=y + y, q=x + x):
         return x + z
@@ -548,7 +560,7 @@ def test_default_closure(x, y):
     return clos(y)
 
 
-@infer_std((1,),)
+@infer_standard(result=1)
 def test_closure_manager_bug():
     rval = 0
     for z in (1, 2, 3, 4):
@@ -557,10 +569,10 @@ def test_closure_manager_bug():
     return rval
 
 
-@infer_std(
-    (0,),
-    (i64, i64, i64),
-    (i64, i64, i64, i64, i64, i64, i64),
+@mt(
+    infer_standard(result=0),
+    infer_standard(i64, i64, result=i64),
+    infer_standard(i64, i64, i64, i64, i64, i64, result=i64),
 )
 def test_varargs(*args):
     rval = 0
@@ -569,9 +581,7 @@ def test_varargs(*args):
     return rval
 
 
-@infer(
-    (i64, i64, i64),
-)
+@infer_scalar(i64, i64, result=i64)
 def test_keywords(x, y):
     def fn(albert, beatrice):
         return albert - beatrice
@@ -579,9 +589,7 @@ def test_keywords(x, y):
     return fn(albert=x, beatrice=y) + fn(beatrice=3, albert=7)
 
 
-@infer(
-    (i64, i64, i64),
-)
+@infer_scalar(i64, i64, result=i64)
 def test_keywords_expand(x, y):
     def fn(z, albert, beatrice):
         return albert - beatrice + z
@@ -589,9 +597,7 @@ def test_keywords_expand(x, y):
     return fn(4, **{'albert': x, 'beatrice': y})
 
 
-@infer(
-    (i64, i64, InferenceError),
-)
+@infer_scalar(i64, i64, result=InferenceError)
 def test_keywords_bad(x, y):
     def fn(albert, beatrice):
         return albert - beatrice
@@ -599,9 +605,7 @@ def test_keywords_bad(x, y):
     return fn(albert=x, charles=y)
 
 
-@infer(
-    (i64, i64, i64),
-)
+@infer_scalar(i64, i64, result=i64)
 def test_keywords_different_order(x, y):
     def fn1(x, albert, beatrice):
         return albert * (x - beatrice)
@@ -614,7 +618,7 @@ def test_keywords_different_order(x, y):
     return fn(5, albert=x, beatrice=y)
 
 
-@infer((i64, i64, i64),)
+@infer_scalar(i64, i64, result=i64)
 def test_keywords_defaults(x, y):
     def fn(charles, *, albert=1, beatrice=10):
         return albert - beatrice + charles
@@ -622,7 +626,7 @@ def test_keywords_defaults(x, y):
     return fn(x, beatrice=y)
 
 
-@infer((i64, i64, i64),)
+@infer_scalar(i64, i64, result=i64)
 def test_keywords_shadow(x, y):
     # It used to be that the beatrice arg would be renamed barbara
     # because of the assignment.
@@ -633,7 +637,7 @@ def test_keywords_shadow(x, y):
     return fn(albert=x, beatrice=y)
 
 
-@infer((i64, i64, InferenceError),)
+@infer_scalar(i64, i64, result=InferenceError)
 def test_redundant_kw(x, y):
     def fn(albert, beatrice):
         return albert - beatrice
@@ -641,7 +645,7 @@ def test_redundant_kw(x, y):
     return fn(albert=x, **{'albert': y, 'beatrice': y})
 
 
-@infer((i64, i64),)
+@infer_scalar(i64, result=i64)
 def test_defaults_recursive(x):
     def fact(n=x):
         if n <= 1:
@@ -651,7 +655,7 @@ def test_defaults_recursive(x):
     return fact()
 
 
-@infer((i64, i64, (i64, i64, i64)),)
+@infer_scalar(i64, i64, result=(i64, i64, i64))
 def test_kwarg(x, y):
     def fn(albert=1, beatrice=10):
         return albert - beatrice
@@ -662,7 +666,7 @@ def test_kwarg(x, y):
     return proxy(x, beatrice=y), proxy(x, y), proxy(beatrice=x, albert=y)
 
 
-@infer((i64, i64, InferenceError),)
+@infer_scalar(i64, i64, result=InferenceError)
 def test_kwarg_bad(x, y):
     def fn(albert=1, beatrice=10):
         return albert - beatrice
@@ -673,19 +677,17 @@ def test_kwarg_bad(x, y):
     return proxy(albert=x, beatrice=y, charles=x + y)
 
 
-@infer(
-    (i64, i64, InferenceError),
-)
+@infer_scalar(i64, i64, result=InferenceError)
 def test_keywords_bad_3(x, y):
     return scalar_add(x=x, y=y)
 
 
-@infer(
-    ((i64, i64, i64), i64),
-    ((i64, i64, f64), InferenceError),
-    ((i64, i64, i64, i64), InferenceError),
-    ((i64, i64), InferenceError),
-    (i64, InferenceError),
+@mt(
+    infer_scalar((i64, i64, i64), result=i64),
+    infer_scalar((i64, i64, f64), result=InferenceError),
+    infer_scalar((i64, i64, i64, i64), result=InferenceError),
+    infer_scalar((i64, i64), result=InferenceError),
+    infer_scalar(i64, result=InferenceError),
 )
 def test_apply(args):
     def _f(x, y, z):
@@ -694,9 +696,9 @@ def test_apply(args):
     return _f(*args)
 
 
-@infer(
-    (i64, i64),
-    (f64, f64),
+@mt(
+    infer_scalar(i64, result=i64),
+    infer_scalar(f64, result=f64),
 )
 def test_fact(n):
     def fact(n):
@@ -721,12 +723,18 @@ def odd(n):
         return even(n - 1)
 
 
-@infer((i64, B), (f64, B))
+@mt(
+    infer_scalar(i64, result=B),
+    infer_scalar(f64, result=B),
+)
 def test_even_odd(n):
     return even(n)
 
 
-@infer((i64, i64), (f64, f64))
+@mt(
+    infer_scalar(i64, result=i64),
+    infer_scalar(f64, result=f64),
+)
 def test_pow10(x):
     v = x
     j = 0
@@ -739,9 +747,9 @@ def test_pow10(x):
     return v
 
 
-@infer(
-    (i64, i64, i64, i64),
-    (i64, f64, f64, f64)
+@mt(
+    infer_scalar(i64, i64, i64, result=i64),
+    infer_scalar(i64, f64, f64, result=f64),
 )
 def test_choose_prim(i, x, y):
 
@@ -754,10 +762,10 @@ def test_choose_prim(i, x, y):
     return choose(i)(x, y)
 
 
-@infer(
-    (i64, i64, i64, InferenceError),
-    (0, i64, i64, i64),
-    (1, i64, i64, B),
+@mt(
+    infer_scalar(i64, i64, i64, result=InferenceError),
+    infer_scalar(0, i64, i64, result=i64),
+    infer_scalar(1, i64, i64, result=B),
 )
 def test_choose_prim_incompatible(i, x, y):
 
@@ -770,10 +778,10 @@ def test_choose_prim_incompatible(i, x, y):
     return choose(i)(x, y)
 
 
-@infer(
-    (i64, i64, i64, InferenceError),
-    (0, i64, i64, i64),
-    (1, i64, i64, B),
+@mt(
+    infer_scalar(i64, i64, i64, result=InferenceError),
+    infer_scalar(0, i64, i64, result=i64),
+    infer_scalar(1, i64, i64, result=B),
 )
 def test_choose_incompatible(i, x, y):
 
@@ -792,9 +800,9 @@ def test_choose_incompatible(i, x, y):
     return choose(i)(x, y)
 
 
-@infer(
-    (i64, i64, i64),
-    (i64, f64, f64)
+@mt(
+    infer_scalar(i64, i64, result=i64),
+    infer_scalar(i64, f64, result=f64)
 )
 def test_choose_indirect(i, x):
 
@@ -813,7 +821,7 @@ def test_choose_indirect(i, x):
     return choose(i)(x)
 
 
-@infer((i64, i64))
+@infer_scalar(i64, result=i64)
 def test_hof(x):
 
     def double(x):
@@ -828,10 +836,10 @@ def test_hof(x):
     return hof(double, (x + 1, x + 2)) + hof(square, (x + 3, x + 4))
 
 
-@infer(
-    (i64, i64, i64),
-    (i64, f64, InferenceError),
-    (i64, 3, i64),
+@mt(
+    infer_scalar(i64, i64, result=i64),
+    infer_scalar(i64, f64, result=InferenceError),
+    infer_scalar(i64, 3, result=i64),
 )
 def test_hof_2(c, x):
 
@@ -861,7 +869,7 @@ def test_hof_2(c, x):
     return pick2(c, pick(c))(x + x)
 
 
-@infer((i64, ((i64, i64), (B, B))))
+@infer_scalar(i64, result=((i64, i64), (B, B)))
 def test_hof_3(x):
 
     def double(x):
@@ -876,10 +884,10 @@ def test_hof_3(x):
     return (hof(double, (x + 1, x + 2)), hof(is_zero, (x + 3, x + 4)))
 
 
-@infer(
-    (i64, i64, InferenceError),
-    (-1, i64, i64),
-    (1, i64, (i64, i64)),
+@mt(
+    infer_scalar(i64, i64, result=InferenceError),
+    infer_scalar(-1, i64, result=i64),
+    infer_scalar(1, i64, result=(i64, i64)),
 )
 def test_hof_4(x, y):
 
@@ -902,12 +910,12 @@ def test_hof_4(x, y):
     return f(double, (y + 3, y + 4))
 
 
-@infer(
-    (B, B, i64, i64, i64),
-    (B, B, f64, f64, InferenceError),
-    (True, B, (), i64, i64),
-    (B, True, f64, f64, f64),
-    (B, True, i64, f64, InferenceError),
+@mt(
+    infer_scalar(B, B, i64, i64, result=i64),
+    infer_scalar(B, B, f64, f64, result=InferenceError),
+    infer_scalar(True, B, (), i64, result=i64),
+    infer_scalar(B, True, f64, f64, result=f64),
+    infer_scalar(B, True, i64, f64, result=InferenceError),
 )
 def test_hof_5(c1, c2, x, y):
 
@@ -936,7 +944,7 @@ def test_hof_5(c1, c2, x, y):
     return pick_hof(c1)(pick_f(c2))(x, y)
 
 
-@infer((i64, i64, i64))
+@infer_scalar(i64, i64, result=i64)
 def test_func_arg(x, y):
     def g(func, x, y):
         return func(x, y)
@@ -946,7 +954,7 @@ def test_func_arg(x, y):
     return g(h, x, y)
 
 
-@infer((i64, InferenceError))
+@infer_scalar(i64, result=InferenceError)
 def test_func_arg3(x):
     def g(func, x):
         z = func + x
@@ -958,9 +966,9 @@ def test_func_arg3(x):
     return g(h, x)
 
 
-@infer(
-    (i64, i64),
-    (f64, f64),
+@mt(
+    infer_scalar(i64, result=i64),
+    infer_scalar(f64, result=f64),
 )
 def test_func_arg4(x):
     def h(x):
@@ -975,7 +983,7 @@ def test_func_arg4(x):
     return g(t, x)
 
 
-@infer((i64,))
+@infer_scalar(result=i64)
 def test_closure_deep():
     def g(x):
         def h():
@@ -984,9 +992,7 @@ def test_closure_deep():
     return g(2)()
 
 
-@infer(
-    (i64, i64, i64),
-)
+@infer_scalar(i64, i64, result=i64)
 def test_closure_passing(x, y):
     def adder(x):
         def f(y):
@@ -999,42 +1005,45 @@ def test_closure_passing(x, y):
     return a1(x) + a2(y)
 
 
-@infer((B, B), (i64, InferenceError))
+@mt(
+    infer_scalar(B, result=B),
+    infer_scalar(i64, result=InferenceError)
+)
 def test_not(x):
     return not x
 
 
-@infer(
-    (i64, True),
-    (f64, False),
+@mt(
+    infer_scalar(i64, result=True),
+    infer_scalar(f64, result=False),
 )
 def test_hastype_simple(x):
     return hastype(x, i64)
 
 
-@infer(
-    (i64, i64, InferenceError),
-    (i64, Ty(i64), True),
-    (f64, Ty(i64), False),
-    ((i64, i64), Ty(tuple), True),
-    ((i64, i64), Ty(Tuple), True),
-    ((i64, i64), Ty(Tuple[Number, Number]), True),
-    ((i64, i64), Ty(Tuple[i64, i64]), True),
-    ((i64, i64), Ty(Tuple[float, float]), False),
-    ((i64, i64), Ty(ANYTHING), InferenceError),
-    ([i64], Ty(List), True),
-    (None, Ty(Nil), True),
-    (U(i32, i64), Ty(i64), B),
-    (i32, Ty(U(i16, i32)), True),
-    (U(i32, i64), Ty(U(i16, i32)), B),
+@mt(
+    infer_scalar(i64, i64, result=InferenceError),
+    infer_scalar(i64, Ty(i64), result=True),
+    infer_scalar(f64, Ty(i64), result=False),
+    infer_scalar((i64, i64), Ty(tuple), result=True),
+    infer_scalar((i64, i64), Ty(Tuple), result=True),
+    infer_scalar((i64, i64), Ty(Tuple[Number, Number]), result=True),
+    infer_scalar((i64, i64), Ty(Tuple[i64, i64]), result=True),
+    infer_scalar((i64, i64), Ty(Tuple[float, float]), result=False),
+    infer_scalar((i64, i64), Ty(ANYTHING), result=InferenceError),
+    infer_scalar([i64], Ty(List), result=True),
+    infer_scalar(None, Ty(Nil), result=True),
+    infer_scalar(U(i32, i64), Ty(i64), result=B),
+    infer_scalar(i32, Ty(U(i16, i32)), result=True),
+    infer_scalar(U(i32, i64), Ty(U(i16, i32)), result=B),
 )
 def test_hastype(x, y):
     return hastype(x, y)
 
 
-@infer(
-    (i64, Ty(to_abstract_test(i64))),
-    (f64, Ty(to_abstract_test(f64))),
+@mt(
+    infer_scalar(i64, result=Ty(to_abstract_test(i64))),
+    infer_scalar(f64, result=Ty(to_abstract_test(f64))),
 )
 def test_typeof(x):
     return typeof(x)
@@ -1043,25 +1052,25 @@ def test_typeof(x):
 Tf4 = Tuple[f64, f64, f64, f64]
 
 
-@infer_std(
-    (i64, i64),
-    (f64, i64),
-    (ai64_of(2, 5), 0.0),
-    (af64_of(2, 5), 0),
-    ((i64, i64), i64),
-    ((f64, f64, i64, i64), i64),
-    ((f64, f64, f64, f64), (f64, f64, f64, f64)),
-    ((i64, (f64, i64)), i64),
-    ([i64], 1.0),
-    ((i64, [i64]), i64),
-    (Point(i64, i64), i64),
-    (Point3D(i64, i64, i64), 0),
-    (Thing_ftup, (f64, f64)),
-    (Thing_f, 0),
-    (5, 5),
-    (Point3D(5, 7, 9), 0),
-    (U(ai64_of(2, 5), [f32]), f64),
-    (U([i64], [f32]), 1.0),
+@mt(
+    infer_standard(i64, result=i64),
+    infer_standard(f64, result=i64),
+    infer_standard(ai64_of(2, 5), result=0.0),
+    infer_standard(af64_of(2, 5), result=0),
+    infer_standard((i64, i64), result=i64),
+    infer_standard((f64, f64, i64, i64), result=i64),
+    infer_standard((f64, f64, f64, f64), result=(f64, f64, f64, f64)),
+    infer_standard((i64, (f64, i64)), result=i64),
+    infer_standard([i64], result=1.0),
+    infer_standard((i64, [i64]), result=i64),
+    infer_standard(Point(i64, i64), result=i64),
+    infer_standard(Point3D(i64, i64, i64), result=0),
+    infer_standard(Thing_ftup, result=(f64, f64)),
+    infer_standard(Thing_f, result=0),
+    infer_standard(5, result=5),
+    infer_standard(Point3D(5, 7, 9), result=0),
+    infer_standard(U(ai64_of(2, 5), [f32]), result=f64),
+    infer_standard(U([i64], [f32]), result=1.0),
 )
 def test_hastype_2(x):
 
@@ -1090,13 +1099,13 @@ def test_hastype_2(x):
     return f(x)
 
 
-@infer_std(
-    (i64, i64),
-    (f64, f64),
-    ((i64, i64), i64),
-    ((i64, f64), InferenceError),
-    ([f64], f64),
-    (Point(i64, i64), i64),
+@mt(
+    infer_standard(i64, result=i64),
+    infer_standard(f64, result=f64),
+    infer_standard((i64, i64), result=i64),
+    infer_standard((i64, f64), result=InferenceError),
+    infer_standard([f64], result=f64),
+    infer_standard(Point(i64, i64), result=i64),
 )
 def test_isinstance(x):
     def f(x):
@@ -1120,15 +1129,15 @@ def test_isinstance(x):
     return f(x)
 
 
-@infer_std((i64, InferenceError))
+@infer_standard(i64, result=InferenceError)
 def test_isinstance_bad(x):
     return isinstance(x, (int, 3))
 
 
-@infer_std(
-    (U(i64, (i64, i64)), i64),
-    (U(i64, (f64, i64)), InferenceError),
-    (U(i64, f64), InferenceError),
+@mt(
+    infer_standard(U(i64, (i64, i64)), result=i64),
+    infer_standard(U(i64, (f64, i64)), result=InferenceError),
+    infer_standard(U(i64, f64), result=InferenceError),
 )
 def test_union(x):
     if hastype(x, i64):
@@ -1140,9 +1149,7 @@ def test_union(x):
 @pytest.mark.xfail(
     reason="user_switch can't process conditions that partly depend on type"
 )
-@infer_std(
-    (U(i64, (i64, i64)), i64),
-)
+@infer_standard(U(i64, (i64, i64)), result=i64)
 def test_union_2(x):
     def condition(x):
         return hastype(x, i64) and x > 0
@@ -1153,9 +1160,9 @@ def test_union_2(x):
         return -1
 
 
-@infer_std(
-    (U(i64, None), i64),
-    (None, 0),
+@mt(
+    infer_standard(U(i64, None), result=i64),
+    infer_standard(None, result=0),
 )
 def test_union_nil(x):
     if x is None:
@@ -1164,11 +1171,11 @@ def test_union_nil(x):
         return x
 
 
-@infer_std(
-    (U(i64, f64, (i64, i64)), i64, i64),
-    (U(i64, f64, (i64, i64)), f64, InferenceError),
-    (U(i64, (i64, i64)), f64, i64),
-    (f64, f64, f64),
+@mt(
+    infer_standard(U(i64, f64, (i64, i64)), i64, result=i64),
+    infer_standard(U(i64, f64, (i64, i64)), f64, result=InferenceError),
+    infer_standard(U(i64, (i64, i64)), f64, result=i64),
+    infer_standard(f64, f64, result=f64),
 )
 def test_union_nested(x, y):
     if hastype(x, i64):
@@ -1179,9 +1186,9 @@ def test_union_nested(x, y):
         return x[0]
 
 
-@infer_std(
-    (U(i64, f64, (i64, i64)), i64),
-    (U(i64, (i64, i64)), i64),
+@mt(
+    infer_standard(U(i64, f64, (i64, i64)), result=i64),
+    infer_standard(U(i64, (i64, i64)), result=i64),
 )
 def test_union_nested_2(x):
     if hastype(x, i64):
@@ -1192,10 +1199,10 @@ def test_union_nested_2(x):
         return x[0]
 
 
-@infer_std(
-    (TU(_1=i64, _2=f64, _37=(i64, i64)), i64),
-    (TU(_2=f64, _3=(i64, i64)), InferenceError),
-    (TU(_1=i64, _2=f64, _77=(i64, i64)), InferenceError),
+@mt(
+    infer_standard(TU(_1=i64, _2=f64, _37=(i64, i64)), result=i64),
+    infer_standard(TU(_2=f64, _3=(i64, i64)), result=InferenceError),
+    infer_standard(TU(_1=i64, _2=f64, _77=(i64, i64)), result=InferenceError),
 )
 def test_hastag_casttag(x):
     if hastag(x, 1):
@@ -1210,7 +1217,7 @@ def _square(x):
     return x * x
 
 
-@infer((InferenceError,))
+@infer_scalar(result=InferenceError)
 def test_nonexistent_variable():
     return xxxx + yz  # noqa
 
@@ -1225,18 +1232,18 @@ class data:
     a25 = np.ones((2, 5))
 
 
-@infer(
-    (i64, False),
-    (Point(i64, i64), True),
+@mt(
+    infer_scalar(i64, result=False),
+    infer_scalar(Point(i64, i64), result=True),
 )
 def test_hasattr(x):
     return hasattr(x, 'x')
 
 
-@infer_std(
-    (i64, i64),
-    (Point(i64, i64), i64),
-    (U(i64, Point(i64, i64)), i64),
+@mt(
+    infer_standard(i64, result=i64),
+    infer_standard(Point(i64, i64), result=i64),
+    infer_standard(U(i64, Point(i64, i64)), result=i64),
 )
 def test_hasattr_cond(x):
     if hasattr(x, 'x'):
@@ -1245,9 +1252,9 @@ def test_hasattr_cond(x):
         return x
 
 
-@infer(
-    (i64, i64, (i64, i64)),
-    (i64, f64, InferenceError),
+@mt(
+    infer_scalar(i64, i64, result=(i64, i64)),
+    infer_scalar(i64, f64, result=InferenceError),
 )
 def test_getattr(x, y):
     a = helpers.add(x, y)
@@ -1256,9 +1263,9 @@ def test_getattr(x, y):
     return a, c
 
 
-@infer(
-    (i64, i64, (i64, i64)),
-    (i64, f64, (i64, f64)),
+@mt(
+    infer_scalar(i64, i64, result=(i64, i64)),
+    infer_scalar(i64, f64, result=(i64, f64)),
 )
 def test_getattr_multitype(x, y):
     a = helpers.add(x, x)
@@ -1266,9 +1273,7 @@ def test_getattr_multitype(x, y):
     return a, b
 
 
-@infer(
-    (af64_of(2, 5),)
-)
+@infer_scalar(result=af64_of(2, 5))
 def test_getattr_shape():
     return data.a25
 
@@ -1289,9 +1294,7 @@ class C2:
         return x * self.value
 
 
-@infer(
-    (U(C1(2), C2(5)), i64, i64)
-)
+@infer_scalar(U(C1(2), C2(5)), i64, result=i64)
 def test_getattr_union(c, x):
     return c.f(x)
 
@@ -1299,36 +1302,39 @@ def test_getattr_union(c, x):
 _getattr = getattr
 
 
-@infer(
-    ('add', i64, i64),
-    ('bad', i64, InferenceError),
-    (1234, i64, InferenceError),
-    (External[str], i64, InferenceError),
+@mt(
+    infer_scalar('add', i64, result=i64),
+    infer_scalar('bad', i64, result=InferenceError),
+    infer_scalar(1234, i64, result=InferenceError),
+    infer_scalar(External[str], i64, result=InferenceError),
 )
 def test_getattr_flex(name, x):
     return _getattr(helpers, name)(x, x)
 
 
-@infer(
-    (External[SimpleNamespace],
-     Ex('surprise'),
-     InferenceError)
+@infer_scalar(
+    External[SimpleNamespace],
+    Ex('surprise'),
+    result=InferenceError
 )
 def test_unknown_data(data, field):
     return _getattr(data, field)
 
 
-@infer((i64, i64, i64), (f64, f64, f64))
+@mt(
+    infer_scalar(i64, i64, result=i64),
+    infer_scalar(f64, f64, result=f64),
+)
 def test_method(x, y):
     return x.__add__(y)
 
 
-@infer((i64, i64, InferenceError))
+@infer_scalar(i64, i64, result=InferenceError)
 def test_unknown_method(x, y):
     return x.unknown(y)
 
 
-@infer((i64, InferenceError))
+@infer_scalar(i64, result=InferenceError)
 def test_infinite_recursion(x):
     def ouroboros(x):
         return ouroboros(x - 1)
@@ -1336,7 +1342,7 @@ def test_infinite_recursion(x):
     return ouroboros(x)
 
 
-@infer((i64, InferenceError))
+@infer_scalar(i64, result=InferenceError)
 def test_indirect_infinite_recursion(x):
     def ouroboros(x):
         if x < 0:
@@ -1355,12 +1361,12 @@ def pong():
     return ping()
 
 
-@infer((i64, InferenceError))
+@infer_scalar(i64, result=InferenceError)
 def test_infinite_mutual_recursion(x):
     return ping()
 
 
-@infer(([i64], InferenceError))
+@infer_scalar([i64], result=InferenceError)
 def test_recursive_build(xs):
     rval = ()
     for x in xs:
@@ -1368,90 +1374,91 @@ def test_recursive_build(xs):
     return rval
 
 
-@infer(
-    (af16_of(2, 3), Shp(2, 3)),
-    (af16_of(2, ANYTHING), (S(2, u64), u64)),
+@mt(
+    infer_scalar(af16_of(2, 3), result=Shp(2, 3)),
+    infer_scalar(af16_of(2, ANYTHING), result=(S(2, u64), u64)),
 )
 def test_shape(ary):
     return shape(ary)
 
 
-@infer(
-    (af64_of(2, 3), af64_of(3, 4), af64_of(2, 4)),
-    (af64_of(2, 3), af32_of(3, 4), InferenceError),
-    (af64_of(2), af64_of(3, 4), InferenceError),
-    (af64_of(2, 2), af64_of(3, 4), InferenceError),
+@mt(
+    infer_scalar(af64_of(2, 3), af64_of(3, 4), result=af64_of(2, 4)),
+    infer_scalar(af64_of(2, 3), af32_of(3, 4), result=InferenceError),
+    infer_scalar(af64_of(2), af64_of(3, 4), result=InferenceError),
+    infer_scalar(af64_of(2, 2), af64_of(3, 4), result=InferenceError),
 )
 def test_dot(a, b):
     return dot(a, b)
 
 
-@infer(
-    (ai32_of(4), Shp(2, 4), ai32_of(2, 4)),
-    (ai32_of(4), (u64, u64), ai32_of(ANYTHING, ANYTHING)),
-    (ai32_of(4), Shp(5, 2), InferenceError),
-    (ai32_of(4, 2), Shp(4), InferenceError),
-    (ai32_of(1), Shp(4), ai32_of(4)),
-    (i32, Shp(4), InferenceError),
-    ([i32], Shp(4), InferenceError),
+@mt(
+    infer_scalar(ai32_of(4), Shp(2, 4), result=ai32_of(2, 4)),
+    infer_scalar(ai32_of(4), (u64, u64), result=ai32_of(ANYTHING, ANYTHING)),
+    infer_scalar(ai32_of(4), Shp(5, 2), result=InferenceError),
+    infer_scalar(ai32_of(4, 2), Shp(4), result=InferenceError),
+    infer_scalar(ai32_of(1), Shp(4), result=ai32_of(4)),
+    infer_scalar(i32, Shp(4), result=InferenceError),
+    infer_scalar([i32], Shp(4), result=InferenceError),
 )
 def test_distribute(v, shp):
     return distribute(v, shp)
 
 
-@infer(
-    (ai32_of(3, 7), ai32_of(3, 7)),
-    (ai32_of(7), ai32_of(3, 7)),
-    (ai32_of(1), ai32_of(3, 7)),
-    (ai32_of(1, 7), ai32_of(3, 7)),
-    (ai32_of(3), InferenceError),
+@mt(
+    infer_scalar(ai32_of(3, 7), result=ai32_of(3, 7)),
+    infer_scalar(ai32_of(7), result=ai32_of(3, 7)),
+    infer_scalar(ai32_of(1), result=ai32_of(3, 7)),
+    infer_scalar(ai32_of(1, 7), result=ai32_of(3, 7)),
+    infer_scalar(ai32_of(3), result=InferenceError),
 )
 def test_distribute2(v):
     return distribute(v, (3, 7))
 
 
-@infer(
-    (af16_of(1, 2, 3), Shp(6), af16_of(6)),
-    (af16_of(1, 2, 3), (u64,), af16_of(ANYTHING)),
-    (af16_of(2, 3), Shp(7), InferenceError),
+@mt(
+    infer_scalar(af16_of(1, 2, 3), Shp(6), result=af16_of(6)),
+    infer_scalar(af16_of(1, 2, 3), (u64,), result=af16_of(ANYTHING)),
+    infer_scalar(af16_of(2, 3), Shp(7), result=InferenceError),
 )
 def test_reshape(v, shp):
     return reshape(v, shp)
 
 
-@infer(
-    (af16_of(6, 7), Shp(0, 1), af16_of(6, 7)),
-    (af16_of(6, 7), Shp(1, 0), af16_of(7, 6)),
-    (af16_of(3, 4, 5), Shp(2, 0, 1), af16_of(5, 3, 4)),
-    (af16_of(3, 4, 5), (u64, u64, u64), af16_of(ANYTHING, ANYTHING, ANYTHING)),
-    (af16_of(3, 4, 5), (i64, i64, i64), InferenceError),
-    (af16_of(3, 4, 5), Shp(1, 0), InferenceError),
-    (af16_of(3, 4, 5), Shp(1, 2, 9), InferenceError),
+@mt(
+    infer_scalar(af16_of(6, 7), Shp(0, 1), result=af16_of(6, 7)),
+    infer_scalar(af16_of(6, 7), Shp(1, 0), result=af16_of(7, 6)),
+    infer_scalar(af16_of(3, 4, 5), Shp(2, 0, 1), result=af16_of(5, 3, 4)),
+    infer_scalar(af16_of(3, 4, 5), (u64, u64, u64),
+                 result=af16_of(ANYTHING, ANYTHING, ANYTHING)),
+    infer_scalar(af16_of(3, 4, 5), (i64, i64, i64), result=InferenceError),
+    infer_scalar(af16_of(3, 4, 5), Shp(1, 0), result=InferenceError),
+    infer_scalar(af16_of(3, 4, 5), Shp(1, 2, 9), result=InferenceError),
 )
 def test_transpose(v, perm):
     return transpose(v, perm)
 
 
-@infer(
-    (af16_of(6, 7), af16_of(7, 6)),
-    (af16_of(6, 7, 8), af16_of(8, 7, 6)),
+@mt(
+    infer_scalar(af16_of(6, 7), result=af16_of(7, 6)),
+    infer_scalar(af16_of(6, 7, 8), result=af16_of(8, 7, 6)),
 )
 def test_transpose_method(v):
     return v.T
 
 
-@infer(
-    (af16_of(6, 7), 2),
-    (af16_of(6, 7, 8), 3),
+@mt(
+    infer_scalar(af16_of(6, 7), result=2),
+    infer_scalar(af16_of(6, 7, 8), result=3),
 )
 def test_ndim(v):
     return v.ndim
 
 
-@infer(
-    (af32_of(3, 4), af32_of(3, 4)),
-    (ai64_of(3, 4, 5), ai64_of(3, 4, 5)),
-    (i64, InferenceError),
+@mt(
+    infer_scalar(af32_of(3, 4), result=af32_of(3, 4)),
+    infer_scalar(ai64_of(3, 4, 5), result=ai64_of(3, 4, 5)),
+    infer_scalar(i64, result=InferenceError),
 )
 def test_array_map(ary):
     def f(v):
@@ -1459,13 +1466,15 @@ def test_array_map(ary):
     return array_map(f, ary)
 
 
-@infer(
-    (af32_of(3, 4), af32_of(3, 4), af32_of(3, 4)),
-    (af32_of(3, 4), af32_of(3, 7), InferenceError),
-    (ai64_of(3, ANYTHING), ai64_of(ANYTHING, 7), ai64_of(3, 7)),
-    (af32_of(3, ANYTHING), af32_of(ANYTHING, ANYTHING), af32_of(3, ANYTHING)),
-    (af32_of(3, 4, 5), af32_of(3, 4), InferenceError),
-    (i64, af32_of(3, 4), InferenceError),
+@mt(
+    infer_scalar(af32_of(3, 4), af32_of(3, 4), result=af32_of(3, 4)),
+    infer_scalar(af32_of(3, 4), af32_of(3, 7), result=InferenceError),
+    infer_scalar(ai64_of(3, ANYTHING), ai64_of(ANYTHING, 7),
+                 result=ai64_of(3, 7)),
+    infer_scalar(af32_of(3, ANYTHING), af32_of(ANYTHING, ANYTHING),
+                 result=af32_of(3, ANYTHING)),
+    infer_scalar(af32_of(3, 4, 5), af32_of(3, 4), result=InferenceError),
+    infer_scalar(i64, af32_of(3, 4), result=InferenceError),
 )
 def test_array_map2(ary1, ary2):
     def f(v1, v2):
@@ -1473,28 +1482,36 @@ def test_array_map2(ary1, ary2):
     return array_map(f, ary1, ary2)
 
 
-@infer((InferenceError,))
+@infer_scalar(result=InferenceError)
 def test_array_map0():
     def f():
         return 1
     return array_map(f)
 
 
-@infer(
-    (af32_of(3, 4), af32_of(3, 4), af32_of(3, 4), af32_of(3, 4)),
-    (af32_of(3, 4), af32_of(3, 4), af32_of(3, 7), InferenceError),
-    (i64, af32_of(3, 4), af32_of(3, 4), InferenceError),
-    (af32_of(3, 4), i64, af32_of(3, 4), InferenceError),
-    (af32_of(3, 4), af32_of(3, 4), i64, InferenceError),
-    (af32_of(3, ANYTHING, 5, 6),
-     af32_of(3, 4, 5, ANYTHING),
-     af32_of(ANYTHING, ANYTHING, ANYTHING, 6),
-     af32_of(3, 4, 5, 6)),
-    (af32_of(3, ANYTHING, 5, 6),
-     af32_of(3, 4, 5, ANYTHING),
-     af32_of(ANYTHING, ANYTHING, ANYTHING, 7),
-     InferenceError),
-    (af32_of(3, 4, 5), af32_of(3, 4), af32_of(3, 4), InferenceError),
+@mt(
+    infer_scalar(af32_of(3, 4), af32_of(3, 4), af32_of(3, 4),
+                 result=af32_of(3, 4)),
+    infer_scalar(af32_of(3, 4), af32_of(3, 4), af32_of(3, 7),
+                 result=InferenceError),
+    infer_scalar(i64, af32_of(3, 4), af32_of(3, 4),
+                 result=InferenceError),
+    infer_scalar(af32_of(3, 4), i64, af32_of(3, 4),
+                 result=InferenceError),
+    infer_scalar(af32_of(3, 4), af32_of(3, 4), i64,
+                 result=InferenceError),
+    infer_scalar(af32_of(3, ANYTHING, 5, 6),
+                 af32_of(3, 4, 5, ANYTHING),
+                 af32_of(ANYTHING, ANYTHING, ANYTHING, 6),
+                 result=af32_of(3, 4, 5, 6)),
+    infer_scalar(af32_of(3, ANYTHING, 5, 6),
+                 af32_of(3, 4, 5, ANYTHING),
+                 af32_of(ANYTHING, ANYTHING, ANYTHING, 7),
+                 result=InferenceError),
+    infer_scalar(af32_of(3, 4, 5),
+                 af32_of(3, 4),
+                 af32_of(3, 4),
+                 result=InferenceError),
 )
 def test_array_map3(ary1, ary2, ary3):
     def f(v1, v2, v3):
@@ -1502,17 +1519,18 @@ def test_array_map3(ary1, ary2, ary3):
     return array_map(f, ary1, ary2, ary3)
 
 
-@infer(
-    (ai64_of(3, 4), Shp(3, 4), ai64_of(3, 4)),
-    # (ai64_of(3, 4), Shp(3, ANYTHING), ai64_of(3, ANYTHING)),
-    (ai64_of(3, 4), Shp(3, 1), ai64_of(3, 1)),
-    (ai64_of(3, 4), Shp(1, 4), ai64_of(1, 4)),
-    (ai64_of(3, 4), Shp(3, 1, 1), InferenceError),
-    (ai64_of(3, 4), Shp(4, 1), InferenceError),
-    (ai64_of(3, 4), Shp(4), ai64_of(4)),
-    (ai64_of(3, 4), Shp(1), ai64_of(1)),
-    (ai64_of(3, 4), Shp(), ai64_of()),
-    (i64, Shp(3, 4), InferenceError),
+@mt(
+    infer_scalar(ai64_of(3, 4), Shp(3, 4), result=ai64_of(3, 4)),
+    # infer_scalar(ai64_of(3, 4), Shp(3, ANYTHING),
+    #              result=ai64_of(3, ANYTHING)),
+    infer_scalar(ai64_of(3, 4), Shp(3, 1), result=ai64_of(3, 1)),
+    infer_scalar(ai64_of(3, 4), Shp(1, 4), result=ai64_of(1, 4)),
+    infer_scalar(ai64_of(3, 4), Shp(3, 1, 1), result=InferenceError),
+    infer_scalar(ai64_of(3, 4), Shp(4, 1), result=InferenceError),
+    infer_scalar(ai64_of(3, 4), Shp(4), result=ai64_of(4)),
+    infer_scalar(ai64_of(3, 4), Shp(1), result=ai64_of(1)),
+    infer_scalar(ai64_of(3, 4), Shp(), result=ai64_of()),
+    infer_scalar(i64, Shp(3, 4), result=InferenceError),
 )
 def test_array_reduce(ary, shp):
     def f(a, b):
@@ -1520,7 +1538,7 @@ def test_array_reduce(ary, shp):
     return array_reduce(f, ary, shp)
 
 
-@infer((i64, i64))
+@infer_scalar(i64, result=i64)
 def test_partial_1(x):
     def f(a, b):
         return a + b
@@ -1528,7 +1546,7 @@ def test_partial_1(x):
     return f2(x)
 
 
-@infer((i64, i64))
+@infer_scalar(i64, result=i64)
 def test_partial_2(x):
     def f(a, b):
         return a + b
@@ -1543,32 +1561,49 @@ def test_partial_2(x):
     return g(x < 42)(x)
 
 
-@infer((i64, i64), (ai64_of(6, 13), ai64_of(6, 13)))
+@mt(
+    infer_scalar(i64, result=i64),
+    infer_scalar(ai64_of(6, 13), result=ai64_of(6, 13))
+)
 def test_identity_function(x):
     return identity(x)
 
 
-@infer((B, B, B), (i64, B, InferenceError), (B, i64, InferenceError))
+@mt(
+    infer_scalar(B, B, result=B),
+    infer_scalar(i64, B, result=InferenceError),
+    infer_scalar(B, i64, result=InferenceError)
+)
 def test_bool_and(x, y):
     return bool_and(x, y)
 
 
-@infer((B, B, B), (i64, B, InferenceError), (B, i64, InferenceError))
+@mt(
+    infer_scalar(B, B, result=B),
+    infer_scalar(i64, B, result=InferenceError),
+    infer_scalar(B, i64, result=InferenceError)
+)
 def test_bool_or(x, y):
     return bool_or(x, y)
 
 
-@infer_std((B, False), (None, True))
+@mt(
+    infer_standard(B, result=False),
+    infer_standard(None, result=True),
+)
 def test_nil_eq(x):
     return nil_eq(None, x)
 
 
-@infer_std((B, True), (None, False))
+@mt(
+    infer_standard(B, result=True),
+    infer_standard(None, result=False),
+)
 def test_nil_ne(x):
     return nil_ne(None, x)
 
 
-@infer_std((i64, 0))
+@infer_standard(i64, result=0)
 def test_bool_ne(x):
     if None:
         return x
@@ -1576,17 +1611,17 @@ def test_bool_ne(x):
         return 0
 
 
-@infer(
-    (B, B, B),
-    (i64, i64, InferenceError),
+@mt(
+    infer_scalar(B, B, result=B),
+    infer_scalar(i64, i64, result=InferenceError),
 )
 def test_and(x, y):
     return x and y
 
 
-@infer(
-    (i64, None, i64),
-    (i64, i64, i64),
+@mt(
+    infer_scalar(i64, None, result=i64),
+    infer_scalar(i64, i64, result=i64),
 )
 def test_and_none(x, y):
     if x > 0 and y is not None:
@@ -1595,25 +1630,29 @@ def test_and_none(x, y):
         return x
 
 
-@infer(
-    (B, i64, i64, i64),
-    (i64, i64, i64, InferenceError),
-    (B, i64, f64, InferenceError),
-    (True, i64, f64, i64),
-    (False, i64, f64, f64),
-    (True, 1, 2, 1),
-    (False, 1, 2, 2),
-    (B, 1, 2, i64),
-    (B, ai64_of(6, 13), ai64_of(6, 13), ai64_of(6, 13)),
-    (B, ai64_of(6, 13), ai64_of(6, 14), ai64_of(6, ANYTHING)),
-    (True, ai64_of(6, 13), ai64_of(6, 14), ai64_of(6, 13)),
-    (False, ai64_of(6, 13), ai64_of(6, 14), ai64_of(6, 14)),
+@mt(
+    infer_scalar(B, i64, i64, result=i64),
+    infer_scalar(i64, i64, i64, result=InferenceError),
+    infer_scalar(B, i64, f64, result=InferenceError),
+    infer_scalar(True, i64, f64, result=i64),
+    infer_scalar(False, i64, f64, result=f64),
+    infer_scalar(True, 1, 2, result=1),
+    infer_scalar(False, 1, 2, result=2),
+    infer_scalar(B, 1, 2, result=i64),
+    infer_scalar(B, ai64_of(6, 13), ai64_of(6, 13),
+                 result=ai64_of(6, 13)),
+    infer_scalar(B, ai64_of(6, 13), ai64_of(6, 14),
+                 result=ai64_of(6, ANYTHING)),
+    infer_scalar(True, ai64_of(6, 13), ai64_of(6, 14),
+                 result=ai64_of(6, 13)),
+    infer_scalar(False, ai64_of(6, 13), ai64_of(6, 14),
+                 result=ai64_of(6, 14)),
 )
 def test_switch(c, x, y):
     return switch(c, x, y)
 
 
-@infer((i64, i64, i64))
+@infer_scalar(i64, i64, result=i64)
 def test_switch_switch(x, y):
     def f1(z):
         return z > 0
@@ -1624,14 +1663,12 @@ def test_switch_switch(x, y):
     return switch(f(y), 1, 2)
 
 
-@infer_std(
-    (i64, i64, InferenceError),
-)
+@infer_standard(i64, i64, result=InferenceError)
 def test_user_switch_hastype(x, y):
     return user_switch(hastype(x, i64), y + 1, y + 2)
 
 
-@infer_std((B, i64, i64))
+@infer_standard(B, i64, result=i64)
 def test_closure_in_data(c, x):
     def f(x):
         return x * x
@@ -1645,71 +1682,76 @@ def test_closure_in_data(c, x):
     return h[0](x)
 
 
-@infer(
-    (i64, Ty(to_abstract_test(i64)), i64),
-    (i64, Ty(to_abstract_test(i16)), i16),
-    (f64, Ty(to_abstract_test(i16)), i16),
-    (f16, Ty(to_abstract_test(f32)), f32),
-    (f16, Ty(ANYTHING), InferenceError),
-    (f16, Ty(to_abstract_test(B)), InferenceError),
-    (B, Ty(to_abstract_test(f32)), InferenceError),
+@mt(
+    infer_scalar(i64, Ty(to_abstract_test(i64)), result=i64),
+    infer_scalar(i64, Ty(to_abstract_test(i16)), result=i16),
+    infer_scalar(f64, Ty(to_abstract_test(i16)), result=i16),
+    infer_scalar(f16, Ty(to_abstract_test(f32)), result=f32),
+    infer_scalar(f16, Ty(ANYTHING), result=InferenceError),
+    infer_scalar(f16, Ty(to_abstract_test(B)), result=InferenceError),
+    infer_scalar(B, Ty(to_abstract_test(f32)), result=InferenceError),
 )
 def test_scalar_cast(x, t):
     return scalar_cast(x, t)
 
 
-@infer(
-    (ai64_of(2, 3), Ty(to_abstract_test(i64)), ai64_of(2, 3)),
-    (ai64_of(2, 3), Ty(to_abstract_test(i16)), ai16_of(2, 3)),
-    (af64_of(2, 3), Ty(to_abstract_test(i16)), ai16_of(2, 3)),
-    (af16_of(2, 3), Ty(to_abstract_test(f32)), af32_of(2, 3)),
-    (af16_of(2, 3), Ty(ANYTHING), InferenceError),
-    (af16_of(2, 3), Ty(to_abstract_test(B)), InferenceError),
-    (B, Ty(to_abstract_test(f32)), InferenceError),
+@mt(
+    infer_scalar(ai64_of(2, 3), Ty(to_abstract_test(i64)),
+                 result=ai64_of(2, 3)),
+    infer_scalar(ai64_of(2, 3), Ty(to_abstract_test(i16)),
+                 result=ai16_of(2, 3)),
+    infer_scalar(af64_of(2, 3), Ty(to_abstract_test(i16)),
+                 result=ai16_of(2, 3)),
+    infer_scalar(af16_of(2, 3), Ty(to_abstract_test(f32)),
+                 result=af32_of(2, 3)),
+    infer_scalar(af16_of(2, 3), Ty(ANYTHING),
+                 result=InferenceError),
+    infer_scalar(af16_of(2, 3), Ty(to_abstract_test(B)),
+                 result=InferenceError),
+    infer_scalar(B, Ty(to_abstract_test(f32)),
+                 result=InferenceError),
 )
 def test_array_cast(x, t):
     return array_cast(x, t)
 
 
-@infer(
-    (i64, ai64_of()),
-    (f64, af64_of()),
-    (af64_of(9, 7), InferenceError),
-    ((i64,), InferenceError)
+@mt(
+    infer_scalar(i64, result=ai64_of()),
+    infer_scalar(f64, result=af64_of()),
+    infer_scalar(af64_of(9, 7), result=InferenceError),
+    infer_scalar((i64,), result=InferenceError)
 )
 def test_scalar_to_array(x):
     return scalar_to_array(x, AN)
 
 
-@infer(
-    (ai64_of(), i64),
-    (af64_of(), f64),
-    (af64_of(3, 4), InferenceError),
-    (af64_of(1, 1, 1), InferenceError),
+@mt(
+    infer_scalar(ai64_of(), result=i64),
+    infer_scalar(af64_of(), result=f64),
+    infer_scalar(af64_of(3, 4), result=InferenceError),
+    infer_scalar(af64_of(1, 1, 1), result=InferenceError),
 )
 def test_array_to_scalar(x):
     return array_to_scalar(x)
 
 
-@infer(
-    ((u64,), (u64,), (u64,)),
-    ((u64, u64), (u64,), (u64, u64)),
-    ((u64,), (u64, u64), (u64, u64)),
-    (Shp(1, 3), Shp(2, 1), Shp(2, 3)),
-    (Shp(2, 3), Shp(2, 3), Shp(2, 3)),
-    (Shp(2, 4), Shp(2, 3), InferenceError),
-    ((u64, u64), Shp(2, 3), Shp(2, 3)),
-    ((i64,), (u64,), InferenceError),
-    ((u64,), (i64,), InferenceError),
-    (i64, i64, InferenceError),
+@mt(
+    infer_scalar((u64,), (u64,), result=(u64,)),
+    infer_scalar((u64, u64), (u64,), result=(u64, u64)),
+    infer_scalar((u64,), (u64, u64), result=(u64, u64)),
+    infer_scalar(Shp(1, 3), Shp(2, 1), result=Shp(2, 3)),
+    infer_scalar(Shp(2, 3), Shp(2, 3), result=Shp(2, 3)),
+    infer_scalar(Shp(2, 4), Shp(2, 3), result=InferenceError),
+    infer_scalar((u64, u64), Shp(2, 3), result=Shp(2, 3)),
+    infer_scalar((i64,), (u64,), result=InferenceError),
+    infer_scalar((u64,), (i64,), result=InferenceError),
+    infer_scalar(i64, i64, result=InferenceError),
 )
 def test_broadcast_shape(xs, ys):
     return broadcast_shape(xs, ys)
 
 
-@infer(
-    (i64, i64, InferenceError)
-)
+@infer_scalar(i64, i64, result=InferenceError)
 def test_call_nonfunc(x, y):
     return x(y)
 
@@ -1733,9 +1775,9 @@ def test_call_nonfunc(x, y):
 #     return f(g)
 
 
-@infer(
-    (i64, i64, i64, i64),
-    (f64, f64, f64, InferenceError),
+@mt(
+    infer_scalar(i64, i64, i64, result=i64),
+    infer_scalar(f64, f64, f64, result=InferenceError),
 )
 def test_multitype(x, y, z):
     return mysum(x) * mysum(x, y) * mysum(x, y, z)
@@ -1754,12 +1796,12 @@ def _mystery2(x, y):
     return array_map(scalar_add, x, y)
 
 
-@infer(
-    (ai64_of(7, 9), ai64_of(9, 2), ai64_of(7, 2)),
-    (af64_of(7, 9), af64_of(9, 2), InferenceError),
-    (ai64_of(7, 9), ai64_of(7, 9), InferenceError),
-    (af64_of(7, 9), af64_of(7, 9), af64_of(7, 9)),
-    (f64, f64, InferenceError),
+@mt(
+    infer_scalar(ai64_of(7, 9), ai64_of(9, 2), result=ai64_of(7, 2)),
+    infer_scalar(af64_of(7, 9), af64_of(9, 2), result=InferenceError),
+    infer_scalar(ai64_of(7, 9), ai64_of(7, 9), result=InferenceError),
+    infer_scalar(af64_of(7, 9), af64_of(7, 9), result=af64_of(7, 9)),
+    infer_scalar(f64, f64, result=InferenceError),
 )
 def test_multitype_2(x, y):
     return mystery(x, y)
@@ -1773,7 +1815,7 @@ class _BadMG(MetaGraph):
 _bmg = _BadMG('badmg')
 
 
-@infer((i64, InferenceError))
+@infer_scalar(i64, result=InferenceError)
 def test_bad_metagraph(x):
     return _bmg(x)
 
@@ -1850,29 +1892,33 @@ def test_bad_metagraph(x):
 # ###########################
 
 
-@infer_std(
-    (i64, i64, i64),
-    (ai64_of(7, 9), ai64_of(7, 9), ai64_of(7, 9)),
-    (ai64_of(7, 9), i64, ai64_of(7, 9)),
-    (i64, ai64_of(7, 9), ai64_of(7, 9)),
-    (ai64_of(7, 9), i64, ai64_of(7, 9)),
-    (i64, f64, InferenceError),
-    (3, ai64_of(7, 9), ai64_of(7, 9)),
-    (af32_of(7, 9), af32_of(7, 1), af32_of(7, 9)),
-    (af32_of(1, 9), af32_of(7, 1), af32_of(7, 9)),
-    (af32_of(1, ANYTHING), af32_of(7, 1), af32_of(7, ANYTHING)),
-    (af32_of(8, ANYTHING), af32_of(8, ANYTHING), af32_of(8, ANYTHING)),
-    (af32_of(8, 3), af32_of(8, ANYTHING), af32_of(8, 3)),
-    (af32_of(2, 3, 4), af32_of(3, 4), af32_of(2, 3, 4)),
-    (ai64_of(7), ai64_of(9), InferenceError),
+@mt(
+    infer_standard(i64, i64, result=i64),
+    infer_standard(ai64_of(7, 9), ai64_of(7, 9), result=ai64_of(7, 9)),
+    infer_standard(ai64_of(7, 9), i64, result=ai64_of(7, 9)),
+    infer_standard(i64, ai64_of(7, 9), result=ai64_of(7, 9)),
+    infer_standard(ai64_of(7, 9), i64, result=ai64_of(7, 9)),
+    infer_standard(i64, f64, result=InferenceError),
+    infer_standard(3, ai64_of(7, 9), result=ai64_of(7, 9)),
+    infer_standard(af32_of(7, 9), af32_of(7, 1), result=af32_of(7, 9)),
+    infer_standard(af32_of(1, 9), af32_of(7, 1), result=af32_of(7, 9)),
+    infer_standard(af32_of(1, ANYTHING), af32_of(7, 1),
+                   result=af32_of(7, ANYTHING)),
+    infer_standard(af32_of(8, ANYTHING), af32_of(8, ANYTHING),
+                   result=af32_of(8, ANYTHING)),
+    infer_standard(af32_of(8, 3), af32_of(8, ANYTHING),
+                   result=af32_of(8, 3)),
+    infer_standard(af32_of(2, 3, 4), af32_of(3, 4),
+                   result=af32_of(2, 3, 4)),
+    infer_standard(ai64_of(7), ai64_of(9), result=InferenceError),
 )
 def test_add_std(x, y):
     return x + y
 
 
-@infer_std(
-    (i64, i64, i64),
-    (ai64_of(7, 9), i64, InferenceError)
+@mt(
+    infer_standard(i64, i64, result=i64),
+    infer_standard(ai64_of(7, 9), i64, result=InferenceError)
 )
 def test_max_std(x, y):
     if x > y:
@@ -1881,10 +1927,10 @@ def test_max_std(x, y):
         return y
 
 
-@infer_std(
-    (f64, f64),
-    (i64, i64),
-    (af32_of(2, 5), af32_of(2, 5)),
+@mt(
+    infer_standard(f64, result=f64),
+    infer_standard(i64, result=i64),
+    infer_standard(af32_of(2, 5), result=af32_of(2, 5)),
 )
 def test_add1_stdx(x):
     return 1 + x
@@ -1894,9 +1940,9 @@ def _add(x, y):
     return x + y
 
 
-@infer_std(
-    (f64, f64),
-    (i64, i64),
+@mt(
+    infer_standard(f64, result=f64),
+    infer_standard(i64, result=i64),
 )
 def test_add1_std_indirect(x):
     return _add(1, x)
@@ -1909,92 +1955,95 @@ def _interference_helper(x):
         return x
 
 
-@infer(
-    (i64, i64),
-    (f64, f64),
+@mt(
+    infer_scalar(i64, result=i64),
+    infer_scalar(f64, result=f64),
 )
 def test_add1_hastype_interference(x):
     return x + _interference_helper(1)
 
 
-@infer(
-    (Point(i64, i64), i64),
-    (Point(f64, f64), f64),
+@mt(
+    infer_scalar(Point(i64, i64), result=i64),
+    infer_scalar(Point(f64, f64), result=f64),
 )
 def test_class(pt):
     return pt.x + pt.y
 
 
-@infer(
-    (Point(i64, i64), i64),
-    (Point(f64, f64), f64),
+@mt(
+    infer_scalar(Point(i64, i64), result=i64),
+    infer_scalar(Point(f64, f64), result=f64),
 )
 def test_dataclass_method(pt):
     return pt.abs()
 
 
-@infer(
-    (Point(i64, i64), i64),
-    (Point(f64, f64), f64),
+@mt(
+    infer_scalar(Point(i64, i64), result=i64),
+    infer_scalar(Point(f64, f64), result=f64),
 )
 def test_dataclass_property(pt):
     return pt.absprop
 
 
-@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+@infer_standard(Point(i64, i64), Point(i64, i64), result=Point(i64, i64))
 def test_arithmetic_data_add(pt1, pt2):
     return pt1 + pt2
 
 
-@infer_std((Point(i64, i64), Point(i64, i64)))
+@infer_standard(Point(i64, i64), result=Point(i64, i64))
 def test_arithmetic_data_add_ct(pt):
     return pt + 10
 
 
-@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+@infer_standard(Point(i64, i64), Point(i64, i64), result=Point(i64, i64))
 def test_arithmetic_data_sub(pt1, pt2):
     return pt1 - pt2
 
 
-@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+@infer_standard(Point(i64, i64), Point(i64, i64), result=Point(i64, i64))
 def test_arithmetic_data_mul(pt1, pt2):
     return pt1 * pt2
 
 
-@infer_std((Point3D(f64, f64, f64), Point3D(f64, f64, f64),
-            Point3D(f64, f64, f64)))
+@infer_standard(
+    Point3D(f64, f64, f64),
+    Point3D(f64, f64, f64),
+    result=Point3D(f64, f64, f64)
+)
 def test_arithmetic_data_truediv(pt1, pt2):
     return pt1 / pt2
 
 
-@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+@infer_standard(Point(i64, i64), Point(i64, i64), result=Point(i64, i64))
 def test_arithmetic_data_floordiv(pt1, pt2):
     return pt1 // pt2
 
 
-@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+@infer_standard(Point(i64, i64), Point(i64, i64), result=Point(i64, i64))
 def test_arithmetic_data_mod(pt1, pt2):
     return pt1 % pt2
 
 
-@infer_std((Point(i64, i64), Point(i64, i64), Point(i64, i64)))
+@infer_standard(Point(i64, i64), Point(i64, i64), result=Point(i64, i64))
 def test_arithmetic_data_pow(pt1, pt2):
     return pt1 ** pt2
 
 
-@infer_std((Point(i64, i64), Point(i64, i64)))
+@infer_standard(Point(i64, i64), result=Point(i64, i64))
 def test_arithmetic_data_pos(pt):
     return +pt
 
 
-@infer_std((Point(i64, i64), Point(i64, i64)))
+@infer_standard(Point(i64, i64), result=Point(i64, i64))
 def test_arithmetic_data_neg(pt):
     return -pt
 
 
-@infer(
-    (i64, i64, i64, i64, Point(i64, i64)),
-    (f64, f64, f64, f64, InferenceError),
+@mt(
+    infer_scalar(i64, i64, i64, i64, result=Point(i64, i64)),
+    infer_scalar(f64, f64, f64, f64, result=InferenceError),
 )
 def test_dataclass_inst(x1, y1, x2, y2):
     pt1 = Point(x1, y1)
@@ -2002,38 +2051,40 @@ def test_dataclass_inst(x1, y1, x2, y2):
     return Point(pt1.x + pt2.x, pt1.y + pt2.y)
 
 
-@infer((i64, i64, i64, InferenceError))
+@infer_scalar(i64, i64, i64, result=InferenceError)
 def test_dataclass_bad_inst(x, y, z):
     return Point(x, y, z)
 
 
-@infer((Ty(ANYTHING), i64, i64, InferenceError))
+@infer_scalar(Ty(ANYTHING), i64, i64, result=InferenceError)
 def test_dataclass_bad_inst2(cls, x, y):
     return P.make_record(cls, x, y)
 
 
-@infer((Point(i64, i64), InferenceError))
+@infer_scalar(Point(i64, i64), result=InferenceError)
 def test_dataclass_wrong_field(pt):
     return pt.z
 
 
-@infer((Thing(i64), i64))
+@infer_scalar(Thing(i64), result=i64)
 def test_dataclass_call(thing):
     return thing()
 
 
-@infer((Thing(i64), f64, Thing(f64)))
+@infer_scalar(Thing(i64), f64, result=Thing(f64))
 def test_record_setitem(thing, x):
     return P.record_setitem(thing, 'contents', x)
 
 
-@infer((Point(i64, i64), i64, Point(i64, i64)),
-       (Point(i64, i64), f64, InferenceError))
+@mt(
+    infer_scalar(Point(i64, i64), i64, result=Point(i64, i64)),
+    infer_scalar(Point(i64, i64), f64, result=InferenceError)
+)
 def test_record_setitem_2(pt, x):
     return P.record_setitem(pt, 'x', x)
 
 
-@infer((Thing(i64), f64, InferenceError))
+@infer_scalar(Thing(i64), f64, result=InferenceError)
 def test_record_setitem_wrong_field(thing, x):
     return P.record_setitem(thing, 'shfifty_five', x)
 
@@ -2046,97 +2097,106 @@ hyper_map_notuple = HyperMap(
 hyper_map_nobroadcast = HyperMap(broadcast=False)
 
 
-@infer(
-    (i64, i64, i64),
-    (f64, f64, f64),
-    ([f64], [f64], [f64]),
-    ([[f64]], [[f64]], [[f64]]),
-    ((i64, f64), (i64, f64), (i64, f64)),
-    (Point(i64, i64), Point(i64, i64), Point(i64, i64)),
-    (ai64_of(2, 5), ai64_of(2, 5), ai64_of(2, 5)),
-    (ai64_of(2, 5), i64, ai64_of(2, 5)),
-    (ai64_of(1, 5), ai64_of(2, 1), ai64_of(2, 5)),
-    (i64, f64, InferenceError),
-    (ai64_of(2, 5), af64_of(2, 5), InferenceError),
-    (U(i64, (i64, i64)), U(i64, (i64, i64)), U(i64, (i64, i64))),
-    (U(i64, (i64, i64)), U(i64, (i64, i64, i64)), InferenceError),
-    ({"x": i64, "y": i64}, {"x": i64, "y": i64}, {"x": i64, "y": i64}),
-    ({"x": i64, "y": i64}, {"x": i64, "y": i64, "z": i64}, InferenceError),
-    ({"x": i64, "y": i64}, {"y": i64, "z": i64}, InferenceError),
+@mt(
+    infer_scalar(i64, i64, result=i64),
+    infer_scalar(f64, f64, result=f64),
+    infer_scalar([f64], [f64], result=[f64]),
+    infer_scalar([[f64]], [[f64]], result=[[f64]]),
+    infer_scalar((i64, f64), (i64, f64), result=(i64, f64)),
+    infer_scalar(Point(i64, i64), Point(i64, i64), result=Point(i64, i64)),
+    infer_scalar(ai64_of(2, 5), ai64_of(2, 5), result=ai64_of(2, 5)),
+    infer_scalar(ai64_of(2, 5), i64, result=ai64_of(2, 5)),
+    infer_scalar(ai64_of(1, 5), ai64_of(2, 1), result=ai64_of(2, 5)),
+    infer_scalar(i64, f64, result=InferenceError),
+    infer_scalar(ai64_of(2, 5), af64_of(2, 5), result=InferenceError),
+    infer_scalar(U(i64, (i64, i64)), U(i64, (i64, i64)),
+                 result=U(i64, (i64, i64))),
+    infer_scalar(U(i64, (i64, i64)), U(i64, (i64, i64, i64)),
+                 result=InferenceError),
+    infer_scalar({"x": i64, "y": i64}, {"x": i64, "y": i64},
+                 result={"x": i64, "y": i64}),
+    infer_scalar({"x": i64, "y": i64}, {"x": i64, "y": i64, "z": i64},
+                 result=InferenceError),
+    infer_scalar({"x": i64, "y": i64}, {"y": i64, "z": i64},
+                 result=InferenceError),
 
     # Generic broadcasting tests
-    ([f64], f64, [f64]),
-    ([[f64]], [[f64]], [[f64]]),
-    ((i64, i64), i64, (i64, i64)),
-    (i64, (i64, i64), (i64, i64)),
-    (Point(i64, i64), i64, Point(i64, i64)),
+    infer_scalar([f64], f64, result=[f64]),
+    infer_scalar([[f64]], [[f64]], result=[[f64]]),
+    infer_scalar((i64, i64), i64, result=(i64, i64)),
+    infer_scalar(i64, (i64, i64), result=(i64, i64)),
+    infer_scalar(Point(i64, i64), i64, result=Point(i64, i64)),
 
     # Various errors
-    ((i64, i64), (i64, i64, i64), InferenceError),
-    (Point(i64, i64), Point3D(i64, i64, i64), InferenceError),
-    ((i64, i64), [i64], InferenceError),
+    infer_scalar((i64, i64), (i64, i64, i64), result=InferenceError),
+    infer_scalar(Point(i64, i64), Point3D(i64, i64, i64),
+                 result=InferenceError),
+    infer_scalar((i64, i64), [i64], result=InferenceError),
 )
 def test_hyper_map(x, y):
     return hyper_map(scalar_add, x, y)
 
 
-@infer(((i64, f64), (i64, f64), InferenceError),
-       ([f64], f64, [f64]))
+@mt(
+    infer_scalar((i64, f64), (i64, f64), result=InferenceError),
+    infer_scalar([f64], f64, result=[f64]),
+)
 def test_hyper_map_notuple(x, y):
     return hyper_map_notuple(scalar_add, x, y)
 
 
-@infer(
-    (ai64_of(2, 5), ai64_of(2, 5), ai64_of(2, 5)),
-    (ai64_of(2, 5), ai64_of(2, 1), InferenceError),
-    (ai64_of(2, 5), i64, InferenceError),
+@mt(
+    infer_scalar(ai64_of(2, 5), ai64_of(2, 5), result=ai64_of(2, 5)),
+    infer_scalar(ai64_of(2, 5), ai64_of(2, 1), result=InferenceError),
+    infer_scalar(ai64_of(2, 5), i64, result=InferenceError),
 )
 def test_hyper_map_nobroadcast(x, y):
     return hyper_map_nobroadcast(scalar_add, x, y)
 
 
-@infer(
-    (i64, i64, i64),
-    (f64, f64, f64),
-    ([f64], [f64], [f64]),
-    ((i64, f64), (i64, f64), (i64, f64)),
-    (Point(i64, i64), Point(i64, i64), Point(i64, i64)),
-    (ai64_of(2, 5), ai64_of(2, 5), ai64_of(2, 5)),
-    (ai64_of(2, 1), ai64_of(1, 5), InferenceError),
-    (Env, Env, Env),
-    ({"x": i64, "y": i64}, {"x": i64, "y": i64}, {"x": i64, "y": i64}),
+@mt(
+    infer_scalar(i64, i64, result=i64),
+    infer_scalar(f64, f64, result=f64),
+    infer_scalar([f64], [f64], result=[f64]),
+    infer_scalar((i64, f64), (i64, f64), result=(i64, f64)),
+    infer_scalar(Point(i64, i64), Point(i64, i64), result=Point(i64, i64)),
+    infer_scalar(ai64_of(2, 5), ai64_of(2, 5), result=ai64_of(2, 5)),
+    infer_scalar(ai64_of(2, 1), ai64_of(1, 5), result=InferenceError),
+    infer_scalar(Env, Env, result=Env),
+    infer_scalar({"x": i64, "y": i64}, {"x": i64, "y": i64},
+                 result={"x": i64, "y": i64}),
 )
 def test_gadd(x, y):
     return gadd(x, y)
 
 
-@infer(
-    (i64, 0),
-    (f64, 0.0),
-    ([f64], [f64]),  # list element types are broadened
-    ((i64, f64), (0, 0.0)),
-    (Point(i64, i64), Point(0, 0)),
-    (ai64_of(2, 5), ai64_of(2, 5, value=0)),
-    (af32_of(2, 5), af32_of(2, 5, value=0)),
-    ((2, 3.0), (0, 0.0)),
-    (Point(1, 2), Point(0, 0)),
+@mt(
+    infer_scalar(i64, result=0),
+    infer_scalar(f64, result=0.0),
+    infer_scalar([f64], result=[f64]),  # list element types are broadened
+    infer_scalar((i64, f64), result=(0, 0.0)),
+    infer_scalar(Point(i64, i64), result=Point(0, 0)),
+    infer_scalar(ai64_of(2, 5), result=ai64_of(2, 5, value=0)),
+    infer_scalar(af32_of(2, 5), result=af32_of(2, 5, value=0)),
+    infer_scalar((2, 3.0), result=(0, 0.0)),
+    infer_scalar(Point(1, 2), result=Point(0, 0)),
 )
 def test_zeros_like(x):
     return zeros_like(x)
 
 
 # TODO: fix test
-@infer((i64, newenv))
+@infer_scalar(i64, result=newenv)
 def test_zeros_like_fn(x):
     def f(y):
         return x + y
     return zeros_like(f)
 
 
-@infer(
-    (i32, i32, i32, i32),
-    (i32, f32, i32, InferenceError),
-    (i32, i32, f32, InferenceError),
+@mt(
+    infer_scalar(i32, i32, i32, result=i32),
+    infer_scalar(i32, f32, i32, result=InferenceError),
+    infer_scalar(i32, i32, f32, result=InferenceError),
 )
 def test_env(x, y, z):
     e = newenv
@@ -2144,7 +2204,7 @@ def test_env(x, y, z):
     return env_getitem(e, embed(x), z)
 
 
-@infer((Env,))
+@infer_scalar(result=Env)
 def test_env_onfn():
     def f(x):
         return x * x
@@ -2156,18 +2216,24 @@ def test_env_onfn():
 _i64 = to_abstract_test(i64)
 
 
-@infer((i32, i64), (f64, i64), ((i32, i64), i64))
+@mt(
+    infer_scalar(i32, result=i64),
+    infer_scalar(f64, result=i64),
+    infer_scalar((i32, i64), result=i64)
+)
 def test_unsafe_static_cast(x):
     return unsafe_static_cast(x, _i64)
 
 
-@infer((i32, i32, InferenceError),
-       (i32, (i32, i32), InferenceError))
+@mt(
+    infer_scalar(i32, i32, result=InferenceError),
+    infer_scalar(i32, (i32, i32), result=InferenceError)
+)
 def test_unsafe_static_cast_error(x, y):
     return unsafe_static_cast(x, y)
 
 
-@infer((i32, i32))
+@infer_scalar(i32, result=i32)
 def test_pass(x):
     if x < 0:
         x = -x
@@ -2176,27 +2242,27 @@ def test_pass(x):
     return x
 
 
-@infer(
-    (i32, i32),
-    (1, i64),
-    (-1, Bot),
+@mt(
+    infer_scalar(i32, result=i32),
+    infer_scalar(1, result=i64),
+    infer_scalar(-1, result=Bot),
 )
 def test_assert(x):
     assert x >= 0
     return x ** 0.5
 
 
-@infer(
-    (i32, i32),
-    (1, i64),
-    (-1, Bot),
+@mt(
+    infer_scalar(i32, result=i32),
+    infer_scalar(1, result=i64),
+    infer_scalar(-1, result=Bot),
 )
 def test_assert_msg(x):
     assert x >= 0, 'x must be positive'
     return x ** 0.5
 
 
-@infer((i32, i32))
+@infer_scalar(i32, result=i32)
 def test_raise(x):
     if x >= 0:
         return x ** 0.5
@@ -2204,12 +2270,12 @@ def test_raise(x):
         raise Exception("sqrt of negative number")
 
 
-@infer((i32, Bot))
+@infer_scalar(i32, result=Bot)
 def test_raise_unconditional(x):
     raise Exception("I don't like your face")
 
 
-@infer((i32, i32))
+@infer_scalar(i32, result=i32)
 def test_raise_multiple(x):
     if x < 0:
         raise Exception("You are too ugly")
@@ -2219,7 +2285,11 @@ def test_raise_multiple(x):
         return x
 
 
-@infer_std((i32, Bot), (f64, f64), (U(i32, i64), i64))
+@mt(
+    infer_standard(i32, result=Bot),
+    infer_standard(f64, result=f64),
+    infer_standard(U(i32, i64), result=i64)
+)
 def test_raise_hastype(x):
     if hastype(x, i32):
         raise Exception("What a terrible type")
@@ -2227,7 +2297,7 @@ def test_raise_hastype(x):
         return x
 
 
-@infer((i32, i32))
+@infer_scalar(i32, result=i32)
 def test_raise_loop(x):
     while x < 100:
         x = x * x
@@ -2236,7 +2306,7 @@ def test_raise_loop(x):
     return x
 
 
-@infer((i32, i32))
+@infer_scalar(i32, result=i32)
 def test_raise_rec(x):
     def f(x):
         if x == 0:
@@ -2248,7 +2318,7 @@ def test_raise_rec(x):
     return f(x)
 
 
-@infer((i64, i32, i64, U(i32, i64)))
+@infer_scalar(i64, i32, i64, result=U(i32, i64))
 def test_tagged(x, y, z):
     if x > 0:
         return tagged(y)
@@ -2256,7 +2326,7 @@ def test_tagged(x, y, z):
         return tagged(z)
 
 
-@infer((i64, i16, i32, i64, U(i16, i32, i64)))
+@infer_scalar(i64, i16, i32, i64, result=U(i16, i32, i64))
 def test_tagged_more(c, x, y, z):
     if c == 0:
         return tagged(x)
@@ -2266,7 +2336,7 @@ def test_tagged_more(c, x, y, z):
         return tagged(z)
 
 
-@infer((i64, InferenceError))
+@infer_scalar(i64, result=InferenceError)
 def test_tagged_too_many_arguments(x):
     return tagged(x, 1, 2)
 
@@ -2275,7 +2345,7 @@ pair_t1 = from_value(Pair(Pair(1, 2), Pair(2, 3)))
 pair_t1_u = pair_t1.attributes['left']
 
 
-@infer((i64, pair_t1_u))
+@infer_scalar(i64, result=pair_t1_u)
 def test_tagged_adt(depth):
     return make_tree(depth, 1)
 
@@ -2284,14 +2354,14 @@ pair_t2 = from_value(Pair(1, Pair(2, Pair(3, None))))
 pair_t2_u = pair_t2.attributes['right']
 
 
-@infer((i64, pair_t2_u))
+@infer_scalar(i64, result=pair_t2_u)
 def test_tagged_adt_2(depth):
     return countdown(depth)
 
 
-@infer(
-    (i32, (JT(i32), Env, i32)),
-    (f64, (JT(f64), Env, f64)),
+@mt(
+    infer_scalar(i32, result=(JT(i32), Env, i32)),
+    infer_scalar(f64, result=(JT(f64), Env, f64)),
 )
 def test_J(x):
     def f(x):
@@ -2304,19 +2374,19 @@ def test_J(x):
     return jy, df, dx
 
 
-@infer(
-    (JT(i32), i32),
-    (JT([i32]), [i32]),
-    (i32, InferenceError),
+@mt(
+    infer_scalar(JT(i32), result=i32),
+    infer_scalar(JT([i32]), result=[i32]),
+    infer_scalar(i32, result=InferenceError),
 )
 def test_Jinv(x):
     return Jinv(x)
 
 
-@infer_std(
-    (i32, i32),
-    (f64, f64),
-    (ai64_of(4, 5), ai64_of(4, 5)),
+@mt(
+    infer_standard(i32, result=i32),
+    infer_standard(f64, result=f64),
+    infer_standard(ai64_of(4, 5), result=ai64_of(4, 5)),
 )
 def test_Jinv2(x):
     def f(x):
@@ -2326,21 +2396,19 @@ def test_Jinv2(x):
     return ff(x)
 
 
-@infer((i32, InferenceError))
+@infer_scalar(i32, result=InferenceError)
 def test_Jinv3(x):
     def f(x):
         return x * x
     return Jinv(f)(x)
 
 
-@infer((i32, InferenceError))
+@infer_scalar(i32, result=InferenceError)
 def test_Jinv4(x):
     return Jinv(scalar_add)(x)
 
 
-@infer_std(
-    (af32_of(5, 7), (f32, (Env, af32_of(5, 7)))),
-)
+@infer_standard(af32_of(5, 7), result=(f32, (Env, af32_of(5, 7))))
 def test_J_array(xs):
     def prod(xs):
         p = array_reduce(lambda x, y: x * y, xs, ())
@@ -2349,9 +2417,7 @@ def test_J_array(xs):
     return Jinv(jy), bprop(1.0)
 
 
-@infer_std(
-    (f64, InferenceError)
-)
+@infer_standard(f64, result=InferenceError)
 def test_J_bprop_invalid(x):
     def f(x):
         return x * x
@@ -2359,9 +2425,7 @@ def test_J_bprop_invalid(x):
     return bprop(1.0, 1.0)
 
 
-@infer_std(
-    (f64, (f64, f64))
-)
+@infer_standard(f64, result=(f64, f64))
 def test_J_return_function(x):
     def f(y):
         return y * y
@@ -2375,9 +2439,9 @@ def test_J_return_function(x):
     return Jinv(jy), dy
 
 
-@infer_std(
-    (f32, f32, f32),
-    (i16, i16, i16),
+@mt(
+    infer_standard(f32, f32, result=f32),
+    infer_standard(i16, i16, result=i16),
 )
 def test_grad(x, y):
     def f(x, y):
@@ -2385,10 +2449,10 @@ def test_grad(x, y):
     return grad(f)(x, y)
 
 
-@infer_std(
-    (i64, i64),
-    (f32, f32),
-    (f64, f64),
+@mt(
+    infer_standard(i64, result=i64),
+    infer_standard(f32, result=f32),
+    infer_standard(f64, result=f64),
 )
 def test_grad_scalar_cast(x):
     def f(x):
@@ -2397,10 +2461,10 @@ def test_grad_scalar_cast(x):
     return grad(f)(x)
 
 
-@infer_std(
-    (ai64_of(2, 3), ai64_of(2, 3)),
-    (af32_of(2, 3), af32_of(2, 3)),
-    (af64_of(2, 3), af64_of(2, 3)),
+@mt(
+    infer_standard(ai64_of(2, 3), result=ai64_of(2, 3)),
+    infer_standard(af32_of(2, 3), result=af32_of(2, 3)),
+    infer_standard(af64_of(2, 3), result=af64_of(2, 3)),
 )
 def test_grad_array_cast(x):
     def f(x):
@@ -2409,9 +2473,7 @@ def test_grad_array_cast(x):
     return grad(f)(x)
 
 
-@infer_std(
-    (af16_of(2, 5), af16_of(2, 5), af16_of(2, 5)),
-)
+@infer_standard(af16_of(2, 5), af16_of(2, 5), result=af16_of(2, 5))
 def test_grad_reduce(xs, ys):
     def f(xs, ys):
         return array_reduce(scalar_add, xs * ys, ())
@@ -2419,77 +2481,94 @@ def test_grad_reduce(xs, ys):
     return grad(f)(xs, ys)
 
 
-@infer_std(
-    (None, f64, False),
-    (B, f64, False),
-    (f64, f64, MyiaTypeError),
-    (B, B, B),
-    (None, None, True),
-    (None, NotImplemented, False),
-    (NotImplemented, NotImplemented, True),
+@mt(
+    infer_standard(None, f64, result=False),
+    infer_standard(B, f64, result=False),
+    infer_standard(f64, f64, result=MyiaTypeError),
+    infer_standard(B, B, result=B),
+    infer_standard(None, None, result=True),
+    infer_standard(None, NotImplemented, result=False),
+    infer_standard(NotImplemented, NotImplemented, result=True),
 )
 def test_is(x, y):
     return x is y
 
 
-@infer_std(
-    (None, f64, True),
-    (B, f64, True),
-    (f64, f64, MyiaTypeError),
-    (B, B, B),
-    (None, None, False),
-    (None, NotImplemented, True),
-    (NotImplemented, NotImplemented, False),
+@mt(
+    infer_standard(None, f64, result=True),
+    infer_standard(B, f64, result=True),
+    infer_standard(f64, f64, result=MyiaTypeError),
+    infer_standard(B, B, result=B),
+    infer_standard(None, None, result=False),
+    infer_standard(None, NotImplemented, result=True),
+    infer_standard(NotImplemented, NotImplemented, result=False),
 )
 def test_is_not(x, y):
     return x is not y
 
 
-@infer(
-    (af32_of(1, 3, 4, 5), af32_of(3, 1, 3, 3), Shp(2, 3), Shp(3, 2),
-     Shp(3, 4), u64, af32_of(1, 3, 2, 1)),
-    (af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3), Shp(2, 3), Shp(3, 2),
-     Shp(3, 4), u64, af32_of(2, 3, 2, 1)),
-    (af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3), Shp(2, 3, 4), Shp(3, 2),
-     Shp(3, 4), u64, InferenceError),
-    (af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3), Shp(2, 3), Shp(3, 2, 4),
-     Shp(3, 4), u64, InferenceError),
-    (af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3), Shp(2, 3), Shp(3, 2),
-     Shp(3, 4, 2), u64, InferenceError),
+@mt(
+    infer_scalar(af32_of(1, 3, 4, 5), af32_of(3, 1, 3, 3),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4), u64,
+                 result=af32_of(1, 3, 2, 1)),
+    infer_scalar(af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4), u64,
+                 result=af32_of(2, 3, 2, 1)),
+    infer_scalar(af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3),
+                 Shp(2, 3, 4), Shp(3, 2), Shp(3, 4), u64,
+                 result=InferenceError),
+    infer_scalar(af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3),
+                 Shp(2, 3), Shp(3, 2, 4), Shp(3, 4), u64,
+                 result=InferenceError),
+    infer_scalar(af32_of(2, 3, 4, 5), af32_of(3, 1, 3, 3),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4, 2), u64,
+                 result=InferenceError),
 )
 def test_conv2d(i, w, s, p, d, g):
     return P.conv2d(i, w, s, p, d, g)
 
 
-@infer(
-    (Shp(1, 3, 4, 5), af32_of(3, 1, 3, 3), af32_of(1, 3, 2, 1), Shp(2, 3),
-     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(1, 3, 4, 5)),
-    (Shp(2, 3, 4, 5), af32_of(3, 1, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
-     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(2, 3, 4, 5)),
-    (Shp(2, 6, 4, 5), af32_of(3, 2, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
-     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(2, 6, 4, 5)),
-    (Shp(2, 1, 4, 5), af32_of(3, 1, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
-     Shp(3, 2), Shp(3, 4), S(1, u64), af32_of(2, 1, 4, 5)),
+@mt(
+    infer_scalar(Shp(1, 3, 4, 5), af32_of(3, 1, 3, 3), af32_of(1, 3, 2, 1),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4), S(3, u64),
+                 result=af32_of(1, 3, 4, 5)),
+    infer_scalar(Shp(2, 3, 4, 5), af32_of(3, 1, 3, 3), af32_of(2, 3, 2, 1),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4), S(3, u64),
+                 result=af32_of(2, 3, 4, 5)),
+    infer_scalar(Shp(2, 6, 4, 5), af32_of(3, 2, 3, 3), af32_of(2, 3, 2, 1),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4), S(3, u64),
+                 result=af32_of(2, 6, 4, 5)),
+    infer_scalar(Shp(2, 1, 4, 5), af32_of(3, 1, 3, 3), af32_of(2, 3, 2, 1),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4), S(1, u64),
+                 result=af32_of(2, 1, 4, 5)),
 )
 def test_conv2d_input_grad(i_s, w, g_o, s, p, d, g):
     return P.conv2d_input_grad(i_s, w, g_o, s, p, d, g)
 
 
-@infer(
-    (af32_of(1, 3, 4, 5), Shp(3, 1, 3, 3), af32_of(1, 3, 2, 1), Shp(2, 3),
-     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(3, 1, 3, 3)),
-    (af32_of(2, 3, 4, 5), Shp(3, 1, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
-     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(3, 1, 3, 3)),
-    (af32_of(2, 6, 4, 5), Shp(3, 2, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
-     Shp(3, 2), Shp(3, 4), S(3, u64), af32_of(3, 2, 3, 3)),
-    (af32_of(2, 1, 4, 5), Shp(3, 1, 3, 3), af32_of(2, 3, 2, 1), Shp(2, 3),
-     Shp(3, 2), Shp(3, 4), S(1, u64), af32_of(3, 1, 3, 3)),
+@mt(
+    infer_scalar(af32_of(1, 3, 4, 5), Shp(3, 1, 3, 3), af32_of(1, 3, 2, 1),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4), S(3, u64),
+                 result=af32_of(3, 1, 3, 3)),
+    infer_scalar(af32_of(2, 3, 4, 5), Shp(3, 1, 3, 3), af32_of(2, 3, 2, 1),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4), S(3, u64),
+                 result=af32_of(3, 1, 3, 3)),
+    infer_scalar(af32_of(2, 6, 4, 5), Shp(3, 2, 3, 3), af32_of(2, 3, 2, 1),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4), S(3, u64),
+                 result=af32_of(3, 2, 3, 3)),
+    infer_scalar(af32_of(2, 1, 4, 5), Shp(3, 1, 3, 3), af32_of(2, 3, 2, 1),
+                 Shp(2, 3), Shp(3, 2), Shp(3, 4), S(1, u64),
+                 result=af32_of(3, 1, 3, 3)),
 )
 def test_conv2d_weight_grad(i, w_s, g_o, s, p, d, g):
     return P.conv2d_weight_grad(i, w_s, g_o, s, p, d, g)
 
 
-@infer_std(("idk", i64), ("hey", 2), (String, i64))
+@mt(
+    infer_standard("idk", result=i64),
+    infer_standard("hey", result=2),
+    infer_standard(String, result=i64)
+)
 def test_string_eq(s):
     x = 2
     if s == 'idk':
@@ -2497,7 +2576,11 @@ def test_string_eq(s):
     return x
 
 
-@infer_std(("idk", 2), ("hey", i64), (String, i64))
+@mt(
+    infer_standard("idk", result=2),
+    infer_standard("hey", result=i64),
+    infer_standard(String, result=i64)
+)
 def test_string_ne(s):
     x = 2
     if s != 'idk':
@@ -2505,7 +2588,10 @@ def test_string_ne(s):
     return x
 
 
-@infer_std(('hey', 'hey'), (String, String))
+@mt(
+    infer_standard('hey', result='hey'),
+    infer_standard(String, result=String)
+)
 def test_string_return(s):
     return s
 
@@ -2513,6 +2599,6 @@ def test_string_return(s):
 bad_op = Operation('bad_op')
 
 
-@infer_std((i64, InferenceError))
+@infer_standard(i64, result=InferenceError)
 def test_bad_operation(x):
     return bad_op(x)
