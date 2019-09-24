@@ -26,36 +26,6 @@ from myia.pipeline import standard_pipeline
 from ..common import AN, MA, MB
 
 
-@pytest.fixture(params=[
-    pytest.param(('nnvm', {'target': 'cpu', 'device_id': 0}), id='nnvm-cpu'),
-    pytest.param(('nnvm', {'target': 'cuda', 'device_id': 0}), id='nnvm-cuda',
-                 marks=pytest.mark.gpu),
-    pytest.param(('relay', {'target': 'cpu', 'device_id': 0}), id='relay-cpu'),
-    pytest.param(('relay', {'target': 'cuda', 'device_id': 0}),
-                 id='relay-cuda', marks=pytest.mark.gpu),
-    pytest.param(('pytorch', {'device': 'cpu'}), id='pytorch-cpu'),
-    pytest.param(('pytorch', {'device': 'cuda'}), id='pytorch-cuda',
-                 marks=pytest.mark.gpu)])
-def backend_opt(request):
-    name, options = request.param
-    return BackendOption(name, options)
-
-
-class BackendOption:
-    def __init__(self, backend, backend_options):
-        try:
-            self.backend = load_backend(backend, backend_options)
-        except LoadingError as e:
-            pytest.skip(f"Can't load {backend}: {e.__cause__}")
-        self.pip = standard_pipeline.configure({
-            'resources.backend.name': backend,
-            'resources.backend.options': backend_options
-        }).make()
-
-    def convert_args(self, args):
-        return tuple(to_device(arg, self.backend) for arg in args)
-
-
 def parse_compare(*tests, justeq=False):
     """Decorate a function to run it against pure python.
 
