@@ -90,7 +90,7 @@ class MyiaFunctionTest(Partializable):
         return self.runtest(self, fn, **self.spec)
 
     def __call__(self, fn):
-        return mt(self)
+        return mt(self)(fn)
 
 
 class myia_function_test:
