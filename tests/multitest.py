@@ -6,7 +6,7 @@ import pytest
 
 from myia.lib import concretize_abstract, from_value
 from myia.pipeline import standard_debug_pipeline, standard_pipeline
-from myia.utils import Partializable, overload
+from myia.utils import keyword_decorator, merge, overload
 
 from .common import to_abstract_test
 
@@ -41,35 +41,25 @@ def mt(*tests, **kwargs):
     def deco(fn):
         def runtest(test):
             test.run(fn)
-        pytests = [
-            pytest.param(test.configure(**kwargs),
-                         marks=test.marks, id=test.id)
-            for test in tests
-        ]
+        pytests = []
+        for test in tests:
+            test = test.configure(**kwargs)
+            pytests.append(test.make_param())
         runtest = pytest.mark.parametrize('test', pytests)(runtest)
         return runtest
     return deco
 
 
-class MyiaFunctionTest(Partializable):
+class MyiaFunctionTest:
 
-    def __init__(self, runtest, args, kwargs, marks=[], id=None):
-        self.spec = {'args': args, **kwargs}
+    def __init__(self, runtest, spec):
+        self.spec = spec
         self.runtest = runtest
-        self.name = runtest.__qualname__
-        if not isinstance(marks, (list, tuple)):
-            marks = [marks]
-        marks.append(getattr(pytest.mark, self.name))
-        self.marks = marks
-        self.id = id or self.name
 
     def configure(self, **spec):
         return MyiaFunctionTest(
             self.runtest,
-            args=self.spec['args'],
-            kwargs={**self.spec, **spec},
-            marks=self.marks,
-            id=self.id
+            spec={**self.spec, **spec},
         )
 
     def check(self, run, expected):
@@ -96,30 +86,46 @@ class MyiaFunctionTest(Partializable):
                     f'Mismatch: expected {expected}, got {res}'
                 )
 
+    def make_param(self):
+        p = pytest.param(self,
+                         marks=self.spec.get('marks', []),
+                         id=self.spec.get('id', None))
+        return p
+
     def run(self, fn):
-        return self.runtest(self, fn, **self.spec)
+        spec = dict(self.spec)
+        for key in ('marks', 'id'):
+            if key in spec:
+                del spec[key]
+        return self.runtest(self, fn, **spec)
 
     def __call__(self, fn):
         return mt(self)(fn)
 
 
-class myia_function_test:
+class MyiaFunctionTestFactory:
     def __init__(self, runtest, spec={}):
         self.runtest = runtest
         self.spec = spec
 
     def configure(self, **spec):
-        return myia_function_test(self.runtest, {**self.spec, **spec})
+        return MyiaFunctionTestFactory(self.runtest, merge(self.spec, spec))
 
     def xfail(self, *args, **kwargs):
         return self(*args, **kwargs, marks=[pytest.mark.xfail])
 
-    def __call__(self, *args, marks=[], id=None, **kwargs):
-        kwargs = {**self.spec, **kwargs}
-        return MyiaFunctionTest(self.runtest, args, kwargs, marks, id)
+    def __call__(self, *args, **kwargs):
+        kwargs = merge(self.spec, kwargs)
+        kwargs['args'] = args
+        return MyiaFunctionTest(self.runtest, kwargs)
 
 
-@myia_function_test
+@keyword_decorator
+def myia_function_test(fn, **kwargs):
+    return MyiaFunctionTestFactory(fn, kwargs)
+
+
+@myia_function_test(marks=[pytest.mark.infer], id='infer')
 def infer(self, fn, args, result=None, pipeline=infer_pipeline):
     args = [to_abstract_test(arg) for arg in args]
 
@@ -133,7 +139,7 @@ def infer(self, fn, args, result=None, pipeline=infer_pipeline):
     self.check(out, to_abstract_test(result))
 
 
-@myia_function_test
+@myia_function_test(marks=[pytest.mark.run], id='run')
 def run(self, fn, args, result=None, abstract=None,
         validate=True, pipeline=run_pipeline):
 
