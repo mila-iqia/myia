@@ -207,12 +207,6 @@ def to_relay_type(self, a: (VirtualFunction, TypedPrimitive)):
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: PartialApplication):
-    tp = self(a.fn)
-    return relay.ty.FuncType(tp.arg_types[len(a.args):], tp.ret_type)
-
-
-@overload  # noqa: F811
 def to_relay_type(self, a: AbstractTaggedUnion):
     return union_type()
 
@@ -250,9 +244,9 @@ def _placeholder_body(type):
             return empty_union()
         elif type.func == env_type:
             return empty_env()
-        else:
-            raise ValueError(f"Can't build value for union: {type.func}")
-    else:
+        else:  # pragma: no cover
+            raise ValueError(f"Can't build value for adt: {type.func}")
+    else:  # pragma: no cover
         raise ValueError(f"Can't build value of type {type}")
 
 

@@ -5,7 +5,6 @@ import urllib
 import weakref
 
 from ... import abstract, xtype
-from ...utils import TaggedValue
 from ..channel import RPCProcess, handle
 from ..transform import convert_grad
 
@@ -187,34 +186,31 @@ class Converter:
 
     def convert_nil(self, v, t):
         """Convert Nil values."""
-        return None
+        raise NotImplementedError("convert_nil")
 
     def convert_dead(self, v, t):
         """Convert dead values."""
-        return None
+        raise NotImplementedError("convert_dead")
 
     def convert_bool(self, v, t):
         """Convert boolean values."""
-        return v
+        raise NotImplementedError("convert_bool")
 
     def convert_env(self, v, t):
         """Convert a grad env."""
-        assert len(v) == 0
-        return ()
+        raise NotImplementedError("convert_env")
 
     def convert_tuple(self, v, t):
         """Convert a tuple."""
-        return tuple(self(v, t)
-                     for v, t in zip(v, t.elements))
+        raise NotImplementedError("convert_tuple")
 
     def convert_tagged(self, v, t):
         """Convert a union value."""
-        real_t = t.options.get(v.tag)
-        return TaggedValue(v.tag, self(v.value, real_t))
+        raise NotImplementedError("convert_tagged")
 
     def convert_type(self, v, t):
         """Convert a type value."""
-        return None
+        raise NotImplementedError("convert_type")
 
     def __call__(self, v, t):
         """Convert a value."""

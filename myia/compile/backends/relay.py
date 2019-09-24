@@ -75,18 +75,6 @@ SIMPLE_MAP = {
 }
 
 
-def relay_partial(c, fn, *args):
-    """Implementation of partial for Relay."""
-    ty = to_relay_type(fn.abstract)
-    rargs = [relay.var("") for a in ty.arg_types]
-    fn = relay.Function(rargs, relay.Call(c.ref(fn), rargs))
-    binds = {}
-    for ra, a in zip(rargs, args):
-        binds[ra] = c.ref(a)
-    res = relay.bind(fn, binds)
-    return res
-
-
 def relay_distribute(c, array, shape):
     """Implementation of distribute for Relay."""
     assert shape.is_constant(tuple)
@@ -211,7 +199,6 @@ def relay_array_getitem(c, a, start, stop, strides):
 
 
 COMPLEX_MAP = {
-    P.partial: relay_partial,
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
     P.reshape: relay_reshape,
@@ -300,7 +287,7 @@ class RelayConstantConverter(Converter):
         """Set the context."""
         self.context = context
 
-    def convert_array(self, v, t):
+    def convert_array(self, v, t):  # pragma: no cover
         """Make a TVM array from a numpy array."""
         return relay.const(tvm.ndarray.array(v, self.context))
 
@@ -328,7 +315,7 @@ class RelayConstantConverter(Converter):
         return relay.Tuple([self(e, et) for e, et in
                             zip(v, t.elements)])
 
-    def convert_tagged(self, v, t):
+    def convert_tagged(self, v, t):  # pragma: no cover
         real_t = t.options.get(v.tag)
         ctr = get_union_ctr(v.tag, real_t)
         conv_val = self(v.value, real_t)
@@ -468,10 +455,6 @@ class RelayInputConverter(Converter):
         """Convert Nil to Relay."""
         return interpreter.TupleValue()
 
-    def convert_env(self, v, t):
-        assert len(v) == 0
-        return interpreter.ConstructorValue(empty_env.tag, [], None)
-
     def convert_tuple(self, v, t):
         return interpreter.TupleValue(*[self(e, et) for e, et in
                                         zip(v, t.elements)])
@@ -496,11 +479,17 @@ class RelayOutputConverter(Converter):
         return None
 
     def convert_bool(self, v, t):
+        """Convert the value to a boolean."""
         return v.asnumpy().item()
 
     def convert_scalar(self, v, t):
         """Convert the TVM array to a scalar."""
         return v.asnumpy().item()
+
+    def convert_tuple(self, v, t):
+        """Convert the value to a tuple."""
+        return tuple(self(v, t)
+                     for v, t in zip(v, t.elements))
 
     def convert_tagged(self, v, t):
         tag = get_myia_tag(v.constructor)

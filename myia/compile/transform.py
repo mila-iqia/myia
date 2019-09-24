@@ -144,15 +144,11 @@ class CompileGraph:
 
         for node in toposort(graph.return_):
             if self._is_cut(node):
-                if len(split) != 0:
-                    splits.append(split)
                 splits.append(node)
                 split = []
             elif not (node.is_constant() or node.is_parameter()):
-                if self.split_linear:
-                    splits.append([node])
-                else:
-                    split.append(node)
+                assert self.split_linear
+                splits.append([node])
 
         return splits
 
@@ -180,10 +176,6 @@ class CompileGraph:
         assert node not in self.slots
         self.slots[node] = self.height
         self.height += 1
-
-    def tie(self, n1, n2):
-        """Declare two nodes as equivalent."""
-        self.slots[n2] = self.slots[n1]
 
     def ref(self, node):
         """Get the stack reference for the value of a node.
@@ -227,11 +219,6 @@ class CompileGraph:
         for split in splits:
             if isinstance(split, list):
                 run, inputs, outputs = self.lin_convert(split)
-                if run is None:  # empty function
-                    assert len(inputs) == len(outputs)
-                    for i, o in zip(inputs, outputs):
-                        self.tie(i, o)
-                    continue
                 # prime the arguments because self.ref() can invalidate
                 # previously returned references if a new one is not ready
                 for i in inputs:
@@ -298,10 +285,6 @@ class CompileGraph:
                         self.add_instr('unsafe_static_cast',
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]))
-                    elif fn.value == P.scalar_cast:
-                        self.add_instr('scalar_cast',
-                                       self.ref(split.inputs[1]),
-                                       split.inputs[2].value)
                     elif fn.value == P.env_getitem:
                         self.add_instr('env_getitem',
                                        self.ref(split.inputs[1]),

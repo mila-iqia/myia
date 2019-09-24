@@ -409,11 +409,7 @@ class PyTorchBackend(Backend):
         if isinstance(t, abstract.AbstractScalar):
             return self.to_scalar(v)
         elif isinstance(t, abstract.AbstractArray):
-            res = self.to_numpy(v)
-            # Some backends will use 1d instead of 0d for internal reasons.
-            if res.shape != t.values[abstract.SHAPE]:
-                res = res.reshape(t.values[abstract.SHAPE])
-            return res
+            return self.to_numpy(v)
         elif isinstance(t, abstract.AbstractTuple):
             return tuple(self.from_backend_value(ve, te)
                          for ve, te in zip(v, t.elements))

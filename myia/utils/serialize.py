@@ -116,21 +116,11 @@ def _make_construct(cls, dc, sequence, scalar):
             if e.value is not None:
                 loader.add_finalizer(e.value)
     if dc:
-        if cls.__dataclass_params__.frozen:
+        assert cls.__dataclass_params__.frozen
 
-            def _construct(loader, node):  # noqa: F811
-                data = loader.construct_mapping(node)
-                return cls(**data)
-        else:
-            empty_args = dict((k, None)
-                              for k in cls.__dataclass_fields__.keys())
-
-            def _construct(loader, node):  # noqa: F811
-                res = cls(**empty_args)
-                yield res
-                data = loader.construct_mapping(node)
-                for k, v in data.items():
-                    setattr(res, k, v)
+        def _construct(loader, node):  # noqa: F811
+            data = loader.construct_mapping(node)
+            return cls(**data)
     if sequence:
         def _construct(loader, node):  # noqa: F811
             it = cls._construct()
