@@ -2,7 +2,6 @@
 from copy import copy
 from types import FunctionType
 
-import numpy as np
 import pytest
 from pytest import mark
 
@@ -15,12 +14,13 @@ from myia.abstract.data import (
     AbstractScalar,
     AbstractTuple,
 )
-from myia.debug.finite_diff import clean_args
+from myia.debug.finite_diff import NoTestGrad, clean_args
 from myia.frontends import activate_frontend  # noqa: E402
 from myia.frontends.pytorch_abstract_types import PyTorchTensor  # noqa: E402
 from myia.pipeline import standard_pipeline
 
 from ..common import MA, f32, to_abstract_test
+from ..multitest import eqtest
 from ..test_grad import grad_pipeline, grad_wrap
 
 torch = pytest.importorskip("torch")
@@ -37,61 +37,14 @@ fwd_compile_pipeline = standard_pipeline
 # torch.set_printoptions(precision=8)
 
 
-""" # This is for if/when tested with backends besides nnvm later
-def get_backend_options(args, backend):
-    device_type = args.dev
+@eqtest.register
+def eqtest(t1: torch.Tensor, t2, rtol=1e-5, atol=1e-8, **kwargs):
+    return torch.allclose(t1, t2, equal_nan=True, atol=atol, rtol=rtol)
 
-    backend_options_dict = {
-        'pytorch': {'device': device_type},
-        'nnvm': {'target': device_type, 'device_id': 0},
-        'relay': {'target': device_type, 'device_id': 0}
-    }
 
-    backend_options = backend_options_dict[backend]
-
-    return backend_options
-
-# TODO: add relay support
-# TODO: maybe fixture for return_backend=True and return_backend=False
-@pytest.fixture(params=[
-    pytest.param('pytorch'),
-    pytest.param('nnvm')
-])
-def _backend_fixture(request):
-    return request.param
-
-from myia.pipeline import standard_resources
-from myia.pipeline import PipelineDefinition, steps
-from ..test_grad import step_grad_validate
-grad_pipeline = PipelineDefinition(
-    resources=standard_resources,
-    steps=dict(
-        parse=steps.step_parse,
-        resolve=steps.step_resolve,
-        infer=steps.step_infer,
-        specialize=steps.step_specialize,
-        opt=steps.step_debug_opt,
-        validate=step_grad_validate,
-        # compile=steps.step_compile,
-        export=steps.step_debug_export,
-    )
-)
-
-backend = _backend_fixture
-backend_options = get_backend_options(args, backend)
-
-standard_pipeline = \
-standard_pipeline.configure({
-            'resources.backend.name': backend,
-            'resources.backend.options': backend_options,
-        })
-
-grad_pipeline = \
-grad_pipeline.configure({
-            'resources.backend.name': backend,
-            'resources.backend.options': backend_options,
-        })
-#"""
+@eqtest.register
+def eqtest(x1: NoTestGrad, x2, **kwargs):
+    return True
 
 
 def is_tensor_param(x):
@@ -126,74 +79,50 @@ def pt_fn_grads(fn, *args, **kwargs):
             grad_with_NA.append(grads[0])
             del grads[0]
         else:
-            grad_with_NA.append('NA')
+            grad_with_NA.append(NoTestGrad(None))
 
     return tuple(grad_with_NA)
 
 
-APT_loss = AbstractArray(
-    AbstractScalar({TYPE: f32, VALUE: ANYTHING}),
-    {SHAPE: (1,), TYPE: PyTorchTensor}
-)
-APT_0d_loss = AbstractArray(
-    AbstractScalar({TYPE: f32, VALUE: ANYTHING}),
-    {SHAPE: (), TYPE: PyTorchTensor}
-)
-
-
-def _fwd_test(fn, args, broad_specs, pipeline=standard_pipeline,
-              optimize=True, python=True):
-    if python:
-        ref_result = fn(*map(copy, args))
+def make_argspec(args, broad_specs):
     if broad_specs is None:
-        argspec = tuple(from_value(arg, broaden=True)
-                        for arg in clean_args(args))
-    else:
-        argspec = tuple(from_value(arg, broaden=True)
-                        if bs else from_value(arg, broaden=False)
-                        for bs, arg in zip(broad_specs, clean_args(args)))
+        broad_specs = (True,) * len(args)
+    return tuple(from_value(arg, broaden=bs)
+                 for bs, arg in zip(broad_specs, clean_args(args)))
+
+
+def _fwd_test(fn, args, broad_specs, pipeline=standard_pipeline):
+    ref_result = fn(*map(copy, args))
+    argspec = make_argspec(args, broad_specs)
     res = pipeline.run(input=fn, argspec=argspec)
     myia_fn = res['output']
     myia_result = myia_fn(*map(copy, args))
+
+    assert eqtest(ref_result, myia_result)
 
     if not isinstance(ref_result, tuple):
         ref_result = (ref_result,)
     if not isinstance(myia_result, tuple):
         myia_result = (myia_result,)
-
-    ret_shps = ()
-    for _ref_result, _myia_result in zip(ref_result, myia_result):
-        if (type(_ref_result) == torch.Tensor
-                and type(_myia_result) == torch.Tensor):
-            assert torch.allclose(_ref_result, _myia_result, equal_nan=True)
-            assert _ref_result.shape == _myia_result.shape
-            ret_shps = ret_shps + (_myia_result.shape,)
-        else:
-            assert np.isclose(_ref_result, _myia_result)
-            ret_shps = ret_shps + ((),)
-    return ret_shps
+    return [getattr(res, 'shape', ()) for res in myia_result]
 
 
 def _grad_test(fn, obj, args,
                sens_type,
                broad_specs,
-               pipeline=grad_pipeline,
-               rel_error=1e-3):
+               pipeline=grad_pipeline):
 
     pytorch_grads = pt_fn_grads(fn, *args)
 
     sens_type_shape = sens_type
-    sens1 = ()
+    sens1 = []
     for s in sens_type:
-        if s == ():
-            sens1 += (APT_0d_loss,)
-        elif s == (1,):
-            sens1 += (APT_loss,)
-        else:
-            sens1 += (AbstractArray(
+        sens1.append(
+            AbstractArray(
                 AbstractScalar({TYPE: f32, VALUE: ANYTHING}),
-                {SHAPE: tuple(s), TYPE: PyTorchTensor}),
+                {SHAPE: tuple(s), TYPE: PyTorchTensor}
             )
+        )
     if len(sens1) == 1:
         sens_type = sens1[0]
     else:
@@ -201,13 +130,7 @@ def _grad_test(fn, obj, args,
 
     pipeline = standard_pipeline
     pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
-    if broad_specs is None:
-        argspec = tuple(from_value(arg, broaden=True)
-                        for arg in clean_args(args))
-    else:
-        argspec = tuple(from_value(arg, broaden=True)
-                        if bs else from_value(arg, broaden=False)
-                        for bs, arg in zip(broad_specs, clean_args(args)))
+    argspec = make_argspec(args, broad_specs)
     sens_type = to_abstract_test(sens_type)
     if isinstance(obj, FunctionType):
         res = pipeline.run(input=obj, argspec=[*argspec, sens_type])
@@ -215,26 +138,15 @@ def _grad_test(fn, obj, args,
         pip = pipeline.configure(parse=False)
         res = pip.run(graph=obj, argspec=[*argspec, sens_type])
 
-    sens = ()
-    for s in sens_type_shape:
-        if s == ():
-            sens += (torch.Tensor([1.0]).reshape(()),)
-        elif s == (1,):
-            sens += (torch.Tensor([1.0]),)
-        else:
-            sens += (torch.ones(s),)
+    sens = tuple(torch.ones(s) for s in sens_type_shape)
     if len(sens) == 1:
         sens = sens[0]
 
     myia_grads = res['output'](*args, sens)
-
-    for pt_g, my_g in zip(pytorch_grads, myia_grads):
-        if not isinstance(pt_g, str):
-            assert torch.allclose(
-                pt_g, my_g, rtol=1e-05, atol=1e-06, equal_nan=True)
+    assert eqtest(pytorch_grads, myia_grads, rtol=1e-05, atol=1e-06)
 
 
-def compare_fwd(*tests, broad_specs=None, optimize=True, python=True):
+def compare_fwd(*tests, broad_specs=None):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -247,18 +159,12 @@ def compare_fwd(*tests, broad_specs=None, optimize=True, python=True):
         tests: One or more inputs tuple.
 
     """
-    fwd_pipeline = fwd_compile_pipeline if optimize else \
-        fwd_compile_pipeline.configure({'opt.phases.main': []})
-
     def decorate(fn):
         def test(args):
             if not isinstance(args, tuple):
                 args = (args,)
 
-            _fwd_test(fn, args, broad_specs,
-                      pipeline=fwd_pipeline,
-                      optimize=optimize,
-                      python=python)
+            _fwd_test(fn, args, broad_specs, pipeline=fwd_compile_pipeline)
 
         m = mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
@@ -266,8 +172,7 @@ def compare_fwd(*tests, broad_specs=None, optimize=True, python=True):
     return decorate
 
 
-def compare_bwd(*tests, sens_type=None, pipeline=grad_pipeline,
-                rel_error=1e-3):
+def compare_bwd(*tests, sens_type=None, pipeline=grad_pipeline):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -284,8 +189,7 @@ def compare_bwd(*tests, sens_type=None, pipeline=grad_pipeline,
             if not isinstance(args, tuple):
                 args = (args,)
 
-            _grad_test(fn, fn, args, pipeline=pipeline, rel_error=rel_error,
-                       sens_type=sens_type)
+            _grad_test(fn, fn, args, pipeline=pipeline, sens_type=sens_type)
 
         m = pytest.mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
@@ -293,9 +197,8 @@ def compare_bwd(*tests, sens_type=None, pipeline=grad_pipeline,
     return decorate
 
 
-def compare_fwd_and_bwd(*tests, broad_specs=None, optimize=True, python=True,
-                        sens_type=None, pipeline=grad_pipeline,
-                        rel_error=1e-3):
+def compare_fwd_and_bwd(*tests, broad_specs=None,
+                        sens_type=None, pipeline=grad_pipeline):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -306,20 +209,14 @@ def compare_fwd_and_bwd(*tests, broad_specs=None, optimize=True, python=True,
         tests: One or more inputs tuple.
 
     """
-
-    fwd_pipeline = fwd_compile_pipeline if optimize else \
-        fwd_compile_pipeline.configure({'opt.phases.main': []})
-
     def decorate(fn):
         def test(args):
             if not isinstance(args, tuple):
                 args = (args,)
             out_shape = _fwd_test(fn, args, broad_specs=broad_specs,
-                                  pipeline=fwd_pipeline,
-                                  optimize=optimize, python=python)
+                                  pipeline=fwd_compile_pipeline)
             _grad_test(fn, fn, args, broad_specs=broad_specs,
-                       pipeline=pipeline, rel_error=rel_error,
-                       sens_type=out_shape)
+                       pipeline=pipeline, sens_type=out_shape)
 
         m = pytest.mark.parametrize('args', list(tests))(test)
         m.__orig__ = fn
@@ -645,14 +542,6 @@ def test_torch_tensor_set(x, y):
                      broad_specs=(True, False))
 def test_torch_softmax(x, y):
     return torch.softmax(x, y)
-
-
-@compare_fwd_and_bwd((nn.Parameter(torch.Tensor(MA(2, 3))), 0),
-                     (nn.Parameter(torch.Tensor(MA(2, 3))), 1),
-                     (nn.Parameter(torch.Tensor(MA(2, 3))), -1),
-                     broad_specs=(True, False))
-def test_torch_functional_softmax(x, y):
-    return torch.nn.functional.softmax(x, y)
 
 
 @compare_fwd_and_bwd((nn.Parameter(torch.Tensor(MA(1, 2))), -1),
