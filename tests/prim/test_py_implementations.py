@@ -46,142 +46,231 @@ from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.utils import assert_scalar, newenv
 
 from ..common import AA, f16, i64, to_abstract_test
-from ..test_lang import parse_compare
+from ..multitest import mt, run_debug
+from ..test_lang import run_lang
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_add(x, y):
     return x + y
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_sub(x, y):
     return x - y
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_mul(x, y):
     return x * y
 
 
-@parse_compare((2.0, 7.0), (4.0, -6.0), (-11, 2),
-               pipeline=standard_debug_pipeline)
+@mt(
+    run_debug(2.0, 7.0),
+    run_debug(4.0, -6.0),
+    run_debug(-11, 2),
+)
 def test_prim_truediv(x, y):
     return x / y
 
 
-@parse_compare((2, 7), (4, -6), (-11, 2), (-11.0, 2.0), (0, -1),
-               pipeline=standard_debug_pipeline)
+@mt(
+    run_debug(2, 7),
+    run_debug(4, -6),
+    run_debug(-11, 2),
+    run_debug(-11.0, 2.0),
+    run_debug(0, -1),
+)
 def test_prim_floordiv(x, y):
     return x // y
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_mod(x, y):
     return x % y
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_pow(x, y):
     return x ** y
 
 
-@parse_compare(-2, 2.3, -0.6, pipeline=scalar_debug_pipeline)
+@mt(
+    run_debug(-2),
+    run_debug(2.3),
+    run_debug(-0.6),
+)
 def test_prim_floor(x):
     return math.floor(x)
 
 
-@parse_compare((2, 7), (4, -6.0), (0, -1), (-3.2, 0.0))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6.0),
+    run_lang(0, -1),
+    run_lang(-3.2, 0.0),
+)
 def test_prim_max(x, y):
     return scalar_max(x, y)
 
 
-@parse_compare(-2, 2.3, -0.6)
+@mt(
+    run_lang(-2),
+    run_lang(2.3),
+    run_lang(-0.6),
+)
 def test_prim_trunc(x):
     return math_trunc(x)
 
 
-@parse_compare(2, -6)
+@mt(
+    run_lang(2),
+    run_lang(-6),
+)
 def test_prim_uadd(x):
     return +x
 
 
-@parse_compare(2, -6)
+@mt(
+    run_lang(2),
+    run_lang(-6),
+)
 def test_prim_usub(x):
     return -x
 
 
-@parse_compare(13, 0, -3)
+@mt(
+    run_lang(13),
+    run_lang(0),
+    run_lang(-3),
+)
 def test_prim_exp(x):
     return math_exp(x)
 
 
-@parse_compare(13, 1)
+@mt(
+    run_lang(13),
+    run_lang(1),
+)
 def test_prim_log(x):
     return math_log(x)
 
 
-@parse_compare(13, -3)
+@mt(
+    run_lang(13),
+    run_lang(-3),
+)
 def test_prim_sin(x):
     return math_sin(x)
 
 
-@parse_compare(13, -3)
+@mt(
+    run_lang(13),
+    run_lang(-3),
+)
 def test_prim_cos(x):
     return math_cos(x)
 
 
-@parse_compare(13, -3)
+@mt(
+    run_lang(13),
+    run_lang(-3),
+)
 def test_prim_tan(x):
     return math_tan(x)
 
 
-@parse_compare(-0.1, 0.3)
+@mt(
+    run_lang(-0.1),
+    run_lang(0.3),
+)
 def test_prim_tanh(x):
     return math_tanh(x)
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_eq(x, y):
     return x == y
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_lt(x, y):
     return x < y
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_gt(x, y):
     return x > y
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_ne(x, y):
     return x != y
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_le(x, y):
     return x <= y
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_ge(x, y):
     return x >= y
 
 
-@parse_compare((True,), (False,))
+@mt(
+    run_lang(True),
+    run_lang(False),
+)
 def test_prim_not_(x):
     return not x
 
 
-@parse_compare((2, 7), (4, -6))
+@mt(
+    run_lang(2, 7),
+    run_lang(4, -6),
+)
 def test_prim_tuple(x, y):
     return x, y
 
 
-@parse_compare(((1, 2, 3), 0), ((4, -6, 7), 2))
+@mt(
+    run_lang((1, 2, 3), 0),
+    run_lang((4, -6, 7), 2),
+)
 def test_prim_tuple_getitem(data, item):
     return tuple_getitem(data, item)
 
@@ -303,7 +392,7 @@ def test_prim_dot():
     assert (res == ref).all()
 
 
-@parse_compare((40,),)
+@run_lang(40)
 def test_prim_partial(x):
     def f(a, b):
         return a + b

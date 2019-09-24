@@ -6,15 +6,22 @@ from myia.pipeline import (
     standard_debug_pipeline,
 )
 
-from .test_lang import parse_compare
+from .multitest import mt
+from .test_lang import run_debug
 
 
-@parse_compare((2, 3), (2.0, 3.0), pipeline=standard_debug_pipeline)
+@mt(
+    run_debug(2, 3),
+    run_debug(2.0, 3.0),
+)
 def test_vm_floordiv(x, y):
     return x // y
 
 
-@parse_compare((2, 3), (2.0, 3.0), pipeline=standard_debug_pipeline)
+@mt(
+    run_debug(2, 3),
+    run_debug(2.0, 3.0),
+)
 def test_vm_truediv(x, y):
     return x / y
 

@@ -37,12 +37,13 @@ run_pipeline = standard_pipeline
 run_debug_pipeline = standard_debug_pipeline
 
 
-def mt(*tests):
+def mt(*tests, **kwargs):
     def deco(fn):
         def runtest(test):
             test.run(fn)
         pytests = [
-            pytest.param(test, marks=test.marks, id=test.id)
+            pytest.param(test.configure(**kwargs),
+                         marks=test.marks, id=test.id)
             for test in tests
         ]
         runtest = pytest.mark.parametrize('test', pytests)(runtest)
@@ -61,6 +62,15 @@ class MyiaFunctionTest(Partializable):
         marks.append(getattr(pytest.mark, self.name))
         self.marks = marks
         self.id = id or self.name
+
+    def configure(self, **spec):
+        return MyiaFunctionTest(
+            self.runtest,
+            args=self.spec['args'],
+            kwargs={**self.spec, **spec},
+            marks=self.marks,
+            id=self.id
+        )
 
     def check(self, run, expected):
         if isinstance(expected, type) and issubclass(expected, Exception):

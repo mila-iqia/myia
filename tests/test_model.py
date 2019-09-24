@@ -12,8 +12,7 @@ from myia.utils import InferenceError
 from myia.xtype import Array
 
 from .common import MA, MB, MC, MD, af32_of, af64_of
-from .multitest import mt
-from .test_compile import parse_compare
+from .multitest import mt, run
 from .test_grad import grad_test
 from .test_infer import infer_standard
 
@@ -99,13 +98,10 @@ def cost(model, x, y):
                    result=af32_of(3, 8)),
     infer_standard(make_model(), MC(3, 9),
                    result=InferenceError),
+
+    run(make_model(), MC(3, 6)),
 )
-def test_forward_infer(model, x):
-    return model.apply(x)
-
-
-@parse_compare((make_model(), MC(3, 6)))
-def test_forward_specialize(model, x):
+def test_forward(model, x):
     return model.apply(x)
 
 
