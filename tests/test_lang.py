@@ -1,18 +1,19 @@
 
-from copy import copy
-
 from pytest import mark
 
-from myia.abstract import from_value
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 
 from .common import Point, mysum
+from .multitest import mt, run
 
 lang_pipeline = scalar_debug_pipeline \
     .select('resources', 'parse', 'resolve', 'export')
 
 
-def parse_compare(*tests, pipeline=lang_pipeline):
+run_lang = run.configure(result=None, pipeline=lang_pipeline)
+
+
+def parse_compare(*entries, pipeline=lang_pipeline):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -23,21 +24,13 @@ def parse_compare(*tests, pipeline=lang_pipeline):
         tests: One or more inputs tuple.
 
     """
-
-    def decorate(fn):
-        def test(args):
-            if not isinstance(args, tuple):
-                args = (args,)
-            py_result = fn(*map(copy, args))
-            argspec = tuple(from_value(arg, broaden=True) for arg in args)
-            myia_fn = pipeline.run(input=fn, argspec=argspec)['output']
-            myia_result = myia_fn(*map(copy, args))
-            assert py_result == myia_result
-
-        m = mark.parametrize('args', list(tests))(test)
-        m.__orig__ = fn
-        return m
-    return decorate
+    mtentries = []
+    for args in entries:
+        if not isinstance(args, tuple):
+            args = (args,)
+        mtentry = run_lang(*args, pipeline=pipeline)
+        mtentries.append(mtentry)
+    return mt(*mtentries)
 
 
 #############

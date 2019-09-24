@@ -54,6 +54,7 @@ from .common import (
     to_abstract_test,
     u64,
 )
+from .multitest import mt, myia_function_test
 
 
 @dataclass
@@ -145,21 +146,6 @@ def test_GradTester_outtup():
     gtest.assert_match()
 
 
-prim_tests = {
-    P.scalar_add: [(-7.1, 4.3)],
-    P.scalar_sub: [(-7.1, 4.3)],
-    P.scalar_mul: [(-7.1, 4.3)],
-    P.scalar_div: [(-7.1, 4.3)],
-    P.scalar_pow: [(7.1, 4.3), (5.3, -1.2)],
-    P.scalar_uadd: [(-7.1,)],
-    P.scalar_usub: [(-7.1,)],
-    # P.scalar_gt: [(-7.1, 4.3)],
-    # P.scalar_lt: [(-7.1, 4.3)],
-    # P.scalar_ge: [(-7.1, 4.3)],
-    # P.scalar_le: [(-7.1, 4.3)],
-}
-
-
 def _grad_test(fn, obj, args,
                sens_type=f64,
                pipeline=grad_pipeline,
@@ -188,41 +174,49 @@ def _grad_test(fn, obj, args,
     gtest.assert_match()
 
 
-@pytest.mark.parametrize('prim,cases', prim_tests.items())
-def test_prim_grads(prim, cases):
-    for case in cases:
-        _grad_test(pyi[prim], prim, case)
+@myia_function_test
+def gradient(self, fn, args, argspec=None,
+             rel_error=1e-3, pipeline=grad_pipeline):
+    _grad_test(fn, fn, args,
+               pipeline=pipeline,
+               rel_error=rel_error,
+               argspec=argspec)
 
 
 def grad_test(*tests,
               pipeline=grad_pipeline,
               rel_error=1e-3,
               argspec=None):
-    """Decorate a function to parse and run it against pure Python.
+    """Tests the gradient of a function."""
+    mtentries = []
+    for args in tests:
+        if not isinstance(args, tuple):
+            args = (args,)
+        mtentry = gradient(*args, pipeline=pipeline,
+                           rel_error=rel_error, argspec=argspec)
+        mtentries.append(mtentry)
+    return mt(*mtentries)
 
-    Returns a unit test that will parse the function, and then for
-    each `inputs` tuple in `tests` it will check that the pure Python,
-    undecorated function returns that same output.
 
-    Arguments:
-        tests: One or more inputs tuple.
+prim_tests = {
+    P.scalar_add: [(-7.1, 4.3)],
+    P.scalar_sub: [(-7.1, 4.3)],
+    P.scalar_mul: [(-7.1, 4.3)],
+    P.scalar_div: [(-7.1, 4.3)],
+    P.scalar_pow: [(7.1, 4.3), (5.3, -1.2)],
+    P.scalar_uadd: [(-7.1,)],
+    P.scalar_usub: [(-7.1,)],
+    # P.scalar_gt: [(-7.1, 4.3)],
+    # P.scalar_lt: [(-7.1, 4.3)],
+    # P.scalar_ge: [(-7.1, 4.3)],
+    # P.scalar_le: [(-7.1, 4.3)],
+}
 
-    """
 
-    def decorate(fn):
-        def test(args):
-            if not isinstance(args, tuple):
-                args = (args,)
-
-            _grad_test(fn, fn, args,
-                       pipeline=pipeline,
-                       rel_error=rel_error,
-                       argspec=argspec)
-
-        m = pytest.mark.parametrize('args', list(tests))(test)
-        m.__orig__ = fn
-        return m
-    return decorate
+@pytest.mark.parametrize('prim,cases', prim_tests.items())
+def test_prim_grads(prim, cases):
+    for case in cases:
+        _grad_test(pyi[prim], prim, case)
 
 
 @grad_test((13.0, 14.0))

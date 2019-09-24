@@ -2,9 +2,6 @@
 import numpy as np
 from pytest import mark
 
-from myia.abstract import from_value
-from myia.debug.label import short_labeler as lbl
-from myia.debug.traceback import print_inference_error
 from myia.hypermap import hyper_map
 from myia.operations import (
     array_map,
@@ -19,8 +16,6 @@ from myia.operations import (
     tagged,
 )
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
-from myia.utils import InferenceError, overload
-from myia.validate import ValidationError
 
 from .common import (
     Point,
@@ -32,8 +27,8 @@ from .common import (
     mysum,
     reducetree,
     sumtree,
-    to_abstract_test,
 )
+from .multitest import mt, run
 
 specialize_pipeline = scalar_debug_pipeline \
     .select('resources', 'parse', 'infer', 'specialize', 'simplify_types',
@@ -48,76 +43,24 @@ specialize_pipeline_std = standard_debug_pipeline \
             'opt', 'opt2', 'validate', 'export', 'wrap')
 
 
-@overload
-def _eq(t1: tuple, t2):
-    return (isinstance(t2, tuple)
-            and all(_eq(x1, x2) for x1, x2 in zip(t1, t2)))
-
-
-@overload  # noqa: F811
-def _eq(a1: np.ndarray, a2):
-    return (a1 == a2).all()
-
-
-@overload  # noqa: F811
-def _eq(x: object, y):
-    return x == y
-
-
 def specializer_decorator(pipeline):
-    def specialize(*arglists, abstract=None, validate=True):
-
-        def decorate(fn):
-            def run_test(args):
-                if isinstance(args, Exception):
-                    exc = type(args)
-                    args = args.args
-                else:
-                    exc = None
-                pdef = pipeline
-                if not validate:
-                    pdef = pdef.configure(validate=False)
-                pip = pdef.make()
-                if abstract is None:
-                    argspec = tuple(from_value(arg, broaden=True)
-                                    for arg in args)
-                else:
-                    argspec = tuple(to_abstract_test(a) for a in abstract)
-
-                if exc is not None:
-                    try:
-                        mfn = pip(input=fn, argspec=argspec)
-                        mfn['output'](*args)
-                    except exc:
-                        pass
-                    return
-
-                result_py = fn(*args)
-
-                try:
-                    res = pip(input=fn, argspec=argspec)
-                except InferenceError as ierr:
-                    print_inference_error(ierr)
-                    raise ierr
-                except ValidationError as verr:
-                    print('Collected the following errors:')
-                    for err in verr.errors:
-                        n = err.node
-                        nlbl = lbl.label(n)
-                        tname = type(n).__name__
-                        print(f'   {nlbl} ({tname}) :: {n.abstract}')
-                        print(f'      {err.args[0]}')
-                    raise verr
-
-                result_final = res['output'](*args)
-                assert _eq(result_py, result_final)
-
-            m = mark.parametrize('args', arglists)(run_test)
-            m.__orig__ = fn
-            return m
-
-        return decorate
-    return specialize
+    def deco(*entries, abstract=None, validate=True):
+        mtentries = []
+        for args in entries:
+            if isinstance(args, Exception):
+                result = type(args)
+                args = args.args
+            else:
+                result = None
+            mtentry = run(
+                *args, result=result,
+                abstract=abstract,
+                validate=validate,
+                pipeline=pipeline
+            )
+            mtentries.append(mtentry)
+        return mt(*mtentries)
+    return deco
 
 
 specialize = specializer_decorator(specialize_pipeline)
@@ -196,8 +139,7 @@ def test_polymorphic_closure(x, y):
 
 
 @specialize((True, int1, int2),
-            # (True, fp1, int1)  # TODO: mark this one as xfail
-            )
+            (True, fp1, int1))
 def test_switch_fn(c, x, y):
     def dee(y):
         return y * y

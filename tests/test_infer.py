@@ -13,7 +13,6 @@ from myia.abstract import (
     CONTEXTLESS,
     Contextless,
     UniformPrimitiveInferrer,
-    concretize_abstract,
     from_value,
 )
 from myia.hypermap import HyperMap, hyper_map
@@ -22,7 +21,6 @@ from myia.operations import (
     J,
     Jinv,
     Operation,
-    Primitive,
     array_cast,
     array_map,
     array_reduce,
@@ -62,6 +60,7 @@ from myia.operations import (
     user_switch,
     zeros_like,
 )
+from myia.operations.utils import InferencePrimitive
 from myia.pipeline import scalar_pipeline, standard_pipeline
 from myia.utils import InferenceError, MyiaTypeError, newenv
 from myia.xtype import (
@@ -111,6 +110,7 @@ from .common import (
     mysum,
     to_abstract_test,
 )
+from .multitest import infer as mt_infer, mt
 
 ai64 = Array[i64]
 af64 = Array[f64]
@@ -121,14 +121,15 @@ af64 = Array[f64]
 ########################
 
 
-pyimpl_test = {}
 abstract_inferrer_cons_test = {}
 
 
 def _test_op(fn):
-    prim = Primitive(fn.__name__)
+    prim = InferencePrimitive(fn.__name__)
     xinf = UniformPrimitiveInferrer.partial(prim=prim, impl=fn)
-    abstract_inferrer_cons_test[prim] = xinf
+    prim.set_defaults({
+        'inferrer_constructor': xinf
+    })
     return prim
 
 
@@ -144,68 +145,22 @@ def _to_i64(x: Number) -> Int[64]:
 
 infer_pipeline = scalar_pipeline.select(
     'resources', 'parse', 'infer'
-).configure({
-    'resources.py_implementations': pyimpl_test,
-    'resources.inferrer.constructors': abstract_inferrer_cons_test,
-})
-
+)
 
 infer_pipeline_std = standard_pipeline.select(
     'resources', 'parse', 'infer'
-).configure({
-    'resources.py_implementations': pyimpl_test,
-    'resources.inferrer.constructors': abstract_inferrer_cons_test,
-})
-
-
-def _is_exc_type(cls):
-    return isinstance(cls, type) and issubclass(cls, Exception)
+)
 
 
 def inferrer_decorator(pipeline):
-    def infer(*tests):
-
-        tests = [[to_abstract_test(x) for x in test] for test in tests]
-
-        def decorate(fn):
-            def run_test(spec):
-                *args, expected_out = spec
-
-                print('Args:')
-                print(args)
-
-                def out():
-                    pip = pipeline.make()
-                    res = pip(input=fn, argspec=args)
-                    rval = res['outspec']
-
-                    print('Output of inferrer:')
-                    rval = concretize_abstract(rval)
-                    print(rval)
-                    return rval
-
-                print('Expected:')
-                print(expected_out)
-
-                if _is_exc_type(expected_out):
-                    try:
-                        out()
-                    except expected_out:
-                        pass
-                    else:
-                        raise Exception(
-                            f'Expected {expected_out}, got: (see stdout).'
-                        )
-                else:
-                    assert out() == expected_out
-
-            m = pytest.mark.parametrize('spec', list(tests))(run_test)
-            m.__orig__ = fn
-            return m
-
-        return decorate
-
-    return infer
+    def deco(*entries):
+        mtentries = []
+        for entry in entries:
+            *args, result = entry
+            mtentry = mt_infer(*args, result=result, pipeline=pipeline)
+            mtentries.append(mtentry)
+        return mt(*mtentries)
+    return deco
 
 
 infer = inferrer_decorator(infer_pipeline)

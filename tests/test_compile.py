@@ -1,7 +1,3 @@
-from copy import copy
-
-import numpy as np
-from pytest import mark
 
 from myia.abstract import from_value
 from myia.operations import (
@@ -16,11 +12,12 @@ from myia.operations import (
 from myia.pipeline import standard_pipeline
 
 from .common import MA, MB, Point, make_tree, sumtree
+from .multitest import mt, run
 
 compile_pipeline = standard_pipeline
 
 
-def parse_compare(*tests, optimize=True, python=True, justeq=False):
+def parse_compare(*entries, optimize=True):
     """Decorate a function to parse and run it against pure Python.
 
     Returns a unit test that will parse the function, and then for
@@ -36,26 +33,13 @@ def parse_compare(*tests, optimize=True, python=True, justeq=False):
     pipeline = compile_pipeline if optimize else \
         compile_pipeline.configure({'opt.phases.main': []})
 
-    def decorate(fn):
-        def test(args):
-            if not isinstance(args, tuple):
-                args = (args,)
-            if python:
-                ref_result = fn(*map(copy, args))
-            argspec = tuple(from_value(arg, broaden=True) for arg in args)
-            res = pipeline.run(input=fn, argspec=argspec)
-            myia_fn = res['output']
-            myia_result = myia_fn(*map(copy, args))
-            if python:
-                if justeq:
-                    assert ref_result == myia_result
-                else:
-                    np.testing.assert_allclose(ref_result, myia_result)
-
-        m = mark.parametrize('args', list(tests))(test)
-        m.__orig__ = fn
-        return m
-    return decorate
+    mtentries = []
+    for args in entries:
+        if not isinstance(args, tuple):
+            args = (args,)
+        mtentry = run(*args, result=None, pipeline=pipeline)
+        mtentries.append(mtentry)
+    return mt(*mtentries)
 
 
 @parse_compare((2, 3))
@@ -73,7 +57,7 @@ def test_bool_and(x, y):
     return bool_and(x, y)
 
 
-@parse_compare((22,), (3.0,), justeq=True)
+@parse_compare((22,), (3.0,))
 def test_dict(v):
     return {'x': v}
 
@@ -193,7 +177,6 @@ def test_sumtree(t):
     (1, 1.7, Point(3, 4), (8, 9)),
     (0, 1.7, Point(3, 4), (8, 9)),
     (-1, 1.7, Point(3, 4), (8, 9)),
-    justeq=True
 )
 def test_tagged(c, x, y, z):
     if c > 0:
@@ -218,7 +201,7 @@ def test_string_ne(s, x):
     return x
 
 
-@parse_compare(('hey',), justeq=True)
+@parse_compare(('hey',))
 def test_string_return(s):
     return s
 
