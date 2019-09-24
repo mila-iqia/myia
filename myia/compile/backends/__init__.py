@@ -189,7 +189,7 @@ class Converter:
         """Convert Nil values."""
         return None
 
-    def covnert_dead(self, v, t):
+    def convert_dead(self, v, t):
         """Convert dead values."""
         return None
 
