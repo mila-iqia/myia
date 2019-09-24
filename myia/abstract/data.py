@@ -183,7 +183,6 @@ class MacroFunction(Function):
     macro: 'Macro'
 
 
-@serializable('PartialApplication')
 @dataclass(eq=False)
 class PartialApplication(Function):
     """Represents a partial application.
