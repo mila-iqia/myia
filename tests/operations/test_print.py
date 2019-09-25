@@ -1,6 +1,6 @@
 
 from myia.operations import ioprint, print as myia_print
-from myia.lib import IOState, new_universe
+from myia.lib import new_universe
 from myia.operations.op_print import print_handle
 from myia.xtype import UniverseType
 
@@ -32,7 +32,7 @@ def _test_print_check(args, res):
     infer(UniverseType, i64, i64, result=(UniverseType, None)),
     infer(UniverseType, i64, i64, f64, result=(UniverseType, None)),
 
-    run_debug(new_universe, 66, 89, 41.5, result_check=_test_print_check)
+    run_debug(new_universe, 66, 89, 41.5, result=_test_print_check)
 )
 def test_print(U, *entries):
     return myia_print(U, *entries)

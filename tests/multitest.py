@@ -93,7 +93,7 @@ class MyiaFunctionTest:
             spec={**self.spec, **spec},
         )
 
-    def check(self, run, expected):
+    def check(self, run, args, expected):
         """Check the result of run() against expected.
 
         Expected can be either:
@@ -108,16 +108,16 @@ class MyiaFunctionTest:
             expected = type(expected)
         if isinstance(expected, type) and issubclass(expected, Exception):
             try:
-                res = run()
+                res = run(args)
             except expected as err:
                 if message is not None and message not in err.args[0]:
                     raise
             else:
                 raise
         else:
-            res = run()
+            res = run(args)
             if isinstance(expected, FunctionType):
-                if not expected(res):
+                if not expected(args, res):
                     raise Exception(
                         f'Failed the result check function'
                     )
@@ -219,14 +219,14 @@ def infer(self, fn, args, result=None, pipeline=infer_pipeline):
     """
     args = [to_abstract_test(arg) for arg in args]
 
-    def out():
+    def out(args):
         pip = pipeline.make()
         res = pip(input=fn, argspec=args)
         rval = res['outspec']
         rval = concretize_abstract(rval)
         return rval
 
-    self.check(out, to_abstract_test(result))
+    self.check(out, args, to_abstract_test(result))
 
 
 @myia_function_test(marks=[pytest.mark.run], id='run')
@@ -268,7 +268,7 @@ def _run(self, fn, args, result=None, abstract=None, broad_specs=None,
     if not validate:
         pipeline = pipeline.configure(validate=False)
 
-    def out():
+    def out(args):
         pip = pipeline.make()
         mfn = pip(input=fn, argspec=argspec)
         rval = mfn['output'](*args)
@@ -277,7 +277,7 @@ def _run(self, fn, args, result=None, abstract=None, broad_specs=None,
     if result is None:
         result = fn(*args)
 
-    self.check(out, result)
+    self.check(out, args, result)
 
 
 backend_all = Multiple(

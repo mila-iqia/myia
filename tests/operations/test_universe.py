@@ -34,7 +34,7 @@ def test_universe_setitem(U, h, v):
     return universe_setitem(U, h, v)
 
 
-def _chk(args, U):
+def _test_universe_chk(args, U):
     U0, h, x, y = args
     assert U.get(h) == h.state * (x + y)
     return True
@@ -45,7 +45,7 @@ def _chk(args, U):
     infer(UniverseType, H(i64), f64, f64, result=InferenceError),
 
     run_debug(new_universe, HandleInstance(2), 3, 4,
-              result_check=_chk),
+              result=_test_universe_chk),
 )
 def test_universe(U, h, x, y):
     init = universe_getitem(U, h)
