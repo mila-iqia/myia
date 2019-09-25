@@ -1,45 +1,30 @@
 """Algorithms for inference."""
 
 import asyncio
-import typing
-from dataclasses import is_dataclass, replace as dc_replace
+from dataclasses import replace as dc_replace
 from functools import reduce
 
-import numpy as np
-
 from .. import operations, xtype
-from ..classes import ADT
 from ..info import About
-from ..ir import Graph, MetaGraph
-from ..operations import Primitive, primitives as P
+from ..ir import Graph
+from ..operations import primitives as P
 from ..utils import (
     InferenceError,
     InternalInferenceError,
     MyiaTypeError,
     Overload,
     Partializable,
-    SymbolicKeyInstance,
-    dataclass_fields,
     infer_trace,
-    is_dataclass_type,
-    overload,
     tracer,
     type_error_nargs,
 )
 from .data import (
-    ALIASID,
     ANYTHING,
     DATA,
-    SHAPE,
     TYPE,
     VALUE,
-    AbstractADT,
-    AbstractArray,
-    AbstractClass,
     AbstractClassBase,
-    AbstractDict,
     AbstractError,
-    AbstractExternal,
     AbstractFunction,
     AbstractJTagged,
     AbstractKeywordArgument,
@@ -48,7 +33,6 @@ from .data import (
     AbstractType,
     AbstractValue,
     DummyFunction,
-    Function,
     GraphFunction,
     JTransformedFunction,
     MacroFunction,
@@ -57,20 +41,17 @@ from .data import (
     PrimitiveFunction,
     TypedPrimitive,
     VirtualFunction,
-    empty,
-    listof,
 )
 from .loop import InferenceLoop, Pending, force_pending
-from .macro import AnnotationBasedChecker, Macro
+from .macro import AnnotationBasedChecker
 from .ref import Context, EvaluationCache, Reference, VirtualReference
+from .to_abstract import to_abstract
 from .utils import (
     amerge,
     bind,
     broaden as _broaden,
     concretize_abstract,
-    normalize_adt,
     sensitivity_transform,
-    type_to_abstract,
 )
 
 
@@ -410,185 +391,6 @@ class InferenceEngine:
         immediately.
         """
         return await force_pending(self.check(predicate, *values))
-
-
-_number_types = [
-    xtype.Int[8], xtype.Int[16], xtype.Int[32], xtype.Int[64],
-    xtype.UInt[8], xtype.UInt[16], xtype.UInt[32], xtype.UInt[64],
-    xtype.Float[16], xtype.Float[32], xtype.Float[64],
-]
-
-
-def from_value(v, broaden=False, **kwargs):
-    """Convert a value to an abstract value.
-
-    Arguments:
-        v: The value to convert.
-        broaden: If True, concrete values will be made more abstract, so e.g.
-            the value 1234 would become ANYTHING.
-    """
-    a = to_abstract(v, **kwargs)
-    if broaden:
-        a = _broaden(a)
-    return a
-
-
-@overload.wrapper(bootstrap=True)
-def to_abstract(fn, self, v, **kwargs):
-    """Translate the value to an abstract value.
-
-    Arguments:
-        v: The value to convert.
-        context: The context in which the value was found, used if the value
-            is a Graph.
-        node: The node for the Constant we are converting, if there is one,
-            so that we can generate a tracking_id.
-        loop: The InferenceLoop, or None. If not None, scalars ints or floats
-            will be given a Pending type so that it can adapt to the types of
-            the variables they interact with.
-    """
-    if fn is not None:
-        rval = fn(self, v, **kwargs)
-
-    elif is_dataclass_type(v):
-        return AbstractType(type_to_abstract(v))
-
-    elif is_dataclass(v):
-        assert not isinstance(v, Function)
-        new_args = {}
-        for name, value in dataclass_fields(v).items():
-            new_args[name] = self(value, **kwargs)
-        rval = AbstractClass(type(v), new_args)
-
-    elif isinstance(v, xtype.TypeMeta):
-        rval = AbstractType(v)
-
-    else:
-        try:
-            typ = xtype.pytype_to_myiatype(type(v))
-        except KeyError:
-            rval = AbstractExternal({
-                VALUE: v,
-                TYPE: type(v),
-            })
-        else:
-            assert issubclass(typ, (xtype.External, xtype.EnvType))
-            rval = AbstractScalar({
-                VALUE: v,
-                TYPE: typ,
-            })
-
-    return rval
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: AbstractValue, **kwargs):
-    return AbstractType(v)
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: Graph, context=None, node=None, **kwargs):
-    ctx = context or Context.empty()
-    return AbstractFunction(
-        GraphFunction(v, ctx, tracking_id=node)
-    )
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: MetaGraph, node=None, **kwargs):
-    return AbstractFunction(
-        MetaGraphFunction(v, Context.empty(), tracking_id=node)
-    )
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: Macro, **kwargs):
-    return AbstractFunction(MacroFunction(v))
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: Primitive, node=None, **kwargs):
-    return AbstractFunction(PrimitiveFunction(v, tracking_id=node))
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: SymbolicKeyInstance, **kwargs):
-    return AbstractScalar({VALUE: v, TYPE: xtype.SymbolicKeyType})
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: (bool, type(None),
-                          str, type(NotImplemented)), **kwargs):
-    typ = xtype.pytype_to_myiatype(type(v))
-    return AbstractScalar({
-        VALUE: v,
-        TYPE: typ,
-    })
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: (int, float, np.integer, np.floating),
-                loop=None, **kwargs):
-    typ = xtype.pytype_to_myiatype(type(v))
-    if loop is not None:
-        prio = 1 if issubclass(typ, xtype.Float) else 0
-        typ = loop.create_pending_from_list(
-            _number_types, typ, lambda: prio
-        )
-    return AbstractScalar({
-        VALUE: v,
-        TYPE: typ,
-    })
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: tuple, **kwargs):
-    return AbstractTuple([self(elem, **kwargs)
-                          for elem in v])
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: list, **kwargs):
-    if v == []:
-        return empty
-    else:
-        elem_types = [self(elem, **kwargs) for elem in v]
-        elem_type = reduce(amerge, elem_types)
-        return listof(_broaden(elem_type))
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: dict, **kwargs):
-    entries = dict((k, self(val, **kwargs)) for k, val in v.items())
-    return AbstractDict(entries)
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: np.ndarray, alias_map={}, **kwargs):
-    tracks = {SHAPE: v.shape, TYPE: xtype.NDArray}
-    if id(v) in alias_map:
-        tracks[ALIASID] = alias_map[id(v)]
-    return AbstractArray(
-        AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: xtype.np_dtype_to_type(str(v.dtype)),
-        }),
-        tracks
-    )
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: typing._GenericAlias, **kwargs):
-    return AbstractType(type_to_abstract(v))
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: ADT, **kwargs):
-    new_args = {}
-    for name, value in dataclass_fields(v).items():
-        new_args[name] = self(value, **kwargs)
-    draft = AbstractADT(type(v), new_args)
-    return normalize_adt(draft)
 
 
 class Inferrer(Partializable):
@@ -1076,7 +878,5 @@ __all__ = [
     'UniformPrimitiveInferrer',
     'VirtualInferrer',
     'execute_inferrers',
-    'from_value',
     'standard_prim',
-    'to_abstract',
 ]
