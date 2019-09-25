@@ -13,8 +13,8 @@ node ('gpu') {
     junit 'test-report.xml'
   }
   stage ('Coverage') {
-    withEnv(['PATH+CONDA=$HOME/miniconda/bin']) {
-      sh script: 'cov.sh'
+    withEnv(['PATH+CONDA=/home/jenkins/miniconda/bin']) {
+      sh script: './cov.sh'
       sh script: 'coverage xml'
       sh script: 'pip install codecov'
       withCredentials([string(credentialsId: 'myia_codecov', variable: 'CODECOV_TOKEN')]) {
