@@ -12,7 +12,7 @@ from myia.operations import (
 from myia.pipeline import standard_pipeline
 
 from .common import MA, MB, Point, make_tree, sumtree
-from .multitest import mt, run
+from .multitest import mt, run, run_no_relay
 
 run_no_opt = run.configure(
     pipeline=standard_pipeline.configure({'opt.phases.main': []})
@@ -215,6 +215,6 @@ def test_array_getitem(x):
     return array_getitem(x, (0, 1), (3, 5), (2, 3))
 
 
-@run(MA(4, 5), MB(2, 2))
+@run_no_relay(MA(4, 5), MB(2, 2))
 def test_array_setitem(x, v):
     return array_setitem(x, (0, 1), (3, 5), (2, 3), v)

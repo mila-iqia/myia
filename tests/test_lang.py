@@ -10,7 +10,7 @@ lang_pipeline = scalar_debug_pipeline \
     .select('resources', 'parse', 'resolve', 'export')
 
 
-run_lang = run.configure(pipeline=lang_pipeline)
+run_lang = run.configure(pipeline=lang_pipeline, backend=False)
 
 
 #############

@@ -23,63 +23,6 @@ from myia.operations import (
 from myia.pipeline import standard_pipeline
 
 from ..common import AN, MA, MB, to_abstract_test
-from ..multitest import Multiple, mt, myia_function_test
-
-
-class BackendOption:
-    def __init__(self, backend, backend_options):
-        try:
-            self.backend = load_backend(backend, backend_options)
-        except LoadingError as e:
-            pytest.skip(f"Can't load {backend}: {e.__cause__}")
-        self.pip = standard_pipeline.configure({
-            'resources.backend.name': backend,
-            'resources.backend.options': backend_options
-        }).make()
-
-    def convert_args(self, args):
-        return tuple(to_device(arg, self.backend) for arg in args)
-
-
-@myia_function_test(id='run_backend')
-def _run_backend(self, fn, args, result=None, abstract=None,
-                 backend=None):
-    backend = BackendOption(*backend)
-
-    if abstract is None:
-        argspec = tuple(from_value(arg, broaden=True)
-                        for arg in args)
-    else:
-        argspec = tuple(to_abstract_test(a) for a in abstract)
-
-    def out():
-        mfn = backend.pip(input=fn, argspec=argspec)
-        myia_args = backend.convert_args(args)
-        rval = mfn['output'](*myia_args)
-        return rval
-
-    if result is None:
-        result = fn(*args)
-
-    self.check(out, result)
-
-
-run_backend = _run_backend.configure(
-    backend=Multiple(
-        pytest.param(('relay', {'target': 'cpu', 'device_id': 0}),
-                     id='relay-cpu',
-                     marks=pytest.mark.relay),
-        pytest.param(('relay', {'target': 'cuda', 'device_id': 0}),
-                     id='relay-cuda',
-                     marks=[pytest.mark.relay, pytest.mark.gpu]),
-        pytest.param(('pytorch', {'device': 'cpu'}),
-                     id='pytorch-cpu',
-                     marks=pytest.mark.pytorch),
-        pytest.param(('pytorch', {'device': 'cuda'}),
-                     id='pytorch-cuda',
-                     marks=[pytest.mark.pytorch, pytest.mark.gpu])
-    )
-)
 
 
 def test_default_backend():
@@ -127,6 +70,7 @@ def test_backend_error():
     del _backends[name]
 
 
+"""
 @run_backend(2, 3)
 def test_add(x, y):
     return x + y
@@ -401,3 +345,4 @@ a = MA(2, 3)
 @run_backend(())
 def test_constant_array():
     return a
+"""
