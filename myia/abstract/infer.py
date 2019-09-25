@@ -47,12 +47,10 @@ from .data import (
     AbstractTuple,
     AbstractType,
     AbstractValue,
-    AnnotationBasedChecker,
     DummyFunction,
     Function,
     GraphFunction,
     JTransformedFunction,
-    Macro,
     MacroFunction,
     MetaGraphFunction,
     PartialApplication,
@@ -63,6 +61,7 @@ from .data import (
     listof,
 )
 from .loop import InferenceLoop, Pending, force_pending
+from .macro import AnnotationBasedChecker, Macro
 from .ref import Context, EvaluationCache, Reference, VirtualReference
 from .utils import (
     amerge,
