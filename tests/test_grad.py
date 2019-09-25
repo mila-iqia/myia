@@ -775,3 +775,15 @@ def test_bad_bprop_def():
         @bprop_to_grad_transform(Primitive('nonsense'))
         def _bprop_nonsense(x, y, dout):
             return dout + x + y
+
+
+@mark.xfail(reason="Second order gradients are not supported yet")
+def test_second_order():
+    def square(x):
+        return x * x
+
+    @myia
+    def f(x):
+        return grad(grad(square))(x)
+
+    assert f(10) == 2
