@@ -213,6 +213,7 @@ standard_method_map = {
         'shape': property(operations.shape),
         'T': property(operations.t),
         'ndim': property(operations.ndim),
+        'dtype': property(operations.dtype),
     },
 }
 

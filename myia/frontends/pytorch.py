@@ -82,6 +82,7 @@ standard_method_map[PyTorchTensor] = \
     standard_method_map[NDArray].copy()
 standard_method_map[PyTorchTensor].update({
     'dim': operations.ndim,
+    'dtype': property(operations.dtype),
     'argmax': argmax,
     'exp': operations.array_exp,
     'gather': gather,
