@@ -67,6 +67,20 @@ def _fix_type(self, a: GraphFunction, spc):
         return DummyFunction()
 
 
+@overload  # noqa: F811
+def _fix_type(self, a: PrimitiveFunction, spc):
+    try:
+        return spc.analyze_function(None, a, None)[0].abstract.get_unique()
+    except Unspecializable:
+        return a
+
+
+@overload  # noqa: F811
+def _fix_type(self, a: TypedPrimitive, spc):
+    return TypedPrimitive(a.prim, tuple(self(ar, spc) for ar in a.args),
+                          self(a.output, spc))
+
+
 @abstract_check.variant(
     initial_state=lambda: CheckState({}, '_no_track')
 )
@@ -278,9 +292,12 @@ class Monomorphizer:
         if len(choices) == 1:
             choice, = choices
             argrefs = [VirtualReference(v) for v in choice]
-            res = self.engine.run_coroutine(
-                inf.run(self.engine, None, argrefs)
-            )
+            try:
+                res = self.engine.run_coroutine(
+                    inf.run(self.engine, None, argrefs)
+                )
+            except InferenceError:
+                return None, None
             self.infcaches[inf] = {choice: res}
             return choice, res
         else:

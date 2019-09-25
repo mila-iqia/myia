@@ -141,7 +141,6 @@ class GraphFunction(Function):
         return self.graph.abstract
 
 
-@serializable('PrimitiveFunction')
 @dataclass(frozen=True)
 class PrimitiveFunction(Function):
     """Represents a Primitive.
@@ -184,7 +183,6 @@ class MacroFunction(Function):
     macro: 'Macro'
 
 
-@serializable('PartialApplication')
 @dataclass(eq=False)
 class PartialApplication(Function):
     """Represents a partial application.

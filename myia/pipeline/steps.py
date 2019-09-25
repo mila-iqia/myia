@@ -6,7 +6,6 @@ The steps are listed in roughly the same order they should be called.
 from itertools import count
 
 from ..abstract import AbstractTuple, find_aliases
-from ..cconv import closure_convert
 from ..compile import BackendValue
 from ..ir import Graph
 from ..opt import (
@@ -364,24 +363,6 @@ def step_validate(resources, graph, argspec=None, outspec=None):
     validate(graph,
              whitelist=resources.operation_whitelist,
              validate_abstract=resources.validate_abstract)
-    return {'graph': graph}
-
-
-######################
-# Closure conversion #
-######################
-
-
-def step_cconv(graph):
-    """Closure convert the graph.
-
-    Inputs:
-        graph: The graph to closure convert.
-
-    Outputs:
-        graph: The closure converted graph.
-    """
-    closure_convert(graph)
     return {'graph': graph}
 
 

@@ -3,11 +3,14 @@
 import numpy as np
 import torch
 
+from ... import abstract, xtype
 from ...ir import manage
 from ...operations import Primitive, primitives as P
+from ...utils import TaggedValue
 from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
+from ..cconv import closure_convert
 from ..transform import CompileGraphs, nonlinear_ops
-from . import ConcreteBackend, HandleBackend
+from . import Backend, HandleBackend
 from .pytorch_conv_grad import conv2d_input, conv2d_weight
 
 _type_map = {
@@ -357,7 +360,7 @@ def pytorch_convert(lst, backend):
     return impl, inputs, [op]
 
 
-class PyTorchBackend(ConcreteBackend):
+class PyTorchBackend(Backend):
     """Backend to run using pytorch.
 
     Backend options:
@@ -369,11 +372,12 @@ class PyTorchBackend(ConcreteBackend):
         """Create a PyTorch backend on the given device."""
         self.device = torch.device(device)
         self.compiler = CompileGraphs(lambda lst: pytorch_convert(lst, self),
-                                      nonlinear_ops, self, split_linear=True)
+                                      nonlinear_ops, self)
 
     def compile(self, graph, *others):
         """Compile a graph."""
         manage(graph)
+        graph = closure_convert(graph)
         return self.compiler.compile_and_link(graph)
 
     def to_numpy(self, v):
@@ -399,6 +403,46 @@ class PyTorchBackend(ConcreteBackend):
             return None
         dt = type_to_np_dtype(t)
         return np.asarray(s, dtype=dt)
+
+    def from_backend_value(self, v, t):
+        """Convert a backend value to an intermediate value."""
+        if isinstance(t, abstract.AbstractScalar):
+            return self.to_scalar(v)
+        elif isinstance(t, abstract.AbstractArray):
+            return self.to_numpy(v)
+        elif isinstance(t, abstract.AbstractTuple):
+            return tuple(self.from_backend_value(ve, te)
+                         for ve, te in zip(v, t.elements))
+        elif isinstance(t, abstract.AbstractTaggedUnion):
+            return TaggedValue(v.tag, self.from_backend_value(
+                v.value, t.options.get(v.tag)))
+        else:
+            raise NotImplementedError(f"Don't know what to do for {t}")
+
+    def to_backend_value(self, v, t):
+        """Convert an intermediate value to a backend value."""
+        if (isinstance(t, (abstract.AbstractError, abstract.AbstractType))
+                or v is abstract.DEAD):
+            return None
+        if isinstance(t, abstract.AbstractArray):
+            return self.from_numpy(v)
+        elif isinstance(t, abstract.AbstractScalar):
+            if issubclass(t.values[abstract.TYPE],
+                          (xtype.Number, xtype.Bool, xtype.Nil)):
+                return self.from_scalar(v, t.values[abstract.TYPE])
+            elif issubclass(t.values[abstract.TYPE], xtype.EnvType):
+                assert len(v._contents) == 0
+                return ()
+            else:
+                raise NotImplementedError(f'to_backend_value for {t}')
+        elif isinstance(t, abstract.AbstractTuple):
+            return tuple(self.to_backend_value(v, t)
+                         for v, t in zip(v, t.elements))
+        elif isinstance(t, abstract.AbstractTaggedUnion):
+            real_t = t.options.get(v.tag)
+            return TaggedValue(v.tag, self.to_backend_value(v.value, real_t))
+        else:
+            raise NotImplementedError(f'to_backend_value for {t}')
 
 
 def PyTorchBackendR(device):

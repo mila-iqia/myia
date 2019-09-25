@@ -67,8 +67,8 @@ specialize = specializer_decorator(specialize_pipeline)
 specialize_std = specializer_decorator(specialize_pipeline_std)
 
 
-mono_scalar = run.configure(pipeline=specialize_pipeline)
-mono_standard = run.configure(pipeline=specialize_pipeline_std)
+mono_scalar = run.configure(pipeline=specialize_pipeline, backend=False)
+mono_standard = run.configure(pipeline=specialize_pipeline_std, backend=False)
 
 
 int1 = 13

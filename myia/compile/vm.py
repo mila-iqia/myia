@@ -292,11 +292,6 @@ class FinalVM:
         """
         self._push(self._ref(x))
 
-    def inst_scalar_cast(self, x, type):
-        """Cast a scalar."""
-        v = self.backend.to_scalar(self._ref(x))
-        self._push(self.backend.from_scalar(v, type))
-
     def inst_env_getitem(self, env, idx, default):
         """Get an item from a grad environment."""
         env = self._ref(env)

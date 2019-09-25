@@ -34,6 +34,25 @@ def convert_grad(graph):
     return graph
 
 
+def get_prim_graph(cache, prim, typ):
+    """Make a graph that wraps a primitive."""
+    if (prim, typ) not in cache:
+        g = Graph()
+        args = []
+        tp = list(typ.xvalue())[0]
+        for t in tp.args:
+            p = g.add_parameter()
+            p.abstract = t
+            args.append(p)
+        primct = Constant(prim)
+        primct.abstract = typ
+        out = g.apply(primct, *args)
+        out.abstract = tp.output
+        g.output = out
+        cache[(prim, typ)] = g
+    return cache[(prim, typ)]
+
+
 def wrap_primitives(graph):
     """Helper function to wrap primitives.
 
@@ -42,23 +61,6 @@ def wrap_primitives(graph):
     mng = graph.manager
 
     prim_graphs = {}
-
-    def get_prim_graph(prim, typ):
-        if (prim, typ) not in prim_graphs:
-            g = Graph()
-            args = []
-            tp = list(typ.xvalue())[0]
-            for t in tp.args:
-                p = g.add_parameter()
-                p.abstract = t
-                args.append(p)
-            primct = Constant(prim)
-            primct.abstract = typ
-            out = g.apply(primct, *args)
-            out.abstract = tp.output
-            g.output = out
-            prim_graphs[(prim, typ)] = g
-        return prim_graphs[(prim, typ)]
 
     with mng.transact() as tr:
         cts = {ct for cts in mng.constants.values() for ct in cts}
@@ -71,24 +73,24 @@ def wrap_primitives(graph):
                             node.inputs[0].value in (P.array_map,
                                                      P.array_reduce)):
                             continue
-                        g = get_prim_graph(ct.value, ct.abstract)
+                        g = get_prim_graph(prim_graphs, ct.value, ct.abstract)
                         tr.set_edge(node, key, Constant(g))
 
     return graph
 
 
-@overload(bootstrap=True)
-def wrap_result(self, data: tuple):
+@overload
+def wrap_result(data: tuple):
     """Function to wrap final results in a handle.
 
     This leaves first-level tuples alone so that we support multiple
     value returns more naturally.
     """
-    return tuple(self(d) for d in data)
+    return tuple(handle(d) for d in data)
 
 
 @overload  # noqa: F811
-def wrap_result(self, data: object):
+def wrap_result(data: object):
     return handle(data)
 
 
@@ -111,12 +113,11 @@ class CompileGraph:
 
     """
 
-    def __init__(self, lin_convert, cut_list, backend, *, split_linear=False):
+    def __init__(self, lin_convert, cut_list, backend):
         """Create a CompileGraph with the specified linear backend."""
         self.lin_convert = lin_convert
         self.cut_list = cut_list
         self.backend = backend
-        self.split_linear = split_linear
 
     def _reset(self):
         """Set/clear shared values."""
@@ -138,19 +139,12 @@ class CompileGraph:
     def split(self, graph):
         """Split a graph into portions."""
         splits = []
-        split = []
 
         for node in toposort(graph.return_):
             if self._is_cut(node):
-                if len(split) != 0:
-                    splits.append(split)
                 splits.append(node)
-                split = []
             elif not (node.is_constant() or node.is_parameter()):
-                if self.split_linear:
-                    splits.append([node])
-                else:
-                    split.append(node)
+                splits.append([node])
 
         return splits
 
@@ -178,10 +172,6 @@ class CompileGraph:
         assert node not in self.slots
         self.slots[node] = self.height
         self.height += 1
-
-    def tie(self, n1, n2):
-        """Declare two nodes as equivalent."""
-        self.slots[n2] = self.slots[n1]
 
     def ref(self, node):
         """Get the stack reference for the value of a node.
@@ -225,11 +215,6 @@ class CompileGraph:
         for split in splits:
             if isinstance(split, list):
                 run, inputs, outputs = self.lin_convert(split)
-                if run is None:  # empty function
-                    assert len(inputs) == len(outputs)
-                    for i, o in zip(inputs, outputs):
-                        self.tie(i, o)
-                    continue
                 # prime the arguments because self.ref() can invalidate
                 # previously returned references if a new one is not ready
                 for i in inputs:
@@ -296,10 +281,6 @@ class CompileGraph:
                         self.add_instr('unsafe_static_cast',
                                        self.ref(split.inputs[1]),
                                        self.ref(split.inputs[2]))
-                    elif fn.value == P.scalar_cast:
-                        self.add_instr('scalar_cast',
-                                       self.ref(split.inputs[1]),
-                                       split.inputs[2].value)
                     elif fn.value == P.env_getitem:
                         self.add_instr('env_getitem',
                                        self.ref(split.inputs[1]),
@@ -358,15 +339,14 @@ class CompileGraphs:
 
     """
 
-    def __init__(self, lin_convert, cut_list, backend, *, split_linear=False):
+    def __init__(self, lin_convert, cut_list, backend):
         """Create a compiler.
 
         This use the specifed implementation for linear parts and a
         list of excluded ops that will be covered by the built-in VM.
 
         """
-        self.transform = CompileGraph(lin_convert, cut_list, backend,
-                                      split_linear=split_linear)
+        self.transform = CompileGraph(lin_convert, cut_list, backend)
         self._reset()
 
     def _reset(self):

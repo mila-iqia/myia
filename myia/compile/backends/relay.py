@@ -1,76 +1,37 @@
 """Transforms a graph into lower-level code."""
 
-import numpy as np
 import tvm
 from tvm import relay
+from tvm.relay import adt
+from tvm.relay.backend import interpreter
 
-from ...abstract import (
-    AbstractArray,
-    AbstractFunction,
-    AbstractScalar,
-    AbstractTuple,
-    AbstractType,
-    PartialApplication,
-    TypedPrimitive,
-    VirtualFunction,
-)
+from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import overload
-from ...xtype import Bool, Nil, type_to_np_dtype
-from ..transform import wrap_result
-from . import ConcreteBackend, HandleBackend
-from .relay_helpers import build_module, optimize
+from ...utils import TaggedValue
+from ...xtype import type_to_np_dtype
+from ..channel import handle
+from ..transform import get_prim_graph, wrap_result
+from . import Backend, Converter, HandleBackend
+from .relay_helpers import (
+    TypeHelper,
+    add_functions,
+    dead_value,
+    empty_env,
+    get_myia_tag,
+    get_union_ctr,
+    optimize,
+    to_relay_type,
+)
+
+relay_from_scalar = tvm.get_global_func('relay.from_scalar')
 
 
 @wrap_result.register
-def wrap_result(self, data: relay.backend.interpreter.TupleValue):
+def wrap_result(data: interpreter.TupleValue):
     """Wrap tuples from relay."""
-    return tuple(self(d) for d in data)
-
-
-@overload(bootstrap=True)
-def to_relay_type(self, a: AbstractScalar):
-    """Convert a myia abstract to a Relay type."""
-    tp = a.xtype()
-    if issubclass(tp, Bool):
-        return relay.ty.TensorType((), 'bool')
-    elif issubclass(tp, Nil):
-        return relay.ty.TupleType([])
-    else:
-        return relay.ty.TensorType((), type_to_np_dtype(tp))
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: AbstractTuple):
-    return relay.ty.TupleType([self(e) for e in a.elements])
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: AbstractArray):
-    tp = a.element.xtype()
-    return relay.ty.TensorType(a.xshape(), type_to_np_dtype(tp))
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: AbstractFunction):
-    sings = list(self(sing) for sing in a.get_sync())
-    for sing in sings[1:]:
-        assert sing == sings[0]
-    return sings[0]
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: (VirtualFunction, TypedPrimitive)):
-    return relay.ty.FuncType([self(aa) for aa in a.args],
-                             self(a.output))
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: PartialApplication):
-    tp = self(a.fn)
-    return relay.ty.FuncType(tp.arg_types[len(a.args):], tp.ret_type)
+    return tuple(handle(d) for d in data)
 
 
 def ashape(node):
@@ -112,18 +73,6 @@ SIMPLE_MAP = {
     P.make_tuple: lambda *args: relay.Tuple(args),
     P.switch: relay.If,
 }
-
-
-def relay_partial(c, fn, *args):
-    """Implementation of partial for Relay."""
-    ty = to_relay_type(fn.abstract)
-    rargs = [relay.var("") for a in ty.arg_types]
-    fn = relay.Function(rargs, relay.Call(c.ref(fn), rargs))
-    binds = {}
-    for ra, a in zip(rargs, args):
-        binds[ra] = c.ref(a)
-    res = relay.bind(fn, binds)
-    return res
 
 
 def relay_distribute(c, array, shape):
@@ -189,14 +138,81 @@ def relay_array_reduce(c, fn, array, shape):
         raise NotImplementedError(f"reduce with {fn}")
 
 
+def relay_tuple_getitem(c, t, idx):
+    """Implementation of tuple_getitem for Relay."""
+    assert idx.is_constant(int)
+    return relay.expr.TupleGetItem(c.ref(t), idx.value)
+
+
+def relay_casttag(c, x, tag):
+    """Implementation of casttag for Relay."""
+    assert tag.is_constant(int)
+    rtag = get_union_ctr(tag.value, x.abstract.options.get(tag.value))
+    v = relay.Var("v")
+    clause = adt.Clause(adt.PatternConstructor(rtag, [adt.PatternVar(v)]), v)
+    return adt.Match(c.ref(x), [clause], complete=False)
+
+
+def relay_hastag(c, x, tag):
+    """Implementation of hastag for Relay."""
+    assert tag.is_constant(int)
+    rtag = get_union_ctr(tag.value, x.abstract.options.get(tag.value))
+    t_clause = adt.Clause(adt.PatternConstructor(
+        rtag, [adt.PatternWildcard()]), relay.const(True))
+    f_clause = adt.Clause(adt.PatternWildcard(), relay.const(False))
+    return adt.Match(c.ref(x), [t_clause, f_clause])
+
+
+def relay_tagged(c, x, tag):
+    """Implementation of tagged for Relay."""
+    assert tag.is_constant(int)
+    rtag = get_union_ctr(tag.value, None)
+    return rtag(c.ref(x))
+
+
+def relay_env_setitem(c, env, key, x):
+    """Implementation of env_setitem for Relay."""
+    gv = c.types.get_env_update(x.abstract)
+    return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(x)])
+
+
+def relay_env_getitem(c, env, key, dft):
+    """Implementation of env_getitem for Relay."""
+    gv = c.types.get_env_find(dft.abstract)
+    return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(dft)])
+
+
+def relay_unsafe_static_cast(c, val, ty):
+    """Implementation of unsafe_static_cast for Relay."""
+    assert ty.is_constant(AbstractTaggedUnion)
+    assert isinstance(val.abstract, AbstractTaggedUnion)
+    return c.ref(val)
+
+
+def relay_array_getitem(c, a, start, stop, strides):
+    """Implementation of array_getitem for Relay."""
+    assert start.is_constant(tuple)
+    assert stop.is_constant(tuple)
+    assert strides.is_constant(tuple)
+    return relay.op.transform.strided_slice(c.ref(a), start.value, stop.value,
+                                            strides.value)
+
+
 COMPLEX_MAP = {
-    P.partial: relay_partial,
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
     P.reshape: relay_reshape,
     P.array_map: relay_array_map,
     P.array_reduce: relay_array_reduce,
     P.scalar_to_array: lambda c, x, t: c.ref(x),
+    P.tuple_getitem: relay_tuple_getitem,
+    P.casttag: relay_casttag,
+    P.hastag: relay_hastag,
+    P.tagged: relay_tagged,
+    P.env_setitem: relay_env_setitem,
+    P.env_getitem: relay_env_getitem,
+    P.unsafe_static_cast: relay_unsafe_static_cast,
+    P.array_getitem: relay_array_getitem,
 }
 
 
@@ -217,7 +233,7 @@ class RelayMapper:
         self.mapping[prim] = fn
 
     def register_simple(self, map):
-        """Register simple conversions (1:1 map to nnvm ops)."""
+        """Register simple conversions (1:1 map to relay ops)."""
         for k, v in map.items():
             self.register(k, lambda c, *args, v=v: v(*[c.ref(a)
                                                        for a in args]))
@@ -235,6 +251,80 @@ class RelayMapper:
 MAP = RelayMapper(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 
 
+class NodeVisitor:
+    """Visitor for node enumeration."""
+
+    def _visit_array_map(self, node):
+        return node.inputs[2:]
+
+    def _visit_array_reduce(self, node):
+        return node.inputs[2:]
+
+    def _visit_scalar_to_array(self, node):
+        return [node.inputs[1]]
+
+    def _visit_unsafe_static_cast(self, node):
+        return [node.inputs[1]]
+
+    def __call__(self, node):
+        """Don't visit called primitives."""
+        if node.inputs:
+            if node.inputs[0].is_constant(Primitive):
+                prim = node.inputs[0].value
+                visit = getattr(self, f'_visit_{prim}', None)
+                if visit is None:
+                    return node.inputs[1:]
+                return visit(node)
+            else:
+                return node.inputs
+        return []
+
+
+class RelayConstantConverter(Converter):
+    """Convert values to Relay constants."""
+
+    def __init__(self, context):
+        """Set the context."""
+        self.context = context
+
+    def convert_array(self, v, t):  # pragma: no cover
+        """Make a TVM array from a numpy array."""
+        return relay.const(tvm.ndarray.array(v, self.context))
+
+    def convert_scalar(self, v, t):
+        """Convert the scalar to a TVM array."""
+        return relay.const(v, type_to_np_dtype(t))
+
+    def convert_bool(self, v, t):
+        """Convert the scalar to a TVM array."""
+        return relay.const(v, type_to_np_dtype(t))
+
+    def convert_nil(self, v, t):
+        """Convert Nil to Relay."""
+        return relay.Tuple([])
+
+    def convert_dead(self, v, t):
+        """Convert a dead value to Relay."""
+        return dead_value(t)
+
+    def convert_env(self, v, t):
+        assert len(v) == 0
+        return empty_env()
+
+    def convert_tuple(self, v, t):
+        return relay.Tuple([self(e, et) for e, et in
+                            zip(v, t.elements)])
+
+    def convert_tagged(self, v, t):  # pragma: no cover
+        real_t = t.options.get(v.tag)
+        ctr = get_union_ctr(v.tag, real_t)
+        conv_val = self(v.value, real_t)
+        return ctr(conv_val)
+
+    def convert_type(self, v, t):
+        return to_relay_type(v)
+
+
 class CompileGraph:
     """Step to convert a myia graph to a relay graph.
 
@@ -249,27 +339,40 @@ class CompileGraph:
         """Convert the graph into a relay callable."""
         mng = manage(graph)
 
+        self.module = relay.Module({})
+        self.types = TypeHelper()
+        self.types.initialize(self.module, mng)
+        self.make_const = RelayConstantConverter(context)
+
+        # Analyze and create a global union type of all the possible types
+        # and then use it for all union values.
+
         function_map = {}
         self.node_map = {}
         self.graph_map = {}
 
         for g in mng.graphs:
-            self.graph_map[g] = relay.GlobalVar(g.debug.debug_name)
+            if g.parent is None:
+                self.graph_map[g] = relay.GlobalVar(g.debug.debug_name)
 
         for g in mng.graphs:
-            function_map[self.graph_map[g]] = self.convert_func(g)
+            if g.parent is None:
+                function_map[self.graph_map[g]] = self.convert_func(g)
 
-        module = build_module(function_map)
+        self.types.finalize(self.module)
+        add_functions(self.module, function_map)
 
-        module = optimize(module)
+        # Maybe make a function that calls the right graph instead?
+        self.module["main"] = self.module[self.graph_map[graph]]
 
-        module.entry_func = module.get_global_var(graph.debug.debug_name)
+        self.module = optimize(self.module)
 
-        exec = relay.create_executor(mod=module, ctx=context, target=target)
-        res = exec.evaluate(module.entry_func)
+        exec = relay.create_executor(mod=self.module, ctx=context,
+                                     target=target)
+        res = exec.evaluate(self.module["main"])
 
-        def f(*args, **kwargs):
-            return wrap_result(res(*args, **kwargs))
+        def f(*args):
+            return wrap_result(res(*args))
         return f
 
     def on_parameter(self, node):
@@ -290,24 +393,18 @@ class CompileGraph:
 
     def on_constant(self, node):
         """Convert a constant node."""
-        def _helper(value, type):
-            if isinstance(type, AbstractTuple):
-                return relay.Tuple([_helper(e, et) for e, et in
-                                    zip(value, type.elements)])
-            elif isinstance(type, AbstractType):
-                return value
-            else:
-                dtype = type_to_np_dtype(type.xtype())
-                return relay.const(value, dtype=dtype)
-        if isinstance(node.value, (Primitive, AbstractArray)):
-            # This is a hack for list_map and friends
-            # And also for scalar_to_array
-            return None
-        return _helper(node.value, node.abstract)
+        if node.is_constant(Primitive):
+            return self.convert_func(
+                get_prim_graph({}, node.value, node.abstract))
+        return self.make_const(node.value, node.abstract)
 
     def on_graph(self, node):
         """Convert a graph constant."""
-        return self.graph_map[node.value]
+        if node.value.parent is None:
+            return self.graph_map[node.value]
+        if node not in self.node_map:
+            self.node_map[node] = self.convert_func(node.value)
+        return self.node_map[node]
 
     def ref(self, node):
         """Return the value for a node."""
@@ -320,16 +417,7 @@ class CompileGraph:
 
         params = [self.ref(p) for p in graph.parameters]
 
-        def visit_noprimfunc(node):
-            """Don't visit called primitives."""
-            if node.inputs:
-                if node.inputs[0].is_constant(Primitive):
-                    return node.inputs[1:]
-                else:
-                    return node.inputs
-            return []
-
-        for node in toposort(graph.output, visit_noprimfunc):
+        for node in toposort(graph.output, NodeVisitor()):
             if node.is_apply():
                 self.node_map[node] = self.on_apply(node)
             elif node.is_constant_graph():
@@ -344,7 +432,72 @@ class CompileGraph:
 compiler = CompileGraph()
 
 
-class RelayBackend(ConcreteBackend):
+class RelayInputConverter(Converter):
+    """Convert values to Relay."""
+
+    def __init__(self, context):
+        """Set the context."""
+        self.context = context
+
+    def convert_array(self, v, t):
+        """Make a TVM array from a numpy array."""
+        return interpreter.TensorValue(tvm.ndarray.array(v, self.context))
+
+    def convert_scalar(self, v, t):
+        """Convert the scalar to a TVM array."""
+        return relay_from_scalar(v, type_to_np_dtype(t))
+
+    def convert_bool(self, v, t):
+        """Convert the scalar to a TVM array."""
+        return relay_from_scalar(v, type_to_np_dtype(t))
+
+    def convert_nil(self, v, t):
+        """Convert Nil to Relay."""
+        return interpreter.TupleValue()
+
+    def convert_tuple(self, v, t):
+        return interpreter.TupleValue(*[self(e, et) for e, et in
+                                        zip(v, t.elements)])
+
+    def convert_tagged(self, v, t):
+        real_t = t.options.get(v.tag)
+        ctr = get_union_ctr(v.tag, real_t)
+        conv_val = self(v.value, real_t)
+        return interpreter.ConstructorValue(ctr.tag, [conv_val], None)
+
+
+class RelayOutputConverter(Converter):
+    """Convert values from Relay."""
+
+    def convert_array(self, v, t):
+        """Make a numpy array from a TVM array."""
+        return v.asnumpy()
+
+    def convert_nil(self, v, t):
+        """Convert Nil from relay."""
+        assert len(v) == 0
+        return None
+
+    def convert_bool(self, v, t):
+        """Convert the value to a boolean."""
+        return v.asnumpy().item()
+
+    def convert_scalar(self, v, t):
+        """Convert the TVM array to a scalar."""
+        return v.asnumpy().item()
+
+    def convert_tuple(self, v, t):
+        """Convert the value to a tuple."""
+        return tuple(self(v, t)
+                     for v, t in zip(v, t.elements))
+
+    def convert_tagged(self, v, t):
+        tag = get_myia_tag(v.constructor)
+        conv_val = self(v.fields[0], t.options.get(tag))
+        return TaggedValue(tag, conv_val)
+
+
+class RelayBackend(Backend):
     """Backend based on Relay.
 
     Backend options:
@@ -363,33 +516,12 @@ class RelayBackend(ConcreteBackend):
             raise RuntimeError("No hardware to support selected target "
                                f"'{target}' on device {device_id}")
         self.compiler = compiler
+        self.to_backend_value = RelayInputConverter(self.context)
+        self.from_backend_value = RelayOutputConverter()
 
     def compile(self, graph, argspec, outspec):
         """Compiler a graph."""
         return self.compiler.run(graph, self.context, self.target)
-
-    def to_numpy(self, v):
-        """Make a numpy array from a TVM array."""
-        return v.asnumpy()
-
-    def from_numpy(self, a):
-        """Make an TVM array from a numpy array."""
-        return tvm.ndarray.array(a, self.context)
-
-    def to_scalar(self, v):
-        """Convert the TVM array to a scalar."""
-        if isinstance(v, (relay.backend.interpreter.TupleValue, tuple)):
-            assert len(v) == 0
-            return None
-        else:
-            return v.asnumpy().item()
-
-    def from_scalar(self, s, t):
-        """Convert the scalar to an TVM array."""
-        if t == Nil:
-            return ()
-        dt = type_to_np_dtype(t)
-        return self.from_numpy(np.array(s, dtype=dt, copy=False))
 
 
 def RelayBackendR(target, device_id):

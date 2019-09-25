@@ -220,8 +220,8 @@ def infer(self, fn, args, result=None, pipeline=infer_pipeline):
 
 
 @myia_function_test(marks=[pytest.mark.run], id='run')
-def run(self, fn, args, result=None, abstract=None, broad_specs=None,
-        validate=True, pipeline=standard_pipeline):
+def _run(self, fn, args, result=None, abstract=None, broad_specs=None,
+         validate=True, pipeline=standard_pipeline, backend=None):
     """Test a Myia function.
 
     Arguments:
@@ -237,6 +237,15 @@ def run(self, fn, args, result=None, abstract=None, broad_specs=None,
         validate: Whether to run the validation step.
         pipeline: The pipeline to use.
     """
+
+    if backend:
+        backend_name = backend[0]
+        backend_options = backend[1]
+
+        pipeline = pipeline.configure({
+            'resources.backend.name': backend_name,
+            'resources.backend.options': backend_options
+        })
 
     if abstract is None:
         if broad_specs is None:
@@ -261,4 +270,29 @@ def run(self, fn, args, result=None, abstract=None, broad_specs=None,
     self.check(out, result)
 
 
-run_debug = run.configure(pipeline=standard_debug_pipeline, validate=False)
+backend_all = Multiple(
+    pytest.param(('relay', {'target': 'cpu', 'device_id': 0}),
+                 id='relay-cpu',
+                 marks=pytest.mark.relay),
+    pytest.param(('relay', {'target': 'cuda', 'device_id': 0}),
+                 id='relay-cuda',
+                 marks=[pytest.mark.relay, pytest.mark.gpu]),
+    pytest.param(('pytorch', {'device': 'cpu'}),
+                 id='pytorch-cpu',
+                 marks=pytest.mark.pytorch),
+    pytest.param(('pytorch', {'device': 'cuda'}),
+                 id='pytorch-cuda',
+                 marks=[pytest.mark.pytorch, pytest.mark.gpu])
+)
+backend_no_relay = Multiple(
+    pytest.param(('pytorch', {'device': 'cpu'}),
+                 id='pytorch-cpu',
+                 marks=pytest.mark.pytorch),
+    pytest.param(('pytorch', {'device': 'cuda'}),
+                 id='pytorch-cuda',
+                 marks=[pytest.mark.pytorch, pytest.mark.gpu])
+)
+run = _run.configure(backend=backend_all)
+run_no_relay = _run.configure(backend=backend_no_relay)
+run_debug = run.configure(pipeline=standard_debug_pipeline, validate=False,
+                          backend=False)
