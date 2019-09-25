@@ -293,6 +293,8 @@ def abstract_clone(self, d: TrackDict, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractTuple, *args):
+    if x.elements is ANYTHING:
+        return (yield AbstractTuple)(ANYTHING)
     return (yield AbstractTuple)(
         [self(y, *args) for y in x.elements],
         self(x.values, *args)

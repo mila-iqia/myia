@@ -14,13 +14,11 @@ async def isinstance_(info, r_data, r_type):
     if not isinstance(ts, tuple):
         ts = (ts,)
     for t in ts:
-        if not isinstance(t, type):
-            if not (isinstance(t, lib.AbstractClassBase)
-                    and t.user_defined_version() is t):
-                raise MyiaTypeError(
-                    'isinstance expects a Python type'
-                    ' or a tuple of Python types'
-                )
+        if not isinstance(t, lib.AbstractValue):
+            raise MyiaTypeError(
+                'isinstance expects a Python type'
+                ' or a tuple of Python types'
+            )
     hastypes = [info.graph.apply(P.hastype, r_data.node,
                                  Constant(type_to_abstract(t)))
                 for t in ts]

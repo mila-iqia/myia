@@ -27,7 +27,7 @@ from ..ir import Constant
 from ..operations import primitives as P
 from ..utils import MyiaValueError, core
 from ..xtype import TupleT, f32, i64, u64
-from .pytorch_abstract_types import APT, pytorch_dtype_to_type
+from .pytorch_abstract_types import APT
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############
 

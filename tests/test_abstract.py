@@ -230,7 +230,7 @@ def test_repr():
     assert repr(kw1) == f'AbstractKeywordArgument(KW(bucket :: Int[64] = 1))'
 
     ty1 = Ty(f32)
-    assert repr(ty1) == 'AbstractType(Ty(Float[32]))'
+    assert repr(ty1) == 'AbstractType(Ty(AbstractScalar(Float[32])))'
 
     e1 = AbstractError(DEAD)
     assert repr(e1) == 'AbstractError(E(DEAD))'

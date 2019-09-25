@@ -60,18 +60,21 @@ def default_convert(env, x: Operation):
 
 
 @overload  # noqa: F811
-def default_convert(env, x: (object, type)):
+def default_convert(env, x: object):
     return x
 
 
 @overload  # noqa: F811
-def default_convert(env, x: xtype.TypeMeta):
-    return type_to_abstract(x)
+def default_convert(env, x: type):
+    try:
+        return type_to_abstract(x)
+    except KeyError:
+        return x
 
 
 @overload  # noqa: F811
 def default_convert(env, x: np.dtype):
-    return default_convert(env, xtype.np_dtype_to_type(x))
+    return default_convert(env, xtype.np_dtype_to_type(x.name))
 
 
 class _Unconverted:
