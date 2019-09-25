@@ -54,6 +54,7 @@ from .common import (
     to_abstract_test,
     u64,
 )
+from .multitest import mt, myia_function_test
 
 
 @dataclass
@@ -145,21 +146,6 @@ def test_GradTester_outtup():
     gtest.assert_match()
 
 
-prim_tests = {
-    P.scalar_add: [(-7.1, 4.3)],
-    P.scalar_sub: [(-7.1, 4.3)],
-    P.scalar_mul: [(-7.1, 4.3)],
-    P.scalar_div: [(-7.1, 4.3)],
-    P.scalar_pow: [(7.1, 4.3), (5.3, -1.2)],
-    P.scalar_uadd: [(-7.1,)],
-    P.scalar_usub: [(-7.1,)],
-    # P.scalar_gt: [(-7.1, 4.3)],
-    # P.scalar_lt: [(-7.1, 4.3)],
-    # P.scalar_ge: [(-7.1, 4.3)],
-    # P.scalar_le: [(-7.1, 4.3)],
-}
-
-
 def _grad_test(fn, obj, args,
                sens_type=f64,
                pipeline=grad_pipeline,
@@ -188,73 +174,79 @@ def _grad_test(fn, obj, args,
     gtest.assert_match()
 
 
+@myia_function_test(marks=[pytest.mark.grad], id='grad')
+def gradient(self, fn, args, abstract=None,
+             rel_error=1e-3, pipeline=grad_pipeline):
+    """Test the gradient of a Myia function using finite_differences.
+
+    Arguments:
+        fn: The Myia function to test.
+        args: The args for the function.
+        abstract: The argspec. If None, it will be derived automatically from
+            the args.
+        rel_error: The relative tolerance.
+        pipeline: The pipeline to use.
+    """
+    _grad_test(fn, fn, args,
+               pipeline=pipeline,
+               rel_error=rel_error,
+               argspec=abstract)
+
+
+prim_tests = {
+    P.scalar_add: [(-7.1, 4.3)],
+    P.scalar_sub: [(-7.1, 4.3)],
+    P.scalar_mul: [(-7.1, 4.3)],
+    P.scalar_div: [(-7.1, 4.3)],
+    P.scalar_pow: [(7.1, 4.3), (5.3, -1.2)],
+    P.scalar_uadd: [(-7.1,)],
+    P.scalar_usub: [(-7.1,)],
+    # P.scalar_gt: [(-7.1, 4.3)],
+    # P.scalar_lt: [(-7.1, 4.3)],
+    # P.scalar_ge: [(-7.1, 4.3)],
+    # P.scalar_le: [(-7.1, 4.3)],
+}
+
+
 @pytest.mark.parametrize('prim,cases', prim_tests.items())
 def test_prim_grads(prim, cases):
     for case in cases:
         _grad_test(pyi[prim], prim, case)
 
 
-def grad_test(*tests,
-              pipeline=grad_pipeline,
-              rel_error=1e-3,
-              argspec=None):
-    """Decorate a function to parse and run it against pure Python.
-
-    Returns a unit test that will parse the function, and then for
-    each `inputs` tuple in `tests` it will check that the pure Python,
-    undecorated function returns that same output.
-
-    Arguments:
-        tests: One or more inputs tuple.
-
-    """
-
-    def decorate(fn):
-        def test(args):
-            if not isinstance(args, tuple):
-                args = (args,)
-
-            _grad_test(fn, fn, args,
-                       pipeline=pipeline,
-                       rel_error=rel_error,
-                       argspec=argspec)
-
-        m = pytest.mark.parametrize('args', list(tests))(test)
-        m.__orig__ = fn
-        return m
-    return decorate
-
-
-@grad_test((13.0, 14.0))
+@gradient(13.0, 14.0)
 def test_null(x, y):
     """Test null gradient."""
     return 10.0 + 28.0 / 43.0
 
 
-@grad_test((1.0, 4.0), (5.0, -13.0))
+@mt(
+    gradient(1.0, 4.0),
+    gradient(5.0, -13.0),
+)
 def test_grad_add(x, y):
     return x + y
 
 
-@grad_test((3.0, 4.0))
+@gradient(3.0, 4.0)
 def test_grad_expr(x, y):
     return x**3.0 * y**4.0
 
 
-@grad_test((3.0,))
+@gradient(3.0)
 def test_constant(x):
     """Test the use of a literal in the expression."""
     return 18.0 * x
 
 
-@grad_test((3.0,))
+@gradient(3.0)
 def test_dup_args_in_call(x):
     """The naive gradient update rule fails when a function's arguments
     contain the same variable more than once."""
     return x * x
 
 
-@grad_test((3.0,))
+@gradient(3.0)
 def test_quadruple_args_in_call(x):
     """Test that duplicated arguments still cause no problem even if
     there are four of them."""
@@ -263,24 +255,24 @@ def test_quadruple_args_in_call(x):
     return g(x, x, x, x)
 
 
-@grad_test((3.0, 5.0))
+@gradient(3.0, 5.0)
 def test_tuples(x, y):
     tup = x + y, x * y
     z = tup[0] + tup[1]
     return z
 
 
-@grad_test((Point(3.0, 5.0),), pipeline=standard_pipeline)
+@gradient(Point(3.0, 5.0), pipeline=standard_pipeline)
 def test_dataclass(pt):
     return pt.x * pt.y
 
 
-@grad_test((Point(3.0, 5.0),), pipeline=standard_pipeline)
+@gradient(Point(3.0, 5.0), pipeline=standard_pipeline)
 def test_dataclass_2(pt):
     return pt.abs()
 
 
-@grad_test((4.0, 5.0))
+@gradient(4.0, 5.0)
 def test_hof(a, b):
     """Test higher order functions."""
     def f(g, x):
@@ -292,7 +284,7 @@ def test_hof(a, b):
     return f(g, a) + f(g, b)
 
 
-@grad_test((4.0, 5.0))
+@gradient(4.0, 5.0)
 def test_hof_tup(a, b):
     """Test higher order functions."""
     def f(gh, x, y):
@@ -303,7 +295,7 @@ def test_hof_tup(a, b):
     return f((scalar_add, scalar_mul), a, b)
 
 
-@grad_test((4.0, 5.0))
+@gradient(4.0, 5.0)
 def test_simple_closure(a, b):
     """Test some trivial closures."""
     def f():
@@ -314,7 +306,7 @@ def test_simple_closure(a, b):
     return f() * g()
 
 
-@grad_test((4.0,))
+@gradient(4.0)
 def test_closure(a):
     """This is the closure test in the paper."""
     def x1(b):
@@ -327,7 +319,10 @@ def test_closure(a):
     return x3
 
 
-@grad_test((4.0, 5.0), (6.4, -7.8))
+@mt(
+    gradient(4.0, 5.0),
+    gradient(6.4, -7.8),
+)
 def test_if(a, b):
     # This is max, but what this is really testing is the most basic
     # if statement, so I prefer to name the test 'test_if'
@@ -337,7 +332,10 @@ def test_if(a, b):
         return b
 
 
-@grad_test((4.0, 5.0), (6.4, -7.8))
+@mt(
+    gradient(4.0, 5.0),
+    gradient(6.4, -7.8),
+)
 def test_if2(a, b):
     if a > b:
         return a * a
@@ -345,7 +343,7 @@ def test_if2(a, b):
         return b + b
 
 
-@grad_test(4.1,)
+@gradient(4.1)
 def test_fact(x):
     def fact(n):
         if n <= 1:
@@ -355,7 +353,7 @@ def test_fact(x):
     return fact(x)
 
 
-@grad_test((4.1,), pipeline=standard_pipeline)
+@gradient(4.1, pipeline=standard_pipeline)
 def test_fact_opt(x):
     def fact(n=x):
         if n <= 1:
@@ -365,7 +363,7 @@ def test_fact_opt(x):
     return fact()
 
 
-@grad_test((4.0,))
+@gradient(4.0)
 def test_while(x):
     rval = x
     while rval < 100:
@@ -373,7 +371,7 @@ def test_while(x):
     return rval
 
 
-@grad_test((4.0, 5.0, 2.0),)
+@gradient(4.0, 5.0, 2.0)
 def test_while_2(x, y, z):
     rval = 0
     # Cannot compare to 0 or finite diff is unstable
@@ -383,7 +381,7 @@ def test_while_2(x, y, z):
     return rval
 
 
-@grad_test(2.0,)
+@gradient(2.0,)
 def test_pow10(x):
     v = x
     j = 0
@@ -396,8 +394,8 @@ def test_pow10(x):
     return v
 
 
-@grad_test(([1.0, 2.0, 3.0, 4.0],),
-           pipeline=standard_debug_pipeline.configure(validate=False))
+@gradient([1.0, 2.0, 3.0, 4.0],
+          pipeline=standard_debug_pipeline.configure(validate=False))
 def test_list_while(xs):
     y = 1.0
     index = 0
@@ -407,7 +405,7 @@ def test_list_while(xs):
     return y
 
 
-@grad_test(([1.0, 2.0, 3.0, 4.0],), pipeline=standard_pipeline)
+@gradient([1.0, 2.0, 3.0, 4.0], pipeline=standard_pipeline)
 def test_list_for(xs):
     y = 1
     for x in xs:
@@ -415,8 +413,8 @@ def test_list_for(xs):
     return y
 
 
-@grad_test(4.5,
-           pipeline=standard_debug_pipeline.configure(validate=False))
+@gradient(4.5,
+          pipeline=standard_debug_pipeline.configure(validate=False))
 def test_exception(x):
     if x > 0:
         return x
@@ -424,7 +422,7 @@ def test_exception(x):
         raise Exception("oh no")
 
 
-@grad_test(4.5,)
+@gradient(4.5)
 def test_nested_closure(x):
     a = x * x
 
@@ -440,7 +438,7 @@ def test_nested_closure(x):
     return f()()
 
 
-@grad_test((4.5, 6.7),)
+@gradient(4.5, 6.7)
 def test_functions_in_tuples(x, y):
     tup = scalar_add, scalar_mul
     f, g = tup
@@ -448,7 +446,7 @@ def test_functions_in_tuples(x, y):
 
 
 @mark.xfail(reason="A DummyInferrer ends up being called")
-@grad_test((4.5, 6.7),)
+@gradient(4.5, 6.7)
 def test_closures_in_tuples(x, y):
     def f():
         return x * y
@@ -461,14 +459,14 @@ def test_closures_in_tuples(x, y):
     return ff() + gg()
 
 
-@grad_test((MA(2, 3), MB(2, 3)),)
+@gradient(MA(2, 3), MB(2, 3))
 def test_array_operations(xs, ys):
     div = array_map(scalar_div, xs, ys)
     sm = array_reduce(scalar_add, div, ())
     return array_to_scalar(sm)
 
 
-@grad_test((3.1, 7.6),)
+@gradient(3.1, 7.6)
 def test_array_operations_distribute(x, y):
     xs = distribute(scalar_to_array(x, AA), (4, 3))
     ys = distribute(scalar_to_array(y, AA), (4, 3))
@@ -477,7 +475,7 @@ def test_array_operations_distribute(x, y):
     return array_to_scalar(sm)
 
 
-@grad_test((MA(2, 3), MB(2, 3)),)
+@gradient(MA(2, 3), MB(2, 3))
 def test_array_operations_reshape(xs, ys):
     xs = reshape(xs, (6,))
     ys = reshape(ys, (6,))
@@ -486,21 +484,21 @@ def test_array_operations_reshape(xs, ys):
     return array_to_scalar(sm)
 
 
-@grad_test((MA(2, 3), MB(2, 3)),)
+@gradient(MA(2, 3), MB(2, 3))
 def test_array_operations_std(xs, ys):
     div = xs / ys
     sm = array_reduce(scalar_add, div, ())
     return array_to_scalar(sm)
 
 
-@grad_test((MA(2, 3), MB(3, 4)),)
+@gradient(MA(2, 3), MB(3, 4))
 def test_dot(x, y):
     d = dot(x, y)
     sm = array_reduce(scalar_add, d, ())
     return array_to_scalar(sm)
 
 
-@grad_test((MA(3, 4), MB(2, 3)),)
+@gradient(MA(3, 4), MB(2, 3))
 def test_transpose(x, y):
     xt = transpose(x, (1, 0))
     yt = transpose(y, (1, 0))
@@ -509,7 +507,7 @@ def test_transpose(x, y):
     return array_to_scalar(sm)
 
 
-@grad_test((MA(3, 4), MB(2, 3), NoTestGrad(1), NoTestGrad(0)),)
+@gradient(MA(3, 4), MB(2, 3), NoTestGrad(1), NoTestGrad(0))
 def test_transpose2(x, y, axis1, axis2):
     perm = (scalar_cast(axis1, u64),
             scalar_cast(axis2, u64))
@@ -520,11 +518,11 @@ def test_transpose2(x, y, axis1, axis2):
     return array_to_scalar(sm)
 
 
-@grad_test(
-    (4.5,),
-    ((5.5, 1.3),),
+@mt(
+    gradient(4.5),
+    gradient((5.5, 1.3)),
     pipeline=standard_pipeline,
-    argspec=(U(f64, (f64, f64)),)
+    abstract=(U(f64, (f64, f64)),)
 )
 def test_union(x):
     if isinstance(x, float):
@@ -534,18 +532,18 @@ def test_union(x):
         return a * b
 
 
-@grad_test(
-    (make_tree(3, 1.0),),
-    (countdown(3.0),),
+@mt(
+    gradient(make_tree(3, 1.0)),
+    gradient(countdown(3.0)),
     pipeline=standard_pipeline,
 )
 def test_sumtree(x):
     return sumtree(x)
 
 
-@grad_test(
-    (make_tree(3, 1.0), 1.0),
-    (countdown(4.0), 1.0),
+@mt(
+    gradient(make_tree(3, 1.0), 1.0),
+    gradient(countdown(4.0), 1.0),
     pipeline=standard_pipeline,
 )
 def test_reducetree(t, init):

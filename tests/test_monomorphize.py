@@ -2,9 +2,6 @@
 import numpy as np
 from pytest import mark
 
-from myia.abstract import from_value
-from myia.debug.label import short_labeler as lbl
-from myia.debug.traceback import print_inference_error
 from myia.hypermap import hyper_map
 from myia.operations import (
     array_map,
@@ -19,8 +16,6 @@ from myia.operations import (
     tagged,
 )
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
-from myia.utils import InferenceError, overload
-from myia.validate import ValidationError
 
 from .common import (
     Point,
@@ -32,8 +27,8 @@ from .common import (
     mysum,
     reducetree,
     sumtree,
-    to_abstract_test,
 )
+from .multitest import mt, run
 
 specialize_pipeline = scalar_debug_pipeline \
     .select('resources', 'parse', 'infer', 'specialize', 'simplify_types',
@@ -48,80 +43,32 @@ specialize_pipeline_std = standard_debug_pipeline \
             'opt', 'opt2', 'validate', 'export', 'wrap')
 
 
-@overload
-def _eq(t1: tuple, t2):
-    return (isinstance(t2, tuple)
-            and all(_eq(x1, x2) for x1, x2 in zip(t1, t2)))
-
-
-@overload  # noqa: F811
-def _eq(a1: np.ndarray, a2):
-    return (a1 == a2).all()
-
-
-@overload  # noqa: F811
-def _eq(x: object, y):
-    return x == y
-
-
 def specializer_decorator(pipeline):
-    def specialize(*arglists, abstract=None, validate=True):
-
-        def decorate(fn):
-            def run_test(args):
-                if isinstance(args, Exception):
-                    exc = type(args)
-                    args = args.args
-                else:
-                    exc = None
-                pdef = pipeline
-                if not validate:
-                    pdef = pdef.configure(validate=False)
-                pip = pdef.make()
-                if abstract is None:
-                    argspec = tuple(from_value(arg, broaden=True)
-                                    for arg in args)
-                else:
-                    argspec = tuple(to_abstract_test(a) for a in abstract)
-
-                if exc is not None:
-                    try:
-                        mfn = pip(input=fn, argspec=argspec)
-                        mfn['output'](*args)
-                    except exc:
-                        pass
-                    return
-
-                result_py = fn(*args)
-
-                try:
-                    res = pip(input=fn, argspec=argspec)
-                except InferenceError as ierr:
-                    print_inference_error(ierr)
-                    raise ierr
-                except ValidationError as verr:
-                    print('Collected the following errors:')
-                    for err in verr.errors:
-                        n = err.node
-                        nlbl = lbl.label(n)
-                        tname = type(n).__name__
-                        print(f'   {nlbl} ({tname}) :: {n.abstract}')
-                        print(f'      {err.args[0]}')
-                    raise verr
-
-                result_final = res['output'](*args)
-                assert _eq(result_py, result_final)
-
-            m = mark.parametrize('args', arglists)(run_test)
-            m.__orig__ = fn
-            return m
-
-        return decorate
-    return specialize
+    def deco(*entries, abstract=None, validate=True):
+        mtentries = []
+        for args in entries:
+            if isinstance(args, Exception):
+                result = type(args)
+                args = args.args
+            else:
+                result = None
+            mtentry = run(
+                *args, result=result,
+                abstract=abstract,
+                validate=validate,
+                pipeline=pipeline
+            )
+            mtentries.append(mtentry)
+        return mt(*mtentries)
+    return deco
 
 
 specialize = specializer_decorator(specialize_pipeline)
 specialize_std = specializer_decorator(specialize_pipeline_std)
+
+
+mono_scalar = run.configure(pipeline=specialize_pipeline)
+mono_standard = run.configure(pipeline=specialize_pipeline_std)
 
 
 int1 = 13
@@ -146,9 +93,14 @@ pt1 = Point(10, 20)
 pt2 = Point(100, 200)
 
 
-@specialize((int1, int2_np64), (int1_np64, int2_np64),
-            (fp1, fp2_np64), (fp1_np64, fp2_np64),
-            (fp1_np32, fp2_np32), (int1_np32, int2_np32))
+@mt(
+    mono_scalar(int1, int2_np64),
+    mono_scalar(int1_np64, int2_np64),
+    mono_scalar(fp1, fp2_np64),
+    mono_scalar(fp1_np64, fp2_np64),
+    mono_scalar(fp1_np32, fp2_np32),
+    mono_scalar(int1_np32, int2_np32),
+)
 def test_prim_arithmetic_np_same_precision(x, y):
 
     def test_prim_mul_np(x, y):
@@ -171,22 +123,28 @@ def test_prim_arithmetic_np_same_precision(x, y):
     return _a, _b, _c, _d
 
 
-@specialize((int1, int2),
-            (fp1, fp2))
+@mt(
+    mono_scalar(int1, int2),
+    mono_scalar(fp1, fp2),
+)
 def test_prim_mul(x, y):
     return x * y
 
 
-@specialize((int1, int2),
-            (fp1, int1))
+@mt(
+    mono_scalar(int1, int2),
+    mono_scalar(fp1, int1),
+)
 def test_polymorphic(x, y):
     def helper(a, b):
         return a * a + b * b
     return helper(x, x + x), helper(y, y + y)
 
 
-@specialize((int1, int2),
-            (fp1, int1))
+@mt(
+    mono_scalar(int1, int2),
+    mono_scalar(fp1, int1),
+)
 def test_polymorphic_closure(x, y):
     def construct(z):
         def inner(w):
@@ -195,9 +153,10 @@ def test_polymorphic_closure(x, y):
     return construct(x + x)(x), construct(y + y)(y)
 
 
-@specialize((True, int1, int2),
-            # (True, fp1, int1)  # TODO: mark this one as xfail
-            )
+@mt(
+    mono_scalar(True, int1, int2),
+    mono_scalar(True, fp1, int1),
+)
 def test_switch_fn(c, x, y):
     def dee(y):
         return y * y
@@ -213,7 +172,10 @@ def test_switch_fn(c, x, y):
     return f(x), f(y)
 
 
-@specialize((int1, int2), (int1, fp1))
+@mt(
+    mono_scalar(int1, int2),
+    mono_scalar(int1, fp1),
+)
 def test_while(n, x):
     rval = x
     while n > 0:
@@ -222,7 +184,10 @@ def test_while(n, x):
     return rval
 
 
-@specialize((int1,), (fp1,))
+@mt(
+    mono_scalar(int1,),
+    mono_scalar(fp1,),
+)
 def test_pow10(x):
     v = x
     j = 0
@@ -235,7 +200,7 @@ def test_pow10(x):
     return v
 
 
-@specialize((int1, fp1))
+@mono_scalar(int1, fp1)
 def test_isinstance(x, y):
     def helper(x):
         if isinstance(x, int):
@@ -248,18 +213,18 @@ def test_isinstance(x, y):
     return helper(x), helper(y), helper(())
 
 
-@specialize((int1, int2))
+@mono_scalar(int1, int2)
 def test_struct(x, y):
     return Point(x, y)
 
 
-@specialize((int1, int2))
+@mono_scalar(int1, int2)
 def test_struct2(x, y):
     p = Point(x, y)
     return p.x + p.y
 
 
-@specialize((np.array([fp1, fp2]),))
+@mono_scalar(np.array([fp1, fp2]))
 def test_array_map(xs):
     def square(x):
         return x * x
@@ -267,8 +232,8 @@ def test_array_map(xs):
     return array_map(square, xs)
 
 
-@specialize((np.array([fp1, fp2]),
-             np.array([int1, int2])))
+@mono_scalar(np.array([fp1, fp2]),
+             np.array([int1, int2]))
 def test_array_map_polymorphic(xs, ys):
     def square(x):
         return x * x
@@ -276,8 +241,8 @@ def test_array_map_polymorphic(xs, ys):
     return array_map(square, xs), array_map(square, ys)
 
 
-@specialize((np.array([fp1, fp2]),
-             np.array([int1, int2])))
+@mono_scalar(np.array([fp1, fp2]),
+             np.array([int1, int2]))
 def test_array_map_polymorphic_indirect(xs, ys):
     def square(x):
         return x * x
@@ -288,8 +253,8 @@ def test_array_map_polymorphic_indirect(xs, ys):
     return helper(square)
 
 
-@specialize((np.array([fp1, fp2]),
-             np.array([int1, int2])))
+@mono_scalar(np.array([fp1, fp2]),
+             np.array([int1, int2]))
 def test_array_reduce_polymorphic_indirect(xs, ys):
     def helper(fn):
         return array_reduce(fn, xs, ()), array_reduce(fn, ys, ())
@@ -297,7 +262,7 @@ def test_array_reduce_polymorphic_indirect(xs, ys):
     return helper(scalar_add)
 
 
-@specialize((int1, np.array([fp1, fp2]),))
+@mono_scalar(int1, np.array([fp1, fp2]))
 def test_array_map_partial(c, xs):
     def square(x):
         return x * x
@@ -312,12 +277,12 @@ def test_array_map_partial(c, xs):
     return fn(xs)
 
 
-@specialize(([fp1, fp2],))
+@mono_scalar([fp1, fp2])
 def test_list_len(xs):
     return len(xs)
 
 
-@specialize(([fp1, fp2],))
+@mono_scalar([fp1, fp2])
 def test_hyper_map(xs):
     def square(x):
         return x * x
@@ -325,7 +290,7 @@ def test_hyper_map(xs):
     return hyper_map(square, xs)
 
 
-@specialize(([fp1, fp2], [int1, int2]))
+@mono_scalar([fp1, fp2], [int1, int2])
 def test_hyper_map_polymorphic(xs, ys):
     def square(x):
         return x * x
@@ -334,7 +299,7 @@ def test_hyper_map_polymorphic(xs, ys):
 
 
 @mark.xfail(reason="Cannot specialize f.")
-@specialize((True, [fp1, fp2], [int1, int2]))
+@mono_scalar(True, [fp1, fp2], [int1, int2])
 def test_hyper_map_polymorphic_2(c, xs, ys):
     def square(x):
         return x * x
@@ -352,12 +317,12 @@ def test_hyper_map_polymorphic_2(c, xs, ys):
     return hyper_map(f, xs), hyper_map(f, ys)
 
 
-@specialize((int1, int2))
+@mono_scalar(int1, int2)
 def test_unused_parameter(x, y):
     return x * x
 
 
-@specialize((int1,))
+@mono_scalar(int1)
 def test_unused_function_parameter(x):
     # The type of square will be AbstractError(DEAD), but that's not really
     # an issue because it is indeed not used, and we can simply replace the
@@ -370,7 +335,7 @@ def test_unused_function_parameter(x):
     return helper(square, x)
 
 
-@specialize((int1,))
+@mono_scalar(int1)
 def test_indirect_primitive(x):
     def add2():
         return scalar_add
@@ -378,7 +343,7 @@ def test_indirect_primitive(x):
     return add2()(x, x)
 
 
-@specialize((int1,))
+@mono_scalar(int1)
 def test_indirect_graph(x):
     def f(x):
         return x * x
@@ -389,7 +354,7 @@ def test_indirect_graph(x):
     return f2()(x)
 
 
-@specialize((True, int1, int2))
+@mono_scalar(True, int1, int2)
 def test_poly_with_constants(c, x, y):
     def f1(x, y):
         return x + y
@@ -406,7 +371,7 @@ def test_poly_with_constants(c, x, y):
     return choose(c)(x, y), choose(not c)(x, y)
 
 
-@specialize((True, int1, int2))
+@mono_scalar(True, int1, int2)
 def test_poly_with_constants2(c, x, y):
     def f1(x, y):
         return x + y
@@ -423,29 +388,38 @@ def test_poly_with_constants2(c, x, y):
     return choose(c)(x, 2), choose(not c)(y, 3)
 
 
-@specialize((int1, int2), (fp1, fp2))
+@mt(
+    mono_scalar(int1, int2),
+    mono_scalar(fp1, fp2),
+)
 def test_method(x, y):
     return x.__add__(y)
 
 
-@specialize((int1, fp1))
+@mono_scalar(int1, fp1)
 def test_method_polymorphic(x, y):
     return x.__add__(x), y.__add__(y)
 
 
-@specialize((int1, fp1))
+@mono_scalar(int1, fp1)
 def test_partial_polymorphic(x, y):
     def f(a, b):
         return a + b
     return partial(f, x)(x), partial(f, y)(y)
 
 
-@specialize((True, int1), (False, int1))
+@mt(
+    mono_scalar(True, int1),
+    mono_scalar(False, int1),
+)
 def test_switch(c, x):
     return switch(c, scalar_usub, scalar_uadd)(x)
 
 
-@specialize((True, int1, int2), (False, int1, int2))
+@mt(
+    mono_scalar(True, int1, int2),
+    mono_scalar(False, int1, int2),
+)
 def test_switch2(c, x, y):
     fn = switch(
         c,
@@ -455,12 +429,12 @@ def test_switch2(c, x, y):
     return fn(y)
 
 
-@specialize((int1, int2, int2))
+@mono_scalar(int1, int2, int2)
 def test_multitype(x, y, z):
     return mysum(x) * mysum(x, y) * mysum(x, y, z)
 
 
-@specialize((int1, int2))
+@mono_scalar(int1, int2)
 def test_closure_stays_in_scope(x, y):
     # The inferrer knows that h(x + y) is the graph for g, but
     # it shouldn't try to replace the expression with that graph,
@@ -477,7 +451,7 @@ def test_closure_stays_in_scope(x, y):
     return h(x + y)()
 
 
-@specialize((int1,))
+@mono_scalar(int1)
 def test_return_closure(x):
     # The specializer should be careful not to replace `f(z - 1)[0]`
     # by a reference to `g`, because `g` is closed over `z` whereas
@@ -493,7 +467,7 @@ def test_return_closure(x):
     return f(x)[1]()
 
 
-@specialize((int1, int2))
+@mono_scalar(int1, int2)
 def test_partial_outside_scope(x, y):
     # The inferrer knows that g(x) is a partial of f, but it can't
     # build it inside the main function.
@@ -507,10 +481,10 @@ def test_partial_outside_scope(x, y):
     return g(x)(y)
 
 
-@specialize_std(
-    (int1,),
-    ([int1, int2],),
-    TypeError((int1, int2),),
+@mt(
+    mono_standard(int1),
+    mono_standard([int1, int2]),
+    mono_standard((int1, int2), result=TypeError),
     abstract=(U(i64, [i64]),)
 )
 def test_union(x):
@@ -520,10 +494,10 @@ def test_union(x):
         return x[0]
 
 
-@specialize_std(
-    (int1, int2),
-    ([int1, int2], int1),
-    TypeError((int1, int2), int1),
+@mt(
+    mono_standard(int1, int2),
+    mono_standard([int1, int2], int1),
+    mono_standard((int1, int2), int1, result=TypeError),
     abstract=(U(i64, f64, [i64]), i64)
 )
 def test_union_nested(x, y):
@@ -535,10 +509,10 @@ def test_union_nested(x, y):
         return x[0]
 
 
-@specialize_std(
-    (int1, int2),
-    ([int1, int2], int1),
-    TypeError((int1, int2), int1),
+@mt(
+    mono_standard(int1, int2),
+    mono_standard([int1, int2], int1),
+    mono_standard((int1, int2), int1, result=TypeError),
     abstract=(U(i64, f64, [i64]), i64)
 )
 def test_union_nested_2(x, y):
@@ -551,10 +525,10 @@ def test_union_nested_2(x, y):
         return x[0]
 
 
-@specialize(
-    (1, fp1, pt1, (int1, int2)),
-    (0, fp1, pt1, (int1, int2)),
-    (-1, fp1, pt1, (int1, int2)),
+@mt(
+    mono_scalar(1, fp1, pt1, (int1, int2)),
+    mono_scalar(0, fp1, pt1, (int1, int2)),
+    mono_scalar(-1, fp1, pt1, (int1, int2)),
 )
 def test_tagged(c, x, y, z):
     if c > 0:
@@ -565,62 +539,57 @@ def test_tagged(c, x, y, z):
         return tagged(z)
 
 
-@specialize(
-    (int1, int2),
-    (pt1, int1),
-    (pt1, pt2),
+@mt(
+    mono_scalar(int1, int2),
+    mono_scalar(pt1, int1),
+    mono_scalar(pt1, pt2),
 )
 def test_hyper_map_scalar_add(x, y):
     return hyper_map(scalar_add, x, y)
 
 
-@specialize((int1,))
+@mono_scalar(int1)
 def test_hyper_map_ct(x):
     return hyper_map(scalar_add, x, 1)
 
 
-@specialize_std(
-    (make_tree(3, 1),),
-    (countdown(10),)
+@mt(
+    mono_standard(make_tree(3, 1)),
+    mono_standard(countdown(10)),
 )
 def test_sumtree(t):
     return sumtree(t)
 
 
-@specialize_std(
-    (make_tree(3, 1),),
-    (countdown(10),)
+@mt(
+    mono_standard(make_tree(3, 1)),
+    mono_standard(countdown(10)),
 )
 def test_reducetree(t):
     return reducetree(scalar_mul, t, 1)
 
 
-@specialize(
-    (make_tree(3, 1),),
-    validate=False
-)
+@mono_scalar(make_tree(3, 1), validate=False)
 def test_hypermap_tree(t):
     return hyper_map(scalar_add, t, t)
 
 
-@specialize_std(((int1, int2), (fp1, fp2)),)
+@mono_standard((int1, int2), (fp1, fp2))
 def test_tuple_surgery(xs, ys):
     return xs[::-1]
 
 
-@specialize(
-    (int1,),
-    (fp1,),
-    (int1, int2),
-    (int1, int2, int1),
+@mt(
+    mono_scalar(int1),
+    mono_scalar(fp1),
+    mono_scalar(int1, int2),
+    mono_scalar(int1, int2, int1),
 )
 def test_default_arg(x, y=3, z=6):
     return x + y + z
 
 
-@specialize(
-    (int1, int2),
-)
+@mono_scalar(int1, int2)
 def test_default_closure(x, y):
     def clos(z=y + y):
         if x > z:
@@ -630,9 +599,7 @@ def test_default_closure(x, y):
     return clos() + clos(x)
 
 
-@specialize(
-    (1, 2, 3, 4, 5),
-)
+@mono_scalar(1, 2, 3, 4, 5)
 def test_varargs(x, *args):
     return args[1]
 
@@ -641,13 +608,13 @@ def _v(x, *args):
     return x + args[-1]
 
 
-@specialize((int1, int2))
+@mono_scalar(int1, int2)
 def test_varargs_2(x, y):
     argos = (1, 2, 3, 4, 5)
     return _v(x, 1, 2, 3) + _v(y, 5) + _v(*argos, 6, *(4, 5))
 
 
-@specialize((int1, int2),)
+@mono_scalar(int1, int2)
 def test_keywords(x, y):
     def fn(albert, beatrice):
         return albert - beatrice
@@ -655,7 +622,7 @@ def test_keywords(x, y):
     return fn(albert=x, beatrice=y) + fn(beatrice=3, albert=7)
 
 
-@specialize((int1, int2),)
+@mono_scalar(int1, int2)
 def test_keywords_2(x, y):
     def fn1(x, albert, beatrice):
         return albert * (x - beatrice)
@@ -668,7 +635,7 @@ def test_keywords_2(x, y):
     return fn(5, albert=x, beatrice=y) + fn(9, albert=3, beatrice=7)
 
 
-@specialize((int1, int2),)
+@mono_scalar(int1, int2)
 def test_keywords_defaults(x, y):
     def fn(albert=1, beatrice=10):
         return albert - beatrice
@@ -676,7 +643,7 @@ def test_keywords_defaults(x, y):
     return fn(beatrice=x + y)
 
 
-@specialize((int1, int2),)
+@mono_scalar(int1, int2)
 def test_kwarg(x, y):
     def fn(albert=1, beatrice=10):
         return albert - beatrice
@@ -687,7 +654,7 @@ def test_kwarg(x, y):
     return proxy(x, beatrice=y), proxy(x, y), proxy(beatrice=x, albert=y)
 
 
-@specialize_std((),)
+@mono_standard()
 def test_reference_bug():
     orig = (4, 1, 6)
     shp = ()
@@ -697,7 +664,7 @@ def test_reference_bug():
     return shp
 
 
-@specialize((int1,),)
+@mono_scalar(int1)
 def test_fib(n):
     a = 1
     b = 1
@@ -706,10 +673,10 @@ def test_fib(n):
     return a
 
 
-@specialize_std(
-    ([11, 22, 33], [44, 55, 66]),
-    ((11, 22, 33), (44, 55, 66)),
-    validate=False
+@mt(
+    mono_standard([11, 22, 33], [44, 55, 66]),
+    mono_standard((11, 22, 33), (44, 55, 66)),
+    validate=False,
 )
 def test_zip_enumerate(xs, ys):
     rval = 0
@@ -725,7 +692,7 @@ def list_reduce(fn, lst, dftl):
     return res
 
 
-@specialize_std(([int1, int2],))
+@mono_standard([int1, int2])
 def test_list_reduce(xs):
     def add(x, y):
         return x + y

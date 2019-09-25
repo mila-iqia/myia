@@ -1,7 +1,3 @@
-from copy import copy
-
-import numpy as np
-from pytest import mark
 
 from myia.abstract import from_value
 from myia.operations import (
@@ -16,74 +12,50 @@ from myia.operations import (
 from myia.pipeline import standard_pipeline
 
 from .common import MA, MB, Point, make_tree, sumtree
+from .multitest import mt, run
 
-compile_pipeline = standard_pipeline
-
-
-def parse_compare(*tests, optimize=True, python=True, justeq=False):
-    """Decorate a function to parse and run it against pure Python.
-
-    Returns a unit test that will parse the function, and then for
-    each `inputs` tuple in `tests` it will check that the pure Python,
-    undecorated function returns that same output.
-
-    This uses the full myia pipeline.
-
-    Arguments:
-        tests: One or more inputs tuple.
-
-    """
-    pipeline = compile_pipeline if optimize else \
-        compile_pipeline.configure({'opt.phases.main': []})
-
-    def decorate(fn):
-        def test(args):
-            if not isinstance(args, tuple):
-                args = (args,)
-            if python:
-                ref_result = fn(*map(copy, args))
-            argspec = tuple(from_value(arg, broaden=True) for arg in args)
-            res = pipeline.run(input=fn, argspec=argspec)
-            myia_fn = res['output']
-            myia_result = myia_fn(*map(copy, args))
-            if python:
-                if justeq:
-                    assert ref_result == myia_result
-                else:
-                    np.testing.assert_allclose(ref_result, myia_result)
-
-        m = mark.parametrize('args', list(tests))(test)
-        m.__orig__ = fn
-        return m
-    return decorate
+run_no_opt = run.configure(
+    pipeline=standard_pipeline.configure({'opt.phases.main': []})
+)
 
 
-@parse_compare((2, 3))
+@run(2, 3)
 def test_simple(x, y):
     return x + y
 
 
-@parse_compare((42,))
+@run(42)
 def test_constant(x):
     return x == 42
 
 
-@parse_compare((False, True), (True, True), (True, False), (False, False))
+@mt(
+    run(False, True),
+    run(True, True),
+    run(True, False),
+    run(False, False)
+)
 def test_bool_and(x, y):
     return bool_and(x, y)
 
 
-@parse_compare((22,), (3.0,), justeq=True)
+@mt(
+    run(22),
+    run(3.0),
+)
 def test_dict(v):
     return {'x': v}
 
 
-@parse_compare({'x': 22, 'y': 3.0})
+@run({'x': 22, 'y': 3.0})
 def test_dict_getitem(d):
     return d['x']
 
 
-@parse_compare((33, 42), (42, 33))
+@mt(
+    run(33, 42),
+    run(42, 33),
+)
 def test_if(x, y):
     if x > y:
         return x - y
@@ -91,7 +63,10 @@ def test_if(x, y):
         return y - x
 
 
-@parse_compare((33, 42), (44, 42))
+@mt(
+    run(33, 42),
+    run(44, 42),
+)
 def test_if_nottail(x, y):
     def cap(x):
         if x > 42:
@@ -100,7 +75,7 @@ def test_if_nottail(x, y):
     return y - cap(x)
 
 
-@parse_compare((42, 33))
+@run(42, 33)
 def test_call(x, y):
     def f(x):
         return x * x
@@ -108,7 +83,7 @@ def test_call(x, y):
     return f(x) + f(y)
 
 
-@parse_compare((42,))
+@run(42)
 def test_tailcall(x):
     def fsum(x, a):
         if x == 1:
@@ -118,7 +93,10 @@ def test_tailcall(x):
     return fsum(x, 1)
 
 
-@parse_compare((-1,), (1,))
+@mt(
+    run(-1),
+    run(1),
+)
 def test_callp(x):
     def fn(f, x):
         return f(x)
@@ -129,7 +107,7 @@ def test_callp(x):
     return fn(f, -42)
 
 
-@parse_compare((True, 42, 33))
+@run(True, 42, 33)
 def test_call_hof(c, x, y):
     def f1(x, y):
         return x + y
@@ -146,7 +124,7 @@ def test_call_hof(c, x, y):
     return choose(c)(x, y) + choose(not c)(x, y)
 
 
-@parse_compare((15, 17), optimize=False)
+@run_no_opt(15, 17)
 def test_partial_prim(x, y):
     return partial(scalar_add, x)(y)
 
@@ -164,36 +142,39 @@ def test_switch_nontail():
 
     i64 = from_value(1, broaden=True)
     argspec = (i64, i64)
-    myia_fn = compile_pipeline.run(input=fn,
-                                   argspec=argspec)['output']
+    myia_fn = standard_pipeline.run(input=fn,
+                                    argspec=argspec)['output']
 
     for test in [(6, 23, 23**2), (67, 23, 67**2)]:
         *args, expected = test
         assert myia_fn(*args) == expected
 
 
-@parse_compare((None,),
-               (42,))
+@mt(
+    run(None),
+    run(42),
+)
 def test_is_(x):
     return x is None
 
 
-@parse_compare((None,),
-               (42,))
+@mt(
+    run(None),
+    run(42),
+)
 def test_is_not(x):
     return x is not None
 
 
-@parse_compare((make_tree(3, 1),))
+@run(make_tree(3, 1))
 def test_sumtree(t):
     return sumtree(t)
 
 
-@parse_compare(
-    (1, 1.7, Point(3, 4), (8, 9)),
-    (0, 1.7, Point(3, 4), (8, 9)),
-    (-1, 1.7, Point(3, 4), (8, 9)),
-    justeq=True
+@mt(
+    run(1, 1.7, Point(3, 4), (8, 9)),
+    run(0, 1.7, Point(3, 4), (8, 9)),
+    run(-1, 1.7, Point(3, 4), (8, 9)),
 )
 def test_tagged(c, x, y, z):
     if c > 0:
@@ -204,30 +185,36 @@ def test_tagged(c, x, y, z):
         return tagged(z)
 
 
-@parse_compare(('hey', 2), ('idk', 5))
+@mt(
+    run('hey', 2),
+    run('idk', 5),
+)
 def test_string_eq(s, x):
     if s == 'idk':
         x = x + 1
     return x
 
 
-@parse_compare(('hey', 2), ('idk', 5))
+@mt(
+    run('hey', 2),
+    run('idk', 5),
+)
 def test_string_ne(s, x):
     if s != 'idk':
         x = x + 1
     return x
 
 
-@parse_compare(('hey',), justeq=True)
+@run('hey')
 def test_string_return(s):
     return s
 
 
-@parse_compare((MA(4, 5)))
+@run(MA(4, 5))
 def test_array_getitem(x):
     return array_getitem(x, (0, 1), (3, 5), (2, 3))
 
 
-@parse_compare((MA(4, 5), MB(2, 2)))
+@run(MA(4, 5), MB(2, 2))
 def test_array_setitem(x, v):
     return array_setitem(x, (0, 1), (3, 5), (2, 3), v)
