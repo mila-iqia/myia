@@ -18,6 +18,7 @@ from ..utils import (
     tracer,
     type_error_nargs,
 )
+from .amerge import amerge, bind
 from .data import (
     ANYTHING,
     DATA,
@@ -47,8 +48,6 @@ from .macro import AnnotationBasedChecker
 from .ref import Context, EvaluationCache, Reference, VirtualReference
 from .to_abstract import to_abstract
 from .utils import (
-    amerge,
-    bind,
     broaden as _broaden,
     concretize_abstract,
     sensitivity_transform,

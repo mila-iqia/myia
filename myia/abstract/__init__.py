@@ -1,6 +1,7 @@
 """Abstract data and type/shape inference."""
 
 from .aliasing import *  # noqa
+from .amerge import *  # noqa
 from .data import *  # noqa
 from .infer import *  # noqa
 from .loop import *  # noqa
