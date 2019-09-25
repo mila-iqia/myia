@@ -339,15 +339,14 @@ class CompileGraphs:
 
     """
 
-    def __init__(self, lin_convert, cut_list, backend, *, split_linear=False):
+    def __init__(self, lin_convert, cut_list, backend):
         """Create a compiler.
 
         This use the specifed implementation for linear parts and a
         list of excluded ops that will be covered by the built-in VM.
 
         """
-        self.transform = CompileGraph(lin_convert, cut_list, backend,
-                                      split_linear=split_linear)
+        self.transform = CompileGraph(lin_convert, cut_list, backend)
         self._reset()
 
     def _reset(self):
