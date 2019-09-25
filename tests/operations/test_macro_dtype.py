@@ -19,5 +19,5 @@ def test_dtype(arr):
 
     run(MA(2, 3), 7, result=7.0),
 )
-def test_cast(arr, x):
+def test_cast_to_dtype(arr, x):
     return scalar_cast(x, dtype(arr))
