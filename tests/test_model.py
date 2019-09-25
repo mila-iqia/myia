@@ -13,7 +13,7 @@ from myia.xtype import Array
 
 from .common import MA, MB, MC, MD, af32_of, af64_of
 from .multitest import mt, run
-from .test_grad import grad_test
+from .test_grad import gradient
 from .test_infer import infer_standard
 
 MA = MA * 0.1
@@ -121,8 +121,8 @@ def test_backward_infer(model, x, y):
     return grad(cost)(model, x, y)
 
 
-@grad_test((make_model(), MC(3, 6), MD(3, 8)),
-           pipeline=standard_pipeline,
-           rel_error=1e-1)
+@gradient(make_model(), MC(3, 6), MD(3, 8),
+          pipeline=standard_pipeline,
+          rel_error=1e-1)
 def test_backward_specialize(model, x, y):
     return cost(model, x, y)

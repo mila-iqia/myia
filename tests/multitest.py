@@ -35,10 +35,6 @@ infer_pipeline = standard_pipeline.select(
     'resources', 'parse', 'infer'
 )
 
-run_pipeline = standard_pipeline
-
-run_debug_pipeline = standard_debug_pipeline
-
 
 class Multiple:
     def __init__(self, *params, **options):
@@ -176,12 +172,14 @@ def infer(self, fn, args, result=None, pipeline=infer_pipeline):
 
 
 @myia_function_test(marks=[pytest.mark.run], id='run')
-def run(self, fn, args, result=None, abstract=None,
-        validate=True, pipeline=run_pipeline):
+def run(self, fn, args, result=None, abstract=None, broad_specs=None,
+        validate=True, pipeline=standard_pipeline):
 
     if abstract is None:
-        argspec = tuple(from_value(arg, broaden=True)
-                        for arg in args)
+        if broad_specs is None:
+            broad_specs = (True,) * len(args)
+        argspec = tuple(from_value(arg, broaden=bs)
+                        for bs, arg in zip(broad_specs, args))
     else:
         argspec = tuple(to_abstract_test(a) for a in abstract)
 
@@ -200,4 +198,4 @@ def run(self, fn, args, result=None, abstract=None,
     self.check(out, result)
 
 
-run_debug = run.configure(pipeline=run_debug_pipeline, validate=False)
+run_debug = run.configure(pipeline=standard_debug_pipeline, validate=False)
