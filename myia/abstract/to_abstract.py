@@ -17,6 +17,7 @@ from ..utils import (
     is_dataclass_type,
     overload,
 )
+from .amerge import amerge
 from .data import (
     ALIASID,
     ANYTHING,
@@ -44,7 +45,7 @@ from .data import (
 )
 from .macro import Macro
 from .ref import Context
-from .utils import amerge, broaden as _broaden, normalize_adt
+from .utils import broaden as _broaden, normalize_adt
 
 _number_types = [
     xtype.Int[8], xtype.Int[16], xtype.Int[32], xtype.Int[64],
