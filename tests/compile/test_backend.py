@@ -23,6 +23,7 @@ from myia.operations import (
 from myia.pipeline import standard_pipeline
 
 from ..common import AN, MA, MB, to_abstract_test
+from ..multitest import run, mt
 
 
 def test_default_backend():
@@ -70,261 +71,49 @@ def test_backend_error():
     del _backends[name]
 
 
-"""
-@run_backend(2, 3)
-def test_add(x, y):
-    return x + y
-
-
-@run_backend(2, 3)
-def test_sub(x, y):
-    return x - y
-
-
-@run_backend(2, 3)
-def test_mul(x, y):
-    return x * y
-
-
-@pytest.mark.xfail(reason="scalar_cast is needed for ints")
-@mt(
-    run_backend(2, 3),
-    run_backend(2.0, 3.0),
-)
-def test_truediv(x, y):
-    return x / y
-
-
-@mt(
-    run_backend(2, 3),
-    run_backend(2.0, 3.0)
-)
-def test_floordiv(x, y):
-    return x // y
-
-
-@run_backend(2, 3)
-def test_mod(x, y):
-    return x % y
-
-
-@run_backend(2.0, 3.0)
-def test_pow(x, y):
-    return x ** y
-
-
-@run_backend(2)
-def test_uadd(x):
-    return +x
-
-
-@run_backend(2)
-def test_usub(x):
-    return -x
-
-
-@run_backend(2.0)
-def test_exp(x):
-    return math.exp(x)
-
-
-@run_backend(2.0)
-def test_log(x):
-    return math.log(x)
-
-
-@pytest.mark.xfail(reason="not implemented")
-@run_backend(2.0)
-def test_tan(x):
-    return math.tan(x)
-
-
-@run_backend(0.3)
-def test_tanh(x):
-    return math.tanh(x)
-
-
-@run_backend(2, 3)
-def test_eq(x, y):
-    return x == y
-
-
-@run_backend(2, 3)
-def test_lt(x, y):
-    return x < y
-
-
-@run_backend(2, 3)
-def test_gt(x, y):
-    return x > y
-
-
-@run_backend(2, 3)
-def test_ne(x, y):
-    return x != y
-
-
-@run_backend(2, 3)
-def test_le(x, y):
-    return x <= y
-
-
-@run_backend(2, 3)
-def test_ge(x, y):
-    return x >= y
-
-
-@mt(
-    run_backend(True, False),
-    run_backend(True, True)
-)
-def test_bool_eq(x, y):
-    return x == y
-
-
-@run_backend(2)
-def test_to_array(x):
-    return scalar_to_array(x, AN)
-
-
-@mt(
-    run_backend(False),
-    run_backend(True),
-)
-def test_bool_not(x,):
-    return not x
-
-
-@run_backend(2)
-def test_distribute(x):
-    return distribute(scalar_to_array(x, AN), (2, 3))
-
-
-@run_backend(2)
-def test_distribute2(x):
-    return distribute(scalar_to_array(x, AN), (1,))
-
-
-@mt(
-    run_backend(np.ones((1, 3))),
-    run_backend(np.ones((3,))),
-)
-def test_distribute3(x):
-    return distribute(x, (2, 3))
-
-
-@run_backend(MA(2, 3))
-def test_distribute4(x):
-    return distribute(x, (2, 3))
-
-
-@run_backend(MA(2, 3))
-def test_reshape(x):
-    return reshape(x, (1, 3, 2, 1))
-
-
-@run_backend(MA(2, 3))
+@run(MA(2, 3))
 def test_reshape2(x):
     return reshape(x, (6,))
 
 
-@run_backend(MA(1, 3))
-def test_reshape3(x):
-    return reshape(x, (3,))
-
-
-@run_backend(np.ones((1,)))
-def test_reshape4(x):
-    return reshape(x, ())
-
-
-@run_backend(MA(2, 3), MB(3, 4))
-def test_dot(x, y):
-    return dot(x, y)
-
-
 @mt(
-    run_backend(MA(2, 3), MB(2, 3)),
-    run_backend(MA(1, 3), MB(2, 3)),
-    run_backend(MA(2, 1), MB(2, 3)),
-)
-def test_array_map(x, y):
-    return x + y
-
-
-@mt(
-    run_backend(MA(2, 3)),
-    run_backend(MA(1, 3)),
+    run(MA(2, 3)),
+    run(MA(1, 3)),
 )
 def test_array_reduce(x):
     return array_reduce(scalar_add, x, (1, 3))
 
 
-@run_backend(MA(2, 3))
+@run(MA(2, 3))
 def test_array_reduce2(x):
     return array_reduce(scalar_add, x, (3,))
 
 
-@run_backend(MA(2, 3))
-def test_array_reduce3(x):
-    return array_reduce(scalar_add, x, ())
+@pytest.mark.xfail(reason="scalar_cast is needed for ints")
+@mt(
+    run(2, 3),
+    run(2.0, 3.0),
+)
+def test_truediv(x, y):
+    return x / y
 
 
-@run_backend(MA(2, 3))
-def test_transpose(x):
-    return transpose(x, (1, 0))
-
-
-@run_backend(3, 4)
-def test_make_tuple(a, b):
-    return (a, b)
-
-
-@run_backend(True, 42, 33)
-def test_call_hof(c, x, y):
-    def f1(x):
-        return x + y
-
-    def f2(x):
-        return x * y
-
-    def choose(c):
-        if c:
-            return f1
-        else:
-            return f2
-
-    return choose(c)(x) + choose(not c)(x)
+@run(2)
+def test_to_array(x):
+    return scalar_to_array(x, AN)
 
 
 @mt(
-    run_backend(None),
-    run_backend(True),
-    run_backend(False)
+    run(None),
+    run(True),
+    run(False)
 )
 def test_bool_and_nil_args(x):
     return x
 
 
-@run_backend(None)
-def test_True_assign(_x):
-    x = True
-    return x
-
-
-@run_backend(None)
-def test_False_assign(_x):
-    x = False
-    return x
-
-
-@run_backend(np.array(2))
-def test_array_to_scalar(x):
-    return x.item()
-
-
 @pytest.mark.xfail  # MyiaTypeError: AbstractTuple vs AbstractTaggedUnion
-@run_backend(())
+@run(())
 def test_return_list():
     return [1, 2, 3]
 
@@ -333,7 +122,7 @@ ll = [1, 2, 3]
 
 
 @pytest.mark.xfail  # unhashable type in cse
-@run_backend(())
+@run(())
 def test_constant_list():
     return ll
 
@@ -342,7 +131,6 @@ a = MA(2, 3)
 
 
 @pytest.mark.xfail  # unhashable type in cse
-@run_backend(())
+@run(())
 def test_constant_array():
     return a
-"""

@@ -54,7 +54,7 @@ from .common import (
     to_abstract_test,
     u64,
 )
-from .multitest import mt, myia_function_test
+from .multitest import mt, myia_function_test, backend_all
 
 
 @dataclass
@@ -176,7 +176,8 @@ def _grad_test(fn, obj, args,
 
 @myia_function_test(marks=[pytest.mark.grad], id='grad')
 def gradient(self, fn, args, abstract=None,
-             rel_error=1e-3, pipeline=grad_pipeline):
+             rel_error=1e-3, pipeline=grad_pipeline,
+             backend=False):
     """Test the gradient of a Myia function using finite_differences.
 
     Arguments:
@@ -187,6 +188,16 @@ def gradient(self, fn, args, abstract=None,
         rel_error: The relative tolerance.
         pipeline: The pipeline to use.
     """
+
+    if backend:
+        backend_name = backend[0]
+        backend_options = backend[1]
+
+        pipeline = pipeline.configure({
+            'resources.backend.name': backend_name,
+            'resources.backend.options': backend_options
+	})
+
     _grad_test(fn, fn, args,
                pipeline=pipeline,
                rel_error=rel_error,
@@ -262,12 +273,12 @@ def test_tuples(x, y):
     return z
 
 
-@gradient(Point(3.0, 5.0), pipeline=standard_pipeline)
+@gradient(Point(3.0, 5.0), pipeline=standard_pipeline, backend=backend_all)
 def test_dataclass(pt):
     return pt.x * pt.y
 
 
-@gradient(Point(3.0, 5.0), pipeline=standard_pipeline)
+@gradient(Point(3.0, 5.0), pipeline=standard_pipeline, backend=backend_all)
 def test_dataclass_2(pt):
     return pt.abs()
 
@@ -353,7 +364,7 @@ def test_fact(x):
     return fact(x)
 
 
-@gradient(4.1, pipeline=standard_pipeline)
+@gradient(4.1, pipeline=standard_pipeline, backend=backend_all)
 def test_fact_opt(x):
     def fact(n=x):
         if n <= 1:
@@ -405,7 +416,8 @@ def test_list_while(xs):
     return y
 
 
-@gradient([1.0, 2.0, 3.0, 4.0], pipeline=standard_pipeline)
+@gradient([1.0, 2.0, 3.0, 4.0], pipeline=standard_pipeline,
+          backend=backend_all)
 def test_list_for(xs):
     y = 1
     for x in xs:
@@ -522,6 +534,7 @@ def test_transpose2(x, y, axis1, axis2):
     gradient(4.5),
     gradient((5.5, 1.3)),
     pipeline=standard_pipeline,
+    backend=backend_all,
     abstract=(U(f64, (f64, f64)),)
 )
 def test_union(x):
@@ -536,6 +549,7 @@ def test_union(x):
     gradient(make_tree(3, 1.0)),
     gradient(countdown(3.0)),
     pipeline=standard_pipeline,
+    backend=backend_all
 )
 def test_sumtree(x):
     return sumtree(x)
@@ -545,6 +559,7 @@ def test_sumtree(x):
     gradient(make_tree(3, 1.0), 1.0),
     gradient(countdown(4.0), 1.0),
     pipeline=standard_pipeline,
+    backend=backend_all
 )
 def test_reducetree(t, init):
     return reducetree(scalar_mul, t, init)
