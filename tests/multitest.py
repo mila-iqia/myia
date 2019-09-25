@@ -97,7 +97,7 @@ class MyiaFunctionTest:
         if isinstance(expected, type) and issubclass(expected, Exception):
             try:
                 res = run()
-            except expected as err:
+            except expected:
                 pass
             else:
                 raise Exception(

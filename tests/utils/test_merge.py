@@ -1,5 +1,14 @@
 
-from myia.utils import DELETE, Merge, Override, Reset, TypeMap, cleanup, merge
+from myia.utils import (
+    DELETE,
+    Merge,
+    Override,
+    Registry,
+    Reset,
+    TypeMap,
+    cleanup,
+    merge,
+)
 
 
 def test_merge():
@@ -17,6 +26,19 @@ def test_merge():
 
     dlt = dict(c=DELETE, d=3)
     assert merge(a, dlt) == dict(a=1, b=2, d=3)
+
+
+def test_merge_registry():
+
+    a = Registry()
+    a.update(dict(a=1, b=2, c=3))
+    b = Registry()
+    b.update(dict(d=4))
+    c = Registry()
+    c.update(dict(a=1, b=2, c=3, d=4))
+
+    assert merge(a, b) == c
+    assert type(merge(a, b)) is Registry
 
 
 def test_merge_subclass():

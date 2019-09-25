@@ -12,6 +12,7 @@ from myia.abstract import (
     DEAD,
     TYPE,
     VALUE,
+    AbstractBottom,
     AbstractClass,
     AbstractError,
     AbstractFunction,
@@ -240,6 +241,9 @@ def test_repr():
     tu1 = AbstractTaggedUnion([[13, s2], [4, to_abstract_test(i16)]])
     assert repr(tu1) == \
         'AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))'
+
+    bot = AbstractBottom()
+    assert repr(bot) == 'AbstractBottom(⊥)'
 
 
 def test_repr_recursive():
