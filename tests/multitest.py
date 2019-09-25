@@ -5,7 +5,6 @@ from types import FunctionType
 import numpy as np
 import pytest
 
-from myia.api import to_device
 from myia.lib import concretize_abstract, from_value
 from myia.pipeline import standard_debug_pipeline, standard_pipeline
 from myia.utils import keyword_decorator, merge, overload

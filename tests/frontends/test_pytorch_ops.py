@@ -19,7 +19,7 @@ from myia.frontends.pytorch_abstract_types import PyTorchTensor  # noqa: E402
 from myia.pipeline import standard_pipeline
 
 from ..common import MA, f32, to_abstract_test
-from ..multitest import eqtest, mt, myia_function_test, run
+from ..multitest import eqtest, mt, myia_function_test, run, run_no_relay
 from ..test_grad import grad_wrap
 
 torch = pytest.importorskip("torch")
@@ -173,14 +173,14 @@ def test_torch_tanh(x):
 # KEEP THESE IN ALPHABETICAL ORDER ####################################
 
 
-@run(nn.Parameter(torch.Tensor(MA(2, 3))))
+@run_no_relay(nn.Parameter(torch.Tensor(MA(2, 3))))
 def test_torch_tensor_argmax_1_arg(x):
     return torch.argmax(x)
 
 
 @mt(
-    run(nn.Parameter(torch.Tensor(MA(2, 3))), 1, True),
-    run(nn.Parameter(torch.Tensor(MA(2, 3))), 0, True),
+    run_no_relay(nn.Parameter(torch.Tensor(MA(2, 3))), 1, True),
+    run_no_relay(nn.Parameter(torch.Tensor(MA(2, 3))), 0, True),
     broad_specs=(True, False, False),
 )
 def test_torch_tensor_argmax_3_arg(x, y, z):
@@ -260,11 +260,12 @@ def test_torch_max_pool2d(x, ri):
 
 
 @mt(
-    run(nn.Parameter(torch.randn(2, 4, 3, 5)), True),
-    run(nn.Parameter(torch.tensor([[[[1., 2., 3., 4.],
-        [5., 6., 7., 8.], [13., 14., 15., 16.],
-        [9., 10., 11., 12.]]]])),
-        True),
+    run_no_relay(nn.Parameter(torch.randn(2, 4, 3, 5)), True),
+    run_no_relay(nn.Parameter(torch.tensor([[[[1., 2., 3., 4.],
+                                              [5., 6., 7., 8.],
+                                              [13., 14., 15., 16.],
+                                              [9., 10., 11., 12.]]]])),
+                 True),
     broad_specs=(True, False, False, False, False, False, True)
 )
 def test_torch_max_pool2d_return_indices(x, ri):
@@ -384,7 +385,7 @@ def test_torch_sum(x):
     return torch.sum(x)
 
 
-@run(nn.Parameter(torch.Tensor(MA(2, 3))))
+@run_no_relay(nn.Parameter(torch.Tensor(MA(2, 3))))
 def test_torch_sum_dtype_fwd(x):
     return torch.sum(x, dtype=torch.float64)
 
