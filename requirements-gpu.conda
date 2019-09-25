@@ -1,7 +1,7 @@
 python>=3.7,<3.8a0
 colorama
 numpy
-abergeron/label/cuda::tvm-libs==0.6dev+3.*
+abergeron/label/cuda::tvm-libs
 abergeron::tvm==0.6dev+3.*
 pytest
 pytest-cov
