@@ -11,7 +11,7 @@ from myia.operations import (
 )
 from myia.pipeline import standard_pipeline
 
-from .common import MA, MB, Point, make_tree, sumtree
+from .common import MA, MB, Point
 from .multitest import mt, run, run_no_relay
 
 run_no_opt = run.configure(
@@ -164,11 +164,6 @@ def test_is_(x):
 )
 def test_is_not(x):
     return x is not None
-
-
-@run(make_tree(3, 1))
-def test_sumtree(t):
-    return sumtree(t)
 
 
 @mt(

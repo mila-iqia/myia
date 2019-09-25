@@ -29,7 +29,6 @@ from myia.abstract import (
 )
 from myia.classes import ADT
 from myia.ir import MultitypeGraph
-from myia.operations import tagged
 from myia.utils import EnvInstance, dataclass_fields, overload
 from myia.xtype import Bool, f16, f32, f64, i16, i32, i64, u64
 
@@ -248,49 +247,6 @@ Thing_ftup = from_value(Thing((1.0, 2.0)), broaden=True)
 class Pair(ADT):
     left: object
     right: object
-
-
-def make_tree(depth, x):
-    if depth == 0:
-        return tagged(x)
-    else:
-        return tagged(
-            Pair(
-                make_tree(depth - 1, x * 2),
-                make_tree(depth - 1, x * 2 + 1)
-            )
-        )
-
-
-def countdown(n):
-    if n == 0:
-        return tagged(None)
-    else:
-        return tagged(
-            Pair(
-                n,
-                countdown(n - 1)
-            )
-        )
-
-
-def sumtree(t):
-    if isinstance(t, (int, float)):
-        return t
-    elif t is None:
-        return 0
-    else:
-        return sumtree(t.left) + sumtree(t.right)
-
-
-def reducetree(fn, t, init):
-    if isinstance(t, (int, float)):
-        return t
-    elif t is None:
-        return init
-    else:
-        return fn(reducetree(fn, t.left, init),
-                  reducetree(fn, t.right, init))
 
 
 ###################

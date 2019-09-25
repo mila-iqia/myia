@@ -8,7 +8,6 @@ from myia.operations import (
     array_reduce,
     partial,
     scalar_add,
-    scalar_mul,
     scalar_sub,
     scalar_uadd,
     scalar_usub,
@@ -17,17 +16,7 @@ from myia.operations import (
 )
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 
-from .common import (
-    Point,
-    U,
-    countdown,
-    f64,
-    i64,
-    make_tree,
-    mysum,
-    reducetree,
-    sumtree,
-)
+from .common import Point, U, f64, i64, mysum
 from .multitest import mt, run
 
 specialize_pipeline = scalar_debug_pipeline \
@@ -182,22 +171,6 @@ def test_while(n, x):
         n = n - 1
         rval = rval - x
     return rval
-
-
-@mt(
-    mono_scalar(int1,),
-    mono_scalar(fp1,),
-)
-def test_pow10(x):
-    v = x
-    j = 0
-    while j < 3:
-        i = 0
-        while i < 3:
-            v = v * x
-            i = i + 1
-        j = j + 1
-    return v
 
 
 @mono_scalar(int1, fp1)
@@ -539,41 +512,6 @@ def test_tagged(c, x, y, z):
         return tagged(z)
 
 
-@mt(
-    mono_scalar(int1, int2),
-    mono_scalar(pt1, int1),
-    mono_scalar(pt1, pt2),
-)
-def test_hyper_map_scalar_add(x, y):
-    return hyper_map(scalar_add, x, y)
-
-
-@mono_scalar(int1)
-def test_hyper_map_ct(x):
-    return hyper_map(scalar_add, x, 1)
-
-
-@mt(
-    mono_standard(make_tree(3, 1)),
-    mono_standard(countdown(10)),
-)
-def test_sumtree(t):
-    return sumtree(t)
-
-
-@mt(
-    mono_standard(make_tree(3, 1)),
-    mono_standard(countdown(10)),
-)
-def test_reducetree(t):
-    return reducetree(scalar_mul, t, 1)
-
-
-@mono_scalar(make_tree(3, 1), validate=False)
-def test_hypermap_tree(t):
-    return hyper_map(scalar_add, t, t)
-
-
 @mono_standard((int1, int2), (fp1, fp2))
 def test_tuple_surgery(xs, ys):
     return xs[::-1]
@@ -662,15 +600,6 @@ def test_reference_bug():
         if z != 1:
             shp = shp + (z,)
     return shp
-
-
-@mono_scalar(int1)
-def test_fib(n):
-    a = 1
-    b = 1
-    for _ in range(n):
-        a, b = b, a + b
-    return a
 
 
 @mt(

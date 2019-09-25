@@ -7,15 +7,12 @@ from typing import List, Tuple
 import numpy as np
 import pytest
 
-from myia import abstract
 from myia.abstract import (
     ANYTHING,
     CONTEXTLESS,
     Contextless,
     UniformPrimitiveInferrer,
-    from_value,
 )
-from myia.hypermap import HyperMap, hyper_map
 from myia.ir import Graph, MetaGraph, MultitypeGraph
 from myia.operations import (
     J,
@@ -89,7 +86,6 @@ from .common import (
     D,
     EmptyTuple,
     Ex,
-    Pair,
     Point,
     Point3D,
     S,
@@ -105,8 +101,6 @@ from .common import (
     ai16_of,
     ai32_of,
     ai64_of,
-    countdown,
-    make_tree,
     mysum,
     to_abstract_test,
 )
@@ -696,19 +690,6 @@ def test_apply(args):
     return _f(*args)
 
 
-@mt(
-    infer_scalar(i64, result=i64),
-    infer_scalar(f64, result=f64),
-)
-def test_fact(n):
-    def fact(n):
-        if n <= 1:
-            return 1
-        else:
-            return n * fact(n - 1)
-    return fact(n)
-
-
 def even(n):
     if n == 0:
         return True
@@ -729,22 +710,6 @@ def odd(n):
 )
 def test_even_odd(n):
     return even(n)
-
-
-@mt(
-    infer_scalar(i64, result=i64),
-    infer_scalar(f64, result=f64),
-)
-def test_pow10(x):
-    v = x
-    j = 0
-    while j < 3:
-        i = 0
-        while i < 3:
-            v = v * x
-            i = i + 1
-        j = j + 1
-    return v
 
 
 @mt(
@@ -2107,71 +2072,6 @@ def test_record_setitem_wrong_field(thing, x):
     return P.record_setitem(thing, 'shfifty_five', x)
 
 
-hyper_map_notuple = HyperMap(
-    nonleaf=(abstract.AbstractArray,
-             abstract.AbstractUnion,
-             abstract.AbstractClassBase)
-)
-hyper_map_nobroadcast = HyperMap(broadcast=False)
-
-
-@mt(
-    infer_scalar(i64, i64, result=i64),
-    infer_scalar(f64, f64, result=f64),
-    infer_scalar([f64], [f64], result=[f64]),
-    infer_scalar([[f64]], [[f64]], result=[[f64]]),
-    infer_scalar((i64, f64), (i64, f64), result=(i64, f64)),
-    infer_scalar(Point(i64, i64), Point(i64, i64), result=Point(i64, i64)),
-    infer_scalar(ai64_of(2, 5), ai64_of(2, 5), result=ai64_of(2, 5)),
-    infer_scalar(ai64_of(2, 5), i64, result=ai64_of(2, 5)),
-    infer_scalar(ai64_of(1, 5), ai64_of(2, 1), result=ai64_of(2, 5)),
-    infer_scalar(i64, f64, result=InferenceError),
-    infer_scalar(ai64_of(2, 5), af64_of(2, 5), result=InferenceError),
-    infer_scalar(U(i64, (i64, i64)), U(i64, (i64, i64)),
-                 result=U(i64, (i64, i64))),
-    infer_scalar(U(i64, (i64, i64)), U(i64, (i64, i64, i64)),
-                 result=InferenceError),
-    infer_scalar({"x": i64, "y": i64}, {"x": i64, "y": i64},
-                 result={"x": i64, "y": i64}),
-    infer_scalar({"x": i64, "y": i64}, {"x": i64, "y": i64, "z": i64},
-                 result=InferenceError),
-    infer_scalar({"x": i64, "y": i64}, {"y": i64, "z": i64},
-                 result=InferenceError),
-
-    # Generic broadcasting tests
-    infer_scalar([f64], f64, result=[f64]),
-    infer_scalar([[f64]], [[f64]], result=[[f64]]),
-    infer_scalar((i64, i64), i64, result=(i64, i64)),
-    infer_scalar(i64, (i64, i64), result=(i64, i64)),
-    infer_scalar(Point(i64, i64), i64, result=Point(i64, i64)),
-
-    # Various errors
-    infer_scalar((i64, i64), (i64, i64, i64), result=InferenceError),
-    infer_scalar(Point(i64, i64), Point3D(i64, i64, i64),
-                 result=InferenceError),
-    infer_scalar((i64, i64), [i64], result=InferenceError),
-)
-def test_hyper_map(x, y):
-    return hyper_map(scalar_add, x, y)
-
-
-@mt(
-    infer_scalar((i64, f64), (i64, f64), result=InferenceError),
-    infer_scalar([f64], f64, result=[f64]),
-)
-def test_hyper_map_notuple(x, y):
-    return hyper_map_notuple(scalar_add, x, y)
-
-
-@mt(
-    infer_scalar(ai64_of(2, 5), ai64_of(2, 5), result=ai64_of(2, 5)),
-    infer_scalar(ai64_of(2, 5), ai64_of(2, 1), result=InferenceError),
-    infer_scalar(ai64_of(2, 5), i64, result=InferenceError),
-)
-def test_hyper_map_nobroadcast(x, y):
-    return hyper_map_nobroadcast(scalar_add, x, y)
-
-
 @mt(
     infer_scalar(i64, i64, result=i64),
     infer_scalar(f64, f64, result=f64),
@@ -2260,82 +2160,6 @@ def test_pass(x):
     return x
 
 
-@mt(
-    infer_scalar(i32, result=i32),
-    infer_scalar(1, result=i64),
-    infer_scalar(-1, result=Bot),
-)
-def test_assert(x):
-    assert x >= 0
-    return x ** 0.5
-
-
-@mt(
-    infer_scalar(i32, result=i32),
-    infer_scalar(1, result=i64),
-    infer_scalar(-1, result=Bot),
-)
-def test_assert_msg(x):
-    assert x >= 0, 'x must be positive'
-    return x ** 0.5
-
-
-@infer_scalar(i32, result=i32)
-def test_raise(x):
-    if x >= 0:
-        return x ** 0.5
-    else:
-        raise Exception("sqrt of negative number")
-
-
-@infer_scalar(i32, result=Bot)
-def test_raise_unconditional(x):
-    raise Exception("I don't like your face")
-
-
-@infer_scalar(i32, result=i32)
-def test_raise_multiple(x):
-    if x < 0:
-        raise Exception("You are too ugly")
-    elif x > 0:
-        raise Exception("You are too beautiful")
-    else:
-        return x
-
-
-@mt(
-    infer_standard(i32, result=Bot),
-    infer_standard(f64, result=f64),
-    infer_standard(U(i32, i64), result=i64)
-)
-def test_raise_hastype(x):
-    if hastype(x, i32):
-        raise Exception("What a terrible type")
-    else:
-        return x
-
-
-@infer_scalar(i32, result=i32)
-def test_raise_loop(x):
-    while x < 100:
-        x = x * x
-        if x > 150:
-            raise Exception("oh no")
-    return x
-
-
-@infer_scalar(i32, result=i32)
-def test_raise_rec(x):
-    def f(x):
-        if x == 0:
-            return 1
-        elif x >= 10:
-            raise Exception("too big")
-        else:
-            return x * f(x - 1)
-    return f(x)
-
-
 @infer_scalar(i64, i32, i64, result=U(i32, i64))
 def test_tagged(x, y, z):
     if x > 0:
@@ -2357,24 +2181,6 @@ def test_tagged_more(c, x, y, z):
 @infer_scalar(i64, result=InferenceError)
 def test_tagged_too_many_arguments(x):
     return tagged(x, 1, 2)
-
-
-pair_t1 = from_value(Pair(Pair(1, 2), Pair(2, 3)))
-pair_t1_u = pair_t1.attributes['left']
-
-
-@infer_scalar(i64, result=pair_t1_u)
-def test_tagged_adt(depth):
-    return make_tree(depth, 1)
-
-
-pair_t2 = from_value(Pair(1, Pair(2, Pair(3, None))))
-pair_t2_u = pair_t2.attributes['right']
-
-
-@infer_scalar(i64, result=pair_t2_u)
-def test_tagged_adt_2(depth):
-    return countdown(depth)
 
 
 @mt(
