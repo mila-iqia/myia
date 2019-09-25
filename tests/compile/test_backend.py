@@ -1,29 +1,15 @@
-import math
-
-import numpy as np
 import pytest
 
-from myia.abstract import from_value
-from myia.api import to_device
 from myia.compile.backends import (
     LoadingError,
     UnknownBackend,
     load_backend,
     parse_default,
 )
-from myia.operations import (
-    array_reduce,
-    distribute,
-    dot,
-    reshape,
-    scalar_add,
-    scalar_to_array,
-    transpose,
-)
-from myia.pipeline import standard_pipeline
+from myia.operations import array_reduce, reshape, scalar_add, scalar_to_array
 
-from ..common import AN, MA, MB, to_abstract_test
-from ..multitest import run, mt
+from ..common import AN, MA
+from ..multitest import mt, run
 
 
 def test_default_backend():

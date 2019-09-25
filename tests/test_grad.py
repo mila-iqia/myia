@@ -54,7 +54,7 @@ from .common import (
     to_abstract_test,
     u64,
 )
-from .multitest import mt, myia_function_test, backend_all
+from .multitest import backend_all, mt, myia_function_test
 
 
 @dataclass
@@ -196,7 +196,7 @@ def gradient(self, fn, args, abstract=None,
         pipeline = pipeline.configure({
             'resources.backend.name': backend_name,
             'resources.backend.options': backend_options
-	})
+        })
 
     _grad_test(fn, fn, args,
                pipeline=pipeline,
