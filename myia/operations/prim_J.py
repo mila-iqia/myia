@@ -4,8 +4,10 @@ from ..lib import (
     AbstractFunction,
     AbstractJTagged,
     JTransformedFunction,
+    bprop_to_grad_transform,
     standard_prim,
 )
+from ..operations import Jinv
 from . import primitives as P
 
 
@@ -17,6 +19,12 @@ async def infer_J(self, engine, x):
         return AbstractFunction(*[JTransformedFunction(poss)
                                   for poss in v])
     return AbstractJTagged(x)
+
+
+@bprop_to_grad_transform(P.J)
+def bprop_J(x, out, dout):
+    """Backpropagator for primitive `J`."""
+    return (Jinv(dout),)
 
 
 __operation_defaults__ = {
@@ -33,5 +41,5 @@ __primitive_defaults__ = {
     'type': 'placeholder',
     'python_implementation': None,
     'inferrer_constructor': infer_J,
-    'grad_transform': None,
+    'grad_transform': bprop_J,
 }
