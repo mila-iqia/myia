@@ -380,21 +380,24 @@ def test_array_to_scalar(x):
 
 
 @pytest.mark.xfail  # MyiaTypeError: AbstractTuple vs AbstractTaggedUnion
-@parse_compare(())
+@run_backend(())
 def test_return_list():
     return [1, 2, 3]
 
 
-l = [1, 2, 3]
+ll = [1, 2, 3]
+
+
 @pytest.mark.xfail  # unhashable type in cse
-@parse_compare(())
+@run_backend(())
 def test_constant_list():
-    return l
+    return ll
 
 
 a = MA(2, 3)
 
+
 @pytest.mark.xfail  # unhashable type in cse
-@parse_compare(())
+@run_backend(())
 def test_constant_array():
     return a

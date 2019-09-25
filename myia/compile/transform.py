@@ -113,12 +113,11 @@ class CompileGraph:
 
     """
 
-    def __init__(self, lin_convert, cut_list, backend, *, split_linear=False):
+    def __init__(self, lin_convert, cut_list, backend):
         """Create a CompileGraph with the specified linear backend."""
         self.lin_convert = lin_convert
         self.cut_list = cut_list
         self.backend = backend
-        self.split_linear = split_linear
 
     def _reset(self):
         """Set/clear shared values."""
@@ -140,14 +139,11 @@ class CompileGraph:
     def split(self, graph):
         """Split a graph into portions."""
         splits = []
-        split = []
 
         for node in toposort(graph.return_):
             if self._is_cut(node):
                 splits.append(node)
-                split = []
             elif not (node.is_constant() or node.is_parameter()):
-                assert self.split_linear
                 splits.append([node])
 
         return splits

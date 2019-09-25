@@ -372,7 +372,7 @@ class PyTorchBackend(Backend):
         """Create a PyTorch backend on the given device."""
         self.device = torch.device(device)
         self.compiler = CompileGraphs(lambda lst: pytorch_convert(lst, self),
-                                      nonlinear_ops, self, split_linear=True)
+                                      nonlinear_ops, self)
 
     def compile(self, graph, *others):
         """Compile a graph."""

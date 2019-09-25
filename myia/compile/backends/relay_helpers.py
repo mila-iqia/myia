@@ -14,7 +14,6 @@ from ...abstract import (
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
-    PartialApplication,
     TypedPrimitive,
     VirtualFunction,
     broaden,
