@@ -129,12 +129,6 @@ def fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline):
     _fwd_and_bwd(fn, args, broad_specs, pipeline)
 
 
-''' # for when test is not product of "name, args"
-def _name_args_helper(name, args):
-    return [(name, args) for arg in args]
-    #'''
-
-
 # THIS TEST ALL OPS that are in dir of "torch" or "torch.tensor"
 # all_torch_ops = dir(torch)
 # all_torch_tensor_ops = dir(torch.Tensor([5.49670]))

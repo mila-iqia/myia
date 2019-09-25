@@ -48,6 +48,11 @@ class Multiple:
 
 
 def mt(*tests, **kwargs):
+    """Multitest.
+
+    All MyiaFunctionTest instances in the list of tests will be run on the same
+    function. If kwargs are provided, they will be given to all the tests.
+    """
     def deco(fn):
         def runtest(test):
             test.run(fn)
@@ -61,18 +66,34 @@ def mt(*tests, **kwargs):
 
 
 class MyiaFunctionTest:
+    """Test a Myia function on a set of arguments.
+
+    Arguments:
+        runtest: The function to use to run the test.
+        spec: The kwargs to give to the function.
+    """
 
     def __init__(self, runtest, spec):
+        """Initialize a MyiaFunctionTest."""
         self.spec = spec
         self.runtest = runtest
 
     def configure(self, **spec):
+        """Configure this test with new kwargs."""
         return MyiaFunctionTest(
             self.runtest,
             spec={**self.spec, **spec},
         )
 
     def check(self, run, expected):
+        """Check the result of run() against expected.
+
+        Expected can be either:
+
+        * A value, which will be compared using eqtest.
+        * A subclass of Exception, which run() is expected to raise.
+        * A callable, which can run custom checks.
+        """
         if isinstance(expected, type) and issubclass(expected, Exception):
             try:
                 res = run()
@@ -97,6 +118,12 @@ class MyiaFunctionTest:
                 )
 
     def generate_params(self):
+        """Generate pytest parameters.
+
+        If any of the kwargs is an instance of Multiple, we will generate tests
+        for each possible value it can take. If there are multiple Multiples,
+        we will test a cartesian product of them.
+        """
         marks = self.spec.get('marks', [])
         id = self.spec.get('id', 'test')
         spec = dict(self.spec)
@@ -118,35 +145,48 @@ class MyiaFunctionTest:
                 curr_ids.append(opt_id)
                 curr_marks += opt_marks
             curr_ids.append(id)
-            p = pytest.param(self.configure(**curr_spec),
+            p = pytest.param(MyiaFunctionTest(self.runtest, curr_spec),
                              marks=curr_marks, id="-".join(curr_ids))
             params.append(p)
 
         return params
 
     def run(self, fn):
-        spec = dict(self.spec)
-        for key in ('marks', 'id'):
-            if key in spec:
-                del spec[key]
-        return self.runtest(self, fn, **spec)
+        """Run the test on the given function."""
+        return self.runtest(self, fn, **self.spec)
 
     def __call__(self, fn):
+        """Decorate a Myia function."""
         return mt(self)(fn)
 
 
 class MyiaFunctionTestFactory:
+    """Represents a decorator to perform a particular test on a function.
+
+    For example, @infer, @run, etc. are instances of this. Calling a
+    MyiaFunctionTestFactory produces a MyiaFunctionTest, e.g. infer(1, 2, 3)
+    creates a MyiaFunctionTest.
+
+    Arguments:
+        runtest: The function to run the test.
+        spec: Default kwargs for the function.
+    """
+
     def __init__(self, runtest, spec={}):
+        """Initialize a MyiaFunctionTestFactory."""
         self.runtest = runtest
         self.spec = spec
 
     def configure(self, **spec):
+        """Configure the factory with more kwargs."""
         return MyiaFunctionTestFactory(self.runtest, merge(self.spec, spec))
 
     def xfail(self, *args, **kwargs):
+        """Add the xfail mark when the test is created."""
         return self(*args, **kwargs, marks=[pytest.mark.xfail])
 
     def __call__(self, *args, **kwargs):
+        """Create a MyiaFunctionTest."""
         kwargs = merge(self.spec, kwargs)
         kwargs['args'] = args
         return MyiaFunctionTest(self.runtest, kwargs)
@@ -154,11 +194,19 @@ class MyiaFunctionTestFactory:
 
 @keyword_decorator
 def myia_function_test(fn, **kwargs):
+    """Create a MyiaFunctionTestFactory from a function."""
     return MyiaFunctionTestFactory(fn, kwargs)
 
 
 @myia_function_test(marks=[pytest.mark.infer], id='infer')
 def infer(self, fn, args, result=None, pipeline=infer_pipeline):
+    """Inference test.
+
+    Arguments:
+        fn: The Myia function to test.
+        args: The argspec for the function.
+        result: The expected result, or an exception subclass.
+    """
     args = [to_abstract_test(arg) for arg in args]
 
     def out():
@@ -174,6 +222,21 @@ def infer(self, fn, args, result=None, pipeline=infer_pipeline):
 @myia_function_test(marks=[pytest.mark.run], id='run')
 def run(self, fn, args, result=None, abstract=None, broad_specs=None,
         validate=True, pipeline=standard_pipeline):
+    """Test a Myia function.
+
+    Arguments:
+        fn: The Myia function to test.
+        args: The args for the function.
+        result: The expected result, or an exception subclass. If result is
+            None, we will call the Python version of the function to compare
+            with.
+        abstract: The argspec. If None, it will be derived automatically from
+            the args.
+        broad_specs: For each argument, whether to broaden the type. By
+            default, broaden all arguments.
+        validate: Whether to run the validation step.
+        pipeline: The pipeline to use.
+    """
 
     if abstract is None:
         if broad_specs is None:

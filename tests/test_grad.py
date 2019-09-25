@@ -174,9 +174,19 @@ def _grad_test(fn, obj, args,
     gtest.assert_match()
 
 
-@myia_function_test
+@myia_function_test(marks=[pytest.mark.grad], id='grad')
 def gradient(self, fn, args, abstract=None,
              rel_error=1e-3, pipeline=grad_pipeline):
+    """Test the gradient of a Myia function using finite_differences.
+
+    Arguments:
+        fn: The Myia function to test.
+        args: The args for the function.
+        abstract: The argspec. If None, it will be derived automatically from
+            the args.
+        rel_error: The relative tolerance.
+        pipeline: The pipeline to use.
+    """
     _grad_test(fn, fn, args,
                pipeline=pipeline,
                rel_error=rel_error,
@@ -509,8 +519,8 @@ def test_transpose2(x, y, axis1, axis2):
 
 
 @mt(
-    gradient(4.5,),
-    gradient(5.5, 1.3),
+    gradient(4.5),
+    gradient((5.5, 1.3)),
     pipeline=standard_pipeline,
     abstract=(U(f64, (f64, f64)),)
 )
