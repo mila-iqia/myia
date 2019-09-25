@@ -1,26 +1,15 @@
 """Utilities for abstract values and inference."""
 
-import typing
 from dataclasses import dataclass
 from functools import reduce
 from itertools import chain
 from types import AsyncGeneratorType, GeneratorType
 
-import numpy as np
-
 from .. import xtype
-from ..classes import ADT, Cons, Empty
-from ..utils import (
-    MyiaTypeError,
-    TypeMismatchError,
-    intern,
-    is_dataclass_type,
-    overload,
-)
+from ..utils import MyiaTypeError, TypeMismatchError, intern, overload
 from .data import (
     ABSENT,
     ANYTHING,
-    SHAPE,
     TYPE,
     VALUE,
     AbstractADT,
@@ -111,131 +100,6 @@ def _build_value(x: AbstractTuple):
 def _build_value(ac: AbstractClass):
     args = {k: build_value(v) for k, v in ac.attributes.items()}
     return ac.constructor(**args)
-
-
-_default_type_params = {
-    tuple: (),
-    list: (object,),
-}
-
-
-@overload(bootstrap=True)
-def type_to_abstract(self, t: xtype.TypeMeta):
-    """Convert a type to an AbstractValue.
-
-    If the value is already an AbstractValue, returns it directly.
-    """
-    return self[t](t)
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: AbstractValue):
-    return t
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: (xtype.Number, xtype.Bool, xtype.EnvType,
-                               xtype.SymbolicKeyType, xtype.Nil)):
-    return AbstractScalar({
-        VALUE: ANYTHING,
-        TYPE: t,
-    })
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: type):
-    if is_dataclass_type(t):
-        fields = t.__dataclass_fields__
-        attributes = {name: ANYTHING
-                      if isinstance(field.type, (str, type(None)))
-                      else self(field.type)
-                      for name, field in fields.items()}
-        if issubclass(t, ADT):
-            return AbstractADT(t, attributes)
-        else:
-            return AbstractClass(t, attributes)
-
-    elif t is object:
-        return ANYTHING
-
-    else:
-        return pytype_to_abstract[t](t, _default_type_params.get(t, None))
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: typing._GenericAlias):
-    args = tuple(object if isinstance(arg, typing.TypeVar) else arg
-                 for arg in t.__args__)
-    return pytype_to_abstract[t.__origin__](t, args)
-
-
-@overload  # noqa: F811
-def type_to_abstract(self, t: object):
-    raise MyiaTypeError(f'{t} is not a recognized type')
-
-
-@overload
-def pytype_to_abstract(main: tuple, args):
-    """Convert a Python type to an AbstractValue."""
-    if args == () or args is None:
-        targs = ANYTHING
-    elif args == ((),):
-        targs = []
-    else:
-        targs = [type_to_abstract(a) for a in args]
-    return AbstractTuple(targs)
-
-
-@overload  # noqa: F811
-def pytype_to_abstract(main: list, args):
-    arg, = args
-    argt = type_to_abstract(arg)
-    assert argt is ANYTHING
-    rval = AbstractUnion([
-        type_to_abstract(Empty),
-        type_to_abstract(Cons)
-    ])
-    return rval
-
-
-@overload  # noqa: F811
-def pytype_to_abstract(main: np.ndarray, args):
-    arg, = args
-    arg = type_to_abstract(arg)
-    shp = ANYTHING
-    return AbstractArray(arg, {SHAPE: shp, TYPE: xtype.NDArray})
-
-
-@overload  # noqa: F811
-def pytype_to_abstract(main: int, args):
-    return AbstractScalar({
-        VALUE: ANYTHING,
-        TYPE: xtype.Int[64],
-    })
-
-
-@overload  # noqa: F811
-def pytype_to_abstract(main: float, args):
-    return AbstractScalar({
-        VALUE: ANYTHING,
-        TYPE: xtype.Float[64],
-    })
-
-
-@overload  # noqa: F811
-def pytype_to_abstract(main: bool, args):
-    return AbstractScalar({
-        VALUE: ANYTHING,
-        TYPE: xtype.Bool,
-    })
-
-
-@overload  # noqa: F811
-def pytype_to_abstract(main: AbstractArray, args):
-    return AbstractArray(
-        ANYTHING,
-        values={SHAPE: ANYTHING, TYPE: ANYTHING},
-    )
 
 
 ############
@@ -1344,11 +1208,9 @@ __all__ = [
     'hastype_helper',
     'nobottom',
     'normalize_adt',
-    'pytype_to_abstract',
     'sensitivity_transform',
     'split_type',
     'tentative',
-    'type_to_abstract',
     'typecheck',
     'union_simplify',
 ]
