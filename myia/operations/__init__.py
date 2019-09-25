@@ -293,6 +293,11 @@ dot = Operation(
     defaults='myia.operations.prim_dot'
 )
 
+dtype = Operation(
+    name='dtype',
+    defaults='myia.operations.macro_dtype'
+)
+
 embed = Operation(
     name='embed',
     defaults='myia.operations.macro_embed'
