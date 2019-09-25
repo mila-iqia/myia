@@ -328,13 +328,19 @@ class InferenceEngine:
 
     async def infer_constant(self, ctref):
         """Infer the type of a ref of a Constant node."""
-        v = self.resources.convert(ctref.node.value)
-        return to_abstract(
-            v,
-            context=ctref.context,
-            node=ctref.node,
-            loop=self.loop
-        )
+        if getattr(ctref.node, '_converted', False):
+            return to_abstract(
+                ctref.node.value,
+                context=ctref.context,
+                node=ctref.node,
+                loop=self.loop
+            )
+
+        else:
+            newct = Constant(self.resources.convert(ctref.node.value))
+            newct._converted = True
+            new = self.ref(newct, ctref.context)
+            return await self.reroute(ctref, new)
 
     def abstract_merge(self, *values):
         """Merge a list of AbstractValues together."""

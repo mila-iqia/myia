@@ -34,10 +34,6 @@ from .pytorch_abstract_types import APT, pytorch_dtype_to_type
 
 # HELPER FUNCTIONS ##########################################################
 
-@myia_static
-def _pt_dtype_to_my_dtype(dtype):
-    return pytorch_dtype_to_type(dtype)
-
 
 @macro
 async def _dim_explicit(info, a_shp_ref, dim_ref):
@@ -232,7 +228,7 @@ def log_softmax(self, dim=None, dtype=None):
     dim = _dim_explicit(x.shape, dim)
 
     if dtype is not None:
-        x = P.array_cast(x, _pt_dtype_to_my_dtype(dtype))
+        x = P.array_cast(x, dtype)
 
     maxes = torch.max(x, dim, keepdim=True)[0]
     lse_stable = torch.log(torch.sum(torch.exp(x - maxes), dim, keepdim=True))
@@ -342,7 +338,7 @@ def softmax(self, dim=None, dtype=None):
     dim = _dim_explicit(x.shape, dim)
 
     if dtype is not None:
-        x = P.array_cast(x, _pt_dtype_to_my_dtype(dtype))
+        x = P.array_cast(x, dtype)
 
     maxes = torch.max(x, dim, keepdim=True)[0]
     x_exp = torch.exp(x - maxes)
@@ -358,7 +354,7 @@ def _sum(self, dim=None, keepdim=False, *, dtype=None):
     dim = _dim_explicit(x.shape, dim)
 
     if dtype is not None:
-        x = P.array_cast(x, _pt_dtype_to_my_dtype(dtype))
+        x = P.array_cast(x, dtype)
 
     if dim is None:
         return P.array_reduce(P.scalar_add, x, ())
@@ -417,9 +413,7 @@ def transpose(a, dim0, dim1):
 @core
 def zeros(*shp, dtype=None):
     """Map of 'dim' pytorch method."""
-    if dtype is not None:
-        dtype = _pt_dtype_to_my_dtype(dtype)
-    else:
+    if dtype is None:
         dtype = f32
 
     if len(shp) == 1:

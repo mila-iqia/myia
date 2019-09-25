@@ -18,6 +18,7 @@ from ..abstract.data import (
 from ..abstract.infer import to_abstract
 from ..hypermap import hyper_map
 from ..operations import primitives as P
+from ..pipeline.resources import default_convert
 from ..pipeline.standard import standard_method_map, standard_object_map
 from ..utils import core
 from ..xtype import NDArray
@@ -197,6 +198,11 @@ def _to_abstract(self, v: torch.nn.Parameter, **kwargs):
         }),
         {SHAPE: tuple(v.shape), TYPE: PyTorchTensor},
     )
+
+
+@default_convert.register  # noqa: F811
+def _default_convert(env, x: torch.dtype):
+    return default_convert(env, pytorch_dtype_to_type(x))
 
 
 __all__ = [

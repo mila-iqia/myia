@@ -2,8 +2,10 @@
 
 from types import FunctionType
 
+import numpy as np
+
 from .. import parser, xtype
-from ..abstract import InferenceEngine
+from ..abstract import InferenceEngine, type_to_abstract
 from ..compile import load_backend
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
@@ -58,8 +60,18 @@ def default_convert(env, x: Operation):
 
 
 @overload  # noqa: F811
-def default_convert(env, x: (object, type, xtype.TypeMeta)):
+def default_convert(env, x: (object, type)):
     return x
+
+
+@overload  # noqa: F811
+def default_convert(env, x: xtype.TypeMeta):
+    return type_to_abstract(x)
+
+
+@overload  # noqa: F811
+def default_convert(env, x: np.dtype):
+    return default_convert(env, xtype.np_dtype_to_type(x))
 
 
 class _Unconverted:
