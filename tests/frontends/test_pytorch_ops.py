@@ -173,14 +173,14 @@ def test_torch_tanh(x):
 # KEEP THESE IN ALPHABETICAL ORDER ####################################
 
 
-@run_no_relay(nn.Parameter(torch.Tensor(MA(2, 3))))
+@run(nn.Parameter(torch.Tensor(MA(2, 3))))
 def test_torch_tensor_argmax_1_arg(x):
     return torch.argmax(x)
 
 
 @mt(
-    run_no_relay(nn.Parameter(torch.Tensor(MA(2, 3))), 1, True),
-    run_no_relay(nn.Parameter(torch.Tensor(MA(2, 3))), 0, True),
+    run(nn.Parameter(torch.Tensor(MA(2, 3))), 1, True),
+    run(nn.Parameter(torch.Tensor(MA(2, 3))), 0, True),
     broad_specs=(True, False, False),
 )
 def test_torch_tensor_argmax_3_arg(x, y, z):

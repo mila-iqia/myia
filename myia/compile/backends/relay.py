@@ -205,6 +205,13 @@ def relay_array_getitem(c, a, start, stop, strides):
                                             strides.value)
 
 
+def relay_argmax(c, v, dims):
+    """Implementation of argmax for Relay."""
+    v = c.ref(v)
+    assert dims.is_constant(tuple)
+    return relay.cast(relay.argmax(v, axis=dims.value), 'int64')
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -221,6 +228,7 @@ COMPLEX_MAP = {
     P.env_getitem: relay_env_getitem,
     P.unsafe_static_cast: relay_unsafe_static_cast,
     P.array_getitem: relay_array_getitem,
+    P.argmax: relay_argmax,
 }
 
 
