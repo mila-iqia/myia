@@ -101,15 +101,16 @@ def test_prim_arithmetic_np_same_precision(x, y):
     def test_prim_sub_np(x, y):
         return x - y
 
-    def test_prim_div_np(x, y):
-        return x / y
+    # def test_prim_div_np(x, y):
+    #     return x / y
 
     _a = test_prim_mul_np(x, y)
     _b = test_prim_add_np(x, y)
     _c = test_prim_sub_np(x, y)
-    _d = test_prim_div_np(x, y)
+    # _d = test_prim_div_np(x, y)
 
-    return _a, _b, _c, _d
+    # return _a, _b, _c, _d
+    return _a, _b, _c
 
 
 @mt(
