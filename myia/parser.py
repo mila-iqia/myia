@@ -138,13 +138,16 @@ def parse(func):
     """
     if func in _parse_cache:
         return _parse_cache[func]
-    parser = Parser(func)
-    graph = parser.parse()
     flags = getattr(func, '_myia_flags', {})
     if 'name' in flags:
-        graph.debug.name = flags['name']
+        name = flags['name']
         del flags['name']
-    graph.set_flags(**flags)
+    else:
+        name = None
+    parser = Parser(func, recflags=flags)
+    graph = parser.parse()
+    if name is not None:
+        graph.debug.name = name
     _parse_cache[func] = graph
     return graph
 
@@ -167,12 +170,14 @@ class Parser:
             nonlocal variables. It will be embedded in the graph for every
             nonlocal variable to resolve.
         graph: The graph of the function being parsed.
+        recflags: A set of flags to apply to all generated graphs.
 
     """
 
-    def __init__(self, function: FunctionType) -> None:
+    def __init__(self, function: FunctionType, recflags) -> None:
         """Construct a parser."""
         self.function = function
+        self.recflags = recflags
         _, self.line_offset = inspect.getsourcelines(function)
         self.filename: str = inspect.getfile(function)
         # This is used to resolve the function's globals.
@@ -864,6 +869,7 @@ class Block:
         self.graph: Graph = Graph()
         self.graph.set_flags(reference=True)
         self.graph.flags.update(flags)
+        self.graph.flags.update(parser.recflags)
 
     def set_phi_arguments(self, phi: Parameter) -> None:
         """Resolve the arguments to a phi node.
