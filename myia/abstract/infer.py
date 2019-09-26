@@ -6,7 +6,7 @@ from functools import reduce
 
 from .. import operations, xtype
 from ..info import About
-from ..ir import Graph
+from ..ir import Constant, Graph
 from ..operations import primitives as P
 from ..utils import (
     InferenceError,
