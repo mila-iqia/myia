@@ -12,7 +12,7 @@ from math import (
 import numpy as np
 import pytest
 
-from myia.abstract import ANYTHING
+from myia.abstract import ANYTHING, type_to_abstract
 from myia.operations import (
     array_cast,
     array_getitem,
@@ -468,15 +468,19 @@ def test_broadcast_shape():
 
 
 def test_scalar_cast():
-    assert isinstance(scalar_cast(1.5, i64), np.int64)
-    assert isinstance(scalar_cast(1.5, f16), np.float16)
+    assert isinstance(scalar_cast(1.5, type_to_abstract(i64)), np.int64)
+    assert isinstance(scalar_cast(1.5, type_to_abstract(f16)), np.float16)
 
 
 def test_array_cast():
-    assert isinstance(array_cast(np.array([1.5, 1.7]), i64), np.ndarray)
-    assert (array_cast(np.array([1.5, 1.7]), i64)).dtype == np.dtype(np.int64)
-    assert isinstance(array_cast(np.array([1.5, 1.7]), f16), np.ndarray)
-    assert (array_cast(np.array([1.5, 1.]), f16)).dtype == np.dtype(np.float16)
+    assert isinstance(array_cast(np.array([1.5, 1.7]),
+                                 type_to_abstract(i64)), np.ndarray)
+    assert (array_cast(np.array([1.5, 1.7]),
+                       type_to_abstract(i64))).dtype == np.dtype(np.int64)
+    assert isinstance(array_cast(np.array([1.5, 1.7]),
+                                 type_to_abstract(f16)), np.ndarray)
+    assert (array_cast(np.array([1.5, 1.]),
+                       type_to_abstract(f16))).dtype == np.dtype(np.float16)
 
 
 def test_env():

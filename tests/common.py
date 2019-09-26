@@ -25,6 +25,7 @@ from myia.abstract import (
     empty,
     from_value,
     listof,
+    type_to_abstract,
 )
 from myia.classes import ADT
 from myia.ir import MultitypeGraph
@@ -109,6 +110,7 @@ def Shp(*vals):
 
 
 def Ty(t):
+    t = t if t is ANYTHING else type_to_abstract(t)
     return AbstractType(t)
 
 

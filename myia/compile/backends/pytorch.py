@@ -107,7 +107,7 @@ def pytorch_scalar_cast(op):
     """Implementation of scalar_cast."""
     v = op.inputs[1]
     assert op.inputs[2].is_constant()
-    dtype = type_to_np_dtype(op.inputs[2].value)
+    dtype = type_to_np_dtype(op.inputs[2].value.xtype())
 
     def _impl(v):
         return (v.astype(dtype),)
@@ -117,7 +117,7 @@ def pytorch_scalar_cast(op):
 def pytorch_array_cast(op):
     """Implementation of array_cast for pytorch."""
     t = op.inputs[2]
-    dt = _type_map[t.value]
+    dt = _type_map[t.value.xtype()]
 
     def _impl(x):
         return (x.to(dtype=dt),)

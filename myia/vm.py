@@ -7,11 +7,12 @@ implementation.
 
 from typing import Any, Iterable, List, Mapping
 
+from .abstract import AbstractClassBase
 from .graph_utils import toposort
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
 from .operations import Primitive
 from .operations.primitives import partial, return_
-from .utils import TypeMap, is_dataclass_type
+from .utils import TypeMap
 
 
 class VMFrame:
@@ -265,8 +266,8 @@ class VM:
             self._dispatch_call(node, frame, fn.fn, fn.args + tuple(args))
         elif isinstance(fn, (Graph, Closure)):
             self._call(fn, args)
-        elif is_dataclass_type(fn):
-            frame.values[node] = fn(*args)
+        elif isinstance(fn, AbstractClassBase):
+            frame.values[node] = fn.constructor(*args)
         else:
             raise AssertionError(f'Invalid fn to call: {fn}')
 

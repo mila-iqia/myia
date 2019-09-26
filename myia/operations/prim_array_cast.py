@@ -1,7 +1,12 @@
 """Definitions for the primitive `array_cast`."""
 
 from .. import lib, operations, xtype
-from ..lib import bprop_to_grad_transform, standard_prim, type_to_abstract
+from ..lib import (
+    MyiaTypeError,
+    bprop_to_grad_transform,
+    standard_prim,
+    type_to_abstract,
+)
 from . import primitives as P
 
 
@@ -21,7 +26,10 @@ async def infer_array_cast(self, engine,
                            a: lib.AbstractArray,
                            typ: lib.AbstractType):
     """Infer the return type of primitive `array_cast`."""
-    t = (type_to_abstract(typ.xvalue())).xtype()
+    scal = self.require_constant(typ, argnum=1)
+    if not isinstance(scal, lib.AbstractScalar):
+        raise MyiaTypeError('array_cast must cast to a scalar dtype')
+    t = scal.xtype()
     engine.check(xtype.Number, t)
     e_values = {**a.element.values, lib.TYPE: t}
     return lib.AbstractArray(lib.AbstractScalar(e_values), a.values)

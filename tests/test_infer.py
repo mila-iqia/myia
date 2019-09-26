@@ -1683,16 +1683,32 @@ def test_closure_in_data(c, x):
 
 
 @mt(
-    infer_scalar(i64, Ty(to_abstract_test(i64)), result=i64),
-    infer_scalar(i64, Ty(to_abstract_test(i16)), result=i16),
-    infer_scalar(f64, Ty(to_abstract_test(i16)), result=i16),
-    infer_scalar(f16, Ty(to_abstract_test(f32)), result=f32),
+    infer_scalar(i64, Ty(i64), result=i64),
+    infer_scalar(i64, Ty(i16), result=i16),
+    infer_scalar(f64, Ty(i16), result=i16),
+    infer_scalar(f16, Ty(f32), result=f32),
+    infer_scalar(f16, Ty(np.float32), result=f32),
+    infer_scalar(f16, Ty(np.dtype('float32')), result=f32),
     infer_scalar(f16, Ty(ANYTHING), result=InferenceError),
-    infer_scalar(f16, Ty(to_abstract_test(B)), result=InferenceError),
-    infer_scalar(B, Ty(to_abstract_test(f32)), result=InferenceError),
+    infer_scalar(f16, Ty(Bot), result=InferenceError),
+    infer_scalar(f16, Ty(B), result=InferenceError),
+    infer_scalar(B, Ty(f32), result=InferenceError),
 )
 def test_scalar_cast(x, t):
     return scalar_cast(x, t)
+
+
+@infer_scalar(i64, result=f32)
+def test_scalar_cast_2(x):
+    return scalar_cast(x, np.float32)
+
+
+_npf32 = np.dtype('float32')
+
+
+@infer_scalar(i64, result=f32)
+def test_scalar_cast_3(x):
+    return scalar_cast(x, _npf32)
 
 
 @mt(
@@ -1705,6 +1721,8 @@ def test_scalar_cast(x, t):
     infer_scalar(af16_of(2, 3), Ty(to_abstract_test(f32)),
                  result=af32_of(2, 3)),
     infer_scalar(af16_of(2, 3), Ty(ANYTHING),
+                 result=InferenceError),
+    infer_scalar(af16_of(2, 3), Ty(Bot),
                  result=InferenceError),
     infer_scalar(af16_of(2, 3), Ty(to_abstract_test(B)),
                  result=InferenceError),

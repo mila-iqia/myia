@@ -6,6 +6,7 @@ from .. import lib, xtype
 from ..lib import (
     TYPE,
     AbstractScalar,
+    MyiaTypeError,
     bprop_to_grad_transform,
     standard_prim,
     type_to_abstract,
@@ -29,7 +30,9 @@ async def infer_scalar_cast(self, engine,
                             scalar: xtype.Number,
                             typ: lib.AbstractType):
     """Infer the return type of primitive `scalar_cast`."""
-    a = lib.type_to_abstract(typ.xvalue())
+    a = self.require_constant(typ, argnum=1)
+    if not isinstance(a, AbstractScalar):
+        raise MyiaTypeError('scalar_cast must cast to a scalar type')
     t = a.xtype()
     engine.check(xtype.Number, t)
     values = {**scalar.values, TYPE: t}

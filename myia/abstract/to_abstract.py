@@ -95,9 +95,6 @@ def to_abstract(fn, self, v, **kwargs):
     if fn is not None:
         rval = fn(self, v, **kwargs)
 
-    elif is_dataclass_type(v):
-        return AbstractType(type_to_abstract(v))
-
     elif is_dataclass(v):
         assert not isinstance(v, Function)
         new_args = {}
@@ -108,6 +105,14 @@ def to_abstract(fn, self, v, **kwargs):
     elif isinstance(v, xtype.TypeMeta):
         rval = AbstractType(v)
 
+    elif isinstance(v, type):
+        try:
+            rval = AbstractType(type_to_abstract(v))
+        except KeyError:
+            return AbstractExternal({
+                VALUE: v,
+                TYPE: type(v),
+            })
     else:
         try:
             typ = xtype.pytype_to_myiatype(type(v))
@@ -271,6 +276,11 @@ def type_to_abstract(self, t: (xtype.Number, xtype.Bool, xtype.EnvType,
 
 
 @overload  # noqa: F811
+def type_to_abstract(self, t: np.dtype):
+    return self(xtype.np_dtype_to_type(t.name))
+
+
+@overload  # noqa: F811
 def type_to_abstract(self, t: type):
     if is_dataclass_type(t):
         fields = t.__dataclass_fields__
@@ -300,6 +310,21 @@ def type_to_abstract(self, t: typing._GenericAlias):
 @overload  # noqa: F811
 def type_to_abstract(self, t: object):
     raise MyiaTypeError(f'{t} is not a recognized type')
+
+
+_numpy_types = (
+    np.int8,
+    np.int16,
+    np.int32,
+    np.int64,
+    np.uint8,
+    np.uint16,
+    np.uint32,
+    np.uint64,
+    np.float16,
+    np.float32,
+    np.float64,
+)
 
 
 @overload
@@ -332,6 +357,11 @@ def pytype_to_abstract(main: np.ndarray, args):
     arg = type_to_abstract(arg)
     shp = ANYTHING
     return AbstractArray(arg, {SHAPE: shp, TYPE: xtype.NDArray})
+
+
+@overload  # noqa: F811
+def pytype_to_abstract(main: _numpy_types, args):
+    return type_to_abstract(xtype.np_dtype_to_type(main.__name__))
 
 
 @overload  # noqa: F811
