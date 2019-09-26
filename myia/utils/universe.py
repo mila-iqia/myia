@@ -44,7 +44,7 @@ class UniverseInstance:
             handle.state = value
 
 
-@serializable('Handle')
+# @serializable('Handle')
 @dataclass(eq=False)
 class HandleInstance:
     """Key to use in an Universe."""

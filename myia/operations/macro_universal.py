@@ -1,15 +1,7 @@
 """Implementation of the 'universal' macro."""
 
-from .. import lib, operations, xtype
-from ..lib import (
-    Constant,
-    Graph,
-    MetaGraph,
-    MyiaTypeError,
-    Reference,
-    macro,
-    overload,
-)
+from .. import lib, operations
+from ..lib import Constant, Graph, MetaGraph, macro, overload
 from ..parser import parse
 
 
@@ -18,7 +10,7 @@ def is_universal(g: lib.GraphFunction):
     return g.graph.has_flags('universal')
 
 
-@overload
+@overload  # noqa: F811
 def is_universal(x: object):
     return False
 
@@ -35,24 +27,24 @@ def to_universal(gf: lib.GraphFunction):
         raise NotImplementedError(f'Cannot universalize {g}')
 
 
-@overload
+@overload  # noqa: F811
 def to_universal(pf: lib.PrimitiveFunction):
     return StatePassthrough(pf.prim)
 
 
-@overload
+@overload  # noqa: F811
 def to_universal(mf: lib.MacroFunction):
     return StatePassthrough(mf.macro)
 
 
-@overload
+@overload  # noqa: F811
 def to_universal(mf: lib.MetaGraphFunction):
     return StatePassthrough(mf.metagraph)
 
 
-@overload
+@overload  # noqa: F811
 def to_universal(x: object):
-    raise NorImplementedError(f'Cannot universalize {x}')
+    raise NotImplementedError(f'Cannot universalize {x}')
 
 
 class StatePassthrough(MetaGraph):

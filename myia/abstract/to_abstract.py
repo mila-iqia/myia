@@ -11,8 +11,11 @@ from ..classes import ADT, Cons, Empty
 from ..ir import Graph, MetaGraph
 from ..operations import Primitive
 from ..utils import (
+    EnvInstance,
+    HandleInstance,
     MyiaTypeError,
     SymbolicKeyInstance,
+    UniverseInstance,
     dataclass_fields,
     is_dataclass_type,
     overload,
@@ -30,6 +33,7 @@ from .data import (
     AbstractDict,
     AbstractExternal,
     AbstractFunction,
+    AbstractHandle,
     AbstractScalar,
     AbstractTuple,
     AbstractType,
@@ -164,6 +168,21 @@ def to_abstract(self, v: SymbolicKeyInstance, **kwargs):
 
 
 @overload  # noqa: F811
+def to_abstract(self, v: EnvInstance, **kwargs):
+    return AbstractScalar({VALUE: v, TYPE: xtype.EnvType})
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: UniverseInstance, **kwargs):
+    return AbstractScalar({VALUE: v, TYPE: xtype.UniverseType})
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: HandleInstance, **kwargs):
+    return AbstractHandle(to_abstract(v.state, **kwargs))
+
+
+@overload  # noqa: F811
 def to_abstract(self, v: (bool, type(None),
                           str, type(NotImplemented)), **kwargs):
     typ = xtype.pytype_to_myiatype(type(v))
@@ -264,8 +283,9 @@ def type_to_abstract(self, t: AbstractValue):
 
 
 @overload  # noqa: F811
-def type_to_abstract(self, t: (xtype.Number, xtype.Bool, xtype.EnvType,
-                               xtype.SymbolicKeyType, xtype.Nil)):
+def type_to_abstract(self, t: (xtype.Number, xtype.Bool, xtype.Nil,
+                               xtype.SymbolicKeyType, xtype.EnvType,
+                               xtype.UniverseType)):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: t,

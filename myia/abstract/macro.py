@@ -45,6 +45,9 @@ class AnnotationBasedChecker:
 
     async def check(self, engine, argrefs, uniform=False):
         """Check that the argrefs match the function signature."""
+        from .amerge import amerge
+        from .to_abstract import type_to_abstract
+
         check_nargs(self.name, self.nargs, argrefs)
         outtype = self.outtype
 
@@ -63,10 +66,16 @@ class AnnotationBasedChecker:
             for arg in args:
                 if isinstance(typ, xtype.TypeMeta):
                     await force_pending(engine.check(typ, arg.xtype(), typ))
-                elif isinstance(typ, type) and issubclass(typ, AbstractValue):
-                    if not isinstance(arg, typ):
-                        raise MyiaTypeError(
-                            f'Wrong type {arg} != {typ} for {self.name}'
+                elif isinstance(typ, type):
+                    if issubclass(typ, AbstractValue):
+                        if not isinstance(arg, typ):
+                            raise MyiaTypeError(
+                                f'Wrong type {arg} != {typ} for {self.name}'
+                            )
+                    else:
+                        return await force_pending(
+                            amerge(type_to_abstract(typ), arg,
+                                   forced=True, bind_pending=False)
                         )
                 elif callable(typ):
                     await force_pending(engine.check(typ, arg))

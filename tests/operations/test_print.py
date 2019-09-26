@@ -1,10 +1,10 @@
 
-from myia.operations import ioprint, print as myia_print
 from myia.lib import new_universe
+from myia.operations import ioprint, print as myia_print
 from myia.operations.op_print import print_handle
 from myia.xtype import UniverseType
 
-from ..common import i64, f64
+from ..common import f64, i64
 from ..multitest import infer, mt, run_debug
 
 
@@ -16,7 +16,6 @@ from ..multitest import infer, mt, run_debug
 )
 def test_ioprint(iostate, obj):
     return ioprint(iostate, obj)
-
 
 
 def _test_print_check(args, res):

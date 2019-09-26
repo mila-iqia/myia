@@ -8,17 +8,16 @@ from ..utils import MyiaTypeError, TypeMismatchError, overload
 from .data import (
     ABSENT,
     ANYTHING,
-    AbstractArray,
     AbstractBottom,
     AbstractClassBase,
     AbstractDict,
     AbstractError,
     AbstractFunction,
-    AbstractJTagged,
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
     AbstractUnion,
+    AbstractWrapper,
     Possibilities,
     TaggedPossibilities,
     TrackDict,
@@ -341,13 +340,13 @@ def amerge(self, x1: AbstractTuple, x2, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(self, x1: AbstractArray, x2, forced, bp):
+def amerge(self, x1: AbstractWrapper, x2, forced, bp):
     args1 = (x1.element, x1.values)
     args2 = (x2.element, x2.values)
     merged = self(args1, args2, forced, bp)
     if forced or merged is args1:
         return x1
-    return AbstractArray(*merged)
+    return type(x1)(*merged)
 
 
 @overload  # noqa: F811
@@ -369,16 +368,6 @@ def amerge(self, x1: AbstractDict, x2, forced, bp):
     if forced or merged is args1:
         return x1
     return type(x1)(*merged)
-
-
-@overload  # noqa: F811
-def amerge(self, x1: AbstractJTagged, x2, forced, bp):
-    args1 = x1.element
-    args2 = x2.element
-    merged = self(args1, args2, forced, bp)
-    if forced or merged is args1:
-        return x1
-    return AbstractJTagged(merged)
 
 
 @overload  # noqa: F811

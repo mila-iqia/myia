@@ -9,8 +9,6 @@ from ..info import About
 from ..ir import Constant, Graph
 from ..operations import primitives as P
 from ..utils import (
-    EnvInstance,
-    HandleInstance,
     InferenceError,
     InternalInferenceError,
     MyiaTypeError,
@@ -29,7 +27,6 @@ from .data import (
     AbstractClassBase,
     AbstractError,
     AbstractFunction,
-    AbstractHandle,
     AbstractJTagged,
     AbstractKeywordArgument,
     AbstractScalar,
