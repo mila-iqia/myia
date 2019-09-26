@@ -385,7 +385,7 @@ def test_torch_sum(x):
     return torch.sum(x)
 
 
-@run_no_relay(nn.Parameter(torch.Tensor(MA(2, 3))))
+@run(nn.Parameter(torch.Tensor(MA(2, 3))))
 def test_torch_sum_dtype_fwd(x):
     return torch.sum(x, dtype=torch.float64)
 

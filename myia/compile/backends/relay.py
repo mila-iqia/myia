@@ -138,8 +138,8 @@ def relay_array_reduce(c, fn, array, shape):
         raise NotImplementedError(f"reduce with {fn}")
 
 
-def relay_scalar_cast(c, v, t):
-    """Implementation of scalar_cast for Relay."""
+def relay_cast(c, v, t):
+    """Implementation of scalar_cast/array_cast for Relay."""
     v = c.ref(v)
     assert t.is_constant()
     return relay.cast(v, type_to_np_dtype(t.value.xtype()))
@@ -219,7 +219,8 @@ COMPLEX_MAP = {
     P.array_map: relay_array_map,
     P.array_reduce: relay_array_reduce,
     P.scalar_to_array: lambda c, x, t: c.ref(x),
-    P.scalar_cast: relay_scalar_cast,
+    P.array_cast: relay_cast,
+    P.scalar_cast: relay_cast,
     P.tuple_getitem: relay_tuple_getitem,
     P.casttag: relay_casttag,
     P.hastag: relay_hastag,
