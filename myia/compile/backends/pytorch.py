@@ -321,7 +321,7 @@ def pytorch_max_pool2d(op):
     def _impl(input, kernel_size, stride, padding, dilation, ceil_mode):
         return (torch.nn.functional.max_pool2d(
             input, kernel_size, stride, padding, dilation,
-            ceil_mode.item(), True),)
+            ceil_mode.item(), False),)
     return _impl, op.inputs[1:]
 
 

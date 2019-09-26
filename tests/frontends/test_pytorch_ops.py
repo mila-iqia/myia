@@ -302,20 +302,6 @@ def test_torch_max_pool2d(x, ri):
                                           0, 1, False, ri)
 
 
-@mt(
-    run_no_relay(nn.Parameter(torch.randn(2, 4, 3, 5)), True),
-    run_no_relay(nn.Parameter(torch.tensor([[[[1., 2., 3., 4.],
-                                              [5., 6., 7., 8.],
-                                              [13., 14., 15., 16.],
-                                              [9., 10., 11., 12.]]]])),
-                 True),
-    broad_specs=(True, False, False, False, False, False, True)
-)
-def test_torch_max_pool2d_return_indices(x, ri):
-    return torch.nn.functional.max_pool2d(x, (2, 2), (1, 1),
-                                          0, 1, False, ri)
-
-
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
 def test_torch_mean(x):
     return torch.mean(x)

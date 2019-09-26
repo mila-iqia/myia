@@ -53,12 +53,7 @@ async def infer_max_pool2d(self, engine,
 
     out_shape = (N, C_out, int(H_out), int(W_out))
 
-    return AbstractTuple([
-        type(input)(input.element, {SHAPE: out_shape, TYPE: input.xtype()}),
-        type(input)(AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Int[64]}),
-                    {SHAPE: out_shape, TYPE: input.xtype()}
-                    )
-    ])
+    return type(input)(input.element, {SHAPE: out_shape, TYPE: input.xtype()})
 
 
 @bprop_to_grad_transform(P.max_pool2d)
@@ -66,7 +61,7 @@ def bprop_max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode,
                      out, dout):
     """Backpropagator for `max_pool2d`."""
     gI = max_pool2d_grad(input, kernel_size, stride, padding, dilation,
-                         ceil_mode, tuple_getitem(dout, 0))
+                         ceil_mode, dout)
     return (gI,)
 
 
