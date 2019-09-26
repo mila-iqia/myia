@@ -21,6 +21,7 @@ from myia.abstract import (
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple as T,
+    AbstractType,
     AbstractUnion,
     Context,
     InferenceLoop,
@@ -62,6 +63,10 @@ def test_to_abstract_skey():
 def test_to_abstract_list():
     assert to_abstract([]) is empty
     assert to_abstract([1, 2, 3]) is listof(S(t=ty.Int[64]))
+
+
+def test_to_abstract_xtype():
+    assert to_abstract(ty.Int[64]) is AbstractType(ty.Int[64])
 
 
 def test_numpy_scalar_to_abstract():

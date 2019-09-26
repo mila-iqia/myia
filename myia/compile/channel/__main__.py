@@ -36,7 +36,7 @@ def _rpc_server():
             try:
                 meth = getattr(iface, name)
                 res = meth(*args, **kwargs)
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 if do_pm:  # pragma: no cover
                     import rpdb
                     rpdb.post_mortem()
