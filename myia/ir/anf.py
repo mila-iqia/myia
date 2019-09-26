@@ -67,11 +67,15 @@ class Graph:
         self._sig = None
         self._manager = None
 
+    def plain(self):
+        """Return whether the graph is plain, i.e. not parameterized."""
+        return (not self.vararg
+                and not self.kwarg
+                and self.defaults == []
+                and self.kwonly == 0)
+
     def _serialize(self):
-        assert not self.vararg
-        assert not self.kwarg
-        assert self.defaults == []
-        assert self.kwonly == 0
+        assert self.plain()
         return {'parameters': self.parameters,
                 'return': self.return_,
                 'debug': self.debug}
@@ -311,8 +315,21 @@ class Graph:
         return new_graph
 
     async def reroute(self, engine, outref, argrefs):
-        """No rerouting."""
-        return None
+        """The graph is inlined if it has the static_inline flag."""
+        if self.has_flags('static_inline'):
+            from .clone import GraphCloner
+            assert self.plain()
+            new_params = [ref.node for ref in argrefs]
+            cl = GraphCloner(
+                inline=[(self, outref.node.graph, new_params)],
+            )
+            new_output = cl[self.output]
+            for g in cl.remapper.graph_repl.values():
+                if g:
+                    engine.mng.add_graph(g)
+            return engine.ref(new_output, outref.context)
+        else:
+            return None
 
     #########
     # Flags #
