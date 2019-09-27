@@ -56,7 +56,7 @@ def test_dump_undefined():
 
 def test_exception():
     e2 = dumpload(Exception("this is bad"))
-    assert e2.message == "Exception: this is bad\n"
+    assert str(e2) == "Exception: this is bad\n"
     assert repr(e2) == 'LoadedException'
 
 

@@ -138,6 +138,13 @@ def relay_array_reduce(c, fn, array, shape):
         raise NotImplementedError(f"reduce with {fn}")
 
 
+def relay_cast(c, v, t):
+    """Implementation of scalar_cast/array_cast for Relay."""
+    v = c.ref(v)
+    assert t.is_constant()
+    return relay.cast(v, type_to_np_dtype(t.value.xtype()))
+
+
 def relay_tuple_getitem(c, t, idx):
     """Implementation of tuple_getitem for Relay."""
     assert idx.is_constant(int)
@@ -198,6 +205,13 @@ def relay_array_getitem(c, a, start, stop, strides):
                                             strides.value)
 
 
+def relay_argmax(c, v, dims):
+    """Implementation of argmax for Relay."""
+    v = c.ref(v)
+    assert dims.is_constant(tuple)
+    return relay.cast(relay.argmax(v, axis=dims.value), 'int64')
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -205,6 +219,8 @@ COMPLEX_MAP = {
     P.array_map: relay_array_map,
     P.array_reduce: relay_array_reduce,
     P.scalar_to_array: lambda c, x, t: c.ref(x),
+    P.array_cast: relay_cast,
+    P.scalar_cast: relay_cast,
     P.tuple_getitem: relay_tuple_getitem,
     P.casttag: relay_casttag,
     P.hastag: relay_hastag,
@@ -213,6 +229,7 @@ COMPLEX_MAP = {
     P.env_getitem: relay_env_getitem,
     P.unsafe_static_cast: relay_unsafe_static_cast,
     P.array_getitem: relay_array_getitem,
+    P.argmax: relay_argmax,
 }
 
 

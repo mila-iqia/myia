@@ -75,7 +75,6 @@ def test_array_reduce2(x):
     return array_reduce(scalar_add, x, (3,))
 
 
-@pytest.mark.xfail(reason="scalar_cast is needed for ints")
 @mt(
     run(2, 3),
     run(2.0, 3.0),
