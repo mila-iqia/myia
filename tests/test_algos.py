@@ -7,6 +7,7 @@ from .common import Pair, f64, i64
 from .multitest import backend_all, mt, run, run_debug
 from .test_grad import gradient
 from .test_infer import infer_scalar
+from .test_monomorphize import mono_scalar
 
 #########################
 # Arithmetic algorithms #
@@ -54,7 +55,10 @@ def test_fact(n):
     return fact(n)
 
 
-@run(8)
+@mt(
+    run(8),
+    mono_scalar(13),  # Covers an edge case in monomorphize
+)
 def test_fib(n):
     a = 1
     b = 1
