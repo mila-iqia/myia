@@ -102,9 +102,6 @@ def to_abstract(fn, self, v, **kwargs):
             new_args[name] = self(value, **kwargs)
         rval = AbstractClass(type(v), new_args)
 
-    elif isinstance(v, xtype.TypeMeta):
-        rval = AbstractType(v)
-
     elif isinstance(v, type):
         try:
             rval = AbstractType(type_to_abstract(v))
