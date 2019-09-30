@@ -212,6 +212,18 @@ def relay_argmax(c, v, dims):
     return relay.cast(relay.argmax(v, axis=dims.value), 'int64')
 
 
+def relay_max_pool2d(c, img, psize, stride, pad, dil, ceil_mode):
+    assert psize.is_constant(tuple)
+    assert stride.is_constant(tuple)
+    assert pad.is_constant(tuple)
+    assert dil.is_constant(tuple)
+    assert ceil_mode.is_constant(bool)
+    assert dil.value == (1, 1)
+
+    return relay.max_pool2d(c.ref(img), psize.value, stride.value, pad.value,
+                            ceil_mode=ceil_mode.value)
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -230,6 +242,7 @@ COMPLEX_MAP = {
     P.unsafe_static_cast: relay_unsafe_static_cast,
     P.array_getitem: relay_array_getitem,
     P.argmax: relay_argmax,
+    P.max_pool2d: relay_max_pool2d,
 }
 
 
