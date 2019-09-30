@@ -1,9 +1,34 @@
 """Serialization utilities for graphs and their properties."""
 
-try:
-    from yaml import CSafeLoader as SafeLoader, CSafeDumper as SafeDumper
-except ImportError:  # pragma: no cover
-    from yaml import SafeLoader, SafeDumper
+# This is a mess of imports
+
+# 1) We prefer ruamel.yaml since it has merged the large files fix.
+# 2) Conda has a different name for it since it doesn't like namespaces.
+# 3) We attempt to use pyyaml as a fallback
+try:  # pragma: no cover
+    try:
+        from ruamel.yaml import (
+            CSafeLoader as SafeLoader,
+            CSafeDumper as SafeDumper
+        )
+    except ImportError:
+        try:
+            from ruamel_yaml import (
+                CSafeLoader as SafeLoader,
+                CSafeDumper as SafeDumper
+            )
+        except ImportError:
+            from yaml import (
+                CSafeLoader as SafeLoader,
+                CSafeDumper as SafeDumper
+            )
+except ImportError as e:  # pragma: no cover
+    raise RuntimeError("""
+Couldn't find a C-backed version of yaml.
+
+Please install either ruamel.yaml or PyYAML with the C extension. The python
+ versions are just too slow to work properly.
+""") from e
 
 import codecs
 import os
