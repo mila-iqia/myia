@@ -23,6 +23,8 @@ export PATH="$HOME/miniconda/bin:$PATH"
 hash -r
 conda config --set always_yes yes --set changeps1 no
 conda update -q conda
+conda create -y -n test python=3.7
+source activate test
 conda install --file=requirements-$DEV.conda
 pip install -r requirements.txt
 pip install -e . --no-deps

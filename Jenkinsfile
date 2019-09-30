@@ -7,19 +7,20 @@ node ('gpu') {
   }
   try {
     stage ('Test') {
-      sh script: '$HOME/miniconda/bin/pytest --cov=./ --cov-report= --gpu --junit-xml test-report.xml'
+      sh script: 'source activate test && pytest --cov=./ --cov-report= --gpu --junit-xml test-report.xml'
     }
   } finally {
     junit 'test-report.xml'
   }
   stage ('Coverage') {
-    withEnv(['PATH+CONDA=/home/jenkins/miniconda/bin']) {
-      sh script: './cov.sh'
-      sh script: 'coverage xml'
-      sh script: 'pip install codecov'
-      withCredentials([string(credentialsId: 'myia_codecov', variable: 'CODECOV_TOKEN')]) {
-        sh script: 'codecov'
-      }
+    sh script: """
+source activate test &&
+./cov.sh &&
+coverage xml
+"""
+    sh script: '$HOME/miniconda/bin/pip install codecov'
+    withCredentials([string(credentialsId: 'myia_codecov', variable: 'CODECOV_TOKEN')]) {
+      sh script: '$HOME/miniconda/bin/codecov'
     }
   }
 }

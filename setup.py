@@ -23,7 +23,7 @@ setup(
     ],
     packages=find_packages(exclude=['docs', 'tests']),
     install_requires=['asttokens', 'colorama', 'prettyprinter',
-                      'numpy', 'pyyaml'],
+                      'numpy', 'ruamel.yaml'],
     extras_require={
         'test': ['flake8', 'pytest', 'codecov', 'isort',
                  'pytest-cov', 'pydocstyle', 'docopt'],
