@@ -54,7 +54,6 @@ SIMPLE_MAP = {
     P.scalar_exp: relay.exp,
     P.scalar_log: relay.log,
     P.scalar_max: relay.maximum,
-    # This is not right tangent vs hyperbolic tangent
     P.scalar_tanh: relay.op.tanh,
 
     P.scalar_eq: relay.op.equal,
@@ -229,6 +228,11 @@ def relay_max_pool2d(c, img, psize, stride, pad, dil, ceil_mode):
                             ceil_mode=ceil_mode.value)
 
 
+def relay_array_max(c, a, dim):
+    assert dim.is_constant(tuple)
+    return relay.max(c.ref(a), axis=dim.value)
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -248,6 +252,7 @@ COMPLEX_MAP = {
     P.array_getitem: relay_array_getitem,
     P.argmax: relay_argmax,
     P.max_pool2d: relay_max_pool2d,
+    P.array_max: relay_array_max,
 }
 
 
