@@ -1870,33 +1870,9 @@ def test_bad_metagraph(x):
 #         )
 
 
-# ###########################
-# # Using standard_pipeline #
-# ###########################
-
-
-@mt(
-    infer_standard(i64, i64, result=i64),
-    infer_standard(ai64_of(7, 9), ai64_of(7, 9), result=ai64_of(7, 9)),
-    infer_standard(ai64_of(7, 9), i64, result=ai64_of(7, 9)),
-    infer_standard(i64, ai64_of(7, 9), result=ai64_of(7, 9)),
-    infer_standard(ai64_of(7, 9), i64, result=ai64_of(7, 9)),
-    infer_standard(i64, f64, result=InferenceError),
-    infer_standard(3, ai64_of(7, 9), result=ai64_of(7, 9)),
-    infer_standard(af32_of(7, 9), af32_of(7, 1), result=af32_of(7, 9)),
-    infer_standard(af32_of(1, 9), af32_of(7, 1), result=af32_of(7, 9)),
-    infer_standard(af32_of(1, ANYTHING), af32_of(7, 1),
-                   result=af32_of(7, ANYTHING)),
-    infer_standard(af32_of(8, ANYTHING), af32_of(8, ANYTHING),
-                   result=af32_of(8, ANYTHING)),
-    infer_standard(af32_of(8, 3), af32_of(8, ANYTHING),
-                   result=af32_of(8, 3)),
-    infer_standard(af32_of(2, 3, 4), af32_of(3, 4),
-                   result=af32_of(2, 3, 4)),
-    infer_standard(ai64_of(7), ai64_of(9), result=InferenceError),
-)
-def test_add_std(x, y):
-    return x + y
+###########################
+# Using standard_pipeline #
+###########################
 
 
 @mt(
@@ -1908,42 +1884,6 @@ def test_max_std(x, y):
         return x
     else:
         return y
-
-
-@mt(
-    infer_standard(f64, result=f64),
-    infer_standard(i64, result=i64),
-    infer_standard(af32_of(2, 5), result=af32_of(2, 5)),
-)
-def test_add1_stdx(x):
-    return 1 + x
-
-
-def _add(x, y):
-    return x + y
-
-
-@mt(
-    infer_standard(f64, result=f64),
-    infer_standard(i64, result=i64),
-)
-def test_add1_std_indirect(x):
-    return _add(1, x)
-
-
-def _interference_helper(x):
-    if hastype(x, Tuple):
-        return x[0]
-    else:
-        return x
-
-
-@mt(
-    infer_scalar(i64, result=i64),
-    infer_scalar(f64, result=f64),
-)
-def test_add1_hastype_interference(x):
-    return x + _interference_helper(1)
 
 
 @mt(

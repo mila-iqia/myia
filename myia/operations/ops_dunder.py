@@ -116,11 +116,11 @@ eq = dunder_protocol_binary(
     fallback=is_fallback, infer_value=True, pyop=operator.eq
 )
 lt = dunder_protocol_binary(
-    name='lt', lattr='__lt__', rattr='__ge__',
+    name='lt', lattr='__lt__', rattr='__gt__',
     infer_value=True, pyop=operator.lt
 )
 gt = dunder_protocol_binary(
-    name='gt', lattr='__gt__', rattr='__le__',
+    name='gt', lattr='__gt__', rattr='__lt__',
     infer_value=True, pyop=operator.gt
 )
 ne = dunder_protocol_binary(
@@ -128,11 +128,11 @@ ne = dunder_protocol_binary(
     fallback=is_not_fallback, infer_value=True, pyop=operator.ne
 )
 le = dunder_protocol_binary(
-    name='le', lattr='__le__', rattr='__gt__',
+    name='le', lattr='__le__', rattr='__ge__',
     infer_value=True, pyop=operator.le
 )
 ge = dunder_protocol_binary(
-    name='ge', lattr='__ge__', rattr='__lt__',
+    name='ge', lattr='__ge__', rattr='__le__',
     infer_value=True, pyop=operator.ge
 )
 and_ = dunder_protocol_binary(

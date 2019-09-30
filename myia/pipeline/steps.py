@@ -5,7 +5,7 @@ The steps are listed in roughly the same order they should be called.
 
 from itertools import count
 
-from ..abstract import AbstractTuple, find_aliases
+from ..abstract import AbstractTuple, find_aliases, nobottom
 from ..compile import BackendValue
 from ..ir import Graph
 from ..opt import (
@@ -16,7 +16,7 @@ from ..opt import (
     lib as optlib,
 )
 from ..simplify_types import from_canonical, simplify_types, to_canonical
-from ..utils import MyiaInputTypeError, Partializable, tracer
+from ..utils import InferenceError, MyiaInputTypeError, Partializable, tracer
 from ..validate import validate
 
 #############
@@ -140,6 +140,10 @@ def step_infer(resources, graph, argspec):
         inference_context: The Context for the root graph.
     """
     res, context = resources.inferrer.infer(graph, argspec)
+    if not nobottom(res):
+        raise InferenceError(
+            'There is no condition in which the program succeeds'
+        )
     return {'outspec': res,
             'argspec': argspec,
             'inference_context': context}

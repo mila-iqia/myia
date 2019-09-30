@@ -7,7 +7,7 @@ import operator
 import numpy as np
 
 from .. import operations, xtype
-from ..abstract import Context
+from ..abstract import ABSENT, Context
 from ..ir import GraphManager
 from ..operations import primitives as P
 from ..operations.gen import lop, reverse_binop, rop
@@ -248,6 +248,14 @@ standard_method_map = {
         'ndim': property(operations.ndim),
         'dtype': property(operations.dtype),
     },
+    object: {
+        '__eq__': ABSENT,
+        '__ne__': ABSENT,
+        '__lt__': ABSENT,
+        '__gt__': ABSENT,
+        '__le__': ABSENT,
+        '__ge__': ABSENT,
+    }
 }
 
 
