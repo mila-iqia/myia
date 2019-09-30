@@ -66,7 +66,7 @@ def test_to_abstract_list():
 
 
 def test_to_abstract_xtype():
-    assert to_abstract(ty.Int[64]) is AbstractType(ty.Int[64])
+    assert to_abstract(ty.Int[64]) is AbstractType(S(t=ty.Int[64]))
 
 
 def test_numpy_scalar_to_abstract():
