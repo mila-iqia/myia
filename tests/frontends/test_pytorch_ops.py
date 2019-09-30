@@ -21,8 +21,9 @@ from myia.frontends.pytorch_abstract_types import (
 )
 from myia.pipeline import standard_pipeline
 
-from ..common import MA, MB, to_abstract_test
-from ..multitest import eqtest, mt, myia_function_test, run, run_no_relay
+
+from ..common import MA, MB, f32, to_abstract_test
+from ..multitest import eqtest, mt, myia_function_test, run, backend_all, backend_no_relay
 from ..test_grad import grad_wrap
 
 torch = pytest.importorskip("torch")
@@ -95,7 +96,16 @@ def make_argspec(args, broad_specs):
                  for bs, arg in zip(broad_specs, clean_args(args)))
 
 
-def _fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline):
+def _fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
+                 backend=False):
+    if backend:
+        backend_name = backend[0]
+        backend_options = backend[1]
+
+        pipeline = pipeline.configure({
+            'resources.backend.name': backend_name,
+            'resources.backend.options': backend_options
+        })
 
     def mksens(x):
         return AbstractArray(
@@ -134,8 +144,8 @@ def _fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline):
 
 
 @myia_function_test(marks=[pytest.mark.grad], id='grad')
-def fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline):
-    _fwd_and_bwd(fn, args, broad_specs, pipeline)
+def fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline, backend=False):
+    _fwd_and_bwd(fn, args, broad_specs, pipeline, backend)
 
 
 # THIS TEST ALL OPS that are in dir of "torch" or "torch.tensor"
