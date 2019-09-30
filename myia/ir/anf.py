@@ -317,7 +317,10 @@ class Graph:
     async def reroute(self, engine, outref, argrefs):
         """The graph is inlined if it has the static_inline flag."""
         if self.has_flags('static_inline'):
+            from ..abstract import VirtualReference
             from .clone import GraphCloner
+            if any(isinstance(ref, VirtualReference) for ref in argrefs):
+                return None
             assert self.plain()
             new_params = [ref.node for ref in argrefs]
             cl = GraphCloner(
