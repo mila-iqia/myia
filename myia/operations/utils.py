@@ -58,12 +58,27 @@ class Operation(HasDefaults):
     __repr__ = __str__
 
 
+class OperationDefinition(dict):
+    def __init__(self, **kwargs):
+        assert 'name' in kwargs
+        super().__init__(**kwargs)
+
+    def __to_myia__(self):
+        """Return the mapping."""
+        return self['mapping']
+
+    def __call__(self):
+        raise TypeError(
+            f'Operation definition for {self["name"]} is not callable.'
+        )
+
+
 def to_opdef(fn):
     """Create an operation definition from a function."""
     name = fn.__name__
-    return {
-        'name': name,
-        'registered_name': name,
-        'mapping': fn,
-        'python_implementation': None,
-    }
+    return OperationDefinition(
+        name=name,
+        registered_name=name,
+        mapping=fn,
+        python_implementation=None,
+    )

@@ -1,12 +1,11 @@
 
 
-from ..utils import core
-
+from ..lib import core
 from . import hastype
 
 
 def lop(op, type, name):
-    @core(name=name)
+    @core(name=name, static_inline=True)
     def protocol(x, y):
         if hastype(y, type):
             return op(x, y)
@@ -15,8 +14,9 @@ def lop(op, type, name):
     return protocol
 
 
+@core(static_inline=True)
 def rop(op, type, name):
-    @core(name=name)
+    @core(name=name, static_inline=True)
     def protocol(x, y):
         if hastype(y, type):
             return op(y, x)
@@ -26,7 +26,7 @@ def rop(op, type, name):
 
 
 def reverse_binop(op, name):
-    @core(name=name)
+    @core(name=name, static_inline=True)
     def protocol(x, y):
         return op(y, x)
     return protocol

@@ -1,6 +1,7 @@
 
 from dataclasses import dataclass
-from ..common import i64, ai64_of
+
+from ..common import ai64_of, i64
 from ..multitest import mt
 from ..test_infer import infer_standard
 

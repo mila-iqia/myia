@@ -10,7 +10,7 @@ from .. import operations, xtype
 from ..abstract import Context
 from ..ir import GraphManager
 from ..operations import primitives as P
-from ..operations.gen import lop, rop, reverse_binop
+from ..operations.gen import lop, reverse_binop, rop
 from ..utils import Registry
 from ..validate import (
     validate_abstract as default_validate_abstract,
