@@ -42,17 +42,18 @@ def ashape(node):
 
 
 SIMPLE_MAP = {
-    P.scalar_add: relay.op.add,
-    P.scalar_sub: relay.op.subtract,
-    P.scalar_mul: relay.op.multiply,
-    P.scalar_div: relay.op.divide,
-    P.scalar_mod: relay.op.mod,
+    P.scalar_add: relay.add,
+    P.scalar_sub: relay.subtract,
+    P.scalar_mul: relay.multiply,
+    P.scalar_div: relay.divide,
+    P.scalar_mod: relay.mod,
     P.scalar_pow: relay.op.power,
     P.scalar_floor: relay.op.floor,
     P.scalar_uadd: lambda x: x,
     P.scalar_usub: relay.op.negative,
-    P.scalar_exp: relay.op.exp,
-    P.scalar_log: relay.op.log,
+    P.scalar_exp: relay.exp,
+    P.scalar_log: relay.log,
+    P.scalar_max: relay.maximum,
     # This is not right tangent vs hyperbolic tangent
     P.scalar_tanh: relay.op.tanh,
 
@@ -108,7 +109,11 @@ def relay_array_map(c, fn, *array):
     """Implementation of array_map for Relay."""
     assert fn.is_constant(Primitive)
     fn = fn.value
-    return SIMPLE_MAP[fn](*[c.ref(a) for a in array])
+    if fn is P.switch:
+        rfn = relay.where
+    else:
+        rfn = SIMPLE_MAP[fn]
+    return rfn(*[c.ref(a) for a in array])
 
 
 def relay_array_reduce(c, fn, array, shape):
