@@ -4,7 +4,7 @@ numpy
 abergeron::tvm==0.6dev+3.*
 pytest
 pytest-cov
-pyyaml
+ruamel_yaml
 flake8==3.7.7
 pytorch::pytorch==1.1.0
 pydocstyle==2.1.1
