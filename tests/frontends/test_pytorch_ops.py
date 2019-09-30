@@ -96,8 +96,8 @@ def make_argspec(args, broad_specs):
                  for bs, arg in zip(broad_specs, clean_args(args)))
 
 
-def _fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
-                 backend=False):
+def __fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
+                  backend=False):
     if backend:
         backend_name = backend[0]
         backend_options = backend[1]
@@ -144,8 +144,11 @@ def _fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
 
 
 @myia_function_test(marks=[pytest.mark.grad], id='grad')
-def fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline, backend=False):
-    _fwd_and_bwd(fn, args, broad_specs, pipeline, backend)
+def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline, backend=False):
+    __fwd_and_bwd(fn, args, broad_specs, pipeline, backend)
+
+fwd_and_bwd = _fwd_and_bwd.configure(backend=backend_all)
+fwd_and_bwd_no_relay = _fwd_and_bwd.configure(backend=backend_no_relay)
 
 
 # THIS TEST ALL OPS that are in dir of "torch" or "torch.tensor"
