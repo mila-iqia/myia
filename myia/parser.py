@@ -195,7 +195,7 @@ class Parser:
 
     def new_block(self, **kwargs) -> 'Block':
         """Create a new block."""
-        return Block(self, **kwargs)
+        return Block(self, **kwargs, **self.recflags)
 
     def make_location(self, node) -> Location:
         """Create a Location from an AST node."""
@@ -869,7 +869,6 @@ class Block:
         self.graph: Graph = Graph()
         self.graph.set_flags(reference=True)
         self.graph.flags.update(flags)
-        self.graph.flags.update(parser.recflags)
 
     def set_phi_arguments(self, phi: Parameter) -> None:
         """Resolve the arguments to a phi node.
