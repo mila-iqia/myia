@@ -243,8 +243,8 @@ def test_torch_eq(x, y):
 # """
 
 
-@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(3, 4))),
-             torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]))
+@fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(3, 4))),
+                      torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]))
 def test_torch_gather(x, index):
     return torch.gather(x, 0, index)
 
@@ -257,12 +257,12 @@ def test_torch_item(x):
     return x.item()
 
 
-@fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)))
+@fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)))
 def test_torch_tensor_get(x):
     return x[:, -3:-1:2, -2]
 
 
-@fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)))
+@fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)))
 def test_torch_tensor_get2(x):
     return x[1, 2]
 
