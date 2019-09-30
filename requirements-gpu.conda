@@ -5,7 +5,7 @@ abergeron/label/cuda::tvm-libs
 abergeron::tvm==0.6dev+3.*
 pytest
 pytest-cov
-pyyaml
+yaml
 flake8==3.7.7
 pytorch::pytorch==1.1.0
 pydocstyle==2.1.1

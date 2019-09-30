@@ -7,7 +7,7 @@ env:
   - TEST_SUITE=static
   - TEST_SUITE=unit
 script:
-  - if [[ $TEST_SUITE == "static" ]]; then flake8 && pydocstyle myia && isort -c -df; fi
-  - if [[ $TEST_SUITE == "unit" ]]; then pytest tests --cov=./ --cov-report term-missing; fi
+  - if [[ $TEST_SUITE == "static" ]]; then source activate test && flake8 && pydocstyle myia && isort -c -df; fi
+  - if [[ $TEST_SUITE == "unit" ]]; then source activate test && pytest tests --cov=./ --cov-report term-missing; fi
 after_success:
   - if [[ $TEST_SUITE == "unit" ]]; then codecov; fi
