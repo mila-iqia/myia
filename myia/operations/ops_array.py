@@ -6,18 +6,19 @@ from .. import lib, operations
 from ..hypermap import HyperMap
 from ..lib import core, myia_static
 from ..operations import array_reduce, primitives as P, scalar_add, shape
-from .utils import to_opdef
+from .utils import OperationDefinition, to_opdef
 
 
 def elemwise(name, op, infer_value=False):
+    """Define an elemwise operation on one or more arrays."""
     hm = HyperMap(name=name, fn_leaf=op, nonleaf=(lib.AbstractArray,),
                   infer_value=infer_value)
-    return {
-        'name': name,
-        'registered_name': name,
-        'mapping': hm,
-        'python_implementation': None,
-    }
+    return OperationDefinition(
+        name=name,
+        registered_name=name,
+        mapping=hm,
+        python_implementation=None,
+    )
 
 
 array_add = elemwise('array_add', operations.add)

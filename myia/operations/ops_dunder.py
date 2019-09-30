@@ -18,7 +18,7 @@ def _operation(name, fn, pyop):
     )
 
 
-def dunder_method_protocol(name, pyop=None):
+def dunder_protocol_unary(name, pyop=None):
     """Define a function that calls a certain method (unary)."""
     attr = f'__{name}__'
 
@@ -29,7 +29,7 @@ def dunder_method_protocol(name, pyop=None):
     return _operation(name, protocol, pyop)
 
 
-def dunder_method_protocol_2(name, pyop=None):
+def dunder_protocol_binary_simple(name, pyop=None):
     """Define a function that calls a certain method (binary)."""
     attr = f'__{name}__'
 
@@ -42,22 +42,33 @@ def dunder_method_protocol_2(name, pyop=None):
 
 @core(static_inline=True)
 def exc_fallback(x, y):
+    """Fallback for most dunder operations."""
     raise Exception('Not implemented')
 
 
 @core(static_inline=True)
 def is_fallback(x, y):
+    """Fallback to x is y."""
     return x is y
 
 
 @core(static_inline=True)
 def is_not_fallback(x, y):
+    """Fallback to x is not y."""
     return x is not y
 
 
-def dunder_protocol_binary(name, lattr, rattr, infer_value=False,
+def dunder_protocol_binary(name, lattr, rattr,
                            fallback=exc_fallback, pyop=None):
-    """Define a function that calls a certain method (binary)."""
+    """Define a function that calls a certain method (binary).
+
+    This typically works as follows:
+    * Try method lattr on the left operand.
+    * If it doesn't exist or returns NotImplemented, try method rattr
+      on the right operand.
+    * If neither method exists, or they return NotImplemented, try the
+      fallback (usually raise an exception).
+    """
     @core(name=name, static_inline='inner')
     def protocol(x, y):
         rval = NotImplemented
@@ -105,35 +116,37 @@ matmul = dunder_protocol_binary(
     name='matmul', lattr='__matmul__', rattr='__rmatmul__',
     pyop=operator.matmul
 )
-pos = dunder_method_protocol('pos')
-neg = dunder_method_protocol('neg')
-floor = dunder_method_protocol('floor')
-trunc = dunder_method_protocol('trunc')
+pos = dunder_protocol_unary('pos')
+neg = dunder_protocol_unary('neg')
+floor = dunder_protocol_unary('floor')
+trunc = dunder_protocol_unary('trunc')
 
-bool = dunder_method_protocol('bool')
+bool = dunder_protocol_unary('bool')
 eq = dunder_protocol_binary(
     name='eq', lattr='__eq__', rattr='__eq__',
-    fallback=is_fallback, infer_value=True, pyop=operator.eq
+    pyop=operator.eq,
+    fallback=is_fallback
 )
 lt = dunder_protocol_binary(
     name='lt', lattr='__lt__', rattr='__gt__',
-    infer_value=True, pyop=operator.lt
+    pyop=operator.lt
 )
 gt = dunder_protocol_binary(
     name='gt', lattr='__gt__', rattr='__lt__',
-    infer_value=True, pyop=operator.gt
+    pyop=operator.gt
 )
 ne = dunder_protocol_binary(
     name='ne', lattr='__ne__', rattr='__ne__',
-    fallback=is_not_fallback, infer_value=True, pyop=operator.ne
+    pyop=operator.ne,
+    fallback=is_not_fallback
 )
 le = dunder_protocol_binary(
     name='le', lattr='__le__', rattr='__ge__',
-    infer_value=True, pyop=operator.le
+    pyop=operator.le
 )
 ge = dunder_protocol_binary(
     name='ge', lattr='__ge__', rattr='__le__',
-    infer_value=True, pyop=operator.ge
+    pyop=operator.ge
 )
 and_ = dunder_protocol_binary(
     name='and', lattr='__and__', rattr='__rand__',
@@ -144,9 +157,9 @@ or_ = dunder_protocol_binary(
     pyop=operator.or_
 )
 
-getitem = dunder_method_protocol_2('getitem')
-len = dunder_method_protocol('len')
-myia_iter = dunder_method_protocol('myia_iter')
-myia_next = dunder_method_protocol('myia_next')
-myia_hasnext = dunder_method_protocol('myia_hasnext')
-myia_to_array = dunder_method_protocol_2('myia_to_array')
+getitem = dunder_protocol_binary_simple('getitem')
+len = dunder_protocol_unary('len')
+myia_iter = dunder_protocol_unary('myia_iter')
+myia_next = dunder_protocol_unary('myia_next')
+myia_hasnext = dunder_protocol_unary('myia_hasnext')
+myia_to_array = dunder_protocol_binary_simple('myia_to_array')

@@ -61,7 +61,10 @@ def default_convert(env, x: Operation):
 
 @overload  # noqa: F811
 def default_convert(env, x: object):
-    return getattr(x, '__to_myia__', x)
+    if hasattr(x, '__to_myia__'):
+        return x.__to_myia__()
+    else:
+        return x
 
 
 @overload  # noqa: F811

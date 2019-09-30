@@ -59,7 +59,10 @@ class Operation(HasDefaults):
 
 
 class OperationDefinition(dict):
+    """Definition of an operation."""
+
     def __init__(self, **kwargs):
+        """Initialize an OperationDefinition."""
         assert 'name' in kwargs
         super().__init__(**kwargs)
 
@@ -68,6 +71,7 @@ class OperationDefinition(dict):
         return self['mapping']
 
     def __call__(self):
+        """Raise an error when calling the OperationDefinition."""
         raise TypeError(
             f'Operation definition for {self["name"]} is not callable.'
         )
