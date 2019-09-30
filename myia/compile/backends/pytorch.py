@@ -237,8 +237,7 @@ def pytorch_array_max(op):
 def pytorch_gather(op):
     """Implementation of gather for pytorch."""
     def _impl(x, dim, index):
-        if dim is not None:
-            dim = dim.item()
+        dim = dim.item()
         return (torch.gather(x, dim, index),)
     return _impl, op.inputs[1:]
 
@@ -246,8 +245,7 @@ def pytorch_gather(op):
 def pytorch_scatter(op):
     """Implementation of scatter for pytorch."""
     def _impl(x, dim, index, src):
-        if dim is not None:
-            dim = dim.item()
+        dim = dim.item()
         return (torch.scatter(x, dim, index, src),)
     return _impl, op.inputs[1:]
 
@@ -255,8 +253,7 @@ def pytorch_scatter(op):
 def pytorch_scatter_add(op):
     """Implementation of scatter_add for pytorch."""
     def _impl(x, dim, index, src):
-        if dim is not None:
-            dim = dim.item()
+        dim = dim.item()
         return (torch.scatter_add(x, dim, index, src),)
     return _impl, op.inputs[1:]
 
