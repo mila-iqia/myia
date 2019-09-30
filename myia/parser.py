@@ -138,14 +138,23 @@ def parse(func):
     """
     if func in _parse_cache:
         return _parse_cache[func]
-    flags = getattr(func, '_myia_flags', {})
+    flags = dict(getattr(func, '_myia_flags', {}))
     if 'name' in flags:
         name = flags['name']
         del flags['name']
     else:
         name = None
+
+    inner_flags = {flag: True for flag, value in flags.items()
+                   if value == 'inner'}
+    flags.update(inner_flags)
+
     parser = Parser(func, recflags=flags)
     graph = parser.parse()
+
+    for flag in inner_flags:
+        del graph.flags[flag]
+
     if name is not None:
         graph.debug.name = name
     _parse_cache[func] = graph
