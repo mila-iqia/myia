@@ -102,16 +102,18 @@ class MyiaFunctionTest:
         * A subclass of Exception, which run() is expected to raise.
         * A callable, which can run custom checks.
         """
+        message = None
+        if isinstance(expected, Exception):
+            message = expected.args[0]
+            expected = type(expected)
         if isinstance(expected, type) and issubclass(expected, Exception):
             try:
                 res = run()
-            except expected:
-                pass
+            except expected as err:
+                if message is not None and message not in err.args[0]:
+                    raise
             else:
-                raise Exception(
-                    f'Expected an error of type {expected}, '
-                    f'but got result {res}'
-                )
+                raise
         else:
             res = run()
             if isinstance(expected, FunctionType):

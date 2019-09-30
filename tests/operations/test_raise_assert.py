@@ -1,17 +1,20 @@
 
+from myia.lib import InferenceError
 from myia.operations import hastype
 from myia.pipeline import standard_debug_pipeline
 
-from ..common import Bot, U, f64, i32, i64
+from ..common import U, f64, i32, i64
 from ..multitest import mt, run_debug
 from ..test_grad import gradient
 from ..test_infer import infer_scalar, infer_standard
+
+_msg = 'There is no condition in which the program succeeds'
 
 
 @mt(
     infer_scalar(i32, result=i32),
     infer_scalar(1, result=i64),
-    infer_scalar(-1, result=Bot),
+    infer_scalar(-1, result=InferenceError(_msg)),
 )
 def test_assert(x):
     assert x >= 0
@@ -21,7 +24,7 @@ def test_assert(x):
 @mt(
     infer_scalar(i32, result=i32),
     infer_scalar(1, result=i64),
-    infer_scalar(-1, result=Bot),
+    infer_scalar(-1, result=InferenceError(_msg)),
 )
 def test_assert_msg(x):
     assert x >= 0, 'x must be positive'
@@ -43,7 +46,7 @@ def test_raise(x):
         raise Exception("sqrt of negative number")
 
 
-@infer_scalar(i32, result=Bot)
+@infer_scalar(i32, result=InferenceError(_msg))
 def test_raise_unconditional(x):
     raise Exception("I don't like your face")
 
@@ -59,7 +62,7 @@ def test_raise_multiple(x):
 
 
 @mt(
-    infer_standard(i32, result=Bot),
+    infer_standard(i32, result=InferenceError(_msg)),
     infer_standard(f64, result=f64),
     infer_standard(U(i32, i64), result=i64)
 )
