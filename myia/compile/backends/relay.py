@@ -246,6 +246,17 @@ def relay_array_max(c, a, dim):
     return relay.max(c.ref(a), axis=dim.value)
 
 
+def relay_conv2d(c, img, w, stride, pad, dil, groups):
+    assert stride.is_constant(tuple)
+    assert pad.is_constant(tuple)
+    assert dil.is_constant(tuple)
+    assert groups.is_constant(int)
+
+    return relay.nn.conv2d(c.ref(img), c.ref(w), strides=stride.value,
+                           padding=pad.value, dilation=dil.value,
+                           groups=groups.value)
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -267,6 +278,7 @@ COMPLEX_MAP = {
     P.max_pool2d: relay_max_pool2d,
     P.max_pool2d_grad: relay_max_pool2d_grad,
     P.array_max: relay_array_max,
+    P.conv2d: relay_conv2d,
 }
 
 
