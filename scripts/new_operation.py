@@ -1,3 +1,23 @@
+"""Create a new Myia operation.
+
+This script uses relative paths and must be executed in the project folder.
+
+Usage:
+
+  python scripts/new_operation.py template OPERATION=name ARGUMENTS="arg1, arg2, ..."
+
+For example, to create a new primitive walk(speed, gait):
+
+  python scripts/new_operation.py prim OPERATION=walk ARGUMENTS="speed, gait"
+
+The following templates are available:
+
+  prim: Create a new BackendPrimitive.
+  infprim: Create a new InferencePrimitive.
+  macro: Create a new Macro.
+  op: Create a new operation (generic).
+
+"""  # noqa: 501
 
 import os
 import sys

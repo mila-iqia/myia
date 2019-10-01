@@ -1,0 +1,29 @@
+"""Definitions for the primitive `OPERATION`."""
+
+from .. import lib, xtype
+from ..lib import standard_prim
+from . import primitives as P
+
+
+@standard_prim(P.OPERATION)
+async def infer_OPERATION(self, engine, ARGUMENTS):
+    """Infer the return type of primitive `OPERATION`."""
+    # TODO
+
+
+__operation_defaults__ = {
+    'name': 'OPERATION',
+    'registered_name': 'OPERATION',
+    'mapping': P.OPERATION,
+    'python_implementation': None,
+}
+
+
+__primitive_defaults__ = {
+    'name': 'OPERATION',
+    'registered_name': 'OPERATION',
+    'type': 'inference',
+    'python_implementation': None,
+    'inferrer_constructor': infer_OPERATION,
+    'grad_transform': None,
+}

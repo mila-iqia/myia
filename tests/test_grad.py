@@ -40,20 +40,7 @@ from myia.pipeline import (
 from myia.utils import InferenceError, MyiaInputTypeError
 from myia.validate import validate_abstract, whitelist
 
-from .common import (
-    AA,
-    MA,
-    MB,
-    Point3D,
-    U,
-    countdown,
-    f64,
-    make_tree,
-    reducetree,
-    sumtree,
-    to_abstract_test,
-    u64,
-)
+from .common import AA, MA, MB, Point3D, U, f64, to_abstract_test, u64
 from .multitest import backend_all, mt, myia_function_test
 
 
@@ -354,16 +341,6 @@ def test_if2(a, b):
         return b + b
 
 
-@gradient(4.1)
-def test_fact(x):
-    def fact(n):
-        if n <= 1:
-            return 1
-        else:
-            return n * fact(n - 1)
-    return fact(x)
-
-
 @gradient(4.1, pipeline=standard_pipeline, backend=backend_all)
 def test_fact_opt(x):
     def fact(n=x):
@@ -392,19 +369,6 @@ def test_while_2(x, y, z):
     return rval
 
 
-@gradient(2.0,)
-def test_pow10(x):
-    v = x
-    j = 0
-    while j < 3:
-        i = 0
-        while i < 3:
-            v = v * x
-            i = i + 1
-        j = j + 1
-    return v
-
-
 @gradient([1.0, 2.0, 3.0, 4.0],
           pipeline=standard_debug_pipeline.configure(validate=False))
 def test_list_while(xs):
@@ -423,15 +387,6 @@ def test_list_for(xs):
     for x in xs:
         y = y * x
     return y
-
-
-@gradient(4.5,
-          pipeline=standard_debug_pipeline.configure(validate=False))
-def test_exception(x):
-    if x > 0:
-        return x
-    else:
-        raise Exception("oh no")
 
 
 @gradient(4.5)
@@ -543,26 +498,6 @@ def test_union(x):
     else:
         a, b = x
         return a * b
-
-
-@mt(
-    gradient(make_tree(3, 1.0)),
-    gradient(countdown(3.0)),
-    pipeline=standard_pipeline,
-    backend=backend_all
-)
-def test_sumtree(x):
-    return sumtree(x)
-
-
-@mt(
-    gradient(make_tree(3, 1.0), 1.0),
-    gradient(countdown(4.0), 1.0),
-    pipeline=standard_pipeline,
-    backend=backend_all
-)
-def test_reducetree(t, init):
-    return reducetree(scalar_mul, t, init)
 
 
 def _runwith(f, *args):
@@ -840,3 +775,15 @@ def test_bad_bprop_def():
         @bprop_to_grad_transform(Primitive('nonsense'))
         def _bprop_nonsense(x, y, dout):
             return dout + x + y
+
+
+@mark.xfail(reason="Second order gradients are not supported yet")
+def test_second_order():
+    def square(x):
+        return x * x
+
+    @myia
+    def f(x):
+        return grad(grad(square))(x)
+
+    assert f(10) == 2

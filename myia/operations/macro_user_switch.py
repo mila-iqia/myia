@@ -142,8 +142,7 @@ async def user_switch(info, condref, tbref, fbref):
     for branch_ref in [tbref, fbref]:
         if not branch_ref.node.is_constant_graph():
             raise MyiaTypeError(
-                'Branches of switch must be functions when the condition'
-                ' is hastype on a Union.'
+                'Both branches of user_switch must be constant graphs.'
             )
 
     cond = condref.node

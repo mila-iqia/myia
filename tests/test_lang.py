@@ -540,37 +540,6 @@ def test_pow8(x):
     return x
 
 
-@mt(
-    run_lang(2),
-    run_lang(3),
-)
-def test_pow10(x):
-    v = x
-    j = 0
-    while j < 3:
-        i = 0
-        while i < 3:
-            v = v * x
-            i = i + 1
-        j = j + 1
-    return v
-
-
-@mt(
-    run_lang(0),
-    run_lang(1),
-    run_lang(4),
-    run_lang(10),
-)
-def test_fact(x):
-    def fact(n):
-        if n <= 1:
-            return 1
-        else:
-            return n * fact(n - 1)
-    return fact(x)
-
-
 @run_lang(42)
 def test_record(x):
     return Point(x, x)

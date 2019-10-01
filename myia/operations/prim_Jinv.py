@@ -11,8 +11,10 @@ from ..lib import (
     MyiaTypeError,
     Primitive,
     PrimitiveFunction,
+    bprop_to_grad_transform,
     standard_prim,
 )
+from ..operations import J
 from . import primitives as P
 
 
@@ -60,6 +62,12 @@ async def infer_Jinv(self, engine, x):
         raise MyiaTypeError('Expected JTagged')
 
 
+@bprop_to_grad_transform(P.Jinv)
+def bprop_Jinv(x, out, dout):
+    """Backpropagator for primitive `Jinv`."""
+    return (J(dout),)
+
+
 __operation_defaults__ = {
     'name': 'Jinv',
     'registered_name': 'Jinv',
@@ -74,5 +82,5 @@ __primitive_defaults__ = {
     'type': 'placeholder',
     'python_implementation': None,
     'inferrer_constructor': infer_Jinv,
-    'grad_transform': None,
+    'grad_transform': bprop_Jinv,
 }

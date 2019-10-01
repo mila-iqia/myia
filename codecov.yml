@@ -5,3 +5,10 @@ ignore:
   - "myia/debug"
   - "examples"
 comment: false
+
+coverage:
+  status:
+    project:
+      default:
+        target: 100%
+        threshold: 0%

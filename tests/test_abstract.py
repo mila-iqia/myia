@@ -66,7 +66,7 @@ def test_to_abstract_list():
 
 
 def test_to_abstract_xtype():
-    assert to_abstract(ty.Int[64]) is AbstractType(ty.Int[64])
+    assert to_abstract(ty.Int[64]) is AbstractType(S(t=ty.Int[64]))
 
 
 def test_numpy_scalar_to_abstract():
@@ -132,15 +132,6 @@ def test_amerge():
     with pytest.raises(MyiaTypeError):
         amerge(ty.Int[64], ty.Int, forced=True)
 
-    loop = asyncio.new_event_loop()
-    p = PendingFromList([ty.Int[64], ty.Float[64]], None, None, loop=loop)
-    assert amerge(ty.Number, p, forced=False, bind_pending=False) \
-        is ty.Number
-    assert amerge(p, ty.Number, forced=False, bind_pending=False) \
-        is ty.Number
-    with pytest.raises(MyiaTypeError):
-        print(amerge(p, ty.Number, forced=True, bind_pending=False))
-
     assert amerge(AbstractError(DEAD),
                   AbstractError(ANYTHING),
                   forced=False) is AbstractError(ANYTHING)
@@ -154,6 +145,26 @@ def test_amerge():
     td2 = TrackDict({})
     with pytest.raises(MyiaTypeError):
         print(amerge(td1, td2, forced=True))
+
+
+def test_amerge_pending():
+    loop = asyncio.new_event_loop()
+
+    p = PendingFromList([ty.Int[64], ty.Float[64]], None, None, loop=loop)
+    assert amerge(ty.Number, p, forced=False, bind_pending=False) \
+        is ty.Number
+    assert amerge(p, ty.Number, forced=False, bind_pending=False) \
+        is ty.Number
+    with pytest.raises(MyiaTypeError):
+        print(amerge(p, ty.Number, forced=True, bind_pending=False))
+
+    s1 = S(t=ty.Int[32])
+    p = Pending(loop=loop, resolve=None, priority=None)
+    sp = S(t=p)
+    assert amerge(sp, s1, forced=True) is sp
+    p.set_result(ty.Int[32])
+    assert amerge(sp, s1) is s1
+    assert amerge(s1, sp) is s1
 
 
 def test_merge_possibilities():
