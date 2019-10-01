@@ -271,7 +271,8 @@ def test_torch_tensor_get2(x):
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 0),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), -1),
-    broad_specs=(True, False)
+    broad_specs=(True, False),
+    backend=backend_no_relay
 )
 def test_torch_log_softmax(x, y):
     return torch.log_softmax(x, y)
@@ -281,13 +282,14 @@ def test_torch_log_softmax(x, y):
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 0),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), -1),
-    broad_specs=(True, False)
+    broad_specs=(True, False),
+    backend=backend_no_relay
 )
 def test_torch_functional_log_softmax(x, y):
     return torch.nn.functional.log_softmax(x, y)
 
 
-@fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)))
+@fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)))
 def test_torch_tensor_max_1_arg(x):
     return torch.max(x)
 
@@ -296,7 +298,8 @@ def test_torch_tensor_max_1_arg(x):
     fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)), -1, True),
     fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)), 1, True),
     fwd_and_bwd(nn.Parameter(torch.randn(4)), 0, True),
-    broad_specs=(True, False, False)
+    broad_specs=(True, False, False),
+    backend=backend_no_relay
 )
 def test_torch_tensor_max_3_arg(x, y, z):
     return torch.max(x, y, z)[0]
@@ -315,13 +318,14 @@ def test_torch_max_pool2d(x, ri):
                                           0, 1, False, ri)
 
 
+
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
 def test_torch_mean(x):
     return torch.mean(x)
 
 
-@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))),
-             torch.tensor([1, 2]))
+@fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(2, 3))),
+                      torch.tensor([1, 2]))
 def test_torch_nll_loss(x, y):
     return torch.nn.functional.nll_loss(x, y)
 
@@ -333,7 +337,8 @@ def test_torch_nll_loss(x, y):
                 torch.tensor([1, 2]), 'sum'),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))),
                 torch.tensor([1, 2]), 'mean'),
-    broad_specs=(True, True, False)
+    broad_specs=(True, True, False),
+    backend=backend_no_relay
 )
 def test_torch_nll_loss_reduce_options(x, y, z):
     return torch.nn.functional.nll_loss(x, y, reduction=z)
@@ -367,23 +372,23 @@ def test_torch_tensor_reshape(x, y):
     return x.reshape(y)
 
 
-@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(3, 4))),
-             torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
-             nn.Parameter(torch.Tensor(MA(2, 4))))
+@fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(3, 4))),
+                      torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
+                      nn.Parameter(torch.Tensor(MA(2, 4))))
 def test_torch_scatter(x, index, src):
     return torch.scatter(x, 0, index, src)
 
 
-@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(3, 4))),
-             torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
-             nn.Parameter(torch.Tensor(MA(2, 4))))
+@fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(3, 4))),
+                      torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
+                      nn.Parameter(torch.Tensor(MA(2, 4))))
 def test_torch_scatter_add(x, index, src):
     return torch.scatter_add(x, 0, index, src)
 
 
-@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(3, 4))),
-             torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
-             nn.Parameter(torch.Tensor([2.1]).reshape(())))
+@fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(3, 4))),
+                      torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
+                      nn.Parameter(torch.Tensor([2.1]).reshape(())))
 def test_torch_scatter_broadcast_source(x, index, src):
     return torch.scatter(x, 0, index, src)
 
@@ -420,7 +425,8 @@ def test_torch_smooth_l1_loss(x, y):
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 0),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), -1),
-    broad_specs=(True, False)
+    broad_specs=(True, False),
+    backend=backend_no_relay
 )
 def test_torch_softmax(x, y):
     return torch.softmax(x, y)
