@@ -224,8 +224,21 @@ def relay_max_pool2d(c, img, psize, stride, pad, dil, ceil_mode):
     assert ceil_mode.is_constant(bool)
     assert dil.value == (1, 1)
 
-    return relay.max_pool2d(c.ref(img), psize.value, stride.value, pad.value,
-                            ceil_mode=ceil_mode.value)
+    return relay.nn.max_pool2d(c.ref(img), psize.value, stride.value,
+                               pad.value, ceil_mode=ceil_mode.value)
+
+
+def relay_max_pool2d_grad(c, img, psize, stride, pad, dil, ceil_mode, dout):
+    assert psize.is_constant(tuple)
+    assert stride.is_constant(tuple)
+    assert pad.is_constant(tuple)
+    assert dil.is_constant(tuple)
+    assert ceil_mode.is_constant(bool)
+    assert dil.value == (1, 1)
+
+    return relay.nn.max_pool2d_grad(c.ref(dout), c.ref(img), psize.value,
+                                    stride.value, pad.value,
+                                    ceil_mode=ceil_mode.value)
 
 
 def relay_array_max(c, a, dim):
@@ -252,6 +265,7 @@ COMPLEX_MAP = {
     P.array_getitem: relay_array_getitem,
     P.argmax: relay_argmax,
     P.max_pool2d: relay_max_pool2d,
+    P.max_pool2d_grad: relay_max_pool2d_grad,
     P.array_max: relay_array_max,
 }
 
