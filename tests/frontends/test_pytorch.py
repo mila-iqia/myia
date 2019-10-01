@@ -1,4 +1,3 @@
-
 import numpy as np
 import pytest
 
@@ -8,6 +7,7 @@ from myia.frontends import activate_frontend
 from myia.utils import MyiaTypeError, MyiaValueError
 
 from ..common import MA
+from ..multitest import eqtest, run
 
 torch = pytest.importorskip("torch")
 nn = torch.nn

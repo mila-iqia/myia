@@ -23,7 +23,14 @@ from myia.pipeline import standard_pipeline
 
 
 from ..common import MA, MB, f32, to_abstract_test
-from ..multitest import eqtest, mt, myia_function_test, run, backend_all, backend_no_relay
+from ..multitest import (
+    backend_all,
+    backend_no_relay,
+    eqtest,
+    mt,
+    myia_function_test,
+    run,
+)
 from ..test_grad import grad_wrap
 
 torch = pytest.importorskip("torch")
@@ -144,8 +151,10 @@ def __fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
 
 
 @myia_function_test(marks=[pytest.mark.grad], id='grad')
-def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline, backend=False):
+def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline,
+                 backend=False):
     __fwd_and_bwd(fn, args, broad_specs, pipeline, backend)
+
 
 fwd_and_bwd = _fwd_and_bwd.configure(backend=backend_all)
 fwd_and_bwd_no_relay = _fwd_and_bwd.configure(backend=backend_no_relay)

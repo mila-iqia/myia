@@ -1,17 +1,8 @@
 """Definitions for the primitive `max_pool2d`."""
 
 from .. import lib, xtype
-from ..lib import (
-    ANYTHING,
-    SHAPE,
-    TYPE,
-    VALUE,
-    AbstractScalar,
-    AbstractTuple,
-    bprop_to_grad_transform,
-    standard_prim,
-)
-from ..operations import max_pool2d_grad, tuple_getitem
+from ..lib import SHAPE, TYPE, bprop_to_grad_transform, standard_prim
+from ..operations import max_pool2d_grad
 from . import primitives as P
 
 
