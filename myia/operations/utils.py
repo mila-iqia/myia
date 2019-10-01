@@ -70,7 +70,7 @@ class OperationDefinition(dict):
         """Return the mapping."""
         return self['mapping']
 
-    def __call__(self):
+    def __call__(self, *args, **kwargs):
         """Raise an error when calling the OperationDefinition."""
         raise TypeError(
             f'Operation definition for {self["name"]} is not callable.'
