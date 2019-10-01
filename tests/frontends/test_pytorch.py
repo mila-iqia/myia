@@ -15,6 +15,11 @@ nn = torch.nn
 activate_frontend('pytorch')
 
 
+@eqtest.register
+def eqtest(t1: torch.Tensor, t2, rtol=1e-5, atol=1e-8, **kwargs):
+    return torch.allclose(t1, t2, equal_nan=True, atol=atol, rtol=rtol)
+
+
 def test_pytorch_dtype_to_type():
     from myia.frontends.pytorch import pytorch_dtype_to_type
     with pytest.raises(TypeError):
@@ -70,58 +75,9 @@ class Tiny(nn.Module):
         return input @ self.W
 
 
-def test_module_matmul_fwd(_backend_fixture):
-    backend = _backend_fixture
-    backend_options = get_backend_options(args, backend)
-
-    torch.manual_seed(123)
-
-    inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
-    model = Tiny(4, 3)
-
-    @myia(backend=backend, backend_options=backend_options)
-    def step(model, inp):
-        return model(inp)
-    output = step(model, inp)
-
-    output_expected = torch.Tensor(
-        [[-2.92155361,  2.21107101, -4.36360359],
-         [6.78069878, -4.06704664,  7.29815578]])
-
-    assert torch.allclose(output, output_expected)
-
-
-# This will be uncommented once debug VM is compatible with PyTorch
-"""
-from myia.pipeline import standard_debug_pipeline
-
-pt_debug_pipeline = standard_debug_pipeline \
-    .select('resources', 'parse', 'resolve', 'infer', 'export')
-
-def test_module_matmul_fwd__debug():
-
-    inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
-    model = Tiny(4, 3)
-
-    def step(model, inp):
-        return model(inp)
-
-    argspec = [
-        frontend.to_abstract(model),
-        frontend.to_abstract(inp)
-    ]
-
-    step_debug = pip.run(input=step, argspec=argspec)['output']
-
-    output = step_debug(model, inp)
-
-    output_expected = torch.Tensor(
-        [[ -5.20440006,   0.74380112,  -8.34329891],
-         [-18.35869789, -54.33729553,   9.38029861]]
-         )
-
-    assert torch.allclose(output, output_expected)
-#"""
+@run(Tiny(4, 3), torch.tensor(MA(2, 4, dtype='float32')))
+def test_module_matmul_fwd(model, inp):
+    return model(inp)
 
 
 def test_module_matmul_bwd():
