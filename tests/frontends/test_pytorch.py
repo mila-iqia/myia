@@ -411,28 +411,10 @@ def test_module_2_layer_mlp_seq_fwd():
     assert torch.allclose(output, output_expected)
 
 
-def test_conv2d_fwd():
-    backend = 'pytorch'
-    backend_options = get_backend_options(args, backend)
-
-    torch.manual_seed(123)
-
-    input = torch.randn(1, 1, 3, 3, dtype=getattr(torch, args.dtype),
-                        requires_grad=True)
-    weight = torch.randn(1, 1, 2, 2, dtype=getattr(torch, args.dtype),
-                         requires_grad=True)
-
-    def model(inp, w):
-        return torch.nn.functional.conv2d(inp, w, None, 1, 0, 1, 1)
-
-    pt_out = model(input, weight)
-
-    @myia(backend=backend, backend_options=backend_options)
-    def step(inp, w):
-        return model(inp, w)
-    my_out = step(input, weight)
-
-    assert torch.allclose(my_out, pt_out)
+@run(torch.randn(1, 1, 3, 3, dtype=torch.float32, requires_grad=True),
+     torch.randn(1, 1, 2, 2, dtype=torch.float32, requires_grad=True))
+def test_conv2d_fwd(inp, w):
+    return torch.nn.functional.conv2d(inp, w, None, 1, 0, 1, 1)
 
 
 def test_conv2d_module_grad():
