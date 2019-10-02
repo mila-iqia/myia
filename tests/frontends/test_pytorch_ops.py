@@ -258,6 +258,12 @@ def test_conv2d_no_dil(inp, w):
     return torch.nn.functional.conv2d(inp, w, None, 1, 0, 1, 1)
 
 
+@fwd_and_bwd(nn.Parameter(torch.randn(2, 2, 4, 5, dtype=torch.float32)),
+             nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)))
+def test_conv2d_no_dil_pad(inp, w):
+    return torch.nn.functional.conv2d(inp, w, None, (2, 3), (3, 2))
+
+
 @mt(
     fwd_and_bwd(nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
                 nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
@@ -350,11 +356,11 @@ def test_torch_tensor_max_1_arg(x):
 
 
 @mt(
-    fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)), -1, True),
-    fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)), 1, True),
-    fwd_and_bwd(nn.Parameter(torch.randn(4)), 0, True),
-    broad_specs=(True, False, False),
-    backend=backend_no_relay
+    fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)), -1, True),
+    fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)), 1, True),
+    fwd_and_bwd_no_relay(nn.Parameter(torch.randn(4)), 0, True),
+    run(nn.Parameter(torch.randn(2, 4, 3)), -1, True),
+    broad_specs=(True, False, False)
 )
 def test_torch_tensor_max_3_arg(x, y, z):
     return torch.max(x, y, z)[0]
