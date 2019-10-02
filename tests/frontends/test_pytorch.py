@@ -731,6 +731,79 @@ def test_conv2d_module_grad_no_bias():
     assert torch.allclose(my_out_dw_grad, weight.grad.data)
 
 
+def test_nn_conv2d_fwd():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = torch.randn(2, 6, 4, 5, dtype=getattr(torch, args.dtype))
+
+    class Conv2dMod(nn.Module):
+        def __init__(self):
+            super(Conv2dMod, self).__init__()
+            self.conv1 = nn.Conv2d(6, 3, (4, 3), (2, 3), (3, 2), (3, 4), 3)
+
+        def forward(self, inp):
+            return self.conv1(inp)
+
+    model = Conv2dMod()
+
+    @myia(backend=backend, backend_options=backend_options,
+          specialize_values=["model"])
+    def step(model, inp):
+        return model(inp)
+    my_out = step(model, input)
+    pt_out = model(input)
+    assert torch.allclose(my_out, pt_out)
+
+
+def test_nn_conv2d_bwd():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    input = torch.randn(2, 6, 4, 5, dtype=getattr(torch, args.dtype),
+                        requires_grad=True)
+
+    class Conv2dMod(nn.Module):
+        def __init__(self):
+            super(Conv2dMod, self).__init__()
+            self.conv1 = nn.Conv2d(6, 3, (4, 3), (2, 3), (3, 2), (3, 4), 3)
+
+        def forward(self, inp):
+            return self.conv1(inp)
+
+    def cost(model, inp):
+        value = model(inp)
+        return torch.sum(value)
+
+    model = Conv2dMod()
+
+    @myia(backend=backend, backend_options=backend_options,
+          specialize_values=["model"])
+    def step(model, inp):
+        _cost, dmodel, dinp = value_and_grad(cost, 'model', 'inp')(model, inp)
+        return _cost, dmodel, dinp
+    loss, dmodel, dinp = step(model, input)
+
+    if input.grad is not None:
+        input.grad.data.zero_()
+    if model.conv1.weight.grad is not None:
+        model.conv1.weight.grad.data.zero_()
+    if model.conv1.bias.grad is not None:
+        model.conv1.bias.grad.data.zero_()
+
+    pt_cost = cost(model, input)
+    pt_cost.backward()
+
+    assert torch.allclose(dinp, input.grad.data)
+    assert torch.allclose(dmodel.conv1.weight.data,
+                          model.conv1.weight.grad.data)
+    assert torch.allclose(dmodel.conv1.bias.data, model.conv1.bias.grad.data)
+
+
 def test_nn_max_pool2d_fwd():
     backend = 'pytorch'
     backend_options = get_backend_options(args, backend)

@@ -1,7 +1,7 @@
 """Implementation of the 'gadd' operation."""
 
 from ..lib import HyperMap, MultitypeGraph, core
-from ..xtype import EnvType, Nil, Number
+from ..xtype import Bool, EnvType, Nil, Number
 from .primitives import env_add, scalar_add
 
 _leaf_add = MultitypeGraph('gadd')
@@ -23,6 +23,13 @@ def _sm_add(x, y):
 @core
 def _nil_add(x, y):
     return None
+
+
+@_leaf_add.register(Bool, Bool)
+@core
+def _bool_add(x, y):
+    assert x is y
+    return y
 
 
 gadd = HyperMap(name='gadd', fn_leaf=_leaf_add,

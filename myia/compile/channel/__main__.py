@@ -30,7 +30,11 @@ def _rpc_server():
         return 1
 
     while loader.check_data():
-        data = loader.get_data()
+        try:
+            data = loader.get_data()
+        except Exception as e:
+            dumper.represent(e)
+            continue
         if isinstance(data, tuple):
             name, args, kwargs = data
             try:

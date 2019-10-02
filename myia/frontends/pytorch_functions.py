@@ -27,7 +27,7 @@ from ..ir import Constant
 from ..operations import primitives as P
 from ..utils import MyiaValueError, core
 from ..xtype import TupleT, f32, i64, u64
-from .pytorch_abstract_types import APT
+from .pytorch_abstract_types import APT, APT_bool
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############
 
@@ -268,8 +268,8 @@ def _max(self, dim=None, keepdim=False):
 
 
 @core
-def max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode=False,
-               return_indices=False):
+def max_pool2d(input, kernel_size, stride=(), padding=0, dilation=1,
+               ceil_mode=False, return_indices=False):
     r"""Applies a max_pool2d."""
     kernel_size = _pair(kernel_size)
     stride = _pair(stride)
@@ -287,8 +287,6 @@ def max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode=False,
 # F.nll_loss(input, target, weight=None, size_average=None, ignore_index=-100,
 # reduce=None, reduction='mean')
 # Is current implementation numerically stable?
-# Should not be hardcoded to f32 in scalar_cast,
-# but need dtype attr implementation for xtype.NDArray to get dtype of out.
 @core
 def nll_loss(logs, targets, reduction='mean'):
     """Map of 'nll_loss' pytorch method."""
@@ -300,7 +298,7 @@ def nll_loss(logs, targets, reduction='mean'):
     if reduction == 'none':
         out = out
     elif reduction == 'mean':
-        out = torch.sum(out) / P.scalar_cast(logs.shape[0], f32)
+        out = torch.sum(out) / P.scalar_cast(logs.shape[0], out.dtype)
     elif reduction == 'sum':
         out = torch.sum(out)
     return out
@@ -313,9 +311,28 @@ def relu(x):
 
 
 @core
-def reshape(x, shp):
+def reshape(x, *shp):
     """Reshape that allow unknown dim (-1)."""
+    if len(shp) == 1:
+        if isinstance(shp[0], tuple):
+            shp = shp[0]
     return P.reshape(x, _shp_explicit(x.shape, shp))
+
+
+@core
+def scatter(self, dim, index, src):
+    """Map of 'scatter' pytorch method."""
+    if not P.hastype(src, APT):
+        src = P.scalar_to_array(P.scalar_cast(src, self.dtype), APT)
+    if len(src.shape) == 0:
+        src = P.distribute(src, index.shape)
+    return P.scatter(self, dim, index, src)
+
+
+@core
+def scatter_add(self, dim, index, src):
+    """Map of 'scatter_add' pytorch method."""
+    return P.scatter_add(self, dim, index, src)
 
 
 @core
@@ -353,6 +370,9 @@ def _sum(self, dim=None, keepdim=False, *, dtype=None):
     x = self
     dim = _dim_explicit(x.shape, dim)
 
+    if P.hastype(x, APT_bool):
+        x = P.array_cast(x, i64)
+
     if dtype is not None:
         x = P.array_cast(x, dtype)
 
@@ -363,25 +383,9 @@ def _sum(self, dim=None, keepdim=False, *, dtype=None):
 
 
 @core
-def scatter(self, dim, index, src):
-    r"""Map of 'scatter' pytorch method.
-
-    None
-    """
-    # TODO: Need dtype attr for xtype.NDArray to support nonpytorch scalar src
-    """
-    if not P.hastype(src, APT):
-        src = P.scalar_to_array(P.scalar_cast(src, self.dtype), APT)
-    # """
-    if len(src.shape) == 0:
-        src = P.distribute(src, index.shape)
-    return P.scatter(self, dim, index, src)
-
-
-@core
-def scatter_add(self, dim, index, src):
-    """Map of 'scatter_add' pytorch method."""
-    return P.scatter_add(self, dim, index, src)
+def size(self):
+    """Map of 'size' pytorch method."""
+    return self.shape
 
 
 @core
@@ -411,6 +415,12 @@ def transpose(a, dim0, dim1):
 
 
 @core
+def view_as(x, y):
+    """Map of 'view_as' pytorch method."""
+    return P.reshape(x, y.shape)
+
+
+@core
 def zeros(*shp, dtype=None):
     """Map of 'dim' pytorch method."""
     if dtype is None:
@@ -420,11 +430,6 @@ def zeros(*shp, dtype=None):
         if isinstance(shp[0], tuple):
             shp = shp[0]
     return P.distribute(P.scalar_to_array(P.scalar_cast(0.0, dtype), APT), shp)
-
-
-def __sum(x, d, kd):
-    """Remove a dim (of length 1)."""
-    raise NotImplementedError()
 
 
 __all__ = [

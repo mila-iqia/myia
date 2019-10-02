@@ -27,6 +27,14 @@ def eqtest(a1: (np.ndarray, int, float), a2,
 
 
 @overload  # noqa: F811
+def eqtest(x: type(None), y, **kwargs):
+    if y is None:
+        return True
+    else:
+        return y.sum().item() == 0
+
+
+@overload  # noqa: F811
 def eqtest(x: object, y, **kwargs):
     return x == y
 

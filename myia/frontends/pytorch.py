@@ -43,14 +43,17 @@ from .pytorch_functions import (
     scatter,
     scatter_add,
     sigmoid,
+    size,
     softmax,
     squeeze,
     transpose,
+    view_as,
     zeros,
 )
 
 standard_object_map.update({
     torch.argmax: argmax,
+    torch.eq: operations.array_eq,
     torch.exp: operations.array_exp,
     torch.gather: gather,
     torch.log: operations.array_log,
@@ -84,6 +87,7 @@ standard_method_map[PyTorchTensor].update({
     'dim': operations.ndim,
     'dtype': property(operations.dtype),
     'argmax': argmax,
+    'eq': operations.array_eq,
     'exp': operations.array_exp,
     'gather': gather,
     'item': item,
@@ -97,13 +101,15 @@ standard_method_map[PyTorchTensor].update({
     'scatter_add': scatter_add,
     'sigmoid': sigmoid,
     'shape': property(operations.shape),
+    'size': size,
     'softmax': softmax,
     'squeeze': squeeze,
     'sum': _sum,
     't': operations.t,
     'transpose': transpose,
     'tanh': operations.array_tanh,
-    'view': P.reshape,  # contiguousness is ignored by us for now?
+    'view': reshape,  # contiguousness is ignored by us for now?
+    'view_as': view_as,  # contiguousness is ignored by us for now?
     'zeros_like': operations.zeros_like,  # hidden method used by bwd (I think)
 })
 

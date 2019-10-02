@@ -234,7 +234,7 @@ class FinalVM:
         idx = self.backend.to_scalar(self._ref(idx))
         self._push(a[idx])
 
-    def inst_tuple_setitem(self, t, idx, v):  # pragma: no cover
+    def inst_tuple_setitem(self, t, idx, v):
         """Set an item in a tuple.
 
         Arguments:
@@ -242,8 +242,6 @@ class FinalVM:
            idx: index
            v: value to set
         """
-        raise RuntimeError("Please report your test case so that "
-                           "we can add it to the test suite")
         t = self._ref(t)
         idx = self.backend.to_scalar(self._ref(idx))
         v = self._ref(v)
