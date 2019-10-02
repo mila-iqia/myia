@@ -252,6 +252,52 @@ def test_torch_eq(x, y):
 # """
 
 
+@fwd_and_bwd(torch.randn(1, 1, 3, 3, dtype=torch.float32, requires_grad=True),
+             torch.randn(1, 1, 2, 2, dtype=torch.float32, requires_grad=True))
+def test_conv2d_no_dil(inp, w):
+    return torch.nn.functional.conv2d(inp, w, None, 1, 0, 1, 1)
+
+
+@mt(
+    fwd_and_bwd(nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
+                nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
+                nn.Parameter(torch.randn(3, dtype=torch.float32))),
+    fwd_and_bwd(nn.Parameter(torch.randn(2, 3, 4, 5, dtype=torch.float32)),
+                nn.Parameter(torch.randn(3, 1, 3, 3, dtype=torch.float32)),
+                nn.Parameter(torch.randn(3, dtype=torch.float32))),
+    fwd_and_bwd(nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
+                nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
+                None),
+    backend=backend_no_relay
+)
+def test_torch_conv2d(inp, w, b):
+    value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (3, 4), 3)
+    return torch.sum(value)
+
+
+@mt(
+    fwd_and_bwd(nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
+                nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
+                nn.Parameter(torch.randn(3, dtype=torch.float32))),
+    fwd_and_bwd(nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
+                nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
+                None),
+    backend=backend_no_relay
+)
+def test_torch_conv2d__non_tuple_args(inp, w, b):
+    value = torch.nn.functional.conv2d(inp, w, b, 2, 3, 4, 3)
+    return torch.sum(value)
+
+
+@fwd_and_bwd_no_relay(
+    nn.Parameter(torch.randn(2, 1, 4, 5, dtype=torch.float32)),
+    nn.Parameter(torch.randn(3, 1, 3, 3, dtype=torch.float32)),
+    nn.Parameter(torch.randn(3, dtype=torch.float32)))
+def test_torch_conv2d__group3(inp, w, b):
+    value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2) (3, 4), 1)
+    return torch.sum(value)
+
+
 @fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(3, 4))),
                       torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]))
 def test_torch_gather(x, index):
