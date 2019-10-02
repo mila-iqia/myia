@@ -254,9 +254,7 @@ def relay_conv2d(c, img, w, stride, pad, dil, groups):
 
     return relay.nn.conv2d(c.ref(img), c.ref(w), strides=stride.value,
                            padding=pad.value, dilation=dil.value,
-                           groups=groups.value,
-                           data_layout='NCHW', kernel_layout='OIHW',
-                           out_layout='NCHW')
+                           groups=groups.value)
 
 
 def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
@@ -330,9 +328,7 @@ def relay_conv2d_input_grad(c, isize, w, dout, stride, pad, dil, groups):
                                      groups=groups.value,
                                      output_padding=output_padding,
                                      kernel_size=(filter_h, filter_w),
-                                     channels=in_channels,
-                                     data_layout='NCHW', kernel_layout='OIHW',
-                                     out_layout='NCHW')
+                                     channels=in_channels)
 
 
 COMPLEX_MAP = {
