@@ -294,7 +294,7 @@ def test_torch_conv2d__non_tuple_args(inp, w, b):
     nn.Parameter(torch.randn(3, 1, 3, 3, dtype=torch.float32)),
     nn.Parameter(torch.randn(3, dtype=torch.float32)))
 def test_torch_conv2d__group3(inp, w, b):
-    value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2) (3, 4), 1)
+    value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (3, 4), 1)
     return torch.sum(value)
 
 
