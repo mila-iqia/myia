@@ -1136,6 +1136,14 @@ def test_union_nil(x):
         return x
 
 
+@infer_standard(U(i64, None), U(i64, None), result=i64)
+def test_union_binand(x, y):
+    if (x is not None) & (y is not None):
+        return x + y
+    else:
+        return 0
+
+
 @mt(
     infer_standard(U(i64, f64, (i64, i64)), i64, result=i64),
     infer_standard(U(i64, f64, (i64, i64)), f64, result=InferenceError),
