@@ -115,19 +115,10 @@ def to_abstract(fn, self, v, **kwargs):
                 TYPE: type(v),
             })
     else:
-        try:
-            typ = xtype.pytype_to_myiatype(type(v))
-        except KeyError:
-            rval = AbstractExternal({
-                VALUE: v,
-                TYPE: type(v),
-            })
-        else:
-            assert issubclass(typ, (xtype.External, xtype.EnvType))
-            rval = AbstractScalar({
-                VALUE: v,
-                TYPE: typ,
-            })
+        rval = AbstractExternal({
+            VALUE: v,
+            TYPE: type(v),
+        })
 
     return rval
 
