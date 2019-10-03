@@ -76,8 +76,8 @@ async def make_trials(engine, ref, repl):
         replacement_node is a node that corresponds to ref.node, but uses
         `unsafe_static_cast(node, type)` for each `(node, type)` pair in the
         set, for each occurrence of `node` in the subtree.
-    """
 
+    """
     def prod(options, finalize):
         # This performs the cartesian product of the options. The nodes are
         # merged using the finalize function.
@@ -102,12 +102,14 @@ async def make_trials(engine, ref, repl):
     typ = await ref.get()
 
     if isinstance(typ, lib.AbstractUnion):
+        # Return one entry for each possible type.
         return {
             frozenset({(node, opt)}): getrepl(node, opt)
-            for opt in typ.options
+            for opt in (await force_pending(typ.options))
         }
 
     elif ref.node.is_apply():
+        # Return the cartesian product of the entries for each argument.
         arg_results = [
             (await make_trials(
                 engine, engine.ref(arg, ref.context), repl
@@ -117,12 +119,18 @@ async def make_trials(engine, ref, repl):
 
         def _finalize(nodes):
             if nodes == ref.node.inputs:
+                # Avoid unnecessary cloning
                 return node
             else:
                 return g.apply(*nodes)
         return prod(arg_results, _finalize)
 
     elif ref.node.is_constant_graph():
+        # Do the cartesian product for all the free variables, then make a
+        # clone of the graph for each possibility, using _CastRemapper to point
+        # to the casted free variables. (This is needed to support expressions
+        # like `if x is None and y is None: ...`, because the second clause is
+        # a closure).
         g = ref.node.value
         if g.parent is None:
             return {frozenset(): ref.node}
@@ -156,7 +164,103 @@ async def make_trials(engine, ref, repl):
             return res
 
     else:
+        # This is not a union or an application, there is only one possibility.
         return {frozenset(): ref.node}
+
+
+async def execute_trials(engine, cond_trials, g, condref, tbref, fbref):
+    """Handle code like `user_switch(hastype(x, typ), tb, fb)`.
+
+    cond_trials must be in the format returned by `make_trials`.
+
+    We want to evaluate tb in a context where x has type typ and fb
+    in a context where it doesn't.
+    """
+    async def wrap(branch_ref, branch_types):
+        # We transform branch_graph into a new graph which refers to a cast
+        # version of x. We also transform all of the children of x's graph
+        # so that closures called in the branch also refer to the cast
+        # version of x.
+        branch_graph = branch_ref.node.value
+        nomod = True
+
+        rval = branch_graph.make_new(relation='copy')
+        children = set()
+        fv_repl = {}
+        for node, typ in branch_types.items():
+            if branch_graph not in node.graph.scope:
+                continue
+            nomod = False
+            children.update(node.graph.children)
+            cast = rval.apply(P.unsafe_static_cast, node, typ)
+            fv_repl[node] = cast
+
+        if nomod:
+            return branch_graph
+
+        cl = GraphCloner(
+            *children,
+            total=False,
+            graph_repl={branch_graph: rval},
+            remapper_class=_CastRemapper.partial(
+                fv_replacements=fv_repl
+            )
+        )
+        assert rval is cl[branch_graph]
+        engine.mng.add_graph(rval)
+        return rval
+
+    cond = condref.node
+    ctx = condref.context
+
+    groups = {
+        True: defaultdict(list),
+        False: defaultdict(list),
+    }
+
+    replaceable_condition = True
+    for keys, cond_trial in cond_trials.items():
+        result = await engine.ref(cond_trial, ctx).get()
+        assert result.xtype() is Bool
+        value = result.xvalue()
+        if value is ANYTHING:
+            replaceable_condition = False
+            bucket = [True, False]
+        else:
+            bucket = [value]
+        for node, opt in keys:
+            for value in bucket:
+                groups[value][node].append(opt)
+
+    typemap = {}
+    for key, mapping in groups.items():
+        typemap[key] = {node: union_simplify(opts)
+                        for node, opts in mapping.items()}
+
+    if not groups[True]:
+        return fbref
+    elif not groups[False]:
+        return tbref
+    else:
+        if replaceable_condition:
+            # If each type combination gives us a definite True or False
+            # for the condition, we don't need to keep the original
+            # condition.
+            type_filter_parts = []
+            for node, types in groups[True].items():
+                parts = [g.apply(P.hastype, node, t)
+                         for t in types]
+                new_cond = reduce(lambda x, y: g.apply(P.bool_or, x, y),
+                                  parts)
+                type_filter_parts.append(new_cond)
+            type_filter = reduce(lambda x, y: g.apply(P.bool_and, x, y),
+                                 type_filter_parts)
+            new_cond = type_filter
+        else:
+            new_cond = cond
+        new_tb = await wrap(tbref, typemap[True])
+        new_fb = await wrap(fbref, typemap[False])
+        return g.apply(P.switch, new_cond, new_tb, new_fb)
 
 
 @macro
@@ -171,107 +275,6 @@ async def user_switch(info, condref, tbref, fbref):
     engine = info.engine
     g = info.graph
 
-    async def type_trials(cond_trials):
-        """Handle `user_switch(hastype(x, typ), tb, fb)`.
-
-        We want to evaluate tb in a context where x has type typ and fb
-        in a context where it doesn't.
-        """
-        async def wrap(branch_ref, branch_types):
-            # We transform branch_graph into a new graph which refers to a cast
-            # version of x. We also transform all of the children of x's graph
-            # so that closures called in the branch also refer to the cast
-            # version of x.
-            branch_graph = branch_ref.node.value
-            nomod = True
-
-            rval = branch_graph.make_new(relation='copy')
-            children = set()
-            fv_repl = {}
-            for node, typ in branch_types.items():
-                if branch_graph not in node.graph.scope:
-                    continue
-                nomod = False
-                children.update(node.graph.children)
-                cast = rval.apply(P.unsafe_static_cast, node, typ)
-                fv_repl[node] = cast
-
-            if nomod:
-                return branch_graph
-
-            cl = GraphCloner(
-                *children,
-                total=False,
-                graph_repl={branch_graph: rval},
-                remapper_class=_CastRemapper.partial(
-                    fv_replacements=fv_repl
-                )
-            )
-            assert rval is cl[branch_graph]
-            engine.mng.add_graph(rval)
-            return rval
-
-        groups = {
-            True: defaultdict(list),
-            False: defaultdict(list),
-        }
-
-        replaceable_condition = True
-        for keys, cond_trial in cond_trials.items():
-            result = await engine.ref(cond_trial, ctx).get()
-            assert result.xtype() is Bool
-            value = result.xvalue()
-            if value is ANYTHING:
-                replaceable_condition = False
-                bucket = [True, False]
-            else:
-                bucket = [value]
-            for node, opt in keys:
-                for value in bucket:
-                    groups[value][node].append(opt)
-
-        typemap = {}
-        for key, mapping in groups.items():
-            typemap[key] = {node: union_simplify(opts)
-                            for node, opts in mapping.items()}
-
-        if not groups[True]:
-            return fbref
-        elif not groups[False]:
-            return tbref
-        else:
-            type_filter_parts = []
-            for node, types in groups[True].items():
-                parts = [g.apply(P.hastype, node, t)
-                         for t in types]
-                new_cond = reduce(lambda x, y: g.apply(P.bool_or, x, y),
-                                  parts)
-                type_filter_parts.append(new_cond)
-            type_filter = reduce(lambda x, y: g.apply(P.bool_and, x, y),
-                                 type_filter_parts)
-            if replaceable_condition:
-                # If each type combination gives us a definite True or False
-                # for the condition, we don't need to keep the original
-                # condition.
-                new_cond = type_filter
-            else:
-                # g1 = Graph()
-                # g1.output = cond
-                # g2 = Graph()
-                # g2.output = Constant(False)
-                # engine.mng.add_graph(g1)
-                # engine.mng.add_graph(g2)
-                # new_cond = g.apply(P.switch, type_filter, g1, g2)
-                # new_cond = g.apply(new_cond)
-                new_cond = cond
-            new_tb = await wrap(tbref, typemap[True])
-            new_fb = await wrap(fbref, typemap[False])
-            return g.apply(P.switch, new_cond, new_tb, new_fb)
-
-    async def default():
-        _, _, tb, fb = info.outref.node.inputs
-        return g.apply(P.switch, cond, tb, fb)
-
     for branch_ref in [tbref, fbref]:
         if not branch_ref.node.is_constant_graph():
             raise MyiaTypeError(
@@ -279,7 +282,6 @@ async def user_switch(info, condref, tbref, fbref):
             )
 
     orig_cond = cond = condref.node
-    ctx = condref.context
 
     condt = await condref.get()
     if not engine.check_predicate(Bool, condt):
@@ -287,12 +289,15 @@ async def user_switch(info, condref, tbref, fbref):
         cond = (cond.graph or g).apply(to_bool, cond)
 
     if orig_cond.graph is not None and cond.is_apply():
-        new_condref = engine.ref(cond, ctx)
-        cond_alts = await make_trials(engine, new_condref, {})
-        if len(cond_alts) > 1:
-            return await type_trials(cond_alts)
+        new_condref = engine.ref(cond, condref.context)
+        cond_trials = await make_trials(engine, new_condref, {})
+        if len(cond_trials) > 1:
+            return await execute_trials(
+                engine, cond_trials, g, new_condref, tbref, fbref
+            )
 
-    return await default()
+    _, _, tb, fb = info.outref.node.inputs
+    return g.apply(P.switch, cond, tb, fb)
 
 
 __operation_defaults__ = {
