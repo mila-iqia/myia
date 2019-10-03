@@ -308,8 +308,6 @@ step_opt = Optimizer.partial(
             optlib.elim_j_jinv,
             optlib.elim_jinv_j,
             optlib.cancel_env_set_get,
-            optlib.cancel_universe_set_get,
-            optlib.cancel_universe_double_set,
             optlib.getitem_newenv,
             optlib.getitem_env_add,
             optlib.simplify_array_map,
