@@ -453,8 +453,8 @@ def step_wrap(resources,
             'OutputWrapper step requires the simplify_types step'
         )
     fn = output
-    orig_arg_t = orig_argspec or argspec
-    orig_out_t = orig_outspec or outspec
+    orig_arg_t = argspec if orig_argspec is None else orig_argspec
+    orig_out_t = outspec if orig_outspec is None else orig_outspec
     vm_arg_t = graph.abstract.get_sync()[0].args
     vm_out_t = graph.return_.abstract
 
