@@ -16,6 +16,7 @@ from myia.abstract import (
     AbstractClass,
     AbstractError,
     AbstractFunction,
+    AbstractHandle,
     AbstractJTagged,
     AbstractKeywordArgument,
     AbstractScalar,
@@ -241,6 +242,9 @@ def test_repr():
 
     j1 = AbstractJTagged(to_abstract_test(1))
     assert repr(j1) == f'AbstractJTagged(J(Int[64] = 1))'
+
+    h1 = AbstractHandle(to_abstract_test(1))
+    assert repr(h1) == f'AbstractHandle(H(Int[64] = 1))'
 
     kw1 = AbstractKeywordArgument('bucket', to_abstract_test(1))
     assert repr(kw1) == f'AbstractKeywordArgument(KW(bucket :: Int[64] = 1))'
