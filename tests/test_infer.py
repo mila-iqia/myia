@@ -104,7 +104,7 @@ from .common import (
     mysum,
     to_abstract_test,
 )
-from .multitest import infer as mt_infer, mt
+from .multitest import infer as mt_infer, mt, run_debug
 
 ai64 = Array[i64]
 af64 = Array[f64]
@@ -1111,15 +1111,13 @@ def test_union(x):
         return x[0]
 
 
-@pytest.mark.xfail(
-    reason="user_switch can't process conditions that partly depend on type"
+@mt(
+    infer_standard(U(i64, (i64, i64)), result=i64),
+    run_debug(31, result=31, abstract=(U(i64, (i64, i64)),)),
+    run_debug(-9, result=-1, abstract=(U(i64, (i64, i64)),)),
 )
-@infer_standard(U(i64, (i64, i64)), result=i64)
 def test_union_2(x):
-    def condition(x):
-        return hastype(x, i64) and x > 0
-
-    if condition(x):
+    if hastype(x, i64) and x > 0:
         return x
     else:
         return -1
@@ -1134,6 +1132,16 @@ def test_union_nil(x):
         return 0
     else:
         return x
+
+
+@mt(
+    infer_standard(U(i64, None), U(i64, None), U(i64, None), result=i64),
+)
+def test_union_and(x, y, z):
+    if (x is not None) and (y is not None) and (z is not None):
+        return x + y + z
+    else:
+        return 0
 
 
 @infer_standard(U(i64, None), U(i64, None), result=i64)

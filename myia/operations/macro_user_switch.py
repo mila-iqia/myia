@@ -1,5 +1,6 @@
 """Implementation of the 'user_switch' operation."""
 
+from collections import defaultdict
 from functools import reduce
 from itertools import product
 
@@ -7,6 +8,8 @@ from .. import lib
 from ..lib import (
     ANYTHING,
     CloneRemapper,
+    Constant,
+    Graph,
     GraphCloner,
     MyiaTypeError,
     force_pending,
@@ -49,6 +52,16 @@ class _CastRemapper(CloneRemapper):
 
 async def make_trials(engine, ref, repl):
 
+    def prod(options, finalize):
+        res = {}
+        for entry in product(*options):
+            s = set()
+            for s2, n in entry:
+                s |= s2
+            nodes = [n for _, n in entry]
+            res[frozenset(s)] = finalize(nodes)
+        return res
+
     def getrepl(node, opt):
         key = (node, opt)
         if key not in repl:
@@ -72,26 +85,45 @@ async def make_trials(engine, ref, repl):
             )).items()
             for arg in ref.node.inputs
         ]
-        res = {}
-        for entry in product(*arg_results):
-            s = set()
-            for s2, n in entry:
-                s |= s2
-            nodes = [n for _, n in entry]
+        def _finalize(nodes):
             if nodes == ref.node.inputs:
-                new_node = node
+                return node
             else:
-                new_node = g.apply(*nodes)
-            res[frozenset(s)] = new_node
-        return res
+                return g.apply(*nodes)
+        return prod(arg_results, _finalize)
 
     elif ref.node.is_constant_graph():
         g = ref.node.value
         if g.parent is None:
             return {frozenset(): ref.node}
         else:
-            # TODO
-            return {frozenset(): ref.node}
+            fvs = list(g.free_variables_total)
+            trials = []
+            while fvs:
+                fv = fvs.pop()
+                if isinstance(fv, Graph):
+                    fvs += fv.free_variables_total
+                    continue
+                trial = await make_trials(
+                    engine, engine.ref(fv, ref.context), repl
+                )
+                trials.append(trial.items())
+            res = {}
+            for entry in prod(trials, lambda _: None):
+                fv_repl = {node: getrepl(node, opt) for node, opt in entry}
+                # NOTE: total=True may be overkill here, but the alternative is
+                # to collect siblings of g that g may refer to, which is what's
+                # done in the wrap function below.
+                cl = GraphCloner(
+                    g,
+                    total=True,
+                    remapper_class=_CastRemapper.partial(
+                        fv_replacements=fv_repl
+                    )
+                )
+                engine.mng.add_graph(cl[g])
+                res[entry] = Constant(cl[g])
+            return res
 
     else:
         return {frozenset(): ref.node}
@@ -149,22 +181,24 @@ async def user_switch(info, condref, tbref, fbref):
             engine.mng.add_graph(rval)
             return rval
 
-        from collections import defaultdict
         groups = {
             True: defaultdict(list),
             False: defaultdict(list),
-            ANYTHING: defaultdict(list),
         }
 
-        for keys, cond in cond_trials.items():
-            result = await engine.ref(cond, ctx).get()
+        replaceable_condition = True
+        for keys, cond_trial in cond_trials.items():
+            result = await engine.ref(cond_trial, ctx).get()
             assert result.xtype() is Bool
             value = result.xvalue()
+            if value is ANYTHING:
+                replaceable_condition = False
+                bucket = [True, False]
+            else:
+                bucket = [value]
             for node, opt in keys:
-                groups[value][node].append(opt)
-
-        if groups[ANYTHING]:
-            return await default()
+                for value in bucket:
+                    groups[value][node].append(opt)
 
         typemap = {}
         for key, mapping in groups.items():
@@ -176,15 +210,26 @@ async def user_switch(info, condref, tbref, fbref):
         elif not groups[False]:
             return tbref
         else:
-            new_conds = []
+            type_filter_parts = []
             for node, types in groups[True].items():
                 parts = [g.apply(P.hastype, node, t)
                          for t in types]
                 new_cond = reduce(lambda x, y: g.apply(P.bool_or, x, y),
                                   parts)
-                new_conds.append(new_cond)
-            new_cond = reduce(lambda x, y: g.apply(P.bool_and, x, y),
-                              new_conds)
+                type_filter_parts.append(new_cond)
+            type_filter = reduce(lambda x, y: g.apply(P.bool_and, x, y),
+                                 type_filter_parts)
+            if replaceable_condition:
+                new_cond = type_filter
+            else:
+                g1 = Graph()
+                g1.output = cond
+                g2 = Graph()
+                g2.output = Constant(False)
+                engine.mng.add_graph(g1)
+                engine.mng.add_graph(g2)
+                new_cond = g.apply(P.switch, type_filter, g1, g2)
+                new_cond = g.apply(new_cond)
             new_tb = await wrap(tbref, typemap[True])
             new_fb = await wrap(fbref, typemap[False])
             return g.apply(P.switch, new_cond, new_tb, new_fb)
@@ -211,14 +256,11 @@ async def user_switch(info, condref, tbref, fbref):
         opnode, *args = cond.inputs
         opref = engine.ref(opnode, ctx)
         ops = (await opref.get()).get_sync()
-        if len(ops) == 1:
-            op, = ops
-            argrefs = [engine.ref(a, ctx) for a in args]
-
-            new_condref = engine.ref(cond, ctx)
-            cond_alts = await make_trials(engine, new_condref, {})
-            if len(cond_alts) > 1:
-                return await type_trials(cond_alts, opnode, argrefs)
+        argrefs = [engine.ref(a, ctx) for a in args]
+        new_condref = engine.ref(cond, ctx)
+        cond_alts = await make_trials(engine, new_condref, {})
+        if len(cond_alts) > 1:
+            return await type_trials(cond_alts, opnode, argrefs)
 
     return await default()
 
