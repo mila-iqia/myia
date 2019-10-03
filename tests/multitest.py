@@ -31,7 +31,7 @@ def eqtest(x: type(None), y, **kwargs):
     if y is None:
         return True
     else:
-        return y.sum().item() == 0
+        return (y == 0).all()
 
 
 @overload  # noqa: F811

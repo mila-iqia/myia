@@ -2,7 +2,7 @@
 
 from ..lib import HyperMap, MultitypeGraph, core
 from ..xtype import Bool, EnvType, Nil, Number
-from .primitives import env_add, scalar_add
+from .primitives import bool_or, env_add, scalar_add
 
 _leaf_add = MultitypeGraph('gadd')
 
@@ -28,8 +28,7 @@ def _nil_add(x, y):
 @_leaf_add.register(Bool, Bool)
 @core
 def _bool_add(x, y):
-    assert x is y
-    return y
+    return bool_or(x, y)
 
 
 gadd = HyperMap(name='gadd', fn_leaf=_leaf_add,
