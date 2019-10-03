@@ -7,6 +7,7 @@ from ..parser import parse
 
 @overload
 def is_universal(g: lib.GraphFunction):
+    """Check whether a function is universal or not."""
     return g.graph.has_flags('universal')
 
 
@@ -17,6 +18,7 @@ def is_universal(x: object):
 
 @overload
 def to_universal(gf: lib.GraphFunction):
+    """Transform a function into a universal function."""
     g = gf.graph
     if g.parent:
         raise NotImplementedError(f'Cannot universalize closure {g}')

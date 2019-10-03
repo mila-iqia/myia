@@ -1,12 +1,11 @@
 
 from myia import myia
-from myia.lib import core, HandleInstance, Empty
-from myia.operations import handle, universe_getitem, universe_setitem, \
-    handle_get, handle_set
+from myia.lib import Empty, HandleInstance, core
+from myia.operations import handle, handle_get, handle_set
 
 
 def add_one(x):
-    # Not universal
+    # Not universal, but should work from universal function
     return x + 1
 
 
@@ -28,6 +27,22 @@ def test_increment():
 
     assert plus4(3) == 7
     assert plus4(10) == 14
+
+
+def test_increment_interleave():
+
+    @myia(use_universe=True)
+    def plus2(x, y):
+        h1 = handle(x)
+        h2 = handle(y)
+        increment(h1)
+        increment(h2)
+        increment(h1)
+        increment(h2)
+        return handle_get(h1), handle_get(h2)
+
+    assert plus2(3, 6) == (5, 8)
+    assert plus2(10, -21) == (12, -19)
 
 
 def test_increment_loop():
