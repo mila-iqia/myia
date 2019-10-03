@@ -51,8 +51,36 @@ class _CastRemapper(CloneRemapper):
 
 
 async def make_trials(engine, ref, repl):
+    """Return a collection of alternative subtrees to test type combinations.
+
+    The subtree for ref.node is explored, and for every Union encountered we
+    create a subtree for each combination of options. For example, if
+    `x :: Union(i64, None)`, `y :: Union(i64, None)`, `z :: i64` and
+    `ref.node = x * y * z`, make_trials returns the following:
+
+    ```
+    {
+        {(x, i64),  (y, i64)}:  cast(x, i64) * cast(y, i64) * z
+        {(x, None), (y, i64)}:  cast(x, None) * cast(y, i64) * z
+        {(x, i64),  (y, None)}: cast(x, i64) * cast(y, None) * z
+        {(x, None), (y, None)}: cast(x, None) * cast(y, None) * z
+    }
+    ```
+
+    This is not cheap, and exponential in the number of distinct unions
+    encountered, but in practice, conditions of if statements should not
+    contain a whole lot of these and it should probably be fine.
+
+    Returns:
+        A `{{(node, type), ...}: replacement_node}` dictionary, where
+        replacement_node is a node that corresponds to ref.node, but uses
+        `unsafe_static_cast(node, type)` for each `(node, type)` pair in the
+        set, for each occurrence of `node` in the subtree.
+    """
 
     def prod(options, finalize):
+        # This performs the cartesian product of the options. The nodes are
+        # merged using the finalize function.
         res = {}
         for entry in product(*options):
             s = set()
@@ -63,6 +91,7 @@ async def make_trials(engine, ref, repl):
         return res
 
     def getrepl(node, opt):
+        # Returns cast(node, opt) and caches it.
         key = (node, opt)
         if key not in repl:
             repl[key] = g.apply(P.unsafe_static_cast, node, opt)
@@ -85,6 +114,7 @@ async def make_trials(engine, ref, repl):
             )).items()
             for arg in ref.node.inputs
         ]
+
         def _finalize(nodes):
             if nodes == ref.node.inputs:
                 return node
@@ -141,7 +171,7 @@ async def user_switch(info, condref, tbref, fbref):
     engine = info.engine
     g = info.graph
 
-    async def type_trials(cond_trials, opnode, argrefs):
+    async def type_trials(cond_trials):
         """Handle `user_switch(hastype(x, typ), tb, fb)`.
 
         We want to evaluate tb in a context where x has type typ and fb
@@ -220,16 +250,20 @@ async def user_switch(info, condref, tbref, fbref):
             type_filter = reduce(lambda x, y: g.apply(P.bool_and, x, y),
                                  type_filter_parts)
             if replaceable_condition:
+                # If each type combination gives us a definite True or False
+                # for the condition, we don't need to keep the original
+                # condition.
                 new_cond = type_filter
             else:
-                g1 = Graph()
-                g1.output = cond
-                g2 = Graph()
-                g2.output = Constant(False)
-                engine.mng.add_graph(g1)
-                engine.mng.add_graph(g2)
-                new_cond = g.apply(P.switch, type_filter, g1, g2)
-                new_cond = g.apply(new_cond)
+                # g1 = Graph()
+                # g1.output = cond
+                # g2 = Graph()
+                # g2.output = Constant(False)
+                # engine.mng.add_graph(g1)
+                # engine.mng.add_graph(g2)
+                # new_cond = g.apply(P.switch, type_filter, g1, g2)
+                # new_cond = g.apply(new_cond)
+                new_cond = cond
             new_tb = await wrap(tbref, typemap[True])
             new_fb = await wrap(fbref, typemap[False])
             return g.apply(P.switch, new_cond, new_tb, new_fb)
@@ -253,14 +287,10 @@ async def user_switch(info, condref, tbref, fbref):
         cond = (cond.graph or g).apply(to_bool, cond)
 
     if orig_cond.graph is not None and cond.is_apply():
-        opnode, *args = cond.inputs
-        opref = engine.ref(opnode, ctx)
-        ops = (await opref.get()).get_sync()
-        argrefs = [engine.ref(a, ctx) for a in args]
         new_condref = engine.ref(cond, ctx)
         cond_alts = await make_trials(engine, new_condref, {})
         if len(cond_alts) > 1:
-            return await type_trials(cond_alts, opnode, argrefs)
+            return await type_trials(cond_alts)
 
     return await default()
 

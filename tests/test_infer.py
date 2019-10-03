@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from typing import List, Tuple
 
 import numpy as np
-import pytest
 
 from myia.abstract import (
     ANYTHING,
