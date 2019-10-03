@@ -30,12 +30,12 @@ class MyiaFunction:
 
     def __init__(self, fn, specialize_values=[], return_backend=False,
                  backend=None, backend_options=None, alias_tracker=None,
-                 universal=False):
+                 use_universe=False):
         """Initialize a MyiaFunction."""
         self.fn = fn
         self.alias_tracker = alias_tracker
         self.specialize_values = set(specialize_values)
-        if universal:
+        if use_universe:
             from .pipeline import standard_debug_pipeline
             self.pip = standard_debug_pipeline.configure({
                 'validate': False,
@@ -98,7 +98,7 @@ class MyiaFunction:
 
 @keyword_decorator
 def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
-         return_backend=False, alias_tracker=None, universal=False):
+         return_backend=False, alias_tracker=None, use_universe=False):
     """Create a function using Myia's runtime.
 
     `@myia` can be used as a simple decorator. If custom options are needed,
@@ -124,7 +124,7 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
                         backend_options=backend_options,
                         return_backend=return_backend,
                         alias_tracker=alias_tracker,
-                        universal=universal)
+                        use_universe=use_universe)
 
 
 #############################################

@@ -408,6 +408,16 @@ handle = Operation(
     defaults='myia.operations.prim_handle'
 )
 
+handle_get = Operation(
+    name='handle_get',
+    defaults='myia.operations.ops_universe.handle_get'
+)
+
+handle_set = Operation(
+    name='handle_set',
+    defaults='myia.operations.ops_universe.handle_set'
+)
+
 hasattr = Operation(
     name='hasattr',
     defaults='myia.operations.macro_hasattr'

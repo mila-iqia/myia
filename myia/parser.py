@@ -136,10 +136,13 @@ def parse(func, use_universe=False):
     function will return the same graph. It should therefore be cloned prior
     to manipulation.
     """
+    flags = dict(getattr(func, '_myia_flags', {}))
+    if 'use_universe' in flags:
+        use_universe = flags['use_universe']
+        del flags['use_universe']
     key = (func, use_universe)
     if key in _parse_cache:
         return _parse_cache[key]
-    flags = dict(getattr(func, '_myia_flags', {}))
     if 'name' in flags:
         name = flags['name']
         del flags['name']
