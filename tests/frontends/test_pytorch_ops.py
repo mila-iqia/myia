@@ -191,7 +191,7 @@ def test_torch_tensor_argmax_3_arg(x, y, z):
     return torch.argmax(x, y, z)
 
 
-# uncomment this when bool array compare is merged in pytorch:
+# TODO: uncomment this when bool array compare is merged in pytorch:
 """
 http://forum.opennmt.net/t/runtimeerror-subtraction-the-operator-with-a-bool
 -tensor-is-not-supported-if-you-are-trying-to-invert-a-mask-use-the-or-bitwise
@@ -407,7 +407,7 @@ def test_torch_sum(x):
     return torch.sum(x)
 
 
-# need pytorch-cpu=1.2.0 or higher to install to run this test
+# TODO: need pytorch-cpu=1.2.0 or higher to install to run this test
 """
 @run(torch.BoolTensor([[True, False, False], [False, False, True]]))
 def test_torch_sum_bool(x):
