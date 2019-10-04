@@ -105,11 +105,11 @@ pow = dunder_protocol_binary(
     pyop=operator.pow
 )
 truediv = dunder_protocol_binary(
-    name='truediv', lattr='__truediv__', rattr='__truediv__',
+    name='truediv', lattr='__truediv__', rattr='__rtruediv__',
     pyop=operator.truediv
 )
 floordiv = dunder_protocol_binary(
-    name='floordiv', lattr='__floordiv__', rattr='__floordiv__',
+    name='floordiv', lattr='__floordiv__', rattr='__rfloordiv__',
     pyop=operator.floordiv
 )
 matmul = dunder_protocol_binary(
