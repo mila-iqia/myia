@@ -434,7 +434,7 @@ def from_canonical(self, arg, orig_t: AbstractArray):
 
 @overload  # noqa: F811
 def from_canonical(self, arg, orig_t: AbstractHandle):
-    arg.state = self(arg.state, orig_t.element)
+    # The state is updated by the pipeline through universe.commit()
     return arg
 
 

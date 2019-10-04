@@ -90,3 +90,16 @@ def test_give_handle():
     assert plus(h1, 4) == 4
     assert plus(h2, 9) == 9
     assert plus(h1, 30) == 34
+
+
+def test_return_handle():
+
+    @myia(use_universe=True)
+    def plus2(h):
+        increment(h)
+        increment(h)
+        return h
+
+    h = HandleInstance(0)
+    h2 = plus2(h)
+    assert h2.state == 2

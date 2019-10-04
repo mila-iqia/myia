@@ -16,39 +16,6 @@ def is_universal(x: object):
     return False
 
 
-@overload
-def to_universal(gf: lib.GraphFunction):
-    """Transform a function into a universal function."""
-    g = gf.graph
-    if g.parent:
-        raise NotImplementedError(f'Cannot universalize closure {g}')
-    elif g.has_flags('original'):
-        assert not g.has_flags('universal')
-        return parse(g.flags['original'], use_universe=True)
-    else:
-        raise NotImplementedError(f'Cannot universalize {g}')
-
-
-@overload  # noqa: F811
-def to_universal(pf: lib.PrimitiveFunction):
-    return StatePassthrough(pf.prim)
-
-
-@overload  # noqa: F811
-def to_universal(mf: lib.MacroFunction):
-    return StatePassthrough(mf.macro)
-
-
-@overload  # noqa: F811
-def to_universal(mf: lib.MetaGraphFunction):
-    return StatePassthrough(mf.metagraph)
-
-
-@overload  # noqa: F811
-def to_universal(x: object):
-    raise NotImplementedError(f'Cannot universalize {x}')
-
-
 class StatePassthrough(MetaGraph):
     """Wrap a function to pass through the universe argument.
 
@@ -109,12 +76,10 @@ async def universal(info, fn):
         return Constant(StatePassthrough(fn.node.value))
 
     else:
-        repl = {to_universal(opt) for opt in options}
-        if len(repl) == 1:
-            rval, = repl
-            return Constant(rval)
-        else:
-            raise Exception(f'Too many options')
+        raise NotImplementedError(
+            'Macro "universal" does not currently work on non-constant'
+            ' functions.'
+        )
 
 
 __operation_defaults__ = {
