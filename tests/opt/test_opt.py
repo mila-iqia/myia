@@ -343,8 +343,8 @@ def test_cse():
 
     def f2(x, y):
         a = x + y
-        b = (a * y) + (a / x)
-        c = (a * y) + ((x + y) / x)
+        b = (a * y) + (a ** x)
+        c = (a * y) + ((x + y) ** x)
         d = b + c
         return d
 

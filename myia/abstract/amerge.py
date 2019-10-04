@@ -599,6 +599,7 @@ __all__ = [
     'amerge',
     'bind',
     'hastype_helper',
+    'nobottom',
     'split_type',
     'typecheck',
 ]

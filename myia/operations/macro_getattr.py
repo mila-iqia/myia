@@ -2,6 +2,7 @@
 
 from .. import lib, operations
 from ..lib import (
+    ABSENT,
     ANYTHING,
     Constant,
     Graph,
@@ -24,22 +25,25 @@ async def _resolve_case(resources, data, data_t, item_v):
     else:
         mro = data_t.mro()
 
+    if is_cls and item_v in data.attributes:
+        return ('field', item_v)
+
     for t in mro:
         if t in mmap:
             mmap_t = mmap[t]
             if item_v in mmap_t:
                 method = mmap_t[item_v]
+                if method is ABSENT:
+                    return ('no method',)
                 return ('method', method)
+
+        if item_v in vars(t):
+            return ('method', getattr(data_t, item_v))
+
+    if is_cls:
+        return ('no_method',)
     else:
-        if is_cls:
-            if item_v in data.attributes:
-                return ('field', item_v)
-            elif hasattr(data_t, item_v):
-                return ('method', getattr(data_t, item_v))
-            else:
-                return ('no_method',)
-        else:
-            return ('static',)
+        return ('static',)
 
 
 async def _attr_case(info, data, attr_v):

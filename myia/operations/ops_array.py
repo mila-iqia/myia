@@ -2,68 +2,49 @@
 
 from dataclasses import dataclass
 
-from .. import operations
-from ..hypermap import Elemwise
+from .. import lib, operations
+from ..hypermap import HyperMap
 from ..lib import core, myia_static
 from ..operations import array_reduce, primitives as P, scalar_add, shape
-from .utils import to_opdef
+from .utils import OperationDefinition, to_opdef
 
 
-def arrayify(name, op):
-    """Create an array_map over the op."""
-    @core(name=name)
-    def arrayified(xs):
-        return operations.array_map(op, xs)
-
-    return {
-        'name': name,
-        'registered_name': name,
-        'mapping': arrayified,
-        'python_implementation': None,
-    }
+def elemwise(name, op, infer_value=False):
+    """Define an elemwise operation on one or more arrays."""
+    hm = HyperMap(name=name, fn_leaf=op, nonleaf=(lib.AbstractArray,),
+                  infer_value=infer_value)
+    return OperationDefinition(
+        name=name,
+        registered_name=name,
+        mapping=hm,
+        python_implementation=None,
+    )
 
 
-def elemwise(name, field, op, pyop=None, **kwargs):
-    """Create an operation from an application of Elemwise."""
-    ew = Elemwise(field, op, name=name, **kwargs)
-    return {
-        'name': name,
-        'registered_name': name,
-        'mapping': ew,
-        'python_implementation': pyop,
-    }
+array_add = elemwise('array_add', operations.add)
+array_sub = elemwise('array_sub', operations.sub)
+array_mul = elemwise('array_mul', operations.mul)
+array_mod = elemwise('array_mod', operations.mod)
+array_pow = elemwise('array_pow', operations.pow)
+array_exp = elemwise('array_exp', operations.scalar_exp)
+array_log = elemwise('array_log', operations.scalar_log)
+array_sin = elemwise('array_sin', operations.scalar_sin)
+array_cos = elemwise('array_cos', operations.scalar_cos)
+array_tan = elemwise('array_tan', operations.scalar_tan)
+array_tanh = elemwise('array_tanh', operations.scalar_tanh)
+array_floor = elemwise('array_floor', operations.floor)
+array_trunc = elemwise('array_trunc', operations.trunc)
+array_uadd = elemwise('array_uadd', operations.pos)
+array_usub = elemwise('array_usub', operations.neg)
+array_truediv = elemwise('array_truediv', operations.truediv)
+array_floordiv = elemwise('array_floordiv', operations.floordiv)
 
-
-array_add = elemwise('array_add', '__add__', operations.scalar_add)
-array_sub = elemwise('array_sub', '__sub__', operations.scalar_sub)
-array_mul = elemwise('array_mul', '__mul__', operations.scalar_mul)
-array_mod = elemwise('array_mod', '__mod__', operations.scalar_mod)
-array_pow = elemwise('array_pow', '__pow__', operations.scalar_pow)
-array_exp = elemwise('array_exp', None, operations.scalar_exp)
-array_log = elemwise('array_log', None, operations.scalar_log)
-array_sin = elemwise('array_sin', None, operations.scalar_sin)
-array_cos = elemwise('array_cos', None, operations.scalar_cos)
-array_tan = elemwise('array_tan', None, operations.scalar_tan)
-array_tanh = elemwise('array_tanh', None, operations.scalar_tanh)
-array_floor = arrayify('array_floor', operations.floor)
-array_trunc = arrayify('array_trunc', operations.trunc)
-array_uadd = arrayify('array_uadd', operations.pos)
-array_usub = arrayify('array_usub', operations.neg)
-array_truediv = elemwise('array_truediv', '__truediv__', None)
-array_floordiv = elemwise('array_floordiv', '__floordiv__', None)
-
-array_eq = elemwise('array_eq', '__eq__', operations.scalar_eq,
-                    infer_value=True)
-array_lt = elemwise('array_lt', '__lt__', operations.scalar_lt,
-                    infer_value=True)
-array_gt = elemwise('array_gt', '__gt__', operations.scalar_gt,
-                    infer_value=True)
-array_ne = elemwise('array_ne', '__ne__', operations.scalar_ne,
-                    infer_value=True)
-array_le = elemwise('array_le', '__le__', operations.scalar_le,
-                    infer_value=True)
-array_ge = elemwise('array_ge', '__ge__', operations.scalar_ge,
-                    infer_value=True)
+array_eq = elemwise('array_eq', operations.eq, infer_value=True)
+array_lt = elemwise('array_lt', operations.lt, infer_value=True)
+array_gt = elemwise('array_gt', operations.gt, infer_value=True)
+array_ne = elemwise('array_ne', operations.ne, infer_value=True)
+array_le = elemwise('array_le', operations.le, infer_value=True)
+array_ge = elemwise('array_ge', operations.ge, infer_value=True)
 
 
 @to_opdef

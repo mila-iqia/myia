@@ -199,7 +199,7 @@ def step(model, lr, x, y):
     # The 'model' argument can be omitted: by default the derivative wrt
     # the first argument is returned.
     _cost, dmodel = value_and_grad(cost, 'model')(model, x, y)
-    return _cost, model - (dmodel * lr)
+    return _cost, model - (lr * dmodel)
 
 
 def run_helper(epochs, n, batch_size, layer_sizes):
