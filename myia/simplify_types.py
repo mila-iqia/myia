@@ -332,7 +332,7 @@ def to_canonical(self, arg, orig_t: AbstractArray):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
     et = et.xtype()
-    assert issubclass(et, xtype.Number)
+    assert issubclass(et, (xtype.Number, xtype.Bool))
     arg = orig_t.xtype().to_numpy(arg)
     arg_dtype = xtype.np_dtype_to_type(str(arg.dtype))
     if arg_dtype != et:

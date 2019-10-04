@@ -15,10 +15,13 @@ from myia.abstract.data import (
 )
 from myia.debug.finite_diff import NoTestGrad, clean_args
 from myia.frontends import activate_frontend  # noqa: E402
-from myia.frontends.pytorch_abstract_types import PyTorchTensor  # noqa: E402
+from myia.frontends.pytorch_abstract_types import (
+    PyTorchTensor,
+    pytorch_dtype_to_type,
+)
 from myia.pipeline import standard_pipeline
 
-from ..common import MA, f32, to_abstract_test
+from ..common import MA, to_abstract_test
 from ..multitest import eqtest, mt, myia_function_test, run, run_no_relay
 from ..test_grad import grad_wrap
 
@@ -89,10 +92,11 @@ def make_argspec(args, broad_specs):
 
 def _fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline):
 
-    def mksens(s):
+    def mksens(x):
         return AbstractArray(
-            AbstractScalar({TYPE: f32, VALUE: ANYTHING}),
-            {SHAPE: tuple(s), TYPE: PyTorchTensor}
+            AbstractScalar({TYPE: pytorch_dtype_to_type(x.dtype),
+                            VALUE: ANYTHING}),
+            {SHAPE: tuple(x.shape), TYPE: PyTorchTensor}
         )
 
     ref_result = fn(*map(copy, args))
@@ -105,13 +109,13 @@ def _fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline):
 
     if isinstance(myia_result, tuple):
         sens_type = AbstractTuple(
-            [mksens(res.shape) for res in myia_result]
+            [mksens(res) for res in myia_result]
         )
-        sens = tuple(torch.ones(res.shape) for res in myia_result)
-
+        sens = tuple(torch.ones(res.shape, dtype=res.dtype)
+                     for res in myia_result)
     else:
-        sens_type = mksens(myia_result.shape)
-        sens = torch.ones(myia_result.shape)
+        sens_type = mksens(myia_result)
+        sens = torch.ones(myia_result.shape, dtype=myia_result.dtype)
 
     pytorch_grads = pt_fn_grads(fn, *args)
 
@@ -185,6 +189,20 @@ def test_torch_tensor_argmax_1_arg(x):
 )
 def test_torch_tensor_argmax_3_arg(x, y, z):
     return torch.argmax(x, y, z)
+
+
+# TODO: uncomment this when bool array compare is merged in pytorch:
+"""
+http://forum.opennmt.net/t/runtimeerror-subtraction-the-operator-with-a-bool
+-tensor-is-not-supported-if-you-are-trying-to-invert-a-mask-use-the-or-bitwise
+-not-operator-instead/2994
+# """
+"""
+@run(nn.Parameter(torch.tensor([[0.74, 1., 2.], [0.3, 0.0, 0.6]])),
+     nn.Parameter(torch.tensor([[0.74, 1., 2.], [0.7, 0.0, -0.6]])))
+def test_torch_eq(x, y):
+    return torch.eq(x, y)
+# """
 
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(3, 4))),
@@ -292,6 +310,12 @@ def test_torch_nll_loss_reduce_options(x, y, z):
     return torch.nn.functional.nll_loss(x, y, reduction=z)
 
 
+@fwd_and_bwd(nn.Parameter(torch.randn(2, 3, dtype=torch.float64)),
+             torch.tensor([1, 2]))
+def test_torch_nll_loss_reduce_cast(x, y):
+    return torch.nn.functional.nll_loss(x, y, reduction='mean')
+
+
 @fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(2, 3, 4, 5))))
 def test_torch_tensor_permute(x):
     return x.permute((0, 3, 2, 1))
@@ -306,6 +330,7 @@ def test_torch_tensor_pow(x):
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), (-1,)),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), (6,)),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), (2, 3)),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), (-1, 6)),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 1))), (2,)),
     broad_specs=(True, False)
 )
@@ -334,14 +359,11 @@ def test_torch_scatter_broadcast_source(x, index, src):
     return torch.scatter(x, 0, index, src)
 
 
-# TODO: Need dtype attr for xtype.NDArray to support nonpytorch scalar src
-"""
-@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(3, 4))),
-              torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
-              1.23)
+@fwd_and_bwd(nn.Parameter(torch.randn(3, 4, dtype=torch.float64)),
+             torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
+             1.23)
 def test_torch_scatter_broadcast_source_nonpytorch_scalar(x, index, src):
     return torch.scatter(x, 0, index, src)
-# """
 
 
 # TODO: NotImplementedError: <_ast.Subscript object at 0x*>
@@ -385,16 +407,17 @@ def test_torch_sum(x):
     return torch.sum(x)
 
 
-@run(nn.Parameter(torch.Tensor(MA(2, 3))))
-def test_torch_sum_dtype_fwd(x):
-    return torch.sum(x, dtype=torch.float64)
+# TODO: need pytorch-cpu=1.2.0 or higher to install to run this test
+"""
+@run(torch.BoolTensor([[True, False, False], [False, False, True]]))
+def test_torch_sum_bool(x):
+    return torch.sum(x)
+# """
 
 
-""" # TODO: implement bwd for array_cast
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
 def test_torch_sum_dtype(x):
     return torch.sum(x, dtype=torch.float64)
-"""
 
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
@@ -419,6 +442,12 @@ def test_torch_sum_multi_dim(x):
 @fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(2, 4, 3, 5))))
 def test_torch_tensor_transpose(x):
     return x.transpose(3, 1)
+
+
+@fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(2, 4, 3))),
+             nn.Parameter(torch.Tensor(torch.randn(4, 3, 2))))
+def test_torch_tensor_view_as(x, y):
+    return x.view_as(y)
 
 
 @run()
