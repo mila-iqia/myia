@@ -958,3 +958,68 @@ def test_switch_input_types():
 
     f(torch.ones((2, 2)))
     f(np.ones((2, 2)))
+
+
+# This is mostly here to cover inst_tuple_setitem method in myia.compile.vm
+def test_optim_getitem():
+    from myia.abstract import macro
+    from myia.operations import primitives as P
+    from myia.ir import sexp_to_node
+    from myia.lib import setter_from_getter
+
+    def update_sgd(p, g):
+        return p - 0.01 * g
+
+    @macro
+    async def update(info, model_ref, dmodel_ref, update_rule_ref):
+        new_model = model_ref.node
+        dmodel = dmodel_ref.node
+        update_rule = update_rule_ref.node
+
+        p = new_model
+        g = dmodel
+
+        p = (P.record_getitem, p, 'W')
+        g = (P.record_getitem, g, 'W')
+
+        p_node = sexp_to_node(p, info.graph)
+        g_node = sexp_to_node(g, info.graph)
+
+        pn = info.graph.apply(update_rule, p_node, g_node)
+
+        new_model = sexp_to_node(setter_from_getter(p, pn), info.graph)
+
+        return new_model
+
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
+    model = Tiny(4, 3)
+    target = torch.Tensor([2.5])
+
+    def mse(value, target):
+        diff = value - target
+        return sum(diff * diff)
+
+    def cost(model, inp, target):
+        value = model(inp)
+        loss = mse(value, target)
+        return loss
+
+    @myia(backend=backend, backend_options=backend_options)
+    def step(model, inp, target):
+        _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
+        return _cost, update(model, dmodel, update_sgd)
+    loss, model_new = step(model, inp, target)
+
+    assert loss.item() == 161.05856323242188
+
+    expected_param = torch.Tensor([[-0.21953332, -0.31154382, -0.29184943],
+                                   [-0.47497076, -0.39380032, -0.32451797],
+                                   [-0.27165186, -0.96610248, -0.09999254],
+                                   [-0.24826682,  0.73539025, -0.39692938]])
+
+    assert torch.allclose(model_new.W, expected_param)
