@@ -572,6 +572,10 @@ class GraphInferrer(Inferrer):
         out = engine.ref(g.return_, context)
         return await engine.get_inferred(out)
 
+    async def reroute(self, engine, outref, argrefs):
+        """Inline the Graph/MetaGraph if it has the appropriate flag."""
+        return await self._graph.reroute(engine, outref, argrefs)
+
 
 class PartialInferrer(Inferrer):
     """Inferrer for partial application.
@@ -844,9 +848,9 @@ async def execute_inferrers(engine, inferrers, outref, argrefs):
     reroutes = set([await inf.reroute(engine, outref, argrefs)
                     for inf in inferrers])
     if len(reroutes) > 1:
-        # Unlikely to happen naturally, so I'm leaving it as an assert for the
-        # time being.
-        raise AssertionError('Only one macro may be used at a call point.')
+        # We do no rerouting if there is more than one possibility
+        reroutes = {None}
+
     newref, = reroutes
     if newref is not None:
         return await engine.reroute(outref, newref)

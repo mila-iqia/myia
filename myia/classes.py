@@ -49,6 +49,7 @@ class Cons(ADT):
             curr = curr.tail
         return rval
 
+    @core(static_inline=True)
     def __bool__(self):
         return True
 
@@ -64,12 +65,15 @@ class Cons(ADT):
     def __iter__(self):
         return iter(self._to_list())
 
+    @core(static_inline=True)
     def __myia_iter__(self):
         return self
 
+    @core(static_inline=True)
     def __myia_hasnext__(self):
         return True
 
+    @core(static_inline=True)
     def __myia_next__(self):
         return self.head, self.tail
 
@@ -81,21 +85,27 @@ class Empty(ADT):
     def __iter__(self):
         return iter(())
 
+    @core(static_inline=True)
     def __bool__(self):
         return False
 
+    @core(static_inline=True)
     def __len__(self):
         return 0
 
+    @core(static_inline=True)
     def __getitem__(self, idx):
         raise Exception('Index out of bounds')
 
+    @core(static_inline=True)
     def __myia_iter__(self):
         return self
 
+    @core(static_inline=True)
     def __myia_next__(self):
         raise Exception('Out of bounds')
 
+    @core(static_inline=True)
     def __myia_hasnext__(self):
         return False
 

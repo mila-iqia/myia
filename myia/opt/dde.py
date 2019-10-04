@@ -5,7 +5,6 @@ from collections import defaultdict
 
 from ..abstract import (
     DEAD,
-    AbstractError,
     AbstractFunction,
     GraphFunction,
     PartialApplication,
@@ -214,8 +213,10 @@ class DeadDataElimination(Partializable):
             for node, idx in dead:
                 repl = Constant(DEAD)
                 repl.abstract = node.inputs[idx].abstract
-                if isinstance(repl.abstract, AbstractFunction):
-                    repl.abstract = AbstractError(DEAD)
+                # This used to happen prior to adding support for the
+                # static_inline flag and can be reassessed later, if it happens
+                # again.
+                assert not isinstance(repl.abstract, AbstractFunction)
                 mng.set_edge(node, idx, repl)
         return False  # Pretend there are no changes, for now
 
