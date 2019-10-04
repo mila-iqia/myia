@@ -1,7 +1,7 @@
 """Implementation of the 'universal' macro."""
 
 from .. import lib, operations
-from ..lib import Constant, Graph, MetaGraph, macro, overload
+from ..lib import Constant, MetaGraph, macro, overload
 
 
 @overload
