@@ -154,28 +154,15 @@ def to_abstract(self, v: Primitive, node=None, **kwargs):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: SymbolicKeyInstance, **kwargs):
-    return AbstractScalar({VALUE: v, TYPE: xtype.SymbolicKeyType})
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: EnvInstance, **kwargs):
-    return AbstractScalar({VALUE: v, TYPE: xtype.EnvType})
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: UniverseInstance, **kwargs):
-    return AbstractScalar({VALUE: v, TYPE: xtype.UniverseType})
-
-
-@overload  # noqa: F811
 def to_abstract(self, v: HandleInstance, **kwargs):
-    return AbstractHandle(to_abstract(v.state, **kwargs))
+    return AbstractHandle(self(v.state, **kwargs))
 
 
 @overload  # noqa: F811
 def to_abstract(self, v: (bool, type(None),
-                          str, type(NotImplemented)), **kwargs):
+                          str, type(NotImplemented),
+                          SymbolicKeyInstance, EnvInstance,
+                          UniverseInstance), **kwargs):
     typ = xtype.pytype_to_myiatype(type(v))
     return AbstractScalar({
         VALUE: v,

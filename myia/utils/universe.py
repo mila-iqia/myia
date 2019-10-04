@@ -1,7 +1,5 @@
 """Classes to support universes."""
 
-from dataclasses import dataclass
-
 
 class UniverseInstance:
     """Universe mapping references to values.
@@ -32,11 +30,12 @@ class UniverseInstance:
             handle.state = value
 
 
-@dataclass(eq=False)
 class HandleInstance:
     """Key to use in an Universe."""
 
-    state: object
+    def __init__(self, state):
+        """Initialize a HandleInstance."""
+        self.state = state
 
 
 new_universe = UniverseInstance()

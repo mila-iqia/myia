@@ -30,7 +30,7 @@ from myia.abstract import (
 )
 from myia.classes import ADT
 from myia.ir import MultitypeGraph
-from myia.utils import EnvInstance, dataclass_fields, overload
+from myia.utils import EnvInstance, HandleInstance, dataclass_fields, overload
 from myia.xtype import Bool, f16, f32, f64, i16, i32, i64, u64
 
 B = Bool
@@ -137,6 +137,11 @@ def to_abstract_test(self, x: (bool, int, float, str,
         VALUE: x,
         TYPE: xtype.pytype_to_myiatype(type(x)),
     })
+
+
+@overload  # noqa: F811
+def to_abstract_test(self, v: HandleInstance, **kwargs):
+    return AbstractHandle(self(v.state, **kwargs))
 
 
 @overload  # noqa: F811
