@@ -463,11 +463,6 @@ invert_permutation = Operation(
     defaults='myia.operations.prim_invert_permutation'
 )
 
-ioprint = Operation(
-    name='ioprint',
-    defaults='myia.operations.prim_ioprint'
-)
-
 is_ = Operation(
     name='is',
     defaults='myia.operations.macro_is'
@@ -626,11 +621,6 @@ pos = Operation(
 pow = Operation(
     name='pow',
     defaults='myia.operations.ops_dunder.pow'
-)
-
-print = Operation(
-    name='print',
-    defaults='myia.operations.op_print'
 )
 
 raise_ = Operation(
