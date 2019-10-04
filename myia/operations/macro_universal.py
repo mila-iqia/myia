@@ -2,7 +2,6 @@
 
 from .. import lib, operations
 from ..lib import Constant, Graph, MetaGraph, macro, overload
-from ..parser import parse
 
 
 @overload

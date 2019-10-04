@@ -2,8 +2,6 @@
 
 from dataclasses import dataclass
 
-from .serialize import serializable
-
 
 class UniverseInstance:
     """Universe mapping references to values.
