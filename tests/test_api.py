@@ -10,7 +10,7 @@ from myia.pipeline import (
     scalar_parse as parse,
 )
 from myia.simplify_types import from_canonical, to_canonical
-from myia.utils import InferenceError, TaggedValue
+from myia.utils import HandleInstance, InferenceError, TaggedValue
 from myia.xtype import Bool
 
 from .common import (
@@ -170,6 +170,8 @@ def test_to_canonical():
         _convert('x', 1.0)
     with pytest.raises(TypeError):
         _convert(1.0, to_abstract_test('x'))
+    with pytest.raises(TypeError):
+        _convert(1.0, to_abstract_test(HandleInstance(1.0)))
 
     v = to_device(22, None)
     with pytest.raises(TypeError):
