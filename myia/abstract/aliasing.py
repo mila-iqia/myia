@@ -8,16 +8,13 @@ import numpy as np
 
 from ..classes import ADT
 from ..operations import primitives as P
-from ..utils import MyiaInputTypeError, dataclass_fields, overload
+from ..utils import MyiaInputTypeError, dataclass_fields, get_fields, overload
 from . import data as ab
 
 
-@overload.wrapper(bootstrap=True, initial_state=set)
+@overload.wrapper(bootstrap=True)
 def _explore(__call__, self, v, vseq, path):
     yield v, vseq, path
-    if id(v) in self.state:
-        return
-    self.state.add(id(v))
     yield from __call__(self, v, vseq, path)
 
 
@@ -40,6 +37,16 @@ def _explore(self, v: object, vseq, path):
     if is_dataclass(v):
         vseq = (*vseq, v)
         for k, x in dataclass_fields(v).items():
+            yield from self(x, vseq, (*path, k))
+    else:
+        vseq = (*vseq, v)
+
+        try:
+            fields = get_fields(v)
+        except TypeError:
+            return None
+
+        for k, x in fields.items():
             yield from self(x, vseq, (*path, k))
 
 

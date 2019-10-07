@@ -1,3 +1,5 @@
+#delete this file; it's just a reference
+
 """PyTorch Frontend."""
 
 import copy
@@ -32,14 +34,12 @@ from .pytorch_functions import (
     _max,
     _sum,
     argmax,
-    cat,
     conv2d,
     gather,
     item,
     linear,
     log_softmax,
     max_pool2d,
-    mean,
     nll_loss,
     relu,
     reshape,
@@ -47,55 +47,38 @@ from .pytorch_functions import (
     scatter_add,
     sigmoid,
     size,
-    smooth_l1_loss,
     softmax,
-    split,
     squeeze,
-    stack,
-    std,
     transpose,
-    unsqueeze,
-    var,
     view_as,
     zeros,
 )
 
 standard_object_map.update({
-    torch.abs: operations.array_abs,
     torch.argmax: argmax,
-    torch.cat: cat,
     torch.eq: operations.array_eq,
     torch.exp: operations.array_exp,
     torch.gather: gather,
     torch.log: operations.array_log,
     torch.log_softmax: log_softmax,
     torch.max: _max,
-    torch.mean: mean,
     torch.mm: P.dot,
-    torch.pow: operations.array_pow,
     torch.relu: relu,
     torch.reshape: reshape,
     torch.scatter: scatter,
     torch.scatter_add: scatter_add,
     torch.sigmoid: sigmoid,
-    torch.sign: operations.array_sign,
     torch.softmax: softmax,
-    torch.split: split,
     torch.squeeze: squeeze,
-    torch.stack: stack,
-    torch.std: std,
     torch.sum: _sum,
     torch.t: operations.t,
     torch.tanh: operations.array_tanh,
     torch.transpose: transpose,
-    torch.unsqueeze: unsqueeze,
-    torch.var: var,
     # torch.zeros_like: C.zeros_like,  # currently only works with pt backend
     torch.nn.functional.conv2d: conv2d,
     torch.nn.functional.linear: linear,
     torch.nn.functional.max_pool2d: max_pool2d,
     torch.nn.functional.nll_loss: nll_loss,
-    torch.nn.functional.smooth_l1_loss: smooth_l1_loss,
 
     torch.zeros: zeros,
 })
@@ -104,7 +87,6 @@ standard_object_map.update({
 standard_method_map[PyTorchTensor] = \
     standard_method_map[NDArray].copy()
 standard_method_map[PyTorchTensor].update({
-    'abs': operations.array_abs,
     'dim': operations.ndim,
     'dtype': property(operations.dtype),
     'argmax': argmax,
@@ -115,27 +97,20 @@ standard_method_map[PyTorchTensor].update({
     'log': operations.array_log,
     'log_softmax': log_softmax,
     'max': _max,
-    'mean': mean,
     'permute': P.transpose,
-    'pow': operations.array_pow,
     'relu': relu,
     'reshape': reshape,
     'scatter': scatter,
     'scatter_add': scatter_add,
     'sigmoid': sigmoid,
     'shape': property(operations.shape),
-    'sign': operations.array_sign,
     'size': size,
     'softmax': softmax,
-    'split': split,
     'squeeze': squeeze,
-    'std': std,
     'sum': _sum,
     't': operations.t,
     'transpose': transpose,
     'tanh': operations.array_tanh,
-    'unsqueeze': unsqueeze,
-    'var': var,
     'view': reshape,  # contiguousness is ignored by us for now?
     'view_as': view_as,  # contiguousness is ignored by us for now?
     'zeros_like': operations.zeros_like,  # hidden method used by bwd (I think)
@@ -170,21 +145,18 @@ def _to_abstract(self, v: torch.nn.Module, **kwargs):
                 # TODO: Remove "(isinstance(v, torch.nn.Sequential) and"
                 #       once Alias PR ready
                 # TODO: Remove rest of if statement once Dict support empty Dic
-                """
                 if var_k not in ('_parameters', '_modules') or \
                         (isinstance(v, torch.nn.Sequential) and
                          var_v != OrderedDict()):
-                """
 
-                #print("k", var_k, "v", var_v)
-                fields[var_k] = self(var_v, **kwargs)
+                    fields[var_k] = self(var_v, **kwargs)
         else:
             pass
             # TODO: maybe make a warning for if user happened
             #       to name attribute something in blacklist
 
     # TODO: Remove "if not isinstance(v, Sequential)" once Alias PR is ready
-    """TODO: Remove these 2 loops (mod and par) once Dict support empty Dict
+    # """TODO: Remove these 2 loops (mod and par) once Dict support empty Dict
     if not isinstance(v, torch.nn.Sequential):
         for mod_k, mod_v in v._modules.items():
             fields[mod_k] = self(mod_v, **kwargs)
@@ -206,19 +178,12 @@ def _to_abstract(self, v: torch.nn.Module, **kwargs):
         # TODO: Figure out something more memory efficient than deepcopy.
         #       P.S. We tried copy.copy(v) and it is not sufficiently deep.
         v = copy.deepcopy(v)
-        #breakpoint()
         for k, a in zip(names, args):
-            #print("v", v, "k", k, "a", a)
-            if k not in ('_parameters', '_modules'):
-                print("v", v, "k", k, "a", a)
-                #print("The third printed bias and weight has the gradient, not sure how to access those afterwards though.")
-                if isinstance(getattr(v, k), torch.nn.Parameter):
-                    setattr(v, k, torch.nn.Parameter(a))
-                else:
-                    setattr(v, k, a)
+            if isinstance(getattr(v, k), torch.nn.Parameter):
+                setattr(v, k, torch.nn.Parameter(a))
+            else:
+                setattr(v, k, a)
         return v
-
-    #print(1234, v)
 
     return AbstractModule(v.__class__, fields, constructor=new_module)
 
@@ -254,7 +219,7 @@ __all__ = [
     'pytorch_dtype_to_type',
 ]
 
-
+#breakpoint()
 @get_fields.register
 def _get_fields(instance: torch.nn.Module):
     blacklist = OrderedSet(dir(torch.nn.Module()))
@@ -266,10 +231,34 @@ def _get_fields(instance: torch.nn.Module):
 
     keys = OrderedSet(dir(instance)) - blacklist
     d = {}
-
+    print("keys", keys)
     for k in keys:
         d[k] = getattr(instance, k)
     return d
+
+'''
+@get_fields.register
+def _get_fields(instance: torch.nn.modules.container.Sequential):
+    blacklist = OrderedSet(dir(torch.nn.modules.container.Sequential()))
+    blacklist.add('__constants__')
+    blacklist.add('reset_parameters')
+
+    blacklist.remove('_parameters')
+    blacklist.remove('_modules')
+
+    keys = OrderedSet(dir(instance)) - blacklist
+    d = {}
+    #print("keys", keys)
+    #breakpoint()
+    for k in keys:
+        d[k] = getattr(instance, k)
+    """
+    for k, v in instance._modules.items():
+        d[k] = v
+    #"""
+    #breakpoint()
+    return d
+    #'''
 
 
 def tensor_pytorch_aliasable(v, vseq, path):
@@ -277,7 +266,8 @@ def tensor_pytorch_aliasable(v, vseq, path):
 
     Tensors inside a list or ADT are not aliasable.
     """
-    if isinstance(v, torch.Tensor):
+    #if isinstance(v, torch.Tensor):
+    if isinstance(v, (torch.Tensor, torch.nn.Parameter, torch.nn.parameter.Parameter)):
         if any(isinstance(x, (list, ADT)) for x in vseq):
             return 'X'
         else:
