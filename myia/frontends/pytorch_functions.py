@@ -36,6 +36,26 @@ from .pytorch_abstract_types import APT, APT_bool
 
 
 @macro
+async def _denom(info, shp_ref, dtype_ref, dim_ref, unbiased_ref):
+    shp = build_value(await shp_ref.get())
+    dim = build_value(await dim_ref.get())
+    unbiased = build_value(await unbiased_ref.get())
+
+    def prod(_x):
+        return reduce(operator.mul, _x, 1)
+
+    if dim is None:
+        denom = int(prod(shp))
+    else:
+        denom = shp[dim]
+
+    if unbiased is True:
+        denom = denom - 1
+
+    return Constant(denom)
+
+
+@macro
 async def _dim_explicit(info, a_shp_ref, dim_ref):
     a_shp = build_value(await a_shp_ref.get())
     dim = build_value(await dim_ref.get())
@@ -149,6 +169,18 @@ async def _shp_explicit(info, a_shp_ref, shp_ref):
             shp_explicit = shp_explicit + (s, )
 
     return Constant(shp_explicit)
+
+
+@macro
+async def _total_elements(info, shp_ref):
+    shp = build_value(await shp_ref.get())
+
+    def prod(_x):
+        return reduce(operator.mul, _x, 1)
+
+    _tot_elems = int(prod(shp))
+
+    return Constant(_tot_elems)
 
 
 # ACTUAL FUNCTIONS ##########################################################
@@ -283,6 +315,27 @@ def max_pool2d(input, kernel_size, stride=(), padding=0, dilation=1,
     return ret
 
 
+# TODO: mean with tuple dim (reduce over multiple chosen dims)
+@core
+def mean(self, dim=None, keepdim=False, *, dtype=None):
+    """Map of 'mean' pytorch method."""
+    x = self
+    dim = _dim_explicit(x.shape, dim)
+
+    if P.hastype(x, APT_bool):
+        x = P.array_cast(x, i64)
+
+    if dtype is not None:
+        x = P.array_cast(x, dtype)
+
+    if dim is None:
+        return P.array_reduce(P.scalar_add, x, ()) \
+            / P.scalar_cast(_total_elements(x.shape), x.dtype)
+    else:
+        return operations.array_reduce_dim(P.scalar_add, x, dim, keepdim) \
+            / P.scalar_cast(x.shape[dim], x.dtype)
+
+
 # TODO:
 # F.nll_loss(input, target, weight=None, size_average=None, ignore_index=-100,
 # reduce=None, reduction='mean')
@@ -342,6 +395,17 @@ def sigmoid(x):
 
 
 @core
+def size(self, dim=None):
+    """Map of 'size' pytorch method."""
+    x = self
+    dim = _dim_explicit(x.shape, dim)
+    if dim is None:
+        return x.shape
+    else:
+        return x.shape[dim]
+
+
+@core
 def squeeze(self, dim=None):
     """Map of 'squeeze' pytorch method."""
     final_shape = _shp_squeeze(self.shape, dim, False)
@@ -363,6 +427,15 @@ def softmax(self, dim=None, dtype=None):
     return x_exp / x_exp_sum
 
 
+# TODO: std with tuple dim (reduce over multiple chosen dims)
+@core
+def std(self, dim=None, unbiased=True, keepdim=False, *, dtype=None):
+    """Map of 'std' pytorch method."""
+    return torch.var(self,
+                     dim=dim, unbiased=unbiased,
+                     keepdim=keepdim, dtype=dtype) ** .5
+
+
 # TODO: sum with tuple dim (reduce over multiple chosen dims)
 @core
 def _sum(self, dim=None, keepdim=False, *, dtype=None):
@@ -380,12 +453,6 @@ def _sum(self, dim=None, keepdim=False, *, dtype=None):
         return P.array_reduce(P.scalar_add, x, ())
     else:
         return operations.array_reduce_dim(P.scalar_add, x, dim, keepdim)
-
-
-@core
-def size(self):
-    """Map of 'size' pytorch method."""
-    return self.shape
 
 
 @core
@@ -412,6 +479,29 @@ def transpose(a, dim0, dim1):
     """Map of 'transpose' pytorch method."""
     dims = _transpose_dims(len(a.shape), dim0, dim1)
     return P.transpose(a, dims)
+
+
+# TODO: var with tuple dim (reduce over multiple chosen dims)
+@core
+def var(self, dim=None, unbiased=True, keepdim=False, *, dtype=None):
+    """Map of 'var' pytorch method."""
+    x = self
+    dim = _dim_explicit(x.shape, dim)
+
+    if P.hastype(x, APT_bool):
+        x = P.array_cast(x, i64)
+
+    if dtype is not None:
+        x = P.array_cast(x, dtype)
+
+    x = (x - x.mean(dim=dim, keepdim=True, dtype=None)) ** 2
+    x = torch.sum(x, dim=dim, keepdim=keepdim, dtype=None)
+
+    denom = _denom(self.shape, x.dtype, dim, unbiased)
+
+    denom = P.scalar_cast(denom, x.dtype)
+
+    return x / denom
 
 
 @core

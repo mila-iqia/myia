@@ -291,6 +291,11 @@ def test_torch_max_pool2d_return_indices(x, ri):
                                           0, 1, False, ri)
 
 
+@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
+def test_torch_mean(x):
+    return torch.mean(x)
+
+
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))),
              torch.tensor([1, 2]))
 def test_torch_nll_loss(x, y):
@@ -376,6 +381,11 @@ def test_torch_tensor_set(x, y):
 # """
 
 
+@run(nn.Parameter(torch.Tensor(MA(2, 3))))
+def test_torch_size(x):
+    return x.size(-1), x.size()
+
+
 @mt(
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 0),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
@@ -400,6 +410,11 @@ def test_torch_tensor_squeeze(x, y):
              broad_specs=(True, False))
 def test_torch_tensor_squeeze_all(x):
     return x.squeeze()
+
+
+@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
+def test_torch_std(x):
+    return torch.std(x, dim=-1)
 
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
@@ -442,6 +457,11 @@ def test_torch_sum_multi_dim(x):
 @fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(2, 4, 3, 5))))
 def test_torch_tensor_transpose(x):
     return x.transpose(3, 1)
+
+
+@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
+def test_torch_var(x):
+    return torch.var(x, dim=-1)
 
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(2, 4, 3))),
