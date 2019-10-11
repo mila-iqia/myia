@@ -21,7 +21,7 @@ from myia.frontends.pytorch_abstract_types import (
 )
 from myia.pipeline import standard_pipeline
 
-from ..common import MA, to_abstract_test
+from ..common import MA, MB, to_abstract_test
 from ..multitest import eqtest, mt, myia_function_test, run, run_no_relay
 from ..test_grad import grad_wrap
 
@@ -150,6 +150,11 @@ single_tensor_arg_tests = (
 
 
 @mt(*single_tensor_arg_tests)
+def test_torch_abs(x):
+    return torch.abs(x)
+
+
+@mt(*single_tensor_arg_tests)
 def test_torch_exp(x):
     return torch.exp(x)
 
@@ -162,6 +167,11 @@ def test_torch_log(x):
 @mt(*single_tensor_arg_tests)
 def test_torch_relu(x):
     return torch.relu(x)
+
+
+@mt(*single_tensor_arg_tests)
+def test_torch_sign(x):
+    return torch.sign(x)
 
 
 @mt(*single_tensor_arg_tests)
@@ -189,6 +199,16 @@ def test_torch_tensor_argmax_1_arg(x):
 )
 def test_torch_tensor_argmax_3_arg(x, y, z):
     return torch.argmax(x, y, z)
+
+
+@mt(
+    fwd_and_bwd(nn.Parameter(torch.randn(3, 4, 2)),
+                nn.Parameter(torch.randn(3, 5, 2)),
+                nn.Parameter(torch.randn(3, 6, 2))),
+    broad_specs=(False, False, False)
+)
+def test_torch_concat(a, b, c):
+    return torch.cat((a, b, c), dim=1)
 
 
 # TODO: uncomment this when bool array compare is merged in pytorch:
@@ -386,6 +406,12 @@ def test_torch_size(x):
     return x.size(-1), x.size()
 
 
+@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))),
+             nn.Parameter(torch.Tensor(MB(2, 3))))
+def test_torch_smooth_l1_loss(x, y):
+    return torch.nn.functional.smooth_l1_loss(x, y)
+
+
 @mt(
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 0),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
@@ -394,6 +420,11 @@ def test_torch_size(x):
 )
 def test_torch_softmax(x, y):
     return torch.softmax(x, y)
+
+
+@fwd_and_bwd(nn.Parameter(torch.randn(3, 9, 2)))
+def test_torch_split(x):
+    return torch.split(x, (4, 3, 2), dim=1)
 
 
 @mt(

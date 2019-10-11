@@ -203,6 +203,13 @@ def argmax(self, dim=None, keepdim=False):
 
 
 @core
+def cat(self, dim=0):
+    """Map of 'cat' pytorch method."""
+    x = self
+    return P.concat(x, dim)
+
+
+@core
 def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
            groups=1):
     r"""Applies a Conv2d."""
@@ -405,11 +412,61 @@ def size(self, dim=None):
         return x.shape[dim]
 
 
+@macro
+async def get_z(info, z_ref):
+    z_abs = build_value(await z_ref.get())
+
+    def pw(_z_abs):
+        if _z_abs < 1:
+            #out = 0.5 * (_z_raw ** 2)
+            out = 0.5 * (_z_abs ** 2)
+        else:
+            out = _z_abs - 0.5
+        return out
+
+    out = P.array_map(pw, z_abs)
+
+    return Constant(out)
+
+
 @core
-def squeeze(self, dim=None):
-    """Map of 'squeeze' pytorch method."""
-    final_shape = _shp_squeeze(self.shape, dim, False)
-    return self.reshape(final_shape)
+def smooth_l1_loss(input, target, reduction='mean'):
+    """Map of 'smooth_l1_loss' pytorch method."""
+
+    z_raw = input - target
+    z_abs = torch.abs(z_raw)
+
+    """
+    if z_abs < 1:
+        out = 0.5 * (z_raw ** 2)
+    else:
+        out = z_abs - 0.5
+        #"""
+
+    # def pw(_z_raw, _z_abs):
+
+    """
+    def pw(_z_abs):
+        if _z_abs < 1:
+            #out = 0.5 * (_z_raw ** 2)
+            out = 0.5 * (_z_abs ** 2)
+        else:
+            out = _z_abs - 0.5
+        return out
+
+    out = P.array_map(pw, z_abs)
+    #"""
+
+    out = get_z(z_abs)
+
+    if reduction == 'none':
+        out = out
+    elif reduction == 'mean':
+        out = torch.sum(out) / P.scalar_cast(input.shape[0], out.dtype)
+    elif reduction == 'sum':
+        out = torch.sum(out)
+    # return out
+    raise NotImplementedError()
 
 
 @core
@@ -425,6 +482,21 @@ def softmax(self, dim=None, dtype=None):
     x_exp = torch.exp(x - maxes)
     x_exp_sum = torch.sum(x_exp, dim, keepdim=True)
     return x_exp / x_exp_sum
+
+
+#TODO: support for split_size rather than just sections
+@core
+def split(self, split_size_or_sections, dim=0):
+    """Map of 'split' pytorch method."""
+    x = self
+    return P.split(x, split_size_or_sections, dim)
+
+
+@core
+def squeeze(self, dim=None):
+    """Map of 'squeeze' pytorch method."""
+    final_shape = _shp_squeeze(self.shape, dim, False)
+    return self.reshape(final_shape)
 
 
 # TODO: std with tuple dim (reduce over multiple chosen dims)

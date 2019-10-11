@@ -38,6 +38,11 @@ argmax = Operation(
     defaults='myia.operations.prim_argmax'
 )
 
+array_abs = Operation(
+    name='array_abs',
+    defaults='myia.operations.ops_array.array_abs'
+)
+
 array_add = Operation(
     name='array_add',
     defaults='myia.operations.ops_array.array_add'
@@ -168,6 +173,11 @@ array_setitem = Operation(
     defaults='myia.operations.prim_array_setitem'
 )
 
+array_sign = Operation(
+    name='array_sign',
+    defaults='myia.operations.ops_array.array_sign'
+)
+
 array_sin = Operation(
     name='array_sin',
     defaults='myia.operations.ops_array.array_sin'
@@ -251,6 +261,11 @@ broadcast_shape = Operation(
 casttag = Operation(
     name='casttag',
     defaults='myia.operations.prim_casttag'
+)
+
+concat = Operation(
+    name='concat',
+    defaults='myia.operations.prim_concat'
 )
 
 conv2d = Operation(
@@ -628,6 +643,11 @@ return_ = Operation(
     defaults='myia.operations.prim_return_'
 )
 
+scalar_abs = Operation(
+    name='scalar_abs',
+    defaults='myia.operations.prim_scalar_abs'
+)
+
 scalar_add = Operation(
     name='scalar_add',
     defaults='myia.operations.prim_scalar_add'
@@ -713,6 +733,11 @@ scalar_pow = Operation(
     defaults='myia.operations.prim_scalar_pow'
 )
 
+scalar_sign = Operation(
+    name='scalar_sign',
+    defaults='myia.operations.prim_scalar_sign'
+)
+
 scalar_sin = Operation(
     name='scalar_sin',
     defaults='myia.operations.prim_scalar_sin'
@@ -771,6 +796,11 @@ shape = Operation(
 slice = Operation(
     name='slice',
     defaults='myia.operations.op_slice'
+)
+
+split = Operation(
+    name='split',
+    defaults='myia.operations.prim_split'
 )
 
 string_eq = Operation(

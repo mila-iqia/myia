@@ -57,6 +57,7 @@ def validate_abstract(self, a: (type(None), AbstractExternal), uses):
 # All the legal operations are listed here.
 # Illegal ones are commented out.
 whitelist = frozenset({
+    P.scalar_abs,
     P.scalar_add,
     P.scalar_sub,
     P.scalar_mul,
@@ -79,6 +80,7 @@ whitelist = frozenset({
     P.scalar_ge,
     P.scalar_floor,
     P.scalar_max,
+    P.scalar_sign,
     P.bool_not,
     P.bool_and,
     P.bool_or,
@@ -123,11 +125,13 @@ whitelist = frozenset({
     P.scatter_add,
     P.argmax,
     P.array_max,
+    P.concat,
     P.conv2d,
     P.conv2d_input_grad,
     P.conv2d_weight_grad,
     P.max_pool2d,
     P.max_pool2d_grad,
+    P.split,
 })
 
 

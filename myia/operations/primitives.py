@@ -99,6 +99,11 @@ casttag = BackendPrimitive(
     defaults='myia.operations.prim_casttag'
 )
 
+concat = BackendPrimitive(
+    name='concat',
+    defaults='myia.operations.prim_concat'
+)
+
 conv2d = BackendPrimitive(
     name='conv2d',
     defaults='myia.operations.prim_conv2d'
@@ -249,6 +254,11 @@ scalar_add = BackendPrimitive(
     defaults='myia.operations.prim_scalar_add'
 )
 
+scalar_abs = BackendPrimitive(
+    name='scalar_abs',
+    defaults='myia.operations.prim_scalar_abs'
+)
+
 scalar_cast = BackendPrimitive(
     name='scalar_cast',
     defaults='myia.operations.prim_scalar_cast'
@@ -329,6 +339,11 @@ scalar_pow = BackendPrimitive(
     defaults='myia.operations.prim_scalar_pow'
 )
 
+scalar_sign = BackendPrimitive(
+    name='scalar_sign',
+    defaults='myia.operations.prim_scalar_sign'
+)
+
 scalar_sin = BackendPrimitive(
     name='scalar_sin',
     defaults='myia.operations.prim_scalar_sin'
@@ -382,6 +397,11 @@ scatter_add = BackendPrimitive(
 shape = BackendPrimitive(
     name='shape',
     defaults='myia.operations.prim_shape'
+)
+
+split = BackendPrimitive(
+    name='split',
+    defaults='myia.operations.prim_split'
 )
 
 string_eq = InferencePrimitive(

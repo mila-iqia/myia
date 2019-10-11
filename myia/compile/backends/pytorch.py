@@ -36,6 +36,7 @@ def pytorch_array_to_scalar(v):
 
 
 simple_mapping = {
+    P.scalar_abs: np.absolute,
     P.scalar_add: lambda a, b: a + b,
     P.scalar_sub: lambda a, b: a - b,
     P.scalar_mul: lambda a, b: a * b,
@@ -57,6 +58,8 @@ simple_mapping = {
     P.scalar_le: lambda a, b: a <= b,
     P.scalar_ge: lambda a, b: a >= b,
 
+    P.scalar_sign: np.sign,
+
     P.bool_and: lambda a, b: a & b,
     P.bool_or: lambda a, b: a | b,
     P.bool_eq: lambda a, b: a == b,
@@ -72,6 +75,7 @@ simple_mapping = {
 
 
 scalar_mapping = {
+    P.scalar_abs: torch.abs,
     P.scalar_add: lambda a, b: a + b,
     P.scalar_sub: lambda a, b: a - b,
     P.scalar_max: torch.max,
@@ -93,6 +97,8 @@ scalar_mapping = {
     P.scalar_ne: torch.ne,
     P.scalar_le: torch.le,
     P.scalar_ge: torch.ge,
+
+    P.scalar_sign: torch.sign,
 
     P.bool_and: lambda a, b: a & b,
     P.bool_or: lambda a, b: a | b,
@@ -255,6 +261,22 @@ def pytorch_scatter_add(op):
     return _impl, op.inputs[1:]
 
 
+def pytorch_concat(op):
+    """Implementation of concat for pytorch."""
+    def _impl(x, dim):
+        dim = dim.item()
+        return (torch.cat(x, dim),)
+    return _impl, op.inputs[1:]
+
+
+def pytorch_split(op):
+    """Implementation of split for pytorch."""
+    def _impl(x, sections, dim):
+        dim = dim.item()
+        return (torch.split(x, sections, dim),)
+    return _impl, op.inputs[1:]
+
+
 def pytorch_conv2d(op):
     """Implementation of conv2d for pytorch."""
     def _impl(input, weight, stride, padding, dilation, groups):
@@ -323,6 +345,7 @@ _mapping = {
     P.array_reduce: pytorch_array_reduce,
     P.array_getitem: pytorch_array_getitem,
     P.array_setitem: pytorch_array_setitem,
+    P.concat: pytorch_concat,
     P.conv2d: pytorch_conv2d,
     P.conv2d_input_grad: pytorch_conv2d_input_grad,
     P.conv2d_weight_grad: pytorch_conv2d_weight_grad,
@@ -332,6 +355,7 @@ _mapping = {
     P.gather: pytorch_gather,
     P.scatter: pytorch_scatter,
     P.scatter_add: pytorch_scatter_add,
+    P.split: pytorch_split,
     P.argmax: pytorch_argmax,
     P.array_max: pytorch_array_max,
 }

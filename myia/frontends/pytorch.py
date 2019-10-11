@@ -31,6 +31,7 @@ from .pytorch_functions import (
     _max,
     _sum,
     argmax,
+    cat,
     conv2d,
     gather,
     item,
@@ -45,7 +46,9 @@ from .pytorch_functions import (
     scatter_add,
     sigmoid,
     size,
+    smooth_l1_loss,
     softmax,
+    split,
     squeeze,
     std,
     transpose,
@@ -55,7 +58,9 @@ from .pytorch_functions import (
 )
 
 standard_object_map.update({
+    torch.abs: operations.array_abs,
     torch.argmax: argmax,
+    torch.cat: cat,
     torch.eq: operations.array_eq,
     torch.exp: operations.array_exp,
     torch.gather: gather,
@@ -69,7 +74,9 @@ standard_object_map.update({
     torch.scatter: scatter,
     torch.scatter_add: scatter_add,
     torch.sigmoid: sigmoid,
+    torch.sign: operations.array_sign,
     torch.softmax: softmax,
+    torch.split: split,
     torch.squeeze: squeeze,
     torch.std: std,
     torch.sum: _sum,
@@ -82,6 +89,7 @@ standard_object_map.update({
     torch.nn.functional.linear: linear,
     torch.nn.functional.max_pool2d: max_pool2d,
     torch.nn.functional.nll_loss: nll_loss,
+    torch.nn.functional.smooth_l1_loss: smooth_l1_loss,
 
     torch.zeros: zeros,
 })
@@ -90,6 +98,7 @@ standard_object_map.update({
 standard_method_map[PyTorchTensor] = \
     standard_method_map[NDArray].copy()
 standard_method_map[PyTorchTensor].update({
+    'abs': operations.array_abs,
     'dim': operations.ndim,
     'dtype': property(operations.dtype),
     'argmax': argmax,
@@ -108,8 +117,10 @@ standard_method_map[PyTorchTensor].update({
     'scatter_add': scatter_add,
     'sigmoid': sigmoid,
     'shape': property(operations.shape),
+    'sign': operations.array_sign,
     'size': size,
     'softmax': softmax,
+    'split': split,
     'squeeze': squeeze,
     'std': std,
     'sum': _sum,
