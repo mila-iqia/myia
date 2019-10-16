@@ -53,6 +53,11 @@ def is_tensor_param(x):
     return False
 
 
+def _make_sens(o, _sens=3.21):
+    return torch.ones(o.shape, dtype=o.dtype) \
+        * torch.tensor([_sens]).reshape(())
+
+
 # TODO: should this also return grads with respect to kwargs
 def pt_fn_grads(fn, *args, **kwargs):
     output = fn(*args, **kwargs)
@@ -69,7 +74,7 @@ def pt_fn_grads(fn, *args, **kwargs):
         output = (output,)
     grads = list(torch.autograd.grad(
         output, tensor_param_args,
-        (torch.ones(o.shape, dtype=o.dtype) for o in output),
+        (_make_sens(o) for o in output),
         allow_unused=True))
 
     grad_with_NA = []
@@ -111,11 +116,11 @@ def _fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline):
         sens_type = AbstractTuple(
             [mksens(res) for res in myia_result]
         )
-        sens = tuple(torch.ones(res.shape, dtype=res.dtype)
+        sens = tuple(_make_sens(res)
                      for res in myia_result)
     else:
         sens_type = mksens(myia_result)
-        sens = torch.ones(myia_result.shape, dtype=myia_result.dtype)
+        sens = _make_sens(myia_result)
 
     pytorch_grads = pt_fn_grads(fn, *args)
 
@@ -346,9 +351,14 @@ def test_torch_tensor_permute(x):
     return x.permute((0, 3, 2, 1))
 
 
-@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(1, 3))))
+@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(1, 2))))
 def test_torch_tensor_pow(x):
     return x ** 2
+
+
+@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(1, 2))))
+def test_torch_tensor_pow2(x):
+    return torch.pow(x, 2)
 
 
 @mt(
@@ -409,7 +419,7 @@ def test_torch_size(x):
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))),
              nn.Parameter(torch.Tensor(MB(2, 3))))
 def test_torch_smooth_l1_loss(x, y):
-    return torch.nn.functional.smooth_l1_loss(x, y)
+    return torch.nn.functional.smooth_l1_loss(x, y, reduction='mean')
 
 
 @mt(
@@ -428,7 +438,7 @@ def test_torch_split(x):
 
 
 @mt(
-    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(1, 2))), -1),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(3, 2))), -1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 1))), 0),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 1))), 1),
     broad_specs=(True, False)
@@ -441,6 +451,16 @@ def test_torch_tensor_squeeze(x, y):
              broad_specs=(True, False))
 def test_torch_tensor_squeeze_all(x):
     return x.squeeze()
+
+
+@mt(
+    fwd_and_bwd(nn.Parameter(torch.randn(5, 4, 2)),
+                nn.Parameter(torch.randn(5, 4, 2)),
+                nn.Parameter(torch.randn(5, 4, 2))),
+    broad_specs=(False, False, False)
+)
+def test_torch_stack(a, b, c):
+    return torch.stack((a, b, c), dim=1)
 
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
@@ -490,8 +510,24 @@ def test_torch_tensor_transpose(x):
     return x.transpose(3, 1)
 
 
+@mt(
+    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(1, 2))), -1),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 1))), 0),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 1))), 1),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 1))), 2),
+    broad_specs=(True, False)
+)
+def test_torch_tensor_unsqueeze(x, y):
+    return x.unsqueeze(y)
+
+
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
 def test_torch_var(x):
+    return torch.var(x)
+
+
+@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
+def test_torch_var_dim(x):
     return torch.var(x, dim=-1)
 
 

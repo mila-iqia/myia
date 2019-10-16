@@ -2,12 +2,12 @@
 
 import numpy as np
 
-from ..operations import zeros_like
 from ..lib import (
     UniformPrimitiveInferrer,
     assert_scalar,
     bprop_to_grad_transform,
 )
+from ..operations import zeros_like
 from ..xtype import Number
 from . import primitives as P
 

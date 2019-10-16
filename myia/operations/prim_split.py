@@ -37,6 +37,7 @@ async def infer_split(self, engine, x, sections, dim):
 
 @bprop_to_grad_transform(P.split)
 def bprop_split(x, sections, dim, out, dout):
+    """Backpropagator for primitive `split`."""
     x_grad = concat(dout, dim)
     return (x_grad, zeros_like(sections), zeros_like(dim))
 

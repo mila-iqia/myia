@@ -1,11 +1,11 @@
 """Definitions for the primitive `scalar_abs`."""
 
-from ..operations import scalar_sign
 from ..lib import (
     UniformPrimitiveInferrer,
     assert_scalar,
     bprop_to_grad_transform,
 )
+from ..operations import scalar_sign
 from ..xtype import Number
 from . import primitives as P
 
@@ -26,7 +26,7 @@ infer_scalar_abs = UniformPrimitiveInferrer.partial(
 @bprop_to_grad_transform(P.scalar_abs)
 def bprop_scalar_abs(x, out, dout):  # pragma: no cover
     """Backpropagator for `scalar_abs`."""
-    return (scalar_sign(x),)
+    return (scalar_sign(x) * dout,)
 
 
 __operation_defaults__ = {

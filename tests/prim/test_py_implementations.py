@@ -23,6 +23,7 @@ from myia.operations import (
     array_to_scalar,
     bool_eq,
     broadcast_shape,
+    concat,
     distribute,
     dot,
     embed,
@@ -33,10 +34,13 @@ from myia.operations import (
     partial as myia_partial,
     reshape,
     return_,
+    scalar_abs,
     scalar_cast,
     scalar_max,
+    scalar_sign,
     scalar_to_array,
     shape,
+    split,
     switch,
     transpose,
     tuple_getitem,
@@ -481,6 +485,44 @@ def test_array_cast():
                                  type_to_abstract(f16)), np.ndarray)
     assert (array_cast(np.array([1.5, 1.]),
                        type_to_abstract(f16))).dtype == np.dtype(np.float16)
+
+
+def test_prim_concat():
+    a = np.array([[1.5, 1.7]])
+    b = np.array([[2.3, 0.5]])
+
+    ref = np.concatenate((a, b), 1)
+    res = concat((a, b), 1)
+
+    assert (res == ref).all()
+
+
+def test_prim_split():
+    a = np.array([0., 1., 2., 3.])
+
+    ref = np.split(a, (1, 2), 0)
+    res = split(a, (1, 2), 0)
+
+    for _ref, _res in zip(ref, res):
+        assert (_res == _ref).all()
+
+
+@mt(
+    run_lang(7),
+    run_lang(-6),
+    run_lang(0),
+)
+def test_prim_scalar_abs(x):
+    return scalar_abs(x)
+
+
+@mt(
+    run_lang(7),
+    run_lang(-6),
+    run_lang(0),
+)
+def test_prim_scalar_sign(x):
+    return scalar_sign(x)
 
 
 def test_env():
