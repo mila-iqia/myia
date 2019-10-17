@@ -53,9 +53,9 @@ def is_tensor_param(x):
     return False
 
 
-def _make_sens(o, _sens=3.21):
-    return torch.ones(o.shape, dtype=o.dtype) \
-        * torch.tensor([_sens]).reshape(())
+# sens of 3.21 is used because sens!=1 is more robust test
+def _make_sens(o, sens=3.21):
+    return torch.ones(o.shape, dtype=o.dtype).fill_(sens)
 
 
 # TODO: should this also return grads with respect to kwargs
@@ -354,11 +354,6 @@ def test_torch_tensor_permute(x):
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(1, 2))))
 def test_torch_tensor_pow(x):
     return x ** 2
-
-
-@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(1, 2))))
-def test_torch_tensor_pow2(x):
-    return torch.pow(x, 2)
 
 
 @mt(

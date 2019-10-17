@@ -116,7 +116,7 @@ standard_method_map[PyTorchTensor].update({
     'max': _max,
     'mean': mean,
     'permute': P.transpose,
-    'torch.': operations.array_pow,
+    'pow': operations.array_pow,
     'relu': relu,
     'reshape': reshape,
     'scatter': scatter,
