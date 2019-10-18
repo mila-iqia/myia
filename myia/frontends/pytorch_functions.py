@@ -21,9 +21,8 @@ from functools import reduce
 import torch
 
 from .. import operations
-from ..abstract import build_value, macro, myia_static
+from ..abstract import myia_static
 from ..hypermap import hyper_map
-from ..ir import Constant
 from ..operations import primitives as P
 from ..utils import MyiaValueError, core
 from ..xtype import TupleT, f32, i64, u64
@@ -90,10 +89,8 @@ def prod(x):
     return reduce(operator.mul, x, 1)
 
 
-@macro
-async def _shp_explicit_m(info, a_shp_ref, shp_ref):
-    a_shp = build_value(await a_shp_ref.get())
-    shp = build_value(await shp_ref.get())
+@myia_static
+def _shp_explicit(a_shp, shp):
 
     unk_count = 0
     for s in shp:
@@ -112,11 +109,6 @@ async def _shp_explicit_m(info, a_shp_ref, shp_ref):
         e_msg = "Cannot change the total number of elements in reshape"
         raise MyiaValueError(e_msg)
 
-    return Constant((a_shp, shp))
-
-
-@myia_static
-def _shp_explicit_ms(a_shp, shp):
     known_unk_dim = int(abs(prod(a_shp) / prod(shp)))
     shp_explicit = ()
     for s in shp:
@@ -125,13 +117,6 @@ def _shp_explicit_ms(a_shp, shp):
         else:
             shp_explicit = shp_explicit + (s, )
 
-    return shp_explicit
-
-
-@core
-def _shp_explicit(a_shp, shp):
-    a_shp, shp = _shp_explicit_m(a_shp, shp)
-    shp_explicit = _shp_explicit_ms(a_shp, shp)
     return shp_explicit
 
 
