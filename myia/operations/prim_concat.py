@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from ..abstract import build_value, macro
+from ..ir import Constant
 from ..lib import SHAPE, TYPE, bprop_to_grad_transform, standard_prim
 from ..operations import split, zeros_like
 from . import primitives as P
@@ -33,16 +35,21 @@ async def infer_concat(self, engine, x, dim):
                                {SHAPE: shp_f, TYPE: x.elements[0].xtype()})
 
 
+@macro
+async def _sect_dim(info, x_ref, dim_ref):
+    """Returns shape of arrays along a dimension."""
+    x = await x_ref.get()
+    dim = build_value(await dim_ref.get())
+    sections = ()
+    for _x in x.elements:
+        sections = sections + (_x.xshape()[dim],)
+    return Constant(sections)
+
+
 @bprop_to_grad_transform(P.concat)
 def bprop_concat(x, dim, out, dout):
     """Backpropagator for primitive `concat`."""
-    def f(_x, _dim):
-        sections = ()
-        for __x in _x:
-            sections = sections + (__x.shape[_dim],)
-        return sections
-
-    _sections = f(x, dim)
+    _sections = _sect_dim(x, dim)
     x_grad = split(dout, _sections, dim)
     return (x_grad, zeros_like(dim))
 
