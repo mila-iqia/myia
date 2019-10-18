@@ -128,6 +128,7 @@ def _shp_explicit_ms(a_shp, shp):
     return shp_explicit
 
 
+@core
 def _shp_explicit(a_shp, shp):
     a_shp, shp = _shp_explicit_m(a_shp, shp)
     shp_explicit = _shp_explicit_ms(a_shp, shp)
