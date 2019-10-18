@@ -5,7 +5,7 @@ import pytest
 from myia import myia, value_and_grad
 from myia.api import to_device
 from myia.frontends import activate_frontend
-from myia.utils import MyiaTypeError
+from myia.utils import MyiaTypeError, MyiaValueError
 
 from ..common import MA
 
@@ -895,9 +895,6 @@ def test_conv_grad_errors():
 
 # TODO: Should this eventually be in a different test file?
 #       It's currently here because it needs to have 'torch' imported.
-# TODO: This is commented out because _shp_explicit is a myia_static,
-#       and pytest.raises can't detect myia_static functions.
-"""
 def test_shp_explicit_errors():
     backend = 'pytorch'
     backend_options = get_backend_options(args, backend)
@@ -933,7 +930,6 @@ def test_shp_explicit_errors():
 
     with pytest.raises(MyiaValueError):
         ret3 = step3(input)  # noqa: F841
-# """
 
 
 # TODO: Should this eventually be in a different test file?
