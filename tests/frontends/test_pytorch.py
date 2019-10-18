@@ -961,7 +961,7 @@ def test_switch_input_types():
 
 
 # This is mostly here to cover inst_tuple_setitem method in myia.compile.vm
-def test_optim_getitem():
+def test_optim_setitem():
     from myia.abstract import macro
     from myia.operations import primitives as P
     from myia.ir import sexp_to_node

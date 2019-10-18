@@ -21,9 +21,8 @@ from functools import reduce
 import torch
 
 from .. import operations
-from ..abstract import build_value, macro, myia_static
+from ..abstract import myia_static
 from ..hypermap import hyper_map
-from ..ir import Constant
 from ..operations import primitives as P
 from ..utils import MyiaValueError, core
 from ..xtype import TupleT, f32, i64, u64
@@ -34,27 +33,32 @@ from .pytorch_abstract_types import APT, APT_bool
 
 # HELPER FUNCTIONS ##########################################################
 
+@myia_static
+def _dim_explicit(a_shp, dim):
+    if dim is None:
+        return dim
 
-@macro
-async def _dim_explicit(info, a_shp_ref, dim_ref):
-    a_shp = build_value(await a_shp_ref.get())
-    dim = build_value(await dim_ref.get())
-    if dim == -1:
-        dim = len(a_shp) - 1
-    return Constant(dim)
+    if dim < 0:
+        dim = len(a_shp) + dim
+    return dim
 
 
-@macro
-async def _dim_tuple_explicit(info, a_shp_ref, dim_ref):
-    a_shp = build_value(await a_shp_ref.get())
-    dim = build_value(await dim_ref.get())
+@myia_static
+def _dim_explicit_unsqueeze(a_shp, dim):
+    if dim < 0:
+        dim = len(a_shp) + dim + 1
+    return dim
+
+
+@myia_static
+def _dim_tuple_explicit(a_shp, dim):
     shp_explicit = ()
     for s in dim:
-        if s == -1:
-            shp_explicit = shp_explicit + (len(a_shp) - 1,)
+        if s < 0:
+            shp_explicit = shp_explicit + (len(a_shp) + s,)
         else:
             shp_explicit = shp_explicit + (s,)
-    return Constant(shp_explicit)
+    return shp_explicit
 
 
 @myia_static
@@ -81,47 +85,12 @@ def _pair(x):
     return x
 
 
-@macro
-async def _shp_squeeze(info, o_shp_ref, dim_ref, keepdim_ref):
-    orig_shp = build_value(await o_shp_ref.get())
-    dim = build_value(await dim_ref.get())
-    keepdim = build_value(await keepdim_ref.get())
-
-    final_shape = ()
-    skip = False
-
-    if keepdim:
-        final_shape = orig_shp
-    else:
-        if dim is not None:
-            if orig_shp[dim] != 1:
-                final_shape = orig_shp
-                skip = True
-        if not skip:
-            new_shape = ()
-            if dim is None:
-                for _x in orig_shp:
-                    if _x != 1:
-                        new_shape = new_shape + (_x,)
-            else:
-                i = 0
-                for _x in orig_shp:
-                    if _x == 1 and dim == i:
-                        new_shape = new_shape
-                    else:
-                        new_shape = new_shape + (_x,)
-                    i = i + 1
-            final_shape = new_shape
-    return Constant(final_shape)
+def prod(x):
+    return reduce(operator.mul, x, 1)
 
 
-@macro
-async def _shp_explicit(info, a_shp_ref, shp_ref):
-    a_shp = build_value(await a_shp_ref.get())
-    shp = build_value(await shp_ref.get())
-
-    def prod(_x):
-        return reduce(operator.mul, _x, 1)
+@myia_static
+def _shp_explicit(a_shp, shp):
 
     unk_count = 0
     for s in shp:
@@ -148,7 +117,77 @@ async def _shp_explicit(info, a_shp_ref, shp_ref):
         else:
             shp_explicit = shp_explicit + (s, )
 
-    return Constant(shp_explicit)
+    return shp_explicit
+
+
+@myia_static
+def _shp_squeeze(orig_shp, dim, keepdim):
+
+    final_shape = ()
+    skip = False
+
+    if keepdim:
+        final_shape = orig_shp
+    else:
+        if dim is not None:
+            if orig_shp[dim] != 1:
+                final_shape = orig_shp
+                skip = True
+        if not skip:
+            new_shape = ()
+            if dim is None:
+                for _x in orig_shp:
+                    if _x != 1:
+                        new_shape = new_shape + (_x,)
+            else:
+                i = 0
+                for _x in orig_shp:
+                    if _x == 1 and dim == i:
+                        new_shape = new_shape
+                    else:
+                        new_shape = new_shape + (_x,)
+                    i = i + 1
+            final_shape = new_shape
+    return final_shape
+
+
+@myia_static
+def _shp_unsqueeze(orig_shp, dim):
+
+    final_shape = ()
+
+    for ddx, d in enumerate(orig_shp):
+        if ddx == dim:
+            final_shape = final_shape + (1, d)
+        else:
+            final_shape = final_shape + (d,)
+
+    if dim == len(orig_shp):
+        final_shape = final_shape + (1,)
+
+    return final_shape
+
+
+@myia_static
+def _total_elements(shp):
+
+    _tot_elems = int(prod(shp))
+
+    return _tot_elems
+
+
+@myia_static
+def _var_denom(shp, dim, unbiased):
+
+    if dim is None:
+        denom = int(prod(shp))
+    else:
+        denom = shp[dim]
+
+    if unbiased is True:
+        denom = denom - 1
+
+    return denom
 
 
 # ACTUAL FUNCTIONS ##########################################################
@@ -168,6 +207,14 @@ def argmax(self, dim=None, keepdim=False):
                                _dim_explicit(x.shape, dim_orig),
                                keepdim)
     return P.reshape(ret, final_shape)
+
+
+@core
+def cat(self, dim=0):
+    """Map of 'cat' pytorch method."""
+    x = self
+    dim = _dim_explicit(x[0].shape, dim)
+    return P.concat(x, dim)
 
 
 @core
@@ -283,6 +330,27 @@ def max_pool2d(input, kernel_size, stride=(), padding=0, dilation=1,
     return ret
 
 
+# TODO: mean with tuple dim (reduce over multiple chosen dims)
+@core
+def mean(self, dim=None, keepdim=False, *, dtype=None):
+    """Map of 'mean' pytorch method."""
+    x = self
+    dim = _dim_explicit(x.shape, dim)
+
+    if P.hastype(x, APT_bool):
+        x = P.array_cast(x, i64)
+
+    if dtype is not None:
+        x = P.array_cast(x, dtype)
+
+    if dim is None:
+        return P.array_reduce(P.scalar_add, x, ()) \
+            / P.scalar_cast(_total_elements(x.shape), x.dtype)
+    else:
+        return operations.array_reduce_dim(P.scalar_add, x, dim, keepdim) \
+            / P.scalar_cast(x.shape[dim], x.dtype)
+
+
 # TODO:
 # F.nll_loss(input, target, weight=None, size_average=None, ignore_index=-100,
 # reduce=None, reduction='mean')
@@ -298,7 +366,7 @@ def nll_loss(logs, targets, reduction='mean'):
     if reduction == 'none':
         out = out
     elif reduction == 'mean':
-        out = torch.sum(out) / P.scalar_cast(logs.shape[0], out.dtype)
+        out = torch.mean(out)
     elif reduction == 'sum':
         out = torch.sum(out)
     return out
@@ -342,10 +410,33 @@ def sigmoid(x):
 
 
 @core
-def squeeze(self, dim=None):
-    """Map of 'squeeze' pytorch method."""
-    final_shape = _shp_squeeze(self.shape, dim, False)
-    return self.reshape(final_shape)
+def size(self, dim=None):
+    """Map of 'size' pytorch method."""
+    if dim is None:
+        return self.shape
+    else:
+        return self.shape[dim]
+
+
+@core
+def smooth_l1_loss(input, target, reduction='mean'):
+    """Map of 'smooth_l1_loss' pytorch method."""
+    z_raw = input - target
+    z_abs = torch.abs(z_raw)
+
+    def pw(_z_abs):
+        out = P.switch(_z_abs < 1, 0.5 * (_z_abs ** 2), _z_abs - 0.5)
+        return out
+
+    out = P.array_map(pw, z_abs)
+
+    if reduction == 'none':
+        out = out
+    elif reduction == 'mean':
+        out = torch.mean(out)
+    elif reduction == 'sum':
+        out = torch.sum(out)
+    return out
 
 
 @core
@@ -363,12 +454,48 @@ def softmax(self, dim=None, dtype=None):
     return x_exp / x_exp_sum
 
 
-# TODO: sum with tuple dim (reduce over multiple chosen dims)
+# TODO: support for split_size rather than just sections
+@core
+def split(self, split_size_or_sections, dim=0):
+    """Map of 'split' pytorch method."""
+    return P.split(self, split_size_or_sections, dim)
+
+
+@core
+def squeeze(self, dim=None):
+    """Map of 'squeeze' pytorch method."""
+    dim = _dim_explicit(self.shape, dim)
+    final_shape = _shp_squeeze(self.shape, dim, False)
+    return self.reshape(final_shape)
+
+
+@core
+def stack(self, dim=0):
+    """Map of 'stack' pytorch method."""
+    x = self
+    x_u = ()
+    for _x in x:
+        x_u = x_u + (_x.unsqueeze(dim),)
+    return P.concat(x_u, dim)
+
+
+# TODO: std with tuple dim (reduce over multiple chosen dims)
+@core
+def std(self, dim=None, unbiased=True, keepdim=False, *, dtype=None):
+    """Map of 'std' pytorch method."""
+    return torch.var(self,
+                     dim=dim, unbiased=unbiased,
+                     keepdim=keepdim, dtype=dtype) ** .5
+
+
 @core
 def _sum(self, dim=None, keepdim=False, *, dtype=None):
     """Map of 'sum' pytorch method."""
     x = self
-    dim = _dim_explicit(x.shape, dim)
+    if isinstance(dim, tuple):
+        dim = _dim_tuple_explicit(x.shape, dim)
+    else:
+        dim = _dim_explicit(x.shape, dim)
 
     if P.hastype(x, APT_bool):
         x = P.array_cast(x, i64)
@@ -380,12 +507,6 @@ def _sum(self, dim=None, keepdim=False, *, dtype=None):
         return P.array_reduce(P.scalar_add, x, ())
     else:
         return operations.array_reduce_dim(P.scalar_add, x, dim, keepdim)
-
-
-@core
-def size(self):
-    """Map of 'size' pytorch method."""
-    return self.shape
 
 
 @core
@@ -412,6 +533,37 @@ def transpose(a, dim0, dim1):
     """Map of 'transpose' pytorch method."""
     dims = _transpose_dims(len(a.shape), dim0, dim1)
     return P.transpose(a, dims)
+
+
+@core
+def unsqueeze(self, dim=None):
+    """Map of 'unsqueeze' pytorch method."""
+    dim = _dim_explicit_unsqueeze(self.shape, dim)
+    final_shape = _shp_unsqueeze(self.shape, dim)
+    return self.reshape(final_shape)
+
+
+# TODO: var with tuple dim (reduce over multiple chosen dims)
+@core
+def var(self, dim=None, unbiased=True, keepdim=False, *, dtype=None):
+    """Map of 'var' pytorch method."""
+    x = self
+    dim = _dim_explicit(x.shape, dim)
+
+    if P.hastype(x, APT_bool):
+        x = P.array_cast(x, i64)
+
+    if dtype is not None:
+        x = P.array_cast(x, dtype)
+
+    x = (x - x.mean(dim=dim, keepdim=True, dtype=None)) ** 2
+    x = torch.sum(x, dim=dim, keepdim=keepdim, dtype=None)
+
+    denom = _var_denom(self.shape, dim, unbiased)
+
+    denom = P.scalar_cast(denom, x.dtype)
+
+    return x / denom
 
 
 @core
