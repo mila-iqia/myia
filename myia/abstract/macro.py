@@ -215,7 +215,7 @@ class MyiaStatic(Macro):
                 posargs.append(await info.build(ref, ab=arg))
         try:
             rval = self._macro(*posargs, **kwargs)
-        except InferenceError as e:
+        except InferenceError:
             raise
         except Exception as e:
             raise MacroError(e)
