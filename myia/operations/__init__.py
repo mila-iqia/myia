@@ -403,6 +403,21 @@ gt = Operation(
     defaults='myia.operations.ops_dunder.gt'
 )
 
+handle = Operation(
+    name='handle',
+    defaults='myia.operations.prim_handle'
+)
+
+handle_get = Operation(
+    name='handle_get',
+    defaults='myia.operations.ops_universe.handle_get'
+)
+
+handle_set = Operation(
+    name='handle_set',
+    defaults='myia.operations.ops_universe.handle_set'
+)
+
 hasattr = Operation(
     name='hasattr',
     defaults='myia.operations.macro_hasattr'
@@ -896,6 +911,21 @@ tuple_setitem = Operation(
 typeof = Operation(
     name='typeof',
     defaults='myia.operations.macro_typeof'
+)
+
+universal = Operation(
+    name='universal',
+    defaults='myia.operations.macro_universal'
+)
+
+universe_getitem = Operation(
+    name='universe_getitem',
+    defaults='myia.operations.prim_universe_getitem'
+)
+
+universe_setitem = Operation(
+    name='universe_setitem',
+    defaults='myia.operations.prim_universe_setitem'
 )
 
 unsafe_static_cast = Operation(

@@ -22,8 +22,7 @@ fi
 export PATH="$HOME/miniconda/bin:$PATH"
 hash -r
 conda config --set always_yes yes --set changeps1 no
-# TODO: uncomment proceeding line; it was commented out because new conda was broken
-# conda update -q conda
+conda update -q conda
 conda create -y -n test python=3.7
 conda init
 source activate test

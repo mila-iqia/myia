@@ -84,11 +84,11 @@ CONTEXTLESS = Contextless()
 ##############
 
 
-class AbstractReference:
+class ReferenceBase:
     """Superclass for Reference and VirtualReference."""
 
 
-class Reference(AbstractReference):
+class Reference(ReferenceBase):
     """Reference to a certain node in a certain context.
 
     Attributes:
@@ -141,7 +141,7 @@ class Reference(AbstractReference):
 
 
 @dataclass
-class VirtualReference(AbstractReference):
+class VirtualReference(ReferenceBase):
     """Synthetic reference that can be given to an inferrer.
 
     Attributes:
@@ -206,11 +206,11 @@ class EvaluationCache:
 
 __consolidate__ = True
 __all__ = [
-    'AbstractReference',
     'CONTEXTLESS',
     'Context',
     'Contextless',
     'EvaluationCache',
     'Reference',
+    'ReferenceBase',
     'VirtualReference',
 ]

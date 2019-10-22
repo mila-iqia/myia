@@ -10,6 +10,7 @@ from .utils import (
     EnvInstance,
     MyiaInputTypeError,
     SymbolicKeyInstance,
+    UniverseInstance,
     register_serialize,
 )
 
@@ -206,6 +207,10 @@ class ExceptionType(Object):
     """Represents an exception."""
 
 
+class UniverseType(Object):
+    """Represents a collection of states."""
+
+
 i8 = Int[8]
 i16 = Int[16]
 i32 = Int[32]
@@ -236,6 +241,7 @@ register_serialize(u64, 'u64')
 register_serialize(f16, 'f16')
 register_serialize(f32, 'f32')
 register_serialize(f64, 'f64')
+register_serialize(UniverseType, 'universe_type')
 
 
 DTYPE_TO_MTYPE = dict(
@@ -291,6 +297,7 @@ _simple_types = {
     numpy.float64: Float[64],
     EnvInstance: EnvType,
     SymbolicKeyInstance: SymbolicKeyType,
+    UniverseInstance: UniverseType,
 }
 
 

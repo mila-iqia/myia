@@ -451,6 +451,23 @@ class AbstractStructure(AbstractValue):
     """Base class for abstract values that are structures."""
 
 
+class AbstractWrapper(AbstractStructure):
+    """Base class for abstract values that wrap a single element type."""
+
+    def __init__(self, element, values):
+        """Initialize an AbstractWrapper."""
+        super().__init__(values)
+        self.element = element
+
+    def children(self):
+        """Return the element."""
+        return self.element,
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, 'element'))
+
+
 @serializable('AbstractTuple')
 class AbstractTuple(AbstractStructure):
     """Represents a tuple of elements."""
@@ -491,7 +508,7 @@ class AbstractTuple(AbstractStructure):
 
 
 @serializable('AbstractArray')
-class AbstractArray(AbstractStructure):
+class AbstractArray(AbstractWrapper):
     """Represents an array.
 
     The SHAPE track on an array contains the array's shape.
@@ -503,11 +520,6 @@ class AbstractArray(AbstractStructure):
         element: AbstractValue representing each element of the array.
 
     """
-
-    def __init__(self, element, values):
-        """Initialize an AbstractArray."""
-        super().__init__(values)
-        self.element = element
 
     def _serialize(self):
         data = super()._serialize()
@@ -525,17 +537,9 @@ class AbstractArray(AbstractStructure):
         except StopIteration:
             pass
 
-    def children(self):
-        """Return the array element."""
-        return self.element,
-
     def xshape(self):
         """Return the shape of this array."""
         return self.values[SHAPE]
-
-    def __eqkey__(self):
-        v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, 'element'))
 
     def __pretty__(self, ctx):
         elem = pretty_python_value(self.element, ctx)
@@ -636,24 +640,26 @@ class AbstractADT(AbstractClassBase):
     """
 
 
-class AbstractJTagged(AbstractStructure):
+class AbstractJTagged(AbstractWrapper):
     """Represents a value (non-function) transformed through J."""
 
-    def __init__(self, element):
+    def __init__(self, element, values={}):
         """Initialize an AbstractJTagged."""
-        super().__init__({})
-        self.element = element
-
-    def children(self):
-        """Return the jtagged element."""
-        return self.element,
-
-    def __eqkey__(self):
-        v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, 'element'))
+        super().__init__(element, values)
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "J", self.element)
+
+
+class AbstractHandle(AbstractWrapper):
+    """Represents a value (non-function) transformed through J."""
+
+    def __init__(self, element, values={}):
+        """Initialize an AbstractHandle."""
+        super().__init__(element, values)
+
+    def __pretty__(self, ctx):
+        return pretty_call(ctx, "H", self.element)
 
 
 class AbstractUnion(AbstractStructure):
@@ -960,6 +966,7 @@ __all__ = [
     'AbstractError',
     'AbstractExternal',
     'AbstractFunction',
+    'AbstractHandle',
     'AbstractJTagged',
     'AbstractKeywordArgument',
     'AbstractScalar',

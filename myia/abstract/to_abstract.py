@@ -11,8 +11,11 @@ from ..classes import ADT, Cons, Empty
 from ..ir import Graph, MetaGraph
 from ..operations import Primitive
 from ..utils import (
+    EnvInstance,
+    HandleInstance,
     MyiaTypeError,
     SymbolicKeyInstance,
+    UniverseInstance,
     dataclass_fields,
     is_dataclass_type,
     overload,
@@ -30,6 +33,7 @@ from .data import (
     AbstractDict,
     AbstractExternal,
     AbstractFunction,
+    AbstractHandle,
     AbstractScalar,
     AbstractTuple,
     AbstractType,
@@ -111,19 +115,10 @@ def to_abstract(fn, self, v, **kwargs):
                 TYPE: type(v),
             })
     else:
-        try:
-            typ = xtype.pytype_to_myiatype(type(v))
-        except KeyError:
-            rval = AbstractExternal({
-                VALUE: v,
-                TYPE: type(v),
-            })
-        else:
-            assert issubclass(typ, (xtype.External, xtype.EnvType))
-            rval = AbstractScalar({
-                VALUE: v,
-                TYPE: typ,
-            })
+        rval = AbstractExternal({
+            VALUE: v,
+            TYPE: type(v),
+        })
 
     return rval
 
@@ -159,13 +154,15 @@ def to_abstract(self, v: Primitive, node=None, **kwargs):
 
 
 @overload  # noqa: F811
-def to_abstract(self, v: SymbolicKeyInstance, **kwargs):
-    return AbstractScalar({VALUE: v, TYPE: xtype.SymbolicKeyType})
+def to_abstract(self, v: HandleInstance, **kwargs):
+    return AbstractHandle(self(v.state, **kwargs))
 
 
 @overload  # noqa: F811
 def to_abstract(self, v: (bool, type(None),
-                          str, type(NotImplemented)), **kwargs):
+                          str, type(NotImplemented),
+                          SymbolicKeyInstance, EnvInstance,
+                          UniverseInstance), **kwargs):
     typ = xtype.pytype_to_myiatype(type(v))
     return AbstractScalar({
         VALUE: v,
@@ -264,8 +261,9 @@ def type_to_abstract(self, t: AbstractValue):
 
 
 @overload  # noqa: F811
-def type_to_abstract(self, t: (xtype.Number, xtype.Bool, xtype.EnvType,
-                               xtype.SymbolicKeyType, xtype.Nil)):
+def type_to_abstract(self, t: (xtype.Number, xtype.Bool, xtype.Nil,
+                               xtype.SymbolicKeyType, xtype.EnvType,
+                               xtype.UniverseType)):
     return AbstractScalar({
         VALUE: ANYTHING,
         TYPE: t,

@@ -129,16 +129,20 @@ def _fresh(node):
         return node
 
 
-def parse(func):
+def parse(func, use_universe=False):
     """Parse a function into a Myia graph.
 
     The result of the parsing is cached: multiple calls to parse on the same
     function will return the same graph. It should therefore be cloned prior
     to manipulation.
     """
-    if func in _parse_cache:
-        return _parse_cache[func]
     flags = dict(getattr(func, '_myia_flags', {}))
+    if 'use_universe' in flags:
+        use_universe = flags['use_universe']
+        del flags['use_universe']
+    key = (func, use_universe)
+    if key in _parse_cache:
+        return _parse_cache[key]
     if 'name' in flags:
         name = flags['name']
         del flags['name']
@@ -149,7 +153,7 @@ def parse(func):
                    if value == 'inner'}
     flags.update(inner_flags)
 
-    parser = Parser(func, recflags=flags)
+    parser = Parser(func, recflags=flags, use_universe=use_universe)
     graph = parser.parse()
 
     for flag in inner_flags:
@@ -157,7 +161,7 @@ def parse(func):
 
     if name is not None:
         graph.debug.name = name
-    _parse_cache[func] = graph
+    _parse_cache[key] = graph
     return graph
 
 
@@ -183,10 +187,12 @@ class Parser:
 
     """
 
-    def __init__(self, function: FunctionType, recflags) -> None:
+    def __init__(self, function: FunctionType,
+                 recflags: dict, use_universe: bool) -> None:
         """Construct a parser."""
         self.function = function
         self.recflags = recflags
+        self.use_universe = use_universe
         _, self.line_offset = inspect.getsourcelines(function)
         self.filename: str = inspect.getfile(function)
         # This is used to resolve the function's globals.
@@ -204,7 +210,7 @@ class Parser:
 
     def new_block(self, **kwargs) -> 'Block':
         """Create a new block."""
-        return Block(self, **kwargs, **self.recflags)
+        return Block(self, self.use_universe, **kwargs, **self.recflags)
 
     def make_location(self, node) -> Location:
         """Create a Location from an AST node."""
@@ -686,13 +692,16 @@ class Parser:
 
         This ignores the statement.
         """
-        if self.flag_used == 0 and not isinstance(node.value, ast.Str):
-            warnings.warn(MyiaDisconnectedCodeWarning(
-                f"Expression was not assigned to a variable." +
-                f"\n\tAs a result, it is not connected to the output " +
-                f"and will not be executed.",
-                self.make_location(node))
-            )
+        if self.use_universe:
+            self.process_node(block, node.value)
+        else:
+            if self.flag_used == 0 and not isinstance(node.value, ast.Str):
+                warnings.warn(MyiaDisconnectedCodeWarning(
+                    f"Expression was not assigned to a variable." +
+                    f"\n\tAs a result, it is not connected to the output " +
+                    f"and will not be executed.",
+                    self.make_location(node))
+                )
         return block
 
     def process_If(self, block: 'Block', node: ast.If) -> 'Block':
@@ -858,7 +867,7 @@ class Block:
 
     """
 
-    def __init__(self, parser: Parser, **flags) -> None:
+    def __init__(self, parser: Parser, use_universe=False, **flags) -> None:
         """Construct a basic block.
 
         Constructing a basic block also constructs a corresponding function,
@@ -869,6 +878,7 @@ class Block:
             flags: Flags to give to that Block's graph.
         """
         self.parser = parser
+        self.use_universe = use_universe
 
         self.matured: bool = False
         self.variables: Dict[str, ANFNode] = {}
@@ -876,7 +886,12 @@ class Block:
         self.phi_nodes: Dict[Parameter, str] = {}
         self.jumps: Dict[Block, Apply] = {}
         self.graph: Graph = Graph()
-        self.graph.set_flags(reference=True)
+        if self.use_universe:
+            self.universe = self.graph.add_parameter()
+            self.universe.debug.name = 'U'
+        else:
+            self.universe = False
+        self.graph.set_flags(reference=True, universal=self.use_universe)
         self.graph.flags.update(flags)
 
     def set_phi_arguments(self, phi: Parameter) -> None:
@@ -913,7 +928,15 @@ class Block:
 
     def apply(self, fn, *args):
         """Create an application of fn on args."""
-        return self.graph.apply(fn, *args)
+        if self.use_universe:
+            tget = self.operation('tuple_getitem')
+            usl = self.operation('universal')
+            ufn = self.graph.apply(usl, fn)
+            pair = self.graph.apply(ufn, self.universe, *args)
+            self.universe = self.graph.apply(tget, pair, 0)
+            return self.graph.apply(tget, pair, 1)
+        else:
+            return self.graph.apply(fn, *args)
 
     def make_resolve(self, module_name, symbol_name):
         """Return a subtree that resolves a name in a module."""
@@ -1008,9 +1031,12 @@ class Block:
         """
         assert self.graph.return_ is None
         jump = self.apply(target.graph, *args)
-        self.jumps[target] = jump
+        jump_call = jump
+        if self.use_universe:
+            jump_call = jump.inputs[1]
+        self.jumps[target] = jump_call
         target.preds.append(self)
-        self.graph.output = jump
+        self.returns(jump)
 
     def cond(self, cond: ANFNode, true: 'Block', false: 'Block') -> Apply:
         """Perform a conditional jump.
@@ -1038,7 +1064,12 @@ class Block:
     def returns(self, value):
         """Return a value in this block."""
         assert self.graph.return_ is None
-        self.graph.output = value
+        if self.use_universe:
+            tmake = self.operation('make_tuple')
+            assert self.graph.return_ is None
+            self.graph.output = self.graph.apply(tmake, self.universe, value)
+        else:
+            self.graph.output = value
 
 
 __consolidate__ = True

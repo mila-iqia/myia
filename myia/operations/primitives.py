@@ -164,6 +164,11 @@ gather = BackendPrimitive(
     defaults='myia.operations.prim_gather'
 )
 
+handle = BackendPrimitive(
+    name='handle',
+    defaults='myia.operations.prim_handle'
+)
+
 hastag = BackendPrimitive(
     name='hastag',
     defaults='myia.operations.prim_hastag'
@@ -432,6 +437,16 @@ tuple_getitem = BackendPrimitive(
 tuple_setitem = BackendPrimitive(
     name='tuple_setitem',
     defaults='myia.operations.prim_tuple_setitem'
+)
+
+universe_getitem = BackendPrimitive(
+    name='universe_getitem',
+    defaults='myia.operations.prim_universe_getitem'
+)
+
+universe_setitem = BackendPrimitive(
+    name='universe_setitem',
+    defaults='myia.operations.prim_universe_setitem'
 )
 
 unsafe_static_cast = BackendPrimitive(
