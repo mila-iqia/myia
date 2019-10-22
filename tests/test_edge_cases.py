@@ -1,5 +1,7 @@
 """Edge cases that may pop up but it's not clear where else to test them."""
 
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
 
@@ -37,3 +39,22 @@ def test_call_opdef():
         return f(x, y)
 
     assert g(1, 2) == 3
+
+
+@dataclass(frozen=True)
+class Linear():
+    """Linear layer."""
+
+    W: 'Ambiguous'
+
+    def apply(self):
+        """Apply the layer."""
+        return self.W
+
+
+def test_get_dclass_fields():
+    from myia.utils import get_fields
+    lin = Linear(np.ones((2, 1)))
+    f = get_fields(lin)
+
+    assert eqtest(list(f)[0][1], np.ones((2, 1)))

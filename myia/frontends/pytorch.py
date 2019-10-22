@@ -8,6 +8,7 @@ import torch
 
 from .. import operations
 from ..abstract.data import (
+    ALIASID,
     ANYTHING,
     SHAPE,
     TYPE,
@@ -21,7 +22,7 @@ from ..hypermap import hyper_map
 from ..operations import primitives as P
 from ..pipeline.resources import default_convert
 from ..pipeline.standard import standard_method_map, standard_object_map
-from ..utils import core, get_fields, OrderedSet
+from ..utils import OrderedSet, core, get_fields
 from ..xtype import NDArray
 from .pytorch_abstract_types import (
     AbstractModule,
@@ -170,21 +171,18 @@ def _to_abstract(self, v: torch.nn.Module, **kwargs):
                 # TODO: Remove "(isinstance(v, torch.nn.Sequential) and"
                 #       once Alias PR ready
                 # TODO: Remove rest of if statement once Dict support empty Dic
-                """
                 if var_k not in ('_parameters', '_modules') or \
                         (isinstance(v, torch.nn.Sequential) and
                          var_v != OrderedDict()):
-                """
 
-                #print("k", var_k, "v", var_v)
-                fields[var_k] = self(var_v, **kwargs)
+                    fields[var_k] = self(var_v, **kwargs)
         else:
             pass
             # TODO: maybe make a warning for if user happened
             #       to name attribute something in blacklist
 
     # TODO: Remove "if not isinstance(v, Sequential)" once Alias PR is ready
-    """TODO: Remove these 2 loops (mod and par) once Dict support empty Dict
+    # """TODO: Remove these 2 loops (mod and par) once Dict support empty Dict
     if not isinstance(v, torch.nn.Sequential):
         for mod_k, mod_v in v._modules.items():
             fields[mod_k] = self(mod_v, **kwargs)
@@ -206,19 +204,12 @@ def _to_abstract(self, v: torch.nn.Module, **kwargs):
         # TODO: Figure out something more memory efficient than deepcopy.
         #       P.S. We tried copy.copy(v) and it is not sufficiently deep.
         v = copy.deepcopy(v)
-        #breakpoint()
         for k, a in zip(names, args):
-            #print("v", v, "k", k, "a", a)
-            if k not in ('_parameters', '_modules'):
-                print("v", v, "k", k, "a", a)
-                #print("The third printed bias and weight has the gradient, not sure how to access those afterwards though.")
-                if isinstance(getattr(v, k), torch.nn.Parameter):
-                    setattr(v, k, torch.nn.Parameter(a))
-                else:
-                    setattr(v, k, a)
+            if isinstance(getattr(v, k), torch.nn.Parameter):
+                setattr(v, k, torch.nn.Parameter(a))
+            else:
+                setattr(v, k, a)
         return v
-
-    #print(1234, v)
 
     return AbstractModule(v.__class__, fields, constructor=new_module)
 
@@ -235,13 +226,16 @@ def _to_abstract(self, v: torch.Tensor, **kwargs):
 
 
 @to_abstract.register  # noqa: F811
-def _to_abstract(self, v: torch.nn.Parameter, **kwargs):
+def _to_abstract(self, v: torch.nn.Parameter, alias_map={}, **kwargs):
+    tracks = {SHAPE: tuple(v.shape), TYPE: PyTorchTensor}
+    if id(v) in alias_map:
+        tracks[ALIASID] = alias_map[id(v)]
     return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
-        {SHAPE: tuple(v.shape), TYPE: PyTorchTensor},
+        tracks,
     )
 
 

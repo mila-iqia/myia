@@ -44,7 +44,11 @@ class AbstractModule(AbstractClassBase):
         hypermap mapping function to return a different type from its input
         (especially for pytorch modules and their contents).
         """
-        return self
+        return AbstractModule(
+            self.tag,
+            {attr: ANYTHING for attr in self.attributes},
+            constructor=self.constructor,
+        )
 
 
 def pytorch_dtype_to_type(dtype):

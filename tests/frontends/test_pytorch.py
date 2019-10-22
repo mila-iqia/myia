@@ -1,10 +1,11 @@
 import numpy as np
 import pytest
 
-from myia import myia, value_and_grad
+from myia import grad, myia, value_and_grad
 from myia.api import to_device
 from myia.frontends import activate_frontend
-from myia.utils import MyiaTypeError, MyiaValueError
+from myia.frontends.pytorch import tensor_pytorch_aliasable
+from myia.utils import MyiaInputTypeError, MyiaTypeError, MyiaValueError
 
 from ..common import MA
 from ..multitest import eqtest, run
@@ -409,6 +410,96 @@ def test_module_2_layer_mlp_seq_fwd():
          [-0.67215765, -0.09247651, -0.38900381]])
 
     assert torch.allclose(output, output_expected)
+
+
+def test_module_linear_seq_bwd():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    inp = torch.Tensor(MA(2, 4, dtype=args.dtype))
+    model = Linear_Seq(4, 2, 3)
+    target = torch.Tensor([2.5])
+
+    # Leave this here, it will be needed again for when we investigate how
+    # to automatically remove duplicates from grads of sequential
+    """
+    from myia.abstract.aliasing import find_aliases
+    al = find_aliases(model, aliasable=tensor_pytorch_aliasable)
+    print("alias", al)
+    # """
+
+    def mse(value, target):
+        diff = value - target
+        return (diff * diff).sum()
+
+    def cost(model, inp, target):
+        value = model(inp)
+        loss = mse(value, target)
+        return loss
+
+    pt_cost = cost(model, inp, target)
+
+    @myia(backend=backend, backend_options=backend_options,
+          alias_tracker=tensor_pytorch_aliasable)
+    def step(model, inp, target):
+        _cost, dmodel = value_and_grad(cost, 'model')(model, inp, target)
+        return _cost, dmodel
+    loss, grad = step(model, inp, target)
+
+    pt_cost = cost(model, inp, target)
+    if model.f1.weight.grad is not None:
+        model.f1.weight.grad.data.zero_()
+    if model.f1.bias.grad is not None:
+        model.f1.bias.grad.data.zero_()
+    pt_cost.backward()
+
+    for n, p in model.named_parameters():
+        m_p = grad
+        for a in tuple(n.split('.')):
+            m_p = getattr(m_p, a)
+        assert torch.allclose(p.grad.data, m_p)
+
+
+class Linear_List(nn.Module):
+    def __init__(self, i_size, h_size, o_size):
+        super(Linear_List, self).__init__()
+        self.f1 = nn.Linear(i_size, h_size)
+
+        self.f = [self.f1]
+
+    def forward(self, x):
+        x = self.f[0](x)
+        return x
+
+
+def test_alias_list_error():
+    backend = 'pytorch'
+    backend_options = get_backend_options(args, backend)
+
+    torch.manual_seed(123)
+
+    def g(xs, y):
+        res = 0
+        for x in xs:
+            res = res + x
+        return sum(res)
+
+    @myia(backend=backend, backend_options=backend_options,
+          alias_tracker=tensor_pytorch_aliasable)
+    def f(xs, y):
+        return grad(g)(xs, y)
+
+    o = torch.ones((1, 3))
+
+    a = o * 3
+    b = o * 4
+    c = o * 5
+    e = o * 7
+
+    with pytest.raises(MyiaInputTypeError):
+        print(f([a, b, c, a], e))
 
 
 def test_nn_max_pool2d_fwd():
