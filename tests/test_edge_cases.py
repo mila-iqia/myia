@@ -45,7 +45,7 @@ def test_call_opdef():
 class Linear():
     """Linear layer."""
 
-    W: 'Ambiguous'
+    W: object
 
     def apply(self):
         """Apply the layer."""
