@@ -10,7 +10,6 @@ node ('gpu') {
       sh script: """
 . $HOME/miniconda/etc/profile.d/conda.sh &&
 conda activate test &&
-conda env list &&
 pytest --cov=./ --cov-report= --gpu --junit-xml test-report.xml
 """
     }
