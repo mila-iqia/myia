@@ -7,7 +7,7 @@ node ('gpu') {
   }
   try {
     stage ('Test') {
-      sh script: '. $HOME/miniconda/bin/activate test && pytest --cov=./ --cov-report= --gpu --junit-xml test-report.xml'
+      sh script: '. $HOME/miniconda/bin/activate test && echo $PATH && which python && pytest --cov=./ --cov-report= --gpu --junit-xml test-report.xml'
     }
   } finally {
     junit 'test-report.xml'
