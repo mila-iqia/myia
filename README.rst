@@ -11,11 +11,13 @@ Myia is a new differentiable programming language. It aims to support large scal
 
 If you want to play with the current implementation, you can check out `ALPHA.md <https://github.com/mila-iqia/myia/blob/master/ALPHA.md>`_
 
+A short document explaining some of Myia's inner workings is available `here <https://github.com/mila-iqia/myia/blob/master/devdoc.md>`_
+
 
 Status
 ------
 
-Myia is currently under development and is not yet ready for use. As of 2019/03/19 we anticipate we may be able to offer a beta for 2019/09/01. We will update that estimate regularly.
+Myia is currently under development and is not yet ready for use. We are optimistic about having an alpha version to play with around the start of 2020.
 
 See `Roadmap`_.
 
@@ -45,19 +47,18 @@ Current
 * **Parser**: Supports ``def``, ``if``, ``for``, ``while``, operators, function calls, ``class`` and methods (limited support).
 * **Intermediate representation**: Implemented, with an array of utilities.
 * **Debug VM**: Faithfully runs the IR.
-* **VM**: Works on the simplified/optimized IR. Uses NNVM to run linear chunks.
-* **Primitives**: Scalar primitives work, as well as map, reduce and broadcasting.
-* **Type system**: Types are inferred without the need for annotations. Shapes can also be inferred.
+* **VM**: Works on the simplified/optimized IR.
+* **Primitives**: Scalar primitives work, as well as map, reduce, broadcasting, 2D convolutions, concat/split, and many other operations.
+* **Type system**: Types are inferred without the need for annotations. Shapes can also be inferred. Myia supports recursive ADTs (e.g. tree data structures).
 * **Optimization**: Pattern-based optimizations, inlining, constant propagation, common subexpression elimination, closure conversion.
 * **Automatic differentiation**: Second order differentiation is not yet in working order.
-* **GPU support**: Using NNVM.
+* **GPU support**: Using Relay or PyTorch.
 
 In development
 ~~~~~~~~~~~~~~
 
-* **Algebraic data types**: Support for recursive ADTs (e.g. tree data structures) is being added to the system.
 * **Compiler optimization**: The compiler currently needs to be optimized to reduce compile times.
-* **Optimization**: Graphs produced by AD need further optimization to eliminate operations on special data structures.
+* **Auto-monadization**: We are working to support print statements and random number generation through an auto-monadization system that can automatically keep track of the IO or RNG state.
 
 Next steps
 ~~~~~~~~~~
@@ -80,3 +81,8 @@ After Beta
   * ``yield`` and ``await``
 
 * **Support other languages**: Which ones depend on demand. A new language is also a possibility.
+
+Publications
+~~~~~~~~~~~~
+
+* `Automatic differentiation in ML: Where we are and where we should be going (NeurIPS 2018) <https://papers.nips.cc/paper/8092-automatic-differentiation-in-ml-where-we-are-and-where-we-should-be-going>`_
