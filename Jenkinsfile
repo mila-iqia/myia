@@ -7,14 +7,14 @@ node ('gpu') {
   }
   try {
     stage ('Test') {
-      sh script: '. $HOME/miniconda/bin/activate test && conda env list && echo $PATH && which python && pytest --cov=./ --cov-report= --gpu --junit-xml test-report.xml'
+      sh script: '. $HOME/miniconda/bin/conda activate test && conda env list && pytest --cov=./ --cov-report= --gpu --junit-xml test-report.xml'
     }
   } finally {
     junit 'test-report.xml'
   }
   stage ('Coverage') {
     sh script: """
-. $HOME/miniconda/bin/activate test &&
+. $HOME/miniconda/bin/conda activate test &&
 ./cov.sh &&
 coverage xml
 """
