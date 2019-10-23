@@ -25,6 +25,8 @@ conda config --set always_yes yes --set changeps1 no
 conda update -q conda
 conda create -y -n test python=3.7
 conda init
+# Don't use conda activate here, it doesn't because it would need the
+# shell to reinitialize
 source activate test
 conda install --file=requirements-$DEV.conda
 pip install -r requirements.txt
