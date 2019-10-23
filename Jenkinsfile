@@ -18,7 +18,7 @@ pytest --cov=./ --cov-report= --gpu --junit-xml test-report.xml
   }
   stage ('Coverage') {
     sh script: """
-. $HOME/miniconda/profile.d/conda.sh &&
+. $HOME/miniconda/etc/profile.d/conda.sh &&
 conda activate test &&
 ./cov.sh &&
 coverage xml
