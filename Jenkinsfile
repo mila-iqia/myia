@@ -25,7 +25,7 @@ coverage xml
 """
     sh script: '$HOME/miniconda/bin/pip install codecov'
     withCredentials([string(credentialsId: 'myia_codecov', variable: 'CODECOV_TOKEN')]) {
-      sh script: '$HOME/miniconda/bin/codecov'
+      sh script: '$HOME/miniconda/bin/codecov --commit `git rev-parse origin/$BRANCH_NAME`'
     }
   }
 }
