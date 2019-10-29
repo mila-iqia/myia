@@ -310,7 +310,7 @@ def relay_conv2d_input_grad(c, isize, w, dout, stride, pad, dil, groups):
     assert pad.is_constant(tuple)
     assert dil.is_constant(tuple)
     assert groups.is_constant(int)
-    if stride != (1, 1):
+    if stride.value != (1, 1):
         raise ValueError("non unit stride is not supported for input grad for now, it gives bad values")
 
     weight = c.ref(w)

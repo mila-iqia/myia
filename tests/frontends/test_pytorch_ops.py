@@ -258,12 +258,6 @@ def test_conv2d_no_dil(inp, w):
     return torch.nn.functional.conv2d(inp, w, None, 1, 0, 1, 1)
 
 
-@fwd_and_bwd(nn.Parameter(torch.randn(2, 2, 4, 5, dtype=torch.float32)),
-             nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)))
-def test_conv2d_no_dil_pad(inp, w):
-    return torch.nn.functional.conv2d(inp, w, None, (2, 3), (3, 2))
-
-
 @mt(
     fwd_and_bwd(nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
                 nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
@@ -405,8 +399,8 @@ def test_torch_nll_loss_reduce_options(x, y, z):
     return torch.nn.functional.nll_loss(x, y, reduction=z)
 
 
-@fwd_and_bwd(nn.Parameter(torch.randn(2, 3, dtype=torch.float64)),
-             torch.tensor([1, 2]))
+@fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 3, dtype=torch.float64)),
+                      torch.tensor([1, 2]))
 def test_torch_nll_loss_reduce_cast(x, y):
     return torch.nn.functional.nll_loss(x, y, reduction='mean')
 
@@ -454,9 +448,9 @@ def test_torch_scatter_broadcast_source(x, index, src):
     return torch.scatter(x, 0, index, src)
 
 
-@fwd_and_bwd(nn.Parameter(torch.randn(3, 4, dtype=torch.float64)),
-             torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
-             1.23)
+@fwd_and_bwd_no_relay(nn.Parameter(torch.randn(3, 4, dtype=torch.float64)),
+                      torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
+                      1.23)
 def test_torch_scatter_broadcast_source_nonpytorch_scalar(x, index, src):
     return torch.scatter(x, 0, index, src)
 
