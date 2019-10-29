@@ -1,11 +1,11 @@
 """Transforms a graph into lower-level code."""
 
+from itertools import accumulate
+
 import tvm
 from tvm import relay
 from tvm.relay import adt
 from tvm.relay.backend import interpreter
-
-from itertools import accumulate
 
 from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
@@ -311,7 +311,8 @@ def relay_conv2d_input_grad(c, isize, w, dout, stride, pad, dil, groups):
     assert dil.is_constant(tuple)
     assert groups.is_constant(int)
     if stride.value != (1, 1):
-        raise ValueError("non unit stride is not supported for input grad for now, it gives bad values")
+        raise ValueError("non unit stride is not supported for input grad "
+                         "for now, it gives bad values")
 
     weight = c.ref(w)
     grad = c.ref(dout)
@@ -335,6 +336,7 @@ def relay_conv2d_input_grad(c, isize, w, dout, stride, pad, dil, groups):
                                      output_padding=output_padding,
                                      kernel_size=(filter_h, filter_w),
                                      channels=in_channels)
+
 
 def relay_concat(c, x, dim):
     assert dim.is_constant(int)

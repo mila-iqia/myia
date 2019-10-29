@@ -21,8 +21,7 @@ from myia.frontends.pytorch_abstract_types import (
 )
 from myia.pipeline import standard_pipeline
 
-
-from ..common import MA, MB, f32, to_abstract_test
+from ..common import MA, MB, to_abstract_test
 from ..multitest import (
     backend_all,
     backend_no_relay,
@@ -371,7 +370,6 @@ def test_torch_tensor_max_3_arg(x, y, z):
 def test_torch_max_pool2d(x, ri):
     return torch.nn.functional.max_pool2d(x, (2, 2), (1, 1),
                                           0, 1, False, ri)
-
 
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
