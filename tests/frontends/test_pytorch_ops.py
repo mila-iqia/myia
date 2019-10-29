@@ -103,7 +103,8 @@ def make_argspec(args, broad_specs):
 
 
 def __fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
-                  backend=False):
+                  backend=False, atol=1e-8, rtol=1e-5,
+                  grad_atol=1e-6, grad_rtol=1e-5):
     if backend:
         backend_name = backend[0]
         backend_options = backend[1]
@@ -126,7 +127,7 @@ def __fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
     myia_fn = res['output']
     myia_result = myia_fn(*map(copy, args))
 
-    assert eqtest(ref_result, myia_result)
+    assert eqtest(ref_result, myia_result, atol=atol, rtol=rtol)
 
     if isinstance(myia_result, tuple):
         sens_type = AbstractTuple(
@@ -146,13 +147,15 @@ def __fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
     res = gpipeline.run(input=fn, argspec=[*argspec, sens_type])
 
     myia_grads = res['output'](*args, sens)
-    assert eqtest(pytorch_grads, myia_grads, rtol=1e-05, atol=1e-06)
+    assert eqtest(pytorch_grads, myia_grads, rtol=grad_rtol, atol=grad_atol)
 
 
 @myia_function_test(marks=[pytest.mark.grad], id='grad')
 def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline,
-                 backend=False):
-    __fwd_and_bwd(fn, args, broad_specs, pipeline, backend)
+                 backend=False, atol=1e-8, rtol=1e-5,
+                 grad_atol=1e-6, grad_rtol=1e-5):
+    __fwd_and_bwd(fn, args, broad_specs, pipeline, backend, atol=atol,
+                  rtol=rtol, grad_atol=grad_atol, grad_rtol=grad_rtol)
 
 
 fwd_and_bwd = _fwd_and_bwd.configure(backend=backend_all)
@@ -205,7 +208,7 @@ def test_torch_sigmoid(x):
     return torch.sigmoid(x)
 
 
-@mt(*single_tensor_arg_tests)
+@mt(*single_tensor_arg_tests, grad_rtol=1e-4)
 def test_torch_tanh(x):
     return torch.tanh(x)
 
@@ -322,7 +325,7 @@ def test_torch_tensor_get2(x):
 
 
 @mt(
-    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 0),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 0, rtol=1e-4),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), -1),
     broad_specs=(True, False),
@@ -333,7 +336,7 @@ def test_torch_log_softmax(x, y):
 
 
 @mt(
-    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 0),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 0, rtol=1e-4),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), -1),
     broad_specs=(True, False),
