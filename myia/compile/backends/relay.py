@@ -5,6 +5,8 @@ from tvm import relay
 from tvm.relay import adt
 from tvm.relay.backend import interpreter
 
+from itertools import accumulate
+
 from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
 from ...ir import manage
@@ -306,6 +308,8 @@ def relay_conv2d_input_grad(c, isize, w, dout, stride, pad, dil, groups):
     assert pad.is_constant(tuple)
     assert dil.is_constant(tuple)
     assert groups.is_constant(int)
+    if stride != (1, 1):
+        raise ValueError("non unit stride is not supported for input grad for now, it gives bad values")
 
     weight = c.ref(w)
     grad = c.ref(dout)
@@ -329,6 +333,22 @@ def relay_conv2d_input_grad(c, isize, w, dout, stride, pad, dil, groups):
                                      output_padding=output_padding,
                                      kernel_size=(filter_h, filter_w),
                                      channels=in_channels)
+
+def relay_concat(c, x, dim):
+    assert dim.is_constant(int)
+
+    xr = c.ref(x)
+    inputs = [relay.expr.TupleGetItem(xr, i)
+              for i in range(len(x.abstract.elements))]
+    return relay.concatenate(inputs, dim.value)
+
+
+def relay_split(c, x, sections, dim):
+    assert sections.is_constant(tuple)
+    assert dim.is_constant(int)
+
+    sections = tuple(accumulate(sections.value))[:-1]
+    return relay.split(c.ref(x), sections, dim.value).astuple()
 
 
 COMPLEX_MAP = {
@@ -355,6 +375,8 @@ COMPLEX_MAP = {
     P.conv2d: relay_conv2d,
     P.conv2d_weight_grad: relay_conv2d_weight_grad,
     P.conv2d_input_grad: relay_conv2d_input_grad,
+    P.concat: relay_concat,
+    P.split: relay_split,
 }
 
 
