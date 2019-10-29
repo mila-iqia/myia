@@ -208,7 +208,7 @@ def test_torch_sigmoid(x):
     return torch.sigmoid(x)
 
 
-@mt(*single_tensor_arg_tests, grad_rtol=1e-4)
+@mt(*single_tensor_arg_tests, grad_rtol=3e-3)
 def test_torch_tanh(x):
     return torch.tanh(x)
 
