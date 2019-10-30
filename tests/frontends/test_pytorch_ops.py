@@ -260,6 +260,13 @@ def test_conv2d_no_dil(inp, w):
     return torch.nn.functional.conv2d(inp, w, None, 1, 0, 1, 1)
 
 
+@pytest.mark.xfail
+@fwd_and_bwd(torch.randn(1, 1, 3, 3, dtype=torch.float32, requires_grad=True),
+             torch.randn(1, 1, 2, 2, dtype=torch.float32, requires_grad=True))
+def test_conv2d_no_dil_stride(inp, w):
+    return torch.nn.functional.conv2d(inp, w, None, (2, 3))
+
+
 @mt(
     fwd_and_bwd(nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
                 nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
