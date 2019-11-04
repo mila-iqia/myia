@@ -1,3 +1,6 @@
+import numpy as np
+
+from myia import myia
 from myia.xtype import i32, i64, u32
 
 from ..multitest import infer, mt, run, run_no_relay
@@ -51,3 +54,25 @@ def test_bitwise_lshift(a, b):
 )
 def test_bitwise_rshift(a, b):
     return a >> b
+
+
+def test_op_full():
+    @myia
+    def run_full(value):
+        return np.full((2, 7), value, 'float16')
+
+    expected = np.ones((2, 7), 'float16') * 4
+    output = run_full(4)
+    assert output.dtype == np.float16
+    assert np.allclose(expected, output)
+
+
+def test_op_prod():
+    @myia
+    def run_prod(val):
+        return np.prod(val)
+
+    values = np.arange(1, 6)
+    expected = np.prod(values)
+    output = run_prod(values)
+    assert expected == output == 120

@@ -71,6 +71,7 @@ python_operation_map = {
     math.cos: operations.scalar_cos,
     math.tan: operations.scalar_tan,
     math.tanh: operations.scalar_tanh,
+    np.full: operations.full,
     np.abs: operations.array_abs,
     np.sign: operations.array_sign,
     np.floor: operations.array_floor,
@@ -88,6 +89,7 @@ python_operation_map = {
     np.tan: operations.array_tan,
     np.tanh: operations.array_tanh,
     np.sum: operations.sum,
+    np.prod: operations.prod,
 }
 
 

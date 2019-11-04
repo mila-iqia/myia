@@ -155,20 +155,8 @@ def pytorch_array_map(op):
     return _impl, op.inputs[2:]
 
 
-def pytorch_array_reduce(op):
-    """Implementation of array_reduce for pytorch."""
-    fn = op.inputs[1]
-    shape = op.inputs[3]
-    assert fn.is_constant(Primitive)
-    assert shape.is_constant(tuple)
-    fn = fn.value
-    tshp = shape.value
-
-    if fn == P.scalar_add:
-        impl = torch.sum
-    else:
-        raise NotImplementedError(f"reduce with {fn}")
-
+def _pytorch_array_reduce_add(tshp):
+    """Generate implementation for sum reduction based on given axes."""
     def _impl(array):
         ashp = array.shape
 
@@ -179,11 +167,48 @@ def pytorch_array_reduce(op):
         axis = list(i for i, t in enumerate(ts) if t == 1)
         if len(axis) == 1:
             axis = axis[0]
-        res = impl(array, axis, keepdim=True)
+        res = torch.sum(array, axis, keepdim=True)
         if len(tshp) < len(ashp):
             res = torch.reshape(res, shape=tshp)
         return (res,)
-    return _impl, (op.inputs[2],)
+
+    return _impl
+
+
+def _pytorch_array_reduce_mul(tshp):
+    """Generate implementation for product reduction based on given axes."""
+    def _impl(array):
+        ashp = array.shape
+
+        if len(tshp) in (0, len(ashp)):
+            res = torch.prod(array)
+        elif len(tshp) == 1:
+            res = torch.prod(array, tshp[0], keepdim=True)
+        else:
+            raise NotImplementedError(
+                'Pytorch product reduction only accepts 1 dim nor no dim.')
+        return (res,)
+
+    return _impl
+
+
+def pytorch_array_reduce(op):
+    """Implementation of array_reduce for pytorch."""
+    fn = op.inputs[1]
+    shape = op.inputs[3]
+    assert fn.is_constant(Primitive)
+    assert shape.is_constant(tuple)
+    fn = fn.value
+    tshp = shape.value
+
+    if fn == P.scalar_add:
+        gen_impl = _pytorch_array_reduce_add
+    elif fn == P.scalar_mul:
+        gen_impl = _pytorch_array_reduce_mul
+    else:
+        raise NotImplementedError(f"reduce with {fn}")
+
+    return gen_impl(tshp), (op.inputs[2],)
 
 
 def pytorch_array_getitem(op):
