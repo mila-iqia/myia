@@ -322,11 +322,10 @@ def max_pool2d(input, kernel_size, stride=(), padding=0, dilation=1,
     stride = _pair(stride)
     padding = _pair(padding)
     dilation = _pair(dilation)
+    assert return_indices is False
 
     ret = P.max_pool2d(input, kernel_size, stride, padding, dilation,
                        ceil_mode)
-    if not return_indices:
-        ret = ret[0]
     return ret
 
 

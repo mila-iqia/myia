@@ -14,7 +14,8 @@ from . import primitives as P
 
 
 def pyimpl_split(x, sections, dim):
-    """Implement `splitenate`."""
+    """Implement `split`."""
+    sections = tuple(np.cumsum(sections))[:-1]
     return np.split(x, sections, axis=dim)
 
 

@@ -1,5 +1,7 @@
 """Transforms a graph into lower-level code."""
 
+from itertools import accumulate
+
 import tvm
 from tvm import relay
 from tvm.relay import adt
@@ -42,19 +44,21 @@ def ashape(node):
 
 
 SIMPLE_MAP = {
-    P.scalar_add: relay.op.add,
-    P.scalar_sub: relay.op.subtract,
-    P.scalar_mul: relay.op.multiply,
-    P.scalar_div: relay.op.divide,
-    P.scalar_mod: relay.op.mod,
+    P.scalar_add: relay.add,
+    P.scalar_sub: relay.subtract,
+    P.scalar_mul: relay.multiply,
+    P.scalar_div: relay.divide,
+    P.scalar_mod: relay.mod,
     P.scalar_pow: relay.op.power,
     P.scalar_floor: relay.op.floor,
     P.scalar_uadd: lambda x: x,
     P.scalar_usub: relay.op.negative,
-    P.scalar_exp: relay.op.exp,
-    P.scalar_log: relay.op.log,
-    # This is not right tangent vs hyperbolic tangent
+    P.scalar_exp: relay.exp,
+    P.scalar_log: relay.log,
+    P.scalar_max: relay.maximum,
     P.scalar_tanh: relay.op.tanh,
+    P.scalar_sign: relay.sign,
+    P.scalar_abs: relay.abs,
 
     P.scalar_eq: relay.op.equal,
     P.scalar_lt: relay.op.less,
@@ -108,7 +112,11 @@ def relay_array_map(c, fn, *array):
     """Implementation of array_map for Relay."""
     assert fn.is_constant(Primitive)
     fn = fn.value
-    return SIMPLE_MAP[fn](*[c.ref(a) for a in array])
+    if fn is P.switch:
+        rfn = relay.where
+    else:
+        rfn = SIMPLE_MAP[fn]
+    return rfn(*[c.ref(a) for a in array])
 
 
 def relay_array_reduce(c, fn, array, shape):
@@ -212,6 +220,141 @@ def relay_argmax(c, v, dims):
     return relay.cast(relay.argmax(v, axis=dims.value), 'int64')
 
 
+def relay_max_pool2d(c, img, psize, stride, pad, dil, ceil_mode):
+    assert psize.is_constant(tuple)
+    assert stride.is_constant(tuple)
+    assert pad.is_constant(tuple)
+    assert dil.is_constant(tuple)
+    assert ceil_mode.is_constant(bool)
+    assert dil.value == (1, 1)
+
+    return relay.nn.max_pool2d(c.ref(img), psize.value, stride.value,
+                               pad.value, ceil_mode=ceil_mode.value)
+
+
+def relay_max_pool2d_grad(c, img, psize, stride, pad, dil, ceil_mode, dout):
+    assert psize.is_constant(tuple)
+    assert stride.is_constant(tuple)
+    assert pad.is_constant(tuple)
+    assert dil.is_constant(tuple)
+    assert ceil_mode.is_constant(bool)
+    assert dil.value == (1, 1)
+
+    return relay.nn.max_pool2d_grad(c.ref(dout), c.ref(img), psize.value,
+                                    stride.value, pad.value,
+                                    ceil_mode=ceil_mode.value)
+
+
+def relay_array_max(c, a, dim):
+    assert dim.is_constant(tuple)
+    return relay.max(c.ref(a), axis=dim.value)
+
+
+def relay_conv2d(c, img, w, stride, pad, dil, groups):
+    assert stride.is_constant(tuple)
+    assert pad.is_constant(tuple)
+    assert dil.is_constant(tuple)
+    assert groups.is_constant(int)
+
+    return relay.nn.conv2d(c.ref(img), c.ref(w), strides=stride.value,
+                           padding=pad.value, dilation=dil.value,
+                           groups=groups.value)
+
+
+def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
+    assert wsize.is_constant(tuple)
+    assert stride.is_constant(tuple)
+    assert pad.is_constant(tuple)
+    assert dil.is_constant(tuple)
+    assert groups.is_constant(int)
+
+    batch, in_channel, in_h, in_w = data.abstract.xshape()
+    out_channel, _, filter_h, filter_w = wsize.value
+    _, _, grad_h, grad_w = dout.abstract.xshape()
+    pad_h, pad_w = pad.value
+
+    data = c.ref(data)
+    dout = c.ref(dout)
+
+    fpad_h = pad_h * 2
+    fpad_w = pad_w * 2
+    fpad_top = (pad_h + 1) // 2
+    fpad_left = (pad_w + 1) // 2
+    fpad_bottom = fpad_h - fpad_top
+    fpad_right = fpad_w - fpad_left
+
+    padded_weight_grad_h = ((in_h - (grad_h - 1) * stride.value[0] - 1 +
+                             fpad_top + fpad_bottom) // dil.value[0] + 1)
+    padded_weight_grad_w = ((in_w - (grad_w - 1) * stride.value[1] - 1 +
+                             fpad_left + fpad_right) // dil.value[1] + 1)
+
+    dout = relay.tile(dout, [1, in_channel // groups.value, 1, 1])
+    dout = relay.reshape(dout, [-1, 1, 0, 0])
+    data = relay.reshape(data, [1, -1, 0, 0])
+
+    d = relay.nn.conv2d(data, dout, strides=dil.value, padding=pad.value,
+                        dilation=stride.value, groups=batch * in_channel)
+    d = relay.reshape(d, [batch, in_channel // groups.value, out_channel,
+                          padded_weight_grad_h, padded_weight_grad_w])
+    d = relay.sum(d, axis=0)
+    d = relay.transpose(d, [1, 0, 2, 3])
+    if padded_weight_grad_h > filter_h or padded_weight_grad_w > filter_w:
+        d = relay.strided_slice(d, begin=[0, 0, 0, 0],
+                                end=[None, None, filter_h, filter_w])
+    return d
+
+
+def relay_conv2d_input_grad(c, isize, w, dout, stride, pad, dil, groups):
+    assert isize.is_constant(tuple)
+    assert stride.is_constant(tuple)
+    assert pad.is_constant(tuple)
+    assert dil.is_constant(tuple)
+    assert groups.is_constant(int)
+    if stride.value != (1, 1):
+        raise ValueError("non unit stride is not supported for input grad "
+                         "for now, it gives bad values")
+
+    weight = c.ref(w)
+    grad = c.ref(dout)
+
+    data_shape = isize.value
+    weight_shape = w.abstract.xshape()
+    _, _, grad_h, grad_w = dout.abstract.xshape()
+    bactch, in_channels, in_h, in_w = data_shape
+    out_channels, _, filter_h, filter_w = weight_shape
+
+    out_h = ((grad_h - 1) * stride.value[0] - pad.value[0] * 2 +
+             (filter_h - 1) * dil.value[0] + 1)
+    out_w = ((grad_w - 1) * stride.value[1] - pad.value[1] * 2 +
+             (filter_w - 1) * dil.value[1] + 1)
+    output_padding = (isize.value[2] - out_h, isize.value[3] - out_w)
+
+    return relay.nn.conv2d_transpose(grad, weight,
+                                     strides=stride.value,
+                                     padding=pad.value, dilation=dil.value,
+                                     groups=groups.value,
+                                     output_padding=output_padding,
+                                     kernel_size=(filter_h, filter_w),
+                                     channels=in_channels)
+
+
+def relay_concat(c, x, dim):
+    assert dim.is_constant(int)
+
+    xr = c.ref(x)
+    inputs = [relay.expr.TupleGetItem(xr, i)
+              for i in range(len(x.abstract.elements))]
+    return relay.concatenate(inputs, dim.value)
+
+
+def relay_split(c, x, sections, dim):
+    assert sections.is_constant(tuple)
+    assert dim.is_constant(int)
+
+    sections = tuple(accumulate(sections.value))[:-1]
+    return relay.split(c.ref(x), sections, dim.value).astuple()
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -230,6 +373,14 @@ COMPLEX_MAP = {
     P.unsafe_static_cast: relay_unsafe_static_cast,
     P.array_getitem: relay_array_getitem,
     P.argmax: relay_argmax,
+    P.max_pool2d: relay_max_pool2d,
+    P.max_pool2d_grad: relay_max_pool2d_grad,
+    P.array_max: relay_array_max,
+    P.conv2d: relay_conv2d,
+    P.conv2d_weight_grad: relay_conv2d_weight_grad,
+    P.conv2d_input_grad: relay_conv2d_input_grad,
+    P.concat: relay_concat,
+    P.split: relay_split,
 }
 
 

@@ -501,7 +501,7 @@ def test_prim_split():
     a = np.array([0., 1., 2., 3.])
 
     ref = np.split(a, (1, 2), 0)
-    res = split(a, (1, 2), 0)
+    res = split(a, (1, 1, 2), 0)
 
     for _ref, _res in zip(ref, res):
         assert (_res == _ref).all()
