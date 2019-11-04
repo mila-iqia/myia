@@ -475,9 +475,14 @@ class PyTorchBackend(Backend):
 
     def to_backend_value(self, v, t):
         """Convert an intermediate value to a backend value."""
-        if (isinstance(t, (abstract.AbstractError, abstract.AbstractType))
+        if (isinstance(t, abstract.AbstractError)
                 or v is abstract.DEAD):
             return None
+        if isinstance(t, abstract.AbstractType):
+            # Handle abstract types.
+            # Return None if type does not match any torch type.
+            myia_type = t.xvalue().xtype()
+            return _type_map.get(myia_type, None)
         if isinstance(t, abstract.AbstractArray):
             return self.from_numpy(v)
         elif isinstance(t, abstract.AbstractScalar):

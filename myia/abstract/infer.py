@@ -47,7 +47,7 @@ from .data import (
 from .loop import InferenceLoop, Pending, force_pending
 from .macro import AnnotationBasedChecker
 from .ref import Context, EvaluationCache, Reference, VirtualReference
-from .to_abstract import to_abstract
+from .to_abstract import to_abstract, type_to_abstract
 from .utils import (
     broaden as _broaden,
     concretize_abstract,
@@ -296,9 +296,17 @@ class InferenceEngine:
         argrefs = [self.ref(node, ctx) for node in n_args]
 
         if isinstance(fn, AbstractType):
+            # Replace abstract type instantiation with
+            # either a cast for abstract scalars, or
+            # a make_record for all other cases.
+            val = fn.xvalue()
+            cls = type_to_abstract(val)
             g = ref.node.graph
-            newfn = g.apply(P.partial, P.make_record, fn.xvalue())
-            newcall = g.apply(newfn, *n_args)
+            if isinstance(cls, AbstractScalar):
+                newcall = g.apply(P.scalar_cast, *n_args, cls)
+            else:
+                newfn = g.apply(P.partial, P.make_record, val)
+                newcall = g.apply(newfn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
 
         elif isinstance(fn, AbstractError):
