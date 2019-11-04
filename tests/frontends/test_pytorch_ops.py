@@ -103,7 +103,7 @@ def make_argspec(args, broad_specs):
 
 
 @myia_function_test(marks=[pytest.mark.grad], id='grad')
-def _fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
+def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline,
                  backend=False, atol=1e-8, rtol=1e-5,
                  grad_atol=1e-6, grad_rtol=1e-5):
     if backend:
