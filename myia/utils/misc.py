@@ -79,11 +79,12 @@ class Registry(Dict[T1, T2]):
         super().__init__()
         self.default_field = default_field
 
-    def register(self, prim):
+    def register(self, *prims):
         """Register a primitive."""
         def deco(fn):
             """Decorate the function."""
-            self[prim] = fn
+            for prim in prims:
+                self[prim] = fn
             return fn
         return deco
 
