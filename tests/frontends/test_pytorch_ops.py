@@ -102,9 +102,10 @@ def make_argspec(args, broad_specs):
                  for bs, arg in zip(broad_specs, clean_args(args)))
 
 
-def __fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
-                  backend=False, atol=1e-8, rtol=1e-5,
-                  grad_atol=1e-6, grad_rtol=1e-5):
+@myia_function_test(marks=[pytest.mark.grad], id='grad')
+def _fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
+                 backend=False, atol=1e-8, rtol=1e-5,
+                 grad_atol=1e-6, grad_rtol=1e-5):
     if backend:
         backend_name = backend[0]
         backend_options = backend[1]
@@ -148,14 +149,6 @@ def __fwd_and_bwd(fn, args, broad_specs=None, pipeline=standard_pipeline,
 
     myia_grads = res['output'](*args, sens)
     assert eqtest(pytorch_grads, myia_grads, rtol=grad_rtol, atol=grad_atol)
-
-
-@myia_function_test(marks=[pytest.mark.grad], id='grad')
-def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline,
-                 backend=False, atol=1e-8, rtol=1e-5,
-                 grad_atol=1e-6, grad_rtol=1e-5):
-    __fwd_and_bwd(fn, args, broad_specs, pipeline, backend, atol=atol,
-                  rtol=rtol, grad_atol=grad_atol, grad_rtol=grad_rtol)
 
 
 fwd_and_bwd = _fwd_and_bwd.configure(backend=backend_all)
