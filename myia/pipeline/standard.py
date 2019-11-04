@@ -139,6 +139,13 @@ standard_method_map = {
     },
     xtype.Number: {
         '__add__': lop(operations.scalar_add, xtype.Number, '__add__'),
+        '__and__': lop(operations.scalar_bit_and, xtype.Number, '__and__'),
+        '__or__': lop(operations.scalar_bit_or, xtype.Number, '__or__'),
+        '__xor__': lop(operations.scalar_bit_xor, xtype.Number, '__xor__'),
+        '__lshift__': lop(
+            operations.scalar_bit_lshift, xtype.Int, '__lshift__'),
+        '__rshift__': lop(
+            operations.scalar_bit_rshift, xtype.Int, '__rshift__'),
         '__sub__': lop(operations.scalar_sub, xtype.Number, '__sub__'),
         '__mul__': lop(operations.scalar_mul, xtype.Number, '__mul__'),
         '__mod__': lop(operations.scalar_mod, xtype.Number, '__mod__'),

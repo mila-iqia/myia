@@ -254,14 +254,39 @@ return_ = BackendPrimitive(
     defaults='myia.operations.prim_return_'
 )
 
+scalar_abs = BackendPrimitive(
+    name='scalar_abs',
+    defaults='myia.operations.prim_scalar_abs'
+)
+
 scalar_add = BackendPrimitive(
     name='scalar_add',
     defaults='myia.operations.prim_scalar_add'
 )
 
-scalar_abs = BackendPrimitive(
-    name='scalar_abs',
-    defaults='myia.operations.prim_scalar_abs'
+scalar_bit_and = BackendPrimitive(
+    name='scalar_bit_and',
+    defaults='myia.operations.prim_scalar_bit_and'
+)
+
+scalar_bit_lshift = BackendPrimitive(
+    name='scalar_bit_lshift',
+    defaults='myia.operations.prim_scalar_bit_lshift'
+)
+
+scalar_bit_or = BackendPrimitive(
+    name='scalar_bit_or',
+    defaults='myia.operations.prim_scalar_bit_or'
+)
+
+scalar_bit_rshift = BackendPrimitive(
+    name='scalar_bit_rshift',
+    defaults='myia.operations.prim_scalar_bit_rshift'
+)
+
+scalar_bit_xor = BackendPrimitive(
+    name='scalar_bit_xor',
+    defaults='myia.operations.prim_scalar_bit_xor'
 )
 
 scalar_cast = BackendPrimitive(

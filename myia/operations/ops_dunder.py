@@ -152,9 +152,21 @@ and_ = dunder_protocol_binary(
     name='and', lattr='__and__', rattr='__rand__',
     pyop=operator.and_
 )
+lshift = dunder_protocol_binary(
+    name='lshift', lattr='__lshift__', rattr='__rlshift__',
+    pyop=operator.lshift
+)
+rshift = dunder_protocol_binary(
+    name='rshift', lattr='__rshift__', rattr='__rrshift__',
+    pyop=operator.rshift
+)
 or_ = dunder_protocol_binary(
     name='or', lattr='__or__', rattr='__ror__',
     pyop=operator.or_
+)
+xor_ = dunder_protocol_binary(
+    name='xor', lattr='__xor__', rattr='__rxor__',
+    pyop=operator.xor
 )
 
 getitem = dunder_protocol_binary_simple('getitem')
