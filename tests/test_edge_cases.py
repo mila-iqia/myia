@@ -50,11 +50,3 @@ class Linear():
     def apply(self):
         """Apply the layer."""
         return self.W
-
-
-def test_get_dclass_fields():
-    from myia.utils import get_fields
-    lin = Linear(np.ones((2, 1)))
-    f = get_fields(lin)
-
-    assert eqtest(list(f)[0][1], np.ones((2, 1)))

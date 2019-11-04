@@ -10,7 +10,7 @@ from .overload import overload
 def get_fields(instance: object):
     """Returns fields of an instance."""
     if is_dataclass(instance):
-        return dataclass_fields(instance).items()
+        return dataclass_fields(instance)
     else:
         msg = f'Expected dataclass'
         raise TypeError(msg)

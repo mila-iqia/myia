@@ -2,13 +2,12 @@
 
 
 from collections import defaultdict
-from dataclasses import is_dataclass
 
 import numpy as np
 
 from ..classes import ADT
 from ..operations import primitives as P
-from ..utils import MyiaInputTypeError, dataclass_fields, get_fields, overload
+from ..utils import MyiaInputTypeError, get_fields, overload
 from . import data as ab
 
 
@@ -34,20 +33,15 @@ def _explore(self, v: dict, vseq, path):
 
 @overload  # noqa: F811
 def _explore(self, v: object, vseq, path):
-    if is_dataclass(v):
-        vseq = (*vseq, v)
-        for k, x in dataclass_fields(v).items():
-            yield from self(x, vseq, (*path, k))
-    else:
-        vseq = (*vseq, v)
+    vseq = (*vseq, v)
 
-        try:
-            fields = get_fields(v)
-        except TypeError:
-            return None
+    try:
+        fields = get_fields(v)
+    except TypeError:
+        return None
 
-        for k, x in fields.items():
-            yield from self(x, vseq, (*path, k))
+    for k, x in fields.items():
+        yield from self(x, vseq, (*path, k))
 
 
 def ndarray_aliasable(v, vseq, path):
