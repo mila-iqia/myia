@@ -59,6 +59,10 @@ class ValuePropagator:
             for other_node in self.flow[node]:
                 self._propagate(other_node, need, value)
 
+    def propagate_all(self, node, need, values):
+        for value in values:
+            self.propagate(node, need, value)
+
     def invalidate(self, node):
         for node2, i in self.manager.uses[node]:
             self.todo.add(node2)
@@ -165,8 +169,7 @@ def _vprop_make_tuple(engine, need, inputs, out):
         others = tuple(others)
         if not others:
             others = ANYTHING
-        for val in engine.values(inputs[here], others):
-            engine.propagate(out, need, val)
+        engine.propagate_all(out, need, engine.values(inputs[here], others))
 
 
 @regvprop(P.tuple_getitem)
@@ -182,8 +185,7 @@ def _vprop_tuple_getitem(engine, need, inputs, out):
 
     # Compute
     for i in keyv:
-        for v in engine.values(coll, (i, *need_tup)):
-            engine.propagate(out, need, v)
+        engine.propagate_all(out, need, engine.values(coll, (i, *need_tup)))
 
 
 @regvprop(P.tuple_setitem)
@@ -206,11 +208,9 @@ def _vprop_tuple_setitem(engine, need, inputs, out):
 
     # Compute
     if propval:
-        for v in engine.values(val, ANYTHING):
-            engine.propagate(out, need, v)
+        engine.propagate_all(out, need, engine.values(val, ANYTHING))
     if propcoll:
-        for v in engine.values(coll, need):
-            engine.propagate(out, need, v)
+        engine.propagate_all(out, need, engine.values(coll, need))
 
 
 @regvprop(P.env_getitem)
@@ -229,8 +229,7 @@ def _vprop_env_getitem(engine, need, inputs, out):
     for v in engine.values(dflt, need):
         engine.propagate(out, need, v)
     for i in keyv:
-        for v in engine.values(coll, (i, *need_tup)):
-            engine.propagate(out, need, v)
+        engine.propagate_all(out, need, engine.values(coll, (i, *need_tup)))
 
 
 @regvprop(P.env_setitem)
@@ -253,11 +252,9 @@ def _vprop_env_setitem(engine, need, inputs, out):
 
     # Compute
     if propval:
-        for v in engine.values(val, ANYTHING):
-            engine.propagate(out, need, v)
+        engine.propagate_all(out, need, engine.values(val, ANYTHING))
     if propcoll:
-        for v in engine.values(coll, need):
-            engine.propagate(out, need, v)
+        engine.propagate_all(out, need, engine.values(coll, need))
 
 
 @regvprop(P.universe_getitem)
@@ -273,8 +270,7 @@ def _vprop_universe_getitem(engine, need, inputs, out):
 
     # Compute
     for i in engine.values(h, ANYTHING):
-        for v in engine.values(u, (i, *need_tup)):
-            engine.propagate(out, need, v)
+        engine.propagate_all(out, need, engine.values(u, (i, *need_tup)))
 
 
 @regvprop(P.universe_setitem)
@@ -298,11 +294,9 @@ def _vprop_universe_setitem(engine, need, inputs, out):
 
     # Compute
     if propval:
-        for v in engine.values(val, ANYTHING):
-            engine.propagate(out, need, v)
+        engine.propagate_all(out, need, engine.values(val, ANYTHING))
     if propcoll:
-        for v in engine.values(coll, need):
-            engine.propagate(out, need, v)
+        engine.propagate_all(out, need, engine.values(coll, need))
 
 
 @regvprop(P.partial)
@@ -334,8 +328,7 @@ def _vprop_return(engine, need, inputs, out):
     engine.declare_need(arg, need)
 
     # Compute
-    for v in engine.values(arg, need):
-        engine.propagate(out, need, v)
+    engine.propagate_all(out, need, engine.values(arg, need))
 
 
 @regvprop(P.raise_)
@@ -358,8 +351,8 @@ def _vprop_switch(engine, need, inputs, out):
     engine.declare_need(fb, need)
 
     # Compute
-    for v in chain(engine.values(tb, need), engine.values(fb, need)):
-        engine.propagate(out, need, v)
+    engine.propagate_all(out, need, engine.values(tb, need))
+    engine.propagate_all(out, need, engine.values(fb, need))
 
 
 @regvprop(P.array_map)
@@ -407,8 +400,7 @@ def _vprop_cast_operation(engine, need, inputs, out):
     engine.declare_need(arg, need)
 
     # Compute
-    for v in engine.values(arg, need):
-        engine.propagate(out, need, v)
+    engine.propagate_all(out, need, engine.values(arg, need))
 
 
 @regvprop(
