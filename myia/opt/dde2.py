@@ -121,23 +121,6 @@ class ValuePropagator:
 #####################
 
 
-_generic_primitives = (
-    P.scalar_eq, P.scalar_ne,
-    P.scalar_gt, P.scalar_lt, P.scalar_ge, P.scalar_le,
-    P.scalar_sub, P.scalar_mul, P.scalar_div, P.scalar_add, P.scalar_mod,
-    P.scalar_pow, P.scalar_exp, P.scalar_log, P.scalar_tanh,
-    P.distribute, P.dot, P.transpose, P.scalar_to_array,
-    P.bool_and, P.bool_or, P.bool_not, P.bool_eq, P.scalar_usub, P.scalar_uadd,
-    P.array_getitem, P.array_setitem, P.scalar_cast, P.reshape, P.scalar_floor,
-    P.hastag, P.make_exception,
-    P.argmax, P.array_max, P.gather, P.scatter, P.scatter_add,
-    P.scalar_sign, P.split, P.concat, P.array_cast,
-    P.conv2d, P.conv2d_input_grad, P.conv2d_weight_grad, P.array_to_scalar,
-    P.max_pool2d_grad, P.max_pool2d,
-    P.handle,  # TODO: special handling
-)
-
-
 def _split_need(need):
     if need is ANYTHING:
         here, others = None, need
@@ -147,6 +130,12 @@ def _split_need(need):
         if not others:
             others = ANYTHING
     return here, others
+
+
+def _need_tup(need):
+    if need is ANYTHING:
+        return ()
+    return need
 
 
 vprop_registry = Registry()
@@ -182,21 +171,16 @@ def _vprop_make_tuple(engine, need, inputs, out):
 
 @regvprop(P.tuple_getitem)
 def _vprop_tuple_getitem(engine, need, inputs, out):
-    # Need
-    need_tup = need
-    if need is ANYTHING:
-        need_tup = ()
     tup, idx = inputs
+    need_tup = _need_tup(need)
+
+    # Need
     idxv = engine.values(idx, ANYTHING)
     for v in idxv:
         engine.declare_need(tup, (v, *need_tup))
     engine.declare_need(idx, ANYTHING)
 
     # Compute
-    tup, idx = inputs
-    need_tup = need
-    if need_tup is ANYTHING:
-        need_tup = ()
     for i in engine.values(idx, ANYTHING):
         for v in engine.values(tup, (i, *need_tup)):
             engine.propagate(out, need, v)
@@ -205,10 +189,10 @@ def _vprop_tuple_getitem(engine, need, inputs, out):
 @regvprop(P.tuple_setitem)
 def _vprop_tuple_setitem(engine, need, inputs, out):
     tup, idx, val = inputs
+    here, others = _split_need(need)
 
     # Need
     engine.declare_need(idx, ANYTHING)
-    here, others = _split_need(need)
     for v in engine.values(idx, ANYTHING):
         if here is None:
             engine.declare_need(val, others)
@@ -219,7 +203,6 @@ def _vprop_tuple_setitem(engine, need, inputs, out):
             engine.declare_need(tup, need)
 
     # Compute
-    here, others = _split_need(need)
     for i in engine.values(idx, ANYTHING):
         if here is None:
             for v in engine.values(val, ANYTHING):
@@ -237,22 +220,17 @@ def _vprop_tuple_setitem(engine, need, inputs, out):
 @regvprop(P.env_getitem)
 def _vprop_env_getitem(engine, need, inputs, out):
     env, item, dflt = inputs
+    need_tup = _need_tup(need)
 
     # Need
     engine.declare_need(dflt, need)
     engine.declare_need(item, ANYTHING)
-    need_tup = need
-    if need_tup is ANYTHING:
-        need_tup = ()
     for v in engine.values(item, ANYTHING):
         engine.declare_need(env, (v, *need_tup))
 
     # Compute
     for v in engine.values(dflt, need):
         engine.propagate(out, need, v)
-    need_tup = need
-    if need_tup is ANYTHING:
-        need_tup = ()
     for i in engine.values(item, ANYTHING):
         for v in engine.values(env, (i, *need_tup)):
             engine.propagate(out, need, v)
@@ -261,10 +239,10 @@ def _vprop_env_getitem(engine, need, inputs, out):
 @regvprop(P.env_setitem)
 def _vprop_env_setitem(engine, need, inputs, out):
     env, item, val = inputs
+    here, others = _split_need(need)
 
     # Need
     engine.declare_need(item, ANYTHING)
-    here, others = _split_need(need)
     for v in engine.values(item, ANYTHING):
         if here is None:
             engine.declare_need(val, others)
@@ -275,7 +253,6 @@ def _vprop_env_setitem(engine, need, inputs, out):
             engine.declare_need(env, need)
 
     # Compute
-    here, others = _split_need(need)
     for i in engine.values(item, ANYTHING):
         if i == here:
             for v in engine.values(val, others):
@@ -288,20 +265,15 @@ def _vprop_env_setitem(engine, need, inputs, out):
 @regvprop(P.universe_getitem)
 def _vprop_universe_getitem(engine, need, inputs, out):
     u, h = inputs
+    need_tup = _need_tup(need)
 
     # Need
-    need_tup = need
-    if need is ANYTHING:
-        need_tup = ()
     hv = engine.values(h, ANYTHING)
     for v in hv:
         engine.declare_need(u, (v, *need_tup))
     engine.declare_need(h, ANYTHING)
 
     # Compute
-    need_tup = need
-    if need_tup is ANYTHING:
-        need_tup = ()
     for i in engine.values(h, ANYTHING):
         for v in engine.values(u, (i, *need_tup)):
             engine.propagate(out, need, v)
@@ -310,10 +282,10 @@ def _vprop_universe_getitem(engine, need, inputs, out):
 @regvprop(P.universe_setitem)
 def _vprop_universe_setitem(engine, need, inputs, out):
     u, h, val = inputs
+    here, others = _split_need(need)
 
     # Need
     engine.declare_need(h, ANYTHING)
-    here, others = _split_need(need)
     for v in engine.values(h, ANYTHING):
         assert v is ANYTHING  # TODO: relax this assumption
         if v == here or here is None:
@@ -321,7 +293,6 @@ def _vprop_universe_setitem(engine, need, inputs, out):
         engine.declare_need(u, need)
 
     # Compute
-    here, others = _split_need(need)
     for i in engine.values(h, ANYTHING):
         if i == here:
             for v in engine.values(val, ANYTHING):
@@ -368,7 +339,7 @@ def _vprop_raise_(engine, need, inputs, out):
     arg, = inputs
 
     # Need
-    engine.declare_need(arg, need)
+    engine.declare_need(arg, ANYTHING)
 
     # No compute
 
@@ -423,8 +394,8 @@ def _vprop_array_reduce(engine, need, inputs, out):
     engine.propagate(out, need, ANYTHING)
 
 
-@regvprop(P.casttag)
-def _vprop_casttag(engine, need, inputs, out):
+@regvprop(P.casttag, P.tagged, P.unsafe_static_cast)
+def _vprop_cast_operation(engine, need, inputs, out):
     arg, tag = inputs
 
     # Need
@@ -436,33 +407,21 @@ def _vprop_casttag(engine, need, inputs, out):
         engine.propagate(out, need, v)
 
 
-@regvprop(P.tagged)
-def _vprop_tagged(engine, need, inputs, out):
-    arg, tag = inputs
-
-    # Need
-    engine.declare_need(tag, ANYTHING)
-    engine.declare_need(arg, need)
-
-    # Compute
-    for v in engine.values(arg, need):
-        engine.propagate(out, need, v)
-
-
-@regvprop(P.unsafe_static_cast)
-def _vprop_unsafe_static_cast(engine, need, inputs, out):
-    arg, typ = inputs
-
-    # Need
-    engine.declare_need(typ, ANYTHING)
-    engine.declare_need(arg, need)
-
-    # Compute
-    for v in engine.values(arg, need):
-        engine.propagate(out, need, v)
-
-
-@regvprop(*_generic_primitives)
+@regvprop(
+    P.scalar_eq, P.scalar_ne,
+    P.scalar_gt, P.scalar_lt, P.scalar_ge, P.scalar_le,
+    P.scalar_sub, P.scalar_mul, P.scalar_div, P.scalar_add, P.scalar_mod,
+    P.scalar_pow, P.scalar_exp, P.scalar_log, P.scalar_tanh,
+    P.distribute, P.dot, P.transpose, P.scalar_to_array,
+    P.bool_and, P.bool_or, P.bool_not, P.bool_eq, P.scalar_usub, P.scalar_uadd,
+    P.array_getitem, P.array_setitem, P.scalar_cast, P.reshape, P.scalar_floor,
+    P.hastag, P.make_exception,
+    P.argmax, P.array_max, P.gather, P.scatter, P.scatter_add,
+    P.scalar_sign, P.split, P.concat, P.array_cast,
+    P.conv2d, P.conv2d_input_grad, P.conv2d_weight_grad, P.array_to_scalar,
+    P.max_pool2d_grad, P.max_pool2d,
+    P.handle,  # TODO: special handling
+)
 def _vprop_generic(engine, need, inputs, out):
     # Need
     for inp in inputs:
