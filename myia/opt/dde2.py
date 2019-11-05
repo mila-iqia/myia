@@ -171,95 +171,93 @@ def _vprop_make_tuple(engine, need, inputs, out):
 
 @regvprop(P.tuple_getitem)
 def _vprop_tuple_getitem(engine, need, inputs, out):
-    tup, idx = inputs
+    coll, key = inputs
     need_tup = _need_tup(need)
+    keyv = engine.values(key, ANYTHING)
 
     # Need
-    idxv = engine.values(idx, ANYTHING)
-    for v in idxv:
-        engine.declare_need(tup, (v, *need_tup))
-    engine.declare_need(idx, ANYTHING)
+    for i in keyv:
+        engine.declare_need(coll, (i, *need_tup))
+    engine.declare_need(key, ANYTHING)
 
     # Compute
-    for i in engine.values(idx, ANYTHING):
-        for v in engine.values(tup, (i, *need_tup)):
+    for i in keyv:
+        for v in engine.values(coll, (i, *need_tup)):
             engine.propagate(out, need, v)
 
 
 @regvprop(P.tuple_setitem)
 def _vprop_tuple_setitem(engine, need, inputs, out):
-    tup, idx, val = inputs
+    coll, key, val = inputs
     here, others = _split_need(need)
+    if here is None:
+        propval, propcoll = True, True
+    else:
+        matches = {i == here for i in engine.values(key, ANYTHING)}
+        propval = True in matches
+        propcoll = False in matches
 
     # Need
-    engine.declare_need(idx, ANYTHING)
-    for v in engine.values(idx, ANYTHING):
-        if here is None:
-            engine.declare_need(val, others)
-            engine.declare_need(tup, need)
-        elif v == here:
-            engine.declare_need(val, others)
-        else:
-            engine.declare_need(tup, need)
+    engine.declare_need(key, ANYTHING)
+    if propval:
+        engine.declare_need(val, others)
+    if propcoll:
+        engine.declare_need(coll, need)
 
     # Compute
-    for i in engine.values(idx, ANYTHING):
-        if here is None:
-            for v in engine.values(val, ANYTHING):
-                engine.propagate(out, need, v)
-            for v in engine.values(tup, need):
-                engine.propagate(out, need, v)
-        elif i == here:
-            for v in engine.values(val, ANYTHING):
-                engine.propagate(out, need, v)
-        else:
-            for v in engine.values(tup, need):
-                engine.propagate(out, need, v)
+    if propval:
+        for v in engine.values(val, ANYTHING):
+            engine.propagate(out, need, v)
+    if propcoll:
+        for v in engine.values(coll, need):
+            engine.propagate(out, need, v)
 
 
 @regvprop(P.env_getitem)
 def _vprop_env_getitem(engine, need, inputs, out):
-    env, item, dflt = inputs
+    coll, key, dflt = inputs
     need_tup = _need_tup(need)
+    keyv = engine.values(key, ANYTHING)
 
     # Need
     engine.declare_need(dflt, need)
-    engine.declare_need(item, ANYTHING)
-    for v in engine.values(item, ANYTHING):
-        engine.declare_need(env, (v, *need_tup))
+    engine.declare_need(key, ANYTHING)
+    for i in keyv:
+        engine.declare_need(coll, (i, *need_tup))
 
     # Compute
     for v in engine.values(dflt, need):
         engine.propagate(out, need, v)
-    for i in engine.values(item, ANYTHING):
-        for v in engine.values(env, (i, *need_tup)):
+    for i in keyv:
+        for v in engine.values(coll, (i, *need_tup)):
             engine.propagate(out, need, v)
 
 
 @regvprop(P.env_setitem)
 def _vprop_env_setitem(engine, need, inputs, out):
-    env, item, val = inputs
+    coll, key, val = inputs
     here, others = _split_need(need)
+    if here is None:
+        propval, propcoll = True, True
+    else:
+        matches = {i == here for i in engine.values(key, ANYTHING)}
+        propval = True in matches
+        propcoll = False in matches
 
     # Need
-    engine.declare_need(item, ANYTHING)
-    for v in engine.values(item, ANYTHING):
-        if here is None:
-            engine.declare_need(val, others)
-            engine.declare_need(env, need)
-        elif v == here:
-            engine.declare_need(val, others)
-        else:
-            engine.declare_need(env, need)
+    engine.declare_need(key, ANYTHING)
+    if propval:
+        engine.declare_need(val, others)
+    if propcoll:
+        engine.declare_need(coll, need)
 
     # Compute
-    for i in engine.values(item, ANYTHING):
-        if i == here:
-            for v in engine.values(val, others):
-                engine.propagate(out, need, v)
-        else:
-            for v in engine.values(env, need):
-                engine.propagate(out, need, v)
+    if propval:
+        for v in engine.values(val, ANYTHING):
+            engine.propagate(out, need, v)
+    if propcoll:
+        for v in engine.values(coll, need):
+            engine.propagate(out, need, v)
 
 
 @regvprop(P.universe_getitem)
@@ -281,23 +279,29 @@ def _vprop_universe_getitem(engine, need, inputs, out):
 
 @regvprop(P.universe_setitem)
 def _vprop_universe_setitem(engine, need, inputs, out):
-    u, h, val = inputs
+    coll, key, val = inputs
     here, others = _split_need(need)
+    propcoll = True
+    if here is None:
+        propval = True
+    else:
+        assert here is ANYTHING
+        matches = {i == here for i in engine.values(key, ANYTHING)}
+        propval = True in matches
 
     # Need
-    engine.declare_need(h, ANYTHING)
-    for v in engine.values(h, ANYTHING):
-        assert v is ANYTHING  # TODO: relax this assumption
-        if v == here or here is None:
-            engine.declare_need(val, others)
-        engine.declare_need(u, need)
+    engine.declare_need(key, ANYTHING)
+    if propval:
+        engine.declare_need(val, others)
+    if propcoll:
+        engine.declare_need(coll, need)
 
     # Compute
-    for i in engine.values(h, ANYTHING):
-        if i == here:
-            for v in engine.values(val, ANYTHING):
-                engine.propagate(out, need, v)
-        for v in engine.values(u, need):
+    if propval:
+        for v in engine.values(val, ANYTHING):
+            engine.propagate(out, need, v)
+    if propcoll:
+        for v in engine.values(coll, need):
             engine.propagate(out, need, v)
 
 
