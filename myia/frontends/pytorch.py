@@ -8,6 +8,7 @@ import torch
 
 from .. import operations
 from ..abstract.data import (
+    ALIASID,
     ANYTHING,
     SHAPE,
     TYPE,
@@ -16,11 +17,12 @@ from ..abstract.data import (
     AbstractScalar,
 )
 from ..abstract.infer import to_abstract
+from ..classes import ADT
 from ..hypermap import hyper_map
 from ..operations import primitives as P
 from ..pipeline.resources import default_convert
 from ..pipeline.standard import standard_method_map, standard_object_map
-from ..utils import core
+from ..utils import OrderedSet, core, get_fields
 from ..xtype import NDArray
 from .pytorch_abstract_types import (
     AbstractModule,
@@ -224,13 +226,16 @@ def _to_abstract(self, v: torch.Tensor, **kwargs):
 
 
 @to_abstract.register  # noqa: F811
-def _to_abstract(self, v: torch.nn.Parameter, **kwargs):
+def _to_abstract(self, v: torch.nn.Parameter, alias_map={}, **kwargs):
+    tracks = {SHAPE: tuple(v.shape), TYPE: PyTorchTensor}
+    if id(v) in alias_map:
+        tracks[ALIASID] = alias_map[id(v)]
     return AbstractArray(
         AbstractScalar({
             VALUE: ANYTHING,
             TYPE: pytorch_dtype_to_type(v.dtype),
         }),
-        {SHAPE: tuple(v.shape), TYPE: PyTorchTensor},
+        tracks,
     )
 
 
@@ -242,3 +247,33 @@ def _default_convert(env, x: torch.dtype):
 __all__ = [
     'pytorch_dtype_to_type',
 ]
+
+
+@get_fields.register
+def _get_fields(instance: torch.nn.Module):
+    blacklist = OrderedSet(dir(torch.nn.Module()))
+    blacklist.add('__constants__')
+    blacklist.add('reset_parameters')
+
+    blacklist.remove('_parameters')
+    blacklist.remove('_modules')
+
+    keys = OrderedSet(dir(instance)) - blacklist
+    d = {}
+
+    for k in keys:
+        d[k] = getattr(instance, k)
+    return d
+
+
+def tensor_pytorch_aliasable(v, vseq, path):
+    """Aliasing policy whereas all pytorch tensors are aliasable.
+
+    Tensors inside a list or ADT are not aliasable.
+    """
+    if isinstance(v, torch.Tensor):
+        if any(isinstance(x, (list, ADT)) for x in vseq):
+            return 'X'
+        else:
+            return True
+    return False

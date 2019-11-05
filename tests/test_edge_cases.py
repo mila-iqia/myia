@@ -1,5 +1,7 @@
 """Edge cases that may pop up but it's not clear where else to test them."""
 
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
 
@@ -37,3 +39,14 @@ def test_call_opdef():
         return f(x, y)
 
     assert g(1, 2) == 3
+
+
+@dataclass(frozen=True)
+class Linear():
+    """Linear layer."""
+
+    W: object
+
+    def apply(self):
+        """Apply the layer."""
+        return self.W

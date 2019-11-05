@@ -131,15 +131,16 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
 # Move value to target accelerator hardware #
 #############################################
 
-def to_device(value, backend, backend_options=None, *, orig_t=None, vm_t=None):
+def to_device(value, backend, backend_options=None, *, broaden=True,
+              orig_t=None, vm_t=None):
     """Move value to target accelerator hardware (using selected backend)."""
     if not isinstance(backend, Backend):
         backend = load_backend(backend, backend_options)
     if orig_t is None:
-        orig_t = from_value(value, broaden=True)
+        orig_t = from_value(value, broaden=broaden)
     value = to_canonical(value, orig_t)
     if vm_t is None:
-        vm_t = from_value(value, broaden=True)
+        vm_t = from_value(value, broaden=broaden)
     value = backend.to_backend_value(value, vm_t)
     return BackendValue(value, orig_t, vm_t, backend)
 
