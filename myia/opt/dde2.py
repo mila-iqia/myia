@@ -116,6 +116,12 @@ class ValuePropagator:
             for value in values:
                 self._propagate(to, need, value)
 
+    def passthrough(self, arg, out, need, *, through_need=None):
+        if through_need is None:
+            through_need = need
+        self.declare_need(arg, through_need)
+        self.propagate_all(out, need, self.values(arg, through_need))
+
     def values(self, node, need):
         return self.results[node][need] | self.results[node][WILDCARD]
 
@@ -200,8 +206,7 @@ def _vprop_tuple_setitem(engine, need, inputs, out):
         engine.declare_need(val, others)
         engine.propagate_all(out, need, engine.values(val, ANYTHING))
     if propcoll:
-        engine.declare_need(coll, need)
-        engine.propagate_all(out, need, engine.values(coll, need))
+        engine.passthrough(coll, out, need)
 
 
 @regvprop(P.env_getitem)
@@ -234,8 +239,7 @@ def _vprop_env_setitem(engine, need, inputs, out):
         engine.declare_need(val, others)
         engine.propagate_all(out, need, engine.values(val, ANYTHING))
     if propcoll:
-        engine.declare_need(coll, need)
-        engine.propagate_all(out, need, engine.values(coll, need))
+        engine.passthrough(coll, out, need)
 
 
 @regvprop(P.universe_getitem)
@@ -267,8 +271,7 @@ def _vprop_universe_setitem(engine, need, inputs, out):
         engine.declare_need(val, others)
         engine.propagate_all(out, need, engine.values(val, ANYTHING))
     if propcoll:
-        engine.declare_need(coll, need)
-        engine.propagate_all(out, need, engine.values(coll, need))
+        engine.passthrough(coll, out, need)
 
 
 @regvprop(P.partial)
@@ -295,15 +298,12 @@ def _vprop_partial(engine, need, inputs, out):
 @regvprop(P.return_)
 def _vprop_return(engine, need, inputs, out):
     arg, = inputs
-
-    engine.declare_need(arg, need)
-    engine.propagate_all(out, need, engine.values(arg, need))
+    engine.passthrough(arg, out, need)
 
 
 @regvprop(P.raise_)
 def _vprop_raise_(engine, need, inputs, out):
     arg, = inputs
-
     engine.declare_need(arg, ANYTHING)
 
 
@@ -312,10 +312,8 @@ def _vprop_switch(engine, need, inputs, out):
     cond, tb, fb = inputs
 
     engine.declare_need(cond, ANYTHING)
-    engine.declare_need(tb, need)
-    engine.propagate_all(out, need, engine.values(tb, need))
-    engine.declare_need(fb, need)
-    engine.propagate_all(out, need, engine.values(fb, need))
+    engine.passthrough(tb, out, need)
+    engine.passthrough(fb, out, need)
 
 
 @regvprop(P.array_map)
@@ -359,8 +357,7 @@ def _vprop_cast_operation(engine, need, inputs, out):
     arg, tag = inputs
 
     engine.declare_need(tag, ANYTHING)
-    engine.declare_need(arg, need)
-    engine.propagate_all(out, need, engine.values(arg, need))
+    engine.passthrough(arg, out, need)
 
 
 @regvprop(
