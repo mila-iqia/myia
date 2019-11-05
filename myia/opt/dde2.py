@@ -122,6 +122,12 @@ class ValuePropagator:
         self.declare_need(arg, through_need)
         self.propagate_all(out, need, self.values(arg, through_need))
 
+    def getitem(self, coll, key, out, need):
+        need_tup = _need_tup(need)
+        self.declare_need(key, ANYTHING)
+        for i in self.values(key, ANYTHING):
+            self.passthrough(coll, out, need, through_need=(i, *need_tup))
+
     def values(self, node, need):
         return self.results[node][need] | self.results[node][WILDCARD]
 
@@ -154,37 +160,19 @@ regvprop = vprop_registry.register
 
 @regvprop(P.make_tuple)
 def _vprop_make_tuple(engine, need, inputs, out):
-    # Need
-    if need is ANYTHING:
+    here, others = _split_need(need)
+    if here is None:
         for inp in inputs:
             engine.declare_need(inp, ANYTHING)
-    else:
-        assert isinstance(need, tuple)
-        here, *others = need
-        others = tuple(others)
-        if not others:
-            others = ANYTHING
-        engine.declare_need(inputs[here], others)
-
-    # Compute
-    if need is ANYTHING:
         engine.propagate(out, need, tuple(ANYTHING for inp in inputs))
     else:
-        assert isinstance(need, tuple)
-        here, *others = need
-        others = tuple(others)
-        if not others:
-            others = ANYTHING
-        engine.propagate_all(out, need, engine.values(inputs[here], others))
+        engine.passthrough(inputs[here], out, need, through_need=others)
 
 
 @regvprop(P.tuple_getitem)
 def _vprop_tuple_getitem(engine, need, inputs, out):
     coll, key = inputs
-    need_tup = _need_tup(need)
-    engine.declare_need(key, ANYTHING)
-    for i in engine.values(key, ANYTHING):
-        engine.passthrough(coll, out, need, through_need=(i, *need_tup))
+    engine.getitem(coll, key, out, need)
 
 
 @regvprop(P.tuple_setitem)
@@ -208,11 +196,8 @@ def _vprop_tuple_setitem(engine, need, inputs, out):
 @regvprop(P.env_getitem)
 def _vprop_env_getitem(engine, need, inputs, out):
     coll, key, dflt = inputs
-    need_tup = _need_tup(need)
-    engine.declare_need(key, ANYTHING)
     engine.passthrough(dflt, out, need)
-    for i in engine.values(key, ANYTHING):
-        engine.passthrough(coll, out, need, through_need=(i, *need_tup))
+    engine.getitem(coll, key, out, need)
 
 
 @regvprop(P.env_setitem)
@@ -236,10 +221,7 @@ def _vprop_env_setitem(engine, need, inputs, out):
 @regvprop(P.universe_getitem)
 def _vprop_universe_getitem(engine, need, inputs, out):
     coll, key = inputs
-    need_tup = _need_tup(need)
-    engine.declare_need(key, ANYTHING)
-    for i in engine.values(key, ANYTHING):
-        engine.passthrough(coll, out, need, through_need=(i, *need_tup))
+    engine.getitem(coll, key, out, need)
 
 
 @regvprop(P.universe_setitem)
@@ -302,9 +284,8 @@ def _vprop_switch(engine, need, inputs, out):
     engine.passthrough(fb, out, need)
 
 
-@regvprop(P.array_map)
-def _vprop_array_map(engine, need, inputs, out):
-    # Need
+@regvprop(P.array_map, P.array_reduce)
+def _vprop_array_operation(engine, need, inputs, out):
     for inp in inputs:
         engine.declare_need(inp, ANYTHING)
     fn_node, *_ = inputs
@@ -316,25 +297,6 @@ def _vprop_array_map(engine, need, inputs, out):
         else:
             raise NotImplementedError(type(fn))
 
-    # Compute
-    engine.propagate(out, need, ANYTHING)
-
-
-@regvprop(P.array_reduce)
-def _vprop_array_reduce(engine, need, inputs, out):
-    # Need
-    for inp in inputs:
-        engine.declare_need(inp, ANYTHING)
-    fn_node, *_ = inputs
-    for fn in engine.values(fn_node, ANYTHING):
-        if isinstance(fn, Primitive):
-            pass
-        elif isinstance(fn, Graph):
-            engine.declare_need(fn.return_, ANYTHING)
-        else:
-            raise NotImplementedError(type(fn))
-
-    # Compute
     engine.propagate(out, need, ANYTHING)
 
 
