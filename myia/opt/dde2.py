@@ -83,8 +83,7 @@ class ValuePropagator:
         def _dofn(fn, inp):
             if isinstance(fn, Primitive):
                 for need in self.need[node]:
-                    need_registry[fn](self, need, inp, node)
-                    compute_registry[fn](self, need, inp, node)
+                    vprop_registry[fn](self, need, inp, node)
             elif isinstance(fn, Graph):
                 for param, inp in zip(fn.parameters, node.inputs[1:]):
                     self.connect(inp, param)
@@ -139,14 +138,6 @@ _generic_primitives = (
 )
 
 
-need_registry = Registry()
-regneed = need_registry.register
-
-
-compute_registry = Registry()
-regcompute = compute_registry.register
-
-
 def _split_need(need):
     if need is ANYTHING:
         here, others = None, need
@@ -158,8 +149,13 @@ def _split_need(need):
     return here, others
 
 
-@regneed(P.make_tuple)
-def _need_make_tuple(engine, need, inputs, out):
+vprop_registry = Registry()
+regvprop = vprop_registry.register
+
+
+@regvprop(P.make_tuple)
+def _vprop_make_tuple(engine, need, inputs, out):
+    # Need
     if need is ANYTHING:
         for inp in inputs:
             engine.declare_need(inp, ANYTHING)
@@ -171,9 +167,7 @@ def _need_make_tuple(engine, need, inputs, out):
             others = ANYTHING
         engine.declare_need(inputs[here], others)
 
-
-@regcompute(P.make_tuple)
-def _compute_make_tuple(engine, need, inputs, out):
+    # Compute
     if need is ANYTHING:
         engine.propagate(out, need, tuple(ANYTHING for inp in inputs))
     else:
@@ -186,8 +180,9 @@ def _compute_make_tuple(engine, need, inputs, out):
             engine.propagate(out, need, val)
 
 
-@regneed(P.tuple_getitem)
-def _need_tuple_getitem(engine, need, inputs, out):
+@regvprop(P.tuple_getitem)
+def _vprop_tuple_getitem(engine, need, inputs, out):
+    # Need
     need_tup = need
     if need is ANYTHING:
         need_tup = ()
@@ -197,9 +192,7 @@ def _need_tuple_getitem(engine, need, inputs, out):
         engine.declare_need(tup, (v, *need_tup))
     engine.declare_need(idx, ANYTHING)
 
-
-@regcompute(P.tuple_getitem)
-def _compute_tuple_getitem(engine, need, inputs, out):
+    # Compute
     tup, idx = inputs
     need_tup = need
     if need_tup is ANYTHING:
@@ -209,9 +202,11 @@ def _compute_tuple_getitem(engine, need, inputs, out):
             engine.propagate(out, need, v)
 
 
-@regneed(P.tuple_setitem)
-def _need_tuple_setitem(engine, need, inputs, out):
+@regvprop(P.tuple_setitem)
+def _vprop_tuple_setitem(engine, need, inputs, out):
     tup, idx, val = inputs
+
+    # Need
     engine.declare_need(idx, ANYTHING)
     here, others = _split_need(need)
     for v in engine.values(idx, ANYTHING):
@@ -223,10 +218,7 @@ def _need_tuple_setitem(engine, need, inputs, out):
         else:
             engine.declare_need(tup, need)
 
-
-@regcompute(P.tuple_setitem)
-def _compute_tuple_setitem(engine, need, inputs, out):
-    tup, idx, val = inputs
+    # Compute
     here, others = _split_need(need)
     for i in engine.values(idx, ANYTHING):
         if here is None:
@@ -242,21 +234,20 @@ def _compute_tuple_setitem(engine, need, inputs, out):
                 engine.propagate(out, need, v)
 
 
-@regneed(P.env_getitem)
-def _need_env_getitem(engine, need, inputs, out):
+@regvprop(P.env_getitem)
+def _vprop_env_getitem(engine, need, inputs, out):
     env, item, dflt = inputs
+
+    # Need
     engine.declare_need(dflt, need)
     engine.declare_need(item, ANYTHING)
-    if need is ANYTHING:
-        need = ()
+    need_tup = need
+    if need_tup is ANYTHING:
+        need_tup = ()
     for v in engine.values(item, ANYTHING):
-        engine.declare_need(env, (v, *need))
+        engine.declare_need(env, (v, *need_tup))
 
-
-@regcompute(P.env_getitem)
-def _compute_env_getitem(engine, need, inputs, out):
-    # print(need)
-    env, item, dflt = inputs
+    # Compute
     for v in engine.values(dflt, need):
         engine.propagate(out, need, v)
     need_tup = need
@@ -267,9 +258,11 @@ def _compute_env_getitem(engine, need, inputs, out):
             engine.propagate(out, need, v)
 
 
-@regneed(P.env_setitem)
-def _need_env_setitem(engine, need, inputs, out):
+@regvprop(P.env_setitem)
+def _vprop_env_setitem(engine, need, inputs, out):
     env, item, val = inputs
+
+    # Need
     engine.declare_need(item, ANYTHING)
     here, others = _split_need(need)
     for v in engine.values(item, ANYTHING):
@@ -281,10 +274,7 @@ def _need_env_setitem(engine, need, inputs, out):
         else:
             engine.declare_need(env, need)
 
-
-@regcompute(P.env_setitem)
-def _compute_env_setitem(engine, need, inputs, out):
-    env, item, val = inputs
+    # Compute
     here, others = _split_need(need)
     for i in engine.values(item, ANYTHING):
         if i == here:
@@ -295,21 +285,20 @@ def _compute_env_setitem(engine, need, inputs, out):
                 engine.propagate(out, need, v)
 
 
-@regneed(P.universe_getitem)
-def _need_universe_getitem(engine, need, inputs, out):
+@regvprop(P.universe_getitem)
+def _vprop_universe_getitem(engine, need, inputs, out):
+    u, h = inputs
+
+    # Need
     need_tup = need
     if need is ANYTHING:
         need_tup = ()
-    u, h = inputs
     hv = engine.values(h, ANYTHING)
     for v in hv:
         engine.declare_need(u, (v, *need_tup))
     engine.declare_need(h, ANYTHING)
 
-
-@regcompute(P.universe_getitem)
-def _compute_universe_getitem(engine, need, inputs, out):
-    u, h = inputs
+    # Compute
     need_tup = need
     if need_tup is ANYTHING:
         need_tup = ()
@@ -318,9 +307,11 @@ def _compute_universe_getitem(engine, need, inputs, out):
             engine.propagate(out, need, v)
 
 
-@regneed(P.universe_setitem)
-def _need_universe_setitem(engine, need, inputs, out):
+@regvprop(P.universe_setitem)
+def _vprop_universe_setitem(engine, need, inputs, out):
     u, h, val = inputs
+
+    # Need
     engine.declare_need(h, ANYTHING)
     here, others = _split_need(need)
     for v in engine.values(h, ANYTHING):
@@ -329,10 +320,7 @@ def _need_universe_setitem(engine, need, inputs, out):
             engine.declare_need(val, others)
         engine.declare_need(u, need)
 
-
-@regcompute(P.universe_setitem)
-def _compute_universe_setitem(engine, need, inputs, out):
-    u, h, val = inputs
+    # Compute
     here, others = _split_need(need)
     for i in engine.values(h, ANYTHING):
         if i == here:
@@ -342,9 +330,11 @@ def _compute_universe_setitem(engine, need, inputs, out):
             engine.propagate(out, need, v)
 
 
-@regneed(P.partial)
-def _need_partial(engine, need, inputs, out):
+@regvprop(P.partial)
+def _vprop_partial(engine, need, inputs, out):
     fn_node, *args = inputs
+
+    # Need
     engine.declare_need(fn_node, ANYTHING)
     for fn in engine.values(fn_node, ANYTHING):
         if isinstance(fn, Primitive):
@@ -355,56 +345,51 @@ def _need_partial(engine, need, inputs, out):
         else:
             raise NotImplementedError(type(fn))
 
-
-@regcompute(P.partial)
-def _compute_partial(engine, need, inputs, out):
-    fn_node, *args = inputs
+    # Compute
     for fn in engine.values(fn_node, ANYTHING):
         part = PartialApplication(fn, args)
         engine.propagate(out, need, part)
 
 
-@regneed(P.return_)
-def _need_return(engine, need, inputs, out):
+@regvprop(P.return_)
+def _vprop_return(engine, need, inputs, out):
     arg, = inputs
+
+    # Need
     engine.declare_need(arg, need)
 
-
-@regcompute(P.return_)
-def _compute_return_(engine, need, inputs, out):
-    arg, = inputs
+    # Compute
     for v in engine.values(arg, need):
         engine.propagate(out, need, v)
 
 
-@regneed(P.raise_)
-def _need_raise_(engine, need, inputs, out):
+@regvprop(P.raise_)
+def _vprop_raise_(engine, need, inputs, out):
     arg, = inputs
+
+    # Need
     engine.declare_need(arg, need)
 
-
-@regcompute(P.raise_)
-def _compute_raise_(engine, need, inputs, out):
-    pass
+    # No compute
 
 
-@regneed(P.switch)
-def _need_switch(engine, need, inputs, out):
+@regvprop(P.switch)
+def _vprop_switch(engine, need, inputs, out):
     cond, tb, fb = inputs
+
+    # Need
     engine.declare_need(cond, ANYTHING)
     engine.declare_need(tb, need)
     engine.declare_need(fb, need)
 
-
-@regcompute(P.switch)
-def _compute_switch(engine, need, inputs, out):
-    cond, tb, fb = inputs
+    # Compute
     for v in chain(engine.values(tb, need), engine.values(fb, need)):
         engine.propagate(out, need, v)
 
 
-@regneed(P.array_map)
-def _need_array_map(engine, need, inputs, out):
+@regvprop(P.array_map)
+def _vprop_array_map(engine, need, inputs, out):
+    # Need
     for inp in inputs:
         engine.declare_need(inp, ANYTHING)
     fn_node, *_ = inputs
@@ -416,14 +401,13 @@ def _need_array_map(engine, need, inputs, out):
         else:
             raise NotImplementedError(type(fn))
 
-
-@regcompute(P.array_map)
-def _compute_array_map(engine, need, inputs, out):
+    # Compute
     engine.propagate(out, need, ANYTHING)
 
 
-@regneed(P.array_reduce)
-def _need_array_reduce(engine, need, inputs, out):
+@regvprop(P.array_reduce)
+def _vprop_array_reduce(engine, need, inputs, out):
+    # Need
     for inp in inputs:
         engine.declare_need(inp, ANYTHING)
     fn_node, *_ = inputs
@@ -435,62 +419,56 @@ def _need_array_reduce(engine, need, inputs, out):
         else:
             raise NotImplementedError(type(fn))
 
-
-@regcompute(P.array_reduce)
-def _compute_array_reduce(engine, need, inputs, out):
+    # Compute
     engine.propagate(out, need, ANYTHING)
 
 
-@regneed(P.casttag)
-def _need_casttag(engine, need, inputs, out):
+@regvprop(P.casttag)
+def _vprop_casttag(engine, need, inputs, out):
     arg, tag = inputs
+
+    # Need
     engine.declare_need(tag, ANYTHING)
     engine.declare_need(arg, need)
 
-
-@regcompute(P.casttag)
-def _compute_casttag(engine, need, inputs, out):
-    arg, tag = inputs
+    # Compute
     for v in engine.values(arg, need):
         engine.propagate(out, need, v)
 
 
-@regneed(P.tagged)
-def _need_tagged(engine, need, inputs, out):
+@regvprop(P.tagged)
+def _vprop_tagged(engine, need, inputs, out):
     arg, tag = inputs
+
+    # Need
     engine.declare_need(tag, ANYTHING)
     engine.declare_need(arg, need)
 
-
-@regcompute(P.tagged)
-def _compute_tagged(engine, need, inputs, out):
-    arg, tag = inputs
+    # Compute
     for v in engine.values(arg, need):
         engine.propagate(out, need, v)
 
 
-@regneed(P.unsafe_static_cast)
-def _need_unsafe_static_cast(engine, need, inputs, out):
+@regvprop(P.unsafe_static_cast)
+def _vprop_unsafe_static_cast(engine, need, inputs, out):
     arg, typ = inputs
+
+    # Need
     engine.declare_need(typ, ANYTHING)
     engine.declare_need(arg, need)
 
-
-@regcompute(P.unsafe_static_cast)
-def _compute_unsafe_static_cast(engine, need, inputs, out):
-    arg, typ = inputs
+    # Compute
     for v in engine.values(arg, need):
         engine.propagate(out, need, v)
 
 
-@regneed(*_generic_primitives)
-def _need_generic(engine, need, inputs, out):
+@regvprop(*_generic_primitives)
+def _vprop_generic(engine, need, inputs, out):
+    # Need
     for inp in inputs:
         engine.declare_need(inp, ANYTHING)
 
-
-@regcompute(*_generic_primitives)
-def _compute_generic(engine, need, inputs, out):
+    # Compute
     engine.propagate(out, need, ANYTHING)
 
 
