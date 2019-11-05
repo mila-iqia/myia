@@ -122,17 +122,21 @@ class ValuePropagator:
         self.propagate_all(out, need, self.values(arg, through_need))
 
     def getitem(self, coll, key, out, need):
-        need_tup = _need_tup(need)
+        need_tup = need
+        if need_tup is ANYTHING:
+            need_tup = ()
         self.declare_need(key, ANYTHING)
         for i in self.values(key, ANYTHING):
             self.passthrough(coll, out, need, through_need=(i, *need_tup))
 
-    def setitem(self, coll, key, val, out, need, *, propagation_choices):
+    def setitem(self, coll, key, val, out, need, *, precise_values=True):
         here, others = _split_need(need)
         if here is None:
             propval, propcoll = True, True
         else:
-            propval, propcoll = propagation_choices(here, key)
+            matches = {i == here for i in self.values(key, ANYTHING)}
+            propval = True in matches
+            propcoll = not precise_values or False in matches
 
         self.declare_need(key, ANYTHING)
         if propval:
@@ -144,11 +148,6 @@ class ValuePropagator:
         return self.results[node][need] | self.results[node][WILDCARD]
 
 
-#####################
-# Need relationship #
-#####################
-
-
 def _split_need(need):
     if need is ANYTHING:
         here, others = None, need
@@ -158,12 +157,6 @@ def _split_need(need):
         if not others:
             others = ANYTHING
     return here, others
-
-
-def _need_tup(need):
-    if need is ANYTHING:
-        return ()
-    return need
 
 
 vprop_registry = Registry()
@@ -189,12 +182,8 @@ def _vprop_tuple_getitem(engine, need, inputs, out):
 
 @regvprop(P.tuple_setitem)
 def _vprop_tuple_setitem(engine, need, inputs, out):
-    def _pch(here, key):
-        matches = {i == here for i in engine.values(key, ANYTHING)}
-        return True in matches, False in matches
-
     coll, key, val = inputs
-    engine.setitem(coll, key, val, out, need, propagation_choices=_pch)
+    engine.setitem(coll, key, val, out, need)
 
 
 @regvprop(P.env_getitem)
@@ -206,12 +195,8 @@ def _vprop_env_getitem(engine, need, inputs, out):
 
 @regvprop(P.env_setitem)
 def _vprop_env_setitem(engine, need, inputs, out):
-    def _pch(here, key):
-        matches = {i == here for i in engine.values(key, ANYTHING)}
-        return True in matches, False in matches
-
     coll, key, val = inputs
-    engine.setitem(coll, key, val, out, need, propagation_choices=_pch)
+    engine.setitem(coll, key, val, out, need)
 
 
 @regvprop(P.universe_getitem)
@@ -222,20 +207,13 @@ def _vprop_universe_getitem(engine, need, inputs, out):
 
 @regvprop(P.universe_setitem)
 def _vprop_universe_setitem(engine, need, inputs, out):
-    def _pch(here, key):
-        assert here is ANYTHING
-        matches = {i == here for i in engine.values(key, ANYTHING)}
-        return True in matches, True
-
     coll, key, val = inputs
-    engine.setitem(coll, key, val, out, need, propagation_choices=_pch)
+    engine.setitem(coll, key, val, out, need, precise_values=False)
 
 
 @regvprop(P.partial)
 def _vprop_partial(engine, need, inputs, out):
     fn_node, *args = inputs
-
-    # Need
     engine.declare_need(fn_node, ANYTHING)
     for fn in engine.values(fn_node, ANYTHING):
         if isinstance(fn, Primitive):
@@ -246,8 +224,6 @@ def _vprop_partial(engine, need, inputs, out):
         else:
             raise NotImplementedError(type(fn))
 
-    # Compute
-    for fn in engine.values(fn_node, ANYTHING):
         part = PartialApplication(fn, args)
         engine.propagate(out, need, part)
 
