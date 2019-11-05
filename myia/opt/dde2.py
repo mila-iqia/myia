@@ -39,7 +39,6 @@ class ValuePropagator:
                 else:
                     self.propagate(ct, ANYTHING, ct.value)
         self.declare_need(root.return_, ANYTHING)
-        i = 0
         while self.todo:
             nxt = self.todo.pop()
             self.process_node(nxt)
@@ -128,6 +127,19 @@ class ValuePropagator:
         for i in self.values(key, ANYTHING):
             self.passthrough(coll, out, need, through_need=(i, *need_tup))
 
+    def setitem(self, coll, key, val, out, need, *, propagation_choices):
+        here, others = _split_need(need)
+        if here is None:
+            propval, propcoll = True, True
+        else:
+            propval, propcoll = propagation_choices(here, key)
+
+        self.declare_need(key, ANYTHING)
+        if propval:
+            self.passthrough(val, out, need, through_need=others)
+        if propcoll:
+            self.passthrough(coll, out, need)
+
     def values(self, node, need):
         return self.results[node][need] | self.results[node][WILDCARD]
 
@@ -177,20 +189,12 @@ def _vprop_tuple_getitem(engine, need, inputs, out):
 
 @regvprop(P.tuple_setitem)
 def _vprop_tuple_setitem(engine, need, inputs, out):
-    coll, key, val = inputs
-    here, others = _split_need(need)
-    if here is None:
-        propval, propcoll = True, True
-    else:
+    def _pch(here, key):
         matches = {i == here for i in engine.values(key, ANYTHING)}
-        propval = True in matches
-        propcoll = False in matches
+        return True in matches, False in matches
 
-    engine.declare_need(key, ANYTHING)
-    if propval:
-        engine.passthrough(val, out, need, through_need=others)
-    if propcoll:
-        engine.passthrough(coll, out, need)
+    coll, key, val = inputs
+    engine.setitem(coll, key, val, out, need, propagation_choices=_pch)
 
 
 @regvprop(P.env_getitem)
@@ -202,20 +206,12 @@ def _vprop_env_getitem(engine, need, inputs, out):
 
 @regvprop(P.env_setitem)
 def _vprop_env_setitem(engine, need, inputs, out):
-    coll, key, val = inputs
-    here, others = _split_need(need)
-    if here is None:
-        propval, propcoll = True, True
-    else:
+    def _pch(here, key):
         matches = {i == here for i in engine.values(key, ANYTHING)}
-        propval = True in matches
-        propcoll = False in matches
+        return True in matches, False in matches
 
-    engine.declare_need(key, ANYTHING)
-    if propval:
-        engine.passthrough(val, out, need, through_need=others)
-    if propcoll:
-        engine.passthrough(coll, out, need)
+    coll, key, val = inputs
+    engine.setitem(coll, key, val, out, need, propagation_choices=_pch)
 
 
 @regvprop(P.universe_getitem)
@@ -226,21 +222,13 @@ def _vprop_universe_getitem(engine, need, inputs, out):
 
 @regvprop(P.universe_setitem)
 def _vprop_universe_setitem(engine, need, inputs, out):
-    coll, key, val = inputs
-    here, others = _split_need(need)
-    propcoll = True
-    if here is None:
-        propval = True
-    else:
+    def _pch(here, key):
         assert here is ANYTHING
         matches = {i == here for i in engine.values(key, ANYTHING)}
-        propval = True in matches
+        return True in matches, True
 
-    engine.declare_need(key, ANYTHING)
-    if propval:
-        engine.passthrough(val, out, need, through_need=others)
-    if propcoll:
-        engine.passthrough(coll, out, need)
+    coll, key, val = inputs
+    engine.setitem(coll, key, val, out, need, propagation_choices=_pch)
 
 
 @regvprop(P.partial)
