@@ -182,12 +182,9 @@ def _vprop_make_tuple(engine, need, inputs, out):
 def _vprop_tuple_getitem(engine, need, inputs, out):
     coll, key = inputs
     need_tup = _need_tup(need)
-    keyv = engine.values(key, ANYTHING)
-
     engine.declare_need(key, ANYTHING)
-    for i in keyv:
-        engine.declare_need(coll, (i, *need_tup))
-        engine.propagate_all(out, need, engine.values(coll, (i, *need_tup)))
+    for i in engine.values(key, ANYTHING):
+        engine.passthrough(coll, out, need, through_need=(i, *need_tup))
 
 
 @regvprop(P.tuple_setitem)
@@ -203,8 +200,7 @@ def _vprop_tuple_setitem(engine, need, inputs, out):
 
     engine.declare_need(key, ANYTHING)
     if propval:
-        engine.declare_need(val, others)
-        engine.propagate_all(out, need, engine.values(val, ANYTHING))
+        engine.passthrough(val, out, need, through_need=others)
     if propcoll:
         engine.passthrough(coll, out, need)
 
@@ -213,14 +209,10 @@ def _vprop_tuple_setitem(engine, need, inputs, out):
 def _vprop_env_getitem(engine, need, inputs, out):
     coll, key, dflt = inputs
     need_tup = _need_tup(need)
-    keyv = engine.values(key, ANYTHING)
-
-    engine.declare_need(dflt, need)
-    engine.propagate_all(out, need, engine.values(dflt, need))
     engine.declare_need(key, ANYTHING)
-    for i in keyv:
-        engine.declare_need(coll, (i, *need_tup))
-        engine.propagate_all(out, need, engine.values(coll, (i, *need_tup)))
+    engine.passthrough(dflt, out, need)
+    for i in engine.values(key, ANYTHING):
+        engine.passthrough(coll, out, need, through_need=(i, *need_tup))
 
 
 @regvprop(P.env_setitem)
@@ -236,22 +228,18 @@ def _vprop_env_setitem(engine, need, inputs, out):
 
     engine.declare_need(key, ANYTHING)
     if propval:
-        engine.declare_need(val, others)
-        engine.propagate_all(out, need, engine.values(val, ANYTHING))
+        engine.passthrough(val, out, need, through_need=others)
     if propcoll:
         engine.passthrough(coll, out, need)
 
 
 @regvprop(P.universe_getitem)
 def _vprop_universe_getitem(engine, need, inputs, out):
-    u, h = inputs
+    coll, key = inputs
     need_tup = _need_tup(need)
-
-    # Need
-    engine.declare_need(h, ANYTHING)
-    for i in engine.values(h, ANYTHING):
-        engine.declare_need(u, (i, *need_tup))
-        engine.propagate_all(out, need, engine.values(u, (i, *need_tup)))
+    engine.declare_need(key, ANYTHING)
+    for i in engine.values(key, ANYTHING):
+        engine.passthrough(coll, out, need, through_need=(i, *need_tup))
 
 
 @regvprop(P.universe_setitem)
@@ -268,8 +256,7 @@ def _vprop_universe_setitem(engine, need, inputs, out):
 
     engine.declare_need(key, ANYTHING)
     if propval:
-        engine.declare_need(val, others)
-        engine.propagate_all(out, need, engine.values(val, ANYTHING))
+        engine.passthrough(val, out, need, through_need=others)
     if propcoll:
         engine.passthrough(coll, out, need)
 
@@ -310,7 +297,6 @@ def _vprop_raise_(engine, need, inputs, out):
 @regvprop(P.switch)
 def _vprop_switch(engine, need, inputs, out):
     cond, tb, fb = inputs
-
     engine.declare_need(cond, ANYTHING)
     engine.passthrough(tb, out, need)
     engine.passthrough(fb, out, need)
@@ -355,7 +341,6 @@ def _vprop_array_reduce(engine, need, inputs, out):
 @regvprop(P.casttag, P.tagged, P.unsafe_static_cast)
 def _vprop_cast_operation(engine, need, inputs, out):
     arg, tag = inputs
-
     engine.declare_need(tag, ANYTHING)
     engine.passthrough(arg, out, need)
 
