@@ -178,13 +178,9 @@ def _vprop_tuple_getitem(engine, need, inputs, out):
     need_tup = _need_tup(need)
     keyv = engine.values(key, ANYTHING)
 
-    # Need
+    engine.declare_need(key, ANYTHING)
     for i in keyv:
         engine.declare_need(coll, (i, *need_tup))
-    engine.declare_need(key, ANYTHING)
-
-    # Compute
-    for i in keyv:
         engine.propagate_all(out, need, engine.values(coll, (i, *need_tup)))
 
 
@@ -199,17 +195,12 @@ def _vprop_tuple_setitem(engine, need, inputs, out):
         propval = True in matches
         propcoll = False in matches
 
-    # Need
     engine.declare_need(key, ANYTHING)
     if propval:
         engine.declare_need(val, others)
-    if propcoll:
-        engine.declare_need(coll, need)
-
-    # Compute
-    if propval:
         engine.propagate_all(out, need, engine.values(val, ANYTHING))
     if propcoll:
+        engine.declare_need(coll, need)
         engine.propagate_all(out, need, engine.values(coll, need))
 
 
@@ -219,16 +210,11 @@ def _vprop_env_getitem(engine, need, inputs, out):
     need_tup = _need_tup(need)
     keyv = engine.values(key, ANYTHING)
 
-    # Need
     engine.declare_need(dflt, need)
+    engine.propagate_all(out, need, engine.values(dflt, need))
     engine.declare_need(key, ANYTHING)
     for i in keyv:
         engine.declare_need(coll, (i, *need_tup))
-
-    # Compute
-    for v in engine.values(dflt, need):
-        engine.propagate(out, need, v)
-    for i in keyv:
         engine.propagate_all(out, need, engine.values(coll, (i, *need_tup)))
 
 
@@ -243,17 +229,12 @@ def _vprop_env_setitem(engine, need, inputs, out):
         propval = True in matches
         propcoll = False in matches
 
-    # Need
     engine.declare_need(key, ANYTHING)
     if propval:
         engine.declare_need(val, others)
-    if propcoll:
-        engine.declare_need(coll, need)
-
-    # Compute
-    if propval:
         engine.propagate_all(out, need, engine.values(val, ANYTHING))
     if propcoll:
+        engine.declare_need(coll, need)
         engine.propagate_all(out, need, engine.values(coll, need))
 
 
@@ -263,13 +244,9 @@ def _vprop_universe_getitem(engine, need, inputs, out):
     need_tup = _need_tup(need)
 
     # Need
-    hv = engine.values(h, ANYTHING)
-    for v in hv:
-        engine.declare_need(u, (v, *need_tup))
     engine.declare_need(h, ANYTHING)
-
-    # Compute
     for i in engine.values(h, ANYTHING):
+        engine.declare_need(u, (i, *need_tup))
         engine.propagate_all(out, need, engine.values(u, (i, *need_tup)))
 
 
@@ -285,17 +262,12 @@ def _vprop_universe_setitem(engine, need, inputs, out):
         matches = {i == here for i in engine.values(key, ANYTHING)}
         propval = True in matches
 
-    # Need
     engine.declare_need(key, ANYTHING)
     if propval:
         engine.declare_need(val, others)
-    if propcoll:
-        engine.declare_need(coll, need)
-
-    # Compute
-    if propval:
         engine.propagate_all(out, need, engine.values(val, ANYTHING))
     if propcoll:
+        engine.declare_need(coll, need)
         engine.propagate_all(out, need, engine.values(coll, need))
 
 
@@ -324,10 +296,7 @@ def _vprop_partial(engine, need, inputs, out):
 def _vprop_return(engine, need, inputs, out):
     arg, = inputs
 
-    # Need
     engine.declare_need(arg, need)
-
-    # Compute
     engine.propagate_all(out, need, engine.values(arg, need))
 
 
@@ -335,23 +304,17 @@ def _vprop_return(engine, need, inputs, out):
 def _vprop_raise_(engine, need, inputs, out):
     arg, = inputs
 
-    # Need
     engine.declare_need(arg, ANYTHING)
-
-    # No compute
 
 
 @regvprop(P.switch)
 def _vprop_switch(engine, need, inputs, out):
     cond, tb, fb = inputs
 
-    # Need
     engine.declare_need(cond, ANYTHING)
     engine.declare_need(tb, need)
-    engine.declare_need(fb, need)
-
-    # Compute
     engine.propagate_all(out, need, engine.values(tb, need))
+    engine.declare_need(fb, need)
     engine.propagate_all(out, need, engine.values(fb, need))
 
 
@@ -395,11 +358,8 @@ def _vprop_array_reduce(engine, need, inputs, out):
 def _vprop_cast_operation(engine, need, inputs, out):
     arg, tag = inputs
 
-    # Need
     engine.declare_need(tag, ANYTHING)
     engine.declare_need(arg, need)
-
-    # Compute
     engine.propagate_all(out, need, engine.values(arg, need))
 
 
@@ -419,11 +379,8 @@ def _vprop_cast_operation(engine, need, inputs, out):
     P.handle,  # TODO: special handling
 )
 def _vprop_generic(engine, need, inputs, out):
-    # Need
     for inp in inputs:
         engine.declare_need(inp, ANYTHING)
-
-    # Compute
     engine.propagate(out, need, ANYTHING)
 
 
