@@ -1,13 +1,13 @@
+"""Dead data elimination."""
 
 from collections import defaultdict
-from itertools import product, chain
-from .. import abstract, xtype
-from ..operations import primitives as P, Primitive
-from ..utils import Registry, overload
-from ..abstract import ANYTHING, PartialApplication
-from ..ir import Graph
-from ..utils import Named
+from itertools import chain
 
+from .. import abstract, xtype
+from ..abstract import ANYTHING, DEAD, PartialApplication
+from ..ir import Constant, Graph
+from ..operations import Primitive, primitives as P
+from ..utils import Named, Partializable, Registry, new_universe, newenv
 
 WILDCARD = Named('WILDCARD')
 
@@ -41,10 +41,7 @@ class ValuePropagator:
         self.declare_need(root.return_, ANYTHING)
         i = 0
         while self.todo:
-            i += 1
             nxt = self.todo.pop()
-            mx = max(len(opts) for _, opts in self.need.items())
-            mxi, *_ = [opts for _, opts in self.need.items() if len(opts) == mx]
             self.process_node(nxt)
 
     def propagate(self, node, need, value):
@@ -95,7 +92,7 @@ class ValuePropagator:
             elif isinstance(fn, PartialApplication):
                 return _dofn(fn.fn, fn.args + inp)
             else:
-                raise Exception(type(fn))
+                raise NotImplementedError(type(fn))
 
         if node.is_apply():
             f, *inp = node.inputs
@@ -118,16 +115,6 @@ class ValuePropagator:
 
     def values(self, node, need):
         return self.results[node][need] | self.results[node][WILDCARD]
-
-
-def dde2(resources, root):
-    root.manager.keep_roots(root)
-    vprop = ValuePropagator(resources, root)
-
-    present = {node for node, needs in vprop.need.items() if needs}
-    missing = vprop.manager.all_nodes - present
-
-    return missing
 
 
 #####################
@@ -225,7 +212,10 @@ def _need_tuple_setitem(engine, need, inputs, out):
             others = ANYTHING
 
     for v in engine.values(idx, ANYTHING):
-        if v == here:
+        if here is None:
+            engine.declare_need(val, others)
+            engine.declare_need(tup, need)
+        elif v == here:
             engine.declare_need(val, others)
         else:
             engine.declare_need(tup, need)
@@ -235,7 +225,6 @@ def _need_tuple_setitem(engine, need, inputs, out):
 def _compute_tuple_setitem(engine, need, inputs, out):
     tup, idx, val = inputs
 
-    need_tup = need
     if need is ANYTHING:
         here, others = None, need
     else:
@@ -245,131 +234,17 @@ def _compute_tuple_setitem(engine, need, inputs, out):
             others = ANYTHING
 
     for i in engine.values(idx, ANYTHING):
-        if i == here:
+        if here is None:
+            for v in engine.values(val, ANYTHING):
+                engine.propagate(out, need, v)
+            for v in engine.values(tup, need):
+                engine.propagate(out, need, v)
+        elif i == here:
             for v in engine.values(val, ANYTHING):
                 engine.propagate(out, need, v)
         else:
             for v in engine.values(tup, need):
                 engine.propagate(out, need, v)
-
-
-@regneed(P.return_)
-def _need_return(engine, need, inputs, out):
-    arg, = inputs
-    engine.declare_need(arg, need)
-
-
-@regcompute(P.return_)
-def _compute_return_(engine, need, inputs, out):
-    arg, = inputs
-    for v in engine.values(arg, need):
-        engine.propagate(out, need, v)
-
-
-@regneed(P.raise_)
-def _need_raise_(engine, need, inputs, out):
-    arg, = inputs
-    engine.declare_need(arg, need)
-
-
-@regcompute(P.raise_)
-def _compute_raise_(engine, need, inputs, out):
-    pass
-
-
-@regneed(P.switch)
-def _need_switch(engine, need, inputs, out):
-    cond, tb, fb = inputs
-    engine.declare_need(cond, ANYTHING)
-    engine.declare_need(tb, need)
-    engine.declare_need(fb, need)
-
-
-@regcompute(P.switch)
-def _compute_switch(engine, need, inputs, out):
-    cond, tb, fb = inputs
-    for v in chain(engine.values(tb, need), engine.values(fb, need)):
-        engine.propagate(out, need, v)
-
-
-@regneed(P.array_map)
-def _need_array_map(engine, need, inputs, out):
-    for inp in inputs:
-        engine.declare_need(inp, ANYTHING)
-    fn_node, *_ = inputs
-    for fn in engine.values(fn_node, ANYTHING):
-        if isinstance(fn, Primitive):
-            pass
-        elif isinstance(fn, Graph):
-            engine.declare_need(fn.return_, ANYTHING)
-        else:
-            raise Exception(type(fn))
-
-
-@regcompute(P.array_map)
-def _compute_array_map(engine, need, inputs, out):
-    engine.propagate(out, need, ANYTHING)
-
-
-@regneed(P.array_reduce)
-def _need_array_reduce(engine, need, inputs, out):
-    for inp in inputs:
-        engine.declare_need(inp, ANYTHING)
-    fn_node, *_ = inputs
-    for fn in engine.values(fn_node, ANYTHING):
-        if isinstance(fn, Primitive):
-            pass
-        elif isinstance(fn, Graph):
-            engine.declare_need(fn.return_, ANYTHING)
-        else:
-            raise Exception(type(fn))
-
-
-@regcompute(P.array_reduce)
-def _compute_array_reduce(engine, need, inputs, out):
-    engine.propagate(out, need, ANYTHING)
-
-
-@regneed(P.casttag)
-def _need_casttag(engine, need, inputs, out):
-    arg, tag = inputs
-    engine.declare_need(tag, ANYTHING)
-    engine.declare_need(arg, need)
-
-
-@regcompute(P.casttag)
-def _compute_casttag(engine, need, inputs, out):
-    arg, tag = inputs
-    for v in engine.values(arg, need):
-        engine.propagate(out, need, v)
-
-
-@regneed(P.tagged)
-def _need_tagged(engine, need, inputs, out):
-    arg, tag = inputs
-    engine.declare_need(tag, ANYTHING)
-    engine.declare_need(arg, need)
-
-
-@regcompute(P.tagged)
-def _compute_tagged(engine, need, inputs, out):
-    arg, tag = inputs
-    for v in engine.values(arg, need):
-        engine.propagate(out, need, v)
-
-
-@regneed(P.unsafe_static_cast)
-def _need_unsafe_static_cast(engine, need, inputs, out):
-    arg, typ = inputs
-    engine.declare_need(typ, ANYTHING)
-    engine.declare_need(arg, need)
-
-
-@regcompute(P.unsafe_static_cast)
-def _compute_unsafe_static_cast(engine, need, inputs, out):
-    arg, typ = inputs
-    for v in engine.values(arg, need):
-        engine.propagate(out, need, v)
 
 
 @regneed(P.env_getitem)
@@ -411,7 +286,10 @@ def _need_env_setitem(engine, need, inputs, out):
             others = ANYTHING
 
     for v in engine.values(item, ANYTHING):
-        if v == here:
+        if here is None:
+            engine.declare_need(val, others)
+            engine.declare_need(env, need)
+        elif v == here:
             # engine.declare_need(val, ANYTHING)
             # engine.declare_need(env, others)
             engine.declare_need(val, others)
@@ -423,7 +301,6 @@ def _need_env_setitem(engine, need, inputs, out):
 def _compute_env_setitem(engine, need, inputs, out):
     env, item, val = inputs
 
-    need_tup = need
     if need is ANYTHING:
         here, others = None, need
     else:
@@ -480,7 +357,7 @@ def _need_universe_setitem(engine, need, inputs, out):
 
     for v in engine.values(h, ANYTHING):
         assert v is ANYTHING  # TODO: relax this assumption
-        if v == here:
+        if v == here or here is None:
             engine.declare_need(val, others)
         engine.declare_need(u, need)
 
@@ -489,7 +366,6 @@ def _need_universe_setitem(engine, need, inputs, out):
 def _compute_universe_setitem(engine, need, inputs, out):
     u, h, val = inputs
 
-    need_tup = need
     if need is ANYTHING:
         here, others = None, need
     else:
@@ -517,7 +393,7 @@ def _need_partial(engine, need, inputs, out):
             for p, arg in zip(fn.parameters, args):
                 engine.connect(arg, p)
         else:
-            raise Exception(type(fn))
+            raise NotImplementedError(type(fn))
 
 
 @regcompute(P.partial)
@@ -526,6 +402,125 @@ def _compute_partial(engine, need, inputs, out):
     for fn in engine.values(fn_node, ANYTHING):
         part = PartialApplication(fn, args)
         engine.propagate(out, need, part)
+
+
+@regneed(P.return_)
+def _need_return(engine, need, inputs, out):
+    arg, = inputs
+    engine.declare_need(arg, need)
+
+
+@regcompute(P.return_)
+def _compute_return_(engine, need, inputs, out):
+    arg, = inputs
+    for v in engine.values(arg, need):
+        engine.propagate(out, need, v)
+
+
+@regneed(P.raise_)
+def _need_raise_(engine, need, inputs, out):
+    arg, = inputs
+    engine.declare_need(arg, need)
+
+
+@regcompute(P.raise_)
+def _compute_raise_(engine, need, inputs, out):
+    pass
+
+
+@regneed(P.switch)
+def _need_switch(engine, need, inputs, out):
+    cond, tb, fb = inputs
+    engine.declare_need(cond, ANYTHING)
+    engine.declare_need(tb, need)
+    engine.declare_need(fb, need)
+
+
+@regcompute(P.switch)
+def _compute_switch(engine, need, inputs, out):
+    cond, tb, fb = inputs
+    for v in chain(engine.values(tb, need), engine.values(fb, need)):
+        engine.propagate(out, need, v)
+
+
+@regneed(P.array_map)
+def _need_array_map(engine, need, inputs, out):
+    for inp in inputs:
+        engine.declare_need(inp, ANYTHING)
+    fn_node, *_ = inputs
+    for fn in engine.values(fn_node, ANYTHING):
+        if isinstance(fn, Primitive):
+            pass
+        elif isinstance(fn, Graph):
+            engine.declare_need(fn.return_, ANYTHING)
+        else:
+            raise NotImplementedError(type(fn))
+
+
+@regcompute(P.array_map)
+def _compute_array_map(engine, need, inputs, out):
+    engine.propagate(out, need, ANYTHING)
+
+
+@regneed(P.array_reduce)
+def _need_array_reduce(engine, need, inputs, out):
+    for inp in inputs:
+        engine.declare_need(inp, ANYTHING)
+    fn_node, *_ = inputs
+    for fn in engine.values(fn_node, ANYTHING):
+        if isinstance(fn, Primitive):
+            pass
+        elif isinstance(fn, Graph):
+            engine.declare_need(fn.return_, ANYTHING)
+        else:
+            raise NotImplementedError(type(fn))
+
+
+@regcompute(P.array_reduce)
+def _compute_array_reduce(engine, need, inputs, out):
+    engine.propagate(out, need, ANYTHING)
+
+
+@regneed(P.casttag)
+def _need_casttag(engine, need, inputs, out):
+    arg, tag = inputs
+    engine.declare_need(tag, ANYTHING)
+    engine.declare_need(arg, need)
+
+
+@regcompute(P.casttag)
+def _compute_casttag(engine, need, inputs, out):
+    arg, tag = inputs
+    for v in engine.values(arg, need):
+        engine.propagate(out, need, v)
+
+
+@regneed(P.tagged)
+def _need_tagged(engine, need, inputs, out):
+    arg, tag = inputs
+    engine.declare_need(tag, ANYTHING)
+    engine.declare_need(arg, need)
+
+
+@regcompute(P.tagged)
+def _compute_tagged(engine, need, inputs, out):
+    arg, tag = inputs
+    for v in engine.values(arg, need):
+        engine.propagate(out, need, v)
+
+
+@regneed(P.unsafe_static_cast)
+def _need_unsafe_static_cast(engine, need, inputs, out):
+    arg, typ = inputs
+    engine.declare_need(typ, ANYTHING)
+    engine.declare_need(arg, need)
+
+
+@regcompute(P.unsafe_static_cast)
+def _compute_unsafe_static_cast(engine, need, inputs, out):
+    arg, typ = inputs
+    for v in engine.values(arg, need):
+        engine.propagate(out, need, v)
 
 
 @regneed(*_generic_primitives)
@@ -537,3 +532,52 @@ def _need_generic(engine, need, inputs, out):
 @regcompute(*_generic_primitives)
 def _compute_generic(engine, need, inputs, out):
     engine.propagate(out, need, ANYTHING)
+
+
+#######################
+# DeadDataElimination #
+#######################
+
+
+class DeadDataElimination2(Partializable):
+    """Eliminate expressions that compute unretrieved data."""
+
+    def __init__(self, resources=None):
+        """Initialize a DeadDataElimination."""
+        self.resources = resources
+
+    def make_dead(self, node):
+        """Create a dead version of the node."""
+        a = node.abstract
+        val = DEAD
+        if isinstance(a, abstract.AbstractScalar):
+            if a.xtype() == xtype.EnvType:
+                val = newenv
+            elif a.xtype() == xtype.UniverseType:
+                val = new_universe
+        repl = Constant(val)
+        repl.abstract = node.abstract
+        return repl
+
+    def __call__(self, root):
+        """Apply dead data elimination."""
+        root.manager.keep_roots(root)
+        vprop = ValuePropagator(self.resources, root)
+        present = {node for node, needs in vprop.need.items() if needs}
+        missing = vprop.manager.all_nodes - present
+        mng = root.manager
+        for node in missing:
+            g = node.graph
+            if g not in mng.graphs:
+                # This might happen if replace removes a graph.
+                continue
+            if g and node is g.return_:
+                continue
+            repl = self.make_dead(node)
+            mng.replace(node, repl)
+        return False  # Pretend there are no changes, for now
+
+
+__all__ = [
+    'DeadDataElimination2',
+]

@@ -10,7 +10,7 @@ from ..compile import BackendValue
 from ..ir import Graph
 from ..opt import (
     CSE,
-    DeadDataElimination,
+    DeadDataElimination2,
     LocalPassOptimizer,
     NodeMap,
     lib as optlib,
@@ -341,7 +341,7 @@ step_opt = Optimizer.partial(
 step_opt2 = Optimizer.partial(
     phases=dict(
         renormalize='renormalize',
-        dde=DeadDataElimination.partial(),
+        dde=DeadDataElimination2.partial(),
         main=[
             optlib.unfuse_composite,
             optlib.getitem_tuple,
