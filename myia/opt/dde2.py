@@ -147,6 +147,17 @@ compute_registry = Registry()
 regcompute = compute_registry.register
 
 
+def _split_need(need):
+    if need is ANYTHING:
+        here, others = None, need
+    else:
+        here, *others = need
+        others = tuple(others)
+        if not others:
+            others = ANYTHING
+    return here, others
+
+
 @regneed(P.make_tuple)
 def _need_make_tuple(engine, need, inputs, out):
     if need is ANYTHING:
@@ -202,15 +213,7 @@ def _compute_tuple_getitem(engine, need, inputs, out):
 def _need_tuple_setitem(engine, need, inputs, out):
     tup, idx, val = inputs
     engine.declare_need(idx, ANYTHING)
-
-    if need is ANYTHING:
-        here, others = None, need
-    else:
-        here, *others = need
-        others = tuple(others)
-        if not others:
-            others = ANYTHING
-
+    here, others = _split_need(need)
     for v in engine.values(idx, ANYTHING):
         if here is None:
             engine.declare_need(val, others)
@@ -224,15 +227,7 @@ def _need_tuple_setitem(engine, need, inputs, out):
 @regcompute(P.tuple_setitem)
 def _compute_tuple_setitem(engine, need, inputs, out):
     tup, idx, val = inputs
-
-    if need is ANYTHING:
-        here, others = None, need
-    else:
-        here, *others = need
-        others = tuple(others)
-        if not others:
-            others = ANYTHING
-
+    here, others = _split_need(need)
     for i in engine.values(idx, ANYTHING):
         if here is None:
             for v in engine.values(val, ANYTHING):
@@ -276,22 +271,12 @@ def _compute_env_getitem(engine, need, inputs, out):
 def _need_env_setitem(engine, need, inputs, out):
     env, item, val = inputs
     engine.declare_need(item, ANYTHING)
-
-    if need is ANYTHING:
-        here, others = None, need
-    else:
-        here, *others = need
-        others = tuple(others)
-        if not others:
-            others = ANYTHING
-
+    here, others = _split_need(need)
     for v in engine.values(item, ANYTHING):
         if here is None:
             engine.declare_need(val, others)
             engine.declare_need(env, need)
         elif v == here:
-            # engine.declare_need(val, ANYTHING)
-            # engine.declare_need(env, others)
             engine.declare_need(val, others)
         else:
             engine.declare_need(env, need)
@@ -300,18 +285,9 @@ def _need_env_setitem(engine, need, inputs, out):
 @regcompute(P.env_setitem)
 def _compute_env_setitem(engine, need, inputs, out):
     env, item, val = inputs
-
-    if need is ANYTHING:
-        here, others = None, need
-    else:
-        here, *others = need
-        others = tuple(others)
-        if not others:
-            others = ANYTHING
-
+    here, others = _split_need(need)
     for i in engine.values(item, ANYTHING):
         if i == here:
-            # for v in engine.values(val, ANYTHING):
             for v in engine.values(val, others):
                 engine.propagate(out, need, v)
         else:
@@ -346,15 +322,7 @@ def _compute_universe_getitem(engine, need, inputs, out):
 def _need_universe_setitem(engine, need, inputs, out):
     u, h, val = inputs
     engine.declare_need(h, ANYTHING)
-
-    if need is ANYTHING:
-        here, others = None, need
-    else:
-        here, *others = need
-        others = tuple(others)
-        if not others:
-            others = ANYTHING
-
+    here, others = _split_need(need)
     for v in engine.values(h, ANYTHING):
         assert v is ANYTHING  # TODO: relax this assumption
         if v == here or here is None:
@@ -365,15 +333,7 @@ def _need_universe_setitem(engine, need, inputs, out):
 @regcompute(P.universe_setitem)
 def _compute_universe_setitem(engine, need, inputs, out):
     u, h, val = inputs
-
-    if need is ANYTHING:
-        here, others = None, need
-    else:
-        here, *others = need
-        others = tuple(others)
-        if not others:
-            others = ANYTHING
-
+    here, others = _split_need(need)
     for i in engine.values(h, ANYTHING):
         if i == here:
             for v in engine.values(val, ANYTHING):
