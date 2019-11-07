@@ -246,111 +246,111 @@ regvprop = vprop_registry.register
 
 
 @regvprop(P.make_tuple)
-def _vprop_make_tuple(engine, need, inputs, out):
+def _vprop_make_tuple(vprop, need, inputs, out):
     here, others = _split_need(need)
     if here is None:
         for inp in inputs:
-            engine.add_need(inp, ANYTHING)
-        engine.add_value(out, need, tuple(ANYTHING for inp in inputs))
+            vprop.add_need(inp, ANYTHING)
+        vprop.add_value(out, need, tuple(ANYTHING for inp in inputs))
     else:
-        engine.passthrough(inputs[here], out, need, through_need=others)
+        vprop.passthrough(inputs[here], out, need, through_need=others)
 
 
 @regvprop(P.tuple_getitem)
-def _vprop_tuple_getitem(engine, need, inputs, out):
+def _vprop_tuple_getitem(vprop, need, inputs, out):
     coll, key = inputs
-    engine.getitem(coll, key, out, need)
+    vprop.getitem(coll, key, out, need)
 
 
 @regvprop(P.tuple_setitem)
-def _vprop_tuple_setitem(engine, need, inputs, out):
+def _vprop_tuple_setitem(vprop, need, inputs, out):
     coll, key, val = inputs
-    engine.setitem(coll, key, val, out, need)
+    vprop.setitem(coll, key, val, out, need)
 
 
 @regvprop(P.env_getitem)
-def _vprop_env_getitem(engine, need, inputs, out):
+def _vprop_env_getitem(vprop, need, inputs, out):
     coll, key, dflt = inputs
-    engine.passthrough(dflt, out, need)
-    engine.getitem(coll, key, out, need)
+    vprop.passthrough(dflt, out, need)
+    vprop.getitem(coll, key, out, need)
 
 
 @regvprop(P.env_setitem)
-def _vprop_env_setitem(engine, need, inputs, out):
+def _vprop_env_setitem(vprop, need, inputs, out):
     coll, key, val = inputs
-    engine.setitem(coll, key, val, out, need)
+    vprop.setitem(coll, key, val, out, need)
 
 
 @regvprop(P.universe_getitem)
-def _vprop_universe_getitem(engine, need, inputs, out):
+def _vprop_universe_getitem(vprop, need, inputs, out):
     coll, key = inputs
-    engine.getitem(coll, key, out, need)
+    vprop.getitem(coll, key, out, need)
 
 
 @regvprop(P.universe_setitem)
-def _vprop_universe_setitem(engine, need, inputs, out):
+def _vprop_universe_setitem(vprop, need, inputs, out):
     coll, key, val = inputs
-    engine.setitem(coll, key, val, out, need, precise_values=False)
+    vprop.setitem(coll, key, val, out, need, precise_values=False)
 
 
 @regvprop(P.partial)
-def _vprop_partial(engine, need, inputs, out):
+def _vprop_partial(vprop, need, inputs, out):
     fn_node, *args = inputs
-    engine.add_need(fn_node, ANYTHING)
-    for fn in engine.values(fn_node, ANYTHING):
+    vprop.add_need(fn_node, ANYTHING)
+    for fn in vprop.values(fn_node, ANYTHING):
         if isinstance(fn, Primitive):
             pass
         elif isinstance(fn, Graph):
             for p, arg in zip(fn.parameters, args):
-                engine.connect(arg, p)
+                vprop.connect(arg, p)
         else:
             raise NotImplementedError(type(fn))
 
         part = PartialApplication(fn, args)
-        engine.add_value(out, need, part)
+        vprop.add_value(out, need, part)
 
 
 @regvprop(P.return_)
-def _vprop_return(engine, need, inputs, out):
+def _vprop_return(vprop, need, inputs, out):
     arg, = inputs
-    engine.passthrough(arg, out, need)
+    vprop.passthrough(arg, out, need)
 
 
 @regvprop(P.raise_)
-def _vprop_raise_(engine, need, inputs, out):
+def _vprop_raise_(vprop, need, inputs, out):
     arg, = inputs
-    engine.add_need(arg, ANYTHING)
+    vprop.add_need(arg, ANYTHING)
 
 
 @regvprop(P.switch)
-def _vprop_switch(engine, need, inputs, out):
+def _vprop_switch(vprop, need, inputs, out):
     cond, tb, fb = inputs
-    engine.add_need(cond, ANYTHING)
-    engine.passthrough(tb, out, need)
-    engine.passthrough(fb, out, need)
+    vprop.add_need(cond, ANYTHING)
+    vprop.passthrough(tb, out, need)
+    vprop.passthrough(fb, out, need)
 
 
 @regvprop(P.array_map, P.array_reduce)
-def _vprop_array_operation(engine, need, inputs, out):
+def _vprop_array_operation(vprop, need, inputs, out):
     for inp in inputs:
-        engine.add_need(inp, ANYTHING)
+        vprop.add_need(inp, ANYTHING)
     fn_node, *_ = inputs
-    for fn in engine.values(fn_node, ANYTHING):
+    for fn in vprop.values(fn_node, ANYTHING):
         if isinstance(fn, Primitive):
             pass
         elif isinstance(fn, Graph):
-            engine.add_need(fn.return_, ANYTHING)
+            vprop.add_need(fn.return_, ANYTHING)
         else:
             raise NotImplementedError(type(fn))
 
-    engine.add_value(out, need, ANYTHING)
+    vprop.add_value(out, need, ANYTHING)
 
 
 @regvprop(P.casttag, P.tagged, P.unsafe_static_cast)
-def _vprop_cast_operation(engine, need, inputs, out):
+def _vprop_cast_operation(vprop, need, inputs, out):
     arg, tag = inputs
-    engine.add_need(tag, ANYTHING)
-    engine.passthrough(arg, out, need)
+    vprop.add_need(tag, ANYTHING)
+    vprop.passthrough(arg, out, need)
 
 
 @regvprop(
@@ -368,10 +368,10 @@ def _vprop_cast_operation(engine, need, inputs, out):
     P.max_pool2d_grad, P.max_pool2d,
     P.handle,  # TODO: special handling
 )
-def _vprop_generic(engine, need, inputs, out):
+def _vprop_generic(vprop, need, inputs, out):
     for inp in inputs:
-        engine.add_need(inp, ANYTHING)
-    engine.add_value(out, need, ANYTHING)
+        vprop.add_need(inp, ANYTHING)
+    vprop.add_value(out, need, ANYTHING)
 
 
 #######################
