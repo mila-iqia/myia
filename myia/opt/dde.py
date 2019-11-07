@@ -9,6 +9,7 @@ from ..operations import Primitive, primitives as P
 from ..utils import Named, Partializable, Registry, newenv
 
 WILDCARD = Named('WILDCARD')
+MAX_NEED_DEPTH = 5
 
 
 #####################
@@ -102,8 +103,8 @@ class ValuePropagator:
     def add_need(self, node, need):
         """Declare that node has the given need."""
         needs = self.need[node]
-        if isinstance(need, tuple) and len(need) > 3:
-            need = need[:3]
+        if isinstance(need, tuple) and len(need) > MAX_NEED_DEPTH:
+            need = need[:MAX_NEED_DEPTH]
         if need not in needs:
             if isinstance(need, tuple):
                 for i in range(1, len(need)):
