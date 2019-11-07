@@ -1,7 +1,6 @@
 """Dead data elimination."""
 
 from collections import defaultdict
-from itertools import chain
 
 from .. import abstract, xtype
 from ..abstract import ANYTHING, DEAD, PartialApplication
@@ -18,18 +17,43 @@ WILDCARD = Named('WILDCARD')
 
 
 class ValuePropagator:
+    """Perform value propagation.
+
+    Each need for each node is associated to a set of possible values. A "need"
+    is either ANYTHING or a path. For example, the need (0, 7) on a node means
+    that we need element 7 of element 0 of the tuple returned at this node.
+
+    * Primitives of the form *_getitem or *_setitem should manipulate the needs
+      accordingly, e.g. if we need (0, 7) on getitem(tup, 3), then we need
+      (3, 0, 7) on tup.
+
+    We start with the ANYTHING need on root.return_, ANYTHING on
+    root.parameters, and the appropriate values on constants, and propagate
+    until equilibrium. The set of possible needs and values is appropriately
+    limited to ensure that the process terminates.
+
+    Some nodes may end up not being needed at all, e.g. if the only need on
+    a tuple is (1,), then the node for element 0, if it is used nowhere else,
+    is not needed, and it can be removed later.
+    """
 
     def __init__(self, resources, root):
+        """Initialize a ValuePropagator and run the algorithm."""
         self.resources = resources
         self.manager = resources.manager
+        # need :: node -> {paths}
         self.need = defaultdict(set)
+        # flow :: node -> {node}
         self.flow = defaultdict(set)
+        # backflow :: node -> {node} (opposite of flow)
         self.backflow = defaultdict(set)
+        # results :: node -> need -> values
         self.results = defaultdict(lambda: defaultdict(set))
         self.todo = set()
         self.run(root)
 
     def run(self, root):
+        """Run the algorithm."""
         for p in root.parameters:
             self.propagate(p, WILDCARD, ANYTHING)
         for ct in self.manager.all_nodes:
@@ -43,7 +67,12 @@ class ValuePropagator:
             nxt = self.todo.pop()
             self.process_node(nxt)
 
+    def values(self, node, need):
+        """Return the current set of possible values for node:need."""
+        return self.results[node][need] | self.results[node][WILDCARD]
+
     def propagate(self, node, need, value):
+        """Propagate a value for a need on a node."""
         if need is ANYTHING and isinstance(value, tuple):
             for i, v in enumerate(value):
                 self.propagate(node, (i,), v)
@@ -54,17 +83,17 @@ class ValuePropagator:
         results = self.results[node][need]
         if value not in results:
             results.add(value)
-            self.invalidate(node)
+            # Invalidate all uses of this node, because they now have new
+            # values to test.
+            for node2, i in self.manager.uses[node]:
+                self.todo.add(node2)
             for other_node in self.flow[node]:
                 self._propagate(other_node, need, value)
 
     def propagate_all(self, node, need, values):
+        """Propagate a set of values for a need on a node."""
         for value in values:
             self.propagate(node, need, value)
-
-    def invalidate(self, node):
-        for node2, i in self.manager.uses[node]:
-            self.todo.add(node2)
 
     def declare_need(self, node, need):
         needs = self.need[node]
@@ -77,11 +106,17 @@ class ValuePropagator:
                         return
             needs.add(need)
             self.todo.add(node)
-            self.invalidate(node)
             for other_node in self.backflow[node]:
                 self.declare_need(other_node, need)
 
     def process_node(self, node):
+        """Perform value/need propagation on node.
+
+        If new values or needs are discovered, the nodes touched by the change
+        will be rescheduled for processing. It is important for the process to
+        be monotonic and for the sets of values/needs to be finite for it to
+        terminate.
+        """
 
         def _dofn(fn, inp):
             if isinstance(fn, Primitive):
@@ -105,6 +140,14 @@ class ValuePropagator:
             pass
 
     def connect(self, frm, to):
+        """Connect node frm to node to.
+
+        When calling `y = f(x)`, x is connected to the first parameter of f,
+        and the return node of f is connected to y.
+
+        * Any value propagated to frm is propagated to to.
+        * Any need on to is propagated to frm.
+        """
         if to in self.flow[frm]:
             return
         self.flow[frm].add(to)
@@ -116,12 +159,38 @@ class ValuePropagator:
                 self._propagate(to, need, value)
 
     def passthrough(self, arg, out, need, *, through_need=None):
+        """Declare that out:need is equivalent to arg:through_need.
+
+        * We need through_need on arg.
+        * Values for through_need on arg are propagated to need on out.
+
+        Arguments:
+            arg: An argument that is related to out.
+            out: The output node.
+            need: The need on the output node.
+            through_need: The equivalent need on arg. If None, then the
+                need on out is used.
+
+        """
         if through_need is None:
             through_need = need
         self.declare_need(arg, through_need)
         self.propagate_all(out, need, self.values(arg, through_need))
 
     def getitem(self, coll, key, out, need):
+        """Implement a standard getitem operation.
+
+        * We need key:ANYTHING
+        * For all possible values of key, we need coll:(key, *need),
+          and the values are propagated to out:need.
+
+        Arguments:
+            coll: The collection node.
+            key: The key/index node.
+            out: The output node.
+            need: The need on out.
+
+        """
         need_tup = need
         if need_tup is ANYTHING:
             need_tup = ()
@@ -130,6 +199,26 @@ class ValuePropagator:
             self.passthrough(coll, out, need, through_need=(i, *need_tup))
 
     def setitem(self, coll, key, val, out, need, *, precise_values=True):
+        """Implement a standard setitem operation.
+
+        * We need key:ANYTHING
+        * If the first item of the need matches at least one of the possible
+          values for the key, we propagate the rest of the need to val.
+        * Otherwise, or if precise_values is False, we propagate the need
+          to coll.
+
+        Arguments:
+            coll: The collection node.
+            key: The key/index node.
+            val: The value node, to put in the collection with the given key.
+            out: The output node.
+            need: The need on out.
+            precise_values: Whether the key represents a single possible key
+                at runtime, or a set of keys. If it is the former, then if the
+                need is equal to the key, nothing is needed from coll. If it is
+                the latter, then we declare a need on both val and coll.
+
+        """
         here, others = _split_need(need)
         if here is None:
             propval, propcoll = True, True
@@ -143,9 +232,6 @@ class ValuePropagator:
             self.passthrough(val, out, need, through_need=others)
         if propcoll:
             self.passthrough(coll, out, need)
-
-    def values(self, node, need):
-        return self.results[node][need] | self.results[node][WILDCARD]
 
 
 def _split_need(need):
@@ -337,5 +423,6 @@ class DeadDataElimination2(Partializable):
 
 
 __all__ = [
+    'ValuePropagator',
     'DeadDataElimination2',
 ]
