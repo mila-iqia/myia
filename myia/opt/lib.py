@@ -186,7 +186,7 @@ gadd_switch = psub(
 
 
 _ArrayType = Var('ArrayType')
-
+_Shape = Var('Shape')
 
 @overload
 def _transform(pattern: tuple):
@@ -202,7 +202,7 @@ def _transform(pattern: Var):
 @overload  # noqa: F811
 def _transform(pattern: (int, float)):
     return (P.distribute, (P.scalar_to_array, pattern, _ArrayType),
-            constvar())
+            _Shape)
 
 
 def on_array_map(orig):
