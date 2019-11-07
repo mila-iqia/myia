@@ -34,7 +34,6 @@ from ..utils.variables import (
     Y,
     Ys,
     Z,
-    constvar,
 )
 from ..xtype import Number
 from .opt import (
@@ -187,6 +186,7 @@ gadd_switch = psub(
 
 _ArrayType = Var('ArrayType')
 _Shape = Var('Shape')
+
 
 @overload
 def _transform(pattern: tuple):
