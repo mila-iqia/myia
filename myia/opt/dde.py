@@ -6,7 +6,7 @@ from .. import abstract, xtype
 from ..abstract import ANYTHING, DEAD, PartialApplication
 from ..ir import Constant, Graph
 from ..operations import Primitive, primitives as P
-from ..utils import Named, Partializable, Registry, new_universe, newenv
+from ..utils import Named, Partializable, Registry, newenv
 
 WILDCARD = Named('WILDCARD')
 
@@ -393,8 +393,7 @@ class DeadDataElimination(Partializable):
         if isinstance(a, abstract.AbstractScalar):
             if a.xtype() == xtype.EnvType:
                 val = newenv
-            elif a.xtype() == xtype.UniverseType:
-                val = new_universe
+            assert a.xtype() != xtype.UniverseType  # TODO
         repl = Constant(val)
         repl.abstract = node.abstract
         return repl
