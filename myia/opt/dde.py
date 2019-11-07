@@ -69,6 +69,15 @@ class ValuePropagator:
 
     def values(self, node, need):
         """Return the current set of possible values for node:need."""
+        # The purpose of the WILDCARD key is to act as a fallback to cover any
+        # need. For example, if a parameter is a tree (so its type at this
+        # point is a recursive AbstractTuple), we might need paths (1, 0), (1,
+        # 1, 0), and so on, but rather than having an infinite number of
+        # entries, we just have a single WILDCARD entry that covers them all.
+        # This is conceptually different from ANYTHING, which covers the path
+        # (), where the need is for the unindexed data structure. WILDCARD
+        # is currently only set in run(), for parameters and tuple constants.
+        # So most of the time there's nothing in it.
         return self.results[node][need] | self.results[node][WILDCARD]
 
     def add_value(self, node, need, value):
