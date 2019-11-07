@@ -55,14 +55,14 @@ class ValuePropagator:
     def run(self, root):
         """Run the algorithm."""
         for p in root.parameters:
-            self.propagate(p, WILDCARD, ANYTHING)
+            self.add_value(p, WILDCARD, ANYTHING)
         for ct in self.manager.all_nodes:
             if ct.is_constant():
                 if isinstance(ct.value, tuple):
-                    self.propagate(ct, WILDCARD, ANYTHING)
+                    self.add_value(ct, WILDCARD, ANYTHING)
                 else:
-                    self.propagate(ct, ANYTHING, ct.value)
-        self.declare_need(root.return_, ANYTHING)
+                    self.add_value(ct, ANYTHING, ct.value)
+        self.add_need(root.return_, ANYTHING)
         while self.todo:
             nxt = self.todo.pop()
             self.process_node(nxt)
@@ -71,14 +71,14 @@ class ValuePropagator:
         """Return the current set of possible values for node:need."""
         return self.results[node][need] | self.results[node][WILDCARD]
 
-    def propagate(self, node, need, value):
+    def add_value(self, node, need, value):
         """Propagate a value for a need on a node."""
         if need is ANYTHING and isinstance(value, tuple):
             for i, v in enumerate(value):
-                self.propagate(node, (i,), v)
-        self._propagate(node, need, value)
+                self.add_value(node, (i,), v)
+        self._add_value(node, need, value)
 
-    def _propagate(self, node, need, value):
+    def _add_value(self, node, need, value):
         assert need != ()
         results = self.results[node][need]
         if value not in results:
@@ -88,14 +88,9 @@ class ValuePropagator:
             for node2, i in self.manager.uses[node]:
                 self.todo.add(node2)
             for other_node in self.flow[node]:
-                self._propagate(other_node, need, value)
+                self._add_value(other_node, need, value)
 
-    def propagate_all(self, node, need, values):
-        """Propagate a set of values for a need on a node."""
-        for value in values:
-            self.propagate(node, need, value)
-
-    def declare_need(self, node, need):
+    def add_need(self, node, need):
         needs = self.need[node]
         if isinstance(need, tuple) and len(need) > 3:
             need = need[:3]
@@ -107,7 +102,7 @@ class ValuePropagator:
             needs.add(need)
             self.todo.add(node)
             for other_node in self.backflow[node]:
-                self.declare_need(other_node, need)
+                self.add_need(other_node, need)
 
     def process_node(self, node):
         """Perform value/need propagation on node.
@@ -133,7 +128,7 @@ class ValuePropagator:
 
         if node.is_apply():
             f, *inp = node.inputs
-            self.declare_need(f, ANYTHING)
+            self.add_need(f, ANYTHING)
             for fn in self.values(f, ANYTHING):
                 _dofn(fn, inp)
         else:
@@ -153,10 +148,10 @@ class ValuePropagator:
         self.flow[frm].add(to)
         self.backflow[to].add(frm)
         for need in self.need[to]:
-            self.declare_need(frm, need)
+            self.add_need(frm, need)
         for need, values in self.results[frm].items():
             for value in values:
-                self._propagate(to, need, value)
+                self._add_value(to, need, value)
 
     def passthrough(self, arg, out, need, *, through_need=None):
         """Declare that out:need is equivalent to arg:through_need.
@@ -174,8 +169,9 @@ class ValuePropagator:
         """
         if through_need is None:
             through_need = need
-        self.declare_need(arg, through_need)
-        self.propagate_all(out, need, self.values(arg, through_need))
+        self.add_need(arg, through_need)
+        for value in self.values(arg, through_need):
+            self.add_value(out, need, value)
 
     def getitem(self, coll, key, out, need):
         """Implement a standard getitem operation.
@@ -194,7 +190,7 @@ class ValuePropagator:
         need_tup = need
         if need_tup is ANYTHING:
             need_tup = ()
-        self.declare_need(key, ANYTHING)
+        self.add_need(key, ANYTHING)
         for i in self.values(key, ANYTHING):
             self.passthrough(coll, out, need, through_need=(i, *need_tup))
 
@@ -227,7 +223,7 @@ class ValuePropagator:
             propval = True in matches
             propcoll = not precise_values or False in matches
 
-        self.declare_need(key, ANYTHING)
+        self.add_need(key, ANYTHING)
         if propval:
             self.passthrough(val, out, need, through_need=others)
         if propcoll:
@@ -254,8 +250,8 @@ def _vprop_make_tuple(engine, need, inputs, out):
     here, others = _split_need(need)
     if here is None:
         for inp in inputs:
-            engine.declare_need(inp, ANYTHING)
-        engine.propagate(out, need, tuple(ANYTHING for inp in inputs))
+            engine.add_need(inp, ANYTHING)
+        engine.add_value(out, need, tuple(ANYTHING for inp in inputs))
     else:
         engine.passthrough(inputs[here], out, need, through_need=others)
 
@@ -300,7 +296,7 @@ def _vprop_universe_setitem(engine, need, inputs, out):
 @regvprop(P.partial)
 def _vprop_partial(engine, need, inputs, out):
     fn_node, *args = inputs
-    engine.declare_need(fn_node, ANYTHING)
+    engine.add_need(fn_node, ANYTHING)
     for fn in engine.values(fn_node, ANYTHING):
         if isinstance(fn, Primitive):
             pass
@@ -311,7 +307,7 @@ def _vprop_partial(engine, need, inputs, out):
             raise NotImplementedError(type(fn))
 
         part = PartialApplication(fn, args)
-        engine.propagate(out, need, part)
+        engine.add_value(out, need, part)
 
 
 @regvprop(P.return_)
@@ -323,13 +319,13 @@ def _vprop_return(engine, need, inputs, out):
 @regvprop(P.raise_)
 def _vprop_raise_(engine, need, inputs, out):
     arg, = inputs
-    engine.declare_need(arg, ANYTHING)
+    engine.add_need(arg, ANYTHING)
 
 
 @regvprop(P.switch)
 def _vprop_switch(engine, need, inputs, out):
     cond, tb, fb = inputs
-    engine.declare_need(cond, ANYTHING)
+    engine.add_need(cond, ANYTHING)
     engine.passthrough(tb, out, need)
     engine.passthrough(fb, out, need)
 
@@ -337,23 +333,23 @@ def _vprop_switch(engine, need, inputs, out):
 @regvprop(P.array_map, P.array_reduce)
 def _vprop_array_operation(engine, need, inputs, out):
     for inp in inputs:
-        engine.declare_need(inp, ANYTHING)
+        engine.add_need(inp, ANYTHING)
     fn_node, *_ = inputs
     for fn in engine.values(fn_node, ANYTHING):
         if isinstance(fn, Primitive):
             pass
         elif isinstance(fn, Graph):
-            engine.declare_need(fn.return_, ANYTHING)
+            engine.add_need(fn.return_, ANYTHING)
         else:
             raise NotImplementedError(type(fn))
 
-    engine.propagate(out, need, ANYTHING)
+    engine.add_value(out, need, ANYTHING)
 
 
 @regvprop(P.casttag, P.tagged, P.unsafe_static_cast)
 def _vprop_cast_operation(engine, need, inputs, out):
     arg, tag = inputs
-    engine.declare_need(tag, ANYTHING)
+    engine.add_need(tag, ANYTHING)
     engine.passthrough(arg, out, need)
 
 
@@ -374,8 +370,8 @@ def _vprop_cast_operation(engine, need, inputs, out):
 )
 def _vprop_generic(engine, need, inputs, out):
     for inp in inputs:
-        engine.declare_need(inp, ANYTHING)
-    engine.propagate(out, need, ANYTHING)
+        engine.add_need(inp, ANYTHING)
+    engine.add_value(out, need, ANYTHING)
 
 
 #######################
