@@ -22,7 +22,7 @@ class PyTorchTensor(Object):
         import torch
         if not isinstance(x, torch.Tensor):
             raise MyiaInputTypeError(f"Expected torch.Tensor but got {x}.")
-        return x.detach().numpy()
+        return x.detach().cpu().numpy()
 
     @classmethod
     def from_numpy(self, x):
