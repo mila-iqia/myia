@@ -320,7 +320,7 @@ def _vprop_partial(vprop, need, inputs, out):
         vprop.add_value(out, need, part)
 
 
-@regvprop(P.return_)
+@regvprop(P.return_, P.identity)
 def _vprop_return(vprop, need, inputs, out):
     arg, = inputs
     vprop.passthrough(arg, out, need)
@@ -364,19 +364,65 @@ def _vprop_cast_operation(vprop, need, inputs, out):
 
 
 @regvprop(
-    P.scalar_eq, P.scalar_ne,
-    P.scalar_gt, P.scalar_lt, P.scalar_ge, P.scalar_le,
-    P.scalar_sub, P.scalar_mul, P.scalar_div, P.scalar_add, P.scalar_mod,
-    P.scalar_pow, P.scalar_exp, P.scalar_log, P.scalar_tanh,
-    P.distribute, P.dot, P.transpose, P.scalar_to_array,
-    P.bool_and, P.bool_or, P.bool_not, P.bool_eq, P.scalar_usub, P.scalar_uadd,
-    P.array_getitem, P.array_setitem, P.scalar_cast, P.reshape, P.scalar_floor,
-    P.hastag, P.make_exception,
-    P.argmax, P.array_max, P.gather, P.scatter, P.scatter_add,
-    P.scalar_sign, P.split, P.concat, P.array_cast,
-    P.conv2d, P.conv2d_input_grad, P.conv2d_weight_grad, P.array_to_scalar,
-    P.max_pool2d_grad, P.max_pool2d,
-    P.handle,  # TODO: special handling
+    P.argmax,
+    P.array_cast,
+    P.array_getitem,
+    P.array_max,
+    P.array_scan,
+    P.array_setitem,
+    P.array_to_scalar,
+    P.bool_and,
+    P.bool_eq,
+    P.bool_not,
+    P.bool_or,
+    P.broadcast_shape,
+    P.concat,
+    P.conv2d,
+    P.conv2d_input_grad,
+    P.conv2d_weight_grad,
+    P.distribute,
+    P.dot,
+    P.env_add,
+    P.gather,
+    P.handle,
+    P.hastag,
+    P.invert_permutation,
+    P.make_exception,
+    P.max_pool2d,
+    P.max_pool2d_grad,
+    P.reshape,
+    P.scalar_add,
+    P.scalar_abs,
+    P.scalar_cast,
+    P.scalar_cos,
+    P.scalar_div,
+    P.scalar_eq,
+    P.scalar_exp,
+    P.scalar_floor,
+    P.scalar_ge,
+    P.scalar_gt,
+    P.scalar_le,
+    P.scalar_log,
+    P.scalar_lt,
+    P.scalar_max,
+    P.scalar_mod,
+    P.scalar_mul,
+    P.scalar_ne,
+    P.scalar_pow,
+    P.scalar_sign,
+    P.scalar_sin,
+    P.scalar_sub,
+    P.scalar_tan,
+    P.scalar_tanh,
+    P.scalar_to_array,
+    P.scalar_trunc,
+    P.scalar_uadd,
+    P.scalar_usub,
+    P.scatter,
+    P.scatter_add,
+    P.shape,
+    P.split,
+    P.transpose,
 )
 def _vprop_generic(vprop, need, inputs, out):
     for inp in inputs:
