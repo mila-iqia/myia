@@ -19,7 +19,7 @@ from ...abstract import (
     broaden,
 )
 from ...utils import overload
-from ...xtype import Bool, EnvType, Nil, type_to_np_dtype
+from ...xtype import Bool, EnvType, Nil, type_to_np_dtype, UniverseType
 
 union_type = relay.GlobalTypeVar('$_union_adt')
 empty_union = adt.Constructor("empty", [], union_type)
@@ -172,7 +172,7 @@ def to_relay_type(self, a: AbstractScalar):
     tp = a.xtype()
     if issubclass(tp, Bool):
         return relay.ty.scalar_type('bool')
-    elif issubclass(tp, Nil):
+    elif issubclass(tp, (Nil, UniverseType)):
         return relay.ty.TupleType([])
     elif issubclass(tp, EnvType):
         return env_type(env_val())
