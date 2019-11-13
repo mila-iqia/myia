@@ -44,7 +44,8 @@ def validate_abstract(self, a: AbstractError, uses):
 def validate_abstract(self, a: AbstractScalar, uses):
     if not issubclass(a.xtype(),
                       (xtype.Number, xtype.Bool, xtype.Nil,
-                       xtype.EnvType, xtype.SymbolicKeyType)):
+                       xtype.EnvType, xtype.SymbolicKeyType,
+                       xtype.UniverseType)):
         raise ValidationError(
             f'Illegal type in the graph: {a}'
         )   # pragma: no cover
