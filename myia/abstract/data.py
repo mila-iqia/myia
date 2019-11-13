@@ -670,12 +670,22 @@ class AbstractJTagged(AbstractWrapper):
         return pretty_call(ctx, "J", self.element)
 
 
+@serializable('AbstractHandle')
 class AbstractHandle(AbstractWrapper):
     """Represents a value (non-function) transformed through J."""
 
     def __init__(self, element, values={}):
         """Initialize an AbstractHandle."""
         super().__init__(element, values)
+
+    def _serialize(self):
+        return {'element': self.element}
+
+    @classmethod
+    def _construct(cls):
+        res = cls(None)
+        data = yield res
+        res.element = data['element']
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "H", self.element)
