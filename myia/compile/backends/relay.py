@@ -78,6 +78,7 @@ SIMPLE_MAP = {
 
     P.make_tuple: lambda *args: relay.Tuple(args),
     P.switch: relay.If,
+    P.handle: relay.expr.RefCreate,
 }
 
 
@@ -367,6 +368,14 @@ def relay_split(c, x, sections, dim):
     return relay.split(c.ref(x), sections, dim.value).astuple()
 
 
+def relay_universe_getitem(c, u, h):
+    return relay.expr.RefRead(c.ref(h))
+
+
+def relay_universe_setitem(c, u, h, v):
+    return relay.expr.RefWrite(c.ref(h), c.ref(v))
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -393,6 +402,8 @@ COMPLEX_MAP = {
     P.conv2d_input_grad: relay_conv2d_input_grad,
     P.concat: relay_concat,
     P.split: relay_split,
+    P.universe_getitem: relay_universe_getitem,
+    P.universe_setitem: relay_universe_setitem,
 }
 
 
@@ -445,6 +456,12 @@ class NodeVisitor:
 
     def _visit_unsafe_static_cast(self, node):
         return [node.inputs[1]]
+
+    def _visit_universe_getitem(self, node):
+        return node.inputs[2:]
+
+    def _visit_universe_setitem(self, node):
+        return node.inputs[2:]
 
     def __call__(self, node):
         """Don't visit called primitives."""
