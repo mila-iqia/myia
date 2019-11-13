@@ -639,6 +639,9 @@ class RelayInputConverter(Converter):
         return interpreter.TupleValue(*[self(e, et) for e, et in
                                         zip(v, t.elements)])
 
+    def convert_universe(self, v, t):
+        return interpreter.TupleValue()
+
     def convert_tagged(self, v, t):
         real_t = t.options.get(v.tag)
         ctr = get_union_ctr(v.tag, real_t)

@@ -200,6 +200,10 @@ class Converter:
         """Convert a grad env."""
         raise NotImplementedError("convert_env")
 
+    def convert_universe(self, v, t):
+        """Convert a Universe."""
+        raise NotImplementedError("convert_universe")
+
     def convert_tuple(self, v, t):
         """Convert a tuple."""
         raise NotImplementedError("convert_tuple")
@@ -227,6 +231,8 @@ class Converter:
                 return self.convert_nil(v, t.xtype())
             elif issubclass(t.xtype(), xtype.EnvType):
                 return self.convert_env(v, t.xtype())
+            elif issubclass(t.xtype(), xtype.UniverseType):
+                return self.convert_universe(v, t.xtype())
             else:
                 raise NotImplementedError(f'convert for scalar {t.xtype()}')
         elif isinstance(t, abstract.AbstractTuple):
