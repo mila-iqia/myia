@@ -42,18 +42,12 @@ class MyiaFunction:
         self.fn = fn
         self.alias_tracker = alias_tracker
         self.specialize_values = set(specialize_values)
-        if use_universe:
-            from .pipeline import standard_debug_pipeline
-            self.pip = standard_debug_pipeline.configure({
-                'validate': False,
-                'resources.universal': True,
-            })
-        else:
-            self.pip = standard_pipeline.configure({
-                'resources.backend.name': backend,
-                'resources.backend.options': backend_options,
-                'resources.return_backend': return_backend,
-            })
+        self.pip = standard_pipeline.configure({
+            'resources.universal': True,
+            'resources.backend.name': backend,
+            'resources.backend.options': backend_options,
+            'resources.return_backend': return_backend,
+        })
         self._cache = {}
         self.latest = None
         if tracer is ABSENT:
