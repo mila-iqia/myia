@@ -8,6 +8,7 @@ from myia.utils import (
     TraceExplorer,
     TraceListener,
     listener,
+    resolve_tracers,
     tracer,
 )
 
@@ -163,3 +164,16 @@ def test_repr():
     with TraceListener():
         with tracer('xyz') as tr:
             assert str(tr) == '<TracerContextManager xyz>'
+
+
+def test_resolve():
+    from myia.utils import Named, Registry
+
+    assert resolve_tracers('myia.utils.Named') == [(Named, ())]
+    assert resolve_tracers('myia.utils.Named:BEEP') == [(Named, ["BEEP"])]
+    assert (resolve_tracers('myia.utils.Named:BEEP:BOOP')
+            == [(Named, ["BEEP", "BOOP"])])
+    assert (resolve_tracers('myia.utils.Named("BEEP","BOOP")')
+            == [(Named, ("BEEP", "BOOP"))])
+    assert (resolve_tracers('myia.utils.Named;myia.utils.Registry')
+            == [(Named, ()), (Registry, ())])

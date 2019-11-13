@@ -1,13 +1,20 @@
 """User-friendly interfaces to Myia machinery."""
 
 import inspect
+import os
 
-from .abstract import find_aliases, from_value
+from .abstract import ABSENT, find_aliases, from_value
 from .compile.backends import Backend, load_backend
 from .compile.utils import BackendValue
 from .pipeline import standard_pipeline
 from .simplify_types import to_canonical
-from .utils import MyiaInputTypeError, MyiaTypeError, keyword_decorator
+from .utils import (
+    MultiTrace,
+    MyiaInputTypeError,
+    MyiaTypeError,
+    keyword_decorator,
+    resolve_tracers,
+)
 
 #################
 # Top-level API #
@@ -30,7 +37,7 @@ class MyiaFunction:
 
     def __init__(self, fn, specialize_values=[], return_backend=False,
                  backend=None, backend_options=None, alias_tracker=None,
-                 use_universe=False):
+                 use_universe=False, tracer=ABSENT):
         """Initialize a MyiaFunction."""
         self.fn = fn
         self.alias_tracker = alias_tracker
@@ -49,6 +56,15 @@ class MyiaFunction:
             })
         self._cache = {}
         self.latest = None
+        if tracer is ABSENT:
+            mt = os.environ.get('MYIATRACER')
+            if mt:
+                pairs = resolve_tracers(mt)
+                tracers = [fn(*args) for fn, args in pairs]
+                tracer = MultiTrace(*tracers)
+            else:
+                tracer = None
+        self.tracer = tracer
 
     def specialize(self, args):
         """Specialize on the types of the given arguments.
@@ -74,11 +90,15 @@ class MyiaFunction:
         )
 
         if argspec not in self._cache:
+            if self.tracer:
+                self.tracer.__enter__()
             self._cache[argspec] = self.pip.run(
                 input=self.fn,
                 argspec=argspec,
                 aliasspec=(self.alias_tracker, aid_to_paths),
             )
+            if self.tracer:
+                self.tracer.__exit__(None, None, None)
         return self._cache[argspec]
 
     def compile(self, args):

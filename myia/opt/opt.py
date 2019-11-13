@@ -211,27 +211,28 @@ class LocalPassOptimizer:
         while loop:
             loop = False
             for transformer in self.node_map.get(n):
-                tracer().emit_attempt_opt(
+                args = dict(
                     opt=transformer,
                     node=n,
+                    manager=mng,
                 )
-                with About(n.debug, 'opt', transformer.name):
-                    new = transformer(self.resources, n)
-                if new is not None:
-                    tracer().emit_opt(
-                        opt=transformer,
-                        node=n,
-                        new_node=new
-                    )
-                if new is True:
-                    changes = True
-                    continue
-                if new and new is not n:
-                    mng.replace(n, new)
-                    n = new
-                    loop = True
-                    changes = True
-                    break
+                with tracer('opt', **args) as tr:
+                    tr.set_results(success=False, **args)
+                    with About(n.debug, 'opt', transformer.name):
+                        new = transformer(self.resources, n)
+                    if new is not None and new is not n:
+                        tracer().emit_match(**args, new_node=new)
+                    if new is True:
+                        changes = True
+                        continue
+                    if new and new is not n:
+                        mng.replace(n, new)
+                        tracer().emit_success(**args, new_node=new)
+                        tr.set_results(success=True, **args)
+                        n = new
+                        loop = True
+                        changes = True
+                        break
 
         return n, changes
 

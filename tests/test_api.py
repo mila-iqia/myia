@@ -10,7 +10,7 @@ from myia.pipeline import (
     scalar_parse as parse,
 )
 from myia.simplify_types import from_canonical, to_canonical
-from myia.utils import HandleInstance, InferenceError, TaggedValue
+from myia.utils import DoTrace, HandleInstance, InferenceError, TaggedValue
 from myia.xtype import Bool
 
 from .common import (
@@ -365,3 +365,40 @@ def test_return_backend():
         return a
 
     f(33)
+
+
+_flag1 = [False]
+_flag2 = [False]
+
+
+def _setflag1():
+    def _set(**_):
+        _flag1[0] = True
+
+    return DoTrace({'/compile/enter': _set})
+
+
+def _setflag2():
+    def _set(**_):
+        _flag2[0] = True
+
+    return DoTrace({'/compile/exit': _set})
+
+
+def test_env_tracer(monkeypatch):
+    _flag1[0] = False
+    _flag2[0] = False
+
+    monkeypatch.setenv(
+        'MYIATRACER',
+        'tests.test_api._setflag1;tests.test_api._setflag2'
+    )
+
+    @myia
+    def f(x, y):
+        return x * y
+
+    assert f(10, 11) == 110
+
+    assert _flag1[0] is True
+    assert _flag2[0] is True
