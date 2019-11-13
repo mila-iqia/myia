@@ -85,7 +85,7 @@ class ValuePropagator:
         """Propagate a value for a need on a node."""
         if need is ANYTHING and isinstance(value, tuple):
             for i, v in enumerate(value):
-                self.add_value(node, (i,), v)
+                self._add_value(node, (i,), v)
         self._add_value(node, need, value)
 
     def _add_value(self, node, need, value):
@@ -449,7 +449,8 @@ class DeadDataElimination(Partializable):
         if isinstance(a, abstract.AbstractScalar):
             if a.xtype() == xtype.EnvType:
                 val = newenv
-            assert a.xtype() != xtype.UniverseType  # TODO
+            elif a.xtype() == xtype.UniverseType:  # pragma: no cover
+                return None
         repl = Constant(val)
         repl.abstract = node.abstract
         return repl
@@ -469,7 +470,8 @@ class DeadDataElimination(Partializable):
             if g and node is g.return_:
                 continue
             repl = self.make_dead(node)
-            mng.replace(node, repl)
+            if repl is not None:
+                mng.replace(node, repl)
         return False  # Pretend there are no changes, for now
 
 
