@@ -1,6 +1,8 @@
 """Classes to support universes."""
+from . import serializable
 
 
+@serializable('Universe')
 class UniverseInstance:
     """Universe mapping references to values.
 
@@ -10,6 +12,15 @@ class UniverseInstance:
     def __init__(self, _contents={}):
         """Initialize a UniverseInstance."""
         self._contents = dict(_contents)
+
+    def _serialize(self):
+        return self._contents
+
+    @classmethod
+    def _construct(cls):
+        res = cls()
+        data = yield res
+        res._contents = data
 
     def get(self, handle):
         """Get the value associated to the handle."""

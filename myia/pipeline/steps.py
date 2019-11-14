@@ -451,6 +451,9 @@ def step_wrap(resources,
     orig_out_t = outspec if orig_outspec is None else orig_outspec
     vm_arg_t = graph.abstract.get_sync()[0].args
     vm_out_t = graph.return_.abstract
+    if resources.universal:
+        vm_unv_in_t, vm_arg_t = vm_arg_t[0], vm_arg_t[1:]
+        vm_unv_out_t, vm_out_t = vm_out_t.elements[0], vm_out_t.elements[1]
 
     def wrapped(*args):
         if aliasspec:
@@ -464,7 +467,11 @@ def step_wrap(resources,
         args = tuple(_to_backend(to_canonical(arg, ot), backend, vt)
                      for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
         if resources.universal:
-            unv, res = fn(new_universe, *args)
+            backend_universe = backend.to_backend_value(
+                to_canonical(new_universe, argspec[0]), vm_unv_in_t)
+            unv, res = fn(backend_universe, *args)
+            unv = backend.from_backend_value(unv, vm_unv_out_t)
+            unv = from_canonical(unv, outspec.elements[0])
             unv.commit()
         else:
             res = fn(*args)

@@ -11,7 +11,7 @@ from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import TaggedValue
+from ...utils import TaggedValue, new_universe
 from ...xtype import type_to_np_dtype
 from ..channel import handle
 from ..transform import get_prim_graph, wrap_result
@@ -690,6 +690,11 @@ class RelayOutputConverter(Converter):
         """Convert the value to a tuple."""
         return tuple(self(v, t)
                      for v, t in zip(v, t.elements))
+
+    def convert_universe(self, v, t):
+        """Convert a universe value"""
+        assert len(v) == 0
+        return new_universe
 
     def convert_tagged(self, v, t):
         tag = get_myia_tag(v.constructor)
