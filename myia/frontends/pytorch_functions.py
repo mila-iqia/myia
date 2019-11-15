@@ -34,6 +34,29 @@ from .pytorch_abstract_types import APT, APT_bool
 # HELPER FUNCTIONS ##########################################################
 
 @myia_static
+def _chunks_to_split_sections(a_dim_shp, chunks):
+    rem = a_dim_shp % chunks
+    sections = ()
+    if rem == 0:
+        def_sec_size = int(a_dim_shp / chunks)
+        for i in range(chunks):
+            sections = sections + (def_sec_size,)
+    else:
+        def_sec_size = a_dim_shp // chunks + 1
+        if (a_dim_shp // def_sec_size) > chunks:
+            sec_rem = chunks % (a_dim_shp // def_sec_size)
+        else:
+            sec_rem = (a_dim_shp // def_sec_size) % chunks
+
+        for i in range(chunks - sec_rem):
+            sections = sections + (def_sec_size,)
+        new_rem = a_dim_shp % (def_sec_size * (chunks - sec_rem))
+        if new_rem != 0:
+            sections = sections + (new_rem,)
+    return sections
+
+
+@myia_static
 def _dim_explicit(a_shp, dim):
     if dim is None:
         return dim
@@ -218,6 +241,13 @@ def cat(self, dim=0):
 
 
 @core
+def chunk(self, chunks, dim=0):
+    """Map of 'chunk' pytorch method."""
+    sections = _chunks_to_split_sections(self.shape[dim], chunks)
+    return P.split(self, sections, dim)
+
+
+@core
 def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
            groups=1):
     r"""Applies a Conv2d."""
@@ -266,6 +296,24 @@ def linear(input, weight, bias=None):
             output = output + bias
         ret = output
     return ret
+
+
+@core
+def lstm_cell(input, hidden, w_ih, w_hh, b_ih, b_hh):
+    hx, cx = hidden
+    gates = torch.mm(input, w_ih.t()) + torch.mm(hx, w_hh.t()) + b_ih + b_hh
+
+    ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
+
+    ingate = torch.sigmoid(ingate)
+    forgetgate = torch.sigmoid(forgetgate)
+    cellgate = torch.tanh(cellgate)
+    outgate = torch.sigmoid(outgate)
+
+    cy = (forgetgate * cx) + (ingate * cellgate)
+    hy = outgate * torch.tanh(cy)
+
+    return hy, cy
 
 
 @core
@@ -348,6 +396,20 @@ def mean(self, dim=None, keepdim=False, *, dtype=None):
     else:
         return operations.array_reduce_dim(P.scalar_add, x, dim, keepdim) \
             / P.scalar_cast(x.shape[dim], x.dtype)
+
+
+@core
+def mse_loss(input, target, reduction='mean'):
+    """Map of 'nll_loss' pytorch method."""
+    out = (input - target) ** 2
+
+    if reduction == 'none':
+        out = out
+    elif reduction == 'mean':
+        out = torch.mean(out)
+    elif reduction == 'sum':
+        out = torch.sum(out)
+    return out
 
 
 # TODO:
