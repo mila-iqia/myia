@@ -7,7 +7,7 @@ import pytest
 from myia.debug import traceback as myia_tr
 from myia.info import DebugInherit
 from myia.parser import MyiaSyntaxError
-from myia.utils import InferenceError, Profiler
+from myia.utils import InferenceError, MultiTrace, Profiler, resolve_tracers
 
 if os.environ.get('BUCHE'):
     from debug import do_inject  # noqa
@@ -20,7 +20,7 @@ _context_managers = []
 def pytest_addoption(parser):
     parser.addoption('--gpu', action='store_true', dest="gpu",
                      default=False, help="Enable GPU tests")
-    parser.addoption('-T', action='store', dest="tracer",
+    parser.addoption('-T', action='append', dest="tracer",
                      default=None, help="Set a Myia tracer")
     parser.addoption('--mprof', action='store_true', dest="mprof",
                      default=False, help="Use the Myia profiler")
@@ -30,33 +30,26 @@ def pytest_addoption(parser):
                      default=False, help="Import Myia debug functions")
 
 
-def _resolve(call):
-    if '(' in call:
-        path, args = call.split('(', 1)
-        assert args.endswith(')')
-        args = eval(f'({args[:-1]},)')
-    elif ':' in call:
-        path, *args = call.split(':')
-    else:
-        path = call
-        args = ()
-    modname, field = path.rsplit('.', 1)
-    mod = __import__(modname, fromlist=[field])
-    fn = getattr(mod, field)
-    return fn, args
-
-
 def pytest_configure(config):
+    listener_pairs = []
     if config.option.usepdb:
         os.environ['MYIA_PYTEST_USE_PDB'] = "1"
     if config.option.do_inject:
         from debug import do_inject  # noqa
     if config.option.tracer:
-        _context_managers.append(_resolve(config.option.tracer))
+        for tracer in config.option.tracer:
+            listener_pairs += resolve_tracers(tracer)
     if config.option.mprof:
-        _context_managers.append((Profiler, ()))
+        listener_pairs.append((Profiler, ()))
     if config.option.trace_nodes:
         _context_managers.append(((lambda: DebugInherit(save_trace=True)), ()))
+
+    def _make_trace_listeners():
+        listeners = [fn(*args) for fn, args in listener_pairs]
+        return MultiTrace(*listeners)
+
+    if listener_pairs:
+        _context_managers.append((_make_trace_listeners, ()))
 
 
 class StringIOTTY(StringIO):

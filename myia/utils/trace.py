@@ -239,6 +239,24 @@ class DoTrace(TraceListener):
             self._post()
 
 
+class MultiTrace(TraceListener):
+    """Combine multiple TraceListeners."""
+
+    def __init__(self, *listeners):
+        """Initialize a MultiTrace."""
+        self.listeners = listeners
+
+    def install(self, tracer):
+        """Install all sub-listeners."""
+        for listener in self.listeners:
+            listener.install(tracer)
+
+    def post(self):
+        """Run post from all sub-listeners."""
+        for listener in self.listeners:
+            listener.post()
+
+
 def _unit(secs):
     ms = secs * 1000
     return f"{ms:10.2f}ms"
@@ -337,9 +355,42 @@ def listener(*patterns):
     return deco
 
 
+def resolve_tracers(spec):
+    """Return a list of (fn, args) pairs from a string specification.
+
+    The specification has the following forms:
+
+    * module.function
+    * module.function:arg
+    * module.function:arg1:arg2
+    * module.function(arg1,arg2)
+    * module.function1;module.function2
+
+    The function is not called immediately, the consumer must call function on
+    args when needed.
+    """
+    def _resolve_single(call):
+        if '(' in call:
+            path, args = call.split('(', 1)
+            assert args.endswith(')')
+            args = eval(f'({args[:-1]},)')
+        elif ':' in call:
+            path, *args = call.split(':')
+        else:
+            path = call
+            args = ()
+        modname, field = path.rsplit('.', 1)
+        mod = __import__(modname, fromlist=[field])
+        fn = getattr(mod, field)
+        return fn, args
+
+    return [_resolve_single(call.strip()) for call in spec.split(';')]
+
+
 __consolidate__ = True
 __all__ = [
     'DoTrace',
+    'MultiTrace',
     'ProfileResults',
     'Profiler',
     'TraceExplorer',
@@ -347,5 +398,6 @@ __all__ = [
     'Tracer',
     'TracerContextManager',
     'listener',
+    'resolve_tracers',
     'tracer',
 ]
