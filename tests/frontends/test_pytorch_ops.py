@@ -224,8 +224,10 @@ def test_torch_tensor_argmax_3_arg(x, y, z):
 
 
 @mt(
+    fwd_and_bwd(nn.Parameter(torch.randn(1, 6)), 2),
     fwd_and_bwd(nn.Parameter(torch.randn(1, 9)), 2),
     fwd_and_bwd(nn.Parameter(torch.randn(1, 6)), 5),
+    fwd_and_bwd(nn.Parameter(torch.randn(1, 6)), 13),
     broad_specs=(True, False)
 )
 def test_torch_chunk(x, chunks):

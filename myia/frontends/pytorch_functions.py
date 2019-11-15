@@ -41,17 +41,16 @@ def _chunks_to_split_sections(a_dim_shp, chunks):
         def_sec_size = int(a_dim_shp / chunks)
         for i in range(chunks):
             sections = sections + (def_sec_size,)
+    elif a_dim_shp < chunks:
+        for i in range(a_dim_shp):
+            sections = sections + (1,)
     else:
         def_sec_size = a_dim_shp // chunks + 1
-        if (a_dim_shp // def_sec_size) > chunks:
-            sec_rem = chunks % (a_dim_shp // def_sec_size)
-        else:
-            sec_rem = (a_dim_shp // def_sec_size) % chunks
-
+        sec_rem = (a_dim_shp // def_sec_size) % chunks
         for i in range(chunks - sec_rem):
             sections = sections + (def_sec_size,)
         new_rem = a_dim_shp % (def_sec_size * (chunks - sec_rem))
-        if new_rem != 0:
+        if new_rem != 0 and (chunks < a_dim_shp):
             sections = sections + (new_rem,)
     return sections
 
