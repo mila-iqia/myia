@@ -105,7 +105,7 @@ def make_argspec(args, broad_specs):
 @myia_function_test(marks=[pytest.mark.grad], id='grad')
 def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline,
                  backend=False, atol=1e-8, rtol=1e-5,
-                 grad_atol=1e-5, grad_rtol=1e-5):
+                 grad_atol=1e-6, grad_rtol=1e-5):
     if backend:
         backend_name = backend[0]
         backend_options = backend[1]
@@ -363,7 +363,8 @@ def test_torch_functional_log_softmax(x, y):
              torch.randn(4, 4, dtype=torch.float32, requires_grad=True),
              torch.randn(4, 4, dtype=torch.float32, requires_grad=True),
              torch.randn(4, 4, dtype=torch.float32, requires_grad=True),
-             torch.randn(4, 4, dtype=torch.float32, requires_grad=True)
+             torch.randn(4, 4, dtype=torch.float32, requires_grad=True),
+             grad_atol=1e-5
              )
 def test_lstm_cell(inp, hx, cx, w_ih, w_hh, b_ih, b_hh):
     return torch.lstm_cell(inp, (hx, cx), w_ih, w_hh, b_ih, b_hh)
@@ -403,8 +404,8 @@ def test_torch_mean(x):
     return torch.mean(x)
 
 
-@fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(2, 3))),
-                      nn.Parameter(torch.Tensor(MB(2, 3))))
+@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))),
+             nn.Parameter(torch.Tensor(MB(2, 3))))
 def test_torch_mse_loss(x, y):
     return torch.nn.functional.mse_loss(x, y)
 

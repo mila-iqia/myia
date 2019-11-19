@@ -399,7 +399,7 @@ def mean(self, dim=None, keepdim=False, *, dtype=None):
 
 @core
 def mse_loss(input, target, reduction='mean'):
-    """Map of 'nll_loss' pytorch method."""
+    """Map of 'mse_loss' pytorch method."""
     out = (input - target) ** 2
 
     if reduction == 'none':
