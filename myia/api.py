@@ -109,6 +109,11 @@ class MyiaFunction:
                 pass
         return self.compile(args)(*args)
 
+    def to_device(self, v, *, broaden=True, vm_t=None, orig_t=None):
+        backr = self.pip.steps['resources'].keywords['backend'].keywords
+        return to_device(v, backr['name'], backr['options'],
+                         broaden=broaden, vm_t=vm_t, orig_t=orig_t)
+
 
 @keyword_decorator
 def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
