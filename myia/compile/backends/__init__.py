@@ -204,6 +204,10 @@ class Converter:
         """Convert a Universe."""
         raise NotImplementedError("convert_universe")
 
+    def convert_handle(self, v, t):
+        """Convert a Handle."""
+        raise NotImplementedError("convert_handle")
+
     def convert_tuple(self, v, t):
         """Convert a tuple."""
         raise NotImplementedError("convert_tuple")
@@ -241,6 +245,8 @@ class Converter:
             return self.convert_tagged(v, t)
         elif isinstance(t, abstract.AbstractType):
             return self.convert_type(v, t)
+        elif isinstance(t, abstract.AbstractHandle):
+            return self.convert_handle(v, t)
         else:
             raise NotImplementedError(f'convert for {t}')
 
