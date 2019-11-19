@@ -550,7 +550,10 @@ class CompileGraph:
 
         for g in mng.graphs:
             if g.parent is None:
-                self.graph_map[g] = relay.GlobalVar(g.debug.debug_name)
+                if g is graph:
+                    self.graph_map[g] = relay.GlobalVar("main")
+                else:
+                    self.graph_map[g] = relay.GlobalVar(g.debug.debug_name)
 
         for g in mng.graphs:
             if g.parent is None:
@@ -558,9 +561,6 @@ class CompileGraph:
 
         self.types.finalize(self.module)
         add_functions(self.module, function_map)
-
-        # Maybe make a function that calls the right graph instead?
-        self.module["main"] = self.module[self.graph_map[graph]]
 
         self.module = optimize(self.module)
 

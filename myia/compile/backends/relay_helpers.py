@@ -10,6 +10,7 @@ from tvm.relay import adt, transform
 from ...abstract import (
     AbstractArray,
     AbstractError,
+    AbstractHandle,
     AbstractFunction,
     AbstractScalar,
     AbstractTaggedUnion,
@@ -172,10 +173,12 @@ def to_relay_type(self, a: AbstractScalar):
     tp = a.xtype()
     if issubclass(tp, Bool):
         return relay.ty.scalar_type('bool')
-    elif issubclass(tp, (Nil, UniverseType)):
+    elif issubclass(tp, Nil):
         return relay.ty.TupleType([])
     elif issubclass(tp, EnvType):
         return env_type(env_val())
+    elif issubclass(tp, UniverseType):
+        return relay.ty.scalar_type('uint64')
     else:
         return relay.ty.scalar_type(type_to_np_dtype(tp))
 

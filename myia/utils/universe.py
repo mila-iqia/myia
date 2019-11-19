@@ -41,12 +41,22 @@ class UniverseInstance:
             handle.state = value
 
 
+@serializable('Handle')
 class HandleInstance:
     """Key to use in an Universe."""
 
     def __init__(self, state):
         """Initialize a HandleInstance."""
         self.state = state
+
+    def _serialize(self):
+        return {'state': self.state}
+
+    @classmethod
+    def _construct(cls):
+        res = cls(None)
+        data = yield cls
+        cls.state = data['state']
 
 
 new_universe = UniverseInstance()
