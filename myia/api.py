@@ -43,7 +43,7 @@ class MyiaFunction:
         self.alias_tracker = alias_tracker
         self.specialize_values = set(specialize_values)
         self.pip = standard_pipeline.configure({
-            'resources.universal': True,
+            'resources.universal': use_universe,
             'resources.backend.name': backend,
             'resources.backend.options': backend_options,
             'resources.return_backend': return_backend,
