@@ -214,6 +214,12 @@ def to_relay_type(self, a: AbstractTaggedUnion):
 
 
 @overload  # noqa: F811
+def to_relay_type(self, a: AbstractHandle):
+    return relay.ty.RefType(relay.ty.TupleType(
+        [relay.ty.scalar_type('uint64'), self(a.element)]))
+
+
+@overload  # noqa: F811
 def to_relay_type(self, a: AbstractError):
     return relay.ty.scalar_type('uint16')
 
