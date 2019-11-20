@@ -55,8 +55,8 @@ class HandleInstance:
     @classmethod
     def _construct(cls):
         res = cls(None)
-        data = yield cls
-        cls.state = data['state']
+        data = yield res
+        res.state = data['state']
 
 
 new_universe = UniverseInstance()
