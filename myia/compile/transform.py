@@ -1,9 +1,17 @@
 """Transforms a graph into lower-level code."""
 
-from ..abstract import to_abstract
+from ..abstract import (
+    AbstractArray,
+    AbstractHandle,
+    AbstractScalar,
+    AbstractTaggedUnion,
+    AbstractTuple,
+    AbstractType,
+    to_abstract,
+)
 from ..ir import Apply, Constant, Graph, toposort
 from ..operations import Primitive, primitives as P
-from ..utils import SymbolicKeyInstance, overload
+from ..utils import HandleInstance, SymbolicKeyInstance, overload
 from .channel import handle
 from .vm import FinalVM
 
@@ -77,6 +85,84 @@ def wrap_primitives(graph):
                         tr.set_edge(node, key, Constant(g))
 
     return graph
+
+
+def gather_handles_cst(node):
+    """Return a list of constant handles."""
+    lst = []
+    if node.is_constant(HandleInstance):
+        lst.append((node.value, node))
+    return lst
+
+
+@overload(bootstrap=True)
+def _gather_handles_param(self, t: AbstractHandle, curnode, idx, curget, lst):
+    lst.append((idx, curget, curnode))
+
+
+@overload  # noqa: F811
+def _gather_handles_param(self, t: AbstractTuple, curnode, idx, curget, lst):
+    for i, tt in enumerate(t.elements):
+        self(tt, (P.tuple_getitem, curnode, i), idx, lambda v, i=i: v[i], lst)
+
+
+@overload  # noqa: F811
+def _gather_handles_param(self,
+                          t: (AbstractArray, AbstractScalar,
+                              AbstractType, AbstractTaggedUnion),
+                          *args):
+    return
+
+
+def gather_handles_params(params):
+    """
+    Returns a list of all the handles in the parameters with graph
+    and value accessors.
+    """
+    lst = []
+    for i, p in enumerate(params):
+        _gather_handles_param(p.abstract, p, i, lambda v: v, lst)
+    return lst
+
+
+def return_handles(graph):
+    """Change the Universe output to return all the new values of handles."""
+    mng = graph.manager
+
+    handles_params = gather_handles_params(graph.parameters)
+
+    cts = {ct for cts in mng.constants.values() for ct in cts}
+    for ct in cts:
+        handles_cst = gather_handles_cst(ct)
+
+    handle_nodes = [h for _, h in handles_cst]
+    handle_nodes.extend(sexp_to_node(n, graph) for _, _, n in handles_params)
+
+    with mng.transact() as tr:
+        universe_out = graph.output.inputs[1]
+        vals = [graph.apply(P.universe_getitem, universe_out, n)
+                for n in handle_nodes]
+        tr.set_edge(graph.output, 1, graph.apply(P.make_tuple, *vals))
+
+    return (graph, [i for i, _ in handles_cst],
+            [(i, get) for i, get, _ in handles_params])
+
+
+def handle_wrapper(fn, handle_cst, handle_params):
+    """Wraps a model function to perform handle updates."""
+    def wrapper(*args):
+        handle_instances = handle_cst
+        handle_instances.extend(get(args[i]) for i, get in handle_params)
+        res = fn(*args)
+        u = res[0]
+        res = res[1] if len(res) == 2 else res[1:]
+        for h, v in zip(handle_instances, u):
+            h.state = v
+        return res
+    if len(handle_cst) + len(handle_params) == 0:
+        return fn
+    else:
+        return wrapper
 
 
 @overload
@@ -388,4 +474,6 @@ __all__ = [
     'convert_grad',
     'wrap_primitives',
     'wrap_result',
+    'handle_wrapper',
+    'return_handles',
 ]
