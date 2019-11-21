@@ -488,6 +488,11 @@ len = Operation(
     defaults='myia.operations.ops_dunder.len'
 )
 
+lshift = Operation(
+    name='lshift',
+    defaults='myia.operations.ops_dunder.lshift'
+)
+
 lt = Operation(
     name='lt',
     defaults='myia.operations.ops_dunder.lt'
@@ -658,6 +663,11 @@ return_ = Operation(
     defaults='myia.operations.prim_return_'
 )
 
+rshift = Operation(
+    name='rshift',
+    defaults='myia.operations.ops_dunder.rshift'
+)
+
 scalar_abs = Operation(
     name='scalar_abs',
     defaults='myia.operations.prim_scalar_abs'
@@ -666,6 +676,31 @@ scalar_abs = Operation(
 scalar_add = Operation(
     name='scalar_add',
     defaults='myia.operations.prim_scalar_add'
+)
+
+scalar_bit_and = Operation(
+    name='scalar_bit_and',
+    defaults='myia.operations.prim_scalar_bit_and'
+)
+
+scalar_bit_lshift = Operation(
+    name='scalar_bit_lshift',
+    defaults='myia.operations.prim_scalar_bit_lshift'
+)
+
+scalar_bit_or = Operation(
+    name='scalar_bit_or',
+    defaults='myia.operations.prim_scalar_bit_or'
+)
+
+scalar_bit_rshift = Operation(
+    name='scalar_bit_rshift',
+    defaults='myia.operations.prim_scalar_bit_rshift'
+)
+
+scalar_bit_xor = Operation(
+    name='scalar_bit_xor',
+    defaults='myia.operations.prim_scalar_bit_xor'
 )
 
 scalar_cast = Operation(
@@ -941,6 +976,11 @@ user_switch = Operation(
 value_and_grad = Operation(
     name='value_and_grad',
     defaults='myia.operations.op_value_and_grad'
+)
+
+xor = Operation(
+    name='xor',
+    defaults='myia.operations.ops_dunder.xor'
 )
 
 zeros_like = Operation(

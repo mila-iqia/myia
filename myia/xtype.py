@@ -145,24 +145,29 @@ class Float(Number):
     _valid_bits = (16, 32, 64)
 
 
-class Int(Number):
+class Integral(Number):
+    """Represents integer values (signed or not).
+
+    Should not be instanciated directly.
+    """
+
+    _valid_bits = (8, 16, 32, 64)
+
+
+class Int(Integral):
     """Represents signed integer values.
 
     Instantiate with `Int[nbits]`.  Unsupported values will raise a
     ValueError.
     """
 
-    _valid_bits = (8, 16, 32, 64)
 
-
-class UInt(Number):
+class UInt(Integral):
     """Represents unsigned integer values.
 
     Instantiate with `UInt[nbits]`.  Unsupported values will raise a
     ValueError.
     """
-
-    _valid_bits = (8, 16, 32, 64)
 
 
 class Tuple(Object):

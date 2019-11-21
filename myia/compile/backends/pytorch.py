@@ -60,6 +60,11 @@ simple_mapping = {
 
     P.scalar_sign: np.sign,
 
+    P.scalar_bit_and: lambda a, b: a & b,
+    P.scalar_bit_or: lambda a, b: a | b,
+    P.scalar_bit_xor: lambda a, b: a ^ b,
+    P.scalar_bit_lshift: lambda a, b: a << b,
+    P.scalar_bit_rshift: lambda a, b: a >> b,
     P.bool_and: lambda a, b: a & b,
     P.bool_or: lambda a, b: a | b,
     P.bool_eq: lambda a, b: a == b,
@@ -100,6 +105,11 @@ scalar_mapping = {
 
     P.scalar_sign: torch.sign,
 
+    P.scalar_bit_and: lambda a, b: a & b,
+    P.scalar_bit_or: lambda a, b: a | b,
+    P.scalar_bit_xor: lambda a, b: a ^ b,
+    P.scalar_bit_lshift: lambda a, b: a << b,
+    P.scalar_bit_rshift: lambda a, b: a >> b,
     P.bool_and: lambda a, b: a & b,
     P.bool_or: lambda a, b: a | b,
     P.bool_eq: torch.eq,

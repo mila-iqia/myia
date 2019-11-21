@@ -67,6 +67,8 @@ SIMPLE_MAP = {
     P.scalar_le: relay.op.less_equal,
     P.scalar_ge: relay.op.greater_equal,
     P.bool_and: relay.op.logical_and,
+    P.scalar_bit_lshift: relay.op.left_shift,
+    P.scalar_bit_rshift: relay.op.right_shift,
     P.bool_or: relay.op.logical_or,
     P.bool_eq: relay.op.equal,
     P.bool_not: relay.op.logical_not,

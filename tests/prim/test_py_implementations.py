@@ -35,6 +35,11 @@ from myia.operations import (
     reshape,
     return_,
     scalar_abs,
+    scalar_bit_and,
+    scalar_bit_lshift,
+    scalar_bit_or,
+    scalar_bit_rshift,
+    scalar_bit_xor,
     scalar_cast,
     scalar_max,
     scalar_sign,
@@ -394,6 +399,36 @@ def test_prim_dot():
     res = dot(a, b)
 
     assert (res == ref).all()
+
+
+def test_prim_scalar_bit_lshift():
+    ref = 3 << 2
+    res = scalar_bit_lshift(3, 2)
+    assert ref == res == 12
+
+
+def test_prim_scalar_bit_rshift():
+    ref = 12 >> 2
+    res = scalar_bit_rshift(12, 2)
+    assert ref == res == 3
+
+
+def test_prim_scalar_bit_and():
+    ref = 5 & 7
+    res = scalar_bit_and(5, 7)
+    assert ref == res == 5
+
+
+def test_prim_scalar_bit_or():
+    ref = 5 | 2
+    res = scalar_bit_or(5, 2)
+    assert ref == res == 7
+
+
+def test_prim_scalar_bit_xor():
+    ref = 10 ^ 8
+    res = scalar_bit_xor(10, 8)
+    assert ref == res == 2
 
 
 @run_lang(40)
