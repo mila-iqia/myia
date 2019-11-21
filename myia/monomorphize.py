@@ -234,6 +234,7 @@ class Monomorphizer:
         self.fill_placeholders()
         result = self.results[context]
         self.manager.keep_roots(result)
+        self.fix_types()
         return result
 
     #########
@@ -567,11 +568,9 @@ class Monomorphizer:
                 else:
                     ref = self.engine.ref(node, orig_ctx)
                     if ref in self.engine.cache.cache:
-                        res = ref.get_resolved()
-                        new_node.abstract = concretize_abstract(res)
+                        new_node.abstract = ref.get_resolved()
                     else:
                         new_node.abstract = AbstractError(DEAD)
-                new_node.abstract = _fix_type(new_node.abstract, self)
 
             def fv_function(fv, ctx=ctx):
                 fv_ctx = ctx.filter(fv.graph)
@@ -642,6 +641,15 @@ class Monomorphizer:
                     node.abstract = AbstractFunction(
                         GraphFunction(node.value, Context.empty())
                     )
+
+    #############
+    # Fix types #
+    #############
+
+    def fix_types(self):
+        """Fix all node types."""
+        for node in self.manager.all_nodes:
+            node.abstract = _fix_type(node.abstract, self)
 
 
 class _MonoRemapper(CloneRemapper):
