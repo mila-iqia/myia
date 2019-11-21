@@ -31,6 +31,7 @@ from .data import (
     Possibilities,
     TaggedPossibilities,
     TrackDict,
+    VirtualFunction,
 )
 from .loop import Pending
 
@@ -234,7 +235,7 @@ def _make_constructor(inst):
 def abstract_clone(__call__, self, x, *args):
     """Clone an abstract value."""
     def proceed():
-        if isinstance(x, AbstractValue) and x in cache:
+        if isinstance(x, (AbstractValue, VirtualFunction)) and x in cache:
             return cache[x]
         result = __call__(self, x, *args)
         if not isinstance(result, GeneratorType):
@@ -362,6 +363,14 @@ def abstract_clone(self, x: PartialApplication, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: JTransformedFunction, *args):
     return JTransformedFunction(self(x.fn, *args))
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: VirtualFunction, *args):
+    return (yield VirtualFunction)(
+        [self(arg, *args) for arg in x.args],
+        self(x.output, *args)
+    )
 
 
 @overload  # noqa: F811
