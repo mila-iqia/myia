@@ -187,12 +187,9 @@ class EvaluationCache:
         """Get the future associated to the key."""
         key = self.keytransform(key)
         if key not in self.cache:
-            self.set(key, self.keycalc(key))
+            coro = self.keycalc(key)
+            self.cache[key] = self.loop.create_task(coro)
         return self.cache[key]
-
-    def set(self, key, coro):
-        """Associate a key to a coroutine."""
-        self.cache[key] = self.loop.create_task(coro)
 
     def set_value(self, key, value):
         """Associate a key to a value.
