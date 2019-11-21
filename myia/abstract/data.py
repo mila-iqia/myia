@@ -215,7 +215,7 @@ class VirtualFunction(Function):
 
     """
 
-    args: Tuple['AbstractValue']
+    args: List['AbstractValue']
     output: 'AbstractValue'
 
 

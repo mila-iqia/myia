@@ -1302,11 +1302,17 @@ class _AbstractKeywordArgument:
         )
 
 
+def _toseq(xs):
+    if not isinstance(xs, (list, tuple, Possibilities)):
+        xs = [xs]
+    return xs
+
+
 @mixin(abstract.AbstractTuple)
 class _AbstractTuple:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_iterable(
-            self.elements,
+            _toseq(self.elements),
             before='★T',
             cls='abstract',
         )
@@ -1315,9 +1321,8 @@ class _AbstractTuple:
 @mixin(abstract.AbstractUnion)
 class _AbstractUnion:
     def __hrepr__(self, H, hrepr):
-        v = self.options
         return hrepr.stdrepr_iterable(
-            v if isinstance(v, Possibilities) else [v],
+            _toseq(self.options),
             before='★U',
             cls='abstract',
         )
