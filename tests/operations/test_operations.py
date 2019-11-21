@@ -1,34 +1,53 @@
-from myia import myia
+from myia.xtype import i32, i64, u32
+
+from ..multitest import infer, mt, run, run_no_relay
 
 
-@myia
-def run_lsfhit(a, b):
-    return a << b
-
-
-@myia
-def run_rshift(a, b):
-    return a >> b
-
-
-@myia
-def run_bit_and(a, b):
+@mt(
+    infer(u32, u32, result=u32),
+    infer(i32, i32, result=i32),
+    infer(i64, i64, result=i64),
+    run_no_relay(5, 7, result=5)
+)
+def test_bitwise_and(a, b):
     return a & b
 
 
-@myia
-def run_bit_or(a, b):
+@mt(
+    infer(u32, u32, result=u32),
+    infer(i32, i32, result=i32),
+    infer(i64, i64, result=i64),
+    run_no_relay(5, 2, result=7)
+)
+def test_bitwise_or(a, b):
     return a | b
 
 
-@myia
-def run_bit_xor(a, b):
+@mt(
+    infer(u32, u32, result=u32),
+    infer(i32, i32, result=i32),
+    infer(i64, i64, result=i64),
+    run_no_relay(10, 8, result=2)
+)
+def test_bitwise_xor(a, b):
     return a ^ b
 
 
-def test_bitwise_operations():
-    assert run_lsfhit(3, 2) == 12
-    assert run_rshift(12, 2) == 3
-    assert run_bit_and(5, 7) == 5
-    assert run_bit_or(5, 2) == 7
-    assert run_bit_xor(10, 8) == 2
+@mt(
+    infer(u32, u32, result=u32),
+    infer(i32, i32, result=i32),
+    infer(i64, i64, result=i64),
+    run(3, 2, result=12)
+)
+def test_bitwise_lshift(a, b):
+    return a << b
+
+
+@mt(
+    infer(u32, u32, result=u32),
+    infer(i32, i32, result=i32),
+    infer(i64, i64, result=i64),
+    run(12, 2, result=3)
+)
+def test_bitwise_rshift(a, b):
+    return a >> b

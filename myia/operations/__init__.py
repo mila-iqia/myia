@@ -980,7 +980,7 @@ value_and_grad = Operation(
 
 xor = Operation(
     name='xor',
-    defaults='myia.operations.ops_dunder.xor_'
+    defaults='myia.operations.ops_dunder.xor'
 )
 
 zeros_like = Operation(

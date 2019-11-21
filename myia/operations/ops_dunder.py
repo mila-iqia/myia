@@ -164,7 +164,7 @@ or_ = dunder_protocol_binary(
     name='or', lattr='__or__', rattr='__ror__',
     pyop=operator.or_
 )
-xor_ = dunder_protocol_binary(
+xor = dunder_protocol_binary(
     name='xor', lattr='__xor__', rattr='__rxor__',
     pyop=operator.xor
 )

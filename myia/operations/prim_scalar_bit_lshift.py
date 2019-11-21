@@ -1,11 +1,11 @@
 """Definitions for the primitive `scalar_bit_lshift` x << y."""
 
 from ..lib import UniformPrimitiveInferrer, assert_scalar
-from ..xtype import Number
+from ..xtype import Integral
 from . import primitives as P
 
 
-def pyimpl_scalar_bit_lshift(x: Number, y: Number) -> Number:
+def pyimpl_scalar_bit_lshift(x: Integral, y: Integral) -> Integral:
     """Implement `scalar_bit_lshift`."""
     assert_scalar(x, y)
     return x << y
