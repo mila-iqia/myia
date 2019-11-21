@@ -13,17 +13,21 @@ class Zip2:  # pragma: no cover
     iter1: object
     iter2: object
 
+    @core
     def __len__(self):
         return len(self.iter1)
 
+    @core
     def __myia_iter__(self):
         return self
 
+    @core
     def __myia_next__(self):
         nxt1, iter1 = myia_next(self.iter1)
         nxt2, iter2 = myia_next(self.iter2)
         return (nxt1, nxt2), Zip2(iter1, iter2)
 
+    @core
     def __myia_hasnext__(self):
         return myia_hasnext(self.iter1) and myia_hasnext(self.iter2)
 
