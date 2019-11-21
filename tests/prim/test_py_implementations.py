@@ -35,6 +35,7 @@ from myia.operations import (
     reshape,
     return_,
     scalar_abs,
+    scalar_bit_and,
     scalar_bit_lshift,
     scalar_bit_or,
     scalar_bit_rshift,
@@ -410,6 +411,12 @@ def test_prim_scalar_bit_rshift():
     ref = 12 >> 2
     res = scalar_bit_rshift(12, 2)
     assert ref == res == 3
+
+
+def test_prim_scalar_bit_and():
+    ref = 5 & 7
+    res = scalar_bit_and(5, 7)
+    assert ref == res == 5
 
 
 def test_prim_scalar_bit_or():
