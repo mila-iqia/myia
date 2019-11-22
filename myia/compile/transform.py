@@ -1,6 +1,9 @@
 """Transforms a graph into lower-level code."""
 
+from .. import xtype
 from ..abstract import (
+    TYPE,
+    VALUE,
     AbstractArray,
     AbstractHandle,
     AbstractScalar,
@@ -8,15 +11,12 @@ from ..abstract import (
     AbstractTuple,
     AbstractType,
     to_abstract,
-    TYPE,
-    VALUE
 )
-from ..ir import Apply, Constant, Graph, toposort, sexp_to_node
+from ..ir import Apply, Constant, Graph, sexp_to_node, toposort
 from ..operations import Primitive, primitives as P
 from ..utils import HandleInstance, SymbolicKeyInstance, overload
 from .channel import handle
 from .vm import FinalVM
-from .. import xtype
 
 i64 = xtype.Int[64]
 
@@ -127,9 +127,10 @@ def _gather_handles_param(self,
 
 
 def gather_handles_params(params):
-    """
-    Returns a list of all the handles in the parameters with graph
-    and value accessors.
+    """Return list of all handles in params.
+
+    This list also has graph nodes that correspond to the handle value
+    and functions to extract the value from the arguments.
     """
     lst = []
     for i, p in enumerate(params):

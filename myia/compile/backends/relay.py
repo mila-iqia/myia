@@ -14,11 +14,7 @@ from ...operations import Primitive, primitives as P
 from ...utils import HandleInstance, TaggedValue, new_universe
 from ...xtype import type_to_np_dtype
 from ..channel import handle
-from ..transform import (
-    get_prim_graph,
-    return_handles,
-    wrap_result,
-)
+from ..transform import get_prim_graph, return_handles, wrap_result
 from . import Backend, Converter, HandleBackend
 from .relay_helpers import (
     TypeHelper,
@@ -27,9 +23,9 @@ from .relay_helpers import (
     empty_env,
     get_myia_tag,
     get_union_ctr,
+    handle_wrapper,
     optimize,
     to_relay_type,
-    handle_wrapper,
 )
 
 relay_from_scalar = tvm.get_global_func('relay.from_scalar')
@@ -744,7 +740,7 @@ class RelayOutputConverter(Converter):
                      for v, t in zip(v, t.elements))
 
     def convert_universe(self, v, t):
-        """Convert a universe value"""
+        """Convert a universe value."""
         return new_universe
 
     def convert_handle(self, v, t):
