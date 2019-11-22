@@ -8,7 +8,7 @@ from myia.operations import handle, handle_get, handle_set
 try:
     load_backend('relay')
 except Exception:
-    pytest.skip('Requires relay')
+    pytestmark = pytest.mark.skip('Requires relay')
 
 
 def add_one(x):
