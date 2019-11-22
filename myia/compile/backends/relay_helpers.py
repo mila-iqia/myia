@@ -10,8 +10,8 @@ from tvm.relay import adt, transform
 from ...abstract import (
     AbstractArray,
     AbstractError,
-    AbstractHandle,
     AbstractFunction,
+    AbstractHandle,
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
@@ -20,7 +20,7 @@ from ...abstract import (
     broaden,
 )
 from ...utils import overload
-from ...xtype import Bool, EnvType, Nil, type_to_np_dtype, UniverseType
+from ...xtype import Bool, EnvType, Nil, UniverseType, type_to_np_dtype
 
 union_type = relay.GlobalTypeVar('$_union_adt')
 empty_union = adt.Constructor("empty", [], union_type)
@@ -231,6 +231,23 @@ def dead_value(t):
     return _placeholder_body(to_relay_type(t))
 
 
+def handle_wrapper(fn, handle_cst, handle_params):
+    """Wraps a model function to perform handle updates."""
+    def wrapper(*args):
+        handle_instances = list(handle_cst)
+        handle_instances.extend(get(args[i]) for i, get in handle_params)
+        res = fn(*args)
+        u = res[0]
+        res = res[1] if len(res) == 2 else res[1:]
+        for h, v in zip(handle_instances, u):
+            h.value = type(h.value)(h.value.fields[0], v)
+        return (), res
+    if len(handle_cst) + len(handle_params) == 0:
+        return fn
+    else:
+        return wrapper
+
+
 def _placeholder_body(type):
     if isinstance(type, relay.TensorType):
         sh = [sh.value for sh in type.shape]
@@ -254,6 +271,8 @@ def _placeholder_body(type):
             return empty_env()
         else:  # pragma: no cover
             raise ValueError(f"Can't build value for adt: {type.func}")
+    elif isinstance(type, relay.RefType):
+        return relay.RefCreate(_placeholder_body(type.value))
     else:  # pragma: no cover
         raise ValueError(f"Can't build value of type {type}")
 

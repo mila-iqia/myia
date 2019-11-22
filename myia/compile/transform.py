@@ -8,12 +8,17 @@ from ..abstract import (
     AbstractTuple,
     AbstractType,
     to_abstract,
+    TYPE,
+    VALUE
 )
-from ..ir import Apply, Constant, Graph, toposort
+from ..ir import Apply, Constant, Graph, toposort, sexp_to_node
 from ..operations import Primitive, primitives as P
 from ..utils import HandleInstance, SymbolicKeyInstance, overload
 from .channel import handle
 from .vm import FinalVM
+from .. import xtype
+
+i64 = xtype.Int[64]
 
 
 def convert_grad(graph):
@@ -100,10 +105,17 @@ def _gather_handles_param(self, t: AbstractHandle, curnode, idx, curget, lst):
     lst.append((idx, curget, curnode))
 
 
+def _make_typed_cst(v, t):
+    node = Constant(v)
+    node.abstract = AbstractScalar({TYPE: t, VALUE: v})
+    return node
+
+
 @overload  # noqa: F811
 def _gather_handles_param(self, t: AbstractTuple, curnode, idx, curget, lst):
     for i, tt in enumerate(t.elements):
-        self(tt, (P.tuple_getitem, curnode, i), idx, lambda v, i=i: v[i], lst)
+        self(tt, (tt, (P.tuple_getitem, curnode, _make_typed_cst(i, i64))),
+             idx, lambda v, i=i: v[i], lst)
 
 
 @overload  # noqa: F811
@@ -136,13 +148,22 @@ def return_handles(graph):
         handles_cst = gather_handles_cst(ct)
 
     handle_nodes = [h for _, h in handles_cst]
-    handle_nodes.extend(sexp_to_node(n, graph) for _, _, n in handles_params)
+    handle_nodes.extend(sexp_to_node(n, graph, typed=True)
+                        for _, _, n in handles_params)
 
     with mng.transact() as tr:
         universe_out = graph.output.inputs[1]
         vals = [graph.apply(P.universe_getitem, universe_out, n)
                 for n in handle_nodes]
-        tr.set_edge(graph.output, 1, graph.apply(P.make_tuple, *vals))
+        types = [n.abstract.element for n in handle_nodes]
+        for v, a in zip(vals, types):
+            v.abstract = a
+        out_node = graph.apply(P.make_tuple, *vals)
+        out_node.abstract = AbstractTuple(types)
+        tr.set_edge(graph.output, 1, out_node)
+    old_a = graph.output.abstract
+    graph.output.abstract = AbstractTuple([out_node.abstract] +
+                                          old_a.elements[1:])
 
     return (graph, [i for i, _ in handles_cst],
             [(i, get) for i, get, _ in handles_params])
