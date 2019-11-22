@@ -667,12 +667,22 @@ class CompileGraph:
 compiler = CompileGraph()
 
 
+class DummyManager:
+    all_nodes = []
+
+
 class RelayInputConverter(Converter):
     """Convert values to Relay."""
 
     def __init__(self, context):
         """Set the context."""
         self.context = context
+        self.cst_conv = RelayConstantConverter(self.context)
+        mod = relay.Module({})
+        th = TypeHelper()
+        th.initialize(mod, DummyManager())
+        th.finalize(mod)
+        self.intrp = relay.create_executor(mod=mod, ctx=context)
 
     def convert_array(self, v, t):
         """Make a TVM array from a numpy array."""
@@ -704,10 +714,8 @@ class RelayInputConverter(Converter):
         return res
 
     def convert_tagged(self, v, t):
-        real_t = t.options.get(v.tag)
-        ctr = get_union_ctr(v.tag, real_t)
-        conv_val = self(v.value, real_t)
-        return interpreter.ConstructorValue(ctr.tag, [conv_val], None)
+        cst = self.cst_conv.convert_tagged(v, t)
+        return self.intrp.evaluate(cst)
 
 
 class RelayOutputConverter(Converter):
