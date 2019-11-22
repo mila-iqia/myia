@@ -70,7 +70,8 @@ def test_increment_recursion():
         return handle_get(h)
 
     h = HandleInstance(0)
-    assert length(h, [1, 2, 3, 4]) == 4
+    hb = length.to_device(h)
+    assert length(hb, [1, 2, 3, 4]) == 4
 
 
 def test_give_handle():
@@ -86,10 +87,13 @@ def test_give_handle():
     h1 = HandleInstance(0)
     h2 = HandleInstance(0)
 
+    hb1 = plus.to_device(h1)
+    hb2 = plus.to_device(h2)
+
     # handle is updated automatically
-    assert plus(h1, 4) == 4
-    assert plus(h2, 9) == 9
-    assert plus(h1, 30) == 34
+    assert plus(hb1, 4) == 4
+    assert plus(hb2, 9) == 9
+    assert plus(hb1, 30) == 34
 
 
 def test_return_handle():
@@ -101,5 +105,8 @@ def test_return_handle():
         return h
 
     h = HandleInstance(0)
-    h2 = plus2(h)
+    hb = plus2.to_device(h)
+    # This might return a BackendValue later but it seems
+    # to return the handle for now.
+    h2 = plus2(hb)
     assert h2.state == 2
