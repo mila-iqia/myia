@@ -152,19 +152,20 @@ def return_handles(graph):
     handle_nodes.extend(sexp_to_node(n, graph, typed=True)
                         for _, _, n in handles_params)
 
-    with mng.transact() as tr:
-        universe_out = graph.output.inputs[1]
-        vals = [graph.apply(P.universe_getitem, universe_out, n)
-                for n in handle_nodes]
-        types = [n.abstract.element for n in handle_nodes]
-        for v, a in zip(vals, types):
-            v.abstract = a
-        out_node = graph.apply(P.make_tuple, *vals)
-        out_node.abstract = AbstractTuple(types)
-        tr.set_edge(graph.output, 1, out_node)
-    old_a = graph.output.abstract
-    graph.output.abstract = AbstractTuple([out_node.abstract] +
-                                          old_a.elements[1:])
+    if len(handle_nodes) != 0:
+        with mng.transact() as tr:
+            universe_out = graph.output.inputs[1]
+            vals = [graph.apply(P.universe_getitem, universe_out, n)
+                    for n in handle_nodes]
+            types = [n.abstract.element for n in handle_nodes]
+            for v, a in zip(vals, types):
+                v.abstract = a
+            out_node = graph.apply(P.make_tuple, *vals)
+            out_node.abstract = AbstractTuple(types)
+            tr.set_edge(graph.output, 1, out_node)
+        old_a = graph.output.abstract
+        graph.output.abstract = AbstractTuple([out_node.abstract] +
+                                              old_a.elements[1:])
 
     return (graph, [i for i, _ in handles_cst],
             [(i, get) for i, get, _ in handles_params])
