@@ -469,10 +469,7 @@ def step_wrap(resources,
         if resources.universal:
             backend_universe = backend.to_backend_value(
                 to_canonical(new_universe, argspec[0]), vm_unv_in_t)
-            unv, res = fn(backend_universe, *args)
-            unv = backend.from_backend_value(unv, vm_unv_out_t)
-            unv = from_canonical(unv, outspec.elements[0])
-            unv.commit()
+            _, res = fn(backend_universe, *args)
         else:
             res = fn(*args)
         if resources.return_backend:
